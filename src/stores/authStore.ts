@@ -23,6 +23,23 @@ interface AuthStore {
 }
 
 // ==========================================
+// HELPER: Lấy thông tin employee từ user_id
+// ==========================================
+async function getEmployeeByUserId(userId: string) {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('id, code, full_name, department_id, position_id')
+    .eq('user_id', userId)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error fetching employee:', error)
+    return null
+  }
+  return data
+}
+
+// ==========================================
 // TẠO STORE
 // ==========================================
 
@@ -48,11 +65,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
       if (error) throw error
 
-      // Lấy thông tin user
+      // Lấy thông tin employee liên kết với user
+      const employee = await getEmployeeByUserId(data.user.id)
+
+      // Tạo user object với employee_id
       const user: User = {
         id: data.user.id,
         email: data.user.email || '',
-        full_name: data.user.user_metadata?.full_name,
+        full_name: employee?.full_name || data.user.user_metadata?.full_name,
+        employee_id: employee?.id,
+        employee_code: employee?.code,
+        department_id: employee?.department_id,
+        position_id: employee?.position_id,
       }
 
       set({ user, isAuthenticated: true, isLoading: false })
@@ -148,10 +172,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const { data: { session } } = await supabase.auth.getSession()
 
       if (session?.user) {
+        // Lấy thông tin employee liên kết với user
+        const employee = await getEmployeeByUserId(session.user.id)
+
         const user: User = {
           id: session.user.id,
           email: session.user.email || '',
-          full_name: session.user.user_metadata?.full_name,
+          full_name: employee?.full_name || session.user.user_metadata?.full_name,
+          employee_id: employee?.id,
+          employee_code: employee?.code,
+          department_id: employee?.department_id,
+          position_id: employee?.position_id,
         }
         set({ user, isAuthenticated: true, isLoading: false })
       } else {

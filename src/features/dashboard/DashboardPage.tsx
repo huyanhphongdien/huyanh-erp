@@ -1,5 +1,8 @@
 import { useAuthStore } from '../../stores/authStore'
 import { Card } from '../../components/ui'
+// ===== IMPORT MỚI PHASE 3.2 =====
+import { ExpiringContractsWidget } from '../contracts'
+// ================================
 
 export function DashboardPage() {
   const { user } = useAuthStore()
@@ -56,6 +59,24 @@ export function DashboardPage() {
           </div>
         </Card>
       </div>
+
+      {/* ===== WIDGETS ROW - PHASE 3.2 ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Widget cảnh báo hợp đồng sắp hết hạn */}
+        <ExpiringContractsWidget />
+        
+        {/* Có thể thêm widget khác ở đây sau này */}
+        <Card>
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+            Hoạt động gần đây
+          </h3>
+          <div className="text-gray-500 text-sm">
+            Chưa có hoạt động nào
+          </div>
+        </Card>
+      </div>
+      {/* ==================================== */}
 
       {/* Quick Actions */}
       <Card>

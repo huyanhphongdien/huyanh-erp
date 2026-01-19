@@ -1,21 +1,23 @@
-export { departmentService } from './departmentService'
-export { positionService } from './positionService'
-export { employeeService } from './employeeService'
-export { contractTypeService } from './contractTypeService'
-export { employeeProfileService } from './employeeProfileService'
-export { contractService } from './contractService'
-export { employeeDocumentService } from './employeeDocumentService'
+// src/services/index.ts
+
+export * from './departmentService'
+export * from './positionService'
+export * from './employeeService'
+export * from './contractTypeService'
+export * from './employeeProfileService'
+export * from './contractService'
+export * from './employeeDocumentService'
+
 // ===== PHASE 3.3 =====
-export { leaveTypeService } from './leaveTypeService'
-export { leaveRequestService } from './leaveRequestService'
-export { attendanceService } from './attendanceService'
+export * from './leaveTypeService'
+export * from './leaveRequestService'
+export * from './attendanceService'
 
 // Phase 3.4
-export { salaryGradeService } from './salaryGradeService'
-export { payrollService } from './payrollService'
-export { performanceService } from './performanceService'
+export * from './salaryGradeService'
+export * from './payrollService'
+export * from './performanceService'
 
-
-// New exports - Phase 4.1
-export * from './taskService'
-export * from './taskDetailService'
+// New exports - Phase 4.1 (COMMENT LẠI CHO ĐẾN KHI TẠO FILE)
+// export * from './taskService'
+// export * from './taskDetailService'

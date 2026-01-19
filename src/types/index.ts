@@ -669,3 +669,37 @@ export interface TaskListResponse {
   page: number
   limit: number
 }
+
+
+// ==========================================
+// DEPARTMENT INPUT TYPES
+// ==========================================
+export interface CreateDepartmentInput {
+  code: string
+  name: string
+  parent_id?: string
+  manager_id?: string
+  description?: string
+  status?: 'active' | 'inactive'
+}
+
+export interface UpdateDepartmentInput extends Partial<CreateDepartmentInput> {}
+
+// ==========================================
+// EMPLOYEE INPUT TYPES
+// ==========================================
+export interface CreateEmployeeInput {
+  code?: string
+  full_name: string
+  email?: string
+  phone?: string
+  date_of_birth?: string
+  gender?: 'male' | 'female' | 'other'
+  address?: string
+  department_id?: string
+  position_id?: string
+  hire_date?: string
+  status?: 'active' | 'inactive'
+}
+
+export interface UpdateEmployeeInput extends Partial<CreateEmployeeInput> {}

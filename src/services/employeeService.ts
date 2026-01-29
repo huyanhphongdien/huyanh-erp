@@ -1,7 +1,23 @@
+// src/services/employeeService.ts
 import { supabase } from '../lib/supabase'
-import type { Employee, EmployeeFormData, PaginatedResponse } from '../types'
+import type { Employee, PaginatedResponse } from '../types'
 
-// Định nghĩa params riêng cho employee
+// Define EmployeeFormData inline
+interface EmployeeFormData {
+  code?: string
+  full_name: string
+  email?: string
+  phone?: string
+  date_of_birth?: string
+  gender?: 'male' | 'female' | 'other'
+  address?: string
+  department_id?: string
+  position_id?: string
+  hire_date?: string
+  status?: string
+}
+
+// Interface riêng cho employee params
 interface EmployeePaginationParams {
   page?: number
   pageSize?: number
@@ -13,7 +29,7 @@ interface EmployeePaginationParams {
 
 export const employeeService = {
   // Lấy danh sách có phân trang
-  async getAll(params: EmployeePaginationParams): Promise<PaginatedResponse<Employee>> {
+  async getAll(params: EmployeePaginationParams = {}): Promise<PaginatedResponse<Employee>> {
     const page = params.page || 1
     const pageSize = params.pageSize || 10
     const { search, status, department_id, position_id } = params
@@ -23,11 +39,7 @@ export const employeeService = {
 
     let query = supabase
       .from('employees')
-      .select(`
-        *,
-        department:departments!employees_department_id_fkey(id, code, name),
-        position:positions!employees_position_id_fkey(id, code, name)
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })  // FIXED: Bỏ relation query phức tạp
 
     if (status && status !== 'all') {
       query = query.eq('status', status)
@@ -64,11 +76,7 @@ export const employeeService = {
   async getById(id: string): Promise<Employee | null> {
     const { data, error } = await supabase
       .from('employees')
-      .select(`
-        *,
-        department:departments!employees_department_id_fkey(id, code, name),
-        position:positions!employees_position_id_fkey(id, code, name)
-      `)
+      .select('*')  // FIXED: Bỏ relation query
       .eq('id', id)
       .single()
 
@@ -115,15 +123,15 @@ export const employeeService = {
   async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
     let query = supabase
       .from('employees')
-      .select('id')
+      .select('id', { count: 'exact', head: true })  // FIXED: Thêm head: true
       .eq('code', code)
 
     if (excludeId) {
       query = query.neq('id', excludeId)
     }
 
-    const { data } = await query.single()
-    return !!data
+    const { count } = await query  // FIXED: Dùng count thay vì data
+    return (count || 0) > 0
   },
 
   // Tạo mã nhân viên tự động
@@ -133,7 +141,7 @@ export const employeeService = {
       .select('code')
       .order('code', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()  // FIXED: Dùng maybeSingle() thay vì single()
 
     if (data?.code) {
       const num = parseInt(data.code.replace('NV', '')) + 1
@@ -142,3 +150,5 @@ export const employeeService = {
     return 'NV001'
   }
 }
+
+export default employeeService

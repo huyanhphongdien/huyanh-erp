@@ -1,9 +1,82 @@
 import { supabase } from '../lib/supabase'
-import type { 
-  PayrollPeriod, PayrollPeriodFormData, 
-  Payslip,
-  PaginationParams, PaginatedResponse 
-} from '../types'
+
+// Define types inline
+interface PayrollPeriod {
+  id: string
+  code: string
+  name: string
+  year: number
+  month: number
+  start_date: string
+  end_date: string
+  status: string
+  total_employees?: number
+  total_amount?: number
+  created_by: string
+  confirmed_by?: string
+  confirmed_at?: string
+  created_at: string
+  updated_at: string
+}
+
+interface PayrollPeriodFormData {
+  code: string
+  name: string
+  year: number
+  month: number
+  start_date: string
+  end_date: string
+  status?: string
+}
+
+interface Payslip {
+  id: string
+  payslip_number: string
+  payroll_period_id: string
+  employee_id: string
+  employee_code: string
+  employee_name: string
+  department_name?: string
+  position_name?: string
+  salary_grade_name?: string
+  working_days: number
+  actual_days: number
+  leave_days: number
+  unpaid_leave_days: number
+  overtime_hours: number
+  base_salary: number
+  allowances: number
+  overtime_pay: number
+  bonus: number
+  other_income: number
+  gross_salary: number
+  social_insurance: number
+  health_insurance: number
+  unemployment_insurance: number
+  personal_income_tax: number
+  other_deductions: number
+  total_deductions: number
+  net_salary: number
+  status: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
 
 // Type cho employee khi query với relations
 interface EmployeeWithRelations {
@@ -296,3 +369,5 @@ export const payrollService = {
       .eq('id', periodId)
   }
 }
+
+export default payrollService

@@ -7,13 +7,11 @@ import type { User, LoginCredentials, RegisterCredentials } from '../types'
 // ==========================================
 
 interface AuthStore {
-  // State (Trạng thái)
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
   error: string | null
 
-  // Actions (Hành động)
   login: (credentials: LoginCredentials) => Promise<boolean>
   register: (credentials: RegisterCredentials) => Promise<boolean>
   logout: () => Promise<void>
@@ -25,18 +23,145 @@ interface AuthStore {
 // ==========================================
 // HELPER: Lấy thông tin employee từ user_id
 // ==========================================
-async function getEmployeeByUserId(userId: string) {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, code, full_name, department_id, position_id')
-    .eq('user_id', userId)
-    .single()
+interface EmployeeWithDepartment {
+  id: string
+  code: string | null
+  full_name: string
+  department_id: string | null
+  position_id: string | null
+  department: {
+    id: string
+    name: string
+    manager_id: string | null
+  } | null
+  position: {
+    id: string
+    name: string
+    level: number
+  } | null
+}
 
-  if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching employee:', error)
+async function getEmployeeByUserId(userId: string): Promise<EmployeeWithDepartment | null> {
+  try {
+    // Bước 1: Tìm employee theo id trước (vì id = User UID khi tạo qua Supabase)
+    let employee = null
+
+    // Thử tìm theo id trước
+    const { data: empById, error: errById } = await supabase
+      .from('employees')
+      .select('id, code, full_name, department_id, position_id')
+      .eq('id', userId)
+      .single()
+
+    if (empById) {
+      employee = empById
+    } else {
+      // Nếu không tìm thấy theo id, thử tìm theo user_id
+      const { data: empByUserId, error: errByUserId } = await supabase
+        .from('employees')
+        .select('id, code, full_name, department_id, position_id')
+        .eq('user_id', userId)
+        .single()
+
+      if (empByUserId) {
+        employee = empByUserId
+      }
+    }
+
+    if (!employee) {
+      return null
+    }
+
+    // Bước 2: Lấy thông tin department nếu có
+    let department = null
+    if (employee.department_id) {
+      const { data: deptData, error: deptError } = await supabase
+        .from('departments')
+        .select('id, name, manager_id')
+        .eq('id', employee.department_id)
+        .single()
+
+      if (!deptError && deptData) {
+        department = deptData
+      }
+    }
+
+    // Bước 3: Lấy thông tin position nếu có
+    let position = null
+    if (employee.position_id) {
+      const { data: posData, error: posError } = await supabase
+        .from('positions')
+        .select('id, name, level')
+        .eq('id', employee.position_id)
+        .single()
+
+      if (!posError && posData) {
+        position = posData
+      }
+    }
+
+    return {
+      id: employee.id,
+      code: employee.code,
+      full_name: employee.full_name,
+      department_id: employee.department_id,
+      position_id: employee.position_id,
+      department: department,
+      position: position
+    }
+
+  } catch (error) {
+    console.error('Error in getEmployeeByUserId:', error)
     return null
   }
-  return data
+}
+
+// ==========================================
+// HELPER: Xác định role của user
+// ==========================================
+type UserRole = 'admin' | 'manager' | 'employee'
+
+function determineUserRole(
+  userMetadata: Record<string, unknown> | undefined, 
+  employee: EmployeeWithDepartment | null
+): UserRole {
+  // 1. Check admin từ user_metadata
+  if (userMetadata?.is_admin === true || userMetadata?.role === 'admin') {
+    return 'admin'
+  }
+
+  // 2. Check manager từ user_metadata
+  if (
+    userMetadata?.role === 'manager' || 
+    userMetadata?.is_manager === true ||
+    userMetadata?.is_manager === 'true'
+  ) {
+    return 'manager'
+  }
+
+  // 3. Check nếu employee là trưởng phòng ban
+  if (employee && employee.department && employee.department.manager_id === employee.id) {
+    return 'manager'
+  }
+
+  // 4. Check theo position level
+  // Level 1: Giám đốc
+  // Level 2: Trợ lý Giám đốc  
+  // Level 3: Phó Giám đốc
+  // Level 4: Trưởng phòng
+  // Level 5: Phó phòng
+  // Level 6: Nhân viên
+  // Level 7: Thực tập sinh
+  if (employee && employee.position && employee.position.level) {
+    const level = employee.position.level
+    // Level 1-5: Từ Phó phòng trở lên đều có quyền manager
+    if (level <= 5) {
+      return 'manager'
+    }
+  }
+
+  // 5. Default: nhân viên
+  return 'employee'
 }
 
 // ==========================================
@@ -44,7 +169,6 @@ async function getEmployeeByUserId(userId: string) {
 // ==========================================
 
 export const useAuthStore = create<AuthStore>((set) => ({
-  // Khởi tạo state ban đầu
   user: null,
   isLoading: true,
   isAuthenticated: false,
@@ -57,26 +181,32 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({ isLoading: true, error: null })
 
     try {
-      // Gọi Supabase Auth để đăng nhập
       const { data, error } = await supabase.auth.signInWithPassword({
         email: credentials.email,
         password: credentials.password,
       })
 
-      if (error) throw error
+      if (error) {
+        throw error
+      }
 
-      // Lấy thông tin employee liên kết với user
+      // Lấy thông tin employee
       const employee = await getEmployeeByUserId(data.user.id)
+      const role = determineUserRole(data.user.user_metadata, employee)
 
-      // Tạo user object với employee_id
       const user: User = {
         id: data.user.id,
         email: data.user.email || '',
-        full_name: employee?.full_name || data.user.user_metadata?.full_name,
-        employee_id: employee?.id,
-        employee_code: employee?.code,
-        department_id: employee?.department_id,
-        position_id: employee?.position_id,
+        full_name: employee?.full_name || data.user.user_metadata?.full_name as string | undefined,
+        employee_id: employee?.id || null,
+        employee_code: employee?.code || null,
+        department_id: employee?.department_id || null,
+        department_name: employee?.department?.name || null,
+        position_id: employee?.position_id || null,
+        position_name: employee?.position?.name || null,
+        position_level: employee?.position?.level || null,
+        role: role,
+        is_manager: role === 'manager' || role === 'admin',
       }
 
       set({ user, isAuthenticated: true, isLoading: false })
@@ -98,7 +228,6 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({ isLoading: true, error: null })
 
     try {
-      // Gọi Supabase Auth để đăng ký
       const { data, error } = await supabase.auth.signUp({
         email: credentials.email,
         password: credentials.password,
@@ -172,30 +301,34 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const { data: { session } } = await supabase.auth.getSession()
 
       if (session?.user) {
-        // Lấy thông tin employee liên kết với user
         const employee = await getEmployeeByUserId(session.user.id)
+        const role = determineUserRole(session.user.user_metadata, employee)
 
         const user: User = {
           id: session.user.id,
           email: session.user.email || '',
-          full_name: employee?.full_name || session.user.user_metadata?.full_name,
-          employee_id: employee?.id,
-          employee_code: employee?.code,
-          department_id: employee?.department_id,
-          position_id: employee?.position_id,
+          full_name: employee?.full_name || session.user.user_metadata?.full_name as string | undefined,
+          employee_id: employee?.id || null,
+          employee_code: employee?.code || null,
+          department_id: employee?.department_id || null,
+          department_name: employee?.department?.name || null,
+          position_id: employee?.position_id || null,
+          position_name: employee?.position?.name || null,
+          position_level: employee?.position?.level || null,
+          role: role,
+          is_manager: role === 'manager' || role === 'admin',
         }
+
         set({ user, isAuthenticated: true, isLoading: false })
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false })
       }
 
     } catch (error) {
+      console.error('checkAuth error:', error)
       set({ user: null, isAuthenticated: false, isLoading: false })
     }
   },
 
-  // ------------------------------------------
-  // XÓA LỖI
-  // ------------------------------------------
   clearError: () => set({ error: null }),
 }))

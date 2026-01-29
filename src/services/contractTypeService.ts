@@ -1,5 +1,41 @@
 import { supabase } from '../lib/supabase'
-import type { ContractType, ContractTypeFormData, PaginationParams, PaginatedResponse } from '../types'
+
+// Define types inline
+interface ContractType {
+  id: string
+  code: string
+  name: string
+  description?: string
+  duration_months?: number
+  is_renewable?: boolean
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+interface ContractTypeFormData {
+  code: string
+  name: string
+  description?: string
+  duration_months?: number
+  is_renewable?: boolean
+  status?: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
  
 export const contractTypeService = {
   async getAll(params: PaginationParams): Promise<PaginatedResponse<ContractType>> {
@@ -88,3 +124,5 @@ export const contractTypeService = {
     if (error) throw error
   }
 }
+
+export default contractTypeService

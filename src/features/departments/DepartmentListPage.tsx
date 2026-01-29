@@ -3,8 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { departmentService } from '../../services'
 import { Card, Button, Input, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { DepartmentForm } from './DepartmentForm'
+import { Lock } from 'lucide-react'
 import type { Department } from '../../types'
- 
+
+// ============================================================================
+// TẠM THỜI KHÓA CHỨC NĂNG SỬA/XÓA
+// Set = false để mở lại
+// ============================================================================
+const DISABLE_EDIT_DELETE = true
+
 export function DepartmentListPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
@@ -12,13 +19,13 @@ export function DepartmentListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
- 
+
   // Query danh sách
   const { data, isLoading } = useQuery({
     queryKey: ['departments', page, search],
     queryFn: () => departmentService.getAll({ page, pageSize: 10, search })
   })
- 
+
   // Mutation xóa
   const deleteMutation = useMutation({
     mutationFn: departmentService.delete,
@@ -27,7 +34,7 @@ export function DepartmentListPage() {
       setDeleteId(null)
     }
   })
- 
+
   // Columns cho table
   const columns = [
     { key: 'code', title: 'Mã' },
@@ -51,44 +58,80 @@ export function DepartmentListPage() {
       title: 'Thao tác',
       render: (item: Department) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
-            Sửa
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
-            Xóa
-          </Button>
+          {DISABLE_EDIT_DELETE ? (
+            <>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                disabled
+                className="opacity-50 cursor-not-allowed"
+                title="Chức năng tạm khóa"
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Sửa
+              </Button>
+              <Button 
+                size="sm" 
+                variant="danger" 
+                disabled
+                className="opacity-50 cursor-not-allowed"
+                title="Chức năng tạm khóa"
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Xóa
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+                Sửa
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
+                Xóa
+              </Button>
+            </>
+          )}
         </div>
       )
     }
   ]
- 
+
   const handleEdit = (department: Department) => {
+    if (DISABLE_EDIT_DELETE) return
     setSelectedDepartment(department)
     setIsModalOpen(true)
   }
- 
+
   const handleAdd = () => {
     setSelectedDepartment(null)
     setIsModalOpen(true)
   }
- 
+
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedDepartment(null)
   }
- 
+
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['departments'] })
     handleCloseModal()
   }
- 
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Quản lý Phòng ban</h1>
         <Button onClick={handleAdd}>+ Thêm phòng ban</Button>
       </div>
- 
+
+      {/* Thông báo tạm khóa */}
+      {DISABLE_EDIT_DELETE && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700">
+          <Lock className="w-4 h-4" />
+          <span className="text-sm">Chức năng Sửa/Xóa đang tạm thời bị khóa để đảm bảo tính toàn vẹn dữ liệu.</span>
+        </div>
+      )}
+
       <Card>
         {/* Search */}
         <div className="mb-4">
@@ -99,7 +142,7 @@ export function DepartmentListPage() {
             className="max-w-md"
           />
         </div>
- 
+
         {/* Table */}
         <DataTable
           columns={columns}
@@ -107,7 +150,7 @@ export function DepartmentListPage() {
           isLoading={isLoading}
           emptyMessage="Chưa có phòng ban nào"
         />
- 
+
         {/* Pagination */}
         {data && (
           <Pagination
@@ -117,7 +160,7 @@ export function DepartmentListPage() {
           />
         )}
       </Card>
- 
+
       {/* Modal Form */}
       <Modal
         isOpen={isModalOpen}
@@ -130,7 +173,7 @@ export function DepartmentListPage() {
           onCancel={handleCloseModal}
         />
       </Modal>
- 
+
       {/* Confirm Delete */}
       <ConfirmDialog
         isOpen={!!deleteId}

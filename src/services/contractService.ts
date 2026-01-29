@@ -1,5 +1,51 @@
 import { supabase } from '../lib/supabase'
-import type { Contract, ContractFormData, PaginationParams, PaginatedResponse } from '../types'
+
+// Define types inline
+interface Contract {
+  id: string
+  employee_id: string
+  contract_type_id: string
+  contract_number: string
+  start_date: string
+  end_date?: string
+  salary?: number
+  allowances?: number
+  benefits?: string
+  status: string
+  signed_date?: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+interface ContractFormData {
+  employee_id: string
+  contract_type_id: string
+  contract_number: string
+  start_date: string
+  end_date?: string
+  salary?: number
+  allowances?: number
+  benefits?: string
+  status?: string
+  signed_date?: string
+  notes?: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
 
 export const contractService = {
   async getAll(params: PaginationParams & { employee_id?: string }): Promise<PaginatedResponse<Contract>> {
@@ -65,9 +111,9 @@ export const contractService = {
       `)
       .eq('employee_id', employeeId)
       .eq('status', 'active')
-      .single()
+      .maybeSingle()  // FIXED: Dùng maybeSingle
 
-    if (error && error.code !== 'PGRST116') throw error
+    if (error) throw error
     return data
   },
 
@@ -118,28 +164,28 @@ export const contractService = {
     if (error) throw error
   },
 
-// Tạo số hợp đồng tự động
-async generateContractNumber(): Promise<string> {
-  const year = new Date().getFullYear()
-  
-  const { data, error } = await supabase
-    .from('contracts')
-    .select('contract_number')
-    .ilike('contract_number', `HD${year}%`)
-    .order('contract_number', { ascending: false })
-    .limit(1)
+  // Tạo số hợp đồng tự động
+  async generateContractNumber(): Promise<string> {
+    const year = new Date().getFullYear()
+    
+    const { data, error } = await supabase
+      .from('contracts')
+      .select('contract_number')
+      .ilike('contract_number', `HD${year}%`)
+      .order('contract_number', { ascending: false })
+      .limit(1)
 
-  // Không dùng .single() vì sẽ lỗi 406 khi bảng rỗng
-  // data trả về là array
-  if (!error && data && data.length > 0 && data[0].contract_number) {
-    const lastNumber = data[0].contract_number
-    const num = parseInt(lastNumber.slice(-4)) + 1
-    return `HD${year}${num.toString().padStart(4, '0')}`
-  }
-  
-  // Nếu chưa có hợp đồng nào trong năm, bắt đầu từ 0001
-  return `HD${year}0001`
-},
+    // Không dùng .single() vì sẽ lỗi 406 khi bảng rỗng
+    // data trả về là array
+    if (!error && data && data.length > 0 && data[0].contract_number) {
+      const lastNumber = data[0].contract_number
+      const num = parseInt(lastNumber.slice(-4)) + 1
+      return `HD${year}${num.toString().padStart(4, '0')}`
+    }
+    
+    // Nếu chưa có hợp đồng nào trong năm, bắt đầu từ 0001
+    return `HD${year}0001`
+  },
 
   async getExpiringContracts(daysAhead: number = 30): Promise<Contract[]> {
     const today = new Date()
@@ -163,3 +209,5 @@ async generateContractNumber(): Promise<string> {
     return data || []
   }
 }
+
+export default contractService

@@ -1,11 +1,28 @@
 // src/services/departmentService.ts
 import { supabase } from '../lib/supabase'
-import type { Department, DepartmentFormData, PaginationParams, PaginatedResponse } from '../types'
+import type { Department, PaginatedResponse } from '../types'
+
+// Define DepartmentFormData inline
+interface DepartmentFormData {
+  code: string
+  name: string
+  description?: string
+  parent_id?: string
+  manager_id?: string
+  status?: string
+}
+
+// Interface riêng cho department params
+interface DepartmentPaginationParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: string
+}
 
 export const departmentService = {
   // Lấy danh sách có phân trang
-  async getAll(params: PaginationParams): Promise<PaginatedResponse<Department>> {
-    // Thêm giá trị mặc định
+  async getAll(params: DepartmentPaginationParams = {}): Promise<PaginatedResponse<Department>> {
     const page = params.page || 1
     const pageSize = params.pageSize || 10
     const { search, status } = params
@@ -15,16 +32,19 @@ export const departmentService = {
 
     let query = supabase
       .from('departments')
-      .select('*, employees!employees_department_id_fkey(count)', { count: 'exact' })
+      .select('*', { count: 'exact' })  // FIXED: Bỏ count employees, chỉ select departments
 
+    // Filter theo status
     if (status && status !== 'all') {
       query = query.eq('status', status)
     }
 
+    // Tìm kiếm theo tên hoặc mã
     if (search) {
       query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
     }
 
+    // Sắp xếp và phân trang
     const { data, error, count } = await query
       .order('created_at', { ascending: false })
       .range(from, to)
@@ -40,6 +60,7 @@ export const departmentService = {
     }
   },
 
+  // Lấy tất cả (cho dropdown)
   async getAllActive(): Promise<Department[]> {
     const { data, error } = await supabase
       .from('departments')
@@ -51,6 +72,7 @@ export const departmentService = {
     return data || []
   },
 
+  // Lấy theo ID
   async getById(id: string): Promise<Department | null> {
     const { data, error } = await supabase
       .from('departments')
@@ -62,6 +84,7 @@ export const departmentService = {
     return data
   },
 
+  // Tạo mới
   async create(department: DepartmentFormData): Promise<Department> {
     const { data, error } = await supabase
       .from('departments')
@@ -73,6 +96,7 @@ export const departmentService = {
     return data
   },
 
+  // Cập nhật
   async update(id: string, department: Partial<DepartmentFormData>): Promise<Department> {
     const { data, error } = await supabase
       .from('departments')
@@ -85,6 +109,7 @@ export const departmentService = {
     return data
   },
 
+  // Xóa
   async delete(id: string): Promise<void> {
     const { error } = await supabase
       .from('departments')
@@ -94,17 +119,32 @@ export const departmentService = {
     if (error) throw error
   },
 
+  // Kiểm tra mã đã tồn tại
   async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
     let query = supabase
       .from('departments')
-      .select('id')
+      .select('id', { count: 'exact', head: true })  // FIXED: Thêm head: true để chỉ count
       .eq('code', code)
 
     if (excludeId) {
       query = query.neq('id', excludeId)
     }
 
-    const { data } = await query.single()
-    return !!data
+    const { count } = await query  // FIXED: Dùng count thay vì data
+    return (count || 0) > 0
+  },
+
+  // NEW: Lấy số lượng employees trong department (nếu cần)
+  async getEmployeeCount(departmentId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('employees')
+      .select('id', { count: 'exact', head: true })
+      .eq('department_id', departmentId)
+      .eq('status', 'active')
+
+    if (error) throw error
+    return count || 0
   }
 }
+
+export default departmentService

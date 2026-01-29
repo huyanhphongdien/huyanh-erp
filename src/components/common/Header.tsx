@@ -1,5 +1,7 @@
+// src/components/common/Header.tsx
 import { useAuthStore } from '../../stores/authStore'
 import { Button } from '../ui'
+import { NotificationBell } from './NotificationBell'
 
 export function Header() {
   const { user, logout } = useAuthStore()
@@ -13,14 +15,20 @@ export function Header() {
           <span className="font-bold text-xl text-primary">Huy Anh ERP</span>
         </div>
 
-        {/* User info */}
+        {/* User info & Actions */}
         <div className="flex items-center gap-4">
+          {/* Notification Bell */}
+          <NotificationBell />
+          
+          {/* User Info */}
           <div className="text-right">
             <p className="font-medium text-gray-800">
               {user?.full_name || 'Người dùng'}
             </p>
             <p className="text-sm text-gray-500">{user?.email}</p>
           </div>
+          
+          {/* Logout Button */}
           <Button variant="outline" size="sm" onClick={logout}>
             Đăng xuất
           </Button>

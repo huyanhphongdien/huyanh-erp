@@ -1,34 +1,60 @@
-import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useAuthStore } from './stores/authStore'
+// ============================================================
+// PHASE 4.5 REFACTOR: UPDATED APP.TSX
+// File: src/App.tsx
+// ============================================================
+// UPDATED: Added Phase 6.3 Task Reports route
+// ============================================================
 
-// Layout - nằm trong components/common
-import { MainLayout } from './components/common/Layout'
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useAuthStore } from './stores/authStore';
+
+// Layout
+import { MainLayout } from './components/common/Layout';
 
 // Auth
-import { LoginPage } from './features/auth/LoginPage'
+import { LoginPage } from './features/auth/LoginPage';
+
+// ===== DASHBOARD - IMPORT TỪ FILE RIÊNG =====
+import DashboardPage from './features/dashboard/DashboardPage';
 
 // Phase 3.1: Phòng ban, Chức vụ, Nhân viên
-import { DepartmentListPage } from './features/departments'
-import { PositionListPage } from './features/positions'
-import { EmployeeListPage } from './features/employees'
+import { DepartmentListPage } from './features/departments';
+import { PositionListPage } from './features/positions';
+import { EmployeeListPage } from './features/employees';
 
 // Phase 3.2: Hợp đồng
-import { ContractTypeListPage } from './features/contract-types'
-import { ContractListPage } from './features/contracts'
+import { ContractTypeListPage } from './features/contract-types';
+import { ContractListPage } from './features/contracts';
 
 // Phase 3.3: Nghỉ phép, Chấm công
-import { LeaveTypeListPage } from './features/leave-types'
-import { LeaveRequestListPage } from './features/leave-requests'
-import { AttendanceListPage } from './features/attendance'
+import { LeaveTypeListPage } from './features/leave-types';
+import { LeaveRequestListPage } from './features/leave-requests';
+import { AttendanceListPage } from './features/attendance';
 
 // Phase 3.4: Lương, Đánh giá
-import { SalaryGradeListPage } from './features/salary-grades'
-import { PayrollPeriodListPage } from './features/payroll'
-import { PayslipListPage } from './features/payslips'
-import { PerformanceCriteriaListPage } from './features/performance-criteria'
-import { PerformanceReviewListPage } from './features/performance-reviews'
+import { SalaryGradeListPage } from './features/salary-grades';
+import { PayrollPeriodListPage } from './features/payroll';
+import { PayslipListPage } from './features/payslips';
+import { PerformanceCriteriaListPage } from './features/performance-criteria';
+import { PerformanceReviewListPage } from './features/performance-reviews';
+
+// Phase 4.1: Task Management
+import { TaskListPage, TaskCreatePage, TaskEditPage, TaskViewPage } from './features/tasks';
+
+// Phase 4.3: Evaluation & Approval
+import MyTasksPage from './pages/evaluations/MyTasksPage';
+import ApprovalsPage from './pages/evaluations/ApprovalPage';
+import SelfEvaluationPage from './pages/evaluations/SelfEvaluationPage';
+import TaskDetailPage from './pages/evaluations/TaskDetailPage';
+
+// Phase 6.3: Task Reports
+import TaskReportsPage from './features/reports/TaskReportsPage';
+
+// ============================================================
+// QUERY CLIENT
+// ============================================================
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,62 +63,75 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-})
+});
 
-// Protected Route Component
+// ============================================================
+// PROTECTED ROUTE COMPONENT
+// ============================================================
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthStore()
+  const { isAuthenticated, isLoading } = useAuthStore();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
 
-// Public Route Component (redirect if already logged in)
+// ============================================================
+// PUBLIC ROUTE COMPONENT
+// ============================================================
+
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthStore()
+  const { isAuthenticated, isLoading } = useAuthStore();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
 
-// Auth Initializer Component
+// ============================================================
+// AUTH INITIALIZER
+// ============================================================
+
 function AuthInitializer({ children }: { children: React.ReactNode }) {
-  const { checkAuth } = useAuthStore()
+  const { checkAuth } = useAuthStore();
 
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    checkAuth();
+  }, [checkAuth]);
 
-  return <>{children}</>
+  return <>{children}</>;
 }
+
+// ============================================================
+// MAIN APP
+// ============================================================
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthInitializer>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AuthInitializer>
           <Routes>
             {/* Public Routes */}
             <Route
@@ -104,7 +143,7 @@ function App() {
               }
             />
 
-            {/* Protected Routes */}
+            {/* Protected Routes - MainLayout chứa Sidebar */}
             <Route
               path="/"
               element={
@@ -113,7 +152,7 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              {/* Dashboard */}
+              {/* Dashboard - SỬ DỤNG COMPONENT TỪ FILE RIÊNG */}
               <Route index element={<DashboardPage />} />
 
               {/* ===== PHASE 3.1: Phòng ban, Chức vụ, Nhân viên ===== */}
@@ -136,78 +175,44 @@ function App() {
               <Route path="payslips" element={<PayslipListPage />} />
               <Route path="performance-criteria" element={<PerformanceCriteriaListPage />} />
               <Route path="performance-reviews" element={<PerformanceReviewListPage />} />
+
+              {/* ===== PHASE 4.1 & 4.5: Task Management (with Overview Tab) ===== */}
+              <Route path="tasks" element={<TaskListPage />} />
+              <Route path="tasks/create" element={<TaskCreatePage />} />
+              <Route path="tasks/new" element={<TaskCreatePage />} />
+              <Route path="tasks/:id" element={<TaskViewPage />} />
+              <Route path="tasks/:id/edit" element={<TaskEditPage />} />
+
+              {/* ===== PHASE 4.3: Evaluation & Approval ===== */}
+              <Route path="my-tasks" element={<MyTasksPage />} />
+              <Route path="approvals" element={<ApprovalsPage />} />
+              
+              {/* SelfEvaluationPage */}
+              <Route path="evaluations/self-evaluation" element={<SelfEvaluationPage />} />
+              <Route path="self-evaluation" element={<SelfEvaluationPage />} />
+
+              {/* TaskDetailPage - Chi tiết công việc với permissions */}
+              <Route path="task-detail/:taskId" element={<TaskDetailPage />} />
+              <Route path="my-tasks/:taskId" element={<TaskDetailPage />} />
+
+              {/* ===== PHASE 6.3: Task Reports ===== */}
+              <Route path="reports/tasks" element={<TaskReportsPage />} />
+
+              {/* ===== REDIRECTS: Legacy routes & backward compatibility ===== */}
+              <Route path="my-evaluations" element={<Navigate to="/my-tasks?tab=approved" replace />} />
+              <Route path="evaluations/my-tasks" element={<Navigate to="/my-tasks" replace />} />
+              <Route path="evaluations/approval" element={<Navigate to="/approvals" replace />} />
+              <Route path="evaluations/my" element={<Navigate to="/my-tasks?tab=approved" replace />} />
+              <Route path="evaluations/results" element={<Navigate to="/my-tasks?tab=approved" replace />} />
             </Route>
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </BrowserRouter>
-      </AuthInitializer>
+        </AuthInitializer>
+      </BrowserRouter>
     </QueryClientProvider>
-  )
+  );
 }
 
-// Simple Dashboard Page
-function DashboardPage() {
-  const { user } = useAuthStore()
-
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-600">
-          Xin chào, <span className="font-semibold">{user?.full_name || user?.email}</span>!
-        </p>
-        <p className="text-gray-500 mt-2">
-          Chào mừng bạn đến với hệ thống Huy Anh ERP.
-        </p>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-        <StatCard title="Nhân viên" value="--" icon="👥" color="blue" link="/employees" />
-        <StatCard title="Phòng ban" value="--" icon="🏢" color="green" link="/departments" />
-        <StatCard title="Đơn nghỉ phép" value="--" icon="📋" color="yellow" link="/leave-requests" />
-        <StatCard title="Kỳ lương" value="--" icon="💰" color="purple" link="/payroll-periods" />
-      </div>
-    </div>
-  )
-}
-
-// Stat Card Component
-function StatCard({ 
-  title, 
-  value, 
-  icon, 
-  color, 
-  link 
-}: { 
-  title: string
-  value: string
-  icon: string
-  color: 'blue' | 'green' | 'yellow' | 'purple'
-  link: string
-}) {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-green-50 text-green-600',
-    yellow: 'bg-yellow-50 text-yellow-600',
-    purple: 'bg-purple-50 text-purple-600'
-  }
-
-  return (
-    <a href={link} className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-500 text-sm">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
-        </div>
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${colorClasses[color]}`}>
-          {icon}
-        </div>
-      </div>
-    </a>
-  )
-}
-
-export default App
+export default App;

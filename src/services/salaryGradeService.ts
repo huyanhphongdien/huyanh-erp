@@ -1,5 +1,45 @@
 import { supabase } from '../lib/supabase'
-import type { SalaryGrade, SalaryGradeFormData, PaginationParams, PaginatedResponse } from '../types'
+
+// Define types inline
+interface SalaryGrade {
+  id: string
+  code: string
+  name: string
+  level: number
+  base_salary: number
+  min_salary?: number
+  max_salary?: number
+  description?: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+interface SalaryGradeFormData {
+  code: string
+  name: string
+  level: number
+  base_salary: number
+  min_salary?: number
+  max_salary?: number
+  description?: string
+  status?: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
 
 export const salaryGradeService = {
   async getAll(params: PaginationParams): Promise<PaginatedResponse<SalaryGrade>> {
@@ -83,3 +123,5 @@ export const salaryGradeService = {
     if (error) throw error
   }
 }
+
+export default salaryGradeService

@@ -2,7 +2,32 @@ import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
 import { performanceService } from '../../services'
 import { Button, Input, Select } from '../../components/ui'
-import type { PerformanceCriteria, PerformanceCriteriaFormData } from '../../types'
+
+// Define types inline
+interface PerformanceCriteria {
+  id: string
+  code: string
+  name: string
+  description?: string
+  category?: string
+  weight?: number
+  max_score?: number
+  is_required?: boolean
+  status?: string
+  sort_order?: number
+}
+
+interface PerformanceCriteriaFormData {
+  code: string
+  name: string
+  description?: string
+  category?: string
+  weight?: number
+  max_score?: number
+  is_required?: boolean
+  status?: string
+  sort_order?: number
+}
 
 interface Props {
   initialData?: PerformanceCriteria | null
@@ -10,9 +35,10 @@ interface Props {
   onCancel: () => void
 }
 
-export function PerformanceCriteriaForm({ initialData, onSuccess, onCancel }: Props) {
-  const { register, handleSubmit, formState: { errors } } = useForm<PerformanceCriteriaFormData>({
-    defaultValues: initialData || {
+// Helper function để convert sang form data
+function toFormData(data: PerformanceCriteria | null | undefined): PerformanceCriteriaFormData {
+  if (!data) {
+    return {
       code: '',
       name: '',
       description: '',
@@ -23,13 +49,30 @@ export function PerformanceCriteriaForm({ initialData, onSuccess, onCancel }: Pr
       status: 'active',
       sort_order: 0
     }
+  }
+  return {
+    code: data.code ?? '',
+    name: data.name ?? '',
+    description: data.description ?? '',
+    category: data.category ?? 'work_quality',
+    weight: data.weight ?? 20,
+    max_score: data.max_score ?? 5,
+    is_required: data.is_required ?? true,
+    status: data.status ?? 'active',
+    sort_order: data.sort_order ?? 0
+  }
+}
+
+export function PerformanceCriteriaForm({ initialData, onSuccess, onCancel }: Props) {
+  const { register, handleSubmit, formState: { errors } } = useForm<PerformanceCriteriaFormData>({
+    defaultValues: toFormData(initialData)
   })
 
   const mutation = useMutation({
     mutationFn: (data: PerformanceCriteriaFormData) => 
       initialData 
-        ? performanceService.updateCriteria(initialData.id, data)
-        : performanceService.createCriteria(data),
+        ? performanceService.updateCriteria(initialData.id, data as any)
+        : performanceService.createCriteria(data as any),
     onSuccess
   })
 

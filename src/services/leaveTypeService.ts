@@ -1,5 +1,45 @@
 import { supabase } from '../lib/supabase'
-import type { LeaveType, LeaveTypeFormData, PaginationParams, PaginatedResponse } from '../types'
+
+// Define types inline
+interface LeaveType {
+  id: string
+  code: string
+  name: string
+  description?: string
+  max_days_per_year?: number
+  requires_approval: boolean
+  is_paid: boolean
+  color?: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+interface LeaveTypeFormData {
+  code: string
+  name: string
+  description?: string
+  max_days_per_year?: number
+  requires_approval?: boolean
+  is_paid?: boolean
+  color?: string
+  status?: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
 
 export const leaveTypeService = {
   // Lấy tất cả loại nghỉ phép (có phân trang)
@@ -37,9 +77,7 @@ export const leaveTypeService = {
     }
   },
 
-  // =========================================
-  // LẤY TẤT CẢ LOẠI NGHỈ PHÉP ACTIVE (cho dropdown)
-  // =========================================
+  // Lấy tất cả loại nghỉ phép active (cho dropdown)
   async getAllActive(): Promise<LeaveType[]> {
     const { data, error } = await supabase
       .from('leave_types')
@@ -98,3 +136,5 @@ export const leaveTypeService = {
     if (error) throw error
   }
 }
+
+export default leaveTypeService

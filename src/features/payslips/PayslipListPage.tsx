@@ -3,7 +3,24 @@ import { useQuery } from '@tanstack/react-query'
 import { payrollService } from '../../services'
 import { Button, Input, Select, Card, Pagination, Modal } from '../../components/ui'
 import { PayslipDetail } from './PayslipDetail'
-import type { Payslip } from '../../types'
+
+// Define Payslip type inline
+interface Payslip {
+  id: string
+  payslip_number: string
+  employee_id: string
+  employee_code?: string
+  employee_name?: string
+  department_name?: string
+  payroll_period?: {
+    id: string
+    name: string
+  }
+  gross_salary: number
+  total_deductions: number
+  net_salary: number
+  status: string
+}
 
 const statusLabels: Record<string, { label: string; color: string }> = {
   draft: { label: 'Nháp', color: 'bg-gray-100 text-gray-800' },
@@ -88,7 +105,7 @@ export function PayslipListPage() {
                   </td>
                 </tr>
               ) : (
-                data.data.map((item) => {
+                data.data.map((item: Payslip) => {
                   const statusInfo = statusLabels[item.status] || statusLabels.draft
                   return (
                     <tr key={item.id} className="hover:bg-gray-50">

@@ -3,8 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { employeeService, departmentService, positionService } from '../../services'
 import { Card, Button, Input, Select, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { EmployeeForm } from './EmployeeForm'
+import { Lock } from 'lucide-react'
 import type { Employee } from '../../types'
- 
+
+// ============================================================================
+// TẠM THỜI KHÓA CHỨC NĂNG SỬA/XÓA
+// Set = false để mở lại
+// ============================================================================
+const DISABLE_EDIT_DELETE = true
+
 export function EmployeeListPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
@@ -13,7 +20,7 @@ export function EmployeeListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
- 
+
   // Query danh sách nhân viên
   const { data, isLoading } = useQuery({
     queryKey: ['employees', page, search, departmentFilter],
@@ -24,13 +31,13 @@ export function EmployeeListPage() {
       department_id: departmentFilter || undefined
     })
   })
- 
+
   // Query danh sách phòng ban cho filter
   const { data: departments } = useQuery({
     queryKey: ['departments-active'],
     queryFn: departmentService.getAllActive
   })
- 
+
   const deleteMutation = useMutation({
     mutationFn: employeeService.delete,
     onSuccess: () => {
@@ -38,7 +45,7 @@ export function EmployeeListPage() {
       setDeleteId(null)
     }
   })
- 
+
   const columns = [
     { key: 'code', title: 'Mã NV' },
     { key: 'full_name', title: 'Họ và tên' },
@@ -71,44 +78,80 @@ export function EmployeeListPage() {
       title: 'Thao tác',
       render: (item: Employee) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
-            Sửa
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
-            Xóa
-          </Button>
+          {DISABLE_EDIT_DELETE ? (
+            <>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                disabled
+                className="opacity-50 cursor-not-allowed"
+                title="Chức năng tạm khóa"
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Sửa
+              </Button>
+              <Button 
+                size="sm" 
+                variant="danger" 
+                disabled
+                className="opacity-50 cursor-not-allowed"
+                title="Chức năng tạm khóa"
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Xóa
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+                Sửa
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
+                Xóa
+              </Button>
+            </>
+          )}
         </div>
       )
     }
   ]
- 
+
   const handleEdit = (employee: Employee) => {
+    if (DISABLE_EDIT_DELETE) return
     setSelectedEmployee(employee)
     setIsModalOpen(true)
   }
- 
+
   const handleAdd = () => {
     setSelectedEmployee(null)
     setIsModalOpen(true)
   }
- 
+
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedEmployee(null)
   }
- 
+
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['employees'] })
     handleCloseModal()
   }
- 
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Quản lý Nhân viên</h1>
         <Button onClick={handleAdd}>+ Thêm nhân viên</Button>
       </div>
- 
+
+      {/* Thông báo tạm khóa */}
+      {DISABLE_EDIT_DELETE && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700">
+          <Lock className="w-4 h-4" />
+          <span className="text-sm">Chức năng Sửa/Xóa đang tạm thời bị khóa để đảm bảo tính toàn vẹn dữ liệu.</span>
+        </div>
+      )}
+
       <Card>
         {/* Filters */}
         <div className="flex gap-4 mb-4">
@@ -128,14 +171,14 @@ export function EmployeeListPage() {
             className="w-48"
           />
         </div>
- 
+
         <DataTable
           columns={columns}
           data={data?.data || []}
           isLoading={isLoading}
           emptyMessage="Chưa có nhân viên nào"
         />
- 
+
         {data && (
           <Pagination
             currentPage={data.page}
@@ -144,7 +187,7 @@ export function EmployeeListPage() {
           />
         )}
       </Card>
- 
+
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
@@ -157,7 +200,7 @@ export function EmployeeListPage() {
           onCancel={handleCloseModal}
         />
       </Modal>
- 
+
       <ConfirmDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}

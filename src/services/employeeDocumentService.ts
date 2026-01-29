@@ -1,5 +1,30 @@
 import { supabase } from '../lib/supabase'
-import type { EmployeeDocument, EmployeeDocumentFormData } from '../types'
+
+// Define types inline
+interface EmployeeDocument {
+  id: string
+  employee_id: string
+  document_type: string
+  document_name: string
+  document_url?: string
+  issue_date?: string
+  expiry_date?: string
+  status: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+interface EmployeeDocumentFormData {
+  employee_id: string
+  document_type: string
+  document_name: string
+  document_url?: string
+  issue_date?: string
+  expiry_date?: string
+  status?: string
+  notes?: string
+}
  
 export const employeeDocumentService = {
   // Lấy tất cả tài liệu của nhân viên
@@ -89,3 +114,5 @@ export const employeeDocumentService = {
     return data.publicUrl
   }
 }
+
+export default employeeDocumentService

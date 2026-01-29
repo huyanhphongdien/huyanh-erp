@@ -1,9 +1,81 @@
 import { supabase } from '../lib/supabase'
-import type { 
-  PerformanceCriteria, PerformanceCriteriaFormData,
-  PerformanceReview, PerformanceReviewFormData, ReviewScore,
-  PaginationParams, PaginatedResponse 
-} from '../types'
+
+// Define types inline
+interface PerformanceCriteria {
+  id: string
+  code: string
+  name: string
+  description?: string
+  category?: string
+  weight: number
+  max_score: number
+  sort_order: number
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+interface PerformanceCriteriaFormData {
+  code: string
+  name: string
+  description?: string
+  category?: string
+  weight: number
+  max_score: number
+  sort_order?: number
+  status?: string
+}
+
+interface PerformanceReview {
+  id: string
+  review_code: string
+  employee_id: string
+  reviewer_id?: string
+  review_period: string
+  review_type: string
+  total_score?: number
+  grade?: string
+  status: string
+  reviewer_comments?: string
+  employee_comments?: string
+  submitted_at?: string
+  reviewed_at?: string
+  created_at: string
+  updated_at: string
+}
+
+interface PerformanceReviewFormData {
+  employee_id: string
+  reviewer_id?: string
+  review_period: string
+  review_type: string
+  employee_comments?: string
+}
+
+interface ReviewScore {
+  id: string
+  review_id: string
+  criteria_id: string
+  score: number
+  weighted_score: number
+  comments?: string
+  created_at: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
  
 export const performanceService = {
   // ===== CRITERIA =====
@@ -245,3 +317,5 @@ export const performanceService = {
     return data
   }
 }
+
+export default performanceService

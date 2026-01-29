@@ -3,7 +3,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { performanceService } from '../../services'
 import { Button, Input, Card, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { PerformanceCriteriaForm } from './PerformanceCriteriaForm'
-import type { PerformanceCriteria } from '../../types'
+
+// Define type inline
+interface PerformanceCriteria {
+  id: string
+  code: string
+  name: string
+  description?: string
+  category?: string
+  weight?: number
+  max_score?: number
+  is_required?: boolean
+  status?: string
+  sort_order?: number
+}
 
 const categoryLabels: Record<string, string> = {
   work_quality: 'Chất lượng công việc',
@@ -85,7 +98,7 @@ export function PerformanceCriteriaListPage() {
                   </td>
                 </tr>
               ) : (
-                data.data.map((item) => (
+                data.data.map((item: PerformanceCriteria) => (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium">{item.code}</td>
                     <td className="px-4 py-3 text-sm">{item.name}</td>

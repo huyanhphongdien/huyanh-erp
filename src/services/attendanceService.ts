@@ -1,5 +1,45 @@
 import { supabase } from '../lib/supabase'
-import type { Attendance, AttendanceFormData, PaginationParams, PaginatedResponse } from '../types'
+
+// Define types inline
+interface Attendance {
+  id: string
+  employee_id: string
+  date: string
+  check_in_time?: string
+  check_out_time?: string
+  working_minutes?: number
+  overtime_minutes?: number
+  status: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+interface AttendanceFormData {
+  employee_id: string
+  date: string
+  check_in_time?: string
+  check_out_time?: string
+  working_minutes?: number
+  overtime_minutes?: number
+  status?: string
+  notes?: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
  
 export const attendanceService = {
   async getAll(params: PaginationParams & { 
@@ -56,9 +96,9 @@ export const attendanceService = {
       .select('*')
       .eq('employee_id', employeeId)
       .eq('date', date)
-      .single()
+      .maybeSingle()  // FIXED: Dùng maybeSingle thay vì single
  
-    if (error && error.code !== 'PGRST116') throw error
+    if (error) throw error
     return data
   },
  
@@ -191,3 +231,5 @@ export const attendanceService = {
     return data
   }
 }
+
+export default attendanceService

@@ -1,5 +1,46 @@
 import { supabase } from '../lib/supabase'
-import type { LeaveRequest, LeaveRequestFormData, PaginationParams, PaginatedResponse } from '../types'
+
+// Define types inline
+interface LeaveRequest {
+  id: string
+  employee_id: string
+  leave_type_id: string
+  request_number: string
+  start_date: string
+  end_date: string
+  total_days: number
+  reason: string
+  status: string
+  approved_by?: string
+  approved_at?: string
+  approval_notes?: string
+  created_at: string
+  updated_at: string
+}
+
+interface LeaveRequestFormData {
+  employee_id: string
+  leave_type_id: string
+  start_date: string
+  end_date: string
+  total_days: number
+  reason: string
+}
+
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
 
 export const leaveRequestService = {
   // Lấy danh sách đơn nghỉ phép (có phân trang)
@@ -194,3 +235,5 @@ export const leaveRequestService = {
     return data || []
   }
 }
+
+export default leaveRequestService

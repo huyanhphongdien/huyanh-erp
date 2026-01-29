@@ -3,8 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { positionService } from '../../services'
 import { Card, Button, Input, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { PositionForm } from './PositionForm'
+import { Lock } from 'lucide-react'
 import type { Position } from '../../types'
- 
+
+// ============================================================================
+// TẠM THỜI KHÓA CHỨC NĂNG SỬA/XÓA
+// Set = false để mở lại
+// ============================================================================
+const DISABLE_EDIT_DELETE = true
+
 export function PositionListPage() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
@@ -12,12 +19,12 @@ export function PositionListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
- 
+
   const { data, isLoading } = useQuery({
     queryKey: ['positions', page, search],
     queryFn: () => positionService.getAll({ page, pageSize: 10, search })
   })
- 
+
   const deleteMutation = useMutation({
     mutationFn: positionService.delete,
     onSuccess: () => {
@@ -25,21 +32,12 @@ export function PositionListPage() {
       setDeleteId(null)
     }
   })
- 
+
   const columns = [
     { key: 'code', title: 'Mã' },
     { key: 'name', title: 'Tên chức vụ' },
     { key: 'level', title: 'Cấp bậc' },
-    {
-      key: 'salary_range',
-      title: 'Thang lương',
-      render: (item: Position) => {
-        if (item.min_salary && item.max_salary) {
-          return `${item.min_salary.toLocaleString()} - ${item.max_salary.toLocaleString()}`
-        }
-        return '-'
-      }
-    },
+    { key: 'description', title: 'Mô tả' },
     {
       key: 'status',
       title: 'Trạng thái',
@@ -58,44 +56,80 @@ export function PositionListPage() {
       title: 'Thao tác',
       render: (item: Position) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
-            Sửa
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
-            Xóa
-          </Button>
+          {DISABLE_EDIT_DELETE ? (
+            <>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                disabled
+                className="opacity-50 cursor-not-allowed"
+                title="Chức năng tạm khóa"
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Sửa
+              </Button>
+              <Button 
+                size="sm" 
+                variant="danger" 
+                disabled
+                className="opacity-50 cursor-not-allowed"
+                title="Chức năng tạm khóa"
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Xóa
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+                Sửa
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => setDeleteId(item.id)}>
+                Xóa
+              </Button>
+            </>
+          )}
         </div>
       )
     }
   ]
- 
+
   const handleEdit = (position: Position) => {
+    if (DISABLE_EDIT_DELETE) return
     setSelectedPosition(position)
     setIsModalOpen(true)
   }
- 
+
   const handleAdd = () => {
     setSelectedPosition(null)
     setIsModalOpen(true)
   }
- 
+
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedPosition(null)
   }
- 
+
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['positions'] })
     handleCloseModal()
   }
- 
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Quản lý Chức vụ</h1>
         <Button onClick={handleAdd}>+ Thêm chức vụ</Button>
       </div>
- 
+
+      {/* Thông báo tạm khóa */}
+      {DISABLE_EDIT_DELETE && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700">
+          <Lock className="w-4 h-4" />
+          <span className="text-sm">Chức năng Sửa/Xóa đang tạm thời bị khóa để đảm bảo tính toàn vẹn dữ liệu.</span>
+        </div>
+      )}
+
       <Card>
         <div className="mb-4">
           <Input
@@ -105,14 +139,14 @@ export function PositionListPage() {
             className="max-w-md"
           />
         </div>
- 
+
         <DataTable
           columns={columns}
           data={data?.data || []}
           isLoading={isLoading}
           emptyMessage="Chưa có chức vụ nào"
         />
- 
+
         {data && (
           <Pagination
             currentPage={data.page}
@@ -121,7 +155,7 @@ export function PositionListPage() {
           />
         )}
       </Card>
- 
+
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
@@ -133,7 +167,7 @@ export function PositionListPage() {
           onCancel={handleCloseModal}
         />
       </Modal>
- 
+
       <ConfirmDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}

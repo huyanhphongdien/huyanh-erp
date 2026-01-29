@@ -1,5 +1,10 @@
-import { Outlet } from 'react-router-dom'
-import { Sidebar } from './Sidebar'
+// ============================================================
+// MAIN LAYOUT COMPONENT
+// File: src/components/common/Layout.tsx
+// ============================================================
+
+import { Outlet } from 'react-router-dom';
+import { Sidebar } from './Sidebar';
 
 export function MainLayout() {
   return (
@@ -9,5 +14,7 @@ export function MainLayout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }
+
+export default MainLayout;

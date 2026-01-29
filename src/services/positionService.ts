@@ -1,5 +1,23 @@
 import { supabase } from '../lib/supabase'
-import type { Position, PositionFormData, PaginationParams, PaginatedResponse } from '../types'
+import type { Position, PaginatedResponse } from '../types'
+
+// Define PositionFormData inline
+interface PositionFormData {
+  code: string
+  name: string
+  description?: string
+  department_id?: string
+  level?: number
+  status?: string
+}
+
+// Define PaginationParams inline
+interface PaginationParams {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+}
  
 export const positionService = {
   // Lấy danh sách có phân trang
@@ -98,14 +116,16 @@ export const positionService = {
   async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
     let query = supabase
       .from('positions')
-      .select('id')
+      .select('id', { count: 'exact', head: true })  // FIXED: Thêm head: true
       .eq('code', code)
  
     if (excludeId) {
       query = query.neq('id', excludeId)
     }
  
-    const { data } = await query.single()
-    return !!data
+    const { count } = await query  // FIXED: Dùng count thay vì data
+    return (count || 0) > 0
   }
 }
+
+export default positionService

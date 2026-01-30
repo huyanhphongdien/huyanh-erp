@@ -11,28 +11,50 @@ interface Props {
   onSuccess: () => void
   onCancel: () => void
 }
+
+// Helper: Convert Contract (with nulls) to ContractFormData (with undefined)
+function contractToFormData(contract: Contract): Partial<ContractFormData> {
+  return {
+    employee_id: contract.employee_id,
+    contract_type_id: contract.contract_type_id,
+    contract_number: contract.contract_number ?? undefined,
+    code: contract.code ?? undefined,
+    start_date: contract.start_date,
+    end_date: contract.end_date ?? undefined,
+    signed_date: contract.signed_date ?? undefined,
+    sign_date: contract.sign_date ?? undefined,
+    salary: contract.salary ?? undefined,
+    base_salary: contract.base_salary ?? undefined,
+    allowances: contract.allowances ?? undefined,
+    benefits: contract.benefits ?? undefined,
+    status: contract.status ?? undefined,
+    notes: contract.notes ?? undefined,
+  }
+}
  
 export function ContractForm({ initialData, employeeId, onSuccess, onCancel }: Props) {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<ContractFormData>({
-    defaultValues: initialData || {
-      contract_number: '',
-      employee_id: employeeId || '',
-      contract_type_id: '',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: '',
-      base_salary: 0,
-      salary_currency: 'VND',
-      allowance_lunch: 0,
-      allowance_transport: 0,
-      allowance_phone: 0,
-      allowance_housing: 0,
-      allowance_other: 0,
-      job_title: '',
-      work_location: 'Huy Anh Rubber',
-      working_hours: '8:00 - 17:00',
-      status: 'active',
-      notes: ''
-    }
+    defaultValues: initialData 
+      ? contractToFormData(initialData)
+      : {
+          contract_number: '',
+          employee_id: employeeId || '',
+          contract_type_id: '',
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: '',
+          base_salary: 0,
+          salary_currency: 'VND',
+          allowance_lunch: 0,
+          allowance_transport: 0,
+          allowance_phone: 0,
+          allowance_housing: 0,
+          allowance_other: 0,
+          job_title: '',
+          work_location: 'Huy Anh Rubber',
+          working_hours: '8:00 - 17:00',
+          status: 'active',
+          notes: ''
+        }
   })
  
   // Load employees for dropdown
@@ -63,21 +85,33 @@ export function ContractForm({ initialData, employeeId, onSuccess, onCancel }: P
   useEffect(() => {
     if (contractTypeId && startDate && contractTypes) {
       const selectedType = contractTypes.find(t => t.id === contractTypeId)
-      if (selectedType && !selectedType.is_permanent && selectedType.duration_months) {
+      // FIX: Use is_renewable instead of is_permanent
+      // is_renewable === false means permanent contract (no end date)
+      if (selectedType && selectedType.is_renewable !== false && selectedType.duration_months) {
         const start = new Date(startDate)
         start.setMonth(start.getMonth() + selectedType.duration_months)
         setValue('end_date', start.toISOString().split('T')[0])
-      } else if (selectedType?.is_permanent) {
+      } else if (selectedType?.is_renewable === false) {
+        // Permanent contract - no end date
         setValue('end_date', '')
       }
     }
   }, [contractTypeId, startDate, contractTypes, setValue])
  
   const mutation = useMutation({
-    mutationFn: (data: ContractFormData) => 
-      initialData 
-        ? contractService.update(initialData.id, data)
-        : contractService.create(data),
+    mutationFn: (data: ContractFormData) => {
+      // Ensure required fields for create
+      const submitData = {
+        ...data,
+        contract_number: data.contract_number || '',
+        employee_id: data.employee_id,
+        contract_type_id: data.contract_type_id,
+        start_date: data.start_date,
+      }
+      return initialData 
+        ? contractService.update(initialData.id, submitData)
+        : contractService.create(submitData as any)
+    },
     onSuccess
   })
  

@@ -356,7 +356,7 @@ export const taskParticipantService = {
    */
   async removeParticipant(
     assignmentId: string,
-    removedBy: string
+    // removedBy: string
   ): Promise<{ success: boolean; error?: string }> {
     console.log('➖ [taskParticipantService] removeParticipant:', assignmentId)
 

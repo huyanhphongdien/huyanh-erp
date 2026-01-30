@@ -5,7 +5,7 @@
 // ============================================================================
 
 import React, { useState, useCallback } from 'react';
-import { calculateRating, type RatingLevel } from '../../types/evaluation.types';
+import { calculateRating } from '../../types/evaluation.types';
 
 // ============================================================================
 // TYPES

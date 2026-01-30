@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { attendanceService, departmentService } from '../../services'
+import { attendanceService } from '../../services'
 import { Card, Select, DataTable, Pagination } from '../../components/ui'
 import { CheckInOutWidget } from './CheckInOutWidget'
 import type { Attendance } from '../../types'
@@ -54,23 +54,23 @@ export function AttendanceListPage() {
     {
       key: 'check_in',
       title: 'Check-in',
-      render: (item: Attendance) => formatTime(item.check_in_time)
+      render: (item: Attendance) => formatTime(item.check_in_time ?? undefined)
     },
     {
       key: 'check_out',
       title: 'Check-out',
-      render: (item: Attendance) => formatTime(item.check_out_time)
+      render: (item: Attendance) => formatTime(item.check_out_time ?? undefined)
     },
     {
       key: 'working_time',
       title: 'Thời gian làm',
-      render: (item: Attendance) => formatMinutes(item.working_minutes)
+      render: (item: Attendance) => formatMinutes(item.working_minutes ?? 0)
     },
     {
       key: 'overtime',
       title: 'Tăng ca',
-      render: (item: Attendance) => item.overtime_minutes > 0 
-        ? formatMinutes(item.overtime_minutes) 
+      render: (item: Attendance) => (item.overtime_minutes ?? 0) > 0 
+        ? formatMinutes(item.overtime_minutes ?? 0) 
         : '-'
     },
     {

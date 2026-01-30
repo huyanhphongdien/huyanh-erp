@@ -131,7 +131,7 @@ export function PayrollPeriodListPage() {
                         {String(item.month).padStart(2, '0')}/{item.year}
                       </td>
                       <td className="px-4 py-3 text-sm">{item.total_employees}</td>
-                      <td className="px-4 py-3 text-sm">{formatCurrency(item.total_amount)}</td>
+                      <td className="px-4 py-3 text-sm">{formatCurrency(item.total_amount ?? 0)}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`px-2 py-1 rounded text-xs ${statusInfo.color}`}>
                           {statusInfo.label}

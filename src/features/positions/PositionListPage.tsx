@@ -162,7 +162,7 @@ export function PositionListPage() {
         title={selectedPosition ? 'Sửa chức vụ' : 'Thêm chức vụ'}
       >
         <PositionForm
-          position={selectedPosition}
+          position={selectedPosition as any}
           onSuccess={handleSuccess}
           onCancel={handleCloseModal}
         />

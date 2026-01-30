@@ -52,7 +52,7 @@ interface PerformanceReviewFormData {
   employee_comments?: string
 }
 
-interface ReviewScore {
+interface _ReviewScore {
   id: string
   review_id: string
   criteria_id: string

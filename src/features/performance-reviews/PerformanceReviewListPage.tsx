@@ -68,7 +68,7 @@ export function PerformanceReviewListPage() {
   })
 
   // Cast data để TypeScript hiểu type
-  const reviews = (data?.data || []) as PerformanceReview[]
+  const reviews = (data?.data || []) as unknown as PerformanceReview[]
 
   const handlePeriodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPeriodFilter(e.target.value)

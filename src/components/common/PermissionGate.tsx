@@ -95,11 +95,11 @@ export function PermissionGate({
     if (!hasPermission) reason = `Requires groups: ${allowedGroups.join(', ')}`;
   }
 
-  // Check level range
+  // Check level range - FIX: Added null check for level
   if (hasPermission && (minLevel !== undefined || maxLevel !== undefined)) {
     const min = minLevel ?? 1;
     const max = maxLevel ?? 6;
-    hasPermission = isAdmin || (level >= min && level <= max);
+    hasPermission = isAdmin || (level !== null && level >= min && level <= max);
     if (!hasPermission) reason = `Requires level ${min}-${max}, current: ${level}`;
   }
 

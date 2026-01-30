@@ -1,8 +1,16 @@
-// ============================================================
-// HOOKS INDEX
-// File: src/hooks/index.ts
-// Huy Anh ERP System - Hooks Export
-// ============================================================
+// src/hooks/index.ts
+// Export all hooks
 
+export { usePermissions, useTaskPermissions } from './usePermissions'
+export type { 
+  UsePermissionsReturn, 
+  UseTaskPermissionsReturn,
+  TaskForPermission,
+  TaskPermissions,
+  PermissionGroup,
+  UserRole,
+} from './usePermissions'
 
-export { usePermissions } from './usePermissions';
+// Re-export other hooks if they exist
+// export { useDebounce } from './useDebounce'
+// export { useLocalStorage } from './useLocalStorage'

@@ -47,7 +47,7 @@ async function getEmployeeByUserId(userId: string): Promise<EmployeeWithDepartme
     let employee = null
 
     // Thử tìm theo id trước
-    const { data: empById, error: errById } = await supabase
+    const { data: empById, error: _errById } = await supabase
       .from('employees')
       .select('id, code, full_name, department_id, position_id')
       .eq('id', userId)
@@ -57,7 +57,7 @@ async function getEmployeeByUserId(userId: string): Promise<EmployeeWithDepartme
       employee = empById
     } else {
       // Nếu không tìm thấy theo id, thử tìm theo user_id
-      const { data: empByUserId, error: errByUserId } = await supabase
+      const { data: empByUserId, error: _errByUserId } = await supabase
         .from('employees')
         .select('id, code, full_name, department_id, position_id')
         .eq('user_id', userId)
@@ -228,7 +228,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: credentials.email,
         password: credentials.password,
         options: {

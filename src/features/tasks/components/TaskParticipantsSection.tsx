@@ -47,7 +47,7 @@ interface TaskParticipantsSectionProps {
 // ============================================================================
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-  accepted: {  // UPDATED: 'active' -> 'accepted'
+  accepted: {
     label: 'Đang tham gia',
     color: 'text-green-700',
     bgColor: 'bg-green-100',
@@ -59,7 +59,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
     bgColor: 'bg-yellow-100',
     icon: <Clock className="w-3 h-3" />,
   },
-  declined: {  // UPDATED: 'rejected' -> 'declined'
+  declined: {
     label: 'Đã từ chối',
     color: 'text-red-700',
     bgColor: 'bg-red-100',
@@ -88,7 +88,7 @@ const ParticipantBadge: React.FC<{
   return (
     <div
       className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-        participant.status === 'accepted' || participant.status === 'completed'  // UPDATED
+        participant.status === 'accepted' || participant.status === 'completed'
           ? 'bg-white border-gray-200 hover:border-gray-300'
           : participant.status === 'pending'
           ? 'bg-yellow-50 border-yellow-200'
@@ -131,7 +131,7 @@ const ParticipantBadge: React.FC<{
       </div>
 
       {/* Remove button */}
-      {canRemove && participant.status !== 'declined' && (  // UPDATED: 'rejected' -> 'declined'
+      {canRemove && participant.status !== 'declined' && (
         <button
           onClick={onRemove}
           disabled={isRemoving}
@@ -229,7 +229,7 @@ const AddParticipantModal: React.FC<{
     setError(null)
 
     let successCount = 0
-    let errorMessages: string[] = []
+    const errorMessages: string[] = []
 
     for (const employeeId of selectedEmployees) {
       const result = await taskParticipantService.addParticipant({
@@ -459,15 +459,12 @@ const TaskParticipantsSection: React.FC<TaskParticipantsSectionProps> = ({
     loadParticipants()
   }, [loadParticipants])
 
-  // Handle remove participant
+  // Handle remove participant - FIX: removeParticipant chỉ nhận 1 tham số
   const handleRemove = async (assignmentId: string) => {
     if (!confirm('Bạn có chắc muốn xóa người này khỏi công việc?')) return
 
     setRemovingId(assignmentId)
-    const result = await taskParticipantService.removeParticipant(
-      assignmentId,
-      user?.employee_id || ''
-    )
+    const result = await taskParticipantService.removeParticipant(assignmentId)
 
     if (result.success) {
       await loadParticipants()
@@ -479,7 +476,7 @@ const TaskParticipantsSection: React.FC<TaskParticipantsSectionProps> = ({
     setRemovingId(null)
   }
 
-  // Count by status - UPDATED to use correct enum values
+  // Count by status
   const activeCount = participants.filter((p) => p.status === 'accepted' || p.status === 'completed').length
   const pendingCount = participants.filter((p) => p.status === 'pending').length
 

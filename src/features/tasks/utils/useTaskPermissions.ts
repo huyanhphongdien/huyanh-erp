@@ -1,193 +1,177 @@
 // ============================================================================
-// USE TASK PERMISSIONS HOOK
-// File: src/features/tasks/utils/useTaskPermissions.ts
-// Huy Anh ERP System
+// src/features/tasks/utils/useTaskPermissions.ts
+// Task Permission Hook - FINAL VERSION
 // ============================================================================
 
-import { useCallback, useMemo, useState, useEffect } from 'react';
-import { useAuthStore } from '../../../stores/authStore';
-import { supabase } from '../../../lib/supabase';
+import { useMemo } from 'react'
+import { useAuthStore } from '../../../stores/authStore'
 import {
   getTaskPermissions,
   getPermissionGroup,
-  isExecutive,
+  isExecutive as checkIsExecutive,
   isManagerLevel,
-  isEmployeeLevel,
-  canUserApproveTask,
-  canAssignToEmployee,
+  canTaskBeEvaluated,
+  isTaskLocked,
   type TaskForPermission,
   type TaskPermissions,
   type PermissionGroup,
   type UserRole,
-} from './taskPermissions';
+} from './taskPermissions'
+
+// Re-export types
+export type { TaskForPermission, TaskPermissions, PermissionGroup, UserRole }
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface UseTaskPermissionsReturn {
-  isLoading: boolean;
-  userLevel: number;
-  userDepartmentId: string;
-  userEmployeeId: string;
-  userGroup: PermissionGroup;
-  userRole: UserRole;
-  isAdmin: boolean;
-  isExecutive: boolean;
-  isManager: boolean;
-  isEmployee: boolean;
-  getPermissions: (task: TaskForPermission) => TaskPermissions;
-  getPermissionsForList: (tasks: TaskForPermission[]) => Map<string, TaskPermissions>;
-  canApprove: (assignerLevel: number | null, taskDepartmentId: string | null) => { canApprove: boolean; reason?: string };
-  canAssignTo: (targetDepartmentId: string | null) => { canAssign: boolean; reason?: string };
+  // User info
+  userRole: UserRole
+  userGroup: PermissionGroup
+  userLevel: number | null
+  userDepartmentId: string | null
+  userEmployeeId: string | null
+  isAdmin: boolean
+  isLoading: boolean
+  
+  // Role checks
+  isExecutive: boolean
+  isManager: boolean
+  isEmployee: boolean
+  
+  // Permission check functions
+  getPermissions: (task: TaskForPermission) => TaskPermissions
+  canApprove: (assignerLevel: number | null, taskDepartmentId: string | null) => { canApprove: boolean; reason?: string }
+  canApproveTask: (assignerLevel: number | null, taskDepartmentId: string | null) => { canApprove: boolean; reason?: string }
+  canAssignTo: (targetDepartmentId: string | null) => { canAssign: boolean; reason?: string }
+  canEvaluateTask: (task: TaskForPermission) => boolean
+  
+  // Helper functions
+  isTaskLocked: (evaluationStatus: string | null | undefined) => boolean
+  canTaskBeEvaluated: (status: string) => boolean
 }
 
 // ============================================================================
-// HOOK
+// HOOK IMPLEMENTATION
 // ============================================================================
 
 export function useTaskPermissions(): UseTaskPermissionsReturn {
-  const { user } = useAuthStore();
-  const [positionLevel, setPositionLevel] = useState<number>(6); // Default = Employee
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch position level từ database
-  useEffect(() => {
-    async function fetchPositionLevel() {
-      console.log('🔐 [useTaskPermissions] Fetching position level for user:', user?.employee_id);
-      
-      if (!user?.position_id) {
-        console.log('🔐 [useTaskPermissions] No position_id, defaulting to level 6 (Employee)');
-        setPositionLevel(6);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('positions')
-          .select('level, name')
-          .eq('id', user.position_id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('❌ [useTaskPermissions] Error fetching position:', error);
-          setPositionLevel(6);
-        } else if (data) {
-          console.log('✅ [useTaskPermissions] Position found:', data);
-          setPositionLevel(data.level || 6);
-        } else {
-          console.log('⚠️ [useTaskPermissions] No position data, defaulting to level 6');
-          setPositionLevel(6);
-        }
-      } catch (err) {
-        console.error('❌ [useTaskPermissions] Exception:', err);
-        setPositionLevel(6);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchPositionLevel();
-  }, [user?.position_id, user?.employee_id]);
-
-  // User context
-  const userLevel = positionLevel;
-  const userDepartmentId = user?.department_id || '';
-  const userEmployeeId = user?.employee_id || '';
-  const userRole: UserRole = (user?.role as UserRole) || 'employee';
-  const isAdmin = user?.role === 'admin';
-
-  // Permission group
-  const userGroup = useMemo(() => getPermissionGroup(userLevel), [userLevel]);
-  const userIsExecutive = useMemo(() => isExecutive(userLevel), [userLevel]);
-  const userIsManager = useMemo(() => isManagerLevel(userLevel), [userLevel]);
-  const userIsEmployee = useMemo(() => isEmployeeLevel(userLevel), [userLevel]);
-
-  // Log khi permission context thay đổi
-  useEffect(() => {
-    if (!isLoading) {
-      console.log('🔐 [useTaskPermissions] Permission context ready:', {
-        employeeId: userEmployeeId,
-        departmentId: userDepartmentId,
-        positionLevel: userLevel,
-        group: userGroup,
-        role: userRole,
-        isAdmin,
-        isExecutive: userIsExecutive,
-        isManager: userIsManager,
-        isEmployee: userIsEmployee,
-      });
-    }
-  }, [isLoading, userEmployeeId, userDepartmentId, userLevel, userGroup, userRole, isAdmin, userIsExecutive, userIsManager, userIsEmployee]);
-
-  // ========== PERMISSION CHECK FUNCTIONS ==========
-
-  const getPermissions = useCallback(
-    (task: TaskForPermission): TaskPermissions => {
+  const { user, isLoading } = useAuthStore()
+  
+  // Get user info
+  const userRole: UserRole = useMemo(() => {
+    if (!user?.role) return 'employee'
+    if (user.role === 'admin') return 'admin'
+    if (user.role === 'manager' || user.is_manager) return 'manager'
+    return 'employee'
+  }, [user?.role, user?.is_manager])
+  
+  const userLevel = user?.position_level ?? null
+  const userDepartmentId = user?.department_id ?? null
+  const userEmployeeId = user?.employee_id ?? null
+  const isAdmin = userRole === 'admin'
+  const userGroup = getPermissionGroup(userLevel)
+  
+  // Role checks
+  const isExecutive = checkIsExecutive(userLevel)
+  const isManager = userRole === 'manager' || userRole === 'admin' || isManagerLevel(userLevel)
+  const isEmployee = !isManager && !isAdmin
+  
+  // Get permissions for a task
+  const getPermissions = useMemo(() => {
+    return (task: TaskForPermission): TaskPermissions => {
       return getTaskPermissions(
         task,
-        userEmployeeId,
         userRole,
         userDepartmentId,
-        userLevel
-      );
-    },
-    [userEmployeeId, userRole, userDepartmentId, userLevel]
-  );
-
-  const getPermissionsForList = useCallback(
-    (tasks: TaskForPermission[]): Map<string, TaskPermissions> => {
-      const results = new Map<string, TaskPermissions>();
-      for (const task of tasks) {
-        results.set(task.id, getPermissions(task));
+        userLevel,
+        isAdmin
+      )
+    }
+  }, [userRole, userDepartmentId, userLevel, isAdmin])
+  
+  // Check if user can approve a task - returns object
+  const canApprove = useMemo(() => {
+    return (_assignerLevel: number | null, taskDepartmentId: string | null): { canApprove: boolean; reason?: string } => {
+      // Admin can always approve
+      if (isAdmin) {
+        return { canApprove: true }
       }
-      return results;
-    },
-    [getPermissions]
-  );
-
-  const canApprove = useCallback(
-    (assignerLevel: number | null, taskDepartmentId: string | null) => {
-      return canUserApproveTask(
-        userLevel,
-        userDepartmentId,
-        assignerLevel,
-        taskDepartmentId,
-        isAdmin
-      );
-    },
-    [userLevel, userDepartmentId, isAdmin]
-  );
-
-  const canAssignTo = useCallback(
-    (targetDepartmentId: string | null) => {
-      return canAssignToEmployee(
-        userLevel,
-        userDepartmentId,
-        targetDepartmentId,
-        isAdmin
-      );
-    },
-    [userLevel, userDepartmentId, isAdmin]
-  );
-
+      
+      // Only managers can approve
+      if (!isManagerLevel(userLevel)) {
+        return { canApprove: false, reason: 'Chỉ quản lý mới có quyền phê duyệt' }
+      }
+      
+      // Executive can approve all
+      if (isExecutive) {
+        return { canApprove: true }
+      }
+      
+      // Manager can only approve in same department
+      if (taskDepartmentId === userDepartmentId) {
+        return { canApprove: true }
+      }
+      
+      return { canApprove: false, reason: 'Không có quyền phê duyệt công việc ngoài phòng ban' }
+    }
+  }, [userLevel, userDepartmentId, isAdmin, isExecutive])
+  
+  // Check if user can assign to a department
+  const canAssignTo = useMemo(() => {
+    return (targetDepartmentId: string | null): { canAssign: boolean; reason?: string } => {
+      if (isAdmin) {
+        return { canAssign: true }
+      }
+      
+      if (isExecutive) {
+        return { canAssign: true }
+      }
+      
+      if (isManagerLevel(userLevel)) {
+        if (!targetDepartmentId || targetDepartmentId === userDepartmentId) {
+          return { canAssign: true }
+        }
+        return { canAssign: false, reason: 'Chỉ có thể giao việc trong phòng ban của mình' }
+      }
+      
+      return { canAssign: false, reason: 'Nhân viên không có quyền giao việc' }
+    }
+  }, [userLevel, userDepartmentId, isAdmin, isExecutive])
+  
+  // Check if user can evaluate a task
+  const canEvaluateTask = useMemo(() => {
+    return (task: TaskForPermission): boolean => {
+      if (!canTaskBeEvaluated(task.status)) return false
+      if (isTaskLocked(task.evaluation_status)) return false
+      return true
+    }
+  }, [])
+  
   return {
-    isLoading,
+    userRole,
+    userGroup,
     userLevel,
     userDepartmentId,
     userEmployeeId,
-    userGroup,
-    userRole,
     isAdmin,
-    isExecutive: userIsExecutive,
-    isManager: userIsManager,
-    isEmployee: userIsEmployee,
+    isLoading: isLoading ?? false,
+    
+    // Role checks
+    isExecutive,
+    isManager,
+    isEmployee,
+    
+    // Functions
     getPermissions,
-    getPermissionsForList,
     canApprove,
+    canApproveTask: canApprove, // Alias
     canAssignTo,
-  };
+    canEvaluateTask,
+    isTaskLocked,
+    canTaskBeEvaluated,
+  }
 }
 
-export default useTaskPermissions;
+export default useTaskPermissions

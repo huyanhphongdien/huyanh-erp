@@ -2,7 +2,7 @@
 // Phase 6.3: Task Reports - Custom Report Tab (FIXED)
 // ============================================================
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Settings,
   Filter,

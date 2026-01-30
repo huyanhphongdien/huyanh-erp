@@ -12,7 +12,12 @@ interface Props {
 
 export function SalaryGradeForm({ initialData, onSuccess, onCancel }: Props) {
   const { register, handleSubmit, formState: { errors } } = useForm<SalaryGradeFormData>({
-    defaultValues: initialData || {
+    defaultValues: initialData ? {
+      ...initialData,
+      min_salary: initialData.min_salary ?? undefined,
+      max_salary: initialData.max_salary ?? undefined,
+      description: initialData.description ?? undefined,
+    } : {
       code: '',
       name: '',
       level: 1,
@@ -34,7 +39,7 @@ export function SalaryGradeForm({ initialData, onSuccess, onCancel }: Props) {
   })
 
   return (
-    <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
+    <form onSubmit={handleSubmit(data => mutation.mutate(data as any))} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <Input
           label="Mã bậc lương *"

@@ -12,7 +12,11 @@ interface Props {
  
 export function ContractTypeForm({ initialData, onSuccess, onCancel }: Props) {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<ContractTypeFormData>({
-    defaultValues: initialData || {
+    defaultValues: initialData ? {
+      ...initialData,
+      description: initialData.description ?? undefined,
+      duration_months: initialData.duration_months ?? undefined,
+    } : {
       code: '',
       name: '',
       description: '',
@@ -40,7 +44,7 @@ export function ContractTypeForm({ initialData, onSuccess, onCancel }: Props) {
   }
  
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-4">
       <Input
         label="Mã loại hợp đồng *"
         {...register('code', { required: 'Vui lòng nhập mã' })}

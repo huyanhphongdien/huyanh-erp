@@ -16,7 +16,7 @@ export function EmployeeProfileTab({ employeeId }: Props) {
     queryFn: () => employeeProfileService.getByEmployeeId(employeeId)
   })
  
-  const { register, handleSubmit, formState: { errors, isDirty } } = useForm<EmployeeProfileFormData>({
+  const { register, handleSubmit, formState: { isDirty } } = useForm<EmployeeProfileFormData>({
     values: profile ? { ...profile } : { employee_id: employeeId }
   })
  

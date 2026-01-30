@@ -8,10 +8,8 @@ import React, { useState, useMemo } from 'react';
 import {
   type PendingApprovalItem,
   type SelfEvaluationWithRelations,
-  type SelfEvaluationStatus,
-  SELF_EVALUATION_STATUS_LABELS,
 } from '../../types/evaluation.types';
-import { RatingBadge, ScoreBadge, ProgressRing } from './RatingBadge';
+import { ScoreBadge, ProgressRing } from './RatingBadge';
 import { EvaluationStatusBadge } from './StatusBadge';
 
 // ============================================================================

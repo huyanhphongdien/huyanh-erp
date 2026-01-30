@@ -72,7 +72,7 @@ export function LeaveRequestForm({ initialData, onSuccess, onCancel }: Props) {
     mutationFn: (data: LeaveRequestFormData) => 
       initialData 
         ? leaveRequestService.update(initialData.id, data)
-        : leaveRequestService.create(data),
+        : leaveRequestService.create(data as any),
     onSuccess
   })
 

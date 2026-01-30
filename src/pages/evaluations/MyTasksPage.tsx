@@ -124,7 +124,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string
   low: { label: 'Thấp', color: 'text-gray-600', bg: 'bg-gray-100', sortOrder: 4 },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+const _STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: 'Nháp', color: 'text-gray-600', bg: 'bg-gray-100' },
   in_progress: { label: 'Đang làm', color: 'text-blue-600', bg: 'bg-blue-100' },
   paused: { label: 'Tạm dừng', color: 'text-yellow-600', bg: 'bg-yellow-100' },

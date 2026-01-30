@@ -152,7 +152,7 @@ export function useCreateExtensionRequest() {
   return useMutation({
     mutationFn: (input: CreateExtensionRequestInput) =>
       extensionService.createRequest(input),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: extensionKeys.all });
       queryClient.invalidateQueries({

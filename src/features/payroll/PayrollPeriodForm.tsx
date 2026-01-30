@@ -22,7 +22,7 @@ export function PayrollPeriodForm({ initialData, onSuccess, onCancel }: Props) {
     return new Date(year, month, 0).getDate()
   }
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<PayrollPeriodFormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<PayrollPeriodFormData>({
     defaultValues: initialData ? {
       code: initialData.code,
       name: initialData.name,
@@ -79,7 +79,7 @@ export function PayrollPeriodForm({ initialData, onSuccess, onCancel }: Props) {
           </div>
           <div>
             <label className="text-sm text-gray-500">Tổng lương</label>
-            <p className="font-medium text-green-600">{formatCurrency(initialData.total_amount)}</p>
+            <p className="font-medium text-green-600">{formatCurrency(initialData.total_amount ?? 0)}</p>
           </div>
           <div>
             <label className="text-sm text-gray-500">Trạng thái</label>

@@ -54,7 +54,7 @@ function getTaskPermissions(task: any, userRole?: string): TaskPermissions {
   const taskStatus = task?.status || 'draft'
   
   const lockedStatuses = ['pending_approval', 'approved']
-  const isLocked = lockedStatuses.includes(evaluationStatus)
+  // const isLocked = lockedStatuses.includes(evaluationStatus)
   
   if (evaluationStatus === 'pending_approval') {
     return {
@@ -104,7 +104,7 @@ export function TaskViewPage() {
 
   // Subtask states
   const [isChildTask, setIsChildTask] = useState(false)
-  const [canHaveChildren, setCanHaveChildren] = useState(true)
+  const [, setCanHaveChildren] = useState(true)
   const [subtaskCount, setSubtaskCount] = useState(0)
 
   const { data: task, isLoading, error, refetch } = useTask(id || '')

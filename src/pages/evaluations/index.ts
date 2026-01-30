@@ -1,14 +1,15 @@
 // src/pages/evaluations/index.ts
-// FIXED: Chỉ export các modules thực sự tồn tại
+// FIXED: Sửa tên exports đúng với file thực tế
 
-export { ApprovalPage } from './ApprovalPage'
-export { MyTasksPage } from './MyTasksPage'
-export { SelfEvaluationPage } from './SelfEvaluationPage'
-export { TaskDetailPage } from './TaskDetailPage'
+// ApprovalPage.tsx export là "ApprovalsPage" (có s)
+export { ApprovalsPage } from './ApprovalPage'
+export { ApprovalsPage as ApprovalPage } from './ApprovalPage'
 
-// XÓA các exports không tồn tại:
-// export { TaskListPage } from './TaskListPage';
-// export { TaskCreatePage } from './TaskCreatePage';
-// export { TaskEditPage } from './TaskEditPage';
-// export { default as TaskViewPage } from './TaskViewPage';
-// export * from './components';
+// MyTasksPage.tsx dùng default export
+export { default as MyTasksPage } from './MyTasksPage'
+
+// TaskDetailPage.tsx dùng default export
+export { default as TaskDetailPage } from './TaskDetailPage'
+
+// Nếu có SelfEvaluationPage (uncomment nếu file tồn tại)
+// export { default as SelfEvaluationPage } from './SelfEvaluationPage'

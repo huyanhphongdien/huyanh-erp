@@ -8,7 +8,6 @@ import React, { useState, useMemo } from 'react';
 import {
   type SelfEvaluationWithRelations,
   type SelfEvaluationStatus,
-  SELF_EVALUATION_STATUS,
   SELF_EVALUATION_STATUS_LABELS,
   calculateRating,
 } from '../../types/evaluation.types';

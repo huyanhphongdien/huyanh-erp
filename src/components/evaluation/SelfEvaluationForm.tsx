@@ -10,8 +10,6 @@ import {
   type UpdateSelfEvaluationInput,
   type TaskSelfEvaluation,
   type QualityAssessment,
-  QUALITY_ASSESSMENTS,
-  QUALITY_ASSESSMENT_LABELS,
   calculateRating,
 } from '../../types/evaluation.types';
 import { ScoreInput } from './ScoreInput';

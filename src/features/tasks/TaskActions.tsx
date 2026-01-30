@@ -1,6 +1,6 @@
 // ============================================================================
 // TASK ACTIONS COMPONENT
-// File: src/components/tasks/TaskActions.tsx
+// File: src/features/tasks/TaskActions.tsx
 // Huy Anh ERP System
 // ============================================================================
 // PHÂN QUYỀN:
@@ -26,7 +26,7 @@ import {
   getTaskPermissions,
   type TaskForPermission,
   type UserRole,
-} from '../../features/tasks/utils/taskPermissions';
+} from './utils/taskPermissions';
 
 // ============================================================================
 // STATUS CONFIG (inline để tránh import lỗi)
@@ -127,12 +127,14 @@ export const TaskActions: React.FC<TaskActionsProps> = ({
     assigner_level: assignerLevel,
   };
 
+  // FIX: Updated getTaskPermissions call to match new signature
+  // New signature: (task, userRole, userDeptId, userLevel?, isAdmin?)
   const permissions = getTaskPermissions(
     taskForPerm,
-    currentUserId,
     currentUserRole as UserRole,
     currentUserDepartmentId,
-    currentUserPositionLevel
+    currentUserPositionLevel,
+    currentUserRole === 'admin'
   );
 
   // ============================================
@@ -653,12 +655,13 @@ export const AssignTaskButton: React.FC<AssignTaskButtonProps> = ({
     assigner_level: assignerLevel,
   };
 
+  // FIX: Updated getTaskPermissions call to match new signature
   const permissions = getTaskPermissions(
     taskForPerm,
-    currentUserId,
     currentUserRole as UserRole,
     currentUserDepartmentId,
-    currentUserPositionLevel
+    currentUserPositionLevel,
+    currentUserRole === 'admin'
   );
 
   // Chỉ hiển thị khi task ở draft, có assignee, và có quyền assign

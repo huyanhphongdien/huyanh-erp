@@ -4,7 +4,7 @@
 // Phase 4.4: Hiển thị thông tin công việc cha khi xem công việc con
 // ============================================================================
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -19,7 +19,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
-import { subtaskService, SubtaskItem } from '../../../services/subtaskService'
+import { subtaskService } from '../../../services/subtaskService'
 
 // ============================================================================
 // STATUS CONFIG

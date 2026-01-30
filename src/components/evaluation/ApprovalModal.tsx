@@ -6,13 +6,11 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  type ApprovalAction,
   type ApproveTaskInput,
   type RejectTaskInput,
   type RequestInfoInput,
   type SelfEvaluationWithRelations,
   type PendingApprovalItem,
-  APPROVAL_ACTIONS,
   calculateRating,
 } from '../../types/evaluation.types';
 import { ScoreInput } from './ScoreInput';
@@ -148,7 +146,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
   if (!isOpen || !item) return null;
 
   const normalized = normalizeItem(item);
-  const calculatedRating = score !== null ? calculateRating(score) : null;
+  // const calculatedRating = score !== null ? calculateRating(score) : null;
 
   // Validate form based on mode
   const validateForm = (): boolean => {

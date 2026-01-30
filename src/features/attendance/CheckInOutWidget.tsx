@@ -111,7 +111,7 @@ export function CheckInOutWidget({ onCheckInOut }: Props) {
               <div className="text-center">
                 <span className="text-green-600 font-medium">✓ Đã hoàn thành</span>
                 <p className="text-sm text-gray-500">
-                  Làm việc: {Math.floor(todayAttendance.working_minutes / 60)}h {todayAttendance.working_minutes % 60}m
+                  Làm việc: {Math.floor((todayAttendance.working_minutes ?? 0) / 60)}h {(todayAttendance.working_minutes ?? 0) % 60}m
                 </p>
               </div>
             )}

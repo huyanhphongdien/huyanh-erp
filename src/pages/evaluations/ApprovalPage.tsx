@@ -157,7 +157,7 @@ function NoPermissionMessage() {
 export const ApprovalsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { group, isAdmin, canApprove } = usePermissions();
+  const { group, isAdmin } = usePermissions();
   
   // State
   const [activeTab, setActiveTab] = useState<TabType>('pending');

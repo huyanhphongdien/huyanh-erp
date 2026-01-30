@@ -23,7 +23,13 @@ const colorOptions = [
  
 export function LeaveTypeForm({ initialData, onSuccess, onCancel }: Props) {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<LeaveTypeFormData>({
-    defaultValues: initialData || {
+    defaultValues: initialData ? {
+      ...initialData,
+      description: initialData.description ?? undefined,
+      max_days_per_year: initialData.max_days_per_year ?? undefined,
+      default_days: initialData.default_days ?? undefined,
+      color: initialData.color ?? undefined,
+    } : {
       code: '',
       name: '',
       description: '',
@@ -46,7 +52,7 @@ export function LeaveTypeForm({ initialData, onSuccess, onCancel }: Props) {
   })
  
   return (
-    <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
+    <form onSubmit={handleSubmit(data => mutation.mutate(data as any))} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <Input
           label="Mã loại nghỉ *"

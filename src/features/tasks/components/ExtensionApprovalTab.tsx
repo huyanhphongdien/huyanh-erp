@@ -101,7 +101,7 @@ function getFileIcon(fileName: string | null | undefined) {
   }
 }
 
-function getStatusBadge(status: string) {
+function _getStatusBadge(status: string) {
   switch (status) {
     case 'pending':
       return (

@@ -4,7 +4,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { Button, Input, Card } from '../../components/ui'
 
 export function RegisterPage() {
-  const navigate = useNavigate()
+  // const navigate = useNavigate()
   const { register, isLoading, error, clearError } = useAuthStore()
 
   const [formData, setFormData] = useState({

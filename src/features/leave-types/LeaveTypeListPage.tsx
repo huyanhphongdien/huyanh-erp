@@ -35,7 +35,7 @@ export function LeaveTypeListPage() {
       render: (item: LeaveType) => (
         <div 
           className="w-6 h-6 rounded" 
-          style={{ backgroundColor: item.color }}
+          style={{ backgroundColor: item.color ?? undefined }}
         />
       )
     },

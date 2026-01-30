@@ -113,7 +113,7 @@ export function calculateProgressBySubtasks(subtasks: { progress: number }[]): n
  * - Tự động chuyển status thành 'finished' nếu progress = 100
  */
 export async function updateTaskProgress(input: UpdateProgressInput) {
-  const { taskId, progress, changedBy, reason } = input
+  const { taskId, progress } = input
 
   // Validate progress range
   if (progress < 0 || progress > 100) {
@@ -173,7 +173,7 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
  * Đổi chế độ tính tiến độ
  */
 export async function changeProgressMode(input: ChangeProgressModeInput) {
-  const { taskId, mode, changedBy } = input
+  const { taskId, mode } = input
 
   const updateData: Record<string, any> = {
     progress_mode: mode,

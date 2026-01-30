@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { Button, Input, Card } from '../../components/ui';
+import { Button, Card } from '../../components/ui';
 
 export function LoginPage() {
   const navigate = useNavigate();

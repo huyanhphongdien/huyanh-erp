@@ -1,249 +1,260 @@
-// ============================================================
-// USE PERMISSIONS HOOK
-// File: src/hooks/usePermissions.ts
-// Huy Anh ERP System - Permission Hook
-// ============================================================
+// ============================================================================
+// src/hooks/usePermissions.ts
+// Permission Hook - COMPLETE VERSION matching PermissionGate usage
+// ============================================================================
 
-import { useMemo } from 'react';
-import { useAuthStore } from '../stores/authStore';
-import { PERMISSIONS, canAccessMenu, getFeatureFromPath } from '../config/permissions.config';
-import type { 
-  Feature, 
-  DataScope, 
-  PermissionGroup, 
-  PositionLevel,
-  POSITION_LEVEL_TO_GROUP 
-} from '../types/permissions';
+import { useMemo } from 'react'
+import { useAuthStore } from '../stores/authStore'
+import {
+  getPermissionGroup,
+  isExecutive as checkIsExecutive,
+  isManagerLevel,
+  canTaskBeEvaluated,
+  isTaskLocked,
+  getTaskPermissions,
+  type TaskForPermission,
+  type TaskPermissions,
+  type PermissionGroup,
+  type UserRole,
+} from '../features/tasks/utils/taskPermissions'
 
-// ==================== HELPER: Get permission group from level ====================
-function getPermissionGroup(level: number | null | undefined): PermissionGroup {
-  if (!level) return 'employee';
+// Re-export types
+export type { TaskForPermission, TaskPermissions, PermissionGroup, UserRole }
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface UsePermissionsReturn {
+  // User info
+  group: PermissionGroup
+  level: number | null
+  userRole: UserRole
+  userLevel: number | null
+  userDepartmentId: string | null
+  userEmployeeId: string | null
+  isAdmin: boolean
+  isManager: boolean
+  isLoading: boolean
   
-  // Level 1-3: Executive
-  if (level >= 1 && level <= 3) return 'executive';
+  // Role checks
+  isExecutive: boolean
+  isEmployee: boolean
   
-  // Level 4-5: Manager
-  if (level >= 4 && level <= 5) return 'manager';
+  // General permission checks - matching PermissionGate usage
+  canView: (feature?: string, resourceOwnerId?: string, resourceDeptId?: string) => boolean
+  canCreate: (feature?: string, resourceOwnerId?: string, resourceDeptId?: string) => boolean
+  canEdit: (feature?: string, resourceOwnerId?: string, resourceDeptId?: string) => boolean
+  canDelete: (feature?: string, resourceOwnerId?: string, resourceDeptId?: string) => boolean
+  // canApprove for PermissionGate - returns boolean
+  canApprove: (feature?: string, resourceDeptId?: string | null) => boolean
+  // canApproveTask for task approval - returns object
+  canApproveTask: (assignerLevel: number | null, taskDepartmentId: string | null) => { canApprove: boolean; reason?: string }
   
-  // Level 6+: Employee
-  return 'employee';
+  // Task permission functions
+  getPermissions: (task: TaskForPermission) => TaskPermissions
+  canAssignTo: (targetDepartmentId: string | null) => { canAssign: boolean; reason?: string }
+  canEvaluateTask: (task: TaskForPermission) => boolean
+  
+  // Helper functions
+  isTaskLocked: (evaluationStatus: string | null | undefined) => boolean
+  canTaskBeEvaluated: (status: string) => boolean
 }
 
-// ==================== MAIN HOOK ====================
-export function usePermissions() {
-  const { user } = useAuthStore();
+export interface UseTaskPermissionsReturn extends UsePermissionsReturn {}
 
-  // Tính toán permission group từ position level
-  const permissionData = useMemo(() => {
-    const level = user?.position_level ?? 6;
-    const group = getPermissionGroup(level);
-    const isAdmin = user?.role === 'admin';
-    const departmentId = user?.department_id ?? null;
-    const employeeId = user?.employee_id ?? null;
+// ============================================================================
+// HOOK IMPLEMENTATION
+// ============================================================================
 
-    return {
-      level: level as PositionLevel,
-      group,
-      isAdmin,
-      departmentId,
-      employeeId,
-    };
-  }, [user]);
-
-  // ==================== CHECK VIEW PERMISSION ====================
-  const canView = (feature: Feature): boolean => {
-    if (permissionData.isAdmin) return true;
-    
-    const featurePerms = PERMISSIONS[feature];
-    if (!featurePerms) return false;
-    
-    const groupPerms = featurePerms[permissionData.group];
-    return groupPerms.view !== 'none';
-  };
-
-  // ==================== CHECK CREATE PERMISSION ====================
-  const canCreate = (feature: Feature): boolean => {
-    if (permissionData.isAdmin) return true;
-    
-    const featurePerms = PERMISSIONS[feature];
-    if (!featurePerms) return false;
-    
-    const groupPerms = featurePerms[permissionData.group];
-    return groupPerms.create;
-  };
-
-  // ==================== CHECK EDIT PERMISSION ====================
-  const canEdit = (feature: Feature, resourceOwnerId?: string, resourceDeptId?: string): boolean => {
-    if (permissionData.isAdmin) return true;
-    
-    const featurePerms = PERMISSIONS[feature];
-    if (!featurePerms) return false;
-    
-    const groupPerms = featurePerms[permissionData.group];
-    const scope = groupPerms.edit;
-    
-    if (scope === 'none') return false;
-    if (scope === 'all') return true;
-    
-    if (scope === 'self') {
-      return resourceOwnerId === permissionData.employeeId;
+export function usePermissions(): UsePermissionsReturn {
+  const { user, isLoading } = useAuthStore()
+  
+  // Get user info
+  const userRole: UserRole = useMemo(() => {
+    if (!user?.role) return 'employee'
+    if (user.role === 'admin') return 'admin'
+    if (user.role === 'manager' || user.is_manager) return 'manager'
+    return 'employee'
+  }, [user?.role, user?.is_manager])
+  
+  const userLevel = user?.position_level ?? null
+  const userDepartmentId = user?.department_id ?? null
+  const userEmployeeId = user?.employee_id ?? null
+  const isAdmin = userRole === 'admin'
+  const group = getPermissionGroup(userLevel)
+  
+  // Role checks
+  const isExecutive = checkIsExecutive(userLevel)
+  const isManager = userRole === 'manager' || userRole === 'admin' || isManagerLevel(userLevel)
+  const isEmployee = !isManager && !isAdmin
+  
+  // General permission checks - matching PermissionGate usage
+  const canView = useMemo(() => {
+    return (_feature?: string, _resourceOwnerId?: string, resourceDeptId?: string): boolean => {
+      // Admin and executives can view everything
+      if (isAdmin || isExecutive) return true
+      // Managers can view their department
+      if (isManager) {
+        if (!resourceDeptId) return true
+        return resourceDeptId === userDepartmentId
+      }
+      // Employees can view limited
+      return true
     }
-    
-    if (scope === 'department') {
-      return resourceDeptId === permissionData.departmentId || 
-             resourceOwnerId === permissionData.employeeId;
+  }, [isAdmin, isExecutive, isManager, userDepartmentId])
+  
+  const canCreate = useMemo(() => {
+    return (_feature?: string, _resourceOwnerId?: string, resourceDeptId?: string): boolean => {
+      if (isAdmin || isExecutive) return true
+      if (isManager) {
+        if (!resourceDeptId) return true
+        return resourceDeptId === userDepartmentId
+      }
+      return false
     }
-    
-    return false;
-  };
-
-  // ==================== CHECK DELETE PERMISSION ====================
-  const canDelete = (feature: Feature, resourceOwnerId?: string, resourceDeptId?: string): boolean => {
-    if (permissionData.isAdmin) return true;
-    
-    const featurePerms = PERMISSIONS[feature];
-    if (!featurePerms) return false;
-    
-    const groupPerms = featurePerms[permissionData.group];
-    const scope = groupPerms.delete;
-    
-    if (scope === 'none') return false;
-    if (scope === 'all') return true;
-    
-    if (scope === 'self') {
-      return resourceOwnerId === permissionData.employeeId;
+  }, [isAdmin, isExecutive, isManager, userDepartmentId])
+  
+  const canEdit = useMemo(() => {
+    return (_feature?: string, resourceOwnerId?: string, resourceDeptId?: string): boolean => {
+      if (isAdmin || isExecutive) return true
+      if (isManager) {
+        if (!resourceDeptId) return true
+        return resourceDeptId === userDepartmentId
+      }
+      // Employee can edit own resources
+      if (resourceOwnerId && resourceOwnerId === userEmployeeId) return true
+      return false
     }
-    
-    if (scope === 'department') {
-      return resourceDeptId === permissionData.departmentId;
+  }, [isAdmin, isExecutive, isManager, userDepartmentId, userEmployeeId])
+  
+  const canDelete = useMemo(() => {
+    return (_feature?: string, resourceOwnerId?: string, resourceDeptId?: string): boolean => {
+      if (isAdmin || isExecutive) return true
+      if (isManager) {
+        if (!resourceDeptId) return true
+        return resourceDeptId === userDepartmentId
+      }
+      // Employee can delete own resources (in some cases)
+      if (resourceOwnerId && resourceOwnerId === userEmployeeId) return true
+      return false
     }
-    
-    return false;
-  };
-
-  // ==================== CHECK APPROVE PERMISSION ====================
-  const canApprove = (feature: Feature, resourceDeptId?: string): boolean => {
-    if (permissionData.isAdmin) return true;
-    
-    const featurePerms = PERMISSIONS[feature];
-    if (!featurePerms) return false;
-    
-    const groupPerms = featurePerms[permissionData.group];
-    const scope = groupPerms.approve;
-    
-    if (scope === 'none') return false;
-    if (scope === 'all') return true;
-    
-    if (scope === 'department') {
-      return resourceDeptId === permissionData.departmentId;
+  }, [isAdmin, isExecutive, isManager, userDepartmentId, userEmployeeId])
+  
+  // canApprove for PermissionGate - returns boolean
+  const canApprove = useMemo(() => {
+    return (_feature?: string, resourceDeptId?: string | null): boolean => {
+      if (isAdmin) return true
+      if (!isManagerLevel(userLevel)) return false
+      if (isExecutive) return true
+      if (!resourceDeptId || resourceDeptId === userDepartmentId) return true
+      return false
     }
-    
-    return false;
-  };
-
-  // ==================== GET DATA SCOPE ====================
-  // Trả về phạm vi dữ liệu cho một feature
-  const getDataScope = (feature: Feature): DataScope => {
-    if (permissionData.isAdmin) return 'all';
-    
-    const featurePerms = PERMISSIONS[feature];
-    if (!featurePerms) return 'none';
-    
-    const groupPerms = featurePerms[permissionData.group];
-    return groupPerms.view;
-  };
-
-  // ==================== CHECK MENU ACCESS ====================
-  const checkMenuAccess = (path: string): boolean => {
-    return canAccessMenu(path, permissionData.group, permissionData.isAdmin);
-  };
-
-  // ==================== GET PERMISSION FOR FEATURE ====================
-  const getFeaturePermissions = (feature: Feature) => {
-    if (permissionData.isAdmin) {
-      return {
-        canView: true,
-        canCreate: true,
-        canEdit: true,
-        canDelete: true,
-        canApprove: true,
-        dataScope: 'all' as DataScope,
-      };
+  }, [userLevel, userDepartmentId, isAdmin, isExecutive])
+  
+  // canApproveTask for task approval - returns object
+  const canApproveTask = useMemo(() => {
+    return (_assignerLevel: number | null, taskDepartmentId: string | null): { canApprove: boolean; reason?: string } => {
+      if (isAdmin) {
+        return { canApprove: true }
+      }
+      
+      if (!isManagerLevel(userLevel)) {
+        return { canApprove: false, reason: 'Chỉ quản lý mới có quyền phê duyệt' }
+      }
+      
+      if (isExecutive) {
+        return { canApprove: true }
+      }
+      
+      if (taskDepartmentId === userDepartmentId) {
+        return { canApprove: true }
+      }
+      
+      return { canApprove: false, reason: 'Không có quyền phê duyệt công việc ngoài phòng ban' }
     }
-    
-    const featurePerms = PERMISSIONS[feature];
-    if (!featurePerms) {
-      return {
-        canView: false,
-        canCreate: false,
-        canEdit: false,
-        canDelete: false,
-        canApprove: false,
-        dataScope: 'none' as DataScope,
-      };
+  }, [userLevel, userDepartmentId, isAdmin, isExecutive])
+  
+  // Get permissions for a task
+  const getPermissions = useMemo(() => {
+    return (task: TaskForPermission): TaskPermissions => {
+      return getTaskPermissions(
+        task,
+        userRole,
+        userDepartmentId,
+        userLevel,
+        isAdmin
+      )
     }
-    
-    const groupPerms = featurePerms[permissionData.group];
-    
-    return {
-      canView: groupPerms.view !== 'none',
-      canCreate: groupPerms.create,
-      canEdit: groupPerms.edit !== 'none',
-      canDelete: groupPerms.delete !== 'none',
-      canApprove: groupPerms.approve !== 'none',
-      dataScope: groupPerms.view,
-    };
-  };
-
-  // ==================== HELPER: Build query filter ====================
-  // Trả về filter object cho Supabase query
-  const buildDataFilter = (feature: Feature): { 
-    filterField?: string; 
-    filterValue?: string | null;
-    noFilter?: boolean;
-  } => {
-    const scope = getDataScope(feature);
-    
-    if (scope === 'all' || scope === 'none') {
-      return { noFilter: scope === 'all' };
+  }, [userRole, userDepartmentId, userLevel, isAdmin])
+  
+  // Check if user can assign to a department
+  const canAssignTo = useMemo(() => {
+    return (targetDepartmentId: string | null): { canAssign: boolean; reason?: string } => {
+      if (isAdmin) {
+        return { canAssign: true }
+      }
+      
+      if (isExecutive) {
+        return { canAssign: true }
+      }
+      
+      if (isManagerLevel(userLevel)) {
+        if (!targetDepartmentId || targetDepartmentId === userDepartmentId) {
+          return { canAssign: true }
+        }
+        return { canAssign: false, reason: 'Chỉ có thể giao việc trong phòng ban của mình' }
+      }
+      
+      return { canAssign: false, reason: 'Nhân viên không có quyền giao việc' }
     }
-    
-    if (scope === 'self') {
-      return { filterField: 'employee_id', filterValue: permissionData.employeeId };
+  }, [userLevel, userDepartmentId, isAdmin, isExecutive])
+  
+  // Check if user can evaluate a task
+  const canEvaluateTask = useMemo(() => {
+    return (task: TaskForPermission): boolean => {
+      if (!canTaskBeEvaluated(task.status)) return false
+      if (isTaskLocked(task.evaluation_status)) return false
+      return true
     }
-    
-    if (scope === 'department') {
-      return { filterField: 'department_id', filterValue: permissionData.departmentId };
-    }
-    
-    return { noFilter: true };
-  };
-
+  }, [])
+  
   return {
     // User info
-    user,
-    ...permissionData,
+    group,
+    level: userLevel,
+    userRole,
+    userLevel,
+    userDepartmentId,
+    userEmployeeId,
+    isAdmin,
+    isManager,
+    isLoading: isLoading ?? false,
     
-    // Permission checks
+    // Role checks
+    isExecutive,
+    isEmployee,
+    
+    // General permissions
     canView,
     canCreate,
     canEdit,
     canDelete,
     canApprove,
+    canApproveTask,
     
-    // Scope & filters
-    getDataScope,
-    buildDataFilter,
-    getFeaturePermissions,
-    
-    // Menu access
-    checkMenuAccess,
-    
-    // Quick checks
-    isExecutive: permissionData.group === 'executive' || permissionData.isAdmin,
-    isManager: permissionData.group === 'manager' || permissionData.group === 'executive' || permissionData.isAdmin,
-    isEmployee: permissionData.group === 'employee',
-  };
+    // Task permissions
+    getPermissions,
+    canAssignTo,
+    canEvaluateTask,
+    isTaskLocked,
+    canTaskBeEvaluated,
+  }
 }
 
-export default usePermissions;
+// Alias for backward compatibility
+export function useTaskPermissions(): UseTaskPermissionsReturn {
+  return usePermissions()
+}
+
+export default usePermissions

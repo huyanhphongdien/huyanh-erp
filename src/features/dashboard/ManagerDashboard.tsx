@@ -440,7 +440,7 @@ export function ManagerDashboard() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value, name, props) => [
+                    formatter={(value, _name, props) => [
                       `${value} công việc`,
                       (props as any).payload.label,
                     ]}

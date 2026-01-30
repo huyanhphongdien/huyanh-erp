@@ -86,7 +86,7 @@ export function useBulkCreateAssignment() {
       role?: AssignmentRole
       assignedBy?: string
     }) => taskAssignmentService.createBulk(taskId, employeeIds, role, assignedBy),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ 
         queryKey: ASSIGNMENT_QUERY_KEYS.byTask(variables.taskId) 
       })

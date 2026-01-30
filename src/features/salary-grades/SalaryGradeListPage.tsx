@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { salaryGradeService } from '../../services'
-import { Button, Input, Select, Card, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
+import { Button, Input, Select, Card, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { SalaryGradeForm } from './SalaryGradeForm'
 import type { SalaryGrade } from '../../types'
 
@@ -99,8 +99,8 @@ export function SalaryGradeListPage() {
                     <td className="px-4 py-3 text-sm">{item.code}</td>
                     <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
                     <td className="px-4 py-3 text-sm">{item.level}</td>
-                    <td className="px-4 py-3 text-sm">{formatCurrency(item.min_salary)}</td>
-                    <td className="px-4 py-3 text-sm">{formatCurrency(item.max_salary)}</td>
+                    <td className="px-4 py-3 text-sm">{formatCurrency(item.min_salary ?? 0)}</td>
+                    <td className="px-4 py-3 text-sm">{formatCurrency(item.max_salary ?? 0)}</td>
                     <td className="px-4 py-3 text-sm">
                       {item.base_salary ? formatCurrency(item.base_salary) : '-'}
                     </td>

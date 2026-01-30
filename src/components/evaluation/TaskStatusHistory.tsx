@@ -126,7 +126,7 @@ interface HistoryItemProps {
   compact: boolean
 }
 
-function HistoryItem({ item, isFirst, isLast, compact }: HistoryItemProps) {
+function HistoryItem({ item, isFirst, compact }: HistoryItemProps) {
   const newStatusColor = statusColors[item.new_status] || statusColors.new
   const oldStatusColor = item.old_status ? (statusColors[item.old_status] || statusColors.new) : null
   const changeTypeIcon = changeTypeIcons[item.change_type] || '📌'

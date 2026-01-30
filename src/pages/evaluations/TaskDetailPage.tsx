@@ -36,11 +36,11 @@ import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
 import {
   getTaskPermissions,
-  isTaskLocked,
   getTaskLockMessage,
   getEvaluationStatusColor,
   getEvaluationStatusLabel,
   type TaskPermissions,
+  type UserRole,
 } from '../../features/tasks/utils/taskPermissions';
 
 // *** IMPORT MỚI: TaskParticipantsSection ***
@@ -310,11 +310,14 @@ const TaskDetailPage: React.FC = () => {
 
       // Calculate permissions
       if (user) {
+        // FIX: Updated getTaskPermissions call to match new signature
+        // New signature: (task, userRole, userDeptId, userLevel?, isAdmin?)
         const perms = getTaskPermissions(
           taskData,
-          user.employee_id,
-          user.role as 'admin' | 'manager' | 'employee',
-          user.department_id
+          (user.role as UserRole) || 'employee',
+          user.department_id,
+          undefined, // userLevel - can fetch if needed
+          user.role === 'admin'
         );
         setPermissions(perms);
       }

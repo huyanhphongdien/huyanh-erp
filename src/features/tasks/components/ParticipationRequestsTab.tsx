@@ -60,7 +60,7 @@ function formatDate(dateStr: string | null | undefined): string {
   })
 }
 
-function formatDateTime(dateStr: string | null | undefined): string {
+function _formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('vi-VN', {
     day: '2-digit',

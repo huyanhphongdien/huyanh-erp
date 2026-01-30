@@ -419,7 +419,7 @@ export function TaskListPage() {
 
       {activeTab === 'overview' ? (
         <TaskOverviewTab
-          userDepartmentId={canViewAllDepartments ? undefined : userDepartmentId}
+          userDepartmentId={canViewAllDepartments ? undefined : (userDepartmentId ?? undefined)}
           canViewAllDepartments={canViewAllDepartments}
         />
       ) : (

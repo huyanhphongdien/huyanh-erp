@@ -18,6 +18,7 @@ import {
   getTaskPermissions,
   getPermissionGroup,
   type TaskForPermission,
+  type UserRole,
 } from './utils/taskPermissions'
 
 // ============================================================================
@@ -206,12 +207,14 @@ export function TaskEditPage() {
           assigner_level: assignerLevel,
         }
 
+        // FIX: Updated getTaskPermissions call to match new signature
+        // New signature: (task, userRole, userDeptId, userLevel?, isAdmin?)
         const permissions = getTaskPermissions(
           taskForPerm,
-          user?.employee_id || null,
-          (user?.role as any) || 'employee',
+          (user?.role as UserRole) || 'employee',
           user?.department_id || null,
-          posLevel
+          posLevel,
+          user?.role === 'admin'
         )
 
         console.log('🔐 [TaskEditPage] Permissions:', permissions)

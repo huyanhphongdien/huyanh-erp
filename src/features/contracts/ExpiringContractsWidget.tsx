@@ -47,9 +47,9 @@ export function ExpiringContractsWidget() {
               className="flex justify-between items-center p-2 bg-yellow-50 rounded"
             >
               <div>
-                <div className="font-medium">{contract.employee?.full_name}</div>
+                <div className="font-medium">{(contract as any).employee?.full_name}</div>
                 <div className="text-sm text-gray-600">
-                  {contract.contract_type?.name} - Hết hạn: {formatDate(contract.end_date!)}
+                  {(contract as any).contract_type?.name} - Hết hạn: {formatDate(contract.end_date!)}
                 </div>
               </div>
               <span className={`px-2 py-1 rounded text-xs font-medium ${

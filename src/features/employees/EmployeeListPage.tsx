@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { employeeService, departmentService, positionService } from '../../services'
+import { employeeService, departmentService } from '../../services'
 import { Card, Button, Input, Select, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { EmployeeForm } from './EmployeeForm'
 import { Lock } from 'lucide-react'

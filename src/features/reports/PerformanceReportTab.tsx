@@ -2,7 +2,7 @@
 // Phase 6.3: Task Reports - Performance Analysis Tab (FIXED ERROR HANDLING)
 // ============================================================
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   TrendingUp,
   Trophy,

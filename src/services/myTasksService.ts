@@ -73,7 +73,7 @@ export interface MyTasksResponse {
 const EXCLUDED_STATUSES_FOR_EMPLOYEE = ['draft']
 
 // ✅ FIXED: Status đã hoàn thành - dùng 'finished' không phải 'completed'
-const COMPLETED_STATUSES = ['finished', 'cancelled']
+const _COMPLETED_STATUSES = ['finished', 'cancelled']
 
 // ============================================================================
 // SERVICE
@@ -146,7 +146,7 @@ export const myTasksService = {
         assigneeQuery = assigneeQuery.lte('due_date', filter.to_date)
       }
 
-      const { data: assigneeTasks, error: assigneeError, count: assigneeCount } = await assigneeQuery
+      const { data: assigneeTasks, error: assigneeError, count: _assigneeCount } = await assigneeQuery
         .order('updated_at', { ascending: false })
 
       if (assigneeError) {

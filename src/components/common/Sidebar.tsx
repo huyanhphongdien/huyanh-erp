@@ -1,5 +1,5 @@
 // ============================================================
-// SIDEBAR COMPONENT - REFACTORED v3
+// SIDEBAR COMPONENT - REFACTORED v4
 // File: src/components/common/Sidebar.tsx
 // ============================================================
 // CHANGES:
@@ -8,6 +8,7 @@
 // - Gộp "Tự đánh giá" vào "Công việc của tôi" (tabs)
 // - Mobile responsive với hamburger menu
 // - THÊM MỚI: Menu BÁO CÁO cho Phó phòng trở lên (level <= 5)
+// - THÊM MỚI: Menu CÀI ĐẶT TÀI KHOẢN cho tất cả user
 // ============================================================
 
 import { useState } from 'react';
@@ -23,6 +24,8 @@ import {
   LogOut,
   BarChart3,     // Icon cho group Báo cáo
   FileBarChart,  // Icon cho Báo cáo công việc
+  Settings,      // Icon cho Cài đặt
+  User,          // Icon cho Hồ sơ cá nhân
 } from 'lucide-react';
 
 // ============================================================
@@ -145,6 +148,18 @@ const getMenuGroups = (pendingApprovals: number = 0): MenuGroup[] => [
       },
     ],
   },
+  // ===== CÀI ĐẶT - HIỂN THỊ CHO TẤT CẢ USER =====
+  {
+    title: 'CÀI ĐẶT',
+    icon: <Settings size={18} />,
+    items: [
+      { 
+        path: '/settings', 
+        label: 'Cài đặt tài khoản', 
+        icon: <User size={18} />,
+      },
+    ],
+  },
 ];
 
 // ============================================================
@@ -259,12 +274,16 @@ export function Sidebar() {
 
       {/* User Info */}
       <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-lg font-bold text-white shadow-lg">
+        <NavLink 
+          to="/settings" 
+          onClick={() => setIsMobileOpen(false)}
+          className="flex items-center gap-3 group"
+        >
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-lg font-bold text-white shadow-lg group-hover:from-blue-400 group-hover:to-blue-500 transition-all">
             {user?.full_name?.charAt(0) || user?.email?.charAt(0) || '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">
+            <p className="text-sm font-medium text-white truncate group-hover:text-blue-300 transition-colors">
               {user?.full_name || user?.email}
             </p>
             <p className="text-xs text-gray-400 truncate">
@@ -274,7 +293,8 @@ export function Sidebar() {
               )}
             </p>
           </div>
-        </div>
+          <Settings size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors" />
+        </NavLink>
       </div>
 
       {/* Navigation */}

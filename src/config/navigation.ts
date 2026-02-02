@@ -1,11 +1,12 @@
 // ============================================================
-// NAVIGATION CONFIG - REFACTORED
+// NAVIGATION CONFIG - REFACTORED v2
 // File: src/config/navigation.ts
 // ============================================================
 // CHANGES:
 // - Xóa "Tự đánh giá" (đã gộp vào "Công việc của tôi")
 // - Xóa "Tạo công việc" riêng (đã có trong trang Danh sách)
 // - Gọn gàng hơn, tập trung vào các entry points chính
+// - THÊM MỚI: CÀI ĐẶT TÀI KHOẢN cho tất cả user
 // ============================================================
 
 import {
@@ -21,6 +22,9 @@ import {
   CheckSquare,
   UserCheck,
   Star,
+  Settings,
+  User,
+  BarChart3,
   LucideIcon,
 } from 'lucide-react';
 
@@ -37,6 +41,8 @@ export interface NavItem {
   requireManager?: boolean;
   /** Chỉ hiển thị cho admin */
   adminOnly?: boolean;
+  /** Chỉ hiển thị cho Phó phòng trở lên (level <= 5) */
+  executiveOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -44,6 +50,8 @@ export interface NavGroup {
   items: NavItem[];
   /** Mặc định mở rộng */
   defaultOpen?: boolean;
+  /** Chỉ hiển thị cho Phó phòng trở lên */
+  executiveOnly?: boolean;
 }
 
 // ============================================================
@@ -174,12 +182,11 @@ export const navigationGroups: NavGroup[] = [
     title: 'QUẢN LÝ CÔNG VIỆC',
     defaultOpen: true,
     items: [
-      // Danh sách công việc - Manager only (có nút + tạo mới bên trong)
+      // Danh sách công việc - Tất cả user có thể xem
       {
         label: 'Danh sách công việc',
         href: '/tasks',
         icon: ClipboardList,
-        requireManager: true,
       },
       // Công việc của tôi - Entry point chính cho nhân viên
       // Đã gộp: Tự đánh giá + Kết quả đánh giá (tabs trong page)
@@ -188,14 +195,40 @@ export const navigationGroups: NavGroup[] = [
         href: '/my-tasks',
         icon: UserCheck,
       },
-      // ĐÃ XÓA: Tự đánh giá (gộp vào Công việc của tôi)
-      // ĐÃ XÓA: Kết quả đánh giá (gộp vào Công việc của tôi - tab Đã duyệt)
       // Phê duyệt - Manager only
       {
         label: 'Phê duyệt công việc',
         href: '/approvals',
         icon: CheckSquare,
         requireManager: true,
+      },
+    ],
+  },
+
+  // ===== BÁO CÁO - CHỈ CHO PHÓ PHÒNG TRỞ LÊN =====
+  {
+    title: 'BÁO CÁO',
+    defaultOpen: true,
+    executiveOnly: true,
+    items: [
+      {
+        label: 'Báo cáo công việc',
+        href: '/reports/tasks',
+        icon: BarChart3,
+        executiveOnly: true,
+      },
+    ],
+  },
+
+  // ===== CÀI ĐẶT - TẤT CẢ USER =====
+  {
+    title: 'CÀI ĐẶT',
+    defaultOpen: true,
+    items: [
+      {
+        label: 'Cài đặt tài khoản',
+        href: '/settings',
+        icon: User,
       },
     ],
   },
@@ -215,15 +248,27 @@ export function getAllNavItems(): NavItem[] {
 /**
  * Lọc nav items theo role
  */
-export function getNavItemsByRole(isManager: boolean, isAdmin: boolean): NavGroup[] {
-  return navigationGroups.map(group => ({
-    ...group,
-    items: group.items.filter(item => {
-      if (item.adminOnly && !isAdmin) return false;
-      if (item.requireManager && !isManager && !isAdmin) return false;
+export function getNavItemsByRole(
+  isManager: boolean, 
+  isAdmin: boolean, 
+  isExecutive: boolean = false
+): NavGroup[] {
+  return navigationGroups
+    .filter(group => {
+      // Filter out executive-only groups for non-executives
+      if (group.executiveOnly && !isExecutive && !isAdmin) return false;
       return true;
-    }),
-  })).filter(group => group.items.length > 0);
+    })
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        if (item.adminOnly && !isAdmin) return false;
+        if (item.requireManager && !isManager && !isAdmin) return false;
+        if (item.executiveOnly && !isExecutive && !isAdmin) return false;
+        return true;
+      }),
+    }))
+    .filter(group => group.items.length > 0);
 }
 
 /**

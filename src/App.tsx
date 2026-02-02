@@ -2,7 +2,9 @@
 // PHASE 4.5 REFACTOR: UPDATED APP.TSX
 // File: src/App.tsx
 // ============================================================
-// UPDATED: Added Phase 6.3 Task Reports route
+// UPDATED: 
+// - Added Phase 6.3 Task Reports route
+// - Added User Settings route
 // ============================================================
 
 import { useEffect } from 'react';
@@ -51,6 +53,9 @@ import TaskDetailPage from './pages/evaluations/TaskDetailPage';
 
 // Phase 6.3: Task Reports
 import TaskReportsPage from './features/reports/TaskReportsPage';
+
+// User Settings
+import UserSettingsPage from './pages/settings/UserSettingsPage';
 
 // ============================================================
 // QUERY CLIENT
@@ -197,6 +202,11 @@ function App() {
 
               {/* ===== PHASE 6.3: Task Reports ===== */}
               <Route path="reports/tasks" element={<TaskReportsPage />} />
+
+              {/* ===== USER SETTINGS ===== */}
+              <Route path="settings" element={<UserSettingsPage />} />
+              <Route path="account" element={<UserSettingsPage />} />
+              <Route path="profile" element={<UserSettingsPage />} />
 
               {/* ===== REDIRECTS: Legacy routes & backward compatibility ===== */}
               <Route path="my-evaluations" element={<Navigate to="/my-tasks?tab=approved" replace />} />

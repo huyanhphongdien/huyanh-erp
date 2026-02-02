@@ -1,7 +1,9 @@
 // ============================================================================
-// DASHBOARD SERVICE
+// DASHBOARD SERVICE - FIXED
 // File: src/services/dashboardService.ts
 // Huy Anh ERP System - Phase 6.1: Executive Dashboard
+// ============================================================================
+// FIXED: Multiple relationship errors for employees and departments
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
@@ -290,6 +292,7 @@ export const dashboardService = {
 
   /**
    * Lấy hiệu suất theo phòng ban (dựa trên department của assignee)
+   * FIXED: Tách query để tránh multiple relationship error
    */
   async getDepartmentPerformance(): Promise<{ data: DepartmentPerformance[]; error: Error | null }> {
     try {
@@ -301,19 +304,29 @@ export const dashboardService = {
 
       if (deptError) throw deptError;
 
-      // Get all tasks with assignee info
+      // Get all tasks với assignee_id (không dùng nested select)
       const { data: allTasks, error: tasksError } = await supabase
         .from('tasks')
-        .select(`
-          id,
-          status,
-          assignee:employees!tasks_assignee_id_fkey(
-            id,
-            department_id
-          )
-        `);
+        .select('id, status, assignee_id');
 
       if (tasksError) throw tasksError;
+
+      // Get all employees để map department
+      const assigneeIds = [...new Set((allTasks || []).map(t => t.assignee_id).filter(Boolean))];
+      
+      let employeeMap = new Map<string, string>(); // employee_id -> department_id
+      if (assigneeIds.length > 0) {
+        const { data: employees } = await supabase
+          .from('employees')
+          .select('id, department_id')
+          .in('id', assigneeIds);
+        
+        (employees || []).forEach(emp => {
+          if (emp.department_id) {
+            employeeMap.set(emp.id, emp.department_id);
+          }
+        });
+      }
 
       // Get all approved scores
       const { data: allApprovals, error: approvalsError } = await supabase
@@ -327,10 +340,10 @@ export const dashboardService = {
       // Build task map for quick lookup
       const taskMap = new Map<string, any>();
       (allTasks || []).forEach((task: any) => {
-        const assignee = Array.isArray(task.assignee) ? task.assignee[0] : task.assignee;
+        const deptId = task.assignee_id ? employeeMap.get(task.assignee_id) : null;
         taskMap.set(task.id, {
           status: task.status,
-          department_id: assignee?.department_id || null
+          department_id: deptId
         });
       });
 
@@ -339,8 +352,8 @@ export const dashboardService = {
       for (const dept of departments || []) {
         // Filter tasks by assignee's department
         const deptTasks = (allTasks || []).filter((task: any) => {
-          const assignee = Array.isArray(task.assignee) ? task.assignee[0] : task.assignee;
-          return assignee?.department_id === dept.id;
+          const deptId = task.assignee_id ? employeeMap.get(task.assignee_id) : null;
+          return deptId === dept.id;
         });
 
         const totalTasks = deptTasks.length;
@@ -387,6 +400,7 @@ export const dashboardService = {
 
   /**
    * Lấy top nhân viên xuất sắc
+   * FIXED: Tách query để tránh multiple relationship error
    */
   async getTopEmployees(limit: number = 5): Promise<{ data: TopEmployee[]; error: Error | null }> {
     try {
@@ -406,48 +420,55 @@ export const dashboardService = {
       // Lấy task_ids
       const taskIds = [...new Set(approvals.map(a => a.task_id))];
 
-      // Lấy thông tin tasks với assignee
+      // Lấy thông tin tasks với assignee_id (không dùng nested select)
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
-        .select(`
-          id,
-          assignee_id,
-          assignee:employees!tasks_assignee_id_fkey(
-            id,
-            code,
-            full_name,
-            department_id
-          )
-        `)
+        .select('id, assignee_id')
         .in('id', taskIds);
 
       if (tasksError) throw tasksError;
 
+      // Lấy assignee_ids
+      const assigneeIds = [...new Set((tasks || []).map(t => t.assignee_id).filter(Boolean))] as string[];
+
+      // Lấy thông tin employees riêng
+      let employeeMap = new Map<string, any>();
+      if (assigneeIds.length > 0) {
+        const { data: employees } = await supabase
+          .from('employees')
+          .select('id, code, full_name, department_id')
+          .in('id', assigneeIds);
+        
+        (employees || []).forEach(emp => {
+          employeeMap.set(emp.id, emp);
+        });
+      }
+
       // Lấy department names
       const deptIds = [...new Set(
-        (tasks || [])
-          .map(t => {
-            const assignee = Array.isArray(t.assignee) ? t.assignee[0] : t.assignee;
-            return (assignee as any)?.department_id;
-          })
+        Array.from(employeeMap.values())
+          .map(emp => emp.department_id)
           .filter(Boolean)
       )] as string[];
 
-      const { data: departments } = await supabase
-        .from('departments')
-        .select('id, name')
-        .in('id', deptIds);
+      let deptMap = new Map<string, string>();
+      if (deptIds.length > 0) {
+        const { data: departments } = await supabase
+          .from('departments')
+          .select('id, name')
+          .in('id', deptIds);
 
-      const deptMap = new Map((departments || []).map(d => [d.id, d.name]));
-
-      // Build task map
-      const taskMap = new Map<string, any>();
-      (tasks || []).forEach(t => {
-        const assignee = Array.isArray(t.assignee) ? t.assignee[0] : t.assignee;
-        taskMap.set(t.id, {
-          assignee_id: t.assignee_id,
-          assignee: assignee
+        (departments || []).forEach(d => {
+          deptMap.set(d.id, d.name);
         });
+      }
+
+      // Build task -> assignee map
+      const taskMap = new Map<string, string>();
+      (tasks || []).forEach(t => {
+        if (t.assignee_id) {
+          taskMap.set(t.id, t.assignee_id);
+        }
       });
 
       // Aggregate by employee
@@ -461,10 +482,12 @@ export const dashboardService = {
       }> = {};
 
       approvals.forEach((approval) => {
-        const task = taskMap.get(approval.task_id);
-        if (!task?.assignee) return;
+        const assigneeId = taskMap.get(approval.task_id);
+        if (!assigneeId) return;
 
-        const employee = task.assignee;
+        const employee = employeeMap.get(assigneeId);
+        if (!employee) return;
+
         const empId = employee.id;
 
         if (!employeeStats[empId]) {
@@ -503,21 +526,16 @@ export const dashboardService = {
 
   /**
    * Lấy danh sách task quá hạn
+   * FIXED: Tách query để tránh multiple relationship error
    */
   async getOverdueTasks(limit: number = 10): Promise<{ data: OverdueTask[]; error: Error | null }> {
     try {
       const today = new Date().toISOString().split('T')[0];
 
+      // Query tasks without nested select
       const { data, error } = await supabase
         .from('tasks')
-        .select(`
-          id,
-          code,
-          name,
-          due_date,
-          priority,
-          assignee:employees!tasks_assignee_id_fkey(full_name, department_id)
-        `)
+        .select('id, code, name, due_date, priority, assignee_id')
         .lt('due_date', today)
         .not('status', 'in', '("finished","cancelled")')
         .order('due_date', { ascending: true })
@@ -525,28 +543,45 @@ export const dashboardService = {
 
       if (error) throw error;
 
-      // Lấy department names
+      // Get assignee info separately
+      const assigneeIds = [...new Set((data || []).map(t => t.assignee_id).filter(Boolean))] as string[];
+      
+      let employeeMap = new Map<string, any>();
+      if (assigneeIds.length > 0) {
+        const { data: employees } = await supabase
+          .from('employees')
+          .select('id, full_name, department_id')
+          .in('id', assigneeIds);
+        
+        (employees || []).forEach(emp => {
+          employeeMap.set(emp.id, emp);
+        });
+      }
+
+      // Get department names
       const deptIds = [...new Set(
-        (data || [])
-          .map(t => {
-            const assignee = Array.isArray(t.assignee) ? t.assignee[0] : t.assignee;
-            return (assignee as any)?.department_id;
-          })
+        Array.from(employeeMap.values())
+          .map(emp => emp.department_id)
           .filter(Boolean)
       )] as string[];
 
-      const { data: departments } = await supabase
-        .from('departments')
-        .select('id, name')
-        .in('id', deptIds);
+      let deptMap = new Map<string, string>();
+      if (deptIds.length > 0) {
+        const { data: departments } = await supabase
+          .from('departments')
+          .select('id, name')
+          .in('id', deptIds);
 
-      const deptMap = new Map((departments || []).map(d => [d.id, d.name]));
+        (departments || []).forEach(d => {
+          deptMap.set(d.id, d.name);
+        });
+      }
 
       const results: OverdueTask[] = (data || []).map((task: any) => {
         const dueDate = new Date(task.due_date);
         const todayDate = new Date(today);
         const daysOverdue = Math.ceil((todayDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-        const assignee = Array.isArray(task.assignee) ? task.assignee[0] : task.assignee;
+        const employee = task.assignee_id ? employeeMap.get(task.assignee_id) : null;
 
         return {
           id: task.id,
@@ -554,8 +589,8 @@ export const dashboardService = {
           name: task.name || '',
           due_date: task.due_date,
           days_overdue: daysOverdue,
-          assignee_name: assignee?.full_name || 'Chưa giao',
-          department_name: deptMap.get(assignee?.department_id) || '',
+          assignee_name: employee?.full_name || 'Chưa giao',
+          department_name: employee?.department_id ? (deptMap.get(employee.department_id) || '') : '',
           priority: task.priority || 'medium',
         };
       });
@@ -569,22 +604,17 @@ export const dashboardService = {
 
   /**
    * Lấy danh sách task sắp đến hạn
+   * FIXED: Tách query để tránh multiple relationship error
    */
   async getUpcomingTasks(days: number = 7, limit: number = 10): Promise<{ data: UpcomingTask[]; error: Error | null }> {
     try {
       const today = new Date().toISOString().split('T')[0];
       const futureDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+      // Query tasks without nested select
       const { data, error } = await supabase
         .from('tasks')
-        .select(`
-          id,
-          code,
-          name,
-          due_date,
-          priority,
-          assignee:employees!tasks_assignee_id_fkey(full_name)
-        `)
+        .select('id, code, name, due_date, priority, assignee_id')
         .gte('due_date', today)
         .lte('due_date', futureDate)
         .not('status', 'in', '("finished","cancelled")')
@@ -593,11 +623,25 @@ export const dashboardService = {
 
       if (error) throw error;
 
+      // Get assignee info separately
+      const assigneeIds = [...new Set((data || []).map(t => t.assignee_id).filter(Boolean))] as string[];
+      
+      let employeeMap = new Map<string, string>();
+      if (assigneeIds.length > 0) {
+        const { data: employees } = await supabase
+          .from('employees')
+          .select('id, full_name')
+          .in('id', assigneeIds);
+        
+        (employees || []).forEach(emp => {
+          employeeMap.set(emp.id, emp.full_name);
+        });
+      }
+
       const results: UpcomingTask[] = (data || []).map((task: any) => {
         const dueDate = new Date(task.due_date);
         const todayDate = new Date(today);
         const daysUntilDue = Math.ceil((dueDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
-        const assignee = Array.isArray(task.assignee) ? task.assignee[0] : task.assignee;
 
         return {
           id: task.id,
@@ -605,7 +649,7 @@ export const dashboardService = {
           name: task.name || '',
           due_date: task.due_date,
           days_until_due: daysUntilDue,
-          assignee_name: assignee?.full_name || 'Chưa giao',
+          assignee_name: task.assignee_id ? (employeeMap.get(task.assignee_id) || 'Chưa giao') : 'Chưa giao',
           priority: task.priority || 'medium',
         };
       });
@@ -619,33 +663,55 @@ export const dashboardService = {
 
   /**
    * Lấy hoạt động gần đây
+   * FIXED: Tách query để tránh multiple relationship error
    */
   async getRecentActivities(limit: number = 10): Promise<{ data: RecentActivity[]; error: Error | null }> {
     try {
+      // Query activities without nested select
       const { data, error } = await supabase
         .from('task_activities')
-        .select(`
-          id,
-          action,
-          description,
-          created_at,
-          actor:employees!task_activities_actor_id_fkey(full_name),
-          task:tasks(code, name)
-        `)
+        .select('id, action, description, created_at, actor_id, task_id')
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
 
+      // Get actor names
+      const actorIds = [...new Set((data || []).map(a => a.actor_id).filter(Boolean))] as string[];
+      let actorMap = new Map<string, string>();
+      if (actorIds.length > 0) {
+        const { data: actors } = await supabase
+          .from('employees')
+          .select('id, full_name')
+          .in('id', actorIds);
+        
+        (actors || []).forEach(a => {
+          actorMap.set(a.id, a.full_name);
+        });
+      }
+
+      // Get task info
+      const taskIds = [...new Set((data || []).map(a => a.task_id).filter(Boolean))] as string[];
+      let taskMap = new Map<string, { code: string; name: string }>();
+      if (taskIds.length > 0) {
+        const { data: tasks } = await supabase
+          .from('tasks')
+          .select('id, code, name')
+          .in('id', taskIds);
+        
+        (tasks || []).forEach(t => {
+          taskMap.set(t.id, { code: t.code, name: t.name });
+        });
+      }
+
       const results: RecentActivity[] = (data || []).map((activity: any) => {
-        const actor = Array.isArray(activity.actor) ? activity.actor[0] : activity.actor;
-        const task = Array.isArray(activity.task) ? activity.task[0] : activity.task;
+        const task = activity.task_id ? taskMap.get(activity.task_id) : null;
 
         return {
           id: activity.id,
           action: activity.action,
           description: activity.description || '',
-          actor_name: actor?.full_name || 'Hệ thống',
+          actor_name: activity.actor_id ? (actorMap.get(activity.actor_id) || 'Hệ thống') : 'Hệ thống',
           task_name: task?.name || '',
           task_code: task?.code || '',
           created_at: activity.created_at,
@@ -661,20 +727,17 @@ export const dashboardService = {
 
   /**
    * Lấy hợp đồng sắp hết hạn
+   * FIXED: Tách query để tránh multiple relationship error
    */
   async getExpiringContracts(days: number = 30, limit: number = 5): Promise<{ data: ContractAlert[]; error: Error | null }> {
     try {
       const today = new Date().toISOString().split('T')[0];
       const futureDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+      // Query contracts without nested select
       const { data, error } = await supabase
         .from('contracts')
-        .select(`
-          id,
-          end_date,
-          employee:employees(code, full_name),
-          contract_type:contract_types(name)
-        `)
+        .select('id, end_date, employee_id, contract_type_id')
         .eq('status', 'active')
         .gte('end_date', today)
         .lte('end_date', futureDate)
@@ -683,18 +746,45 @@ export const dashboardService = {
 
       if (error) throw error;
 
+      // Get employee info separately
+      const employeeIds = [...new Set((data || []).map(c => c.employee_id).filter(Boolean))] as string[];
+      let employeeMap = new Map<string, { code: string; full_name: string }>();
+      if (employeeIds.length > 0) {
+        const { data: employees } = await supabase
+          .from('employees')
+          .select('id, code, full_name')
+          .in('id', employeeIds);
+        
+        (employees || []).forEach(emp => {
+          employeeMap.set(emp.id, { code: emp.code, full_name: emp.full_name });
+        });
+      }
+
+      // Get contract type names
+      const typeIds = [...new Set((data || []).map(c => c.contract_type_id).filter(Boolean))] as string[];
+      let typeMap = new Map<string, string>();
+      if (typeIds.length > 0) {
+        const { data: types } = await supabase
+          .from('contract_types')
+          .select('id, name')
+          .in('id', typeIds);
+        
+        (types || []).forEach(t => {
+          typeMap.set(t.id, t.name);
+        });
+      }
+
       const results: ContractAlert[] = (data || []).map((contract: any) => {
         const endDate = new Date(contract.end_date);
         const todayDate = new Date(today);
         const daysUntilExpiry = Math.ceil((endDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
-        const employee = Array.isArray(contract.employee) ? contract.employee[0] : contract.employee;
-        const contractType = Array.isArray(contract.contract_type) ? contract.contract_type[0] : contract.contract_type;
+        const employee = contract.employee_id ? employeeMap.get(contract.employee_id) : null;
 
         return {
           id: contract.id,
           employee_name: employee?.full_name || '',
           employee_code: employee?.code || '',
-          contract_type: contractType?.name || '',
+          contract_type: contract.contract_type_id ? (typeMap.get(contract.contract_type_id) || '') : '',
           end_date: contract.end_date,
           days_until_expiry: daysUntilExpiry,
         };

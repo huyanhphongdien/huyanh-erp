@@ -1,8 +1,12 @@
 // src/features/tasks/components/TaskForm.tsx
 // ============================================================================
-// TASK FORM - UPDATED v2
-// Hỗ trợ: isSelfMode - Nhân viên tạo công việc cá nhân
-// Khi isSelfMode=true: Ẩn dropdown "Phòng ban" và "Người phụ trách"
+// TASK FORM - UPDATED v3 (WITH DEPARTMENT LOCK FOR MANAGER)
+// Huy Anh ERP System
+// ============================================================================
+// CẬP NHẬT v3:
+// - Thêm prop isDepartmentLocked: Khóa dropdown phòng ban cho Manager
+// - Khi isDepartmentLocked=true: Dropdown phòng ban hiển thị read-only
+// - Hỗ trợ isSelfMode: Nhân viên tạo công việc cá nhân
 // ============================================================================
 
 import { useState, useEffect } from 'react'
@@ -17,6 +21,7 @@ import {
   AlertCircle,
   Plus,
   X,
+  Lock,
 } from 'lucide-react'
 
 // ============================================================================
@@ -71,6 +76,8 @@ interface TaskFormProps {
   isSelfMode?: boolean // Chế độ tự giao việc cho nhân viên
   initialData?: { department_id?: string; assignee_id?: string } // Dữ liệu ban đầu
   currentUser?: CurrentUser | null // Thông tin user hiện tại
+  // ========== PROPS MỚI CHO PERMISSION ==========
+  isDepartmentLocked?: boolean // Khóa dropdown phòng ban (cho Manager)
 }
 
 // ============================================================================
@@ -100,6 +107,7 @@ export function TaskForm({
   isSelfMode = false,
   initialData,
   currentUser,
+  isDepartmentLocked = false,
 }: TaskFormProps) {
   // Form state
   const [formData, setFormData] = useState<TaskFormData>({
@@ -137,21 +145,23 @@ export function TaskForm({
     }
   }, [task])
 
-  // Set initial data khi isSelfMode
+  // Set initial data khi isSelfMode hoặc isDepartmentLocked
   useEffect(() => {
-    if (isSelfMode && initialData && mode === 'create') {
+    if (mode === 'create' && initialData) {
       setFormData(prev => ({
         ...prev,
-        department_id: initialData.department_id || '',
-        assignee_id: initialData.assignee_id || '',
+        department_id: initialData.department_id || prev.department_id,
+        assignee_id: initialData.assignee_id || prev.assignee_id,
       }))
     }
-  }, [isSelfMode, initialData, mode])
+  }, [isSelfMode, isDepartmentLocked, initialData, mode])
 
   // Filter employees by selected department
+  // - isDepartmentLocked: employees đã được filter từ TaskCreatePage
+  // - Không lock: phải chọn phòng ban trước mới hiển thị nhân viên
   const filteredEmployees = formData.department_id
     ? employees.filter(e => e.department_id === formData.department_id)
-    : employees
+    : (isDepartmentLocked ? employees : [])  // Chưa chọn phòng ban → mảng rỗng
 
   // Handle input change
   const handleChange = (
@@ -160,8 +170,8 @@ export function TaskForm({
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
 
-    // Reset assignee when department changes (chỉ khi không phải selfMode)
-    if (name === 'department_id' && !isSelfMode) {
+    // Reset assignee when department changes (chỉ khi không phải selfMode và không bị lock)
+    if (name === 'department_id' && !isSelfMode && !isDepartmentLocked) {
       setFormData(prev => ({ ...prev, assignee_id: '' }))
     }
   }
@@ -191,6 +201,15 @@ export function TaskForm({
     if (!validate()) return
 
     onSubmit(formData)
+  }
+
+  // ========== HELPER: Lấy tên phòng ban hiện tại ==========
+  const getCurrentDepartmentName = (): string => {
+    if (currentUser?.department_name) {
+      return currentUser.department_name
+    }
+    const dept = departments.find(d => d.id === formData.department_id)
+    return dept?.name || 'Chưa chọn phòng ban'
   }
 
   return (
@@ -244,7 +263,7 @@ export function TaskForm({
         </div>
 
         {/* Section 2: Phân công */}
-        {/* ========== ẨN KHI SELF MODE ========== */}
+        {/* ========== ẨN HOÀN TOÀN KHI SELF MODE ========== */}
         {!isSelfMode && (
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b pb-2">
@@ -252,28 +271,51 @@ export function TaskForm({
             </h3>
 
             <div className="grid grid-cols-2 gap-4">
-              {/* Phòng ban */}
+              {/* ========== PHÒNG BAN ========== */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Building className="w-4 h-4 inline mr-1" />
                   Phòng ban
+                  {isDepartmentLocked && (
+                    <span title="Đã khóa">
+                      <Lock className="w-3 h-3 inline ml-1 text-blue-500" />
+                    </span>
+                  )}
                 </label>
-                <select
-                  name="department_id"
-                  value={formData.department_id}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="">-- Chọn phòng ban --</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
+                
+                {isDepartmentLocked ? (
+                  // ========== LOCKED: Hiển thị read-only ==========
+                  <div className="w-full px-3 py-2 border border-blue-200 rounded-lg bg-blue-50 text-blue-700 font-medium flex items-center gap-2">
+                    <Building className="w-4 h-4" />
+                    {getCurrentDepartmentName()}
+                    <span className="ml-auto text-xs text-blue-500">(Cố định)</span>
+                  </div>
+                ) : (
+                  // ========== UNLOCKED: Dropdown bình thường ==========
+                  <select
+                    name="department_id"
+                    value={formData.department_id}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">-- Chọn phòng ban --</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                
+                {/* Hint cho Manager */}
+                {isDepartmentLocked && (
+                  <p className="text-xs text-blue-500 mt-1">
+                    Bạn chỉ có thể phân công trong phòng ban của mình
+                  </p>
+                )}
               </div>
 
-              {/* Người phụ trách */}
+              {/* ========== NGƯỜI PHỤ TRÁCH ========== */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <User className="w-4 h-4 inline mr-1" />
@@ -283,18 +325,43 @@ export function TaskForm({
                   name="assignee_id"
                   value={formData.assignee_id}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  disabled={!isDepartmentLocked && !formData.department_id}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    !isDepartmentLocked && !formData.department_id 
+                      ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
+                      : 'bg-white border-gray-300'
+                  }`}
                 >
-                  <option value="">-- Chọn người phụ trách --</option>
+                  <option value="">
+                    {!isDepartmentLocked && !formData.department_id 
+                      ? '-- Chọn phòng ban trước --' 
+                      : '-- Chọn người phụ trách --'}
+                  </option>
                   {filteredEmployees.map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.full_name} {emp.code ? `(${emp.code})` : ''}
                     </option>
                   ))}
                 </select>
-                {formData.department_id && filteredEmployees.length === 0 && (
+                
+                {/* Hint: Chưa chọn phòng ban */}
+                {!isDepartmentLocked && !formData.department_id && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Vui lòng chọn phòng ban để xem danh sách nhân viên
+                  </p>
+                )}
+                
+                {/* Warning: Không có nhân viên */}
+                {(formData.department_id || isDepartmentLocked) && filteredEmployees.length === 0 && (
                   <p className="text-xs text-orange-500 mt-1">
                     Không có nhân viên trong phòng ban này
+                  </p>
+                )}
+                
+                {/* Hint: Số nhân viên */}
+                {(formData.department_id || isDepartmentLocked) && filteredEmployees.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {filteredEmployees.length} nhân viên trong phòng ban
                   </p>
                 )}
               </div>

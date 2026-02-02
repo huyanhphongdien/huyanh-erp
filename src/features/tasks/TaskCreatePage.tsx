@@ -1,20 +1,23 @@
 // ============================================================================
-// TASK CREATE PAGE - FIXED v5
+// TASK CREATE PAGE - FIXED v6 (WITH PERMISSION FILTERING)
 // File: src/features/tasks/TaskCreatePage.tsx
 // Huy Anh ERP System
 // ============================================================================
-// CẬP NHẬT:
-// - Hỗ trợ mode=self: Nhân viên tạo công việc cá nhân (tự giao cho mình)
-// - Khi mode=self: tự động set assignee_id = user.employee_id
-// - Ẩn dropdown "Người phụ trách" khi mode=self
+// CẬP NHẬT v6:
+// - MANAGER (Trưởng phòng/Phó phòng level 4,5): 
+//   + Chỉ thấy phòng ban của mình
+//   + Chỉ phân công được nhân viên trong phòng ban
+// - EXECUTIVE (level 1,2,3) + ADMIN: Thấy tất cả
+// - Hỗ trợ mode=self: Nhân viên tạo công việc cá nhân
 // ============================================================================
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, User, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, User, AlertCircle, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { TaskForm, type TaskFormData } from './components/TaskForm';
+import { isExecutive, isManagerLevel, isEmployeeLevel } from './utils/taskPermissions';
 
 // ============================================================================
 // TYPES
@@ -44,6 +47,13 @@ export const TaskCreatePage: React.FC = () => {
   // mode=self: Nhân viên tạo công việc cá nhân
   const isSelfMode = searchParams.get('mode') === 'self';
 
+  // ========== PERMISSION CHECK ==========
+  const userLevel = user?.position_level || 6;
+  const isAdmin = user?.role === 'admin';
+  const isUserExecutive = isExecutive(userLevel);
+  const isUserManager = isManagerLevel(userLevel) && !isUserExecutive;
+  const isUserEmployee = isEmployeeLevel(userLevel);
+
   // State
   const [departments, setDepartments] = useState<Department[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -52,31 +62,75 @@ export const TaskCreatePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Load data
+  // ========== LOAD DATA WITH PERMISSION FILTERING ==========
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // Load departments
-        const { data: deptData, error: deptError } = await supabase
-          .from('departments')
-          .select('id, name')
-          .eq('status', 'active')
-          .order('name');
+        // ============================================================
+        // PHÂN QUYỀN KHI LOAD DATA
+        // ============================================================
         
-        if (deptError) console.warn('Departments query error:', deptError);
+        // 1. DEPARTMENTS
+        if (isAdmin || isUserExecutive) {
+          // ADMIN & EXECUTIVE: Thấy tất cả phòng ban
+          const { data: deptData, error: deptError } = await supabase
+            .from('departments')
+            .select('id, name')
+            .eq('status', 'active')
+            .order('name');
+          
+          if (deptError) console.warn('Departments query error:', deptError);
+          setDepartments(deptData || []);
+        } else if (isUserManager && user?.department_id) {
+          // MANAGER: Chỉ thấy phòng ban của mình
+          const { data: deptData, error: deptError } = await supabase
+            .from('departments')
+            .select('id, name')
+            .eq('id', user.department_id)
+            .single();
+          
+          if (deptError) {
+            console.warn('Department query error:', deptError);
+            // Fallback: dùng thông tin từ authStore
+            if (user.department_name) {
+              setDepartments([{ id: user.department_id, name: user.department_name }]);
+            }
+          } else {
+            setDepartments(deptData ? [deptData] : []);
+          }
+        } else {
+          // EMPLOYEE hoặc không có department: không load departments
+          setDepartments([]);
+        }
 
-        // Load employees
-        const { data: empData, error: empError } = await supabase
-          .from('employees')
-          .select('id, full_name, department_id')
-          .eq('status', 'active')
-          .order('full_name');
-        
-        if (empError) console.warn('Employees query error:', empError);
+        // 2. EMPLOYEES
+        if (isAdmin || isUserExecutive) {
+          // ADMIN & EXECUTIVE: Thấy tất cả nhân viên
+          const { data: empData, error: empError } = await supabase
+            .from('employees')
+            .select('id, full_name, department_id')
+            .eq('status', 'active')
+            .order('full_name');
+          
+          if (empError) console.warn('Employees query error:', empError);
+          setEmployees(empData || []);
+        } else if (isUserManager && user?.department_id) {
+          // MANAGER: Chỉ thấy nhân viên trong phòng ban của mình
+          const { data: empData, error: empError } = await supabase
+            .from('employees')
+            .select('id, full_name, department_id')
+            .eq('department_id', user.department_id)
+            .eq('status', 'active')
+            .order('full_name');
+          
+          if (empError) console.warn('Employees query error:', empError);
+          setEmployees(empData || []);
+        } else {
+          // EMPLOYEE: không load employees (sẽ dùng selfMode)
+          setEmployees([]);
+        }
 
-        setDepartments(deptData || []);
-        setEmployees(empData || []);
       } catch (err) {
         console.error('Error loading data:', err);
         setError('Không thể tải dữ liệu. Vui lòng thử lại.');
@@ -86,18 +140,32 @@ export const TaskCreatePage: React.FC = () => {
     };
 
     loadData();
-  }, []);
+  }, [isAdmin, isUserExecutive, isUserManager, user?.department_id, user?.department_name]);
 
-  // ========== INITIAL VALUES FOR SELF MODE ==========
+  // ========== INITIAL VALUES FOR FORM ==========
   const initialFormData = useMemo(() => {
     if (isSelfMode && user) {
+      // Self mode: tự giao cho mình
       return {
         department_id: user.department_id || '',
         assignee_id: user.employee_id || '',
       };
     }
+    
+    if (isUserManager && user?.department_id) {
+      // Manager mode: auto-set phòng ban
+      return {
+        department_id: user.department_id,
+        assignee_id: '',
+      };
+    }
+    
     return undefined;
-  }, [isSelfMode, user]);
+  }, [isSelfMode, isUserManager, user]);
+
+  // ========== CHECK IF DEPARTMENT IS LOCKED ==========
+  // Manager không được đổi phòng ban
+  const isDepartmentLocked = isUserManager && !isAdmin && !isUserExecutive;
 
   // Handle form submit
   const handleSubmit = async (formData: TaskFormData) => {
@@ -106,10 +174,6 @@ export const TaskCreatePage: React.FC = () => {
 
     try {
       // ========== TRANSFORM FORM DATA TO DATABASE FORMAT ==========
-      // FIX v5:
-      // - Hỗ trợ mode=self: tự động set assignee_id, assigner_id, is_self_assigned
-      // - Database constraint: status IN ('draft', 'in_progress', 'paused', 'finished', 'cancelled')
-      
       const dbData: Record<string, any> = {
         name: formData.name,
         description: formData.description || null,
@@ -122,23 +186,25 @@ export const TaskCreatePage: React.FC = () => {
         progress_mode: 'manual',
       };
 
-      // ========== XỬ LÝ MODE SELF ==========
+      // ========== XỬ LÝ THEO MODE ==========
       if (isSelfMode) {
         // Công việc cá nhân: người tạo = người phụ trách = người giao
         dbData.assignee_id = user?.employee_id || null;
         dbData.assigner_id = user?.employee_id || null;
         dbData.department_id = user?.department_id || null;
         dbData.is_self_assigned = true;
-        
-        console.log('📝 Creating SELF-ASSIGNED task:', dbData);
       } else {
         // Công việc bình thường
-        dbData.department_id = formData.department_id || null;
+        // MANAGER: force department_id là phòng ban của họ
+        if (isDepartmentLocked && user?.department_id) {
+          dbData.department_id = user.department_id;
+        } else {
+          dbData.department_id = formData.department_id || null;
+        }
+        
         dbData.assignee_id = formData.assignee_id || null;
         dbData.assigner_id = user?.employee_id || null;
         dbData.is_self_assigned = false;
-        
-        console.log('📝 Creating task:', dbData);
       }
 
       const { data, error: insertError } = await supabase
@@ -152,7 +218,6 @@ export const TaskCreatePage: React.FC = () => {
         throw new Error(insertError.message);
       }
 
-      console.log('✅ Task created:', data);
       setSuccess(true);
 
       // Redirect sau 1.5s
@@ -227,6 +292,21 @@ export const TaskCreatePage: React.FC = () => {
         </div>
       )}
 
+      {/* Manager Mode Notice - Phòng ban bị khóa */}
+      {!isSelfMode && isDepartmentLocked && user && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div>
+              <p className="font-medium text-blue-800">Phân công trong phòng ban</p>
+              <p className="text-sm text-blue-600 mt-1">
+                Bạn chỉ có thể phân công công việc cho nhân viên trong phòng <strong>{user.department_name}</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error Alert */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-start gap-2">
@@ -250,8 +330,9 @@ export const TaskCreatePage: React.FC = () => {
           departments={departments}
           employees={employees}
           isLoading={isSubmitting}
-          // ========== PROPS MỚI CHO SELF MODE ==========
+          // ========== PROPS CHO PERMISSION ==========
           isSelfMode={isSelfMode}
+          isDepartmentLocked={isDepartmentLocked}
           initialData={initialFormData}
           currentUser={user}
         />

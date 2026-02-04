@@ -151,8 +151,9 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
 
   // ===== MUA HÀNG =====
   {
-    title: 'MUA HÀNG',
+    title: 'QUẢN LÝ ĐƠN HÀNG',
     icon: <ShoppingCart size={18} />,
+    collapsible: true,
     requirePurchaseAccess: true,
     items: [
       { path: '/purchasing/suppliers', label: 'Nhà cung cấp', icon: <Building2 size={18} />, requirePurchaseAccess: true },
@@ -200,6 +201,7 @@ export function Sidebar() {
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
     'QUẢN LÝ NHÂN SỰ': true,
     'CHẤM CÔNG': false,
+    'QUẢN LÝ ĐƠN HÀNG': true,
   });
   
   // Purchase access state

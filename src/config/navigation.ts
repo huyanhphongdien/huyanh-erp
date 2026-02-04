@@ -92,7 +92,7 @@ export const navigationGroups: NavGroup[] = [
 
   // ===== QUẢN LÝ NHÂN SỰ (GOM LẠI) =====
   {
-    title: 'QUẢN LÝ NHÂN SỰ',
+    title: 'QUẢN LÝ ĐƠN HÀNG',
     defaultOpen: false,
     items: [
       // Tổ chức

@@ -3,6 +3,9 @@
 // File: src/types/permissions.ts
 // Huy Anh ERP System - Permission System
 // ============================================================
+// CẬP NHẬT V2:
+// - THÊM: shifts, shift-assignments, overtime, overtime-approval
+// ============================================================
 
 // ==================== POSITION LEVELS ====================
 // Level 1: Giám đốc
@@ -43,10 +46,15 @@ export type Feature =
   // Hợp đồng
   | 'contract-types'
   | 'contracts'
-  // Nghỉ phép & Chấm công
+  // Nghỉ phép
   | 'leave-types'
   | 'leave-requests'
+  // Chấm công V2
   | 'attendance'
+  | 'shifts'
+  | 'shift-assignments'
+  | 'overtime'
+  | 'overtime-approval'
   // Lương
   | 'salary-grades'
   | 'payroll-periods'

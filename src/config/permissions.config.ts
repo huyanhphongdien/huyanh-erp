@@ -1,12 +1,14 @@
 // ============================================================
-// PERMISSIONS CONFIG
+// PERMISSIONS CONFIG - CẬP NHẬT CHẤM CÔNG V2
 // File: src/config/permissions.config.ts
 // Huy Anh ERP System - Permission Matrix Configuration
 // ============================================================
-// CẬP NHẬT:
-// - Employee có thể xem công việc trong phòng ban (view: 'department')
-// - Employee có thể tạo công việc cá nhân (create: true)
-// - Employee có thể sửa công việc của mình (edit: 'self')
+// CẬP NHẬT V2:
+// - THÊM: shifts, shift-assignments, overtime, overtime-approval
+// - Quản lý ca: Executive only (Phó phòng trở lên, level ≤ 5)
+// - Phân ca: Manager (Trưởng/Phó phòng) + Executive
+// - Tăng ca: Tất cả nhân viên
+// - Duyệt tăng ca: Manager + Executive
 // ============================================================
 
 import type { 
@@ -50,38 +52,64 @@ export const PERMISSIONS: PermissionConfig = {
     employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
   },
 
-  // ===== NGHỈ PHÉP & CHẤM CÔNG =====
+  // ===== NGHỈ PHÉP =====
   'leave-types': {
     executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'none' },
     manager: { view: 'all', create: false, edit: 'none', delete: 'none', approve: 'none' },
-    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' }, // Ẩn
+    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
   },
   'leave-requests': {
     executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'all' },
     manager: { view: 'department', create: true, edit: 'department', delete: 'self', approve: 'department' },
-    employee: { view: 'self', create: true, edit: 'self', delete: 'self', approve: 'none' }, // HIỆN
+    employee: { view: 'self', create: true, edit: 'self', delete: 'self', approve: 'none' },
   },
+
+  // ===== CHẤM CÔNG V2 =====
   'attendance': {
     executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'none' },
     manager: { view: 'department', create: true, edit: 'self', delete: 'none', approve: 'none' },
-    employee: { view: 'self', create: true, edit: 'self', delete: 'none', approve: 'none' }, // HIỆN
+    employee: { view: 'self', create: true, edit: 'self', delete: 'none', approve: 'none' },
+  },
+  // Quản lý ca: CHỈ Executive (Phó phòng trở lên, level ≤ 5)
+  'shifts': {
+    executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'none' },
+    manager: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
+    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
+  },
+  // Phân ca: Manager (Trưởng/Phó phòng) + Executive
+  'shift-assignments': {
+    executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'none' },
+    manager: { view: 'department', create: true, edit: 'department', delete: 'department', approve: 'none' },
+    employee: { view: 'self', create: false, edit: 'none', delete: 'none', approve: 'none' },
+  },
+  // Tăng ca: Tất cả đều có thể xem và tạo
+  'overtime': {
+    executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'none' },
+    manager: { view: 'department', create: true, edit: 'self', delete: 'self', approve: 'none' },
+    employee: { view: 'self', create: true, edit: 'self', delete: 'self', approve: 'none' },
+  },
+  // Duyệt tăng ca: CHỈ Manager + Executive
+  'overtime-approval': {
+    executive: { view: 'all', create: false, edit: 'all', delete: 'none', approve: 'all' },
+    manager: { view: 'department', create: false, edit: 'department', delete: 'none', approve: 'department' },
+    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
   },
 
   // ===== LƯƠNG =====
   'salary-grades': {
     executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'none' },
     manager: { view: 'all', create: false, edit: 'none', delete: 'none', approve: 'none' },
-    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' }, // Ẩn
+    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
   },
   'payroll-periods': {
     executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'all' },
     manager: { view: 'all', create: false, edit: 'none', delete: 'none', approve: 'none' },
-    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' }, // Ẩn
+    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
   },
   'payslips': {
     executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'all' },
     manager: { view: 'department', create: false, edit: 'none', delete: 'none', approve: 'none' },
-    employee: { view: 'self', create: false, edit: 'none', delete: 'none', approve: 'none' }, // HIỆN
+    employee: { view: 'self', create: false, edit: 'none', delete: 'none', approve: 'none' },
   },
 
   // ===== ĐÁNH GIÁ HIỆU SUẤT - Ẩn toàn bộ với Employee =====
@@ -100,24 +128,23 @@ export const PERMISSIONS: PermissionConfig = {
   'tasks': {
     executive: { view: 'all', create: true, edit: 'all', delete: 'all', approve: 'all' },
     manager: { view: 'department', create: true, edit: 'department', delete: 'department', approve: 'department' },
-    // ========== ĐÃ SỬA: Employee có thể xem phòng ban và tạo việc cá nhân ==========
     employee: { 
-      view: 'department',  // Xem công việc trong phòng ban
-      create: true,        // Tạo công việc cá nhân (tự giao cho mình)
-      edit: 'self',        // Sửa công việc của mình
-      delete: 'self',      // Xóa công việc của mình (chỉ draft)
-      approve: 'none'      // Không có quyền phê duyệt
+      view: 'department',
+      create: true,
+      edit: 'self',
+      delete: 'self',
+      approve: 'none'
     },
   },
   'my-tasks': {
     executive: { view: 'all', create: true, edit: 'self', delete: 'none', approve: 'none' },
     manager: { view: 'all', create: true, edit: 'self', delete: 'none', approve: 'none' },
-    employee: { view: 'all', create: true, edit: 'self', delete: 'none', approve: 'none' }, // HIỆN - Đã thêm create: true
+    employee: { view: 'all', create: true, edit: 'self', delete: 'none', approve: 'none' },
   },
   'approvals': {
     executive: { view: 'all', create: false, edit: 'all', delete: 'none', approve: 'all' },
     manager: { view: 'department', create: false, edit: 'department', delete: 'none', approve: 'department' },
-    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' }, // Ẩn
+    employee: { view: 'none', create: false, edit: 'none', delete: 'none', approve: 'none' },
   },
 
   // ===== BÁO CÁO =====
@@ -144,10 +171,16 @@ export const MENU_CONFIG: MenuVisibility[] = [
   { path: '/contract-types', groups: ['executive', 'manager'] },
   { path: '/contracts', groups: ['executive', 'manager'] },
   
-  // NGHỈ PHÉP & CHẤM CÔNG
-  { path: '/leave-types', groups: ['executive', 'manager'] },  // Ẩn với employee
+  // NGHỈ PHÉP
+  { path: '/leave-types', groups: ['executive', 'manager'] },
   { path: '/leave-requests' },  // Hiện cho tất cả
-  { path: '/attendance' },       // Hiện cho tất cả
+
+  // ===== CHẤM CÔNG V2 =====
+  { path: '/attendance' },                                        // Hiện cho tất cả
+  { path: '/shifts', groups: ['executive'] },                     // CHỈ Executive
+  { path: '/shift-assignments', groups: ['executive', 'manager'] }, // Manager + Executive
+  { path: '/overtime' },                                          // Hiện cho tất cả
+  { path: '/overtime/approval', groups: ['executive', 'manager'] }, // Manager + Executive
   
   // LƯƠNG
   { path: '/salary-grades', groups: ['executive', 'manager'] },
@@ -159,10 +192,9 @@ export const MENU_CONFIG: MenuVisibility[] = [
   { path: '/performance-reviews', groups: ['executive', 'manager'] },
   
   // QUẢN LÝ CÔNG VIỆC
-  // ========== ĐÃ SỬA: Bỏ giới hạn groups để employee có thể xem ==========
-  { path: '/tasks' },  // Hiện cho tất cả (employee xem công việc phòng ban)
-  { path: '/my-tasks' },  // Hiện cho tất cả
-  { path: '/approvals', groups: ['executive', 'manager'] },  // Chỉ manager+ mới phê duyệt
+  { path: '/tasks' },
+  { path: '/my-tasks' },
+  { path: '/approvals', groups: ['executive', 'manager'] },
   
   // BÁO CÁO
   { path: '/reports/tasks', groups: ['executive', 'manager'] },
@@ -179,6 +211,10 @@ export function getFeatureFromPath(path: string): Feature | null {
     '/leave-types': 'leave-types',
     '/leave-requests': 'leave-requests',
     '/attendance': 'attendance',
+    '/shifts': 'shifts',
+    '/shift-assignments': 'shift-assignments',
+    '/overtime': 'overtime',
+    '/overtime/approval': 'overtime-approval',
     '/salary-grades': 'salary-grades',
     '/payroll-periods': 'payroll-periods',
     '/payslips': 'payslips',

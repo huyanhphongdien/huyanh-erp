@@ -1,12 +1,13 @@
 // ============================================================
-// NAVIGATION CONFIG - REFACTORED v2
+// NAVIGATION CONFIG - REFACTORED v9 (PHÂN QUYỀN V2)
 // File: src/config/navigation.ts
 // ============================================================
-// CHANGES:
-// - Xóa "Tự đánh giá" (đã gộp vào "Công việc của tôi")
-// - Xóa "Tạo công việc" riêng (đã có trong trang Danh sách)
-// - Gọn gàng hơn, tập trung vào các entry points chính
-// - THÊM MỚI: CÀI ĐẶT TÀI KHOẢN cho tất cả user
+// CHANGES v9:
+// - PHÂN QUYỀN CHI TIẾT cho CHẤM CÔNG V2:
+//   • Quản lý ca: executiveOnly (Phó phòng trở lên, level ≤ 5)
+//   • Phân ca: requireManager (Trưởng/Phó phòng)
+//   • Duyệt tăng ca: requireManager
+//   • Bảng chấm công + Tăng ca: Tất cả nhân viên
 // ============================================================
 
 import {
@@ -15,16 +16,33 @@ import {
   Users,
   Briefcase,
   FileText,
+  ScrollText,
+  Palmtree,
+  CalendarClock,
   Calendar,
   Clock,
   DollarSign,
+  Wallet,
+  Receipt,
+  Target,
+  Star,
   ClipboardList,
   CheckSquare,
   UserCheck,
-  Star,
   Settings,
   User,
   BarChart3,
+  ShoppingCart,
+  Package,
+  Layers,
+  Tag,
+  Scale,
+  Boxes,
+  CreditCard,
+  Timer,
+  CalendarDays,
+  AlarmClockPlus,
+  ClipboardCheck,
   LucideIcon,
 } from 'lucide-react';
 
@@ -37,12 +55,14 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   badge?: number | string;
-  /** Chỉ hiển thị cho manager/admin */
+  /** Chỉ hiển thị cho manager/admin (Trưởng/Phó phòng) */
   requireManager?: boolean;
   /** Chỉ hiển thị cho admin */
   adminOnly?: boolean;
   /** Chỉ hiển thị cho Phó phòng trở lên (level <= 5) */
   executiveOnly?: boolean;
+  /** Yêu cầu quyền truy cập module mua hàng */
+  requirePurchaseAccess?: boolean;
 }
 
 export interface NavGroup {
@@ -52,6 +72,8 @@ export interface NavGroup {
   defaultOpen?: boolean;
   /** Chỉ hiển thị cho Phó phòng trở lên */
   executiveOnly?: boolean;
+  /** Yêu cầu quyền truy cập module mua hàng */
+  requirePurchaseAccess?: boolean;
 }
 
 // ============================================================
@@ -64,172 +86,98 @@ export const navigationGroups: NavGroup[] = [
     title: 'TỔNG QUAN',
     defaultOpen: true,
     items: [
-      {
-        label: 'Dashboard',
-        href: '/',
-        icon: LayoutDashboard,
-      },
+      { label: 'Dashboard', href: '/', icon: LayoutDashboard },
     ],
   },
 
-  // ===== TỔ CHỨC =====
+  // ===== QUẢN LÝ NHÂN SỰ (GOM LẠI) =====
   {
-    title: 'TỔ CHỨC',
+    title: 'QUẢN LÝ NHÂN SỰ',
     defaultOpen: false,
     items: [
-      {
-        label: 'Phòng ban',
-        href: '/departments',
-        icon: Building2,
-      },
-      {
-        label: 'Chức vụ',
-        href: '/positions',
-        icon: Briefcase,
-      },
-      {
-        label: 'Nhân viên',
-        href: '/employees',
-        icon: Users,
-      },
+      // Tổ chức
+      { label: 'Phòng ban', href: '/departments', icon: Building2 },
+      { label: 'Chức vụ', href: '/positions', icon: Briefcase },
+      { label: 'Nhân viên', href: '/employees', icon: Users },
+      // Hợp đồng
+      { label: 'Loại hợp đồng', href: '/contract-types', icon: ScrollText },
+      { label: 'Hợp đồng', href: '/contracts', icon: FileText },
+      // Nghỉ phép
+      { label: 'Loại nghỉ phép', href: '/leave-types', icon: Palmtree },
+      { label: 'Đơn nghỉ phép', href: '/leave-requests', icon: CalendarClock },
+      // Lương
+      { label: 'Bậc lương', href: '/salary-grades', icon: Wallet },
+      { label: 'Kỳ lương', href: '/payroll-periods', icon: Calendar },
+      { label: 'Phiếu lương', href: '/payslips', icon: Receipt },
+      // Đánh giá hiệu suất
+      { label: 'Tiêu chí đánh giá', href: '/performance-criteria', icon: Target },
+      { label: 'Đánh giá hiệu suất', href: '/performance-reviews', icon: Star },
     ],
   },
 
-  // ===== HỢP ĐỒNG =====
+  // ===== CHẤM CÔNG V2 (PHÂN QUYỀN CHI TIẾT) =====
   {
-    title: 'HỢP ĐỒNG',
-    defaultOpen: false,
+    title: 'CHẤM CÔNG',
+    defaultOpen: true,
     items: [
-      {
-        label: 'Loại hợp đồng',
-        href: '/contract-types',
-        icon: FileText,
-      },
-      {
-        label: 'Hợp đồng',
-        href: '/contracts',
-        icon: FileText,
-      },
+      // ✅ TẤT CẢ nhân viên xem được
+      { label: 'Bảng chấm công', href: '/attendance', icon: Clock },
+      // ❌ CHỈ Executive (Phó phòng trở lên, level ≤ 5)
+      { label: 'Quản lý ca', href: '/shifts', icon: Timer, executiveOnly: true },
+      // ❌ CHỈ Manager (Trưởng/Phó phòng) + Executive
+      { label: 'Phân ca', href: '/shift-assignments', icon: CalendarDays, requireManager: true },
+      // ✅ TẤT CẢ nhân viên xem được
+      { label: 'Tăng ca', href: '/overtime', icon: AlarmClockPlus },
+      // ❌ CHỈ Manager + Executive
+      { label: 'Duyệt tăng ca', href: '/overtime/approval', icon: ClipboardCheck, requireManager: true },
     ],
   },
 
-  // ===== NGHỈ PHÉP & CHẤM CÔNG =====
-  {
-    title: 'NGHỈ PHÉP & CHẤM CÔNG',
-    defaultOpen: false,
-    items: [
-      {
-        label: 'Loại nghỉ phép',
-        href: '/leave-types',
-        icon: Calendar,
-      },
-      {
-        label: 'Đơn nghỉ phép',
-        href: '/leave-requests',
-        icon: Calendar,
-      },
-      {
-        label: 'Chấm công',
-        href: '/attendance',
-        icon: Clock,
-      },
-    ],
-  },
-
-  // ===== LƯƠNG =====
-  {
-    title: 'LƯƠNG',
-    defaultOpen: false,
-    items: [
-      {
-        label: 'Bậc lương',
-        href: '/salary-grades',
-        icon: DollarSign,
-      },
-      {
-        label: 'Kỳ lương',
-        href: '/payroll-periods',
-        icon: DollarSign,
-      },
-      {
-        label: 'Phiếu lương',
-        href: '/payslips',
-        icon: FileText,
-      },
-    ],
-  },
-
-  // ===== ĐÁNH GIÁ HIỆU SUẤT =====
-  {
-    title: 'ĐÁNH GIÁ HIỆU SUẤT',
-    defaultOpen: false,
-    items: [
-      {
-        label: 'Tiêu chí đánh giá',
-        href: '/performance-criteria',
-        icon: Star,
-      },
-      {
-        label: 'Đánh giá nhân viên',
-        href: '/performance-reviews',
-        icon: Star,
-      },
-    ],
-  },
-
-  // ===== QUẢN LÝ CÔNG VIỆC (REFACTORED - GỌN HƠN) =====
+  // ===== QUẢN LÝ CÔNG VIỆC =====
   {
     title: 'QUẢN LÝ CÔNG VIỆC',
     defaultOpen: true,
     items: [
-      // Danh sách công việc - Tất cả user có thể xem
-      {
-        label: 'Danh sách công việc',
-        href: '/tasks',
-        icon: ClipboardList,
-      },
-      // Công việc của tôi - Entry point chính cho nhân viên
-      // Đã gộp: Tự đánh giá + Kết quả đánh giá (tabs trong page)
-      {
-        label: 'Công việc của tôi',
-        href: '/my-tasks',
-        icon: UserCheck,
-      },
-      // Phê duyệt - Manager only
-      {
-        label: 'Phê duyệt công việc',
-        href: '/approvals',
-        icon: CheckSquare,
-        requireManager: true,
-      },
+      { label: 'Danh sách công việc', href: '/tasks', icon: ClipboardList },
+      { label: 'Công việc của tôi', href: '/my-tasks', icon: UserCheck },
+      { label: 'Phê duyệt công việc', href: '/approvals', icon: CheckSquare, requireManager: true },
     ],
   },
 
-  // ===== BÁO CÁO - CHỈ CHO PHÓ PHÒNG TRỞ LÊN =====
+  // ===== MUA HÀNG =====
+  {
+    title: 'MUA HÀNG',
+    defaultOpen: true,
+    requirePurchaseAccess: true,
+    items: [
+      { label: 'Nhà cung cấp', href: '/purchasing/suppliers', icon: Building2, requirePurchaseAccess: true },
+      { label: 'Nhóm vật tư', href: '/purchasing/categories', icon: Layers, requirePurchaseAccess: true },
+      { label: 'Loại vật tư', href: '/purchasing/types', icon: Tag, requirePurchaseAccess: true },
+      { label: 'Đơn vị tính', href: '/purchasing/units', icon: Scale, requirePurchaseAccess: true },
+      { label: 'Vật tư', href: '/purchasing/materials', icon: Package, requirePurchaseAccess: true },
+      { label: 'Thuộc tính biến thể', href: '/purchasing/variant-attributes', icon: Boxes, requirePurchaseAccess: true },
+      { label: 'Đơn đặt hàng', href: '/purchasing/orders', icon: ShoppingCart, requirePurchaseAccess: true },
+      { label: 'Công nợ NCC', href: '/purchasing/debt', icon: DollarSign, requirePurchaseAccess: true },
+      { label: 'Lịch sử thanh toán', href: '/purchasing/payments', icon: CreditCard, requirePurchaseAccess: true },
+    ],
+  },
+
+  // ===== BÁO CÁO =====
   {
     title: 'BÁO CÁO',
     defaultOpen: true,
     executiveOnly: true,
     items: [
-      {
-        label: 'Báo cáo công việc',
-        href: '/reports/tasks',
-        icon: BarChart3,
-        executiveOnly: true,
-      },
+      { label: 'Báo cáo công việc', href: '/reports/tasks', icon: BarChart3, executiveOnly: true },
     ],
   },
 
-  // ===== CÀI ĐẶT - TẤT CẢ USER =====
+  // ===== CÀI ĐẶT =====
   {
     title: 'CÀI ĐẶT',
     defaultOpen: true,
     items: [
-      {
-        label: 'Cài đặt tài khoản',
-        href: '/settings',
-        icon: User,
-      },
+      { label: 'Cài đặt tài khoản', href: '/settings', icon: User },
     ],
   },
 ];
@@ -238,25 +186,20 @@ export const navigationGroups: NavGroup[] = [
 // HELPER FUNCTIONS
 // ============================================================
 
-/**
- * Lấy tất cả nav items (flat)
- */
 export function getAllNavItems(): NavItem[] {
   return navigationGroups.flatMap(group => group.items);
 }
 
-/**
- * Lọc nav items theo role
- */
 export function getNavItemsByRole(
   isManager: boolean, 
   isAdmin: boolean, 
-  isExecutive: boolean = false
+  isExecutive: boolean = false,
+  hasPurchaseAccess: boolean = false
 ): NavGroup[] {
   return navigationGroups
     .filter(group => {
-      // Filter out executive-only groups for non-executives
       if (group.executiveOnly && !isExecutive && !isAdmin) return false;
+      if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
       return true;
     })
     .map(group => ({
@@ -265,22 +208,17 @@ export function getNavItemsByRole(
         if (item.adminOnly && !isAdmin) return false;
         if (item.requireManager && !isManager && !isAdmin) return false;
         if (item.executiveOnly && !isExecutive && !isAdmin) return false;
+        if (item.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
         return true;
       }),
     }))
     .filter(group => group.items.length > 0);
 }
 
-/**
- * Tìm nav item theo href
- */
 export function findNavItemByHref(href: string): NavItem | undefined {
   return getAllNavItems().find(item => item.href === href);
 }
 
-/**
- * Lấy breadcrumb từ href
- */
 export function getBreadcrumbFromHref(href: string): { group: string; item: string } | null {
   for (const group of navigationGroups) {
     const item = group.items.find(i => i.href === href);

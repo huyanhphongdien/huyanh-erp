@@ -17,6 +17,11 @@ export * from './leaveTypeService';
 export * from './leaveRequestService';
 export * from './attendanceService';
 
+// ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
+export * from './shiftService';
+export * from './shiftAssignmentService';
+export * from './overtimeRequestService';
+
 // ===== PHASE 3.4: Lương & Đánh giá =====
 export * from './salaryGradeService';
 export * from './payrollService';

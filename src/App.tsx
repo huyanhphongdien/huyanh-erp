@@ -1,10 +1,10 @@
 // ============================================================
-// PHASE 4.5 REFACTOR: UPDATED APP.TSX
+// PHASE 5 UPDATE + CHẤM CÔNG V2: UPDATED APP.TSX
 // File: src/App.tsx
 // ============================================================
-// UPDATED: 
-// - Added Phase 6.3 Task Reports route
-// - Added User Settings route
+// CHANGES:
+// - Added Chấm công V2 routes: shifts, shift-assignments, overtime
+// - All previous routes preserved
 // ============================================================
 
 import { useEffect } from 'react';
@@ -18,7 +18,7 @@ import { MainLayout } from './components/common/Layout';
 // Auth
 import { LoginPage } from './features/auth/LoginPage';
 
-// ===== DASHBOARD - IMPORT TỪ FILE RIÊNG =====
+// ===== DASHBOARD =====
 import DashboardPage from './features/dashboard/DashboardPage';
 
 // Phase 3.1: Phòng ban, Chức vụ, Nhân viên
@@ -56,6 +56,24 @@ import TaskReportsPage from './features/reports/TaskReportsPage';
 
 // User Settings
 import UserSettingsPage from './pages/settings/UserSettingsPage';
+
+// ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
+import { ShiftListPage } from './features/shifts';
+import { ShiftCalendarPage } from './features/shift-assignments';
+import { OvertimeListPage, OvertimeApprovalPage } from './features/overtime';
+
+// ===== PURCHASING MODULE =====
+import { 
+  SupplierListPage, SupplierCreatePage, SupplierEditPage, SupplierDetailPage,
+  CategoryListPage, TypeListPage, UnitListPage,
+  MaterialListPage, MaterialDetailPage
+} from './features/purchasing';
+import VariantAttributeManagement from './features/purchasing/pages/VariantAttributeManagement';
+import POListPage from './features/purchasing/pages/POListPage';
+import POFormPage from './features/purchasing/pages/POFormPage';
+import PODetailPage from './features/purchasing/pages/PODetailPage';
+import SupplierDebtPage from './features/purchasing/pages/SupplierDebtPage';
+import PaymentListPage from './features/purchasing/pages/PaymentListPage';
 
 // ============================================================
 // QUERY CLIENT
@@ -157,7 +175,7 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              {/* Dashboard - SỬ DỤNG COMPONENT TỪ FILE RIÊNG */}
+              {/* Dashboard */}
               <Route index element={<DashboardPage />} />
 
               {/* ===== PHASE 3.1: Phòng ban, Chức vụ, Nhân viên ===== */}
@@ -169,10 +187,16 @@ function App() {
               <Route path="contract-types" element={<ContractTypeListPage />} />
               <Route path="contracts" element={<ContractListPage />} />
 
-              {/* ===== PHASE 3.3: Nghỉ phép, Chấm công ===== */}
+              {/* ===== PHASE 3.3: Nghỉ phép ===== */}
               <Route path="leave-types" element={<LeaveTypeListPage />} />
               <Route path="leave-requests" element={<LeaveRequestListPage />} />
+
+              {/* ===== CHẤM CÔNG V2 ===== */}
               <Route path="attendance" element={<AttendanceListPage />} />
+              <Route path="shifts" element={<ShiftListPage />} />
+              <Route path="shift-assignments" element={<ShiftCalendarPage />} />
+              <Route path="overtime" element={<OvertimeListPage />} />
+              <Route path="overtime/approval" element={<OvertimeApprovalPage />} />
 
               {/* ===== PHASE 3.4: Lương, Đánh giá ===== */}
               <Route path="salary-grades" element={<SalaryGradeListPage />} />
@@ -181,7 +205,7 @@ function App() {
               <Route path="performance-criteria" element={<PerformanceCriteriaListPage />} />
               <Route path="performance-reviews" element={<PerformanceReviewListPage />} />
 
-              {/* ===== PHASE 4.1 & 4.5: Task Management (with Overview Tab) ===== */}
+              {/* ===== PHASE 4.1 & 4.5: Task Management ===== */}
               <Route path="tasks" element={<TaskListPage />} />
               <Route path="tasks/create" element={<TaskCreatePage />} />
               <Route path="tasks/new" element={<TaskCreatePage />} />
@@ -191,24 +215,41 @@ function App() {
               {/* ===== PHASE 4.3: Evaluation & Approval ===== */}
               <Route path="my-tasks" element={<MyTasksPage />} />
               <Route path="approvals" element={<ApprovalsPage />} />
-              
-              {/* SelfEvaluationPage */}
               <Route path="evaluations/self-evaluation" element={<SelfEvaluationPage />} />
               <Route path="self-evaluation" element={<SelfEvaluationPage />} />
-
-              {/* TaskDetailPage - Chi tiết công việc với permissions */}
               <Route path="task-detail/:taskId" element={<TaskDetailPage />} />
               <Route path="my-tasks/:taskId" element={<TaskDetailPage />} />
 
               {/* ===== PHASE 6.3: Task Reports ===== */}
               <Route path="reports/tasks" element={<TaskReportsPage />} />
 
+              {/* ===== PURCHASING MODULE ===== */}
+              <Route path="purchasing">
+                <Route index element={<Navigate to="/purchasing/suppliers" replace />} />
+                <Route path="suppliers" element={<SupplierListPage />} />
+                <Route path="suppliers/new" element={<SupplierCreatePage />} />
+                <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+                <Route path="suppliers/:id/edit" element={<SupplierEditPage />} />
+                <Route path="categories" element={<CategoryListPage />} />
+                <Route path="types" element={<TypeListPage />} />
+                <Route path="units" element={<UnitListPage />} />
+                <Route path="materials" element={<MaterialListPage />} />
+                <Route path="materials/:id" element={<MaterialDetailPage />} />
+                <Route path="variant-attributes" element={<VariantAttributeManagement />} />
+                <Route path="orders" element={<POListPage />} />
+                <Route path="orders/new" element={<POFormPage />} />
+                <Route path="orders/:id" element={<PODetailPage />} />
+                <Route path="orders/:id/edit" element={<POFormPage />} />
+                <Route path="debt" element={<SupplierDebtPage />} />
+                <Route path="payments" element={<PaymentListPage />} />
+              </Route>
+
               {/* ===== USER SETTINGS ===== */}
               <Route path="settings" element={<UserSettingsPage />} />
               <Route path="account" element={<UserSettingsPage />} />
               <Route path="profile" element={<UserSettingsPage />} />
 
-              {/* ===== REDIRECTS: Legacy routes & backward compatibility ===== */}
+              {/* ===== REDIRECTS ===== */}
               <Route path="my-evaluations" element={<Navigate to="/my-tasks?tab=approved" replace />} />
               <Route path="evaluations/my-tasks" element={<Navigate to="/my-tasks" replace />} />
               <Route path="evaluations/approval" element={<Navigate to="/approvals" replace />} />

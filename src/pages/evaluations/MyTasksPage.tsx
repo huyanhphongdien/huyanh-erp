@@ -1,9 +1,14 @@
 // ============================================================================
-// MY TASKS PAGE - WITH EXTENSION REQUEST
+// MY TASKS PAGE - WITH EXTENSION REQUEST + RESPONSIVE
 // File: src/pages/evaluations/MyTasksPage.tsx
-// Huy Anh ERP System
 // ============================================================================
-// THÊM MỚI: Nút "Xin gia hạn" cho công việc đang làm
+// RESPONSIVE UPDATE:
+// - Stats grid: 2 cols mobile, 3 cols tablet, 6 cols desktop
+// - Table: hidden on mobile, card view instead
+// - Tabs: horizontal scroll on mobile
+// - Action buttons: compact on mobile
+// - Modals: mobile-friendly sizing
+// - Quick filters: scroll on mobile
 // ============================================================================
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -33,14 +38,13 @@ import {
   Loader2,
   Check,
   UserPlus,
-  CalendarPlus, // *** THÊM MỚI: Icon cho nút gia hạn ***
+  CalendarPlus,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { myTasksService, type MyTask } from '../../services/myTasksService';
 import { supabase } from '../../lib/supabase';
 import ParticipationRequestsTab from '../../features/tasks/components/ParticipationRequestsTab';
 import { taskParticipantService } from '../../services/taskParticipantService';
-// *** IMPORT MỚI: ExtensionRequestModal ***
 import { ExtensionRequestModal } from '../../features/tasks/components/ExtensionRequestModal';
 
 // ============================================================================
@@ -55,6 +59,7 @@ type QuickFilter = 'all' | 'overdue' | 'today' | 'high_priority' | 'this_week';
 interface TabConfig {
   key: TabKey;
   label: string;
+  shortLabel: string;
   icon: React.ReactNode;
   color: string;
   bgColor: string;
@@ -78,6 +83,7 @@ const TABS: TabConfig[] = [
   {
     key: 'in_progress',
     label: 'Đang làm',
+    shortLabel: 'Đang làm',
     icon: <Clock className="w-4 h-4" />,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
@@ -86,6 +92,7 @@ const TABS: TabConfig[] = [
   {
     key: 'awaiting_eval',
     label: 'Chờ tự đánh giá',
+    shortLabel: 'Chờ ĐG',
     icon: <FileText className="w-4 h-4" />,
     color: 'text-amber-600',
     bgColor: 'bg-amber-50',
@@ -94,6 +101,7 @@ const TABS: TabConfig[] = [
   {
     key: 'pending_approval',
     label: 'Chờ phê duyệt',
+    shortLabel: 'Chờ duyệt',
     icon: <AlertCircle className="w-4 h-4" />,
     color: 'text-orange-600',
     bgColor: 'bg-orange-50',
@@ -102,6 +110,7 @@ const TABS: TabConfig[] = [
   {
     key: 'approved',
     label: 'Đã duyệt',
+    shortLabel: 'Đã duyệt',
     icon: <CheckCircle className="w-4 h-4" />,
     color: 'text-green-600',
     bgColor: 'bg-green-50',
@@ -110,6 +119,7 @@ const TABS: TabConfig[] = [
   {
     key: 'participation_requests',
     label: 'Yêu cầu tham gia',
+    shortLabel: 'Tham gia',
     icon: <UserPlus className="w-4 h-4" />,
     color: 'text-purple-600',
     bgColor: 'bg-purple-50',
@@ -122,14 +132,6 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string
   high: { label: 'Cao', color: 'text-orange-700', bg: 'bg-orange-100', sortOrder: 2 },
   medium: { label: 'Trung bình', color: 'text-blue-700', bg: 'bg-blue-100', sortOrder: 3 },
   low: { label: 'Thấp', color: 'text-gray-600', bg: 'bg-gray-100', sortOrder: 4 },
-};
-
-const _STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  draft: { label: 'Nháp', color: 'text-gray-600', bg: 'bg-gray-100' },
-  in_progress: { label: 'Đang làm', color: 'text-blue-600', bg: 'bg-blue-100' },
-  paused: { label: 'Tạm dừng', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  finished: { label: 'Hoàn thành', color: 'text-green-600', bg: 'bg-green-100' },
-  cancelled: { label: 'Đã hủy', color: 'text-red-600', bg: 'bg-red-100' },
 };
 
 const RATING_CONFIG: Record<string, { label: string; color: string }> = {
@@ -230,9 +232,7 @@ const ProgressUpdateModal: React.FC<{
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (isOpen && task) {
-      setProgress(task.progress || 0);
-    }
+    if (isOpen && task) setProgress(task.progress || 0);
   }, [isOpen, task]);
 
   const handleSave = async () => {
@@ -242,7 +242,7 @@ const ProgressUpdateModal: React.FC<{
       await onUpdate(task.id, progress);
       onClose();
     } catch (error) {
-      // Silent error
+      // Silent
     } finally {
       setSaving(false);
     }
@@ -252,26 +252,26 @@ const ProgressUpdateModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
+      <div className="flex items-end sm:items-center justify-center min-h-screen px-4 pt-4 pb-20 sm:pb-4 text-center">
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
         
-        <div className="relative inline-block w-full max-w-md p-6 my-8 text-left bg-white rounded-xl shadow-xl transform transition-all">
+        <div className="relative inline-block w-full max-w-md p-5 sm:p-6 my-8 text-left bg-white rounded-t-xl sm:rounded-xl shadow-xl transform transition-all">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Cập nhật tiến độ</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Cập nhật tiến độ</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-500 p-1">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3 mb-4">
-            <p className="text-sm font-medium text-gray-900">{task.name}</p>
-            <p className="text-xs text-gray-500 mt-1">{task.code}</p>
+            <p className="text-sm font-medium text-gray-900 line-clamp-2">{task.name}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{task.code}</p>
           </div>
 
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Tiến độ hiện tại</span>
-              <span className="text-2xl font-bold text-blue-600">{progress}%</span>
+              <span className="text-sm font-medium text-gray-700">Tiến độ</span>
+              <span className="text-xl sm:text-2xl font-bold text-blue-600">{progress}%</span>
             </div>
             
             <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
@@ -293,14 +293,14 @@ const ProgressUpdateModal: React.FC<{
             />
           </div>
 
-          <div className="mb-6">
+          <div className="mb-5 sm:mb-6">
             <p className="text-sm font-medium text-gray-700 mb-2">Chọn nhanh:</p>
             <div className="grid grid-cols-4 gap-2">
               {QUICK_PROGRESS_OPTIONS.map((qv) => (
                 <button
                   key={qv}
                   onClick={() => setProgress(qv)}
-                  className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  className={`px-2 sm:px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     progress === qv
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -315,34 +315,28 @@ const ProgressUpdateModal: React.FC<{
           {progress >= 100 && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span className="text-sm text-green-700 font-medium">
-                  Công việc sẽ được đánh dấu hoàn thành
-                </span>
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                <div>
+                  <span className="text-sm text-green-700 font-medium">Sẽ đánh dấu hoàn thành</span>
+                  <p className="text-xs text-green-600 mt-0.5">Bạn có thể tiến hành tự đánh giá</p>
+                </div>
               </div>
-              <p className="text-xs text-green-600 mt-1">
-                Sau khi cập nhật, bạn có thể tiến hành tự đánh giá
-              </p>
             </div>
           )}
 
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               Hủy
             </button>
             <button
               onClick={handleSave}
               disabled={saving || progress === task.progress}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors"
             >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Check className="w-4 h-4" />
-              )}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Cập nhật
             </button>
           </div>
@@ -353,7 +347,7 @@ const ProgressUpdateModal: React.FC<{
 };
 
 // ============================================================================
-// COMPONENTS
+// SMALL COMPONENTS
 // ============================================================================
 
 const StatsCard: React.FC<{
@@ -367,50 +361,45 @@ const StatsCard: React.FC<{
 }> = ({ icon, label, value, color, bgColor, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className={`w-full text-left rounded-xl p-4 border-2 transition-all hover:shadow-md ${bgColor} ${
+    className={`w-full text-left rounded-xl p-3 sm:p-4 border-2 transition-all hover:shadow-md ${bgColor} ${
       isActive ? 'border-current ring-2 ring-offset-1' : 'border-transparent'
     } ${color}`}
   >
-    <div className="flex items-center gap-3">
-      <div className={`p-2.5 rounded-lg bg-white/80 shadow-sm ${color}`}>
+    <div className="flex items-center gap-2 sm:gap-3">
+      <div className={`p-2 sm:p-2.5 rounded-lg bg-white/80 shadow-sm ${color}`}>
         {icon}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-gray-500 truncate">{label}</p>
-        <p className={`text-2xl font-bold ${color}`}>{value}</p>
+        <p className={`text-xl sm:text-2xl font-bold ${color}`}>{value}</p>
       </div>
     </div>
   </button>
 );
 
-const ScoreCard: React.FC<{
-  score: number;
-  label: string;
-}> = ({ score, label }) => {
+const ScoreCard: React.FC<{ score: number; label: string }> = ({ score, label }) => {
   const hasData = score > 0;
   const rating = hasData ? getRatingFromScore(score) : 'none';
   const ratingConfig = RATING_CONFIG[rating];
   
   return (
-    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-lg bg-white shadow-sm">
-          <Award className="w-5 h-5 text-purple-600" />
+    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-3 sm:p-4 border border-purple-100">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="p-2 sm:p-2.5 rounded-lg bg-white shadow-sm">
+          <Award className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
         </div>
         <div>
           <p className="text-xs font-medium text-gray-500">Điểm TB</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-purple-700">
+          <div className="flex items-baseline gap-1 sm:gap-2">
+            <span className="text-xl sm:text-2xl font-bold text-purple-700">
               {hasData ? score : '-'}
             </span>
             {hasData && (
-              <span className={`text-sm font-medium ${ratingConfig?.color || 'text-gray-600'}`}>
+              <span className={`text-xs sm:text-sm font-medium ${ratingConfig?.color || 'text-gray-600'}`}>
                 {label}
               </span>
             )}
-            {!hasData && (
-              <span className="text-sm text-gray-400">Chưa có</span>
-            )}
+            {!hasData && <span className="text-xs sm:text-sm text-gray-400">Chưa có</span>}
           </div>
         </div>
       </div>
@@ -428,61 +417,25 @@ const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
   );
 };
 
-const ProgressBar: React.FC<{ progress: number; size?: 'sm' | 'md' }> = ({ progress, size = 'sm' }) => {
-  const height = size === 'sm' ? 'h-1.5' : 'h-2';
+const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => {
   const color = progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-amber-500';
-  
   return (
     <div className="flex items-center gap-2">
-      <div className={`flex-1 ${height} bg-gray-200 rounded-full overflow-hidden`}>
-        <div
-          className={`${height} ${color} rounded-full transition-all duration-300`}
-          style={{ width: `${Math.min(progress, 100)}%` }}
-        />
+      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-1.5 ${color} rounded-full transition-all duration-300`} style={{ width: `${Math.min(progress, 100)}%` }} />
       </div>
       <span className="text-xs font-medium text-gray-600 w-8 text-right">{progress}%</span>
     </div>
   );
 };
 
-const SortableHeader: React.FC<{
-  label: string;
-  field: SortField;
-  currentSort: SortField;
-  currentOrder: SortOrder;
-  onSort: (field: SortField) => void;
-  className?: string;
-}> = ({ label, field, currentSort, currentOrder, onSort, className = '' }) => (
-  <th
-    className={`px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none ${className}`}
-    onClick={() => onSort(field)}
-  >
-    <div className="flex items-center gap-1">
-      <span>{label}</span>
-      {currentSort === field ? (
-        currentOrder === 'asc' ? (
-          <ChevronUp className="w-3.5 h-3.5 text-blue-600" />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
-        )
-      ) : (
-        <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
-      )}
-    </div>
-  </th>
-);
-
-const EmptyState: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}> = ({ icon, title, description }) => (
-  <div className="py-16 text-center">
-    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-400 mb-4">
+const EmptyState: React.FC<{ icon: React.ReactNode; title: string; description: string }> = ({ icon, title, description }) => (
+  <div className="py-12 sm:py-16 text-center px-4">
+    <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-100 text-gray-400 mb-3 sm:mb-4">
       {icon}
     </div>
-    <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
-    <p className="text-gray-500">{description}</p>
+    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">{title}</h3>
+    <p className="text-sm text-gray-500">{description}</p>
   </div>
 );
 
@@ -510,20 +463,16 @@ const MyTasksPage: React.FC = () => {
 
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<MyTask | null>(null);
-
   const [participationRequestsCount, setParticipationRequestsCount] = useState(0);
-
-  // *** STATE MỚI: Extension Modal ***
   const [extensionModalOpen, setExtensionModalOpen] = useState(false);
   const [extensionTask, setExtensionTask] = useState<MyTask | null>(null);
 
   // ============================================================================
-  // DATA FETCHING
+  // DATA FETCHING (unchanged logic)
   // ============================================================================
 
   const fetchTasks = useCallback(async () => {
     if (!user?.employee_id) return;
-    
     try {
       const response = await myTasksService.getMyTasks(user.employee_id);
       setTasks(response.data || []);
@@ -534,88 +483,50 @@ const MyTasksPage: React.FC = () => {
 
   const fetchApprovalInfo = useCallback(async () => {
     if (!user?.employee_id) return;
-
     try {
       const { data: myTasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select('id')
-        .eq('assignee_id', user.employee_id);
-
-      if (tasksError || !myTasks || myTasks.length === 0) {
-        return;
-      }
-
+        .from('tasks').select('id').eq('assignee_id', user.employee_id);
+      if (tasksError || !myTasks || myTasks.length === 0) return;
       const taskIds = myTasks.map(t => t.id);
-
       const { data, error } = await supabase
         .from('task_approvals')
-        .select(`
-          task_id,
-          approved_score,
-          original_score,
-          rating,
-          comments,
-          action,
-          created_at,
-          approver:employees!task_approvals_approver_id_fkey(full_name)
-        `)
-        .in('task_id', taskIds)
-        .eq('action', 'approved');
-
+        .select(`task_id, approved_score, original_score, rating, comments, action, created_at, approver:employees!task_approvals_approver_id_fkey(full_name)`)
+        .in('task_id', taskIds).eq('action', 'approved');
       if (!error && data && data.length > 0) {
         const map = new Map<string, ApprovalInfo>();
         data.forEach((item: any) => {
           map.set(item.task_id, {
-            task_id: item.task_id,
-            score: item.approved_score,
-            rating: item.rating,
-            comments: item.comments,
-            approval_date: item.created_at,
-            approver_name: item.approver?.full_name,
+            task_id: item.task_id, score: item.approved_score, rating: item.rating,
+            comments: item.comments, approval_date: item.created_at, approver_name: item.approver?.full_name,
           });
         });
         setApprovalInfoMap(map);
       }
-    } catch (error) {
-      // Silent error
-    }
+    } catch (error) { /* Silent */ }
   }, [user?.employee_id]);
 
   const fetchParticipationRequestsCount = useCallback(async () => {
     if (!user?.employee_id) return;
-    
     try {
       const count = await taskParticipantService.countPendingRequests(user.employee_id);
       setParticipationRequestsCount(count);
-    } catch (error) {
-      setParticipationRequestsCount(0);
-    }
+    } catch (error) { setParticipationRequestsCount(0); }
   }, [user?.employee_id]);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([
-        fetchTasks(),
-        fetchApprovalInfo(),
-        fetchParticipationRequestsCount(),
-      ]);
+      await Promise.all([fetchTasks(), fetchApprovalInfo(), fetchParticipationRequestsCount()]);
       setLoading(false);
     };
     loadData();
   }, [fetchTasks, fetchApprovalInfo, fetchParticipationRequestsCount]);
 
-  useEffect(() => {
-    setSearchParams({ tab: activeTab });
-  }, [activeTab, setSearchParams]);
+  useEffect(() => { setSearchParams({ tab: activeTab }); }, [activeTab, setSearchParams]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      fetchTasks(),
-      fetchApprovalInfo(),
-      fetchParticipationRequestsCount(),
-    ]);
+    await Promise.all([fetchTasks(), fetchApprovalInfo(), fetchParticipationRequestsCount()]);
     setRefreshing(false);
   };
 
@@ -624,140 +535,66 @@ const MyTasksPage: React.FC = () => {
   // ============================================================================
 
   const stats = useMemo(() => {
-    const inProgress = tasks.filter(t => 
-      t.status === 'in_progress' && t.evaluation_status !== 'approved'
-    ).length;
-    
-    const awaitingEval = tasks.filter(t => 
-      t.status === 'finished' && 
-      (!t.evaluation_status || t.evaluation_status === 'none' || t.evaluation_status === 'pending_self_eval')
-    ).length;
-    
-    const pendingApproval = tasks.filter(t => 
-      t.evaluation_status === 'pending_approval'
-    ).length;
-    
-    const approved = tasks.filter(t => 
-      t.evaluation_status === 'approved'
-    ).length;
-    
-    const overdue = tasks.filter(t => 
-      isOverdue(t.due_date, t.status) && t.evaluation_status !== 'approved'
-    ).length;
-
+    const inProgress = tasks.filter(t => t.status === 'in_progress' && t.evaluation_status !== 'approved').length;
+    const awaitingEval = tasks.filter(t => t.status === 'finished' && (!t.evaluation_status || t.evaluation_status === 'none' || t.evaluation_status === 'pending_self_eval')).length;
+    const pendingApproval = tasks.filter(t => t.evaluation_status === 'pending_approval').length;
+    const approved = tasks.filter(t => t.evaluation_status === 'approved').length;
+    const overdue = tasks.filter(t => isOverdue(t.due_date, t.status) && t.evaluation_status !== 'approved').length;
     return { total: tasks.length, inProgress, awaitingEval, pendingApproval, approved, overdue };
   }, [tasks]);
 
   const evaluationStats = useMemo(() => {
-    if (approvalInfoMap.size === 0) {
-      return { averageScore: 0, rating: '-' };
-    }
-
-    let totalScore = 0;
-    let count = 0;
-
-    approvalInfoMap.forEach((info) => {
-      if (info.score && info.score > 0) {
-        totalScore += info.score;
-        count++;
-      }
-    });
-
+    if (approvalInfoMap.size === 0) return { averageScore: 0, rating: '-' };
+    let totalScore = 0; let count = 0;
+    approvalInfoMap.forEach((info) => { if (info.score && info.score > 0) { totalScore += info.score; count++; } });
     const avg = count > 0 ? Math.round(totalScore / count) : 0;
-    const rating = getRatingFromScore(avg);
-    const ratingLabel = RATING_CONFIG[rating]?.label || '-';
-
-    return { averageScore: avg, rating: ratingLabel };
+    return { averageScore: avg, rating: RATING_CONFIG[getRatingFromScore(avg)]?.label || '-' };
   }, [approvalInfoMap]);
 
   const tabCounts: Record<TabKey, number> = {
-    in_progress: stats.inProgress,
-    awaiting_eval: stats.awaitingEval,
-    pending_approval: stats.pendingApproval,
-    approved: stats.approved,
+    in_progress: stats.inProgress, awaiting_eval: stats.awaitingEval,
+    pending_approval: stats.pendingApproval, approved: stats.approved,
     participation_requests: participationRequestsCount,
   };
 
   const filteredTasks = useMemo(() => {
-    if (activeTab === 'participation_requests') {
-      return [];
-    }
-
+    if (activeTab === 'participation_requests') return [];
     let result = tasks.filter(task => {
       switch (activeTab) {
-        case 'in_progress':
-          return task.status === 'in_progress' && task.evaluation_status !== 'approved';
-        case 'awaiting_eval':
-          return task.status === 'finished' && 
-            (!task.evaluation_status || task.evaluation_status === 'none' || task.evaluation_status === 'pending_self_eval');
-        case 'pending_approval':
-          return task.evaluation_status === 'pending_approval';
-        case 'approved':
-          return task.evaluation_status === 'approved';
-        default:
-          return true;
+        case 'in_progress': return task.status === 'in_progress' && task.evaluation_status !== 'approved';
+        case 'awaiting_eval': return task.status === 'finished' && (!task.evaluation_status || task.evaluation_status === 'none' || task.evaluation_status === 'pending_self_eval');
+        case 'pending_approval': return task.evaluation_status === 'pending_approval';
+        case 'approved': return task.evaluation_status === 'approved';
+        default: return true;
       }
     });
-
     if (quickFilter !== 'all') {
       result = result.filter(task => {
         switch (quickFilter) {
-          case 'overdue':
-            return isOverdue(task.due_date, task.status);
-          case 'today':
-            return isToday(task.due_date);
-          case 'high_priority':
-            return task.priority === 'high' || task.priority === 'urgent';
-          case 'this_week':
-            return isThisWeek(task.due_date);
-          default:
-            return true;
+          case 'overdue': return isOverdue(task.due_date, task.status);
+          case 'today': return isToday(task.due_date);
+          case 'high_priority': return task.priority === 'high' || task.priority === 'urgent';
+          case 'this_week': return isThisWeek(task.due_date);
+          default: return true;
         }
       });
     }
-
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
-      result = result.filter(task =>
-        task.name?.toLowerCase().includes(search) ||
-        task.code?.toLowerCase().includes(search) ||
-        task.description?.toLowerCase().includes(search)
-      );
+      result = result.filter(task => task.name?.toLowerCase().includes(search) || task.code?.toLowerCase().includes(search));
     }
-
     result.sort((a, b) => {
       let comparison = 0;
-      
       switch (sortField) {
-        case 'code':
-          comparison = (a.code || '').localeCompare(b.code || '');
-          break;
-        case 'name':
-          comparison = (a.name || '').localeCompare(b.name || '');
-          break;
-        case 'priority':
-          const aPriority = PRIORITY_CONFIG[a.priority]?.sortOrder || 99;
-          const bPriority = PRIORITY_CONFIG[b.priority]?.sortOrder || 99;
-          comparison = aPriority - bPriority;
-          break;
-        case 'due_date':
-          const aDate = a.due_date ? new Date(a.due_date).getTime() : Infinity;
-          const bDate = b.due_date ? new Date(b.due_date).getTime() : Infinity;
-          comparison = aDate - bDate;
-          break;
-        case 'progress':
-          comparison = (a.progress || 0) - (b.progress || 0);
-          break;
-        case 'status':
-          comparison = (a.status || '').localeCompare(b.status || '');
-          break;
-        default:
-          comparison = 0;
+        case 'code': comparison = (a.code || '').localeCompare(b.code || ''); break;
+        case 'name': comparison = (a.name || '').localeCompare(b.name || ''); break;
+        case 'priority': comparison = (PRIORITY_CONFIG[a.priority]?.sortOrder || 99) - (PRIORITY_CONFIG[b.priority]?.sortOrder || 99); break;
+        case 'due_date': comparison = (a.due_date ? new Date(a.due_date).getTime() : Infinity) - (b.due_date ? new Date(b.due_date).getTime() : Infinity); break;
+        case 'progress': comparison = (a.progress || 0) - (b.progress || 0); break;
+        default: comparison = 0;
       }
-      
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-
     return result;
   }, [tasks, activeTab, quickFilter, searchTerm, sortField, sortOrder]);
 
@@ -766,64 +603,25 @@ const MyTasksPage: React.FC = () => {
   // ============================================================================
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
+    if (sortField === field) { setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc'); }
+    else { setSortField(field); setSortOrder('asc'); }
   };
 
-  const handleViewTask = (taskId: string) => {
-    navigate(`/tasks/${taskId}`);
-  };
-
-  const handleSelfEvaluate = (task: MyTask) => {
-    navigate(`/evaluations/self-evaluation?task_id=${task.id}`);
-  };
-
-  const handleUpdateProgress = (task: MyTask) => {
-    setSelectedTask(task);
-    setProgressModalOpen(true);
-  };
+  const handleViewTask = (taskId: string) => navigate(`/tasks/${taskId}`);
+  const handleSelfEvaluate = (task: MyTask) => navigate(`/evaluations/self-evaluation?task_id=${task.id}`);
+  const handleUpdateProgress = (task: MyTask) => { setSelectedTask(task); setProgressModalOpen(true); };
 
   const handleProgressUpdate = async (taskId: string, newProgress: number) => {
     let newStatus = 'in_progress';
-    if (newProgress >= 100) {
-      newStatus = 'finished';
-    } else if (newProgress === 0) {
-      newStatus = 'draft';
-    }
-
-    const { error } = await supabase
-      .from('tasks')
-      .update({
-        progress: newProgress,
-        status: newStatus,
-      })
-      .eq('id', taskId);
-
+    if (newProgress >= 100) newStatus = 'finished';
+    else if (newProgress === 0) newStatus = 'draft';
+    const { error } = await supabase.from('tasks').update({ progress: newProgress, status: newStatus }).eq('id', taskId);
     if (error) throw error;
-
     await fetchTasks();
   };
 
-  const handleParticipationRequestChange = (count: number) => {
-    setParticipationRequestsCount(count);
-  };
-
-  // *** HANDLER MỚI: Mở modal xin gia hạn ***
-  const handleRequestExtension = (task: MyTask) => {
-    setExtensionTask(task);
-    setExtensionModalOpen(true);
-  };
-
-  // *** HANDLER MỚI: Đóng modal và refresh ***
-  const handleExtensionSuccess = () => {
-    setExtensionModalOpen(false);
-    setExtensionTask(null);
-    fetchTasks(); // Refresh để cập nhật due_date nếu tự động duyệt
-  };
+  const handleRequestExtension = (task: MyTask) => { setExtensionTask(task); setExtensionModalOpen(true); };
+  const handleExtensionSuccess = () => { setExtensionModalOpen(false); setExtensionTask(null); fetchTasks(); };
 
   // ============================================================================
   // RENDER
@@ -841,17 +639,17 @@ const MyTasksPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Công việc của tôi</h1>
-          <p className="text-gray-500 mt-1">Quản lý và theo dõi tiến độ công việc</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Công việc của tôi</h1>
+          <p className="text-sm text-gray-500 mt-0.5 sm:mt-1">Quản lý và theo dõi tiến độ</p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm self-start sm:self-auto"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           Làm mới
@@ -859,76 +657,31 @@ const MyTasksPage: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatsCard
-          icon={<FileText className="w-5 h-5" />}
-          label="Tổng công việc"
-          value={stats.total}
-          color="text-gray-700"
-          bgColor="bg-gray-50"
-        />
-        <StatsCard
-          icon={<Clock className="w-5 h-5" />}
-          label="Đang làm"
-          value={stats.inProgress}
-          color="text-blue-600"
-          bgColor="bg-blue-50"
-          isActive={activeTab === 'in_progress'}
-          onClick={() => setActiveTab('in_progress')}
-        />
-        <StatsCard
-          icon={<Edit3 className="w-5 h-5" />}
-          label="Chờ tự ĐG"
-          value={stats.awaitingEval}
-          color="text-amber-600"
-          bgColor="bg-amber-50"
-          isActive={activeTab === 'awaiting_eval'}
-          onClick={() => setActiveTab('awaiting_eval')}
-        />
-        <StatsCard
-          icon={<AlertCircle className="w-5 h-5" />}
-          label="Chờ duyệt"
-          value={stats.pendingApproval}
-          color="text-orange-600"
-          bgColor="bg-orange-50"
-          isActive={activeTab === 'pending_approval'}
-          onClick={() => setActiveTab('pending_approval')}
-        />
-        <StatsCard
-          icon={<CheckCircle className="w-5 h-5" />}
-          label="Đã duyệt"
-          value={stats.approved}
-          color="text-green-600"
-          bgColor="bg-green-50"
-          isActive={activeTab === 'approved'}
-          onClick={() => setActiveTab('approved')}
-        />
-        <ScoreCard
-          score={evaluationStats.averageScore}
-          label={evaluationStats.rating}
-        />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+        <StatsCard icon={<FileText className="w-4 h-4 sm:w-5 sm:h-5" />} label="Tổng" value={stats.total} color="text-gray-700" bgColor="bg-gray-50" />
+        <StatsCard icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />} label="Đang làm" value={stats.inProgress} color="text-blue-600" bgColor="bg-blue-50" isActive={activeTab === 'in_progress'} onClick={() => setActiveTab('in_progress')} />
+        <StatsCard icon={<Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />} label="Chờ ĐG" value={stats.awaitingEval} color="text-amber-600" bgColor="bg-amber-50" isActive={activeTab === 'awaiting_eval'} onClick={() => setActiveTab('awaiting_eval')} />
+        <StatsCard icon={<AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />} label="Chờ duyệt" value={stats.pendingApproval} color="text-orange-600" bgColor="bg-orange-50" isActive={activeTab === 'pending_approval'} onClick={() => setActiveTab('pending_approval')} />
+        <StatsCard icon={<CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />} label="Đã duyệt" value={stats.approved} color="text-green-600" bgColor="bg-green-50" isActive={activeTab === 'approved'} onClick={() => setActiveTab('approved')} />
+        <ScoreCard score={evaluationStats.averageScore} label={evaluationStats.rating} />
       </div>
 
       {/* Overdue Warning */}
       {stats.overdue > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="p-2 bg-red-100 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+          <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
+            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
           </div>
-          <div className="flex-1">
-            <p className="text-red-800 font-medium">
-              Bạn có <strong>{stats.overdue}</strong> công việc đã quá hạn
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-red-800 font-medium">
+              <strong>{stats.overdue}</strong> công việc quá hạn
             </p>
-            <p className="text-red-600 text-sm">Vui lòng xử lý sớm hoặc xin gia hạn nếu cần thiết</p>
           </div>
           <button
-            onClick={() => {
-              setActiveTab('in_progress');
-              setQuickFilter('overdue');
-            }}
-            className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            onClick={() => { setActiveTab('in_progress'); setQuickFilter('overdue'); }}
+            className="px-3 py-1.5 bg-red-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-red-700 flex-shrink-0"
           >
-            Xem ngay
+            Xem
           </button>
         </div>
       )}
@@ -937,42 +690,40 @@ const MyTasksPage: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Search & Filters */}
         {activeTab !== 'participation_requests' && (
-          <div className="p-4 border-b border-gray-200 space-y-4">
+          <div className="p-3 sm:p-4 border-b border-gray-200 space-y-3 sm:space-y-4">
             <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm theo mã hoặc tên công việc..."
+                placeholder="Tìm mã hoặc tên..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full pl-9 sm:pl-10 pr-9 py-2 sm:py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-500 mr-1">Lọc nhanh:</span>
-              {QUICK_FILTERS.map(filter => (
+            {/* Quick filters - scrollable on mobile */}
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
+              <span className="text-xs sm:text-sm text-gray-500 mr-1 whitespace-nowrap flex-shrink-0">Lọc:</span>
+              {QUICK_FILTERS.map(f => (
                 <button
-                  key={filter.key}
-                  onClick={() => setQuickFilter(filter.key)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    quickFilter === filter.key
+                  key={f.key}
+                  onClick={() => setQuickFilter(f.key)}
+                  className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                    quickFilter === f.key
                       ? 'bg-blue-100 text-blue-700 border border-blue-300'
                       : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'
                   }`}
                 >
-                  {filter.icon}
-                  {filter.label}
-                  {filter.key === 'overdue' && stats.overdue > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                  {f.icon}
+                  {f.label}
+                  {f.key === 'overdue' && stats.overdue > 0 && (
+                    <span className="ml-1 px-1 py-0.5 bg-red-500 text-white text-xs rounded-full leading-none">
                       {stats.overdue}
                     </span>
                   )}
@@ -982,33 +733,25 @@ const MyTasksPage: React.FC = () => {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
+        {/* Tabs - scrollable on mobile */}
+        <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 scrollbar-hide">
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => {
-                setActiveTab(tab.key);
-                setQuickFilter('all');
-              }}
-              className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
+              onClick={() => { setActiveTab(tab.key); setQuickFilter('all'); }}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${
                 activeTab === tab.key
                   ? `${tab.borderColor} ${tab.color} ${tab.bgColor}`
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
               }`}
             >
               {tab.icon}
-              <span>{tab.label}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.shortLabel}</span>
               {tabCounts[tab.key] > 0 && (
-                <span
-                  className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    activeTab === tab.key
-                      ? 'bg-white/80 shadow-sm'
-                      : tab.key === 'participation_requests'
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
+                <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${
+                  activeTab === tab.key ? 'bg-white/80 shadow-sm' : tab.key === 'participation_requests' ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-600'
+                }`}>
                   {tabCounts[tab.key]}
                 </span>
               )}
@@ -1018,256 +761,176 @@ const MyTasksPage: React.FC = () => {
 
         {/* Content */}
         {activeTab === 'participation_requests' ? (
-          <ParticipationRequestsTab onCountChange={handleParticipationRequestChange} />
+          <ParticipationRequestsTab onCountChange={(count) => setParticipationRequestsCount(count)} />
         ) : (
           <>
-            {/* Table */}
-            <div className="overflow-x-auto">
-              {filteredTasks.length === 0 ? (
-                <EmptyState
-                  icon={
-                    searchTerm ? (
-                      <Search className="w-8 h-8" />
-                    ) : quickFilter !== 'all' ? (
-                      <Filter className="w-8 h-8" />
-                    ) : (
-                      React.cloneElement(TABS.find(t => t.key === activeTab)?.icon as React.ReactElement || <FileText className="w-8 h-8" />, { className: 'w-8 h-8' })
-                    )
-                  }
-                  title={
-                    searchTerm
-                      ? 'Không tìm thấy công việc'
-                      : quickFilter !== 'all'
-                      ? `Không có công việc ${QUICK_FILTERS.find(f => f.key === quickFilter)?.label.toLowerCase()}`
-                      : activeTab === 'in_progress'
-                      ? 'Không có công việc đang làm'
-                      : activeTab === 'awaiting_eval'
-                      ? 'Không có công việc chờ tự đánh giá'
-                      : activeTab === 'pending_approval'
-                      ? 'Không có công việc chờ phê duyệt'
-                      : 'Chưa có công việc được duyệt'
-                  }
-                  description={
-                    searchTerm
-                      ? 'Thử thay đổi từ khóa tìm kiếm'
-                      : quickFilter !== 'all'
-                      ? 'Thử bỏ bộ lọc để xem tất cả'
-                      : 'Khi có công việc mới, chúng sẽ hiển thị ở đây'
-                  }
-                />
-              ) : (
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="w-8 px-3 py-3"></th>
-                      <SortableHeader
-                        label="Mã"
-                        field="code"
-                        currentSort={sortField}
-                        currentOrder={sortOrder}
-                        onSort={handleSort}
-                        className="w-28"
-                      />
-                      <SortableHeader
-                        label="Tên công việc"
-                        field="name"
-                        currentSort={sortField}
-                        currentOrder={sortOrder}
-                        onSort={handleSort}
-                      />
-                      <SortableHeader
-                        label="Ưu tiên"
-                        field="priority"
-                        currentSort={sortField}
-                        currentOrder={sortOrder}
-                        onSort={handleSort}
-                        className="w-28"
-                      />
-                      <SortableHeader
-                        label="Hạn"
-                        field="due_date"
-                        currentSort={sortField}
-                        currentOrder={sortOrder}
-                        onSort={handleSort}
-                        className="w-32"
-                      />
-                      <SortableHeader
-                        label="Tiến độ"
-                        field="progress"
-                        currentSort={sortField}
-                        currentOrder={sortOrder}
-                        onSort={handleSort}
-                        className="w-32"
-                      />
-                      {activeTab === 'approved' && (
-                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">
-                          Điểm
+            {filteredTasks.length === 0 ? (
+              <EmptyState
+                icon={searchTerm ? <Search className="w-7 h-7 sm:w-8 sm:h-8" /> : <FileText className="w-7 h-7 sm:w-8 sm:h-8" />}
+                title={searchTerm ? 'Không tìm thấy' : 'Không có công việc'}
+                description={searchTerm ? 'Thử thay đổi từ khóa' : 'Khi có công việc mới sẽ hiển thị ở đây'}
+              />
+            ) : (
+              <>
+                {/* ===== DESKTOP TABLE (hidden on mobile) ===== */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="w-8 px-3 py-3"></th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-28 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('code')}>
+                          <div className="flex items-center gap-1">Mã {sortField === 'code' ? (sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />}</div>
                         </th>
-                      )}
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-44">
-                        Thao tác
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredTasks.map((task) => {
-                      const taskOverdue = isOverdue(task.due_date, task.status) && task.evaluation_status !== 'approved';
-                      const daysInfo = getDaysRemaining(task.due_date);
-                      const approvalInfo = approvalInfoMap.get(task.id);
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
+                          <div className="flex items-center gap-1">Tên {sortField === 'name' ? (sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />}</div>
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-28 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('priority')}>
+                          <div className="flex items-center gap-1">Ưu tiên</div>
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-32 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('due_date')}>
+                          <div className="flex items-center gap-1">Hạn</div>
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-32 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('progress')}>
+                          <div className="flex items-center gap-1">Tiến độ</div>
+                        </th>
+                        {activeTab === 'approved' && (
+                          <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-24">Điểm</th>
+                        )}
+                        <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase w-44">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredTasks.map((task) => {
+                        const taskOverdue = isOverdue(task.due_date, task.status) && task.evaluation_status !== 'approved';
+                        const daysInfo = getDaysRemaining(task.due_date);
+                        const approvalInfo = approvalInfoMap.get(task.id);
+                        const canRequestExtension = activeTab === 'in_progress' && task.status === 'in_progress' && task.due_date;
 
-                      // *** ĐIỀU KIỆN HIỂN THỊ NÚT GIA HẠN ***
-                      const canRequestExtension = 
-                        activeTab === 'in_progress' && 
-                        task.status === 'in_progress' &&
-                        task.due_date; // Phải có ngày hạn
-
-                      return (
-                        <tr
-                          key={task.id}
-                          className={`hover:bg-gray-50 transition-colors ${
-                            taskOverdue ? 'bg-red-50/50' : ''
-                          }`}
-                        >
-                          <td className="px-3 py-3.5">
-                            {taskOverdue && (
-                              <span title="Quá hạn">
-                                <AlertTriangle className="w-4 h-4 text-red-500" />
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="px-3 py-3.5">
-                            <span className="font-mono text-sm text-gray-600">{task.code}</span>
-                          </td>
-
-                          <td className="px-3 py-3.5">
-                            <div className="min-w-0">
-                              <button
-                                onClick={() => handleViewTask(task.id)}
-                                className="font-medium text-gray-900 hover:text-blue-600 text-left truncate max-w-[300px] block"
-                                title={task.name}
-                              >
-                                {task.name}
-                              </button>
-                              {task.department?.name && (
-                                <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500">
-                                  <Building2 className="w-3 h-3" />
-                                  {task.department.name}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="px-3 py-3.5">
-                            <PriorityBadge priority={task.priority} />
-                          </td>
-
-                          <td className="px-3 py-3.5">
-                            <div className="text-sm">
-                              <div className={taskOverdue ? 'text-red-600 font-medium' : 'text-gray-900'}>
-                                {formatDate(task.due_date)}
-                              </div>
-                              <div className={`text-xs ${daysInfo.isOverdue ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
-                                {daysInfo.text}
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="px-3 py-3.5">
-                            <ProgressBar progress={task.progress || 0} />
-                          </td>
-
-                          {activeTab === 'approved' && (
+                        return (
+                          <tr key={task.id} className={`hover:bg-gray-50 transition-colors ${taskOverdue ? 'bg-red-50/50' : ''}`}>
+                            <td className="px-3 py-3.5">{taskOverdue && <AlertTriangle className="w-4 h-4 text-red-500" />}</td>
+                            <td className="px-3 py-3.5"><span className="font-mono text-sm text-gray-600">{task.code}</span></td>
                             <td className="px-3 py-3.5">
-                              {approvalInfo?.score ? (
-                                <div className="text-center">
-                                  <span className="text-lg font-bold text-purple-600">
-                                    {approvalInfo.score}
-                                  </span>
-                                  {approvalInfo.rating && (
-                                    <div className={`text-xs ${RATING_CONFIG[approvalInfo.rating]?.color || 'text-gray-500'}`}>
-                                      {RATING_CONFIG[approvalInfo.rating]?.label || approvalInfo.rating}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
+                              <button onClick={() => handleViewTask(task.id)} className="font-medium text-gray-900 hover:text-blue-600 text-left truncate max-w-[300px] block" title={task.name}>{task.name}</button>
+                              {task.department?.name && <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500"><Building2 className="w-3 h-3" />{task.department.name}</div>}
                             </td>
-                          )}
+                            <td className="px-3 py-3.5"><PriorityBadge priority={task.priority} /></td>
+                            <td className="px-3 py-3.5">
+                              <div className={`text-sm ${taskOverdue ? 'text-red-600 font-medium' : 'text-gray-900'}`}>{formatDate(task.due_date)}</div>
+                              <div className={`text-xs ${daysInfo.isOverdue ? 'text-red-500 font-medium' : 'text-gray-500'}`}>{daysInfo.text}</div>
+                            </td>
+                            <td className="px-3 py-3.5"><ProgressBar progress={task.progress || 0} /></td>
+                            {activeTab === 'approved' && (
+                              <td className="px-3 py-3.5 text-center">
+                                {approvalInfo?.score ? (
+                                  <div><span className="text-lg font-bold text-purple-600">{approvalInfo.score}</span>
+                                  {approvalInfo.rating && <div className={`text-xs ${RATING_CONFIG[approvalInfo.rating]?.color || ''}`}>{RATING_CONFIG[approvalInfo.rating]?.label}</div>}</div>
+                                ) : <span className="text-gray-400">-</span>}
+                              </td>
+                            )}
+                            <td className="px-3 py-3.5 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button onClick={() => handleViewTask(task.id)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Xem"><Eye className="w-4 h-4" /></button>
+                                {activeTab === 'in_progress' && (
+                                  <button onClick={() => handleUpdateProgress(task)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg"><TrendingUp className="w-3.5 h-3.5" />Cập nhật</button>
+                                )}
+                                {canRequestExtension && (
+                                  <button onClick={() => handleRequestExtension(task)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><CalendarPlus className="w-3.5 h-3.5" />Gia hạn</button>
+                                )}
+                                {activeTab === 'awaiting_eval' && (
+                                  <button onClick={() => handleSelfEvaluate(task)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><Edit3 className="w-3.5 h-3.5" />Tự ĐG</button>
+                                )}
+                                {activeTab === 'approved' && (
+                                  <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg"><ExternalLink className="w-3.5 h-3.5" />Kết quả</button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-                          <td className="px-3 py-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Nút Xem */}
-                              <button
-                                onClick={() => handleViewTask(task.id)}
-                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Xem chi tiết"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
+                {/* ===== MOBILE CARD VIEW ===== */}
+                <div className="md:hidden divide-y divide-gray-100">
+                  {filteredTasks.map((task) => {
+                    const taskOverdue = isOverdue(task.due_date, task.status) && task.evaluation_status !== 'approved';
+                    const daysInfo = getDaysRemaining(task.due_date);
+                    const approvalInfo = approvalInfoMap.get(task.id);
+                    const canRequestExtension = activeTab === 'in_progress' && task.status === 'in_progress' && task.due_date;
 
-                              {/* Nút Cập nhật tiến độ - Tab Đang làm */}
-                              {activeTab === 'in_progress' && (
-                                <button
-                                  onClick={() => handleUpdateProgress(task)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                                  title="Cập nhật tiến độ"
-                                >
-                                  <TrendingUp className="w-3.5 h-3.5" />
-                                  Cập nhật
-                                </button>
-                              )}
-
-                              {/* *** NÚT MỚI: Xin gia hạn - Tab Đang làm *** */}
-                              {canRequestExtension && (
-                                <button
-                                  onClick={() => handleRequestExtension(task)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
-                                  title="Xin gia hạn"
-                                >
-                                  <CalendarPlus className="w-3.5 h-3.5" />
-                                  Gia hạn
-                                </button>
-                              )}
-
-                              {/* Nút Tự đánh giá - Tab Chờ tự đánh giá */}
-                              {activeTab === 'awaiting_eval' && (
-                                <button
-                                  onClick={() => handleSelfEvaluate(task)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
-                                  title="Tự đánh giá"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  Tự đánh giá
-                                </button>
-                              )}
-
-                              {/* Nút Xem kết quả - Tab Đã duyệt */}
-                              {activeTab === 'approved' && (
-                                <button
-                                  onClick={() => handleViewTask(task.id)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-                                  title="Xem kết quả"
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                  Xem kết quả
-                                </button>
-                              )}
+                    return (
+                      <div key={task.id} className={`p-3 sm:p-4 ${taskOverdue ? 'bg-red-50/50' : ''}`}>
+                        {/* Top row: name + priority */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0 flex-1">
+                            <button onClick={() => handleViewTask(task.id)} className="font-medium text-sm text-gray-900 hover:text-blue-600 text-left line-clamp-2 w-full">{task.name}</button>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="font-mono text-xs text-gray-400">{task.code}</span>
+                              {task.department?.name && <span className="text-xs text-gray-400">• {task.department.name}</span>}
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                          </div>
+                          <PriorityBadge priority={task.priority} />
+                        </div>
+
+                        {/* Middle: deadline + progress */}
+                        <div className="flex items-center gap-4 mb-3 text-xs">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-gray-400" />
+                            <span className={taskOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}>{formatDate(task.due_date)}</span>
+                            <span className={`${daysInfo.isOverdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>({daysInfo.text})</span>
+                          </div>
+                          {activeTab === 'approved' && approvalInfo?.score && (
+                            <div className="flex items-center gap-1">
+                              <Award className="w-3 h-3 text-purple-500" />
+                              <span className="text-purple-600 font-bold">{approvalInfo.score}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="mb-3">
+                          <ProgressBar progress={task.progress || 0} />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                            <Eye className="w-3.5 h-3.5" />Xem
+                          </button>
+                          {activeTab === 'in_progress' && (
+                            <button onClick={() => handleUpdateProgress(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg">
+                              <TrendingUp className="w-3.5 h-3.5" />Cập nhật
+                            </button>
+                          )}
+                          {canRequestExtension && (
+                            <button onClick={() => handleRequestExtension(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg">
+                              <CalendarPlus className="w-3.5 h-3.5" />Gia hạn
+                            </button>
+                          )}
+                          {activeTab === 'awaiting_eval' && (
+                            <button onClick={() => handleSelfEvaluate(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg">
+                              <Edit3 className="w-3.5 h-3.5" />Tự đánh giá
+                            </button>
+                          )}
+                          {activeTab === 'approved' && (
+                            <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg">
+                              <ExternalLink className="w-3.5 h-3.5" />Kết quả
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             {filteredTasks.length > 0 && (
-              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 text-sm text-gray-500">
-                Hiển thị <strong>{filteredTasks.length}</strong> công việc
-                {searchTerm && ` phù hợp với "${searchTerm}"`}
+              <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-gray-200 bg-gray-50 text-xs sm:text-sm text-gray-500">
+                <strong>{filteredTasks.length}</strong> công việc
+                {searchTerm && ` • "${searchTerm}"`}
                 {quickFilter !== 'all' && ` • ${QUICK_FILTERS.find(f => f.key === quickFilter)?.label}`}
               </div>
             )}
@@ -1275,31 +938,19 @@ const MyTasksPage: React.FC = () => {
         )}
       </div>
 
-      {/* Progress Update Modal */}
+      {/* Modals */}
       <ProgressUpdateModal
         task={selectedTask}
         isOpen={progressModalOpen}
-        onClose={() => {
-          setProgressModalOpen(false);
-          setSelectedTask(null);
-        }}
+        onClose={() => { setProgressModalOpen(false); setSelectedTask(null); }}
         onUpdate={handleProgressUpdate}
       />
 
-      {/* *** MODAL MỚI: Extension Request Modal *** */}
       {extensionTask && (
         <ExtensionRequestModal
           isOpen={extensionModalOpen}
-          onClose={() => {
-            setExtensionModalOpen(false);
-            setExtensionTask(null);
-          }}
-          task={{
-            id: extensionTask.id,
-            name: extensionTask.name,
-            code: extensionTask.code,
-            due_date: extensionTask.due_date || '',
-          }}
+          onClose={() => { setExtensionModalOpen(false); setExtensionTask(null); }}
+          task={{ id: extensionTask.id, name: extensionTask.name, code: extensionTask.code, due_date: extensionTask.due_date || '' }}
           onSuccess={handleExtensionSuccess}
         />
       )}

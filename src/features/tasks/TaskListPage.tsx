@@ -1,9 +1,12 @@
 // src/features/tasks/TaskListPage.tsx
 // ============================================================================
-// PHÂN QUYỀN:
-// - EXECUTIVE (Level 1-3): Xem tất cả, sửa/xóa tất cả
-// - MANAGER (Level 4-5): Chỉ xem/sửa/xóa trong phòng ban, KHÔNG sửa task do Executive tạo
-// - EMPLOYEE (Level 6+): Xem trong phòng ban, tạo việc cá nhân (tự giao cho mình)
+// RESPONSIVE UPDATE:
+// - Header: stacked on mobile, flex-wrap
+// - Table: hidden on mobile, card view on mobile
+// - Filters: compact on mobile
+// - Pagination: responsive
+// - Action buttons: compact, wrapped
+// - Department notice: compact on mobile
 // ============================================================================
 
 import { useState, useEffect, useMemo } from 'react'
@@ -65,9 +68,6 @@ function getDaysOverdue(dueDate: string): number {
   return Math.ceil((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-/**
- * Convert API task to TaskForPermission
- */
 function toTaskForPermission(task: any): TaskForPermission {
   let assignerLevel: number | null = null
   
@@ -105,7 +105,6 @@ export function TaskListPage() {
 
   const { user } = useAuthStore()
 
-  // Permission hook
   const { 
     isLoading: permissionLoading,
     userGroup, 
@@ -119,7 +118,6 @@ export function TaskListPage() {
     canAssignTo,
   } = useTaskPermissions()
 
-  // ========== AUTO FILTER THEO PHÒNG BAN ==========
   const effectiveDepartmentFilter = useMemo(() => {
     if (isAdmin || isExecutive) {
       return filter.department_id || undefined
@@ -130,7 +128,6 @@ export function TaskListPage() {
     return filter.department_id || undefined
   }, [isAdmin, isExecutive, userDepartmentId, filter.department_id])
 
-  // Build API filter
   const apiFilter = useMemo(() => {
     const result: Record<string, any> = {}
     
@@ -147,7 +144,6 @@ export function TaskListPage() {
     return result
   }, [filter, effectiveDepartmentFilter])
 
-  // Fetch data
   const { 
     data: tasksData, 
     isLoading, 
@@ -160,14 +156,12 @@ export function TaskListPage() {
   const { data: employeesData } = useEmployees()
   const deleteMutation = useDeleteTask()
 
-  // Department name for display
   const userDepartmentName = useMemo(() => {
     if (!userDepartmentId || !departmentsData?.data) return ''
     const dept = (departmentsData.data as any[]).find(d => d.id === userDepartmentId)
     return dept?.name || ''
   }, [userDepartmentId, departmentsData])
 
-  // Auto hide messages
   useEffect(() => {
     if (assignSuccess) {
       const timer = setTimeout(() => setAssignSuccess(null), 5000)
@@ -175,7 +169,6 @@ export function TaskListPage() {
     }
   }, [assignSuccess])
 
-  // Helpers
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-'
     try {
@@ -187,29 +180,20 @@ export function TaskListPage() {
 
   const getTaskTitle = (task: any) => task.title || task.name || 'Không có tiêu đề'
 
-  // ========== CHECK CÓ THỂ GIAO VIỆC KHÔNG ==========
   const canAssignTask = (task: any): boolean => {
-    // Task phải đang ở trạng thái draft
     if (task.status !== 'draft') return false
-    
-    // Task phải có người phụ trách
     if (!task.assignee_id) return false
     
-    // ========== ĐIỀU KIỆN CHO EMPLOYEE ==========
     if (isEmployee) {
-      // Employee chỉ có thể giao việc cho task do mình tạo (tự giao)
       const isOwnTask = task.is_self_assigned && task.assigner_id === user?.employee_id
       return isOwnTask
     }
     
-    // ========== ĐIỀU KIỆN CHO MANAGER/EXECUTIVE ==========
-    // Kiểm tra quyền giao việc theo phòng ban
     const assigneeDepId = task.assignee?.department_id || task.department_id
     const { canAssign } = canAssignTo(assigneeDepId)
     return canAssign
   }
 
-  // Handle assign task
   const handleAssignTask = async (task: any) => {
     if (!task.assignee_id) {
       setAssignError('Công việc chưa có người phụ trách')
@@ -220,7 +204,6 @@ export function TaskListPage() {
       return
     }
 
-    // Với Employee: kiểm tra task tự giao
     if (isEmployee) {
       const isOwnTask = task.is_self_assigned && task.assigner_id === user.employee_id
       if (!isOwnTask) {
@@ -228,7 +211,6 @@ export function TaskListPage() {
         return
       }
     } else {
-      // Với Manager/Executive: kiểm tra quyền phòng ban
       const assigneeDepId = task.assignee?.department_id || task.department_id
       const { canAssign, reason } = canAssignTo(assigneeDepId)
       if (!canAssign) {
@@ -261,7 +243,6 @@ export function TaskListPage() {
     }
   }
 
-  // Handle delete
   const handleDeleteTask = (task: any) => {
     const taskForPerm = toTaskForPermission(task)
     const permissions = getPermissions(taskForPerm)
@@ -273,7 +254,6 @@ export function TaskListPage() {
     setDeleteId(task.id)
   }
 
-  // Extract data
   const tasks = tasksData?.data || []
   const totalPages = tasksData?.totalPages || 1
   const total = tasksData?.total || 0
@@ -281,24 +261,14 @@ export function TaskListPage() {
   const departments = Array.isArray(departmentsData?.data) ? departmentsData.data : []
   const allEmployees = Array.isArray(employeesData?.data) ? employeesData.data : []
 
-  // ========== FILTER EMPLOYEES THEO QUYỀN ==========
-  // Executive/Admin: Xem tất cả nhân viên
-  // Manager/Employee: Chỉ xem nhân viên trong phòng ban
   const filteredEmployees = useMemo(() => {
-    if (isAdmin || isExecutive) {
-      // Executive/Admin: hiển thị tất cả nhân viên
-      return allEmployees
-    }
-    
+    if (isAdmin || isExecutive) return allEmployees
     if (userDepartmentId) {
-      // Manager/Employee: chỉ hiển thị nhân viên trong phòng ban
       return allEmployees.filter((emp: any) => emp.department_id === userDepartmentId)
     }
-    
     return allEmployees
   }, [allEmployees, isAdmin, isExecutive, userDepartmentId])
 
-  // Stats
   const overdueCount = useMemo(() => tasks.filter(isTaskOverdue).length, [tasks])
   const dueTodayCount = useMemo(() => tasks.filter(isTaskDueToday).length, [tasks])
 
@@ -312,7 +282,6 @@ export function TaskListPage() {
     filter.created_date_from || filter.created_date_to,
   ].filter(Boolean).length
 
-  // Permission labels
   const permissionLabel = isAdmin ? 'Admin' : isExecutive ? 'Ban Giám đốc' : isManager ? 'Quản lý' : 'Nhân viên'
   const permissionBadgeColor = isAdmin ? 'bg-red-100 text-red-700' 
     : isExecutive ? 'bg-purple-100 text-purple-700'
@@ -321,21 +290,19 @@ export function TaskListPage() {
 
   const canViewAllDepartments = isAdmin || isExecutive
 
-  // Error state
   if (error) {
     return (
-      <div className="p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <div className="p-4 md:p-6">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm sm:text-base">
           Lỗi: {(error as Error).message}
         </div>
       </div>
     )
   }
 
-  // Loading permission
   if (permissionLoading) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           <span className="ml-3 text-gray-500">Đang tải quyền hạn...</span>
@@ -345,26 +312,26 @@ export function TaskListPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">Quản lý công việc</h1>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${permissionBadgeColor}`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Quản lý công việc</h1>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 sm:py-1 text-xs font-medium rounded-full ${permissionBadgeColor}`}>
               <Shield className="w-3 h-3" />
               {permissionLabel} (L{userLevel})
             </span>
           </div>
           {activeTab === 'list' && (
-            <p className="text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               Tổng: {total} công việc
               {overdueCount > 0 && <span className="ml-2 text-red-600">({overdueCount} quá hạn)</span>}
-              {dueTodayCount > 0 && <span className="ml-2 text-amber-600">({dueTodayCount} đến hạn hôm nay)</span>}
+              {dueTodayCount > 0 && <span className="ml-2 text-amber-600">({dueTodayCount} đến hạn)</span>}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {activeTab === 'list' && (
             <>
               <button
@@ -376,22 +343,23 @@ export function TaskListPage() {
                 <RefreshCw size={20} className={isFetching ? 'animate-spin' : ''} />
               </button>
               
-              {/* ========== NÚT TẠO CÔNG VIỆC ========== */}
               {isEmployee ? (
                 <Link
                   to="/tasks/create?mode=self"
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm sm:text-base"
                 >
-                  <Plus size={20} />
-                  Tạo việc cá nhân
+                  <Plus size={18} />
+                  <span className="hidden xs:inline">Tạo việc</span>
+                  <span className="xs:hidden">Tạo</span>
                 </Link>
               ) : (
                 <Link
                   to="/tasks/create"
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base"
                 >
-                  <Plus size={20} />
-                  Tạo công việc
+                  <Plus size={18} />
+                  <span className="hidden sm:inline">Tạo công việc</span>
+                  <span className="sm:hidden">Tạo</span>
                 </Link>
               )}
             </>
@@ -400,12 +368,12 @@ export function TaskListPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 mb-6 border-b border-gray-200">
+      <div className="flex items-center gap-1 mb-4 sm:mb-6 border-b border-gray-200">
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setSearchParams({ tab: tab.id })}
-            className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm border-b-2 transition-colors ${
               activeTab === tab.id
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -426,42 +394,42 @@ export function TaskListPage() {
         <>
           {/* Alerts */}
           {assignSuccess && (
-            <div className="mb-4 p-4 bg-green-100 border border-green-300 text-green-700 rounded-lg flex justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle size={20} />
-                {assignSuccess}
+            <div className="mb-3 sm:mb-4 p-3 sm:p-4 bg-green-100 border border-green-300 text-green-700 rounded-lg flex justify-between items-start gap-2">
+              <div className="flex items-center gap-2 text-sm sm:text-base">
+                <CheckCircle size={18} className="flex-shrink-0" />
+                <span>{assignSuccess}</span>
               </div>
-              <button onClick={() => setAssignSuccess(null)} className="text-green-500 hover:text-green-700 text-xl">×</button>
+              <button onClick={() => setAssignSuccess(null)} className="text-green-500 hover:text-green-700 text-xl leading-none flex-shrink-0">×</button>
             </div>
           )}
 
           {assignError && (
-            <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg flex justify-between">
-              {assignError}
-              <button onClick={() => setAssignError(null)} className="text-red-500 hover:text-red-700 text-xl">×</button>
+            <div className="mb-3 sm:mb-4 p-3 sm:p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg flex justify-between items-start gap-2 text-sm sm:text-base">
+              <span>{assignError}</span>
+              <button onClick={() => setAssignError(null)} className="text-red-500 hover:text-red-700 text-xl leading-none flex-shrink-0">×</button>
             </div>
           )}
 
           {/* Department restriction notice */}
           {(isManager || isEmployee) && !isAdmin && userDepartmentName && (
-            <div className={`mb-4 p-4 rounded-lg flex items-start gap-3 ${
+            <div className={`mb-3 sm:mb-4 p-3 sm:p-4 rounded-lg flex items-start gap-2 sm:gap-3 ${
               isManager ? 'bg-blue-50 border border-blue-200' : 'bg-green-50 border border-green-200'
             }`}>
-              <Building2 className={`w-5 h-5 mt-0.5 ${isManager ? 'text-blue-500' : 'text-green-500'}`} />
-              <div>
-                <p className={`font-medium ${isManager ? 'text-blue-800' : 'text-green-800'}`}>
+              <Building2 className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isManager ? 'text-blue-500' : 'text-green-500'}`} />
+              <div className="min-w-0">
+                <p className={`font-medium text-sm sm:text-base ${isManager ? 'text-blue-800' : 'text-green-800'}`}>
                   Phạm vi: {userDepartmentName}
                 </p>
-                <p className={`text-sm mt-1 ${isManager ? 'text-blue-600' : 'text-green-600'}`}>
+                <p className={`text-xs sm:text-sm mt-0.5 sm:mt-1 ${isManager ? 'text-blue-600' : 'text-green-600'}`}>
                   {isManager 
-                    ? 'Bạn chỉ thao tác được công việc trong phòng ban. Không thể sửa/xóa công việc do Ban Giám đốc tạo.'
-                    : 'Bạn có thể xem công việc trong phòng ban và tạo công việc cá nhân cho chính mình.'}
+                    ? 'Bạn chỉ thao tác được công việc trong phòng ban.'
+                    : 'Bạn có thể xem công việc trong phòng ban và tạo công việc cá nhân.'}
                 </p>
               </div>
             </div>
           )}
 
-          {/* Filters - Truyền filteredEmployees thay vì allEmployees */}
+          {/* Filters */}
           <TaskFilters
             value={filter}
             onChange={(newFilter) => {
@@ -473,8 +441,8 @@ export function TaskListPage() {
             disableDepartmentFilter={(isManager || isEmployee) && !isAdmin}
           />
 
-          {/* Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden mt-4">
+          {/* ========== DESKTOP TABLE (hidden on mobile) ========== */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden mt-4">
             {isLoading ? (
               <div className="p-8 text-center">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
@@ -504,32 +472,22 @@ export function TaskListPage() {
                       const overdue = isTaskOverdue(task)
                       const dueToday = isTaskDueToday(task)
                       const daysOverdue = overdue ? getDaysOverdue(task.due_date) : 0
-                      
-                      // Convert và check permission
                       const taskForPerm = toTaskForPermission(task)
                       const permissions = getPermissions(taskForPerm)
-                      
-                      // ========== CHECK CÓ THỂ GIAO VIỆC ==========
                       const showAssignButton = canAssignTask(task)
-                      
-                      // ========== CHECK CÓ THỂ XÓA ==========
-                      // Employee chỉ xóa được task do mình tạo
                       const canDeleteTask = isEmployee 
                         ? (task.status === 'draft' && task.assigner_id === user?.employee_id)
                         : (task.status === 'draft' && permissions.canDelete)
-                      
                       const rowBgClass = overdue ? 'bg-red-50/50' : dueToday ? 'bg-amber-50/50' : ''
                       
                       return (
                         <tr key={task.id} className={`hover:bg-gray-50 ${rowBgClass}`}>
-                          {/* Name */}
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Link to={`/tasks/${task.id}`} className="text-blue-600 hover:underline font-medium">
                                 {getTaskTitle(task)}
                               </Link>
                               <SubtaskBadge taskId={task.id} />
-                              {/* Badge công việc tự giao */}
                               {task.is_self_assigned && (
                                 <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                                   Tự giao
@@ -548,20 +506,10 @@ export function TaskListPage() {
                             </div>
                             {task.code && <p className="text-xs text-gray-400 mt-0.5">{task.code}</p>}
                           </td>
-                          
-                          {/* Department */}
                           <td className="px-4 py-3 text-sm text-gray-500">{task.department?.name || '-'}</td>
-                          
-                          {/* Assignee */}
                           <td className="px-4 py-3 text-sm text-gray-500">{task.assignee?.full_name || '-'}</td>
-                          
-                          {/* Status */}
                           <td className="px-4 py-3"><TaskStatusBadge status={task.status} /></td>
-                          
-                          {/* Priority */}
                           <td className="px-4 py-3"><TaskPriorityBadge priority={task.priority} /></td>
-                          
-                          {/* Due date */}
                           <td className="px-4 py-3">
                             <div className="flex flex-col">
                               <span className={`text-sm ${
@@ -573,8 +521,6 @@ export function TaskListPage() {
                               {dueToday && <span className="text-xs text-amber-500 mt-0.5">Deadline hôm nay</span>}
                             </div>
                           </td>
-                          
-                          {/* Progress */}
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <div className={`w-16 rounded-full h-2 ${overdue ? 'bg-red-200' : dueToday ? 'bg-amber-200' : 'bg-gray-200'}`}>
@@ -588,70 +534,37 @@ export function TaskListPage() {
                               </span>
                             </div>
                           </td>
-                          
-                          {/* Actions */}
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end items-center gap-1">
-                              {/* View - Always */}
-                              <Link 
-                                to={`/tasks/${task.id}`} 
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                                title="Xem chi tiết"
-                              >
+                              <Link to={`/tasks/${task.id}`} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="Xem chi tiết">
                                 <Eye size={18} />
                               </Link>
-                              
-                              {/* Edit */}
                               {permissions.canEdit ? (
-                                <Link 
-                                  to={`/tasks/${task.id}/edit`} 
-                                  className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded"
-                                  title="Chỉnh sửa"
-                                >
+                                <Link to={`/tasks/${task.id}/edit`} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded" title="Chỉnh sửa">
                                   <Edit size={18} />
                                 </Link>
                               ) : (
-                                <button
-                                  disabled
-                                  className="p-1.5 text-gray-300 cursor-not-allowed rounded"
-                                  title={permissions.editDisabledReason || 'Không có quyền sửa'}
-                                >
+                                <button disabled className="p-1.5 text-gray-300 cursor-not-allowed rounded" title={permissions.editDisabledReason || 'Không có quyền sửa'}>
                                   <Edit size={18} />
                                 </button>
                               )}
-
-                              {/* ========== NÚT GIAO VIỆC / BẮT ĐẦU ========== */}
                               {showAssignButton && (
                                 <button
                                   onClick={() => handleAssignTask(task)}
                                   disabled={assigningTaskId === task.id}
                                   className="ml-1 px-2.5 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-xs font-medium flex items-center gap-1 disabled:opacity-50"
-                                  title={task.is_self_assigned ? 'Bắt đầu công việc' : 'Giao việc'}
+                                  title={task.is_self_assigned ? 'Bắt đầu' : 'Giao việc'}
                                 >
-                                  {assigningTaskId === task.id ? (
-                                    <Loader2 size={14} className="animate-spin" />
-                                  ) : (
-                                    <Send size={14} />
-                                  )}
+                                  {assigningTaskId === task.id ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                   {task.is_self_assigned ? 'Bắt đầu' : 'Giao việc'}
                                 </button>
                               )}
-
-                              {/* Delete (only for draft) */}
                               {canDeleteTask ? (
-                                <button 
-                                  onClick={() => handleDeleteTask(task)} 
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                                  title="Xóa"
-                                >
+                                <button onClick={() => handleDeleteTask(task)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="Xóa">
                                   <Trash2 size={18} />
                                 </button>
                               ) : task.status === 'draft' && (
-                                <button
-                                  disabled
-                                  className="p-1.5 text-gray-300 cursor-not-allowed rounded"
-                                  title={permissions.deleteDisabledReason || 'Không có quyền xóa'}
-                                >
+                                <button disabled className="p-1.5 text-gray-300 cursor-not-allowed rounded" title={permissions.deleteDisabledReason || 'Không có quyền xóa'}>
                                   <Trash2 size={18} />
                                 </button>
                               )}
@@ -666,6 +579,141 @@ export function TaskListPage() {
             )}
           </div>
 
+          {/* ========== MOBILE CARD VIEW (shown only on mobile) ========== */}
+          <div className="md:hidden mt-4 space-y-3">
+            {isLoading ? (
+              <div className="p-8 text-center bg-white rounded-lg shadow">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
+                <p className="mt-2 text-gray-500 text-sm">Đang tải...</p>
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="p-8 text-center text-gray-500 bg-white rounded-lg shadow text-sm">
+                {activeFilterCount > 0 ? 'Không tìm thấy công việc nào' : 'Không có công việc nào'}
+              </div>
+            ) : (
+              tasks.map((task: any) => {
+                const overdue = isTaskOverdue(task)
+                const dueToday = isTaskDueToday(task)
+                const daysOverdue = overdue ? getDaysOverdue(task.due_date) : 0
+                const taskForPerm = toTaskForPermission(task)
+                const permissions = getPermissions(taskForPerm)
+                const showAssignButton = canAssignTask(task)
+                const canDeleteTask = isEmployee 
+                  ? (task.status === 'draft' && task.assigner_id === user?.employee_id)
+                  : (task.status === 'draft' && permissions.canDelete)
+                
+                return (
+                  <div 
+                    key={task.id} 
+                    className={`bg-white rounded-lg shadow-sm border p-4 ${
+                      overdue ? 'border-red-200 bg-red-50/30' : dueToday ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200'
+                    }`}
+                  >
+                    {/* Task name & badges */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0 flex-1">
+                        <Link to={`/tasks/${task.id}`} className="text-blue-600 hover:underline font-medium text-sm line-clamp-2">
+                          {getTaskTitle(task)}
+                        </Link>
+                        {task.code && <p className="text-xs text-gray-400 mt-0.5">{task.code}</p>}
+                      </div>
+                      <div className="flex-shrink-0">
+                        <TaskPriorityBadge priority={task.priority} />
+                      </div>
+                    </div>
+
+                    {/* Badges row */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <TaskStatusBadge status={task.status} />
+                      <SubtaskBadge taskId={task.id} />
+                      {task.is_self_assigned && (
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                          Tự giao
+                        </span>
+                      )}
+                      {overdue && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                          <AlertTriangle size={10} />Quá {daysOverdue} ngày
+                        </span>
+                      )}
+                      {dueToday && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                          <Clock size={10} />Hôm nay
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info grid */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-gray-500 mb-3">
+                      <div>
+                        <span className="text-gray-400">Phòng ban:</span>
+                        <span className="ml-1 text-gray-700">{task.department?.name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Người PT:</span>
+                        <span className="ml-1 text-gray-700">{task.assignee?.full_name || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Hạn:</span>
+                        <span className={`ml-1 ${overdue ? 'text-red-600 font-medium' : dueToday ? 'text-amber-600 font-medium' : 'text-gray-700'}`}>
+                          {formatDate(task.due_date)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-gray-400">Tiến độ:</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                          <div 
+                            className={`h-1.5 rounded-full ${overdue ? 'bg-red-500' : dueToday ? 'bg-amber-500' : 'bg-blue-600'}`}
+                            style={{ width: `${Math.min(task.progress || 0, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-gray-700 font-medium">{task.progress || 0}%</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
+                      <Link 
+                        to={`/tasks/${task.id}`} 
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"
+                      >
+                        <Eye size={14} />
+                        Xem
+                      </Link>
+                      {permissions.canEdit && (
+                        <Link 
+                          to={`/tasks/${task.id}/edit`} 
+                          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg"
+                        >
+                          <Edit size={14} />
+                          Sửa
+                        </Link>
+                      )}
+                      {showAssignButton && (
+                        <button
+                          onClick={() => handleAssignTask(task)}
+                          disabled={assigningTaskId === task.id}
+                          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-medium disabled:opacity-50"
+                        >
+                          {assigningTaskId === task.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                          {task.is_self_assigned ? 'Bắt đầu' : 'Giao việc'}
+                        </button>
+                      )}
+                      {canDeleteTask && (
+                        <button 
+                          onClick={() => handleDeleteTask(task)} 
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-between items-center mt-4">
@@ -674,14 +722,14 @@ export function TaskListPage() {
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
+                  className="px-3 py-1.5 border rounded text-sm disabled:opacity-50 hover:bg-gray-50"
                 >
                   Trước
                 </button>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
+                  className="px-3 py-1.5 border rounded text-sm disabled:opacity-50 hover:bg-gray-50"
                 >
                   Sau
                 </button>
@@ -691,12 +739,12 @@ export function TaskListPage() {
 
           {/* Delete Dialog */}
           {deleteId && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-                <h3 className="text-lg font-semibold mb-4">Xác nhận xóa?</h3>
-                <p className="text-gray-600 mb-4">Bạn có chắc muốn xóa công việc này?</p>
-                <div className="flex justify-end gap-3">
-                  <button onClick={() => setDeleteId(null)} className="px-4 py-2 border rounded hover:bg-gray-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg p-5 sm:p-6 max-w-sm w-full">
+                <h3 className="text-lg font-semibold mb-3 sm:mb-4">Xác nhận xóa?</h3>
+                <p className="text-gray-600 mb-4 text-sm sm:text-base">Bạn có chắc muốn xóa công việc này?</p>
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+                  <button onClick={() => setDeleteId(null)} className="px-4 py-2 border rounded hover:bg-gray-50 text-sm sm:text-base">
                     Hủy
                   </button>
                   <button
@@ -705,7 +753,7 @@ export function TaskListPage() {
                       setDeleteId(null)
                     }}
                     disabled={deleteMutation.isPending}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 text-sm sm:text-base"
                   >
                     {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
                   </button>

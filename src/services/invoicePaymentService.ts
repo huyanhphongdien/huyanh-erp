@@ -13,12 +13,17 @@ import { supabase } from '../lib/supabase';
 export interface InvoicePayment {
   id: string;
   invoice_id: string;
+  payment_code?: string;                    // ← FIX: Thêm field từ DB
   payment_date: string;
   amount: number;
   payment_method: 'cash' | 'bank_transfer';
   reference_number?: string | null;
   bank_name?: string | null;
+  bank_account?: string | null;             // ← FIX: Thêm field từ DB
+  document_url?: string | null;             // ← FIX: Thêm field từ DB
+  document_urls?: string[] | null;          // ← FIX: Thêm field từ DB
   notes?: string | null;
+  is_deleted?: boolean;                     // ← FIX: Thêm field từ DB
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -53,6 +58,7 @@ export interface CreatePaymentInput {
   payment_method: 'cash' | 'bank_transfer';
   reference_number?: string;
   bank_name?: string;
+  bank_account?: string;
   notes?: string;
   created_by?: string;
 }
@@ -63,6 +69,7 @@ export interface UpdatePaymentInput {
   payment_method?: 'cash' | 'bank_transfer';
   reference_number?: string;
   bank_name?: string;
+  bank_account?: string;
   notes?: string;
 }
 
@@ -232,6 +239,7 @@ export const invoicePaymentService = {
         payment_method: input.payment_method,
         reference_number: input.reference_number || null,
         bank_name: input.bank_name || null,
+        bank_account: input.bank_account || null,
         notes: input.notes || null,
         created_by: input.created_by || null,
       })
@@ -334,7 +342,7 @@ export const invoicePaymentService = {
           supplier_id,
           order_id,
           supplier:supplier_id(id, code, name),
-          order:order_id(id, order_code, title)
+          order:order_id(id, order_code, project_name)
         )
       `, { count: 'exact' });
 
@@ -392,7 +400,7 @@ export const invoicePaymentService = {
         supplier_name: supplier?.name || '',
         order_id: order?.id || invoice?.order_id || '',
         order_code: order?.order_code || '',
-        order_title: order?.title || '',
+        order_title: order?.project_name || '',
         creator: undefined,
         invoice: undefined,
       } as PaymentWithDetails;
@@ -528,7 +536,7 @@ export const invoicePaymentService = {
       .from('supplier_invoices')
       .select(`
         *,
-        order:order_id(id, order_code, title)
+        order:order_id(id, order_code, project_name)
       `)
       .eq('supplier_id', supplierId)
       .neq('status', 'cancelled')
@@ -603,7 +611,7 @@ export const invoicePaymentService = {
       return {
         ...inv,
         order_code: order?.order_code || '',
-        order_title: order?.title || '',
+        order_title: order?.project_name || '',
         order: undefined,
       };
     });
@@ -643,7 +651,7 @@ export const invoicePaymentService = {
       .select(`
         *,
         supplier:supplier_id(id, code, name, phone),
-        order:order_id(id, order_code, title)
+        order:order_id(id, order_code, project_name)
       `)
       .lt('due_date', today)
       .neq('payment_status', 'paid')
@@ -675,7 +683,7 @@ export const invoicePaymentService = {
         supplier_phone: supplier?.phone || '',
         order_id: order?.id || '',
         order_code: order?.order_code || '',
-        order_title: order?.title || '',
+        order_title: order?.project_name || '',
       };
     });
   },

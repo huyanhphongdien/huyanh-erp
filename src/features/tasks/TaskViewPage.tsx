@@ -1,6 +1,11 @@
 // src/features/tasks/TaskViewPage.tsx
 // ============================================================================
-// UPDATED: Tích hợp Activity Timeline (Phase 4.4) + Task Participants
+// RESPONSIVE UPDATE:
+// - Header: stacked buttons on mobile
+// - Content grid: proper stacking
+// - SVG progress: responsive size
+// - Cards: responsive padding
+// - Action buttons: full-width on mobile
 // ============================================================================
 
 import { useParams, useNavigate, Link } from 'react-router-dom'
@@ -12,21 +17,12 @@ import { useTask, useDeleteTask } from './hooks/useTasks'
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 
-// Import subtask components
 import { SubtasksList } from './components/SubtasksList'
 import { ParentTaskInfo } from './components/ParentTaskInfo'
 import subtaskService from '../../services/subtaskService'
-
-// Import attachment component
 import { AttachmentSection } from './components/AttachmentSection'
-
-// Import comment component (Phase 4.4)
 import { CommentSection } from './components/CommentSection'
-
-// Import activity timeline (Phase 4.4)
 import { ActivityTimeline } from './components/ActivityTimeline'
-
-// *** IMPORT MỚI: Task Participants Section ***
 import TaskParticipantsSection from './components/TaskParticipantsSection'
 
 // ============ EVALUATION STATUS CONFIG ============
@@ -52,9 +48,6 @@ interface TaskPermissions {
 function getTaskPermissions(task: any, userRole?: string): TaskPermissions {
   const evaluationStatus = task?.evaluation_status || 'none'
   const taskStatus = task?.status || 'draft'
-  
-  const lockedStatuses = ['pending_approval', 'approved']
-  // const isLocked = lockedStatuses.includes(evaluationStatus)
   
   if (evaluationStatus === 'pending_approval') {
     return {
@@ -102,7 +95,6 @@ export function TaskViewPage() {
   const [showDelete, setShowDelete] = useState(false)
   const { user } = useAuthStore()
 
-  // Subtask states
   const [isChildTask, setIsChildTask] = useState(false)
   const [, setCanHaveChildren] = useState(true)
   const [subtaskCount, setSubtaskCount] = useState(0)
@@ -143,7 +135,7 @@ export function TaskViewPage() {
     if (!id) return
     
     if (subtaskCount > 0) {
-      alert(`Không thể xóa công việc này vì còn ${subtaskCount} công việc con. Vui lòng xóa công việc con trước.`)
+      alert(`Không thể xóa công việc này vì còn ${subtaskCount} công việc con.`)
       setShowDelete(false)
       return
     }
@@ -160,10 +152,9 @@ export function TaskViewPage() {
     refetch()
   }
 
-  // ========== LOADING STATE ==========
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-gray-200 rounded w-1/3"></div>
           <div className="h-64 bg-gray-200 rounded"></div>
@@ -172,22 +163,20 @@ export function TaskViewPage() {
     )
   }
 
-  // ========== ERROR STATE ==========
   if (error) {
     return (
-      <div className="p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <div className="p-4 md:p-6">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm sm:text-base">
           Lỗi: {(error as Error).message}
         </div>
       </div>
     )
   }
 
-  // ========== NOT FOUND STATE ==========
   if (!task) {
     return (
-      <div className="p-6">
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+      <div className="p-4 md:p-6">
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded text-sm sm:text-base">
           Không tìm thấy công việc
         </div>
       </div>
@@ -203,64 +192,64 @@ export function TaskViewPage() {
   const permissions = getTaskPermissions(t, user?.role)
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* ========== HEADER ========== */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/tasks')} className="p-2 hover:bg-gray-100 rounded-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+          <button onClick={() => navigate('/tasks')} className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0 mt-0.5">
             <ArrowLeft size={20} />
           </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">{taskTitle}</h1>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-2xl font-bold text-gray-900 break-words">{taskTitle}</h1>
               {isChildTask && (
-                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
                   Công việc con
                 </span>
               )}
               {subtaskCount > 0 && (
-                <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full flex items-center gap-1">
+                <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full flex items-center gap-1 whitespace-nowrap">
                   <Users size={12} />
                   {subtaskCount} con
                 </span>
               )}
             </div>
-            {t.code && <p className="text-gray-500 text-sm">Mã: {t.code}</p>}
+            {t.code && <p className="text-gray-500 text-sm mt-0.5">Mã: {t.code}</p>}
           </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 ml-11 sm:ml-0">
           {permissions.canEdit ? (
             <Link
               to={`/tasks/${id}/edit`}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
             >
-              <Edit size={18} /> Sửa
+              <Edit size={16} /> Sửa
             </Link>
           ) : (
             <button
               disabled
               title={permissions.editDisabledReason}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed text-sm"
             >
-              <Lock size={18} /> Sửa
+              <Lock size={16} /> Sửa
             </button>
           )}
           
           {permissions.canDelete ? (
             <button
               onClick={() => setShowDelete(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
             >
-              <Trash2 size={18} /> Xóa
+              <Trash2 size={16} /> Xóa
             </button>
           ) : (
             <button
               disabled
               title={permissions.deleteDisabledReason}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed text-sm"
             >
-              <Lock size={18} /> Xóa
+              <Lock size={16} /> Xóa
             </button>
           )}
         </div>
@@ -268,18 +257,18 @@ export function TaskViewPage() {
 
       {/* ========== LOCK BANNER ========== */}
       {permissions.isLocked && permissions.lockMessage && (
-        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
+        <div className="mb-4 sm:mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
           <div>
             <p className="text-sm font-medium text-yellow-800">{permissions.lockMessage}</p>
-            <p className="text-xs text-yellow-600 mt-1">Công việc đang trong quy trình đánh giá, một số thao tác bị hạn chế.</p>
+            <p className="text-xs text-yellow-600 mt-0.5 sm:mt-1">Một số thao tác bị hạn chế.</p>
           </div>
         </div>
       )}
 
       {/* ========== PARENT TASK INFO ========== */}
       {isChildTask && t.parent_task_id && (
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <ParentTaskInfo 
             parentTaskId={t.parent_task_id}
             currentTaskId={id || ''}
@@ -288,24 +277,24 @@ export function TaskViewPage() {
       )}
 
       {/* ========== CONTENT GRID ========== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Main Content - 2 columns */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Status & Priority Badges */}
-          <Card className="p-4">
-            <div className="flex flex-wrap gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Trạng thái:</span>
+          <Card className="p-3 sm:p-4">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-sm text-gray-500">Trạng thái:</span>
                 <TaskStatusBadge status={t.status} />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Ưu tiên:</span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-sm text-gray-500">Ưu tiên:</span>
                 <TaskPriorityBadge priority={t.priority} />
               </div>
               {evaluationStatus && evaluationStatus !== 'none' && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Đánh giá:</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${evalConfig.bgColor} ${evalConfig.color}`}>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-xs sm:text-sm text-gray-500">Đánh giá:</span>
+                  <span className={`px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${evalConfig.bgColor} ${evalConfig.color}`}>
                     {evalConfig.label}
                   </span>
                 </div>
@@ -314,58 +303,58 @@ export function TaskViewPage() {
           </Card>
 
           {/* Details Card */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Flag size={20} className="text-gray-400" />
+          <Card className="p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+              <Flag size={18} className="text-gray-400" />
               Chi tiết công việc
             </h2>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
-                <label className="text-sm text-gray-500">Mô tả</label>
-                <p className="mt-1 text-gray-700 whitespace-pre-wrap">
+                <label className="text-xs sm:text-sm text-gray-500">Mô tả</label>
+                <p className="mt-1 text-sm sm:text-base text-gray-700 whitespace-pre-wrap">
                   {t.description || 'Không có mô tả'}
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                <div className="flex items-start gap-3">
-                  <Building size={18} className="text-gray-400 mt-0.5" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-3 sm:pt-4 border-t">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <Building size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <label className="text-sm text-gray-500">Phòng ban</label>
-                    <p className="font-medium">{t.department?.name || '-'}</p>
+                    <label className="text-xs sm:text-sm text-gray-500">Phòng ban</label>
+                    <p className="font-medium text-sm sm:text-base">{t.department?.name || '-'}</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <User size={18} className="text-gray-400 mt-0.5" />
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <User size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <label className="text-sm text-gray-500">Người phụ trách</label>
-                    <p className="font-medium">{t.assignee?.full_name || '-'}</p>
+                    <label className="text-xs sm:text-sm text-gray-500">Người phụ trách</label>
+                    <p className="font-medium text-sm sm:text-base">{t.assignee?.full_name || '-'}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                <div className="flex items-start gap-3">
-                  <Calendar size={18} className="text-gray-400 mt-0.5" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-3 sm:pt-4 border-t">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <Calendar size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <label className="text-sm text-gray-500">Ngày bắt đầu</label>
-                    <p className="font-medium">{formatDate(t.start_date)}</p>
+                    <label className="text-xs sm:text-sm text-gray-500">Ngày bắt đầu</label>
+                    <p className="font-medium text-sm sm:text-base">{formatDate(t.start_date)}</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <Calendar size={18} className="text-red-400 mt-0.5" />
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <Calendar size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <label className="text-sm text-gray-500">Hạn hoàn thành</label>
-                    <p className="font-medium">{formatDate(t.due_date)}</p>
+                    <label className="text-xs sm:text-sm text-gray-500">Hạn hoàn thành</label>
+                    <p className="font-medium text-sm sm:text-base">{formatDate(t.due_date)}</p>
                   </div>
                 </div>
               </div>
 
               {t.notes && (
-                <div className="pt-4 border-t">
-                  <label className="text-sm text-gray-500">Ghi chú</label>
-                  <p className="mt-1 text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
+                <div className="pt-3 sm:pt-4 border-t">
+                  <label className="text-xs sm:text-sm text-gray-500">Ghi chú</label>
+                  <p className="mt-1 text-sm sm:text-base text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 sm:p-3 rounded-lg">
                     {t.notes}
                   </p>
                 </div>
@@ -373,7 +362,6 @@ export function TaskViewPage() {
             </div>
           </Card>
 
-          {/* ========== NGƯỜI THAM GIA (MỚI) ========== */}
           {id && (
             <TaskParticipantsSection
               taskId={id}
@@ -382,7 +370,6 @@ export function TaskViewPage() {
             />
           )}
 
-          {/* ========== SUBTASKS LIST ========== */}
           {!isChildTask && id && (
             <SubtasksList
               parentTaskId={id}
@@ -396,7 +383,6 @@ export function TaskViewPage() {
             />
           )}
 
-          {/* ========== FILE ĐÍNH KÈM ========== */}
           {id && (
             <AttachmentSection
               taskId={id}
@@ -405,7 +391,6 @@ export function TaskViewPage() {
             />
           )}
 
-          {/* ========== BÌNH LUẬN ========== */}
           {id && (
             <CommentSection
               taskId={id}
@@ -414,7 +399,6 @@ export function TaskViewPage() {
             />
           )}
 
-          {/* ========== LỊCH SỬ HOẠT ĐỘNG ========== */}
           {id && (
             <ActivityTimeline
               taskId={id}
@@ -425,16 +409,17 @@ export function TaskViewPage() {
         </div>
 
         {/* ========== SIDEBAR ========== */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Progress Card */}
           <Card className="p-0 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
-              <h2 className="text-white font-semibold">Tiến độ công việc</h2>
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 sm:p-4">
+              <h2 className="text-white font-semibold text-sm sm:text-base">Tiến độ công việc</h2>
             </div>
             <div className="p-4">
-              <div className="flex flex-col items-center py-4">
-                <div className="relative w-32 h-32">
-                  <svg className="w-full h-full transform -rotate-90">
+              <div className="flex flex-col items-center py-2 sm:py-4">
+                {/* Responsive SVG - smaller on mobile */}
+                <div className="relative w-24 h-24 sm:w-32 sm:h-32">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
                     <circle
                       cx="64"
                       cy="64"
@@ -455,17 +440,17 @@ export function TaskViewPage() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-3xl font-bold text-gray-800">{progress}%</span>
+                    <span className="text-2xl sm:text-3xl font-bold text-gray-800">{progress}%</span>
                   </div>
                 </div>
-                <p className="mt-3 text-sm text-gray-500">
+                <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500">
                   {progress === 0 && 'Chưa bắt đầu'}
                   {progress > 0 && progress < 100 && 'Đang thực hiện'}
                   {progress >= 100 && 'Hoàn thành'}
                 </p>
                 {subtaskCount > 0 && (
                   <p className="mt-1 text-xs text-blue-600">
-                    (Tính trung bình từ {subtaskCount} công việc con)
+                    (Tính từ {subtaskCount} công việc con)
                   </p>
                 )}
               </div>
@@ -473,32 +458,32 @@ export function TaskViewPage() {
           </Card>
 
           {/* Timeline Card */}
-          <Card className="p-4">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <Card className="p-3 sm:p-4">
+            <h2 className="text-sm font-semibold text-gray-700 mb-2 sm:mb-3 flex items-center gap-2">
               <Clock size={16} />
               Thời gian
             </h2>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-2 sm:space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Ngày tạo</span>
-                <span className="font-medium">{formatDate(t.created_at)}</span>
+                <span className="font-medium text-xs sm:text-sm">{formatDate(t.created_at)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Cập nhật</span>
-                <span className="font-medium">{formatDate(t.updated_at)}</span>
+                <span className="font-medium text-xs sm:text-sm">{formatDate(t.updated_at)}</span>
               </div>
               {t.completed_date && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Hoàn thành</span>
-                  <span className="font-medium text-green-600">{formatDate(t.completed_date)}</span>
+                  <span className="font-medium text-green-600 text-xs sm:text-sm">{formatDate(t.completed_date)}</span>
                 </div>
               )}
             </div>
           </Card>
 
           {/* Quick Actions */}
-          <Card className="p-4">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Thao tác nhanh</h2>
+          <Card className="p-3 sm:p-4">
+            <h2 className="text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Thao tác nhanh</h2>
             <div className="space-y-2">
               {!permissions.isLocked ? (
                 <>
@@ -510,13 +495,10 @@ export function TaskViewPage() {
                   </button>
                 </>
               ) : (
-                <div className="text-center py-4">
-                  <Lock className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">
-                    Công việc đang trong quy trình đánh giá
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Một số thao tác bị hạn chế
+                <div className="text-center py-3 sm:py-4">
+                  <Lock className="w-6 h-6 sm:w-8 sm:h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    Đang trong quy trình đánh giá
                   </p>
                 </div>
               )}
@@ -527,23 +509,23 @@ export function TaskViewPage() {
 
       {/* ========== DELETE DIALOG ========== */}
       {showDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-5 sm:p-6 max-w-sm w-full">
             <h3 className="text-lg font-semibold mb-2">Xác nhận xóa</h3>
-            <p className="text-gray-500 mb-4">Bạn có chắc muốn xóa "{taskTitle}"?</p>
+            <p className="text-gray-500 mb-4 text-sm sm:text-base">Bạn có chắc muốn xóa "{taskTitle}"?</p>
             {subtaskCount > 0 && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
-                ⚠️ Công việc này có {subtaskCount} công việc con. Vui lòng xóa công việc con trước.
+                ⚠️ Công việc này có {subtaskCount} công việc con.
               </div>
             )}
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowDelete(false)} className="px-4 py-2 border rounded-lg">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+              <button onClick={() => setShowDelete(false)} className="px-4 py-2 border rounded-lg text-sm sm:text-base">
                 Hủy
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending || subtaskCount > 0}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50 text-sm sm:text-base"
               >
                 {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
               </button>

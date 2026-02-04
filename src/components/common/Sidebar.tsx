@@ -1,13 +1,10 @@
 // ============================================================
-// SIDEBAR COMPONENT - REFACTORED v10
+// SIDEBAR COMPONENT - REFACTORED v11
 // File: src/components/common/Sidebar.tsx
 // ============================================================
-// CHANGES v10:
-// - GOM NHÓM: TỔ CHỨC + HỢP ĐỒNG + NGHỈ PHÉP + LƯƠNG + ĐÁNH GIÁ
-//   → thành "QUẢN LÝ NHÂN SỰ"
-// - TÁCH RIÊNG: "CHẤM CÔNG" thành group mới
-// - THÊM MỚI: Quản lý ca, Phân ca, Tăng ca, Duyệt tăng ca
-// - THÊM: Badge count cho pending overtime approvals
+// CHANGES v11:
+// - THÊM: Menu "Phân quyền" trong nhóm QUẢN LÝ ĐƠN HÀNG (executiveOnly, level ≤ 3)
+// - THÊM: Shield icon import
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -39,6 +36,7 @@ import {
   CalendarDays,
   AlarmClockPlus,
   ClipboardCheck,
+  Shield,
 } from 'lucide-react';
 
 // ============================================================
@@ -51,6 +49,7 @@ interface MenuItem {
   icon: React.ReactNode;
   managerOnly?: boolean;
   executiveOnly?: boolean;
+  bgdOnly?: boolean; // CHỈ BGĐ (level ≤ 3)
   requirePurchaseAccess?: boolean;
   badge?: number;
 }
@@ -78,33 +77,28 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
     ],
   },
 
-  // ===== QUẢN LÝ NHÂN SỰ (GOM: Tổ chức + Hợp đồng + Nghỉ phép + Lương + Đánh giá) =====
+  // ===== QUẢN LÝ NHÂN SỰ =====
   {
     title: 'QUẢN LÝ NHÂN SỰ',
     icon: <Users size={18} />,
     collapsible: true,
     items: [
-      // Tổ chức
       { path: '/departments', label: 'Phòng ban', icon: <Building2 size={18} /> },
       { path: '/positions', label: 'Chức vụ', icon: <Briefcase size={18} /> },
       { path: '/employees', label: 'Nhân viên', icon: <Users size={18} /> },
-      // Hợp đồng
       { path: '/contract-types', label: 'Loại hợp đồng', icon: <ScrollText size={18} /> },
       { path: '/contracts', label: 'Hợp đồng', icon: <FileText size={18} /> },
-      // Nghỉ phép
       { path: '/leave-types', label: 'Loại nghỉ phép', icon: <Palmtree size={18} /> },
       { path: '/leave-requests', label: 'Đơn nghỉ phép', icon: <CalendarClock size={18} /> },
-      // Lương
       { path: '/salary-grades', label: 'Bậc lương', icon: <Wallet size={18} /> },
       { path: '/payroll-periods', label: 'Kỳ lương', icon: <Calendar size={18} /> },
       { path: '/payslips', label: 'Phiếu lương', icon: <Receipt size={18} /> },
-      // Đánh giá hiệu suất
       { path: '/performance-criteria', label: 'Tiêu chí đánh giá', icon: <Target size={18} /> },
       { path: '/performance-reviews', label: 'Đánh giá hiệu suất', icon: <Star size={18} /> },
     ],
   },
 
-  // ===== CHẤM CÔNG (TÁCH RIÊNG + THÊM MỚI) =====
+  // ===== CHẤM CÔNG =====
   {
     title: 'CHẤM CÔNG',
     icon: <Clock size={18} />,
@@ -129,16 +123,8 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
     title: 'QUẢN LÝ CÔNG VIỆC',
     icon: <ClipboardList size={18} />,
     items: [
-      { 
-        path: '/tasks', 
-        label: 'Danh sách công việc', 
-        icon: <ClipboardList size={18} />,
-      },
-      { 
-        path: '/my-tasks', 
-        label: 'Công việc của tôi', 
-        icon: <UserCheck size={18} />,
-      },
+      { path: '/tasks', label: 'Danh sách công việc', icon: <ClipboardList size={18} /> },
+      { path: '/my-tasks', label: 'Công việc của tôi', icon: <UserCheck size={18} /> },
       { 
         path: '/approvals', 
         label: 'Phê duyệt', 
@@ -165,6 +151,15 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
       { path: '/purchasing/orders', label: 'Đơn đặt hàng', icon: <ShoppingCart size={18} />, requirePurchaseAccess: true },
       { path: '/purchasing/debt', label: 'Công nợ NCC', icon: <DollarSign size={18} />, requirePurchaseAccess: true },
       { path: '/purchasing/payments', label: 'Lịch sử thanh toán', icon: <CreditCard size={18} />, requirePurchaseAccess: true },
+    ],
+  },
+
+  // ===== QUẢN TRỊ (chỉ BGĐ / Admin) =====
+  {
+    title: 'QUẢN TRỊ',
+    icon: <Shield size={18} />,
+    items: [
+      { path: '/purchasing/access', label: 'Phân quyền mua hàng', icon: <Shield size={18} />, bgdOnly: true },
     ],
   },
 
@@ -211,15 +206,12 @@ export function Sidebar() {
   // Badge counts
   const [pendingOTCount, setPendingOTCount] = useState(0);
 
-  // Check if user is manager (có quyền quản lý - is_manager flag)
+  // Check if user is manager
   const isManager = user?.role === 'admin' || user?.role === 'manager' || user?.is_manager;
-  
-  // Check if user is admin
   const isAdmin = user?.role === 'admin';
-  
-  // Check if user is executive (Phó phòng trở lên - level <= 5)
   const userLevel = user?.position_level || 7;
   const isExecutive = userLevel <= 5;
+  const isBGD = isAdmin || userLevel <= 3; // Ban Giám đốc
 
   // Load pending overtime count for managers
   useEffect(() => {
@@ -228,9 +220,9 @@ export function Sidebar() {
 
       try {
         const count = await overtimeRequestService.getPendingCount(
-  isExecutive || isAdmin ? undefined : { departmentId: user.department_id || undefined }
-);
-setPendingOTCount(count);
+          isExecutive || isAdmin ? undefined : { departmentId: user.department_id || undefined }
+        );
+        setPendingOTCount(count);
       } catch (error) {
         console.error('Failed to load pending OT count:', error);
         setPendingOTCount(0);
@@ -239,8 +231,6 @@ setPendingOTCount(count);
 
     if (user?.employee_id && (isManager || isAdmin)) {
       loadPendingOTCount();
-
-      // Refresh every 2 minutes
       const interval = setInterval(loadPendingOTCount, 120000);
       return () => clearInterval(interval);
     }
@@ -252,12 +242,22 @@ setPendingOTCount(count);
       try {
         setLoadingPurchaseAccess(true);
         
+        // Admin hoặc Executive → auto full access
         if (isAdmin || isExecutive) {
           setHasPurchaseAccess(true);
           setLoadingPurchaseAccess(false);
           return;
         }
+
+        // Phòng Kế toán → auto access
+        const deptName = (user?.department_name || '').toLowerCase();
+        if (deptName.includes('kế toán') || deptName.includes('tài chính') || deptName.includes('accounting')) {
+          setHasPurchaseAccess(true);
+          setLoadingPurchaseAccess(false);
+          return;
+        }
         
+        // Nhân viên khác → check bảng purchase_access
         try {
           const hasAccess = await purchaseAccessService.hasAccess();
           setHasPurchaseAccess(hasAccess);
@@ -298,24 +298,20 @@ setPendingOTCount(count);
 
   // Check active route
   const isActive = (path: string) => {
-    if (path === '/') {
-      return location.pathname === '/';
-    }
+    if (path === '/') return location.pathname === '/';
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
   // Toggle group collapse
   const toggleGroup = (title: string) => {
-    setCollapsedGroups(prev => ({
-      ...prev,
-      [title]: !prev[title],
-    }));
+    setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));
   };
 
   // Check if item should be visible
   const isItemVisible = (item: MenuItem): boolean => {
     if (item.managerOnly && !isManager && !isAdmin) return false;
     if (item.executiveOnly && !isExecutive && !isAdmin) return false;
+    if (item.bgdOnly && !isBGD) return false;
     if (item.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
     return true;
   };
@@ -334,17 +330,17 @@ setPendingOTCount(count);
     return (
       <li key={item.path}>
         <NavLink
-  to={item.path}
-  end
-  onClick={() => setIsMobileOpen(false)}
-  className={({ isActive: navIsActive }) =>
-    `flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-      navIsActive
-        ? 'bg-blue-600 text-white shadow-md'
-        : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'
-    }`
-  }
->
+          to={item.path}
+          end
+          onClick={() => setIsMobileOpen(false)}
+          className={({ isActive: navIsActive }) =>
+            `flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+              navIsActive
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-300 hover:bg-gray-700/50 hover:text-white'
+            }`
+          }
+        >
           <div className="flex items-center gap-3">
             <span className="opacity-80">{item.icon}</span>
             <span>{item.label}</span>
@@ -415,7 +411,6 @@ setPendingOTCount(count);
 
           return (
             <div key={group.title} className="mb-2">
-              {/* Group Header */}
               {group.collapsible ? (
                 <button
                   onClick={() => toggleGroup(group.title)}
@@ -430,7 +425,6 @@ setPendingOTCount(count);
                 </p>
               )}
 
-              {/* Group Items */}
               {!isCollapsed && (
                 <ul className="space-y-1">
                   {filteredItems.map(renderMenuItem)}
@@ -493,10 +487,8 @@ setPendingOTCount(count);
         {sidebarContent}
       </aside>
 
-      {/* Main content spacer - Desktop only */}
+      {/* Main content spacer */}
       <div className="hidden lg:block w-64 flex-shrink-0" />
-      
-      {/* Mobile top spacer */}
       <div className="lg:hidden h-14" />
     </>
   );

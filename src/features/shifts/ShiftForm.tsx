@@ -1,5 +1,5 @@
 // ============================================================
-// SHIFT FORM - Form tạo/sửa ca làm việc
+// SHIFT FORM - Form tạo/sửa ca làm việc (RESPONSIVE)
 // File: src/features/shifts/ShiftForm.tsx
 // ============================================================
 
@@ -117,7 +117,6 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
       const [sH] = form.start_time.split(':').map(Number);
       const [eH] = form.end_time.split(':').map(Number);
       
-      // Nếu end < start → qua đêm
       const shouldCross = eH < sH || (eH === sH && form.end_time < form.start_time);
       if (shouldCross !== form.crosses_midnight) {
         setForm(prev => ({ ...prev, crosses_midnight: shouldCross }));
@@ -162,7 +161,6 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
     
     if (!validate()) return;
 
-    // Check code uniqueness
     if (!isEdit || form.code !== initialData?.code) {
       const exists = await shiftService.checkCodeExists(form.code, initialData?.id);
       if (exists) {
@@ -192,17 +190,17 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
       {/* API Error */}
       {apiError && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
-          <AlertCircle size={16} />
-          {apiError}
+        <div className="flex items-start sm:items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5 sm:mt-0" />
+          <span>{apiError}</span>
         </div>
       )}
 
       {/* Row 1: Code + Name */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Mã ca <span className="text-red-500">*</span>
@@ -213,7 +211,7 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
             onChange={e => updateField('code', e.target.value.toUpperCase())}
             placeholder="VD: SHORT_1"
             disabled={isEdit}
-            className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
               errors.code ? 'border-red-300 bg-red-50' : 'border-gray-300'
             } ${isEdit ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           />
@@ -229,7 +227,7 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
             value={form.name}
             onChange={e => updateField('name', e.target.value)}
             placeholder="VD: Ca 1 (Ngắn)"
-            className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
               errors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
             }`}
           />
@@ -239,33 +237,34 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
 
       {/* Row 2: Category */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
           Loại ca <span className="text-red-500">*</span>
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[
-            { value: 'short', label: 'Ca ngắn (8h)', color: 'blue' },
-            { value: 'long', label: 'Ca dài (12h)', color: 'purple' },
-            { value: 'admin', label: 'Hành chính', color: 'green' },
+            { value: 'short', label: 'Ca ngắn (8h)', shortLabel: 'Ngắn 8h', color: 'blue' },
+            { value: 'long', label: 'Ca dài (12h)', shortLabel: 'Dài 12h', color: 'purple' },
+            { value: 'admin', label: 'Hành chính', shortLabel: 'HC', color: 'green' },
           ].map(opt => (
             <button
               key={opt.value}
               type="button"
               onClick={() => updateField('shift_category', opt.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                 form.shift_category === opt.value
                   ? `bg-${opt.color}-100 text-${opt.color}-700 ring-2 ring-${opt.color}-500`
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {opt.label}
+              <span className="sm:hidden">{opt.shortLabel}</span>
+              <span className="hidden sm:inline">{opt.label}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Row 3: Start/End time */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Giờ bắt đầu <span className="text-red-500">*</span>
@@ -274,7 +273,7 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
             type="time"
             value={form.start_time}
             onChange={e => updateField('start_time', e.target.value)}
-            className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
               errors.start_time ? 'border-red-300' : 'border-gray-300'
             }`}
           />
@@ -289,18 +288,18 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
             type="time"
             value={form.end_time}
             onChange={e => updateField('end_time', e.target.value)}
-            className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-3 py-2 sm:py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
               errors.end_time ? 'border-red-300' : 'border-gray-300'
             }`}
           />
           {errors.end_time && <p className="text-xs text-red-600 mt-1">{errors.end_time}</p>}
         </div>
 
-        <div>
+        <div className="col-span-2 sm:col-span-1">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Giờ chuẩn (tự tính)
           </label>
-          <div className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 font-medium text-blue-700">
+          <div className="px-3 py-2 sm:py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 font-medium text-blue-700">
             {form.standard_hours}h
             {form.crosses_midnight && (
               <span className="ml-2 text-xs text-indigo-500 font-normal">🌙 Qua đêm</span>
@@ -310,7 +309,7 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
       </div>
 
       {/* Row 4: Break + Thresholds */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Nghỉ giải lao (phút)
@@ -321,7 +320,7 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
             max="120"
             value={form.break_minutes}
             onChange={e => updateField('break_minutes', parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 sm:py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -335,9 +334,9 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
             max="60"
             value={form.late_threshold_minutes}
             onChange={e => updateField('late_threshold_minutes', parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 sm:py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-400 mt-1">Trễ &gt; {form.late_threshold_minutes} phút mới tính</p>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1">Trễ &gt; {form.late_threshold_minutes} phút mới tính</p>
         </div>
 
         <div>
@@ -350,9 +349,9 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
             max="60"
             value={form.early_leave_threshold_minutes}
             onChange={e => updateField('early_leave_threshold_minutes', parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 sm:py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-400 mt-1">Về sớm &gt; {form.early_leave_threshold_minutes} phút mới tính</p>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1">Về sớm &gt; {form.early_leave_threshold_minutes} phút mới tính</p>
         </div>
       </div>
 
@@ -373,7 +372,7 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 pt-4 border-t">
         <button
           type="button"
           onClick={onCancel}
@@ -385,7 +384,7 @@ export function ShiftForm({ initialData, onSuccess, onCancel }: ShiftFormProps) 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {isSubmitting ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

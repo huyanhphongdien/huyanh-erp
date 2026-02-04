@@ -1,5 +1,5 @@
 // ============================================================================
-// TASK DETAIL PAGE - UPDATED WITH PARTICIPANTS SECTION
+// TASK DETAIL PAGE - UPDATED WITH PARTICIPANTS SECTION (RESPONSIVE)
 // File: src/pages/evaluations/TaskDetailPage.tsx
 // Huy Anh ERP System
 // ============================================================================
@@ -31,7 +31,6 @@ import {
   Loader2,
 } from 'lucide-react';
 
-// Import từ src/pages/evaluations/ đến các thư mục khác
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
 import {
@@ -43,7 +42,6 @@ import {
   type UserRole,
 } from '../../features/tasks/utils/taskPermissions';
 
-// *** IMPORT MỚI: TaskParticipantsSection ***
 import TaskParticipantsSection from '../../features/tasks/components/TaskParticipantsSection';
 
 // ============================================================================
@@ -136,8 +134,8 @@ const RATING_CONFIG: Record<string, { label: string; color: string }> = {
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.bgColor} ${config.color}`}>
-      <span className="w-2 h-2 rounded-full bg-current mr-2" />
+    <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${config.bgColor} ${config.color}`}>
+      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-current mr-1.5 sm:mr-2" />
       {config.label}
     </span>
   );
@@ -146,7 +144,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
   const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.bgColor} ${config.color}`}>
+    <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${config.bgColor} ${config.color}`}>
       <Flag className="w-3 h-3 mr-1" />
       {config.label}
     </span>
@@ -177,29 +175,29 @@ const ProgressCircle: React.FC<{ progress: number; size?: number }> = ({ progres
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold" style={{ color: getProgressColor(progress) }}>{progress}%</span>
-        <span className="text-xs text-gray-500">Hoàn thành</span>
+        <span className="text-xl sm:text-2xl font-bold" style={{ color: getProgressColor(progress) }}>{progress}%</span>
+        <span className="text-[10px] sm:text-xs text-gray-500">Hoàn thành</span>
       </div>
     </div>
   );
 };
 
 const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode }> = ({ icon, label, value }) => (
-  <div className="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0">
-    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500">{icon}</div>
+  <div className="flex items-start gap-2 sm:gap-3 py-2.5 sm:py-3 border-b border-gray-100 last:border-0">
+    <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500">{icon}</div>
     <div className="flex-1 min-w-0">
-      <p className="text-sm text-gray-500">{label}</p>
-      <div className="text-sm font-medium text-gray-900 mt-0.5">{value || '-'}</div>
+      <p className="text-xs sm:text-sm text-gray-500">{label}</p>
+      <div className="text-xs sm:text-sm font-medium text-gray-900 mt-0.5">{value || '-'}</div>
     </div>
   </div>
 );
 
 const LockBanner: React.FC<{ message: string }> = ({ message }) => (
-  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
-    <Lock className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 flex items-start sm:items-center gap-2 sm:gap-3">
+    <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 flex-shrink-0 mt-0.5 sm:mt-0" />
     <div>
-      <p className="text-sm font-medium text-yellow-800">{message}</p>
-      <p className="text-xs text-yellow-600 mt-1">Công việc đang trong quy trình đánh giá, một số thao tác bị hạn chế.</p>
+      <p className="text-xs sm:text-sm font-medium text-yellow-800">{message}</p>
+      <p className="text-[10px] sm:text-xs text-yellow-600 mt-0.5 sm:mt-1">Công việc đang trong quy trình đánh giá, một số thao tác bị hạn chế.</p>
     </div>
   </div>
 );
@@ -237,23 +235,23 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex min-h-screen items-end sm:items-center justify-center p-4">
         <div className="fixed inset-0 bg-black bg-opacity-30" onClick={onCancel} />
-        <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-          <p className="text-gray-600 mb-6">{message}</p>
-          <div className="flex gap-3 justify-end">
+        <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+          <p className="text-sm text-gray-600 mb-4 sm:mb-6">{message}</p>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end">
             <button
               onClick={onCancel}
               disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="px-4 py-2.5 sm:py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               {cancelText}
             </button>
             <button
               onClick={onConfirm}
               disabled={loading}
-              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-2 ${colorClasses[confirmColor]}`}
+              className={`px-4 py-2.5 sm:py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-2 ${colorClasses[confirmColor]}`}
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {confirmText}
@@ -291,7 +289,6 @@ const TaskDetailPage: React.FC = () => {
     setError(null);
 
     try {
-      // Fetch task with relations
       const { data: taskData, error: taskError } = await supabase
         .from('tasks')
         .select(`
@@ -308,21 +305,17 @@ const TaskDetailPage: React.FC = () => {
       if (!taskData) throw new Error('Không tìm thấy công việc');
       setTask(taskData);
 
-      // Calculate permissions
       if (user) {
-        // FIX: Updated getTaskPermissions call to match new signature
-        // New signature: (task, userRole, userDeptId, userLevel?, isAdmin?)
         const perms = getTaskPermissions(
           taskData,
           (user.role as UserRole) || 'employee',
           user.department_id,
-          undefined, // userLevel - can fetch if needed
+          undefined,
           user.role === 'admin'
         );
         setPermissions(perms);
       }
 
-      // Fetch self-evaluation if exists
       const { data: evalData } = await supabase
         .from('task_self_evaluations')
         .select(`*, employee:employees(full_name)`)
@@ -334,7 +327,6 @@ const TaskDetailPage: React.FC = () => {
       if (evalData) {
         setSelfEvaluation(evalData);
 
-        // Fetch approval if self-evaluation exists
         const { data: approvalData } = await supabase
           .from('task_approvals')
           .select(`*, approver:employees(full_name)`)
@@ -417,10 +409,10 @@ const TaskDetailPage: React.FC = () => {
   // Error state
   if (error || !task) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">{error || 'Không tìm thấy công việc'}</h2>
-        <button onClick={() => navigate(-1)} className="text-blue-600 hover:underline">Quay lại</button>
+      <div className="flex flex-col items-center justify-center min-h-[400px] px-4">
+        <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 mb-3 sm:mb-4" />
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 text-center">{error || 'Không tìm thấy công việc'}</h2>
+        <button onClick={() => navigate(-1)} className="text-blue-600 hover:underline text-sm sm:text-base">Quay lại</button>
       </div>
     );
   }
@@ -428,51 +420,53 @@ const TaskDetailPage: React.FC = () => {
   const lockMessage = getTaskLockMessage(task);
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-4 md:p-6">
       {/* Header */}
-      <div className="mb-6">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4">
+      <div className="mb-4 md:mb-6">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-900 mb-3 sm:mb-4 text-sm">
           <ArrowLeft className="w-4 h-4" />Quay lại
         </button>
 
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <span className="text-sm text-gray-500 font-mono">{task.code}</span>
+        <div className="flex flex-col gap-3 md:gap-4">
+          {/* Title & Badges */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="text-xs sm:text-sm text-gray-500 font-mono">{task.code}</span>
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
               {task.evaluation_status && task.evaluation_status !== 'none' && (
-                <span className={`px-2 py-1 rounded text-xs font-medium ${getEvaluationStatusColor(task.evaluation_status)}`}>
+                <span className={`px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${getEvaluationStatusColor(task.evaluation_status)}`}>
                   {getEvaluationStatusLabel(task.evaluation_status)}
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">{task.name}</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{task.name}</h1>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons - horizontal scrollable on mobile */}
           <div className="flex flex-wrap gap-2">
-            <button onClick={fetchTaskDetail} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <RefreshCw className="w-4 h-4" />Làm mới
+            <button onClick={fetchTaskDetail} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Làm mới</span>
             </button>
 
             {permissions?.canEdit ? (
-              <button onClick={handleEdit} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
-                <Edit className="w-4 h-4" />Sửa
+              <button onClick={handleEdit} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Sửa
               </button>
             ) : (
-              <button disabled title={permissions?.editDisabledReason || 'Không có quyền sửa'} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
-                <Lock className="w-4 h-4" />Sửa
+              <button disabled title={permissions?.editDisabledReason || 'Không có quyền sửa'} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
+                <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Sửa
               </button>
             )}
 
             {permissions?.canDelete ? (
-              <button onClick={() => setShowDeleteDialog(true)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
-                <Trash2 className="w-4 h-4" />Xóa
+              <button onClick={() => setShowDeleteDialog(true)} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
+                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Xóa
               </button>
             ) : (
-              <button disabled title={permissions?.deleteDisabledReason || 'Không có quyền xóa'} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
-                <Lock className="w-4 h-4" />Xóa
+              <button disabled title={permissions?.deleteDisabledReason || 'Không có quyền xóa'} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
+                <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Xóa
               </button>
             )}
           </div>
@@ -480,28 +474,28 @@ const TaskDetailPage: React.FC = () => {
       </div>
 
       {/* Lock Banner */}
-      {lockMessage && <div className="mb-6"><LockBanner message={lockMessage} /></div>}
+      {lockMessage && <div className="mb-4 md:mb-6"><LockBanner message={lockMessage} /></div>}
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
           {/* Description */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-gray-400" />Chi tiết công việc
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />Chi tiết công việc
             </h2>
-            <div className="prose prose-sm max-w-none text-gray-600">
+            <div className="prose prose-sm max-w-none text-gray-600 text-sm">
               {task.description || <span className="text-gray-400 italic">Chưa có mô tả</span>}
             </div>
           </div>
 
           {/* Task Info Grid */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-gray-400" />Thông tin phân công
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />Thông tin phân công
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 md:gap-x-8">
               <InfoRow icon={<Building2 className="w-4 h-4" />} label="Phòng ban" value={task.department?.name} />
               <InfoRow icon={<User className="w-4 h-4" />} label="Người giao" value={task.assigner?.full_name} />
               <InfoRow icon={<User className="w-4 h-4" />} label="Người thực hiện" value={task.assignee?.full_name} />
@@ -511,7 +505,7 @@ const TaskDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* *** SECTION MỚI: NGƯỜI THAM GIA *** */}
+          {/* Participants Section */}
           <TaskParticipantsSection
             taskId={task.id}
             taskAssigneeId={task.assignee_id}
@@ -520,42 +514,42 @@ const TaskDetailPage: React.FC = () => {
 
           {/* Self Evaluation */}
           {selfEvaluation && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-500" />Tự đánh giá
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                <Star className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />Tự đánh giá
               </h2>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-500">Điểm tự đánh giá</p>
-                    <p className="text-2xl font-bold text-blue-600">{selfEvaluation.score}/100</p>
+                    <p className="text-xs sm:text-sm text-gray-500">Điểm tự đánh giá</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-600">{selfEvaluation.score}/100</p>
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-gray-500">Xếp loại</p>
-                    <p className={`text-xl font-bold ${RATING_CONFIG[selfEvaluation.rating]?.color || 'text-gray-600'}`}>
+                    <p className="text-xs sm:text-sm text-gray-500">Xếp loại</p>
+                    <p className={`text-lg sm:text-xl font-bold ${RATING_CONFIG[selfEvaluation.rating]?.color || 'text-gray-600'}`}>
                       {selfEvaluation.rating} - {RATING_CONFIG[selfEvaluation.rating]?.label || selfEvaluation.rating}
                     </p>
                   </div>
                 </div>
                 {selfEvaluation.achievements && (
                   <div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">Thành tựu đạt được</p>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{selfEvaluation.achievements}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Thành tựu đạt được</p>
+                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.achievements}</p>
                   </div>
                 )}
                 {selfEvaluation.challenges && (
                   <div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">Khó khăn gặp phải</p>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{selfEvaluation.challenges}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Khó khăn gặp phải</p>
+                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.challenges}</p>
                   </div>
                 )}
                 {selfEvaluation.comments && (
                   <div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">Nhận xét</p>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{selfEvaluation.comments}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Nhận xét</p>
+                    <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2.5 sm:p-3 rounded-lg">{selfEvaluation.comments}</p>
                   </div>
                 )}
-                <div className="text-xs text-gray-400 pt-2">
+                <div className="text-[10px] sm:text-xs text-gray-400 pt-2">
                   Gửi bởi: {selfEvaluation.employee?.full_name} · {selfEvaluation.submitted_at && new Date(selfEvaluation.submitted_at).toLocaleString('vi-VN')}
                 </div>
               </div>
@@ -564,29 +558,29 @@ const TaskDetailPage: React.FC = () => {
 
           {/* Approval */}
           {approval && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Award className="w-5 h-5 text-green-500" />Kết quả phê duyệt
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                <Award className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />Kết quả phê duyệt
               </h2>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                   {approval.score !== null && (
                     <div className="flex-1">
-                      <p className="text-sm text-gray-500">Điểm duyệt</p>
-                      <p className="text-2xl font-bold text-green-600">{approval.score}/100</p>
+                      <p className="text-xs sm:text-sm text-gray-500">Điểm duyệt</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">{approval.score}/100</p>
                     </div>
                   )}
                   {approval.rating && (
                     <div className="flex-1">
-                      <p className="text-sm text-gray-500">Xếp loại cuối</p>
-                      <p className={`text-xl font-bold ${RATING_CONFIG[approval.rating]?.color || 'text-gray-600'}`}>
+                      <p className="text-xs sm:text-sm text-gray-500">Xếp loại cuối</p>
+                      <p className={`text-lg sm:text-xl font-bold ${RATING_CONFIG[approval.rating]?.color || 'text-gray-600'}`}>
                         {approval.rating} - {RATING_CONFIG[approval.rating]?.label || approval.rating}
                       </p>
                     </div>
                   )}
                   <div className="flex-1">
-                    <p className="text-sm text-gray-500">Quyết định</p>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    <p className="text-xs sm:text-sm text-gray-500">Quyết định</p>
+                    <span className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${
                       approval.decision === 'approved' ? 'bg-green-100 text-green-800' :
                       approval.decision === 'rejected' ? 'bg-red-100 text-red-800' :
                       'bg-yellow-100 text-yellow-800'
@@ -598,11 +592,11 @@ const TaskDetailPage: React.FC = () => {
                 </div>
                 {approval.comments && (
                   <div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">Nhận xét của người duyệt</p>
-                    <p className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">{approval.comments}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Nhận xét của người duyệt</p>
+                    <p className="text-xs sm:text-sm text-gray-600 bg-green-50 p-2.5 sm:p-3 rounded-lg">{approval.comments}</p>
                   </div>
                 )}
-                <div className="text-xs text-gray-400 pt-2">
+                <div className="text-[10px] sm:text-xs text-gray-400 pt-2">
                   Duyệt bởi: {approval.approver?.full_name} · {approval.approved_at && new Date(approval.approved_at).toLocaleString('vi-VN')}
                 </div>
               </div>
@@ -611,87 +605,93 @@ const TaskDetailPage: React.FC = () => {
         </div>
 
         {/* Right Column */}
-        <div className="space-y-6">
-          {/* Progress */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-500" />Tiến độ công việc
+        <div className="space-y-4 md:space-y-6">
+          {/* Progress - responsive circle size */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />Tiến độ công việc
             </h3>
-            <div className="flex justify-center py-4">
-              <ProgressCircle progress={task.progress} />
+            <div className="flex justify-center py-2 sm:py-4">
+              {/* Responsive: smaller on mobile */}
+              <div className="block sm:hidden">
+                <ProgressCircle progress={task.progress} size={100} />
+              </div>
+              <div className="hidden sm:block">
+                <ProgressCircle progress={task.progress} size={120} />
+              </div>
             </div>
           </div>
 
           {/* Timeline */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-gray-400" />Thời gian
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />Thời gian
             </h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
+            <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
+              <div className="flex justify-between gap-2">
                 <span className="text-gray-500">Ngày tạo</span>
-                <span className="font-medium">{task.created_at ? new Date(task.created_at).toLocaleString('vi-VN') : '-'}</span>
+                <span className="font-medium text-right">{task.created_at ? new Date(task.created_at).toLocaleString('vi-VN') : '-'}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <span className="text-gray-500">Cập nhật</span>
-                <span className="font-medium">{task.updated_at ? new Date(task.updated_at).toLocaleString('vi-VN') : '-'}</span>
+                <span className="font-medium text-right">{task.updated_at ? new Date(task.updated_at).toLocaleString('vi-VN') : '-'}</span>
               </div>
               {task.completed_date && (
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-2">
                   <span className="text-gray-500">Hoàn thành</span>
-                  <span className="font-medium text-green-600">{new Date(task.completed_date).toLocaleString('vi-VN')}</span>
+                  <span className="font-medium text-green-600 text-right">{new Date(task.completed_date).toLocaleString('vi-VN')}</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Thao tác nhanh</h3>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Thao tác nhanh</h3>
             <div className="space-y-2">
               {permissions?.canSelfEvaluate && (
-                <button onClick={handleSelfEvaluate} className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                  <Star className="w-5 h-5" />Tự đánh giá công việc
+                <button onClick={handleSelfEvaluate} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                  <Star className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tự đánh giá công việc
                 </button>
               )}
               {permissions?.canApprove && (
-                <button onClick={handleApprove} className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
-                  <CheckCircle className="w-5 h-5" />Phê duyệt đánh giá
+                <button onClick={handleApprove} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Phê duyệt đánh giá
                 </button>
               )}
               {permissions?.canMarkComplete && (
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
-                  <CheckCircle className="w-5 h-5" />Đánh dấu hoàn thành
+                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Đánh dấu hoàn thành
                 </button>
               )}
               {permissions?.canPause && (
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors">
-                  <Pause className="w-5 h-5" />Tạm dừng công việc
+                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors">
+                  <Pause className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tạm dừng công việc
                 </button>
               )}
               {permissions?.canResume && (
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                  <Play className="w-5 h-5" />Tiếp tục công việc
+                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tiếp tục công việc
                 </button>
               )}
               {permissions?.canCancel && (
-                <button onClick={() => setShowCancelDialog(true)} className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                  <XCircle className="w-5 h-5" />Hủy công việc
+                <button onClick={() => setShowCancelDialog(true)} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                  <XCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Hủy công việc
                 </button>
               )}
               {!permissions?.canSelfEvaluate && !permissions?.canApprove && !permissions?.canMarkComplete && !permissions?.canPause && !permissions?.canResume && !permissions?.canCancel && (
-                <p className="text-sm text-gray-500 text-center py-4">Không có thao tác nào khả dụng</p>
+                <p className="text-xs sm:text-sm text-gray-500 text-center py-3 sm:py-4">Không có thao tác nào khả dụng</p>
               )}
             </div>
           </div>
 
           {/* Notes */}
           {task.notes && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-gray-400" />Ghi chú
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />Ghi chú
               </h3>
-              <p className="text-sm text-gray-600">{task.notes}</p>
+              <p className="text-xs sm:text-sm text-gray-600">{task.notes}</p>
             </div>
           )}
         </div>

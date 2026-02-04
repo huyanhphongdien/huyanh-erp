@@ -1,861 +1,493 @@
-// ============================================
-// src/services/purchaseAccessService.ts
-// Module Quản lý đơn hàng - Access Control Service
-// Huy Anh ERP System
-// ============================================
+// ============================================================================
+// PURCHASE ACCESS SERVICE
+// File: src/services/purchaseAccessService.ts
+// Huy Anh ERP System - Phase 6: Access Control
+// ============================================================================
+// Service quản lý phân quyền truy cập module Mua hàng
+// - Executive (level ≤ 5): Luôn có quyền, không cần grant
+// - Nhân viên khác: Cần được cấp quyền qua bảng purchase_access
+// - access_level: 'full' (CRUD) hoặc 'view_only' (chỉ xem)
+// ============================================================================
 
 import { supabase } from '../lib/supabase';
 
-// ============================================
+// ============================================================================
 // TYPES
-// ============================================
+// ============================================================================
 
-export interface PurchasePermissions {
-  has_access: boolean;
-  access_type: 'executive' | 'accounting' | 'granted' | 'none';
-  access_id?: string;
-  granted_by?: string;
-  can_view: boolean;
-  can_create_order: boolean;
-  can_edit_order: boolean;
-  can_delete_order: boolean;
-  can_approve_order: boolean;
-  can_add_invoice: boolean;
-  can_add_payment: boolean;
-  can_manage_suppliers: boolean;
-  can_manage_materials: boolean;
-  can_view_reports: boolean;
-  can_export_data: boolean;
-  can_view_all_orders: boolean;
-  can_grant_access: boolean;
-  max_order_amount?: number | null;
-  valid_from?: string;
-  valid_until?: string;
-}
+export type AccessLevel = 'full' | 'view_only';
 
 export interface PurchaseAccess {
   id: string;
   employee_id: string;
-  granted_by: string;
-  can_view: boolean;
-  can_create_order: boolean;
-  can_edit_order: boolean;
-  can_delete_order: boolean;
-  can_approve_order: boolean;
-  can_add_invoice: boolean;
-  can_add_payment: boolean;
-  can_manage_suppliers: boolean;
-  can_manage_materials: boolean;
-  can_view_reports: boolean;
-  can_export_data: boolean;
-  can_view_all_orders: boolean;
-  max_order_amount?: number;
-  reason?: string;
-  valid_from: string;
-  valid_until?: string;
-  status: 'active' | 'suspended' | 'revoked';
+  access_level: AccessLevel;
+  granted_by: string | null;
+  granted_at: string;
+  revoked_by: string | null;
+  revoked_at: string | null;
+  is_active: boolean;
+  notes: string | null;
   created_at: string;
   updated_at: string;
-  revoked_at?: string;
-  revoked_by?: string;
-  revoke_reason?: string;
+  // Joined fields
+  employee?: {
+    id: string;
+    code: string;
+    full_name: string;
+    position_name?: string;
+    department_name?: string;
+    position_level?: number;
+    avatar_url?: string;
+  } | null;
+  granter?: {
+    id: string;
+    full_name: string;
+  } | null;
+  revoker?: {
+    id: string;
+    full_name: string;
+  } | null;
 }
 
-export interface PurchaseAccessListItem extends PurchaseAccess {
-  employee_code: string;
-  employee_name: string;
-  department_name: string;
-  position_name: string;
-  granted_by_name: string;
-  is_valid: boolean;
-  access_type: string;
+export interface AccessCheckResult {
+  hasAccess: boolean;
+  accessLevel: AccessLevel | null;
+  isExecutive: boolean;
+  reason?: string;
 }
 
-export interface AllAccessItem {
-  access_id?: string;
-  employee_id: string;
-  employee_code: string;
-  employee_name: string;
-  department_name: string;
-  position_name: string;
-  access_type: 'executive' | 'accounting' | 'granted';
-  can_view: boolean;
-  can_create_order: boolean;
-  can_edit_order: boolean;
-  can_delete_order: boolean;
-  can_approve_order: boolean;
-  can_add_invoice: boolean;
-  can_add_payment: boolean;
-  can_manage_suppliers: boolean;
-  can_manage_materials: boolean;
-  can_view_reports: boolean;
-  can_export_data: boolean;
-  can_view_all_orders: boolean;
-  can_grant_access: boolean;
-  max_order_amount?: number;
-  is_valid: boolean;
+export interface AccessStats {
+  total_granted: number;
+  active_full: number;
+  active_view_only: number;
+  revoked_count: number;
+  executive_count: number;
 }
 
 export interface GrantAccessInput {
   employee_id: string;
-  permissions: Partial<{
-    can_view: boolean;
-    can_create_order: boolean;
-    can_edit_order: boolean;
-    can_delete_order: boolean;
-    can_approve_order: boolean;
-    can_add_invoice: boolean;
-    can_add_payment: boolean;
-    can_manage_suppliers: boolean;
-    can_manage_materials: boolean;
-    can_view_reports: boolean;
-    can_export_data: boolean;
-    can_view_all_orders: boolean;
-    max_order_amount: number | null;
-  }>;
-  reason?: string;
-  valid_until?: string;
+  access_level: AccessLevel;
+  notes?: string;
+  granted_by?: string;
 }
 
-export interface PurchaseAccessLog {
+export interface EmployeeForGrant {
   id: string;
-  access_id?: string;
-  employee_id: string;
-  action: 'granted' | 'updated' | 'suspended' | 'revoked' | 'restored';
-  performed_by: string;
-  changes?: Record<string, { old: unknown; new: unknown }>;
-  reason?: string;
-  created_at: string;
+  code: string;
+  full_name: string;
+  position_name: string | null;
+  department_name: string | null;
+  position_level: number | null;
+  avatar_url: string | null;
+  already_has_access: boolean;
+  current_access_level: AccessLevel | null;
 }
 
-// Default permissions presets
-export const DEFAULT_PERMISSIONS = {
-  can_view: true,
-  can_create_order: false,
-  can_edit_order: false,
-  can_delete_order: false,
-  can_approve_order: false,
-  can_add_invoice: false,
-  can_add_payment: false,
-  can_manage_suppliers: false,
-  can_manage_materials: false,
-  can_view_reports: false,
-  can_export_data: false,
-  can_view_all_orders: false,
-  max_order_amount: null
-};
-
-export const FULL_PERMISSIONS = {
-  can_view: true,
-  can_create_order: true,
-  can_edit_order: true,
-  can_delete_order: true,
-  can_approve_order: true,
-  can_add_invoice: true,
-  can_add_payment: true,
-  can_manage_suppliers: true,
-  can_manage_materials: true,
-  can_view_reports: true,
-  can_export_data: true,
-  can_view_all_orders: true,
-  max_order_amount: null
-};
-
-export const ORDER_CREATOR_PERMISSIONS = {
-  can_view: true,
-  can_create_order: true,
-  can_edit_order: true,
-  can_delete_order: false,
-  can_approve_order: false,
-  can_add_invoice: false,
-  can_add_payment: false,
-  can_manage_suppliers: false,
-  can_manage_materials: false,
-  can_view_reports: false,
-  can_export_data: false,
-  can_view_all_orders: false,
-  max_order_amount: null
-};
-
-
-// ============================================
-// PURCHASE ACCESS SERVICE
-// ============================================
+// ============================================================================
+// SERVICE
+// ============================================================================
 
 export const purchaseAccessService = {
-  // ==========================================
-  // KIỂM TRA QUYỀN
-  // ==========================================
+  // ==========================================================================
+  // CHECK ACCESS
+  // ==========================================================================
 
   /**
-   * Lấy quyền của user hiện tại
+   * Kiểm tra user hiện tại có quyền truy cập module Mua hàng không
+   * Dùng trong Sidebar, PurchaseAccessGuard, và các component khác
    */
-  async getMyPermissions(): Promise<PurchasePermissions> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return {
-        has_access: false,
-        access_type: 'none',
-        can_view: false,
-        can_create_order: false,
-        can_edit_order: false,
-        can_delete_order: false,
-        can_approve_order: false,
-        can_add_invoice: false,
-        can_add_payment: false,
-        can_manage_suppliers: false,
-        can_manage_materials: false,
-        can_view_reports: false,
-        can_export_data: false,
-        can_view_all_orders: false,
-        can_grant_access: false
-      };
+  async hasAccess(): Promise<boolean> {
+    try {
+      const result = await this.checkCurrentUserAccess();
+      return result.hasAccess;
+    } catch (err) {
+      console.error('❌ [purchaseAccess] hasAccess error:', err);
+      return false;
     }
-
-    // Lấy employee_id từ user
-    const { data: employee } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!employee) {
-      return {
-        has_access: false,
-        access_type: 'none',
-        can_view: false,
-        can_create_order: false,
-        can_edit_order: false,
-        can_delete_order: false,
-        can_approve_order: false,
-        can_add_invoice: false,
-        can_add_payment: false,
-        can_manage_suppliers: false,
-        can_manage_materials: false,
-        can_view_reports: false,
-        can_export_data: false,
-        can_view_all_orders: false,
-        can_grant_access: false
-      };
-    }
-
-    return this.getPermissions(employee.id);
   },
 
   /**
-   * Lấy quyền của một nhân viên (gọi function database)
+   * Kiểm tra chi tiết quyền của user hiện tại
    */
-  async getPermissions(employeeId: string): Promise<PurchasePermissions> {
+  async checkCurrentUserAccess(): Promise<AccessCheckResult> {
     try {
-      const { data, error } = await supabase
-        .rpc('get_purchase_permissions', { emp_id: employeeId });
-
-      // Nếu function chưa tồn tại, fallback
-      if (error) {
-        if (error.code === 'PGRST202' || error.message.includes('not find the function')) {
-          console.warn('Function get_purchase_permissions not found, using fallback');
-          return this.fallbackGetPermissions(employeeId);
-        }
-        throw error;
+      // 1. Lấy user hiện tại
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        return { hasAccess: false, accessLevel: null, isExecutive: false, reason: 'Chưa đăng nhập' };
       }
 
-      return data as PurchasePermissions;
-    } catch (err) {
-      console.error('getPermissions error:', err);
-      return this.fallbackGetPermissions(employeeId);
-    }
-  },
-
-  /**
-   * Fallback get permissions khi function chưa được tạo
-   */
-  async fallbackGetPermissions(employeeId: string): Promise<PurchasePermissions> {
-    const noAccess: PurchasePermissions = {
-      has_access: false,
-      access_type: 'none',
-      can_view: false,
-      can_create_order: false,
-      can_edit_order: false,
-      can_delete_order: false,
-      can_approve_order: false,
-      can_add_invoice: false,
-      can_add_payment: false,
-      can_manage_suppliers: false,
-      can_manage_materials: false,
-      can_view_reports: false,
-      can_export_data: false,
-      can_view_all_orders: false,
-      can_grant_access: false
-    };
-
-    try {
-      // Lấy thông tin employee với position level và department
-      const { data: employee, error } = await supabase
+      // 2. Lấy employee info + position level + department qua join
+      const { data: employee, error: empError } = await supabase
         .from('employees')
-        .select(`
-          id,
-          positions!inner(level),
-          departments!inner(code)
-        `)
-        .eq('id', employeeId)
+        .select('id, role, position:position_id(level), department:department_id(name)')
+        .eq('user_id', authUser.id)
+        .eq('status', 'active')
         .single();
 
-      if (error || !employee) return noAccess;
+      if (empError || !employee) {
+        return { hasAccess: false, accessLevel: null, isExecutive: false, reason: 'Không tìm thấy nhân viên' };
+      }
 
-      const positionLevel = (employee.positions as any)?.level || 99;
-      const deptCode = (employee.departments as any)?.code || '';
+      // Parse position level từ relation
+      const pos = Array.isArray((employee as any).position) ? (employee as any).position[0] : (employee as any).position;
+      const positionLevel = pos?.level ?? null;
 
-      // BGĐ (Level 1-3) có full quyền
-      if (positionLevel <= 3) {
+      // Parse department name từ relation
+      const dept = Array.isArray((employee as any).department) ? (employee as any).department[0] : (employee as any).department;
+      const deptName = (dept?.name || '').toLowerCase();
+
+      // 3. Admin → full access
+      if (employee.role === 'admin') {
+        return { hasAccess: true, accessLevel: 'full', isExecutive: true };
+      }
+
+      // 4. Executive (level ≤ 5) → full access
+      if (positionLevel && positionLevel <= 5) {
+        return { hasAccess: true, accessLevel: 'full', isExecutive: true };
+      }
+
+      // 5. Phòng Kế toán → auto full access (không cần cấp thủ công)
+      if (deptName.includes('kế toán') || deptName.includes('ke toan') || deptName.includes('tài chính') || deptName.includes('accounting') || deptName.includes('finance')) {
+        return { hasAccess: true, accessLevel: 'full', isExecutive: false };
+      }
+
+      // 6. Kiểm tra bảng purchase_access (được BGĐ cấp thủ công)
+      return this.checkEmployeeAccess(employee.id);
+    } catch (err: any) {
+      console.error('❌ [purchaseAccess] checkCurrentUserAccess error:', err);
+      return { hasAccess: false, accessLevel: null, isExecutive: false, reason: err.message };
+    }
+  },
+
+  /**
+   * Kiểm tra quyền của 1 employee cụ thể
+   */
+  async checkEmployeeAccess(employeeId: string): Promise<AccessCheckResult> {
+    try {
+      // Thử dùng RPC function trước
+      const { data: rpcResult, error: rpcError } = await supabase
+        .rpc('fn_check_purchase_access', { p_employee_id: employeeId });
+
+      if (!rpcError && rpcResult && rpcResult.length > 0) {
+        const row = rpcResult[0];
         return {
-          has_access: true,
-          access_type: 'executive',
-          can_view: true,
-          can_create_order: true,
-          can_edit_order: true,
-          can_delete_order: true,
-          can_approve_order: true,
-          can_add_invoice: true,
-          can_add_payment: true,
-          can_manage_suppliers: true,
-          can_manage_materials: true,
-          can_view_reports: true,
-          can_export_data: true,
-          can_view_all_orders: true,
-          can_grant_access: true
+          hasAccess: row.has_access || false,
+          accessLevel: row.access_level || null,
+          isExecutive: row.is_executive || false,
         };
       }
 
-      // Kế toán có quyền xem + invoice + payment
-      if (deptCode === 'HAP-KT') {
-        return {
-          has_access: true,
-          access_type: 'accounting',
-          can_view: true,
-          can_create_order: false,
-          can_edit_order: false,
-          can_delete_order: false,
-          can_approve_order: false,
-          can_add_invoice: true,
-          can_add_payment: true,
-          can_manage_suppliers: false,
-          can_manage_materials: false,
-          can_view_reports: true,
-          can_export_data: true,
-          can_view_all_orders: true,
-          can_grant_access: false
-        };
-      }
-
-      // Check trong bảng purchase_access
-      const { data: access } = await supabase
+      // Fallback: query trực tiếp
+      const { data: accessData } = await supabase
         .from('purchase_access')
-        .select('*')
+        .select('access_level')
         .eq('employee_id', employeeId)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (access) {
-        return {
-          has_access: true,
-          access_type: 'granted',
-          can_view: access.can_view || false,
-          can_create_order: access.can_create_order || false,
-          can_edit_order: access.can_edit_order || false,
-          can_delete_order: access.can_delete_order || false,
-          can_approve_order: access.can_approve_order || false,
-          can_add_invoice: access.can_add_invoice || false,
-          can_add_payment: access.can_add_payment || false,
-          can_manage_suppliers: access.can_manage_suppliers || false,
-          can_manage_materials: access.can_manage_materials || false,
-          can_view_reports: access.can_view_reports || false,
-          can_export_data: access.can_export_data || false,
-          can_view_all_orders: access.can_view_all_orders || false,
-          can_grant_access: false,
-          max_order_amount: access.max_order_amount
-        };
-      }
-
-      return noAccess;
-    } catch (err) {
-      console.error('fallbackGetPermissions error:', err);
-      return noAccess;
-    }
-  },
-
-  /**
-   * Kiểm tra có quyền truy cập module không
-   */
-  async hasAccess(employeeId?: string): Promise<boolean> {
-    try {
-      if (!employeeId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return false;
-
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!employee) return false;
-        employeeId = employee.id;
-      }
-
-      // Thử gọi RPC function
-      const { data, error } = await supabase
-        .rpc('has_purchase_access', { emp_id: employeeId });
-
-      // Nếu function chưa tồn tại (404), fallback check trực tiếp
-      if (error) {
-        if (error.code === 'PGRST202' || error.message.includes('not find the function')) {
-          console.warn('Function has_purchase_access not found, using fallback check');
-          if (employeeId) {
-            return this.fallbackHasAccess(employeeId);
-          }
-          return false;
-        }
-        throw error;
-      }
-      
-      return data as boolean;
-    } catch (err) {
-      console.error('hasAccess error:', err);
-      // Fallback nếu có lỗi khác
-      if (employeeId) {
-        return this.fallbackHasAccess(employeeId);
-      }
-      return false;
-    }
-  },
-
-  /**
-   * Fallback check quyền khi function chưa được tạo
-   */
-  async fallbackHasAccess(employeeId: string): Promise<boolean> {
-    try {
-      // Lấy thông tin employee với position level và department
-      const { data: employee, error } = await supabase
-        .from('employees')
-        .select(`
-          id,
-          positions!inner(level),
-          departments!inner(code)
-        `)
-        .eq('id', employeeId)
+        .eq('is_active', true)
         .single();
 
-      if (error || !employee) return false;
-
-      const positionLevel = (employee.positions as any)?.level || 99;
-      const deptCode = (employee.departments as any)?.code || '';
-
-      // BGĐ (Level 1-3) luôn có quyền
-      if (positionLevel <= 3) return true;
-
-      // Kế toán luôn có quyền
-      if (deptCode === 'HAP-KT') return true;
-
-      // Check trong bảng purchase_access
-      const { data: access } = await supabase
-        .from('purchase_access')
-        .select('id')
-        .eq('employee_id', employeeId)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      return !!access;
-    } catch (err) {
-      console.error('fallbackHasAccess error:', err);
-      return false;
-    }
-  },
-
-  /**
-   * Kiểm tra quyền cụ thể
-   */
-  async checkPermission(employeeId: string, permission: string): Promise<boolean> {
-    try {
-      const permissions = await this.getPermissions(employeeId);
-      return permissions[permission as keyof PurchasePermissions] as boolean || false;
-    } catch (err) {
-      console.error('checkPermission error:', err);
-      return false;
-    }
-  },
-
-  /**
-   * Kiểm tra có phải Ban Giám đốc không
-   */
-  async isExecutive(employeeId: string): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .rpc('is_executive', { emp_id: employeeId });
-
-      if (error) {
-        // Fallback
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('positions!inner(level)')
-          .eq('id', employeeId)
-          .single();
-        
-        const level = (employee?.positions as any)?.level || 99;
-        return level <= 3;
+      if (accessData) {
+        return {
+          hasAccess: true,
+          accessLevel: accessData.access_level as AccessLevel,
+          isExecutive: false,
+        };
       }
-      return data as boolean;
-    } catch (err) {
-      console.error('isExecutive error:', err);
-      return false;
+
+      return { hasAccess: false, accessLevel: null, isExecutive: false, reason: 'Chưa được cấp quyền' };
+    } catch (err: any) {
+      console.error('❌ [purchaseAccess] checkEmployeeAccess error:', err);
+      return { hasAccess: false, accessLevel: null, isExecutive: false, reason: err.message };
     }
   },
 
   /**
-   * Kiểm tra có phải Phòng Kế toán không
+   * Kiểm tra quyền cụ thể (dùng trong component)
+   * 'full' → có thể tạo, sửa, xóa
+   * 'view_only' → chỉ xem
    */
-  async isAccounting(employeeId: string): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .rpc('is_accounting', { emp_id: employeeId });
-
-      if (error) {
-        // Fallback
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('departments!inner(code)')
-          .eq('id', employeeId)
-          .single();
-        
-        const deptCode = (employee?.departments as any)?.code || '';
-        return deptCode === 'HAP-KT';
-      }
-      return data as boolean;
-    } catch (err) {
-      console.error('isAccounting error:', err);
-      return false;
-    }
+  async hasPermission(requiredLevel: AccessLevel = 'view_only'): Promise<boolean> {
+    const result = await this.checkCurrentUserAccess();
+    if (!result.hasAccess) return false;
+    if (result.isExecutive) return true;
+    if (requiredLevel === 'view_only') return true;
+    return result.accessLevel === 'full';
   },
 
-
-  // ==========================================
-  // QUẢN LÝ QUYỀN TRUY CẬP
-  // ==========================================
-
-  /**
-   * Lấy danh sách tất cả người có quyền truy cập
-   */
-  async getAllAccess(): Promise<AllAccessItem[]> {
-    const { data, error } = await supabase
-      .from('v_all_purchase_access')
-      .select('*')
-      .order('access_type')
-      .order('employee_name');
-
-    if (error) throw error;
-    return data || [];
-  },
+  // ==========================================================================
+  // ACCESS LIST (cho AccessManagementPage)
+  // ==========================================================================
 
   /**
-   * Lấy danh sách người được cấp quyền (không bao gồm BGĐ/KT tự động)
+   * Lấy danh sách tất cả access grants (active + revoked)
    */
-  async getGrantedAccess(): Promise<PurchaseAccessListItem[]> {
-    const { data, error } = await supabase
-      .from('v_purchase_access_list')
-      .select('*')
-      .order('created_at', { ascending: false });
+  async getAccessList(params?: {
+    activeOnly?: boolean;
+    search?: string;
+  }): Promise<PurchaseAccess[]> {
+    console.log('📋 [purchaseAccess] getAccessList:', params);
 
-    if (error) throw error;
-    return data || [];
-  },
-
-  /**
-   * Lấy chi tiết quyền của một nhân viên
-   */
-  async getAccessByEmployee(employeeId: string): Promise<PurchaseAccess | null> {
-    const { data, error } = await supabase
-      .from('purchase_access')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') return null;
-      throw error;
-    }
-    return data;
-  },
-
-  /**
-   * Cấp quyền truy cập (chỉ BGĐ mới được gọi)
-   */
-  async grantAccess(input: GrantAccessInput): Promise<string> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Chưa đăng nhập');
-
-    // Lấy employee_id của người cấp quyền
-    const { data: grantedBy } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!grantedBy) throw new Error('Không tìm thấy thông tin nhân viên');
-
-    // Gọi function database
-    const { data, error } = await supabase
-      .rpc('grant_purchase_access', {
-        p_employee_id: input.employee_id,
-        p_granted_by: grantedBy.id,
-        p_permissions: input.permissions,
-        p_reason: input.reason || null,
-        p_valid_until: input.valid_until || null
-      });
-
-    if (error) throw error;
-    return data as string;
-  },
-
-  /**
-   * Cập nhật quyền
-   */
-  async updateAccess(
-    accessId: string, 
-    permissions: Partial<GrantAccessInput['permissions']>,
-    reason?: string
-  ): Promise<PurchaseAccess> {
-    const { data, error } = await supabase
-      .from('purchase_access')
-      .update({
-        ...permissions,
-        reason
-      })
-      .eq('id', accessId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  /**
-   * Thu hồi quyền
-   */
-  async revokeAccess(employeeId: string, reason?: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Chưa đăng nhập');
-
-    const { data: revokedBy } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!revokedBy) throw new Error('Không tìm thấy thông tin nhân viên');
-
-    const { data, error } = await supabase
-      .rpc('revoke_purchase_access', {
-        p_employee_id: employeeId,
-        p_revoked_by: revokedBy.id,
-        p_reason: reason || null
-      });
-
-    if (error) throw error;
-    return data as boolean;
-  },
-
-  /**
-   * Tạm ngưng quyền
-   */
-  async suspendAccess(accessId: string, reason?: string): Promise<PurchaseAccess> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Chưa đăng nhập');
-
-    const { data: suspendedBy } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    const { data, error } = await supabase
-      .from('purchase_access')
-      .update({
-        status: 'suspended',
-        revoked_by: suspendedBy?.id,
-        revoke_reason: reason
-      })
-      .eq('id', accessId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  /**
-   * Khôi phục quyền đã tạm ngưng
-   */
-  async restoreAccess(accessId: string): Promise<PurchaseAccess> {
-    const { data, error } = await supabase
-      .from('purchase_access')
-      .update({
-        status: 'active',
-        revoked_by: null,
-        revoke_reason: null,
-        revoked_at: null
-      })
-      .eq('id', accessId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-
-  // ==========================================
-  // DANH SÁCH NHÂN VIÊN CÓ THỂ CẤP QUYỀN
-  // ==========================================
-
-  /**
-   * Lấy danh sách nhân viên chưa có quyền truy cập
-   * (để chọn khi cấp quyền mới)
-   */
-  async getEligibleEmployees(): Promise<{
-    id: string;
-    code: string;
-    full_name: string;
-    department_name: string;
-    position_name: string;
-  }[]> {
-    // Lấy tất cả nhân viên active
-    const { data: allEmployees, error: empError } = await supabase
-      .from('employees')
-      .select(`
-        id,
-        code,
-        full_name,
-        departments!inner(name),
-        positions!inner(name, level)
-      `)
-      .eq('status', 'active');
-
-    if (empError) throw empError;
-
-    // Lấy danh sách đã có quyền
-    const { data: accessList } = await supabase
-      .from('v_all_purchase_access')
-      .select('employee_id');
-
-    const hasAccessIds = new Set(accessList?.map(a => a.employee_id) || []);
-
-    // Filter ra những người chưa có quyền
-    const eligible = (allEmployees || [])
-      .filter(emp => !hasAccessIds.has(emp.id))
-      .map(emp => ({
-        id: emp.id,
-        code: emp.code,
-        full_name: emp.full_name,
-        department_name: (emp.departments as any)?.name || '',
-        position_name: (emp.positions as any)?.name || ''
-      }));
-
-    return eligible;
-  },
-
-
-  // ==========================================
-  // LỊCH SỬ PHÂN QUYỀN
-  // ==========================================
-
-  /**
-   * Lấy lịch sử phân quyền
-   */
-  async getAccessLogs(employeeId?: string): Promise<PurchaseAccessLog[]> {
     let query = supabase
-      .from('purchase_access_logs')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from('purchase_access')
+      .select(`
+        *,
+        employee:employee_id(
+          id, code, full_name, avatar_url,
+          position:position_id(name, level),
+          department:department_id(name)
+        ),
+        granter:granted_by(id, full_name),
+        revoker:revoked_by(id, full_name)
+      `)
+      .order('is_active', { ascending: false })
+      .order('granted_at', { ascending: false });
 
-    if (employeeId) {
-      query = query.eq('employee_id', employeeId);
+    if (params?.activeOnly) {
+      query = query.eq('is_active', true);
     }
 
     const { data, error } = await query;
 
-    if (error) throw error;
-    return data || [];
-  },
-
-
-  // ==========================================
-  // HELPERS
-  // ==========================================
-
-  /**
-   * Kiểm tra hạn mức đơn hàng
-   */
-  canCreateOrderWithAmount(permissions: PurchasePermissions, amount: number): boolean {
-    if (!permissions.can_create_order) return false;
-    if (permissions.max_order_amount === null || permissions.max_order_amount === undefined) {
-      return true; // Không giới hạn
+    if (error) {
+      console.error('❌ [purchaseAccess] getAccessList error:', error);
+      throw error;
     }
-    return amount <= permissions.max_order_amount;
+
+    // Map relations
+    const result = (data || []).map((item: any) => {
+      const employee = Array.isArray(item.employee) ? item.employee[0] : item.employee;
+      const granter = Array.isArray(item.granter) ? item.granter[0] : item.granter;
+      const revoker = Array.isArray(item.revoker) ? item.revoker[0] : item.revoker;
+      const position = employee?.position 
+        ? (Array.isArray(employee.position) ? employee.position[0] : employee.position) 
+        : null;
+      const department = employee?.department 
+        ? (Array.isArray(employee.department) ? employee.department[0] : employee.department) 
+        : null;
+
+      return {
+        ...item,
+        employee: employee ? {
+          id: employee.id,
+          code: employee.code,
+          full_name: employee.full_name,
+          avatar_url: employee.avatar_url,
+          position_name: position?.name || null,
+          department_name: department?.name || null,
+          position_level: position?.level ?? null,
+        } : null,
+        granter: granter || null,
+        revoker: revoker || null,
+      };
+    });
+
+    // Filter by search (client-side)
+    if (params?.search) {
+      const s = params.search.toLowerCase();
+      return result.filter((item: PurchaseAccess) => 
+        item.employee?.full_name?.toLowerCase().includes(s) ||
+        item.employee?.code?.toLowerCase().includes(s) ||
+        item.employee?.department_name?.toLowerCase().includes(s)
+      );
+    }
+
+    console.log('✅ [purchaseAccess] Found', result.length, 'access records');
+    return result;
+  },
+
+  // ==========================================================================
+  // GRANT / REVOKE
+  // ==========================================================================
+
+  /**
+   * Cấp quyền truy cập module Mua hàng cho nhân viên
+   */
+  async grantAccess(input: GrantAccessInput): Promise<PurchaseAccess> {
+    console.log('🔑 [purchaseAccess] grantAccess:', input);
+
+    // Kiểm tra nhân viên đã có quyền chưa
+    const existing = await this.checkEmployeeAccess(input.employee_id);
+    if (existing.hasAccess && existing.isExecutive) {
+      throw new Error('Nhân viên này là cấp quản lý, đã có quyền tự động');
+    }
+
+    const { data, error } = await supabase
+      .from('purchase_access')
+      .upsert({
+        employee_id: input.employee_id,
+        access_level: input.access_level,
+        granted_by: input.granted_by || null,
+        granted_at: new Date().toISOString(),
+        is_active: true,
+        revoked_at: null,
+        revoked_by: null,
+        notes: input.notes || null,
+      }, {
+        onConflict: 'employee_id',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ [purchaseAccess] grantAccess error:', error);
+      throw error;
+    }
+
+    console.log('✅ [purchaseAccess] Granted access to employee:', input.employee_id);
+    return data;
   },
 
   /**
-   * Lấy label tiếng Việt cho permission
+   * Thu hồi quyền truy cập
    */
-  getPermissionLabel(key: string): string {
-    const labels: Record<string, string> = {
-      can_view: 'Xem module',
-      can_create_order: 'Tạo đơn hàng',
-      can_edit_order: 'Sửa đơn hàng',
-      can_delete_order: 'Xóa đơn hàng',
-      can_approve_order: 'Duyệt đơn hàng',
-      can_add_invoice: 'Thêm hóa đơn',
-      can_add_payment: 'Thêm thanh toán',
-      can_manage_suppliers: 'Quản lý NCC',
-      can_manage_materials: 'Quản lý vật tư',
-      can_view_reports: 'Xem báo cáo',
-      can_export_data: 'Xuất dữ liệu',
-      can_view_all_orders: 'Xem tất cả đơn',
-      can_grant_access: 'Cấp quyền',
-      max_order_amount: 'Hạn mức đơn hàng'
-    };
-    
-    return labels[key] || key;
+  async revokeAccess(accessId: string, revokedBy?: string): Promise<void> {
+    console.log('🔒 [purchaseAccess] revokeAccess:', accessId);
+
+    const { error } = await supabase
+      .from('purchase_access')
+      .update({
+        is_active: false,
+        revoked_at: new Date().toISOString(),
+        revoked_by: revokedBy || null,
+      })
+      .eq('id', accessId);
+
+    if (error) {
+      console.error('❌ [purchaseAccess] revokeAccess error:', error);
+      throw error;
+    }
+
+    console.log('✅ [purchaseAccess] Revoked access:', accessId);
   },
 
   /**
-   * Lấy label cho access type
+   * Thay đổi access level (không cần revoke + grant lại)
    */
-  getAccessTypeLabel(type: string): string {
-    const labels: Record<string, string> = {
-      executive: 'Ban Giám đốc',
-      accounting: 'Phòng Kế toán',
-      granted: 'Được cấp quyền',
-      none: 'Không có quyền'
-    };
-    return labels[type] || type;
+  async updateAccessLevel(accessId: string, newLevel: AccessLevel): Promise<void> {
+    console.log('✏️ [purchaseAccess] updateAccessLevel:', accessId, '→', newLevel);
+
+    const { error } = await supabase
+      .from('purchase_access')
+      .update({ access_level: newLevel })
+      .eq('id', accessId)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('❌ [purchaseAccess] updateAccessLevel error:', error);
+      throw error;
+    }
+
+    console.log('✅ [purchaseAccess] Updated access level:', accessId);
   },
 
+  // ==========================================================================
+  // EMPLOYEE LIST (cho GrantAccessModal)
+  // ==========================================================================
+
   /**
-   * Lấy màu badge cho access type
+   * Lấy danh sách nhân viên có thể cấp quyền
+   * (không bao gồm executive vì họ đã có quyền tự động)
    */
-  getAccessTypeBadgeColor(type: string): string {
-    const colors: Record<string, string> = {
-      executive: 'red',
-      accounting: 'blue',
-      granted: 'green',
-      none: 'gray'
+  async getEmployeesForGrant(search?: string): Promise<EmployeeForGrant[]> {
+    console.log('👥 [purchaseAccess] getEmployeesForGrant:', search);
+
+    // Lấy tất cả nhân viên active, join position để lấy level
+    let query = supabase
+      .from('employees')
+      .select(`
+        id, code, full_name, avatar_url,
+        position:position_id(name, level),
+        department:department_id(name)
+      `)
+      .eq('status', 'active')
+      .order('full_name');
+
+    if (search) {
+      query = query.or(`full_name.ilike.%${search}%,code.ilike.%${search}%`);
+    }
+
+    const { data: employees, error } = await query;
+    if (error) throw error;
+
+    // Lấy danh sách đã có access
+    const { data: accessList } = await supabase
+      .from('purchase_access')
+      .select('employee_id, access_level')
+      .eq('is_active', true);
+
+    const accessMap = new Map(
+      (accessList || []).map((a: any) => [a.employee_id, a.access_level as AccessLevel])
+    );
+
+    // Map kết quả — lọc bỏ executive (level ≤ 5) vì họ đã có quyền tự động
+    return (employees || [])
+      .map((emp: any) => {
+        const position = Array.isArray(emp.position) ? emp.position[0] : emp.position;
+        const department = Array.isArray(emp.department) ? emp.department[0] : emp.department;
+        const level = position?.level ?? null;
+
+        return {
+          id: emp.id,
+          code: emp.code,
+          full_name: emp.full_name,
+          avatar_url: emp.avatar_url,
+          position_name: position?.name || null,
+          department_name: department?.name || null,
+          position_level: level,
+          already_has_access: accessMap.has(emp.id),
+          current_access_level: accessMap.get(emp.id) || null,
+        };
+      })
+      .filter(emp => !emp.position_level || emp.position_level > 5);
+  },
+
+  // ==========================================================================
+  // STATISTICS
+  // ==========================================================================
+
+  /**
+   * Lấy thống kê access (cho AccessManagementPage header)
+   */
+  async getStats(): Promise<AccessStats> {
+    console.log('📊 [purchaseAccess] getStats');
+
+    try {
+      const { data, error } = await supabase.rpc('fn_purchase_access_stats');
+
+      if (!error && data && data.length > 0) {
+        return data[0] as AccessStats;
+      }
+    } catch (err) {
+      console.warn('⚠️ [purchaseAccess] fn_purchase_access_stats failed:', err);
+    }
+
+    // Fallback
+    const { data: activeAccess } = await supabase
+      .from('purchase_access')
+      .select('access_level, is_active');
+
+    // Đếm executive qua join positions
+    const { data: executives } = await supabase
+      .from('employees')
+      .select('id, position:position_id(level)')
+      .eq('status', 'active');
+
+    const executiveCount = (executives || []).filter((e: any) => {
+      const pos = Array.isArray(e.position) ? e.position[0] : e.position;
+      return pos?.level && pos.level <= 5;
+    }).length;
+
+    const all = activeAccess || [];
+    const active = all.filter((a: any) => a.is_active);
+
+    return {
+      total_granted: active.length,
+      active_full: active.filter((a: any) => a.access_level === 'full').length,
+      active_view_only: active.filter((a: any) => a.access_level === 'view_only').length,
+      revoked_count: all.filter((a: any) => !a.is_active).length,
+      executive_count: executiveCount || 0,
     };
-    return colors[type] || 'gray';
-  }
+  },
 };
-
-
-// ============================================
-// EXPORT
-// ============================================
 
 export default purchaseAccessService;

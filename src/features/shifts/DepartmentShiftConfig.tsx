@@ -1,5 +1,5 @@
 // ============================================================
-// DEPARTMENT SHIFT CONFIG - Cấu hình phòng ban ↔ ca
+// DEPARTMENT SHIFT CONFIG - Cấu hình phòng ban ↔ ca (RESPONSIVE)
 // File: src/features/shifts/DepartmentShiftConfig.tsx
 // ============================================================
 
@@ -29,8 +29,8 @@ interface Department {
 
 interface ConfigMap {
   [deptId: string]: {
-    shifts: Set<string>;     // shift IDs enabled
-    defaultShift: string;    // shift ID that is default
+    shifts: Set<string>;
+    defaultShift: string;
   };
 }
 
@@ -81,7 +81,7 @@ export function DepartmentShiftConfig() {
 
   const shifts = shiftsData || [];
   const deptList = (departments?.data || []).filter(
-    (d: Department) => d.code !== 'HAP-BGD'  // Bỏ Ban Giám đốc
+    (d: Department) => d.code !== 'HAP-BGD'
   );
 
   // Build initial config map from existing data
@@ -115,20 +115,12 @@ export function DepartmentShiftConfig() {
       
       if (newShifts.has(shiftId)) {
         newShifts.delete(shiftId);
-        // Nếu xóa shift mặc định → clear default
         const newDefault = dept.defaultShift === shiftId ? '' : dept.defaultShift;
-        return { 
-          ...prev, 
-          [deptId]: { shifts: newShifts, defaultShift: newDefault } 
-        };
+        return { ...prev, [deptId]: { shifts: newShifts, defaultShift: newDefault } };
       } else {
         newShifts.add(shiftId);
-        // Nếu chưa có default → set cái vừa thêm làm default
         const newDefault = dept.defaultShift || shiftId;
-        return { 
-          ...prev, 
-          [deptId]: { shifts: newShifts, defaultShift: newDefault } 
-        };
+        return { ...prev, [deptId]: { shifts: newShifts, defaultShift: newDefault } };
       }
     });
     setHasChanges(true);
@@ -138,10 +130,7 @@ export function DepartmentShiftConfig() {
   const setDefaultShift = (deptId: string, shiftId: string) => {
     setConfigMap(prev => ({
       ...prev,
-      [deptId]: {
-        ...prev[deptId],
-        defaultShift: shiftId,
-      },
+      [deptId]: { ...prev[deptId], defaultShift: shiftId },
     }));
     setHasChanges(true);
   };
@@ -153,16 +142,11 @@ export function DepartmentShiftConfig() {
       const allShiftIds = shifts.map(s => s.id);
       
       if (dept.shifts.size === allShiftIds.length) {
-        // Deselect all
         return { ...prev, [deptId]: { shifts: new Set(), defaultShift: '' } };
       } else {
-        // Select all
         return { 
           ...prev, 
-          [deptId]: { 
-            shifts: new Set(allShiftIds), 
-            defaultShift: dept.defaultShift || allShiftIds[0] 
-          } 
+          [deptId]: { shifts: new Set(allShiftIds), defaultShift: dept.defaultShift || allShiftIds[0] } 
         };
       }
     });
@@ -214,22 +198,22 @@ export function DepartmentShiftConfig() {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 size={24} className="animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-500">Đang tải cấu hình...</span>
+        <span className="ml-2 text-gray-500 text-sm">Đang tải cấu hình...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Info Banner */}
-      <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
-        <Info size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
-        <div className="text-sm text-blue-800">
+      <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-100">
+        <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0 sm:w-[18px] sm:h-[18px]" />
+        <div className="text-xs sm:text-sm text-blue-800">
           <p className="font-medium">Hướng dẫn:</p>
           <ul className="mt-1 space-y-0.5 text-blue-700">
             <li>☑️ Checkbox = phòng ban được phép sử dụng ca này</li>
             <li>⭐ Radio = ca mặc định khi phân ca nhanh</li>
-            <li>Ban Giám đốc không hiển thị (không cần phân ca)</li>
+            <li className="hidden sm:list-item">Ban Giám đốc không hiển thị (không cần phân ca)</li>
           </ul>
         </div>
       </div>
@@ -239,16 +223,16 @@ export function DepartmentShiftConfig() {
         <div className="flex items-center justify-end">
           <button
             onClick={saveAll}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors"
           >
-            <Save size={16} />
-            Lưu tất cả thay đổi
+            <Save size={14} className="sm:w-4 sm:h-4" />
+            Lưu tất cả
           </button>
         </div>
       )}
 
-      {/* Config Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* === DESKTOP: Config Table (hidden on small screens) === */}
+      <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -299,7 +283,6 @@ export function DepartmentShiftConfig() {
 
                 return (
                   <tr key={dept.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                    {/* Department Name */}
                     <td className="px-4 py-3 sticky left-0 bg-white z-10">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -312,7 +295,6 @@ export function DepartmentShiftConfig() {
                       </div>
                     </td>
 
-                    {/* Shift Checkboxes + Default Radio */}
                     {shifts.map(shift => {
                       const isEnabled = deptConfig.shifts.has(shift.id);
                       const isDefault = deptConfig.defaultShift === shift.id;
@@ -320,7 +302,6 @@ export function DepartmentShiftConfig() {
                       return (
                         <td key={shift.id} className="px-2 py-3 text-center border-l border-gray-100">
                           <div className="flex flex-col items-center gap-1">
-                            {/* Enable checkbox */}
                             <label className="cursor-pointer">
                               <input
                                 type="checkbox"
@@ -329,13 +310,8 @@ export function DepartmentShiftConfig() {
                                 className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
                               />
                             </label>
-
-                            {/* Default radio (only show if enabled) */}
                             {isEnabled && (
-                              <label 
-                                className="cursor-pointer flex items-center gap-0.5"
-                                title="Ca mặc định"
-                              >
+                              <label className="cursor-pointer flex items-center gap-0.5" title="Ca mặc định">
                                 <input
                                   type="radio"
                                   name={`default-${dept.id}`}
@@ -343,9 +319,7 @@ export function DepartmentShiftConfig() {
                                   onChange={() => setDefaultShift(dept.id, shift.id)}
                                   className="w-3 h-3 text-amber-500 border-gray-300 focus:ring-amber-500 cursor-pointer"
                                 />
-                                {isDefault && (
-                                  <span className="text-[10px] text-amber-600">⭐</span>
-                                )}
+                                {isDefault && <span className="text-[10px] text-amber-600">⭐</span>}
                               </label>
                             )}
                           </div>
@@ -353,10 +327,8 @@ export function DepartmentShiftConfig() {
                       );
                     })}
 
-                    {/* Actions */}
                     <td className="px-3 py-3 text-center border-l border-gray-200">
                       <div className="flex items-center justify-center gap-1">
-                        {/* Toggle all */}
                         <button
                           onClick={() => toggleAllForDept(dept.id)}
                           className={`px-2 py-1 text-xs rounded transition-colors ${
@@ -368,8 +340,6 @@ export function DepartmentShiftConfig() {
                         >
                           {allSelected ? '✓ Tất cả' : 'Tất cả'}
                         </button>
-
-                        {/* Save button */}
                         <button
                           onClick={() => saveDepartment(dept.id)}
                           disabled={isSaving}
@@ -380,13 +350,7 @@ export function DepartmentShiftConfig() {
                           }`}
                           title="Lưu phòng ban này"
                         >
-                          {isSaving ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : isSuccess ? (
-                            <Check size={14} />
-                          ) : (
-                            <Save size={14} />
-                          )}
+                          {isSaving ? <Loader2 size={14} className="animate-spin" /> : isSuccess ? <Check size={14} /> : <Save size={14} />}
                         </button>
                       </div>
                     </td>
@@ -398,22 +362,115 @@ export function DepartmentShiftConfig() {
         </div>
       </div>
 
+      {/* === MOBILE: Card view for each department (hidden on md+) === */}
+      <div className="md:hidden space-y-3">
+        {deptList.map((dept: Department) => {
+          const deptConfig = configMap[dept.id] || { shifts: new Set(), defaultShift: '' };
+          const allSelected = deptConfig.shifts.size === shifts.length;
+          const isSaving = savingDept === dept.id;
+          const isSuccess = successDept === dept.id;
+
+          return (
+            <div key={dept.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* Department Header */}
+              <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <Building2 size={12} className="text-gray-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900 text-sm truncate">{dept.name}</div>
+                    <div className="text-[10px] text-gray-400">{dept.code}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => toggleAllForDept(dept.id)}
+                    className={`px-2 py-1 text-[10px] rounded transition-colors ${
+                      allSelected ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {allSelected ? '✓ Tất cả' : 'Tất cả'}
+                  </button>
+                  <button
+                    onClick={() => saveDepartment(dept.id)}
+                    disabled={isSaving}
+                    className={`p-1.5 rounded transition-colors ${
+                      isSuccess ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    {isSaving ? <Loader2 size={12} className="animate-spin" /> : isSuccess ? <Check size={12} /> : <Save size={12} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Shifts Grid */}
+              <div className="p-3 grid grid-cols-2 gap-2">
+                {shifts.map(shift => {
+                  const isEnabled = deptConfig.shifts.has(shift.id);
+                  const isDefault = deptConfig.defaultShift === shift.id;
+                  const catColor = CATEGORY_COLORS[shift.shift_category] || '';
+
+                  return (
+                    <div
+                      key={shift.id}
+                      className={`rounded-lg border p-2 transition-colors ${
+                        isEnabled
+                          ? 'border-blue-200 bg-blue-50/50'
+                          : 'border-gray-100 bg-gray-50/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <label className="flex items-center gap-1.5 cursor-pointer min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={() => toggleShift(dept.id, shift.id)}
+                            className="w-3.5 h-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                          />
+                          <span className="text-xs font-medium text-gray-800 truncate">{shift.name}</span>
+                        </label>
+                        {isEnabled && (
+                          <label className="cursor-pointer flex items-center gap-0.5 flex-shrink-0" title="Mặc định">
+                            <input
+                              type="radio"
+                              name={`m-default-${dept.id}`}
+                              checked={isDefault}
+                              onChange={() => setDefaultShift(dept.id, shift.id)}
+                              className="w-3 h-3 text-amber-500 border-gray-300 cursor-pointer"
+                            />
+                            {isDefault && <span className="text-[10px]">⭐</span>}
+                          </label>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-gray-400 pl-5">
+                        {shift.start_time?.substring(0, 5)}-{shift.end_time?.substring(0, 5)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
         {deptList.map((dept: Department) => {
           const config = configMap[dept.id];
           const count = config?.shifts?.size || 0;
           const defaultShift = shifts.find(s => s.id === config?.defaultShift);
 
           return (
-            <div key={dept.id} className="px-4 py-3 bg-white rounded-lg border border-gray-200">
-              <div className="text-sm font-medium text-gray-900 truncate">{dept.name}</div>
-              <div className="flex items-center justify-between mt-1">
-                <span className={`text-xs ${count > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div key={dept.id} className="px-3 sm:px-4 py-2.5 sm:py-3 bg-white rounded-lg border border-gray-200">
+              <div className="text-xs sm:text-sm font-medium text-gray-900 truncate">{dept.name}</div>
+              <div className="flex items-center justify-between mt-0.5 sm:mt-1 gap-1">
+                <span className={`text-[10px] sm:text-xs ${count > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
                   {count > 0 ? `${count} ca` : 'Chưa cấu hình'}
                 </span>
                 {defaultShift && (
-                  <span className="text-xs text-amber-600">⭐ {defaultShift.name}</span>
+                  <span className="text-[10px] sm:text-xs text-amber-600 truncate">⭐ {defaultShift.name}</span>
                 )}
               </div>
             </div>

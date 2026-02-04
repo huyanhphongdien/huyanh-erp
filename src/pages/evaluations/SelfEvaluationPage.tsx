@@ -1,9 +1,10 @@
 // ============================================================================
-// SELF EVALUATION PAGE - STANDALONE VERSION
+// SELF EVALUATION PAGE - STANDALONE VERSION (RESPONSIVE)
 // File: src/pages/evaluations/SelfEvaluationPage.tsx
 // Huy Anh ERP System
 // ============================================================================
 // STANDALONE: Tích hợp Form và List trong cùng file, không cần import external
+// RESPONSIVE: Mobile-first design with Tailwind breakpoints
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -181,17 +182,14 @@ export const SelfEvaluationPage: React.FC = () => {
   // EFFECTS
   // ============================================================================
 
-  // Check URL params for task_id
   useEffect(() => {
     const taskIdFromUrl = searchParams.get('task_id');
-    
     if (taskIdFromUrl && employeeId) {
       console.log('📝 [SelfEvaluationPage] task_id from URL:', taskIdFromUrl);
       loadTaskById(taskIdFromUrl);
     }
   }, [searchParams, employeeId]);
 
-  // Check location state
   useEffect(() => {
     const state = location.state as { selectedTaskId?: string; selectedTask?: MyTask } | null;
     if (state?.selectedTask) {
@@ -203,21 +201,18 @@ export const SelfEvaluationPage: React.FC = () => {
     }
   }, [location.state, employeeId]);
 
-  // Load evaluations on mount
   useEffect(() => {
     if (employeeId) {
       loadEvaluations();
     }
   }, [employeeId]);
 
-  // Load completed tasks when select-task mode
   useEffect(() => {
     if (mode === 'select-task' && employeeId) {
       loadCompletedTasks();
     }
   }, [mode, employeeId]);
 
-  // Clear success message
   useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => setSuccessMessage(null), 5000);
@@ -245,7 +240,6 @@ export const SelfEvaluationPage: React.FC = () => {
 
       if (taskError) throw new Error('Không tìm thấy công việc');
 
-      // Check completed
       const isFinished = task.status === 'finished' || task.status === 'completed' || task.progress >= 100;
       if (!isFinished) {
         setError(`Công việc chưa hoàn thành (tiến độ: ${task.progress}%). Vui lòng hoàn thành trước khi tự đánh giá.`);
@@ -253,7 +247,6 @@ export const SelfEvaluationPage: React.FC = () => {
         return;
       }
 
-      // Check existing evaluation
       const { data: existingEval } = await supabase
         .from('task_self_evaluations')
         .select('id, status')
@@ -425,8 +418,6 @@ export const SelfEvaluationPage: React.FC = () => {
     setError(null);
 
     try {
-      // CHỈ INSERT các columns chắc chắn tồn tại trong database
-      // Bỏ: completion_percentage, revision_count, submitted_at (không có trong DB)
       const insertData = {
         task_id: selectedTask.id,
         employee_id: employeeId,
@@ -453,9 +444,6 @@ export const SelfEvaluationPage: React.FC = () => {
 
       console.log('✅ Inserted:', data);
 
-      // KHÔNG update tasks.evaluation_status vì constraint không cho phép giá trị 'pending_approval'
-      // Nếu cần, hãy kiểm tra các giá trị hợp lệ trong database constraint
-
       setSuccessMessage('Đã gửi tự đánh giá thành công!');
       setSelectedTask(null);
       setMode('list');
@@ -477,7 +465,6 @@ export const SelfEvaluationPage: React.FC = () => {
     setError(null);
 
     try {
-      // Bỏ: completion_percentage, revision_count, submitted_at (không có trong DB)
       const updateData: any = {
         self_score: formData.self_score,
         quality_assessment: calculateRating(formData.self_score),
@@ -487,7 +474,6 @@ export const SelfEvaluationPage: React.FC = () => {
         recommendations: formData.recommendations || null,
       };
 
-      // Nếu đang revision_requested, chuyển về pending
       if (selectedEvaluation.status === 'revision_requested') {
         updateData.status = 'pending';
       }
@@ -584,13 +570,14 @@ export const SelfEvaluationPage: React.FC = () => {
   // ============================================================================
 
   const renderSelectTask = () => (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Chọn công việc để đánh giá</h2>
-          <p className="text-sm text-gray-500 mt-1">Chọn công việc đã hoàn thành để tự đánh giá</p>
+    <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 mb-4 md:mb-6">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Chọn công việc để đánh giá</h2>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">Chọn công việc đã hoàn thành để tự đánh giá</p>
         </div>
-        <button onClick={handleCancel} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+        <button onClick={handleCancel} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg flex-shrink-0">
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -600,29 +587,29 @@ export const SelfEvaluationPage: React.FC = () => {
           <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
         </div>
       ) : completedTasks.length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">Không có công việc nào cần tự đánh giá</p>
-          <p className="text-sm text-gray-400 mt-1">Hoàn thành công việc (100%) để có thể tự đánh giá</p>
+        <div className="text-center py-8 md:py-12">
+          <FileText className="w-10 h-10 md:w-12 md:h-12 text-gray-300 mx-auto mb-3 md:mb-4" />
+          <p className="text-gray-500 text-sm md:text-base">Không có công việc nào cần tự đánh giá</p>
+          <p className="text-xs sm:text-sm text-gray-400 mt-1">Hoàn thành công việc (100%) để có thể tự đánh giá</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {completedTasks.map((task) => (
             <button
               key={task.id}
               onClick={() => handleSelectTask(task)}
-              className="w-full p-4 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg text-left transition-colors"
+              className="w-full p-3 sm:p-4 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg text-left transition-colors"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-xs font-mono text-gray-500">{task.code}</span>
                     <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">{task.progress}%</span>
                   </div>
-                  <p className="font-medium text-gray-900">{task.name}</p>
-                  {task.department?.name && <p className="text-sm text-gray-500">{task.department.name}</p>}
+                  <p className="font-medium text-gray-900 text-sm sm:text-base line-clamp-2">{task.name}</p>
+                  {task.department?.name && <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{task.department.name}</p>}
                 </div>
-                <div className="text-blue-600">→</div>
+                <div className="text-blue-600 flex-shrink-0">→</div>
               </div>
             </button>
           ))}
@@ -640,30 +627,31 @@ export const SelfEvaluationPage: React.FC = () => {
     const task = isEditMode ? selectedEvaluation?.task : selectedTask;
 
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={handleCancel} className="p-2 hover:bg-gray-100 rounded-lg">
-            <ArrowLeft className="w-5 h-5" />
+      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+        {/* Header */}
+        <div className="flex items-center gap-2 sm:gap-3 mb-4 md:mb-6">
+          <button onClick={handleCancel} className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg flex-shrink-0">
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
             {isEditMode ? 'Chỉnh sửa tự đánh giá' : 'Tạo tự đánh giá mới'}
           </h2>
         </div>
 
         {/* Task Info */}
         {task && (
-          <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <FileText className="w-5 h-5 text-blue-600" />
+          <div className="bg-gray-50 rounded-xl p-3 sm:p-4 mb-4 md:mb-6 border border-gray-200">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-500">Công việc đang đánh giá</p>
-                <p className="font-semibold text-gray-900">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">Công việc đang đánh giá</p>
+                <p className="font-semibold text-gray-900 text-sm sm:text-base">
                   {task.code && <span className="text-gray-500 mr-2">{task.code}</span>}
                   {task.name || task.title}
                 </p>
-                {task.department?.name && <p className="text-sm text-gray-500 mt-1">Phòng: {task.department.name}</p>}
+                {task.department?.name && <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">Phòng: {task.department.name}</p>}
               </div>
             </div>
           </div>
@@ -671,24 +659,24 @@ export const SelfEvaluationPage: React.FC = () => {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            <p className="text-red-700">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 mb-4 md:mb-6 flex items-start sm:items-center gap-2 sm:gap-3">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+            <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
 
         {/* Form Content */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Section 1: Scores */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-600" />
+          <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Target className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               Kết quả công việc
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {/* Completion */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                   Tỷ lệ hoàn thành (%) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -697,9 +685,9 @@ export const SelfEvaluationPage: React.FC = () => {
                   max={100}
                   value={formData.completion_percentage}
                   onChange={(e) => handleFormChange('completion_percentage', parseInt(e.target.value) || 0)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.completion_percentage ? 'border-red-300' : 'border-gray-300'}`}
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base ${formErrors.completion_percentage ? 'border-red-300' : 'border-gray-300'}`}
                 />
-                {formErrors.completion_percentage && <p className="text-sm text-red-500 mt-1">{formErrors.completion_percentage}</p>}
+                {formErrors.completion_percentage && <p className="text-xs sm:text-sm text-red-500 mt-1">{formErrors.completion_percentage}</p>}
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                   <div className={`h-2 rounded-full ${formData.completion_percentage >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(formData.completion_percentage, 100)}%` }} />
                 </div>
@@ -707,7 +695,7 @@ export const SelfEvaluationPage: React.FC = () => {
 
               {/* Score */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                   Điểm tự đánh giá (0-100) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -716,9 +704,9 @@ export const SelfEvaluationPage: React.FC = () => {
                   max={100}
                   value={formData.self_score}
                   onChange={(e) => handleFormChange('self_score', parseInt(e.target.value) || 0)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.self_score ? 'border-red-300' : 'border-gray-300'}`}
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base ${formErrors.self_score ? 'border-red-300' : 'border-gray-300'}`}
                 />
-                {formErrors.self_score && <p className="text-sm text-red-500 mt-1">{formErrors.self_score}</p>}
+                {formErrors.self_score && <p className="text-xs sm:text-sm text-red-500 mt-1">{formErrors.self_score}</p>}
                 <input
                   type="range"
                   min={0}
@@ -727,7 +715,7 @@ export const SelfEvaluationPage: React.FC = () => {
                   onChange={(e) => handleFormChange('self_score', parseInt(e.target.value))}
                   className="w-full mt-2"
                 />
-                <p className={`text-sm font-medium mt-1 ${getScoreColor(formData.self_score)}`}>
+                <p className={`text-xs sm:text-sm font-medium mt-1 ${getScoreColor(formData.self_score)}`}>
                   Xếp loại: {QUALITY_CONFIG[calculateRating(formData.self_score)]?.label}
                 </p>
               </div>
@@ -735,38 +723,38 @@ export const SelfEvaluationPage: React.FC = () => {
           </div>
 
           {/* Section 2: Quality */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Award className="w-5 h-5 text-yellow-600" />
+          <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
               Đánh giá chất lượng <span className="text-red-500">*</span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               {QUALITY_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   onClick={() => handleFormChange('quality_assessment', option.value)}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                     formData.quality_assessment === option.value
                       ? option.color + ' border-current'
                       : 'bg-white border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold">{option.label}</span>
-                    {formData.quality_assessment === option.value && <CheckCircle className="w-5 h-5" />}
+                  <div className="flex items-center justify-between mb-0.5 sm:mb-1">
+                    <span className="font-semibold text-sm sm:text-base">{option.label}</span>
+                    {formData.quality_assessment === option.value && <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
                   </div>
-                  <p className="text-sm opacity-75">{option.description}</p>
+                  <p className="text-xs sm:text-sm opacity-75 hidden sm:block">{option.description}</p>
                 </button>
               ))}
             </div>
-            {formErrors.quality_assessment && <p className="text-sm text-red-500 mt-2">{formErrors.quality_assessment}</p>}
+            {formErrors.quality_assessment && <p className="text-xs sm:text-sm text-red-500 mt-2">{formErrors.quality_assessment}</p>}
           </div>
 
           {/* Section 3: Achievements */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Star className="w-5 h-5 text-amber-500" />
+          <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Star className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
               Thành tích đạt được
             </h3>
             <textarea
@@ -774,44 +762,44 @@ export const SelfEvaluationPage: React.FC = () => {
               onChange={(e) => handleFormChange('achievements', e.target.value)}
               rows={3}
               placeholder="Mô tả các thành tích, kết quả nổi bật..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none text-sm sm:text-base"
             />
           </div>
 
           {/* Section 4: Difficulties & Solutions */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-orange-500" />
+          <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
               Khó khăn & Giải pháp
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Khó khăn gặp phải</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Khó khăn gặp phải</label>
                 <textarea
                   value={formData.difficulties}
                   onChange={(e) => handleFormChange('difficulties', e.target.value)}
                   rows={3}
                   placeholder="Mô tả các khó khăn, thách thức..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none text-sm sm:text-base"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Giải pháp đã áp dụng</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Giải pháp đã áp dụng</label>
                 <textarea
                   value={formData.solutions}
                   onChange={(e) => handleFormChange('solutions', e.target.value)}
                   rows={3}
                   placeholder="Mô tả các giải pháp đã áp dụng..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none text-sm sm:text-base"
                 />
               </div>
             </div>
           </div>
 
           {/* Section 5: Recommendations */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Lightbulb className="w-5 h-5 text-green-500" />
+          <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+              <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
               Đề xuất & Kiến nghị
             </h3>
             <textarea
@@ -819,17 +807,17 @@ export const SelfEvaluationPage: React.FC = () => {
               onChange={(e) => handleFormChange('recommendations', e.target.value)}
               rows={3}
               placeholder="Các đề xuất, kiến nghị để cải thiện..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none text-sm sm:text-base"
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+          {/* Actions - Submit button on top for mobile */}
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={handleCancel}
               disabled={isSubmitting}
-              className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 sm:px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm sm:text-base"
             >
               Hủy
             </button>
@@ -837,7 +825,7 @@ export const SelfEvaluationPage: React.FC = () => {
               type="button"
               onClick={isEditMode ? handleUpdate : handleCreate}
               disabled={isSubmitting}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base"
             >
               {isSubmitting ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -863,68 +851,69 @@ export const SelfEvaluationPage: React.FC = () => {
     const qualityConfig = QUALITY_CONFIG[selectedEvaluation.quality_assessment] || QUALITY_CONFIG.average;
 
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Chi tiết tự đánh giá</h2>
-          <button onClick={handleCancel} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-4 md:mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Chi tiết tự đánh giá</h2>
+          <button onClick={handleCancel} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* Task Info */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Thông tin công việc</h3>
-            <p className="text-sm text-gray-600">
+          <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+            <h3 className="font-medium text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Thông tin công việc</h3>
+            <p className="text-xs sm:text-sm text-gray-600">
               {selectedEvaluation.task?.code} - {selectedEvaluation.task?.name}
             </p>
           </div>
 
           {/* Scores */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{selectedEvaluation.completion_percentage}%</div>
-              <div className="text-sm text-gray-500">Hoàn thành</div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
+              <div className="text-lg sm:text-2xl font-bold text-blue-600">{selectedEvaluation.completion_percentage}%</div>
+              <div className="text-xs text-gray-500">Hoàn thành</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <div className={`text-2xl font-bold ${getScoreColor(selectedEvaluation.self_score)}`}>{selectedEvaluation.self_score}</div>
-              <div className="text-sm text-gray-500">Điểm tự ĐG</div>
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
+              <div className={`text-lg sm:text-2xl font-bold ${getScoreColor(selectedEvaluation.self_score)}`}>{selectedEvaluation.self_score}</div>
+              <div className="text-xs text-gray-500">Điểm tự ĐG</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <span className={`px-2 py-1 rounded text-sm font-medium ${qualityConfig.bg} ${qualityConfig.color}`}>{qualityConfig.label}</span>
-              <div className="text-sm text-gray-500 mt-1">Xếp loại</div>
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
+              <span className={`inline-block px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-xs sm:text-sm font-medium ${qualityConfig.bg} ${qualityConfig.color}`}>{qualityConfig.label}</span>
+              <div className="text-xs text-gray-500 mt-1">Xếp loại</div>
             </div>
           </div>
 
           {/* Text fields */}
           {selectedEvaluation.achievements && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-medium text-gray-700 mb-2">Thành tích đạt được</h4>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.achievements}</p>
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+              <h4 className="font-medium text-gray-700 mb-1 sm:mb-2 text-sm">Thành tích đạt được</h4>
+              <p className="text-xs sm:text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.achievements}</p>
             </div>
           )}
           {selectedEvaluation.difficulties && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-medium text-gray-700 mb-2">Khó khăn gặp phải</h4>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.difficulties}</p>
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+              <h4 className="font-medium text-gray-700 mb-1 sm:mb-2 text-sm">Khó khăn gặp phải</h4>
+              <p className="text-xs sm:text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.difficulties}</p>
             </div>
           )}
           {selectedEvaluation.solutions && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-medium text-gray-700 mb-2">Giải pháp đã áp dụng</h4>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.solutions}</p>
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+              <h4 className="font-medium text-gray-700 mb-1 sm:mb-2 text-sm">Giải pháp đã áp dụng</h4>
+              <p className="text-xs sm:text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.solutions}</p>
             </div>
           )}
           {selectedEvaluation.recommendations && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="font-medium text-gray-700 mb-2">Đề xuất, kiến nghị</h4>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.recommendations}</p>
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+              <h4 className="font-medium text-gray-700 mb-1 sm:mb-2 text-sm">Đề xuất, kiến nghị</h4>
+              <p className="text-xs sm:text-sm text-gray-600 whitespace-pre-wrap">{selectedEvaluation.recommendations}</p>
             </div>
           )}
 
           {/* Status */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Trạng thái:</span>
+            <span className="text-xs sm:text-sm text-gray-500">Trạng thái:</span>
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
               {statusConfig.icon}
               {statusConfig.label}
@@ -932,16 +921,16 @@ export const SelfEvaluationPage: React.FC = () => {
           </div>
 
           {/* Timestamps */}
-          <div className="text-sm text-gray-500 border-t pt-4 mt-4">
+          <div className="text-xs sm:text-sm text-gray-500 border-t pt-3 sm:pt-4 mt-3 sm:mt-4">
             {selectedEvaluation.submitted_at && <p>Ngày gửi: {formatDate(selectedEvaluation.submitted_at)}</p>}
             {selectedEvaluation.revision_count > 0 && <p>Số lần chỉnh sửa: {selectedEvaluation.revision_count}</p>}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
-            <button onClick={handleCancel} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Đóng</button>
+          {/* Actions - responsive */}
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t">
+            <button onClick={handleCancel} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base">Đóng</button>
             {(selectedEvaluation.status === 'pending' || selectedEvaluation.status === 'revision_requested') && (
-              <button onClick={() => handleEdit(selectedEvaluation)} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">Chỉnh sửa</button>
+              <button onClick={() => handleEdit(selectedEvaluation)} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 text-sm sm:text-base">Chỉnh sửa</button>
             )}
           </div>
         </div>
@@ -954,17 +943,17 @@ export const SelfEvaluationPage: React.FC = () => {
   // ============================================================================
 
   const renderList = () => (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
           <input
             type="text"
             placeholder="Tìm kiếm theo tên công việc..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 sm:pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
           />
         </div>
         <div className="relative">
@@ -972,7 +961,7 @@ export const SelfEvaluationPage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full sm:w-auto pl-9 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-sm sm:text-base"
           >
             <option value="all">Tất cả trạng thái</option>
             {Object.entries(STATUS_CONFIG).map(([key, config]) => (
@@ -984,76 +973,80 @@ export const SelfEvaluationPage: React.FC = () => {
 
       {/* Empty state */}
       {filteredEvaluations.length === 0 ? (
-        <div className="bg-gray-50 rounded-xl p-8 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText className="w-8 h-8 text-gray-400" />
+        <div className="bg-gray-50 rounded-xl p-6 md:p-8 text-center">
+          <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
+            <FileText className="w-6 h-6 md:w-8 md:h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-1">Chưa có tự đánh giá nào</h3>
-          <p className="text-sm text-gray-500">
+          <h3 className="text-base md:text-lg font-medium text-gray-900 mb-1">Chưa có tự đánh giá nào</h3>
+          <p className="text-xs sm:text-sm text-gray-500">
             {searchTerm || statusFilter !== 'all' ? 'Thử thay đổi bộ lọc để xem thêm' : 'Hoàn thành công việc để bắt đầu tự đánh giá'}
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {filteredEvaluations.map((evaluation) => {
             const statusConfig = STATUS_CONFIG[evaluation.status] || STATUS_CONFIG.pending;
             const qualityConfig = QUALITY_CONFIG[evaluation.quality_assessment] || QUALITY_CONFIG.average;
             const canEditDelete = evaluation.status === 'pending' || evaluation.status === 'revision_requested';
 
             return (
-              <div key={evaluation.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  {/* Task Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+              <div key={evaluation.id} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 hover:shadow-md transition-shadow">
+                {/* Mobile Layout */}
+                <div className="space-y-3">
+                  {/* Task Info Row */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-mono text-gray-500">{evaluation.task?.code}</span>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
                         {statusConfig.icon}
                         {statusConfig.label}
                       </span>
                     </div>
-                    <h3 className="font-medium text-gray-900 truncate">{evaluation.task?.name}</h3>
-                    {evaluation.task?.department?.name && <p className="text-sm text-gray-500">{evaluation.task.department.name}</p>}
+                    <h3 className="font-medium text-gray-900 text-sm sm:text-base line-clamp-2">{evaluation.task?.name}</h3>
+                    {evaluation.task?.department?.name && <p className="text-xs sm:text-sm text-gray-500">{evaluation.task.department.name}</p>}
                   </div>
 
-                  {/* Scores */}
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-blue-600">{evaluation.completion_percentage}%</div>
-                      <div className="text-xs text-gray-500">Hoàn thành</div>
+                  {/* Scores + Date + Actions Row */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    {/* Scores - inline */}
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="text-center">
+                        <div className="text-sm sm:text-lg font-bold text-blue-600">{evaluation.completion_percentage}%</div>
+                        <div className="text-[10px] sm:text-xs text-gray-500">Hoàn thành</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-sm sm:text-lg font-bold ${getScoreColor(evaluation.self_score)}`}>{evaluation.self_score}</div>
+                        <div className="text-[10px] sm:text-xs text-gray-500">Điểm</div>
+                      </div>
+                      <div className="text-center">
+                        <span className={`inline-block px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium ${qualityConfig.bg} ${qualityConfig.color}`}>{qualityConfig.label}</span>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <div className={`text-lg font-bold ${getScoreColor(evaluation.self_score)}`}>{evaluation.self_score}</div>
-                      <div className="text-xs text-gray-500">Điểm</div>
-                    </div>
-                    <div className="text-center">
-                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${qualityConfig.bg} ${qualityConfig.color}`}>{qualityConfig.label}</span>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <button onClick={() => handleView(evaluation)} className="p-1.5 sm:p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Xem chi tiết">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {canEditDelete && (
+                        <>
+                          <button onClick={() => handleEdit(evaluation)} className="p-1.5 sm:p-2 text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg" title="Chỉnh sửa">
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(evaluation)} className="p-1.5 sm:p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Xóa">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Date */}
-                  <div className="text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>{formatDate(evaluation.submitted_at || evaluation.created_at)}</span>
-                    </div>
-                    {evaluation.revision_count > 0 && <div className="text-xs text-orange-600 mt-1">Đã sửa {evaluation.revision_count} lần</div>}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => handleView(evaluation)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Xem chi tiết">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    {canEditDelete && (
-                      <>
-                        <button onClick={() => handleEdit(evaluation)} className="p-2 text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg" title="Chỉnh sửa">
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(evaluation)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Xóa">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </>
+                  {/* Date - always visible, compact */}
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <Calendar className="w-3 h-3" />
+                    <span>{formatDate(evaluation.submitted_at || evaluation.created_at)}</span>
+                    {evaluation.revision_count > 0 && (
+                      <span className="text-orange-500 ml-2">· Đã sửa {evaluation.revision_count} lần</span>
                     )}
                   </div>
                 </div>
@@ -1064,7 +1057,7 @@ export const SelfEvaluationPage: React.FC = () => {
       )}
 
       {filteredEvaluations.length > 0 && (
-        <div className="text-sm text-gray-500 text-center">
+        <div className="text-xs sm:text-sm text-gray-500 text-center">
           Hiển thị {filteredEvaluations.length} / {evaluations.length} tự đánh giá
         </div>
       )}
@@ -1088,7 +1081,7 @@ export const SelfEvaluationPage: React.FC = () => {
   // Loading state
   if (isLoading && mode === 'list' && evaluations.length === 0) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex items-center gap-3 text-gray-500">
             <RefreshCw className="w-5 h-5 animate-spin" />
@@ -1100,34 +1093,35 @@ export const SelfEvaluationPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tự đánh giá</h1>
-          <p className="text-gray-500 mt-1">Quản lý tự đánh giá công việc của bạn</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tự đánh giá</h1>
+          <p className="text-gray-500 mt-0.5 sm:mt-1 text-sm">Quản lý tự đánh giá công việc của bạn</p>
         </div>
         {mode === 'list' && (
-          <button onClick={handleStartCreate} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            <Plus className="w-5 h-5" />
-            Tạo tự đánh giá
+          <button onClick={handleStartCreate} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base w-full sm:w-auto">
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="sm:hidden">Tạo mới</span>
+            <span className="hidden sm:inline">Tạo tự đánh giá</span>
           </button>
         )}
       </div>
 
       {/* Success Message */}
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-500" />
-          <p className="text-green-700">{successMessage}</p>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 flex-shrink-0" />
+          <p className="text-green-700 text-sm">{successMessage}</p>
         </div>
       )}
 
       {/* Error Message (for list mode) */}
       {error && mode === 'list' && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500" />
-          <p className="text-red-700">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 flex items-start sm:items-center gap-2 sm:gap-3">
+          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+          <p className="text-red-700 text-sm">{error}</p>
         </div>
       )}
 

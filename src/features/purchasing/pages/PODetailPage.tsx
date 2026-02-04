@@ -1,5 +1,5 @@
 // ============================================================================
-// PO DETAIL PAGE - CẬP NHẬT PHASE P5
+// PO DETAIL PAGE - CẬP NHẬT PHASE P5 (HOÀN CHỈNH)
 // File: src/features/purchasing/pages/PODetailPage.tsx
 // Huy Anh ERP System
 // ============================================================================
@@ -8,6 +8,8 @@
 // - Confirm flow: bắt buộc upload ít nhất 1 file bằng chứng
 // - Workflow mới: draft → confirmed → partial → completed → cancelled
 // - Bỏ pending/approved/rejected
+// - ★ FIX-2: PaymentFormModal inline — bấm "Thanh toán" mở modal ngay,
+//   KHÔNG navigate đi nơi khác
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
@@ -49,8 +51,9 @@ import { OrderStatusBadge } from './components/orders/OrderStatusBadge';
 import { OrderInfoTab } from './components/orders/OrderInfoTab';
 import { OrderItemsTab } from './components/orders/OrderItemsTab';
 import { OrderHistoryTab } from './components/orders/OrderHistoryTab';
-import { OrderInvoiceTab } from './components/orders/OrderInvoiceTab';
+import OrderInvoiceTab from './components/orders/OrderInvoiceTab';
 import { AddInvoiceModal } from './components/orders/AddInvoiceModal';
+import PaymentFormModal from './components/payments/PaymentFormModal';
 
 // ============================================================================
 // CONSTANTS
@@ -407,6 +410,11 @@ function PODetailPage() {
   const [invoicePreSelectedSupplier, setInvoicePreSelectedSupplier] = useState<string | undefined>();
   const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
 
+  // ★ FIX-2: Payment modal state — thay thế navigate bằng inline modal
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
+  const [paymentInvoiceNumber, setPaymentInvoiceNumber] = useState<string>('');
+
   // ===== LOAD DATA =====
   const loadOrder = useCallback(async () => {
     if (!id) return;
@@ -535,8 +543,22 @@ function PODetailPage() {
     loadOrder(); // Reload to update status/progress
   };
 
-  const handlePayment = (invoiceId: string) => {
-    navigate(`/purchasing/invoices/${invoiceId}?tab=payment`);
+  // ★ FIX-2: Mở PaymentFormModal inline thay vì navigate đi nơi khác
+  const handlePayment = (invoiceId: string, invoiceNumber?: string) => {
+    setPaymentInvoiceId(invoiceId);
+    setPaymentInvoiceNumber(invoiceNumber || '');
+    setShowPaymentModal(true);
+  };
+
+  // ★ FIX-2: Callback khi thanh toán thành công
+  const handlePaymentSuccess = () => {
+    setShowPaymentModal(false);
+    setPaymentInvoiceId(null);
+    setPaymentInvoiceNumber('');
+    setSuccessMsg('Thanh toán đã được ghi nhận thành công');
+    // Refresh cả invoice tab và order data
+    setInvoiceRefreshKey((k) => k + 1);
+    loadOrder();
   };
 
   const handleViewInvoice = (invoiceId: string) => {
@@ -804,7 +826,7 @@ function PODetailPage() {
               orderStatus={order.status}
               onAddInvoice={handleAddInvoice}
               onPayment={handlePayment}
-              onViewInvoice={handleViewInvoice}
+              
               refreshKey={invoiceRefreshKey}
             />
           )}
@@ -848,6 +870,21 @@ function PODetailPage() {
         }}
         onSuccess={handleInvoiceCreated}
       />
+
+      {/* ★ FIX-2: PaymentFormModal inline */}
+      {showPaymentModal && paymentInvoiceId && (
+        <PaymentFormModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setPaymentInvoiceId(null);
+            setPaymentInvoiceNumber('');
+          }}
+          onSuccess={handlePaymentSuccess}
+          invoiceId={paymentInvoiceId}
+          invoiceNumber={paymentInvoiceNumber}
+        />
+      )}
     </div>
   );
 }

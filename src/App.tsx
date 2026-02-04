@@ -1,9 +1,9 @@
 // ============================================================
-// PHASE 5 UPDATE + CHẤM CÔNG V2: UPDATED APP.TSX
+// PHASE 6 UPDATE: UPDATED APP.TSX
 // File: src/App.tsx
 // ============================================================
 // CHANGES:
-// - Added Chấm công V2 routes: shifts, shift-assignments, overtime
+// - Added Phase 6 route: purchasing/access (AccessManagementPage)
 // - All previous routes preserved
 // ============================================================
 
@@ -72,8 +72,14 @@ import VariantAttributeManagement from './features/purchasing/pages/VariantAttri
 import POListPage from './features/purchasing/pages/POListPage';
 import POFormPage from './features/purchasing/pages/POFormPage';
 import PODetailPage from './features/purchasing/pages/PODetailPage';
+
+// ===== PHASE P5: Payments & Debt Tracking =====
+import InvoiceDetailPage from './features/purchasing/pages/InvoiceDetailPage';
 import SupplierDebtPage from './features/purchasing/pages/SupplierDebtPage';
 import PaymentListPage from './features/purchasing/pages/PaymentListPage';
+
+// ===== PHASE 6: Access Control =====
+import AccessManagementPage from './features/purchasing/pages/AccessManagementPage';
 
 // ============================================================
 // QUERY CLIENT
@@ -240,8 +246,12 @@ function App() {
                 <Route path="orders/new" element={<POFormPage />} />
                 <Route path="orders/:id" element={<PODetailPage />} />
                 <Route path="orders/:id/edit" element={<POFormPage />} />
+                {/* Phase P5: Invoice Detail, Debt, Payments */}
+                <Route path="invoices/:id" element={<InvoiceDetailPage />} />
                 <Route path="debt" element={<SupplierDebtPage />} />
                 <Route path="payments" element={<PaymentListPage />} />
+                {/* Phase 6: Access Control */}
+                <Route path="access" element={<AccessManagementPage />} />
               </Route>
 
               {/* ===== USER SETTINGS ===== */}

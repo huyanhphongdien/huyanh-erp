@@ -1,698 +1,891 @@
 // ============================================================================
-// PO LIST PAGE - CẬP NHẬT PHASE P5
-// File: src/features/purchasing/pages/POListPage.tsx
-// Huy Anh ERP System
+// PAYMENT LIST PAGE
+// File: src/features/purchasing/pages/PaymentListPage.tsx
+// Huy Anh ERP - Phase P5: Payments & Debt Tracking
 // ============================================================================
-// CẬP NHẬT:
-// - Status tabs mới: Tất cả / Nháp / Đã XN / Đang giao / Hoàn thành
-// - Cột tiến độ hiển thị % hóa đơn + % thanh toán thực tế
-// - Bỏ pending/approved/rejected (workflow cũ)
+// Route: /purchasing/payments
+// Trang lịch sử thanh toán — xem tất cả thanh toán, filter, thống kê
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Plus,
+  CreditCard,
   Search,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Pencil,
-  Trash2,
-  Clock,
-  CheckCircle2,
-  FileText,
-  MoreHorizontal,
-  X,
+  Filter,
+  RefreshCw,
   Calendar,
   Building2,
-  RefreshCw,
-  Package,
-  AlertCircle,
-  AlertTriangle,
-  Ban,
+  Banknote,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
   TrendingUp,
+  TrendingDown,
+  DollarSign,
+  AlertTriangle,
+  Clock,
   Loader2,
-  Filter,
-  ShoppingCart,
-  Receipt,
-  CreditCard,
+  ExternalLink,
+  Eye,
+  X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  User,
+  Hash,
 } from 'lucide-react';
-import {
-  purchaseOrderService,
-  type PurchaseOrder,
-} from '../../../services/purchaseOrderService';
-import { departmentService } from '../../../services/departmentService';
+import { invoicePaymentService } from '../../../services/invoicePaymentService';
+import type {
+  PaymentWithDetails,
+  PaymentStats,
+  PaginatedResponse,
+} from '../../../services/invoicePaymentService';
 
 // ============================================================================
-// TYPES & CONSTANTS
+// HELPERS
 // ============================================================================
 
-type OrderStatus = 'draft' | 'confirmed' | 'partial' | 'completed' | 'cancelled';
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  draft: 'Nháp',
-  confirmed: 'Đã xác nhận',
-  partial: 'Đang giao',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-};
-
-const STATUS_BADGE_CLASSES: Record<OrderStatus, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  confirmed: 'bg-blue-100 text-blue-700',
-  partial: 'bg-orange-100 text-orange-700',
-  completed: 'bg-green-100 text-green-700',
-  cancelled: 'bg-gray-100 text-gray-500',
-};
-
-const STATUS_ICONS: Record<OrderStatus, React.ElementType> = {
-  draft: FileText,
-  confirmed: CheckCircle2,
-  partial: Package,
-  completed: CheckCircle2,
-  cancelled: Ban,
-};
-
-// Tab config (mới - không còn pending/approved/rejected)
-const STATUS_TABS: { key: OrderStatus | 'all'; label: string; icon: React.ElementType }[] = [
-  { key: 'all', label: 'Tất cả', icon: ShoppingCart },
-  { key: 'draft', label: 'Nháp', icon: FileText },
-  { key: 'confirmed', label: 'Đã XN', icon: CheckCircle2 },
-  { key: 'partial', label: 'Đang giao', icon: Package },
-  { key: 'completed', label: 'Hoàn thành', icon: CheckCircle2 },
-];
-
-function formatCurrency(amount: number): string {
+const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND',
+    maximumFractionDigits: 0,
   }).format(amount);
+};
+
+const formatDate = (dateStr: string): string => {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
+const formatDateTime = (dateStr: string): string => {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+// Lấy ngày đầu tháng hiện tại
+const getFirstDayOfMonth = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+};
+
+// Lấy ngày hôm nay
+const getToday = (): string => {
+  return new Date().toISOString().split('T')[0];
+};
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type SortField = 'payment_date' | 'amount' | 'created_at';
+type SortOrder = 'asc' | 'desc';
+
+interface Filters {
+  search: string;
+  paymentMethod: string;
+  fromDate: string;
+  toDate: string;
 }
 
 // ============================================================================
-// STATUS BADGE
+// CONSTANTS
 // ============================================================================
 
-function StatusBadge({ status }: { status: string }) {
-  const Icon = STATUS_ICONS[status as OrderStatus] || FileText;
-  const label = STATUS_LABELS[status as OrderStatus] || status;
-  const classes = STATUS_BADGE_CLASSES[status as OrderStatus] || 'bg-gray-100 text-gray-700';
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${classes}`}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      {label}
-    </span>
-  );
-}
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'bank_transfer', label: 'Chuyển khoản' },
+  { value: 'cash', label: 'Tiền mặt' },
+];
 
 // ============================================================================
-// PROGRESS CELL - Cột tiến độ HĐ + TT
+// COMPONENT
 // ============================================================================
 
-function ProgressCell({
-  invoiceProgress,
-  paymentProgress,
-  status,
-}: {
-  invoiceProgress: number;
-  paymentProgress: number;
-  status: string;
-}) {
-  // Draft orders don't show progress
-  if (status === 'draft' || status === 'cancelled') {
-    return <span className="text-xs text-gray-400">—</span>;
-  }
-
-  return (
-    <div className="space-y-1.5 min-w-[100px]">
-      {/* Invoice progress */}
-      <div className="flex items-center gap-1.5">
-        <Receipt className="w-3 h-3 text-blue-400 flex-shrink-0" />
-        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-blue-500 rounded-full transition-all"
-            style={{ width: `${Math.min(invoiceProgress, 100)}%` }}
-          />
-        </div>
-        <span className="text-[10px] text-gray-500 w-8 text-right">{invoiceProgress}%</span>
-      </div>
-      {/* Payment progress */}
-      <div className="flex items-center gap-1.5">
-        <CreditCard className="w-3 h-3 text-green-400 flex-shrink-0" />
-        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-green-500 rounded-full transition-all"
-            style={{ width: `${Math.min(paymentProgress, 100)}%` }}
-          />
-        </div>
-        <span className="text-[10px] text-gray-500 w-8 text-right">{paymentProgress}%</span>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
-function POListPage() {
+const PaymentListPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
 
-  // State
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all');
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // ========================================================================
+  // STATE
+  // ========================================================================
+
+  // Data
+  const [payments, setPayments] = useState<PaymentWithDetails[]>([]);
+  const [stats, setStats] = useState<PaymentStats | null>(null);
   const [total, setTotal] = useState(0);
-  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Filters
+  const [filters, setFilters] = useState<Filters>({
+    search: '',
+    paymentMethod: 'all',
+    fromDate: '',
+    toDate: '',
+  });
   const [showFilters, setShowFilters] = useState(false);
-  const [departmentFilter, setDepartmentFilter] = useState('');
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [searchInput, setSearchInput] = useState('');
 
-  // Action menu
-  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  // Sort
+  const [sortField, setSortField] = useState<SortField>('payment_date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
-  // Delete
-  const [deleteModal, setDeleteModal] = useState<{
-    show: boolean;
-    order: PurchaseOrder | null;
-    loading: boolean;
-  }>({ show: false, order: null, loading: false });
+  // Loading
+  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Success message from navigation
-  const [successMsg, setSuccessMsg] = useState<string | null>(
-    (location.state as any)?.message || null
-  );
+  // ========================================================================
+  // FETCH DATA
+  // ========================================================================
 
-  // ===== LOAD DEPARTMENTS =====
-  useEffect(() => {
-    departmentService.getAllActive().then(setDepartments).catch(console.error);
-  }, []);
-
-  // ===== LOAD ORDERS =====
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
+  const fetchPayments = useCallback(async () => {
     try {
-      const params: any = { page, pageSize, search };
-      if (activeTab !== 'all') params.status = activeTab;
-      if (departmentFilter) params.department_id = departmentFilter;
+      setLoading(true);
+      setError(null);
 
-      const result = await purchaseOrderService.getAll(params);
-      setOrders(result.data);
+      const result: PaginatedResponse<PaymentWithDetails> = await invoicePaymentService.getAll({
+        page,
+        pageSize,
+        search: filters.search || undefined,
+        payment_method: filters.paymentMethod !== 'all' ? filters.paymentMethod : undefined,
+        from_date: filters.fromDate || undefined,
+        to_date: filters.toDate || undefined,
+      });
+
+      setPayments(result.data);
       setTotal(result.total);
+      setTotalPages(result.totalPages);
     } catch (err: any) {
-      console.error('Error loading orders:', err);
+      console.error('❌ Error loading payments:', err);
+      setError(err.message || 'Không thể tải danh sách thanh toán');
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search, activeTab, departmentFilter]);
+  }, [page, pageSize, filters]);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
-
-  // ===== LOAD STATUS COUNTS =====
-  useEffect(() => {
-    const loadCounts = async () => {
-      try {
-        const counts = await purchaseOrderService.getStatusCounts();
-        setStatusCounts(counts);
-      } catch (err) {
-        console.error('Error loading counts:', err);
-      }
-    };
-    loadCounts();
-  }, [orders]); // Reload counts when orders change
-
-  // Auto-clear success
-  useEffect(() => {
-    if (successMsg) {
-      const timer = setTimeout(() => setSuccessMsg(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMsg]);
-
-  // Search handler
-  const handleSearch = () => {
-    setSearch(searchInput);
-    setPage(1);
-  };
-
-  // Tab change
-  const handleTabChange = (tab: OrderStatus | 'all') => {
-    setActiveTab(tab);
-    setPage(1);
-  };
-
-  // Delete
-  const handleDelete = async () => {
-    if (!deleteModal.order) return;
-    setDeleteModal((prev) => ({ ...prev, loading: true }));
+  const fetchStats = useCallback(async () => {
     try {
-      await purchaseOrderService.delete(deleteModal.order.id);
-      setDeleteModal({ show: false, order: null, loading: false });
-      loadOrders();
+      setStatsLoading(true);
+      const statsData = await invoicePaymentService.getPaymentStats(
+        filters.fromDate || undefined,
+        filters.toDate || undefined
+      );
+      setStats(statsData);
     } catch (err: any) {
-      alert(err.message || 'Lỗi xóa');
-      setDeleteModal((prev) => ({ ...prev, loading: false }));
+      console.warn('⚠️ Could not load stats:', err);
+      setStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [filters.fromDate, filters.toDate]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // ========================================================================
+  // HANDLERS
+  // ========================================================================
+
+  const handleSearch = () => {
+    setPage(1);
+    setFilters(prev => ({ ...prev, search: searchInput }));
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
     }
   };
 
-  // Calculated
-  const totalPages = Math.ceil(total / pageSize);
-  const allCount =
-    Object.values(statusCounts).reduce((s, c) => s + c, 0) -
-    (statusCounts.cancelled || 0);
+  const handleFilterChange = (key: keyof Filters, value: string) => {
+    setPage(1);
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleClearFilters = () => {
+    setPage(1);
+    setSearchInput('');
+    setFilters({
+      search: '',
+      paymentMethod: 'all',
+      fromDate: '',
+      toDate: '',
+    });
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const handleViewInvoice = (invoiceId: string) => {
+    if (invoiceId) {
+      navigate(`/purchasing/invoices/${invoiceId}`);
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchPayments();
+    fetchStats();
+  };
+
+  // Sort payments locally (since API doesn't support sort param directly)
+  const sortedPayments = [...payments].sort((a, b) => {
+    let comparison = 0;
+    switch (sortField) {
+      case 'payment_date':
+        comparison = new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime();
+        break;
+      case 'amount':
+        comparison = (a.amount || 0) - (b.amount || 0);
+        break;
+      case 'created_at':
+        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        break;
+    }
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  // ========================================================================
+  // CHECK ACTIVE FILTERS
+  // ========================================================================
+
+  const hasActiveFilters =
+    filters.search !== '' ||
+    filters.paymentMethod !== 'all' ||
+    filters.fromDate !== '' ||
+    filters.toDate !== '';
+
+  // ========================================================================
+  // RENDER
+  // ========================================================================
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
-      {/* Success message */}
-      {successMsg && (
-        <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-          <span className="text-sm text-green-700 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            {successMsg}
-          </span>
-          <button onClick={() => setSuccessMsg(null)}>
-            <X className="w-4 h-4 text-green-400" />
-          </button>
-        </div>
-      )}
-
-      {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {/* ================================================================ */}
+      {/* HEADER                                                           */}
+      {/* ================================================================ */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <ShoppingCart className="w-6 h-6 text-blue-500" />
-            Đơn đặt hàng
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {total} đơn hàng
+          <div className="flex items-center gap-3">
+            <CreditCard className="w-7 h-7 text-blue-600" />
+            <h1 className="text-2xl font-bold text-gray-900">Lịch sử thanh toán</h1>
+          </div>
+          <p className="text-sm text-gray-500 mt-1 ml-10">
+            {total > 0 ? `${total} thanh toán` : 'Theo dõi tất cả thanh toán cho NCC'}
           </p>
         </div>
-        <button
-          onClick={() => navigate('/purchasing/orders/new')}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 shadow-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Tạo đơn hàng
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-gray-600 text-sm hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+        </div>
       </div>
 
-      {/* ===== STATUS TABS ===== */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto">
-        {STATUS_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const count =
-            tab.key === 'all' ? allCount : statusCounts[tab.key] || 0;
+      {/* ================================================================ */}
+      {/* STATS CARDS                                                      */}
+      {/* ================================================================ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Tổng thanh toán */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-blue-600" />
+            </div>
+            <span className="text-xs text-gray-500 font-medium">Tổng thanh toán</span>
+          </div>
+          {statsLoading ? (
+            <div className="h-7 bg-gray-100 rounded animate-pulse" />
+          ) : (
+            <>
+              <p className="text-lg font-bold text-gray-900">
+                {formatCurrency(stats?.total_amount || 0)}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {stats?.total_payments || 0} lần thanh toán
+              </p>
+            </>
+          )}
+        </div>
 
-          return (
+        {/* Chuyển khoản */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <Building2 className="w-4 h-4 text-indigo-600" />
+            </div>
+            <span className="text-xs text-gray-500 font-medium">Chuyển khoản</span>
+          </div>
+          {statsLoading ? (
+            <div className="h-7 bg-gray-100 rounded animate-pulse" />
+          ) : (
+            <>
+              <p className="text-lg font-bold text-indigo-600">
+                {formatCurrency(stats?.bank_transfer_amount || 0)}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {stats?.total_amount
+                  ? `${Math.round(((stats?.bank_transfer_amount || 0) / stats.total_amount) * 100)}%`
+                  : '0%'} tổng TT
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Tiền mặt */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+              <Banknote className="w-4 h-4 text-green-600" />
+            </div>
+            <span className="text-xs text-gray-500 font-medium">Tiền mặt</span>
+          </div>
+          {statsLoading ? (
+            <div className="h-7 bg-gray-100 rounded animate-pulse" />
+          ) : (
+            <>
+              <p className="text-lg font-bold text-green-600">
+                {formatCurrency(stats?.cash_amount || 0)}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {stats?.total_amount
+                  ? `${Math.round(((stats?.cash_amount || 0) / stats.total_amount) * 100)}%`
+                  : '0%'} tổng TT
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Công nợ */}
+        <div className={`bg-white border rounded-xl p-4 ${
+          (stats?.overdue_count || 0) > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200'
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              (stats?.overdue_count || 0) > 0 ? 'bg-red-100' : 'bg-amber-100'
+            }`}>
+              <AlertTriangle className={`w-4 h-4 ${
+                (stats?.overdue_count || 0) > 0 ? 'text-red-600' : 'text-amber-600'
+              }`} />
+            </div>
+            <span className="text-xs text-gray-500 font-medium">Tổng còn nợ</span>
+          </div>
+          {statsLoading ? (
+            <div className="h-7 bg-gray-100 rounded animate-pulse" />
+          ) : (
+            <>
+              <p className={`text-lg font-bold ${
+                (stats?.total_debt || 0) > 0 ? 'text-amber-600' : 'text-gray-400'
+              }`}>
+                {formatCurrency(stats?.total_debt || 0)}
+              </p>
+              {(stats?.overdue_count || 0) > 0 && (
+                <p className="text-xs text-red-500 mt-0.5">
+                  {stats?.overdue_count} HĐ quá hạn · {formatCurrency(stats?.total_overdue || 0)}
+                </p>
+              )}
+              {(stats?.overdue_count || 0) === 0 && (
+                <p className="text-xs text-gray-400 mt-0.5">Không có quá hạn</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ================================================================ */}
+      {/* SEARCH & FILTERS                                                 */}
+      {/* ================================================================ */}
+      <div className="bg-white border border-gray-200 rounded-xl">
+        {/* Search bar */}
+        <div className="p-4 flex flex-col sm:flex-row gap-3">
+          {/* Search input */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Tìm theo mã UNC, ghi chú..."
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput('');
+                  if (filters.search) {
+                    handleFilterChange('search', '');
+                  }
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter toggle & actions */}
+          <div className="flex items-center gap-2">
             <button
-              key={tab.key}
-              onClick={() => handleTabChange(tab.key)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
-                activeTab === tab.key
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+              onClick={() => setShowFilters(!showFilters)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
+                showFilters || hasActiveFilters
+                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-200 text-gray-500'
-                }`}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ===== SEARCH & FILTERS ===== */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Search */}
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Tìm mã đơn, dự án..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          {searchInput && (
-            <button
-              onClick={() => {
-                setSearchInput('');
-                setSearch('');
-                setPage(1);
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Filter button */}
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm transition-colors ${
-            showFilters || departmentFilter
-              ? 'border-blue-500 text-blue-600 bg-blue-50'
-              : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <Filter className="w-4 h-4" />
-          Bộ lọc
-          {departmentFilter && (
-            <span className="w-2 h-2 bg-blue-500 rounded-full" />
-          )}
-        </button>
-
-        {/* Refresh */}
-        <button
-          onClick={loadOrders}
-          disabled={loading}
-          className="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
-      {/* Filter panel */}
-      {showFilters && (
-        <div className="flex items-end gap-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-          <div className="flex-1">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Phòng ban</label>
-            <select
-              value={departmentFilter}
-              onChange={(e) => {
-                setDepartmentFilter(e.target.value);
-                setPage(1);
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            >
-              <option value="">Tất cả phòng ban</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          {departmentFilter && (
-            <button
-              onClick={() => {
-                setDepartmentFilter('');
-                setPage(1);
-              }}
-              className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
-            >
-              Xóa lọc
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ===== TABLE ===== */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Mã đơn
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Dự án
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Ngày
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Tổng tiền
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Trạng thái
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Tiến độ
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-12">
-                  
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                // Skeleton
-                Array.from({ length: 5 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-4 py-3">
-                      <div className="h-4 bg-gray-200 rounded w-24" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-4 bg-gray-200 rounded w-40" />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="h-4 bg-gray-200 rounded w-20 mx-auto" />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="h-4 bg-gray-200 rounded w-28 ml-auto" />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="h-5 bg-gray-200 rounded-full w-20 mx-auto" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-4 bg-gray-200 rounded w-24 mx-auto" />
-                    </td>
-                    <td className="px-4 py-3" />
-                  </tr>
-                ))
-              ) : orders.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <ShoppingCart className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">
-                      {search || departmentFilter
-                        ? 'Không tìm thấy đơn hàng phù hợp'
-                        : 'Chưa có đơn hàng nào'}
-                    </p>
-                    {!search && !departmentFilter && (
-                      <button
-                        onClick={() => navigate('/purchasing/orders/new')}
-                        className="mt-3 text-sm text-blue-600 hover:underline"
-                      >
-                        + Tạo đơn hàng đầu tiên
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => (
-                  <tr
-                    key={order.id}
-                    onClick={() => navigate(`/purchasing/orders/${order.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    {/* Mã đơn */}
-                    <td className="px-4 py-3">
-                      <span className="font-medium text-blue-600 hover:underline">
-                        {order.order_code}
-                      </span>
-                    </td>
-
-                    {/* Dự án */}
-                    <td className="px-4 py-3">
-                      <p className="text-gray-900 truncate max-w-[200px]">
-                        {order.project_name || '—'}
-                      </p>
-                    </td>
-
-                    {/* Ngày */}
-                    <td className="px-4 py-3 text-center text-gray-500">
-                      {new Date(order.order_date || order.created_at).toLocaleDateString('vi-VN')}
-                    </td>
-
-                    {/* Tổng tiền */}
-                    <td className="px-4 py-3 text-right font-medium text-gray-900">
-                      {formatCurrency(order.grand_total || 0)}
-                    </td>
-
-                    {/* Trạng thái */}
-                    <td className="px-4 py-3 text-center">
-                      <StatusBadge status={order.status} />
-                    </td>
-
-                    {/* Tiến độ */}
-                    <td className="px-4 py-3">
-                      <ProgressCell
-                        invoiceProgress={order.invoice_progress || 0}
-                        paymentProgress={order.payment_progress || 0}
-                        status={order.status}
-                      />
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <div className="relative">
-                        <button
-                          onClick={() =>
-                            setActionMenuId(
-                              actionMenuId === order.id ? null : order.id
-                            )
-                          }
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-
-                        {actionMenuId === order.id && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-10"
-                              onClick={() => setActionMenuId(null)}
-                            />
-                            <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-40">
-                              <button
-                                onClick={() => {
-                                  navigate(`/purchasing/orders/${order.id}`);
-                                  setActionMenuId(null);
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                <Eye className="w-4 h-4" />
-                                Xem chi tiết
-                              </button>
-                              {order.status === 'draft' && (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      navigate(`/purchasing/orders/${order.id}/edit`);
-                                      setActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                    Chỉnh sửa
-                                  </button>
-                                  <div className="border-t border-gray-100 my-1" />
-                                  <button
-                                    onClick={() => {
-                                      setDeleteModal({
-                                        show: true,
-                                        order,
-                                        loading: false,
-                                      });
-                                      setActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Xóa
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+              <Filter className="w-4 h-4" />
+              Bộ lọc
+              {hasActiveFilters && (
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
               )}
-            </tbody>
-          </table>
+            </button>
+
+            <button
+              onClick={handleSearch}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Search className="w-4 h-4" />
+              Tìm
+            </button>
+          </div>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <span className="text-xs text-gray-500">
-              Hiển thị {orders.length} / {total}
-            </span>
-            <div className="flex items-center gap-2">
+        {/* Expanded filters */}
+        {showFilters && (
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Payment method */}
+              <div>
+                <label className="block text-xs text-gray-500 font-medium mb-1.5">
+                  Phương thức
+                </label>
+                <select
+                  value={filters.paymentMethod}
+                  onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {PAYMENT_METHOD_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* From date */}
+              <div>
+                <label className="block text-xs text-gray-500 font-medium mb-1.5">
+                  Từ ngày
+                </label>
+                <input
+                  type="date"
+                  value={filters.fromDate}
+                  onChange={(e) => handleFilterChange('fromDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* To date */}
+              <div>
+                <label className="block text-xs text-gray-500 font-medium mb-1.5">
+                  Đến ngày
+                </label>
+                <input
+                  type="date"
+                  value={filters.toDate}
+                  onChange={(e) => handleFilterChange('toDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Quick date presets + clear */}
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="text-xs text-gray-400">Nhanh:</span>
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-1.5 border border-gray-300 rounded hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  handleFilterChange('fromDate', getFirstDayOfMonth());
+                  handleFilterChange('toDate', getToday());
+                }}
+                className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
+                Tháng này
               </button>
-              <span className="text-sm text-gray-600 px-2">
-                {page} / {totalPages}
-              </span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-1.5 border border-gray-300 rounded hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  const now = new Date();
+                  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+                  handleFilterChange('fromDate', prevMonth.toISOString().split('T')[0]);
+                  handleFilterChange('toDate', lastDay.toISOString().split('T')[0]);
+                }}
+                className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
               >
-                <ChevronRight className="w-4 h-4" />
+                Tháng trước
               </button>
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  const q = Math.floor(now.getMonth() / 3);
+                  const startQ = new Date(now.getFullYear(), q * 3, 1);
+                  handleFilterChange('fromDate', startQ.toISOString().split('T')[0]);
+                  handleFilterChange('toDate', getToday());
+                }}
+                className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Quý này
+              </button>
+              <button
+                onClick={() => {
+                  handleFilterChange('fromDate', `${new Date().getFullYear()}-01-01`);
+                  handleFilterChange('toDate', getToday());
+                }}
+                className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Năm nay
+              </button>
+
+              {hasActiveFilters && (
+                <>
+                  <div className="w-px h-4 bg-gray-200 mx-1" />
+                  <button
+                    onClick={handleClearFilters}
+                    className="text-xs px-2 py-1 rounded-md text-red-600 hover:bg-red-50 transition-colors font-medium"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* ===== DELETE MODAL ===== */}
-      {deleteModal.show && deleteModal.order && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() =>
-              !deleteModal.loading &&
-              setDeleteModal({ show: false, order: null, loading: false })
-            }
-          />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Xóa đơn hàng?</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Đơn <strong>{deleteModal.order.order_code}</strong> sẽ bị xóa vĩnh viễn.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() =>
-                  setDeleteModal({ show: false, order: null, loading: false })
-                }
-                disabled={deleteModal.loading}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteModal.loading}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleteModal.loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-                {deleteModal.loading ? 'Đang xóa...' : 'Xóa'}
-              </button>
-            </div>
+      {/* ================================================================ */}
+      {/* PAYMENT TABLE                                                    */}
+      {/* ================================================================ */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-3" />
+            <span className="text-gray-500">Đang tải dữ liệu thanh toán...</span>
           </div>
-        </div>
-      )}
+        ) : error ? (
+          <div className="text-center py-16">
+            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+            <p className="text-red-600 font-medium mb-2">{error}</p>
+            <button
+              onClick={handleRefresh}
+              className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+            >
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </button>
+          </div>
+        ) : sortedPayments.length === 0 ? (
+          <div className="text-center py-20">
+            <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-700 mb-2">
+              {hasActiveFilters ? 'Không tìm thấy thanh toán' : 'Chưa có thanh toán nào'}
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {hasActiveFilters
+                ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm'
+                : 'Thanh toán sẽ hiển thị tại đây khi bạn ghi nhận thanh toán cho hóa đơn NCC'}
+            </p>
+            {hasActiveFilters && (
+              <button
+                onClick={handleClearFilters}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 uppercase tracking-wider border-b border-gray-100 bg-gray-50/50">
+                    <th className="px-4 py-3 font-medium">#</th>
+                    <th className="px-4 py-3 font-medium">
+                      <button
+                        onClick={() => handleSort('payment_date')}
+                        className="flex items-center gap-1 hover:text-gray-700 transition-colors"
+                      >
+                        Ngày TT
+                        {sortField === 'payment_date' ? (
+                          sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-40" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 font-medium">Hóa đơn</th>
+                    <th className="px-4 py-3 font-medium">NCC</th>
+                    <th className="px-4 py-3 font-medium">Phương thức</th>
+                    <th className="px-4 py-3 font-medium text-right">
+                      <button
+                        onClick={() => handleSort('amount')}
+                        className="flex items-center gap-1 hover:text-gray-700 transition-colors ml-auto"
+                      >
+                        Số tiền
+                        {sortField === 'amount' ? (
+                          sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-40" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 font-medium">Mã UNC / Ghi chú</th>
+                    <th className="px-4 py-3 font-medium">Người tạo</th>
+                    <th className="px-4 py-3 font-medium text-center">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPayments.map((payment, index) => {
+                    const rowNum = (page - 1) * pageSize + index + 1;
+
+                    return (
+                      <tr
+                        key={payment.id}
+                        className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors"
+                      >
+                        {/* # */}
+                        <td className="px-4 py-3.5 text-gray-400 text-xs">{rowNum}</td>
+
+                        {/* Ngày TT */}
+                        <td className="px-4 py-3.5">
+                          <span className="font-medium text-gray-900">
+                            {formatDate(payment.payment_date)}
+                          </span>
+                        </td>
+
+                        {/* Hóa đơn */}
+                        <td className="px-4 py-3.5">
+                          {payment.invoice_number ? (
+                            <button
+                              onClick={() => handleViewInvoice(payment.invoice_id)}
+                              className="text-blue-600 hover:text-blue-700 font-medium text-xs inline-flex items-center gap-1 hover:underline"
+                            >
+                              <FileText className="w-3 h-3" />
+                              {payment.invoice_number}
+                            </button>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                          {payment.order_code && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              ĐH: {payment.order_code}
+                            </p>
+                          )}
+                        </td>
+
+                        {/* NCC */}
+                        <td className="px-4 py-3.5">
+                          <div className="max-w-[180px]">
+                            <p className="text-sm text-gray-900 font-medium truncate">
+                              {payment.supplier_name || '—'}
+                            </p>
+                            {payment.supplier_code && (
+                              <p className="text-xs text-gray-400">{payment.supplier_code}</p>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Phương thức */}
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+                            payment.payment_method === 'bank_transfer'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            {payment.payment_method === 'bank_transfer' ? (
+                              <Building2 className="w-3 h-3" />
+                            ) : (
+                              <Banknote className="w-3 h-3" />
+                            )}
+                            {payment.payment_method === 'bank_transfer' ? 'CK' : 'TM'}
+                          </span>
+                          {payment.bank_name && (
+                            <p className="text-xs text-gray-400 mt-0.5">{payment.bank_name}</p>
+                          )}
+                        </td>
+
+                        {/* Số tiền */}
+                        <td className="px-4 py-3.5 text-right">
+                          <span className="font-bold text-gray-900">
+                            {formatCurrency(payment.amount)}
+                          </span>
+                        </td>
+
+                        {/* UNC / Ghi chú */}
+                        <td className="px-4 py-3.5">
+                          <div className="max-w-[200px]">
+                            {payment.reference_number && (
+                              <p className="text-xs font-mono text-gray-600">
+                                {payment.reference_number}
+                              </p>
+                            )}
+                            {payment.notes && (
+                              <p className="text-xs text-gray-400 truncate italic mt-0.5" title={payment.notes}>
+                                {payment.notes}
+                              </p>
+                            )}
+                            {!payment.reference_number && !payment.notes && (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Người tạo */}
+                        <td className="px-4 py-3.5">
+                          {payment.created_by_name ? (
+                            <span className="text-xs text-gray-600 inline-flex items-center gap-1">
+                              <User className="w-3 h-3 text-gray-400" />
+                              {payment.created_by_name}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </td>
+
+                        {/* Thao tác */}
+                        <td className="px-4 py-3.5 text-center">
+                          {payment.invoice_id && (
+                            <button
+                              onClick={() => handleViewInvoice(payment.invoice_id)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Xem hóa đơn"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-100 bg-gray-50/30">
+              {/* Info */}
+              <div className="flex items-center gap-3 text-sm text-gray-500">
+                <span>
+                  Hiển thị {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {total}
+                </span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="px-2 py-1 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {PAGE_SIZE_OPTIONS.map(size => (
+                    <option key={size} value={size}>{size} / trang</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Page buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1}
+                  className="px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Đầu
+                </button>
+                <button
+                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                  disabled={page <= 1}
+                  className="p-1.5 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {/* Page numbers */}
+                {(() => {
+                  const pages: number[] = [];
+                  const maxShow = 5;
+                  let start = Math.max(1, page - Math.floor(maxShow / 2));
+                  let end = Math.min(totalPages, start + maxShow - 1);
+                  if (end - start + 1 < maxShow) {
+                    start = Math.max(1, end - maxShow + 1);
+                  }
+                  for (let i = start; i <= end; i++) {
+                    pages.push(i);
+                  }
+                  return pages.map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-8 h-8 text-xs rounded font-medium transition-colors ${
+                        p === page
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ));
+                })()}
+
+                <button
+                  onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={page >= totalPages}
+                  className="p-1.5 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                  className="px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Cuối
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
-}
+};
 
-export default POListPage;
+export default PaymentListPage;

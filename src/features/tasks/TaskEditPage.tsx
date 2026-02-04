@@ -1,10 +1,11 @@
 // src/features/tasks/TaskEditPage.tsx
 // ============================================================================
-// UPDATED: 
-// - Tích hợp phân quyền theo Position Level (EXECUTIVE/MANAGER/EMPLOYEE)
-// - EXECUTIVE: Sửa tất cả
-// - MANAGER: Sửa trong phòng ban, KHÔNG sửa task do Executive tạo
-// - EMPLOYEE: KHÔNG sửa
+// UPDATED + RESPONSIVE:
+// - Header: flex-wrap, responsive font sizes, stacked on mobile
+// - Form: responsive padding, grid adjustments
+// - Lock screen: mobile-friendly layout
+// - Progress bar: responsive
+// - Actions: full-width on mobile
 // ============================================================================
 
 import { useState, useEffect } from 'react'
@@ -50,7 +51,6 @@ interface Task {
   department?: { id: string; name: string } | null
   assigner?: { id: string; full_name: string; position_id?: string } | null
   assignee?: { id: string; full_name: string } | null
-  // Thêm assigner_level
   assigner_level?: number | null
 }
 
@@ -95,7 +95,6 @@ export function TaskEditPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
 
-  // State
   const [task, setTask] = useState<Task | null>(null)
   const [departments, setDepartments] = useState<Department[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -104,16 +103,13 @@ export function TaskEditPage() {
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   
-  // Permission state
   const [userPositionLevel, setUserPositionLevel] = useState<number>(6)
   const [editPermission, setEditPermission] = useState<{ canEdit: boolean; reason?: string }>({ canEdit: true })
   
-  // Subtask info
   const [subtaskCount, setSubtaskCount] = useState(0)
   const [isParentTask, setIsParentTask] = useState(false)
   const [statusChangeWarning, setStatusChangeWarning] = useState<string | null>(null)
 
-  // Form state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -142,9 +138,6 @@ export function TaskEditPage() {
       }
 
       try {
-        console.log('🔍 [TaskEditPage] Fetching task:', id)
-
-        // 1. Fetch user's position level
         let posLevel = 6
         if (user?.position_id) {
           const { data: posData } = await supabase
@@ -155,9 +148,7 @@ export function TaskEditPage() {
           posLevel = posData?.level || 6
         }
         setUserPositionLevel(posLevel)
-        console.log('🔐 [TaskEditPage] User position level:', posLevel)
 
-        // 2. Fetch task with assigner's position_id
         const { data: taskData, error: taskError } = await supabase
           .from('tasks')
           .select(`
@@ -169,14 +160,8 @@ export function TaskEditPage() {
           .eq('id', id)
           .single()
 
-        if (taskError) {
-          console.error('❌ [TaskEditPage] Task error:', taskError)
-          throw new Error('Không tìm thấy công việc')
-        }
+        if (taskError) throw new Error('Không tìm thấy công việc')
 
-        console.log('✅ [TaskEditPage] Task loaded:', taskData)
-
-        // 3. Fetch assigner's position level
         let assignerLevel: number | null = null
         if (taskData.assigner?.position_id) {
           const { data: assignerPosData } = await supabase
@@ -187,15 +172,11 @@ export function TaskEditPage() {
           assignerLevel = assignerPosData?.level || null
         }
         
-        // Enrich task với assigner_level
         const enrichedTask: Task = {
           ...taskData,
           assigner_level: assignerLevel,
         }
 
-        console.log('🔐 [TaskEditPage] Assigner level:', assignerLevel)
-
-        // 4. CHECK PERMISSIONS using getTaskPermissions
         const taskForPerm: TaskForPermission = {
           id: enrichedTask.id,
           status: enrichedTask.status,
@@ -207,8 +188,6 @@ export function TaskEditPage() {
           assigner_level: assignerLevel,
         }
 
-        // FIX: Updated getTaskPermissions call to match new signature
-        // New signature: (task, userRole, userDeptId, userLevel?, isAdmin?)
         const permissions = getTaskPermissions(
           taskForPerm,
           (user?.role as UserRole) || 'employee',
@@ -217,19 +196,15 @@ export function TaskEditPage() {
           user?.role === 'admin'
         )
 
-        console.log('🔐 [TaskEditPage] Permissions:', permissions)
-
         setEditPermission({
           canEdit: permissions.canEdit,
           reason: permissions.editDisabledReason,
         })
         
-        // 5. CHECK IF PARENT TASK
         const count = await subtaskService.getSubtaskCount(id)
         setSubtaskCount(count)
         setIsParentTask(count > 0)
 
-        // 6. Fetch departments & employees
         const { data: deptData } = await supabase
           .from('departments')
           .select('id, code, name')
@@ -244,7 +219,6 @@ export function TaskEditPage() {
         setDepartments(deptData || [])
         setEmployees(empData || [])
 
-        // Set form data từ task
         const currentStatus = taskData.status || 'in_progress'
         setOriginalStatus(currentStatus)
         
@@ -262,7 +236,6 @@ export function TaskEditPage() {
         })
 
       } catch (err: any) {
-        console.error('❌ [TaskEditPage] Error:', err)
         setError(err.message || 'Có lỗi xảy ra')
       } finally {
         setLoading(false)
@@ -286,12 +259,10 @@ export function TaskEditPage() {
     }))
   }
 
-  // Handle status change with cascade warning
   const handleStatusChange = async (newStatus: string) => {
     setFormData(prev => ({ ...prev, status: newStatus }))
     setStatusChangeWarning(null)
 
-    // Nếu là công việc cha và đang đổi status
     if (isParentTask && newStatus !== originalStatus) {
       const validation = await taskStatusService.canChangeStatus(id!, newStatus)
       
@@ -311,7 +282,6 @@ export function TaskEditPage() {
     e.preventDefault()
     if (!id) return
     
-    // Double-check permission before submit
     if (!editPermission.canEdit) {
       setError(editPermission.reason || 'Không có quyền chỉnh sửa công việc này')
       return
@@ -322,13 +292,9 @@ export function TaskEditPage() {
     setWarning(null)
 
     try {
-      console.log('💾 [TaskEditPage] Saving:', formData)
-
-      // Kiểm tra status change cho công việc cha
       const statusChanged = formData.status !== originalStatus
       
       if (statusChanged && isParentTask) {
-        // Sử dụng taskStatusService.changeTaskStatus để handle cascade
         const result = await taskStatusService.changeTaskStatus(id, formData.status)
         
         if (!result.success) {
@@ -338,13 +304,8 @@ export function TaskEditPage() {
         if (result.warnings && result.warnings.length > 0) {
           setWarning(result.warnings.join('\n'))
         }
-
-        if (result.cascadedChildren && result.cascadedChildren > 0) {
-          console.log(`✅ Đã cascade ${result.cascadedChildren} công việc con`)
-        }
       }
 
-      // Update các field khác (không bao gồm status nếu đã xử lý riêng)
       const updateData: Record<string, any> = {
         name: formData.name,
         description: formData.description || null,
@@ -358,11 +319,9 @@ export function TaskEditPage() {
         updated_at: new Date().toISOString(),
       }
 
-      // Nếu status chưa được xử lý bởi cascade logic
       if (!statusChanged || !isParentTask) {
         updateData.status = formData.status
         
-        // Auto set completed_date khi status = completed và progress = 100
         if (formData.status === 'completed' && formData.progress >= 100) {
           updateData.completed_date = new Date().toISOString()
         }
@@ -373,15 +332,10 @@ export function TaskEditPage() {
         .update(updateData)
         .eq('id', id)
 
-      if (updateError) {
-        console.error('❌ [TaskEditPage] Update error:', updateError)
-        throw updateError
-      }
+      if (updateError) throw updateError
 
-      console.log('✅ [TaskEditPage] Saved successfully')
       navigate('/tasks')
     } catch (err: any) {
-      console.error('❌ [TaskEditPage] Error:', err)
       setError(err.message || 'Không thể cập nhật công việc')
     } finally {
       setSaving(false)
@@ -409,7 +363,7 @@ export function TaskEditPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex items-center gap-3 text-gray-500">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -426,26 +380,26 @@ export function TaskEditPage() {
 
   if (!editPermission.canEdit) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-start gap-3 sm:gap-4 mb-6">
             <button
               onClick={() => navigate(-1)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">Không thể chỉnh sửa</h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Không thể chỉnh sửa</h1>
                 <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${permissionBadgeColor}`}>
                   <Shield className="w-3 h-3" />
                   {permissionLabel}
                 </span>
               </div>
               {task && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 mt-1 truncate">
                   {task.code} - {task.name}
                 </p>
               )}
@@ -453,20 +407,19 @@ export function TaskEditPage() {
           </div>
 
           {/* Lock Message */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-            <div className="flex items-start gap-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 sm:p-6">
+            <div className="flex items-start gap-3 sm:gap-4">
               <div className="flex-shrink-0">
-                <Lock className="w-8 h-8 text-yellow-600" />
+                <Lock className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base sm:text-lg font-semibold text-yellow-800 mb-2">
                   Công việc bị khóa chỉnh sửa
                 </h3>
-                <p className="text-yellow-700 mb-4">
+                <p className="text-sm sm:text-base text-yellow-700 mb-4">
                   {editPermission.reason}
                 </p>
                 
-                {/* Show current evaluation status */}
                 {task?.evaluation_status && task.evaluation_status !== 'none' && (
                   <div className="bg-yellow-100 rounded-lg p-3 mb-4">
                     <p className="text-sm text-yellow-800">
@@ -478,7 +431,6 @@ export function TaskEditPage() {
                   </div>
                 )}
 
-                {/* Show assigner info if task created by Executive */}
                 {task?.assigner_level && task.assigner_level <= 3 && userGroup === 'manager' && (
                   <div className="bg-purple-50 rounded-lg p-3 mb-4">
                     <p className="text-sm text-purple-800">
@@ -490,16 +442,16 @@ export function TaskEditPage() {
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <button
                     onClick={() => navigate(`/tasks/${id}`)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center text-sm sm:text-base"
                   >
                     Xem chi tiết
                   </button>
                   <button
                     onClick={() => navigate('/tasks')}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-center text-sm sm:text-base"
                   >
                     Quay lại danh sách
                   </button>
@@ -518,7 +470,7 @@ export function TaskEditPage() {
 
   if (!task) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="max-w-2xl mx-auto">
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-700">
             <p className="font-medium">Không tìm thấy công việc</p>
@@ -541,18 +493,18 @@ export function TaskEditPage() {
   // ============================================================================
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
         <button
           onClick={() => navigate('/tasks')}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 mt-0.5"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-gray-900">Sửa công việc</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Sửa công việc</h1>
             <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${permissionBadgeColor}`}>
               <Shield className="w-3 h-3" />
               {permissionLabel}
@@ -564,7 +516,7 @@ export function TaskEditPage() {
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mt-0.5 truncate">
             {task.code} - {task.name}
           </p>
         </div>
@@ -572,26 +524,26 @@ export function TaskEditPage() {
 
       {/* Error Alert */}
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-start gap-2">
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 text-red-700 flex items-start gap-2">
           <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div className="whitespace-pre-line">{error}</div>
+          <div className="whitespace-pre-line text-sm sm:text-base">{error}</div>
         </div>
       )}
 
       {/* Warning Alert */}
       {warning && (
-        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-700 flex items-start gap-2">
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 text-yellow-700 flex items-start gap-2">
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div className="whitespace-pre-line">{warning}</div>
+          <div className="whitespace-pre-line text-sm sm:text-base">{warning}</div>
         </div>
       )}
 
       {/* Parent Task Warning */}
       {isParentTask && (
-        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
           <div className="flex items-start gap-2 text-blue-700">
             <Users className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div>
+            <div className="text-sm sm:text-base">
               <p className="font-medium">Công việc cha với {subtaskCount} công việc con</p>
               <p className="text-sm mt-1">
                 • Tiến độ và trạng thái được tính tự động từ các công việc con<br/>
@@ -604,10 +556,10 @@ export function TaskEditPage() {
 
       {/* Status Change Warning */}
       {statusChangeWarning && (
-        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-4 text-orange-700 flex items-start gap-2">
+        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 text-orange-700 flex items-start gap-2">
           <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium">Cảnh báo cascade</p>
+            <p className="font-medium text-sm sm:text-base">Cảnh báo cascade</p>
             <p className="text-sm whitespace-pre-line mt-1">{statusChangeWarning}</p>
           </div>
         </div>
@@ -615,14 +567,13 @@ export function TaskEditPage() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="max-w-4xl">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 space-y-5 sm:space-y-6">
           
           {/* Section: Thông tin cơ bản */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin cơ bản</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Thông tin cơ bản</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               
-              {/* Tên công việc */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tên công việc <span className="text-red-500">*</span>
@@ -633,12 +584,11 @@ export function TaskEditPage() {
                   value={formData.name}
                   onChange={handleChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                   placeholder="Nhập tên công việc"
                 />
               </div>
 
-              {/* Mô tả */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Mô tả
@@ -648,12 +598,11 @@ export function TaskEditPage() {
                   value={formData.description}
                   onChange={handleChange}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                   placeholder="Mô tả chi tiết công việc"
                 />
               </div>
 
-              {/* Phòng ban */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Phòng ban
@@ -662,7 +611,7 @@ export function TaskEditPage() {
                   name="department_id"
                   value={formData.department_id}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                 >
                   <option value="">-- Chọn phòng ban --</option>
                   {departments.map((dept) => (
@@ -673,7 +622,6 @@ export function TaskEditPage() {
                 </select>
               </div>
 
-              {/* Người thực hiện */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Người thực hiện
@@ -682,7 +630,7 @@ export function TaskEditPage() {
                   name="assignee_id"
                   value={formData.assignee_id}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                 >
                   <option value="">-- Chọn người thực hiện --</option>
                   {employees.map((emp) => (
@@ -697,10 +645,8 @@ export function TaskEditPage() {
 
           {/* Section: Thời gian */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Thời gian</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Ngày bắt đầu */}
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Thời gian</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ngày bắt đầu
@@ -710,11 +656,10 @@ export function TaskEditPage() {
                   name="start_date"
                   value={formData.start_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                 />
               </div>
 
-              {/* Ngày hết hạn */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ngày hết hạn
@@ -724,7 +669,7 @@ export function TaskEditPage() {
                   name="due_date"
                   value={formData.due_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                 />
               </div>
             </div>
@@ -732,10 +677,9 @@ export function TaskEditPage() {
 
           {/* Section: Trạng thái & Ưu tiên */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Trạng thái & Ưu tiên</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Trạng thái & Ưu tiên</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               
-              {/* Trạng thái */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Trạng thái
@@ -747,7 +691,7 @@ export function TaskEditPage() {
                   name="status"
                   value={formData.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                 >
                   {STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -757,7 +701,6 @@ export function TaskEditPage() {
                 </select>
               </div>
 
-              {/* Độ ưu tiên */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Độ ưu tiên
@@ -766,7 +709,7 @@ export function TaskEditPage() {
                   name="priority"
                   value={formData.priority}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                 >
                   {PRIORITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -776,12 +719,11 @@ export function TaskEditPage() {
                 </select>
               </div>
 
-              {/* Tiến độ */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tiến độ (%)
                   {isParentTask && (
-                    <span className="text-xs text-blue-600 ml-1">(tự động từ con)</span>
+                    <span className="text-xs text-blue-600 ml-1">(tự động)</span>
                   )}
                 </label>
                 <input
@@ -792,12 +734,11 @@ export function TaskEditPage() {
                   min={0}
                   max={100}
                   disabled={isParentTask}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm sm:text-base"
                 />
               </div>
             </div>
             
-            {/* Progress bar preview */}
             <div className="mt-3">
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
@@ -812,30 +753,30 @@ export function TaskEditPage() {
 
           {/* Section: Ghi chú */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Ghi chú</h2>
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Ghi chú</h2>
             <textarea
               name="notes"
               value={formData.notes}
               onChange={handleChange}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               placeholder="Ghi chú thêm..."
             />
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={() => navigate('/tasks')}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              className="px-4 py-2.5 sm:py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm sm:text-base"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm sm:text-base"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

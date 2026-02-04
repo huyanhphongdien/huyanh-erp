@@ -1,7 +1,10 @@
 // ============================================================
-// CHECK-IN/OUT WIDGET V2
+// CHECK-IN/OUT WIDGET V2 — FIXED
 // File: src/features/attendance/CheckInOutWidget.tsx
 // Huy Anh ERP System - Chấm công V2
+// ============================================================
+// FIX 1: invalidateQueries dùng predicate → bắt TẤT CẢ query attendance
+// FIX 2: Tính giờ làm từ timestamp (không dùng working_minutes từ DB)
 // ============================================================
 // LOGIC:
 // - Mobile: GPS bắt buộc → canCheckIn = gpsStatus === 'available'
@@ -85,6 +88,19 @@ function formatDuration(minutes: number): string {
   return `${h}h ${m.toString().padStart(2, '0')}p`
 }
 
+// ★ FIX: Tính giờ làm từ timestamp thay vì dùng working_minutes từ DB
+function calculateWorkingTime(checkIn?: string | null, checkOut?: string | null): string {
+  if (!checkIn) return '0h 00p'
+  const start = new Date(checkIn)
+  const end = checkOut ? new Date(checkOut) : new Date()
+  const diffMs = end.getTime() - start.getTime()
+  if (diffMs <= 0) return '0h 00p'
+  const totalMinutes = Math.floor(diffMs / (1000 * 60))
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return `${h}h ${m.toString().padStart(2, '0')}p`
+}
+
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
@@ -101,6 +117,28 @@ export function CheckInOutWidget() {
   // Timer
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ============================================================
+  // ★ FIX: Invalidate TẤT CẢ queries liên quan attendance
+  // Dùng predicate thay vì queryKey prefix → bắt cả:
+  //   ['attendance', 'list', ...] (AttendanceListPage)
+  //   ['today-attendance', ...] (widget)
+  //   ['today-shift', ...] (widget)
+  //   ['attendance-list-v3', ...] (nếu còn tồn tại)
+  // ============================================================
+  const invalidateAllAttendance = useCallback(() => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0]
+        return typeof key === 'string' && (
+          key === 'attendance' ||
+          key.includes('attendance') ||
+          key === 'today-attendance' ||
+          key === 'today-shift'
+        )
+      }
+    })
+  }, [queryClient])
 
   // ============================================================
   // QUERIES
@@ -180,7 +218,7 @@ export function CheckInOutWidget() {
   }, [todayAttendance])
 
   // ============================================================
-  // MUTATIONS
+  // MUTATIONS — ★ FIX: dùng invalidateAllAttendance
   // ============================================================
 
   const checkInMutation = useMutation({
@@ -197,7 +235,8 @@ export function CheckInOutWidget() {
       )
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['today-attendance'] })
+      // ★ FIX: Invalidate TẤT CẢ queries liên quan attendance
+      invalidateAllAttendance()
     },
   })
 
@@ -213,7 +252,8 @@ export function CheckInOutWidget() {
       )
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['today-attendance'] })
+      // ★ FIX: Invalidate TẤT CẢ queries liên quan attendance
+      invalidateAllAttendance()
     },
   })
 
@@ -397,14 +437,14 @@ export function CheckInOutWidget() {
                 </div>
               )}
 
-              {/* Working Summary */}
+              {/* Working Summary — ★ FIX: tính từ timestamp */}
               {isComplete && todayAttendance && (
                 <div className="p-3 bg-blue-50 rounded-lg">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <span className="text-gray-500">Giờ làm: </span>
                       <span className="font-semibold text-gray-800">
-                        {formatDuration(todayAttendance.working_minutes || 0)}
+                        {calculateWorkingTime(todayAttendance.check_in_time, todayAttendance.check_out_time)}
                       </span>
                     </div>
                     {(todayAttendance.overtime_minutes || 0) > 0 && (

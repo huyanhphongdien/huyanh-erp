@@ -1,13 +1,12 @@
 // ============================================================
-// ATTENDANCE LIST PAGE V4 — MOBILE RESPONSIVE
+// ATTENDANCE LIST PAGE V4 — MOBILE RESPONSIVE — FIXED
 // File: src/features/attendance/AttendanceListPage.tsx
 // Huy Anh ERP System - Chấm công V2
 // ============================================================
-// V4: Tối ưu mobile
-// - Mobile: card layout thay vì table
-// - Filters: stack dọc trên mobile, nút "Lọc" mở rộng
-// - Responsive padding, font size
-// - Desktop: giữ nguyên table như V3
+// FIX 1: Query key đổi từ 'attendance-list-v3' → ['attendance', 'list', ...]
+//        → invalidateQueries từ CheckInOutWidget sẽ bắt đúng
+// FIX 2: Giờ làm tính từ timestamp (check_out - check_in)
+//        thay vì đọc working_minutes từ DB (có thể bị sai do trừ break)
 // ============================================================
 
 import { useState, useMemo } from 'react'
@@ -101,6 +100,34 @@ function formatDuration(minutes: number | null): string {
   return `${h}h${m > 0 ? ` ${String(m).padStart(2, '0')}p` : ''}`
 }
 
+// ★ FIX: Tính giờ làm trực tiếp từ check_in_time và check_out_time
+// Không phụ thuộc vào working_minutes trong DB (có thể bị sai do trừ break)
+function calculateWorkingDisplay(checkIn: string | null, checkOut: string | null): string {
+  if (!checkIn) return '—'
+  if (!checkOut) {
+    // Chưa check-out → tính live từ bây giờ
+    const start = new Date(checkIn)
+    const now = new Date()
+    const diffMs = now.getTime() - start.getTime()
+    if (diffMs <= 0) return '—'
+    const totalMinutes = Math.floor(diffMs / (1000 * 60))
+    const h = Math.floor(totalMinutes / 60)
+    const m = totalMinutes % 60
+    if (h === 0) return `${m}p`
+    return `${h}h${m > 0 ? ` ${String(m).padStart(2, '0')}p` : ''}`
+  }
+  // Đã check-out → tính chính xác
+  const start = new Date(checkIn)
+  const end = new Date(checkOut)
+  const diffMs = end.getTime() - start.getTime()
+  if (diffMs <= 0) return '—'
+  const totalMinutes = Math.floor(diffMs / (1000 * 60))
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (h === 0) return `${m}p`
+  return `${h}h${m > 0 ? ` ${String(m).padStart(2, '0')}p` : ''}`
+}
+
 function getStatusBadge(status: string) {
   switch (status) {
     case 'present':
@@ -157,7 +184,7 @@ function GPSBadge({
 }
 
 // ============================================================
-// MOBILE CARD COMPONENT
+// MOBILE CARD COMPONENT — ★ FIX: dùng calculateWorkingDisplay
 // ============================================================
 
 function AttendanceCard({
@@ -212,7 +239,7 @@ function AttendanceCard({
         </div>
       )}
 
-      {/* Row 4: Check-in / Check-out / Giờ làm */}
+      {/* Row 4: Check-in / Check-out / Giờ làm — ★ FIX */}
       <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-2.5">
         <div className="text-center">
           <p className="text-[10px] text-gray-400 mb-0.5">Check-in</p>
@@ -236,7 +263,7 @@ function AttendanceCard({
         <div className="text-center">
           <p className="text-[10px] text-gray-400 mb-0.5">Giờ làm</p>
           <p className="text-sm font-semibold text-gray-800">
-            {formatDuration(record.working_minutes)}
+            {calculateWorkingDisplay(record.check_in_time, record.check_out_time)}
           </p>
         </div>
       </div>
@@ -330,9 +357,12 @@ export function AttendanceListPage() {
   const shifts = shiftsData || []
 
   // ── LOAD ATTENDANCE RECORDS ──
+  // ★ FIX: Query key đổi từ 'attendance-list-v3' → ['attendance', 'list', ...]
+  // Lý do: invalidateQueries({ queryKey: ['attendance'] }) sẽ match prefix 'attendance'
+  // → khi check-in/out từ widget, bảng danh sách sẽ tự động refresh
   const { data: attendanceData, isLoading } = useQuery({
     queryKey: [
-      'attendance-list-v3',
+      'attendance', 'list',
       page, pageSize, statusFilter, shiftFilter,
       dateFrom, dateTo, departmentFilter,
       showOnlyMine, user?.employee_id,
@@ -617,7 +647,7 @@ export function AttendanceListPage() {
         )}
       </div>
 
-      {/* ══════════ DESKTOP: TABLE ══════════ */}
+      {/* ══════════ DESKTOP: TABLE — ★ FIX: cột Giờ làm dùng calculateWorkingDisplay ══════════ */}
       <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -701,8 +731,11 @@ export function AttendanceListPage() {
                           )}
                         </div>
                       </td>
+                      {/* ★ FIX: Tính giờ làm từ timestamp thay vì working_minutes */}
                       <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                        <span className="font-medium text-gray-700 text-xs">{formatDuration(record.working_minutes)}</span>
+                        <span className="font-medium text-gray-700 text-xs">
+                          {calculateWorkingDisplay(record.check_in_time, record.check_out_time)}
+                        </span>
                       </td>
                       <td className="px-4 py-2.5 text-center">
                         {record.late_minutes > 0 ? (

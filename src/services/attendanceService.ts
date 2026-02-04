@@ -1,8 +1,9 @@
 // ============================================================================
-// ATTENDANCE SERVICE V2
+// ATTENDANCE SERVICE V2 — FIXED
 // File: src/services/attendanceService.ts
 // Huy Anh ERP System - Chấm công V2: GPS + Ca làm việc
-// THAY THẾ hoàn toàn file cũ
+// FIX: working_minutes không trừ break_minutes (break chỉ dùng cho payroll)
+// FIX: Thêm comment giải thích logic tính giờ
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
@@ -450,6 +451,8 @@ export const attendanceService = {
 
   // ══════════════════════════════════════════════════════════════════════════
   // CHECK-OUT V2 (GPS + OT logic)
+  // ★ FIX: working_minutes = thời gian thực tế, KHÔNG trừ break_minutes
+  // ★ break_minutes chỉ dùng cho payroll (tính lương), không ảnh hưởng ghi nhận
   // ══════════════════════════════════════════════════════════════════════════
 
   async checkOut(
@@ -511,11 +514,10 @@ export const attendanceService = {
         .maybeSingle()
 
       if (shiftData) {
-        const breakMins = shiftData.break_minutes || 60
-
-        // Tính working minutes (trừ break)
-        const rawMinutes = Math.floor((now.getTime() - checkIn.getTime()) / (1000 * 60))
-        workingMinutes = Math.max(0, rawMinutes - breakMins)
+        // ★ FIX: Tính working_minutes = thời gian thực tế check-out - check-in
+        // KHÔNG trừ break_minutes. break_minutes chỉ dùng cho payroll.
+        // Lý do: nếu làm 9 phút mà trừ break 60 phút → Math.max(0, 9-60) = 0 → SAI
+        workingMinutes = Math.floor((now.getTime() - checkIn.getTime()) / (1000 * 60))
 
         // Parse end_time - dùng ngày check-in (existing.date) để tính
         const [endH, endM] = (shiftData.end_time as string).split(':').map(Number)

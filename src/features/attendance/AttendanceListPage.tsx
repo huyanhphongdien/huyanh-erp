@@ -1,15 +1,17 @@
 // ============================================================
-// ATTENDANCE LIST PAGE V4 — MOBILE RESPONSIVE — FIXED
+// ATTENDANCE LIST PAGE V6 — Uses attendanceService V3
 // File: src/features/attendance/AttendanceListPage.tsx
-// Huy Anh ERP System - Chấm công V2
+// Huy Anh ERP System - Chấm công V3
 // ============================================================
-// FIX 1: Query key đổi từ 'attendance-list-v3' → ['attendance', 'list', ...]
-//        → invalidateQueries từ CheckInOutWidget sẽ bắt đúng
-// FIX 2: Giờ làm tính từ timestamp (check_out - check_in)
-//        thay vì đọc working_minutes từ DB (có thể bị sai do trừ break)
+// CHANGES from V5:
+//   ★ Uses attendanceService.getAll() instead of direct Supabase
+//   ★ Stats: properly caps working_minutes for auto_checkout
+//   ★ Stats: late_minutes capped at shift standard_hours
+//   ★ Widget: warns clearly when no shift assigned
+//   ★ Mobile-first: 44px+ touch targets, active: states
 // ============================================================
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Clock,
@@ -21,749 +23,702 @@ import {
   Zap,
   User,
   Building2,
-  Monitor,
   MapPin,
   MapPinOff,
   Filter,
   ChevronDown,
+  Monitor,
+  Users,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { attendanceService } from '../../services/attendanceService'
+import type { AttendanceRecord } from '../../services/attendanceService'
 import { CheckInOutWidget } from './CheckInOutWidget'
 
 // ============================================================
-// TYPES
+// HELPERS
 // ============================================================
 
-interface AttendanceRecord {
-  id: string
-  employee_id: string
-  date: string
-  check_in_time: string | null
-  check_out_time: string | null
-  working_minutes: number | null
-  overtime_minutes: number | null
-  status: string
-  notes: string | null
-  shift_id: string | null
-  late_minutes: number
-  early_leave_minutes: number
-  is_gps_verified: boolean
-  auto_checkout: boolean
-  check_in_lat: number | null
-  check_in_lng: number | null
-  check_out_lat: number | null
-  check_out_lng: number | null
-  employee?: {
-    id: string
-    code: string
-    full_name: string
-    department_id?: string
-    department?: { id: string; name: string; code: string }
-  }
-  shift?: {
-    id: string
-    code: string
-    name: string
-    start_time: string
-    end_time: string
-  }
-}
-
-interface ShiftOption {
-  id: string
-  code: string
-  name: string
-}
-
-interface DepartmentOption {
-  id: string
-  code: string
-  name: string
-}
-
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
-
-function formatTime(isoStr: string | null): string {
-  if (!isoStr) return '—'
-  const d = new Date(isoStr)
+function formatTime(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
-function formatDuration(minutes: number | null): string {
+function formatShiftTime(t: string): string {
+  return t?.substring(0, 5) || ''
+}
+
+function formatDuration(minutes: number | null | undefined): string {
   if (!minutes || minutes <= 0) return '—'
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
-  if (h === 0) return `${m}p`
-  return `${h}h${m > 0 ? ` ${String(m).padStart(2, '0')}p` : ''}`
+  return `${h}h ${m.toString().padStart(2, '0')}p`
 }
 
-// ★ FIX: Tính giờ làm trực tiếp từ check_in_time và check_out_time
-// Không phụ thuộc vào working_minutes trong DB (có thể bị sai do trừ break)
-function calculateWorkingDisplay(checkIn: string | null, checkOut: string | null): string {
-  if (!checkIn) return '—'
-  if (!checkOut) {
-    // Chưa check-out → tính live từ bây giờ
-    const start = new Date(checkIn)
-    const now = new Date()
-    const diffMs = now.getTime() - start.getTime()
-    if (diffMs <= 0) return '—'
-    const totalMinutes = Math.floor(diffMs / (1000 * 60))
-    const h = Math.floor(totalMinutes / 60)
-    const m = totalMinutes % 60
-    if (h === 0) return `${m}p`
-    return `${h}h${m > 0 ? ` ${String(m).padStart(2, '0')}p` : ''}`
-  }
-  // Đã check-out → tính chính xác
-  const start = new Date(checkIn)
-  const end = new Date(checkOut)
-  const diffMs = end.getTime() - start.getTime()
-  if (diffMs <= 0) return '—'
-  const totalMinutes = Math.floor(diffMs / (1000 * 60))
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  if (h === 0) return `${m}p`
-  return `${h}h${m > 0 ? ` ${String(m).padStart(2, '0')}p` : ''}`
+function formatMinutes(minutes: number | null | undefined): string {
+  if (!minutes || minutes <= 0) return '—'
+  if (minutes < 60) return `${minutes}p`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m > 0 ? `${h}h${m.toString().padStart(2, '0')}p` : `${h}h`
 }
 
-function getStatusBadge(status: string) {
-  switch (status) {
-    case 'present':
-      return { label: 'Đúng giờ', color: 'bg-green-100 text-green-700' }
-    case 'late':
-      return { label: 'Đi trễ', color: 'bg-yellow-100 text-yellow-700' }
-    case 'early_leave':
-      return { label: 'Về sớm', color: 'bg-orange-100 text-orange-700' }
-    case 'absent':
-      return { label: 'Vắng', color: 'bg-red-100 text-red-700' }
-    default:
-      return { label: status, color: 'bg-gray-100 text-gray-600' }
-  }
-}
-
-function formatDateShort(dateStr: string): string {
+function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })
+  const dayNames = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7']
+  const day = d.getDate().toString().padStart(2, '0')
+  const month = (d.getMonth() + 1).toString().padStart(2, '0')
+  return `${dayNames[d.getDay()]}, ${day}/${month}`
 }
 
-// ============================================================
-// GPS STATUS BADGE
-// ============================================================
+/** Cap working_minutes for auto_checkout records */
+function getEffectiveWorkingMinutes(record: AttendanceRecord): number {
+  const raw = record.working_minutes || 0
+  if (!raw) return 0
 
-function GPSBadge({
-  isVerified,
-  isAutoCheckout,
-  hasCoords,
-}: {
-  isVerified: boolean
-  isAutoCheckout: boolean
-  hasCoords: boolean
-}) {
-  if (isAutoCheckout) {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded">
-        <Zap size={10} />
-      </span>
-    )
+  // auto_checkout records: cap at shift's standard_hours
+  if (record.auto_checkout && record.shift?.standard_hours) {
+    const capMinutes = record.shift.standard_hours * 60
+    return Math.min(raw, capMinutes)
   }
-  if (isVerified || hasCoords) {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">
-        <MapPin size={10} />
-        <span className="text-[10px]">✓</span>
-      </span>
-    )
+
+  return raw
+}
+
+/** Cap late_minutes for sanity (max = shift standard_hours * 60) */
+function getEffectiveLateMinutes(record: AttendanceRecord): number {
+  const raw = record.late_minutes || 0
+  if (!raw) return 0
+
+  // Cap at shift standard hours (e.g., max 480 for 8h shift)
+  if (record.shift?.standard_hours) {
+    return Math.min(raw, record.shift.standard_hours * 60)
   }
-  return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-500 text-xs font-medium rounded">
-      <Monitor size={10} />
-    </span>
-  )
+
+  // Default cap: 8 hours
+  return Math.min(raw, 480)
+}
+
+// Default date range: last 7 days
+function getDefaultDateRange(): { from: string; to: string } {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(from.getDate() - 6)
+  return {
+    from: from.toISOString().split('T')[0],
+    to: to.toISOString().split('T')[0],
+  }
+}
+
+// Status config
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  present: { label: 'Đúng giờ', className: 'bg-green-100 text-green-700' },
+  late: { label: 'Đi trễ', className: 'bg-amber-100 text-amber-700' },
+  early_leave: { label: 'Về sớm', className: 'bg-orange-100 text-orange-700' },
+  absent: { label: 'Vắng', className: 'bg-red-100 text-red-700' },
+  auto_checkout: { label: 'auto_checkout', className: 'bg-gray-100 text-gray-600' },
+}
+
+const TEAM_BADGE: Record<string, string> = {
+  A: 'bg-blue-50 text-blue-700 border-blue-200',
+  B: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
 // ============================================================
-// MOBILE CARD COMPONENT — ★ FIX: dùng calculateWorkingDisplay
+// COMPONENT
 // ============================================================
 
-function AttendanceCard({
-  record,
-  showEmployee,
-}: {
-  record: AttendanceRecord
-  showEmployee: boolean
-}) {
-  const statusBadge = getStatusBadge(record.status)
-  const shift = Array.isArray(record.shift) ? (record.shift as any)[0] : record.shift
-  const dept = Array.isArray(record.employee?.department)
-    ? (record.employee?.department as any)[0]
-    : record.employee?.department
-  const hasCoords = record.check_in_lat != null && record.check_in_lng != null
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3.5 space-y-2.5">
-      {/* Row 1: Date + Status + GPS */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-800">
-          {formatDateShort(record.date)}
-        </span>
-        <div className="flex items-center gap-1.5">
-          <GPSBadge isVerified={record.is_gps_verified} isAutoCheckout={record.auto_checkout} hasCoords={hasCoords} />
-          <span className={`px-2 py-0.5 text-[11px] font-medium rounded ${statusBadge.color}`}>
-            {statusBadge.label}
-          </span>
-        </div>
-      </div>
-
-      {/* Row 2: Employee (nếu xem tất cả) */}
-      {showEmployee && record.employee && (
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
-            {record.employee.full_name?.charAt(0) || '?'}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-800 truncate">{record.employee.full_name}</p>
-            <p className="text-[10px] text-gray-400 truncate">
-              {record.employee.code}{dept?.name ? ` • ${dept.name}` : ''}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Row 3: Shift */}
-      {shift && (
-        <div className="text-xs text-gray-500">
-          Ca: <span className="font-medium text-gray-700">{shift.name}</span>
-          <span className="text-gray-400 ml-1">({shift.start_time?.substring(0, 5)} - {shift.end_time?.substring(0, 5)})</span>
-        </div>
-      )}
-
-      {/* Row 4: Check-in / Check-out / Giờ làm — ★ FIX */}
-      <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-2.5">
-        <div className="text-center">
-          <p className="text-[10px] text-gray-400 mb-0.5">Check-in</p>
-          <p className={`text-sm font-semibold ${record.status === 'late' ? 'text-yellow-600' : 'text-gray-800'}`}>
-            {formatTime(record.check_in_time)}
-          </p>
-        </div>
-        <div className="text-center border-x border-gray-200">
-          <p className="text-[10px] text-gray-400 mb-0.5">Check-out</p>
-          <div className="flex items-center justify-center gap-0.5">
-            <p className={`text-sm font-semibold ${record.status === 'early_leave' ? 'text-orange-600' : 'text-gray-800'}`}>
-              {formatTime(record.check_out_time)}
-            </p>
-            {record.auto_checkout && (
-              <span title="Tự động checkout">
-                <Zap size={10} className="text-orange-500" />
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-center">
-          <p className="text-[10px] text-gray-400 mb-0.5">Giờ làm</p>
-          <p className="text-sm font-semibold text-gray-800">
-            {calculateWorkingDisplay(record.check_in_time, record.check_out_time)}
-          </p>
-        </div>
-      </div>
-
-      {/* Row 5: Badges (Trễ, Về sớm, OT) */}
-      {(record.late_minutes > 0 || record.early_leave_minutes > 0 || (record.overtime_minutes || 0) > 0) && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {record.late_minutes > 0 && (
-            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[11px] font-medium rounded">
-              <AlertTriangle size={9} />
-              Trễ {record.late_minutes}p
-            </span>
-          )}
-          {record.early_leave_minutes > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 bg-orange-100 text-orange-700 text-[11px] font-medium rounded">
-              Về sớm {record.early_leave_minutes}p
-            </span>
-          )}
-          {(record.overtime_minutes || 0) > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 bg-purple-100 text-purple-700 text-[11px] font-medium rounded">
-              OT {formatDuration(record.overtime_minutes)}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
-
-export function AttendanceListPage() {
+export default function AttendanceListPage() {
   const { user } = useAuthStore()
+  const employeeId = user?.employee_id
+  const userDepartmentId = user?.department_id
+  const isManager = (user?.position_level ?? 99) <= 5
 
-  // Permission checks
-  const isAdmin = user?.role === 'admin'
-  const isManager = user?.role === 'admin' || user?.role === 'manager' || (user as any)?.is_manager
-  const userLevel = (user as any)?.position_level || 7
-  const isExecutive = userLevel <= 3
-  const canSeeOthers = isAdmin || isExecutive || isManager
-
-  // ── STATE ──
+  // ── State ──
+  const defaultRange = getDefaultDateRange()
+  const [scope, setScope] = useState<'mine' | 'department' | 'all'>(
+    isManager ? 'department' : 'mine'
+  )
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all')
+  const [teamFilter, setTeamFilter] = useState<string>('all')
+  const [search, setSearch] = useState('')
+  const [fromDate, setFromDate] = useState(defaultRange.from)
+  const [toDate, setToDate] = useState(defaultRange.to)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [shiftFilter, setShiftFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(20)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [shiftFilter, setShiftFilter] = useState('all')
-  const [departmentFilter, setDepartmentFilter] = useState('')
-  const [showOnlyMine, setShowOnlyMine] = useState(!canSeeOthers)
-  const [showFilters, setShowFilters] = useState(false)
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date()
-    d.setDate(1)
-    return d.toISOString().split('T')[0]
-  })
-  const [dateTo, setDateTo] = useState(() => {
-    return new Date().toISOString().split('T')[0]
-  })
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const pageSize = 50
 
-  // ── LOAD DEPARTMENTS ──
-  const { data: departmentsData } = useQuery<DepartmentOption[]>({
-    queryKey: ['departments-attendance-filter'],
+  // ── Departments list (for filter) ──
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments-list'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('departments')
-        .select('id, code, name')
-        .eq('status', 'active')
+        .select('id, name, code')
         .order('name')
       if (error) throw error
       return data || []
     },
-    enabled: canSeeOthers,
+    staleTime: 5 * 60 * 1000,
   })
-  const departments = departmentsData || []
 
-  // ── LOAD SHIFTS ──
-  const { data: shiftsData } = useQuery<ShiftOption[]>({
-    queryKey: ['shifts-options'],
+  // ── Shifts list (for filter) ──
+  const { data: shifts = [] } = useQuery({
+    queryKey: ['shifts-list'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shifts')
-        .select('id, code, name')
+        .select('id, code, name, start_time, end_time, standard_hours, crosses_midnight')
         .eq('is_active', true)
-        .order('name')
+        .order('start_time')
       if (error) throw error
       return data || []
     },
+    staleTime: 5 * 60 * 1000,
   })
-  const shifts = shiftsData || []
 
-  // ── LOAD ATTENDANCE RECORDS ──
-  // ★ FIX: Query key đổi từ 'attendance-list-v3' → ['attendance', 'list', ...]
-  // Lý do: invalidateQueries({ queryKey: ['attendance'] }) sẽ match prefix 'attendance'
-  // → khi check-in/out từ widget, bảng danh sách sẽ tự động refresh
+  // ── Teams list (for filter) ──
+  const { data: teams = [] } = useQuery({
+    queryKey: ['teams-list'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shift_teams')
+          .select('id, code, name')
+          .eq('is_active', true)
+          .order('code')
+        if (error) throw error
+        return data || []
+      } catch {
+        return [] // Table may not exist yet
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // ── Team members mapping ──
+  const { data: teamMembers = {} } = useQuery({
+    queryKey: ['team-members-map'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shift_team_members')
+          .select('employee_id, team:shift_teams!shift_team_members_team_id_fkey(code, name)')
+          .is('effective_to', null)
+        if (error) throw error
+        const map: Record<string, { code: string; name: string }> = {}
+        for (const m of data || []) {
+          const t = m.team as any
+          if (t) map[m.employee_id] = { code: t.code, name: t.name }
+        }
+        return map
+      } catch {
+        return {}
+      }
+    },
+    staleTime: 60 * 1000,
+  })
+
+  // ── Main attendance query (via service V3) ──
+  const effectiveDepartmentId =
+    scope === 'department' ? (departmentFilter !== 'all' ? departmentFilter : userDepartmentId) : 
+    scope === 'all' ? (departmentFilter !== 'all' ? departmentFilter : undefined) :
+    undefined
+
   const { data: attendanceData, isLoading } = useQuery({
     queryKey: [
       'attendance', 'list',
-      page, pageSize, statusFilter, shiftFilter,
-      dateFrom, dateTo, departmentFilter,
-      showOnlyMine, user?.employee_id,
+      page, pageSize, scope, search,
+      effectiveDepartmentId, fromDate, toDate,
+      statusFilter, shiftFilter, employeeId,
     ],
-    queryFn: async () => {
-      const from = (page - 1) * pageSize
-      const to = from + pageSize - 1
-
-      let query = supabase
-        .from('attendance')
-        .select(`
-          *,
-          employee:employees!attendance_employee_id_fkey(
-            id, code, full_name, department_id,
-            department:departments!employees_department_id_fkey(id, name, code)
-          ),
-          shift:shifts(
-            id, code, name, start_time, end_time
-          )
-        `, { count: 'exact' })
-
-      if (showOnlyMine) {
-        query = query.eq('employee_id', user?.employee_id || '')
-      } else if (!isAdmin && !isExecutive && !isManager) {
-        query = query.eq('employee_id', user?.employee_id || '')
-      }
-
-      if (statusFilter !== 'all') query = query.eq('status', statusFilter)
-      if (dateFrom) query = query.gte('date', dateFrom)
-      if (dateTo) query = query.lte('date', dateTo)
-      if (shiftFilter !== 'all' && shiftFilter !== 'none') query = query.eq('shift_id', shiftFilter)
-      if (shiftFilter === 'none') query = query.is('shift_id', null)
-
-      const { data, error, count } = await query
-        .order('date', { ascending: false })
-        .order('check_in_time', { ascending: false })
-        .range(from, to)
-
-      if (error) throw error
-
-      let records = (data || []) as AttendanceRecord[]
-
-      if (!showOnlyMine && departmentFilter) {
-        records = records.filter(r => {
-          const dept = Array.isArray(r.employee?.department)
-            ? (r.employee?.department as any)[0]
-            : r.employee?.department
-          return dept?.id === departmentFilter
-        })
-      }
-
-      if (!showOnlyMine && isManager && !isExecutive && !isAdmin && !departmentFilter) {
-        const myDeptId = (user as any)?.department_id
-        if (myDeptId) {
-          records = records.filter(r => {
-            const dept = Array.isArray(r.employee?.department)
-              ? (r.employee?.department as any)[0]
-              : r.employee?.department
-            return dept?.id === myDeptId
-          })
-        }
-      }
-
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim()
-        records = records.filter(r =>
-          r.employee?.full_name?.toLowerCase().includes(term) ||
-          r.employee?.code?.toLowerCase().includes(term)
-        )
-      }
-
-      return {
-        data: records,
-        total: count || 0,
+    queryFn: () =>
+      attendanceService.getAll({
         page,
         pageSize,
-        totalPages: Math.ceil((count || 0) / pageSize),
-      }
-    },
-    enabled: !!user?.employee_id,
+        search: search || undefined,
+        employee_id: scope === 'mine' ? employeeId || undefined : undefined,
+        department_id: effectiveDepartmentId || undefined,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        shift_id: shiftFilter !== 'all' ? shiftFilter : undefined,
+        scope,
+        current_employee_id: employeeId || undefined,
+      }),
+    enabled: !!employeeId,
+    staleTime: 10 * 1000,
   })
 
   const records = attendanceData?.data || []
-  const totalPages = attendanceData?.totalPages || 1
   const totalRecords = attendanceData?.total || 0
+  const totalPages = attendanceData?.totalPages || 1
 
-  const subtitle = useMemo(() => {
-    if (showOnlyMine) return 'Chấm công của tôi'
-    if (isAdmin || isExecutive) return 'Tất cả nhân viên'
-    if (isManager) return 'Phòng ban của bạn'
-    return 'Chấm công của bạn'
-  }, [showOnlyMine, isAdmin, isExecutive, isManager])
+  // ── Post-filter by team (client-side) ──
+  const filteredRecords = useMemo(() => {
+    if (teamFilter === 'all') return records
+    return records.filter((r) => {
+      const team = teamMembers[r.employee_id]
+      if (teamFilter === 'none') return !team
+      return team?.code === teamFilter
+    })
+  }, [records, teamFilter, teamMembers])
 
-  const showEmployeeColumn = canSeeOthers && !showOnlyMine
+  // ── Summary stats (capped values) ──
+  const stats = useMemo(() => {
+    const uniqueDays = new Set(filteredRecords.map((r) => r.date))
+    let totalWorking = 0
+    let totalLate = 0
+    let totalEarlyLeave = 0
+    let totalOT = 0
 
-  const activeFilterCount = [
-    statusFilter !== 'all',
-    shiftFilter !== 'all',
-    departmentFilter !== '',
-  ].filter(Boolean).length
+    for (const r of filteredRecords) {
+      totalWorking += getEffectiveWorkingMinutes(r)
+      totalLate += getEffectiveLateMinutes(r)
+      totalEarlyLeave += r.early_leave_minutes || 0
+      totalOT += r.overtime_minutes || 0
+    }
+
+    return {
+      days: uniqueDays.size,
+      totalWorking,
+      totalLate,
+      totalEarlyLeave,
+      totalOT,
+    }
+  }, [filteredRecords])
+
+  // ── Active filter count (for mobile badge) ──
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (statusFilter !== 'all') count++
+    if (shiftFilter !== 'all') count++
+    if (teamFilter !== 'all') count++
+    if (fromDate !== defaultRange.from || toDate !== defaultRange.to) count++
+    return count
+  }, [statusFilter, shiftFilter, teamFilter, fromDate, toDate, defaultRange])
+
+  // ── Callback: invalidate from widget ──
+  const handleWidgetAction = useCallback(() => {
+    // Widget already invalidates its own queries
+    // This is for page-level refresh if needed
+  }, [])
 
   // ============================================================
   // RENDER
   // ============================================================
-
   return (
-    <div className="p-3 sm:p-4 lg:p-6 max-w-[1500px] mx-auto space-y-3 sm:space-y-5">
-      {/* ══════════ HEADER ══════════ */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Bảng chấm công</h1>
-        <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{subtitle}</p>
+    <div className="max-w-[1600px] mx-auto">
+      {/* ── Header ── */}
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-gray-900">Bảng chấm công</h1>
+        <p className="text-sm text-gray-500">
+          {scope === 'mine' ? 'Của tôi' : scope === 'department' ? 'Phòng ban của bạn' : 'Tất cả'}
+        </p>
       </div>
 
-      {/* ══════════ CHECK-IN/OUT WIDGET ══════════ */}
-      <CheckInOutWidget />
+      {/* ── Check-in/out Widget ── */}
+      <div className="mb-4">
+        <CheckInOutWidget onCheckInOut={handleWidgetAction} />
+      </div>
 
-      {/* ══════════ FILTER TOOLBAR ══════════ */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
-        {/* Row 1: Main actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Nút "Của tôi" */}
-          {canSeeOthers && (
+      {/* ── Stats Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
+        <StatCard icon={Calendar} label="Ngày" value={String(stats.days)} color="blue" />
+        <StatCard
+          icon={Clock}
+          label="Tổng giờ"
+          value={formatDuration(stats.totalWorking)}
+          color="emerald"
+        />
+        <StatCard
+          icon={AlertTriangle}
+          label="Trễ"
+          value={formatMinutes(stats.totalLate)}
+          color={stats.totalLate > 0 ? 'amber' : 'gray'}
+        />
+        <StatCard
+          icon={Zap}
+          label="Về sớm"
+          value={formatMinutes(stats.totalEarlyLeave)}
+          color={stats.totalEarlyLeave > 0 ? 'orange' : 'gray'}
+        />
+        <StatCard
+          icon={Clock}
+          label="OT"
+          value={formatMinutes(stats.totalOT)}
+          color={stats.totalOT > 0 ? 'purple' : 'gray'}
+        />
+      </div>
+
+      {/* ── Filter Bar ── */}
+      <div className="bg-white rounded-xl border shadow-sm mb-4">
+        {/* Row 1: Scope + Department + Team + Search */}
+        <div className="px-3 py-2 flex flex-wrap items-center gap-2">
+          {/* Scope toggle */}
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden">
             <button
-              onClick={() => { setShowOnlyMine(v => !v); setPage(1) }}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all border
-                ${showOnlyMine
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                }`}
+              onClick={() => { setScope('mine'); setPage(1) }}
+              className={`px-3 py-2 text-xs font-medium min-h-[44px] flex items-center gap-1
+                ${scope === 'mine' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 active:bg-gray-100'}`}
             >
-              <User size={15} />
-              <span className="hidden xs:inline">Của tôi</span>
+              <User size={13} /> Của tôi
             </button>
-          )}
-
-          {/* Phòng ban */}
-          {canSeeOthers && !showOnlyMine && (
-            <div className="flex items-center gap-1.5">
-              <Building2 size={15} className="text-gray-400 hidden sm:block" />
-              <select
-                value={departmentFilter}
-                onChange={e => { setDepartmentFilter(e.target.value); setPage(1) }}
-                className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 max-w-[150px] sm:max-w-none"
+            {isManager && (
+              <button
+                onClick={() => { setScope('department'); setPage(1) }}
+                className={`px-3 py-2 text-xs font-medium min-h-[44px] flex items-center gap-1 border-l
+                  ${scope === 'department' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 active:bg-gray-100'}`}
               >
-                <option value="">Tất cả PB</option>
-                {departments.map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Search — desktop only */}
-          {canSeeOthers && !showOnlyMine && (
-            <div className="relative hidden sm:flex flex-1 min-w-[180px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-              <input
-                type="text"
-                placeholder="Tìm nhân viên..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          )}
-
-          {/* Date range — desktop */}
-          <div className="hidden md:flex items-center gap-1.5">
-            <Calendar size={15} className="text-gray-400" />
-            <input type="date" value={dateFrom}
-              onChange={e => { setDateFrom(e.target.value); setPage(1) }}
-              className="px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
-            <span className="text-gray-400 text-xs">→</span>
-            <input type="date" value={dateTo}
-              onChange={e => { setDateTo(e.target.value); setPage(1) }}
-              className="px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                <Building2 size={13} /> PB
+              </button>
+            )}
+            {isManager && (
+              <button
+                onClick={() => { setScope('all'); setPage(1) }}
+                className={`px-3 py-2 text-xs font-medium min-h-[44px] flex items-center gap-1 border-l
+                  ${scope === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 active:bg-gray-100'}`}
+              >
+                <Monitor size={13} /> Tất cả
+              </button>
+            )}
           </div>
 
-          {/* Status & Shift — desktop only */}
-          <select value={statusFilter}
-            onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
-            className="hidden lg:block px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+          {/* Department filter (desktop + when scope=all) */}
+          {(scope === 'department' || scope === 'all') && (
+            <select
+              value={departmentFilter}
+              onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1) }}
+              className="hidden lg:block px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+            >
+              <option value="all">Tất cả PB</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Team filter (desktop) */}
+          {teams.length > 0 && (
+            <select
+              value={teamFilter}
+              onChange={(e) => { setTeamFilter(e.target.value); setPage(1) }}
+              className="hidden lg:block px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+            >
+              <option value="all">Tất cả đội</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.code}>{t.name}</option>
+              ))}
+              <option value="none">Chưa phân đội</option>
+            </select>
+          )}
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-[150px]">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Tìm nhân viên..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm text-[15px] min-h-[44px]"
+            />
+          </div>
+
+          {/* Date range (desktop) */}
+          <div className="hidden lg:flex items-center gap-1">
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+              className="px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+            />
+            <span className="text-gray-400">—</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+              className="px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+            />
+          </div>
+
+          {/* Status filter (desktop) */}
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+            className="hidden lg:block px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+          >
             <option value="all">Tất cả trạng thái</option>
             <option value="present">Đúng giờ</option>
             <option value="late">Đi trễ</option>
             <option value="early_leave">Về sớm</option>
-            <option value="absent">Vắng</option>
+            <option value="auto_checkout">Auto checkout</option>
           </select>
 
-          <select value={shiftFilter}
-            onChange={e => { setShiftFilter(e.target.value); setPage(1) }}
-            className="hidden lg:block px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+          {/* Shift filter (desktop) */}
+          <select
+            value={shiftFilter}
+            onChange={(e) => { setShiftFilter(e.target.value); setPage(1) }}
+            className="hidden lg:block px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+          >
             <option value="all">Tất cả ca</option>
-            {shifts.map(s => (
+            {shifts.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
-            <option value="none">Không có ca</option>
           </select>
 
-          {/* Nút Lọc — mobile/tablet */}
+          {/* Mobile: toggle filters button */}
           <button
-            onClick={() => setShowFilters(v => !v)}
-            className="lg:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 ml-auto relative"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className="lg:hidden flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px] active:bg-gray-50 relative"
           >
-            <Filter size={15} />
-            <span className="hidden sm:inline">Lọc</span>
+            <Filter size={14} />
+            <span>Lọc</span>
             {activeFilterCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
           </button>
         </div>
 
-        {/* Row 2: Expanded filters — mobile/tablet */}
-        {showFilters && (
-          <div className="mt-3 pt-3 border-t border-gray-100 space-y-2 lg:hidden">
-            {/* Search mobile */}
-            {canSeeOthers && !showOnlyMine && (
-              <div className="relative sm:hidden">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                <input type="text" placeholder="Tìm nhân viên..."
-                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
-              </div>
+        {/* ── Mobile expanded filters ── */}
+        {showMobileFilters && (
+          <div className="lg:hidden px-3 pb-3 space-y-2 border-t pt-2">
+            {/* Dept filter mobile */}
+            {(scope === 'department' || scope === 'all') && (
+              <select
+                value={departmentFilter}
+                onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1) }}
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+              >
+                <option value="all">Tất cả PB</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
             )}
 
             {/* Date range mobile */}
-            <div className="flex items-center gap-1.5 md:hidden">
-              <Calendar size={15} className="text-gray-400 flex-shrink-0" />
-              <input type="date" value={dateFrom}
-                onChange={e => { setDateFrom(e.target.value); setPage(1) }}
-                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
-              <span className="text-gray-400 text-xs">→</span>
-              <input type="date" value={dateTo}
-                onChange={e => { setDateTo(e.target.value); setPage(1) }}
-                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+              />
+              <span className="text-gray-400">—</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+              />
             </div>
 
-            {/* Status + Shift mobile */}
+            {/* Status + Shift + Team mobile */}
             <div className="flex gap-2">
-              <select value={statusFilter}
-                onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
-                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
-                <option value="all">Tất cả trạng thái</option>
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+              >
+                <option value="all">Trạng thái</option>
                 <option value="present">Đúng giờ</option>
                 <option value="late">Đi trễ</option>
                 <option value="early_leave">Về sớm</option>
-                <option value="absent">Vắng</option>
+                <option value="auto_checkout">Auto checkout</option>
               </select>
-              <select value={shiftFilter}
-                onChange={e => { setShiftFilter(e.target.value); setPage(1) }}
-                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+              <select
+                value={shiftFilter}
+                onChange={(e) => { setShiftFilter(e.target.value); setPage(1) }}
+                className="flex-1 px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+              >
                 <option value="all">Tất cả ca</option>
-                {shifts.map(s => (
+                {shifts.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
-                <option value="none">Không có ca</option>
               </select>
             </div>
+
+            {teams.length > 0 && (
+              <select
+                value={teamFilter}
+                onChange={(e) => { setTeamFilter(e.target.value); setPage(1) }}
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm min-h-[44px]"
+              >
+                <option value="all">Tất cả đội</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.code}>{t.name}</option>
+                ))}
+                <option value="none">Chưa phân đội</option>
+              </select>
+            )}
           </div>
         )}
       </div>
 
-      {/* ══════════ MOBILE: CARD LIST ══════════ */}
-      <div className="lg:hidden space-y-2">
-        {isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center gap-2 text-gray-500">
-              <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full" />
-              <span className="text-sm">Đang tải...</span>
-            </div>
-          </div>
-        ) : records.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 text-sm">
-            Không có dữ liệu chấm công
-          </div>
-        ) : (
-          records.map(record => (
-            <AttendanceCard key={record.id} record={record} showEmployee={showEmployeeColumn} />
-          ))
-        )}
-      </div>
-
-      {/* ══════════ DESKTOP: TABLE — ★ FIX: cột Giờ làm dùng calculateWorkingDisplay ══════════ */}
-      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* ══════════ TABLE (Desktop) ══════════ */}
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+        {/* Desktop table */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Ngày</th>
-                {showEmployeeColumn && (
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Nhân viên</th>
-                )}
-                <th className="text-left px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Ca</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Check-in</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Check-out</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Giờ làm</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Trễ</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Về sớm</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">OT</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">GPS</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Trạng thái</th>
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Ngày</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Nhân viên</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Đội</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Ca</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Check-in</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Check-out</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Giờ làm</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Trễ</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Về sớm</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">OT</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">GPS</th>
+                <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-16">
-                    <div className="inline-flex items-center gap-2 text-gray-500">
+                  <td colSpan={12} className="text-center py-12 text-gray-400">
+                    <div className="flex items-center justify-center gap-2">
                       <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full" />
-                      Đang tải dữ liệu...
+                      Đang tải...
                     </div>
                   </td>
                 </tr>
-              ) : records.length === 0 ? (
+              ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-16 text-gray-400">
-                    Không có dữ liệu chấm công trong khoảng thời gian này
+                  <td colSpan={12} className="text-center py-12 text-gray-400">
+                    Không có dữ liệu chấm công
                   </td>
                 </tr>
               ) : (
-                records.map(record => {
-                  const statusBadge = getStatusBadge(record.status)
-                  const shift = Array.isArray(record.shift) ? (record.shift as any)[0] : record.shift
-                  const dept = Array.isArray(record.employee?.department)
-                    ? (record.employee?.department as any)[0]
-                    : record.employee?.department
-                  const hasCoords = record.check_in_lat != null && record.check_in_lng != null
+                filteredRecords.map((r) => {
+                  const team = teamMembers[r.employee_id]
+                  const effectiveWorking = getEffectiveWorkingMinutes(r)
+                  const effectiveLate = getEffectiveLateMinutes(r)
+                  const isLate = r.status === 'late' || effectiveLate > 0
+                  const statusCfg = STATUS_CONFIG[r.status] || STATUS_CONFIG.present
 
                   return (
-                    <tr key={record.id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="px-4 py-2.5 whitespace-nowrap">
-                        <span className="font-medium text-gray-800 text-xs">{formatDateShort(record.date)}</span>
+                    <tr key={r.id} className="active:bg-gray-50">
+                      {/* Ngày */}
+                      <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">
+                        {formatDate(r.date)}
                       </td>
-                      {showEmployeeColumn && (
-                        <td className="px-4 py-2.5">
-                          <div className="min-w-[140px]">
-                            <p className="font-medium text-gray-800 text-xs truncate">{record.employee?.full_name || '—'}</p>
-                            <p className="text-[10px] text-gray-400 truncate">
-                              {record.employee?.code}{dept?.name ? ` • ${dept.name}` : ''}
-                            </p>
-                          </div>
-                        </td>
-                      )}
-                      <td className="px-4 py-2.5">
-                        {shift ? (
-                          <div className="min-w-[90px]">
-                            <p className="font-medium text-gray-700 text-xs">{shift.name}</p>
-                            <p className="text-[10px] text-gray-400">{shift.start_time?.substring(0, 5)} - {shift.end_time?.substring(0, 5)}</p>
-                          </div>
-                        ) : <span className="text-xs text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                        <span className={record.status === 'late' ? 'text-yellow-600 font-medium text-xs' : 'text-gray-700 text-xs'}>
-                          {formatTime(record.check_in_time)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1">
-                          <span className={record.status === 'early_leave' ? 'text-orange-600 font-medium text-xs' : 'text-gray-700 text-xs'}>
-                            {formatTime(record.check_out_time)}
-                          </span>
-                          {record.auto_checkout && (
-                            <span title="Tự động checkout"><Zap size={11} className="text-orange-500" /></span>
+
+                      {/* Nhân viên */}
+                      <td className="px-3 py-2.5">
+                        <div className="font-medium text-gray-900">{r.employee?.full_name || '—'}</div>
+                        <div className="text-xs text-gray-400">
+                          {r.employee?.code}
+                          {r.employee?.department?.name && (
+                            <> • {r.employee.department.name}</>
                           )}
                         </div>
                       </td>
-                      {/* ★ FIX: Tính giờ làm từ timestamp thay vì working_minutes */}
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                        <span className="font-medium text-gray-700 text-xs">
-                          {calculateWorkingDisplay(record.check_in_time, record.check_out_time)}
+
+                      {/* Đội */}
+                      <td className="px-3 py-2.5">
+                        {team ? (
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold border ${TEAM_BADGE[team.code] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                            {team.name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Ca */}
+                      <td className="px-3 py-2.5">
+                        {r.shift ? (
+                          <div>
+                            <div className="font-medium text-gray-800 text-xs">{r.shift.name}</div>
+                            <div className="text-[10px] text-gray-400">
+                              {formatShiftTime(r.shift.start_time)}-{formatShiftTime(r.shift.end_time)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Check-in */}
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={isLate ? 'text-amber-600 font-medium' : 'text-gray-700'}>
+                          {formatTime(r.check_in_time)}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-center">
-                        {record.late_minutes > 0 ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-[11px] font-medium rounded">
-                            <AlertTriangle size={9} />{record.late_minutes}p
+
+                      {/* Check-out */}
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={r.auto_checkout ? 'text-gray-400' : 'text-gray-700'}>
+                          {formatTime(r.check_out_time)}
+                        </span>
+                        {r.auto_checkout && (
+                          <span className="ml-1 text-[9px] text-gray-400">⚡</span>
+                        )}
+                      </td>
+
+                      {/* Giờ làm */}
+                      <td className="px-3 py-2.5 text-center font-medium text-gray-700">
+                        {formatDuration(effectiveWorking)}
+                      </td>
+
+                      {/* Trễ */}
+                      <td className="px-3 py-2.5 text-center">
+                        {effectiveLate > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium">
+                            <AlertTriangle size={10} />
+                            {formatMinutes(effectiveLate)}
                           </span>
-                        ) : <span className="text-gray-300 text-xs">—</span>}
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-center">
-                        {record.early_leave_minutes > 0 ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[11px] font-medium rounded">
-                            {record.early_leave_minutes}p
+
+                      {/* Về sớm */}
+                      <td className="px-3 py-2.5 text-center">
+                        {r.early_leave_minutes > 0 ? (
+                          <span className="text-orange-600 text-xs font-medium">
+                            {formatMinutes(r.early_leave_minutes)}
                           </span>
-                        ) : <span className="text-gray-300 text-xs">—</span>}
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-center">
-                        {(record.overtime_minutes || 0) > 0 ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[11px] font-medium rounded">
-                            {formatDuration(record.overtime_minutes)}
+
+                      {/* OT */}
+                      <td className="px-3 py-2.5 text-center">
+                        {(r.overtime_minutes || 0) > 0 ? (
+                          <span className="text-purple-600 text-xs font-medium">
+                            {formatMinutes(r.overtime_minutes)}
                           </span>
-                        ) : <span className="text-gray-300 text-xs">—</span>}
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-center">
-                        <GPSBadge isVerified={record.is_gps_verified} isAutoCheckout={record.auto_checkout} hasCoords={hasCoords} />
+
+                      {/* GPS */}
+                      <td className="px-3 py-2.5 text-center">
+                        {r.is_gps_verified ? (
+                          <MapPin size={14} className="inline text-green-500" />
+                        ) : (
+                          <MapPinOff size={14} className="inline text-red-400" />
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded ${statusBadge.color}`}>
-                          {statusBadge.label}
+
+                      {/* Trạng thái */}
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${statusCfg.className}`}>
+                          {statusCfg.label}
                         </span>
                       </td>
                     </tr>
@@ -773,38 +728,170 @@ export function AttendanceListPage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* ══════════ PAGINATION ══════════ */}
-      <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-gray-200 px-3 sm:px-4 py-3">
-        <p className="text-xs text-gray-500">
-          {totalRecords > 0 ? `${page}/${totalPages} — ${totalRecords} bản ghi` : 'Không có bản ghi'}
-        </p>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="p-1.5 rounded-lg border border-gray-300 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
-              <ChevronLeft size={15} />
-            </button>
-            <div className="hidden sm:flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const startPage = Math.max(1, Math.min(page - 2, totalPages - 4))
-                const pageNum = startPage + i
-                if (pageNum > totalPages) return null
+        {/* ══════════ MOBILE CARDS ══════════ */}
+        <div className="lg:hidden">
+          {isLoading ? (
+            <div className="text-center py-12 text-gray-400">
+              <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
+              <span className="text-sm">Đang tải...</span>
+            </div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              Không có dữ liệu chấm công
+            </div>
+          ) : (
+            <div className="divide-y">
+              {filteredRecords.map((r) => {
+                const team = teamMembers[r.employee_id]
+                const effectiveWorking = getEffectiveWorkingMinutes(r)
+                const effectiveLate = getEffectiveLateMinutes(r)
+                const statusCfg = STATUS_CONFIG[r.status] || STATUS_CONFIG.present
+
                 return (
-                  <button key={pageNum} onClick={() => setPage(pageNum)}
-                    className={`w-8 h-8 text-xs font-medium rounded-lg transition-colors
-                      ${pageNum === page ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                    {pageNum}
-                  </button>
+                  <div key={r.id} className="px-3 py-3 active:bg-gray-50">
+                    {/* Row 1: Date + Employee + Status */}
+                    <div className="flex items-start justify-between mb-1.5">
+                      <div>
+                        <div className="text-xs text-gray-400">{formatDate(r.date)}</div>
+                        <div className="font-medium text-gray-900 text-sm">
+                          {r.employee?.full_name || '—'}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          {r.employee?.code}
+                          {r.employee?.department?.name && <> • {r.employee.department.name}</>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {team && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${TEAM_BADGE[team.code] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                            {team.code}
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusCfg.className}`}>
+                          {statusCfg.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Row 2: Shift + GPS */}
+                    {r.shift && (
+                      <div className="flex items-center gap-2 mb-1.5 text-xs text-gray-500">
+                        <span className="font-medium text-gray-700">{r.shift.name}</span>
+                        <span>
+                          {formatShiftTime(r.shift.start_time)}-{formatShiftTime(r.shift.end_time)}
+                        </span>
+                        {r.shift.crosses_midnight && (
+                          <span className="px-1 py-px bg-indigo-50 text-indigo-500 rounded text-[9px]">
+                            qua đêm
+                          </span>
+                        )}
+                        {r.is_gps_verified ? (
+                          <MapPin size={10} className="text-green-500" />
+                        ) : (
+                          <MapPinOff size={10} className="text-red-400" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Row 3: Check-in/out/Working grid */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <div className="text-[10px] text-gray-400">Check-in</div>
+                        <div className={`text-sm font-medium ${effectiveLate > 0 ? 'text-amber-600' : 'text-gray-700'}`}>
+                          {formatTime(r.check_in_time)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-gray-400">Check-out</div>
+                        <div className={`text-sm font-medium ${r.auto_checkout ? 'text-gray-400' : 'text-gray-700'}`}>
+                          {formatTime(r.check_out_time)}
+                          {r.auto_checkout && <span className="ml-0.5 text-[9px]">⚡</span>}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-gray-400">Giờ làm</div>
+                        <div className="text-sm font-medium text-gray-700">
+                          {formatDuration(effectiveWorking)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row 4: Badges (if any) */}
+                    {(effectiveLate > 0 || (r.early_leave_minutes || 0) > 0 || (r.overtime_minutes || 0) > 0) && (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {effectiveLate > 0 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-medium">
+                            <AlertTriangle size={9} /> Trễ {formatMinutes(effectiveLate)}
+                          </span>
+                        )}
+                        {(r.early_leave_minutes || 0) > 0 && (
+                          <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded text-[10px] font-medium">
+                            Về sớm {formatMinutes(r.early_leave_minutes)}
+                          </span>
+                        )}
+                        {(r.overtime_minutes || 0) > 0 && (
+                          <span className="px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px] font-medium">
+                            OT {formatMinutes(r.overtime_minutes)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )
               })}
             </div>
-            <span className="sm:hidden text-xs font-medium text-gray-700 px-2">{page}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="p-1.5 rounded-lg border border-gray-300 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
-              <ChevronRight size={15} />
-            </button>
+          )}
+        </div>
+
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2.5 border-t bg-gray-50">
+            <span className="text-xs text-gray-500">
+              {totalRecords} bản ghi
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="p-1.5 rounded-lg border border-gray-300 active:bg-white disabled:opacity-40 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                <ChevronLeft size={15} />
+              </button>
+
+              {/* Desktop page numbers */}
+              <div className="hidden sm:flex gap-1">
+                {getPageNumbers(page, totalPages).map((pageNum, i) =>
+                  pageNum === '...' ? (
+                    <span key={`dots-${i}`} className="px-2 py-1.5 text-gray-400 text-sm">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(Number(pageNum))}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium min-w-[44px] min-h-[44px]
+                        ${page === pageNum ? 'bg-blue-600 text-white' : 'text-gray-600 active:bg-gray-100'}`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Mobile: current page */}
+              <span className="sm:hidden text-xs font-medium text-gray-700 px-2 min-h-[44px] flex items-center">
+                {page}/{totalPages}
+              </span>
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="p-1.5 rounded-lg border border-gray-300 active:bg-white disabled:opacity-40 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -812,4 +899,56 @@ export function AttendanceListPage() {
   )
 }
 
-export default AttendanceListPage
+// ============================================================
+// SUB-COMPONENTS
+// ============================================================
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+}: {
+  icon: any
+  label: string
+  value: string
+  color: string
+}) {
+  const colorMap: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    amber: 'bg-amber-50 text-amber-600',
+    orange: 'bg-orange-50 text-orange-600',
+    purple: 'bg-purple-50 text-purple-600',
+    gray: 'bg-gray-50 text-gray-400',
+  }
+
+  return (
+    <div className="bg-white rounded-xl border shadow-sm px-3 py-2.5">
+      <div className="flex items-center gap-1.5 mb-1">
+        <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${colorMap[color] || colorMap.gray}`}>
+          <Icon size={12} />
+        </div>
+        <span className="text-[10px] text-gray-400 uppercase font-medium">{label}</span>
+      </div>
+      <div className={`text-lg font-bold ${color === 'gray' ? 'text-gray-400' : `text-${color}-600`}`}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function getPageNumbers(current: number, total: number): (number | string)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
+  const pages: (number | string)[] = [1]
+  if (current > 3) pages.push('...')
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i)
+  }
+  if (current < total - 2) pages.push('...')
+  pages.push(total)
+  return pages
+}
+
+export { AttendanceListPage }

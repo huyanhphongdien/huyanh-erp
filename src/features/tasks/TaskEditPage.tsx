@@ -1,11 +1,6 @@
 // src/features/tasks/TaskEditPage.tsx
 // ============================================================================
-// UPDATED + RESPONSIVE:
-// - Header: flex-wrap, responsive font sizes, stacked on mobile
-// - Form: responsive padding, grid adjustments
-// - Lock screen: mobile-friendly layout
-// - Progress bar: responsive
-// - Actions: full-width on mobile
+// v3: Passes userEmployeeId to getTaskPermissions
 // ============================================================================
 
 import { useState, useEffect } from 'react'
@@ -188,12 +183,14 @@ export function TaskEditPage() {
           assigner_level: assignerLevel,
         }
 
+        // ← v3: Pass user?.employee_id
         const permissions = getTaskPermissions(
           taskForPerm,
           (user?.role as UserRole) || 'employee',
           user?.department_id || null,
           posLevel,
-          user?.role === 'admin'
+          user?.role === 'admin',
+          user?.employee_id || null
         )
 
         setEditPermission({

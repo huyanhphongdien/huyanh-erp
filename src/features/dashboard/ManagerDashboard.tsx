@@ -66,8 +66,7 @@ import {
   type ContractAlert,
 } from '../../services/dashboardService'
 
-// ★ Tích hợp chấm công nhanh
-import { CheckInOutWidget } from '../attendance/CheckInOutWidget'
+
 
 // ============================================================================
 // TYPES
@@ -317,8 +316,7 @@ export function ManagerDashboard() {
       {/* ══════════ MAIN CONTENT ══════════ */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
-        {/* ══════════ ★ CHẤM CÔNG NHANH ══════════ */}
-        <CheckInOutWidget />
+        
 
         {/* ══════════ STATS CARDS — 2 mobile, 3 tablet, 5 desktop ══════════ */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">

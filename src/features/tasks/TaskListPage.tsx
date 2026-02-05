@@ -438,7 +438,7 @@ export function TaskListPage() {
             }}
             departments={departments as any}
             employees={filteredEmployees as any}
-            disableDepartmentFilter={(isManager || isEmployee) && !isAdmin}
+            disableDepartmentFilter={!canViewAllDepartments}
           />
 
           {/* ========== DESKTOP TABLE (hidden on mobile) ========== */}

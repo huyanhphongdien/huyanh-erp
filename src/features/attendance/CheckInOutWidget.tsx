@@ -1,530 +1,744 @@
 // ============================================================
-// CHECK-IN/OUT WIDGET V2 — FIXED
+// CHECK-IN/OUT WIDGET V3 — Uses attendanceService V3
 // File: src/features/attendance/CheckInOutWidget.tsx
-// Huy Anh ERP System - Chấm công V2
 // ============================================================
-// FIX 1: invalidateQueries dùng predicate → bắt TẤT CẢ query attendance
-// FIX 2: Tính giờ làm từ timestamp (không dùng working_minutes từ DB)
-// ============================================================
-// LOGIC:
-// - Mobile: GPS bắt buộc → canCheckIn = gpsStatus === 'available'
-// - Desktop: GPS bỏ qua → canCheckIn = gpsStatus === 'desktop_bypass'
-// - Hiển thị ca hôm nay + GPS banner + progress bar
+// Thay đổi so với bản cũ:
+//   ① Dùng attendanceService thay vì query Supabase trực tiếp
+//   ② Logic check-in/out đã nằm trong service (DRY)
+//   ③ GPS flow giữ nguyên (mobile bắt buộc, desktop bypass)
+//   ④ Multi-shift display + ca qua đêm hoạt động đúng
+//   ⑤ Mobile-first: 48px buttons, active: states, safe-area
 // ============================================================
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Clock,
   LogIn,
   LogOut,
-  Timer,
   AlertCircle,
   CheckCircle2,
-  Calendar,
   MapPin,
-  Monitor,
   Loader2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { attendanceService } from '../../services/attendanceService'
-import { supabase } from '../../lib/supabase'
-import { GPSRequirementBanner, type GPSPosition, type GPSStatus } from './GPSRequirementBanner'
+import type {
+  ShiftInfo,
+  AttendanceRecord,
+  TodayShiftAssignment,
+  GPSData,
+} from '../../services/attendanceService'
 
 // ============================================================
 // TYPES
 // ============================================================
 
-interface ShiftInfo {
-  id: string
-  code: string
-  name: string
-  start_time: string
-  end_time: string
-  crosses_midnight: boolean
-  standard_hours: number
-  break_minutes: number
-}
+type GPSStatus = 'idle' | 'checking' | 'requesting' | 'available' | 'denied' | 'unavailable' | 'error'
 
-interface TodayAttendance {
-  id: string
-  check_in_time: string | null
-  check_out_time: string | null
-  working_minutes: number | null
-  overtime_minutes: number | null
-  status: string
-  shift_id: string | null
-  late_minutes: number
-  early_leave_minutes: number
-  is_gps_verified: boolean
-}
-
-interface GPSConfig {
-  enabled: boolean
-  locations: {
-    name: string
-    latitude: number
-    longitude: number
-    radius_meters: number
-  }[]
+interface Props {
+  onCheckInOut?: () => void
+  compact?: boolean
 }
 
 // ============================================================
-// HELPERS
+// HELPER FUNCTIONS
 // ============================================================
 
-function formatTime(timeStr: string): string {
-  return timeStr.substring(0, 5)
+function formatTime(t: string): string {
+  if (!t) return ''
+  return t.substring(0, 5)
 }
 
-function formatDateTime(isoStr: string): string {
-  const d = new Date(isoStr)
-  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }
 
 function formatDuration(minutes: number): string {
+  if (!minutes || minutes <= 0) return '0h 00p'
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return `${h}h ${m.toString().padStart(2, '0')}p`
 }
 
-// ★ FIX: Tính giờ làm từ timestamp thay vì dùng working_minutes từ DB
-function calculateWorkingTime(checkIn?: string | null, checkOut?: string | null): string {
-  if (!checkIn) return '0h 00p'
-  const start = new Date(checkIn)
-  const end = checkOut ? new Date(checkOut) : new Date()
-  const diffMs = end.getTime() - start.getTime()
-  if (diffMs <= 0) return '0h 00p'
-  const totalMinutes = Math.floor(diffMs / (1000 * 60))
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  return `${h}h ${m.toString().padStart(2, '0')}p`
+/** Detect current shift from assignments + attendances */
+function detectCurrentShift(
+  shifts: TodayShiftAssignment[],
+  attendances: AttendanceRecord[]
+): TodayShiftAssignment | null {
+  if (shifts.length === 0) return null
+  if (shifts.length === 1) return shifts[0]
+
+  // ① Ca chưa hoàn thành (đã check-in, chưa check-out)
+  for (const sa of shifts) {
+    const att = attendances.find((a) => a.shift_id === sa.shift_id)
+    if (att && att.check_in_time && !att.check_out_time) {
+      return sa
+    }
+  }
+
+  // ② Ca đang trong window + chưa check-in
+  for (const sa of shifts) {
+    const att = attendances.find((a) => a.shift_id === sa.shift_id)
+    if (!att && isShiftActive(sa.shift)) {
+      return sa
+    }
+  }
+
+  // ③ Ca chưa check-in (bất kỳ)
+  for (const sa of shifts) {
+    const att = attendances.find((a) => a.shift_id === sa.shift_id)
+    if (!att) return sa
+  }
+
+  // ④ Tất cả đã hoàn thành → trả về ca cuối
+  return shifts[shifts.length - 1]
+}
+
+/** Check if current time is within shift window (±2h buffer) */
+function isShiftActive(shift: ShiftInfo): boolean {
+  const now = new Date()
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+
+  const [sh, sm] = shift.start_time.split(':').map(Number)
+  const [eh, em] = shift.end_time.split(':').map(Number)
+  const startMin = sh * 60 + (sm || 0)
+  const endMin = eh * 60 + (em || 0)
+
+  const bufferBefore = 120
+  const bufferAfter = 60
+
+  if (shift.crosses_midnight) {
+    const earlyStart = startMin - bufferBefore
+    const lateEnd = endMin + bufferAfter
+    if (earlyStart < 0) {
+      return nowMinutes >= earlyStart + 1440 || nowMinutes <= lateEnd
+    }
+    return nowMinutes >= earlyStart || nowMinutes <= lateEnd
+  } else {
+    const earlyStart = Math.max(0, startMin - bufferBefore)
+    const lateEnd = Math.min(1440, endMin + bufferAfter)
+    return nowMinutes >= earlyStart && nowMinutes <= lateEnd
+  }
+}
+
+// Team badge colors
+const TEAM_COLORS: Record<string, string> = {
+  A: 'bg-blue-100 text-blue-700 border-blue-200',
+  B: 'bg-rose-100 text-rose-700 border-rose-200',
 }
 
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
 
-export function CheckInOutWidget() {
+export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
   const employeeId = user?.employee_id
 
-  // GPS state
-  const [gpsStatus, setGPSStatus] = useState<GPSStatus>('checking')
-  const [gpsPosition, setGPSPosition] = useState<GPSPosition | null>(null)
+  // ── State ──
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [gpsStatus, setGpsStatus] = useState<GPSStatus>('idle')
+  const [gpsPosition, setGpsPosition] = useState<GPSData | null>(null)
+  const [gpsError, setGpsError] = useState<string | null>(null)
+  const [showAllShifts, setShowAllShifts] = useState(false)
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error'
+    message: string
+  } | null>(null)
 
-  // Timer
-  const [elapsed, setElapsed] = useState(0)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // ============================================================
-  // ★ FIX: Invalidate TẤT CẢ queries liên quan attendance
-  // Dùng predicate thay vì queryKey prefix → bắt cả:
-  //   ['attendance', 'list', ...] (AttendanceListPage)
-  //   ['today-attendance', ...] (widget)
-  //   ['today-shift', ...] (widget)
-  //   ['attendance-list-v3', ...] (nếu còn tồn tại)
-  // ============================================================
-  const invalidateAllAttendance = useCallback(() => {
-    queryClient.invalidateQueries({
-      predicate: (query) => {
-        const key = query.queryKey[0]
-        return typeof key === 'string' && (
-          key === 'attendance' ||
-          key.includes('attendance') ||
-          key === 'today-attendance' ||
-          key === 'today-shift'
-        )
-      }
-    })
-  }, [queryClient])
-
-  // ============================================================
-  // QUERIES
-  // ============================================================
-
-  const { data: gpsConfig } = useQuery<GPSConfig | null>({
-    queryKey: ['gps-config'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('attendance_settings')
-        .select('setting_value')
-        .eq('setting_key', 'gps_config')
-        .maybeSingle()
-      if (error || !data) return null
-      return data.setting_value as GPSConfig
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const { data: todayShift, isLoading: loadingShift } = useQuery<ShiftInfo | null>({
-    queryKey: ['today-shift', employeeId],
-    queryFn: async () => {
-      if (!employeeId) return null
-      const today = new Date().toISOString().split('T')[0]
-
-      const { data, error } = await supabase
-        .from('shift_assignments')
-        .select(`
-          shift_id,
-          shift:shifts!shift_assignments_shift_id_fkey(
-            id, code, name, start_time, end_time,
-            crosses_midnight, standard_hours, break_minutes
-          )
-        `)
-        .eq('employee_id', employeeId)
-        .eq('date', today)
-        .maybeSingle()
-
-      if (error || !data?.shift) return null
-      const shift = Array.isArray(data.shift) ? data.shift[0] : data.shift
-      return shift as ShiftInfo
-    },
-    enabled: !!employeeId,
-  })
-
-  const { data: todayAttendance, isLoading: loadingAttendance } = useQuery<TodayAttendance | null>({
-    queryKey: ['today-attendance', employeeId],
-    queryFn: async () => {
-      if (!employeeId) return null
-      return attendanceService.getTodayAttendance(employeeId) as Promise<TodayAttendance | null>
-    },
-    enabled: !!employeeId,
-    refetchInterval: 60000,
-  })
-
-  // ============================================================
-  // TIMER
-  // ============================================================
-
+  // ── Clock ──
   useEffect(() => {
-    if (todayAttendance?.check_in_time && !todayAttendance.check_out_time) {
-      const checkIn = new Date(todayAttendance.check_in_time)
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
-      const updateElapsed = () => {
-        setElapsed(Math.floor((new Date().getTime() - checkIn.getTime()) / (1000 * 60)))
-      }
-
-      updateElapsed()
-      timerRef.current = setInterval(updateElapsed, 60000)
-
-      return () => {
-        if (timerRef.current) clearInterval(timerRef.current)
-      }
-    } else {
-      setElapsed(0)
+  // ── Toast auto-dismiss ──
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 4000)
+      return () => clearTimeout(t)
     }
-  }, [todayAttendance])
+  }, [toast])
 
-  // ============================================================
-  // MUTATIONS — ★ FIX: dùng invalidateAllAttendance
-  // ============================================================
+  // ── GPS initialization ──
+  const requestGPS = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGpsStatus('unavailable')
+      setGpsError('Thiết bị không hỗ trợ GPS')
+      return
+    }
 
+    setGpsStatus('requesting')
+    setGpsError(null)
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsPosition({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        })
+        setGpsStatus('available')
+      },
+      (err) => {
+        if (err.code === 1) {
+          setGpsStatus('denied')
+          setGpsError(
+            'Bạn đã từ chối quyền vị trí. Vui lòng bật GPS trong cài đặt.'
+          )
+        } else if (err.code === 2) {
+          setGpsStatus('unavailable')
+          setGpsError('Không thể xác định vị trí. Kiểm tra GPS.')
+        } else {
+          setGpsStatus('error')
+          setGpsError('Lỗi GPS. Vui lòng thử lại.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    )
+  }, [])
+
+  // Auto-request GPS on mount
+  useEffect(() => {
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+    if (!isMobile) {
+      setGpsStatus('available') // Desktop = bypass GPS
+      return
+    }
+    requestGPS()
+  }, [requestGPS])
+
+  // ── Query: Today's shift assignments (via service) ──
+  const { data: todayShifts = [], isLoading: shiftsLoading } = useQuery({
+    queryKey: ['today-shifts', employeeId],
+    queryFn: () => attendanceService.getTodayShifts(employeeId!),
+    enabled: !!employeeId,
+    staleTime: 60 * 1000,
+  })
+
+  // ── Query: Today's attendance records (via service) ──
+  const { data: todayAttendances = [], isLoading: attendanceLoading } =
+    useQuery({
+      queryKey: ['today-attendances', employeeId],
+      queryFn: () => attendanceService.getTodayAttendances(employeeId!),
+      enabled: !!employeeId,
+      staleTime: 10 * 1000,
+    })
+
+  // ── Query: Open attendance (chưa check-out, kể cả ca đêm hôm qua) ──
+  const { data: openAttendance, isLoading: openLoading } = useQuery({
+    queryKey: ['open-attendance', employeeId],
+    queryFn: () => attendanceService.getOpenAttendance(employeeId!),
+    enabled: !!employeeId,
+    staleTime: 10 * 1000,
+  })
+
+  // ── Detect current shift ──
+  const currentShiftAssignment = detectCurrentShift(
+    todayShifts,
+    todayAttendances
+  )
+  const currentShift = currentShiftAssignment?.shift || null
+
+  // ── Determine current attendance record ──
+  // Ưu tiên: open attendance (cho ca qua đêm), sau đó tìm theo shift hôm nay
+  const currentAttendance: AttendanceRecord | null = (() => {
+    // Nếu có record đang mở (kể cả ca đêm hôm qua) → dùng nó
+    if (openAttendance) return openAttendance
+
+    // Nếu không → tìm record hôm nay theo current shift
+    if (currentShift) {
+      return (
+        todayAttendances.find((a) => a.shift_id === currentShift.id) || null
+      )
+    }
+
+    // Fallback: record đầu tiên hôm nay
+    return todayAttendances[0] || null
+  })()
+
+  // ── Shift info for display (có thể từ open attendance hoặc current shift) ──
+  const displayShift: ShiftInfo | null =
+    openAttendance?.shift || currentShift || null
+
+  const isCheckedIn = !!currentAttendance?.check_in_time
+  const isComplete = !!(
+    currentAttendance?.check_in_time && currentAttendance?.check_out_time
+  )
+  const allComplete =
+    todayShifts.length > 0 &&
+    !openAttendance &&
+    todayShifts.every((sa) => {
+      const att = todayAttendances.find((a) => a.shift_id === sa.shift_id)
+      return att?.check_in_time && att?.check_out_time
+    })
+
+  // ── Permission checks ──
+  const canCheckIn =
+    gpsStatus === 'available' && !isCheckedIn && !isComplete && !openAttendance
+  const canCheckOut = !!openAttendance || (isCheckedIn && !isComplete)
+
+  // ── Invalidate all related queries ──
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['today-shifts'] })
+    queryClient.invalidateQueries({ queryKey: ['today-attendances'] })
+    queryClient.invalidateQueries({ queryKey: ['today-attendance'] })
+    queryClient.invalidateQueries({ queryKey: ['open-attendance'] })
+    queryClient.invalidateQueries({ queryKey: ['attendance'] })
+    onCheckInOut?.()
+  }, [queryClient, onCheckInOut])
+
+  // ── Check-in mutation (via service) ──
   const checkInMutation = useMutation({
     mutationFn: async () => {
-      if (!employeeId) throw new Error('Không tìm thấy thông tin nhân viên')
+      if (!employeeId)
+        throw new Error('Không tìm thấy thông tin nhân viên')
 
-      // Desktop: gpsPosition = null → service sẽ bỏ qua GPS validation
-      // Mobile: gpsPosition có tọa độ → service validate GPS
-      return attendanceService.checkIn(
-        employeeId,
-        gpsPosition
-          ? { latitude: gpsPosition.latitude, longitude: gpsPosition.longitude }
-          : undefined
-      )
+      return attendanceService.checkIn(employeeId, {
+        targetShiftId: currentShift?.id,
+        gps: gpsPosition,
+        isGpsVerified: gpsStatus === 'available' && !!gpsPosition,
+      })
     },
-    onSuccess: () => {
-      // ★ FIX: Invalidate TẤT CẢ queries liên quan attendance
-      invalidateAllAttendance()
+    onSuccess: (data) => {
+      const shiftName = data.shift?.name || displayShift?.name
+      setToast({
+        type: 'success',
+        message: `✅ Check-in thành công${shiftName ? ` — ${shiftName}` : ''}`,
+      })
+      invalidateAll()
+    },
+    onError: (err: Error) => {
+      setToast({ type: 'error', message: err.message || 'Lỗi check-in' })
     },
   })
 
+  // ── Check-out mutation (via service) ──
   const checkOutMutation = useMutation({
     mutationFn: async () => {
-      if (!employeeId) throw new Error('Không tìm thấy thông tin nhân viên')
+      if (!employeeId) throw new Error('Chưa check-in')
 
-      return attendanceService.checkOut(
-        employeeId,
-        gpsPosition
-          ? { latitude: gpsPosition.latitude, longitude: gpsPosition.longitude }
-          : undefined
-      )
+      return attendanceService.checkOut(employeeId, {
+        gps: gpsPosition,
+      })
     },
-    onSuccess: () => {
-      // ★ FIX: Invalidate TẤT CẢ queries liên quan attendance
-      invalidateAllAttendance()
+    onSuccess: (data) => {
+      const shiftName = data.shift?.name || displayShift?.name
+      const workStr = data.working_minutes
+        ? ` — ${formatDuration(data.working_minutes)}`
+        : ''
+      setToast({
+        type: 'success',
+        message: `✅ Check-out thành công${shiftName ? ` (${shiftName})` : ''}${workStr}`,
+      })
+      invalidateAll()
+    },
+    onError: (err: Error) => {
+      setToast({ type: 'error', message: err.message || 'Lỗi check-out' })
     },
   })
 
-  // ============================================================
-  // GPS CALLBACKS
-  // ============================================================
+  // ── Progress ──
+  const progressPercent = (() => {
+    if (!currentAttendance?.check_in_time) return 0
+    const stdHours = displayShift?.standard_hours || 8
+    const checkIn = new Date(currentAttendance.check_in_time)
+    const now = new Date()
+    const elapsed = (now.getTime() - checkIn.getTime()) / (1000 * 60)
+    const total = stdHours * 60
+    return Math.min(100, Math.round((elapsed / total) * 100))
+  })()
 
-  const handleGPSReady = useCallback((pos: GPSPosition | null) => {
-    // pos = null khi desktop bypass
-    setGPSPosition(pos)
-  }, [])
+  // ── Loading state ──
+  const isLoading = shiftsLoading || attendanceLoading || openLoading
+  const isActionLoading =
+    checkInMutation.isPending || checkOutMutation.isPending
 
-  const handleGPSStatusChange = useCallback((status: GPSStatus) => {
-    setGPSStatus(status)
-  }, [])
-
-  // ============================================================
-  // COMPUTED
-  // ============================================================
-
-  const isCheckedIn = !!todayAttendance?.check_in_time
-  const isCheckedOut = !!todayAttendance?.check_out_time
-  const isComplete = isCheckedIn && isCheckedOut
-
-  // ★ KEY LOGIC: Desktop bypass cho phép check-in không cần GPS
-  const isGPSReady = gpsStatus === 'available' || gpsStatus === 'desktop_bypass'
-  const canCheckIn = isGPSReady && !isCheckedIn
-  const canCheckOut = isCheckedIn && !isCheckedOut
-
-  const getProgress = () => {
-    if (!todayShift || !isCheckedIn || isComplete) return 0
-    const standardMinutes = todayShift.standard_hours * 60
-    return Math.min(100, Math.round((elapsed / standardMinutes) * 100))
-  }
-
-  const progress = getProgress()
-  const isLoading = loadingShift || loadingAttendance
+  if (!employeeId) return null
 
   // ============================================================
   // RENDER
   // ============================================================
-
-  if (!employeeId) return null
-
   return (
-    <div className="space-y-4">
-      {/* ========== GPS BANNER ========== */}
-      {!isComplete && (
-        <GPSRequirementBanner
-          gpsConfig={gpsConfig}
-          onGPSReady={handleGPSReady}
-          onStatusChange={handleGPSStatusChange}
-          autoHideOnReady={false}
-          compact={isCheckedIn}
-        />
-      )}
+    <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+      {/* ── Header: Clock + GPS ── */}
+      <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock size={16} />
+            <span className="text-lg font-mono font-bold tracking-wider">
+              {currentTime.toLocaleTimeString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}
+            </span>
+          </div>
 
-      {/* ========== SHIFT + CHECK-IN/OUT CARD ========== */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {/* Header */}
-        <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                <Clock className="text-white" size={20} />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">Chấm công hôm nay</h3>
-                <p className="text-blue-100 text-sm">
-                  {new Date().toLocaleDateString('vi-VN', {
-                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                  })}
-                </p>
-              </div>
-            </div>
-
-            {todayAttendance && (
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                todayAttendance.status === 'present' ? 'bg-green-500/20 text-green-100' :
-                todayAttendance.status === 'late' ? 'bg-yellow-500/20 text-yellow-100' :
-                todayAttendance.status === 'early_leave' ? 'bg-orange-500/20 text-orange-100' :
-                'bg-white/20 text-white'
-              }`}>
-                {todayAttendance.status === 'present' && '✓ Đúng giờ'}
-                {todayAttendance.status === 'late' && `⏰ Trễ ${todayAttendance.late_minutes}p`}
-                {todayAttendance.status === 'early_leave' && `↩ Về sớm ${todayAttendance.early_leave_minutes}p`}
-                {todayAttendance.status === 'absent' && '✗ Vắng'}
-              </div>
+          {/* GPS indicator */}
+          <div className="flex items-center gap-1.5 text-xs">
+            {gpsStatus === 'available' ? (
+              <span className="flex items-center gap-1 bg-green-500/20 text-green-100 px-2 py-0.5 rounded-full">
+                <MapPin size={10} />
+                GPS ✓
+              </span>
+            ) : gpsStatus === 'requesting' || gpsStatus === 'checking' ? (
+              <span className="flex items-center gap-1 bg-yellow-500/20 text-yellow-100 px-2 py-0.5 rounded-full">
+                <Loader2 size={10} className="animate-spin" />
+                Đang lấy GPS...
+              </span>
+            ) : (
+              <button
+                onClick={requestGPS}
+                className="flex items-center gap-1 bg-red-500/20 text-red-100 px-2 py-0.5 rounded-full active:bg-red-500/40"
+              >
+                <AlertCircle size={10} />
+                Bật GPS
+              </button>
             )}
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-5">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="animate-spin text-blue-500" size={24} />
-              <span className="ml-2 text-gray-500">Đang tải...</span>
+        {/* Current shift info */}
+        {displayShift && (
+          <div className="mt-1.5 flex items-center gap-2 text-blue-100 text-xs">
+            <span className="font-medium text-white">
+              {displayShift.name}
+            </span>
+            <span>
+              ({formatTime(displayShift.start_time)} -{' '}
+              {formatTime(displayShift.end_time)})
+            </span>
+            {displayShift.crosses_midnight && (
+              <span className="px-1 py-0.5 rounded text-[10px] bg-indigo-500/30 text-indigo-100">
+                Qua đêm
+              </span>
+            )}
+            {currentShiftAssignment?.team_code && (
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold
+                ${
+                  currentShiftAssignment.team_code === 'A'
+                    ? 'bg-blue-500/30 text-blue-100'
+                    : 'bg-rose-500/30 text-rose-100'
+                }`}
+              >
+                Đội {currentShiftAssignment.team_code}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Ca qua đêm hôm qua đang mở */}
+        {openAttendance &&
+          openAttendance.date !== new Date().toISOString().split('T')[0] && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-yellow-200 text-xs">
+              <AlertCircle size={10} />
+              <span>Ca từ hôm qua — cần check-out</span>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Shift Info */}
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Calendar className="text-gray-400" size={18} />
-                <div>
-                  <span className="text-sm text-gray-500">Ca làm việc: </span>
-                  {todayShift ? (
-                    <span className="font-medium text-gray-800">
-                      {todayShift.name} ({formatTime(todayShift.start_time)} - {formatTime(todayShift.end_time)})
-                    </span>
-                  ) : (
-                    <span className="text-orange-600 font-medium">
-                      ⚠ Chưa được phân ca
-                    </span>
-                  )}
-                </div>
-              </div>
+          )}
 
-              {/* Check-in/out Times */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className={`p-3 rounded-lg border ${
-                  isCheckedIn ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <LogIn size={14} className={isCheckedIn ? 'text-green-600' : 'text-gray-400'} />
-                    <span className="text-xs text-gray-500 uppercase font-medium">Check-in</span>
+        {!displayShift && !isLoading && todayShifts.length === 0 && !openAttendance && (
+          <div className="mt-1.5 text-xs text-blue-200">
+            Chưa phân ca hôm nay
+          </div>
+        )}
+      </div>
+
+      {/* ── GPS Warning Banner ── */}
+      {gpsStatus !== 'available' &&
+        gpsStatus !== 'checking' &&
+        gpsStatus !== 'requesting' && (
+          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
+            <AlertCircle
+              size={16}
+              className="text-amber-600 mt-0.5 flex-shrink-0"
+            />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">
+                Cần bật GPS để điểm danh
+              </p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                {gpsError ||
+                  'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt.'}
+              </p>
+              <button
+                onClick={requestGPS}
+                className="mt-1.5 text-xs font-medium text-amber-700 underline active:text-amber-900"
+              >
+                Thử lại
+              </button>
+            </div>
+          </div>
+        )}
+
+      {/* ── Main Action Area ── */}
+      <div className="px-4 py-3">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4 text-gray-400">
+            <Loader2 size={20} className="animate-spin mr-2" />
+            <span className="text-sm">Đang tải...</span>
+          </div>
+        ) : allComplete ? (
+          /* All shifts complete */
+          <div className="flex flex-col items-center py-3 text-green-700">
+            <CheckCircle2 size={28} className="mb-1" />
+            <span className="text-sm font-semibold">
+              Đã hoàn thành
+              {todayShifts.length > 1
+                ? ` ${todayShifts.length} ca`
+                : ' ca hôm nay'}
+            </span>
+            {todayAttendances.length > 0 && (
+              <span className="text-xs text-green-500 mt-1">
+                Tổng:{' '}
+                {formatDuration(
+                  todayAttendances.reduce(
+                    (sum, a) => sum + (a.working_minutes || 0),
+                    0
+                  )
+                )}
+              </span>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Progress bar (when checked in, not complete) */}
+            {isCheckedIn && !isComplete && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span>Đang làm việc</span>
+                  <span>{progressPercent}%</span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-1000"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                {currentAttendance?.check_in_time && (
+                  <div className="flex items-center justify-between text-[10px] text-gray-400 mt-1">
+                    <span>
+                      Vào: {formatDateTime(currentAttendance.check_in_time)}
+                    </span>
+                    {displayShift && (
+                      <span>
+                        Dự kiến ra: {formatTime(displayShift.end_time)}
+                        {displayShift.crosses_midnight ? ' (+1)' : ''}
+                      </span>
+                    )}
                   </div>
-                  <p className={`text-lg font-semibold ${isCheckedIn ? 'text-green-700' : 'text-gray-400'}`}>
-                    {isCheckedIn ? formatDateTime(todayAttendance!.check_in_time!) : '—:—:—'}
-                  </p>
-                  {isCheckedIn && (
-                    <span className={`inline-flex items-center gap-1 text-xs mt-1 ${
-                      todayAttendance!.is_gps_verified ? 'text-green-600' : 'text-slate-500'
-                    }`}>
-                      {todayAttendance!.is_gps_verified 
-                        ? <><MapPin size={10} /> GPS ✓</>
-                        : <><Monitor size={10} /> Desktop</>
-                      }
-                    </span>
-                  )}
-                </div>
-
-                <div className={`p-3 rounded-lg border ${
-                  isCheckedOut ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <LogOut size={14} className={isCheckedOut ? 'text-blue-600' : 'text-gray-400'} />
-                    <span className="text-xs text-gray-500 uppercase font-medium">Check-out</span>
-                  </div>
-                  <p className={`text-lg font-semibold ${isCheckedOut ? 'text-blue-700' : 'text-gray-400'}`}>
-                    {isCheckedOut ? formatDateTime(todayAttendance!.check_out_time!) : '—:—:—'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              {isCheckedIn && !isCheckedOut && todayShift && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Timer size={14} className="text-blue-600" />
-                      <span className="font-medium text-gray-700">
-                        Đã làm: {formatDuration(elapsed)}
+                )}
+                {/* Late badge */}
+                {currentAttendance?.status === 'late' &&
+                  currentAttendance.late_minutes > 0 && (
+                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-amber-600">
+                      <AlertCircle size={10} />
+                      <span>
+                        Đi trễ {currentAttendance.late_minutes} phút
                       </span>
                     </div>
-                    <span className="text-gray-500">
-                      / {todayShift.standard_hours}h ({progress}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  )}
+              </div>
+            )}
+
+            {/* Check-in button */}
+            {canCheckIn && (
+              <button
+                onClick={() => checkInMutation.mutate()}
+                disabled={isActionLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold
+                  min-h-[48px] transition-colors bg-green-600 text-white active:bg-green-700
+                  disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isActionLoading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <LogIn size={18} />
+                )}
+                {isActionLoading ? 'Đang xử lý...' : 'Check-in'}
+              </button>
+            )}
+
+            {/* Check-out button */}
+            {canCheckOut && (
+              <button
+                onClick={() => checkOutMutation.mutate()}
+                disabled={isActionLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-xl
+                  text-sm font-semibold min-h-[48px] active:bg-red-700 disabled:opacity-60"
+              >
+                {isActionLoading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <LogOut size={18} />
+                )}
+                {isActionLoading ? 'Đang xử lý...' : 'Check-out'}
+              </button>
+            )}
+
+            {/* GPS chưa sẵn sàng + chưa check-in */}
+            {!canCheckIn && !canCheckOut && !isComplete && gpsStatus !== 'available' && (
+              <button
+                disabled
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold
+                  min-h-[48px] bg-gray-200 text-gray-400 cursor-not-allowed"
+              >
+                <LogIn size={18} />
+                Check-in
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Multi-shift list (expandable) ── */}
+      {todayShifts.length > 1 && (
+        <div className="border-t">
+          <button
+            onClick={() => setShowAllShifts(!showAllShifts)}
+            className="w-full px-4 py-2 flex items-center justify-between text-xs text-gray-500 active:bg-gray-50"
+          >
+            <span>
+              Tất cả ca hôm nay ({todayShifts.length} ca)
+            </span>
+            {showAllShifts ? (
+              <ChevronUp size={14} />
+            ) : (
+              <ChevronDown size={14} />
+            )}
+          </button>
+
+          {showAllShifts && (
+            <div className="px-4 pb-3 space-y-2">
+              {todayShifts
+                .sort((a, b) =>
+                  a.shift.start_time.localeCompare(b.shift.start_time)
+                )
+                .map((sa) => {
+                  const att = todayAttendances.find(
+                    (a) => a.shift_id === sa.shift_id
+                  )
+                  const isThisCurrent = displayShift?.id === sa.shift_id
+                  const done = att?.check_in_time && att?.check_out_time
+                  const inProgress =
+                    att?.check_in_time && !att?.check_out_time
+
+                  return (
                     <div
-                      className={`h-2.5 rounded-full transition-all duration-500 ${
-                        progress >= 100 ? 'bg-green-500' :
-                        progress >= 75 ? 'bg-blue-500' :
-                        progress >= 50 ? 'bg-blue-400' :
-                        'bg-blue-300'
-                      }`}
-                      style={{ width: `${Math.min(progress, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+                      key={sa.id}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs
+                        ${
+                          isThisCurrent
+                            ? 'bg-blue-50 border border-blue-200'
+                            : 'bg-gray-50'
+                        }
+                      `}
+                    >
+                      {/* Status dot */}
+                      <div
+                        className={`w-2 h-2 rounded-full flex-shrink-0
+                        ${
+                          done
+                            ? 'bg-green-500'
+                            : inProgress
+                              ? 'bg-blue-500 animate-pulse'
+                              : 'bg-gray-300'
+                        }`}
+                      />
 
-              {/* Working Summary — ★ FIX: tính từ timestamp */}
-              {isComplete && todayAttendance && (
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-gray-500">Giờ làm: </span>
-                      <span className="font-semibold text-gray-800">
-                        {calculateWorkingTime(todayAttendance.check_in_time, todayAttendance.check_out_time)}
-                      </span>
-                    </div>
-                    {(todayAttendance.overtime_minutes || 0) > 0 && (
-                      <div>
-                        <span className="text-gray-500">Tăng ca: </span>
-                        <span className="font-semibold text-orange-600">
-                          {formatDuration(todayAttendance.overtime_minutes || 0)}
+                      {/* Shift info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-gray-800">
+                            {sa.shift.name}
+                          </span>
+                          {sa.team_code && (
+                            <span
+                              className={`px-1 py-px rounded text-[9px] font-bold border
+                              ${
+                                TEAM_COLORS[sa.team_code] ||
+                                'bg-gray-100 text-gray-600 border-gray-200'
+                              }`}
+                            >
+                              {sa.team_code}
+                            </span>
+                          )}
+                          {isThisCurrent && (
+                            <span className="px-1 py-px bg-blue-100 text-blue-600 rounded text-[9px]">
+                              hiện tại
+                            </span>
+                          )}
+                          {sa.shift.crosses_midnight && (
+                            <span className="px-1 py-px bg-indigo-50 text-indigo-500 rounded text-[9px]">
+                              qua đêm
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-gray-400">
+                          {formatTime(sa.shift.start_time)} -{' '}
+                          {formatTime(sa.shift.end_time)}
                         </span>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
-              {/* Error Messages */}
-              {(checkInMutation.isError || checkOutMutation.isError) && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-center gap-2 text-red-700 text-sm">
-                    <AlertCircle size={16} />
-                    <span>
-                      {checkInMutation.error?.message || checkOutMutation.error?.message || 'Đã xảy ra lỗi'}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="pt-2">
-                {!isCheckedIn && (
-                  <button
-                    onClick={() => checkInMutation.mutate()}
-                    disabled={!canCheckIn || checkInMutation.isPending}
-                    className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-base font-semibold transition-all ${
-                      canCheckIn
-                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-200 active:scale-[0.98]'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {checkInMutation.isPending ? (
-                      <Loader2 size={20} className="animate-spin" />
-                    ) : (
-                      <LogIn size={20} />
-                    )}
-                    {checkInMutation.isPending ? 'Đang xử lý...' : 'Check-in'}
-                  </button>
-                )}
-
-                {canCheckOut && (
-                  <button
-                    onClick={() => checkOutMutation.mutate()}
-                    disabled={checkOutMutation.isPending}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg text-base font-semibold hover:bg-blue-700 shadow-lg shadow-blue-200 active:scale-[0.98] transition-all"
-                  >
-                    {checkOutMutation.isPending ? (
-                      <Loader2 size={20} className="animate-spin" />
-                    ) : (
-                      <LogOut size={20} />
-                    )}
-                    {checkOutMutation.isPending ? 'Đang xử lý...' : 'Check-out'}
-                  </button>
-                )}
-
-                {isComplete && (
-                  <div className="flex items-center justify-center gap-2 py-3 text-green-700">
-                    <CheckCircle2 size={20} />
-                    <span className="font-semibold">Đã hoàn thành ca hôm nay</span>
-                  </div>
-                )}
-
-                {/* Warning: mobile GPS not ready */}
-                {!isCheckedIn && !isGPSReady && (
-                  <p className="text-center text-sm text-red-500 mt-2">
-                    ⚠ Vui lòng bật GPS trên điện thoại và di chuyển đến khu vực công ty
-                  </p>
-                )}
-              </div>
+                      {/* Status */}
+                      <div className="text-right">
+                        {done && (
+                          <div className="flex items-center gap-1 text-green-600">
+                            <CheckCircle2 size={14} />
+                            {att?.working_minutes && (
+                              <span className="text-[10px]">
+                                {formatDuration(att.working_minutes)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {inProgress && att?.check_in_time && (
+                          <span className="text-blue-600 text-[10px]">
+                            Vào {formatDateTime(att.check_in_time)}
+                          </span>
+                        )}
+                        {!att && (
+                          <span className="text-gray-400">Chưa</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
             </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div className="px-4 pb-3">
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
+            ${
+              toast.type === 'success'
+                ? 'bg-green-50 text-green-700'
+                : 'bg-red-50 text-red-700'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle2 size={14} />
+            ) : (
+              <AlertCircle size={14} />
+            )}
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

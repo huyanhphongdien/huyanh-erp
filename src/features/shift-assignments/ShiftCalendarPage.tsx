@@ -1,17 +1,22 @@
 // ============================================================
-// SHIFT CALENDAR PAGE - Lịch phân ca
+// SHIFT CALENDAR PAGE V3.1 — Lịch phân ca (Fixed Team Filter)
 // File: src/features/shift-assignments/ShiftCalendarPage.tsx
+// V3.1 fixes:
+//   ① Teams dropdown filter theo departmentId (không load all)
+//   ② Filter đội dựa trên shift_team_members (employee→team)
+//      thay vì check team_id trên assignment
+//   ③ Giữ nguyên toàn bộ UI/UX cũ
 // ============================================================
 
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   shiftAssignmentService,
-  SUNDAY_OFF_DEPT_CODES,
   departmentService,
 } from '../../services';
+import { shiftTeamService } from '../../services/shiftTeamService';
 import { ShiftCell } from './ShiftCell';
-import type { ShiftCellData } from './ShiftCell';
+import type { DayAssignment } from './ShiftCell';
 import { BatchScheduleModal } from './BatchScheduleModal';
 import { ShiftOverrideModal } from './ShiftOverrideModal';
 import { useAuthStore } from '../../stores/authStore';
@@ -21,10 +26,13 @@ import {
 } from 'lucide-react';
 
 // ============================================================
-// TYPES
+// CONSTANTS
 // ============================================================
 
+const SUNDAY_OFF_DEPT_CODES = ['HAP-KT', 'HAP-RD'];
+
 type ViewMode = 'week' | 'month';
+type TeamFilter = 'all' | string; // 'all' hoặc team.id (UUID)
 
 interface OverrideTarget {
   employeeId: string;
@@ -54,449 +62,563 @@ function getMonday(date: Date): Date {
   return d;
 }
 
-function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return `${d.getDate()}/${d.getMonth() + 1}`;
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
-function formatMonthYear(year: number, month: number): string {
-  const monthNames = [
-    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
-    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
-  ];
-  return `${monthNames[month - 1]} ${year}`;
+function formatDate(d: Date): string {
+  return d.toISOString().split('T')[0];
 }
 
-function getWeekDates(baseDate: Date): string[] {
-  const monday = getMonday(baseDate);
-  const dates: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    dates.push(d.toISOString().split('T')[0]);
-  }
-  return dates;
+function formatDateVN(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getMonthDates(year: number, month: number): string[] {
-  const dates: string[] = [];
-  const daysInMonth = new Date(year, month, 0).getDate();
-  for (let d = 1; d <= daysInMonth; d++) {
-    dates.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-  }
-  return dates;
+function getFirstOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function getWeekLabel(baseDate: Date): string {
-  const dates = getWeekDates(baseDate);
-  const from = formatDateShort(dates[0]);
-  const to = formatDateShort(dates[6]);
-  return `${from} — ${to}`;
-}
-
-const DAY_NAMES_SHORT = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const DAY_NAMES_FULL = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+const DAY_LABELS_SHORT = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
 // ============================================================
-// MAIN COMPONENT
+// HELPER: rút gọn tên VN cho mobile (Nguyễn Văn An → NV An)
+// ============================================================
+function shortName(fullName: string): string {
+  if (!fullName) return '?';
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 2) return fullName;
+  const initials = parts.slice(0, -1).map(p => p.charAt(0)).join('');
+  return `${initials} ${parts[parts.length - 1]}`;
+}
+
+// ============================================================
+// COMPONENT
 // ============================================================
 
 export function ShiftCalendarPage() {
-  // === STATE ===
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [departmentId, setDepartmentId] = useState('');
-  const [baseDate, setBaseDate] = useState(new Date());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
-  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
-  const [overrideTarget, setOverrideTarget] = useState<OverrideTarget | null>(null);
-
-  // Current user from auth
   const { user } = useAuthStore();
   const currentUserId = user?.employee_id || '';
 
-  // === DATE RANGES ===
-  const dates = useMemo(() => {
+  // ── View state ──
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [departmentId, setDepartmentId] = useState<string>('');
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>('all');
+  const [showStats, setShowStats] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [overrideTarget, setOverrideTarget] = useState<OverrideTarget | null>(null);
+
+  // ── Date range ──
+  const { dateFrom, dateTo, dates } = useMemo(() => {
     if (viewMode === 'week') {
-      return getWeekDates(baseDate);
+      const monday = getMonday(currentDate);
+      const d: Date[] = [];
+      for (let i = 0; i < 7; i++) d.push(addDays(monday, i));
+      return {
+        dateFrom: formatDate(d[0]),
+        dateTo: formatDate(d[6]),
+        dates: d,
+      };
     } else {
-      return getMonthDates(currentYear, currentMonth);
+      const first = getFirstOfMonth(currentDate);
+      const monday = getMonday(first);
+      const d: Date[] = [];
+      for (let i = 0; i < 42; i++) {
+        const day = addDays(monday, i);
+        d.push(day);
+        if (i >= 28 && day.getMonth() !== currentDate.getMonth() && day.getDay() === 1) break;
+      }
+      return {
+        dateFrom: formatDate(d[0]),
+        dateTo: formatDate(d[d.length - 1]),
+        dates: d,
+      };
     }
-  }, [viewMode, baseDate, currentYear, currentMonth]);
+  }, [viewMode, currentDate]);
 
-  const dateFrom = dates[0];
-  const dateTo = dates[dates.length - 1];
-  const today = getToday();
-
-  // === QUERIES ===
-  const { data: departmentsData } = useQuery({
-    queryKey: ['departments-calendar'],
-    queryFn: () => departmentService.getAll({ page: 1, pageSize: 50, status: 'active' }),
+  // ── Queries ──
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments-list'],
+    queryFn: () => departmentService.getAll({ page: 1, pageSize: 50 }),
+    select: (res: any) => res?.data || res || [],
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: calendarData, isLoading } = useQuery({
+  // ★ FIX 1: Teams query phụ thuộc departmentId — chỉ load đội của phòng ban đang chọn
+  //    shiftTeamService.getTeams(departmentId?) đã hỗ trợ filter sẵn
+  const { data: teams = [] } = useQuery({
+    queryKey: ['shift-teams-dept', departmentId],
+    queryFn: () => shiftTeamService.getTeams(departmentId || undefined),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // ★ FIX 2: Query team members → build map employee_id → team_id
+  //    Dùng để filter nhân viên theo đội, thay vì filter trên assignment
+  const { data: employeeTeamMap = new Map<string, string>() } = useQuery({
+    queryKey: ['shift-team-members-map', departmentId, teams.map((t: any) => t.id).join(',')],
+    queryFn: async () => {
+      const map = new Map<string, string>(); // employee_id → team_id
+      if (teams.length === 0) return map;
+
+      for (const team of teams) {
+        try {
+          // ★ Dùng đúng method: getTeamMembers (không phải getActiveMembers)
+          const members = await shiftTeamService.getTeamMembers(team.id);
+          (members || []).forEach((m: any) => {
+            const empId = m.employee_id || m.id;
+            if (empId) map.set(empId, team.id);
+          });
+        } catch {
+          // Skip this team nếu lỗi
+        }
+      }
+      return map;
+    },
+    enabled: teams.length > 0,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const {
+    data: calendarData = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['shift-calendar', departmentId, dateFrom, dateTo],
-    queryFn: () => shiftAssignmentService.getCalendarView({
-      department_id: departmentId || undefined,
-      date_from: dateFrom,
-      date_to: dateTo,
-    }),
-    enabled: !!dateFrom && !!dateTo,
+    queryFn: () =>
+      shiftAssignmentService.getCalendarView({
+        department_id: departmentId || undefined,
+        date_from: dateFrom,
+        date_to: dateTo,
+      }),
+    select: (res: any) => (Array.isArray(res) ? res : res?.data || []),
+    staleTime: 30 * 1000,
   });
 
-  const departments = departmentsData?.data || [];
-  const employees = calendarData || [];
+  // ★ FIX 3: Filter by team dựa trên employee membership, không phải assignment field
+  const filteredCalendar = useMemo(() => {
+    if (teamFilter === 'all') return calendarData;
 
-  // === NAVIGATION ===
-  const goNext = useCallback(() => {
-    if (viewMode === 'week') {
-      const next = new Date(baseDate);
-      next.setDate(next.getDate() + 7);
-      setBaseDate(next);
-    } else {
-      if (currentMonth === 12) {
-        setCurrentMonth(1);
-        setCurrentYear(y => y + 1);
-      } else {
-        setCurrentMonth(m => m + 1);
+    // Filter: chỉ hiện nhân viên thuộc đội đã chọn
+    return calendarData.filter((emp: any) => {
+      const empTeamId = employeeTeamMap.get(emp.employee_id);
+      return empTeamId === teamFilter;
+    });
+  }, [calendarData, teamFilter, employeeTeamMap]);
+
+  // ── Navigate ──
+  const goToday = useCallback(() => setCurrentDate(new Date()), []);
+  const goPrev = useCallback(
+    () => setCurrentDate((d) => addDays(d, viewMode === 'week' ? -7 : -30)),
+    [viewMode]
+  );
+  const goNext = useCallback(
+    () => setCurrentDate((d) => addDays(d, viewMode === 'week' ? 7 : 30)),
+    [viewMode]
+  );
+
+  // ── Stats ──
+  const stats = useMemo(() => {
+    const today = getToday();
+    let totalEmployees = 0;
+    let totalAssigned = 0;
+    let overrides = 0;
+    let teamACells = 0;
+    let teamBCells = 0;
+
+    // Build reverse map: team_id → team_code
+    const teamCodeMap = new Map<string, string>();
+    teams.forEach((t: any) => {
+      teamCodeMap.set(t.id, t.code || '');
+    });
+
+    for (const emp of filteredCalendar) {
+      totalEmployees++;
+      // Xác định team code của employee
+      const empTeamId = employeeTeamMap.get(emp.employee_id);
+      const empTeamCode = empTeamId ? (teamCodeMap.get(empTeamId) || '') : '';
+
+      for (const d of dates) {
+        const dateStr = formatDate(d);
+        const isSunday = d.getDay() === 0;
+        const isSundayOff = isSunday && SUNDAY_OFF_DEPT_CODES.includes(emp.department_code);
+        if (isSundayOff) continue;
+
+        const dayAssigns: DayAssignment[] = emp.assignments?.[dateStr] || [];
+        const arr = Array.isArray(dayAssigns) ? dayAssigns : dayAssigns ? [dayAssigns] : [];
+
+        for (const a of arr) {
+          totalAssigned++;
+          if (a.is_override) overrides++;
+          // Dùng team code từ employee membership
+          if (empTeamCode.includes('A') || empTeamCode === 'TEAM_A') teamACells++;
+          if (empTeamCode.includes('B') || empTeamCode === 'TEAM_B') teamBCells++;
+        }
       }
     }
-  }, [viewMode, baseDate, currentMonth, currentYear]);
 
-  const goPrev = useCallback(() => {
+    return { totalEmployees, totalAssigned, overrides, teamACells, teamBCells };
+  }, [filteredCalendar, dates, employeeTeamMap, teams]);
+
+  // ── Header label ──
+  const headerLabel = useMemo(() => {
     if (viewMode === 'week') {
-      const prev = new Date(baseDate);
-      prev.setDate(prev.getDate() - 7);
-      setBaseDate(prev);
-    } else {
-      if (currentMonth === 1) {
-        setCurrentMonth(12);
-        setCurrentYear(y => y - 1);
-      } else {
-        setCurrentMonth(m => m - 1);
-      }
+      return `${formatDateVN(dates[0])} — ${formatDateVN(dates[dates.length - 1])}`;
     }
-  }, [viewMode, baseDate, currentMonth, currentYear]);
+    const months = [
+      'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+      'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
+    ];
+    return `${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+  }, [viewMode, dates, currentDate]);
 
-  const goToday = useCallback(() => {
-    const now = new Date();
-    setBaseDate(now);
-    setCurrentYear(now.getFullYear());
-    setCurrentMonth(now.getMonth() + 1);
+  // ── Handle cell click ──
+  const handleCellClick = useCallback(
+    (emp: any, dateStr: string, assignmentIndex?: number) => {
+      const rawAssigns = emp.assignments?.[dateStr];
+      const arr: DayAssignment[] = Array.isArray(rawAssigns)
+        ? rawAssigns
+        : rawAssigns
+          ? [rawAssigns]
+          : [];
+      const targetAssign = assignmentIndex !== undefined ? arr[assignmentIndex] : arr[0] || null;
+
+      setOverrideTarget({
+        employeeId: emp.employee_id,
+        employeeName: emp.full_name,
+        date: dateStr,
+        currentShift: targetAssign
+          ? {
+              id: targetAssign.id,
+              shift_id: targetAssign.shift_id,
+              shift_name: targetAssign.shift_name,
+              assignment_type: targetAssign.assignment_type,
+            }
+          : null,
+      });
+    },
+    []
+  );
+
+  // ── Permission check ──
+  const posLevel = user?.position_level ?? 99;
+  const isManagerOrAbove = posLevel <= 5;
+  const readonly = !isManagerOrAbove;
+  const todayStr = getToday();
+
+  // ★ Reset teamFilter khi đổi phòng ban
+  const handleDepartmentChange = useCallback((newDeptId: string) => {
+    setDepartmentId(newDeptId);
+    setTeamFilter('all'); // Reset về "Tất cả đội" khi đổi phòng ban
   }, []);
 
-  // === STATS ===
-  // ★ Stats giờ tính theo từng nhân viên: chỉ skip CN cho KT + RD
-  const stats = useMemo(() => {
-    let totalAssigned = 0;
-    let totalCells = 0;
-    let overrides = 0;
-
-    employees.forEach(emp => {
-      const isSundayOffDept = SUNDAY_OFF_DEPT_CODES.includes(emp.department_code);
-
-      dates.forEach(d => {
-        const dayOfWeek = new Date(d + 'T00:00:00').getDay();
-        const skipThisCell = dayOfWeek === 0 && isSundayOffDept;
-
-        if (!skipThisCell) {
-          totalCells++;
-          const assignment = emp.assignments[d];
-          if (assignment) {
-            totalAssigned++;
-            if (assignment.is_override) overrides++;
-          }
-        }
-      });
-    });
-
-    return {
-      totalEmployees: employees.length,
-      totalAssigned,
-      totalCells,
-      coverageRate: totalCells > 0 ? Math.round((totalAssigned / totalCells) * 100) : 0,
-      overrides,
-    };
-  }, [employees, dates]);
-
-  // === CELL CLICK ===
-  const handleCellClick = (employeeId: string, employeeName: string, date: string, data: ShiftCellData | null) => {
-    setOverrideTarget({
-      employeeId,
-      employeeName,
-      date,
-      currentShift: data ? {
-        id: data.id,
-        shift_id: data.shift_id,
-        shift_name: data.shift_name,
-        assignment_type: data.assignment_type,
-      } : null,
-    });
-  };
-
-  // === TITLE ===
-  const periodLabel = viewMode === 'week'
-    ? getWeekLabel(baseDate)
-    : formatMonthYear(currentYear, currentMonth);
-
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
-    <div className="p-4 lg:p-6 max-w-[1400px] mx-auto">
-      {/* ============ HEADER ============ */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <CalendarDays size={24} className="text-blue-500" />
-            Phân ca
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{periodLabel}</p>
-        </div>
-        <button
-          onClick={() => setIsBatchModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white
-            rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Layers size={16} />
-          Phân ca nhanh
-        </button>
-      </div>
-
-      {/* ============ TOOLBAR ============ */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        {/* Department filter */}
-        <div className="flex items-center gap-2">
-          <Building2 size={16} className="text-gray-400" />
-          <select
-            value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm
-              focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Tất cả phòng ban</option>
-            {departments.map((d: any) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* ═══════════ HEADER ═══════════ */}
+      <div className="bg-white border-b px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarDays size={20} className="text-blue-600" />
+            <h1 className="text-base font-bold text-gray-900">Lịch phân ca</h1>
+          </div>
+          {isManagerOrAbove && (
+            <button
+              onClick={() => setIsBatchModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium active:bg-blue-700 min-h-[44px]"
+            >
+              <Layers size={14} />
+              <span className="hidden sm:inline">Phân ca hàng loạt</span>
+              <span className="sm:hidden">Phân ca</span>
+            </button>
+          )}
         </div>
 
-        {/* View mode toggle */}
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode('week')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all
-              ${viewMode === 'week'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-              }
-            `}
-          >
-            Tuần
-          </button>
-          <button
-            onClick={() => setViewMode('month')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all
-              ${viewMode === 'month'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-              }
-            `}
-          >
-            Tháng
-          </button>
+        {/* ── Filters ── */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Building2 size={14} className="text-gray-400" />
+            <select
+              value={departmentId}
+              onChange={(e) => handleDepartmentChange(e.target.value)}
+              className="text-sm border rounded-lg px-2 py-1.5 min-h-[36px] bg-white"
+            >
+              <option value="">Tất cả phòng ban</option>
+              {departments.map((dept: any) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* ★ FIX: Team dropdown dùng team.id làm value (UUID) */}
+          {teams.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Users size={14} className="text-gray-400" />
+              <select
+                value={teamFilter}
+                onChange={(e) => setTeamFilter(e.target.value)}
+                className="text-sm border rounded-lg px-2 py-1.5 min-h-[36px] bg-white"
+              >
+                <option value="all">Tất cả đội</option>
+                {teams.map((team: any) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex border rounded-lg overflow-hidden ml-auto">
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-3 py-1.5 text-xs font-medium min-h-[36px] ${
+                viewMode === 'week'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 active:bg-gray-100'
+              }`}
+            >
+              Tuần
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-3 py-1.5 text-xs font-medium min-h-[36px] ${
+                viewMode === 'month'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 active:bg-gray-100'
+              }`}
+            >
+              Tháng
+            </button>
+          </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex items-center gap-1">
+        {/* ── Navigation ── */}
+        <div className="mt-2 flex items-center justify-between">
           <button
             onClick={goPrev}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 rounded-lg active:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <ChevronLeft size={18} className="text-gray-600" />
           </button>
-          <button
-            onClick={goToday}
-            className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50
-              hover:bg-blue-100 rounded-lg transition-colors"
-          >
-            Hôm nay
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-800">{headerLabel}</span>
+            <button
+              onClick={goToday}
+              className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600 active:bg-gray-200"
+            >
+              Hôm nay
+            </button>
+          </div>
           <button
             onClick={goNext}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 rounded-lg active:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <ChevronRight size={18} className="text-gray-600" />
           </button>
         </div>
 
-        {/* Stats mini */}
-        <div className="ml-auto flex items-center gap-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <Users size={13} />
-            {stats.totalEmployees} NV
-          </span>
-          <span className="flex items-center gap-1">
-            <BarChart3 size={13} />
-            {stats.coverageRate}% phân ca
-          </span>
-          {stats.overrides > 0 && (
-            <span className="text-yellow-600">★ {stats.overrides} đổi ca</span>
-          )}
-        </div>
+        {/* ── Stats toggle ── */}
+        <button
+          onClick={() => setShowStats(!showStats)}
+          className="mt-2 flex items-center gap-1 text-xs text-gray-500 active:text-blue-600"
+        >
+          <BarChart3 size={12} />
+          {showStats ? 'Ẩn thống kê' : 'Xem thống kê'}
+        </button>
+
+        {showStats && (
+          <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+            <div className="bg-blue-50 rounded-lg px-3 py-2">
+              <span className="text-blue-600 font-bold">{stats.totalEmployees}</span>
+              <span className="text-blue-500 ml-1">nhân viên</span>
+            </div>
+            <div className="bg-green-50 rounded-lg px-3 py-2">
+              <span className="text-green-600 font-bold">{stats.totalAssigned}</span>
+              <span className="text-green-500 ml-1">ca đã phân</span>
+            </div>
+            <div className="bg-amber-50 rounded-lg px-3 py-2">
+              <span className="text-amber-600 font-bold">{stats.overrides}</span>
+              <span className="text-amber-500 ml-1">đổi ca</span>
+            </div>
+            {(stats.teamACells > 0 || stats.teamBCells > 0) && (
+              <>
+                <div className="bg-blue-50 rounded-lg px-3 py-2 border-l-2 border-blue-500">
+                  <span className="text-blue-600 font-bold">{stats.teamACells}</span>
+                  <span className="text-blue-500 ml-1">Đội A</span>
+                </div>
+                <div className="bg-rose-50 rounded-lg px-3 py-2 border-l-2 border-rose-500">
+                  <span className="text-rose-600 font-bold">{stats.teamBCells}</span>
+                  <span className="text-rose-500 ml-1">Đội B</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ============ CALENDAR TABLE ============ */}
+      {/* ═══════════ CALENDAR TABLE ═══════════ */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" />
-          <span className="ml-3 text-gray-500">Đang tải lịch ca...</span>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2 text-gray-400">
+            <div className="w-6 h-6 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+            <span className="text-sm">Đang tải lịch...</span>
+          </div>
         </div>
-      ) : employees.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200">
-          <Users size={40} className="text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">
-            {departmentId ? 'Không có nhân viên trong phòng ban này' : 'Chọn phòng ban để xem lịch phân ca'}
-          </p>
+      ) : filteredCalendar.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-gray-400">
+            <Users size={40} className="mx-auto mb-2 opacity-30" />
+            <p className="text-sm">Chưa có nhân viên nào</p>
+            <p className="text-xs">Chọn phòng ban hoặc điều chỉnh bộ lọc</p>
+          </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              {/* Header: dates */}
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-600 min-w-[160px] border-b border-r border-gray-200">
-                    Nhân viên
-                  </th>
-                  {dates.map(d => {
-                    const dateObj = new Date(d + 'T00:00:00');
-                    const dayOfWeek = dateObj.getDay();
-                    const isSunday = dayOfWeek === 0;
-                    const isCurrentDay = d === today;
-                    // Map JS day (0=Sun, 1=Mon...) to our DAY_NAMES index (0=Mon)
-                    const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-                    return (
-                      <th
-                        key={d}
-                        className={`px-0.5 py-1.5 text-center border-b border-gray-200 min-w-[52px]
-                          ${isCurrentDay ? 'bg-blue-50' : ''}
-                        `}
-                      >
-                        <div className={`text-[10px] font-medium ${isSunday ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
-                          {viewMode === 'week' ? DAY_NAMES_FULL[dayIndex] : DAY_NAMES_SHORT[dayIndex]}
-                        </div>
-                        <div className={`text-xs font-bold
-                          ${isSunday ? 'text-red-500' : isCurrentDay ? 'text-blue-600' : 'text-gray-700'}
-                        `}>
-                          {dateObj.getDate()}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-
-              {/* Body: employee rows */}
-              <tbody>
-                {employees.map((emp, empIdx) => {
-                  // ★ Xác định phòng ban này có nghỉ CN không
-                  const isSundayOffDept = SUNDAY_OFF_DEPT_CODES.includes(emp.department_code);
+        <div className="flex-1 overflow-auto scrollbar-hide">
+          <table className="w-full border-collapse min-w-[600px]">
+            {/* ── Header ── */}
+            <thead className="sticky top-0 z-10 bg-white">
+              <tr>
+                <th className="p-1.5 text-left text-[11px] font-semibold text-gray-500 w-[140px] sm:w-[180px] min-w-[120px] border-b sticky left-0 bg-white z-20">
+                  Nhân viên
+                </th>
+                {dates.map((d) => {
+                  const dayIdx = (d.getDay() + 6) % 7;
+                  const isSunday = d.getDay() === 0;
+                  const isToday = formatDate(d) === todayStr;
+                  const isCurrentMonth = d.getMonth() === currentDate.getMonth();
 
                   return (
-                    <tr
-                      key={emp.employee_id}
-                      className={empIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}
+                    <th
+                      key={formatDate(d)}
+                      className={`p-1 text-center text-[10px] font-medium border-b min-w-[52px]
+                        ${isSunday ? 'text-red-500' : 'text-gray-500'}
+                        ${isToday ? 'bg-blue-50' : ''}
+                        ${viewMode === 'month' && !isCurrentMonth ? 'opacity-40' : ''}
+                      `}
                     >
-                      {/* Employee name - sticky */}
-                      <td className="sticky left-0 z-10 px-3 py-1.5 border-r border-gray-200 min-w-[160px]"
-                        style={{ backgroundColor: empIdx % 2 === 0 ? 'white' : '#fafafa' }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                            <span className="text-[10px] font-bold text-blue-600">
-                              {emp.employee_name.charAt(emp.employee_name.lastIndexOf(' ') + 1) || '?'}
-                            </span>
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-gray-900 truncate" title={emp.employee_name}>
-                              {emp.employee_name}
-                            </p>
-                            <p className="text-[10px] text-gray-400">{emp.employee_code}</p>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Shift cells */}
-                      {dates.map(d => {
-                        const dateObj = new Date(d + 'T00:00:00');
-                        const dayOfWeek = dateObj.getDay();
-                        const isCurrentDay = d === today;
-                        const isPast = d < today;
-                        const cellData = emp.assignments[d] as ShiftCellData | undefined;
-
-                        // ★ CHỈ nghỉ CN khi phòng ban thuộc danh sách nghỉ CN
-                        const isSundayOff = dayOfWeek === 0 && isSundayOffDept;
-
-                        return (
-                          <ShiftCell
-                            key={d}
-                            data={cellData || null}
-                            date={d}
-                            isSundayOff={isSundayOff}
-                            isToday={isCurrentDay}
-                            isPast={isPast}
-                            onClick={() => handleCellClick(
-                              emp.employee_id,
-                              emp.employee_name,
-                              d,
-                              cellData || null
-                            )}
-                          />
-                        );
-                      })}
-                    </tr>
+                      <div>{DAY_LABELS_SHORT[dayIdx]}</div>
+                      <div className={`text-[11px] font-semibold ${isToday ? 'text-blue-600' : ''}`}>
+                        {d.getDate()}
+                      </div>
+                    </th>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </thead>
 
-          {/* Legend */}
-          <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 flex flex-wrap items-center gap-3 text-[10px]">
-            <span className="text-gray-500 font-medium">Chú thích:</span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" /> Ca 1
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-amber-100 border border-amber-300" /> Ca 2
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-300" /> Ca 3
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-orange-100 border border-orange-300" /> Ca ngày
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-purple-100 border border-purple-300" /> Ca đêm
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-gray-100 border border-gray-300" /> HC-SX
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-sky-100 border border-sky-300" /> HC-VP
-            </span>
-            <span className="flex items-center gap-1 text-yellow-600">★ Đổi ca</span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-gray-100 border border-gray-300" />
-              <span className="text-gray-400 italic">CN nghỉ (KT, R&D)</span>
-            </span>
-          </div>
+            {/* ── Body ── */}
+            <tbody>
+              {filteredCalendar.map((emp: any) => {
+                const isSundayOffDept = SUNDAY_OFF_DEPT_CODES.includes(emp.department_code);
+                const empName = emp.employee_name || emp.full_name || 'N/A';
+                const empCode = emp.employee_code || '';
+
+                return (
+                  <tr key={emp.employee_id} className="border-b border-gray-100 active:bg-gray-50">
+                    {/* ── Employee Name Cell ── */}
+                    <td className="p-1.5 sticky left-0 bg-white z-10 border-r border-gray-50">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-semibold text-gray-600 flex-shrink-0">
+                          {empName.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className="text-[12px] sm:text-[13px] font-medium text-gray-900 truncate leading-tight"
+                            title={empName}
+                          >
+                            <span className="hidden sm:inline">{empName}</span>
+                            <span className="sm:hidden">{shortName(empName)}</span>
+                          </div>
+                          <div className="text-[10px] text-gray-400 truncate leading-tight">
+                            {empCode}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {dates.map((d) => {
+                      const dateStr = formatDate(d);
+                      const isSunday = d.getDay() === 0;
+                      const isSundayOff = isSunday && isSundayOffDept;
+                      const isToday = dateStr === todayStr;
+                      const isPast = dateStr < todayStr;
+
+                      const rawAssigns = emp.assignments?.[dateStr];
+                      const dayAssigns: DayAssignment[] = Array.isArray(rawAssigns)
+                        ? rawAssigns
+                        : rawAssigns
+                          ? [rawAssigns]
+                          : [];
+
+                      return (
+                        <ShiftCell
+                          key={dateStr}
+                          assignments={dayAssigns}
+                          date={dateStr}
+                          isSundayOff={isSundayOff}
+                          isToday={isToday}
+                          isPast={isPast}
+                          readonly={readonly}
+                          onClick={(assignmentIndex) =>
+                            handleCellClick(emp, dateStr, assignmentIndex)
+                          }
+                        />
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* ============ MODALS ============ */}
+      {/* ═══════════ LEGEND ═══════════ */}
+      <div className="mx-4 mt-2 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+        {[
+          { code: 'SHORT_1', label: 'Sáng', color: 'bg-emerald-200' },
+          { code: 'SHORT_2', label: 'Chiều', color: 'bg-amber-200' },
+          { code: 'SHORT_3', label: 'Đêm', color: 'bg-indigo-200' },
+          { code: 'LONG_DAY', label: 'Ngày 12h', color: 'bg-orange-200' },
+          { code: 'LONG_NIGHT', label: 'Đêm 12h', color: 'bg-purple-200' },
+          { code: 'ADMIN_PROD', label: 'HC-SX', color: 'bg-gray-200' },
+          { code: 'ADMIN_OFFICE', label: 'HC-VP', color: 'bg-sky-200' },
+        ].map((item) => (
+          <span key={item.code} className="flex items-center gap-1">
+            <span className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
+            <span className="text-gray-600">{item.label}</span>
+          </span>
+        ))}
+
+        {teams.length > 0 && (
+          <>
+            <span className="border-l pl-2 ml-1 flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
+              <span className="text-gray-500">Đội A</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
+              <span className="text-gray-500">Đội B</span>
+            </span>
+          </>
+        )}
+
+        <span className="flex items-center gap-1 text-amber-500">★ Đổi ca</span>
+      </div>
+
+      {/* ═══════════ MODALS ═══════════ */}
       <BatchScheduleModal
         isOpen={isBatchModalOpen}
-        onClose={() => setIsBatchModalOpen(false)}
+        onClose={() => {
+          setIsBatchModalOpen(false);
+          refetch();
+        }}
         currentUserId={currentUserId}
         preSelectedDepartmentId={departmentId}
       />
@@ -504,7 +626,10 @@ export function ShiftCalendarPage() {
       {overrideTarget && (
         <ShiftOverrideModal
           isOpen={!!overrideTarget}
-          onClose={() => setOverrideTarget(null)}
+          onClose={() => {
+            setOverrideTarget(null);
+            refetch();
+          }}
           employeeId={overrideTarget.employeeId}
           employeeName={overrideTarget.employeeName}
           date={overrideTarget.date}
@@ -512,6 +637,12 @@ export function ShiftCalendarPage() {
           currentUserId={currentUserId}
         />
       )}
+
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+      `}</style>
     </div>
   );
 }

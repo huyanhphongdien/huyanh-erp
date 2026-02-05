@@ -1,7 +1,8 @@
 // ============================================================================
 // src/features/tasks/utils/taskPermissions.ts
-// Task Permissions - FINAL VERSION v2
-// Fixed param order to match approvalService.ts
+// Task Permissions - v3
+// Added userEmployeeId to properly check assignee/assigner for employees
+// Employee same-department: can view + comment only (no edit/delete/attach)
 // ============================================================================
 
 // ============================================================================
@@ -183,12 +184,6 @@ export function canApproveTask(
  * Check if user can approve a task
  * Called from approvalService with: canUserApproveTask(userLevel, userDeptId, assignerLevel, taskDeptId, isAdmin)
  * ALWAYS returns PermissionCheckResult
- * 
- * @param userLevel - User's position level (number)
- * @param userDepartmentId - User's department ID (string)
- * @param assignerLevel - Task assigner's level (number) - NOT USED but kept for compatibility
- * @param taskDepartmentId - Task's department ID (string)
- * @param isAdmin - Whether user is admin (boolean)
  */
 export function canUserApproveTask(
   userLevel: number | null,
@@ -197,22 +192,18 @@ export function canUserApproveTask(
   taskDepartmentId?: string | null,
   isAdmin?: boolean
 ): PermissionCheckResult {
-  // Admin can always approve
   if (isAdmin) {
     return { canApprove: true }
   }
   
-  // Only managers can approve
   if (!isManagerLevel(userLevel)) {
     return { canApprove: false, reason: 'Chỉ quản lý mới có quyền phê duyệt' }
   }
   
-  // Executive can approve all
   if (isExecutive(userLevel)) {
     return { canApprove: true }
   }
   
-  // Manager can only approve in same department
   if (taskDepartmentId === userDepartmentId) {
     return { canApprove: true }
   }
@@ -240,21 +231,33 @@ export function canAssignToEmployee(
   return false
 }
 
+// ============================================================================
+// MAIN: getTaskPermissions
+// v3: Added userEmployeeId param
+// ============================================================================
+
 /**
  * Get all permissions for a task
+ * @param task - Task data for permission check
+ * @param userRole - User's role (admin/manager/employee)
+ * @param userDepartmentId - User's department ID
+ * @param userPositionLevel - User's position level (1-7)
+ * @param isAdmin - Whether user is admin
+ * @param userEmployeeId - User's employee ID (NEW in v3)
  */
 export function getTaskPermissions(
   task: TaskForPermission,
   userRole: UserRole,
   userDepartmentId?: string | null,
   userPositionLevel?: number | null,
-  isAdmin?: boolean
+  isAdmin?: boolean,
+  userEmployeeId?: string | null
 ): TaskPermissions {
   const isAdminUser = isAdmin || userRole === 'admin'
   const locked = isTaskLocked(task.evaluation_status)
   const completed = isTaskCompleted(task.status)
   
-  // Default permissions for admin
+  // ── Admin: full access (except locked) ──
   if (isAdminUser) {
     return {
       canView: true,
@@ -277,12 +280,16 @@ export function getTaskPermissions(
     }
   }
   
-  const isOwner = task.is_self_assigned === true
-  const isSameDepartment = task.department_id === userDepartmentId
-  const isManager = isManagerLevel(userPositionLevel)
+  // ── Common checks ──
+  const isAssignee = !!userEmployeeId && task.assignee_id === userEmployeeId
+  const isAssigner = !!userEmployeeId && task.assigner_id === userEmployeeId
+  const isOwner = task.is_self_assigned === true && (isAssignee || isAssigner)
+  const isMyTask = isAssignee || isAssigner || isOwner
+  const isSameDepartment = !!task.department_id && task.department_id === userDepartmentId
   const isExec = isExecutive(userPositionLevel)
+  const isManager = isManagerLevel(userPositionLevel) && !isExec
   
-  // Executive permissions
+  // ── Executive: near-full access ──
   if (isExec) {
     return {
       canView: true,
@@ -295,59 +302,115 @@ export function getTaskPermissions(
       canRequestExtension: !completed,
       canComment: true,
       canAttach: true,
-      canSelfEvaluate: isOwner && canTaskBeEvaluated(task.status) && !locked,
-      canMarkComplete: isOwner && !completed && !locked,
-      canPause: isOwner && PAUSABLE_STATUSES.includes(task.status),
-      canResume: isOwner && RESUMABLE_STATUSES.includes(task.status),
+      canSelfEvaluate: isAssignee && canTaskBeEvaluated(task.status) && !locked,
+      canMarkComplete: isAssignee && !completed && !locked,
+      canPause: isMyTask && PAUSABLE_STATUSES.includes(task.status),
+      canResume: isMyTask && RESUMABLE_STATUSES.includes(task.status),
       canCancel: CANCELLABLE_STATUSES.includes(task.status) && !locked,
       editDisabledReason: locked ? 'Công việc đã khóa' : undefined,
       deleteDisabledReason: completed ? 'Không thể xóa công việc đã hoàn thành' : undefined,
     }
   }
   
-  // Manager permissions
+  // ── Manager: same-department management ──
   if (isManager) {
     const canManage = isSameDepartment
     return {
-      canView: canManage || isOwner,
+      canView: canManage || isMyTask,
       canEdit: canManage && !locked,
       canDelete: canManage && !completed,
       canAssign: canManage,
-      canChangeStatus: (canManage || isOwner) && !locked,
+      canChangeStatus: (canManage || isMyTask) && !locked,
       canEvaluate: canManage && canTaskBeEvaluated(task.status) && !locked,
       canApprove: canManage && isTaskPendingApproval(task.status),
-      canRequestExtension: isOwner && !completed,
-      canComment: canManage || isOwner,
-      canAttach: canManage || isOwner,
-      canSelfEvaluate: isOwner && canTaskBeEvaluated(task.status) && !locked,
-      canMarkComplete: isOwner && !completed && !locked,
-      canPause: isOwner && PAUSABLE_STATUSES.includes(task.status),
-      canResume: isOwner && RESUMABLE_STATUSES.includes(task.status),
-      canCancel: (canManage || isOwner) && CANCELLABLE_STATUSES.includes(task.status) && !locked,
-      editDisabledReason: !canManage ? 'Không có quyền sửa công việc này' : locked ? 'Công việc đã khóa' : undefined,
-      deleteDisabledReason: !canManage ? 'Không có quyền xóa công việc này' : completed ? 'Không thể xóa công việc đã hoàn thành' : undefined,
+      canRequestExtension: isMyTask && !completed,
+      canComment: canManage || isMyTask,
+      canAttach: canManage || isMyTask,
+      canSelfEvaluate: isAssignee && canTaskBeEvaluated(task.status) && !locked,
+      canMarkComplete: isAssignee && !completed && !locked,
+      canPause: isMyTask && PAUSABLE_STATUSES.includes(task.status),
+      canResume: isMyTask && RESUMABLE_STATUSES.includes(task.status),
+      canCancel: (canManage || isMyTask) && CANCELLABLE_STATUSES.includes(task.status) && !locked,
+      editDisabledReason: !canManage
+        ? 'Không có quyền sửa công việc này'
+        : locked ? 'Công việc đã khóa' : undefined,
+      deleteDisabledReason: !canManage
+        ? 'Không có quyền xóa công việc này'
+        : completed ? 'Không thể xóa công việc đã hoàn thành' : undefined,
     }
   }
   
-  // Employee permissions
+  // ── Employee ──
+  // isMyTask = tôi là assignee hoặc assigner hoặc self-assigned
+  // isSameDepartment = cùng phòng ban nhưng không phải task của tôi → chỉ xem + comment
+  
+  // Case 1: Task của tôi → full employee quyền
+  if (isMyTask) {
+    return {
+      canView: true,
+      canEdit: !locked && !completed,
+      canDelete: false,
+      canAssign: false,
+      canChangeStatus: !locked,
+      canEvaluate: isAssignee && canTaskBeEvaluated(task.status) && !locked,
+      canApprove: false,
+      canRequestExtension: !completed,
+      canComment: true,
+      canAttach: true,
+      canSelfEvaluate: isAssignee && canTaskBeEvaluated(task.status) && !locked,
+      canMarkComplete: isAssignee && !completed && !locked,
+      canPause: PAUSABLE_STATUSES.includes(task.status),
+      canResume: RESUMABLE_STATUSES.includes(task.status),
+      canCancel: CANCELLABLE_STATUSES.includes(task.status) && !locked,
+      editDisabledReason: locked
+        ? 'Công việc đã khóa'
+        : completed ? 'Công việc đã hoàn thành' : undefined,
+      deleteDisabledReason: 'Nhân viên không có quyền xóa công việc',
+    }
+  }
+  
+  // Case 2: Task đồng nghiệp cùng phòng ban → CHỈ xem + comment
+  if (isSameDepartment) {
+    return {
+      canView: true,
+      canEdit: false,
+      canDelete: false,
+      canAssign: false,
+      canChangeStatus: false,
+      canEvaluate: false,
+      canApprove: false,
+      canRequestExtension: false,
+      canComment: true,         // ✅ Được bình luận
+      canAttach: false,
+      canSelfEvaluate: false,
+      canMarkComplete: false,
+      canPause: false,
+      canResume: false,
+      canCancel: false,
+      editDisabledReason: 'Bạn chỉ có thể xem công việc của đồng nghiệp',
+      deleteDisabledReason: 'Bạn chỉ có thể xem công việc của đồng nghiệp',
+    }
+  }
+  
+  // Case 3: Task khác phòng ban → không có quyền gì (nhưng vẫn có thể xem nếu navigate tới)
   return {
-    canView: isOwner,
-    canEdit: isOwner && !locked && !completed,
+    canView: false,
+    canEdit: false,
     canDelete: false,
     canAssign: false,
-    canChangeStatus: isOwner && !locked,
-    canEvaluate: isOwner && canTaskBeEvaluated(task.status) && !locked,
+    canChangeStatus: false,
+    canEvaluate: false,
     canApprove: false,
-    canRequestExtension: isOwner && !completed,
-    canComment: isOwner,
-    canAttach: isOwner,
-    canSelfEvaluate: isOwner && canTaskBeEvaluated(task.status) && !locked,
-    canMarkComplete: isOwner && !completed && !locked,
-    canPause: isOwner && PAUSABLE_STATUSES.includes(task.status),
-    canResume: isOwner && RESUMABLE_STATUSES.includes(task.status),
-    canCancel: isOwner && CANCELLABLE_STATUSES.includes(task.status) && !locked,
-    editDisabledReason: !isOwner ? 'Không có quyền sửa công việc này' : locked ? 'Công việc đã khóa' : completed ? 'Công việc đã hoàn thành' : undefined,
-    deleteDisabledReason: 'Nhân viên không có quyền xóa công việc',
+    canRequestExtension: false,
+    canComment: false,
+    canAttach: false,
+    canSelfEvaluate: false,
+    canMarkComplete: false,
+    canPause: false,
+    canResume: false,
+    canCancel: false,
+    editDisabledReason: 'Không có quyền truy cập công việc này',
+    deleteDisabledReason: 'Không có quyền truy cập công việc này',
   }
 }
 

@@ -1,6 +1,11 @@
 // ============================================================
-// SIDEBAR COMPONENT - UPDATED
+// SIDEBAR COMPONENT - UPDATED WITH SHIFT TEAMS
 // File: src/components/common/Sidebar.tsx
+// ============================================================
+// CHANGES:
+// - Added UsersRound icon import for shift teams
+// - Added "Quản lý đội ca" menu item in CHẤM CÔNG group (after Phân ca)
+// - Permission: managerOnly (Manager level ≤ 5)
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -34,6 +39,7 @@ import {
   AlarmClockPlus,
   ClipboardCheck,
   Shield,
+  UsersRound,  // ✅ NEW: Icon cho Quản lý đội ca
 } from 'lucide-react';
 
 interface MenuItem {
@@ -71,7 +77,7 @@ const getMenuGroups = (
     ],
   },
 
-  // ===== QUẢN LÝ NHÂN SỰ (✅ Loại nghỉ phép ở đây) =====
+  // ===== QUẢN LÝ NHÂN SỰ =====
   {
     title: 'QUẢN LÝ NHÂN SỰ',
     icon: <Users size={18} />,
@@ -87,12 +93,11 @@ const getMenuGroups = (
       { path: '/payslips', label: 'Phiếu lương', icon: <Receipt size={18} /> },
       { path: '/performance-criteria', label: 'Tiêu chí đánh giá', icon: <Target size={18} /> },
       { path: '/performance-reviews', label: 'Đánh giá hiệu suất', icon: <Star size={18} /> },
-      // ✅ Loại nghỉ phép thuộc cấu hình nhân sự
       { path: '/leave-types', label: 'Loại nghỉ phép', icon: <Palmtree size={18} /> },
     ],
   },
 
-  // ===== CHẤM CÔNG (✅ Không còn Loại nghỉ phép) =====
+  // ===== CHẤM CÔNG =====
   {
     title: 'CHẤM CÔNG',
     icon: <Clock size={18} />,
@@ -101,6 +106,8 @@ const getMenuGroups = (
       { path: '/attendance', label: 'Bảng chấm công', icon: <Clock size={18} /> },
       { path: '/shifts', label: 'Quản lý ca', icon: <Timer size={18} />, executiveOnly: true },
       { path: '/shift-assignments', label: 'Phân ca', icon: <CalendarDays size={18} />, managerOnly: true },
+      // ✅ NEW: Quản lý đội ca (2 team × 3 ca ngắn)
+      { path: '/shift-teams', label: 'Quản lý đội ca', icon: <UsersRound size={18} />, managerOnly: true },
       { path: '/leave-requests', label: 'Đơn nghỉ phép', icon: <CalendarClock size={18} /> },
       { 
         path: '/leave-approvals', 

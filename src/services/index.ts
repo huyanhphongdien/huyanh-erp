@@ -1,10 +1,6 @@
 // src/services/index.ts
 // Export all services - với selective exports để tránh conflict
 
-
-// ===== SHARED TYPES =====
-export * from '../types/common'
-
 // ===== PHASE 3.1: Tổ chức =====
 export * from './departmentService';
 export * from './positionService';
@@ -20,11 +16,6 @@ export * from './employeeDocumentService';
 export * from './leaveTypeService';
 export * from './leaveRequestService';
 export * from './attendanceService';
-
-// ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
-export * from './shiftService';
-export * from './shiftAssignmentService';
-export * from './overtimeRequestService';
 
 // ===== PHASE 3.4: Lương & Đánh giá =====
 export * from './salaryGradeService';
@@ -75,3 +66,8 @@ export * from './taskAssignmentService';
 
 // ===== Email Service =====
 export * from './emailService';
+
+// ===== Chấm công V2: Shift Services =====
+export * from './shiftService';
+export * from './shiftAssignmentService';
+export * from './shiftTeamService';

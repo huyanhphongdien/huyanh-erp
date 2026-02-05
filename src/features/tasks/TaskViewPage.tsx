@@ -1,20 +1,16 @@
 // src/features/tasks/TaskViewPage.tsx
 // ============================================================================
-// RESPONSIVE UPDATE:
-// - Header: stacked buttons on mobile
-// - Content grid: proper stacking
-// - SVG progress: responsive size
-// - Cards: responsive padding
-// - Action buttons: full-width on mobile
+// v3: Uses shared useTaskPermissions hook instead of local permission function
+// Employee same-department: can view + comment only
 // ============================================================================
 
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Edit, Trash2, Calendar, User, Building, Flag, Clock, Lock, AlertTriangle, Users } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Calendar, User, Building, Flag, Clock, Lock, AlertTriangle, Users, Eye } from 'lucide-react'
 import { Card } from '../../components/ui'
 import { TaskStatusBadge } from './components/TaskStatusBadge'
 import { TaskPriorityBadge } from './components/TaskPriorityBadge'
 import { useTask, useDeleteTask } from './hooks/useTasks'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 
 import { SubtasksList } from './components/SubtasksList'
@@ -24,6 +20,7 @@ import { AttachmentSection } from './components/AttachmentSection'
 import { CommentSection } from './components/CommentSection'
 import { ActivityTimeline } from './components/ActivityTimeline'
 import TaskParticipantsSection from './components/TaskParticipantsSection'
+import { useTaskPermissions, type TaskForPermission } from './utils/useTaskPermissions'
 
 // ============ EVALUATION STATUS CONFIG ============
 const EVALUATION_STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -33,59 +30,6 @@ const EVALUATION_STATUS_CONFIG: Record<string, { label: string; color: string; b
   approved: { label: 'Đã duyệt', color: 'text-green-600', bgColor: 'bg-green-100' },
   rejected: { label: 'Từ chối', color: 'text-red-600', bgColor: 'bg-red-100' },
   revision_required: { label: 'Cần sửa', color: 'text-orange-600', bgColor: 'bg-orange-100' },
-}
-
-// ============ PERMISSION HELPER ============
-interface TaskPermissions {
-  canEdit: boolean
-  canDelete: boolean
-  editDisabledReason?: string
-  deleteDisabledReason?: string
-  isLocked: boolean
-  lockMessage?: string
-}
-
-function getTaskPermissions(task: any, userRole?: string): TaskPermissions {
-  const evaluationStatus = task?.evaluation_status || 'none'
-  const taskStatus = task?.status || 'draft'
-  
-  if (evaluationStatus === 'pending_approval') {
-    return {
-      canEdit: false,
-      canDelete: false,
-      editDisabledReason: 'Công việc đang chờ phê duyệt, không thể sửa',
-      deleteDisabledReason: 'Công việc đang chờ phê duyệt, không thể xóa',
-      isLocked: true,
-      lockMessage: 'Công việc đang chờ phê duyệt đánh giá',
-    }
-  }
-  
-  if (evaluationStatus === 'approved') {
-    return {
-      canEdit: false,
-      canDelete: false,
-      editDisabledReason: 'Công việc đã được duyệt, không thể sửa',
-      deleteDisabledReason: 'Công việc đã được duyệt, không thể xóa',
-      isLocked: true,
-      lockMessage: 'Công việc đã hoàn tất quy trình đánh giá',
-    }
-  }
-  
-  if (taskStatus === 'cancelled') {
-    return {
-      canEdit: false,
-      canDelete: userRole === 'admin',
-      editDisabledReason: 'Công việc đã hủy, không thể sửa',
-      deleteDisabledReason: userRole !== 'admin' ? 'Chỉ admin mới có thể xóa công việc đã hủy' : undefined,
-      isLocked: false,
-    }
-  }
-  
-  return {
-    canEdit: true,
-    canDelete: true,
-    isLocked: false,
-  }
 }
 
 // ============ COMPONENT ============
@@ -101,6 +45,9 @@ export function TaskViewPage() {
 
   const { data: task, isLoading, error, refetch } = useTask(id || '')
   const deleteMutation = useDeleteTask()
+  
+  // ← Use shared permission hook
+  const { getPermissions } = useTaskPermissions()
 
   useEffect(() => {
     const checkSubtaskInfo = async () => {
@@ -121,6 +68,38 @@ export function TaskViewPage() {
 
     checkSubtaskInfo()
   }, [task, id])
+
+  // Build TaskForPermission from loaded task
+  const permissions = useMemo(() => {
+    if (!task) return null
+    const t = task as any
+    const taskForPerm: TaskForPermission = {
+      id: t.id,
+      status: t.status || 'draft',
+      evaluation_status: t.evaluation_status || null,
+      assignee_id: t.assignee_id || t.assignee?.id || null,
+      assigner_id: t.assigner_id || t.assigner?.id || null,
+      department_id: t.department_id || t.department?.id || null,
+      is_self_assigned: t.is_self_assigned || false,
+      assigner_level: t.assigner_level || t.assigner?.position?.level || null,
+    }
+    return getPermissions(taskForPerm)
+  }, [task, getPermissions])
+
+  // Derived flags
+  const isLocked = useMemo(() => {
+    if (!task) return false
+    const evalStatus = (task as any).evaluation_status || 'none'
+    return evalStatus === 'pending_approval' || evalStatus === 'approved'
+  }, [task])
+
+  const lockMessage = useMemo(() => {
+    if (!task) return ''
+    const evalStatus = (task as any).evaluation_status || 'none'
+    if (evalStatus === 'pending_approval') return 'Công việc đang chờ phê duyệt đánh giá'
+    if (evalStatus === 'approved') return 'Công việc đã hoàn tất quy trình đánh giá'
+    return ''
+  }, [task])
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-'
@@ -173,7 +152,7 @@ export function TaskViewPage() {
     )
   }
 
-  if (!task) {
+  if (!task || !permissions) {
     return (
       <div className="p-4 md:p-6">
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded text-sm sm:text-base">
@@ -188,8 +167,9 @@ export function TaskViewPage() {
   const progress = t.progress || 0
   const evaluationStatus = t.evaluation_status || 'none'
   const evalConfig = EVALUATION_STATUS_CONFIG[evaluationStatus] || EVALUATION_STATUS_CONFIG.none
-  
-  const permissions = getTaskPermissions(t, user?.role)
+
+  // Check if this is "view only" mode (colleague's task)
+  const isViewOnly = permissions.canView && !permissions.canEdit && !permissions.canChangeStatus
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
@@ -211,6 +191,12 @@ export function TaskViewPage() {
                 <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full flex items-center gap-1 whitespace-nowrap">
                   <Users size={12} />
                   {subtaskCount} con
+                </span>
+              )}
+              {isViewOnly && (
+                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full flex items-center gap-1 whitespace-nowrap">
+                  <Eye size={12} />
+                  Chỉ xem
                 </span>
               )}
             </div>
@@ -255,12 +241,23 @@ export function TaskViewPage() {
         </div>
       </div>
 
+      {/* ========== VIEW-ONLY BANNER (for colleagues) ========== */}
+      {isViewOnly && (
+        <div className="mb-4 sm:mb-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+          <Eye className="w-5 h-5 text-blue-600 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-blue-800">Chế độ xem</p>
+            <p className="text-xs text-blue-600 mt-0.5">Đây là công việc của đồng nghiệp. Bạn có thể xem và bình luận.</p>
+          </div>
+        </div>
+      )}
+
       {/* ========== LOCK BANNER ========== */}
-      {permissions.isLocked && permissions.lockMessage && (
+      {isLocked && lockMessage && (
         <div className="mb-4 sm:mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-yellow-800">{permissions.lockMessage}</p>
+            <p className="text-sm font-medium text-yellow-800">{lockMessage}</p>
             <p className="text-xs text-yellow-600 mt-0.5 sm:mt-1">Một số thao tác bị hạn chế.</p>
           </div>
         </div>
@@ -362,6 +359,7 @@ export function TaskViewPage() {
             </div>
           </Card>
 
+          {/* Participants - only show if canView */}
           {id && (
             <TaskParticipantsSection
               taskId={id}
@@ -370,6 +368,7 @@ export function TaskViewPage() {
             />
           )}
 
+          {/* Subtasks - only if canEdit for managing, always visible for viewing */}
           {!isChildTask && id && (
             <SubtasksList
               parentTaskId={id}
@@ -383,22 +382,25 @@ export function TaskViewPage() {
             />
           )}
 
+          {/* Attachments - canEdit controls upload ability */}
           {id && (
             <AttachmentSection
               taskId={id}
               currentUserId={user?.employee_id || ''}
-              canEdit={permissions.canEdit}
+              canEdit={permissions.canAttach}
             />
           )}
 
+          {/* Comments - use permissions.canComment */}
           {id && (
             <CommentSection
               taskId={id}
               currentUserId={user?.employee_id || ''}
-              canComment={true}
+              canComment={permissions.canComment}
             />
           )}
 
+          {/* Activity - always visible */}
           {id && (
             <ActivityTimeline
               taskId={id}
@@ -417,25 +419,13 @@ export function TaskViewPage() {
             </div>
             <div className="p-4">
               <div className="flex flex-col items-center py-2 sm:py-4">
-                {/* Responsive SVG - smaller on mobile */}
                 <div className="relative w-24 h-24 sm:w-32 sm:h-32">
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
+                    <circle cx="64" cy="64" r="56" stroke="#e5e7eb" strokeWidth="12" fill="none" />
                     <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
-                      stroke="#e5e7eb"
-                      strokeWidth="12"
-                      fill="none"
-                    />
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
+                      cx="64" cy="64" r="56"
                       stroke={progress >= 100 ? '#22c55e' : '#3b82f6'}
-                      strokeWidth="12"
-                      fill="none"
-                      strokeLinecap="round"
+                      strokeWidth="12" fill="none" strokeLinecap="round"
                       strokeDasharray={`${(progress / 100) * 352} 352`}
                     />
                   </svg>
@@ -481,24 +471,46 @@ export function TaskViewPage() {
             </div>
           </Card>
 
-          {/* Quick Actions */}
+          {/* Quick Actions - only show if user has action permissions */}
           <Card className="p-3 sm:p-4">
             <h2 className="text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Thao tác nhanh</h2>
             <div className="space-y-2">
-              {!permissions.isLocked ? (
+              {permissions.canMarkComplete || permissions.canPause ? (
                 <>
-                  <button className="w-full px-3 py-2 text-left text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100">
-                    ✅ Đánh dấu hoàn thành
-                  </button>
-                  <button className="w-full px-3 py-2 text-left text-sm bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100">
-                    ⏸️ Tạm dừng công việc
-                  </button>
+                  {permissions.canMarkComplete && (
+                    <button className="w-full px-3 py-2 text-left text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100">
+                      ✅ Đánh dấu hoàn thành
+                    </button>
+                  )}
+                  {permissions.canPause && (
+                    <button className="w-full px-3 py-2 text-left text-sm bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100">
+                      ⏸️ Tạm dừng công việc
+                    </button>
+                  )}
+                  {permissions.canResume && (
+                    <button className="w-full px-3 py-2 text-left text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">
+                      ▶️ Tiếp tục công việc
+                    </button>
+                  )}
                 </>
-              ) : (
+              ) : isLocked ? (
                 <div className="text-center py-3 sm:py-4">
                   <Lock className="w-6 h-6 sm:w-8 sm:h-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-xs sm:text-sm text-gray-500">
                     Đang trong quy trình đánh giá
+                  </p>
+                </div>
+              ) : isViewOnly ? (
+                <div className="text-center py-3 sm:py-4">
+                  <Eye className="w-6 h-6 sm:w-8 sm:h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    Bạn đang xem công việc của đồng nghiệp
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center py-3 sm:py-4">
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    Không có thao tác khả dụng
                   </p>
                 </div>
               )}

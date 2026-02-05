@@ -1,6 +1,11 @@
 // ============================================================
-// APP.TSX - UPDATED WITH LEAVE APPROVALS ROUTE
+// APP.TSX - UPDATED WITH SHIFT TEAMS ROUTE
 // File: src/App.tsx
+// ============================================================
+// CHANGES:
+// - Added import for TeamManagementPage (shift teams)
+// - Added route: /shift-teams → TeamManagementPage
+// - All previous routes preserved
 // ============================================================
 
 import { useEffect } from 'react';
@@ -31,7 +36,7 @@ import { LeaveTypeListPage } from './features/leave-types';
 import { LeaveRequestListPage } from './features/leave-requests';
 import { AttendanceListPage } from './features/attendance';
 
-// ✅ NEW: Leave Approvals
+// ✅ Leave Approvals
 import LeaveApprovalPage from './features/leave-requests/LeaveApprovalPage';
 
 // Phase 3.4: Lương, Đánh giá
@@ -60,6 +65,9 @@ import UserSettingsPage from './pages/settings/UserSettingsPage';
 import { ShiftListPage } from './features/shifts';
 import { ShiftCalendarPage } from './features/shift-assignments';
 import { OvertimeListPage, OvertimeApprovalPage } from './features/overtime';
+
+// ✅ NEW: Quản lý đội ca (2 team × 3 ca)
+import { TeamManagementPage } from './features/shift-assignments';
 
 // ===== PURCHASING MODULE =====
 import { 
@@ -175,13 +183,14 @@ function App() {
               {/* ===== PHASE 3.3: Nghỉ phép ===== */}
               <Route path="leave-types" element={<LeaveTypeListPage />} />
               <Route path="leave-requests" element={<LeaveRequestListPage />} />
-              {/* ✅ NEW: Leave Approvals */}
               <Route path="leave-approvals" element={<LeaveApprovalPage />} />
 
               {/* ===== CHẤM CÔNG V2 ===== */}
               <Route path="attendance" element={<AttendanceListPage />} />
               <Route path="shifts" element={<ShiftListPage />} />
               <Route path="shift-assignments" element={<ShiftCalendarPage />} />
+              {/* ✅ NEW: Quản lý đội ca */}
+              <Route path="shift-teams" element={<TeamManagementPage />} />
               <Route path="overtime" element={<OvertimeListPage />} />
               <Route path="overtime/approval" element={<OvertimeApprovalPage />} />
 

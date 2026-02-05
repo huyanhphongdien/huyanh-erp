@@ -1,6 +1,7 @@
 // ============================================================================
 // src/features/tasks/utils/useTaskPermissions.ts
-// Task Permission Hook - FINAL VERSION
+// Task Permission Hook - v3
+// Now passes userEmployeeId to getTaskPermissions
 // ============================================================================
 
 import { useMemo } from 'react'
@@ -78,7 +79,7 @@ export function useTaskPermissions(): UseTaskPermissionsReturn {
   const isManager = userRole === 'manager' || userRole === 'admin' || isManagerLevel(userLevel)
   const isEmployee = !isManager && !isAdmin
   
-  // Get permissions for a task
+  // Get permissions for a task — now passes userEmployeeId
   const getPermissions = useMemo(() => {
     return (task: TaskForPermission): TaskPermissions => {
       return getTaskPermissions(
@@ -86,30 +87,27 @@ export function useTaskPermissions(): UseTaskPermissionsReturn {
         userRole,
         userDepartmentId,
         userLevel,
-        isAdmin
+        isAdmin,
+        userEmployeeId  // ← NEW in v3
       )
     }
-  }, [userRole, userDepartmentId, userLevel, isAdmin])
+  }, [userRole, userDepartmentId, userLevel, isAdmin, userEmployeeId])
   
-  // Check if user can approve a task - returns object
+  // Check if user can approve a task
   const canApprove = useMemo(() => {
     return (_assignerLevel: number | null, taskDepartmentId: string | null): { canApprove: boolean; reason?: string } => {
-      // Admin can always approve
       if (isAdmin) {
         return { canApprove: true }
       }
       
-      // Only managers can approve
       if (!isManagerLevel(userLevel)) {
         return { canApprove: false, reason: 'Chỉ quản lý mới có quyền phê duyệt' }
       }
       
-      // Executive can approve all
       if (isExecutive) {
         return { canApprove: true }
       }
       
-      // Manager can only approve in same department
       if (taskDepartmentId === userDepartmentId) {
         return { canApprove: true }
       }
@@ -166,7 +164,7 @@ export function useTaskPermissions(): UseTaskPermissionsReturn {
     // Functions
     getPermissions,
     canApprove,
-    canApproveTask: canApprove, // Alias
+    canApproveTask: canApprove,
     canAssignTo,
     canEvaluateTask,
     isTaskLocked,

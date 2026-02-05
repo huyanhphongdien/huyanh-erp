@@ -32,8 +32,7 @@ import {
   LogIn,
 } from 'lucide-react'
 
-// ★ Tích hợp chấm công nhanh
-import { CheckInOutWidget } from '../attendance/CheckInOutWidget'
+
 
 // ============================================================================
 // TYPES
@@ -349,8 +348,7 @@ export function EmployeeDashboard() {
       {/* ══════════ MAIN CONTENT ══════════ */}
       <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
-        {/* ══════════ ★ CHẤM CÔNG NHANH ══════════ */}
-        <CheckInOutWidget />
+       
 
         {/* ══════════ STATS GRID — 2 cols mobile, 3 cols desktop ══════════ */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">

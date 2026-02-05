@@ -1,10 +1,6 @@
 // ============================================================
-// SIDEBAR COMPONENT - REFACTORED v11
+// SIDEBAR COMPONENT - UPDATED
 // File: src/components/common/Sidebar.tsx
-// ============================================================
-// CHANGES v11:
-// - THÊM: Menu "Phân quyền" trong nhóm QUẢN LÝ ĐƠN HÀNG (executiveOnly, level ≤ 3)
-// - THÊM: Shield icon import
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -12,6 +8,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { purchaseAccessService } from '../../services/purchaseAccessService';
 import { overtimeRequestService } from '../../services/overtimeRequestService';
+import { leaveRequestService } from '../../services/leaveRequestService';
 import { 
   Menu, X, ChevronDown, ChevronRight,
   LayoutDashboard, Building2, Briefcase, Users,
@@ -39,18 +36,15 @@ import {
   Shield,
 } from 'lucide-react';
 
-// ============================================================
-// TYPES
-// ============================================================
-
 interface MenuItem {
   path: string;
   label: string;
   icon: React.ReactNode;
   managerOnly?: boolean;
   executiveOnly?: boolean;
-  bgdOnly?: boolean; // CHỈ BGĐ (level ≤ 3)
+  bgdOnly?: boolean;
   requirePurchaseAccess?: boolean;
+  approvalLevel?: boolean;
   badge?: number;
 }
 
@@ -63,11 +57,11 @@ interface MenuGroup {
   requirePurchaseAccess?: boolean;
 }
 
-// ============================================================
-// MENU CONFIGURATION
-// ============================================================
-
-const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): MenuGroup[] => [
+const getMenuGroups = (
+  pendingApprovals: number = 0, 
+  pendingOT: number = 0,
+  pendingLeave: number = 0
+): MenuGroup[] => [
   // ===== TỔNG QUAN =====
   {
     title: 'TỔNG QUAN',
@@ -77,7 +71,7 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
     ],
   },
 
-  // ===== QUẢN LÝ NHÂN SỰ =====
+  // ===== QUẢN LÝ NHÂN SỰ (✅ Loại nghỉ phép ở đây) =====
   {
     title: 'QUẢN LÝ NHÂN SỰ',
     icon: <Users size={18} />,
@@ -88,17 +82,17 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
       { path: '/employees', label: 'Nhân viên', icon: <Users size={18} /> },
       { path: '/contract-types', label: 'Loại hợp đồng', icon: <ScrollText size={18} /> },
       { path: '/contracts', label: 'Hợp đồng', icon: <FileText size={18} /> },
-      { path: '/leave-types', label: 'Loại nghỉ phép', icon: <Palmtree size={18} /> },
-      { path: '/leave-requests', label: 'Đơn nghỉ phép', icon: <CalendarClock size={18} /> },
       { path: '/salary-grades', label: 'Bậc lương', icon: <Wallet size={18} /> },
       { path: '/payroll-periods', label: 'Kỳ lương', icon: <Calendar size={18} /> },
       { path: '/payslips', label: 'Phiếu lương', icon: <Receipt size={18} /> },
       { path: '/performance-criteria', label: 'Tiêu chí đánh giá', icon: <Target size={18} /> },
       { path: '/performance-reviews', label: 'Đánh giá hiệu suất', icon: <Star size={18} /> },
+      // ✅ Loại nghỉ phép thuộc cấu hình nhân sự
+      { path: '/leave-types', label: 'Loại nghỉ phép', icon: <Palmtree size={18} /> },
     ],
   },
 
-  // ===== CHẤM CÔNG =====
+  // ===== CHẤM CÔNG (✅ Không còn Loại nghỉ phép) =====
   {
     title: 'CHẤM CÔNG',
     icon: <Clock size={18} />,
@@ -107,12 +101,20 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
       { path: '/attendance', label: 'Bảng chấm công', icon: <Clock size={18} /> },
       { path: '/shifts', label: 'Quản lý ca', icon: <Timer size={18} />, executiveOnly: true },
       { path: '/shift-assignments', label: 'Phân ca', icon: <CalendarDays size={18} />, managerOnly: true },
+      { path: '/leave-requests', label: 'Đơn nghỉ phép', icon: <CalendarClock size={18} /> },
+      { 
+        path: '/leave-approvals', 
+        label: 'Duyệt nghỉ phép', 
+        icon: <CheckSquare size={18} />, 
+        approvalLevel: true,
+        badge: pendingLeave > 0 ? pendingLeave : undefined,
+      },
       { path: '/overtime', label: 'Tăng ca', icon: <AlarmClockPlus size={18} /> },
       { 
         path: '/overtime/approval', 
         label: 'Duyệt tăng ca', 
         icon: <ClipboardCheck size={18} />, 
-        managerOnly: true,
+        approvalLevel: true,
         badge: pendingOT > 0 ? pendingOT : undefined,
       },
     ],
@@ -154,7 +156,7 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
     ],
   },
 
-  // ===== QUẢN TRỊ (chỉ BGĐ / Admin) =====
+  // ===== QUẢN TRỊ =====
   {
     title: 'QUẢN TRỊ',
     icon: <Shield size={18} />,
@@ -183,15 +185,10 @@ const getMenuGroups = (pendingApprovals: number = 0, pendingOT: number = 0): Men
   },
 ];
 
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
-
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const location = useLocation();
   
-  // State
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
     'QUẢN LÝ NHÂN SỰ': true,
@@ -199,57 +196,72 @@ export function Sidebar() {
     'QUẢN LÝ ĐƠN HÀNG': true,
   });
   
-  // Purchase access state
   const [hasPurchaseAccess, setHasPurchaseAccess] = useState(false);
   const [loadingPurchaseAccess, setLoadingPurchaseAccess] = useState(true);
-
-  // Badge counts
   const [pendingOTCount, setPendingOTCount] = useState(0);
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
 
-  // Check if user is manager
-  const isManager = user?.role === 'admin' || user?.role === 'manager' || user?.is_manager;
   const isAdmin = user?.role === 'admin';
   const userLevel = user?.position_level || 7;
-  const isExecutive = userLevel <= 5;
-  const isBGD = isAdmin || userLevel <= 3; // Ban Giám đốc
+  const isExecutive = userLevel <= 3;
+  const isBGD = isAdmin || userLevel <= 3;
+  const canApproveOT = userLevel >= 4 && userLevel <= 5;
+  const isManager = user?.role === 'admin' || user?.role === 'manager' || user?.is_manager;
 
-  // Load pending overtime count for managers
+  // ✅ Load pending OT count
   useEffect(() => {
     const loadPendingOTCount = async () => {
-      if (!user?.employee_id || (!isManager && !isAdmin)) return;
+      if (!user?.employee_id || (!canApproveOT && !isExecutive && !isAdmin)) return
 
       try {
-        const count = await overtimeRequestService.getPendingCount(
-          isExecutive || isAdmin ? undefined : { departmentId: user.department_id || undefined }
-        );
-        setPendingOTCount(count);
+        const count = await overtimeRequestService.getPendingCount(user.employee_id)
+        setPendingOTCount(count)
       } catch (error) {
-        console.error('Failed to load pending OT count:', error);
-        setPendingOTCount(0);
+        console.error('Failed to load pending OT count:', error)
+        setPendingOTCount(0)
       }
-    };
-
-    if (user?.employee_id && (isManager || isAdmin)) {
-      loadPendingOTCount();
-      const interval = setInterval(loadPendingOTCount, 120000);
-      return () => clearInterval(interval);
     }
-  }, [user?.employee_id, isManager, isAdmin]);
 
-  // Check purchase access on mount
+    if (user?.employee_id && (canApproveOT || isExecutive || isAdmin)) {
+      loadPendingOTCount()
+      const interval = setInterval(loadPendingOTCount, 120000)
+      return () => clearInterval(interval)
+    }
+  }, [user?.employee_id, canApproveOT, isExecutive, isAdmin]);
+
+  // ✅ Load pending leave count
+  useEffect(() => {
+    const loadPendingLeaveCount = async () => {
+      if (!user?.employee_id || (!canApproveOT && !isExecutive && !isAdmin)) return
+
+      try {
+        const count = await leaveRequestService.getPendingCount(user.employee_id)
+        setPendingLeaveCount(count)
+      } catch (error) {
+        console.error('Failed to load pending leave count:', error)
+        setPendingLeaveCount(0)
+      }
+    }
+
+    if (user?.employee_id && (canApproveOT || isExecutive || isAdmin)) {
+      loadPendingLeaveCount()
+      const interval = setInterval(loadPendingLeaveCount, 120000)
+      return () => clearInterval(interval)
+    }
+  }, [user?.employee_id, canApproveOT, isExecutive, isAdmin]);
+
+  // Check purchase access
   useEffect(() => {
     const checkPurchaseAccess = async () => {
       try {
         setLoadingPurchaseAccess(true);
         
-        // Admin hoặc Executive → auto full access
         if (isAdmin || isExecutive) {
           setHasPurchaseAccess(true);
           setLoadingPurchaseAccess(false);
           return;
         }
 
-        // Phòng Kế toán → auto access
         const deptName = (user?.department_name || '').toLowerCase();
         if (deptName.includes('kế toán') || deptName.includes('tài chính') || deptName.includes('accounting')) {
           setHasPurchaseAccess(true);
@@ -257,7 +269,6 @@ export function Sidebar() {
           return;
         }
         
-        // Nhân viên khác → check bảng purchase_access
         try {
           const hasAccess = await purchaseAccessService.hasAccess();
           setHasPurchaseAccess(hasAccess);
@@ -278,7 +289,7 @@ export function Sidebar() {
     }
   }, [user, isAdmin, isExecutive]);
 
-  // Auto-expand group when its child is active
+  // Auto-expand group when child is active
   useEffect(() => {
     const menuGroups = getMenuGroups();
     for (const group of menuGroups) {
@@ -293,37 +304,28 @@ export function Sidebar() {
     }
   }, [location.pathname]);
 
-  // Get menu groups with badge counts
-  const menuGroups = getMenuGroups(0, pendingOTCount);
+  const menuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount);
 
-  // Check active route
-  const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
-    return location.pathname === path || location.pathname.startsWith(path + '/');
-  };
-
-  // Toggle group collapse
   const toggleGroup = (title: string) => {
     setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));
   };
 
-  // Check if item should be visible
   const isItemVisible = (item: MenuItem): boolean => {
-    if (item.managerOnly && !isManager && !isAdmin) return false;
-    if (item.executiveOnly && !isExecutive && !isAdmin) return false;
+    if (isAdmin) return true;
+    if (item.managerOnly && !isManager) return false;
+    if (item.executiveOnly && !isExecutive) return false;
     if (item.bgdOnly && !isBGD) return false;
-    if (item.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
+    if (item.requirePurchaseAccess && !hasPurchaseAccess) return false;
+    if (item.approvalLevel && !canApproveOT && !isExecutive) return false;
     return true;
   };
 
-  // Check if group should be visible
   const isGroupVisible = (group: MenuGroup): boolean => {
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
     return true;
   };
 
-  // Render menu item
   const renderMenuItem = (item: MenuItem) => {
     if (!isItemVisible(item)) return null;
 
@@ -355,10 +357,8 @@ export function Sidebar() {
     );
   };
 
-  // Sidebar content
   const sidebarContent = (
     <>
-      {/* Logo/Header */}
       <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between">
           <div>
@@ -374,7 +374,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* User Info */}
       <div className="p-4 border-b border-gray-700">
         <NavLink 
           to="/settings" 
@@ -399,7 +398,6 @@ export function Sidebar() {
         </NavLink>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         {menuGroups.map((group) => {
           if (!isGroupVisible(group)) return null;
@@ -435,7 +433,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Logout */}
       <div className="p-4 border-t border-gray-700">
         <button
           onClick={() => {
@@ -453,7 +450,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Header Bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
         <button
           onClick={() => setIsMobileOpen(true)}
@@ -465,7 +461,6 @@ export function Sidebar() {
         <div className="w-10" />
       </div>
 
-      {/* Mobile Sidebar Overlay */}
       {isMobileOpen && (
         <div 
           className="lg:hidden fixed inset-0 z-40 bg-black/50"
@@ -473,12 +468,10 @@ export function Sidebar() {
         />
       )}
 
-      {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex w-64 bg-gray-800 text-white flex-col min-h-screen fixed left-0 top-0 bottom-0 z-30">
         {sidebarContent}
       </aside>
 
-      {/* Sidebar - Mobile */}
       <aside 
         className={`lg:hidden fixed top-0 left-0 bottom-0 w-72 bg-gray-800 text-white flex flex-col z-50 transform transition-transform duration-300 ease-in-out ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
@@ -487,9 +480,7 @@ export function Sidebar() {
         {sidebarContent}
       </aside>
 
-      {/* Main content spacer */}
       <div className="hidden lg:block w-64 flex-shrink-0" />
-      <div className="lg:hidden h-14" />
     </>
   );
 }

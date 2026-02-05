@@ -1,90 +1,91 @@
 // ============================================================================
-// OVERTIME REQUEST SERVICE
+// OVERTIME REQUEST SERVICE - V2.1 FIXED
 // File: src/services/overtimeRequestService.ts
-// Huy Anh ERP System - Chấm công V2 (Batch 4)
 // ============================================================================
-// Database table: overtime_requests
-// Cột ngày: request_date (DATE)
-// Trạng thái: pending | approved | rejected | completed
+// FIX: getPendingApprovals - Dựa vào RLS thay vì filter approver_id
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import type { BatchResult } from '../types/common'  // ✅ ADD
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+interface Shift {
+  id: string
+  code: string
+  name: string
+  start_time: string
+  end_time: string
+}
+
+interface Employee {
+  id: string
+  code: string
+  full_name: string
+  department_id: string
+  department?: {
+    id: string
+    name: string
+  }
+  position?: {
+    id: string
+    name: string
+    level: number
+  }
+}
+
+interface Approver {
+  id: string
+  code?: string
+  full_name: string
+}
+
 export interface OvertimeRequest {
   id: string
   employee_id: string
   request_date: string
-  shift_id?: string | null
-  planned_start_time: string
-  planned_end_time: string
+  shift_id?: string
+  planned_start: string
+  planned_end: string
   planned_minutes: number
-  actual_start_time?: string | null
-  actual_end_time?: string | null
-  actual_minutes?: number | null
+  actual_minutes?: number
   reason: string
   status: 'pending' | 'approved' | 'rejected' | 'completed'
-  approved_by?: string | null
-  approved_at?: string | null
-  rejection_reason?: string | null
-  created_at: string
-  updated_at: string
-  // Relations (populated by select queries)
-  employee?: {
-    id: string
-    code: string
-    full_name: string
-    department_id?: string
-    department?: { id: string; name: string } | null
-    position?: { name: string; level: number } | null
-  } | null
-  shift?: {
-    id: string
-    name: string
-    code: string
-    start_time: string
-    end_time: string
-    shift_category: string
-} | null
-    approver?: {        // ← THÊM ĐOẠN NÀY
-    id: string
-    full_name: string
-  } | null
+  approver_id?: string
+  approved_by?: string
+  approved_at?: string
+  rejection_reason?: string
+  created_at?: string
+  updated_at?: string
+  employee?: Employee
+  shift?: Shift
+  approver?: Approver
 }
 
-export interface CreateOvertimeInput {
+export interface OvertimeApproverInfo {
+  approver_id: string
+  approver_name: string
+  approver_position: string
+  approver_level: number
+  approval_type: 'self' | 'executive' | 'manager'
+}
+
+interface CreateOvertimeInput {
   employee_id: string
   request_date: string
-  shift_id?: string | null
-  planned_start_time: string
-  planned_end_time: string
+  shift_id?: string
+  planned_start: string
+  planned_end: string
   planned_minutes: number
   reason: string
 }
 
-export interface OvertimePaginationParams {
-  page: number
-  pageSize: number
-  status?: string
-  employee_id?: string
-  department_id?: string
-  from_date?: string
-  to_date?: string
-}
 
-interface PaginatedResponse<T> {
-  data: T[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-}
 
 // ============================================================================
-// SELECT QUERY (dùng chung)
+// SELECT QUERY
 // ============================================================================
 
 const OVERTIME_SELECT = `
@@ -92,14 +93,10 @@ const OVERTIME_SELECT = `
   employee:employees!overtime_requests_employee_id_fkey(
     id, code, full_name, department_id,
     department:departments!employees_department_id_fkey(id, name),
-    position:positions!employees_position_id_fkey(name, level)
+    position:positions!employees_position_id_fkey(id, name, level)
   ),
-  shift:shifts!overtime_requests_shift_id_fkey(
-    id, name, code, start_time, end_time, shift_category
-),
-  approver:employees!overtime_requests_approved_by_fkey(
-    id, full_name
-  )
+  shift:shifts!overtime_requests_shift_id_fkey(id, code, name, start_time, end_time),
+  approver:employees!overtime_requests_approved_by_fkey(id, full_name)
 `
 
 // ============================================================================
@@ -108,114 +105,199 @@ const OVERTIME_SELECT = `
 
 export const overtimeRequestService = {
 
-  // --------------------------------------------------------------------------
-  // LẤY DANH SÁCH CÓ PHÂN TRANG + FILTER
-  // --------------------------------------------------------------------------
-  async getAll(params: OvertimePaginationParams): Promise<PaginatedResponse<OvertimeRequest>> {
-    const { page = 1, pageSize = 10, status, employee_id, department_id, from_date, to_date } = params
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
+  // ==========================================================================
+  // XÁC ĐỊNH NGƯỜI DUYỆT
+  // ==========================================================================
 
-    let query = supabase
-      .from('overtime_requests')
-      .select(OVERTIME_SELECT, { count: 'exact' })
+  async getApprover(requesterId: string): Promise<OvertimeApproverInfo | null> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_overtime_approver', { p_requester_id: requesterId })
 
-    // Filter theo trạng thái
-    if (status && status !== 'all') {
-      query = query.eq('status', status)
-    }
+      if (error) {
+        console.error('getApprover error:', error)
+        return null
+      }
 
-    // Filter theo nhân viên
-    if (employee_id) {
-      query = query.eq('employee_id', employee_id)
-    }
+      if (!data || data.length === 0) {
+        return null
+      }
 
-    // Filter theo khoảng ngày
-    if (from_date) {
-      query = query.gte('request_date', from_date)
-    }
-    if (to_date) {
-      query = query.lte('request_date', to_date)
-    }
-
-    const { data, error, count } = await query
-      .order('request_date', { ascending: false })
-      .range(from, to)
-
-    if (error) throw error
-
-    // Filter theo phòng ban (client-side vì join nested)
-    let filteredData = data || []
-    if (department_id) {
-      filteredData = filteredData.filter(
-        (item: any) => item.employee?.department_id === department_id
-      )
-    }
-
-    return {
-      data: filteredData as OvertimeRequest[],
-      total: count || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((count || 0) / pageSize),
+      return data[0] as OvertimeApproverInfo
+    } catch (error) {
+      console.error('getApprover exception:', error)
+      return null
     }
   },
 
-  // --------------------------------------------------------------------------
-  // LẤY PHIẾU TĂNG CA CỦA NHÂN VIÊN (cho trang danh sách cá nhân)
-  // --------------------------------------------------------------------------
-  async getMyRequests(
+  // ==========================================================================
+  // DANH SÁCH PHIẾU CỦA NHÂN VIÊN
+  // ==========================================================================
+
+  async getByEmployee(
     employeeId: string,
-    params: Omit<OvertimePaginationParams, 'employee_id' | 'department_id'> = { page: 1, pageSize: 10 }
-  ): Promise<PaginatedResponse<OvertimeRequest>> {
-    return this.getAll({
-      ...params,
-      employee_id: employeeId,
-    })
+    status?: 'pending' | 'approved' | 'rejected' | 'completed',
+    fromDate?: string,
+    toDate?: string
+  ): Promise<OvertimeRequest[]> {
+    try {
+      let query = supabase
+        .from('overtime_requests')
+        .select(OVERTIME_SELECT)
+        .eq('employee_id', employeeId)
+
+      if (status) query = query.eq('status', status)
+      if (fromDate) query = query.gte('request_date', fromDate)
+      if (toDate) query = query.lte('request_date', toDate)
+
+      const { data, error } = await query.order('request_date', { ascending: false })
+
+      if (error) {
+        console.error('getByEmployee error:', error)
+        return []
+      }
+      return data || []
+    } catch (error) {
+      console.error('getByEmployee exception:', error)
+      return []
+    }
   },
 
-  // --------------------------------------------------------------------------
-  // LẤY THEO ID
-  // --------------------------------------------------------------------------
-  async getById(id: string): Promise<OvertimeRequest> {
-    const { data, error } = await supabase
-      .from('overtime_requests')
-      .select(OVERTIME_SELECT)
-      .eq('id', id)
-      .single()
+  // ==========================================================================
+  // ✅ FIX: PHIẾU CHỜ DUYỆT - DỰA VÀO RLS
+  // ==========================================================================
 
-    if (error) throw error
-    return data as OvertimeRequest
+  async getPendingApprovals(
+    approverId: string,
+    status?: 'pending' | 'approved' | 'rejected',
+    fromDate?: string,
+    toDate?: string
+  ): Promise<OvertimeRequest[]> {
+    try {
+      // ✅ ĐƠN GIẢN: Chỉ query, để RLS tự filter theo department
+      let query = supabase
+        .from('overtime_requests')
+        .select(OVERTIME_SELECT)
+
+      // Filter status
+      if (status) {
+        query = query.eq('status', status)
+      } else {
+        // Mặc định: chỉ lấy pending
+        query = query.eq('status', 'pending')
+      }
+
+      // Filter date range
+      if (fromDate) query = query.gte('request_date', fromDate)
+      if (toDate) query = query.lte('request_date', toDate)
+
+      const { data, error } = await query.order('request_date', { ascending: false })
+
+      if (error) {
+        console.error('getPendingApprovals error:', error)
+        return []
+      }
+      return data || []
+    } catch (error) {
+      console.error('getPendingApprovals exception:', error)
+      return []
+    }
   },
 
-  // --------------------------------------------------------------------------
-  // TẠO PHIẾU TĂNG CA MỚI
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // CHI TIẾT 1 PHIẾU
+  // ==========================================================================
+
+  async getById(requestId: string): Promise<OvertimeRequest | null> {
+    try {
+      const { data, error } = await supabase
+        .from('overtime_requests')
+        .select(OVERTIME_SELECT)
+        .eq('id', requestId)
+        .maybeSingle()
+
+      if (error) {
+        console.error('getById error:', error)
+        return null
+      }
+      return data as OvertimeRequest | null
+    } catch (error) {
+      console.error('getById exception:', error)
+      return null
+    }
+  },
+
+  // ==========================================================================
+  // ✅ FIX: ĐẾM PENDING - DỰA VÀO RLS
+  // ==========================================================================
+
+  async getPendingCount(approverId: string): Promise<number> {
+    try {
+      // ✅ ĐƠN GIẢN: Chỉ đếm pending, RLS tự filter
+      const { count, error } = await supabase
+        .from('overtime_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+
+      if (error) {
+        console.error('getPendingCount error:', error)
+        return 0
+      }
+      return count || 0
+    } catch (error) {
+      console.error('getPendingCount exception:', error)
+      return 0
+    }
+  },
+
+  // ==========================================================================
+  // TẠO PHIẾU TĂNG CA
+  // ==========================================================================
+
   async create(input: CreateOvertimeInput): Promise<OvertimeRequest> {
-    // Validate: không tạo trùng ngày cho cùng nhân viên
+    // 1. Validate trùng ngày
     const { data: existing } = await supabase
       .from('overtime_requests')
       .select('id')
       .eq('employee_id', input.employee_id)
       .eq('request_date', input.request_date)
+      .in('status', ['pending', 'approved'])
       .maybeSingle()
 
     if (existing) {
-      throw new Error('Đã tồn tại phiếu tăng ca cho ngày này')
+      throw new Error('Đã tồn tại phiếu tăng ca cho ngày này (đang chờ duyệt hoặc đã duyệt)')
+    }
+
+    // 2. Xác định người duyệt tự động
+    const approverInfo = await this.getApprover(input.employee_id)
+    
+    if (!approverInfo) {
+      throw new Error('Không thể xác định người duyệt. Vui lòng liên hệ quản trị viên.')
+    }
+
+    // 3. Tạo phiếu
+    const insertData: any = {
+      employee_id: input.employee_id,
+      request_date: input.request_date,
+      shift_id: input.shift_id || null,
+      planned_start: input.planned_start,
+      planned_end: input.planned_end,
+      planned_minutes: input.planned_minutes,
+      reason: input.reason,
+      approver_id: approverInfo.approver_id,
+      status: 'pending',
+    }
+
+    // BGĐ tự duyệt → auto approve
+    if (approverInfo.approval_type === 'self') {
+      insertData.status = 'approved'
+      insertData.approved_by = approverInfo.approver_id
+      insertData.approved_at = new Date().toISOString()
     }
 
     const { data, error } = await supabase
       .from('overtime_requests')
-      .insert({
-        employee_id: input.employee_id,
-        request_date: input.request_date,
-        shift_id: input.shift_id || null,
-        planned_start_time: input.planned_start_time,
-        planned_end_time: input.planned_end_time,
-        planned_minutes: input.planned_minutes,
-        reason: input.reason,
-        status: 'pending',
-      })
+      .insert(insertData)
       .select(OVERTIME_SELECT)
       .single()
 
@@ -223,9 +305,10 @@ export const overtimeRequestService = {
     return data as OvertimeRequest
   },
 
-  // --------------------------------------------------------------------------
-  // DUYỆT PHIẾU
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // DUYỆT 1 PHIẾU
+  // ==========================================================================
+
   async approve(id: string, approverId: string, notes?: string): Promise<OvertimeRequest> {
     const { data, error } = await supabase
       .from('overtime_requests')
@@ -244,10 +327,15 @@ export const overtimeRequestService = {
     return data as OvertimeRequest
   },
 
-  // --------------------------------------------------------------------------
-  // TỪ CHỐI PHIẾU
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // TỪ CHỐI 1 PHIẾU
+  // ==========================================================================
+
   async reject(id: string, approverId: string, reason: string): Promise<OvertimeRequest> {
+    if (!reason.trim()) {
+      throw new Error('Vui lòng nhập lý do từ chối')
+    }
+
     const { data, error } = await supabase
       .from('overtime_requests')
       .update({
@@ -265,9 +353,50 @@ export const overtimeRequestService = {
     return data as OvertimeRequest
   },
 
-  // --------------------------------------------------------------------------
-  // HỦY PHIẾU (người tạo tự hủy, chỉ khi đang pending)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // DUYỆT HÀNG LOẠT
+  // ==========================================================================
+
+  async batchApprove(ids: string[], approverId: string, notes?: string): Promise<BatchResult> {
+    const result: BatchResult = { success: 0, failed: 0, errors: [] }
+
+    for (const id of ids) {
+      try {
+        await this.approve(id, approverId, notes)
+        result.success++
+      } catch (error: any) {
+        result.failed++
+        result.errors.push({ id, error: error.message || 'Lỗi không xác định' })
+      }
+    }
+
+    return result
+  },
+
+  // ==========================================================================
+  // TỪ CHỐI HÀNG LOẠT
+  // ==========================================================================
+
+  async batchReject(ids: string[], approverId: string, reason: string): Promise<BatchResult> {
+    const result: BatchResult = { success: 0, failed: 0, errors: [] }
+
+    for (const id of ids) {
+      try {
+        await this.reject(id, approverId, reason)
+        result.success++
+      } catch (error: any) {
+        result.failed++
+        result.errors.push({ id, error: error.message || 'Lỗi không xác định' })
+      }
+    }
+
+    return result
+  },
+
+  // ==========================================================================
+  // HỦY PHIẾU
+  // ==========================================================================
+
   async cancel(id: string): Promise<void> {
     const { error } = await supabase
       .from('overtime_requests')
@@ -278,101 +407,51 @@ export const overtimeRequestService = {
     if (error) throw error
   },
 
-  // --------------------------------------------------------------------------
-  // LẤY PHIẾU CHỜ DUYỆT THEO PHÒNG BAN (Manager level 4-5)
-  // --------------------------------------------------------------------------
-  async getPendingByDepartment(departmentId: string): Promise<OvertimeRequest[]> {
-    const { data, error } = await supabase
-      .from('overtime_requests')
-      .select(OVERTIME_SELECT)
-      .eq('status', 'pending')
-      .order('request_date', { ascending: true })
+  // ==========================================================================
+  // LẤY PHIẾU APPROVED THEO NGÀY
+  // ==========================================================================
 
-    if (error) throw error
+  async getApprovedByDate(
+    employeeId: string,
+    date: string
+  ): Promise<OvertimeRequest | null> {
+    try {
+      const { data, error } = await supabase
+        .from('overtime_requests')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('request_date', date)
+        .eq('status', 'approved')
+        .maybeSingle()
 
-    // Filter theo phòng ban (client-side do join nested)
-    const filtered = (data || []).filter(
-      (item: any) => item.employee?.department_id === departmentId
-    )
-
-    return filtered as OvertimeRequest[]
+      if (error) return null
+      return data as OvertimeRequest | null
+    } catch {
+      return null
+    }
   },
 
-  // --------------------------------------------------------------------------
-  // LẤY TẤT CẢ PHIẾU CHỜ DUYỆT (Executive level 1-3)
-  // --------------------------------------------------------------------------
-  async getAllPending(): Promise<OvertimeRequest[]> {
-    const { data, error } = await supabase
-      .from('overtime_requests')
-      .select(OVERTIME_SELECT)
-      .eq('status', 'pending')
-      .order('request_date', { ascending: true })
+  // ==========================================================================
+  // LỊCH SỬ DUYỆT
+  // ==========================================================================
 
-    if (error) throw error
-    return (data || []) as OvertimeRequest[]
-  },
+  async getApprovalHistory(
+    approverId: string,
+    limit: number = 20
+  ): Promise<OvertimeRequest[]> {
+    try {
+      const { data, error } = await supabase
+        .from('overtime_requests')
+        .select(OVERTIME_SELECT)
+        .eq('approved_by', approverId)
+        .in('status', ['approved', 'rejected'])
+        .order('approved_at', { ascending: false })
+        .limit(limit)
 
-  // --------------------------------------------------------------------------
-  // ĐẾM SỐ PHIẾU PENDING (cho badge sidebar)
-  // --------------------------------------------------------------------------
-  async getPendingCount(params?: { departmentId?: string }): Promise<number> {
-    const { data, error } = await supabase
-      .from('overtime_requests')
-      .select('id, employee:employees!overtime_requests_employee_id_fkey(department_id)')
-      .eq('status', 'pending')
-
-    if (error) throw error
-
-    if (params?.departmentId) {
-      return (data || []).filter(
-        (item: any) => item.employee?.department_id === params.departmentId
-      ).length
-    }
-
-    return data?.length || 0
-  },
-
-  // --------------------------------------------------------------------------
-  // LẤY LỊCH SỬ DUYỆT (cho trang approval - đã duyệt/từ chối)
-  // --------------------------------------------------------------------------
-  async getApprovalHistory(params: {
-    approverId?: string
-    departmentId?: string
-    page?: number
-    pageSize?: number
-  }): Promise<PaginatedResponse<OvertimeRequest>> {
-    const { page = 1, pageSize = 10, approverId, departmentId } = params
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
-
-    let query = supabase
-      .from('overtime_requests')
-      .select(OVERTIME_SELECT, { count: 'exact' })
-      .in('status', ['approved', 'rejected'])
-
-    if (approverId) {
-      query = query.eq('approved_by', approverId)
-    }
-
-    const { data, error, count } = await query
-      .order('approved_at', { ascending: false })
-      .range(from, to)
-
-    if (error) throw error
-
-    let filteredData = data || []
-    if (departmentId) {
-      filteredData = filteredData.filter(
-        (item: any) => item.employee?.department_id === departmentId
-      )
-    }
-
-    return {
-      data: filteredData as OvertimeRequest[],
-      total: count || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((count || 0) / pageSize),
+      if (error) return []
+      return data || []
+    } catch {
+      return []
     }
   },
 }

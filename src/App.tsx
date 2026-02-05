@@ -1,10 +1,6 @@
 // ============================================================
-// PHASE 6 UPDATE: UPDATED APP.TSX
+// APP.TSX - UPDATED WITH LEAVE APPROVALS ROUTE
 // File: src/App.tsx
-// ============================================================
-// CHANGES:
-// - Added Phase 6 route: purchasing/access (AccessManagementPage)
-// - All previous routes preserved
 // ============================================================
 
 import { useEffect } from 'react';
@@ -34,6 +30,9 @@ import { ContractListPage } from './features/contracts';
 import { LeaveTypeListPage } from './features/leave-types';
 import { LeaveRequestListPage } from './features/leave-requests';
 import { AttendanceListPage } from './features/attendance';
+
+// ✅ NEW: Leave Approvals
+import LeaveApprovalPage from './features/leave-requests/LeaveApprovalPage';
 
 // Phase 3.4: Lương, Đánh giá
 import { SalaryGradeListPage } from './features/salary-grades';
@@ -81,10 +80,6 @@ import PaymentListPage from './features/purchasing/pages/PaymentListPage';
 // ===== PHASE 6: Access Control =====
 import AccessManagementPage from './features/purchasing/pages/AccessManagementPage';
 
-// ============================================================
-// QUERY CLIENT
-// ============================================================
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -93,10 +88,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// ============================================================
-// PROTECTED ROUTE COMPONENT
-// ============================================================
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -116,10 +107,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// ============================================================
-// PUBLIC ROUTE COMPONENT
-// ============================================================
-
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
 
@@ -138,10 +125,6 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// ============================================================
-// AUTH INITIALIZER
-// ============================================================
-
 function AuthInitializer({ children }: { children: React.ReactNode }) {
   const { checkAuth } = useAuthStore();
 
@@ -151,10 +134,6 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
-
-// ============================================================
-// MAIN APP
-// ============================================================
 
 function App() {
   return (
@@ -172,7 +151,7 @@ function App() {
               }
             />
 
-            {/* Protected Routes - MainLayout chứa Sidebar */}
+            {/* Protected Routes */}
             <Route
               path="/"
               element={
@@ -196,6 +175,8 @@ function App() {
               {/* ===== PHASE 3.3: Nghỉ phép ===== */}
               <Route path="leave-types" element={<LeaveTypeListPage />} />
               <Route path="leave-requests" element={<LeaveRequestListPage />} />
+              {/* ✅ NEW: Leave Approvals */}
+              <Route path="leave-approvals" element={<LeaveApprovalPage />} />
 
               {/* ===== CHẤM CÔNG V2 ===== */}
               <Route path="attendance" element={<AttendanceListPage />} />
@@ -246,11 +227,9 @@ function App() {
                 <Route path="orders/new" element={<POFormPage />} />
                 <Route path="orders/:id" element={<PODetailPage />} />
                 <Route path="orders/:id/edit" element={<POFormPage />} />
-                {/* Phase P5: Invoice Detail, Debt, Payments */}
                 <Route path="invoices/:id" element={<InvoiceDetailPage />} />
                 <Route path="debt" element={<SupplierDebtPage />} />
                 <Route path="payments" element={<PaymentListPage />} />
-                {/* Phase 6: Access Control */}
                 <Route path="access" element={<AccessManagementPage />} />
               </Route>
 

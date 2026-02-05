@@ -3,6 +3,11 @@
 // File: src/pages/evaluations/TaskDetailPage.tsx
 // Huy Anh ERP System
 // ============================================================================
+// CẬP NHẬT: Fix mobile header che tên công việc
+//   - Giảm spacing trên mobile (mb-2 thay vì mb-3/4)
+//   - break-words cho tên dài
+//   - Compact "Quay lại" button
+// ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -421,17 +426,28 @@ const TaskDetailPage: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6">
-      {/* Header */}
-      <div className="mb-4 md:mb-6">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-900 mb-3 sm:mb-4 text-sm">
-          <ArrowLeft className="w-4 h-4" />Quay lại
+      {/* ══════════════════════════════════════════════════════
+          HEADER - Compact on mobile to prevent top bar overlap
+          ══════════════════════════════════════════════════════ */}
+      <div className="mb-3 md:mb-6">
+        {/* Back button - compact on mobile */}
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-gray-500 active:text-gray-900 mb-2 sm:mb-3 text-xs sm:text-sm py-1"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Quay lại</span>
         </button>
 
-        <div className="flex flex-col gap-3 md:gap-4">
+        <div className="flex flex-col gap-2 md:gap-4">
           {/* Title & Badges */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="text-xs sm:text-sm text-gray-500 font-mono">{task.code}</span>
+            {/* ✅ FIX: Tên công việc TRƯỚC badges trên mobile để không bị che */}
+            <h1 className="text-base sm:text-xl md:text-2xl font-bold text-gray-900 break-words leading-tight mb-1.5 sm:mb-2">
+              {task.name}
+            </h1>
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <span className="text-[11px] sm:text-sm text-gray-400 font-mono">{task.code}</span>
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
               {task.evaluation_status && task.evaluation_status !== 'none' && (
@@ -440,32 +456,31 @@ const TaskDetailPage: React.FC = () => {
                 </span>
               )}
             </div>
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{task.name}</h1>
           </div>
 
-          {/* Action Buttons - horizontal scrollable on mobile */}
-          <div className="flex flex-wrap gap-2">
-            <button onClick={fetchTaskDetail} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <button onClick={fetchTaskDetail} className="flex items-center gap-1.5 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg active:bg-gray-50 transition-colors">
               <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">Làm mới</span>
             </button>
 
             {permissions?.canEdit ? (
-              <button onClick={handleEdit} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+              <button onClick={handleEdit} className="flex items-center gap-1.5 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 rounded-lg active:bg-blue-700 transition-colors">
                 <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Sửa
               </button>
             ) : (
-              <button disabled title={permissions?.editDisabledReason || 'Không có quyền sửa'} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
+              <button disabled title={permissions?.editDisabledReason || 'Không có quyền sửa'} className="flex items-center gap-1.5 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
                 <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Sửa
               </button>
             )}
 
             {permissions?.canDelete ? (
-              <button onClick={() => setShowDeleteDialog(true)} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
+              <button onClick={() => setShowDeleteDialog(true)} className="flex items-center gap-1.5 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 rounded-lg active:bg-red-700 transition-colors">
                 <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Xóa
               </button>
             ) : (
-              <button disabled title={permissions?.deleteDisabledReason || 'Không có quyền xóa'} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
+              <button disabled title={permissions?.deleteDisabledReason || 'Không có quyền xóa'} className="flex items-center gap-1.5 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed">
                 <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Xóa
               </button>
             )}
@@ -650,32 +665,32 @@ const TaskDetailPage: React.FC = () => {
             <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Thao tác nhanh</h3>
             <div className="space-y-2">
               {permissions?.canSelfEvaluate && (
-                <button onClick={handleSelfEvaluate} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                <button onClick={handleSelfEvaluate} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 active:bg-blue-100 rounded-lg transition-colors">
                   <Star className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tự đánh giá công việc
                 </button>
               )}
               {permissions?.canApprove && (
-                <button onClick={handleApprove} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                <button onClick={handleApprove} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-green-700 bg-green-50 active:bg-green-100 rounded-lg transition-colors">
                   <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Phê duyệt đánh giá
                 </button>
               )}
               {permissions?.canMarkComplete && (
-                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-green-700 bg-green-50 active:bg-green-100 rounded-lg transition-colors">
                   <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Đánh dấu hoàn thành
                 </button>
               )}
               {permissions?.canPause && (
-                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors">
+                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-yellow-700 bg-yellow-50 active:bg-yellow-100 rounded-lg transition-colors">
                   <Pause className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tạm dừng công việc
                 </button>
               )}
               {permissions?.canResume && (
-                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                <button className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 active:bg-blue-100 rounded-lg transition-colors">
                   <Play className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Tiếp tục công việc
                 </button>
               )}
               {permissions?.canCancel && (
-                <button onClick={() => setShowCancelDialog(true)} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                <button onClick={() => setShowCancelDialog(true)} className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium text-red-700 bg-red-50 active:bg-red-100 rounded-lg transition-colors">
                   <XCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />Hủy công việc
                 </button>
               )}

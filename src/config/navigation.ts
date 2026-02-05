@@ -1,13 +1,6 @@
 // ============================================================
-// NAVIGATION CONFIG - REFACTORED v9 (PHÂN QUYỀN V2)
+// NAVIGATION CONFIG - UPDATED
 // File: src/config/navigation.ts
-// ============================================================
-// CHANGES v9:
-// - PHÂN QUYỀN CHI TIẾT cho CHẤM CÔNG V2:
-//   • Quản lý ca: executiveOnly (Phó phòng trở lên, level ≤ 5)
-//   • Phân ca: requireManager (Trưởng/Phó phòng)
-//   • Duyệt tăng ca: requireManager
-//   • Bảng chấm công + Tăng ca: Tất cả nhân viên
 // ============================================================
 
 import {
@@ -46,39 +39,24 @@ import {
   LucideIcon,
 } from 'lucide-react';
 
-// ============================================================
-// TYPES
-// ============================================================
-
 export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
   badge?: number | string;
-  /** Chỉ hiển thị cho manager/admin (Trưởng/Phó phòng) */
   requireManager?: boolean;
-  /** Chỉ hiển thị cho admin */
   adminOnly?: boolean;
-  /** Chỉ hiển thị cho Phó phòng trở lên (level <= 5) */
   executiveOnly?: boolean;
-  /** Yêu cầu quyền truy cập module mua hàng */
   requirePurchaseAccess?: boolean;
 }
 
 export interface NavGroup {
   title: string;
   items: NavItem[];
-  /** Mặc định mở rộng */
   defaultOpen?: boolean;
-  /** Chỉ hiển thị cho Phó phòng trở lên */
   executiveOnly?: boolean;
-  /** Yêu cầu quyền truy cập module mua hàng */
   requirePurchaseAccess?: boolean;
 }
-
-// ============================================================
-// NAVIGATION GROUPS
-// ============================================================
 
 export const navigationGroups: NavGroup[] = [
   // ===== TỔNG QUAN =====
@@ -90,45 +68,37 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
 
-  // ===== QUẢN LÝ NHÂN SỰ (GOM LẠI) =====
+  // ===== QUẢN LÝ NHÂN SỰ =====
   {
-    title: 'QUẢN LÝ ĐƠN HÀNG',
+    title: 'QUẢN LÝ NHÂN SỰ',
     defaultOpen: false,
     items: [
-      // Tổ chức
       { label: 'Phòng ban', href: '/departments', icon: Building2 },
       { label: 'Chức vụ', href: '/positions', icon: Briefcase },
       { label: 'Nhân viên', href: '/employees', icon: Users },
-      // Hợp đồng
       { label: 'Loại hợp đồng', href: '/contract-types', icon: ScrollText },
       { label: 'Hợp đồng', href: '/contracts', icon: FileText },
-      // Nghỉ phép
-      { label: 'Loại nghỉ phép', href: '/leave-types', icon: Palmtree },
-      { label: 'Đơn nghỉ phép', href: '/leave-requests', icon: CalendarClock },
-      // Lương
       { label: 'Bậc lương', href: '/salary-grades', icon: Wallet },
       { label: 'Kỳ lương', href: '/payroll-periods', icon: Calendar },
       { label: 'Phiếu lương', href: '/payslips', icon: Receipt },
-      // Đánh giá hiệu suất
       { label: 'Tiêu chí đánh giá', href: '/performance-criteria', icon: Target },
       { label: 'Đánh giá hiệu suất', href: '/performance-reviews', icon: Star },
+      // ✅ Loại nghỉ phép thuộc nhóm Nhân sự (cấu hình, ít thay đổi)
+      { label: 'Loại nghỉ phép', href: '/leave-types', icon: Palmtree },
     ],
   },
 
-  // ===== CHẤM CÔNG V2 (PHÂN QUYỀN CHI TIẾT) =====
+  // ===== CHẤM CÔNG =====
   {
     title: 'CHẤM CÔNG',
     defaultOpen: true,
     items: [
-      // ✅ TẤT CẢ nhân viên xem được
       { label: 'Bảng chấm công', href: '/attendance', icon: Clock },
-      // ❌ CHỈ Executive (Phó phòng trở lên, level ≤ 5)
       { label: 'Quản lý ca', href: '/shifts', icon: Timer, executiveOnly: true },
-      // ❌ CHỈ Manager (Trưởng/Phó phòng) + Executive
       { label: 'Phân ca', href: '/shift-assignments', icon: CalendarDays, requireManager: true },
-      // ✅ TẤT CẢ nhân viên xem được
+      { label: 'Đơn nghỉ phép', href: '/leave-requests', icon: CalendarClock },
+      { label: 'Duyệt nghỉ phép', href: '/leave-approvals', icon: CheckSquare, requireManager: true },
       { label: 'Tăng ca', href: '/overtime', icon: AlarmClockPlus },
-      // ❌ CHỈ Manager + Executive
       { label: 'Duyệt tăng ca', href: '/overtime/approval', icon: ClipboardCheck, requireManager: true },
     ],
   },
@@ -181,10 +151,6 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
 ];
-
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
 
 export function getAllNavItems(): NavItem[] {
   return navigationGroups.flatMap(group => group.items);

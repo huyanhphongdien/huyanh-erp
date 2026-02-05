@@ -1,6 +1,10 @@
 // src/services/index.ts
 // Export all services - với selective exports để tránh conflict
 
+
+// ===== SHARED TYPES =====
+export * from '../types/common'
+
 // ===== PHASE 3.1: Tổ chức =====
 export * from './departmentService';
 export * from './positionService';

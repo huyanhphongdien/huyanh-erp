@@ -1,9 +1,14 @@
 // ============================================================================
-// OVERTIME APPROVAL PAGE - V2.1 (Mobile-First) - FIXED IMPORTS
-// File: src/features/overtime/OvertimeApprovalPage.tsx
-// Huy Anh ERP System - Chấm công V2
+// LEAVE APPROVAL PAGE - MOBILE-FIRST
+// File: src/features/leave/LeaveApprovalPage.tsx
+// Huy Anh ERP System
 // ============================================================================
-// FIX: Import BatchResult từ common.ts thay vì từ service
+// Mobile-first design với:
+//   - 44px+ touch targets
+//   - Bottom-sheet modals
+//   - Safe-area padding
+//   - Sticky action bars
+//   - Batch approve/reject
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
@@ -13,7 +18,7 @@ import {
   CheckSquare, Square, RefreshCw, X, SlidersHorizontal
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
-import { overtimeRequestService, type OvertimeRequest } from '../../services/overtimeRequestService'
+import { leaveRequestService, type LeaveRequest } from '../../services/leaveRequestService'
 import type { BatchResult } from '../../types/common'
 
 // ============================================================================
@@ -22,21 +27,8 @@ import type { BatchResult } from '../../types/common'
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return '—'
-  const d = new Date(dateStr + 'T00:00:00')
+  const d = new Date(dateStr)
   return d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })
-}
-
-function formatTime(t: string): string {
-  return t ? t.slice(0, 5) : '—'
-}
-
-function formatMinutes(m: number): string {
-  if (!m) return '—'
-  const h = Math.floor(m / 60)
-  const r = m % 60
-  if (h === 0) return `${r}p`
-  if (r === 0) return `${h}h`
-  return `${h}h${r.toString().padStart(2, '0')}`
 }
 
 function formatDateTime(dt: string): string {
@@ -56,7 +48,7 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
 // COMPONENT
 // ============================================================================
 
-export default function OvertimeApprovalPage() {
+export default function LeaveApprovalPage() {
   const { user } = useAuthStore()
   const employeeId = user?.employee_id || ''
   const userLevel = user?.position_level || 7
@@ -72,8 +64,8 @@ export default function OvertimeApprovalPage() {
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  const [pendingList, setPendingList] = useState<OvertimeRequest[]>([])
-  const [historyList, setHistoryList] = useState<OvertimeRequest[]>([])
+  const [pendingList, setPendingList] = useState<LeaveRequest[]>([])
+  const [historyList, setHistoryList] = useState<LeaveRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -106,8 +98,8 @@ export default function OvertimeApprovalPage() {
     setLoading(true)
     try {
       const [pending, history] = await Promise.all([
-        overtimeRequestService.getPendingApprovals(employeeId, 'pending', dateFrom || undefined, dateTo || undefined),
-        overtimeRequestService.getApprovalHistory(employeeId, 30),
+        leaveRequestService.getPendingApprovals(employeeId, 'pending', dateFrom || undefined, dateTo || undefined),
+        leaveRequestService.getApprovalHistory(employeeId, 30),
       ])
       setPendingList(pending)
       setHistoryList(history)
@@ -151,10 +143,10 @@ export default function OvertimeApprovalPage() {
     setActionLoading(true)
     setActionError('')
     try {
-      await overtimeRequestService.approve(id, employeeId)
+      await leaveRequestService.approve(id, employeeId)
       await loadData()
     } catch (e: any) {
-      setActionError(e.message || 'Lỗi duyệt phiếu')
+      setActionError(e.message || 'Lỗi duyệt đơn')
     } finally {
       setActionLoading(false)
     }
@@ -165,7 +157,7 @@ export default function OvertimeApprovalPage() {
     setActionLoading(true)
     setActionError('')
     try {
-      await overtimeRequestService.reject(id, employeeId, rejectReason.trim())
+      await leaveRequestService.reject(id, employeeId, rejectReason.trim())
       setRejectingId(null)
       setRejectReason('')
       await loadData()
@@ -181,7 +173,7 @@ export default function OvertimeApprovalPage() {
     setBatchProcessing(true)
     setBatchResult(null)
     try {
-      const r = await overtimeRequestService.batchApprove(Array.from(selected), employeeId)
+      const r = await leaveRequestService.batchApprove(Array.from(selected), employeeId)
       setBatchResult(r)
       await loadData()
     } catch (e: any) {
@@ -196,7 +188,7 @@ export default function OvertimeApprovalPage() {
     setBatchProcessing(true)
     setBatchResult(null)
     try {
-      const r = await overtimeRequestService.batchReject(Array.from(selected), employeeId, batchRejectReason.trim())
+      const r = await leaveRequestService.batchReject(Array.from(selected), employeeId, batchRejectReason.trim())
       setBatchResult(r)
       setShowBatchReject(false)
       setBatchRejectReason('')
@@ -219,7 +211,7 @@ export default function OvertimeApprovalPage() {
           <AlertTriangle className="w-14 h-14 text-amber-300 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-gray-900">Không có quyền truy cập</h2>
           <p className="text-sm text-gray-500 mt-2 px-6">
-            Chỉ Trưởng phòng, Phó phòng và Ban Giám đốc mới có thể duyệt phiếu tăng ca
+            Chỉ Trưởng phòng, Phó phòng và Ban Giám đốc mới có thể duyệt đơn nghỉ phép
           </p>
           <p className="text-xs text-gray-400 mt-3">
             Cấp bậc của bạn: Level {userLevel} {userLevel >= 6 ? '(Nhân viên)' : ''}
@@ -238,9 +230,9 @@ export default function OvertimeApprovalPage() {
       {/* Mobile Header */}
       <div className="sticky top-0 z-20 bg-white border-b px-4 py-3 sm:relative sm:bg-transparent sm:border-0 sm:px-6 sm:py-0 sm:mb-4">
         <div className="max-w-5xl mx-auto">
-          <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Duyệt phiếu tăng ca</h1>
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Duyệt đơn nghỉ phép</h1>
           <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">
-            Phê duyệt hoặc từ chối phiếu tăng ca của nhân viên
+            Phê duyệt hoặc từ chối đơn nghỉ phép của nhân viên
           </p>
         </div>
       </div>
@@ -343,7 +335,7 @@ export default function OvertimeApprovalPage() {
             <div className="flex items-center justify-between">
               <span className="font-semibold">
                 {batchResult.failed === 0
-                  ? `✅ Đã xử lý ${batchResult.success} phiếu`
+                  ? `✅ Đã xử lý ${batchResult.success} đơn`
                   : `⚠️ OK: ${batchResult.success} — Lỗi: ${batchResult.failed}`
                 }
               </span>
@@ -370,7 +362,7 @@ export default function OvertimeApprovalPage() {
           pendingList.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-2xl border">
               <CheckCircle className="w-14 h-14 text-green-200 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium">Không có phiếu chờ duyệt</p>
+              <p className="text-gray-500 font-medium">Không có đơn chờ duyệt</p>
             </div>
           ) : (
             <div className="space-y-2.5 pb-28 sm:pb-4">
@@ -389,7 +381,7 @@ export default function OvertimeApprovalPage() {
               {pendingList.map(req => {
                 const emp = Array.isArray(req.employee) ? req.employee[0] : req.employee
                 const dept = emp?.department
-                const shift = Array.isArray(req.shift) ? req.shift[0] : req.shift
+                const leaveType = Array.isArray(req.leave_type) ? req.leave_type[0] : req.leave_type
                 const isExpanded = expandedId === req.id
                 const isRejecting = rejectingId === req.id
                 const isSelected = selected.has(req.id)
@@ -445,16 +437,20 @@ export default function OvertimeApprovalPage() {
 
                           {/* Chips */}
                           <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                            {leaveType && (
+                              <span
+                                className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium text-white"
+                                style={{ backgroundColor: leaveType.color }}
+                              >
+                                {leaveType.name}
+                              </span>
+                            )}
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 rounded-lg text-xs text-gray-700">
                               <Calendar className="w-3 h-3 text-gray-400" />
-                              {formatDate(req.request_date)}
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 rounded-lg text-xs text-gray-700">
-                              <Clock className="w-3 h-3 text-gray-400" />
-                              {formatTime(req.planned_start)}—{formatTime(req.planned_end)}
+                              {formatDate(req.start_date)} — {formatDate(req.end_date)}
                             </span>
                             <span className="inline-flex items-center px-2.5 py-1 bg-blue-50 rounded-lg text-xs font-bold text-blue-700">
-                              {formatMinutes(req.planned_minutes)}
+                              {req.total_days} ngày
                             </span>
                           </div>
                         </div>
@@ -468,12 +464,10 @@ export default function OvertimeApprovalPage() {
                               <span className="text-gray-500 text-xs font-medium">Lý do</span>
                               <p className="text-gray-800 mt-0.5">{req.reason}</p>
                             </div>
-                            {shift && (
-                              <div>
-                                <span className="text-gray-500 text-xs font-medium">Ca làm việc</span>
-                                <p className="text-gray-700 mt-0.5">{shift.name}</p>
-                              </div>
-                            )}
+                            <div>
+                              <span className="text-gray-500 text-xs font-medium">Mã đơn</span>
+                              <p className="text-gray-700 mt-0.5">{req.request_number}</p>
+                            </div>
                             <div>
                               <span className="text-gray-500 text-xs font-medium">Tạo lúc</span>
                               <p className="text-gray-600 mt-0.5">{formatDateTime(req.created_at || '')}</p>
@@ -555,6 +549,7 @@ export default function OvertimeApprovalPage() {
             <div className="space-y-2.5 pb-4">
               {historyList.map(req => {
                 const emp = Array.isArray(req.employee) ? req.employee[0] : req.employee
+                const leaveType = Array.isArray(req.leave_type) ? req.leave_type[0] : req.leave_type
                 const st = STATUS_CFG[req.status] || STATUS_CFG.pending
 
                 return (
@@ -570,21 +565,25 @@ export default function OvertimeApprovalPage() {
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-2">
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                            <Calendar className="w-3 h-3" />
-                            {formatDate(req.request_date)}
-                          </span>
+                          {leaveType && (
+                            <span
+                              className="inline-flex px-2 py-0.5 rounded text-xs font-medium text-white"
+                              style={{ backgroundColor: leaveType.color }}
+                            >
+                              {leaveType.name}
+                            </span>
+                          )}
                           <span className="text-xs text-gray-500">
-                            {formatTime(req.planned_start)}—{formatTime(req.planned_end)}
+                            {formatDate(req.start_date)} — {formatDate(req.end_date)}
                           </span>
                           <span className="text-xs font-bold text-blue-600">
-                            {formatMinutes(req.planned_minutes)}
+                            {req.total_days} ngày
                           </span>
                         </div>
-                        {req.rejection_reason && (
+                        {req.approval_notes && (
                           <div className="mt-2.5 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
-                            <span className="font-medium">Lý do: </span>
-                            {req.rejection_reason}
+                            <span className="font-medium">Ghi chú: </span>
+                            {req.approval_notes}
                           </div>
                         )}
                       </div>
@@ -610,7 +609,7 @@ export default function OvertimeApprovalPage() {
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 flex-shrink-0">
               <CheckSquare className="w-4 h-4 text-blue-600" />
               <span>{selected.size}</span>
-              <span className="hidden sm:inline">phiếu đã chọn</span>
+              <span className="hidden sm:inline">đơn đã chọn</span>
             </div>
 
             <div className="flex gap-2 flex-1 sm:flex-none sm:ml-auto">
@@ -665,10 +664,10 @@ export default function OvertimeApprovalPage() {
 
             <div className="p-5 sm:p-6">
               <h3 className="text-lg font-bold text-gray-900">
-                Từ chối {selected.size} phiếu
+                Từ chối {selected.size} đơn
               </h3>
               <p className="text-sm text-gray-500 mt-1 mb-4">
-                Lý do sẽ áp dụng cho tất cả phiếu được chọn
+                Lý do sẽ áp dụng cho tất cả đơn được chọn
               </p>
 
               <textarea
@@ -700,7 +699,7 @@ export default function OvertimeApprovalPage() {
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <XCircle className="w-4 h-4" />
                   }
-                  Từ chối {selected.size} phiếu
+                  Từ chối {selected.size} đơn
                 </button>
               </div>
             </div>

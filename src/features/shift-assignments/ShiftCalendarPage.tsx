@@ -1,11 +1,11 @@
 // ============================================================
-// SHIFT CALENDAR PAGE V3.1 — Lịch phân ca (Fixed Team Filter)
+// SHIFT CALENDAR PAGE V3.2 — Lịch phân ca (Fixed Team Filter + Safe Array)
 // File: src/features/shift-assignments/ShiftCalendarPage.tsx
-// V3.1 fixes:
+// V3.2 fixes:
 //   ① Teams dropdown filter theo departmentId (không load all)
 //   ② Filter đội dựa trên shift_team_members (employee→team)
-//      thay vì check team_id trên assignment
 //   ③ Giữ nguyên toàn bộ UI/UX cũ
+//   ④ FIX: Tất cả .map() đều safe — không crash khi API trả null
 // ============================================================
 
 import { useState, useMemo, useCallback } from 'react';
@@ -32,7 +32,7 @@ import {
 const SUNDAY_OFF_DEPT_CODES = ['HAP-KT', 'HAP-RD'];
 
 type ViewMode = 'week' | 'month';
-type TeamFilter = 'all' | string; // 'all' hoặc team.id (UUID)
+type TeamFilter = 'all' | string;
 
 interface OverrideTarget {
   employeeId: string;
@@ -44,6 +44,15 @@ interface OverrideTarget {
     shift_name: string;
     assignment_type: string;
   } | null;
+}
+
+// ============================================================
+// HELPER: đảm bảo luôn trả về array
+// ============================================================
+function ensureArray<T>(val: any): T[] {
+  if (Array.isArray(val)) return val;
+  if (val?.data && Array.isArray(val.data)) return val.data;
+  return [];
 }
 
 // ============================================================
@@ -139,34 +148,33 @@ export function ShiftCalendarPage() {
   }, [viewMode, currentDate]);
 
   // ── Queries ──
+  // ★ FIX V3.2: Dùng ensureArray() cho tất cả queries
   const { data: departments = [] } = useQuery({
     queryKey: ['departments-list'],
     queryFn: () => departmentService.getAll({ page: 1, pageSize: 50 }),
-    select: (res: any) => res?.data || res || [],
+    select: (res: any) => ensureArray(res),
     staleTime: 5 * 60 * 1000,
   });
 
-  // ★ FIX 1: Teams query phụ thuộc departmentId — chỉ load đội của phòng ban đang chọn
-  //    shiftTeamService.getTeams(departmentId?) đã hỗ trợ filter sẵn
+  // ★ FIX 1: Teams query phụ thuộc departmentId
   const { data: teams = [] } = useQuery({
     queryKey: ['shift-teams-dept', departmentId],
     queryFn: () => shiftTeamService.getTeams(departmentId || undefined),
+    select: (res: any) => ensureArray(res),
     staleTime: 2 * 60 * 1000,
   });
 
   // ★ FIX 2: Query team members → build map employee_id → team_id
-  //    Dùng để filter nhân viên theo đội, thay vì filter trên assignment
   const { data: employeeTeamMap = new Map<string, string>() } = useQuery({
-    queryKey: ['shift-team-members-map', departmentId, teams.map((t: any) => t.id).join(',')],
+    queryKey: ['shift-team-members-map', departmentId, (teams || []).map((t: any) => t.id).join(',')],
     queryFn: async () => {
-      const map = new Map<string, string>(); // employee_id → team_id
-      if (teams.length === 0) return map;
+      const map = new Map<string, string>();
+      if (!teams || teams.length === 0) return map;
 
-      for (const team of teams) {
+      for (const team of teams as any[]) {
         try {
-          // ★ Dùng đúng method: getTeamMembers (không phải getActiveMembers)
           const members = await shiftTeamService.getTeamMembers(team.id);
-          (members || []).forEach((m: any) => {
+          ensureArray(members).forEach((m: any) => {
             const empId = m.employee_id || m.id;
             if (empId) map.set(empId, team.id);
           });
@@ -176,7 +184,7 @@ export function ShiftCalendarPage() {
       }
       return map;
     },
-    enabled: teams.length > 0,
+    enabled: (teams || []).length > 0,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -192,16 +200,16 @@ export function ShiftCalendarPage() {
         date_from: dateFrom,
         date_to: dateTo,
       }),
-    select: (res: any) => (Array.isArray(res) ? res : res?.data || []),
+    select: (res: any) => ensureArray(res),
     staleTime: 30 * 1000,
   });
 
-  // ★ FIX 3: Filter by team dựa trên employee membership, không phải assignment field
+  // ★ FIX 3: Filter by team dựa trên employee membership
   const filteredCalendar = useMemo(() => {
-    if (teamFilter === 'all') return calendarData;
+    const safeData = ensureArray(calendarData);
+    if (teamFilter === 'all') return safeData;
 
-    // Filter: chỉ hiện nhân viên thuộc đội đã chọn
-    return calendarData.filter((emp: any) => {
+    return safeData.filter((emp: any) => {
       const empTeamId = employeeTeamMap.get(emp.employee_id);
       return empTeamId === teamFilter;
     });
@@ -227,15 +235,13 @@ export function ShiftCalendarPage() {
     let teamACells = 0;
     let teamBCells = 0;
 
-    // Build reverse map: team_id → team_code
     const teamCodeMap = new Map<string, string>();
-    teams.forEach((t: any) => {
+    ensureArray(teams).forEach((t: any) => {
       teamCodeMap.set(t.id, t.code || '');
     });
 
-    for (const emp of filteredCalendar) {
+    for (const emp of filteredCalendar as any[]) {
       totalEmployees++;
-      // Xác định team code của employee
       const empTeamId = employeeTeamMap.get(emp.employee_id);
       const empTeamCode = empTeamId ? (teamCodeMap.get(empTeamId) || '') : '';
 
@@ -251,7 +257,6 @@ export function ShiftCalendarPage() {
         for (const a of arr) {
           totalAssigned++;
           if (a.is_override) overrides++;
-          // Dùng team code từ employee membership
           if (empTeamCode.includes('A') || empTeamCode === 'TEAM_A') teamACells++;
           if (empTeamCode.includes('B') || empTeamCode === 'TEAM_B') teamBCells++;
         }
@@ -310,7 +315,7 @@ export function ShiftCalendarPage() {
   // ★ Reset teamFilter khi đổi phòng ban
   const handleDepartmentChange = useCallback((newDeptId: string) => {
     setDepartmentId(newDeptId);
-    setTeamFilter('all'); // Reset về "Tất cả đội" khi đổi phòng ban
+    setTeamFilter('all');
   }, []);
 
   // ============================================================
@@ -347,7 +352,7 @@ export function ShiftCalendarPage() {
               className="text-sm border rounded-lg px-2 py-1.5 min-h-[36px] bg-white"
             >
               <option value="">Tất cả phòng ban</option>
-              {departments.map((dept: any) => (
+              {ensureArray(departments).map((dept: any) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}
                 </option>
@@ -356,7 +361,7 @@ export function ShiftCalendarPage() {
           </div>
 
           {/* ★ FIX: Team dropdown dùng team.id làm value (UUID) */}
-          {teams.length > 0 && (
+          {ensureArray(teams).length > 0 && (
             <div className="flex items-center gap-1.5">
               <Users size={14} className="text-gray-400" />
               <select
@@ -365,7 +370,7 @@ export function ShiftCalendarPage() {
                 className="text-sm border rounded-lg px-2 py-1.5 min-h-[36px] bg-white"
               >
                 <option value="all">Tất cả đội</option>
-                {teams.map((team: any) => (
+                {ensureArray(teams).map((team: any) => (
                   <option key={team.id} value={team.id}>
                     {team.name}
                   </option>
@@ -596,7 +601,7 @@ export function ShiftCalendarPage() {
           </span>
         ))}
 
-        {teams.length > 0 && (
+        {ensureArray(teams).length > 0 && (
           <>
             <span className="border-l pl-2 ml-1 flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />

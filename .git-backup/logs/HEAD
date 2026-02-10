@@ -1,0 +1,32 @@
+0000000000000000000000000000000000000000 7a78325b4b1dd537515130e1fcd4166b66ba34d4 Minhld <minhld@huyanhrubber.com> 1768535885 +0700	commit (initial): Initial commit: Setup React + Supabase + TailwindCSS
+7a78325b4b1dd537515130e1fcd4166b66ba34d4 0000000000000000000000000000000000000000 Minhld <minhld@huyanhrubber.com> 1768536431 +0700	Branch: renamed refs/heads/main to refs/heads/main
+7a78325b4b1dd537515130e1fcd4166b66ba34d4 7a78325b4b1dd537515130e1fcd4166b66ba34d4 Minhld <minhld@huyanhrubber.com> 1768536431 +0700	Branch: renamed refs/heads/main to refs/heads/main
+7a78325b4b1dd537515130e1fcd4166b66ba34d4 c5e4b233710cc453418a22228995c414aa63f54b Minhld <minhld@huyanhrubber.com> 1768536549 +0700	pull origin main --rebase (start): checkout c5e4b233710cc453418a22228995c414aa63f54b
+c5e4b233710cc453418a22228995c414aa63f54b c5e4b233710cc453418a22228995c414aa63f54b Minhld <minhld@huyanhrubber.com> 1768544833 +0700	rebase (finish): returning to refs/heads/main
+c5e4b233710cc453418a22228995c414aa63f54b 5b17fdbec8e0f1013e1f01e91dc22473c0299bb4 Minhld <minhld@huyanhrubber.com> 1768553929 +0700	commit: Phase 2: Add Authentication (Login, Register, Dashboard)
+5b17fdbec8e0f1013e1f01e91dc22473c0299bb4 465193ff69c0293bd97e28c1b3aa2190ec5bb180 Minhld <minhld@huyanhrubber.com> 1768832363 +0700	commit: Phase 4.1: Add Core Task Management - WIP (fixing imports)
+465193ff69c0293bd97e28c1b3aa2190ec5bb180 7f4f99af06e0b747046c91c7f175b3a704d4226f Minhld <minhld@huyanhrubber.com> 1768838557 +0700	commit: Pre-Phase 4.1: Add hooks for departments and employees - WIP (fixing errors)
+7f4f99af06e0b747046c91c7f175b3a704d4226f 558de137e28d800ad61b104120f9e0acce933f82 Minhld <minhld@huyanhrubber.com> 1769678633 +0700	commit: Fix TypeScript errors
+558de137e28d800ad61b104120f9e0acce933f82 d64a01dec325aebb92fdf42e693294350b076d0e Minhld <minhld@huyanhrubber.com> 1769760749 +0700	commit: Update: Fix all TypeScript errors, ready for production
+d64a01dec325aebb92fdf42e693294350b076d0e c065f6b8688a601effab0f15674ceef90c71f9cb Minhld <minhld@huyanhrubber.com> 1769762210 +0700	commit: Add vercel.json for SPA routing
+c065f6b8688a601effab0f15674ceef90c71f9cb 6b8af36d6ec06b1701d1385c285d071ac672c6aa Minhld <minhld@huyanhrubber.com> 1769762559 +0700	commit: Fix tsc permission
+6b8af36d6ec06b1701d1385c285d071ac672c6aa 5ed920fe04393251fb0f70183ac9da220e78e0d9 Minhld <minhld@huyanhrubber.com> 1769763808 +0700	commit: Trigger Vercel deploy
+5ed920fe04393251fb0f70183ac9da220e78e0d9 b9423d263a40baed507577b6898ac1f44cd6fbe7 Minhld <minhld@huyanhrubber.com> 1769962861 +0700	commit: Remove package-lock.json to fix permission
+b9423d263a40baed507577b6898ac1f44cd6fbe7 432f345ca509bda2c66f5e52d7f622e3afd3eeef Minhld <minhld@huyanhrubber.com> 1769962918 +0700	pull --rebase (start): checkout 432f345ca509bda2c66f5e52d7f622e3afd3eeef
+432f345ca509bda2c66f5e52d7f622e3afd3eeef 432f345ca509bda2c66f5e52d7f622e3afd3eeef Minhld <minhld@huyanhrubber.com> 1769962918 +0700	pull --rebase (finish): returning to refs/heads/main
+432f345ca509bda2c66f5e52d7f622e3afd3eeef 2cdbeaee3e095ec0b7bed7b8dd7150ede1815e26 Minhld <minhld@huyanhrubber.com> 1770007834 +0700	commit: feat(tasks): Phân quyền tạo công việc - MANAGER chỉ phân công trong phòng ban
+2cdbeaee3e095ec0b7bed7b8dd7150ede1815e26 f74d8e63ba7f9f99f9234483d6693dfdb929c3b6 Minhld <minhld@huyanhrubber.com> 1770023942 +0700	commit: feat: Add User Settings Module - Đổi mật khẩu & Hồ sơ cá nhân
+f74d8e63ba7f9f99f9234483d6693dfdb929c3b6 501502945e717508f30d85507d36a02995e44a82 Minhld <minhld@huyanhrubber.com> 1770181846 +0700	commit: Update: Module Mua hang (Suppliers, Materials, PO), Cham cong V2 (GPS, Shift, Phan ca, Tang ca), Department filter
+501502945e717508f30d85507d36a02995e44a82 9013d38ec8c419e31ceea2cc0c1e1e7d3935b2e8 Minhld <minhld@huyanhrubber.com> 1770185244 +0700	commit: Update: giao dien dien thoair
+9013d38ec8c419e31ceea2cc0c1e1e7d3935b2e8 59e29c4e44b719ecf4077bcc0b4f73015f73d7c8 Minhld <minhld@huyanhrubber.com> 1770187329 +0700	commit: Update: giao dien dien thoai 2
+59e29c4e44b719ecf4077bcc0b4f73015f73d7c8 b7506ddf6331a208ca8f81fbdab857799fcfd9e0 Minhld <minhld@huyanhrubber.com> 1770225861 +0700	commit: chinh sua giao dien
+b7506ddf6331a208ca8f81fbdab857799fcfd9e0 aded1ff7cbeacc45be72e34aeb133c7c2e65dec0 Minhld <minhld@huyanhrubber.com> 1770268293 +0700	commit: update
+aded1ff7cbeacc45be72e34aeb133c7c2e65dec0 6f7f734890d1dc6bee883ded30039df2834d2ab3 Minhld <minhld@huyanhrubber.com> 1770323727 +0700	commit: first fix diem danh t
+6f7f734890d1dc6bee883ded30039df2834d2ab3 e1007c269407bb78fe5475439f4e4a1b7e0179a6 Huy Anh Phong Dien <huyanhphongdien@gmail.com> 1770368860 +0700	commit: Update code tren lap
+e1007c269407bb78fe5475439f4e4a1b7e0179a6 0d93f24581dd44378dffb456432d6b9cc1d3093f Minhld <minhld@huyanhrubber.com> 1770635551 +0700	commit: Fix bug login
+e1007c269407bb78fe5475439f4e4a1b7e0179a6 8228b5d709799002ca33b5564f04848ebffa05c3 Minhld <minhld@huyanhrubber.com> 1770709407 +0700	commit: Noi dung commit
+e1007c269407bb78fe5475439f4e4a1b7e0179a6 21b968478cc1a8749099c0eaba56de4ccc4ac531 Minhld <minhld@huyanhrubber.com> 1770709682 +0700	commit: Nội dung commit
+e1007c269407bb78fe5475439f4e4a1b7e0179a6 d990140efcfa0c33f8b698792f8100cd40a73299 Minhld <minhld@huyanhrubber.com> 1770710241 +0700	commit: Noi dung commit
+e1007c269407bb78fe5475439f4e4a1b7e0179a6 e1007c269407bb78fe5475439f4e4a1b7e0179a6 Minhld <minhld@huyanhrubber.com> 1770710460 +0700
+e1007c269407bb78fe5475439f4e4a1b7e0179a6 0914049fda070307bcf7ed714c87a18030ec84ea Minhld <minhld@huyanhrubber.com> 1770710475 +0700	commit: Noi dung c343ommit
+e1007c269407bb78fe5475439f4e4a1b7e0179a6 b1dd782473b97c0f65aa6af8e8d4e018d7bbcd46 Minhld <minhld@huyanhrubber.com> 1770710611 +0700	commit: Noi dung commit

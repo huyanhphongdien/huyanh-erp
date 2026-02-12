@@ -1,11 +1,14 @@
 // ============================================================
-// APP.TSX - UPDATED WITH NOTIFICATIONS ROUTE
+// APP.TSX - UPDATED WITH WMS + LÝ LỊCH MỦ + PHASE 3.6 ROUTES
 // File: src/App.tsx
 // ============================================================
 // CHANGES:
-// - Added import for NotificationPage
-// - Added route: /notifications → NotificationPage
-// - All previous routes preserved
+// - Fixed WMS import paths (warehouses was nested under materials/)
+// - Added Phase 3 imports: StockInListPage, StockInCreatePage, StockInDetailPage
+// - Added Phase 4 imports: StockOutListPage, StockOutCreatePage, StockOutDetailPage, PickingListPage
+// - Added all Phase 4 routes
+// - ✅ Lý lịch mủ Phase 3.5 — 7 pages, 8 routes, prefix /rubber/
+// - ✅ NEW Phase 3.6 — Thu mua mủ Việt + Lào: 7 pages, 8 routes
 // ============================================================
 
 import { useEffect } from 'react';
@@ -88,8 +91,44 @@ import PaymentListPage from './features/purchasing/pages/PaymentListPage';
 // ===== PHASE 6: Access Control =====
 import AccessManagementPage from './features/purchasing/pages/AccessManagementPage';
 
-// ✅ NEW: Notification Page
+// ✅ Notification Page
 import NotificationPage from './pages/NotificationPage';
+
+// ===== WMS MODULE: Kho Thành phẩm =====
+// Phase 2: Danh mục
+import WMSMaterialListPage from './pages/wms/materials/MaterialListPage';
+import WMSWarehouseListPage from './pages/wms/warehouses/WarehouseListPage';
+import WMSWarehouseLocationPage from './pages/wms/warehouses/WarehouseLocationPage';
+// Phase 3: Nhập kho thành phẩm
+import StockInListPage from './pages/wms/stock-in/StockInListPage';
+import StockInCreatePage from './pages/wms/stock-in/StockInCreatePage';
+import StockInDetailPage from './pages/wms/stock-in/StockInDetailPage';
+// Phase 4: Xuất kho
+import StockOutListPage from './pages/wms/stock-out/StockOutListPage';
+import StockOutCreatePage from './pages/wms/stock-out/StockOutCreatePage';
+import StockOutDetailPage from './pages/wms/stock-out/StockOutDetailPage';
+import PickingListPage from './pages/wms/stock-out/PickingListPage';
+
+// ===== LÝ LỊCH MỦ — Phase 3.5 (Group riêng) =====
+// Folder: pages/wms/rubber-suppliers/
+import RubberSupplierListPage from './pages/wms/rubber-suppliers/RubberSupplierListPage';
+import RubberSupplierFormPage from './pages/wms/rubber-suppliers/RubberSupplierFormPage';
+import RubberSupplierDetailPage from './pages/wms/rubber-suppliers/RubberSupplierDetailPage';
+// Folder: pages/wms/rubber-intake/
+import RubberIntakeListPage from './pages/wms/rubber-intake/RubberIntakeListPage';
+import RubberIntakeDetailPage from './pages/wms/rubber-intake/RubberIntakeDetailPage';
+import RubberDailyReportPage from './pages/wms/rubber-intake/RubberDailyReportPage';
+import RubberDebtPage from './pages/wms/rubber-intake/RubberDebtPage';
+
+// ===== PHASE 3.6: THU MUA MỦ VIỆT + LÀO =====
+// Folder: pages/rubber/
+import VnBatchListPage from './pages/rubber/vn/VnBatchListPage';
+import LaoTransferPage from './pages/rubber/lao/LaoTransferPage';
+import LaoPurchasePage from './pages/rubber/lao/LaoPurchasePage';
+import RubberProfilePage from './pages/rubber/RubberProfilePage';
+import LaoShipmentPage from './pages/rubber/lao/LaoShipmentPage';
+import SettlementPage from './pages/rubber/SettlementPage';
+import RubberDashboard from './pages/rubber/RubberDashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -174,6 +213,60 @@ function App() {
               {/* Dashboard */}
               <Route index element={<DashboardPage />} />
 
+              {/* ===== WMS MODULE: Kho Thành phẩm ===== */}
+              <Route path="wms">
+                <Route index element={<Navigate to="/wms/materials" replace />} />
+                {/* Phase 2: Danh mục cơ bản */}
+                <Route path="materials" element={<WMSMaterialListPage />} />
+                <Route path="warehouses" element={<WMSWarehouseListPage />} />
+                <Route path="warehouses/:id/locations" element={<WMSWarehouseLocationPage />} />
+                {/* Phase 3: Nhập kho thành phẩm */}
+                <Route path="stock-in" element={<StockInListPage />} />
+                <Route path="stock-in/new" element={<StockInCreatePage />} />
+                <Route path="stock-in/:id" element={<StockInDetailPage />} />
+                {/* Phase 4: Xuất kho */}
+                <Route path="stock-out" element={<StockOutListPage />} />
+                <Route path="stock-out/new" element={<StockOutCreatePage />} />
+                <Route path="stock-out/:id" element={<StockOutDetailPage />} />
+                <Route path="stock-out/:id/pick" element={<PickingListPage />} />
+              </Route>
+
+              {/* ============================================================ */}
+              {/* LÝ LỊCH MỦ — Phase 3.5 (Group riêng, prefix /rubber/)       */}
+              {/* ============================================================ */}
+              <Route path="rubber">
+                <Route index element={<Navigate to="/rubber/suppliers" replace />} />
+                {/* NCC Mủ — Nhà cung cấp mủ cao su */}
+                <Route path="suppliers" element={<RubberSupplierListPage />} />
+                <Route path="suppliers/new" element={<RubberSupplierFormPage />} />
+                <Route path="suppliers/:id" element={<RubberSupplierDetailPage />} />
+                <Route path="suppliers/:id/edit" element={<RubberSupplierFormPage />} />
+                {/* Phiếu nhập mủ */}
+                <Route path="intake" element={<RubberIntakeListPage />} />
+                <Route path="intake/:id" element={<RubberIntakeDetailPage />} />
+                {/* Báo cáo & Công nợ */}
+                <Route path="daily-report" element={<RubberDailyReportPage />} />
+                <Route path="debt" element={<RubberDebtPage />} />
+
+                {/* ======================================================== */}
+                {/* PHASE 3.6: Thu mua mủ Việt + Lào                         */}
+                {/* ======================================================== */}
+                {/* Mủ Việt — Bảng chốt */}
+                <Route path="vn/batches" element={<VnBatchListPage />} />
+                {/* Lào — Chuyển tiền */}
+                <Route path="lao/transfers" element={<LaoTransferPage />} />
+                {/* Lào — Thu mua */}
+                <Route path="lao/purchases" element={<LaoPurchasePage />} />
+                {/* Lào — Xuất kho → NM */}
+                <Route path="lao/shipments" element={<LaoShipmentPage />} />
+                {/* Lý lịch phiếu mủ (chung) */}
+                <Route path="profiles" element={<RubberProfilePage />} />
+                {/* Quyết toán thanh toán */}
+                <Route path="settlements" element={<SettlementPage />} />
+                {/* Dashboard tổng hợp */}
+                <Route path="dashboard" element={<RubberDashboard />} />
+              </Route>
+
               {/* ===== PHASE 3.1: Phòng ban, Chức vụ, Nhân viên ===== */}
               <Route path="departments" element={<DepartmentListPage />} />
               <Route path="positions" element={<PositionListPage />} />
@@ -244,7 +337,7 @@ function App() {
                 <Route path="access" element={<AccessManagementPage />} />
               </Route>
 
-              {/* ✅ NEW: Notifications */}
+              {/* ✅ Notifications */}
               <Route path="notifications" element={<NotificationPage />} />
 
               {/* ===== USER SETTINGS ===== */}

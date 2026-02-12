@@ -1,9 +1,16 @@
-// src/services/materialTypeService.ts
-// Service quản lý Loại vật tư (Material Types)
+// ============================================================================
+// MATERIAL TYPE SERVICE - FIXED for WMS DB Schema
+// File: src/services/materialTypeService.ts
+// Huy Anh ERP System - Module Quản lý đơn hàng
+// ============================================================================
+// FIX: material_categories join đã bỏ code, color (không tồn tại trong DB)
+// Bảng material_types vẫn còn nguyên (WMS không tạo lại bảng này)
+// ============================================================================
+
 import { supabase } from '../lib/supabase'
 
 // ============================================
-// INTERFACES
+// TYPES
 // ============================================
 
 export interface MaterialType {
@@ -16,10 +23,8 @@ export interface MaterialType {
   is_active: boolean
   created_at: string
   updated_at: string
-  // Joined fields
+  // Joined fields (FIX: bỏ category_code, category_color)
   category_name?: string
-  category_code?: string
-  category_color?: string
   // Computed fields
   material_count?: number
 }
@@ -61,18 +66,17 @@ export const materialTypeService = {
     const page = params.page || 1
     const pageSize = params.pageSize || 10
     const { search, category_id, is_active } = params
-    
+
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
 
+    // FIX: join material_categories chỉ lấy name (bỏ code, color)
     let query = supabase
       .from('material_types')
       .select(`
         *,
-        material_categories!inner (
-          name,
-          code,
-          color
+        material_categories (
+          name
         )
       `, { count: 'exact' })
 
@@ -97,14 +101,19 @@ export const materialTypeService = {
       .order('name', { ascending: true })
       .range(from, to)
 
-    if (error) throw error
+    if (error) {
+      // Nếu bảng material_types không tồn tại → trả rỗng
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn('Bảng material_types chưa tồn tại, trả dữ liệu rỗng')
+        return { data: [], total: 0, page, pageSize, totalPages: 0 }
+      }
+      throw error
+    }
 
-    // Transform data to flatten category info
-    const transformedData = (data || []).map(item => ({
+    // Transform data - flatten category info (FIX: bỏ category_code, category_color)
+    const transformedData = (data || []).map((item: any) => ({
       ...item,
-      category_name: item.material_categories?.name,
-      category_code: item.material_categories?.code,
-      category_color: item.material_categories?.color,
+      category_name: item.material_categories?.name || '',
       material_categories: undefined
     }))
 
@@ -125,10 +134,8 @@ export const materialTypeService = {
       .from('material_types')
       .select(`
         *,
-        material_categories!inner (
-          name,
-          code,
-          color
+        material_categories (
+          name
         )
       `)
       .eq('is_active', true)
@@ -141,13 +148,16 @@ export const materialTypeService = {
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
 
-    if (error) throw error
+    if (error) {
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        return []
+      }
+      throw error
+    }
 
-    return (data || []).map(item => ({
+    return (data || []).map((item: any) => ({
       ...item,
-      category_name: item.material_categories?.name,
-      category_code: item.material_categories?.code,
-      category_color: item.material_categories?.color,
+      category_name: item.material_categories?.name || '',
       material_categories: undefined
     }))
   },
@@ -160,10 +170,8 @@ export const materialTypeService = {
       .from('material_types')
       .select(`
         *,
-        material_categories!inner (
-          name,
-          code,
-          color
+        material_categories (
+          name
         )
       `)
       .eq('id', id)
@@ -176,41 +184,19 @@ export const materialTypeService = {
 
     return {
       ...data,
-      category_name: data.material_categories?.name,
-      category_code: data.material_categories?.code,
-      category_color: data.material_categories?.color,
+      category_name: (data as any).material_categories?.name || '',
       material_categories: undefined
-    }
-  },
-
-  /**
-   * Lấy loại theo category ID
-   */
-  async getByCategory(categoryId: string): Promise<MaterialType[]> {
-    const { data, error } = await supabase
-      .from('material_types')
-      .select('*')
-      .eq('category_id', categoryId)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
-
-    if (error) throw error
-    return data || []
+    } as MaterialType
   },
 
   /**
    * Tạo loại mới
    */
   async create(type: MaterialTypeFormData): Promise<MaterialType> {
-    // Validate code format
     const code = type.code.toUpperCase().trim()
-    if (!/^[A-Z0-9]{2,10}$/.test(code)) {
-      throw new Error('Mã loại phải từ 2-10 ký tự chữ hoặc số')
-    }
 
-    // Check code exists in same category
-    const exists = await this.checkCodeExists(code, type.category_id)
+    // Check code exists trong cùng category
+    const exists = await this.checkCodeExists(type.category_id, code)
     if (exists) {
       throw new Error(`Mã loại "${code}" đã tồn tại trong nhóm này`)
     }
@@ -218,10 +204,12 @@ export const materialTypeService = {
     const { data, error } = await supabase
       .from('material_types')
       .insert({
-        ...type,
+        category_id: type.category_id,
         code,
+        name: type.name.trim(),
+        description: type.description || null,
         sort_order: type.sort_order || 0,
-        is_active: type.is_active ?? true
+        is_active: type.is_active ?? true,
       })
       .select()
       .single()
@@ -234,33 +222,20 @@ export const materialTypeService = {
    * Cập nhật loại
    */
   async update(id: string, type: Partial<MaterialTypeFormData>): Promise<MaterialType> {
-    // Validate code format if provided
-    if (type.code) {
-      const code = type.code.toUpperCase().trim()
-      if (!/^[A-Z0-9]{2,10}$/.test(code)) {
-        throw new Error('Mã loại phải từ 2-10 ký tự chữ hoặc số')
-      }
+    const updateData: Record<string, any> = {}
 
-      // Get current type to check category
-      const current = await this.getById(id)
-      if (!current) throw new Error('Không tìm thấy loại vật tư')
+    if (type.category_id !== undefined) updateData.category_id = type.category_id
+    if (type.code !== undefined) updateData.code = type.code.toUpperCase().trim()
+    if (type.name !== undefined) updateData.name = type.name.trim()
+    if (type.description !== undefined) updateData.description = type.description
+    if (type.sort_order !== undefined) updateData.sort_order = type.sort_order
+    if (type.is_active !== undefined) updateData.is_active = type.is_active
 
-      const categoryId = type.category_id || current.category_id
-
-      // Check code exists in same category (exclude current)
-      const exists = await this.checkCodeExists(code, categoryId, id)
-      if (exists) {
-        throw new Error(`Mã loại "${code}" đã tồn tại trong nhóm này`)
-      }
-      type.code = code
-    }
+    updateData.updated_at = new Date().toISOString()
 
     const { data, error } = await supabase
       .from('material_types')
-      .update({
-        ...type,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
@@ -273,17 +248,6 @@ export const materialTypeService = {
    * Xóa loại (soft delete)
    */
   async delete(id: string): Promise<void> {
-    // Check if type has materials
-    const { count } = await supabase
-      .from('materials')
-      .select('id', { count: 'exact', head: true })
-      .eq('type_id', id)
-
-    if (count && count > 0) {
-      throw new Error(`Không thể xóa loại này vì có ${count} vật tư đang sử dụng`)
-    }
-
-    // Soft delete
     const { error } = await supabase
       .from('material_types')
       .update({ is_active: false, updated_at: new Date().toISOString() })
@@ -293,91 +257,49 @@ export const materialTypeService = {
   },
 
   /**
-   * Hard delete
-   */
-  async hardDelete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('material_types')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
-  },
-
-  /**
    * Toggle trạng thái active
    */
-  async toggleActive(id: string): Promise<MaterialType> {
-    const current = await this.getById(id)
-    if (!current) {
-      throw new Error('Không tìm thấy loại vật tư')
-    }
+  async toggleActive(id: string, is_active: boolean): Promise<MaterialType> {
+    const { data, error } = await supabase
+      .from('material_types')
+      .update({ is_active, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
 
-    return this.update(id, { is_active: !current.is_active })
+    if (error) throw error
+    return data
   },
 
   /**
-   * Kiểm tra mã đã tồn tại trong cùng category
+   * Kiểm tra code đã tồn tại trong cùng category
    */
-  async checkCodeExists(code: string, categoryId: string, excludeId?: string): Promise<boolean> {
+  async checkCodeExists(categoryId: string, code: string, excludeId?: string): Promise<boolean> {
     let query = supabase
       .from('material_types')
       .select('id', { count: 'exact', head: true })
-      .eq('code', code.toUpperCase())
       .eq('category_id', categoryId)
+      .eq('code', code.toUpperCase().trim())
 
     if (excludeId) {
       query = query.neq('id', excludeId)
     }
 
-    const { count } = await query
+    const { count, error } = await query
+    if (error) return false
     return (count || 0) > 0
   },
 
   /**
-   * Lấy số lượng vật tư trong loại
+   * Đếm vật tư theo loại
    */
-  async getMaterialCount(typeId: string): Promise<number> {
+  async countMaterials(typeId: string): Promise<number> {
     const { count, error } = await supabase
       .from('materials')
       .select('id', { count: 'exact', head: true })
       .eq('type_id', typeId)
 
-    if (error) throw error
+    if (error) return 0
     return count || 0
   },
-
-  /**
-   * Preview mã vật tư
-   * Format: {CATEGORY_CODE}-{TYPE_CODE}{NNN}
-   */
-  async previewMaterialCode(categoryId: string, typeId: string): Promise<string> {
-    // Get category and type info
-    const { data: category } = await supabase
-      .from('material_categories')
-      .select('code')
-      .eq('id', categoryId)
-      .single()
-
-    const { data: type } = await supabase
-      .from('material_types')
-      .select('code')
-      .eq('id', typeId)
-      .single()
-
-    if (!category || !type) {
-      return '???-???001'
-    }
-
-    // Count existing materials in this type
-    const { count } = await supabase
-      .from('materials')
-      .select('id', { count: 'exact', head: true })
-      .eq('type_id', typeId)
-
-    const nextNumber = ((count || 0) + 1).toString().padStart(3, '0')
-    return `${category.code}-${type.code}${nextNumber}`
-  }
 }
-
-export default materialTypeService

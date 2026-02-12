@@ -1,5 +1,10 @@
 // src/features/purchasing/pages/TypeListPage.tsx
 // Trang quản lý Loại vật tư (Material Types)
+// ============================================================================
+// FIX: getMaterialCount → countMaterials (khớp tên hàm trong service)
+// FIX: Bỏ category_color, category_code (không tồn tại trong DB/interface)
+// FIX: toggleActive(type.id) → toggleActive(type.id, !type.is_active)
+// ============================================================================
 import { useState, useEffect, useCallback } from 'react'
 import { 
   Plus, 
@@ -18,11 +23,11 @@ import {
 } from 'lucide-react'
 import { 
   materialTypeService, 
-  MaterialType
+  type MaterialType
 } from '../../../services/materialTypeService'
 import { 
   materialCategoryService, 
-  MaterialCategory
+  type MaterialCategory
 } from '../../../services/materialCategoryService'
 import TypeForm from './components/materials/TypeForm'
 
@@ -57,7 +62,6 @@ export default function TypeListPage() {
   // FETCH DATA
   // ============================================
 
-  // Fetch categories for filter dropdown
   const fetchCategories = useCallback(async () => {
     try {
       const data = await materialCategoryService.getAllActive()
@@ -84,10 +88,10 @@ export default function TypeListPage() {
       setTotal(response.total)
       setTotalPages(response.totalPages)
 
-      // Fetch material counts for each type
+      // FIX: getMaterialCount → countMaterials
       const counts: Record<string, number> = {}
       for (const type of response.data) {
-        counts[type.id] = await materialTypeService.getMaterialCount(type.id)
+        counts[type.id] = await materialTypeService.countMaterials(type.id)
       }
       setTypeCounts(counts)
       
@@ -152,9 +156,10 @@ export default function TypeListPage() {
     }
   }
 
+  // FIX: toggleActive cần truyền is_active mới
   const handleToggleActive = async (type: MaterialType) => {
     try {
-      await materialTypeService.toggleActive(type.id)
+      await materialTypeService.toggleActive(type.id, !type.is_active)
       setSuccess(`Đã ${type.is_active ? 'vô hiệu hóa' : 'kích hoạt'} loại "${type.name}"`)
       fetchTypes()
     } catch (err) {
@@ -167,6 +172,16 @@ export default function TypeListPage() {
     setEditingType(null)
     setSuccess(editingType ? 'Cập nhật thành công!' : 'Tạo mới thành công!')
     fetchTypes()
+  }
+
+  // ============================================
+  // HELPERS
+  // ============================================
+
+  // Tìm category name từ categories list (thay cho category_code/category_color đã bỏ)
+  const getCategoryInfo = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId)
+    return cat || null
   }
 
   // ============================================
@@ -236,7 +251,7 @@ export default function TypeListPage() {
                 <option value="">Tất cả nhóm</option>
                 {categories.map(cat => (
                   <option key={cat.id} value={cat.id}>
-                    {cat.code} - {cat.name}
+                    {cat.name}
                   </option>
                 ))}
               </select>
@@ -316,90 +331,87 @@ export default function TypeListPage() {
                   </td>
                 </tr>
               ) : (
-                types.map((type) => (
-                  <tr key={type.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className="w-8 h-8 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: type.category_color || '#6B7280' }}
-                        >
-                          <Tag className="w-4 h-4 text-white" />
+                types.map((type) => {
+                  const catInfo = getCategoryInfo(type.category_id)
+                  return (
+                    <tr key={type.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {/* FIX: Bỏ category_color, dùng màu mặc định */}
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-500">
+                            <Tag className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{type.name}</div>
+                            {type.description && (
+                              <div className="text-sm text-gray-500 truncate max-w-xs">
+                                {type.description}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{type.name}</div>
-                          {type.description && (
-                            <div className="text-sm text-gray-500 truncate max-w-xs">
-                              {type.description}
-                            </div>
-                          )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {type.code}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {/* FIX: Bỏ category_code badge, chỉ hiện dấu — và category_name */}
+                        <span className="text-sm text-gray-400 mr-1">—</span>
+                        <span className="text-sm text-gray-600">
+                          {type.category_name || catInfo?.name || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                        {typeCounts[type.id] ?? 0}
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                        {type.sort_order}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {type.is_active ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Hoạt động
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            Vô hiệu
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleToggleActive(type)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            title={type.is_active ? 'Vô hiệu hóa' : 'Kích hoạt'}
+                          >
+                            {type.is_active ? (
+                              <ToggleRight className="w-5 h-5 text-green-600" />
+                            ) : (
+                              <ToggleLeft className="w-5 h-5" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleEdit(type)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            title="Chỉnh sửa"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(type)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Xóa"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {type.code}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span 
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white"
-                        style={{ backgroundColor: type.category_color || '#6B7280' }}
-                      >
-                        {type.category_code}
-                      </span>
-                      <span className="ml-2 text-sm text-gray-600">
-                        {type.category_name}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-600">
-                      {typeCounts[type.id] || 0}
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-600">
-                      {type.sort_order}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {type.is_active ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Hoạt động
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          Vô hiệu
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleToggleActive(type)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                          title={type.is_active ? 'Vô hiệu hóa' : 'Kích hoạt'}
-                        >
-                          {type.is_active ? (
-                            <ToggleRight className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <ToggleLeft className="w-5 h-5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleEdit(type)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                          title="Chỉnh sửa"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirm(type)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                          title="Xóa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>

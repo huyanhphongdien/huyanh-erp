@@ -1,5 +1,7 @@
 // src/features/purchasing/pages/materials/CategoryListPage.tsx
 // Trang quản lý Nhóm vật tư (Material Categories)
+// FIX: Đã bỏ code/icon/color/sort_order (không có trong DB hiện tại)
+//      Thêm cột type (raw/finished) từ WMS
 import { useState, useEffect, useCallback } from 'react'
 import { 
   Plus, 
@@ -9,15 +11,6 @@ import {
   ToggleLeft, 
   ToggleRight,
   Package,
-  Fuel,
-  Wrench,
-  HardHat,
-  FileText,
-  Cpu,
-  Droplet,
-  Building,
-  Box,
-  Layers,
   ChevronLeft,
   ChevronRight,
   AlertCircle,
@@ -29,20 +22,6 @@ import {
   MaterialCategory
 } from '../../../services/materialCategoryService'
 import CategoryForm from './components/materials/CategoryForm'
-
-// Icon mapping
-const IconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  Package,
-  Fuel,
-  Wrench,
-  HardHat,
-  FileText,
-  Cpu,
-  Droplet,
-  Building,
-  Box,
-  Layers,
-}
 
 export default function CategoryListPage() {
   // State
@@ -159,7 +138,7 @@ export default function CategoryListPage() {
 
   const handleToggleActive = async (category: MaterialCategory) => {
     try {
-      await materialCategoryService.toggleActive(category.id)
+      await materialCategoryService.toggleActive(category.id, category.is_active)
       setSuccess(`Đã ${category.is_active ? 'vô hiệu hóa' : 'kích hoạt'} nhóm "${category.name}"`)
       fetchCategories()
     } catch (err) {
@@ -178,16 +157,27 @@ export default function CategoryListPage() {
   // RENDER HELPERS
   // ============================================
 
-  const renderIcon = (iconName?: string, color?: string) => {
-    const IconComponent = iconName ? IconMap[iconName] : Package
-    return (
-      <div 
-        className="w-10 h-10 rounded-lg flex items-center justify-center"
-        style={{ backgroundColor: color || '#6B7280' }}
-      >
-        {IconComponent && <IconComponent className="w-5 h-5 text-white" />}
-      </div>
-    )
+  const getTypeBadge = (type?: string) => {
+    switch (type) {
+      case 'raw':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+            Nguyên liệu
+          </span>
+        )
+      case 'finished':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            Thành phẩm
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+            Chưa phân loại
+          </span>
+        )
+    }
   }
 
   // ============================================
@@ -237,7 +227,7 @@ export default function CategoryListPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm theo mã hoặc tên..."
+                placeholder="Tìm theo tên nhóm..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -282,16 +272,13 @@ export default function CategoryListPage() {
                   Nhóm vật tư
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Mã
+                  Phân loại
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Số loại
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Số vật tư
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thứ tự
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
@@ -304,14 +291,14 @@ export default function CategoryListPage() {
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Đang tải...
                   </td>
                 </tr>
               ) : categories.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     {search || statusFilter !== 'all' 
                       ? 'Không tìm thấy nhóm vật tư phù hợp'
                       : 'Chưa có nhóm vật tư nào'}
@@ -322,7 +309,9 @@ export default function CategoryListPage() {
                   <tr key={category.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        {renderIcon(category.icon, category.color)}
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-500">
+                          <Package className="w-5 h-5 text-white" />
+                        </div>
                         <div>
                           <div className="font-medium text-gray-900">{category.name}</div>
                           {category.description && (
@@ -334,18 +323,13 @@ export default function CategoryListPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        {category.code}
-                      </span>
+                      {getTypeBadge(category.type)}
                     </td>
                     <td className="px-4 py-3 text-center text-sm text-gray-600">
                       {categoryCounts[category.id]?.types || 0}
                     </td>
                     <td className="px-4 py-3 text-center text-sm text-gray-600">
                       {categoryCounts[category.id]?.materials || 0}
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-600">
-                      {category.sort_order}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {category.is_active ? (

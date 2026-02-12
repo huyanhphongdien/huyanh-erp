@@ -1,33 +1,33 @@
-// src/services/purchasing/materialCategoryService.ts
-// Service quản lý Nhóm vật tư (Material Categories)
+// ============================================================================
+// MATERIAL CATEGORY SERVICE - FIXED for WMS DB Schema
+// File: src/services/materialCategoryService.ts
+// Huy Anh ERP System - Module Quản lý đơn hàng
+// ============================================================================
+// FIX: DB hiện tại (sau WMS Phase 1) chỉ có columns:
+//   id, name, type, description, is_active, created_at, updated_at
+// KHÔNG CÓ: code, icon, color, sort_order
+// ============================================================================
+
 import { supabase } from '../lib/supabase'
 
 // ============================================
-// INTERFACES
+// TYPES
 // ============================================
 
 export interface MaterialCategory {
   id: string
-  code: string
   name: string
+  type?: 'raw' | 'finished'  // WMS column
   description?: string
-  icon?: string
-  color?: string
-  sort_order: number
   is_active: boolean
   created_at: string
   updated_at: string
-  // Computed fields
-  material_count?: number
 }
 
 export interface MaterialCategoryFormData {
-  code: string
   name: string
+  type?: 'raw' | 'finished'
   description?: string
-  icon?: string
-  color?: string
-  sort_order?: number
   is_active?: boolean
 }
 
@@ -36,6 +36,7 @@ export interface CategoryPaginationParams {
   pageSize?: number
   search?: string
   is_active?: boolean | 'all'
+  type?: 'raw' | 'finished' | 'all'
 }
 
 export interface PaginatedCategoryResponse {
@@ -45,34 +46,6 @@ export interface PaginatedCategoryResponse {
   pageSize: number
   totalPages: number
 }
-
-// ============================================
-// PREDEFINED ICONS & COLORS
-// ============================================
-
-export const CATEGORY_ICONS = [
-  { value: 'Package', label: 'Nguyên liệu' },
-  { value: 'Fuel', label: 'Nhiên liệu' },
-  { value: 'Wrench', label: 'Phụ tùng' },
-  { value: 'HardHat', label: 'Bảo hộ' },
-  { value: 'FileText', label: 'Văn phòng phẩm' },
-  { value: 'Cpu', label: 'Thiết bị điện' },
-  { value: 'Droplet', label: 'Hóa chất' },
-  { value: 'Building', label: 'Vật liệu xây dựng' },
-  { value: 'Box', label: 'Bao bì' },
-  { value: 'Layers', label: 'Khác' },
-]
-
-export const CATEGORY_COLORS = [
-  { value: '#3B82F6', label: 'Xanh dương', bg: 'bg-blue-500' },
-  { value: '#10B981', label: 'Xanh lá', bg: 'bg-emerald-500' },
-  { value: '#F59E0B', label: 'Cam', bg: 'bg-amber-500' },
-  { value: '#EF4444', label: 'Đỏ', bg: 'bg-red-500' },
-  { value: '#8B5CF6', label: 'Tím', bg: 'bg-violet-500' },
-  { value: '#EC4899', label: 'Hồng', bg: 'bg-pink-500' },
-  { value: '#06B6D4', label: 'Cyan', bg: 'bg-cyan-500' },
-  { value: '#6B7280', label: 'Xám', bg: 'bg-gray-500' },
-]
 
 // ============================================
 // SERVICE
@@ -85,8 +58,8 @@ export const materialCategoryService = {
   async getAll(params: CategoryPaginationParams = {}): Promise<PaginatedCategoryResponse> {
     const page = params.page || 1
     const pageSize = params.pageSize || 10
-    const { search, is_active } = params
-    
+    const { search, is_active, type } = params
+
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
 
@@ -99,14 +72,18 @@ export const materialCategoryService = {
       query = query.eq('is_active', is_active)
     }
 
-    // Tìm kiếm theo tên hoặc mã
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+    // Filter theo type (WMS)
+    if (type && type !== 'all') {
+      query = query.eq('type', type)
     }
 
-    // Sắp xếp và phân trang
+    // Tìm kiếm theo tên
+    if (search) {
+      query = query.or(`name.ilike.%${search}%`)
+    }
+
+    // Sắp xếp theo tên
     const { data, error, count } = await query
-      .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
       .range(from, to)
 
@@ -129,7 +106,6 @@ export const materialCategoryService = {
       .from('material_categories')
       .select('*')
       .eq('is_active', true)
-      .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
 
     if (error) throw error
@@ -147,7 +123,7 @@ export const materialCategoryService = {
       .single()
 
     if (error) {
-      if (error.code === 'PGRST116') return null // Not found
+      if (error.code === 'PGRST116') return null
       throw error
     }
     return data
@@ -157,25 +133,13 @@ export const materialCategoryService = {
    * Tạo nhóm mới
    */
   async create(category: MaterialCategoryFormData): Promise<MaterialCategory> {
-    // Validate code format
-    const code = category.code.toUpperCase().trim()
-    if (!/^[A-Z]{2,5}$/.test(code)) {
-      throw new Error('Mã nhóm phải từ 2-5 ký tự chữ in hoa')
-    }
-
-    // Check code exists
-    const exists = await this.checkCodeExists(code)
-    if (exists) {
-      throw new Error(`Mã nhóm "${code}" đã tồn tại`)
-    }
-
     const { data, error } = await supabase
       .from('material_categories')
       .insert({
-        ...category,
-        code,
-        sort_order: category.sort_order || 0,
-        is_active: category.is_active ?? true
+        name: category.name.trim(),
+        type: category.type || null,
+        description: category.description || null,
+        is_active: category.is_active ?? true,
       })
       .select()
       .single()
@@ -188,27 +152,18 @@ export const materialCategoryService = {
    * Cập nhật nhóm
    */
   async update(id: string, category: Partial<MaterialCategoryFormData>): Promise<MaterialCategory> {
-    // Validate code format if provided
-    if (category.code) {
-      const code = category.code.toUpperCase().trim()
-      if (!/^[A-Z]{2,5}$/.test(code)) {
-        throw new Error('Mã nhóm phải từ 2-5 ký tự chữ in hoa')
-      }
+    const updateData: Record<string, any> = {}
 
-      // Check code exists (exclude current)
-      const exists = await this.checkCodeExists(code, id)
-      if (exists) {
-        throw new Error(`Mã nhóm "${code}" đã tồn tại`)
-      }
-      category.code = code
-    }
+    if (category.name !== undefined) updateData.name = category.name.trim()
+    if (category.type !== undefined) updateData.type = category.type
+    if (category.description !== undefined) updateData.description = category.description
+    if (category.is_active !== undefined) updateData.is_active = category.is_active
+
+    updateData.updated_at = new Date().toISOString()
 
     const { data, error } = await supabase
       .from('material_categories')
-      .update({
-        ...category,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
@@ -218,20 +173,9 @@ export const materialCategoryService = {
   },
 
   /**
-   * Xóa nhóm (soft delete - set is_active = false)
+   * Xóa nhóm (soft delete = set is_active = false)
    */
   async delete(id: string): Promise<void> {
-    // Check if category has materials or types
-    const { count: typeCount } = await supabase
-      .from('material_types')
-      .select('id', { count: 'exact', head: true })
-      .eq('category_id', id)
-
-    if (typeCount && typeCount > 0) {
-      throw new Error(`Không thể xóa nhóm này vì có ${typeCount} loại vật tư đang sử dụng`)
-    }
-
-    // Soft delete
     const { error } = await supabase
       .from('material_categories')
       .update({ is_active: false, updated_at: new Date().toISOString() })
@@ -241,117 +185,79 @@ export const materialCategoryService = {
   },
 
   /**
-   * Hard delete (chỉ dùng khi thực sự cần)
-   */
-  async hardDelete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('material_categories')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
-  },
-
-  /**
    * Toggle trạng thái active
    */
-  async toggleActive(id: string): Promise<MaterialCategory> {
-    // Get current status
-    const current = await this.getById(id)
-    if (!current) {
-      throw new Error('Không tìm thấy nhóm vật tư')
+  async toggleActive(id: string, currentActive?: boolean): Promise<MaterialCategory> {
+    // Nếu không truyền currentActive, fetch trước
+    let newActive: boolean
+    if (currentActive !== undefined) {
+      newActive = !currentActive
+    } else {
+      const current = await this.getById(id)
+      if (!current) throw new Error('Không tìm thấy nhóm')
+      newActive = !current.is_active
     }
 
-    return this.update(id, { is_active: !current.is_active })
+    const { data, error } = await supabase
+      .from('material_categories')
+      .update({ is_active: newActive, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
   },
 
   /**
-   * Kiểm tra mã đã tồn tại
+   * Kiểm tra tên đã tồn tại
    */
-  async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
+  async checkNameExists(name: string, excludeId?: string): Promise<boolean> {
     let query = supabase
       .from('material_categories')
       .select('id', { count: 'exact', head: true })
-      .eq('code', code.toUpperCase())
+      .ilike('name', name.trim())
 
     if (excludeId) {
       query = query.neq('id', excludeId)
     }
 
-    const { count } = await query
+    const { count, error } = await query
+    if (error) throw error
     return (count || 0) > 0
   },
 
   /**
-   * Lấy số lượng vật tư trong nhóm
-   */
-  async getMaterialCount(categoryId: string): Promise<number> {
-    const { count, error } = await supabase
-      .from('materials')
-      .select('id', { count: 'exact', head: true })
-      .eq('category_id', categoryId)
-
-    if (error) throw error
-    return count || 0
-  },
-
-  /**
-   * Lấy số lượng loại vật tư trong nhóm
+   * Đếm số loại vật tư thuộc nhóm (bảng material_types)
    */
   async getTypeCount(categoryId: string): Promise<number> {
-    const { count, error } = await supabase
-      .from('material_types')
-      .select('id', { count: 'exact', head: true })
-      .eq('category_id', categoryId)
+    try {
+      const { count, error } = await supabase
+        .from('material_types')
+        .select('id', { count: 'exact', head: true })
+        .eq('category_id', categoryId)
 
-    if (error) throw error
-    return count || 0
-  },
-
-  /**
-   * Cập nhật thứ tự hiển thị
-   */
-  async updateSortOrder(items: { id: string; sort_order: number }[]): Promise<void> {
-    for (const item of items) {
-      const { error } = await supabase
-        .from('material_categories')
-        .update({ sort_order: item.sort_order })
-        .eq('id', item.id)
-
-      if (error) throw error
+      if (error) return 0 // Bảng chưa tồn tại → 0
+      return count || 0
+    } catch {
+      return 0
     }
   },
 
   /**
-   * Lấy danh sách với số lượng types và materials
+   * Đếm số vật tư thuộc nhóm (bảng materials)
    */
-  async getAllWithCounts(): Promise<(MaterialCategory & { type_count: number; material_count: number })[]> {
-    const { data: categories, error } = await supabase
-      .from('material_categories')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
+  async getMaterialCount(categoryId: string): Promise<number> {
+    try {
+      const { count, error } = await supabase
+        .from('materials')
+        .select('id', { count: 'exact', head: true })
+        .eq('category_id', categoryId)
 
-    if (error) throw error
-
-    // Get counts for each category
-    const result = await Promise.all(
-      (categories || []).map(async (cat) => {
-        const [typeCount, materialCount] = await Promise.all([
-          this.getTypeCount(cat.id),
-          this.getMaterialCount(cat.id)
-        ])
-        return {
-          ...cat,
-          type_count: typeCount,
-          material_count: materialCount
-        }
-      })
-    )
-
-    return result
-  }
+      if (error) return 0
+      return count || 0
+    } catch {
+      return 0
+    }
+  },
 }
-
-export default materialCategoryService

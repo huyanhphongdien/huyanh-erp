@@ -1,6 +1,10 @@
 // ============================================================
-// NAVIGATION CONFIG - UPDATED WITH NOTIFICATIONS
+// NAVIGATION CONFIG - UPDATED WITH LÝ LỊCH MỦ + THU MUA MỦ P3.6
 // File: src/config/navigation.ts
+// ============================================================
+// CHANGES:
+// - ✅ Tách "Lý lịch mủ" ra GROUP RIÊNG
+// - ✅ NEW: Group "THU MUA MỦ" — Phase 3.6: 7 nav items
 // ============================================================
 
 import {
@@ -36,8 +40,21 @@ import {
   CalendarDays,
   AlarmClockPlus,
   ClipboardCheck,
-  Bell,  // ✅ NEW
-  LucideIcon,
+  Bell,
+  // WMS icons
+  Warehouse,
+  MapPin,
+  PackagePlus,
+  PackageMinus,
+  // Lý lịch mủ icons
+  Droplets,
+  FileBarChart,
+  // Phase 3.6: Thu mua mủ icons
+  Truck,
+  ArrowRightLeft,
+  FileCheck,
+  PieChart,
+  type LucideIcon,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -66,8 +83,46 @@ export const navigationGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-      // ✅ NEW: Thông báo
       { label: 'Thông báo', href: '/notifications', icon: Bell },
+    ],
+  },
+
+  // ===== KHO THÀNH PHẨM (WMS) =====
+  {
+    title: 'KHO THÀNH PHẨM',
+    defaultOpen: true,
+    items: [
+      { label: 'Thành phẩm', href: '/wms/materials', icon: Package },
+      { label: 'Kho & Vị trí', href: '/wms/warehouses', icon: MapPin },
+      { label: 'Nhập kho TP', href: '/wms/stock-in', icon: PackagePlus },
+      { label: 'Xuất kho', href: '/wms/stock-out', icon: PackageMinus },
+    ],
+  },
+
+  // ===== LÝ LỊCH MỦ — Phase 3.5 =====
+  {
+    title: 'LÝ LỊCH MỦ',
+    defaultOpen: true,
+    items: [
+      { label: 'NCC Mủ', href: '/rubber/suppliers', icon: Users },
+      { label: 'Phiếu nhập mủ', href: '/rubber/intake', icon: ClipboardList },
+      { label: 'Báo cáo ngày', href: '/rubber/daily-report', icon: FileBarChart },
+      { label: 'Công nợ NCC mủ', href: '/rubber/debt', icon: Wallet },
+    ],
+  },
+
+  // ===== THU MUA MỦ — Phase 3.6 =====
+  {
+    title: 'THU MUA MỦ',
+    defaultOpen: true,
+    items: [
+      { label: 'Tổng hợp', href: '/rubber/dashboard', icon: PieChart },
+      { label: 'Chốt mủ Việt', href: '/rubber/vn/batches', icon: ClipboardList },
+      { label: 'Chuyển tiền Lào', href: '/rubber/lao/transfers', icon: ArrowRightLeft },
+      { label: 'Thu mua Lào', href: '/rubber/lao/purchases', icon: ShoppingCart },
+      { label: 'Xuất kho Lào→NM', href: '/rubber/lao/shipments', icon: Truck },
+      { label: 'Lý lịch phiếu', href: '/rubber/profiles', icon: FileCheck },
+      { label: 'Quyết toán TT', href: '/rubber/settlements', icon: DollarSign },
     ],
   },
 

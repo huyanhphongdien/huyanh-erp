@@ -1,11 +1,12 @@
 // ============================================================
-// SIDEBAR COMPONENT - UPDATED WITH NOTIFICATIONS
+// SIDEBAR COMPONENT - UPDATED WITH LÝ LỊCH MỦ + THU MUA MỦ P3.6
 // File: src/components/common/Sidebar.tsx
 // ============================================================
 // CHANGES:
-// - Added Bell icon import for notifications
-// - Added "Thông báo" menu item in TỔNG QUAN group (after Dashboard)
-// - All previous items preserved
+// - ✅ Tách "Lý lịch mủ" ra GROUP RIÊNG (không nằm trong KHO THÀNH PHẨM)
+// - ✅ NEW: Group "THU MUA MỦ" — Phase 3.6: 7 menu items
+//   Việt chốt, Lào chuyển tiền, Lào thu mua, Lào xuất kho,
+//   Lý lịch phiếu, Quyết toán, Dashboard
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -40,7 +41,20 @@ import {
   ClipboardCheck,
   Shield,
   UsersRound,
-  Bell,  // ✅ NEW: Icon cho Thông báo
+  Bell,
+  // WMS icons
+  Warehouse,
+  MapPin,
+  PackagePlus,
+  PackageMinus,
+  // Lý lịch mủ icons
+  Droplets,
+  ClipboardList as ClipboardListIcon,
+  // Phase 3.6: Thu mua mủ icons
+  Truck,
+  ArrowRightLeft,
+  FileCheck,
+  PieChart,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -75,8 +89,49 @@ const getMenuGroups = (
     icon: <LayoutDashboard size={18} />,
     items: [
       { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      // ✅ NEW: Thông báo
       { path: '/notifications', label: 'Thông báo', icon: <Bell size={18} /> },
+    ],
+  },
+
+  // ===== KHO THÀNH PHẨM (WMS) =====
+  {
+    title: 'KHO THÀNH PHẨM',
+    icon: <Warehouse size={18} />,
+    collapsible: true,
+    items: [
+      { path: '/wms/materials', label: 'Thành phẩm', icon: <Package size={18} /> },
+      { path: '/wms/warehouses', label: 'Kho & Vị trí', icon: <MapPin size={18} /> },
+      { path: '/wms/stock-in', label: 'Nhập kho TP', icon: <PackagePlus size={18} /> },
+      { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
+    ],
+  },
+
+  // ===== LÝ LỊCH MỦ — Phase 3.5 =====
+  {
+    title: 'LÝ LỊCH MỦ',
+    icon: <Droplets size={18} />,
+    collapsible: true,
+    items: [
+      { path: '/rubber/suppliers', label: 'NCC Mủ', icon: <Users size={18} /> },
+      { path: '/rubber/intake', label: 'Phiếu nhập mủ', icon: <ClipboardListIcon size={18} /> },
+      { path: '/rubber/daily-report', label: 'Báo cáo ngày', icon: <FileBarChart size={18} /> },
+      { path: '/rubber/debt', label: 'Công nợ NCC mủ', icon: <Wallet size={18} /> },
+    ],
+  },
+
+  // ===== THU MUA MỦ — Phase 3.6 =====
+  {
+    title: 'THU MUA MỦ',
+    icon: <Scale size={18} />,
+    collapsible: true,
+    items: [
+      { path: '/rubber/dashboard', label: 'Tổng hợp', icon: <PieChart size={18} /> },
+      { path: '/rubber/vn/batches', label: '🇻🇳 Chốt mủ Việt', icon: <ClipboardList size={18} /> },
+      { path: '/rubber/lao/transfers', label: '🇱🇦 Chuyển tiền Lào', icon: <ArrowRightLeft size={18} /> },
+      { path: '/rubber/lao/purchases', label: '🇱🇦 Thu mua Lào', icon: <ShoppingCart size={18} /> },
+      { path: '/rubber/lao/shipments', label: '🚛 Xuất kho Lào→NM', icon: <Truck size={18} /> },
+      { path: '/rubber/profiles', label: 'Lý lịch phiếu', icon: <FileCheck size={18} /> },
+      { path: '/rubber/settlements', label: 'Quyết toán TT', icon: <DollarSign size={18} /> },
     ],
   },
 
@@ -202,6 +257,9 @@ export function Sidebar() {
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
     'QUẢN LÝ NHÂN SỰ': true,
     'CHẤM CÔNG': false,
+    'KHO THÀNH PHẨM': false,
+    'LÝ LỊCH MỦ': false,
+    'THU MUA MỦ': false,
     'QUẢN LÝ ĐƠN HÀNG': true,
   });
   

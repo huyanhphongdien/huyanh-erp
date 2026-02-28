@@ -173,14 +173,6 @@ export const leaveRequestService = {
   // ==========================================================================
   // LẤY DANH SÁCH ĐƠN CHỜ DUYỆT - THEO PHÂN CẤP CHỨC VỤ
   // ==========================================================================
-  // Logic giống overtimeRequestService.getPendingApprovals():
-  //   - Manager (level 4-5): Chỉ xem đơn của nhân viên trong phòng mình
-  //   - Executive (level 1-3): Xem tất cả đơn (trừ chính mình)
-  //   - Employee (level 6-7): Không có quyền duyệt
-  //
-  // ✅ FIX: KHÔNG dùng nested position:positions(level) → gây lỗi 406
-  //    Thay vào đó, tách query position riêng biệt
-  // ==========================================================================
   async getPendingApprovals(
     approverId: string,
     status?: 'pending' | 'approved' | 'rejected' | 'cancelled',
@@ -227,7 +219,6 @@ export const leaveRequestService = {
 
       if (approverLevel <= EXECUTIVE_MAX_LEVEL) {
         // ── EXECUTIVE (level 1-3): Xem TẤT CẢ đơn (trừ chính mình) ──
-        // Không cần filter employeeIds → sẽ query tất cả
         employeeIds = []
 
       } else if (approverLevel <= MANAGER_MAX_LEVEL) {
@@ -237,13 +228,12 @@ export const leaveRequestService = {
           return []
         }
 
-        // Lấy danh sách nhân viên trong phòng (SIMPLE - chỉ select id)
         const { data: deptEmployees } = await supabase
           .from('employees')
           .select('id')
           .eq('department_id', approverDeptId)
           .eq('status', 'active')
-          .neq('id', approverId) // Loại trừ chính mình
+          .neq('id', approverId)
 
         if (deptEmployees && deptEmployees.length > 0) {
           employeeIds = deptEmployees.map(e => e.id)
@@ -272,10 +262,8 @@ export const leaveRequestService = {
 
       // Filter employee_id theo phân cấp
       if (employeeIds.length > 0) {
-        // Manager: chỉ xem đơn trong phòng
         query = query.in('employee_id', employeeIds)
       } else if (approverLevel <= EXECUTIVE_MAX_LEVEL) {
-        // Executive: xem tất cả, loại trừ đơn của chính mình
         query = query.neq('employee_id', approverId)
       }
 
@@ -303,7 +291,6 @@ export const leaveRequestService = {
   // ==========================================================================
   async getPendingCount(employeeId: string): Promise<number> {
     try {
-      // Lấy thông tin approver
       const { data: approver } = await supabase
         .from('employees')
         .select('id, department_id, position_id')
@@ -312,7 +299,6 @@ export const leaveRequestService = {
 
       if (!approver) return 0
 
-      // Lấy position level riêng
       let level = 7
       if (approver.position_id) {
         const { data: posData } = await supabase
@@ -558,6 +544,33 @@ export const leaveRequestService = {
     }
 
     return result
+  },
+
+  // ==========================================================================
+  // ★ LỊCH SỬ DUYỆT - FIX: Method bị thiếu gây crash LeaveApprovalPage
+  // ==========================================================================
+  async getApprovalHistory(
+    approverId: string,
+    limit: number = 20
+  ): Promise<LeaveRequest[]> {
+    try {
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .select(LEAVE_SELECT)
+        .eq('approved_by', approverId)
+        .in('status', ['approved', 'rejected'])
+        .order('approved_at', { ascending: false })
+        .limit(limit)
+
+      if (error) {
+        console.error('[leaveRequestService] getApprovalHistory error:', error)
+        return []
+      }
+      return data || []
+    } catch (error) {
+      console.error('[leaveRequestService] getApprovalHistory exception:', error)
+      return []
+    }
   },
 
   // ==========================================================================

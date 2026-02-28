@@ -1,4 +1,9 @@
 // src/features/tasks/hooks/useTasks.ts
+// ============================================================================
+// FIX: 
+// 1. Thêm enabled condition - không fetch khi filter undefined
+// 2. Thêm null safety cho data mapping
+// ============================================================================
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 
@@ -8,8 +13,8 @@ interface TaskFilter {
   department_id?: string
   assignee_id?: string
   assigner_id?: string
-  status?: string
-  priority?: string
+  status?: string | string[]
+  priority?: string | string[]
 }
 
 interface Task {
@@ -96,12 +101,20 @@ async function fetchTasks(
   }
 
   if (filter?.status) {
-    query = query.eq('status', filter.status)
+    if (Array.isArray(filter.status)) {
+      query = query.in('status', filter.status)
+    } else {
+      query = query.eq('status', filter.status)
+    }
     console.log('📊 Applied status:', filter.status)
   }
 
   if (filter?.priority) {
-    query = query.eq('priority', filter.priority)
+    if (Array.isArray(filter.priority)) {
+      query = query.in('priority', filter.priority)
+    } else {
+      query = query.eq('priority', filter.priority)
+    }
     console.log('⚡ Applied priority:', filter.priority)
   }
 
@@ -114,10 +127,17 @@ async function fetchTasks(
     throw error
   }
 
-  // Map name -> title cho UI
-  const mappedData = (data || []).map(task => ({
+  // ★ FIX: Null safety - đảm bảo data luôn là array
+  const safeData = Array.isArray(data) ? data : []
+
+  // Map name -> title cho UI + normalize relations
+  const mappedData = safeData.map(task => ({
     ...task,
-    title: task.name || task.title || ''
+    title: task.name || task.title || '',
+    // ★ FIX: Normalize Supabase relations (có thể trả về array thay vì object)
+    department: Array.isArray(task.department) ? task.department[0] : task.department,
+    assigner: Array.isArray(task.assigner) ? task.assigner[0] : task.assigner,
+    assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
   }))
 
   console.log('✅ [useTasks] Result:', { count, returned: mappedData.length })
@@ -144,7 +164,14 @@ async function fetchTaskById(id: string): Promise<Task | null> {
     .single()
 
   if (error) throw error
-  return data ? { ...data, title: data.name || data.title } : null
+  return data ? { 
+    ...data, 
+    title: data.name || data.title,
+    // ★ FIX: Normalize relations
+    department: Array.isArray(data.department) ? data.department[0] : data.department,
+    assigner: Array.isArray(data.assigner) ? data.assigner[0] : data.assigner,
+    assignee: Array.isArray(data.assignee) ? data.assignee[0] : data.assignee,
+  } : null
 }
 
 async function createTask(input: CreateTaskInput): Promise<Task> {
@@ -180,10 +207,22 @@ async function deleteTask(id: string): Promise<void> {
 }
 
 // ============ HOOKS ============
+
+// ★ FIX: Thêm enabled condition + placeholderData để tránh crash
 export function useTasks(page = 1, pageSize = 10, filter?: TaskFilter) {
   return useQuery({
     queryKey: ['tasks', page, pageSize, filter],
     queryFn: () => fetchTasks(page, pageSize, filter),
+    // ★ FIX: Không fetch khi filter chưa sẵn sàng (undefined = đang loading permissions)
+    enabled: filter !== undefined,
+    // ★ FIX: Đảm bảo luôn có data structure đúng để .map() không crash
+    placeholderData: {
+      data: [],
+      total: 0,
+      page: 1,
+      pageSize: 10,
+      totalPages: 0,
+    },
   })
 }
 

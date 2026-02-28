@@ -7,6 +7,7 @@
 // - ✅ PM3: Thêm Danh sách DA, Tạo DA mới
 // - ✅ PM4: Thêm Gantt tổng hợp
 // - ✅ PM5: Thêm Nguồn lực (Capacity Planning)
+// - ✅ FIX: Ẩn mặc định KHO THÀNH PHẨM, LÝ LỊCH MỦ, THU MUA MỦ
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -92,6 +93,8 @@ interface MenuGroup {
   collapsible?: boolean;
   executiveOnly?: boolean;
   requirePurchaseAccess?: boolean;
+  /** Ẩn hoàn toàn group (cả tiêu đề) khi không có child active */
+  hiddenByDefault?: boolean;
 }
 
 const getMenuGroups = (
@@ -109,73 +112,77 @@ const getMenuGroups = (
     ],
   },
 
-  // ===== KHO THÀNH PHẨM (WMS) — Updated Phase 6 =====
-  {
-    title: 'KHO THÀNH PHẨM',
-    icon: <Warehouse size={18} />,
-    collapsible: true,
-    items: [
-      { path: '/wms', label: 'Dashboard Kho', icon: <BarChart3 size={18} /> },
-      { path: '/wms/materials', label: 'Thành phẩm', icon: <Package size={18} /> },
-      { path: '/wms/warehouses', label: 'Kho & Vị trí', icon: <MapPin size={18} /> },
-      { path: '/wms/stock-in', label: 'Nhập kho TP', icon: <PackagePlus size={18} /> },
-      { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
-      { path: '/wms/qc', label: 'QC & DRC', icon: <FlaskConical size={18} /> },
-      { path: '/wms/alerts', label: 'Cảnh báo', icon: <AlertTriangle size={18} /> },
-      { path: '/wms/stock-check', label: 'Kiểm kê', icon: <ClipboardCheck size={18} /> },
-      { path: '/wms/weighbridge', label: 'Trạm cân', icon: <Scale size={18} /> },
-      { path: '/wms/weighbridge/list', label: 'Lịch sử cân', icon: <History size={18} /> },
-    ],
-  },
+  // ===== KHO THÀNH PHẨM (WMS) — HIDDEN =====
+  // {
+  //   title: 'KHO THÀNH PHẨM',
+  //   icon: <Warehouse size={18} />,
+  //   collapsible: true,
+  //   hiddenByDefault: true,
+  //   items: [
+  //     { path: '/wms', label: 'Dashboard Kho', icon: <BarChart3 size={18} /> },
+  //     { path: '/wms/materials', label: 'Thành phẩm', icon: <Package size={18} /> },
+  //     { path: '/wms/warehouses', label: 'Kho & Vị trí', icon: <MapPin size={18} /> },
+  //     { path: '/wms/stock-in', label: 'Nhập kho TP', icon: <PackagePlus size={18} /> },
+  //     { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
+  //     { path: '/wms/qc', label: 'QC & DRC', icon: <FlaskConical size={18} /> },
+  //     { path: '/wms/alerts', label: 'Cảnh báo', icon: <AlertTriangle size={18} /> },
+  //     { path: '/wms/stock-check', label: 'Kiểm kê', icon: <ClipboardCheck size={18} /> },
+  //     { path: '/wms/weighbridge', label: 'Trạm cân', icon: <Scale size={18} /> },
+  //     { path: '/wms/weighbridge/list', label: 'Lịch sử cân', icon: <History size={18} /> },
+  //   ],
+  // },
 
-  // ===== LÝ LỊCH MỦ — Phase 3.5 =====
-  {
-    title: 'LÝ LỊCH MỦ',
-    icon: <Droplets size={18} />,
-    collapsible: true,
-    items: [
-      { path: '/rubber/suppliers', label: 'NCC Mủ', icon: <Users size={18} /> },
-      { path: '/rubber/intake', label: 'Phiếu nhập mủ', icon: <ClipboardListIcon size={18} /> },
-      { path: '/rubber/daily-report', label: 'Báo cáo ngày', icon: <FileBarChart size={18} /> },
-      { path: '/rubber/debt', label: 'Công nợ NCC mủ', icon: <Wallet size={18} /> },
-    ],
-  },
+  // ===== LÝ LỊCH MỦ — HIDDEN =====
+  // {
+  //   title: 'LÝ LỊCH MỦ',
+  //   icon: <Droplets size={18} />,
+  //   collapsible: true,
+  //   hiddenByDefault: true,
+  //   items: [
+  //     { path: '/rubber/suppliers', label: 'NCC Mủ', icon: <Users size={18} /> },
+  //     { path: '/rubber/intake', label: 'Phiếu nhập mủ', icon: <ClipboardListIcon size={18} /> },
+  //     { path: '/rubber/daily-report', label: 'Báo cáo ngày', icon: <FileBarChart size={18} /> },
+  //     { path: '/rubber/debt', label: 'Công nợ NCC mủ', icon: <Wallet size={18} /> },
+  //   ],
+  // },
 
-  // ===== THU MUA MỦ — Phase 3.6 =====
-  {
-    title: 'THU MUA MỦ',
-    icon: <Scale size={18} />,
-    collapsible: true,
-    items: [
-      { path: '/rubber/dashboard', label: 'Tổng hợp', icon: <PieChart size={18} /> },
-      { path: '/rubber/vn/batches', label: '🇻🇳 Chốt mủ Việt', icon: <ClipboardList size={18} /> },
-      { path: '/rubber/lao/transfers', label: '🇱🇦 Chuyển tiền Lào', icon: <ArrowRightLeft size={18} /> },
-      { path: '/rubber/lao/purchases', label: '🇱🇦 Thu mua Lào', icon: <ShoppingCart size={18} /> },
-      { path: '/rubber/lao/shipments', label: '🚛 Xuất kho Lào→NM', icon: <Truck size={18} /> },
-      { path: '/rubber/profiles', label: 'Lý lịch phiếu', icon: <FileCheck size={18} /> },
-      { path: '/rubber/settlements', label: 'Quyết toán TT', icon: <DollarSign size={18} /> },
-    ],
-  },
+  // ===== THU MUA MỦ — HIDDEN =====
+  // {
+  //   title: 'THU MUA MỦ',
+  //   icon: <Scale size={18} />,
+  //   collapsible: true,
+  //   hiddenByDefault: true,
+  //   items: [
+  //     { path: '/rubber/dashboard', label: 'Tổng hợp', icon: <PieChart size={18} /> },
+  //     { path: '/rubber/vn/batches', label: '🇻🇳 Chốt mủ Việt', icon: <ClipboardList size={18} /> },
+  //     { path: '/rubber/lao/transfers', label: '🇱🇦 Chuyển tiền Lào', icon: <ArrowRightLeft size={18} /> },
+  //     { path: '/rubber/lao/purchases', label: '🇱🇦 Thu mua Lào', icon: <ShoppingCart size={18} /> },
+  //     { path: '/rubber/lao/shipments', label: '🚛 Xuất kho Lào→NM', icon: <Truck size={18} /> },
+  //     { path: '/rubber/profiles', label: 'Lý lịch phiếu', icon: <FileCheck size={18} /> },
+  //     { path: '/rubber/settlements', label: 'Quyết toán TT', icon: <DollarSign size={18} /> },
+  //   ],
+  // },
 
-  // ===== QUẢN LÝ NHÂN SỰ =====
-  {
-    title: 'QUẢN LÝ NHÂN SỰ',
-    icon: <Users size={18} />,
-    collapsible: true,
-    items: [
-      { path: '/departments', label: 'Phòng ban', icon: <Building2 size={18} /> },
-      { path: '/positions', label: 'Chức vụ', icon: <Briefcase size={18} /> },
-      { path: '/employees', label: 'Nhân viên', icon: <Users size={18} /> },
-      { path: '/contract-types', label: 'Loại hợp đồng', icon: <ScrollText size={18} /> },
-      { path: '/contracts', label: 'Hợp đồng', icon: <FileText size={18} /> },
-      { path: '/salary-grades', label: 'Bậc lương', icon: <Wallet size={18} /> },
-      { path: '/payroll-periods', label: 'Kỳ lương', icon: <Calendar size={18} /> },
-      { path: '/payslips', label: 'Phiếu lương', icon: <Receipt size={18} /> },
-      { path: '/performance-criteria', label: 'Tiêu chí đánh giá', icon: <Target size={18} /> },
-      { path: '/performance-reviews', label: 'Đánh giá hiệu suất', icon: <Star size={18} /> },
-      { path: '/leave-types', label: 'Loại nghỉ phép', icon: <Palmtree size={18} /> },
-    ],
-  },
+  // ===== QUẢN LÝ NHÂN SỰ — HIDDEN =====
+  // {
+  //   title: 'QUẢN LÝ NHÂN SỰ',
+  //   icon: <Users size={18} />,
+  //   collapsible: true,
+  //   hiddenByDefault: true,
+  //   items: [
+  //     { path: '/departments', label: 'Phòng ban', icon: <Building2 size={18} /> },
+  //     { path: '/positions', label: 'Chức vụ', icon: <Briefcase size={18} /> },
+  //     { path: '/employees', label: 'Nhân viên', icon: <Users size={18} /> },
+  //     { path: '/contract-types', label: 'Loại hợp đồng', icon: <ScrollText size={18} /> },
+  //     { path: '/contracts', label: 'Hợp đồng', icon: <FileText size={18} /> },
+  //     { path: '/salary-grades', label: 'Bậc lương', icon: <Wallet size={18} /> },
+  //     { path: '/payroll-periods', label: 'Kỳ lương', icon: <Calendar size={18} /> },
+  //     { path: '/payslips', label: 'Phiếu lương', icon: <Receipt size={18} /> },
+  //     { path: '/performance-criteria', label: 'Tiêu chí đánh giá', icon: <Target size={18} /> },
+  //     { path: '/performance-reviews', label: 'Đánh giá hiệu suất', icon: <Star size={18} /> },
+  //     { path: '/leave-types', label: 'Loại nghỉ phép', icon: <Palmtree size={18} /> },
+  //   ],
+  // },
 
   // ===== CHẤM CÔNG =====
   {
@@ -242,24 +249,24 @@ const getMenuGroups = (
     ],
   },
 
-  // ===== MUA HÀNG — TẠM MỞ CHO TẤT CẢ XEM =====
-  {
-    title: 'QUẢN LÝ ĐƠN HÀNG',
-    icon: <ShoppingCart size={18} />,
-    collapsible: true,
-    items: [
-      { path: '/purchasing/suppliers', label: 'Nhà cung cấp', icon: <Building2 size={18} /> },
-      { path: '/purchasing/categories', label: 'Nhóm vật tư', icon: <Layers size={18} /> },
-      { path: '/purchasing/types', label: 'Loại vật tư', icon: <Tag size={18} /> },
-      { path: '/purchasing/units', label: 'Đơn vị tính', icon: <Scale size={18} /> },
-      { path: '/purchasing/materials', label: 'Vật tư', icon: <Package size={18} /> },
-      { path: '/purchasing/variant-attributes', label: 'Thuộc tính biến thể', icon: <Boxes size={18} /> },
-      { path: '/purchasing/orders', label: 'Đơn đặt hàng', icon: <ShoppingCart size={18} /> },
-      { path: '/purchasing/debt', label: 'Công nợ NCC', icon: <DollarSign size={18} /> },
-      { path: '/purchasing/payments', label: 'Lịch sử thanh toán', icon: <CreditCard size={18} /> },
-      { path: '/purchasing/reports', label: 'Báo cáo mua hàng', icon: <TrendingUp size={18} /> },
-    ],
-  },
+  // ===== MUA HÀNG — HIDDEN =====
+  // {
+  //   title: 'QUẢN LÝ ĐƠN HÀNG',
+  //   icon: <ShoppingCart size={18} />,
+  //   collapsible: true,
+  //   items: [
+  //     { path: '/purchasing/suppliers', label: 'Nhà cung cấp', icon: <Building2 size={18} /> },
+  //     { path: '/purchasing/categories', label: 'Nhóm vật tư', icon: <Layers size={18} /> },
+  //     { path: '/purchasing/types', label: 'Loại vật tư', icon: <Tag size={18} /> },
+  //     { path: '/purchasing/units', label: 'Đơn vị tính', icon: <Scale size={18} /> },
+  //     { path: '/purchasing/materials', label: 'Vật tư', icon: <Package size={18} /> },
+  //     { path: '/purchasing/variant-attributes', label: 'Thuộc tính biến thể', icon: <Boxes size={18} /> },
+  //     { path: '/purchasing/orders', label: 'Đơn đặt hàng', icon: <ShoppingCart size={18} /> },
+  //     { path: '/purchasing/debt', label: 'Công nợ NCC', icon: <DollarSign size={18} /> },
+  //     { path: '/purchasing/payments', label: 'Lịch sử thanh toán', icon: <CreditCard size={18} /> },
+  //     { path: '/purchasing/reports', label: 'Báo cáo mua hàng', icon: <TrendingUp size={18} /> },
+  //   ],
+  // },
 
   // ===== QUẢN TRỊ =====
   {
@@ -296,12 +303,13 @@ export function Sidebar() {
   const location = useLocation();
   
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  // ✅ FIX: Ẩn mặc định KHO THÀNH PHẨM, LÝ LỊCH MỦ, THU MUA MỦ, QUẢN LÝ NHÂN SỰ, QUẢN LÝ ĐƠN HÀNG
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+    'KHO THÀNH PHẨM': true,
+    'LÝ LỊCH MỦ': true,
+    'THU MUA MỦ': true,
     'QUẢN LÝ NHÂN SỰ': true,
     'CHẤM CÔNG': false,
-    'KHO THÀNH PHẨM': false,
-    'LÝ LỊCH MỦ': false,
-    'THU MUA MỦ': false,
     'QUẢN LÝ ĐƠN HÀNG': true,
     'QUẢN LÝ DỰ ÁN': false,
   });
@@ -394,6 +402,13 @@ export function Sidebar() {
   const isGroupVisible = (group: MenuGroup): boolean => {
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
+    // ✅ Ẩn hoàn toàn group (cả tiêu đề) nếu hiddenByDefault và không có child active
+    if (group.hiddenByDefault) {
+      const hasActiveChild = group.items.some(item => 
+        location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+      );
+      if (!hasActiveChild) return false;
+    }
     return true;
   };
 

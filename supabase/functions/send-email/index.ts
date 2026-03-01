@@ -96,6 +96,7 @@ async function sendEmail(
 // ══════════════════════════════════════════════════════════════════════════════
 
 interface TaskReportData {
+  month_label: string
   total_tasks: number
   tasks_by_status: Record<string, number>
   tasks_by_priority: Record<string, number>
@@ -106,6 +107,8 @@ interface TaskReportData {
   pending_approvals: number
   approved_today: number
   rejected_today: number
+  approved_month: number
+  rejected_month: number
   departments: Array<{
     name: string
     total: number
@@ -188,17 +191,35 @@ interface ProjectReportData {
 // ══════════════════════════════════════════════════════════════════════════════
 
 async function fetchTaskData(supabase: any): Promise<TaskReportData> {
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
   const todayStart = `${today}T00:00:00+07:00`
   const todayEnd = `${today}T23:59:59+07:00`
 
-  // 1. Tổng quan tasks (không tính draft)
+  // ★ Tính đầu tháng & cuối tháng hiện tại (múi giờ VN)
+  const year = now.getFullYear()
+  const month = now.getMonth() // 0-indexed
+  const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00+07:00`
+  const lastDay = new Date(year, month + 1, 0).getDate() // ngày cuối tháng
+  const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}T23:59:59+07:00`
+  const monthLabel = `Tháng ${month + 1}/${year}`
+
+  // 1. Tổng quan tasks TRONG THÁNG (created hoặc due_date trong tháng, không tính draft)
   const { data: allTasks } = await supabase
     .from('tasks')
     .select('id, status, priority, department_id, due_date, created_at, evaluation_status')
     .neq('status', 'draft')
+    .or(`created_at.gte.${monthStart},due_date.gte.${monthStart}`)
+    .or(`created_at.lte.${monthEnd},due_date.lte.${monthEnd}`)
 
-  const tasks = allTasks || []
+  // Filter chính xác: task thuộc tháng nếu created_at HOẶC due_date nằm trong tháng
+  const tasks = (allTasks || []).filter((t: any) => {
+    const created = t.created_at ? new Date(t.created_at) : null
+    const due = t.due_date ? new Date(t.due_date) : null
+    const ms = new Date(monthStart)
+    const me = new Date(monthEnd)
+    return (created && created >= ms && created <= me) || (due && due >= ms && due <= me)
+  })
 
   const tasks_by_status: Record<string, number> = {}
   const tasks_by_priority: Record<string, number> = {}
@@ -271,11 +292,12 @@ async function fetchTaskData(supabase: any): Promise<TaskReportData> {
     })
   }
 
-  // 4. Overdue details
+  // 4. Overdue details (chỉ task có due_date trong tháng hiện tại)
   const { data: overdueData } = await supabase
     .from('tasks')
     .select(`id, code, name, priority, due_date, departments!tasks_department_id_fkey(name)`)
     .lt('due_date', today)
+    .gte('due_date', monthStart)
     .not('status', 'in', '("finished","cancelled")')
     .neq('status', 'draft')
     .order('due_date', { ascending: true })
@@ -331,6 +353,21 @@ async function fetchTaskData(supabase: any): Promise<TaskReportData> {
     .gte('approved_at', todayStart)
     .lte('approved_at', todayEnd)
 
+  // 6b. Approved/Rejected trong tháng
+  const { count: approvedMonth } = await supabase
+    .from('task_approvals')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'approved')
+    .gte('approved_at', monthStart)
+    .lte('approved_at', monthEnd)
+
+  const { count: rejectedMonth } = await supabase
+    .from('task_approvals')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'rejected')
+    .gte('approved_at', monthStart)
+    .lte('approved_at', monthEnd)
+
   // 7. Theo phòng ban
   const { data: departments } = await supabase.from('departments').select('id, name').order('name')
 
@@ -348,6 +385,7 @@ async function fetchTaskData(supabase: any): Promise<TaskReportData> {
   }
 
   return {
+    month_label: monthLabel,
     total_tasks: tasks.length,
     tasks_by_status,
     tasks_by_priority,
@@ -358,6 +396,8 @@ async function fetchTaskData(supabase: any): Promise<TaskReportData> {
     pending_approvals: pendingApprovals || 0,
     approved_today: approvedToday || 0,
     rejected_today: rejectedToday || 0,
+    approved_month: approvedMonth || 0,
+    rejected_month: rejectedMonth || 0,
     departments: deptStats,
     overdue_details,
     new_today_details: newTodayDetails,
@@ -740,7 +780,7 @@ function buildEmailHTML(
       
       <p style="color:#374151;font-size:14px;margin:0 0 20px;">
         Kính gửi <strong>${recipientName}</strong>,<br>
-        Dưới đây là báo cáo tổng hợp <strong>Công việc</strong> và <strong>Dự án</strong> trong ngày:
+        Dưới đây là báo cáo tổng hợp <strong>Công việc (${taskData.month_label})</strong> và <strong>Dự án</strong>:
       </p>
 
       <!-- ═══════════════════════════════════════════════════════ -->
@@ -748,7 +788,7 @@ function buildEmailHTML(
       <!-- ═══════════════════════════════════════════════════════ -->
       
       <div style="background:#1B4D3E;color:#fff;padding:10px 16px;border-radius:8px 8px 0 0;margin-top:8px;">
-        <h2 style="margin:0;font-size:16px;">📋 PHẦN 1: CÔNG VIỆC</h2>
+        <h2 style="margin:0;font-size:16px;">📋 PHẦN 1: CÔNG VIỆC — ${taskData.month_label}</h2>
       </div>
       <div style="border:1px solid #E5E7EB;border-top:none;border-radius:0 0 8px 8px;padding:20px;margin-bottom:24px;">
 
@@ -758,7 +798,7 @@ function buildEmailHTML(
             <td width="25%" style="padding:4px;">
               <div style="background:#EFF6FF;border-radius:10px;padding:14px;text-align:center;">
                 <div style="font-size:26px;font-weight:700;color:#1D4ED8;">${taskData.total_tasks}</div>
-                <div style="font-size:11px;color:#6B7280;margin-top:4px;">Tổng CV</div>
+                <div style="font-size:11px;color:#6B7280;margin-top:4px;">CV trong tháng</div>
               </div>
             </td>
             <td width="25%" style="padding:4px;">
@@ -785,12 +825,18 @@ function buildEmailHTML(
         <!-- Đánh giá & Phê duyệt -->
         <div style="background:#F8FAFC;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
           <h3 style="margin:0 0 8px;font-size:13px;color:#1B4D3E;">📋 Đánh giá & Phê duyệt</h3>
-          <table width="100%"><tr>
-            <td width="25%" style="font-size:12px;color:#6B7280;">Chờ tự ĐG: <strong style="color:#D97706;">${taskData.pending_evaluations}</strong></td>
-            <td width="25%" style="font-size:12px;color:#6B7280;">Chờ duyệt: <strong style="color:#2563EB;">${taskData.pending_approvals}</strong></td>
-            <td width="25%" style="font-size:12px;color:#6B7280;">Đã duyệt: <strong style="color:#16A34A;">${taskData.approved_today}</strong></td>
-            <td width="25%" style="font-size:12px;color:#6B7280;">Từ chối: <strong style="color:#DC2626;">${taskData.rejected_today}</strong></td>
-          </tr></table>
+          <table width="100%">
+            <tr>
+              <td width="25%" style="font-size:12px;color:#6B7280;">Chờ tự ĐG: <strong style="color:#D97706;">${taskData.pending_evaluations}</strong></td>
+              <td width="25%" style="font-size:12px;color:#6B7280;">Chờ duyệt: <strong style="color:#2563EB;">${taskData.pending_approvals}</strong></td>
+              <td width="25%" style="font-size:12px;color:#6B7280;">Đã duyệt (tháng): <strong style="color:#16A34A;">${taskData.approved_month}</strong></td>
+              <td width="25%" style="font-size:12px;color:#6B7280;">Từ chối (tháng): <strong style="color:#DC2626;">${taskData.rejected_month}</strong></td>
+            </tr>
+            <tr>
+              <td colspan="2" style="font-size:11px;color:#9CA3AF;padding-top:6px;">Hôm nay: duyệt ${taskData.approved_today} | từ chối ${taskData.rejected_today}</td>
+              <td colspan="2"></td>
+            </tr>
+          </table>
         </div>
 
         <!-- Theo phòng ban -->

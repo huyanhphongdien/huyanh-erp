@@ -8,6 +8,7 @@
 // - ✅ PM4: Thêm Gantt tổng hợp
 // - ✅ PM5: Thêm Nguồn lực (Capacity Planning)
 // - ✅ FIX: Ẩn mặc định KHO THÀNH PHẨM, LÝ LỊCH MỦ, THU MUA MỦ
+// - ✅ FIX: BÁO CÁO hiển thị cho Trưởng phòng/Phó phòng (managerOnly)
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -278,13 +279,13 @@ const getMenuGroups = (
   },
 
   // ===== BÁO CÁO =====
+  // ✅ FIX: Đổi từ executiveOnly → managerOnly để Trưởng phòng/Phó phòng cũng thấy
   {
     title: 'BÁO CÁO',
     icon: <BarChart3 size={18} />,
-    executiveOnly: true,
     items: [
-      { path: '/reports/tasks', label: 'Báo cáo công việc', icon: <FileBarChart size={18} />, executiveOnly: true },
-      { path: '/purchasing/reports', label: 'Báo cáo mua hàng', icon: <TrendingUp size={18} />, executiveOnly: true },
+      { path: '/reports/tasks', label: 'Báo cáo công việc', icon: <FileBarChart size={18} />, managerOnly: true },
+      { path: '/purchasing/reports', label: 'Báo cáo mua hàng', icon: <TrendingUp size={18} />, managerOnly: true },
     ],
   },
 

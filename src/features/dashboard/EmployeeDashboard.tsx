@@ -30,6 +30,7 @@ import {
   Timer,
   Calendar,
   LogIn,
+  FolderKanban,
 } from 'lucide-react'
 
 
@@ -46,6 +47,7 @@ interface DashboardStats {
   remainingLeaveDays: number
   pendingLeaveRequests: number
   recentTasks: RecentTask[]
+  myProjectCount: number
 }
 
 interface RecentTask {
@@ -178,6 +180,7 @@ export function EmployeeDashboard() {
     remainingLeaveDays: 12,
     pendingLeaveRequests: 0,
     recentTasks: [],
+    myProjectCount: 0,
   })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -257,6 +260,17 @@ export function EmployeeDashboard() {
           priority: (t.task as any).priority || 'medium',
         }))
 
+      // ✅ Đếm dự án nhân viên tham gia
+      let myProjectCount = 0
+      try {
+        const { count } = await supabase
+          .from('project_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('employee_id', employeeId)
+          .eq('is_active', true)
+        myProjectCount = count || 0
+      } catch {}
+
       setStats({
         totalTasks: totalTasks || 0,
         pendingEvaluation: pendingEvalTasks?.length || 0,
@@ -265,6 +279,7 @@ export function EmployeeDashboard() {
         remainingLeaveDays: remainingDays,
         pendingLeaveRequests: pendingLeave || 0,
         recentTasks,
+        myProjectCount,
       })
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
@@ -399,6 +414,16 @@ export function EmployeeDashboard() {
             color="pink"
             link="/payslips"
           />
+          {stats.myProjectCount > 0 && (
+            <StatCard
+              title="Dự án"
+              value={stats.myProjectCount}
+              subtitle="đang tham gia"
+              icon={<FolderKanban size={24} />}
+              color="indigo"
+              link="/projects/list"
+            />
+          )}
         </div>
 
         {/* ══════════ RECENT TASKS — responsive ══════════ */}
@@ -493,6 +518,13 @@ export function EmployeeDashboard() {
             >
               <Wallet size={22} />
               <span className="text-xs sm:text-sm font-medium">Phiếu lương</span>
+            </Link>
+            <Link
+              to="/projects/list"
+              className="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 active:bg-indigo-200 transition-colors"
+            >
+              <FolderKanban size={22} />
+              <span className="text-xs sm:text-sm font-medium">Dự án</span>
             </Link>
           </div>
         </div>

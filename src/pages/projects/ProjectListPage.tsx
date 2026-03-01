@@ -1,9 +1,12 @@
 // ============================================================================
 // FILE: src/pages/projects/ProjectListPage.tsx
 // MODULE: Quản lý Dự án — Huy Anh Rubber ERP
-// PHASE: PM3 — Bước 3.4 (Updated: Real data from Supabase)
+// PHASE: PM3 + PM10 (Quick Approval on List)
 // ============================================================================
-// ✅ UPDATED: All mock data replaced with real Supabase queries
+// ✅ PM10: Thêm nút phê duyệt nhanh trên danh sách dự án
+//    - BGĐ (level 1-3) thấy nút "Duyệt" bên cạnh badge "Lập KH"
+//    - Click → StatusConfirmDialog → Phê duyệt + ghi log
+//    - Hoạt động trên cả Card view và Table view
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from 'react'
@@ -32,6 +35,15 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+
+// ✅ PM10 imports
+import { useAuthStore } from '../../stores/authStore'
+import StatusConfirmDialog from '../../components/project/StatusConfirmDialog'
+import {
+  getProjectPermissions,
+  type ProjectUser,
+  type ProjectForPermission,
+} from '../../utils/projectPermissions'
 
 // ============================================================================
 // TYPES
@@ -65,6 +77,7 @@ interface ProjectListItem {
   budget_currency: string
   owner_id?: string
   owner?: { id: string; full_name: string }
+  sponsor_id?: string
   department?: { id: string; name: string }
   tags?: string[]
   created_at: string
@@ -207,7 +220,6 @@ function getProgressColor(pct: number, status: ProjectStatus): string {
   return 'bg-gray-300'
 }
 
-/** Parse sort key → { column, ascending } for Supabase .order() */
 function parseSortKey(key: string): { column: string; ascending: boolean } {
   if (key === 'created_at_desc')   return { column: 'created_at', ascending: false }
   if (key === 'planned_end_asc')   return { column: 'planned_end', ascending: true }
@@ -285,13 +297,86 @@ const ProgressBar: React.FC<{ pct: number; status: ProjectStatus; showLabel?: bo
 }
 
 // ============================================================================
+// ✅ PM10: QUICK ACTION BUTTON
+// ============================================================================
+// Hiển thị nút hành động nhanh bên cạnh badge trạng thái:
+//   - "Lập KH" → nút "Duyệt" (chỉ BGĐ level 1-3)
+//   - "Đã duyệt" → nút "Bắt đầu" (Owner + BGĐ)
+// ============================================================================
+
+const QuickActionButton: React.FC<{
+  project: ProjectListItem
+  projectUser: ProjectUser
+  onActionClick: (project: ProjectListItem, targetStatus: ProjectStatus) => void
+}> = ({ project, projectUser, onActionClick }) => {
+  const permissions = getProjectPermissions(projectUser, {
+    id: project.id,
+    status: project.status,
+    owner_id: project.owner_id || project.owner?.id || null,
+    sponsor_id: project.sponsor_id || null,
+  })
+
+  // Nút "Duyệt" — planning → approved (chỉ BGĐ)
+  if (permissions.canApprove) {
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onActionClick(project, 'approved')
+        }}
+        className="
+          ml-1.5 inline-flex items-center gap-1
+          px-2 py-1 rounded-lg
+          bg-indigo-50 text-indigo-600 border border-indigo-200
+          text-[11px] font-semibold
+          active:scale-[0.93] active:bg-indigo-100
+          transition-transform
+        "
+        title="Phê duyệt dự án"
+      >
+        <CheckCircle2 className="w-3 h-3" />
+        Duyệt
+      </button>
+    )
+  }
+
+  // Nút "Bắt đầu" — approved → in_progress (Owner + BGĐ)
+  if (project.status === 'approved' && permissions.allowedTransitions.includes('in_progress')) {
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onActionClick(project, 'in_progress')
+        }}
+        className="
+          ml-1.5 inline-flex items-center gap-1
+          px-2 py-1 rounded-lg
+          bg-emerald-50 text-emerald-700 border border-emerald-200
+          text-[11px] font-semibold
+          active:scale-[0.93] active:bg-emerald-100
+          transition-transform
+        "
+        title="Bắt đầu thực hiện dự án"
+      >
+        <BarChart3 className="w-3 h-3" />
+        Bắt đầu
+      </button>
+    )
+  }
+
+  return null
+}
+
+// ============================================================================
 // PROJECT CARD — Mobile / Card view
 // ============================================================================
 
 const ProjectCard: React.FC<{
   project: ProjectListItem
   onTap: (id: string) => void
-}> = ({ project, onTap }) => {
+  projectUser: ProjectUser
+  onActionClick: (project: ProjectListItem, targetStatus: ProjectStatus) => void
+}> = ({ project, onTap, projectUser, onActionClick }) => {
   const priorityConf = PRIORITY_CONFIG[project.priority]
   const deadline = getDaysRemaining(project.planned_end)
 
@@ -320,7 +405,15 @@ const ProjectCard: React.FC<{
             >
               {project.code}
             </span>
-            <StatusBadge status={project.status} />
+            {/* ✅ PM10: Status badge + nút Duyệt nhanh */}
+            <div className="flex items-center gap-1">
+              <StatusBadge status={project.status} />
+              <QuickActionButton
+                project={project}
+                projectUser={projectUser}
+                onActionClick={onActionClick}
+              />
+            </div>
           </div>
           <h3 className="text-[15px] font-semibold text-gray-900 leading-snug line-clamp-2 mb-2">
             {project.name}
@@ -366,7 +459,9 @@ const ProjectCard: React.FC<{
 const ProjectTableRow: React.FC<{
   project: ProjectListItem
   onTap: (id: string) => void
-}> = ({ project, onTap }) => {
+  projectUser: ProjectUser
+  onActionClick: (project: ProjectListItem, targetStatus: ProjectStatus) => void
+}> = ({ project, onTap, projectUser, onActionClick }) => {
   const deadline = getDaysRemaining(project.planned_end)
 
   return (
@@ -400,8 +495,16 @@ const ProjectTableRow: React.FC<{
       <td className="px-4 py-3 min-w-[160px]">
         <ProgressBar pct={project.progress_pct} status={project.status} />
       </td>
+      {/* ✅ PM10: Cột trạng thái + nút Duyệt nhanh */}
       <td className="px-4 py-3">
-        <StatusBadge status={project.status} />
+        <div className="flex items-center gap-1">
+          <StatusBadge status={project.status} />
+          <QuickActionButton
+            project={project}
+            projectUser={projectUser}
+            onActionClick={onActionClick}
+          />
+        </div>
       </td>
       <td className="px-4 py-3">
         <PriorityBadge priority={project.priority} />
@@ -429,6 +532,7 @@ const ProjectTableRow: React.FC<{
 
 export const ProjectListPage: React.FC = () => {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   // State
   const [projects, setProjects] = useState<ProjectListItem[]>([])
@@ -443,12 +547,26 @@ export const ProjectListPage: React.FC = () => {
     page: 1, pageSize: 20, total: 0, totalPages: 0,
   })
 
-  // ✅ Summary counts — loaded from Supabase
+  // Summary counts
   const [allCount, setAllCount] = useState(0)
   const [runningCount, setRunningCount] = useState(0)
   const [overdueCount, setOverdueCount] = useState(0)
 
-  // ---- Responsive: auto switch to table on desktop ----
+  // ✅ PM10: Quick approval dialog state
+  const [approvalDialog, setApprovalDialog] = useState<{
+    isOpen: boolean
+    project: ProjectListItem | null
+    toStatus: ProjectStatus
+  }>({ isOpen: false, project: null, toStatus: 'approved' })
+
+  // ✅ PM10: Build projectUser from authStore
+  const projectUser: ProjectUser = {
+    employee_id: user?.employee_id || null,
+    position_level: user?.position_level || null,
+    role: (user?.role as 'admin' | 'manager' | 'employee') || 'employee',
+  }
+
+  // Responsive: auto switch to table on desktop
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
     const handler = (e: MediaQueryListEvent | MediaQueryList) => {
@@ -466,7 +584,6 @@ export const ProjectListPage: React.FC = () => {
   const loadProjects = useCallback(async () => {
     setLoading(true)
     try {
-      // Build query — simple select without FK hint joins to avoid constraint name issues
       let query = supabase
         .from('projects')
         .select(`
@@ -475,33 +592,28 @@ export const ProjectListPage: React.FC = () => {
           planned_start, planned_end, actual_start, actual_end,
           status, priority, progress_pct,
           budget_planned, budget_currency,
-          owner_id,
+          owner_id, sponsor_id,
           department_id,
           tags,
           created_at, updated_at
         `)
 
-      // Filter by status tab
       if (activeTab !== 'all') {
         query = query.eq('status', activeTab)
       }
 
-      // Filter by priority
       if (priorityFilter !== 'all') {
         query = query.eq('priority', priorityFilter)
       }
 
-      // Search — use ilike for text search
       if (searchQuery.trim()) {
         const q = `%${searchQuery.trim()}%`
         query = query.or(`name.ilike.${q},code.ilike.${q}`)
       }
 
-      // Sort
       const { column, ascending } = parseSortKey(sortKey)
       query = query.order(column, { ascending, nullsFirst: false })
 
-      // Execute
       const { data, error, count } = await query
 
       if (error) {
@@ -509,7 +621,6 @@ export const ProjectListPage: React.FC = () => {
         throw error
       }
 
-      // Load lookup tables for client-side join
       const [catRes, empRes, deptRes] = await Promise.all([
         supabase.from('project_categories').select('id, name, color'),
         supabase.from('employees').select('id, full_name'),
@@ -520,7 +631,6 @@ export const ProjectListPage: React.FC = () => {
       const empMap = new Map((empRes.data || []).map((e: any) => [e.id, { id: e.id, full_name: e.full_name }]))
       const deptMap = new Map((deptRes.data || []).map((d: any) => [d.id, { id: d.id, name: d.name }]))
 
-      // Normalize with client-side joins
       const normalized: ProjectListItem[] = (data || []).map((p: any) => ({
         ...p,
         progress_pct: Number(p.progress_pct) || 0,
@@ -556,18 +666,15 @@ export const ProjectListPage: React.FC = () => {
   useEffect(() => {
     const loadCounts = async () => {
       try {
-        // Total count
         const { count: total } = await supabase
           .from('projects')
           .select('id', { count: 'exact', head: true })
 
-        // Running count
         const { count: running } = await supabase
           .from('projects')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'in_progress')
 
-        // Overdue count: planned_end < today AND status NOT in completed/cancelled
         const today = new Date().toISOString().split('T')[0]
         const { count: overdue } = await supabase
           .from('projects')
@@ -583,7 +690,79 @@ export const ProjectListPage: React.FC = () => {
       }
     }
     loadCounts()
-  }, [projects]) // Re-count when projects change
+  }, [projects])
+
+  // ========================================================================
+  // ✅ PM10: QUICK APPROVAL HANDLERS
+  // ========================================================================
+
+  const handleQuickAction = (project: ProjectListItem, targetStatus: ProjectStatus) => {
+    setApprovalDialog({
+      isOpen: true,
+      project,
+      toStatus: targetStatus,
+    })
+  }
+
+  const handleApprovalConfirm = async (reason: string, startImmediately?: boolean) => {
+    const proj = approvalDialog.project
+    if (!proj) return
+
+    // Xác định status cuối cùng: nếu phê duyệt + tick "Bắt đầu luôn" → in_progress
+    const finalStatus = approvalDialog.toStatus === 'approved' && startImmediately
+      ? 'in_progress'
+      : approvalDialog.toStatus
+
+    try {
+      const updatePayload: Record<string, any> = {
+        status: finalStatus,
+        updated_at: new Date().toISOString(),
+      }
+
+      // Ghi thông tin phê duyệt (luôn ghi khi flow là approve)
+      if (approvalDialog.toStatus === 'approved' && user?.employee_id) {
+        updatePayload.approved_by = user.employee_id
+        updatePayload.approved_at = new Date().toISOString()
+      }
+
+      // Ghi actual_start khi bắt đầu thực hiện
+      if (finalStatus === 'in_progress') {
+        updatePayload.actual_start = new Date().toISOString().split('T')[0]
+      }
+
+      const { error } = await supabase.from('projects')
+        .update(updatePayload)
+        .eq('id', proj.id)
+
+      if (error) throw error
+
+      // Ghi activity log
+      const actionLabel = startImmediately && approvalDialog.toStatus === 'approved'
+        ? 'Phê duyệt và bắt đầu thực hiện dự án'
+        : approvalDialog.toStatus === 'approved'
+        ? 'Phê duyệt dự án'
+        : approvalDialog.toStatus === 'in_progress'
+        ? 'Bắt đầu thực hiện dự án'
+        : `Chuyển trạng thái dự án sang ${approvalDialog.toStatus}`
+
+      await supabase.from('project_activities').insert({
+        project_id: proj.id,
+        actor_id: user?.employee_id || null,
+        action: 'status_changed',
+        description: `${actionLabel}${reason ? '. Ghi chú: ' + reason : ''}`,
+      })
+
+      // Cập nhật danh sách local — đổi status ngay
+      setProjects(prev => prev.map(p =>
+        p.id === proj.id ? { ...p, status: finalStatus as ProjectStatus } : p
+      ))
+
+      setApprovalDialog({ isOpen: false, project: null, toStatus: 'approved' })
+    } catch (e: any) {
+      console.error('Quick approval failed:', e)
+      throw new Error(e?.message || 'Phê duyệt thất bại')
+    }
+  }
 
   // ---- Handlers ----
   const handleProjectTap = (id: string) => {
@@ -626,7 +805,6 @@ export const ProjectListPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* View mode toggle — desktop */}
               <div className="hidden lg:flex items-center bg-gray-100 rounded-lg p-0.5">
                 <button
                   onClick={() => setViewMode('card')}
@@ -646,7 +824,6 @@ export const ProjectListPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Create button */}
               <button
                 onClick={handleCreateNew}
                 className="
@@ -690,7 +867,6 @@ export const ProjectListPage: React.FC = () => {
               )}
             </div>
 
-            {/* Filter toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`
@@ -705,7 +881,7 @@ export const ProjectListPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Status tabs — horizontal scroll */}
+          {/* Status tabs */}
           <div className="flex gap-1 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-hide">
             {STATUS_TABS.map(tab => {
               const isActive = activeTab === tab.key
@@ -732,17 +908,13 @@ export const ProjectListPage: React.FC = () => {
             })}
           </div>
 
-          {/* Expandable filters panel */}
+          {/* Expandable filters */}
           {showFilters && (
             <div className="pb-3 flex flex-wrap gap-2">
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="
-                  px-3 py-2 text-[13px] bg-white rounded-lg
-                  border border-gray-200 outline-none
-                  focus:border-[#2D8B6E]
-                "
+                className="px-3 py-2 text-[13px] bg-white rounded-lg border border-gray-200 outline-none focus:border-[#2D8B6E]"
               >
                 <option value="all">Tất cả ưu tiên</option>
                 <option value="critical">Khẩn cấp</option>
@@ -754,11 +926,7 @@ export const ProjectListPage: React.FC = () => {
               <select
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value)}
-                className="
-                  px-3 py-2 text-[13px] bg-white rounded-lg
-                  border border-gray-200 outline-none
-                  focus:border-[#2D8B6E]
-                "
+                className="px-3 py-2 text-[13px] bg-white rounded-lg border border-gray-200 outline-none focus:border-[#2D8B6E]"
               >
                 {SORT_OPTIONS.map(opt => (
                   <option key={opt.key} value={opt.key}>{opt.label}</option>
@@ -833,6 +1001,8 @@ export const ProjectListPage: React.FC = () => {
                 key={project.id}
                 project={project}
                 onTap={handleProjectTap}
+                projectUser={projectUser}
+                onActionClick={handleQuickAction}
               />
             ))}
           </div>
@@ -845,27 +1015,13 @@ export const ProjectListPage: React.FC = () => {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50/80 border-b border-gray-100">
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                      Mã DA
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                      Tên dự án
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                      PM
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider min-w-[160px]">
-                      Tiến độ
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                      Trạng thái
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                      Ưu tiên
-                    </th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                      Deadline
-                    </th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Mã DA</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tên dự án</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">PM</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider min-w-[160px]">Tiến độ</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Ưu tiên</th>
+                    <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deadline</th>
                     <th className="w-8" />
                   </tr>
                 </thead>
@@ -875,6 +1031,8 @@ export const ProjectListPage: React.FC = () => {
                       key={project.id}
                       project={project}
                       onTap={handleProjectTap}
+                      projectUser={projectUser}
+                      onActionClick={handleQuickAction}
                     />
                   ))}
                 </tbody>
@@ -883,21 +1041,15 @@ export const ProjectListPage: React.FC = () => {
 
             {pagination.totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <span className="text-[13px] text-gray-500">
-                  {pagination.total} dự án
-                </span>
+                <span className="text-[13px] text-gray-500">{pagination.total} dự án</span>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(p => (
                     <button
                       key={p}
                       onClick={() => setPagination(prev => ({ ...prev, page: p }))}
-                      className={`
-                        w-8 h-8 rounded-lg text-[13px] font-medium transition-colors
-                        ${p === pagination.page
-                          ? 'bg-[#1B4D3E] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                        }
-                      `}
+                      className={`w-8 h-8 rounded-lg text-[13px] font-medium transition-colors ${
+                        p === pagination.page ? 'bg-[#1B4D3E] text-white' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
                     >
                       {p}
                     </button>
@@ -930,6 +1082,18 @@ export const ProjectListPage: React.FC = () => {
       >
         <Plus className="w-6 h-6" />
       </button>
+
+      {/* ✅ PM10: Quick Approval Confirm Dialog */}
+      {approvalDialog.project && (
+        <StatusConfirmDialog
+          isOpen={approvalDialog.isOpen}
+          fromStatus={approvalDialog.project.status}
+          toStatus={approvalDialog.toStatus}
+          projectName={approvalDialog.project.name}
+          onConfirm={handleApprovalConfirm}
+          onCancel={() => setApprovalDialog({ isOpen: false, project: null, toStatus: 'approved' })}
+        />
+      )}
     </div>
   )
 }

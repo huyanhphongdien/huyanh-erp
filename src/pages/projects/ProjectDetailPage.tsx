@@ -1,7 +1,7 @@
 // ============================================================================
 // FILE: src/pages/projects/ProjectDetailPage.tsx
 // MODULE: Quản lý Dự án — Huy Anh Rubber ERP
-// PHASE: PM3 — Bước 3.6 + PM4 (Gantt) + PM5 (Resources) + PM6 (Tasks) + PM7 (Risks) + PM8 (Docs) + PM9 (Reports)
+// PHASE: PM3 — Bước 3.6 + PM4 (Gantt) + PM5 (Resources) + PM6 (Tasks) + PM7 (Risks) + PM8 (Docs) + PM9 (Reports) + PM10 (Activity)
 // ============================================================================
 // Hub chính dự án: Header + Tab navigation
 // Tab Tổng quan: Summary cards, milestones mini, recent activities
@@ -12,7 +12,8 @@
 // Tab Rủi ro: Risk register + Issue tracker — PM7 integrated
 // Tab Tài liệu: Document management — PM8 integrated
 // Tab Báo cáo: Quick reports + Export PDF — PM9 integrated
-// Các tab khác: Placeholder cho PM10-PM11
+// Tab Hoạt động: Rich activity timeline — PM10 integrated
+// Các tab khác: Placeholder cho PM11
 // Design: Industrial Rubber Theme, mobile-first
 // ============================================================================
 
@@ -91,10 +92,19 @@ import ProjectRiskPage from './ProjectRiskPage'
 // PM8 — Document imports
 import ProjectDocsTab from '../../components/project/ProjectDocsTab'
 
+// PM9 — Reports Tab (hoàn chỉnh)
+import ProjectReportsTab from '../../components/project/ProjectReportsTab'
+
 // PM9 — Reports & Health imports
 import { useAuthStore } from '../../stores/authStore'
 import { projectHealthService, type HealthResult } from '../../services/project/projectHealthService'
 import { exportStatusReportPDF, type PDFReportData } from '../../utils/exportProjectPDF'
+
+// PM10 — Activity tab (rich timeline)
+import ProjectActivityTab from '../../components/project/ProjectActivityTab'
+
+// ✅ AUTO-PROGRESS: Import service
+import { projectProgressService, type ProgressMode } from '../../services/project/projectProgressService'
 
 // ============================================================================
 // TYPES
@@ -118,6 +128,7 @@ interface Project {
   status: ProjectStatus
   priority: ProjectPriority
   progress_pct: number
+  progress_mode?: ProgressMode  // ✅ AUTO-PROGRESS
   budget_planned: number
   budget_actual: number
   budget_currency: string
@@ -139,6 +150,7 @@ interface Phase {
   planned_end?: string
   status: PhaseStatus
   progress_pct: number
+  progress_mode?: ProgressMode  // ✅ AUTO-PROGRESS
   color?: string
   milestones?: MilestoneItem[]
 }
@@ -244,6 +256,7 @@ const DEFAULT_PROJECT: Project = {
   status: 'draft',
   priority: 'medium',
   progress_pct: 0,
+  progress_mode: 'auto',
   budget_planned: 0,
   budget_actual: 0,
   budget_currency: 'VND',
@@ -1754,277 +1767,6 @@ const ResourcesTab: React.FC<{ projectId: string }> = ({ projectId }) => {
 }
 
 // ============================================================================
-// TAB: REPORTS (PM9 — Báo cáo nhanh + Export PDF)
-// ============================================================================
-
-const ReportsQuickTab: React.FC<{
-  projectId: string
-  project: Project
-  phases: Phase[]
-}> = ({ projectId, project, phases }) => {
-  const { user } = useAuthStore()
-  const navigate = useNavigate()
-  const [healthResult, setHealthResult] = useState<HealthResult | null>(null)
-  const [loadingHealth, setLoadingHealth] = useState(true)
-  const [exporting, setExporting] = useState(false)
-
-  // Task stats for export
-  const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, in_progress: 0, overdue: 0 })
-  const [milestones, setMilestones] = useState<any[]>([])
-  const [risks, setRisks] = useState<any[]>([])
-  const [issuesBySeverity, setIssuesBySeverity] = useState({ critical: 0, high: 0, medium: 0, low: 0 })
-
-  useEffect(() => {
-    const load = async () => {
-      setLoadingHealth(true)
-      try {
-        // Health
-        const health = await projectHealthService.calculateHealth(projectId)
-        setHealthResult(health)
-
-        // Tasks
-        const { data: tasks } = await supabase
-          .from('tasks').select('id, status, due_date').eq('project_id', projectId)
-        const tl = tasks || []
-        const now = new Date()
-        setTaskStats({
-          total: tl.length,
-          completed: tl.filter(t => t.status === 'completed').length,
-          in_progress: tl.filter(t => t.status === 'in_progress').length,
-          overdue: tl.filter(t => t.due_date && new Date(t.due_date) < now && t.status !== 'completed' && t.status !== 'cancelled').length,
-        })
-
-        // Milestones (simple select)
-        const { data: ms } = await supabase
-          .from('project_milestones')
-          .select('name, due_date, completed_date, status, phase_id')
-          .eq('project_id', projectId).order('due_date')
-
-        // Build phase name lookup from parent phases prop
-        const phLookup = new Map<string, string>()
-        phases.forEach(p => phLookup.set(p.id, p.name))
-
-        setMilestones((ms || []).map((m: any) => ({
-          name: m.name, due_date: m.due_date, completed_date: m.completed_date,
-          status: m.status, phase_name: m.phase_id ? phLookup.get(m.phase_id) : undefined,
-        })))
-
-        // Risks (simple select — no FK hint)
-        const { data: rk } = await supabase
-          .from('project_risks')
-          .select('code, title, probability, impact, status, owner_id')
-          .eq('project_id', projectId).neq('status', 'closed').order('probability', { ascending: false }).limit(5)
-
-        // Load risk owner names
-        const riskOwnerIds = (rk || []).map((r: any) => r.owner_id).filter(Boolean)
-        const riskOwnerMap = new Map<string, string>()
-        if (riskOwnerIds.length > 0) {
-          const { data: ownerData } = await supabase
-            .from('employees').select('id, full_name').in('id', riskOwnerIds)
-          ;(ownerData || []).forEach((e: any) => riskOwnerMap.set(e.id, e.full_name))
-        }
-
-        setRisks((rk || []).map((r: any) => ({
-          code: r.code, title: r.title,
-          score: (r.probability || 0) * (r.impact || 0),
-          owner_name: r.owner_id ? riskOwnerMap.get(r.owner_id) : undefined,
-        })))
-
-        // Issues by severity
-        const { data: issues } = await supabase
-          .from('project_issues').select('severity').eq('project_id', projectId).in('status', ['open', 'in_progress'])
-        const il = issues || []
-        setIssuesBySeverity({
-          critical: il.filter(i => i.severity === 'critical').length,
-          high: il.filter(i => i.severity === 'high').length,
-          medium: il.filter(i => i.severity === 'medium').length,
-          low: il.filter(i => i.severity === 'low').length,
-        })
-      } catch (err) {
-        console.error('Reports load error:', err)
-      } finally {
-        setLoadingHealth(false)
-      }
-    }
-    load()
-  }, [projectId])
-
-  const handleExportPDF = () => {
-    setExporting(true)
-    try {
-      const now = new Date()
-      const periodLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`
-
-      const data: PDFReportData = {
-        project: {
-          code: project.code,
-          name: project.name,
-          description: project.description,
-          status: project.status,
-          progress_pct: project.progress_pct,
-          planned_start: project.planned_start,
-          planned_end: project.planned_end,
-          actual_start: project.actual_start,
-          budget_planned: project.budget_planned || 0,
-          budget_actual: project.budget_actual || 0,
-          owner_name: project.owner?.full_name,
-          department_name: project.department?.name,
-          category_name: project.category?.name,
-        },
-        health: healthResult?.status || 'green',
-        health_label: healthResult?.label || 'Đúng tiến độ',
-        planned_progress: healthResult?.planned_progress || 0,
-        period_label: periodLabel,
-        phases: phases.map(p => ({
-          name: p.name, status: p.status, progress_pct: p.progress_pct,
-          planned_start: p.planned_start, planned_end: p.planned_end, color: p.color,
-        })),
-        milestones,
-        risks,
-        issues_by_severity: issuesBySeverity,
-        task_stats: taskStats,
-        exported_by: user?.full_name || 'System',
-      }
-
-      exportStatusReportPDF(data)
-    } catch (err) {
-      console.error('Export PDF error:', err)
-      alert('Export thất bại')
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  if (loadingHealth) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-[#1B4D3E]" />
-      </div>
-    )
-  }
-
-  const hc = healthResult
-  const hConfig = hc ? projectHealthService.getConfig(hc.status) : null
-
-  return (
-    <div className="space-y-4">
-      {/* RAG Health Card */}
-      {hc && hConfig && (
-        <div className={`rounded-xl border p-4 ${hConfig.bg} ${hConfig.border}`}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[13px] font-semibold text-gray-700">Sức khỏe dự án (RAG)</h3>
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${hConfig.bg} ${hConfig.border}`}>
-              <div className={`w-3 h-3 rounded-full ${hConfig.dot}`} />
-              <span className={`text-[12px] font-bold ${hConfig.text}`}>{hConfig.label}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mb-3">
-            <div className="text-center">
-              <div className="text-[11px] text-gray-500">Thực tế</div>
-              <div className="text-[18px] font-bold font-mono" style={{ color: hConfig.color }}>{hc.actual_progress}%</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[11px] text-gray-500">Kế hoạch</div>
-              <div className="text-[18px] font-bold font-mono text-gray-600">{hc.planned_progress}%</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[11px] text-gray-500">Gap</div>
-              <div className={`text-[18px] font-bold font-mono ${hc.gap >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {hc.gap > 0 ? '+' : ''}{hc.gap}%
-              </div>
-            </div>
-          </div>
-
-          {/* Adjustments */}
-          {hc.adjustments.length > 0 && (
-            <div className="space-y-1 pt-2 border-t border-white/40">
-              {hc.adjustments.map((adj, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px]">
-                  <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                  <span className="text-gray-600">{adj.reason}</span>
-                  <span className="font-mono text-red-600 ml-auto">{adj.impact}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-gray-100 p-3 text-center">
-          <div className="text-[18px] font-bold font-mono text-emerald-600">{taskStats.completed}/{taskStats.total}</div>
-          <div className="text-[11px] text-gray-500">Tasks xong</div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-3 text-center">
-          <div className="text-[18px] font-bold font-mono text-blue-600">{taskStats.in_progress}</div>
-          <div className="text-[11px] text-gray-500">Đang làm</div>
-        </div>
-        <div className={`rounded-xl border p-3 text-center ${taskStats.overdue > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
-          <div className={`text-[18px] font-bold font-mono ${taskStats.overdue > 0 ? 'text-red-600' : 'text-gray-400'}`}>{taskStats.overdue}</div>
-          <div className="text-[11px] text-gray-500">Quá hạn</div>
-        </div>
-        <div className={`rounded-xl border p-3 text-center ${risks.length > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100'}`}>
-          <div className={`text-[18px] font-bold font-mono ${risks.length > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{risks.length}</div>
-          <div className="text-[11px] text-gray-500">Rủi ro</div>
-        </div>
-      </div>
-
-      {/* Export Actions */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4">
-        <h3 className="text-[13px] font-semibold text-gray-700 mb-3">Xuất báo cáo</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <button
-            onClick={handleExportPDF}
-            disabled={exporting}
-            className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1B4D3E] text-white text-[13px] font-semibold active:scale-[0.98] disabled:opacity-50"
-          >
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-            Status Report (PDF)
-          </button>
-          <button
-            onClick={() => navigate('/projects/reports')}
-            className="flex items-center justify-center gap-2 py-3 rounded-xl border border-gray-200 text-gray-700 text-[13px] font-medium active:scale-[0.98]"
-          >
-            <FileText className="w-4 h-4" />
-            Báo cáo chi tiết
-          </button>
-          <button
-            onClick={() => navigate('/projects/reports')}
-            className="flex items-center justify-center gap-2 py-3 rounded-xl border border-gray-200 text-gray-700 text-[13px] font-medium active:scale-[0.98]"
-          >
-            <FolderKanban className="w-4 h-4" />
-            Portfolio Report
-          </button>
-        </div>
-      </div>
-
-      {/* Phases Progress */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4">
-        <h3 className="text-[13px] font-semibold text-gray-700 mb-3">Tiến độ theo Phase</h3>
-        <div className="space-y-2.5">
-          {phases.map((ph, i) => (
-            <div key={i}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ph.color || '#6B7280' }} />
-                  <span className="text-[12px] font-medium text-gray-700">{ph.name}</span>
-                </div>
-                <span className="text-[12px] font-bold font-mono text-gray-600">{ph.progress_pct}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${ph.progress_pct}%`, backgroundColor: ph.color || '#6B7280' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
 // TAB: PLACEHOLDER (for PM10-PM11)
 // ============================================================================
 
@@ -2038,30 +1780,6 @@ const PlaceholderTab: React.FC<{ tabName: string; phase: string }> = ({ tabName,
   </div>
 )
 
-// ============================================================================
-// TAB: ACTIVITY
-// ============================================================================
-
-const ActivityTab: React.FC<{ activities: ActivityItem[] }> = ({ activities }) => (
-  <div className="bg-white rounded-xl border border-gray-100 p-4">
-    <div className="space-y-4">
-      {activities.map((act, idx) => (
-        <div key={act.id} className="flex gap-3">
-          <div className="flex flex-col items-center">
-            <div className="w-3 h-3 rounded-full bg-[#1B4D3E] border-2 border-white ring-2 ring-[#1B4D3E]/20 shrink-0" />
-            {idx < activities.length - 1 && <div className="w-0.5 flex-1 bg-gray-200 mt-1" />}
-          </div>
-          <div className="flex-1 pb-4 min-w-0">
-            <p className="text-[13px] text-gray-800">{act.description}</p>
-            <p className="text-[11px] text-gray-400 mt-1">
-              {act.actor?.full_name} • {timeAgo(act.created_at)}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-)
 
 // ============================================================================
 // MAIN COMPONENT
@@ -2082,6 +1800,10 @@ export const ProjectDetailPage: React.FC = () => {
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [realProjectId, setRealProjectId] = useState<string | null>(null)
 
+  // ✅ AUTO-PROGRESS state
+  const [progressMode, setProgressMode] = useState<ProgressMode>('auto')
+  const [refreshing, setRefreshing] = useState(false)
+
   // ========================================================================
   // LOAD ALL REAL DATA FROM SUPABASE
   // ========================================================================
@@ -2100,7 +1822,7 @@ export const ProjectDetailPage: React.FC = () => {
         const PROJECT_SELECT = `
           id, code, name, description, status, priority,
           planned_start, planned_end, actual_start, actual_end,
-          progress_pct, budget_planned, budget_actual, budget_currency,
+          progress_pct, progress_mode, budget_planned, budget_actual, budget_currency,
           owner_id, sponsor_id, department_id, category_id, tags,
           created_at, updated_at
         `
@@ -2125,6 +1847,9 @@ export const ProjectDetailPage: React.FC = () => {
 
         const projectId = data.id
         setRealProjectId(projectId)
+
+        // ✅ AUTO-PROGRESS: Load progress_mode
+        setProgressMode((data.progress_mode as ProgressMode) || 'auto')
 
         // ── 2. Parallel load: owner, sponsor, department, category ──
         const [ownerRes, sponsorRes, deptRes, catRes] = await Promise.all([
@@ -2154,6 +1879,7 @@ export const ProjectDetailPage: React.FC = () => {
           actual_start: data.actual_start || undefined,
           actual_end: data.actual_end || undefined,
           progress_pct: Number(data.progress_pct) || 0,
+          progress_mode: (data.progress_mode as ProgressMode) || 'auto',
           budget_planned: Number(data.budget_planned) || 0,
           budget_actual: Number(data.budget_actual) || 0,
           budget_currency: data.budget_currency || 'VND',
@@ -2298,6 +2024,7 @@ export const ProjectDetailPage: React.FC = () => {
         order_index: p.order_index ?? p.sort_order ?? 0,
         status: p.status || 'pending',
         progress_pct: Number(p.progress_pct) || 0,
+        progress_mode: (p.progress_mode as ProgressMode) || 'auto',
         planned_start: p.planned_start || '',
         planned_end: p.planned_end || '',
         color: p.color || '#1B4D3E',
@@ -2363,6 +2090,42 @@ export const ProjectDetailPage: React.FC = () => {
   }
 
   const health = getHealthStatus()
+
+  // ========================================================================
+  // ✅ AUTO-PROGRESS: Refresh handler
+  // ========================================================================
+  const refreshProgress = async () => {
+    if (!realProjectId || refreshing) return
+    try {
+      setRefreshing(true)
+      const result = await projectProgressService.recalculate(realProjectId)
+      setProject(prev => ({ ...prev, progress_pct: result.project_progress }))
+      await loadPhases()
+      console.log(`✅ Progress recalculated: ${result.project_progress}%, ${result.phases_updated} phases updated`)
+    } catch (err) {
+      console.error('Refresh progress failed:', err)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // ========================================================================
+  // ✅ AUTO-PROGRESS: Toggle mode handler
+  // ========================================================================
+  const toggleProgressMode = async () => {
+    if (!realProjectId) return
+    const newMode: ProgressMode = progressMode === 'auto' ? 'manual' : 'auto'
+    try {
+      await projectProgressService.setMode('project', realProjectId, newMode)
+      setProgressMode(newMode)
+      setProject(prev => ({ ...prev, progress_mode: newMode }))
+      if (newMode === 'auto') {
+        await refreshProgress()
+      }
+    } catch (err) {
+      console.error('Toggle mode failed:', err)
+    }
+  }
 
   // ============================================================================
   // RENDER
@@ -2471,6 +2234,27 @@ export const ProjectDetailPage: React.FC = () => {
               <span className="text-[14px] font-bold text-gray-800" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                 {project.progress_pct.toFixed(1)}%
               </span>
+              {/* ✅ AUTO-PROGRESS: Mode badge */}
+              <button
+                onClick={toggleProgressMode}
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                  progressMode === 'auto'
+                    ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                    : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                }`}
+                title={progressMode === 'auto' ? 'Đang tự động — nhấn để chuyển sang nhập tay' : 'Đang nhập tay — nhấn để chuyển sang tự động'}
+              >
+                {progressMode === 'auto' ? 'Auto' : 'Nhập tay'}
+              </button>
+              {/* ✅ AUTO-PROGRESS: Refresh button */}
+              <button
+                onClick={refreshProgress}
+                disabled={refreshing}
+                className="p-1 rounded-md text-gray-400 hover:text-[#1B4D3E] hover:bg-gray-100 transition-colors disabled:opacity-50"
+                title="Cập nhật tiến độ từ tasks"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
             </div>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
               <div
@@ -2557,8 +2341,9 @@ export const ProjectDetailPage: React.FC = () => {
           />
         )}
 
-        {activeTab === 'activity' && (
-          <ActivityTab activities={activities} />
+        {/* ✅ PM10: Activity tab (rich timeline with filters, icons, load more) */}
+        {activeTab === 'activity' && realProjectId && (
+          <ProjectActivityTab projectId={realProjectId} />
         )}
 
         {/* ✅ PM5: Resources tab */}
@@ -2595,7 +2380,7 @@ export const ProjectDetailPage: React.FC = () => {
 
         {/* ✅ PM9: Reports & Health tab */}
         {activeTab === 'reports' && realProjectId && (
-          <ReportsQuickTab
+          <ProjectReportsTab
             projectId={realProjectId}
             project={project}
             phases={phases}

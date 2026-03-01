@@ -36,6 +36,7 @@ import {
   Timer,
   Target,
   BarChart3,
+  FolderKanban,
 } from 'lucide-react'
 import {
   LineChart,
@@ -52,6 +53,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
+import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import {
   dashboardService,
@@ -219,6 +221,12 @@ export function ManagerDashboard() {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [expiringContracts, setExpiringContracts] = useState<ContractAlert[]>([])
 
+  // ✅ PROJECT STATS
+  const [projectStats, setProjectStats] = useState<{
+    total: number; active: number; completed: number;
+    recentProjects: { id: string; code: string; name: string; status: string; progress_pct: number }[]
+  }>({ total: 0, active: 0, completed: 0, recentProjects: [] })
+
   const loadData = useCallback(async (showRefresh = false) => {
     if (showRefresh) setIsRefreshing(true)
     else setIsLoading(true)
@@ -241,6 +249,30 @@ export function ManagerDashboard() {
       ])
 
       if (statsResult.data) setStats(statsResult.data)
+
+      // ✅ Load project stats
+      try {
+        const { count: totalProjects } = await supabase
+          .from('projects').select('*', { count: 'exact', head: true })
+        const { count: activeProjects } = await supabase
+          .from('projects').select('*', { count: 'exact', head: true })
+          .in('status', ['in_progress', 'approved', 'planning'])
+        const { count: completedProjects } = await supabase
+          .from('projects').select('*', { count: 'exact', head: true })
+          .eq('status', 'completed')
+        const { data: recentProjs } = await supabase
+          .from('projects')
+          .select('id, code, name, status, progress_pct')
+          .neq('status', 'cancelled')
+          .order('updated_at', { ascending: false })
+          .limit(5)
+        setProjectStats({
+          total: totalProjects || 0,
+          active: activeProjects || 0,
+          completed: completedProjects || 0,
+          recentProjects: recentProjs || [],
+        })
+      } catch (e) { console.error('Project stats error:', e) }
       setStatusDistribution(distributionResult.data)
       setTaskTrend(trendResult.data)
       setDepartmentPerformance(deptResult.data)
@@ -361,6 +393,70 @@ export function ManagerDashboard() {
             onClick={() => navigate('/approvals')}
           />
         </div>
+
+        {/* ══════════ DỰ ÁN ĐANG CHẠY — Project summary card ══════════ */}
+        {projectStats.total > 0 && (
+          <Card>
+            <SectionHeader
+              title="Dự án"
+              icon={<FolderKanban className="w-4 h-4 sm:w-5 sm:h-5" />}
+              action={
+                <button
+                  onClick={() => navigate('/projects/list')}
+                  className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
+                >
+                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              }
+            />
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="text-center p-2.5 sm:p-3 bg-blue-50 rounded-xl">
+                <div className="text-lg sm:text-xl font-bold text-blue-600">{projectStats.total}</div>
+                <div className="text-[10px] sm:text-xs text-gray-500">Tổng DA</div>
+              </div>
+              <div className="text-center p-2.5 sm:p-3 bg-emerald-50 rounded-xl">
+                <div className="text-lg sm:text-xl font-bold text-emerald-600">{projectStats.active}</div>
+                <div className="text-[10px] sm:text-xs text-gray-500">Đang chạy</div>
+              </div>
+              <div className="text-center p-2.5 sm:p-3 bg-green-50 rounded-xl">
+                <div className="text-lg sm:text-xl font-bold text-green-600">{projectStats.completed}</div>
+                <div className="text-[10px] sm:text-xs text-gray-500">Hoàn thành</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {projectStats.recentProjects.map((proj) => (
+                <div
+                  key={proj.id}
+                  onClick={() => navigate(`/projects/${proj.id}`)}
+                  className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors active:bg-gray-100"
+                >
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <FolderKanban className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{proj.name}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500">{proj.code}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="w-16 sm:w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          proj.progress_pct >= 75 ? 'bg-emerald-500' :
+                          proj.progress_pct >= 40 ? 'bg-blue-500' :
+                          proj.progress_pct >= 10 ? 'bg-amber-500' : 'bg-gray-300'
+                        }`}
+                        style={{ width: `${proj.progress_pct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs sm:text-sm font-semibold text-gray-600 w-10 text-right">
+                      {proj.progress_pct}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* ══════════ CHARTS — stack trên mobile ══════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">

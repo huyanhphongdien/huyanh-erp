@@ -200,6 +200,7 @@ export const navigationGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       // ✅ PM3: Danh sách & Tạo mới
+      { label: 'Dashboard DA', href: '/projects/dashboard', icon: FolderKanban },
       { label: 'Danh sách DA', href: '/projects/list', icon: ListTodo },
       { label: 'Tạo DA mới', href: '/projects/new', icon: Plus },
       // ✅ PM4: Gantt tổng hợp

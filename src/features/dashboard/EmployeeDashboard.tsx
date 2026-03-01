@@ -1,15 +1,11 @@
 // ============================================================================
-// EMPLOYEE DASHBOARD — RESPONSIVE + CHẤM CÔNG NHANH
+// EMPLOYEE DASHBOARD — MODERN REDESIGN 2025
 // File: src/features/dashboard/EmployeeDashboard.tsx
 // Huy Anh ERP System - Dashboard cho Nhân viên (Level 6)
 // ============================================================================
-// CHANGES:
-// - Tích hợp CheckInOutWidget ngay trên dashboard
-// - Tối ưu mobile: padding, font-size, grid, touch targets
-// - Header không sticky trên mobile (tránh đè sidebar header)
-// - Stat cards compact hơn trên mobile
-// - Task list dạng card trên mobile
-// - Quick actions responsive
+// REDESIGN: Warm Minimalism, Glassmorphism cards, consistent with Manager style
+// DATA LOGIC: Unchanged - uses same supabase queries
+// RESPONSIVE: Mobile-first with 44px+ touch targets
 // ============================================================================
 
 import { useState, useEffect } from 'react'
@@ -29,14 +25,23 @@ import {
   RefreshCw,
   Timer,
   Calendar,
-  LogIn,
   FolderKanban,
+  ArrowUpRight,
 } from 'lucide-react'
 
+// ============================================================================
+// DESIGN TOKENS
+// ============================================================================
 
+const BRAND = {
+  primary: '#1B4D3E',
+  secondary: '#2D8B6E',
+  accent: '#E8A838',
+  bg: '#F0EDE8',
+} as const
 
 // ============================================================================
-// TYPES
+// TYPES (unchanged)
 // ============================================================================
 
 interface DashboardStats {
@@ -60,7 +65,49 @@ interface RecentTask {
 }
 
 // ============================================================================
-// STAT CARD COMPONENT — RESPONSIVE
+// ANIMATED NUMBER
+// ============================================================================
+
+function AnimatedNumber({ target }: { target: number }) {
+  const [val, setVal] = useState(0)
+  useEffect(() => {
+    if (target === 0) { setVal(0); return }
+    let start = 0
+    const step = target / (800 / 16)
+    const id = setInterval(() => {
+      start += step
+      if (start >= target) { setVal(target); clearInterval(id) }
+      else setVal(Math.floor(start))
+    }, 16)
+    return () => clearInterval(id)
+  }, [target])
+  return <>{val}</>
+}
+
+// ============================================================================
+// GLASS CARD
+// ============================================================================
+
+function GlassCard({ children, className = '', onClick }: {
+  children: React.ReactNode; className?: string; onClick?: () => void
+}) {
+  return (
+    <div onClick={onClick}
+      className={`
+        bg-white/80 backdrop-blur-sm rounded-2xl sm:rounded-[20px]
+        border border-white/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.03)]
+        transition-all duration-300
+        ${onClick ? 'cursor-pointer hover:shadow-lg hover:bg-white/95 hover:-translate-y-0.5 active:translate-y-0' : ''}
+        ${className}
+      `}
+    >
+      {children}
+    </div>
+  )
+}
+
+// ============================================================================
+// STAT CARD — Modern glassmorphism style
 // ============================================================================
 
 interface StatCardProps {
@@ -68,62 +115,45 @@ interface StatCardProps {
   value: number | string
   subtitle?: string
   icon: React.ReactNode
-  color: 'blue' | 'yellow' | 'green' | 'purple' | 'orange' | 'pink' | 'indigo'
+  accentColor: string
+  iconBg: string
   link?: string
   onClick?: () => void
 }
 
-function StatCard({ title, value, subtitle, icon, color, link, onClick }: StatCardProps) {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',
-    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200 hover:bg-yellow-100',
-    green: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100',
-    purple: 'bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-100',
-    orange: 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100',
-    pink: 'bg-pink-50 text-pink-600 border-pink-200 hover:bg-pink-100',
-    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100',
-  }
-
-  const iconBgClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    yellow: 'bg-yellow-100 text-yellow-600',
-    green: 'bg-green-100 text-green-600',
-    purple: 'bg-purple-100 text-purple-600',
-    orange: 'bg-orange-100 text-orange-600',
-    pink: 'bg-pink-100 text-pink-600',
-    indigo: 'bg-indigo-100 text-indigo-600',
-  }
-
+function StatCard({ title, value, subtitle, icon, accentColor, iconBg, link, onClick }: StatCardProps) {
   const content = (
-    <div
-      className={`
-        relative rounded-xl sm:rounded-2xl border-2 p-3 sm:p-5 transition-all duration-300
-        ${colorClasses[color]}
-        ${(link || onClick) ? 'cursor-pointer hover:scale-[1.02] hover:shadow-md active:scale-[0.98]' : ''}
-      `}
+    <GlassCard
       onClick={onClick}
+      className="p-3.5 sm:p-5 relative overflow-hidden group"
     >
-      <div className="flex items-start justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{title}</p>
-          <p className="text-2xl sm:text-3xl font-bold mt-0.5 sm:mt-1">{value}</p>
-          {subtitle && <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 truncate">{subtitle}</p>}
-        </div>
-        <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${iconBgClasses[color]} flex-shrink-0 ml-2`}>
-          <span className="[&>svg]:w-5 [&>svg]:h-5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">{icon}</span>
+      {/* Decorative corner */}
+      <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-[60px] opacity-[0.06] group-hover:opacity-[0.1] transition-opacity"
+        style={{ background: `linear-gradient(135deg, ${accentColor}, transparent)` }} />
+      <div className="relative z-10">
+        <div className="flex items-start justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs sm:text-[13px] font-medium text-gray-500 truncate">{title}</p>
+            <p className="text-2xl sm:text-[32px] font-bold mt-1 tracking-tight text-gray-900 leading-none">
+              {typeof value === 'number' ? <AnimatedNumber target={value} /> : value}
+            </p>
+            {subtitle && <p className="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">{subtitle}</p>}
+          </div>
+          <div className={`p-2 sm:p-2.5 rounded-xl ${iconBg} flex-shrink-0 ml-2`}>
+            <span className="[&>svg]:w-[18px] [&>svg]:h-[18px] sm:[&>svg]:w-5 sm:[&>svg]:h-5">{icon}</span>
+          </div>
         </div>
       </div>
       {(link || onClick) && (
-        <ChevronRight className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 w-4 h-4 sm:w-5 sm:h-5 opacity-40" />
+        <ChevronRight className="absolute bottom-2.5 right-2.5 sm:bottom-4 sm:right-4 w-4 h-4 text-gray-300" />
       )}
-    </div>
+    </GlassCard>
   )
 
   if (link) {
     return <Link to={link} className="block">{content}</Link>
   }
-
-  return <div>{content}</div>
+  return content
 }
 
 // ============================================================================
@@ -131,20 +161,18 @@ function StatCard({ title, value, subtitle, icon, color, link, onClick }: StatCa
 // ============================================================================
 
 function TaskStatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { label: string; className: string }> = {
-    new: { label: 'Mới', className: 'bg-gray-100 text-gray-700' },
-    in_progress: { label: 'Đang làm', className: 'bg-blue-100 text-blue-700' },
-    pending_review: { label: 'Chờ duyệt', className: 'bg-yellow-100 text-yellow-700' },
-    completed: { label: 'Hoàn thành', className: 'bg-green-100 text-green-700' },
-    accepted: { label: 'Đã duyệt', className: 'bg-emerald-100 text-emerald-700' },
-    rejected: { label: 'Từ chối', className: 'bg-red-100 text-red-700' },
+  const configs: Record<string, { label: string; cls: string }> = {
+    new: { label: 'Mới', cls: 'bg-gray-100 text-gray-600' },
+    in_progress: { label: 'Đang làm', cls: 'bg-blue-50 text-blue-600' },
+    pending_review: { label: 'Chờ duyệt', cls: 'bg-amber-50 text-amber-600' },
+    completed: { label: 'Hoàn thành', cls: 'bg-emerald-50 text-emerald-600' },
+    accepted: { label: 'Đã duyệt', cls: 'bg-green-50 text-green-600' },
+    rejected: { label: 'Từ chối', cls: 'bg-red-50 text-red-600' },
   }
-
-  const config = statusConfig[status] || { label: status, className: 'bg-gray-100 text-gray-700' }
-
+  const cfg = configs[status] || { label: status, cls: 'bg-gray-100 text-gray-600' }
   return (
-    <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap ${config.className}`}>
-      {config.label}
+    <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold whitespace-nowrap ${cfg.cls}`}>
+      {cfg.label}
     </span>
   )
 }
@@ -154,15 +182,14 @@ function TaskStatusBadge({ status }: { status: string }) {
 // ============================================================================
 
 function PriorityBadge({ priority }: { priority: string }) {
-  const config: Record<string, { label: string; className: string }> = {
-    low: { label: 'Thấp', className: 'text-gray-500' },
-    medium: { label: 'TB', className: 'text-blue-500' },
-    high: { label: 'Cao', className: 'text-orange-500' },
-    urgent: { label: 'Khẩn', className: 'text-red-500' },
+  const cfg: Record<string, { label: string; cls: string }> = {
+    low: { label: 'Thấp', cls: 'text-gray-400' },
+    medium: { label: 'TB', cls: 'text-blue-500' },
+    high: { label: 'Cao', cls: 'text-orange-500' },
+    urgent: { label: 'Khẩn', cls: 'text-red-500' },
   }
-
-  const item = config[priority] || config.medium
-  return <span className={`text-[10px] sm:text-xs font-medium ${item.className}`}>{item.label}</span>
+  const item = cfg[priority] || cfg.medium
+  return <span className={`text-[10px] sm:text-xs font-semibold ${item.cls}`}>{item.label}</span>
 }
 
 // ============================================================================
@@ -173,150 +200,95 @@ export function EmployeeDashboard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const [stats, setStats] = useState<DashboardStats>({
-    totalTasks: 0,
-    pendingEvaluation: 0,
-    completedTasks: 0,
-    inProgressTasks: 0,
-    remainingLeaveDays: 12,
-    pendingLeaveRequests: 0,
-    recentTasks: [],
-    myProjectCount: 0,
+    totalTasks: 0, pendingEvaluation: 0, completedTasks: 0, inProgressTasks: 0,
+    remainingLeaveDays: 12, pendingLeaveRequests: 0, recentTasks: [], myProjectCount: 0,
   })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch dashboard data
+  // ── Fetch data (unchanged logic) ──
   const fetchDashboardData = async (showRefresh = false) => {
-    if (!user?.employee_id) {
-      setLoading(false)
-      return
-    }
-
+    if (!user?.employee_id) { setLoading(false); return }
     if (showRefresh) setRefreshing(true)
     else setLoading(true)
-
     try {
       setError(null)
       const employeeId = user.employee_id
-
       const { count: totalTasks } = await supabase
-        .from('task_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('employee_id', employeeId)
-
+        .from('task_assignments').select('*', { count: 'exact', head: true }).eq('employee_id', employeeId)
       const { data: inProgressData } = await supabase
-        .from('task_assignments')
-        .select(`id, task:tasks!inner(status)`)
-        .eq('employee_id', employeeId)
-        .in('tasks.status', ['new', 'in_progress'])
-
+        .from('task_assignments').select(`id, task:tasks!inner(status)`)
+        .eq('employee_id', employeeId).in('tasks.status', ['new', 'in_progress'])
       const { data: pendingEvalTasks } = await supabase
-        .from('task_assignments')
-        .select(`id, self_rating, task:tasks!inner(status)`)
-        .eq('employee_id', employeeId)
-        .eq('tasks.status', 'pending_review')
-        .is('self_rating', null)
-
+        .from('task_assignments').select(`id, self_rating, task:tasks!inner(status)`)
+        .eq('employee_id', employeeId).eq('tasks.status', 'pending_review').is('self_rating', null)
       const { data: completedData } = await supabase
-        .from('task_assignments')
-        .select(`id, task:tasks!inner(status)`)
-        .eq('employee_id', employeeId)
-        .in('tasks.status', ['completed', 'accepted'])
-
+        .from('task_assignments').select(`id, task:tasks!inner(status)`)
+        .eq('employee_id', employeeId).in('tasks.status', ['completed', 'accepted'])
       const { count: pendingLeave } = await supabase
-        .from('leave_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('employee_id', employeeId)
-        .eq('status', 'pending')
-
+        .from('leave_requests').select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId).eq('status', 'pending')
       const currentYear = new Date().getFullYear()
       const { data: usedLeave } = await supabase
-        .from('leave_requests')
-        .select('total_days')
-        .eq('employee_id', employeeId)
-        .eq('status', 'approved')
-        .gte('start_date', `${currentYear}-01-01`)
-        .lte('end_date', `${currentYear}-12-31`)
-
+        .from('leave_requests').select('total_days').eq('employee_id', employeeId)
+        .eq('status', 'approved').gte('start_date', `${currentYear}-01-01`).lte('end_date', `${currentYear}-12-31`)
       const totalUsedDays = usedLeave?.reduce((sum, l) => sum + (l.total_days || 0), 0) || 0
       const remainingDays = Math.max(0, 12 - totalUsedDays)
-
       const { data: recentTasksData } = await supabase
-        .from('task_assignments')
-        .select(`id, task:tasks(id, name, code, status, due_date, priority)`)
-        .eq('employee_id', employeeId)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
+        .from('task_assignments').select(`id, task:tasks(id, name, code, status, due_date, priority)`)
+        .eq('employee_id', employeeId).order('created_at', { ascending: false }).limit(5)
       const recentTasks: RecentTask[] = (recentTasksData || [])
         .filter(t => t.task)
         .map(t => ({
-          id: (t.task as any).id,
-          name: (t.task as any).name,
-          code: (t.task as any).code || '',
-          status: (t.task as any).status,
-          due_date: (t.task as any).due_date,
-          priority: (t.task as any).priority || 'medium',
+          id: (t.task as any).id, name: (t.task as any).name, code: (t.task as any).code || '',
+          status: (t.task as any).status, due_date: (t.task as any).due_date, priority: (t.task as any).priority || 'medium',
         }))
-
-      // ✅ Đếm dự án nhân viên tham gia
       let myProjectCount = 0
       try {
         const { count } = await supabase
-          .from('project_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('employee_id', employeeId)
-          .eq('is_active', true)
+          .from('project_members').select('*', { count: 'exact', head: true })
+          .eq('employee_id', employeeId).eq('is_active', true)
         myProjectCount = count || 0
       } catch {}
-
       setStats({
-        totalTasks: totalTasks || 0,
-        pendingEvaluation: pendingEvalTasks?.length || 0,
-        completedTasks: completedData?.length || 0,
-        inProgressTasks: inProgressData?.length || 0,
-        remainingLeaveDays: remainingDays,
-        pendingLeaveRequests: pendingLeave || 0,
-        recentTasks,
-        myProjectCount,
+        totalTasks: totalTasks || 0, pendingEvaluation: pendingEvalTasks?.length || 0,
+        completedTasks: completedData?.length || 0, inProgressTasks: inProgressData?.length || 0,
+        remainingLeaveDays: remainingDays, pendingLeaveRequests: pendingLeave || 0, recentTasks, myProjectCount,
       })
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
       setError('Không thể tải dữ liệu dashboard')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
+    } finally { setLoading(false); setRefreshing(false) }
   }
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [user?.employee_id])
+  useEffect(() => { fetchDashboardData() }, [user?.employee_id])
 
-  // Loading
+  // ── Loading ──
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: BRAND.bg }}>
         <div className="text-center">
-          <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-3 text-sm sm:text-base text-gray-600">Đang tải Dashboard...</p>
+          <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.secondary})` }}>
+            <Loader2 className="w-6 h-6 text-white animate-spin" />
+          </div>
+          <p className="text-sm text-gray-500 font-medium">Đang tải Dashboard...</p>
         </div>
       </div>
     )
   }
 
-  // Error
+  // ── Error ──
   if (error) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: BRAND.bg }}>
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-red-500 mx-auto mb-3" />
-          <p className="text-sm sm:text-base text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => fetchDashboardData()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-          >
+          <AlertCircle className="w-14 h-14 text-red-400 mx-auto mb-3" />
+          <p className="text-sm text-gray-600 mb-4">{error}</p>
+          <button onClick={() => fetchDashboardData()}
+            className="px-5 py-2.5 text-white rounded-xl text-sm font-semibold"
+            style={{ background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.secondary})` }}>
             Thử lại
           </button>
         </div>
@@ -324,94 +296,89 @@ export function EmployeeDashboard() {
     )
   }
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return ''
-    return new Date(dateStr).toLocaleDateString('vi-VN')
-  }
-
-  const isOverdue = (dateStr: string | null) => {
-    if (!dateStr) return false
-    return new Date(dateStr) < new Date()
-  }
+  const formatDate = (dateStr: string | null) => dateStr ? new Date(dateStr).toLocaleDateString('vi-VN') : ''
+  const isOverdue = (dateStr: string | null) => dateStr ? new Date(dateStr) < new Date() : false
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* ══════════ HEADER — responsive, không sticky trên mobile ══════════ */}
-      <div className="bg-white border-b border-gray-200 lg:sticky lg:top-0 z-10">
+    <div className="min-h-screen" style={{ background: BRAND.bg }}>
+
+      {/* ══════ HEADER ══════ */}
+      <div className="bg-white/70 backdrop-blur-md border-b border-black/5 lg:sticky lg:top-0 z-20">
         <div className="max-w-5xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
-                Xin chào, {user?.full_name || 'Nhân viên'}! 👋
+              <h1 className="text-lg sm:text-[22px] font-bold text-gray-900 tracking-tight truncate">
+                Xin chào, {user?.full_name || 'Nhân viên'}{' '}
+                <span className="hidden sm:inline">👋</span>
               </h1>
-              <p className="text-gray-500 text-xs sm:text-sm mt-0.5 truncate">
+              <p className="text-gray-400 text-xs sm:text-[13px] mt-0.5 font-medium truncate">
                 {user?.department_name || 'Chưa có phòng ban'} • {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}
               </p>
             </div>
-            <button
-              onClick={() => fetchDashboardData(true)}
-              disabled={refreshing}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50 flex-shrink-0"
-            >
+            <button onClick={() => fetchDashboardData(true)} disabled={refreshing}
+              className="p-2.5 rounded-xl bg-white/80 border border-gray-200/60 text-gray-500 hover:text-gray-700 hover:bg-white transition-all disabled:opacity-50 flex-shrink-0">
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline text-sm">Làm mới</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* ══════════ MAIN CONTENT ══════════ */}
-      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      {/* ══════ MAIN CONTENT ══════ */}
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
 
-       
-
-        {/* ══════════ STATS GRID — 2 cols mobile, 3 cols desktop ══════════ */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4">
+        {/* ─── STATS GRID ─── */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3.5">
           <StatCard
             title="Công việc"
             value={stats.totalTasks}
             subtitle={`${stats.inProgressTasks} đang thực hiện`}
-            icon={<ClipboardList size={24} />}
-            color="blue"
+            icon={<ClipboardList />}
+            accentColor="#3B82F6"
+            iconBg="bg-blue-50 text-blue-600"
             link="/my-tasks"
           />
           <StatCard
             title="Chờ đánh giá"
             value={stats.pendingEvaluation}
             subtitle="cần tự đánh giá"
-            icon={<Clock size={24} />}
-            color="yellow"
+            icon={<Clock />}
+            accentColor={BRAND.accent}
+            iconBg="bg-amber-50 text-amber-600"
             link="/my-tasks?status=pending_review"
           />
           <StatCard
             title="Đã hoàn thành"
             value={stats.completedTasks}
             subtitle="công việc"
-            icon={<CheckCircle2 size={24} />}
-            color="green"
+            icon={<CheckCircle2 />}
+            accentColor="#10B981"
+            iconBg="bg-emerald-50 text-emerald-600"
             link="/my-tasks?status=completed"
           />
           <StatCard
             title="Ngày phép còn"
             value={stats.remainingLeaveDays}
             subtitle="ngày trong năm"
-            icon={<CalendarDays size={24} />}
-            color="purple"
+            icon={<CalendarDays />}
+            accentColor="#8B5CF6"
+            iconBg="bg-violet-50 text-violet-600"
           />
           <StatCard
             title="Đơn chờ duyệt"
             value={stats.pendingLeaveRequests}
             subtitle="đơn nghỉ phép"
-            icon={<FileText size={24} />}
-            color="orange"
+            icon={<FileText />}
+            accentColor="#F97316"
+            iconBg="bg-orange-50 text-orange-600"
             link="/leave-requests"
           />
           <StatCard
             title="Phiếu lương"
             value="Xem"
             subtitle="phiếu lương mới nhất"
-            icon={<Wallet size={24} />}
-            color="pink"
+            icon={<Wallet />}
+            accentColor="#EC4899"
+            iconBg="bg-pink-50 text-pink-600"
             link="/payslips"
           />
           {stats.myProjectCount > 0 && (
@@ -419,49 +386,46 @@ export function EmployeeDashboard() {
               title="Dự án"
               value={stats.myProjectCount}
               subtitle="đang tham gia"
-              icon={<FolderKanban size={24} />}
-              color="indigo"
+              icon={<FolderKanban />}
+              accentColor="#6366F1"
+              iconBg="bg-indigo-50 text-indigo-600"
               link="/projects/list"
             />
           )}
         </div>
 
-        {/* ══════════ RECENT TASKS — responsive ══════════ */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-3.5 sm:px-5 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
+        {/* ─── RECENT TASKS ─── */}
+        <GlassCard className="overflow-hidden">
+          <div className="px-3.5 sm:px-5 py-3 sm:py-4 border-b border-black/5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 sm:p-2 rounded-lg bg-blue-100 text-blue-600">
-                <ClipboardList size={18} />
+              <div className="p-1.5 rounded-lg" style={{ background: `${BRAND.secondary}15`, color: BRAND.secondary }}>
+                <ClipboardList className="w-4 h-4" />
               </div>
-              <h2 className="text-sm sm:text-base font-semibold text-gray-900">Công việc gần đây</h2>
+              <h3 className="text-sm sm:text-[15px] font-bold text-gray-800 tracking-tight">Công việc gần đây</h3>
             </div>
-            <Link
-              to="/my-tasks"
-              className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
-            >
-              Xem tất cả
-              <ChevronRight size={14} />
+            <Link to="/my-tasks"
+              className="text-xs sm:text-sm font-semibold flex items-center gap-0.5"
+              style={{ color: BRAND.secondary }}>
+              Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-black/[0.03]">
             {stats.recentTasks.length === 0 ? (
-              <div className="px-4 py-10 sm:py-12 text-center">
-                <ClipboardList className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm text-gray-500">Chưa có công việc nào được giao</p>
-                <p className="text-xs text-gray-400 mt-1">Các công việc mới sẽ hiển thị ở đây</p>
+              <div className="px-4 py-12 text-center">
+                <ClipboardList className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm text-gray-400 font-medium">Chưa có công việc nào được giao</p>
+                <p className="text-xs text-gray-300 mt-1">Các công việc mới sẽ hiển thị ở đây</p>
               </div>
             ) : (
               stats.recentTasks.map((task) => (
-                <div
-                  key={task.id}
+                <div key={task.id}
                   onClick={() => navigate(`/my-tasks/${task.id}`)}
-                  className="px-3.5 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-2 hover:bg-gray-50 cursor-pointer transition-colors active:bg-gray-100"
-                >
-                  <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
+                  className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between gap-2 hover:bg-black/[0.015] cursor-pointer transition-colors active:bg-black/[0.03]">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <TaskStatusBadge status={task.status} />
                     <div className="min-w-0">
-                      <p className="text-sm text-gray-900 font-medium truncate">{task.name}</p>
+                      <p className="text-sm text-gray-800 font-semibold truncate">{task.name}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-[10px] sm:text-xs text-gray-400">{task.code}</span>
                         <span className="text-gray-300 text-[10px]">•</span>
@@ -470,8 +434,9 @@ export function EmployeeDashboard() {
                     </div>
                   </div>
                   {task.due_date && (
-                    <div className={`flex items-center gap-1 text-xs sm:text-sm whitespace-nowrap ml-2 flex-shrink-0 ${isOverdue(task.due_date) ? 'text-red-500' : 'text-gray-500'}`}>
-                      {isOverdue(task.due_date) ? <Timer size={12} /> : <Calendar size={12} />}
+                    <div className={`flex items-center gap-1 text-xs whitespace-nowrap ml-2 flex-shrink-0 font-medium
+                      ${isOverdue(task.due_date) ? 'text-red-500' : 'text-gray-400'}`}>
+                      {isOverdue(task.due_date) ? <Timer className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
                       <span className="hidden sm:inline">{formatDate(task.due_date)}</span>
                       <span className="sm:hidden">{new Date(task.due_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
                     </div>
@@ -480,54 +445,32 @@ export function EmployeeDashboard() {
               ))
             )}
           </div>
-        </div>
+        </GlassCard>
 
-        {/* ══════════ QUICK ACTIONS — responsive grid ══════════ */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-3.5 sm:p-5">
+        {/* ─── QUICK ACTIONS ─── */}
+        <GlassCard className="p-3.5 sm:p-5">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600">
-              <ChevronRight size={18} />
+            <div className="p-1.5 rounded-lg" style={{ background: `${BRAND.secondary}15`, color: BRAND.secondary }}>
+              <ArrowUpRight className="w-4 h-4" />
             </div>
-            <h2 className="text-sm sm:text-base font-semibold text-gray-900">Thao tác nhanh</h2>
+            <h3 className="text-sm sm:text-[15px] font-bold text-gray-800 tracking-tight">Thao tác nhanh</h3>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-            <Link
-              to="/my-tasks"
-              className="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 active:bg-blue-200 transition-colors"
-            >
-              <ClipboardList size={22} />
-              <span className="text-xs sm:text-sm font-medium">Công việc</span>
-            </Link>
-            <Link
-              to="/leave-requests"
-              className="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-100 active:bg-purple-200 transition-colors"
-            >
-              <CalendarDays size={22} />
-              <span className="text-xs sm:text-sm font-medium">Xin nghỉ phép</span>
-            </Link>
-            <Link
-              to="/attendance"
-              className="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 active:bg-green-200 transition-colors"
-            >
-              <Clock size={22} />
-              <span className="text-xs sm:text-sm font-medium">Chấm công</span>
-            </Link>
-            <Link
-              to="/payslips"
-              className="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-pink-50 text-pink-600 hover:bg-pink-100 active:bg-pink-200 transition-colors"
-            >
-              <Wallet size={22} />
-              <span className="text-xs sm:text-sm font-medium">Phiếu lương</span>
-            </Link>
-            <Link
-              to="/projects/list"
-              className="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 active:bg-indigo-200 transition-colors"
-            >
-              <FolderKanban size={22} />
-              <span className="text-xs sm:text-sm font-medium">Dự án</span>
-            </Link>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-2.5">
+            {[
+              { label: 'Công việc', icon: <ClipboardList className="w-5 h-5" />, path: '/my-tasks', bg: 'bg-blue-50 text-blue-600 hover:bg-blue-100 active:bg-blue-200' },
+              { label: 'Xin nghỉ phép', icon: <CalendarDays className="w-5 h-5" />, path: '/leave-requests', bg: 'bg-violet-50 text-violet-600 hover:bg-violet-100 active:bg-violet-200' },
+              { label: 'Chấm công', icon: <Clock className="w-5 h-5" />, path: '/attendance', bg: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-200' },
+              { label: 'Phiếu lương', icon: <Wallet className="w-5 h-5" />, path: '/payslips', bg: 'bg-pink-50 text-pink-600 hover:bg-pink-100 active:bg-pink-200' },
+              { label: 'Dự án', icon: <FolderKanban className="w-5 h-5" />, path: '/projects/list', bg: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 active:bg-indigo-200' },
+            ].map((action) => (
+              <Link key={action.path} to={action.path}
+                className={`flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl transition-colors ${action.bg}`}>
+                {action.icon}
+                <span className="text-[10px] sm:text-xs font-semibold text-center leading-tight">{action.label}</span>
+              </Link>
+            ))}
           </div>
-        </div>
+        </GlassCard>
       </div>
     </div>
   )

@@ -18,7 +18,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/authStore';
 
 // Layout
-import { MainLayout } from './components/common/Layout';
+import { MainLayout } from './components/common/MainLayout';
 
 // Auth
 import { LoginPage } from './features/auth/LoginPage';

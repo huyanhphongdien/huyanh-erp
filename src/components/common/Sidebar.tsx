@@ -13,6 +13,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { supabase } from '../../lib/supabase';
 import { purchaseAccessService } from '../../services/purchaseAccessService';
 import { overtimeRequestService } from '../../services/overtimeRequestService';
 import { leaveRequestService } from '../../services/leaveRequestService';
@@ -222,6 +223,7 @@ export function Sidebar() {
   const [loadingPurchaseAccess, setLoadingPurchaseAccess] = useState(false);
   const [pendingOTCount, setPendingOTCount] = useState(0);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'admin';
   const userLevel = user?.position_level || 7;
@@ -267,6 +269,24 @@ export function Sidebar() {
       return () => clearInterval(interval);
     }
   }, [user?.employee_id, canApproveOT, isExecutive, isAdmin]);
+
+  // ── Load avatar from employee record ──
+  useEffect(() => {
+    const loadAvatar = async () => {
+      if (!user?.employee_id) return;
+      try {
+        const { data } = await supabase
+          .from('employees')
+          .select('avatar_url')
+          .eq('id', user.employee_id)
+          .maybeSingle();
+        if (data?.avatar_url) setAvatarUrl(data.avatar_url);
+      } catch (e) {
+        console.error('Failed to load avatar:', e);
+      }
+    };
+    loadAvatar();
+  }, [user?.employee_id]);
 
   // ── Auto-expand active group (unchanged) ──
   useEffect(() => {
@@ -398,12 +418,20 @@ export function Sidebar() {
           onClick={() => setIsMobileOpen(false)}
           className="flex items-center gap-3 group"
         >
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm transition-all group-hover:shadow-md"
-            style={{ background: `linear-gradient(135deg, ${BRAND.accent}, #F5C563)` }}
-          >
-            {user?.full_name?.charAt(0) || user?.email?.charAt(0) || '?'}
-          </div>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={user?.full_name || ''}
+              className="w-9 h-9 rounded-xl object-cover flex-shrink-0 shadow-sm transition-all group-hover:shadow-md"
+            />
+          ) : (
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm transition-all group-hover:shadow-md"
+              style={{ background: `linear-gradient(135deg, ${BRAND.accent}, #F5C563)` }}
+            >
+              {user?.full_name?.charAt(0) || user?.email?.charAt(0) || '?'}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-gray-800 truncate group-hover:text-[#1B4D3E] transition-colors">
               {user?.full_name || user?.email}

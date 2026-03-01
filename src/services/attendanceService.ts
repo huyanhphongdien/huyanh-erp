@@ -1,15 +1,14 @@
 // ============================================================================
-// ATTENDANCE SERVICE V4 — Overnight Shift Fix + Multi-Shift Robust
+// ATTENDANCE SERVICE V5 — Auto-checkout + OT Requests + Team Info
 // File: src/services/attendanceService.ts
-// Huy Anh ERP System - Chấm công V4
+// Huy Anh ERP System - Chấm công V5
 // ============================================================================
-// FIX V4.0:
-//   ① getTodayShifts()   — query cả yesterday cho ca crosses_midnight
-//   ② checkIn()          — lookup cả yesterday cho ca đêm check-in trễ
-//   ③ checkIn()          — late calculation đúng cho ca đêm
-//   ④ checkIn()          — attendance date = shift_assignments.date (ngày bắt đầu ca)
-//   ⑤ getRelevantShifts() — helper mới: tìm ca hợp lệ cho thời điểm hiện tại
-//   ⑥ Bỏ dependency shiftTeamService (team info tùy chọn)
+// V5.0 Changes:
+//   ① [BUG 2] checkIn() — auto-checkout records mở quá hạn thay vì block
+//   ② [BUG 3] checkOut() — OT chỉ tính khi có phiếu tăng ca approved
+//   ③ [BUG 4] getRelevantAssignments — select team_id + join shift_teams
+//   ④ [BUG 4] getTodayShifts — trả về team_code, team_name
+//   ⑤ Giữ nguyên toàn bộ V4 logic: ca đêm, multi-shift, GPS
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
@@ -68,9 +67,9 @@ export interface TodayShiftAssignment {
   id: string
   shift_id: string
   shift: ShiftInfo
-  assignment_date: string   // ★ V4: ngày phân ca (có thể là hôm qua cho ca đêm)
-  team_code?: string
-  team_name?: string
+  assignment_date: string
+  team_code?: string   // ★ V5: populated from shift_teams join
+  team_name?: string   // ★ V5: populated from shift_teams join
 }
 
 export interface GPSData {
@@ -188,16 +187,6 @@ function timeToMinutes(timeStr: string): number {
 // ★ V4: SHIFT DETECTION — Hỗ trợ ca qua đêm
 // ============================================================================
 
-/**
- * Kiểm tra thời điểm hiện tại có nằm trong window check-in của ca không
- * Buffer: 2h trước ca, 1h sau kết thúc ca
- * 
- * Ví dụ: Ca 3 (22:00-06:00), assignment_date = 24/02
- *   → Window check-in: 20:00 ngày 24 → 07:00 ngày 25
- *   → Lúc 22:30 ngày 24: ✓ (trong window)
- *   → Lúc 02:00 ngày 25: ✓ (trong window, check-in trễ ca đêm)
- *   → Lúc 10:00 ngày 25: ✗ (ngoài window)
- */
 function isInShiftWindow(
   shift: ShiftInfo,
   assignmentDate: string,
@@ -208,28 +197,21 @@ function isInShiftWindow(
   const startMin = timeToMinutes(shift.start_time)
   const endMin = timeToMinutes(shift.end_time)
 
-  // Tạo datetime bắt đầu ca
   const shiftStartDT = new Date(assignmentDate + 'T00:00:00')
   shiftStartDT.setMinutes(startMin)
 
-  // Tạo datetime kết thúc ca
   const shiftEndDT = new Date(assignmentDate + 'T00:00:00')
   if (shift.crosses_midnight) {
-    shiftEndDT.setDate(shiftEndDT.getDate() + 1) // Ngày hôm sau
+    shiftEndDT.setDate(shiftEndDT.getDate() + 1)
   }
   shiftEndDT.setMinutes(endMin)
 
-  // Window = [start - buffer, end + buffer]
   const windowStart = new Date(shiftStartDT.getTime() - bufferBeforeMinutes * 60 * 1000)
   const windowEnd = new Date(shiftEndDT.getTime() + bufferAfterMinutes * 60 * 1000)
 
   return now >= windowStart && now <= windowEnd
 }
 
-/**
- * Chọn ca tốt nhất từ danh sách assignments dựa trên thời điểm hiện tại
- * Ưu tiên: ca đang trong window check-in và gần giờ bắt đầu nhất
- */
 function detectBestShift(
   assignments: { shift_id: string; shift: ShiftInfo; assignment_date: string }[],
   now: Date
@@ -237,14 +219,12 @@ function detectBestShift(
   if (assignments.length === 0) return null
   if (assignments.length === 1) return assignments[0]
 
-  // Lọc ca trong window check-in
   const inWindow = assignments.filter(a =>
     isInShiftWindow(a.shift, a.assignment_date, now)
   )
 
   const candidates = inWindow.length > 0 ? inWindow : assignments
 
-  // Chọn ca gần nhất (theo khoảng cách đến start_time)
   let best = candidates[0]
   let bestDistance = Infinity
 
@@ -264,35 +244,43 @@ function detectBestShift(
 }
 
 // ============================================================================
-// SHIFT ASSIGNMENT QUERY
+// ★ V5: SHIFT ASSIGNMENT QUERY — Thêm team_id + join shift_teams
 // ============================================================================
 
 const SHIFT_ASSIGNMENT_SELECT = `
-  id, shift_id, date,
+  id, shift_id, date, team_id,
   shift:shifts!shift_assignments_shift_id_fkey(
     id, code, name, start_time, end_time,
     standard_hours, break_minutes, crosses_midnight,
     late_threshold_minutes, early_leave_threshold_minutes
+  ),
+  team:shift_teams!shift_assignments_team_id_fkey(
+    id, code, name
   )
 `
 
+// ★ V5: Internal type cho assignment kết quả
+interface RelevantAssignment {
+  shift_id: string
+  shift: ShiftInfo
+  assignment_date: string
+  assignment_id: string
+  team_code?: string
+  team_name?: string
+}
+
 /**
- * ★ V4: Lấy tất cả ca liên quan cho thời điểm hiện tại
- * 
- * Query 2 ngày:
- *   - today: tất cả ca hôm nay
- *   - yesterday: chỉ ca crosses_midnight (ca đêm hôm qua chưa kết thúc)
+ * ★ V5: Lấy tất cả ca liên quan — bao gồm team info
  */
 async function getRelevantAssignments(
   employeeId: string,
   now: Date
-): Promise<{ shift_id: string; shift: ShiftInfo; assignment_date: string; assignment_id: string }[]> {
+): Promise<RelevantAssignment[]> {
   const today = now.toISOString().split('T')[0]
   const yesterday = new Date(now)
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayStr = yesterday.toISOString().split('T')[0]
 
-  // Query cả 2 ngày
   const { data, error } = await supabase
     .from('shift_assignments')
     .select(SHIFT_ASSIGNMENT_SELECT)
@@ -305,20 +293,27 @@ async function getRelevantAssignments(
     return []
   }
 
-  const results: { shift_id: string; shift: ShiftInfo; assignment_date: string; assignment_id: string }[] = []
+  const results: RelevantAssignment[] = []
 
   for (const a of data || []) {
     const shift = (Array.isArray(a.shift) ? a.shift[0] : a.shift) as ShiftInfo
     if (!shift) continue
 
-    // Ca hôm qua: chỉ lấy nếu crosses_midnight VÀ đang trong window
+    // ★ V5: Extract team info
+    const team = Array.isArray(a.team) ? a.team[0] : a.team
+    const teamCode = team?.code || undefined
+    const teamName = team?.name || undefined
+
     if (a.date === yesterdayStr) {
+      // Ca hôm qua: chỉ lấy nếu crosses_midnight VÀ đang trong window
       if (shift.crosses_midnight && isInShiftWindow(shift, yesterdayStr, now)) {
         results.push({
           shift_id: a.shift_id,
           shift,
           assignment_date: yesterdayStr,
           assignment_id: a.id,
+          team_code: teamCode,
+          team_name: teamName,
         })
       }
     } else {
@@ -328,6 +323,8 @@ async function getRelevantAssignments(
         shift,
         assignment_date: today,
         assignment_id: a.id,
+        team_code: teamCode,
+        team_name: teamName,
       })
     }
   }
@@ -336,7 +333,94 @@ async function getRelevantAssignments(
 }
 
 // ============================================================================
-// SELECT CONSTANT
+// ★ V5: AUTO-CHECKOUT HELPER
+// ============================================================================
+
+/**
+ * Tính shift_end datetime từ date + shift info
+ */
+function getShiftEndDatetime(date: string, endTime: string, crossesMidnight: boolean): Date {
+  const dt = new Date(date + 'T00:00:00')
+  dt.setMinutes(timeToMinutes(endTime))
+  if (crossesMidnight) {
+    dt.setDate(dt.getDate() + 1)
+  }
+  return dt
+}
+
+/**
+ * ★ V5: Thử auto-checkout 1 record mở nếu đã quá hạn
+ * Returns true nếu đã đóng thành công
+ */
+async function tryAutoCloseRecord(record: AttendanceRecord, now: Date): Promise<boolean> {
+  // Tính shift_end
+  let shiftEndDt: Date
+  if (record.shift?.end_time) {
+    shiftEndDt = getShiftEndDatetime(
+      record.date,
+      record.shift.end_time,
+      record.shift.crosses_midnight || false
+    )
+  } else {
+    shiftEndDt = new Date(record.date + 'T17:00:00')
+  }
+
+  // Phải quá 2h sau kết thúc ca mới auto-checkout
+  const BUFFER_MS = 2 * 60 * 60 * 1000
+  if (now.getTime() <= shiftEndDt.getTime() + BUFFER_MS) {
+    return false
+  }
+
+  // Tính toán giờ làm
+  const checkInDt = new Date(record.check_in_time!)
+  const breakMins = record.shift?.break_minutes ?? record.break_minutes ?? 60
+  const stdMins = (record.shift?.standard_hours ?? 8) * 60
+  const earlyThreshold = record.shift?.early_leave_threshold_minutes ?? 15
+
+  let workingMinutes = Math.max(0,
+    Math.floor((shiftEndDt.getTime() - checkInDt.getTime()) / (1000 * 60)) - breakMins
+  )
+  workingMinutes = Math.min(workingMinutes, stdMins) // Cap tại standard_hours
+
+  let earlyLeaveMinutes = 0
+  let newStatus = record.status
+  if (workingMinutes < stdMins) {
+    const shortage = stdMins - workingMinutes
+    if (shortage > earlyThreshold) {
+      earlyLeaveMinutes = shortage
+      // ★ V5 BUG 7: Phân biệt late + early_leave + late_and_early
+      if (record.status === 'late' || record.late_minutes > 0) {
+        newStatus = 'late_and_early'
+      } else {
+        newStatus = 'early_leave'
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from('attendance')
+    .update({
+      check_out_time: shiftEndDt.toISOString(),
+      auto_checkout: true,
+      working_minutes: workingMinutes,
+      overtime_minutes: 0,
+      early_leave_minutes: earlyLeaveMinutes,
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', record.id)
+
+  if (error) {
+    console.error(`[AutoCheckout] Failed record ${record.id}:`, error)
+    return false
+  }
+
+  console.log(`[AutoCheckout] Đóng ${record.id} — NV ${record.employee_id}, ngày ${record.date}`)
+  return true
+}
+
+// ============================================================================
+// ATTENDANCE SELECT CONSTANT
 // ============================================================================
 
 const ATTENDANCE_SELECT = `
@@ -434,13 +518,10 @@ export const attendanceService = {
   },
 
   // ═══════════════════════════════════════════════════
-  // ★ V4: TODAY QUERIES — Bao gồm ca đêm hôm qua
+  // TODAY QUERIES — Bao gồm ca đêm hôm qua
   // ═══════════════════════════════════════════════════
 
-  /**
-   * ★ V4: Lấy tất cả ca liên quan cho hôm nay
-   * Bao gồm ca đêm hôm qua nếu đang trong window
-   */
+  /** ★ V5: Trả về team_code, team_name từ shift_assignments join */
   async getTodayShifts(employeeId: string): Promise<TodayShiftAssignment[]> {
     const now = new Date()
     const assignments = await getRelevantAssignments(employeeId, now)
@@ -450,6 +531,8 @@ export const attendanceService = {
       shift_id: a.shift_id,
       shift: a.shift,
       assignment_date: a.assignment_date,
+      team_code: a.team_code,
+      team_name: a.team_name,
     }))
   },
 
@@ -457,7 +540,6 @@ export const attendanceService = {
     const today = getToday()
     const yesterday = getYesterday()
 
-    // ★ V4: Query cả hôm nay + hôm qua (cho ca đêm)
     const { data, error } = await supabase
       .from('attendance')
       .select(ATTENDANCE_SELECT)
@@ -469,12 +551,10 @@ export const attendanceService = {
 
     const records = (data || []).map(normalize)
 
-    // Lọc: giữ tất cả hôm nay + ca đêm hôm qua (crosses_midnight)
     return records.filter(r => {
       if (r.date === today) return true
-      // Ca hôm qua: chỉ giữ nếu crosses_midnight VÀ chưa check-out
       if (r.date === yesterday && r.shift?.crosses_midnight) {
-        return !r.check_out_time // Đang mở = hiển thị
+        return !r.check_out_time
       }
       return false
     })
@@ -500,7 +580,7 @@ export const attendanceService = {
   },
 
   // ═══════════════════════════════════════════════════
-  // ★★★ V4: CHECK-IN — Overnight shift support
+  // ★★★ V5: CHECK-IN — Auto-checkout fallback
   // ═══════════════════════════════════════════════════
 
   async checkIn(employeeId: string, options: CheckInOptions = {}): Promise<AttendanceRecord> {
@@ -509,10 +589,28 @@ export const attendanceService = {
     const today = getToday()
     const nowISO = now.toISOString()
 
-    // ① Open record check
+    // ① ★★★ V5: Open record check — với auto-checkout fallback ★★★
     const openRecord = await this.getOpenAttendance(employeeId)
     if (openRecord) {
-      throw new Error(`Bạn chưa check-out ca ${openRecord.shift?.name || 'trước đó'}. Vui lòng check-out trước.`)
+      // Thử auto-checkout nếu đã quá hạn
+      const autoClosed = await tryAutoCloseRecord(openRecord, now)
+
+      if (autoClosed) {
+        // Đã đóng → kiểm tra còn record mở khác không
+        const stillOpen = await this.getOpenAttendance(employeeId)
+        if (stillOpen) {
+          throw new Error(
+            `Bạn chưa check-out ca ${stillOpen.shift?.name || 'trước đó'}. Vui lòng check-out trước.`
+          )
+        }
+        // OK — đã tự đóng, tiếp tục check-in
+        console.log(`[CheckIn] Auto-closed expired record for ${employeeId}, proceeding with check-in`)
+      } else {
+        // Chưa đủ điều kiện auto-checkout (ca vẫn đang trong thời gian)
+        throw new Error(
+          `Bạn chưa check-out ca ${openRecord.shift?.name || 'trước đó'}. Vui lòng check-out trước.`
+        )
+      }
     }
 
     // ② GPS
@@ -534,18 +632,16 @@ export const attendanceService = {
       gpsVerified = true
     }
 
-    // ③ ★★★ V4: LOOKUP shift_assignments — cả today + yesterday ★★★
+    // ③ LOOKUP shift_assignments — cả today + yesterday
     const allAssignments = await getRelevantAssignments(employeeId, now)
 
     // ④ Select shift
-    let selectedShift: { shift_id: string; shift: ShiftInfo; assignment_date: string } | null = null
+    let selectedShift: RelevantAssignment | null = null
 
     if (targetShiftId) {
-      // Tìm trong assignments trước
       selectedShift = allAssignments.find(a => a.shift_id === targetShiftId) || null
 
       if (!selectedShift) {
-        // Fallback: load shift trực tiếp (cho trường hợp chưa phân ca nhưng chọn thủ công)
         const { data: shiftData } = await supabase
           .from('shifts')
           .select('id, code, name, start_time, end_time, standard_hours, break_minutes, crosses_midnight, late_threshold_minutes, early_leave_threshold_minutes')
@@ -556,15 +652,15 @@ export const attendanceService = {
             shift_id: targetShiftId,
             shift: shiftData as ShiftInfo,
             assignment_date: today,
+            assignment_id: '',
           }
         }
       }
     } else if (allAssignments.length > 0) {
-      selectedShift = detectBestShift(allAssignments, now)
+      selectedShift = detectBestShift(allAssignments, now) as RelevantAssignment | null
     }
 
     // ⑤ Duplicate check
-    // ★ V4: attendance.date = assignment_date (ngày phân ca, không phải ngày hiện tại)
     const attendanceDate = selectedShift?.assignment_date || today
 
     if (selectedShift) {
@@ -591,7 +687,7 @@ export const attendanceService = {
       }
     }
 
-    // ⑥ ★ V4: Late calculation — đúng cho mọi loại ca
+    // ⑥ Late calculation
     let status = 'present'
     let lateMinutes = 0
     let breakMins = 0
@@ -600,7 +696,6 @@ export const attendanceService = {
       const shift = selectedShift.shift
       breakMins = shift.break_minutes || 0
 
-      // Tạo datetime chính xác cho giờ bắt đầu ca
       const startMin = timeToMinutes(shift.start_time)
       const shiftStartDT = new Date(selectedShift.assignment_date + 'T00:00:00')
       shiftStartDT.setMinutes(startMin)
@@ -626,7 +721,6 @@ export const attendanceService = {
     }
 
     // ⑦ Insert
-    // ★ V4: date = assignment_date (ngày phân ca, quan trọng cho ca đêm)
     const { data, error } = await supabase
       .from('attendance')
       .insert({
@@ -654,7 +748,7 @@ export const attendanceService = {
   },
 
   // ═══════════════════════════════════════════════════
-  // CHECK-OUT — Handles overnight shifts (giữ nguyên, đã đúng)
+  // ★★★ V5: CHECK-OUT — OT tham chiếu phiếu tăng ca
   // ═══════════════════════════════════════════════════
 
   async checkOut(employeeId: string, options: CheckOutOptions = {}): Promise<AttendanceRecord> {
@@ -668,11 +762,11 @@ export const attendanceService = {
     const checkOutLat = gps?.latitude || null
     const checkOutLng = gps?.longitude || null
 
-    // ★ V4.1: Tổng thời gian từ check-in đến check-out
+    // Tổng thời gian từ check-in đến check-out
     const checkIn = new Date(openRecord.check_in_time!)
     const totalElapsedMinutes = Math.max(0, Math.floor((now.getTime() - checkIn.getTime()) / (1000 * 60)))
 
-    // Early leave / overtime / working time
+    // Calculate working time, early leave, overtime
     let earlyLeaveMinutes = 0
     let overtimeMinutes = 0
     let workingMinutes = 0
@@ -681,38 +775,75 @@ export const attendanceService = {
     if (openRecord.shift) {
       const shift = openRecord.shift
       const breakMins = shift.break_minutes || 0
-      const standardMinutes = shift.standard_hours * 60  // VD: 8h = 480 phút
+      const standardMinutes = shift.standard_hours * 60
 
-      // ★ V4.1: working_minutes = tổng thời gian - break (không âm)
       workingMinutes = Math.max(0, totalElapsedMinutes - breakMins)
 
-      // ★ V4.1: OT = thời gian làm thực tế vượt giờ chuẩn (không tính break)
-      // VD: Ca 8h, break 1h, standard = 8h (480p)
-      //     Làm 10h (600p) - break 60p = 540p working → OT = 540 - 480 = 60p
-      overtimeMinutes = Math.max(0, workingMinutes - standardMinutes)
+      // ★★★ V5: OT chỉ tính khi có phiếu tăng ca approved ★★★
+      const excessMinutes = Math.max(0, workingMinutes - standardMinutes)
 
-      // ★ V4.1: Early leave = giờ chuẩn - giờ làm thực tế
-      // VD: Ca 8h, làm 5h → early = 480 - 300 = 180p (3h)
+      if (excessMinutes > 0) {
+        try {
+          const { data: otRequest } = await supabase
+            .from('overtime_requests')
+            .select('id, planned_minutes, status')
+            .eq('employee_id', employeeId)
+            .eq('request_date', openRecord.date)
+            .eq('status', 'approved')
+            .maybeSingle()
+
+          if (otRequest) {
+            // Có phiếu approved → OT = min(thực tế vượt, phút đã duyệt)
+            overtimeMinutes = Math.min(excessMinutes, otRequest.planned_minutes)
+
+            // Cập nhật actual_minutes vào phiếu
+            await supabase
+              .from('overtime_requests')
+              .update({
+                actual_minutes: excessMinutes,
+                updated_at: nowISO,
+              })
+              .eq('id', otRequest.id)
+          }
+          // Không có phiếu → overtimeMinutes = 0 (không tính OT)
+        } catch (err) {
+          // Lỗi query overtime_requests → an toàn: không tính OT
+          console.error('[CheckOut] Error checking overtime_requests:', err)
+        }
+      }
+
+      // Early leave
       const earlyThreshold = shift.early_leave_threshold_minutes || 15
       if (workingMinutes < standardMinutes) {
         const shortage = standardMinutes - workingMinutes
         if (shortage > earlyThreshold) {
           earlyLeaveMinutes = shortage
-          if (openRecord.status !== 'late') newStatus = 'early_leave'
+          // ★ V5 BUG 7: Phân biệt late + early_leave + late_and_early
+          if (openRecord.status === 'late' || openRecord.late_minutes > 0) {
+            newStatus = 'late_and_early'
+          } else {
+            newStatus = 'early_leave'
+          }
         }
       }
     } else {
       // Fallback: không có shift — dùng 8h chuẩn, 1h break
-      const standardMinutes = 480 // 8h
+      const standardMinutes = 480
       const breakMins = 60
       workingMinutes = Math.max(0, totalElapsedMinutes - breakMins)
-      overtimeMinutes = Math.max(0, workingMinutes - standardMinutes)
+      // Không tính OT khi không có shift (không thể có phiếu tăng ca)
+      overtimeMinutes = 0
 
       if (workingMinutes < standardMinutes) {
         const shortage = standardMinutes - workingMinutes
         if (shortage > 15) {
           earlyLeaveMinutes = shortage
-          if (openRecord.status !== 'late') newStatus = 'early_leave'
+          // ★ V5 BUG 7: Phân biệt late + early_leave + late_and_early
+          if (openRecord.status === 'late' || openRecord.late_minutes > 0) {
+            newStatus = 'late_and_early'
+          } else {
+            newStatus = 'early_leave'
+          }
         }
       }
     }
@@ -734,6 +865,40 @@ export const attendanceService = {
 
     if (error) throw error
     return normalize(data)
+  },
+
+  // ═══════════════════════════════════════════════════
+  // ★ V5: AUTO-CHECKOUT — Chạy hàng loạt
+  // ═══════════════════════════════════════════════════
+
+  /**
+   * Tìm và đóng tất cả attendance records mở quá hạn.
+   * Gọi khi: admin mở dashboard, hoặc widget mount.
+   */
+  async runAutoCheckout(): Promise<{ closed: number }> {
+    const now = new Date()
+    let closed = 0
+
+    const { data: openRecords, error } = await supabase
+      .from('attendance')
+      .select(ATTENDANCE_SELECT)
+      .is('check_out_time', null)
+      .not('check_in_time', 'is', null)
+      .eq('auto_checkout', false)
+
+    if (error || !openRecords) return { closed: 0 }
+
+    for (const raw of openRecords) {
+      const record = normalize(raw)
+      const success = await tryAutoCloseRecord(record, now)
+      if (success) closed++
+    }
+
+    if (closed > 0) {
+      console.log(`[AutoCheckout] Đã đóng ${closed} records quá hạn`)
+    }
+
+    return { closed }
   },
 
   // ═══════════════════════════════════════════════════
@@ -770,15 +935,27 @@ export const attendanceService = {
     const startDate = `${year}-${month.toString().padStart(2, '0')}-01`
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('attendance').select(ATTENDANCE_SELECT)
       .gte('date', startDate).lte('date', endDate)
+
+    // ★ V5: Filter server-side nếu có departmentId (IMPROVE 1)
+    if (departmentId) {
+      const { data: deptEmps } = await supabase
+        .from('employees').select('id')
+        .eq('department_id', departmentId).eq('status', 'active')
+      if (deptEmps && deptEmps.length > 0) {
+        query = query.in('employee_id', deptEmps.map(e => e.id))
+      } else {
+        return []
+      }
+    }
+
+    const { data, error } = await query
       .order('employee_id').order('date')
     if (error) throw error
 
-    let results = (data || []).map(normalize)
-    if (departmentId) results = results.filter(r => r.employee?.department_id === departmentId)
-    return results
+    return (data || []).map(normalize)
   },
 }
 

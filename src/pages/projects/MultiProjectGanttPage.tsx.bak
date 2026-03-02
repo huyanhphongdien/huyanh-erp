@@ -111,14 +111,7 @@ const MultiProjectGanttPage: React.FC = () => {
     const allDeps: GanttDependency[] = []
 
     for (const project of projects) {
-      // Strip mã dự án khỏi tên — "DA-2026-001 — Xây dựng..." → "Xây dựng..."
-      const cleaned = project.items.map(item => {
-        if (item.type === 'project' && item.name.includes(' — ')) {
-          return { ...item, name: item.name.split(' — ').slice(1).join(' — ') }
-        }
-        return item
-      })
-      allItems.push(...cleaned)
+      allItems.push(...project.items)
     }
 
     return {

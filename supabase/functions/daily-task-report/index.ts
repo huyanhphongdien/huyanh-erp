@@ -19,17 +19,12 @@ const CLIENT_ID = Deno.env.get('AZURE_CLIENT_ID') || 'ee1377e6-b52c-4326-88f2-c1
 const CLIENT_SECRET = Deno.env.get('AZURE_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET') || ''
 const SENDER_EMAIL = Deno.env.get('EMAIL_FROM') || Deno.env.get('AZURE_SENDER_EMAIL') || 'huyanhphongdien@huyanhrubber.com'
 
-// ★ CHẾ ĐỘ TEST — Chỉ gửi cho Minh
+// ★ CHÍNH THỨC — Gửi cho 3 người
 const REPORT_RECIPIENTS = [
+  { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com', role: 'Giám đốc' },
+  { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com', role: 'Trợ lý Ban Giám đốc' },
   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com', role: 'IT Manager' },
 ]
-
-// ★ SAU KHI TEST OK — Bỏ comment dòng dưới và comment dòng trên
-// const REPORT_RECIPIENTS = [
-//   { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com', role: 'Giám đốc' },
-//   { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com', role: 'Trợ lý Ban Giám đốc' },
-//   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com', role: 'IT Manager' },
-// ]
 
 const APP_URL = 'https://huyanhrubber.vn'
 

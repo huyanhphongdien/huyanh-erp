@@ -403,9 +403,7 @@ const ProjectReportsTab: React.FC<{
         period_label: periodLabel,
         phases: phases.map(p => ({
           name: p.name, status: p.status, progress_pct: p.progress_pct,
-          planned_start: p.planned_start, planned_end: p.planned_end,
-          actual_start: (p as any).actual_start, actual_end: (p as any).actual_end,
-          color: p.color,
+          planned_start: p.planned_start, planned_end: p.planned_end, color: p.color,
         })),
         milestones: milestones.map(m => ({
           name: m.name, due_date: m.due_date, completed_date: m.completed_date,
@@ -547,64 +545,6 @@ ${hc && hc.adjustments.length > 0 ? `
       <div style="width:95px;font-size:8px;color:#9CA3AF">${fDate(ph.planned_start)} → ${fDate(ph.planned_end)}</div>
     </div>
   `).join('')}
-</div>
-
-<!-- ===== GANTT CHART ===== -->
-<div class="section">
-  <div class="section-title">Biểu đồ Gantt</div>
-  ${phases.length > 0 && project.planned_start && project.planned_end ? (function() {
-    var mn = new Date(project.planned_start).getTime();
-    var mx = new Date(project.planned_end).getTime();
-    var tD = Math.max(1, Math.ceil((mx - mn) / 864e5));
-    var now = new Date();
-    var tp = ((now.getTime() - mn) / (mx - mn) * 100);
-    var showTd = tp >= 0 && tp <= 100;
-    var SC = {completed:'#16A34A',in_progress:'#2563EB',pending:'#9CA3AF',skipped:'#D1D5DB'};
-    var mhH = '';
-    var glH = '';
-    var c = new Date(new Date(mn).getFullYear(), new Date(mn).getMonth(), 1);
-    while (c.getTime() <= mx) {
-      var ms = Math.max(0, Math.ceil((c.getTime() - mn) / 864e5));
-      var nm = new Date(c.getFullYear(), c.getMonth() + 1, 1);
-      var me = Math.min(tD, Math.ceil((nm.getTime() - mn) / 864e5));
-      var sp = (ms / tD * 100).toFixed(1);
-      var wp = ((me - ms) / tD * 100).toFixed(1);
-      var lb = c.toLocaleDateString('vi-VN', {month:'short',year:'2-digit'});
-      mhH += '<div style="position:absolute;left:' + sp + '%;width:' + wp + '%;text-align:center;font-size:7px;color:#9CA3AF;border-left:1px solid #E5E7EB;box-sizing:border-box">' + lb + '</div>';
-      glH += '<div style="position:absolute;left:' + sp + '%;top:0;bottom:0;border-left:1px dashed #F0F0F0"></div>';
-      c.setMonth(c.getMonth() + 1);
-    }
-    var bH = '';
-    phases.forEach(function(ph) {
-      var ps = ph.planned_start ? new Date(ph.planned_start).getTime() : mn;
-      var pe = ph.planned_end ? new Date(ph.planned_end).getTime() : mx;
-      var lp = ((ps - mn) / (mx - mn) * 100).toFixed(1);
-      var wp = (Math.max(1, Math.ceil((pe - ps) / 864e5)) / tD * 100).toFixed(1);
-      var bc = ph.color || (SC as any)[ph.status] || '#6B7280';
-      var pw = (ph.progress_pct / 100 * parseFloat(wp)).toFixed(1);
-      var rd = ph.progress_pct >= 100 ? '3px' : '3px 0 0 3px';
-      bH += '<div style="display:flex;align-items:center;margin-bottom:3px;height:20px">';
-      bH += '<div style="width:130px;font-size:9px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">' + ph.name + '</div>';
-      bH += '<div style="flex:1;position:relative;height:14px">';
-      bH += '<div style="position:absolute;top:2px;left:' + lp + '%;width:' + wp + '%;height:10px;background:#E5E7EB;border-radius:3px;border:1px solid #D1D5DB"></div>';
-      bH += '<div style="position:absolute;top:2px;left:' + lp + '%;width:' + pw + '%;height:10px;background:' + bc + ';border-radius:' + rd + ';opacity:0.85"></div>';
-      bH += '<div style="position:absolute;top:1px;left:' + (parseFloat(lp) + parseFloat(wp) + 0.5).toFixed(1) + '%;font-size:8px;font-weight:700;color:#374151;font-family:monospace;white-space:nowrap">' + ph.progress_pct + '%</div>';
-      bH += '</div></div>';
-    });
-    var tlH = '';
-    if (showTd) {
-      tlH = '<div style="position:absolute;left:' + tp.toFixed(1) + '%;top:0;bottom:0;border-left:2px solid #DC2626;z-index:2"><div style="position:absolute;top:-10px;left:-14px;font-size:6px;color:#DC2626;font-weight:700;background:#fff;padding:0 2px">H\u00F4m nay</div></div>';
-    }
-    var lg = '<div style="display:flex;gap:12px;margin-top:5px;padding-left:130px">';
-    lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:14px;height:5px;background:#2563EB;border-radius:2px;opacity:0.85"></div><span style="font-size:7px;color:#9CA3AF">Ti\u1EBFn \u0111\u1ED9</span></div>';
-    lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:14px;height:5px;background:#E5E7EB;border:1px solid #D1D5DB;border-radius:2px"></div><span style="font-size:7px;color:#9CA3AF">K\u1EBF ho\u1EA1ch</span></div>';
-    if (showTd) { lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:0;height:8px;border-left:2px solid #DC2626"></div><span style="font-size:7px;color:#9CA3AF">H\u00F4m nay</span></div>'; }
-    lg += '</div>';
-    return '<div style="margin-top:2px">' +
-      '<div style="display:flex;align-items:center;margin-bottom:3px"><div style="width:130px"></div><div style="flex:1;position:relative;height:14px">' + mhH + '</div></div>' +
-      '<div style="position:relative"><div style="position:absolute;left:130px;right:30px;top:0;bottom:0">' + glH + tlH + '</div>' + bH + '</div>' +
-      lg + '</div>';
-  })() : '<div style="color:#9CA3AF;font-size:9px;padding:4px 0">Chưa có dữ liệu timeline</div>'}
 </div>
 
 <!-- 3. MILESTONES (FULL) -->

@@ -111,6 +111,141 @@ function progressBar(pct: number, color: string, height = 8): string {
     </div>`
 }
 
+
+// ============================================================================
+// GANTT CHART HTML GENERATOR (for PDF export)
+// ============================================================================
+
+function generateGanttHTML(
+  phases: PDFReportData['phases'],
+  projectStart?: string,
+  projectEnd?: string
+): string {
+  if (!phases.length) return ''
+
+  // Calculate timeline range
+  const allDates: Date[] = []
+  phases.forEach(ph => {
+    if (ph.planned_start) allDates.push(new Date(ph.planned_start))
+    if (ph.planned_end) allDates.push(new Date(ph.planned_end))
+    if (ph.actual_start) allDates.push(new Date(ph.actual_start))
+    if (ph.actual_end) allDates.push(new Date(ph.actual_end))
+  })
+  if (projectStart) allDates.push(new Date(projectStart))
+  if (projectEnd) allDates.push(new Date(projectEnd))
+
+  if (allDates.length < 2) return ''
+
+  const minDate = new Date(Math.min(...allDates.map(d => d.getTime())))
+  const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
+  const totalDays = Math.max(1, Math.ceil((maxDate.getTime() - minDate.getTime()) / 86400000))
+
+  // Generate month headers
+  const months: { label: string; startPct: number; widthPct: number }[] = []
+  const cur = new Date(minDate.getFullYear(), minDate.getMonth(), 1)
+  while (cur <= maxDate) {
+    const mStart = Math.max(0, Math.ceil((cur.getTime() - minDate.getTime()) / 86400000))
+    const nextMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+    const mEnd = Math.min(totalDays, Math.ceil((nextMonth.getTime() - minDate.getTime()) / 86400000))
+    const label = cur.toLocaleDateString('vi-VN', { month: 'short', year: '2-digit' })
+    months.push({
+      label,
+      startPct: (mStart / totalDays) * 100,
+      widthPct: ((mEnd - mStart) / totalDays) * 100,
+    })
+    cur.setMonth(cur.getMonth() + 1)
+  }
+
+  // Today marker
+  const today = new Date()
+  const todayDays = Math.ceil((today.getTime() - minDate.getTime()) / 86400000)
+  const todayPct = (todayDays / totalDays) * 100
+  const showToday = todayPct >= 0 && todayPct <= 100
+
+  // Status colors
+  const STATUS_COLORS: Record<string, string> = {
+    completed: '#16A34A',
+    in_progress: '#2563EB',
+    pending: '#9CA3AF',
+    skipped: '#D1D5DB',
+  }
+
+  // Build phase bars
+  const phaseBars = phases.map(ph => {
+    const pStart = ph.planned_start ? new Date(ph.planned_start) : minDate
+    const pEnd = ph.planned_end ? new Date(ph.planned_end) : maxDate
+    const leftDays = Math.ceil((pStart.getTime() - minDate.getTime()) / 86400000)
+    const widthDays = Math.max(1, Math.ceil((pEnd.getTime() - pStart.getTime()) / 86400000))
+    const leftPct = (leftDays / totalDays) * 100
+    const widthPct = (widthDays / totalDays) * 100
+    const barColor = ph.color || STATUS_COLORS[ph.status] || '#6B7280'
+
+    // Actual bar (if exists)
+    let actualBar = ''
+    if (ph.actual_start) {
+      const aStart = new Date(ph.actual_start)
+      const aEnd = ph.actual_end ? new Date(ph.actual_end) : today
+      const aLeftDays = Math.ceil((aStart.getTime() - minDate.getTime()) / 86400000)
+      const aWidthDays = Math.max(1, Math.ceil((aEnd.getTime() - aStart.getTime()) / 86400000))
+      const aLeftPct = (aLeftDays / totalDays) * 100
+      const aWidthPct = (aWidthDays / totalDays) * 100
+      actualBar = `<div style="position:absolute;top:14px;left:${aLeftPct}%;width:${aWidthPct}%;height:4px;background:${barColor};opacity:0.4;border-radius:2px"></div>`
+    }
+
+    // Progress fill within planned bar
+    const progressWidth = (ph.progress_pct / 100) * widthPct
+
+    return `
+      <div style="display:flex;align-items:center;margin-bottom:2px;height:22px">
+        <div style="width:120px;font-size:8px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px">${ph.name}</div>
+        <div style="flex:1;position:relative;height:22px">
+          <!-- Planned bar (outline) -->
+          <div style="position:absolute;top:3px;left:${leftPct}%;width:${widthPct}%;height:10px;background:#E5E7EB;border-radius:3px;border:1px solid #D1D5DB"></div>
+          <!-- Progress fill -->
+          <div style="position:absolute;top:3px;left:${leftPct}%;width:${progressWidth}%;height:10px;background:${barColor};border-radius:3px ${ph.progress_pct >= 100 ? '3px 3px' : '0 0'} 3px;opacity:0.85"></div>
+          ${actualBar}
+          <!-- Percentage label -->
+          <div style="position:absolute;top:2px;left:${leftPct + widthPct + 0.5}%;font-size:7px;font-weight:700;color:#374151;font-family:'JetBrains Mono',monospace;white-space:nowrap">${ph.progress_pct}%</div>
+        </div>
+      </div>`
+  }).join('')
+
+  // Month grid lines + headers
+  const monthHeaders = months.map(m =>
+    `<div style="position:absolute;left:${m.startPct}%;width:${m.widthPct}%;text-align:center;font-size:7px;color:#9CA3AF;border-left:1px solid #E5E7EB;padding-top:1px">${m.label}</div>`
+  ).join('')
+
+  const monthGridLines = months.map(m =>
+    `<div style="position:absolute;left:${m.startPct}%;top:0;bottom:0;border-left:1px dashed #F3F4F6"></div>`
+  ).join('')
+
+  return `
+    <div style="margin-top:2px">
+      <!-- Month headers -->
+      <div style="display:flex;align-items:center;margin-bottom:2px">
+        <div style="width:120px"></div>
+        <div style="flex:1;position:relative;height:14px">
+          ${monthHeaders}
+        </div>
+      </div>
+      <!-- Phase bars with grid -->
+      <div style="position:relative">
+        <!-- Grid overlay (behind bars) -->
+        <div style="position:absolute;left:120px;right:40px;top:0;bottom:0">
+          ${monthGridLines}
+          ${showToday ? `<div style="position:absolute;left:${todayPct}%;top:0;bottom:0;border-left:2px solid #DC2626;z-index:2"><div style="position:absolute;top:-10px;left:-12px;font-size:6px;color:#DC2626;font-weight:700;background:white;padding:0 2px">H\u00F4m nay</div></div>` : ''}
+        </div>
+        ${phaseBars}
+      </div>
+      <!-- Legend -->
+      <div style="display:flex;gap:12px;margin-top:4px;padding-left:120px">
+        <div style="display:flex;align-items:center;gap:3px"><div style="width:16px;height:6px;background:#2563EB;border-radius:2px;opacity:0.85"></div><span style="font-size:7px;color:#9CA3AF">Ti\u1EBFn \u0111\u1ED9 th\u1EF1c t\u1EBF</span></div>
+        <div style="display:flex;align-items:center;gap:3px"><div style="width:16px;height:6px;background:#E5E7EB;border:1px solid #D1D5DB;border-radius:2px"></div><span style="font-size:7px;color:#9CA3AF">K\u1EBF ho\u1EA1ch</span></div>
+        ${showToday ? '<div style="display:flex;align-items:center;gap:3px"><div style="width:0;height:8px;border-left:2px solid #DC2626"></div><span style="font-size:7px;color:#9CA3AF">H\u00F4m nay</span></div>' : ''}
+      </div>
+    </div>`
+}
+
 // ============================================================================
 // MAIN EXPORT FUNCTION
 // ============================================================================
@@ -234,64 +369,6 @@ export function exportStatusReportPDF(data: PDFReportData): void {
       <div class="progress-status">${STATUS_VI[ph.status] || ph.status}</div>
     </div>
   `).join('')}
-</div>
-
-<!-- ===== GANTT CHART ===== -->
-<div class="section">
-  <div class="section-title">Biểu đồ Gantt</div>
-  ${data.phases.length > 0 && data.project.planned_start && data.project.planned_end ? (function() {
-    var mn = new Date(data.project.planned_start).getTime();
-    var mx = new Date(data.project.planned_end).getTime();
-    var tD = Math.max(1, Math.ceil((mx - mn) / 864e5));
-    var now = new Date();
-    var tp = ((now.getTime() - mn) / (mx - mn) * 100);
-    var showTd = tp >= 0 && tp <= 100;
-    var SC = {completed:'#16A34A',in_progress:'#2563EB',pending:'#9CA3AF',skipped:'#D1D5DB'};
-    var mhH = '';
-    var glH = '';
-    var c = new Date(new Date(mn).getFullYear(), new Date(mn).getMonth(), 1);
-    while (c.getTime() <= mx) {
-      var ms = Math.max(0, Math.ceil((c.getTime() - mn) / 864e5));
-      var nm = new Date(c.getFullYear(), c.getMonth() + 1, 1);
-      var me = Math.min(tD, Math.ceil((nm.getTime() - mn) / 864e5));
-      var sp = (ms / tD * 100).toFixed(1);
-      var wp = ((me - ms) / tD * 100).toFixed(1);
-      var lb = c.toLocaleDateString('vi-VN', {month:'short',year:'2-digit'});
-      mhH += '<div style="position:absolute;left:' + sp + '%;width:' + wp + '%;text-align:center;font-size:7px;color:#9CA3AF;border-left:1px solid #E5E7EB;box-sizing:border-box">' + lb + '</div>';
-      glH += '<div style="position:absolute;left:' + sp + '%;top:0;bottom:0;border-left:1px dashed #F0F0F0"></div>';
-      c.setMonth(c.getMonth() + 1);
-    }
-    var bH = '';
-    data.phases.forEach(function(ph) {
-      var ps = ph.planned_start ? new Date(ph.planned_start).getTime() : mn;
-      var pe = ph.planned_end ? new Date(ph.planned_end).getTime() : mx;
-      var lp = ((ps - mn) / (mx - mn) * 100).toFixed(1);
-      var wp = (Math.max(1, Math.ceil((pe - ps) / 864e5)) / tD * 100).toFixed(1);
-      var bc = ph.color || SC[ph.status] || '#6B7280';
-      var pw = (ph.progress_pct / 100 * parseFloat(wp)).toFixed(1);
-      var rd = ph.progress_pct >= 100 ? '3px' : '3px 0 0 3px';
-      bH += '<div style="display:flex;align-items:center;margin-bottom:3px;height:20px">';
-      bH += '<div style="width:130px;font-size:9px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">' + ph.name + '</div>';
-      bH += '<div style="flex:1;position:relative;height:14px">';
-      bH += '<div style="position:absolute;top:2px;left:' + lp + '%;width:' + wp + '%;height:10px;background:#E5E7EB;border-radius:3px;border:1px solid #D1D5DB"></div>';
-      bH += '<div style="position:absolute;top:2px;left:' + lp + '%;width:' + pw + '%;height:10px;background:' + bc + ';border-radius:' + rd + ';opacity:0.85"></div>';
-      bH += '<div style="position:absolute;top:1px;left:' + (parseFloat(lp) + parseFloat(wp) + 0.5).toFixed(1) + '%;font-size:8px;font-weight:700;color:#374151;font-family:monospace;white-space:nowrap">' + ph.progress_pct + '%</div>';
-      bH += '</div></div>';
-    });
-    var tlH = '';
-    if (showTd) {
-      tlH = '<div style="position:absolute;left:' + tp.toFixed(1) + '%;top:0;bottom:0;border-left:2px solid #DC2626;z-index:2"><div style="position:absolute;top:-10px;left:-14px;font-size:6px;color:#DC2626;font-weight:700;background:#fff;padding:0 2px">H\u00F4m nay</div></div>';
-    }
-    var lg = '<div style="display:flex;gap:12px;margin-top:5px;padding-left:130px">';
-    lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:14px;height:5px;background:#2563EB;border-radius:2px;opacity:0.85"></div><span style="font-size:7px;color:#9CA3AF">Ti\u1EBFn \u0111\u1ED9</span></div>';
-    lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:14px;height:5px;background:#E5E7EB;border:1px solid #D1D5DB;border-radius:2px"></div><span style="font-size:7px;color:#9CA3AF">K\u1EBF ho\u1EA1ch</span></div>';
-    if (showTd) { lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:0;height:8px;border-left:2px solid #DC2626"></div><span style="font-size:7px;color:#9CA3AF">H\u00F4m nay</span></div>'; }
-    lg += '</div>';
-    return '<div style="margin-top:2px">' +
-      '<div style="display:flex;align-items:center;margin-bottom:3px"><div style="width:130px"></div><div style="flex:1;position:relative;height:14px">' + mhH + '</div></div>' +
-      '<div style="position:relative"><div style="position:absolute;left:130px;right:30px;top:0;bottom:0">' + glH + tlH + '</div>' + bH + '</div>' +
-      lg + '</div>';
-  })() : '<div style="color:#9CA3AF;font-size:9px;padding:4px 0">Chưa có dữ liệu timeline</div>'}
 </div>
 
 <div class="two-col">

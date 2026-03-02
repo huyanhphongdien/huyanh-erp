@@ -549,62 +549,50 @@ ${hc && hc.adjustments.length > 0 ? `
   `).join('')}
 </div>
 
-<!-- ===== GANTT CHART ===== -->
+<!-- 2b. GANTT CHART -->
 <div class="section">
-  <div class="section-title">Biểu đồ Gantt</div>
-  ${phases.length > 0 && project.planned_start && project.planned_end ? (function() {
-    var mn = new Date(project.planned_start).getTime();
-    var mx = new Date(project.planned_end).getTime();
-    var tD = Math.max(1, Math.ceil((mx - mn) / 864e5));
-    var now = new Date();
-    var tp = ((now.getTime() - mn) / (mx - mn) * 100);
-    var showTd = tp >= 0 && tp <= 100;
-    var SC = {completed:'#16A34A',in_progress:'#2563EB',pending:'#9CA3AF',skipped:'#D1D5DB'};
-    var mhH = '';
-    var glH = '';
-    var c = new Date(new Date(mn).getFullYear(), new Date(mn).getMonth(), 1);
-    while (c.getTime() <= mx) {
-      var ms = Math.max(0, Math.ceil((c.getTime() - mn) / 864e5));
-      var nm = new Date(c.getFullYear(), c.getMonth() + 1, 1);
-      var me = Math.min(tD, Math.ceil((nm.getTime() - mn) / 864e5));
-      var sp = (ms / tD * 100).toFixed(1);
-      var wp = ((me - ms) / tD * 100).toFixed(1);
-      var lb = c.toLocaleDateString('vi-VN', {month:'short',year:'2-digit'});
-      mhH += '<div style="position:absolute;left:' + sp + '%;width:' + wp + '%;text-align:center;font-size:7px;color:#9CA3AF;border-left:1px solid #E5E7EB;box-sizing:border-box">' + lb + '</div>';
-      glH += '<div style="position:absolute;left:' + sp + '%;top:0;bottom:0;border-left:1px dashed #F0F0F0"></div>';
-      c.setMonth(c.getMonth() + 1);
+  <div class="section-title">Bi\u1EC3u \u0111\u1ED3 Gantt</div>
+  \${(() => {
+    const allDates: Date[] = []
+    phases.forEach((ph: any) => {
+      if (ph.planned_start) allDates.push(new Date(ph.planned_start))
+      if (ph.planned_end) allDates.push(new Date(ph.planned_end))
+    })
+    if (project.planned_start) allDates.push(new Date(project.planned_start))
+    if (project.planned_end) allDates.push(new Date(project.planned_end))
+    if (allDates.length < 2) return '<div style="color:#9CA3AF;font-size:9px">Ch\u01B0a c\u00F3 d\u1EEF li\u1EC7u timeline</div>'
+    const minD = new Date(Math.min(...allDates.map(d => d.getTime())))
+    const maxD = new Date(Math.max(...allDates.map(d => d.getTime())))
+    const totalD = Math.max(1, Math.ceil((maxD.getTime() - minD.getTime()) / 86400000))
+    const months: {label:string;startPct:number;widthPct:number}[] = []
+    const c = new Date(minD.getFullYear(), minD.getMonth(), 1)
+    while (c <= maxD) {
+      const ms = Math.max(0, Math.ceil((c.getTime() - minD.getTime()) / 86400000))
+      const nm = new Date(c.getFullYear(), c.getMonth()+1, 1)
+      const me = Math.min(totalD, Math.ceil((nm.getTime() - minD.getTime()) / 86400000))
+      months.push({label: c.toLocaleDateString('vi-VN',{month:'short',year:'2-digit'}), startPct:(ms/totalD)*100, widthPct:((me-ms)/totalD)*100})
+      c.setMonth(c.getMonth()+1)
     }
-    var bH = '';
-    phases.forEach(function(ph) {
-      var ps = ph.planned_start ? new Date(ph.planned_start).getTime() : mn;
-      var pe = ph.planned_end ? new Date(ph.planned_end).getTime() : mx;
-      var lp = ((ps - mn) / (mx - mn) * 100).toFixed(1);
-      var wp = (Math.max(1, Math.ceil((pe - ps) / 864e5)) / tD * 100).toFixed(1);
-      var bc = ph.color || (SC as any)[ph.status] || '#6B7280';
-      var pw = (ph.progress_pct / 100 * parseFloat(wp)).toFixed(1);
-      var rd = ph.progress_pct >= 100 ? '3px' : '3px 0 0 3px';
-      bH += '<div style="display:flex;align-items:center;margin-bottom:3px;height:20px">';
-      bH += '<div style="width:130px;font-size:9px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">' + ph.name + '</div>';
-      bH += '<div style="flex:1;position:relative;height:14px">';
-      bH += '<div style="position:absolute;top:2px;left:' + lp + '%;width:' + wp + '%;height:10px;background:#E5E7EB;border-radius:3px;border:1px solid #D1D5DB"></div>';
-      bH += '<div style="position:absolute;top:2px;left:' + lp + '%;width:' + pw + '%;height:10px;background:' + bc + ';border-radius:' + rd + ';opacity:0.85"></div>';
-      bH += '<div style="position:absolute;top:1px;left:' + (parseFloat(lp) + parseFloat(wp) + 0.5).toFixed(1) + '%;font-size:8px;font-weight:700;color:#374151;font-family:monospace;white-space:nowrap">' + ph.progress_pct + '%</div>';
-      bH += '</div></div>';
-    });
-    var tlH = '';
-    if (showTd) {
-      tlH = '<div style="position:absolute;left:' + tp.toFixed(1) + '%;top:0;bottom:0;border-left:2px solid #DC2626;z-index:2"><div style="position:absolute;top:-10px;left:-14px;font-size:6px;color:#DC2626;font-weight:700;background:#fff;padding:0 2px">H\u00F4m nay</div></div>';
-    }
-    var lg = '<div style="display:flex;gap:12px;margin-top:5px;padding-left:130px">';
-    lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:14px;height:5px;background:#2563EB;border-radius:2px;opacity:0.85"></div><span style="font-size:7px;color:#9CA3AF">Ti\u1EBFn \u0111\u1ED9</span></div>';
-    lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:14px;height:5px;background:#E5E7EB;border:1px solid #D1D5DB;border-radius:2px"></div><span style="font-size:7px;color:#9CA3AF">K\u1EBF ho\u1EA1ch</span></div>';
-    if (showTd) { lg += '<div style="display:flex;align-items:center;gap:3px"><div style="width:0;height:8px;border-left:2px solid #DC2626"></div><span style="font-size:7px;color:#9CA3AF">H\u00F4m nay</span></div>'; }
-    lg += '</div>';
-    return '<div style="margin-top:2px">' +
-      '<div style="display:flex;align-items:center;margin-bottom:3px"><div style="width:130px"></div><div style="flex:1;position:relative;height:14px">' + mhH + '</div></div>' +
-      '<div style="position:relative"><div style="position:absolute;left:130px;right:30px;top:0;bottom:0">' + glH + tlH + '</div>' + bH + '</div>' +
-      lg + '</div>';
-  })() : '<div style="color:#9CA3AF;font-size:9px;padding:4px 0">Chưa có dữ liệu timeline</div>'}
+    const td = new Date()
+    const tdD = Math.ceil((td.getTime() - minD.getTime()) / 86400000)
+    const tdP = (tdD/totalD)*100
+    const showTd = tdP >= 0 && tdP <= 100
+    const SC: Record<string,string> = {completed:'#16A34A',in_progress:'#2563EB',pending:'#9CA3AF',skipped:'#D1D5DB'}
+    const bars = phases.sort((a:any,b:any)=>(a.order_index||0)-(b.order_index||0)).map((ph: any) => {
+      const ps = ph.planned_start ? new Date(ph.planned_start) : minD
+      const pe = ph.planned_end ? new Date(ph.planned_end) : maxD
+      const ld = Math.ceil((ps.getTime()-minD.getTime())/86400000)
+      const wd = Math.max(1, Math.ceil((pe.getTime()-ps.getTime())/86400000))
+      const lp = (ld/totalD)*100
+      const wp = (wd/totalD)*100
+      const bc = ph.color || SC[ph.status] || '#6B7280'
+      const pw = (ph.progress_pct/100)*wp
+      return '<div style="display:flex;align-items:center;margin-bottom:2px;height:22px"><div style="width:120px;font-size:8px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px">'+ph.name+'</div><div style="flex:1;position:relative;height:22px"><div style="position:absolute;top:3px;left:'+lp+'%;width:'+wp+'%;height:10px;background:#E5E7EB;border-radius:3px;border:1px solid #D1D5DB"></div><div style="position:absolute;top:3px;left:'+lp+'%;width:'+pw+'%;height:10px;background:'+bc+';border-radius:3px '+(ph.progress_pct>=100?'3px 3px':'0 0')+' 3px;opacity:0.85"></div><div style="position:absolute;top:2px;left:'+(lp+wp+0.5)+'%;font-size:7px;font-weight:700;color:#374151;font-family:\'JetBrains Mono\',monospace;white-space:nowrap">'+ph.progress_pct+'%</div></div></div>'
+    }).join('')
+    const mh = months.map(m => '<div style="position:absolute;left:'+m.startPct+'%;width:'+m.widthPct+'%;text-align:center;font-size:7px;color:#9CA3AF;border-left:1px solid #E5E7EB;padding-top:1px">'+m.label+'</div>').join('')
+    const mg = months.map(m => '<div style="position:absolute;left:'+m.startPct+'%;top:0;bottom:0;border-left:1px dashed #F3F4F6"></div>').join('')
+    return '<div style="margin-top:2px"><div style="display:flex;align-items:center;margin-bottom:2px"><div style="width:120px"></div><div style="flex:1;position:relative;height:14px">'+mh+'</div></div><div style="position:relative"><div style="position:absolute;left:120px;right:40px;top:0;bottom:0">'+mg+(showTd?'<div style="position:absolute;left:'+tdP+'%;top:0;bottom:0;border-left:2px solid #DC2626;z-index:2"><div style="position:absolute;top:-10px;left:-12px;font-size:6px;color:#DC2626;font-weight:700;background:white;padding:0 2px">H\u00F4m nay</div></div>':'')+'</div>'+bars+'</div><div style="display:flex;gap:12px;margin-top:4px;padding-left:120px"><div style="display:flex;align-items:center;gap:3px"><div style="width:16px;height:6px;background:#2563EB;border-radius:2px;opacity:0.85"></div><span style="font-size:7px;color:#9CA3AF">Ti\u1EBFn \u0111\u1ED9</span></div><div style="display:flex;align-items:center;gap:3px"><div style="width:16px;height:6px;background:#E5E7EB;border:1px solid #D1D5DB;border-radius:2px"></div><span style="font-size:7px;color:#9CA3AF">K\u1EBF ho\u1EA1ch</span></div>'+(showTd?'<div style="display:flex;align-items:center;gap:3px"><div style="width:0;height:8px;border-left:2px solid #DC2626"></div><span style="font-size:7px;color:#9CA3AF">H\u00F4m nay</span></div>':'')+'</div></div>'
+  })()}
 </div>
 
 <!-- 3. MILESTONES (FULL) -->

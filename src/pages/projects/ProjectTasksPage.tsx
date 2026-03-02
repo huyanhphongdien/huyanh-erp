@@ -81,7 +81,7 @@ const KANBAN_COLUMNS: { key: TaskStatus[]; label: string; headerColor: string }[
   { key: ['draft', 'pending'],  label: 'Chờ làm',    headerColor: 'border-gray-400' },
   { key: ['in_progress'],      label: 'Đang làm',   headerColor: 'border-blue-500' },
   { key: ['review'],           label: 'Chờ duyệt',  headerColor: 'border-purple-500' },
-  { key: ['completed', 'finished'], label: 'Hoàn thành', headerColor: 'border-emerald-500' },
+  { key: ['completed'], label: 'Hoàn thành', headerColor: 'border-emerald-500' },
 ]
 
 // ============================================================================
@@ -473,7 +473,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           const phase = phases.find(p => p.id === key)
           const phaseTasks = tasksByPhase.get(key) || []
           const expanded = expandedPhases.has(key)
-          const completedCount = phaseTasks.filter(t => t.status === 'completed' || t.status === 'finished').length
+          const completedCount = phaseTasks.filter(t => t.status === 'completed').length
 
           // Phase stat from stats
           const phaseStat = stats?.by_phase.find(s => s.phase_id === key)

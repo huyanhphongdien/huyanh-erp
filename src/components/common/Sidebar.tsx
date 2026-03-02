@@ -9,6 +9,10 @@
 // - Company name: Công ty TNHH MTV Cao su Huy Anh Phong Điền
 // LOGIC: 100% unchanged - same permissions, badges, collapsible, mobile
 // ============================================================
+// CẬP NHẬT: Thêm group MUA HÀNG với requirePurchaseAccess
+// - Chỉ hiện cho user có purchase_access hoặc Admin/Executive
+// - User anhttm@minhanhsupplychain.com sẽ thấy menu sau khi cấp quyền
+// ============================================================
 
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -105,7 +109,7 @@ interface MenuGroup {
 }
 
 // ============================================================
-// MENU CONFIG (unchanged content, same groups/items)
+// MENU CONFIG - CẬP NHẬT: Thêm group MUA HÀNG
 // ============================================================
 
 const getMenuGroups = (
@@ -176,6 +180,29 @@ const getMenuGroups = (
       { path: '/projects/templates', label: 'Templates', icon: <Copy size={18} /> },
     ],
   },
+
+  // ============================================================
+  // ★ MUA HÀNG — CHỈ HIỆN KHI CÓ PURCHASE ACCESS ★
+  // ============================================================
+  {
+    title: 'MUA HÀNG',
+    icon: <ShoppingCart size={18} />,
+    collapsible: true,
+    requirePurchaseAccess: true,
+    items: [
+      { path: '/purchasing/suppliers', label: 'Nhà cung cấp', icon: <Building2 size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/categories', label: 'Nhóm vật tư', icon: <Layers size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/types', label: 'Loại vật tư', icon: <Tag size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/units', label: 'Đơn vị tính', icon: <Scale size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/materials', label: 'Vật tư', icon: <Package size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/variant-attributes', label: 'Thuộc tính biến thể', icon: <Boxes size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/orders', label: 'Đơn đặt hàng', icon: <ShoppingCart size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/debt', label: 'Công nợ NCC', icon: <DollarSign size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/payments', label: 'Lịch sử thanh toán', icon: <CreditCard size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/reports', label: 'Báo cáo mua hàng', icon: <TrendingUp size={18} />, requirePurchaseAccess: true },
+    ],
+  },
+
   {
     title: 'QUẢN TRỊ',
     icon: <Shield size={18} />,
@@ -213,14 +240,17 @@ export function Sidebar() {
     'KHO THÀNH PHẨM': true,
     'LÝ LỊCH MỦ': true,
     'THU MUA MỦ': true,
+    'MUA HÀNG': true,
     'QUẢN LÝ NHÂN SỰ': true,
     'CHẤM CÔNG': false,
     'QUẢN LÝ ĐƠN HÀNG': true,
     'QUẢN LÝ DỰ ÁN': false,
   });
 
-  const [hasPurchaseAccess, setHasPurchaseAccess] = useState(true);
+  // ★ Purchase access state
+  const [hasPurchaseAccess, setHasPurchaseAccess] = useState(false);
   const [loadingPurchaseAccess, setLoadingPurchaseAccess] = useState(false);
+  
   const [pendingOTCount, setPendingOTCount] = useState(0);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -231,6 +261,39 @@ export function Sidebar() {
   const isBGD = isAdmin || userLevel <= 3;
   const canApproveOT = userLevel >= 4 && userLevel <= 5;
   const isManager = user?.role === 'admin' || user?.role === 'manager' || user?.is_manager;
+
+  // ── ★ Check purchase access ──
+  useEffect(() => {
+    const checkPurchaseAccess = async () => {
+      try {
+        setLoadingPurchaseAccess(true);
+        
+        // Admin và Executive tự động có quyền
+        if (isAdmin || isExecutive) {
+          setHasPurchaseAccess(true);
+          setLoadingPurchaseAccess(false);
+          return;
+        }
+        
+        try {
+          const hasAccess = await purchaseAccessService.hasAccess();
+          setHasPurchaseAccess(hasAccess);
+        } catch (serviceError) {
+          console.warn('Purchase access check failed:', serviceError);
+          setHasPurchaseAccess(false);
+        }
+      } catch (error) {
+        console.error('Check purchase access error:', error);
+        setHasPurchaseAccess(false);
+      } finally {
+        setLoadingPurchaseAccess(false);
+      }
+    };
+
+    if (user) {
+      checkPurchaseAccess();
+    }
+  }, [user, isAdmin, isExecutive]);
 
   // ── Load pending OT count (unchanged) ──
   useEffect(() => {
@@ -309,7 +372,7 @@ export function Sidebar() {
     setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));
   };
 
-  // ── Permission checks (unchanged) ──
+  // ── Permission checks — ★ CẬP NHẬT: thêm check requirePurchaseAccess ──
   const isItemVisible = (item: MenuItem): boolean => {
     if (isAdmin) return true;
     if (item.managerOnly && !isManager) return false;

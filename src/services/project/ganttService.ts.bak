@@ -257,9 +257,8 @@ export const ganttService = {
 
     // Phase items
     for (const phase of phases) {
-      // ✅ FIX: Ưu tiên planned dates cho Gantt (kế hoạch), fallback actual
-      const start = toDateOnly(phase.planned_start) || toDateOnly(phase.actual_start)
-      const end = toDateOnly(phase.planned_end) || toDateOnly(phase.actual_end)
+      const start = toDateOnly(phase.actual_start) || toDateOnly(phase.planned_start)
+      const end = toDateOnly(phase.actual_end) || toDateOnly(phase.planned_end)
 
       items.push({
         id: phase.id,
@@ -646,7 +645,7 @@ export const ganttService = {
 
       items.push({
         id: project.id,
-        name: project.name,
+        name: `${project.code} — ${project.name}`,
         type: 'project',
         start: toDateOnly(project.planned_start),
         end: toDateOnly(project.planned_end),
@@ -659,9 +658,8 @@ export const ganttService = {
       })
 
       for (const phase of pPhases) {
-        // ✅ FIX: Ưu tiên planned dates cho Gantt
-        const start = toDateOnly(phase.planned_start) || toDateOnly(phase.actual_start)
-        const end = toDateOnly(phase.planned_end) || toDateOnly(phase.actual_end)
+        const start = toDateOnly(phase.actual_start) || toDateOnly(phase.planned_start)
+        const end = toDateOnly(phase.actual_end) || toDateOnly(phase.planned_end)
         items.push({
           id: phase.id, name: phase.name, type: 'phase',
           start, end,

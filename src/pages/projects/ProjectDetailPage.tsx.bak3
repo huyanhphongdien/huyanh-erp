@@ -1800,11 +1800,6 @@ export const ProjectDetailPage: React.FC = () => {
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [realProjectId, setRealProjectId] = useState<string | null>(null)
 
-  // ✅ Inline edit tên dự án
-  const [editingName, setEditingName] = useState(false)
-  const [editName, setEditName] = useState('')
-  const [savingName, setSavingName] = useState(false)
-
   // ✅ AUTO-PROGRESS state
   const [progressMode, setProgressMode] = useState<ProgressMode>('auto')
   const [refreshing, setRefreshing] = useState(false)
@@ -2044,67 +2039,6 @@ export const ProjectDetailPage: React.FC = () => {
 
   const allowedTransitions = VALID_TRANSITIONS[project.status] || []
 
-  // ✅ Inline edit tên dự án
-  const handleStartEditName = () => {
-    setEditName(project.name)
-    setEditingName(true)
-  }
-
-  const handleSaveName = async () => {
-    const trimmed = editName.trim()
-    if (!trimmed) {
-      alert('Tên dự án không được để trống')
-      return
-    }
-    if (trimmed === project.name) {
-      setEditingName(false)
-      return
-    }
-    if (!realProjectId) return
-
-    setSavingName(true)
-    try {
-      const { error } = await supabase.from('projects')
-        .update({ name: trimmed, updated_at: new Date().toISOString() })
-        .eq('id', realProjectId)
-
-      if (error) {
-        alert('Lỗi cập nhật tên: ' + error.message)
-        return
-      }
-
-      setProject(prev => ({ ...prev, name: trimmed }))
-      setEditingName(false)
-
-      // Log activity (non-blocking)
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (!user) return
-        supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle()
-          .then(({ data: emp }) => {
-            supabase.from('project_activities').insert({
-              project_id: realProjectId,
-              action: 'updated',
-              entity_type: 'project',
-              entity_id: realProjectId,
-              actor_id: emp?.id,
-              old_value: { name: project.name },
-              new_value: { name: trimmed },
-              description: `Đổi tên dự án: "${project.name}" → "${trimmed}"`,
-            })
-          })
-      })
-    } catch (e: any) {
-      alert('Lỗi: ' + (e.message || 'Không xác định'))
-    } finally {
-      setSavingName(false)
-    }
-  }
-
-  const handleCancelEditName = () => {
-    setEditingName(false)
-    setEditName('')
-  }
-
   // ✅ FIX: Check .error, validate transitions, auto actual dates, log activity
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     setShowStatusMenu(false)
@@ -2224,118 +2158,50 @@ export const ProjectDetailPage: React.FC = () => {
     }
   }
 
-  // ✅ FIX v4: Xóa Phase cascade — xóa luôn tasks + tất cả FK liên quan
+  // ✅ FIX v2: Xử lý FK milestones + tasks trước khi xóa, reindex, recalc progress
   const handlePhaseDelete = async (phaseId: string) => {
-    // Đếm tasks để hiển thị cảnh báo
-    const { count: taskCount } = await supabase
-      .from('tasks')
-      .select('id', { count: 'exact', head: true })
-      .eq('phase_id', phaseId)
-
-    const phaseName = phases.find(p => p.id === phaseId)?.name || 'này'
-    const taskWarning = taskCount && taskCount > 0
-      ? `\n⚠️ ${taskCount} công việc trong giai đoạn sẽ bị XÓA VĨNH VIỄN!`
-      : ''
-
-    if (!confirm(`Xóa giai đoạn "${phaseName}"?${taskWarning}\n\nMilestones sẽ được chuyển về cấp dự án.`)) return
-
+    if (!confirm('Xóa giai đoạn này?\n- Milestones sẽ được chuyển về cấp dự án\n- Tasks sẽ được gỡ liên kết phase')) return
     try {
-      // ── 1. Unlink milestones → set phase_id = null ──
-      const { error: msError } = await supabase
+      // 1. Unlink milestones → set phase_id = null
+      const { count: msCount } = await supabase
         .from('project_milestones')
-        .update({ phase_id: null })
+        .select('id', { count: 'exact', head: true })
         .eq('phase_id', phaseId)
 
-      if (msError) {
-        console.error('Unlink milestones failed:', msError)
-        alert('Không thể gỡ milestones: ' + msError.message)
-        return
-      }
-
-      // ── 2. Cascade delete tasks + tất cả FK children ──
-      if (taskCount && taskCount > 0) {
-        // Lấy danh sách task IDs thuộc phase
-        const { data: tasksInPhase } = await supabase
-          .from('tasks')
-          .select('id')
+      if (msCount && msCount > 0) {
+        const { error: msError } = await supabase
+          .from('project_milestones')
+          .update({ phase_id: null })
           .eq('phase_id', phaseId)
 
-        const taskIds = (tasksInPhase || []).map(t => t.id)
-
-        if (taskIds.length > 0) {
-          // Xóa theo đúng thứ tự FK dependency:
-
-          // 2a. task_assignments.approval_id = null (FK → task_approvals)
-          await supabase.from('task_assignments')
-            .update({ approval_id: null })
-            .in('task_id', taskIds)
-
-          // 2b. task_assignments (FK → tasks)
-          const { error: e1 } = await supabase
-            .from('task_assignments')
-            .delete()
-            .in('task_id', taskIds)
-          if (e1) console.warn('Delete task_assignments:', e1.message)
-
-          // 2c. task_approvals (FK → tasks, task_self_evaluations)
-          const { error: e2 } = await supabase
-            .from('task_approvals')
-            .delete()
-            .in('task_id', taskIds)
-          if (e2) console.warn('Delete task_approvals:', e2.message)
-
-          // 2d. task_self_evaluations (FK → tasks)
-          const { error: e3 } = await supabase
-            .from('task_self_evaluations')
-            .delete()
-            .in('task_id', taskIds)
-          if (e3) console.warn('Delete task_self_evaluations:', e3.message)
-
-          // 2e. task_comments (FK → tasks)
-          const { error: e4 } = await supabase
-            .from('task_comments')
-            .delete()
-            .in('task_id', taskIds)
-          if (e4) console.warn('Delete task_comments:', e4.message)
-
-          // 2f. task_attachments (FK → tasks)
-          const { error: e5 } = await supabase
-            .from('task_attachments')
-            .delete()
-            .in('task_id', taskIds)
-          if (e5) console.warn('Delete task_attachments:', e5.message)
-
-          // 2g. task_activities (FK → tasks)
-          const { error: e6 } = await supabase
-            .from('task_activities')
-            .delete()
-            .in('task_id', taskIds)
-          if (e6) console.warn('Delete task_activities:', e6.message)
-
-          // 2h. Xóa subtasks trước (parent_task_id → tasks)
-          const { error: e7 } = await supabase
-            .from('tasks')
-            .delete()
-            .in('parent_task_id', taskIds)
-          if (e7) console.warn('Delete subtasks:', e7.message)
-
-          // 2i. Xóa tasks chính
-          const { error: taskError } = await supabase
-            .from('tasks')
-            .delete()
-            .in('id', taskIds)
-
-          if (taskError) {
-            console.error('Delete tasks failed:', taskError)
-            alert('Xóa công việc thất bại: ' + taskError.message)
-            return
-          }
-
-          console.log(`✅ Deleted ${taskIds.length} tasks from phase "${phaseName}"`)
+        if (msError) {
+          console.error('Unlink milestones failed:', msError)
+          alert('Không thể gỡ milestones khỏi giai đoạn: ' + msError.message)
+          return
         }
       }
 
-      // ── 3. Xóa phase ──
+      // 2. Unlink tasks → set phase_id = null (fix tasks_phase_id_fkey)
+      const { count: taskCount } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('phase_id', phaseId)
+
+      if (taskCount && taskCount > 0) {
+        const { error: taskError } = await supabase
+          .from('tasks')
+          .update({ phase_id: null })
+          .eq('phase_id', phaseId)
+
+        if (taskError) {
+          console.error('Unlink tasks failed:', taskError)
+          alert('Không thể gỡ tasks khỏi giai đoạn: ' + taskError.message)
+          return
+        }
+        console.log(`✅ Unlinked ${taskCount} tasks from phase ${phaseId}`)
+      }
+
+      // 3. Xóa phase
       const { error } = await supabase
         .from('project_phases')
         .delete()
@@ -2347,7 +2213,7 @@ export const ProjectDetailPage: React.FC = () => {
         return
       }
 
-      // ── 4. Recalculate project progress + reindex ──
+      // 3. Recalculate project progress + reindex
       if (realProjectId) {
         const { data: remaining } = await supabase
           .from('project_phases')
@@ -2356,6 +2222,7 @@ export const ProjectDetailPage: React.FC = () => {
           .order('order_index', { ascending: true })
 
         if (remaining && remaining.length > 0) {
+          // Reindex order
           for (let i = 0; i < remaining.length; i++) {
             if (remaining[i].order_index !== i) {
               await supabase.from('project_phases')
@@ -2364,6 +2231,7 @@ export const ProjectDetailPage: React.FC = () => {
             }
           }
 
+          // Recalc progress (excluding skipped)
           const active = remaining.filter((p: any) => p.status !== 'skipped')
           const avg = active.length > 0
             ? Math.round(active.reduce((s: number, p: any) => s + (Number(p.progress_pct) || 0), 0) / active.length * 100) / 100
@@ -2481,56 +2349,18 @@ export const ProjectDetailPage: React.FC = () => {
                 {project.code}
               </span>
             </div>
-            {!editingName && (
-              <button
-                onClick={handleStartEditName}
-                className="p-2 rounded-xl active:bg-gray-100"
-                title="Sửa tên dự án"
-              >
-                <Edit3 className="w-5 h-5 text-gray-500" />
-              </button>
-            )}
+            <button
+              onClick={() => navigate(`/projects/${realProjectId || id}/edit`)}
+              className="p-2 rounded-xl active:bg-gray-100"
+            >
+              <Edit3 className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
 
           <div className="pb-3">
-            {editingName ? (
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveName()
-                    if (e.key === 'Escape') handleCancelEditName()
-                  }}
-                  className="flex-1 text-[18px] sm:text-[20px] font-bold text-gray-900 leading-snug
-                    px-3 py-1.5 bg-gray-50 border border-[#2D8B6E] rounded-lg
-                    outline-none focus:ring-2 focus:ring-[#2D8B6E]/20"
-                  autoFocus
-                  disabled={savingName}
-                />
-                <button
-                  onClick={handleSaveName}
-                  disabled={savingName || !editName.trim()}
-                  className="p-2 rounded-lg bg-[#1B4D3E] text-white active:scale-95 disabled:opacity-50"
-                  title="Lưu"
-                >
-                  {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={handleCancelEditName}
-                  disabled={savingName}
-                  className="p-2 rounded-lg bg-gray-100 text-gray-500 active:scale-95"
-                  title="Hủy (Esc)"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <h1 className="text-[18px] sm:text-[20px] font-bold text-gray-900 leading-snug mb-2">
-                {project.name}
-              </h1>
-            )}
+            <h1 className="text-[18px] sm:text-[20px] font-bold text-gray-900 leading-snug mb-2">
+              {project.name}
+            </h1>
             <div className="flex items-center flex-wrap gap-2">
               <div className="relative">
                 <button

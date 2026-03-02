@@ -203,6 +203,7 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) // YYYY-MM-DD
   const todayStart = `${today}T00:00:00+07:00`
   const todayEnd = `${today}T23:59:59+07:00`
+  const monthStart = today.substring(0, 7) + '-01' // YYYY-MM-01
 
   // 1. Tổng quan tasks (không tính draft)
   const { data: allTasks } = await supabase
@@ -219,7 +220,8 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
   for (const t of tasks) {
     tasks_by_status[t.status] = (tasks_by_status[t.status] || 0) + 1
     tasks_by_priority[t.priority || 'medium'] = (tasks_by_priority[t.priority || 'medium'] || 0) + 1
-    if (t.due_date && t.due_date < today && !['finished', 'cancelled'].includes(t.status)) {
+    // Chỉ tính quá hạn trong tháng hiện tại
+    if (t.due_date && t.due_date < today && t.due_date >= monthStart && !['finished', 'cancelled'].includes(t.status)) {
       overdue_tasks++
     }
   }
@@ -276,7 +278,7 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
     })
   }
 
-  // 4. Overdue details — join luôn assignee
+  // 4. Overdue details — chỉ trong tháng hiện tại
   const { data: overdueData } = await supabase
     .from('tasks')
     .select(`
@@ -285,6 +287,7 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
       assignee:employees!tasks_assignee_id_fkey(full_name)
     `)
     .lt('due_date', today)
+    .gte('due_date', monthStart)
     .not('status', 'in', '(finished,cancelled)')
     .neq('status', 'draft')
     .order('due_date', { ascending: true })
@@ -347,7 +350,7 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
       total: deptTasks.length,
       in_progress: deptTasks.filter((t: any) => t.status === 'in_progress').length,
       completed: deptTasks.filter((t: any) => ['completed', 'finished'].includes(t.status)).length,
-      overdue: deptTasks.filter((t: any) => t.due_date && t.due_date < today && !['finished', 'cancelled'].includes(t.status)).length,
+      overdue: deptTasks.filter((t: any) => t.due_date && t.due_date < today && t.due_date >= monthStart && !['finished', 'cancelled'].includes(t.status)).length,
     })
   }
 
@@ -374,114 +377,82 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
 async function fetchAttendanceReportData(supabase: any): Promise<AttendanceReportData> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
 
-  // 1. Tất cả nhân viên active
-  const { data: allEmployees } = await supabase
-    .from('employees')
-    .select(`
-      id, full_name, employee_code, status,
-      departments(id, name),
-      positions(name)
-    `)
-    .eq('status', 'active')
+  // Gọi RPC function — SQL join chắc chắn hoạt động
+  const { data: rpcData, error: rpcError } = await supabase.rpc('get_daily_attendance_report', {
+    report_date: today,
+  })
 
-  const employees = allEmployees || []
-  const totalEmployees = employees.length
-
-  // 2. Attendance hôm nay
-  const { data: todayAttendance } = await supabase
-    .from('attendance')
-    .select(`
-      id, employee_id, date, check_in_time, check_out_time,
-      status, late_minutes, shift_id,
-      shifts(name, code)
-    `)
-    .eq('date', today)
-
-  const attendanceRecords = todayAttendance || []
-  const checkedInIds = new Set(attendanceRecords.map((a: any) => a.employee_id))
-
-  // 3. Đơn nghỉ phép hôm nay (nếu có bảng leave_requests)
-  let onLeaveIds = new Set<string>()
-  try {
-    const { data: leaveToday } = await supabase
-      .from('leave_requests')
-      .select('employee_id')
-      .eq('status', 'approved')
-      .lte('start_date', today)
-      .gte('end_date', today)
-    
-    if (leaveToday) {
-      onLeaveIds = new Set(leaveToday.map((l: any) => l.employee_id))
+  if (rpcError) {
+    console.error('📊 [attendance] RPC error:', rpcError)
+    return {
+      total_employees: 0, checked_in: 0, not_checked_in: 0,
+      checked_out: 0, late_count: 0, on_leave_count: 0,
+      departments: [], late_details: [], not_checked_in_details: [],
     }
-  } catch (e) {
-    console.warn('leave_requests table not found, skipping')
   }
 
-  // 4. Tính toán
-  const checkedIn = attendanceRecords.length
-  const checkedOut = attendanceRecords.filter((a: any) => a.check_out_time).length
-  const lateRecords = attendanceRecords.filter((a: any) => a.late_minutes && a.late_minutes > 0)
-  const lateCount = lateRecords.length
-  const onLeaveCount = onLeaveIds.size
+  const checkedInDetails = rpcData?.checked_in_details || []
+  const allEmployees = rpcData?.all_active_employees || []
+  const onLeaveIds = new Set(rpcData?.on_leave_ids || [])
 
-  // Nhân viên chưa check-in (trừ nghỉ phép + Ban Giám đốc)
-  const notCheckedInEmployees = employees.filter((e: any) => 
-    !checkedInIds.has(e.id) && 
-    !onLeaveIds.has(e.id) &&
-    e.departments?.name !== 'Ban Giám đốc'
+  console.log(`📊 [attendance] RPC OK: ${checkedInDetails.length} check-in, ${allEmployees.length} employees, ${onLeaveIds.size} on leave`)
+
+  const checkedInIds = new Set(checkedInDetails.map((a: any) => a.employee_id))
+  const checkedOut = checkedInDetails.filter((a: any) => a.check_out_time).length
+  const lateRecords = checkedInDetails.filter((a: any) => a.late_minutes && a.late_minutes > 0)
+
+  const workingEmployees = allEmployees.filter((e: any) => e.department_name !== 'Ban Giám đốc')
+  const totalWorking = workingEmployees.length
+
+  const notCheckedInEmployees = workingEmployees.filter((e: any) =>
+    !checkedInIds.has(e.id) && !onLeaveIds.has(e.id)
   )
 
-  // 5. Thống kê theo phòng ban
   const deptMap = new Map<string, { name: string; total: number; checked_in: number; not_checked_in: number; late: number }>()
-  
-  for (const emp of employees) {
-    const deptName = emp.departments?.name || 'Không rõ'
-    if (deptName === 'Ban Giám đốc') continue // Bỏ qua BGĐ
-    
+
+  for (const emp of workingEmployees) {
+    const deptName = emp.department_name || 'Không rõ'
     if (!deptMap.has(deptName)) {
       deptMap.set(deptName, { name: deptName, total: 0, checked_in: 0, not_checked_in: 0, late: 0 })
     }
     const dept = deptMap.get(deptName)!
     dept.total++
-    
+
     if (checkedInIds.has(emp.id)) {
       dept.checked_in++
-      const record = attendanceRecords.find((a: any) => a.employee_id === emp.id)
+      const record = checkedInDetails.find((a: any) => a.employee_id === emp.id)
       if (record?.late_minutes > 0) dept.late++
     } else if (!onLeaveIds.has(emp.id)) {
       dept.not_checked_in++
     }
   }
 
-  // 6. Chi tiết đi trễ
   const late_details = lateRecords.map((a: any) => {
-    const emp = employees.find((e: any) => e.id === a.employee_id)
-    const checkInTime = a.check_in_time 
+    const checkInTime = a.check_in_time
       ? new Date(a.check_in_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })
       : ''
     return {
-      name: emp?.full_name || 'N/A',
-      department: emp?.departments?.name || '',
-      shift_name: a.shifts?.name || '',
+      name: a.full_name || 'N/A',
+      department: a.department_name || '',
+      shift_name: a.shift_name || '',
       check_in_time: checkInTime,
       late_minutes: a.late_minutes || 0,
     }
   }).sort((a: any, b: any) => b.late_minutes - a.late_minutes)
 
-  // 7. Chi tiết chưa check-in
   const not_checked_in_details = notCheckedInEmployees.map((e: any) => ({
-    name: e.full_name,
-    department: e.departments?.name || '',
-    position: e.positions?.name || '',
-  })).sort((a: any, b: any) => a.department.localeCompare(b.department))
+    name: e.full_name || '',
+    department: e.department_name || '',
+    position: e.position_name || '',
+  })).sort((a: any, b: any) => (a.department || '').localeCompare(b.department || ''))
 
   return {
-    total_employees: totalEmployees,
-    checked_in: checkedIn,
+    total_employees: totalWorking,
+    checked_in: checkedInDetails.length,
     not_checked_in: notCheckedInEmployees.length,
     checked_out: checkedOut,
-    late_count: lateCount,
-    on_leave_count: onLeaveCount,
+    late_count: lateRecords.length,
+    on_leave_count: onLeaveIds.size,
     departments: Array.from(deptMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
     late_details,
     not_checked_in_details,

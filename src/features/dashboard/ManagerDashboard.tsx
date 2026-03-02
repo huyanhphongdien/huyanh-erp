@@ -420,7 +420,7 @@ export function ManagerDashboard() {
                 <span className="hidden sm:inline">👋</span>
               </h1>
               <p className="text-gray-400 text-xs sm:text-[13px] mt-0.5 font-medium truncate">
-                Tổng quan hệ thống • {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                {stats?.monthLabel || 'Tổng quan hệ thống'} • {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -462,9 +462,9 @@ export function ManagerDashboard() {
             onClick={() => navigate('/employees')}
           />
           <KpiCard
-            label="Công việc"
+            label="Công việc tháng"
             value={stats?.totalTasks || 0}
-            subtitle={stats?.newTasksThisWeek ? `+${stats.newTasksThisWeek} tuần này` : undefined}
+            subtitle={stats?.newTasksThisWeek ? `+${stats.newTasksThisWeek} tuần này` : 'Tạo trong tháng'}
             icon={<ClipboardList />}
             sparkData={trendSparkCreated}
             accentColor={BRAND.secondary}
@@ -475,7 +475,7 @@ export function ManagerDashboard() {
           <KpiCard
             label="Hoàn thành"
             value={`${stats?.completionRate || 0}%`}
-            subtitle={`${stats?.completedTasks || 0} công việc`}
+            subtitle={`${stats?.completedTasks || 0} CV trong tháng`}
             icon={<CheckCircle2 />}
             sparkData={trendSparkCompleted}
             accentColor="#10B981"
@@ -484,7 +484,7 @@ export function ManagerDashboard() {
           <KpiCard
             label="Quá hạn"
             value={stats?.overdueTasks || 0}
-            subtitle="Cần xử lý"
+            subtitle="Trong tháng"
             icon={<AlertTriangle />}
             accentColor="#EF4444"
             iconBg="bg-red-50 text-red-500"
@@ -570,7 +570,7 @@ export function ManagerDashboard() {
           {/* Trend Area Chart */}
           <GlassCard className="lg:col-span-2 p-3.5 sm:p-5">
             <SectionHeader
-              title="Xu hướng Công việc"
+              title={`Xu hướng Công việc ${stats?.monthLabel || ''}`}
               icon={<TrendingUp className="w-4 h-4" />}
               action={
                 <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs text-gray-400">
@@ -775,7 +775,7 @@ export function ManagerDashboard() {
           {/* Upcoming Tasks */}
           <GlassCard className="p-3.5 sm:p-5">
             <SectionHeader
-              title="Sắp đến hạn (7 ngày)"
+              title="Sắp đến hạn (trong tháng)"
               icon={<Calendar className="w-4 h-4 text-amber-500" />}
               action={upcomingTasks.length > 0 ? (
                 <button onClick={() => navigate('/tasks')}

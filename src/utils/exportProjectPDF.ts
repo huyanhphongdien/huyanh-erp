@@ -267,7 +267,7 @@ export function exportStatusReportPDF(data: PDFReportData): void {
       var pe = ph.planned_end ? new Date(ph.planned_end).getTime() : mx;
       var lp = ((ps - mn) / (mx - mn) * 100).toFixed(1);
       var wp = (Math.max(1, Math.ceil((pe - ps) / 864e5)) / tD * 100).toFixed(1);
-      var bc = ph.color || SC[ph.status] || '#6B7280';
+      var bc = ph.color || (SC as any)[ph.status] || '#6B7280';
       var pw = (ph.progress_pct / 100 * parseFloat(wp)).toFixed(1);
       var rd = ph.progress_pct >= 100 ? '3px' : '3px 0 0 3px';
       bH += '<div style="display:flex;align-items:center;margin-bottom:3px;height:20px">';

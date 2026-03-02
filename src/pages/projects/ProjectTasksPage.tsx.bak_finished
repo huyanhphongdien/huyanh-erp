@@ -65,7 +65,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
   in_progress:{ label: 'Đang làm',   color: 'text-blue-600',   bgColor: 'bg-blue-50',   icon: <Loader2 className="w-3.5 h-3.5 animate-spin" /> },
   review:     { label: 'Chờ duyệt',  color: 'text-purple-600', bgColor: 'bg-purple-50', icon: <Eye className="w-3.5 h-3.5" /> },
   completed:  { label: 'Hoàn thành', color: 'text-emerald-600',bgColor: 'bg-emerald-50',icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  finished:   { label: 'Hoàn thành', color: 'text-emerald-600',bgColor: 'bg-emerald-50',icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
   cancelled:  { label: 'Đã hủy',    color: 'text-red-500',    bgColor: 'bg-red-50',    icon: <X className="w-3.5 h-3.5" /> },
   overdue:    { label: 'Quá hạn',    color: 'text-red-600',    bgColor: 'bg-red-50',    icon: <AlertTriangle className="w-3.5 h-3.5" /> },
 }
@@ -81,7 +80,7 @@ const KANBAN_COLUMNS: { key: TaskStatus[]; label: string; headerColor: string }[
   { key: ['draft', 'pending'],  label: 'Chờ làm',    headerColor: 'border-gray-400' },
   { key: ['in_progress'],      label: 'Đang làm',   headerColor: 'border-blue-500' },
   { key: ['review'],           label: 'Chờ duyệt',  headerColor: 'border-purple-500' },
-  { key: ['completed', 'finished'], label: 'Hoàn thành', headerColor: 'border-emerald-500' },
+  { key: ['completed'],        label: 'Hoàn thành', headerColor: 'border-emerald-500' },
 ]
 
 // ============================================================================
@@ -329,7 +328,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
 
   /** Card task (dùng chung cho By Phase và Kanban) */
   const TaskCard: React.FC<{ task: ProjectTask; showPhase?: boolean; compact?: boolean }> = ({ task, showPhase, compact }) => {
-    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !['completed', 'finished', 'cancelled'].includes(task.status)
+    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !['completed', 'cancelled'].includes(task.status)
 
     return (
       <div
@@ -396,7 +395,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           </div>
 
           {/* Quick complete button */}
-          {!['completed', 'finished', 'cancelled'].includes(task.status) && (
+          {task.status !== 'completed' && task.status !== 'cancelled' && (
             <button
               onClick={(e) => { e.stopPropagation(); handleQuickStatusChange(task.id, 'completed') }}
               className="mt-0.5 p-1 rounded-full text-gray-300 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
@@ -473,7 +472,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           const phase = phases.find(p => p.id === key)
           const phaseTasks = tasksByPhase.get(key) || []
           const expanded = expandedPhases.has(key)
-          const completedCount = phaseTasks.filter(t => t.status === 'completed' || t.status === 'finished').length
+          const completedCount = phaseTasks.filter(t => t.status === 'completed').length
 
           // Phase stat from stats
           const phaseStat = stats?.by_phase.find(s => s.phase_id === key)
@@ -612,7 +611,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {tasks.map(task => {
-              const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !['completed', 'finished', 'cancelled'].includes(task.status)
+              const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !['completed', 'cancelled'].includes(task.status)
               return (
                 <tr key={task.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-3 py-2">

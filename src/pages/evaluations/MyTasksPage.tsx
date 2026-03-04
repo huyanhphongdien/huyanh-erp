@@ -2,11 +2,7 @@
 // MY TASKS PAGE - WITH EXTENSION REQUEST + RESPONSIVE + ASSIGNER COLUMN
 // File: src/pages/evaluations/MyTasksPage.tsx
 // ============================================================================
-// PHASE 1 FIXES:
-// FIX 1: Thêm cột "Người giao" (assigner) vào desktop table
-// FIX 2: Thêm "Giao bởi: ..." vào mobile card
-// FIX 3: Import UserCog icon
-// FIX 4: Normalize assigner từ Supabase FK join (có thể trả array)
+// CẬP NHẬT: Tên task hiển thị đầy đủ, không bị truncate
 // ============================================================================
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -198,27 +194,18 @@ function isThisWeek(dateStr: string | null | undefined): boolean {
 
 function getDaysRemaining(dueDate: string | null | undefined): { text: string; isOverdue: boolean; daysCount: number } {
   if (!dueDate) return { text: '-', isOverdue: false, daysCount: 0 };
-
   const due = new Date(dueDate);
   due.setHours(23, 59, 59, 999);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const diffTime = due.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) {
-    return { text: `Quá ${Math.abs(diffDays)} ngày`, isOverdue: true, daysCount: diffDays };
-  } else if (diffDays === 0) {
-    return { text: 'Hôm nay', isOverdue: false, daysCount: 0 };
-  } else if (diffDays === 1) {
-    return { text: 'Ngày mai', isOverdue: false, daysCount: 1 };
-  } else {
-    return { text: `Còn ${diffDays} ngày`, isOverdue: false, daysCount: diffDays };
-  }
+  if (diffDays < 0) return { text: `Quá ${Math.abs(diffDays)} ngày`, isOverdue: true, daysCount: diffDays };
+  else if (diffDays === 0) return { text: 'Hôm nay', isOverdue: false, daysCount: 0 };
+  else if (diffDays === 1) return { text: 'Ngày mai', isOverdue: false, daysCount: 1 };
+  else return { text: `Còn ${diffDays} ngày`, isOverdue: false, daysCount: diffDays };
 }
 
-/** Normalize Supabase FK join — có thể trả array hoặc object */
 function normalizeRelation<T>(val: T | T[] | null | undefined): T | null {
   if (!val) return null;
   if (Array.isArray(val)) return val[0] || null;
@@ -226,7 +213,7 @@ function normalizeRelation<T>(val: T | T[] | null | undefined): T | null {
 }
 
 // ============================================================================
-// PROGRESS UPDATE MODAL (unchanged)
+// PROGRESS UPDATE MODAL
 // ============================================================================
 
 const ProgressUpdateModal: React.FC<{
@@ -261,64 +248,33 @@ const ProgressUpdateModal: React.FC<{
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-end sm:items-center justify-center min-h-screen px-4 pt-4 pb-20 sm:pb-4 text-center">
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
-
         <div className="relative inline-block w-full max-w-md p-5 sm:p-6 my-8 text-left bg-white rounded-t-xl sm:rounded-xl shadow-xl transform transition-all">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Cập nhật tiến độ</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-500 p-1">
-              <X className="w-5 h-5" />
-            </button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-500 p-1"><X className="w-5 h-5" /></button>
           </div>
-
           <div className="bg-gray-50 rounded-lg p-3 mb-4">
-            <p className="text-sm font-medium text-gray-900 line-clamp-2">{task.name}</p>
+            <p className="text-sm font-medium text-gray-900">{task.name}</p>
             <p className="text-xs text-gray-500 mt-0.5">{task.code}</p>
           </div>
-
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Tiến độ</span>
               <span className="text-xl sm:text-2xl font-bold text-blue-600">{progress}%</span>
             </div>
-
             <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-              <div
-                className={`h-3 rounded-full transition-all duration-300 ${
-                  progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-yellow-500'
-                }`}
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              />
+              <div className={`h-3 rounded-full transition-all duration-300 ${progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-yellow-500'}`} style={{ width: `${Math.min(progress, 100)}%` }} />
             </div>
-
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={progress}
-              onChange={(e) => setProgress(Number(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-            />
+            <input type="range" min="0" max="100" value={progress} onChange={(e) => setProgress(Number(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
           </div>
-
           <div className="mb-5 sm:mb-6">
             <p className="text-sm font-medium text-gray-700 mb-2">Chọn nhanh:</p>
             <div className="grid grid-cols-4 gap-2">
               {QUICK_PROGRESS_OPTIONS.map((qv) => (
-                <button
-                  key={qv}
-                  onClick={() => setProgress(qv)}
-                  className={`px-2 sm:px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    progress === qv
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {qv}%
-                </button>
+                <button key={qv} onClick={() => setProgress(qv)} className={`px-2 sm:px-3 py-2 text-sm font-medium rounded-lg transition-colors ${progress === qv ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{qv}%</button>
               ))}
             </div>
           </div>
-
           {progress >= 100 && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-2">
@@ -330,19 +286,9 @@ const ProgressUpdateModal: React.FC<{
               </div>
             </div>
           )}
-
           <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              Hủy
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || progress === task.progress}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Hủy</button>
+            <button onClick={handleSave} disabled={saving || progress === task.progress} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Cập nhật
             </button>
@@ -358,24 +304,11 @@ const ProgressUpdateModal: React.FC<{
 // ============================================================================
 
 const StatsCard: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  color: string;
-  bgColor: string;
-  isActive?: boolean;
-  onClick?: () => void;
+  icon: React.ReactNode; label: string; value: number; color: string; bgColor: string; isActive?: boolean; onClick?: () => void;
 }> = ({ icon, label, value, color, bgColor, isActive, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`w-full text-left rounded-xl p-3 sm:p-4 border-2 transition-all hover:shadow-md ${bgColor} ${
-      isActive ? 'border-current ring-2 ring-offset-1' : 'border-transparent'
-    } ${color}`}
-  >
+  <button onClick={onClick} className={`w-full text-left rounded-xl p-3 sm:p-4 border-2 transition-all hover:shadow-md ${bgColor} ${isActive ? 'border-current ring-2 ring-offset-1' : 'border-transparent'} ${color}`}>
     <div className="flex items-center gap-2 sm:gap-3">
-      <div className={`p-2 sm:p-2.5 rounded-lg bg-white/80 shadow-sm ${color}`}>
-        {icon}
-      </div>
+      <div className={`p-2 sm:p-2.5 rounded-lg bg-white/80 shadow-sm ${color}`}>{icon}</div>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-gray-500 truncate">{label}</p>
         <p className={`text-xl sm:text-2xl font-bold ${color}`}>{value}</p>
@@ -388,24 +321,15 @@ const ScoreCard: React.FC<{ score: number; label: string }> = ({ score, label })
   const hasData = score > 0;
   const rating = hasData ? getRatingFromScore(score) : 'none';
   const ratingConfig = RATING_CONFIG[rating];
-
   return (
     <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-3 sm:p-4 border border-purple-100">
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="p-2 sm:p-2.5 rounded-lg bg-white shadow-sm">
-          <Award className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-        </div>
+        <div className="p-2 sm:p-2.5 rounded-lg bg-white shadow-sm"><Award className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" /></div>
         <div>
           <p className="text-xs font-medium text-gray-500">Điểm TB</p>
           <div className="flex items-baseline gap-1 sm:gap-2">
-            <span className="text-xl sm:text-2xl font-bold text-purple-700">
-              {hasData ? score : '-'}
-            </span>
-            {hasData && (
-              <span className={`text-xs sm:text-sm font-medium ${ratingConfig?.color || 'text-gray-600'}`}>
-                {label}
-              </span>
-            )}
+            <span className="text-xl sm:text-2xl font-bold text-purple-700">{hasData ? score : '-'}</span>
+            {hasData && <span className={`text-xs sm:text-sm font-medium ${ratingConfig?.color || 'text-gray-600'}`}>{label}</span>}
             {!hasData && <span className="text-xs sm:text-sm text-gray-400">Chưa có</span>}
           </div>
         </div>
@@ -438,9 +362,7 @@ const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => {
 
 const EmptyState: React.FC<{ icon: React.ReactNode; title: string; description: string }> = ({ icon, title, description }) => (
   <div className="py-12 sm:py-16 text-center px-4">
-    <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-100 text-gray-400 mb-3 sm:mb-4">
-      {icon}
-    </div>
+    <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-100 text-gray-400 mb-3 sm:mb-4">{icon}</div>
     <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">{title}</h3>
     <p className="text-sm text-gray-500">{description}</p>
   </div>
@@ -459,15 +381,11 @@ const MyTasksPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<TabKey>(() => {
-    const tabParam = searchParams.get('tab');
-    return (tabParam as TabKey) || 'in_progress';
-  });
+  const [activeTab, setActiveTab] = useState<TabKey>(() => (searchParams.get('tab') as TabKey) || 'in_progress');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [sortField, setSortField] = useState<SortField>('due_date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [approvalInfoMap, setApprovalInfoMap] = useState<Map<string, ApprovalInfo>>(new Map());
-
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<MyTask | null>(null);
   const [participationRequestsCount, setParticipationRequestsCount] = useState(0);
@@ -475,7 +393,7 @@ const MyTasksPage: React.FC = () => {
   const [extensionTask, setExtensionTask] = useState<MyTask | null>(null);
 
   // ============================================================================
-  // DATA FETCHING (unchanged logic)
+  // DATA FETCHING
   // ============================================================================
 
   const fetchTasks = useCallback(async () => {
@@ -483,33 +401,27 @@ const MyTasksPage: React.FC = () => {
     try {
       const response = await myTasksService.getMyTasks(user.employee_id);
       setTasks(response.data || []);
-    } catch (error) {
-      setTasks([]);
-    }
+    } catch { setTasks([]); }
   }, [user?.employee_id]);
 
   const fetchApprovalInfo = useCallback(async () => {
     if (!user?.employee_id) return;
     try {
-      const { data: myTasks, error: tasksError } = await supabase
-        .from('tasks').select('id').eq('assignee_id', user.employee_id);
+      const { data: myTasks, error: tasksError } = await supabase.from('tasks').select('id').eq('assignee_id', user.employee_id);
       if (tasksError || !myTasks || myTasks.length === 0) return;
       const taskIds = myTasks.map(t => t.id);
       const { data, error } = await supabase
         .from('task_approvals')
-        .select(`task_id, approved_score, original_score, rating, comments, action, created_at, approver:employees!task_approvals_approver_id_fkey(full_name)`)
+        .select('task_id, approved_score, original_score, rating, comments, action, created_at, approver:employees!task_approvals_approver_id_fkey(full_name)')
         .in('task_id', taskIds).eq('action', 'approved');
       if (!error && data && data.length > 0) {
         const map = new Map<string, ApprovalInfo>();
         data.forEach((item: any) => {
-          map.set(item.task_id, {
-            task_id: item.task_id, score: item.approved_score, rating: item.rating,
-            comments: item.comments, approval_date: item.created_at, approver_name: item.approver?.full_name,
-          });
+          map.set(item.task_id, { task_id: item.task_id, score: item.approved_score, rating: item.rating, comments: item.comments, approval_date: item.created_at, approver_name: item.approver?.full_name });
         });
         setApprovalInfoMap(map);
       }
-    } catch (error) { /* Silent */ }
+    } catch { /* Silent */ }
   }, [user?.employee_id]);
 
   const fetchParticipationRequestsCount = useCallback(async () => {
@@ -517,7 +429,7 @@ const MyTasksPage: React.FC = () => {
     try {
       const count = await taskParticipantService.countPendingRequests(user.employee_id);
       setParticipationRequestsCount(count);
-    } catch (error) { setParticipationRequestsCount(0); }
+    } catch { setParticipationRequestsCount(0); }
   }, [user?.employee_id]);
 
   useEffect(() => {
@@ -610,7 +522,7 @@ const MyTasksPage: React.FC = () => {
   // ============================================================================
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) { setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc'); }
+    if (sortField === field) setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortOrder('asc'); }
   };
 
@@ -653,11 +565,7 @@ const MyTasksPage: React.FC = () => {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Công việc của tôi</h1>
           <p className="text-sm text-gray-500 mt-0.5 sm:mt-1">Quản lý và theo dõi tiến độ</p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm self-start sm:self-auto"
-        >
+        <button onClick={handleRefresh} disabled={refreshing} className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm self-start sm:self-auto">
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           Làm mới
         </button>
@@ -680,16 +588,9 @@ const MyTasksPage: React.FC = () => {
             <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-red-800 font-medium">
-              <strong>{stats.overdue}</strong> công việc quá hạn
-            </p>
+            <p className="text-sm text-red-800 font-medium"><strong>{stats.overdue}</strong> công việc quá hạn</p>
           </div>
-          <button
-            onClick={() => { setActiveTab('in_progress'); setQuickFilter('overdue'); }}
-            className="px-3 py-1.5 bg-red-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-red-700 flex-shrink-0"
-          >
-            Xem
-          </button>
+          <button onClick={() => { setActiveTab('in_progress'); setQuickFilter('overdue'); }} className="px-3 py-1.5 bg-red-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-red-700 flex-shrink-0">Xem</button>
         </div>
       )}
 
@@ -700,39 +601,18 @@ const MyTasksPage: React.FC = () => {
           <div className="p-3 sm:p-4 border-b border-gray-200 space-y-3 sm:space-y-4">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Tìm mã hoặc tên..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-9 py-2 sm:py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+              <input type="text" placeholder="Tìm mã hoặc tên..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 sm:pl-10 pr-9 py-2 sm:py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
-                </button>
+                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
               )}
             </div>
-
-            {/* Quick filters */}
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
               <span className="text-xs sm:text-sm text-gray-500 mr-1 whitespace-nowrap flex-shrink-0">Lọc:</span>
               {QUICK_FILTERS.map(f => (
-                <button
-                  key={f.key}
-                  onClick={() => setQuickFilter(f.key)}
-                  className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                    quickFilter === f.key
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                      : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'
-                  }`}
-                >
-                  {f.icon}
-                  {f.label}
+                <button key={f.key} onClick={() => setQuickFilter(f.key)} className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${quickFilter === f.key ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'}`}>
+                  {f.icon}{f.label}
                   {f.key === 'overdue' && stats.overdue > 0 && (
-                    <span className="ml-1 px-1 py-0.5 bg-red-500 text-white text-xs rounded-full leading-none">
-                      {stats.overdue}
-                    </span>
+                    <span className="ml-1 px-1 py-0.5 bg-red-500 text-white text-xs rounded-full leading-none">{stats.overdue}</span>
                   )}
                 </button>
               ))}
@@ -743,22 +623,12 @@ const MyTasksPage: React.FC = () => {
         {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 scrollbar-hide">
           {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setQuickFilter('all'); }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${
-                activeTab === tab.key
-                  ? `${tab.borderColor} ${tab.color} ${tab.bgColor}`
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-              }`}
-            >
+            <button key={tab.key} onClick={() => { setActiveTab(tab.key); setQuickFilter('all'); }} className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${activeTab === tab.key ? `${tab.borderColor} ${tab.color} ${tab.bgColor}` : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>
               {tab.icon}
               <span className="hidden sm:inline">{tab.label}</span>
               <span className="sm:hidden">{tab.shortLabel}</span>
               {tabCounts[tab.key] > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${
-                  activeTab === tab.key ? 'bg-white/80 shadow-sm' : tab.key === 'participation_requests' ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-600'
-                }`}>
+                <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === tab.key ? 'bg-white/80 shadow-sm' : tab.key === 'participation_requests' ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
                   {tabCounts[tab.key]}
                 </span>
               )}
@@ -791,14 +661,11 @@ const MyTasksPage: React.FC = () => {
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
                           <div className="flex items-center gap-1">Tên {sortField === 'name' ? (sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />}</div>
                         </th>
-                        {/* ====== CỘT MỚI: NGƯỜI GIAO (FIX #1) ====== */}
-                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-36">
-                          Người giao
-                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-36">Người giao</th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-28 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('priority')}>
                           <div className="flex items-center gap-1">Ưu tiên</div>
                         </th>
-                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-32 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('due_date')}>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-36 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('due_date')}>
                           <div className="flex items-center gap-1">Hạn</div>
                         </th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-32 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('progress')}>
@@ -816,8 +683,6 @@ const MyTasksPage: React.FC = () => {
                         const daysInfo = getDaysRemaining(task.due_date);
                         const approvalInfo = approvalInfoMap.get(task.id);
                         const canRequestExtension = activeTab === 'in_progress' && task.status === 'in_progress' && task.due_date;
-
-                        // FIX #4: Normalize assigner từ Supabase FK join
                         const taskAssigner = normalizeRelation(task.assigner);
 
                         return (
@@ -825,8 +690,14 @@ const MyTasksPage: React.FC = () => {
                             <td className="px-3 py-3.5">{taskOverdue && <AlertTriangle className="w-4 h-4 text-red-500" />}</td>
                             <td className="px-3 py-3.5"><span className="font-mono text-sm text-gray-600">{task.code}</span></td>
                             <td className="px-3 py-3.5">
-                              <button onClick={() => handleViewTask(task.id)} className="font-medium text-gray-900 hover:text-blue-600 text-left truncate max-w-[300px] block" title={task.name}>{task.name}</button>
-                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+                              {/* ← ĐÃ SỬA: bỏ truncate + max-w, dùng break-words để tên hiển thị đầy đủ */}
+                              <button
+                                onClick={() => handleViewTask(task.id)}
+                                className="font-medium text-gray-900 hover:text-blue-600 text-left break-words whitespace-normal block w-full"
+                              >
+                                {task.name}
+                              </button>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 flex-wrap">
                                 {task.department?.name && (
                                   <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{task.department.name}</span>
                                 )}
@@ -837,14 +708,11 @@ const MyTasksPage: React.FC = () => {
                                 )}
                               </div>
                             </td>
-                            {/* ====== Ô MỚI: NGƯỜI GIAO (FIX #1) ====== */}
                             <td className="px-3 py-3.5">
                               {taskAssigner?.full_name ? (
                                 <div className="flex items-center gap-1.5">
                                   <UserCog className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                                  <span className="text-sm text-gray-700 truncate max-w-[120px]" title={taskAssigner.full_name}>
-                                    {taskAssigner.full_name}
-                                  </span>
+                                  <span className="text-sm text-gray-700 break-words" title={taskAssigner.full_name}>{taskAssigner.full_name}</span>
                                 </div>
                               ) : (task as any).is_self_assigned ? (
                                 <span className="text-xs text-gray-400 italic">Tự giao</span>
@@ -861,13 +729,15 @@ const MyTasksPage: React.FC = () => {
                             {activeTab === 'approved' && (
                               <td className="px-3 py-3.5 text-center">
                                 {approvalInfo?.score ? (
-                                  <div><span className="text-lg font-bold text-purple-600">{approvalInfo.score}</span>
-                                  {approvalInfo.rating && <div className={`text-xs ${RATING_CONFIG[approvalInfo.rating]?.color || ''}`}>{RATING_CONFIG[approvalInfo.rating]?.label}</div>}</div>
+                                  <div>
+                                    <span className="text-lg font-bold text-purple-600">{approvalInfo.score}</span>
+                                    {approvalInfo.rating && <div className={`text-xs ${RATING_CONFIG[approvalInfo.rating]?.color || ''}`}>{RATING_CONFIG[approvalInfo.rating]?.label}</div>}
+                                  </div>
                                 ) : <span className="text-gray-400">-</span>}
                               </td>
                             )}
                             <td className="px-3 py-3.5 text-right">
-                              <div className="flex items-center justify-end gap-1">
+                              <div className="flex items-center justify-end gap-1 flex-wrap">
                                 <button onClick={() => handleViewTask(task.id)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Xem"><Eye className="w-4 h-4" /></button>
                                 {activeTab === 'in_progress' && (
                                   <button onClick={() => handleUpdateProgress(task)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg"><TrendingUp className="w-3.5 h-3.5" />Cập nhật</button>
@@ -897,16 +767,19 @@ const MyTasksPage: React.FC = () => {
                     const daysInfo = getDaysRemaining(task.due_date);
                     const approvalInfo = approvalInfoMap.get(task.id);
                     const canRequestExtension = activeTab === 'in_progress' && task.status === 'in_progress' && task.due_date;
-
-                    // FIX #4: Normalize assigner
                     const taskAssigner = normalizeRelation(task.assigner);
 
                     return (
                       <div key={task.id} className={`p-3 sm:p-4 ${taskOverdue ? 'bg-red-50/50' : ''}`}>
-                        {/* Top row: name + priority */}
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0 flex-1">
-                            <button onClick={() => handleViewTask(task.id)} className="font-medium text-sm text-gray-900 hover:text-blue-600 text-left line-clamp-2 w-full">{task.name}</button>
+                            {/* ← ĐÃ SỬA: bỏ line-clamp-2, tên hiển thị đầy đủ */}
+                            <button
+                              onClick={() => handleViewTask(task.id)}
+                              className="font-medium text-sm text-gray-900 hover:text-blue-600 text-left break-words whitespace-normal w-full"
+                            >
+                              {task.name}
+                            </button>
                             <div className="space-y-0.5 mt-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-mono text-xs text-gray-400">{task.code}</span>
@@ -917,7 +790,6 @@ const MyTasksPage: React.FC = () => {
                                   </span>
                                 )}
                               </div>
-                              {/* ====== DÒNG MỚI: NGƯỜI GIAO (FIX #2) ====== */}
                               {taskAssigner?.full_name && (
                                 <div className="flex items-center gap-1 text-xs text-gray-500">
                                   <UserCog className="w-3 h-3 text-blue-400" />
@@ -932,10 +804,9 @@ const MyTasksPage: React.FC = () => {
                               )}
                             </div>
                           </div>
-                          <PriorityBadge priority={task.priority} />
+                          <div className="flex-shrink-0"><PriorityBadge priority={task.priority} /></div>
                         </div>
 
-                        {/* Middle: deadline + score */}
                         <div className="flex items-center gap-4 mb-3 text-xs">
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 text-gray-400" />
@@ -950,35 +821,21 @@ const MyTasksPage: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Progress bar */}
-                        <div className="mb-3">
-                          <ProgressBar progress={task.progress || 0} />
-                        </div>
+                        <div className="mb-3"><ProgressBar progress={task.progress || 0} /></div>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
-                            <Eye className="w-3.5 h-3.5" />Xem
-                          </button>
+                          <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"><Eye className="w-3.5 h-3.5" />Xem</button>
                           {activeTab === 'in_progress' && (
-                            <button onClick={() => handleUpdateProgress(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg">
-                              <TrendingUp className="w-3.5 h-3.5" />Cập nhật
-                            </button>
+                            <button onClick={() => handleUpdateProgress(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg"><TrendingUp className="w-3.5 h-3.5" />Cập nhật</button>
                           )}
                           {canRequestExtension && (
-                            <button onClick={() => handleRequestExtension(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg">
-                              <CalendarPlus className="w-3.5 h-3.5" />Gia hạn
-                            </button>
+                            <button onClick={() => handleRequestExtension(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><CalendarPlus className="w-3.5 h-3.5" />Gia hạn</button>
                           )}
                           {activeTab === 'awaiting_eval' && (
-                            <button onClick={() => handleSelfEvaluate(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg">
-                              <Edit3 className="w-3.5 h-3.5" />Tự đánh giá
-                            </button>
+                            <button onClick={() => handleSelfEvaluate(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><Edit3 className="w-3.5 h-3.5" />Tự đánh giá</button>
                           )}
                           {activeTab === 'approved' && (
-                            <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg">
-                              <ExternalLink className="w-3.5 h-3.5" />Kết quả
-                            </button>
+                            <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg"><ExternalLink className="w-3.5 h-3.5" />Kết quả</button>
                           )}
                         </div>
                       </div>

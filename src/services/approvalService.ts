@@ -3,9 +3,10 @@
 // File: src/services/approvalService.ts
 // Huy Anh ERP System
 // ============================================================================
-// CẬP NHẬT: 
-// - Khi Manager phê duyệt task, điểm sẽ được ghi cho participants qua trigger
-// - Thêm phân quyền theo Position Level (EXECUTIVE/MANAGER/EMPLOYEE)
+// CẬP NHẬT v2:
+// - getCompletedWithoutEvaluation: thêm status 'overdue' vào query
+// - CompletedTaskWithoutEval: thêm field overdue_flagged
+// - Sort: task quá hạn nổi lên trên cùng trong tab
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
@@ -58,7 +59,6 @@ export interface PendingEvaluation {
     avatar_url?: string | null;
     department_id: string | null;
   } | null;
-  // Permission info (thêm sau khi filter)
   canApprove?: boolean;
   permissionReason?: string;
 }
@@ -90,9 +90,10 @@ export interface CompletedTaskWithoutEval {
     full_name: string;
     position?: { level: number } | null;
   } | null;
-  // Permission info
   canApprove?: boolean;
   permissionReason?: string;
+  // ← MỚI: flag để UI biết đây là task quá hạn
+  overdue_flagged?: boolean;
 }
 
 export interface ApprovalStats {
@@ -133,7 +134,6 @@ export interface QuickApproveInput {
   comments?: string;
 }
 
-// Types for evaluationStore compatibility
 export interface ApproveTaskInput {
   task_id: string;
   approver_id: string;
@@ -158,7 +158,6 @@ export interface RequestInfoInput {
   self_evaluation_id?: string;
 }
 
-// Permission context cho filtering
 export interface ApprovalPermissionContext {
   userLevel: number;
   userDepartmentId: string;
@@ -180,14 +179,10 @@ function calculateRating(score: number): string {
 // STANDALONE FUNCTIONS (for evaluationStore)
 // ============================================================================
 
-/**
- * Lấy danh sách pending approvals cho manager
- */
 export async function getPendingApprovals(approverId: string): Promise<{ data: any[]; error: Error | null }> {
   console.log('📋 [getPendingApprovals] for approver:', approverId);
   
   try {
-    // FIX: Bỏ nested position query để tránh lỗi 406
     const { data, error } = await supabase
       .from('task_self_evaluations')
       .select(`
@@ -204,7 +199,6 @@ export async function getPendingApprovals(approverId: string): Promise<{ data: a
 
     if (error) throw error;
 
-    // Transform data
     const result = (data || []).map(item => ({
       ...item,
       task: Array.isArray(item.task) ? item.task[0] : item.task,
@@ -218,9 +212,6 @@ export async function getPendingApprovals(approverId: string): Promise<{ data: a
   }
 }
 
-/**
- * Lấy lịch sử phê duyệt của manager
- */
 export async function getApprovalHistory(params: { approver_id: string }): Promise<{ data: any[]; error: Error | null }> {
   console.log('📋 [getApprovalHistory] for approver:', params.approver_id);
   
@@ -251,18 +242,12 @@ export async function getApprovalHistory(params: { approver_id: string }): Promi
   }
 }
 
-/**
- * Phê duyệt task
- * NOTE: Điểm cho participants được cập nhật TỰ ĐỘNG qua database trigger
- */
 export async function approveTask(input: ApproveTaskInput): Promise<{ success: boolean; error: Error | null }> {
   console.log('📋 [approveTask]:', input);
   
   try {
     const rating = input.rating || calculateRating(input.score);
 
-    // 1. Insert approval record
-    // ⚡ Trigger "trigger_update_participant_scores" sẽ tự động cập nhật điểm cho participants
     const { error: approvalError } = await supabase
       .from('task_approvals')
       .insert({
@@ -277,7 +262,6 @@ export async function approveTask(input: ApproveTaskInput): Promise<{ success: b
 
     if (approvalError) throw approvalError;
 
-    // 2. Update self-evaluation status if provided
     if (input.self_evaluation_id) {
       await supabase
         .from('task_self_evaluations')
@@ -285,14 +269,12 @@ export async function approveTask(input: ApproveTaskInput): Promise<{ success: b
         .eq('id', input.self_evaluation_id);
     }
 
-    // 3. Update task evaluation_status
     await supabase
       .from('tasks')
       .update({ evaluation_status: 'approved' })
       .eq('id', input.task_id);
 
-    // ⚡ Điểm cho participants đã được cập nhật TỰ ĐỘNG qua trigger
-    console.log('✅ [approveTask] Approved successfully (participants scores updated via trigger)');
+    console.log('✅ [approveTask] Approved successfully');
     return { success: true, error: null };
   } catch (error) {
     console.error('❌ [approveTask] error:', error);
@@ -300,14 +282,10 @@ export async function approveTask(input: ApproveTaskInput): Promise<{ success: b
   }
 }
 
-/**
- * Từ chối task
- */
 export async function rejectTask(input: RejectTaskInput): Promise<{ success: boolean; error: Error | null }> {
   console.log('📋 [rejectTask]:', input);
   
   try {
-    // 1. Insert rejection record
     const { error: approvalError } = await supabase
       .from('task_approvals')
       .insert({
@@ -319,7 +297,6 @@ export async function rejectTask(input: RejectTaskInput): Promise<{ success: boo
 
     if (approvalError) throw approvalError;
 
-    // 2. Update self-evaluation status
     if (input.self_evaluation_id) {
       await supabase
         .from('task_self_evaluations')
@@ -327,7 +304,6 @@ export async function rejectTask(input: RejectTaskInput): Promise<{ success: boo
         .eq('id', input.self_evaluation_id);
     }
 
-    // 3. Update task evaluation_status
     await supabase
       .from('tasks')
       .update({ evaluation_status: 'rejected' })
@@ -341,14 +317,10 @@ export async function rejectTask(input: RejectTaskInput): Promise<{ success: boo
   }
 }
 
-/**
- * Yêu cầu bổ sung thông tin
- */
 export async function requestInfo(input: RequestInfoInput): Promise<{ success: boolean; error: Error | null }> {
   console.log('📋 [requestInfo]:', input);
   
   try {
-    // 1. Insert revision request record
     const { error: approvalError } = await supabase
       .from('task_approvals')
       .insert({
@@ -360,7 +332,6 @@ export async function requestInfo(input: RequestInfoInput): Promise<{ success: b
 
     if (approvalError) throw approvalError;
 
-    // 2. Update self-evaluation status
     if (input.self_evaluation_id) {
       await supabase
         .from('task_self_evaluations')
@@ -371,7 +342,6 @@ export async function requestInfo(input: RequestInfoInput): Promise<{ success: b
         .eq('id', input.self_evaluation_id);
     }
 
-    // 3. Update task evaluation_status
     await supabase
       .from('tasks')
       .update({ evaluation_status: 'revision_requested' })
@@ -386,22 +356,17 @@ export async function requestInfo(input: RequestInfoInput): Promise<{ success: b
 }
 
 // ============================================================================
-// SERVICE OBJECT (for ApprovalPage) - WITH PERMISSION FILTERING
+// SERVICE OBJECT
 // ============================================================================
 
 export const approvalService = {
-  /**
-   * Lấy danh sách tự đánh giá chờ phê duyệt
-   * CẬP NHẬT: Filter theo quyền của user (Position Level)
-   */
+
   async getPendingEvaluations(
     permissionContext?: ApprovalPermissionContext
   ): Promise<{ data: PendingEvaluation[]; error: Error | null }> {
     console.log('📋 [approvalService] getPendingEvaluations with permission:', permissionContext);
 
     try {
-      // Query với assigner info để check permission
-      // FIX: Bỏ nested position query để tránh lỗi 406
       const { data, error } = await supabase
         .from('task_self_evaluations')
         .select(`
@@ -418,7 +383,6 @@ export const approvalService = {
 
       if (error) throw error;
 
-      // Collect all position_ids để batch fetch
       const positionIds = new Set<string>();
       (data || []).forEach(item => {
         const task = Array.isArray(item.task) ? item.task[0] : item.task;
@@ -427,7 +391,6 @@ export const approvalService = {
         if (posId) positionIds.add(posId);
       });
 
-      // Batch fetch positions
       const positionLevelMap = new Map<string, number>();
       if (positionIds.size > 0) {
         const { data: positions } = await supabase
@@ -437,65 +400,41 @@ export const approvalService = {
         positions?.forEach(p => positionLevelMap.set(p.id, p.level));
       }
 
-      // Transform data
       let result: PendingEvaluation[] = (data || []).map(item => {
         const task = Array.isArray(item.task) ? item.task[0] : item.task;
         const employee = Array.isArray(item.employee) ? item.employee[0] : item.employee;
-        
-        // Extract assigner info với level từ map
         const assigner = task?.assigner as any;
         const assignerData = Array.isArray(assigner) ? assigner[0] : assigner;
         const assignerLevel = assignerData?.position_id 
-          ? positionLevelMap.get(assignerData.position_id) || 1 
-          : 1; // Default = Executive (safe)
+          ? positionLevelMap.get(assignerData.position_id) || 6 
+          : 6;
 
         return {
           ...item,
           task: task ? {
             ...task,
-            assigner: assignerData ? {
-              ...assignerData,
-              position: { level: assignerLevel }
-            } : null
+            assigner: assignerData ? { ...assignerData, position: { level: assignerLevel } } : null
           } : null,
           employee,
         };
       });
 
-      // Apply permission filtering if context provided
       if (permissionContext) {
         const { userLevel, userDepartmentId, isAdmin } = permissionContext;
         const userGroup = getPermissionGroup(userLevel);
 
-        // EMPLOYEE không có quyền duyệt → Trả về rỗng
         if (userGroup === 'employee' && !isAdmin) {
-          console.log('📋 [approvalService] User is EMPLOYEE, returning empty');
           return { data: [], error: null };
         }
 
-        // Filter và thêm permission info
         result = result
           .map(item => {
             const taskDeptId = item.task?.department_id || '';
             const assignerLevel = item.task?.assigner?.position?.level || 6;
-
-            const permCheck = canUserApproveTask(
-              userLevel,
-              userDepartmentId,
-              assignerLevel,
-              taskDeptId,
-              isAdmin
-            );
-
-            return {
-              ...item,
-              canApprove: permCheck.canApprove,
-              permissionReason: permCheck.reason,
-            };
+            const permCheck = canUserApproveTask(userLevel, userDepartmentId, assignerLevel, taskDeptId, isAdmin);
+            return { ...item, canApprove: permCheck.canApprove, permissionReason: permCheck.reason };
           })
-          .filter(item => item.canApprove); // Chỉ trả về những task được phép duyệt
-
-        console.log(`📋 [approvalService] Filtered to ${result.length} approvable evaluations`);
+          .filter(item => item.canApprove);
       }
 
       console.log('✅ [approvalService] Found', result.length, 'pending evaluations');
@@ -506,18 +445,15 @@ export const approvalService = {
     }
   },
 
-  /**
-   * Lấy danh sách công việc hoàn thành nhưng chưa có tự đánh giá
-   * CẬP NHẬT: Filter theo quyền của user (Position Level)
-   */
+  // ==========================================================================
+  // ĐÃ CẬP NHẬT: Thêm status 'overdue' + field overdue_flagged
+  // ==========================================================================
   async getCompletedWithoutEvaluation(
     permissionContext?: ApprovalPermissionContext
   ): Promise<{ data: CompletedTaskWithoutEval[]; error: Error | null }> {
     console.log('📋 [approvalService] getCompletedWithoutEvaluation with permission:', permissionContext);
 
     try {
-      // Lấy tasks đã hoàn thành với assigner info
-      // FIX: Bỏ nested position query để tránh lỗi 406
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
         .select(`
@@ -527,11 +463,17 @@ export const approvalService = {
           assignee:employees!tasks_assignee_id_fkey(id, code, full_name, avatar_url),
           assigner:employees!tasks_assigner_id_fkey(id, full_name, position_id)
         `)
-        .eq('status', 'finished');
+        // Lấy task hoàn thành (finished) HOẶC quá hạn (overdue)
+        .in('status', ['finished', 'overdue'])
+        // Loại task đã vào evaluation flow của manager (approved/rejected)
+        // pending_self_eval = chưa tự đánh giá → vẫn phải hiện
+        // pending_approval = đã tự đánh giá → thuộc tab "Chờ phê duyệt"
+        .not('evaluation_status', 'in', '("pending_approval","approved","rejected")')
+        // Chỉ lấy task có assignee (không có assignee thì không duyệt được)
+        .not('assignee_id', 'is', null);
 
       if (tasksError) throw tasksError;
 
-      // Lấy danh sách task_id đã có self-evaluation
       const { data: evaluations, error: evalError } = await supabase
         .from('task_self_evaluations')
         .select('task_id');
@@ -548,7 +490,6 @@ export const approvalService = {
         if (posId) positionIds.add(posId);
       });
 
-      // Batch fetch positions
       const positionLevelMap = new Map<string, number>();
       if (positionIds.size > 0) {
         const { data: positions } = await supabase
@@ -558,64 +499,53 @@ export const approvalService = {
         positions?.forEach(p => positionLevelMap.set(p.id, p.level));
       }
 
-      // Filter tasks chưa có self-evaluation và transform
       let result: CompletedTaskWithoutEval[] = (tasks || [])
         .filter(t => !evaluatedTaskIds.has(t.id))
         .map(t => {
           const assigner = t.assigner as any;
           const assignerData = Array.isArray(assigner) ? assigner[0] : assigner;
+          // Default level 6 (Employee) khi assigner NULL → manager được duyệt
           const assignerLevel = assignerData?.position_id 
-            ? positionLevelMap.get(assignerData.position_id) || 1 
-            : 1; // Default = Executive (safe)
+            ? positionLevelMap.get(assignerData.position_id) || 6 
+            : 6;
 
           return {
             ...t,
             department: Array.isArray(t.department) ? t.department[0] : t.department,
-            assignee: Array.isArray(t.assignee) ? t.assignee[0] : t.assignee,
-            assigner: assignerData ? {
-              ...assignerData,
-              position: { level: assignerLevel }
-            } : null,
+            assignee:   Array.isArray(t.assignee)   ? t.assignee[0]   : t.assignee,
+            assigner:   assignerData ? { ...assignerData, position: { level: assignerLevel } } : null,
+            // ← MỚI: task quá hạn được đánh dấu để UI hiện badge đỏ
+            overdue_flagged: t.status === 'overdue',
           };
         });
 
-      // Apply permission filtering if context provided
+      // Sort: overdue lên trước, sau đó theo due_date tăng dần
+      result.sort((a, b) => {
+        if (a.overdue_flagged && !b.overdue_flagged) return -1;
+        if (!a.overdue_flagged && b.overdue_flagged) return 1;
+        return new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime();
+      });
+
+      // Apply permission filtering
       if (permissionContext) {
         const { userLevel, userDepartmentId, isAdmin } = permissionContext;
         const userGroup = getPermissionGroup(userLevel);
 
-        // EMPLOYEE không có quyền duyệt → Trả về rỗng
         if (userGroup === 'employee' && !isAdmin) {
-          console.log('📋 [approvalService] User is EMPLOYEE, returning empty');
           return { data: [], error: null };
         }
 
-        // Filter và thêm permission info
         result = result
           .map(item => {
             const taskDeptId = item.department_id || '';
-            const assignerLevel = item.assigner?.position?.level || 1; // Default = Executive
-
-            const permCheck = canUserApproveTask(
-              userLevel,
-              userDepartmentId,
-              assignerLevel,
-              taskDeptId,
-              isAdmin
-            );
-
-            return {
-              ...item,
-              canApprove: permCheck.canApprove,
-              permissionReason: permCheck.reason,
-            };
+            const assignerLevel = item.assigner?.position?.level || 6;
+            const permCheck = canUserApproveTask(userLevel, userDepartmentId, assignerLevel, taskDeptId, isAdmin);
+            return { ...item, canApprove: permCheck.canApprove, permissionReason: permCheck.reason };
           })
           .filter(item => item.canApprove);
-
-        console.log(`📋 [approvalService] Filtered to ${result.length} approvable tasks`);
       }
 
-      console.log('✅ [approvalService] Found', result.length, 'completed tasks without evaluation');
+      console.log('✅ [approvalService] Found', result.length, 'tasks (finished+overdue) without evaluation');
       return { data: result, error: null };
     } catch (error) {
       console.error('❌ [approvalService] getCompletedWithoutEvaluation error:', error);
@@ -623,23 +553,16 @@ export const approvalService = {
     }
   },
 
-  /**
-   * Lấy thống kê phê duyệt
-   * CẬP NHẬT: Tính theo quyền của user
-   */
   async getApprovalStats(permissionContext?: ApprovalPermissionContext): Promise<ApprovalStats> {
     console.log('📋 [approvalService] getApprovalStats');
 
     try {
-      // Đếm pending evaluations (đã filter theo quyền)
       const { data: pendingData } = await this.getPendingEvaluations(permissionContext);
       const pending_evaluations = pendingData?.length || 0;
 
-      // Đếm completed without eval (đã filter theo quyền)
       const { data: completedData } = await this.getCompletedWithoutEvaluation(permissionContext);
       const completed_without_eval = completedData?.length || 0;
 
-      // Đếm approved/rejected tuần này
       const startOfWeek = new Date();
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
       startOfWeek.setHours(0, 0, 0, 0);
@@ -664,25 +587,15 @@ export const approvalService = {
       };
     } catch (error) {
       console.error('❌ [approvalService] getApprovalStats error:', error);
-      return {
-        pending_evaluations: 0,
-        completed_without_eval: 0,
-        approved_this_week: 0,
-        rejected_this_week: 0,
-      };
+      return { pending_evaluations: 0, completed_without_eval: 0, approved_this_week: 0, rejected_this_week: 0 };
     }
   },
 
-  /**
-   * Kiểm tra quyền phê duyệt trước khi thực hiện
-   * FIX: Tách riêng query position để tránh lỗi 406
-   */
   async checkApprovalPermission(
     taskId: string,
     permissionContext: ApprovalPermissionContext
   ): Promise<{ canApprove: boolean; reason?: string }> {
     try {
-      // 1. Lấy thông tin task và assigner (KHÔNG nested position)
       const { data: task, error } = await supabase
         .from('tasks')
         .select(`
@@ -696,12 +609,9 @@ export const approvalService = {
         return { canApprove: false, reason: 'Không tìm thấy công việc' };
       }
 
-      // 2. Fetch position level riêng nếu có position_id
-      let assignerLevel = 1; // Default = Executive (safe default)
+      let assignerLevel = 1;
       const assigner = task.assigner as any;
-      const assignerPositionId = Array.isArray(assigner) 
-        ? assigner[0]?.position_id 
-        : assigner?.position_id;
+      const assignerPositionId = Array.isArray(assigner) ? assigner[0]?.position_id : assigner?.position_id;
 
       if (assignerPositionId) {
         const { data: posData } = await supabase
@@ -709,10 +619,7 @@ export const approvalService = {
           .select('level')
           .eq('id', assignerPositionId)
           .maybeSingle();
-        
-        if (posData?.level) {
-          assignerLevel = posData.level;
-        }
+        if (posData?.level) assignerLevel = posData.level;
       }
 
       return canUserApproveTask(
@@ -728,10 +635,6 @@ export const approvalService = {
     }
   },
 
-  /**
-   * Phê duyệt tự đánh giá
-   * NOTE: Điểm cho participants được cập nhật TỰ ĐỘNG qua database trigger
-   */
   async approve(input: ApproveInput): Promise<{ success: boolean; error: Error | null }> {
     return approveTask({
       task_id: input.task_id,
@@ -742,9 +645,6 @@ export const approvalService = {
     });
   },
 
-  /**
-   * Từ chối tự đánh giá
-   */
   async reject(input: RejectInput): Promise<{ success: boolean; error: Error | null }> {
     return rejectTask({
       task_id: input.task_id,
@@ -755,9 +655,6 @@ export const approvalService = {
     });
   },
 
-  /**
-   * Yêu cầu chỉnh sửa
-   */
   async requestRevision(input: RequestRevisionInput): Promise<{ success: boolean; error: Error | null }> {
     return requestInfo({
       task_id: input.task_id,
@@ -767,17 +664,29 @@ export const approvalService = {
     });
   },
 
-  /**
-   * Phê duyệt nhanh (cho task chưa có self-evaluation)
-   * NOTE: Điểm cho participants được cập nhật TỰ ĐỘNG qua database trigger
-   */
   async quickApprove(input: QuickApproveInput): Promise<{ success: boolean; error: Error | null }> {
     console.log('📋 [approvalService] quickApprove:', input);
 
     try {
       const rating = calculateRating(input.score);
 
-      // 1. Tạo self-evaluation thay cho nhân viên (người phụ trách chính)
+      // BƯỚC 1: Đảm bảo task có progress=100 và status=finished
+      // Trigger validate_task_status_progress yêu cầu finished phải có progress=100
+      // Task overdue thường có progress < 100 → phải update trước khi insert self_eval
+      const { error: taskUpdateError } = await supabase
+        .from('tasks')
+        .update({
+          progress: 100,
+          status: 'finished',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', input.task_id)
+        .in('status', ['overdue', 'in_progress', 'draft', 'assigned', 'on_hold']);
+        // Chỉ update nếu chưa finished, tránh đụng task đã finished thật
+
+      if (taskUpdateError) throw taskUpdateError;
+
+      // BƯỚC 2: Insert self_evaluation
       const { error: selfEvalError } = await supabase
         .from('task_self_evaluations')
         .insert({
@@ -793,8 +702,7 @@ export const approvalService = {
 
       if (selfEvalError) throw selfEvalError;
 
-      // 2. Tạo approval record
-      // ⚡ Trigger sẽ tự động cập nhật điểm cho participants
+      // BƯỚC 3: Insert approval record
       const { error: approvalError } = await supabase
         .from('task_approvals')
         .insert({
@@ -809,14 +717,13 @@ export const approvalService = {
 
       if (approvalError) throw approvalError;
 
-      // 3. Cập nhật task evaluation_status
+      // BƯỚC 4: Cập nhật evaluation_status
       await supabase
         .from('tasks')
         .update({ evaluation_status: 'approved' })
         .eq('id', input.task_id);
 
-      // ⚡ Điểm cho participants đã được cập nhật TỰ ĐỘNG qua trigger
-      console.log('✅ [approvalService] Quick approved successfully (participants scores updated via trigger)');
+      console.log('✅ [approvalService] Quick approved successfully');
       return { success: true, error: null };
     } catch (error) {
       console.error('❌ [approvalService] quickApprove error:', error);
@@ -824,9 +731,5 @@ export const approvalService = {
     }
   },
 };
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
 
 export default approvalService;

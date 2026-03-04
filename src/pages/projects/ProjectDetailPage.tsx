@@ -17,7 +17,7 @@
 // Design: Industrial Rubber Theme, mobile-first
 // ============================================================================
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, TouchEvent } from 'react'
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -247,6 +247,65 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; phase?: string 
   { key: 'reports',   label: 'Báo cáo',     icon: <BarChart3 className="w-4 h-4" /> },
   { key: 'activity',  label: 'Hoạt động',   icon: <Activity className="w-4 h-4" /> },
 ]
+
+// ============================================================================
+// SWIPE GESTURE HOOK — Smooth tab transitions
+// ============================================================================
+
+interface SwipeHandlers {
+  onTouchStart: (e: TouchEvent<HTMLDivElement>) => void
+  onTouchMove: (e: TouchEvent<HTMLDivElement>) => void
+  onTouchEnd: () => void
+}
+
+function useSwipeNavigation(
+  activeIndex: number,
+  setActiveIndex: (index: number) => void,
+  maxIndex: number
+): SwipeHandlers & { swipeOffset: number; isSwiping: boolean } {
+  const touchStartX = useRef<number>(0)
+  const touchCurrentX = useRef<number>(0)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const [isSwiping, setIsSwiping] = useState(false)
+  const SWIPE_THRESHOLD = 50 // Minimum swipe distance to trigger tab change
+
+  const onTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = e.touches[0].clientX
+    touchCurrentX.current = e.touches[0].clientX
+    setIsSwiping(true)
+  }, [])
+
+  const onTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (!isSwiping) return
+    touchCurrentX.current = e.touches[0].clientX
+    const diff = touchCurrentX.current - touchStartX.current
+    // Limit swipe offset to prevent over-scrolling
+    const limitedDiff = Math.max(-150, Math.min(150, diff))
+    setSwipeOffset(limitedDiff)
+  }, [isSwiping])
+
+  const onTouchEnd = useCallback(() => {
+    if (!isSwiping) return
+    const diff = touchCurrentX.current - touchStartX.current
+    
+    if (Math.abs(diff) > SWIPE_THRESHOLD) {
+      if (diff > 0 && activeIndex > 0) {
+        // Swipe right → previous tab
+        setActiveIndex(activeIndex - 1)
+      } else if (diff < 0 && activeIndex < maxIndex) {
+        // Swipe left → next tab
+        setActiveIndex(activeIndex + 1)
+      }
+    }
+    
+    setSwipeOffset(0)
+    setIsSwiping(false)
+    touchStartX.current = 0
+    touchCurrentX.current = 0
+  }, [isSwiping, activeIndex, maxIndex, setActiveIndex])
+
+  return { onTouchStart, onTouchMove, onTouchEnd, swipeOffset, isSwiping }
+}
 
 // ============================================================================
 // DEFAULT VALUES (no more mock data — all real from Supabase)
@@ -531,6 +590,10 @@ const PhasesTab: React.FC<{
   const [editStart, setEditStart] = useState('')
   const [editEnd, setEditEnd] = useState('')
   const [saving, setSaving] = useState(false)
+  
+  // Reorder state
+  const [reordering, setReordering] = useState<string | null>(null) // ID of phase being moved
+  const [movingDirection, setMovingDirection] = useState<'up' | 'down' | null>(null)
 
   // Milestones state
   const [milestonesMap, setMilestonesMap] = useState<Map<string, MilestoneItem[]>>(new Map())
@@ -933,6 +996,58 @@ const PhasesTab: React.FC<{
     }
   }
 
+  // ==========================================================================
+  // REORDER PHASES — Move Up / Move Down
+  // ==========================================================================
+
+  const handleMovePhase = async (phaseId: string, direction: 'up' | 'down') => {
+    const currentIndex = phases.findIndex(p => p.id === phaseId)
+    if (currentIndex === -1) return
+    
+    // Check boundaries
+    if (direction === 'up' && currentIndex === 0) return
+    if (direction === 'down' && currentIndex === phases.length - 1) return
+    
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    const targetPhase = phases[targetIndex]
+    const currentPhase = phases[currentIndex]
+    
+    // Set animation state
+    setReordering(phaseId)
+    setMovingDirection(direction)
+    
+    try {
+      // Swap order_index values in database
+      const updates = [
+        supabase.from('project_phases')
+          .update({ order_index: targetPhase.order_index, updated_at: new Date().toISOString() })
+          .eq('id', currentPhase.id),
+        supabase.from('project_phases')
+          .update({ order_index: currentPhase.order_index, updated_at: new Date().toISOString() })
+          .eq('id', targetPhase.id),
+      ]
+      
+      const results = await Promise.all(updates)
+      const hasError = results.find(r => r.error)
+      if (hasError?.error) throw hasError.error
+      
+      // Small delay for animation effect
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Refresh phases from parent
+      onRefresh()
+    } catch (err: any) {
+      console.error('Move phase failed:', err)
+      alert('Di chuyển giai đoạn thất bại: ' + (err.message || 'Lỗi'))
+    } finally {
+      // Clear animation state after a brief delay
+      setTimeout(() => {
+        setReordering(null)
+        setMovingDirection(null)
+      }, 300)
+    }
+  }
+
   return (
     <div className="space-y-3">
       {phases.map((phase, idx) => {
@@ -940,20 +1055,65 @@ const PhasesTab: React.FC<{
         const isEditing = editId === phase.id
         const phaseConf = PHASE_STATUS_CONFIG[phase.status]
 
+        // Animation class for moving phase
+        const isMoving = reordering === phase.id
+        const moveClass = isMoving 
+          ? movingDirection === 'up' 
+            ? 'transform -translate-y-2 shadow-lg ring-2 ring-[#2D8B6E]/30' 
+            : 'transform translate-y-2 shadow-lg ring-2 ring-[#2D8B6E]/30'
+          : ''
+        
         return (
-          <div key={phase.id} className={`bg-white rounded-xl border overflow-hidden ${isEditing ? 'border-[#2D8B6E] ring-1 ring-[#2D8B6E]/20' : 'border-gray-100'}`}>
-            <button
-              type="button"
-              onClick={() => setExpandedId(isExpanded ? null : phase.id)}
-              className="w-full flex items-center gap-3 p-4 text-left active:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-1 shrink-0">
-                <GripVertical className="w-4 h-4 text-gray-300" />
-                <span className="text-[12px] font-bold text-gray-400 w-5 text-center"
+          <div 
+            key={phase.id} 
+            className={`
+              bg-white rounded-xl border overflow-hidden transition-all duration-300 ease-out
+              ${isEditing ? 'border-[#2D8B6E] ring-1 ring-[#2D8B6E]/20' : 'border-gray-100'}
+              ${moveClass}
+            `}
+          >
+            {/* Phase header with reorder buttons */}
+            <div className="flex items-center gap-3 p-4">
+              {/* Reorder buttons - vertical stack */}
+              <div className="flex flex-col gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleMovePhase(phase.id, 'up'); }}
+                  disabled={idx === 0 || reordering !== null}
+                  className={`
+                    p-1 rounded transition-all
+                    ${idx === 0 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-[#1B4D3E] hover:bg-gray-100 active:scale-90'}
+                    ${reordering === phase.id && movingDirection === 'up' ? 'text-[#1B4D3E] bg-emerald-50 animate-pulse' : ''}
+                  `}
+                  title={idx === 0 ? 'Đã ở vị trí đầu' : 'Di chuyển lên'}
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </button>
+                <span className="text-[11px] font-bold text-gray-400 w-6 text-center"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   {idx + 1}
                 </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleMovePhase(phase.id, 'down'); }}
+                  disabled={idx === phases.length - 1 || reordering !== null}
+                  className={`
+                    p-1 rounded transition-all
+                    ${idx === phases.length - 1 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-[#1B4D3E] hover:bg-gray-100 active:scale-90'}
+                    ${reordering === phase.id && movingDirection === 'down' ? 'text-[#1B4D3E] bg-emerald-50 animate-pulse' : ''}
+                  `}
+                  title={idx === phases.length - 1 ? 'Đã ở vị trí cuối' : 'Di chuyển xuống'}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
               </div>
+              
+              {/* Clickable area to expand/collapse */}
+              <button
+                type="button"
+                onClick={() => setExpandedId(isExpanded ? null : phase.id)}
+                className="flex-1 flex items-center gap-3 text-left active:bg-gray-50/50 transition-colors rounded-lg -m-2 p-2"
+              >
 
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${phaseConf.bgColor} ${phaseConf.color}`}>
                 {phaseConf.icon}
@@ -984,10 +1144,11 @@ const PhasesTab: React.FC<{
               </span>
 
               {isExpanded
-                ? <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
-                : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                ? <ChevronUp className="w-4 h-4 text-[#1B4D3E] shrink-0" />
+                : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
               }
-            </button>
+              </button>
+            </div>
 
             {isExpanded && !isEditing && (
               <div className="border-t border-gray-100 p-4 space-y-3">
@@ -1885,6 +2046,111 @@ export const ProjectDetailPage: React.FC = () => {
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
+  const tabContentRef = useRef<HTMLDivElement>(null)
+  const tabNavRef = useRef<HTMLDivElement>(null)
+  
+  // Tab index for swipe navigation
+  const activeTabIndex = TABS.findIndex(t => t.key === activeTab)
+  
+  // Swipe handlers
+  const {
+    onTouchStart,
+    onTouchMove,
+    onTouchEnd,
+    swipeOffset,
+    isSwiping
+  } = useSwipeNavigation(
+    activeTabIndex,
+    (newIndex) => {
+      const newTab = TABS[newIndex]?.key
+      if (newTab) handleTabChange(newTab)
+    },
+    TABS.length - 1
+  )
+  
+  // Smooth tab change with animation
+  const handleTabChange = useCallback((newTab: TabKey) => {
+    const currentIndex = TABS.findIndex(t => t.key === activeTab)
+    const newIndex = TABS.findIndex(t => t.key === newTab)
+    
+    if (newIndex > currentIndex) {
+      setSlideDirection('left')
+    } else if (newIndex < currentIndex) {
+      setSlideDirection('right')
+    }
+    
+    setActiveTab(newTab)
+    
+    // Reset direction after animation
+    setTimeout(() => setSlideDirection(null), 300)
+    
+    // Scroll tab into view
+    if (tabNavRef.current) {
+      const tabButton = tabNavRef.current.querySelector(`[data-tab="${newTab}"]`)
+      if (tabButton) {
+        tabButton.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+      }
+    }
+  }, [activeTab])
+  
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if not in an input/textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return
+      
+      if (e.key === 'ArrowRight' && activeTabIndex < TABS.length - 1) {
+        handleTabChange(TABS[activeTabIndex + 1].key)
+      } else if (e.key === 'ArrowLeft' && activeTabIndex > 0) {
+        handleTabChange(TABS[activeTabIndex - 1].key)
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTabIndex, handleTabChange])
+  
+  // Tab indicator position - calculated from actual button dimensions
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 })
+  
+  // Update indicator position when active tab changes
+  useEffect(() => {
+    if (tabNavRef.current) {
+      const activeButton = tabNavRef.current.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement
+      if (activeButton) {
+        const navRect = tabNavRef.current.getBoundingClientRect()
+        const buttonRect = activeButton.getBoundingClientRect()
+        setIndicatorStyle({
+          left: buttonRect.left - navRect.left + tabNavRef.current.scrollLeft,
+          width: buttonRect.width,
+        })
+      }
+    }
+  }, [activeTab])
+  
+  // Also update on window resize
+  useEffect(() => {
+    const updateIndicator = () => {
+      if (tabNavRef.current) {
+        const activeButton = tabNavRef.current.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement
+        if (activeButton) {
+          const navRect = tabNavRef.current.getBoundingClientRect()
+          const buttonRect = activeButton.getBoundingClientRect()
+          setIndicatorStyle({
+            left: buttonRect.left - navRect.left + tabNavRef.current.scrollLeft,
+            width: buttonRect.width,
+          })
+        }
+      }
+    }
+    
+    window.addEventListener('resize', updateIndicator)
+    // Initial calculation after mount
+    setTimeout(updateIndicator, 100)
+    
+    return () => window.removeEventListener('resize', updateIndicator)
+  }, [activeTab])
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [realProjectId, setRealProjectId] = useState<string | null>(null)
 
@@ -2562,6 +2828,57 @@ export const ProjectDetailPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
+      {/* Slide animation styles + Reorder animations */}
+      <style>{`
+        /* Phase reorder animation */
+        @keyframes phaseMovePulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(45, 139, 110, 0.4); }
+          50% { box-shadow: 0 0 0 8px rgba(45, 139, 110, 0); }
+        }
+        
+        .phase-moving {
+          animation: phaseMovePulse 0.5s ease-out;
+        }
+        
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        .animate-slide-in-right {
+          animation: slideInRight 0.3s ease-out forwards;
+        }
+        
+        .animate-slide-in-left {
+          animation: slideInLeft 0.3s ease-out forwards;
+        }
+        
+        /* Smooth scrollbar hide for tab nav */
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
       {/* ===== HEADER ===== */}
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
@@ -2732,25 +3049,57 @@ export const ProjectDetailPage: React.FC = () => {
             </span>
           </div>
 
-          {/* ===== TAB NAVIGATION ===== */}
-          <div className="flex gap-0.5 overflow-x-auto -mx-4 px-4 scrollbar-hide">
-            {TABS.map(tab => {
+          {/* ===== TAB NAVIGATION — Smooth animated indicator ===== */}
+          <div 
+            ref={tabNavRef}
+            className="relative flex gap-0.5 overflow-x-auto -mx-4 px-4 scrollbar-hide"
+            onScroll={() => {
+              // Recalculate indicator on scroll
+              if (tabNavRef.current) {
+                const activeButton = tabNavRef.current.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement
+                if (activeButton) {
+                  const navRect = tabNavRef.current.getBoundingClientRect()
+                  const buttonRect = activeButton.getBoundingClientRect()
+                  setIndicatorStyle({
+                    left: buttonRect.left - navRect.left + tabNavRef.current.scrollLeft,
+                    width: buttonRect.width,
+                  })
+                }
+              }
+            }}
+          >
+            {/* Animated indicator bar - positioned based on actual button dimensions */}
+            <div 
+              className="absolute bottom-0 h-0.5 bg-[#1B4D3E] transition-all duration-300 ease-out rounded-full"
+              style={{
+                left: indicatorStyle.left,
+                width: indicatorStyle.width,
+              }}
+            />
+            
+            {TABS.map((tab, index) => {
               const isActive = activeTab === tab.key
               return (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  data-tab={tab.key}
+                  onClick={() => handleTabChange(tab.key)}
                   className={`
-                    inline-flex items-center gap-1.5 px-3.5 py-2.5
+                    relative inline-flex items-center gap-1.5 px-3.5 py-2.5
                     text-[12px] font-semibold whitespace-nowrap
-                    border-b-2 transition-colors
+                    transition-all duration-200 ease-out
                     ${isActive
-                      ? 'border-[#1B4D3E] text-[#1B4D3E]'
-                      : 'border-transparent text-gray-500 active:text-gray-700'
+                      ? 'text-[#1B4D3E] scale-105'
+                      : 'text-gray-500 active:text-gray-700 hover:text-gray-700'
                     }
                   `}
+                  style={{
+                    transform: isActive ? 'scale(1.02)' : 'scale(1)',
+                  }}
                 >
-                  {tab.icon}
+                  <span className={`transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
+                    {tab.icon}
+                  </span>
                   <span className="hidden sm:inline">{tab.label}</span>
                 </button>
               )
@@ -2759,8 +3108,31 @@ export const ProjectDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ===== TAB CONTENT ===== */}
-      <div className={`mx-auto py-5 ${activeTab === 'gantt' ? 'max-w-7xl px-3 sm:px-4' : 'max-w-5xl px-4 sm:px-6'}`}>
+      {/* ===== TAB CONTENT — Swipeable with smooth transitions ===== */}
+      <div 
+        ref={tabContentRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className={`
+          mx-auto py-5 
+          ${activeTab === 'gantt' ? 'max-w-7xl px-3 sm:px-4' : 'max-w-5xl px-4 sm:px-6'}
+          transition-all duration-300 ease-out
+          ${isSwiping ? 'cursor-grabbing' : ''}
+        `}
+        style={{
+          transform: isSwiping ? `translateX(${swipeOffset}px)` : 'translateX(0)',
+          opacity: isSwiping ? 0.95 : 1,
+        }}
+      >
+        {/* Slide animation wrapper */}
+        <div 
+          className={`
+            transition-all duration-300 ease-out
+            ${slideDirection === 'left' ? 'animate-slide-in-right' : ''}
+            ${slideDirection === 'right' ? 'animate-slide-in-left' : ''}
+          `}
+        >
         {activeTab === 'overview' && (
           <OverviewTab project={project} stats={stats} milestones={milestones} activities={activities} />
         )}
@@ -2836,6 +3208,7 @@ export const ProjectDetailPage: React.FC = () => {
             phase={TABS.find(t => t.key === activeTab)?.phase || ''}
           />
         )}
+        </div>{/* End slide animation wrapper */}
       </div>
 
       {showStatusMenu && (

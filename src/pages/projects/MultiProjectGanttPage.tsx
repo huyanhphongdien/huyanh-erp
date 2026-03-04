@@ -6,9 +6,10 @@
 //         Filter: phòng ban, trạng thái, ưu tiên
 //         Group by project → phases → milestones
 // DESIGN: Industrial Rubber Theme, desktop-focused Manager View
+// FIX: Bộ lọc hoạt động — dùng counter trigger thay vì useCallback dependency
 // ============================================================================
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -19,6 +20,7 @@ import {
   Building2,
   Flag,
   AlertCircle,
+  X,
 } from 'lucide-react'
 import GanttChart from '../../components/project/GanttChart'
 import type { ZoomLevel } from '../../components/project/GanttChart'
@@ -63,47 +65,75 @@ const MultiProjectGanttPage: React.FC = () => {
   // Dropdown data
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
 
+  // =========================================================================
+  // FIX: Dùng fetchTrigger counter để đảm bảo useEffect luôn re-run
+  // khi filter thay đổi (tránh stale closure / memoization issues)
+  // =========================================================================
+  const [fetchTrigger, setFetchTrigger] = useState(0)
+
   // ---- Load departments ----
   useEffect(() => {
     const loadDepts = async () => {
-      const { data } = await supabase
-        .from('departments')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name')
-      if (data) {
-        setDepartments(data.map((d) => ({ id: d.id as string, name: d.name as string })))
+      try {
+        // NOTE: bảng departments KHÔNG có cột is_active
+        const { data } = await supabase
+          .from('departments')
+          .select('id, name')
+          .order('name')
+        if (data) {
+          setDepartments(data.map((d) => ({ id: d.id as string, name: d.name as string })))
+        }
+      } catch (err) {
+        console.error('[MultiProjectGantt] Error loading departments:', err)
       }
     }
     loadDepts()
   }, [])
 
-  // ---- Load gantt data ----
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const params: Record<string, string | undefined> = {}
-      if (filterDept !== 'all') params.department_id = filterDept
-      if (filterStatus !== 'all') params.status = filterStatus
-      if (filterPriority !== 'all') params.priority = filterPriority
-
-      const result = await ganttService.getMultiProjectGantt(params)
-      setProjects(result.projects)
-      setOverallStart(result.overall_start)
-      setOverallEnd(result.overall_end)
-    } catch (err) {
-      console.error('[MultiProjectGantt] Load error:', err)
-      setError('Không thể tải dữ liệu')
-    } finally {
-      setLoading(false)
-    }
+  // ---- FIX: Khi bất kỳ filter nào thay đổi → increment trigger ----
+  useEffect(() => {
+    setFetchTrigger(prev => prev + 1)
   }, [filterDept, filterStatus, filterPriority])
 
+  // ---- Load gantt data — chạy khi fetchTrigger thay đổi ----
   useEffect(() => {
+    let cancelled = false
+
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Build params — chỉ gửi field có giá trị thực
+        const params: Record<string, string> = {}
+        if (filterDept !== 'all') params.department_id = filterDept
+        if (filterStatus !== 'all') params.status = filterStatus
+        if (filterPriority !== 'all') params.priority = filterPriority
+
+        console.log('📊 [MultiProjectGantt] Fetching with params:', JSON.stringify(params))
+
+        const result = await ganttService.getMultiProjectGantt(params)
+
+        if (cancelled) return
+
+        console.log('✅ [MultiProjectGantt] Got', result.projects.length, 'projects')
+
+        setProjects(result.projects)
+        setOverallStart(result.overall_start)
+        setOverallEnd(result.overall_end)
+      } catch (err: any) {
+        if (cancelled) return
+        console.error('[MultiProjectGantt] Load error:', err)
+        setError('Không thể tải dữ liệu: ' + (err?.message || ''))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
     loadData()
-  }, [loadData])
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchTrigger])
 
   // ---- Merge all project items into single GanttData ----
   const mergedGanttData: GanttData = useMemo(() => {
@@ -111,7 +141,6 @@ const MultiProjectGanttPage: React.FC = () => {
     const allDeps: GanttDependency[] = []
 
     for (const project of projects) {
-      // Strip mã dự án khỏi tên — "DA-2026-001 — Xây dựng..." → "Xây dựng..."
       const cleaned = project.items.map(item => {
         if (item.type === 'project' && item.name.includes(' — ')) {
           return { ...item, name: item.name.split(' — ').slice(1).join(' — ') }
@@ -140,12 +169,25 @@ const MultiProjectGanttPage: React.FC = () => {
     return { total, inProgress, completed, onHold }
   }, [projects])
 
+  // ---- Active filter count ----
+  const activeFilterCount = [filterDept, filterStatus, filterPriority]
+    .filter(v => v !== 'all').length
+
   // ---- Handlers ----
   const handleItemClick = (item: GanttItem) => {
-    // Nếu click vào project bar → navigate to project gantt
     if (item.type === 'project') {
-      navigate(`/projects/${item.id}/gantt`)
+      navigate(`/projects/${item.id}`)
     }
+  }
+
+  const handleClearFilters = () => {
+    setFilterDept('all')
+    setFilterStatus('all')
+    setFilterPriority('all')
+  }
+
+  const handleRefresh = () => {
+    setFetchTrigger(prev => prev + 1)
   }
 
   // ---- Render ----
@@ -176,17 +218,26 @@ const MultiProjectGanttPage: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
-                showFilters ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]' : 'border-gray-300 hover:bg-gray-50'
+                showFilters || activeFilterCount > 0
+                  ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]'
+                  : 'border-gray-300 hover:bg-gray-50'
               }`}
             >
-              <Filter className="w-4 h-4" /> Lọc
+              <Filter className="w-4 h-4" />
+              Lọc
+              {activeFilterCount > 0 && (
+                <span className="ml-1 bg-white text-[#1B4D3E] text-xs font-bold rounded-full w-5 h-5 inline-flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
             <button
-              onClick={loadData}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+              onClick={handleRefresh}
+              disabled={loading}
+              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
               title="Tải lại"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -200,7 +251,7 @@ const MultiProjectGanttPage: React.FC = () => {
               <select
                 value={filterDept}
                 onChange={(e) => setFilterDept(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent"
+                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent outline-none"
               >
                 <option value="all">Tất cả phòng ban</option>
                 {departments.map((d) => (
@@ -215,7 +266,7 @@ const MultiProjectGanttPage: React.FC = () => {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent"
+                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent outline-none"
               >
                 <option value="all">Tất cả trạng thái</option>
                 <option value="planning">Lập kế hoạch</option>
@@ -232,7 +283,7 @@ const MultiProjectGanttPage: React.FC = () => {
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent"
+                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-[#1B4D3E] focus:border-transparent outline-none"
               >
                 <option value="all">Tất cả ưu tiên</option>
                 <option value="critical">Khẩn cấp</option>
@@ -242,13 +293,51 @@ const MultiProjectGanttPage: React.FC = () => {
               </select>
             </div>
 
-            {(filterDept !== 'all' || filterStatus !== 'all' || filterPriority !== 'all') && (
-              <button
-                onClick={() => { setFilterDept('all'); setFilterStatus('all'); setFilterPriority('all') }}
-                className="text-xs text-red-600 hover:underline"
-              >
-                Xóa bộ lọc
-              </button>
+            {/* Clear + Active filter tags */}
+            {activeFilterCount > 0 && (
+              <>
+                <button
+                  onClick={handleClearFilters}
+                  className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Xóa bộ lọc
+                </button>
+
+                <div className="flex flex-wrap gap-1.5 ml-1">
+                  {filterDept !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#1B4D3E]/10 text-[#1B4D3E] rounded-full text-xs font-medium">
+                      {departments.find(d => d.id === filterDept)?.name || 'Phòng ban'}
+                      <button onClick={() => setFilterDept('all')} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filterStatus !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                      {filterStatus === 'planning' ? 'Lập kế hoạch' :
+                       filterStatus === 'approved' ? 'Đã duyệt' :
+                       filterStatus === 'in_progress' ? 'Đang thực hiện' :
+                       filterStatus === 'on_hold' ? 'Tạm dừng' :
+                       filterStatus === 'completed' ? 'Hoàn thành' : filterStatus}
+                      <button onClick={() => setFilterStatus('all')} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filterPriority !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full text-xs font-medium">
+                      {filterPriority === 'critical' ? 'Khẩn cấp' :
+                       filterPriority === 'high' ? 'Cao' :
+                       filterPriority === 'medium' ? 'Trung bình' :
+                       filterPriority === 'low' ? 'Thấp' : filterPriority}
+                      <button onClick={() => setFilterPriority('all')} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -271,11 +360,28 @@ const MultiProjectGanttPage: React.FC = () => {
             <Loader2 className="w-8 h-8 animate-spin text-[#1B4D3E]" />
           </div>
         ) : error ? (
-          <div className="bg-red-50 text-red-700 p-4 rounded-lg">{error}</div>
+          <div className="bg-red-50 text-red-700 p-4 rounded-lg text-sm">
+            {error}
+            <button onClick={handleRefresh} className="ml-3 underline hover:no-underline">
+              Thử lại
+            </button>
+          </div>
         ) : projects.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <LayoutGrid className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">Không có dự án nào phù hợp bộ lọc</p>
+            <p className="text-gray-500 mb-2">
+              {activeFilterCount > 0
+                ? 'Không có dự án nào phù hợp bộ lọc'
+                : 'Chưa có dự án nào'}
+            </p>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1 text-sm text-[#1B4D3E] hover:underline"
+              >
+                <X className="w-4 h-4" /> Xóa bộ lọc
+              </button>
+            )}
           </div>
         ) : (
           <GanttChart

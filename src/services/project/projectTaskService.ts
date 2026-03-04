@@ -5,6 +5,7 @@
 // ============================================================================
 // ✅ UPDATED: All FK hint joins removed to avoid 400 errors from mismatched
 //    constraint names. Uses client-side Map lookups instead.
+// ✅ FIX Phase 2: Thêm assigner_id + department_id fallback vào createProjectTask
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
@@ -38,6 +39,7 @@ export interface ProjectTaskFilter {
   sort_order?: 'asc' | 'desc'
 }
 
+// ✅ FIX: Thêm assigner_id + assigner_department_id
 export interface ProjectTaskCreateData {
   name: string
   description?: string
@@ -46,6 +48,8 @@ export interface ProjectTaskCreateData {
   milestone_id?: string
   department_id?: string
   assignee_id?: string
+  assigner_id?: string
+  assigner_department_id?: string  // Phòng ban người giao — fallback khi department_id trống
   priority?: TaskPriority
   due_date?: string
   start_date?: string
@@ -161,7 +165,6 @@ async function buildLookups(tasks: any[]): Promise<{
   empMap: Map<string, EmployeeInfo>
   deptMap: Map<string, DeptInfo>
 }> {
-  // Collect unique IDs
   const phaseIds = new Set<string>()
   const milestoneIds = new Set<string>()
   const empIds = new Set<string>()
@@ -175,7 +178,6 @@ async function buildLookups(tasks: any[]): Promise<{
     if (t.department_id) deptIds.add(t.department_id)
   }
 
-  // Parallel fetch lookups
   const [phaseRes, msRes, empRes, deptRes] = await Promise.all([
     phaseIds.size > 0
       ? supabase.from('project_phases').select('id, name, color, order_index').in('id', Array.from(phaseIds))
@@ -337,6 +339,7 @@ export const projectTaskService = {
     return enrichTasks([data], lookups)[0] || null
   },
 
+  // ✅ FIX: Thêm assigner_id + department_id fallback từ phòng ban người giao
   async createProjectTask(input: ProjectTaskCreateData): Promise<ProjectTask> {
     const { data, error } = await supabase
       .from('tasks')
@@ -346,8 +349,9 @@ export const projectTaskService = {
         project_id: input.project_id,
         phase_id: input.phase_id || null,
         milestone_id: input.milestone_id || null,
-        department_id: input.department_id || null,
+        department_id: input.department_id || input.assigner_department_id || null,  // ✅ FIX: fallback phòng ban người giao
         assignee_id: input.assignee_id || null,
+        assigner_id: input.assigner_id || input.created_by || null,                 // ✅ FIX: người giao việc
         priority: input.priority || 'medium',
         due_date: input.due_date || null,
         start_date: input.start_date || null,
@@ -586,7 +590,7 @@ export const projectTaskService = {
   },
 
   // ==========================================================================
-  // THỐNG KÊ — No FK hints, uses client-side lookups
+  // THỐNG KÊ
   // ==========================================================================
 
   async getTaskStats(project_id: string): Promise<ProjectTaskStats> {
@@ -606,7 +610,6 @@ export const projectTaskService = {
 
     const today = new Date().toISOString().split('T')[0]
 
-    // Load lookups for phases and assignees
     const phaseIds = new Set<string>()
     const empIds = new Set<string>()
     for (const t of rawTasks) {
@@ -630,7 +633,6 @@ export const projectTaskService = {
       ((empRes as any).data || []).map((e: any) => [e.id, e])
     )
 
-    // Overall stats
     const stats: ProjectTaskStats = {
       total: rawTasks.length,
       completed: rawTasks.filter(t => t.status === 'completed').length,
@@ -749,7 +751,7 @@ export const projectTaskService = {
   },
 
   // ==========================================================================
-  // HELPERS CHO DROPDOWN (Phases, Milestones, Members)
+  // HELPERS CHO DROPDOWN
   // ==========================================================================
 
   async getProjectPhases(project_id: string): Promise<{ id: string; name: string; order_index: number; status: string }[]> {
@@ -775,7 +777,6 @@ export const projectTaskService = {
   },
 
   async getProjectMembers(project_id: string): Promise<{ employee_id: string; full_name: string; role: string }[]> {
-    // Step 1: Get member records (no FK hint)
     const { data: memberData, error: memberError } = await supabase
       .from('project_members')
       .select('employee_id, role')
@@ -785,7 +786,6 @@ export const projectTaskService = {
     if (memberError) throw memberError
     if (!memberData || memberData.length === 0) return []
 
-    // Step 2: Load employee names
     const empIds = memberData.map(m => m.employee_id).filter(Boolean)
     const { data: empData } = await supabase
       .from('employees')

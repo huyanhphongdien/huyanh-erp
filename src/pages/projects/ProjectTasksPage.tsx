@@ -5,6 +5,7 @@
 // MÔ TẢ: Trang tasks của dự án — 3 view modes (By Phase, Kanban, List)
 //         Tạo task mới (pre-fill project context), bulk actions
 // DESIGN: Industrial Rubber Theme, mobile-first, TailwindCSS
+// ✅ FIX: Thêm assigner_id + department_id khi tạo task từ dự án
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
@@ -42,6 +43,7 @@ import {
   GripVertical,
 } from 'lucide-react'
 import { projectTaskService } from '../../services/project/projectTaskService'
+import { useAuthStore } from '../../stores/authStore'
 import type {
   ProjectTask,
   ProjectTaskFilter,
@@ -91,7 +93,6 @@ const KANBAN_COLUMNS: { key: TaskStatus[]; label: string; headerColor: string }[
 interface ProjectTasksPageProps {
   projectId: string
   projectName?: string
-  /** Danh sách members dự án cho assignee dropdown */
   onNavigateToTask?: (taskId: string) => void
 }
 
@@ -104,6 +105,9 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
   projectName,
   onNavigateToTask,
 }) => {
+  // ✅ FIX: Lấy user để set assigner_id + department_id khi tạo task
+  const { user } = useAuthStore()
+
   // State
   const [viewMode, setViewMode] = useState<ViewMode>('by_phase')
   const [tasks, setTasks] = useState<ProjectTask[]>([])
@@ -147,7 +151,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           status: filterStatus as TaskStatus || undefined,
           assignee_id: filterAssignee || undefined,
           search: searchQuery || undefined,
-          pageSize: 200, // Load all for client-side grouping
+          pageSize: 200,
         }),
         projectTaskService.getTaskStats(projectId),
         projectTaskService.getProjectPhases(projectId),
@@ -186,11 +190,10 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
     const map = new Map<string, ProjectTask[]>()
     const NO_PHASE = '__no_phase__'
 
-    // Initialize with all phases (even empty ones)
     for (const phase of phases) {
       map.set(phase.id, [])
     }
-    map.set(NO_PHASE, []) // Chưa phân phase
+    map.set(NO_PHASE, [])
 
     for (const task of tasks) {
       const key = task.phase_id || NO_PHASE
@@ -444,7 +447,6 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
   const ByPhaseView = () => {
     const NO_PHASE = '__no_phase__'
 
-    // Build ordered list: phases first, then unassigned
     const orderedKeys = [
       ...phases.map(p => p.id),
       ...(tasksByPhase.has(NO_PHASE) && (tasksByPhase.get(NO_PHASE)?.length || 0) > 0 ? [NO_PHASE] : []),
@@ -474,8 +476,6 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           const phaseTasks = tasksByPhase.get(key) || []
           const expanded = expandedPhases.has(key)
           const completedCount = phaseTasks.filter(t => t.status === 'completed').length
-
-          // Phase stat from stats
           const phaseStat = stats?.by_phase.find(s => s.phase_id === key)
 
           return (
@@ -487,7 +487,6 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
               >
                 {expanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
 
-                {/* Phase color dot */}
                 {!isNoPhase && (
                   <span
                     className="w-3 h-3 rounded-sm flex-shrink-0"
@@ -499,12 +498,10 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                   {isNoPhase ? 'Chưa phân phase' : phase?.name || key}
                 </span>
 
-                {/* Count badges */}
                 <span className="text-[11px] text-gray-500 mr-1">
                   {completedCount}/{phaseTasks.length}
                 </span>
 
-                {/* Mini progress */}
                 {phaseTasks.length > 0 && (
                   <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                     <div
@@ -526,10 +523,8 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
                     ))
                   )}
 
-                  {/* Add task to this phase */}
                   <button
                     onClick={() => {
-                      // TODO: Open create modal with pre-filled phase_id
                       setShowCreateModal(true)
                     }}
                     className="w-full flex items-center justify-center gap-1 py-2 text-[12px] text-gray-400 hover:text-[#1B4D3E] hover:bg-gray-50 rounded transition-colors"
@@ -557,7 +552,6 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           key={col.label}
           className={`flex-shrink-0 w-[280px] sm:w-[300px] bg-gray-50 rounded-lg border-t-2 ${col.headerColor}`}
         >
-          {/* Column header */}
           <div className="flex items-center justify-between px-3 py-2.5">
             <span className="text-[13px] font-semibold text-gray-700">{col.label}</span>
             <span className="text-[11px] text-gray-400 bg-white px-1.5 py-0.5 rounded-full">
@@ -565,7 +559,6 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
             </span>
           </div>
 
-          {/* Column tasks */}
           <div className="px-2 pb-2 space-y-1.5 max-h-[60vh] overflow-y-auto">
             {col.tasks.length === 0 ? (
               <div className="text-center py-6 text-[12px] text-gray-400">
@@ -588,7 +581,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
 
   const ListView = () => (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      {/* Desktop table (hidden on mobile) */}
+      {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -665,7 +658,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
         </table>
       </div>
 
-      {/* Mobile cards (visible on mobile only) */}
+      {/* Mobile cards */}
       <div className="sm:hidden p-2 space-y-1.5">
         {tasks.map(task => (
           <TaskCard key={task.id} task={task} showPhase />
@@ -698,10 +691,14 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
       if (!form.name?.trim()) return
       try {
         setSaving(true)
+        // ✅ FIX: Truyền assigner_id + department_id + created_by từ user hiện tại
         await projectTaskService.createProjectTask({
           ...form,
           project_id: projectId,
           name: form.name!.trim(),
+          assigner_id: user?.employee_id || undefined,
+          assigner_department_id: user?.department_id || undefined,
+          created_by: user?.employee_id || undefined,
         } as ProjectTaskCreateData)
         handleTaskCreated()
       } catch (err: any) {
@@ -752,7 +749,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
               />
             </div>
 
-            {/* Phase + Milestone (2 cols) */}
+            {/* Phase + Milestone */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[12px] font-medium text-gray-600 mb-1">Phase</label>

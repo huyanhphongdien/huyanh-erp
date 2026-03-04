@@ -1,11 +1,14 @@
 // ============================================================================
-// MY TASKS SERVICE - FIXED VERSION v4
+// MY TASKS SERVICE - v5 (Phase 2 Merge)
 // File: src/services/myTasksService.ts
-// 
-// FIXED: 
-// 1. Loại trừ tasks có status "draft" khỏi danh sách công việc của nhân viên
-// 2. Dùng 'finished' thay vì 'completed' (khớp với database constraint)
-// 3. Dùng 'paused' thay vì 'on_hold' (khớp với database constraint)
+//
+// Merge từ v4 (draft exclusion, finished/paused fix) + Phase 2 (project join)
+//
+// THAY ĐỔI Phase 2:
+// - Thêm project_id, phase_id vào select
+// - Thêm join project:projects!tasks_project_id_fkey(id, code, name)
+// - MyTask type thêm project field
+// - normalizeTaskRelations() xử lý project
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
@@ -30,6 +33,8 @@ export interface MyTask {
   notes?: string | null
   is_self_assigned?: boolean
   evaluation_status?: string | null
+  project_id?: string | null
+  phase_id?: string | null
   created_at?: string
   updated_at?: string
   // Relations
@@ -41,7 +46,12 @@ export interface MyTask {
     id: string
     full_name: string
   } | null
-  // Thêm field để biết role của user trong task
+  project?: {
+    id: string
+    code: string
+    name: string
+  } | null
+  // Role trong task
   my_role?: 'assignee' | 'participant'
   // Self evaluation fields - CRITICAL for workflow
   has_self_evaluation: boolean
@@ -56,7 +66,7 @@ export interface MyTasksFilter {
   search?: string
   from_date?: string
   to_date?: string
-  include_draft?: boolean  // Thêm option để bao gồm draft (mặc định false)
+  include_draft?: boolean  // Mặc định false
 }
 
 export interface MyTasksResponse {
@@ -69,11 +79,55 @@ export interface MyTasksResponse {
 // Database: draft, in_progress, paused, finished, cancelled
 // ============================================================================
 
-// Các status mà nhân viên KHÔNG nên thấy
 const EXCLUDED_STATUSES_FOR_EMPLOYEE = ['draft']
-
-// ✅ FIXED: Status đã hoàn thành - dùng 'finished' không phải 'completed'
 const _COMPLETED_STATUSES = ['finished', 'cancelled']
+
+// ============================================================================
+// COMMON SELECT — Phase 2: thêm project join
+// ============================================================================
+
+const TASK_FIELDS = `
+  id, code, name, description,
+  department_id, assigner_id, assignee_id,
+  start_date, due_date, status, priority, progress,
+  notes, is_self_assigned, evaluation_status,
+  project_id, phase_id,
+  created_at, updated_at,
+  department:departments(id, name),
+  assigner:employees!tasks_assigner_id_fkey(id, full_name),
+  project:projects!tasks_project_id_fkey(id, code, name)
+`
+
+const PARTICIPANT_TASK_SELECT = `
+  task_id, role, status,
+  task:tasks(
+    id, code, name, description,
+    department_id, assigner_id, assignee_id,
+    start_date, due_date, status, priority, progress,
+    notes, is_self_assigned, evaluation_status,
+    project_id, phase_id,
+    created_at, updated_at,
+    department:departments(id, name),
+    assigner:employees!tasks_assigner_id_fkey(id, full_name),
+    project:projects!tasks_project_id_fkey(id, code, name)
+  )
+`
+
+// ============================================================================
+// NORMALIZE HELPER
+// ============================================================================
+
+function normalizeTaskRelations(task: any): {
+  department: any
+  assigner: any
+  project: any
+} {
+  return {
+    department: Array.isArray(task.department) ? task.department[0] : task.department,
+    assigner: Array.isArray(task.assigner) ? task.assigner[0] : task.assigner,
+    project: Array.isArray(task.project) ? task.project[0] : task.project,
+  }
+}
 
 // ============================================================================
 // SERVICE
@@ -82,15 +136,11 @@ const _COMPLETED_STATUSES = ['finished', 'cancelled']
 export const myTasksService = {
   /**
    * Lấy danh sách công việc của tôi
-   * Bao gồm:
-   * 1. Tasks mà tôi là người phụ trách chính (assignee_id = myId)
-   * 2. Tasks mà tôi tham gia (trong task_assignments)
-   * 
-   * FIX v4: Dùng 'finished' thay vì 'completed'
+   * 1. Tasks tôi là assignee (assignee_id = myId)
+   * 2. Tasks tôi tham gia (task_assignments)
    */
   async getMyTasks(employeeId: string, filter?: MyTasksFilter): Promise<MyTasksResponse> {
     console.log('📋 [myTasksService] getMyTasks for:', employeeId)
-    console.log('📋 [myTasksService] Filter:', filter)
 
     try {
       // ============================================
@@ -98,30 +148,10 @@ export const myTasksService = {
       // ============================================
       let assigneeQuery = supabase
         .from('tasks')
-        .select(`
-          id,
-          code,
-          name,
-          description,
-          department_id,
-          assigner_id,
-          assignee_id,
-          start_date,
-          due_date,
-          status,
-          priority,
-          progress,
-          notes,
-          is_self_assigned,
-          evaluation_status,
-          created_at,
-          updated_at,
-          department:departments(id, name),
-          assigner:employees!tasks_assigner_id_fkey(id, full_name)
-        `, { count: 'exact' })
+        .select(TASK_FIELDS, { count: 'exact' })
         .eq('assignee_id', employeeId)
 
-      // *** CRITICAL FIX: Loại trừ draft status (trừ khi được yêu cầu) ***
+      // Loại trừ draft (trừ khi include_draft = true)
       if (!filter?.include_draft) {
         assigneeQuery = assigneeQuery.not('status', 'in', `(${EXCLUDED_STATUSES_FOR_EMPLOYEE.join(',')})`)
       }
@@ -146,7 +176,7 @@ export const myTasksService = {
         assigneeQuery = assigneeQuery.lte('due_date', filter.to_date)
       }
 
-      const { data: assigneeTasks, error: assigneeError, count: _assigneeCount } = await assigneeQuery
+      const { data: assigneeTasks, error: assigneeError } = await assigneeQuery
         .order('updated_at', { ascending: false })
 
       if (assigneeError) {
@@ -159,48 +189,21 @@ export const myTasksService = {
       // ============================================
       // QUERY 2: Tasks tôi tham gia (participants)
       // ============================================
-      let participantQuery = supabase
+      const { data: participantData, error: participantError } = await supabase
         .from('task_assignments')
-        .select(`
-          task_id,
-          role,
-          status,
-          task:tasks(
-            id,
-            code,
-            name,
-            description,
-            department_id,
-            assigner_id,
-            assignee_id,
-            start_date,
-            due_date,
-            status,
-            priority,
-            progress,
-            notes,
-            is_self_assigned,
-            evaluation_status,
-            created_at,
-            updated_at,
-            department:departments(id, name),
-            assigner:employees!tasks_assigner_id_fkey(id, full_name)
-          )
-        `)
+        .select(PARTICIPANT_TASK_SELECT)
         .eq('employee_id', employeeId)
         .neq('status', 'removed')
 
-      const { data: participantData, error: participantError } = await participantQuery
-
       if (participantError) {
         console.error('❌ [myTasksService] Error fetching participant tasks:', participantError)
-        // Không throw, chỉ log và tiếp tục với assignee tasks
+        // Không throw, tiếp tục
       }
 
       console.log('✅ [myTasksService] Found', participantData?.length || 0, 'tasks as participant')
 
       // ============================================
-      // QUERY 3: Lấy tất cả self-evaluations của employee này
+      // QUERY 3: Lấy tất cả self-evaluations
       // ============================================
       const { data: selfEvaluations, error: evalError } = await supabase
         .from('task_self_evaluations')
@@ -209,17 +212,15 @@ export const myTasksService = {
 
       if (evalError) {
         console.error('❌ [myTasksService] Error fetching self-evaluations:', evalError)
-        // Không throw, tiếp tục với empty map
       }
 
-      // Tạo map để lookup nhanh: task_id -> { has_self_evaluation, status, id }
       const selfEvalMap = new Map<string, { has: boolean; status: string; id: string }>()
       if (selfEvaluations) {
         for (const eval_ of selfEvaluations) {
           selfEvalMap.set(eval_.task_id, {
             has: true,
             status: eval_.status,
-            id: eval_.id
+            id: eval_.id,
           })
         }
       }
@@ -231,17 +232,16 @@ export const myTasksService = {
       // ============================================
       const taskMap = new Map<string, MyTask>()
 
-      // Add assignee tasks first (có priority cao hơn)
+      // Assignee tasks (priority cao hơn)
       if (assigneeTasks) {
         for (const task of assigneeTasks) {
           const evalInfo = selfEvalMap.get(task.id)
-          
+          const normalized = normalizeTaskRelations(task)
+
           taskMap.set(task.id, {
             ...task,
             my_role: 'assignee' as const,
-            department: Array.isArray(task.department) ? task.department[0] : task.department,
-            assigner: Array.isArray(task.assigner) ? task.assigner[0] : task.assigner,
-            // CRITICAL: Thêm self-evaluation info
+            ...normalized,
             has_self_evaluation: evalInfo?.has || false,
             self_evaluation_status: evalInfo?.status || null,
             self_evaluation_id: evalInfo?.id || null,
@@ -249,33 +249,36 @@ export const myTasksService = {
         }
       }
 
-      // Add participant tasks (chỉ nếu chưa có trong map VÀ không phải draft)
+      // Participant tasks (chỉ nếu chưa có + không phải draft)
       if (participantData) {
         for (const assignment of participantData) {
           const task = assignment.task as any
           if (task && !taskMap.has(task.id)) {
-            // *** CRITICAL FIX: Skip draft tasks cho participants ***
+            // Skip draft cho participants
             if (!filter?.include_draft && EXCLUDED_STATUSES_FOR_EMPLOYEE.includes(task.status)) {
               continue
             }
-            
-            // Apply filters manually for participant tasks
+
+            // Apply filters manually
             if (filter?.status && filter.status !== 'all' && task.status !== filter.status) continue
             if (filter?.priority && filter.priority !== 'all' && task.priority !== filter.priority) continue
             if (filter?.department_id && filter.department_id !== 'all' && task.department_id !== filter.department_id) continue
             if (filter?.search) {
               const searchLower = filter.search.toLowerCase()
-              if (!task.name?.toLowerCase().includes(searchLower) && 
-                  !task.code?.toLowerCase().includes(searchLower)) continue
+              if (
+                !task.name?.toLowerCase().includes(searchLower) &&
+                !task.code?.toLowerCase().includes(searchLower)
+              )
+                continue
             }
 
             const evalInfo = selfEvalMap.get(task.id)
+            const normalized = normalizeTaskRelations(task)
 
             taskMap.set(task.id, {
               ...task,
               my_role: 'participant' as const,
-              department: Array.isArray(task.department) ? task.department[0] : task.department,
-              assigner: Array.isArray(task.assigner) ? task.assigner[0] : task.assigner,
+              ...normalized,
               has_self_evaluation: evalInfo?.has || false,
               self_evaluation_status: evalInfo?.status || null,
               self_evaluation_id: evalInfo?.id || null,
@@ -284,7 +287,7 @@ export const myTasksService = {
         }
       }
 
-      // Convert to array và sort
+      // Sort by updated_at desc
       const combinedTasks = Array.from(taskMap.values())
       combinedTasks.sort((a, b) => {
         const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
@@ -296,9 +299,8 @@ export const myTasksService = {
 
       return {
         data: combinedTasks,
-        total: combinedTasks.length
+        total: combinedTasks.length,
       }
-
     } catch (error) {
       console.error('❌ [myTasksService] getMyTasks error:', error)
       throw error
@@ -314,38 +316,17 @@ export const myTasksService = {
     try {
       const { data: task, error } = await supabase
         .from('tasks')
-        .select(`
-          id,
-          code,
-          name,
-          description,
-          department_id,
-          assigner_id,
-          assignee_id,
-          start_date,
-          due_date,
-          status,
-          priority,
-          progress,
-          notes,
-          is_self_assigned,
-          evaluation_status,
-          created_at,
-          updated_at,
-          department:departments(id, name),
-          assigner:employees!tasks_assigner_id_fkey(id, full_name)
-        `)
+        .select(TASK_FIELDS)
         .eq('id', taskId)
         .single()
 
       if (error) throw error
       if (!task) return null
 
-      // Verify employee has access (là assignee hoặc participant)
+      // Verify access
       const isAssignee = task.assignee_id === employeeId
 
       if (!isAssignee) {
-        // Check if participant
         const { data: assignment } = await supabase
           .from('task_assignments')
           .select('id')
@@ -360,7 +341,7 @@ export const myTasksService = {
         }
       }
 
-      // Get self-evaluation info
+      // Self-evaluation info
       const { data: selfEval } = await supabase
         .from('task_self_evaluations')
         .select('id, status')
@@ -368,16 +349,16 @@ export const myTasksService = {
         .eq('employee_id', employeeId)
         .single()
 
+      const normalized = normalizeTaskRelations(task)
+
       return {
         ...task,
         my_role: isAssignee ? 'assignee' : 'participant',
-        department: Array.isArray(task.department) ? task.department[0] : task.department,
-        assigner: Array.isArray(task.assigner) ? task.assigner[0] : task.assigner,
+        ...normalized,
         has_self_evaluation: !!selfEval,
         self_evaluation_status: selfEval?.status || null,
         self_evaluation_id: selfEval?.id || null,
       }
-
     } catch (error) {
       console.error('❌ [myTasksService] getMyTaskById error:', error)
       throw error
@@ -392,9 +373,9 @@ export const myTasksService = {
 
     const { error } = await supabase
       .from('tasks')
-      .update({ 
+      .update({
         progress,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', taskId)
 
@@ -406,17 +387,16 @@ export const myTasksService = {
 
   /**
    * Cập nhật status task
-   * ✅ FIXED: Dùng 'finished' thay vì 'completed'
+   * ✅ Dùng 'finished' thay vì 'completed'
    */
   async updateStatus(taskId: string, status: string): Promise<void> {
     console.log('📋 [myTasksService] updateStatus:', taskId, status)
 
-    const updateData: any = { 
+    const updateData: any = {
       status,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     }
 
-    // ✅ FIXED: Nếu hoàn thành thì set progress = 100
     if (status === 'finished') {
       updateData.progress = 100
     }
@@ -433,8 +413,7 @@ export const myTasksService = {
   },
 
   /**
-   * Đếm số task theo status
-   * FIX: Loại trừ draft status
+   * Đếm số task theo status (loại trừ draft)
    */
   async getTaskCountsByStatus(employeeId: string): Promise<Record<string, number>> {
     console.log('📋 [myTasksService] getTaskCountsByStatus:', employeeId)
@@ -450,12 +429,11 @@ export const myTasksService = {
       return {}
     }
 
-    // ✅ FIXED: Dùng 'finished' và 'paused' thay vì 'completed' và 'on_hold'
     const counts: Record<string, number> = {
       total: data.length,
       in_progress: 0,
-      paused: 0,       // ✅ Fixed: paused không phải on_hold
-      finished: 0,     // ✅ Fixed: finished không phải completed
+      paused: 0,
+      finished: 0,
       cancelled: 0,
     }
 
@@ -469,44 +447,29 @@ export const myTasksService = {
   },
 
   /**
-   * Lấy danh sách task đã hoàn thành chưa có self-evaluation
-   * Hoặc có self-evaluation bị yêu cầu sửa
-   * ✅ FIXED: Dùng 'finished' thay vì 'completed'
+   * Tasks hoàn thành chưa có self-evaluation hoặc cần sửa
    */
   async getCompletedTasksForEvaluation(employeeId: string): Promise<{ data: MyTask[]; error: Error | null }> {
     console.log('📋 [myTasksService] getCompletedTasksForEvaluation:', employeeId)
 
     try {
-      // ✅ FIXED: Lấy tasks đã hoàn thành (finished) của employee
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
         .select(`
-          id,
-          code,
-          name,
-          description,
-          department_id,
-          assigner_id,
-          assignee_id,
-          start_date,
-          due_date,
-          status,
-          priority,
-          progress,
-          notes,
-          is_self_assigned,
-          evaluation_status,
-          created_at,
-          updated_at,
+          id, code, name, description,
+          department_id, assigner_id, assignee_id,
+          start_date, due_date, status, priority, progress,
+          notes, is_self_assigned, evaluation_status,
+          project_id, phase_id,
+          created_at, updated_at,
           department:departments(id, name)
         `)
         .eq('assignee_id', employeeId)
-        .in('status', ['finished'])  // ✅ Fixed: chỉ 'finished'
+        .in('status', ['finished'])
         .not('status', 'in', `(${EXCLUDED_STATUSES_FOR_EMPLOYEE.join(',')})`)
 
       if (tasksError) throw tasksError
 
-      // Lấy danh sách task_id đã có self-evaluation
       const { data: evaluations, error: evalError } = await supabase
         .from('task_self_evaluations')
         .select('id, task_id, status')
@@ -514,28 +477,27 @@ export const myTasksService = {
 
       if (evalError) throw evalError
 
-      // Tạo map để check nhanh
       const evaluationMap = new Map<string, { status: string; id: string }>()
-      evaluations?.forEach(e => evaluationMap.set(e.task_id, { status: e.status, id: e.id }))
+      evaluations?.forEach((e) => evaluationMap.set(e.task_id, { status: e.status, id: e.id }))
 
-      // Filter tasks chưa có self-evaluation HOẶC có self-evaluation bị yêu cầu sửa
-      const availableTasks: MyTask[] = tasks?.filter(t => {
-        const evalInfo = evaluationMap.get(t.id)
-        // Chưa có evaluation hoặc đang bị yêu cầu sửa
-        return !evalInfo || evalInfo.status === 'revision_requested'
-      }).map(t => {
-        const evalInfo = evaluationMap.get(t.id)
-        return {
-          ...t,
-          department: Array.isArray(t.department) ? t.department[0] : t.department,
-          has_self_evaluation: !!evalInfo,
-          self_evaluation_status: evalInfo?.status || null,
-          self_evaluation_id: evalInfo?.id || null,
-        }
-      }) || []
+      const availableTasks: MyTask[] =
+        tasks
+          ?.filter((t) => {
+            const evalInfo = evaluationMap.get(t.id)
+            return !evalInfo || evalInfo.status === 'revision_requested'
+          })
+          .map((t) => {
+            const evalInfo = evaluationMap.get(t.id)
+            return {
+              ...t,
+              department: Array.isArray(t.department) ? t.department[0] : t.department,
+              has_self_evaluation: !!evalInfo,
+              self_evaluation_status: evalInfo?.status || null,
+              self_evaluation_id: evalInfo?.id || null,
+            }
+          }) || []
 
       console.log('✅ [myTasksService] Found', availableTasks.length, 'tasks for evaluation')
-
       return { data: availableTasks, error: null }
     } catch (error) {
       console.error('❌ [myTasksService] getCompletedTasksForEvaluation error:', error)
@@ -544,10 +506,11 @@ export const myTasksService = {
   },
 
   /**
-   * Lấy thống kê công việc của tôi
-   * ✅ FIXED: Dùng 'finished' thay vì 'completed', 'paused' thay vì 'on_hold'
+   * Thống kê công việc của tôi
    */
-  async getMyTasksStats(employeeId: string): Promise<{
+  async getMyTasksStats(
+    employeeId: string
+  ): Promise<{
     total: number
     in_progress: number
     paused: number
@@ -560,7 +523,6 @@ export const myTasksService = {
   }> {
     console.log('📋 [myTasksService] getMyTasksStats:', employeeId)
 
-    // Get all tasks (excluding draft)
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('id, status, due_date, progress')
@@ -578,40 +540,38 @@ export const myTasksService = {
         overdue: 0,
         awaiting_self_eval: 0,
         pending_approval: 0,
-        approved: 0
+        approved: 0,
       }
     }
 
-    // Get self-evaluations
     const { data: selfEvals } = await supabase
       .from('task_self_evaluations')
       .select('task_id, status')
       .eq('employee_id', employeeId)
 
     const evalMap = new Map<string, string>()
-    selfEvals?.forEach(e => evalMap.set(e.task_id, e.status))
+    selfEvals?.forEach((e) => evalMap.set(e.task_id, e.status))
 
     const now = new Date()
     const stats = {
       total: tasks.length,
       in_progress: 0,
-      paused: 0,      // ✅ Fixed
-      finished: 0,    // ✅ Fixed
+      paused: 0,
+      finished: 0,
       cancelled: 0,
       overdue: 0,
       awaiting_self_eval: 0,
       pending_approval: 0,
-      approved: 0
+      approved: 0,
     }
 
     for (const task of tasks) {
-      // Count by status - ✅ FIXED: dùng 'finished' và 'paused'
       if (task.status === 'in_progress') stats.in_progress++
-      else if (task.status === 'paused') stats.paused++       // ✅ Fixed
-      else if (task.status === 'finished') stats.finished++   // ✅ Fixed
+      else if (task.status === 'paused') stats.paused++
+      else if (task.status === 'finished') stats.finished++
       else if (task.status === 'cancelled') stats.cancelled++
 
-      // Count overdue (not finished and past due date) - ✅ FIXED
+      // Overdue
       if (task.due_date && !['finished', 'cancelled'].includes(task.status)) {
         const dueDate = new Date(task.due_date)
         if (dueDate < now) {
@@ -619,7 +579,7 @@ export const myTasksService = {
         }
       }
 
-      // Count self-evaluation status for finished tasks - ✅ FIXED
+      // Self-eval status
       if (task.status === 'finished' || task.progress >= 100) {
         const evalStatus = evalMap.get(task.id)
         if (!evalStatus) {
@@ -628,18 +588,15 @@ export const myTasksService = {
           stats.pending_approval++
         } else if (evalStatus === 'approved') {
           stats.approved++
-        }
-        // Note: revision_requested tasks đếm vào awaiting_self_eval vì cần sửa lại
-        else if (evalStatus === 'revision_requested') {
+        } else if (evalStatus === 'revision_requested') {
           stats.awaiting_self_eval++
         }
       }
     }
 
     console.log('📊 [myTasksService] Stats (excluding draft):', stats)
-
     return stats
-  }
+  },
 }
 
 export default myTasksService

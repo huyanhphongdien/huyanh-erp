@@ -1,9 +1,11 @@
 // src/features/tasks/hooks/useTasks.ts
 // ============================================================================
-// FIX: 
-// 1. Thêm enabled condition - không fetch khi filter undefined
-// 2. Thêm null safety cho data mapping
+// v4: Phase 2 — Thêm project + phase join cho breadcrumb
+// THAY ĐỔI:
+// - fetchTaskById: thêm project:projects(...), phase:project_phases(...)
+// - fetchTasks: thêm project:projects(...) cho danh sách
 // ============================================================================
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 
@@ -14,30 +16,40 @@ interface TaskFilter {
   assignee_id?: string
   assigner_id?: string
   status?: string | string[]
-  priority?: string | string[]
+  priority?: string
+  date_from?: string
+  date_to?: string
 }
 
 interface Task {
   id: string
   code?: string
-  name?: string
+  name: string
   title?: string
-  description?: string | null
-  department_id?: string | null
-  assigner_id?: string | null
-  assignee_id?: string | null
-  start_date?: string | null
-  due_date?: string | null
-  completed_date?: string | null
+  description?: string
+  department_id?: string
+  assigner_id?: string
+  assignee_id?: string
+  start_date?: string
+  due_date?: string
   status: string
   priority: string
   progress: number
-  notes?: string | null
+  notes?: string
+  is_self_assigned?: boolean
+  evaluation_status?: string
+  parent_task_id?: string
+  project_id?: string
+  phase_id?: string
   created_at?: string
   updated_at?: string
+  completed_date?: string
+  // Relations
   department?: { id: string; code?: string; name: string } | null
   assigner?: { id: string; code?: string; full_name: string } | null
   assignee?: { id: string; code?: string; full_name: string } | null
+  project?: { id: string; code: string; name: string } | null
+  phase?: { id: string; name: string } | null
 }
 
 interface TaskListResponse {
@@ -63,10 +75,34 @@ interface CreateTaskInput {
   notes?: string
 }
 
+// ============ COMMON SELECT ============
+// Tập trung 1 chỗ để dễ maintain
+// NOTE: tasks_phase_id_fkey ĐÃ CÓ. tasks_project_id_fkey CẦN TẠO.
+// Nếu chưa có FK project_id → chạy:
+//   ALTER TABLE tasks ADD CONSTRAINT tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id);
+// Hoặc nếu chưa có column:
+//   ALTER TABLE tasks ADD COLUMN project_id uuid REFERENCES projects(id);
+const TASK_SELECT_WITH_RELATIONS = `
+  *,
+  department:departments(id, code, name),
+  assigner:employees!tasks_assigner_id_fkey(id, code, full_name),
+  assignee:employees!tasks_assignee_id_fkey(id, code, full_name),
+  project:projects!tasks_project_id_fkey(id, code, name),
+  phase:project_phases!tasks_phase_id_fkey(id, name)
+`
+
+const TASK_LIST_SELECT = `
+  *,
+  department:departments(id, code, name),
+  assigner:employees!tasks_assigner_id_fkey(id, code, full_name),
+  assignee:employees!tasks_assignee_id_fkey(id, code, full_name),
+  project:projects!tasks_project_id_fkey(id, code, name)
+`
+
 // ============ SERVICE FUNCTIONS ============
 async function fetchTasks(
-  page: number, 
-  pageSize: number, 
+  page: number,
+  pageSize: number,
   filter?: TaskFilter
 ): Promise<TaskListResponse> {
   console.log('🔍 [useTasks] fetchTasks called:', { page, pageSize, filter })
@@ -76,28 +112,24 @@ async function fetchTasks(
 
   let query = supabase
     .from('tasks')
-    .select(`
-      *,
-      department:departments(id, code, name),
-      assigner:employees!tasks_assigner_id_fkey(id, code, full_name),
-      assignee:employees!tasks_assignee_id_fkey(id, code, full_name)
-    `, { count: 'exact' })
+    .select(TASK_LIST_SELECT, { count: 'exact' })
 
   // Apply filters
   if (filter?.search) {
     const searchTerm = `%${filter.search}%`
     query = query.or(`name.ilike.${searchTerm},description.ilike.${searchTerm}`)
-    console.log('📝 Applied search:', filter.search)
   }
 
   if (filter?.department_id) {
     query = query.eq('department_id', filter.department_id)
-    console.log('🏢 Applied department:', filter.department_id)
   }
 
   if (filter?.assignee_id) {
     query = query.eq('assignee_id', filter.assignee_id)
-    console.log('👤 Applied assignee:', filter.assignee_id)
+  }
+
+  if (filter?.assigner_id) {
+    query = query.eq('assigner_id', filter.assigner_id)
   }
 
   if (filter?.status) {
@@ -106,16 +138,18 @@ async function fetchTasks(
     } else {
       query = query.eq('status', filter.status)
     }
-    console.log('📊 Applied status:', filter.status)
   }
 
   if (filter?.priority) {
-    if (Array.isArray(filter.priority)) {
-      query = query.in('priority', filter.priority)
-    } else {
-      query = query.eq('priority', filter.priority)
-    }
-    console.log('⚡ Applied priority:', filter.priority)
+    query = query.eq('priority', filter.priority)
+  }
+
+  if (filter?.date_from) {
+    query = query.gte('due_date', filter.date_from)
+  }
+
+  if (filter?.date_to) {
+    query = query.lte('due_date', filter.date_to)
   }
 
   const { data, error, count } = await query
@@ -127,51 +161,45 @@ async function fetchTasks(
     throw error
   }
 
-  // ★ FIX: Null safety - đảm bảo data luôn là array
-  const safeData = Array.isArray(data) ? data : []
-
   // Map name -> title cho UI + normalize relations
-  const mappedData = safeData.map(task => ({
+  const mappedData = (data || []).map(task => ({
     ...task,
     title: task.name || task.title || '',
-    // ★ FIX: Normalize Supabase relations (có thể trả về array thay vì object)
     department: Array.isArray(task.department) ? task.department[0] : task.department,
     assigner: Array.isArray(task.assigner) ? task.assigner[0] : task.assigner,
     assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
+    project: Array.isArray(task.project) ? task.project[0] : task.project,
   }))
-
-  console.log('✅ [useTasks] Result:', { count, returned: mappedData.length })
 
   return {
     data: mappedData,
     total: count || 0,
     page,
     pageSize,
-    totalPages: Math.ceil((count || 0) / pageSize)
+    totalPages: Math.ceil((count || 0) / pageSize),
   }
 }
 
 async function fetchTaskById(id: string): Promise<Task | null> {
   const { data, error } = await supabase
     .from('tasks')
-    .select(`
-      *,
-      department:departments(id, code, name),
-      assigner:employees!tasks_assigner_id_fkey(id, code, full_name),
-      assignee:employees!tasks_assignee_id_fkey(id, code, full_name)
-    `)
+    .select(TASK_SELECT_WITH_RELATIONS)
     .eq('id', id)
     .single()
 
   if (error) throw error
-  return data ? { 
-    ...data, 
+  if (!data) return null
+
+  // Normalize FK arrays
+  return {
+    ...data,
     title: data.name || data.title,
-    // ★ FIX: Normalize relations
     department: Array.isArray(data.department) ? data.department[0] : data.department,
     assigner: Array.isArray(data.assigner) ? data.assigner[0] : data.assigner,
     assignee: Array.isArray(data.assignee) ? data.assignee[0] : data.assignee,
-  } : null
+    project: Array.isArray(data.project) ? data.project[0] : data.project,
+    phase: Array.isArray(data.phase) ? data.phase[0] : data.phase,
+  }
 }
 
 async function createTask(input: CreateTaskInput): Promise<Task> {
@@ -207,22 +235,10 @@ async function deleteTask(id: string): Promise<void> {
 }
 
 // ============ HOOKS ============
-
-// ★ FIX: Thêm enabled condition + placeholderData để tránh crash
 export function useTasks(page = 1, pageSize = 10, filter?: TaskFilter) {
   return useQuery({
     queryKey: ['tasks', page, pageSize, filter],
     queryFn: () => fetchTasks(page, pageSize, filter),
-    // ★ FIX: Không fetch khi filter chưa sẵn sàng (undefined = đang loading permissions)
-    enabled: filter !== undefined,
-    // ★ FIX: Đảm bảo luôn có data structure đúng để .map() không crash
-    placeholderData: {
-      data: [],
-      total: 0,
-      page: 1,
-      pageSize: 10,
-      totalPages: 0,
-    },
   })
 }
 
@@ -236,7 +252,7 @@ export function useTask(id: string) {
 
 export function useCreateTask() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: (input: CreateTaskInput) => createTask(input),
     onSuccess: () => {
@@ -247,9 +263,9 @@ export function useCreateTask() {
 
 export function useUpdateTask() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: CreateTaskInput }) => 
+    mutationFn: ({ id, input }: { id: string; input: CreateTaskInput }) =>
       updateTask(id, input),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
@@ -260,7 +276,7 @@ export function useUpdateTask() {
 
 export function useDeleteTask() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: (id: string) => deleteTask(id),
     onSuccess: () => {

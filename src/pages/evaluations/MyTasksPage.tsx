@@ -1,14 +1,12 @@
 // ============================================================================
-// MY TASKS PAGE - WITH EXTENSION REQUEST + RESPONSIVE
+// MY TASKS PAGE - WITH EXTENSION REQUEST + RESPONSIVE + ASSIGNER COLUMN
 // File: src/pages/evaluations/MyTasksPage.tsx
 // ============================================================================
-// RESPONSIVE UPDATE:
-// - Stats grid: 2 cols mobile, 3 cols tablet, 6 cols desktop
-// - Table: hidden on mobile, card view instead
-// - Tabs: horizontal scroll on mobile
-// - Action buttons: compact on mobile
-// - Modals: mobile-friendly sizing
-// - Quick filters: scroll on mobile
+// PHASE 1 FIXES:
+// FIX 1: Thêm cột "Người giao" (assigner) vào desktop table
+// FIX 2: Thêm "Giao bởi: ..." vào mobile card
+// FIX 3: Import UserCog icon
+// FIX 4: Normalize assigner từ Supabase FK join (có thể trả array)
 // ============================================================================
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -39,6 +37,8 @@ import {
   Check,
   UserPlus,
   CalendarPlus,
+  UserCog,
+  FolderKanban,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { myTasksService, type MyTask } from '../../services/myTasksService';
@@ -198,15 +198,15 @@ function isThisWeek(dateStr: string | null | undefined): boolean {
 
 function getDaysRemaining(dueDate: string | null | undefined): { text: string; isOverdue: boolean; daysCount: number } {
   if (!dueDate) return { text: '-', isOverdue: false, daysCount: 0 };
-  
+
   const due = new Date(dueDate);
   due.setHours(23, 59, 59, 999);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const diffTime = due.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays < 0) {
     return { text: `Quá ${Math.abs(diffDays)} ngày`, isOverdue: true, daysCount: diffDays };
   } else if (diffDays === 0) {
@@ -218,8 +218,15 @@ function getDaysRemaining(dueDate: string | null | undefined): { text: string; i
   }
 }
 
+/** Normalize Supabase FK join — có thể trả array hoặc object */
+function normalizeRelation<T>(val: T | T[] | null | undefined): T | null {
+  if (!val) return null;
+  if (Array.isArray(val)) return val[0] || null;
+  return val;
+}
+
 // ============================================================================
-// PROGRESS UPDATE MODAL
+// PROGRESS UPDATE MODAL (unchanged)
 // ============================================================================
 
 const ProgressUpdateModal: React.FC<{
@@ -254,7 +261,7 @@ const ProgressUpdateModal: React.FC<{
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-end sm:items-center justify-center min-h-screen px-4 pt-4 pb-20 sm:pb-4 text-center">
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
-        
+
         <div className="relative inline-block w-full max-w-md p-5 sm:p-6 my-8 text-left bg-white rounded-t-xl sm:rounded-xl shadow-xl transform transition-all">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Cập nhật tiến độ</h3>
@@ -273,7 +280,7 @@ const ProgressUpdateModal: React.FC<{
               <span className="text-sm font-medium text-gray-700">Tiến độ</span>
               <span className="text-xl sm:text-2xl font-bold text-blue-600">{progress}%</span>
             </div>
-            
+
             <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
               <div
                 className={`h-3 rounded-full transition-all duration-300 ${
@@ -381,7 +388,7 @@ const ScoreCard: React.FC<{ score: number; label: string }> = ({ score, label })
   const hasData = score > 0;
   const rating = hasData ? getRatingFromScore(score) : 'none';
   const ratingConfig = RATING_CONFIG[rating];
-  
+
   return (
     <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-3 sm:p-4 border border-purple-100">
       <div className="flex items-center gap-2 sm:gap-3">
@@ -421,8 +428,8 @@ const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => {
   const color = progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-amber-500';
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-1.5 ${color} rounded-full transition-all duration-300`} style={{ width: `${Math.min(progress, 100)}%` }} />
+      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-2 ${color} rounded-full transition-all duration-300`} style={{ width: `${Math.min(progress, 100)}%` }} />
       </div>
       <span className="text-xs font-medium text-gray-600 w-8 text-right">{progress}%</span>
     </div>
@@ -707,7 +714,7 @@ const MyTasksPage: React.FC = () => {
               )}
             </div>
 
-            {/* Quick filters - scrollable on mobile */}
+            {/* Quick filters */}
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
               <span className="text-xs sm:text-sm text-gray-500 mr-1 whitespace-nowrap flex-shrink-0">Lọc:</span>
               {QUICK_FILTERS.map(f => (
@@ -733,7 +740,7 @@ const MyTasksPage: React.FC = () => {
           </div>
         )}
 
-        {/* Tabs - scrollable on mobile */}
+        {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 scrollbar-hide">
           {TABS.map((tab) => (
             <button
@@ -772,7 +779,7 @@ const MyTasksPage: React.FC = () => {
               />
             ) : (
               <>
-                {/* ===== DESKTOP TABLE (hidden on mobile) ===== */}
+                {/* ===== DESKTOP TABLE ===== */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
@@ -783,6 +790,10 @@ const MyTasksPage: React.FC = () => {
                         </th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
                           <div className="flex items-center gap-1">Tên {sortField === 'name' ? (sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />}</div>
+                        </th>
+                        {/* ====== CỘT MỚI: NGƯỜI GIAO (FIX #1) ====== */}
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-36">
+                          Người giao
                         </th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-28 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('priority')}>
                           <div className="flex items-center gap-1">Ưu tiên</div>
@@ -806,13 +817,40 @@ const MyTasksPage: React.FC = () => {
                         const approvalInfo = approvalInfoMap.get(task.id);
                         const canRequestExtension = activeTab === 'in_progress' && task.status === 'in_progress' && task.due_date;
 
+                        // FIX #4: Normalize assigner từ Supabase FK join
+                        const taskAssigner = normalizeRelation(task.assigner);
+
                         return (
                           <tr key={task.id} className={`hover:bg-gray-50 transition-colors ${taskOverdue ? 'bg-red-50/50' : ''}`}>
                             <td className="px-3 py-3.5">{taskOverdue && <AlertTriangle className="w-4 h-4 text-red-500" />}</td>
                             <td className="px-3 py-3.5"><span className="font-mono text-sm text-gray-600">{task.code}</span></td>
                             <td className="px-3 py-3.5">
                               <button onClick={() => handleViewTask(task.id)} className="font-medium text-gray-900 hover:text-blue-600 text-left truncate max-w-[300px] block" title={task.name}>{task.name}</button>
-                              {task.department?.name && <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500"><Building2 className="w-3 h-3" />{task.department.name}</div>}
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+                                {task.department?.name && (
+                                  <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{task.department.name}</span>
+                                )}
+                                {(task as any).project && (
+                                  <span className="flex items-center gap-1 text-emerald-600">
+                                    <FolderKanban className="w-3 h-3" />{(task as any).project.code}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            {/* ====== Ô MỚI: NGƯỜI GIAO (FIX #1) ====== */}
+                            <td className="px-3 py-3.5">
+                              {taskAssigner?.full_name ? (
+                                <div className="flex items-center gap-1.5">
+                                  <UserCog className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                                  <span className="text-sm text-gray-700 truncate max-w-[120px]" title={taskAssigner.full_name}>
+                                    {taskAssigner.full_name}
+                                  </span>
+                                </div>
+                              ) : (task as any).is_self_assigned ? (
+                                <span className="text-xs text-gray-400 italic">Tự giao</span>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
                             </td>
                             <td className="px-3 py-3.5"><PriorityBadge priority={task.priority} /></td>
                             <td className="px-3 py-3.5">
@@ -860,21 +898,44 @@ const MyTasksPage: React.FC = () => {
                     const approvalInfo = approvalInfoMap.get(task.id);
                     const canRequestExtension = activeTab === 'in_progress' && task.status === 'in_progress' && task.due_date;
 
+                    // FIX #4: Normalize assigner
+                    const taskAssigner = normalizeRelation(task.assigner);
+
                     return (
                       <div key={task.id} className={`p-3 sm:p-4 ${taskOverdue ? 'bg-red-50/50' : ''}`}>
                         {/* Top row: name + priority */}
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0 flex-1">
                             <button onClick={() => handleViewTask(task.id)} className="font-medium text-sm text-gray-900 hover:text-blue-600 text-left line-clamp-2 w-full">{task.name}</button>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="font-mono text-xs text-gray-400">{task.code}</span>
-                              {task.department?.name && <span className="text-xs text-gray-400">• {task.department.name}</span>}
+                            <div className="space-y-0.5 mt-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-xs text-gray-400">{task.code}</span>
+                                {task.department?.name && <span className="text-xs text-gray-400">• {task.department.name}</span>}
+                                {(task as any).project && (
+                                  <span className="text-xs text-emerald-600 flex items-center gap-0.5">
+                                    <FolderKanban className="w-3 h-3" />{(task as any).project.code}
+                                  </span>
+                                )}
+                              </div>
+                              {/* ====== DÒNG MỚI: NGƯỜI GIAO (FIX #2) ====== */}
+                              {taskAssigner?.full_name && (
+                                <div className="flex items-center gap-1 text-xs text-gray-500">
+                                  <UserCog className="w-3 h-3 text-blue-400" />
+                                  <span>Giao bởi: <strong className="font-medium text-gray-700">{taskAssigner.full_name}</strong></span>
+                                </div>
+                              )}
+                              {!taskAssigner?.full_name && (task as any).is_self_assigned && (
+                                <div className="flex items-center gap-1 text-xs text-gray-400">
+                                  <UserCog className="w-3 h-3" />
+                                  <span className="italic">Tự giao</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <PriorityBadge priority={task.priority} />
                         </div>
 
-                        {/* Middle: deadline + progress */}
+                        {/* Middle: deadline + score */}
                         <div className="flex items-center gap-4 mb-3 text-xs">
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 text-gray-400" />

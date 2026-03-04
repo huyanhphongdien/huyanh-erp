@@ -475,7 +475,7 @@ const ProjectTasksPage: React.FC<ProjectTasksPageProps> = ({
           const phase = phases.find(p => p.id === key)
           const phaseTasks = tasksByPhase.get(key) || []
           const expanded = expandedPhases.has(key)
-          const completedCount = phaseTasks.filter(t => t.status === 'completed').length
+          const completedCount = phaseTasks.filter(t => ['completed', 'finished'].includes(t.status)).length
           const phaseStat = stats?.by_phase.find(s => s.phase_id === key)
 
           return (

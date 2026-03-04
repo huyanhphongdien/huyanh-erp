@@ -633,14 +633,18 @@ export const projectTaskService = {
       ((empRes as any).data || []).map((e: any) => [e.id, e])
     )
 
+    // ✅ FIX: 'finished' cũng là hoàn thành (cùng label "Hoàn thành" trong UI)
+    const DONE_STATUSES = ['completed', 'finished']
+    const EXCLUDED_OVERDUE = ['completed', 'finished', 'cancelled']
+
     const stats: ProjectTaskStats = {
       total: rawTasks.length,
-      completed: rawTasks.filter(t => t.status === 'completed').length,
+      completed: rawTasks.filter(t => DONE_STATUSES.includes(t.status)).length,
       in_progress: rawTasks.filter(t => t.status === 'in_progress').length,
       todo: rawTasks.filter(t => t.status === 'draft' || t.status === 'pending').length,
       review: rawTasks.filter(t => t.status === 'review').length,
       overdue: rawTasks.filter(t =>
-        t.due_date && t.due_date < today && !['completed', 'cancelled'].includes(t.status)
+        t.due_date && t.due_date < today && !EXCLUDED_OVERDUE.includes(t.status)
       ).length,
       cancelled: rawTasks.filter(t => t.status === 'cancelled').length,
       progress_pct: 0,
@@ -652,7 +656,7 @@ export const projectTaskService = {
     const activeTasks = rawTasks.filter(t => t.status !== 'cancelled')
     if (activeTasks.length > 0) {
       const totalProgress = activeTasks.reduce((sum, t) => {
-        return sum + (t.status === 'completed' ? 100 : (t.progress || 0))
+        return sum + (DONE_STATUSES.includes(t.status) ? 100 : (t.progress || 0))
       }, 0)
       stats.progress_pct = Math.round((totalProgress / activeTasks.length) * 100) / 100
     }
@@ -675,10 +679,10 @@ export const projectTaskService = {
       }
       const ps = phaseStatsMap.get(key)!
       ps.total++
-      if (task.status === 'completed') ps.completed++
+      if (DONE_STATUSES.includes(task.status)) ps.completed++
       else if (task.status === 'in_progress') ps.in_progress++
       else if (['draft', 'pending'].includes(task.status)) ps.todo++
-      if (task.due_date && task.due_date < today && !['completed', 'cancelled'].includes(task.status)) {
+      if (task.due_date && task.due_date < today && !EXCLUDED_OVERDUE.includes(task.status)) {
         ps.overdue++
       }
     }
@@ -686,7 +690,7 @@ export const projectTaskService = {
     for (const ps of phaseStatsMap.values()) {
       const phaseTasks = rawTasks.filter(t => (t.phase_id || NO_PHASE) === ps.phase_id && t.status !== 'cancelled')
       if (phaseTasks.length > 0) {
-        const tp = phaseTasks.reduce((s, t) => s + (t.status === 'completed' ? 100 : (t.progress || 0)), 0)
+        const tp = phaseTasks.reduce((s, t) => s + (DONE_STATUSES.includes(t.status) ? 100 : (t.progress || 0)), 0)
         ps.progress_pct = Math.round((tp / phaseTasks.length) * 100) / 100
       }
     }
@@ -708,7 +712,7 @@ export const projectTaskService = {
       }
       const as = assigneeStatsMap.get(empId)!
       as.count++
-      if (task.status === 'completed') as.completed++
+      if (DONE_STATUSES.includes(task.status)) as.completed++
     }
     stats.by_assignee = Array.from(assigneeStatsMap.values()).sort((a, b) => b.count - a.count)
 

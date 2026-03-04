@@ -163,10 +163,6 @@ interface MilestoneItem {
   status: MilestoneStatus
   assignee?: { id: string; full_name: string }
   phase?: { id: string; name: string }
-  // ✅ MILESTONE PROGRESS
-  total_tasks?: number
-  completed_tasks?: number
-  progress_pct?: number
 }
 
 interface ActivityItem {
@@ -312,23 +308,6 @@ function getProgressColor(pct: number): string {
   return 'bg-gray-300'
 }
 
-// ✅ MILESTONE PROGRESS: Load task counts for milestones
-async function loadMilestoneTaskProgress(msIds: string[]): Promise<Map<string, { total: number; completed: number; pct: number }>> {
-  const map = new Map<string, { total: number; completed: number; pct: number }>()
-  if (msIds.length === 0) return map
-  const { data } = await supabase.from('tasks').select('milestone_id, status').in('milestone_id', msIds).neq('status', 'cancelled')
-  if (!data) return map
-  const grouped = new Map<string, { total: number; completed: number }>()
-  data.forEach((t: any) => {
-    const cur = grouped.get(t.milestone_id) || { total: 0, completed: 0 }
-    cur.total++
-    if (['completed', 'finished'].includes(t.status)) cur.completed++
-    grouped.set(t.milestone_id, cur)
-  })
-  grouped.forEach((v, k) => map.set(k, { total: v.total, completed: v.completed, pct: v.total > 0 ? Math.round(v.completed / v.total * 1000) / 10 : 0 }))
-  return map
-}
-
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
@@ -437,26 +416,13 @@ const OverviewTab: React.FC<{
               <div key={ms.id} className="flex items-center gap-3">
                 <span className="text-[16px] shrink-0">{msConf.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className={`text-[13px] font-medium truncate ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
-                      {ms.name}
-                    </p>
-                    {(ms.total_tasks || 0) > 0 && (
-                      <span className="text-[10px] text-gray-400 font-mono shrink-0">{ms.completed_tasks}/{ms.total_tasks}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[11px] text-gray-500">
-                      {formatDate(ms.due_date)}
-                      {ms.phase && <span className="ml-1.5">• {ms.phase.name}</span>}
-                    </p>
-                    {(ms.total_tasks || 0) > 0 && (
-                      <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden max-w-[60px]">
-                        <div className={`h-full rounded-full ${(ms.progress_pct || 0) >= 100 ? 'bg-green-500' : 'bg-blue-500'}`}
-                          style={{ width: `${Math.min(ms.progress_pct || 0, 100)}%` }} />
-                      </div>
-                    )}
-                  </div>
+                  <p className={`text-[13px] font-medium truncate ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                    {ms.name}
+                  </p>
+                  <p className="text-[11px] text-gray-500">
+                    {formatDate(ms.due_date)}
+                    {ms.phase && <span className="ml-1.5">• {ms.phase.name}</span>}
+                  </p>
                 </div>
                 {ms.assignee && (
                   <span className="text-[11px] text-gray-400 shrink-0">{ms.assignee.full_name}</span>
@@ -567,19 +533,16 @@ const PhasesTab: React.FC<{
         ;(empData || []).forEach((e: any) => empMap.set(e.id, e))
       }
 
-      // ✅ MILESTONE PROGRESS
-      const msProgress = await loadMilestoneTaskProgress((data || []).map((m: any) => m.id))
-      const milestones: MilestoneItem[] = (data || []).map((m: any) => {
-        const tp = msProgress.get(m.id)
-        return {
-          id: m.id, name: m.name, due_date: m.due_date,
-          completed_date: m.completed_date || undefined,
-          status: m.status || 'pending',
-          assignee: m.assignee_id ? empMap.get(m.assignee_id) : undefined,
-          phase: { id: phaseId, name: phases.find(p => p.id === phaseId)?.name || '' },
-          total_tasks: tp?.total || 0, completed_tasks: tp?.completed || 0, progress_pct: tp?.pct || 0,
-        }
-      })
+      const milestones: MilestoneItem[] = (data || []).map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        due_date: m.due_date,
+        completed_date: m.completed_date || undefined,
+        status: m.status || 'pending',
+        assignee: m.assignee_id ? empMap.get(m.assignee_id) : undefined,
+        phase: { id: phaseId, name: phases.find(p => p.id === phaseId)?.name || '' },
+      }))
+
       setMilestonesMap(prev => new Map(prev).set(phaseId, milestones))
     } catch (err) {
       console.error('Load milestones failed:', err)
@@ -614,18 +577,12 @@ const PhasesTab: React.FC<{
         ;(empData || []).forEach((e: any) => empMap.set(e.id, e))
       }
 
-      // ✅ MILESTONE PROGRESS
-      const msProgress = await loadMilestoneTaskProgress((data || []).map((m: any) => m.id))
-      setProjectMilestones((data || []).map((m: any) => {
-        const tp = msProgress.get(m.id)
-        return {
-          id: m.id, name: m.name, due_date: m.due_date,
-          completed_date: m.completed_date || undefined,
-          status: m.status || 'pending',
-          assignee: m.assignee_id ? empMap.get(m.assignee_id) : undefined,
-          total_tasks: tp?.total || 0, completed_tasks: tp?.completed || 0, progress_pct: tp?.pct || 0,
-        }
-      }))
+      setProjectMilestones((data || []).map((m: any) => ({
+        id: m.id, name: m.name, due_date: m.due_date,
+        completed_date: m.completed_date || undefined,
+        status: m.status || 'pending',
+        assignee: m.assignee_id ? empMap.get(m.assignee_id) : undefined,
+      })))
     } catch (err) {
       console.error('Load project milestones failed:', err)
     }
@@ -666,29 +623,18 @@ const PhasesTab: React.FC<{
     }
   }
 
-  // ✅ MILESTONE PROGRESS: Update to specific status (dropdown)
-  const handleUpdateMilestoneStatus = async (msId: string, newStatus: MilestoneStatus, phaseId: string | null) => {
+  const handleToggleMilestoneStatus = async (msId: string, currentStatus: MilestoneStatus, phaseId: string | null) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
     const completedDate = newStatus === 'completed' ? new Date().toISOString().split('T')[0] : null
     try {
-      const { error } = await supabase.from('project_milestones')
-        .update({ status: newStatus, completed_date: completedDate, updated_at: new Date().toISOString() })
+      await supabase.from('project_milestones')
+        .update({ status: newStatus, completed_date: completedDate })
         .eq('id', msId)
-      if (error) { alert('Lỗi: ' + error.message); return }
       if (phaseId) await loadMilestones(phaseId)
       else await loadProjectMilestones()
     } catch (err) {
-      console.error('Update milestone status failed:', err)
+      console.error('Toggle milestone failed:', err)
     }
-  }
-
-  // ✅ MILESTONE PROGRESS: Batch recalc
-  const handleRecalcMilestones = async () => {
-    try {
-      const { error } = await supabase.rpc('fn_recalc_project_milestones', { p_project_id: projectId })
-      if (error) console.warn('Recalc RPC:', error.message)
-      for (const phId of Array.from(milestonesMap.keys())) { await loadMilestones(phId) }
-      await loadProjectMilestones()
-    } catch (err) { console.error('Recalc failed:', err) }
   }
 
   const handleDeleteMilestone = async (msId: string, phaseId: string | null) => {
@@ -703,17 +649,9 @@ const PhasesTab: React.FC<{
   }
 
 
-  /** Milestone list — ✅ Enhanced with progress + status dropdown */
+  /** Milestone list within a phase */
   const MilestoneList: React.FC<{ milestones: MilestoneItem[]; phaseId: string | null; isLoading?: boolean }> = ({ milestones, phaseId, isLoading }) => {
     const isAddingHere = phaseId === null ? addProjectMs : addMsPhaseId === phaseId
-    const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
-    const MS_STATUS_OPTIONS: { value: MilestoneStatus; label: string; icon: string; color: string }[] = [
-      { value: 'pending', label: 'Chờ', icon: '⬜', color: 'text-gray-600' },
-      { value: 'approaching', label: 'Sắp đến', icon: '🔵', color: 'text-blue-600' },
-      { value: 'completed', label: 'Hoàn thành', icon: '✅', color: 'text-green-600' },
-      { value: 'overdue', label: 'Quá hạn', icon: '🔴', color: 'text-red-600' },
-      { value: 'cancelled', label: 'Đã hủy', icon: '⚫', color: 'text-gray-400' },
-    ]
 
     const handleClickAdd = () => {
       setMsName(''); setMsDueDate(''); setMsAssigneeId('')
@@ -738,21 +676,14 @@ const PhasesTab: React.FC<{
             <Milestone className="w-3.5 h-3.5" />
             Milestones ({milestones.length})
           </span>
-          <div className="flex items-center gap-2">
-            {milestones.length > 0 && (
-              <button onClick={handleRecalcMilestones}
-                className="text-[11px] text-gray-400 hover:text-[#1B4D3E] flex items-center gap-0.5"
-                title="Cập nhật trạng thái từ tasks">
-                <RefreshCw className="w-3 h-3" />
-              </button>
-            )}
-            {!isAddingHere && (
-              <button onClick={handleClickAdd}
-                className="text-[11px] text-[#1B4D3E] font-medium flex items-center gap-0.5 hover:underline">
-                <Plus className="w-3 h-3" /> Thêm
-              </button>
-            )}
-          </div>
+          {!isAddingHere && (
+            <button
+              onClick={handleClickAdd}
+              className="text-[11px] text-[#1B4D3E] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              <Plus className="w-3 h-3" /> Thêm
+            </button>
+          )}
         </div>
 
         {isLoading && (
@@ -768,51 +699,32 @@ const PhasesTab: React.FC<{
         {milestones.map(ms => {
           const msConf = MS_STATUS_ICON[ms.status]
           const isOverdue = ms.status !== 'completed' && ms.due_date && new Date(ms.due_date) < new Date()
-          const hasTasks = (ms.total_tasks || 0) > 0
-          const taskPct = ms.progress_pct || 0
           return (
-            <div key={ms.id} className={`rounded-lg border ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'} p-2.5 group`}>
-              <div className="flex items-center gap-2">
-                <div className="relative shrink-0">
-                  <button onClick={() => setStatusMenuId(statusMenuId === ms.id ? null : ms.id)}
-                    className="text-[14px] p-0.5 rounded hover:bg-gray-100 active:scale-95" title="Thay đổi trạng thái">
-                    {msConf.icon}
-                  </button>
-                  {statusMenuId === ms.id && (<>
-                    <div className="fixed inset-0 z-40" onClick={() => setStatusMenuId(null)} />
-                    <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]">
-                      {MS_STATUS_OPTIONS.map(opt => (
-                        <button key={opt.value}
-                          onClick={() => { handleUpdateMilestoneStatus(ms.id, opt.value, phaseId); setStatusMenuId(null) }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-gray-50 ${ms.status === opt.value ? 'bg-gray-50 font-semibold' : ''} ${opt.color}`}>
-                          <span className="text-[13px]">{opt.icon}</span>{opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </>)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className={`text-[12px] font-medium ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{ms.name}</span>
-                </div>
-                <span className={`text-[11px] shrink-0 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{formatDate(ms.due_date)}</span>
-                {ms.assignee && (<span className="text-[10px] text-gray-400 shrink-0 hidden sm:block">{ms.assignee.full_name}</span>)}
-                <button onClick={() => handleDeleteMilestone(ms.id, phaseId)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-300 hover:text-red-500 transition-opacity shrink-0">
-                  <Trash2 className="w-3 h-3" />
-                </button>
+            <div key={ms.id} className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${isOverdue ? 'bg-red-50' : 'hover:bg-gray-50'} group`}>
+              <button
+                onClick={() => handleToggleMilestoneStatus(ms.id, ms.status, phaseId)}
+                className="text-[14px] shrink-0"
+                title={ms.status === 'completed' ? 'Đánh dấu chưa xong' : 'Đánh dấu hoàn thành'}
+              >
+                {msConf.icon}
+              </button>
+              <div className="flex-1 min-w-0">
+                <span className={`text-[12px] font-medium ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                  {ms.name}
+                </span>
               </div>
-              {hasTasks && (
-                <div className="flex items-center gap-2 mt-1.5 ml-7">
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${taskPct >= 100 ? 'bg-green-500' : taskPct > 0 ? 'bg-blue-500' : 'bg-gray-200'}`}
-                      style={{ width: `${Math.min(taskPct, 100)}%` }} />
-                  </div>
-                  <span className="text-[10px] text-gray-500 shrink-0 font-mono">{ms.completed_tasks}/{ms.total_tasks}</span>
-                </div>
+              <span className={`text-[11px] shrink-0 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
+                {formatDate(ms.due_date)}
+              </span>
+              {ms.assignee && (
+                <span className="text-[10px] text-gray-400 shrink-0 hidden sm:block">{ms.assignee.full_name}</span>
               )}
-              {!hasTasks && ms.status !== 'completed' && ms.status !== 'cancelled' && (
-                <div className="mt-1 ml-7"><span className="text-[10px] text-gray-400 italic">Chưa gán task</span></div>
-              )}
+              <button
+                onClick={() => handleDeleteMilestone(ms.id, phaseId)}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-300 hover:text-red-500 transition-opacity shrink-0"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
             </div>
           )
         })}
@@ -2055,21 +1967,16 @@ export const ProjectDetailPage: React.FC = () => {
         const phaseMap = new Map<string, { id: string; name: string }>()
         phasesData.forEach((p: any) => phaseMap.set(p.id, { id: p.id, name: p.name }))
 
-        // ✅ MILESTONE PROGRESS: Load task counts for overview
-        const msProgress = await loadMilestoneTaskProgress(msData.map((m: any) => m.id))
-
-        // Set milestones (client-side join + task progress)
-        setMilestones(msData.map((m: any) => {
-          const tp = msProgress.get(m.id)
-          return {
-            id: m.id, name: m.name, due_date: m.due_date,
-            completed_date: m.completed_date || undefined,
-            status: m.status || 'pending',
-            assignee: m.assignee_id ? empMap.get(m.assignee_id) : undefined,
-            phase: m.phase_id ? phaseMap.get(m.phase_id) : undefined,
-            total_tasks: tp?.total || 0, completed_tasks: tp?.completed || 0, progress_pct: tp?.pct || 0,
-          }
-        }))
+        // Set milestones (client-side join)
+        setMilestones(msData.map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          due_date: m.due_date,
+          completed_date: m.completed_date || undefined,
+          status: m.status || 'pending',
+          assignee: m.assignee_id ? empMap.get(m.assignee_id) : undefined,
+          phase: m.phase_id ? phaseMap.get(m.phase_id) : undefined,
+        })))
 
         // Set activities (client-side join)
         setActivities(actData.map((a: any) => ({

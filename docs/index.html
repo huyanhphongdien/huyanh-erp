@@ -3,2827 +3,654 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1B4D3E">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Huy Anh B2B Platform — Đề xuất Giải pháp</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <title>B2B Chat - Huy Anh Rubber ERP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    :root {
-      --primary: #1B4D3E;
-      --primary-light: #2D8B6E;
-      --primary-dark: #0F2F26;
-      --accent: #E8A838;
-      --accent-light: #F5C76B;
-      --bg: #F8F9FA;
-      --card: #FFFFFF;
-      --text: #1A1A1A;
-      --text-secondary: #6B7280;
-      --text-muted: #9CA3AF;
-      --border: #E5E7EB;
-      --success: #10B981;
-      --warning: #F59E0B;
-      --danger: #EF4444;
-      --info: #3B82F6;
-      --violet: #8B5CF6;
-      --safe-top: env(safe-area-inset-top);
-      --safe-bottom: env(safe-area-inset-bottom);
-      --tap-size: 48px;
-      --radius: 16px;
-      --radius-sm: 12px;
-      --shadow: 0 2px 8px rgba(0,0,0,0.08);
-      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
-    body {
-      font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 15px;
-      line-height: 1.6;
-      padding-bottom: calc(70px + var(--safe-bottom));
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ===== HEADER ===== */
-    .header {
-      background: linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
-      padding: calc(20px + var(--safe-top)) 20px 32px;
-      position: relative;
-      overflow: hidden;
-    }
-    .header::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -50%;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, rgba(232,168,56,0.15) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(10px);
-      padding: 8px 14px;
-      border-radius: 24px;
-      margin-bottom: 16px;
-    }
-    .header-badge-icon {
-      width: 28px;
-      height: 28px;
-      background: var(--accent);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-    }
-    .header-badge-text {
-      color: white;
-      font-weight: 600;
-      font-size: 13px;
-      letter-spacing: 0.3px;
-    }
-    .header h1 {
-      color: white;
-      font-size: 26px;
-      font-weight: 800;
-      line-height: 1.25;
-      margin-bottom: 12px;
-    }
-    .header h1 span { color: var(--accent); }
-    .header-desc {
-      color: rgba(255,255,255,0.85);
-      font-size: 14px;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-    .header-stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    .header-stat {
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(10px);
-      border-radius: var(--radius-sm);
-      padding: 14px 10px;
-      text-align: center;
-    }
-    .header-stat-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--accent);
-      line-height: 1;
-    }
-    .header-stat-label {
-      font-size: 11px;
-      color: rgba(255,255,255,0.8);
-      margin-top: 4px;
-    }
-
-    /* ===== TABS ===== */
-    .tabs {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      padding: 0 16px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tabs-inner {
-      display: flex;
-      gap: 4px;
-      min-width: max-content;
-    }
-    .tab {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 12px 14px;
-      text-decoration: none;
-      color: var(--text-muted);
-      font-size: 11px;
-      font-weight: 600;
-      border-bottom: 3px solid transparent;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
-    .tab-icon { font-size: 18px; margin-bottom: 4px; }
-    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
-
-    /* ===== MAIN ===== */
-    .main { padding: 20px 16px; }
-    .section { margin-bottom: 32px; scroll-margin-top: 80px; }
-    .section-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 8px;
-    }
-    .section-num {
-      width: 36px;
-      height: 36px;
-      background: var(--primary);
-      color: white;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      font-weight: 700;
-    }
-    .section-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .section-desc {
-      color: var(--text-secondary);
-      font-size: 14px;
-      margin-bottom: 20px;
-      padding-left: 48px;
-    }
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 24px 0;
-    }
-
-    /* ===== SCROLL CARDS ===== */
-    .scroll-container {
-      margin: 0 -16px;
-      padding: 0 16px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .scroll-container::-webkit-scrollbar { display: none; }
-    .scroll-cards {
-      display: flex;
-      gap: 12px;
-      padding-bottom: 4px;
-    }
-    .scroll-card {
-      flex: 0 0 280px;
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: var(--shadow);
-    }
-    .scroll-card:last-child { margin-right: 16px; }
-    .card-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      margin-bottom: 14px;
-    }
-    .card-icon.primary { background: rgba(27,77,62,0.1); }
-    .card-icon.accent { background: rgba(232,168,56,0.12); }
-    .card-icon.success { background: rgba(16,185,129,0.1); }
-    .card-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-    .card-text {
-      font-size: 13px;
-      color: var(--text-secondary);
-      line-height: 1.5;
-    }
-
-    /* ===== FLOW STEPS ===== */
-    .flow { padding-left: 20px; }
-    .flow-step {
-      display: flex;
-      align-items: flex-start;
-      position: relative;
-      padding-bottom: 16px;
-    }
-    .flow-step:last-child { padding-bottom: 0; }
-    .flow-step::before {
-      content: '';
-      position: absolute;
-      left: 17px;
-      top: 40px;
-      bottom: 0;
-      width: 2px;
-      background: linear-gradient(180deg, var(--primary) 0%, var(--accent) 100%);
-    }
-    .flow-step:last-child::before { display: none; }
-    .flow-dot {
-      width: 36px;
-      height: 36px;
-      background: var(--primary);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
-      z-index: 1;
-    }
-    .flow-content {
-      margin-left: 14px;
-      flex: 1;
-    }
-    .flow-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 2px;
-    }
-    .flow-desc {
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-
-    /* ===== FEATURE LIST ===== */
-    .feature-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .feature-item {
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 16px;
-      box-shadow: var(--shadow);
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
-    }
-    .feature-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
-    }
-    .feature-content { flex: 1; }
-    .feature-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 4px;
-    }
-    .feature-desc {
-      font-size: 13px;
-      color: var(--text-secondary);
-      line-height: 1.5;
-    }
-
-    /* ===== COMPARE ===== */
-    .compare-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .compare-item {
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 16px;
-      box-shadow: var(--shadow);
-    }
-    .compare-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 12px;
-    }
-    .compare-row {
-      display: flex;
-      gap: 8px;
-    }
-    .compare-box {
-      flex: 1;
-      padding: 12px;
-      border-radius: var(--radius-sm);
-      text-align: center;
-    }
-    .compare-box.old {
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.2);
-    }
-    .compare-box.new {
-      background: rgba(16,185,129,0.08);
-      border: 1px solid rgba(16,185,129,0.2);
-    }
-    .compare-box-label {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-    .compare-box.old .compare-box-label { color: var(--danger); }
-    .compare-box.new .compare-box-label { color: var(--success); }
-    .compare-box-value {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    /* ===== ARCHITECTURE ===== */
-    .arch {
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: var(--shadow);
-    }
-    .arch-layer {
-      padding: 16px;
-      border-radius: var(--radius-sm);
-      text-align: center;
-    }
-    .arch-layer.portal { background: linear-gradient(135deg, var(--info) 0%, #2563EB 100%); }
-    .arch-layer.engine { background: linear-gradient(135deg, var(--accent) 0%, #D97706 100%); }
-    .arch-layer.core { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); }
-    .arch-layer-title {
-      color: white;
-      font-size: 14px;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-    .arch-tags {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 6px;
-    }
-    .arch-tag {
-      background: rgba(255,255,255,0.2);
-      color: white;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 500;
-    }
-    .arch-arrow {
-      text-align: center;
-      padding: 8px 0;
-      font-size: 16px;
-    }
-
-    /* ===== ACCORDION ===== */
-    .accordion {
-      background: var(--card);
-      border-radius: var(--radius);
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .accordion-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px;
-      cursor: pointer;
-    }
-    .accordion-title {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .accordion-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 700;
-    }
-    .accordion-text {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .accordion-arrow {
-      font-size: 12px;
-      color: var(--text-muted);
-      transition: transform 0.3s;
-    }
-    .accordion.open .accordion-arrow { transform: rotate(180deg); }
-    .accordion-body {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease;
-    }
-    .accordion.open .accordion-body { max-height: 2000px; }
-
-    /* ===== MODULE LIST ===== */
-    .module-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 0 16px 16px;
-    }
-    .module-item {
-      background: var(--bg);
-      border-radius: var(--radius-sm);
-      padding: 14px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .module-num {
-      width: 36px;
-      height: 36px;
-      background: var(--primary);
-      color: white;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-    .module-info { flex: 1; min-width: 0; }
-    .module-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 2px;
-    }
-    .module-desc {
-      font-size: 12px;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .module-time {
-      background: rgba(27,77,62,0.08);
-      padding: 6px 10px;
-      border-radius: 8px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-    .module-time-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--primary);
-      line-height: 1;
-    }
-    .module-time-label {
-      font-size: 9px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    /* ===== STAKEHOLDER CARDS ===== */
-    .stakeholder-scroll {
-      margin: 0 -16px;
-      padding: 0 16px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .stakeholder-scroll::-webkit-scrollbar { display: none; }
-    .stakeholder-cards {
-      display: flex;
-      gap: 12px;
-      padding-bottom: 4px;
-    }
-    .stakeholder-card {
-      flex: 0 0 260px;
-      background: var(--card);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-    }
-    .stakeholder-card:last-child { margin-right: 16px; }
-    .stakeholder-header {
-      padding: 16px;
-      text-align: center;
-      color: white;
-    }
-    .stakeholder-header.factory { background: var(--primary); }
-    .stakeholder-header.partner { background: var(--accent); }
-    .stakeholder-header.supervisor { background: var(--info); }
-    .stakeholder-header.finance { background: var(--violet); }
-    .stakeholder-header.management { background: #EC4899; }
-    .stakeholder-icon { font-size: 32px; margin-bottom: 6px; }
-    .stakeholder-title { font-size: 14px; font-weight: 700; }
-    .stakeholder-body { padding: 16px; }
-    .stakeholder-list { list-style: none; }
-    .stakeholder-list li {
-      font-size: 13px;
-      color: var(--text-secondary);
-      padding: 6px 0;
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-    }
-    .stakeholder-list li::before {
-      content: '✓';
-      color: var(--success);
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    /* ===== ROI CARDS ===== */
-    .roi-card {
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-    }
-    .roi-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .roi-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-    }
-    .roi-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .roi-rows {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .roi-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 12px;
-      background: var(--bg);
-      border-radius: var(--radius-sm);
-    }
-    .roi-label {
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-    .roi-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .total-box {
-      background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
-      border: 2px solid #6EE7B7;
-      border-radius: var(--radius);
-      padding: 24px 20px;
-      text-align: center;
-      margin-top: 16px;
-    }
-    .total-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: #059669;
-      margin-bottom: 8px;
-    }
-    .total-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 32px;
-      font-weight: 700;
-      color: #047857;
-      line-height: 1;
-    }
-    .total-unit {
-      font-size: 14px;
-      color: #059669;
-      margin-top: 4px;
-    }
-
-    /* ===== TIMELINE ===== */
-    .timeline {
-      position: relative;
-      padding-left: 20px;
-    }
-    .timeline::before {
-      content: '';
-      position: absolute;
-      left: 7px;
-      top: 8px;
-      bottom: 8px;
-      width: 2px;
-      background: linear-gradient(180deg, var(--primary) 0%, var(--accent) 100%);
-    }
-    .timeline-item {
-      position: relative;
-      padding-bottom: 20px;
-    }
-    .timeline-item:last-child { padding-bottom: 0; }
-    .timeline-dot {
-      position: absolute;
-      left: -20px;
-      top: 4px;
-      width: 16px;
-      height: 16px;
-      background: var(--primary);
-      border-radius: 50%;
-      border: 3px solid var(--bg);
-      box-shadow: var(--shadow);
-    }
-    .timeline-content {
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 16px;
-      box-shadow: var(--shadow);
-    }
-    .timeline-phase {
-      display: inline-block;
-      background: var(--primary);
-      color: white;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 12px;
-      margin-bottom: 8px;
-    }
-    .timeline-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 6px;
-    }
-    .timeline-desc {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-bottom: 12px;
-      line-height: 1.5;
-    }
-    .timeline-meta {
-      display: flex;
-      gap: 16px;
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    /* ===== MOCKUP FRAME ===== */
-    .mockup-frame {
-      background: #1A1A1A;
-      border-radius: 24px;
-      padding: 12px;
-      margin-bottom: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .mockup-notch {
-      width: 120px;
-      height: 28px;
-      background: #1A1A1A;
-      border-radius: 0 0 16px 16px;
-      margin: 0 auto -14px;
-      position: relative;
-      z-index: 10;
-    }
-    .mockup-screen {
-      background: var(--bg);
-      border-radius: 16px;
-      overflow: hidden;
-      min-height: 480px;
-    }
-    .mockup-label {
-      text-align: center;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      margin-top: 12px;
-    }
-
-    /* ===== MOBILE APP HEADER ===== */
-    .app-header {
-      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-      padding: 16px 16px 20px;
-      color: white;
-    }
-    .app-header-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .app-header-back {
-      width: 36px;
-      height: 36px;
-      background: rgba(255,255,255,0.15);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-    .app-header-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .app-header-action {
-      width: 36px;
-      height: 36px;
-      background: rgba(255,255,255,0.15);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-    }
-    .app-header-title {
-      font-size: 20px;
-      font-weight: 700;
-    }
-    .app-header-subtitle {
-      font-size: 13px;
-      opacity: 0.85;
-      margin-top: 4px;
-    }
-
-    /* ===== STATS ROW ===== */
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      padding: 0 16px;
-      margin-top: -10px;
-      margin-bottom: 16px;
-    }
-    .stat-card {
-      background: var(--card);
-      border-radius: var(--radius-sm);
-      padding: 14px 12px;
-      text-align: center;
-      box-shadow: var(--shadow);
-    }
-    .stat-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--primary);
-      line-height: 1;
-    }
-    .stat-value.accent { color: var(--accent); }
-    .stat-value.success { color: var(--success); }
-    .stat-value.danger { color: var(--danger); }
-    .stat-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    /* ===== LIST ITEMS ===== */
-    .list-section { padding: 0 16px; }
-    .list-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .list-badge {
-      background: var(--primary);
-      color: white;
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 10px;
-    }
-    .list-item {
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
-    }
-    .list-item-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
-    }
-    .list-item-icon.primary { background: rgba(27,77,62,0.1); }
-    .list-item-icon.accent { background: rgba(232,168,56,0.12); }
-    .list-item-icon.success { background: rgba(16,185,129,0.1); }
-    .list-item-icon.warning { background: rgba(245,158,11,0.1); }
-    .list-item-icon.danger { background: rgba(239,68,68,0.1); }
-    .list-item-icon.info { background: rgba(59,130,246,0.1); }
-    .list-item-content { flex: 1; min-width: 0; }
-    .list-item-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 4px;
-    }
-    .list-item-subtitle {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-    }
-    .list-item-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      font-size: 12px;
-    }
-    .list-item-tag {
-      background: var(--bg);
-      padding: 4px 10px;
-      border-radius: 8px;
-      color: var(--text-secondary);
-    }
-    .list-item-tag.success { background: rgba(16,185,129,0.1); color: var(--success); }
-    .list-item-tag.warning { background: rgba(245,158,11,0.1); color: var(--warning); }
-    .list-item-tag.danger { background: rgba(239,68,68,0.1); color: var(--danger); }
-    .list-item-tag.accent { background: rgba(232,168,56,0.12); color: #C77D00; }
-
-    /* ===== QUOTE CARD ===== */
-    .quote-card {
-      background: var(--card);
-      border-radius: var(--radius);
-      overflow: hidden;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-    }
-    .quote-header {
-      padding: 14px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-    }
-    .quote-supplier {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .quote-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 700;
-      font-size: 14px;
-    }
-    .quote-supplier-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .quote-supplier-rating {
-      font-size: 12px;
-      color: var(--accent);
-    }
-    .quote-status {
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .quote-status.pending { background: rgba(245,158,11,0.1); color: var(--warning); }
-    .quote-status.won { background: rgba(16,185,129,0.1); color: var(--success); }
-    .quote-status.active { background: rgba(59,130,246,0.1); color: var(--info); }
-    .quote-body { padding: 16px; }
-    .quote-price-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 12px;
-    }
-    .quote-price {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--primary);
-    }
-    .quote-price-unit {
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
-    .quote-details {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .quote-detail {
-      background: var(--bg);
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-    }
-    .quote-detail-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 2px;
-    }
-    .quote-detail-value {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .quote-actions {
-      display: flex;
-      gap: 10px;
-    }
-    .btn {
-      flex: 1;
-      padding: 12px 16px;
-      border-radius: var(--radius-sm);
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      text-align: center;
-    }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text-secondary); }
-    .btn-success { background: var(--success); color: white; }
-    .btn-accent { background: var(--accent); color: white; }
-
-    /* ===== AUCTION LIVE ===== */
-    .auction-live {
-      background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
-      border: 2px solid var(--accent);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    .auction-live-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .auction-live-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--danger);
-      color: white;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .auction-live-badge::before {
-      content: '';
-      width: 8px;
-      height: 8px;
-      background: white;
-      border-radius: 50%;
-      animation: pulse 1s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    .auction-timer {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--danger);
-    }
-    .auction-current {
-      text-align: center;
-      margin-bottom: 16px;
-    }
-    .auction-current-label {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-bottom: 4px;
-    }
-    .auction-current-price {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 36px;
-      font-weight: 700;
-      color: var(--primary);
-    }
-    .auction-bids {
-      background: white;
-      border-radius: var(--radius-sm);
-      padding: 12px;
-    }
-    .auction-bid {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .auction-bid:last-child { border-bottom: none; }
-    .auction-bid-rank {
-      width: 24px;
-      height: 24px;
-      background: var(--primary);
-      color: white;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .auction-bid-rank.first { background: var(--accent); }
-    .auction-bid-supplier {
-      flex: 1;
-      margin-left: 10px;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .auction-bid-price {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--primary);
-    }
-
-    /* ===== CHAT ===== */
-    .chat-container {
-      background: var(--bg);
-      height: 350px;
-      display: flex;
-      flex-direction: column;
-    }
-    .chat-messages {
-      flex: 1;
-      padding: 16px;
-      overflow-y: auto;
-    }
-    .chat-message {
-      display: flex;
-      margin-bottom: 16px;
-    }
-    .chat-message.sent { justify-content: flex-end; }
-    .chat-bubble {
-      max-width: 75%;
-      padding: 12px 16px;
-      border-radius: 16px;
-      font-size: 14px;
-    }
-    .chat-message.received .chat-bubble {
-      background: var(--card);
-      border-bottom-left-radius: 4px;
-    }
-    .chat-message.sent .chat-bubble {
-      background: var(--primary);
-      color: white;
-      border-bottom-right-radius: 4px;
-    }
-    .chat-offer {
-      background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
-      border: 2px solid var(--success);
-      border-radius: var(--radius-sm);
-      padding: 14px;
-      margin-top: 8px;
-    }
-    .chat-offer-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--success);
-      margin-bottom: 4px;
-    }
-    .chat-offer-price {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--primary);
-    }
-    .chat-offer-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .chat-offer-btn {
-      flex: 1;
-      padding: 8px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-    }
-    .chat-offer-btn.accept { background: var(--success); color: white; }
-    .chat-offer-btn.counter { background: var(--accent); color: white; }
-    .chat-input-area {
-      background: var(--card);
-      padding: 12px 16px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      gap: 10px;
-    }
-    .chat-input {
-      flex: 1;
-      background: var(--bg);
-      border: none;
-      border-radius: var(--radius-sm);
-      padding: 12px 16px;
-      font-size: 14px;
-    }
-    .chat-send-btn {
-      width: 44px;
-      height: 44px;
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-size: 18px;
-      cursor: pointer;
-    }
-
-    /* ===== SCHEDULE CARD ===== */
-    .schedule-card {
-      background: var(--card);
-      border-radius: var(--radius);
-      overflow: hidden;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-    }
-    .schedule-header {
-      padding: 14px 16px;
-      background: linear-gradient(135deg, var(--info) 0%, #2563EB 100%);
-      color: white;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .schedule-date {
-      font-size: 15px;
-      font-weight: 700;
-    }
-    .schedule-status {
-      padding: 4px 10px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .schedule-body { padding: 16px; }
-    .schedule-info {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .schedule-info-item {
-      background: var(--bg);
-      padding: 12px;
-      border-radius: var(--radius-sm);
-    }
-    .schedule-info-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 2px;
-    }
-    .schedule-info-value {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .schedule-progress { margin-bottom: 12px; }
-    .schedule-progress-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      margin-bottom: 6px;
-    }
-    .schedule-progress-bar {
-      height: 10px;
-      background: var(--bg);
-      border-radius: 5px;
-      overflow: hidden;
-    }
-    .schedule-progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--success) 0%, var(--primary-light) 100%);
-      border-radius: 5px;
-      transition: width 0.5s ease;
-    }
-
-    /* ===== LIVE MONITOR ===== */
-    .live-monitor {
-      background: #1A1A1A;
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    .live-monitor-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .live-monitor-title {
-      color: white;
-      font-size: 15px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .live-dot {
-      width: 10px;
-      height: 10px;
-      background: var(--success);
-      border-radius: 50%;
-      animation: pulse 1s infinite;
-    }
-    .live-monitor-time {
-      color: var(--text-muted);
-      font-size: 12px;
-    }
-    .live-stats {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-    }
-    .live-stat {
-      background: rgba(255,255,255,0.05);
-      border-radius: var(--radius-sm);
-      padding: 14px;
-      text-align: center;
-    }
-    .live-stat-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--success);
-      line-height: 1;
-    }
-    .live-stat-value.accent { color: var(--accent); }
-    .live-stat-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 6px;
-    }
-
-    /* ===== ACCEPTANCE ===== */
-    .acceptance-card {
-      background: var(--card);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-    }
-    .acceptance-header {
-      padding: 16px;
-      background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-      color: white;
-      text-align: center;
-    }
-    .acceptance-header-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .acceptance-header-subtitle {
-      font-size: 13px;
-      opacity: 0.9;
-    }
-    .acceptance-body { padding: 16px; }
-    .acceptance-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .acceptance-row:last-child { border-bottom: none; }
-    .acceptance-label {
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
-    .acceptance-value {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .acceptance-value.highlight {
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--primary);
-      font-size: 16px;
-    }
-    .acceptance-signature {
-      background: var(--bg);
-      border-radius: var(--radius-sm);
-      padding: 20px;
-      text-align: center;
-      margin-top: 16px;
-      border: 2px dashed var(--border);
-    }
-    .acceptance-signature-icon { font-size: 32px; margin-bottom: 8px; }
-    .acceptance-signature-text { font-size: 14px; color: var(--text-secondary); }
-
-    /* ===== DEBT ===== */
-    .debt-summary {
-      background: linear-gradient(135deg, var(--danger) 0%, #DC2626 100%);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 16px;
-      color: white;
-      text-align: center;
-    }
-    .debt-summary-label {
-      font-size: 13px;
-      opacity: 0.9;
-      margin-bottom: 6px;
-    }
-    .debt-summary-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 32px;
-      font-weight: 700;
-    }
-    .debt-summary-note {
-      font-size: 12px;
-      opacity: 0.8;
-      margin-top: 8px;
-    }
-    .debt-item {
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-    }
-    .debt-item-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .debt-item-code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--primary);
-    }
-    .debt-item-date {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-    .debt-item-details {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-    }
-    .debt-item-info {
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-    .debt-item-amount { text-align: right; }
-    .debt-item-amount-label {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-    .debt-item-amount-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--danger);
-    }
-
-    /* ===== PORTAL ===== */
-    .portal-header {
-      background: linear-gradient(135deg, var(--accent) 0%, #D97706 100%);
-      padding: 20px 16px;
-      color: white;
-    }
-    .portal-greeting {
-      font-size: 14px;
-      opacity: 0.9;
-    }
-    .portal-name {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 16px;
-    }
-    .portal-quick-actions {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-    }
-    .portal-action {
-      background: rgba(255,255,255,0.15);
-      border-radius: var(--radius-sm);
-      padding: 12px 8px;
-      text-align: center;
-    }
-    .portal-action-icon { font-size: 24px; margin-bottom: 4px; }
-    .portal-action-label { font-size: 11px; font-weight: 500; }
-
-    /* ===== BOTTOM NAV ===== */
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: var(--card);
-      border-top: 1px solid var(--border);
-      padding: 8px 16px calc(8px + var(--safe-bottom));
-      display: flex;
-      justify-content: space-around;
-      z-index: 100;
-    }
-    .bottom-nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 8px 12px;
-      text-decoration: none;
-      color: var(--text-muted);
-      font-size: 10px;
-      font-weight: 600;
-      transition: color 0.2s;
-    }
-    .bottom-nav-item.active { color: var(--primary); }
-    .bottom-nav-icon { font-size: 22px; margin-bottom: 2px; }
-
-    /* ===== CTA ===== */
-    .cta {
-      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-      border-radius: var(--radius);
-      padding: 32px 20px;
-      text-align: center;
-      color: white;
-      margin-top: 24px;
-    }
-    .cta-title {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .cta-text {
-      font-size: 14px;
-      opacity: 0.9;
-      margin-bottom: 24px;
-      line-height: 1.6;
-    }
-    .cta-stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-    }
-    .cta-stat {
-      background: rgba(255,255,255,0.1);
-      border-radius: var(--radius-sm);
-      padding: 16px 8px;
-    }
-    .cta-stat-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--accent);
-    }
-    .cta-stat-label {
-      font-size: 11px;
-      opacity: 0.8;
-      margin-top: 4px;
-    }
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+    
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(100%); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-up { animation: slide-up 0.3s ease-out; }
+    
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .animate-fade-in { animation: fade-in 0.2s ease-out; }
+    
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body>
+<body class="bg-gray-900">
+  <div id="root"></div>
 
-  <!-- HEADER -->
-  <header class="header">
-    <div class="header-badge">
-      <div class="header-badge-icon">🏭</div>
-      <span class="header-badge-text">HUY ANH RUBBER</span>
-    </div>
-    <h1>B2B <span>Platform</span></h1>
-    <p class="header-desc">Hệ thống Giao dịch & Gia công với Đại lý/NCC — Minh bạch, Hiệu quả, Chuyên nghiệp</p>
-    <div class="header-stats">
-      <div class="header-stat">
-        <div class="header-stat-value">24</div>
-        <div class="header-stat-label">Module</div>
-      </div>
-      <div class="header-stat">
-        <div class="header-stat-value">3</div>
-        <div class="header-stat-label">Luồng GD</div>
-      </div>
-      <div class="header-stat">
-        <div class="header-stat-value">~110</div>
-        <div class="header-stat-label">Ngày</div>
-      </div>
-    </div>
-  </header>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
 
-  <!-- TABS -->
-  <nav class="tabs">
-    <div class="tabs-inner">
-      <a href="#overview" class="tab active">
-        <span class="tab-icon">📋</span>
-        <span>Tổng quan</span>
-      </a>
-      <a href="#problems" class="tab">
-        <span class="tab-icon">⚠️</span>
-        <span>Vấn đề</span>
-      </a>
-      <a href="#solution" class="tab">
-        <span class="tab-icon">💡</span>
-        <span>Giải pháp</span>
-      </a>
-      <a href="#modules" class="tab">
-        <span class="tab-icon">📦</span>
-        <span>Module</span>
-      </a>
-      <a href="#mockups" class="tab">
-        <span class="tab-icon">📱</span>
-        <span>Giao diện</span>
-      </a>
-      <a href="#benefits" class="tab">
-        <span class="tab-icon">🎯</span>
-        <span>Lợi ích</span>
-      </a>
-      <a href="#roi" class="tab">
-        <span class="tab-icon">💰</span>
-        <span>ROI</span>
-      </a>
-      <a href="#roadmap" class="tab">
-        <span class="tab-icon">🗓️</span>
-        <span>Lộ trình</span>
-      </a>
-    </div>
-  </nav>
-
-  <!-- MAIN -->
-  <main class="main">
-
-    <!-- ==================== SECTION 1: OVERVIEW ==================== -->
-    <section id="overview" class="section">
-      <div class="section-header">
-        <div class="section-num">01</div>
-        <h2 class="section-title">Tổng quan Hệ thống</h2>
-      </div>
-      <p class="section-desc">3 luồng giao dịch chính giữa Nhà máy và Đại lý/NCC</p>
-
-      <div class="scroll-container">
-        <div class="scroll-cards">
-          <div class="scroll-card">
-            <div class="card-icon primary">🔄</div>
-            <h4 class="card-title">Luồng 1: Thu mua</h4>
-            <p class="card-text">NM đăng nhu cầu → NCC báo giá → Đấu thầu/Thương lượng → Chốt deal → Giao hàng → Thanh toán</p>
-          </div>
-          <div class="scroll-card">
-            <div class="card-icon accent">🏭</div>
-            <h4 class="card-title">Luồng 2: Gia công</h4>
-            <p class="card-text">ĐL gửi mủ → NM chế biến → ĐL giám sát realtime → Nghiệm thu → Nhận thành phẩm/Trả phí</p>
-          </div>
-          <div class="scroll-card">
-            <div class="card-icon success">🤝</div>
-            <h4 class="card-title">Luồng 3: Đổi hàng</h4>
-            <p class="card-text">ĐL đổi mủ thô lấy SVR theo tỷ lệ quy đổi thỏa thuận. Không cần thanh toán tiền mặt ngay</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 16px; padding-left: 44px;">Quy trình tổng thể</h4>
-      <div class="flow">
-        <div class="flow-step">
-          <div class="flow-dot">👤</div>
-          <div class="flow-content">
-            <div class="flow-title">Đăng ký Portal</div>
-            <div class="flow-desc">ĐL/NCC tạo tài khoản, xác minh</div>
-          </div>
-        </div>
-        <div class="flow-step">
-          <div class="flow-dot">💼</div>
-          <div class="flow-content">
-            <div class="flow-title">Deal giá</div>
-            <div class="flow-desc">Báo giá, thương lượng, đấu thầu</div>
-          </div>
-        </div>
-        <div class="flow-step">
-          <div class="flow-dot">📦</div>
-          <div class="flow-content">
-            <div class="flow-title">Giao mủ</div>
-            <div class="flow-desc">Cân, kiểm tra DRC, nhập kho</div>
-          </div>
-        </div>
-        <div class="flow-step">
-          <div class="flow-dot">🏭</div>
-          <div class="flow-content">
-            <div class="flow-title">Sản xuất</div>
-            <div class="flow-desc">Lên lịch, chạy đầu ra, giám sát live</div>
-          </div>
-        </div>
-        <div class="flow-step">
-          <div class="flow-dot">✅</div>
-          <div class="flow-content">
-            <div class="flow-title">Nghiệm thu</div>
-            <div class="flow-desc">Cân thành phẩm, QC, ký biên bản</div>
-          </div>
-        </div>
-        <div class="flow-step">
-          <div class="flow-dot">💰</div>
-          <div class="flow-content">
-            <div class="flow-title">Thanh toán</div>
-            <div class="flow-desc">Quyết toán, công nợ, đối chiếu</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== SECTION 2: PROBLEMS ==================== -->
-    <section id="problems" class="section">
-      <div class="section-header">
-        <div class="section-num">02</div>
-        <h2 class="section-title">Vấn đề Hiện tại</h2>
-      </div>
-      <p class="section-desc">Những thách thức khi vận hành theo cách truyền thống</p>
-
-      <div class="feature-list">
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(239,68,68,0.1);">⏰</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Tốn thời gian thu thập giá</h4>
-            <p class="feature-desc">Gọi điện từng NCC, mất 1-2 ngày/đợt. Chỉ tiếp cận 5-10 NCC quen</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(245,158,11,0.1);">👁️</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Thiếu minh bạch</h4>
-            <p class="feature-desc">Không log báo giá, rủi ro "deal ngầm", khó kiểm soát</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(59,130,246,0.1);">📊</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Thiếu dữ liệu</h4>
-            <p class="feature-desc">Không có giá theo mùa, không biết NCC nào uy tín</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(239,68,68,0.1);">🏭</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Giám sát thủ công</h4>
-            <p class="feature-desc">ĐL không biết lịch chạy, GS viên không có công cụ</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(245,158,11,0.1);">📝</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Chứng từ giấy</h4>
-            <p class="feature-desc">Biên bản viết tay, dễ sai sót, lưu trữ khó khăn</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 16px;">So sánh Trước/Sau</h4>
-      <div class="compare-list">
-        <div class="compare-item">
-          <div class="compare-label">Thời gian thu thập giá</div>
-          <div class="compare-row">
-            <div class="compare-box old">
-              <div class="compare-box-label">Trước</div>
-              <div class="compare-box-value">1-2 ngày</div>
-            </div>
-            <div class="compare-box new">
-              <div class="compare-box-label">Sau</div>
-              <div class="compare-box-value">2-4 giờ</div>
-            </div>
-          </div>
-        </div>
-        <div class="compare-item">
-          <div class="compare-label">Số NCC tiếp cận</div>
-          <div class="compare-row">
-            <div class="compare-box old">
-              <div class="compare-box-label">Trước</div>
-              <div class="compare-box-value">5-10 NCC</div>
-            </div>
-            <div class="compare-box new">
-              <div class="compare-box-label">Sau</div>
-              <div class="compare-box-value">100+ NCC</div>
-            </div>
-          </div>
-        </div>
-        <div class="compare-item">
-          <div class="compare-label">Thông báo lịch chạy</div>
-          <div class="compare-row">
-            <div class="compare-box old">
-              <div class="compare-box-label">Trước</div>
-              <div class="compare-box-value">Gọi điện</div>
-            </div>
-            <div class="compare-box new">
-              <div class="compare-box-label">Sau</div>
-              <div class="compare-box-value">Tự động</div>
-            </div>
-          </div>
-        </div>
-        <div class="compare-item">
-          <div class="compare-label">Giám sát sản xuất</div>
-          <div class="compare-row">
-            <div class="compare-box old">
-              <div class="compare-box-label">Trước</div>
-              <div class="compare-box-value">Không có</div>
-            </div>
-            <div class="compare-box new">
-              <div class="compare-box-label">Sau</div>
-              <div class="compare-box-value">Realtime</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== SECTION 3: SOLUTION ==================== -->
-    <section id="solution" class="section">
-      <div class="section-header">
-        <div class="section-num">03</div>
-        <h2 class="section-title">Giải pháp</h2>
-      </div>
-      <p class="section-desc">Kiến trúc 3 tầng và các tính năng nổi bật</p>
-
-      <div class="arch">
-        <div class="arch-layer portal">
-          <div class="arch-layer-title">🌐 Partner Portal</div>
-          <div class="arch-tags">
-            <span class="arch-tag">Dashboard</span>
-            <span class="arch-tag">Báo giá</span>
-            <span class="arch-tag">Lô hàng</span>
-            <span class="arch-tag">Giám sát</span>
-            <span class="arch-tag">Ký số</span>
-          </div>
-        </div>
-        <div class="arch-arrow">⬇️ ⬆️</div>
-        <div class="arch-layer engine">
-          <div class="arch-layer-title">⚙️ Trading & Processing Engine</div>
-          <div class="arch-tags">
-            <span class="arch-tag">Deal</span>
-            <span class="arch-tag">Auction</span>
-            <span class="arch-tag">Schedule</span>
-            <span class="arch-tag">Tracking</span>
-            <span class="arch-tag">Notify</span>
-          </div>
-        </div>
-        <div class="arch-arrow">⬇️ ⬆️</div>
-        <div class="arch-layer core">
-          <div class="arch-layer-title">🏢 Huy Anh ERP Core</div>
-          <div class="arch-tags">
-            <span class="arch-tag">Thu mua</span>
-            <span class="arch-tag">WMS</span>
-            <span class="arch-tag">Fleet</span>
-            <span class="arch-tag">HR</span>
-            <span class="arch-tag">Finance</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 16px;">Tính năng nổi bật</h4>
-      <div class="feature-list">
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(232,168,56,0.12);">🔨</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Đấu thầu ngược</h4>
-            <p class="feature-desc">NCC cạnh tranh giá → Mua được giá tốt hơn 2-5%</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(27,77,62,0.1);">💬</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Thương lượng Realtime</h4>
-            <p class="feature-desc">Chat trực tiếp, counter-offer qua lại</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(16,185,129,0.1);">📅</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Lịch SX thông minh</h4>
-            <p class="feature-desc">Tự động thông báo ĐL trước 24h</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(59,130,246,0.1);">📊</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Giám sát Live</h4>
-            <p class="feature-desc">Xem tiến độ, số liệu cân, DRC realtime</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(245,158,11,0.1);">✍️</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Ký số Biên bản</h4>
-            <p class="feature-desc">ĐL ký xác nhận ngay trên Portal</p>
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" style="background: rgba(239,68,68,0.1);">💰</div>
-          <div class="feature-content">
-            <h4 class="feature-title">Công nợ minh bạch</h4>
-            <p class="feature-desc">Sổ cái realtime, đối chiếu tự động</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== SECTION 4: MODULES ==================== -->
-    <section id="modules" class="section">
-      <div class="section-header">
-        <div class="section-num">04</div>
-        <h2 class="section-title">Các Module</h2>
-      </div>
-      <p class="section-desc">24 module chia thành 4 nhóm chính</p>
-
-      <!-- Group A -->
-      <div class="accordion open" onclick="this.classList.toggle('open')">
-        <div class="accordion-header">
-          <div class="accordion-title">
-            <div class="accordion-icon" style="background: var(--primary); color: white;">A</div>
-            <span class="accordion-text">Trading Engine (5 module)</span>
-          </div>
-          <span class="accordion-arrow">▼</span>
-        </div>
-        <div class="accordion-body">
-          <div class="module-list">
-            <div class="module-item">
-              <div class="module-num">01</div>
-              <div class="module-info">
-                <div class="module-title">Quản lý Đối tác</div>
-                <div class="module-desc">Đăng ký, xác minh, xếp hạng</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">02</div>
-              <div class="module-info">
-                <div class="module-title">Nhu cầu mua</div>
-                <div class="module-desc">NM đăng nhu cầu mua mủ</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">03</div>
-              <div class="module-info">
-                <div class="module-title">Báo giá & Thương lượng</div>
-                <div class="module-desc">Chat, counter-offer realtime</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">04</div>
-              <div class="module-info">
-                <div class="module-title">Đấu thầu ngược</div>
-                <div class="module-desc">Auction engine realtime</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">05</div>
-              <div class="module-info">
-                <div class="module-title">Hợp đồng khung</div>
-                <div class="module-desc">Ký HĐ dài hạn với NCC</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Group B -->
-      <div class="accordion" onclick="this.classList.toggle('open')">
-        <div class="accordion-header">
-          <div class="accordion-title">
-            <div class="accordion-icon" style="background: var(--accent); color: white;">B</div>
-            <span class="accordion-text">Processing Center (6 module)</span>
-          </div>
-          <span class="accordion-arrow">▼</span>
-        </div>
-        <div class="accordion-body">
-          <div class="module-list">
-            <div class="module-item">
-              <div class="module-num">06</div>
-              <div class="module-info">
-                <div class="module-title">Nhận mủ & Cân</div>
-                <div class="module-desc">Cân xe, xác nhận KL, DRC</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">07</div>
-              <div class="module-info">
-                <div class="module-title">Lịch sản xuất</div>
-                <div class="module-desc">Lên lịch, thông báo ĐL</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">08</div>
-              <div class="module-info">
-                <div class="module-title">Thông báo tự động</div>
-                <div class="module-desc">SMS, Zalo, Push 24h trước</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">4</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">09</div>
-              <div class="module-info">
-                <div class="module-title">Giám sát Live</div>
-                <div class="module-desc">Tiến độ, camera, số liệu realtime</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">10</div>
-              <div class="module-info">
-                <div class="module-title">GS viên check-in</div>
-                <div class="module-desc">GPS, ảnh, ghi chú</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">11</div>
-              <div class="module-info">
-                <div class="module-title">Nghiệm thu & Ký số</div>
-                <div class="module-desc">Biên bản, chữ ký điện tử</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Group C -->
-      <div class="accordion" onclick="this.classList.toggle('open')">
-        <div class="accordion-header">
-          <div class="accordion-title">
-            <div class="accordion-icon" style="background: var(--success); color: white;">C</div>
-            <span class="accordion-text">Settlement & Finance (4 module)</span>
-          </div>
-          <span class="accordion-arrow">▼</span>
-        </div>
-        <div class="accordion-body">
-          <div class="module-list">
-            <div class="module-item">
-              <div class="module-num">12</div>
-              <div class="module-info">
-                <div class="module-title">Quyết toán</div>
-                <div class="module-desc">Tính toán, đối chiếu</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">13</div>
-              <div class="module-info">
-                <div class="module-title">Giao hàng</div>
-                <div class="module-desc">Phiếu xuất, xác nhận</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">4</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">14</div>
-              <div class="module-info">
-                <div class="module-title">Công nợ</div>
-                <div class="module-desc">Sổ cái realtime</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">15</div>
-              <div class="module-info">
-                <div class="module-title">Thanh toán</div>
-                <div class="module-desc">Phiếu thu/chi, phân bổ</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Group D -->
-      <div class="accordion" onclick="this.classList.toggle('open')">
-        <div class="accordion-header">
-          <div class="accordion-title">
-            <div class="accordion-icon" style="background: var(--info); color: white;">D</div>
-            <span class="accordion-text">Partner Portal (9 module)</span>
-          </div>
-          <span class="accordion-arrow">▼</span>
-        </div>
-        <div class="accordion-body">
-          <div class="module-list">
-            <div class="module-item">
-              <div class="module-num">16</div>
-              <div class="module-info">
-                <div class="module-title">Đăng ký & Auth</div>
-                <div class="module-desc">Login, OTP, profile</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">4</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">17</div>
-              <div class="module-info">
-                <div class="module-title">Dashboard</div>
-                <div class="module-desc">Tổng quan, thông báo</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">18</div>
-              <div class="module-info">
-                <div class="module-title">Giao dịch UI</div>
-                <div class="module-desc">Báo giá, đấu thầu</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">19</div>
-              <div class="module-info">
-                <div class="module-title">Lô hàng & Lịch</div>
-                <div class="module-desc">Calendar, cử GS viên</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">6</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">20</div>
-              <div class="module-info">
-                <div class="module-title">Giám sát Live</div>
-                <div class="module-desc">Tiến độ realtime</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">21</div>
-              <div class="module-info">
-                <div class="module-title">Chứng từ & Ký</div>
-                <div class="module-desc">Biên bản, ký số, PDF</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">22</div>
-              <div class="module-info">
-                <div class="module-title">Tài chính UI</div>
-                <div class="module-desc">Công nợ, sao kê</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">23</div>
-              <div class="module-info">
-                <div class="module-title">Notification Hub</div>
-                <div class="module-desc">SMS, Zalo, Push</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-            <div class="module-item">
-              <div class="module-num">24</div>
-              <div class="module-info">
-                <div class="module-title">Dashboard Admin</div>
-                <div class="module-desc">Báo cáo, thống kê</div>
-              </div>
-              <div class="module-time">
-                <div class="module-time-value">5</div>
-                <div class="module-time-label">ngày</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== SECTION 5: MOCKUPS ==================== -->
-    <section id="mockups" class="section">
-      <div class="section-header">
-        <div class="section-num">05</div>
-        <h2 class="section-title">Giao diện Mockup</h2>
-      </div>
-      <p class="section-desc">Mô phỏng giao diện các màn hình chính</p>
-
-      <!-- MOCKUP 1: Báo giá -->
-      <div class="mockup-frame">
-        <div class="mockup-notch"></div>
-        <div class="mockup-screen">
-          <div class="app-header">
-            <div class="app-header-top">
-              <div class="app-header-back">☰</div>
-              <div class="app-header-actions">
-                <div class="app-header-action">🔔</div>
-                <div class="app-header-action">+</div>
-              </div>
-            </div>
-            <div class="app-header-title">Danh sách Báo giá</div>
-            <div class="app-header-subtitle">NC-2026-0315 · Mủ nước DRC 30%</div>
-          </div>
-
-          <div class="stats-row">
-            <div class="stat-card">
-              <div class="stat-value">12</div>
-              <div class="stat-label">Báo giá</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value accent">24,500</div>
-              <div class="stat-label">Giá thấp nhất</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value success">3</div>
-              <div class="stat-label">Đang TL</div>
-            </div>
-          </div>
-
-          <div class="list-section">
-            <div class="quote-card">
-              <div class="quote-header">
-                <div class="quote-supplier">
-                  <div class="quote-avatar">TP</div>
-                  <div>
-                    <div class="quote-supplier-name">Công ty Tân Phát</div>
-                    <div class="quote-supplier-rating">⭐ 4.8 · 23 giao dịch</div>
-                  </div>
-                </div>
-                <div class="quote-status won">🏆 Giá tốt</div>
-              </div>
-              <div class="quote-body">
-                <div class="quote-price-row">
-                  <div class="quote-price">24,500</div>
-                  <div class="quote-price-unit">đ/kg</div>
-                </div>
-                <div class="quote-details">
-                  <div class="quote-detail">
-                    <div class="quote-detail-label">Số lượng</div>
-                    <div class="quote-detail-value">50 tấn</div>
-                  </div>
-                  <div class="quote-detail">
-                    <div class="quote-detail-label">Giao hàng</div>
-                    <div class="quote-detail-value">Tại kho NM</div>
-                  </div>
-                </div>
-                <div class="quote-actions">
-                  <button class="btn btn-outline">💬 Thương lượng</button>
-                  <button class="btn btn-primary">✓ Chọn NCC</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mockup-label">Màn hình Báo giá & Thương lượng</div>
-      </div>
-
-      <!-- MOCKUP 2: Đấu thầu LIVE -->
-      <div class="mockup-frame">
-        <div class="mockup-notch"></div>
-        <div class="mockup-screen">
-          <div class="app-header" style="background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);">
-            <div class="app-header-top">
-              <div class="app-header-back">←</div>
-              <div class="app-header-actions">
-                <div class="app-header-action">🔔</div>
-              </div>
-            </div>
-            <div class="app-header-title">🔨 Đấu thầu Ngược</div>
-            <div class="app-header-subtitle">DT-2026-0042 · Mủ đông DRC 58%</div>
-          </div>
-
-          <div style="padding: 16px;">
-            <div class="auction-live">
-              <div class="auction-live-header">
-                <div class="auction-live-badge">LIVE</div>
-                <div class="auction-timer">05:32</div>
-              </div>
-              <div class="auction-current">
-                <div class="auction-current-label">Giá đang dẫn đầu</div>
-                <div class="auction-current-price">28,200 đ/kg</div>
-              </div>
-              <div class="auction-bids">
-                <div class="auction-bid">
-                  <div class="auction-bid-rank first">1</div>
-                  <div class="auction-bid-supplier">Công ty Tân Phát</div>
-                  <div class="auction-bid-price">28,200đ</div>
-                </div>
-                <div class="auction-bid">
-                  <div class="auction-bid-rank">2</div>
-                  <div class="auction-bid-supplier">HTX Hưng Thịnh</div>
-                  <div class="auction-bid-price">28,350đ</div>
-                </div>
-                <div class="auction-bid">
-                  <div class="auction-bid-rank">3</div>
-                  <div class="auction-bid-supplier">Công ty Phú Xuân</div>
-                  <div class="auction-bid-price">28,500đ</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mockup-label">Màn hình Đấu thầu LIVE</div>
-      </div>
-
-      <!-- MOCKUP 3: Giám sát Live -->
-      <div class="mockup-frame">
-        <div class="mockup-notch"></div>
-        <div class="mockup-screen">
-          <div class="app-header" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
-            <div class="app-header-top">
-              <div class="app-header-back">←</div>
-              <div class="app-header-actions">
-                <div class="app-header-action">📷</div>
-              </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <div class="live-dot"></div>
-              <div class="app-header-title">Giám sát LIVE</div>
-            </div>
-            <div class="app-header-subtitle">HTX Hưng Thịnh · SVR 10</div>
-          </div>
-
-          <div style="padding: 16px;">
-            <div class="live-monitor">
-              <div class="live-monitor-header">
-                <div class="live-monitor-title">
-                  <div class="live-dot"></div>
-                  Số liệu Realtime
-                </div>
-                <div class="live-monitor-time">14:32:15</div>
-              </div>
-              <div class="live-stats">
-                <div class="live-stat">
-                  <div class="live-stat-value">9,234</div>
-                  <div class="live-stat-label">kg đã chạy</div>
-                </div>
-                <div class="live-stat">
-                  <div class="live-stat-value accent">58.2%</div>
-                  <div class="live-stat-label">DRC trung bình</div>
-                </div>
-                <div class="live-stat">
-                  <div class="live-stat-value">68%</div>
-                  <div class="live-stat-label">Tiến độ</div>
-                </div>
-                <div class="live-stat">
-                  <div class="live-stat-value accent">2.8T</div>
-                  <div class="live-stat-label">TP ra lò</div>
-                </div>
-              </div>
-            </div>
-
-            <div style="background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);">
-              <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">📹 Camera nhà máy</div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <div style="background: #1A1A1A; border-radius: var(--radius-sm); aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px;">📹 Dây chuyền</div>
-                <div style="background: #1A1A1A; border-radius: var(--radius-sm); aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px;">📹 Trạm cân</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mockup-label">Màn hình Giám sát LIVE</div>
-      </div>
-
-      <!-- MOCKUP 4: Portal Dashboard -->
-      <div class="mockup-frame">
-        <div class="mockup-notch"></div>
-        <div class="mockup-screen">
-          <div class="portal-header">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-              <div>
-                <div class="portal-greeting">Xin chào,</div>
-                <div class="portal-name">HTX Hưng Thịnh</div>
-              </div>
-              <div style="display: flex; gap: 8px;">
-                <div class="app-header-action" style="background: rgba(255,255,255,0.2);">🔔</div>
-                <div class="app-header-action" style="background: rgba(255,255,255,0.2);">👤</div>
-              </div>
-            </div>
-            <div class="portal-quick-actions">
-              <div class="portal-action">
-                <div class="portal-action-icon">📝</div>
-                <div class="portal-action-label">Báo giá</div>
-              </div>
-              <div class="portal-action">
-                <div class="portal-action-icon">📦</div>
-                <div class="portal-action-label">Lô hàng</div>
-              </div>
-              <div class="portal-action">
-                <div class="portal-action-icon">📅</div>
-                <div class="portal-action-label">Lịch SX</div>
-              </div>
-              <div class="portal-action">
-                <div class="portal-action-icon">💰</div>
-                <div class="portal-action-label">Công nợ</div>
-              </div>
-            </div>
-          </div>
-
-          <div style="padding: 16px;">
-            <div class="stats-row" style="margin: -10px -16px 16px; padding: 0 16px;">
-              <div class="stat-card">
-                <div class="stat-value">3</div>
-                <div class="stat-label">Lô đang chạy</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-value accent">125T</div>
-                <div class="stat-label">Tổng mủ gửi</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-value danger">245M</div>
-                <div class="stat-label">Công nợ</div>
-              </div>
-            </div>
-
-            <div class="list-title">🔔 Thông báo mới</div>
-            <div class="list-item">
-              <div class="list-item-icon warning">📅</div>
-              <div class="list-item-content">
-                <div class="list-item-title">Lịch chạy ngày 13/03</div>
-                <div class="list-item-subtitle">Lô SVR 3L sẽ được chạy</div>
-              </div>
-            </div>
-            <div class="list-item">
-              <div class="list-item-icon success">✅</div>
-              <div class="list-item-content">
-                <div class="list-item-title">Nghiệm thu hoàn tất</div>
-                <div class="list-item-subtitle">BB-2026-0310-HT đã sẵn sàng ký</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mockup-label">Dashboard Đại lý/NCC</div>
-      </div>
-    </section>
-
-    <!-- ==================== SECTION 6: BENEFITS ==================== -->
-    <section id="benefits" class="section">
-      <div class="section-header">
-        <div class="section-num">06</div>
-        <h2 class="section-title">Lợi ích</h2>
-      </div>
-      <p class="section-desc">Giá trị mang lại cho từng đối tượng</p>
-
-      <div class="stakeholder-scroll">
-        <div class="stakeholder-cards">
-          <div class="stakeholder-card">
-            <div class="stakeholder-header factory">
-              <div class="stakeholder-icon">🏭</div>
-              <div class="stakeholder-title">Nhà máy</div>
-            </div>
-            <div class="stakeholder-body">
-              <ul class="stakeholder-list">
-                <li>Mua giá tốt hơn nhờ đấu thầu</li>
-                <li>Tiết kiệm thời gian thu mua</li>
-                <li>Mở rộng nguồn cung dễ dàng</li>
-                <li>Minh bạch, kiểm soát được</li>
-                <li>Tối ưu công suất SX</li>
-                <li>Giảm tranh chấp</li>
-              </ul>
-            </div>
-          </div>
-          <div class="stakeholder-card">
-            <div class="stakeholder-header partner">
-              <div class="stakeholder-icon">🤝</div>
-              <div class="stakeholder-title">Đại lý/NCC</div>
-            </div>
-            <div class="stakeholder-body">
-              <ul class="stakeholder-list">
-                <li>Chủ động tiếp cận nhu cầu</li>
-                <li>Cạnh tranh công bằng</li>
-                <li>Theo dõi lô hàng realtime</li>
-                <li>Giám sát SX minh bạch</li>
-                <li>Ký số tiện lợi</li>
-                <li>Công nợ rõ ràng</li>
-              </ul>
-            </div>
-          </div>
-          <div class="stakeholder-card">
-            <div class="stakeholder-header supervisor">
-              <div class="stakeholder-icon">👁️</div>
-              <div class="stakeholder-title">Giám sát viên</div>
-            </div>
-            <div class="stakeholder-body">
-              <ul class="stakeholder-list">
-                <li>Công cụ trên điện thoại</li>
-                <li>Xem số liệu realtime</li>
-                <li>Chụp ảnh, ghi chú</li>
-                <li>Check-in có bằng chứng</li>
-                <li>Ký số ngay trên app</li>
-                <li>Lịch sử đầy đủ</li>
-              </ul>
-            </div>
-          </div>
-          <div class="stakeholder-card">
-            <div class="stakeholder-header finance">
-              <div class="stakeholder-icon">💰</div>
-              <div class="stakeholder-title">Kế toán</div>
-            </div>
-            <div class="stakeholder-body">
-              <ul class="stakeholder-list">
-                <li>Công nợ tự động</li>
-                <li>Đối chiếu qua Portal</li>
-                <li>Chứng từ điện tử</li>
-                <li>Báo cáo tự động</li>
-                <li>Giảm sai sót</li>
-                <li>Tiết kiệm thời gian</li>
-              </ul>
-            </div>
-          </div>
-          <div class="stakeholder-card">
-            <div class="stakeholder-header management">
-              <div class="stakeholder-icon">👔</div>
-              <div class="stakeholder-title">Ban GĐ</div>
-            </div>
-            <div class="stakeholder-body">
-              <ul class="stakeholder-list">
-                <li>Tổng quan realtime</li>
-                <li>Kiểm soát giá mua</li>
-                <li>Theo dõi công suất</li>
-                <li>Dữ liệu chiến lược</li>
-                <li>Mở rộng đối tác</li>
-                <li>Nâng cao uy tín</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== SECTION 7: ROI ==================== -->
-    <section id="roi" class="section">
-      <div class="section-header">
-        <div class="section-num">07</div>
-        <h2 class="section-title">Hiệu quả Đầu tư</h2>
-      </div>
-      <p class="section-desc">Ước tính lợi ích tài chính (500 tấn/tháng)</p>
-
-      <div class="roi-card">
-        <div class="roi-header">
-          <div class="roi-icon" style="background: rgba(16,185,129,0.1);">💵</div>
-          <h4 class="roi-title">Tiết kiệm giá mua</h4>
-        </div>
-        <div class="roi-rows">
-          <div class="roi-row">
-            <span class="roi-label">Giá thương lượng</span>
-            <span class="roi-value">25,000 đ/kg</span>
-          </div>
-          <div class="roi-row">
-            <span class="roi-label">Giá đấu thầu</span>
-            <span class="roi-value">24,500 đ/kg</span>
-          </div>
-          <div class="roi-row" style="background: rgba(16,185,129,0.1);">
-            <span class="roi-label" style="color: var(--success); font-weight: 600;">Tiết kiệm/tấn</span>
-            <span class="roi-value" style="color: var(--success);">500,000 đ</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="roi-card">
-        <div class="roi-header">
-          <div class="roi-icon" style="background: rgba(59,130,246,0.1);">⏱️</div>
-          <h4 class="roi-title">Tiết kiệm thời gian</h4>
-        </div>
-        <div class="roi-rows">
-          <div class="roi-row">
-            <span class="roi-label">Thu thập giá (trước)</span>
-            <span class="roi-value">1-2 ngày</span>
-          </div>
-          <div class="roi-row">
-            <span class="roi-label">Thu thập giá (sau)</span>
-            <span class="roi-value">2-4 giờ</span>
-          </div>
-          <div class="roi-row" style="background: rgba(59,130,246,0.1);">
-            <span class="roi-label" style="color: var(--info); font-weight: 600;">Tiết kiệm/đợt</span>
-            <span class="roi-value" style="color: var(--info);">~10 giờ</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="total-box">
-        <div class="total-label">TỔNG TIẾT KIỆM MỖI THÁNG</div>
-        <div class="total-value">~268,000,000</div>
-        <div class="total-unit">VNĐ</div>
-      </div>
-
-      <div style="background: var(--card); border-radius: var(--radius); padding: 20px; margin-top: 16px; text-align: center; box-shadow: var(--shadow);">
-        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">Với chi phí triển khai ~110 ngày</p>
-        <p style="font-size: 18px; font-weight: 700; color: var(--primary);">
-          Hoàn vốn sau <span style="color: var(--success);">2-3 tháng</span>
-        </p>
-      </div>
-    </section>
-
-    <!-- ==================== SECTION 8: ROADMAP ==================== -->
-    <section id="roadmap" class="section">
-      <div class="section-header">
-        <div class="section-num">08</div>
-        <h2 class="section-title">Lộ trình</h2>
-      </div>
-      <p class="section-desc">Kế hoạch triển khai theo từng giai đoạn</p>
-
-      <div class="timeline">
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <span class="timeline-phase">Phase 1</span>
-            <h4 class="timeline-title">Foundation</h4>
-            <p class="timeline-desc">Database, Auth, Quản lý đối tác. ĐL đăng ký Portal.</p>
-            <div class="timeline-meta">
-              <span>📅 ~10 ngày</span>
-              <span>📦 Module 01-02</span>
-            </div>
-          </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <span class="timeline-phase">Phase 2</span>
-            <h4 class="timeline-title">Trading Engine</h4>
-            <p class="timeline-desc">Nhu cầu mua, báo giá, thương lượng, đấu thầu, HĐ khung.</p>
-            <div class="timeline-meta">
-              <span>📅 ~25 ngày</span>
-              <span>📦 Module 03-05</span>
-            </div>
-          </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <span class="timeline-phase">Phase 3</span>
-            <h4 class="timeline-title">Processing Center</h4>
-            <p class="timeline-desc">Nhận mủ, lịch SX, thông báo, giám sát, nghiệm thu.</p>
-            <div class="timeline-meta">
-              <span>📅 ~30 ngày</span>
-              <span>📦 Module 06-11</span>
-            </div>
-          </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <span class="timeline-phase">Phase 4</span>
-            <h4 class="timeline-title">Settlement & Finance</h4>
-            <p class="timeline-desc">Quyết toán, giao hàng, công nợ, thanh toán.</p>
-            <div class="timeline-meta">
-              <span>📅 ~20 ngày</span>
-              <span>📦 Module 12-15</span>
-            </div>
-          </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <span class="timeline-phase">Phase 5</span>
-            <h4 class="timeline-title">Partner Portal</h4>
-            <p class="timeline-desc">App cho ĐL: dashboard, giao dịch, giám sát, tài chính.</p>
-            <div class="timeline-meta">
-              <span>📅 ~35 ngày</span>
-              <span>📦 Module 16-24</span>
-            </div>
-          </div>
-        </div>
-        <div class="timeline-item">
-          <div class="timeline-dot" style="background: var(--accent);"></div>
-          <div class="timeline-content" style="border-left: 3px solid var(--accent);">
-            <span class="timeline-phase" style="background: var(--accent);">Go-Live</span>
-            <h4 class="timeline-title">Triển khai & Đào tạo</h4>
-            <p class="timeline-desc">Pilot 5-10 ĐL, thu thập feedback, mở rộng dần.</p>
-            <div class="timeline-meta">
-              <span>📅 ~10 ngày</span>
-              <span>🚀 Production</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA -->
-    <section class="cta">
-      <h2 class="cta-title">Sẵn sàng Chuyển đổi?</h2>
-      <p class="cta-text">Hệ thống B2B Platform giúp nâng cao hiệu quả vận hành và tạo lợi thế cạnh tranh bền vững</p>
-      <div class="cta-stats">
-        <div class="cta-stat">
-          <div class="cta-stat-value">24</div>
-          <div class="cta-stat-label">Module</div>
-        </div>
-        <div class="cta-stat">
-          <div class="cta-stat-value">~110</div>
-          <div class="cta-stat-label">Ngày</div>
-        </div>
-        <div class="cta-stat">
-          <div class="cta-stat-value">2-3</div>
-          <div class="cta-stat-label">Tháng ROI</div>
-        </div>
-        <div class="cta-stat">
-          <div class="cta-stat-value">268M</div>
-          <div class="cta-stat-label">Tiết kiệm</div>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- BOTTOM NAV -->
-  <nav class="bottom-nav">
-    <a href="#overview" class="bottom-nav-item active">
-      <span class="bottom-nav-icon">📋</span>
-      <span>Tổng quan</span>
-    </a>
-    <a href="#modules" class="bottom-nav-item">
-      <span class="bottom-nav-icon">📦</span>
-      <span>Module</span>
-    </a>
-    <a href="#mockups" class="bottom-nav-item">
-      <span class="bottom-nav-icon">📱</span>
-      <span>Giao diện</span>
-    </a>
-    <a href="#roi" class="bottom-nav-item">
-      <span class="bottom-nav-icon">💰</span>
-      <span>ROI</span>
-    </a>
-    <a href="#roadmap" class="bottom-nav-item">
-      <span class="bottom-nav-icon">🗓️</span>
-      <span>Lộ trình</span>
-    </a>
-  </nav>
-
-  <script>
-    // Smooth scroll
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function(e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-          const offset = 60;
-          const top = target.getBoundingClientRect().top + window.scrollY - offset;
-          window.scrollTo({ top, behavior: 'smooth' });
+    // ============================================================
+    // ICONS (using Lucide)
+    // ============================================================
+    const Icon = ({ name, size = 20, className = '' }) => {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (ref.current) {
+          ref.current.innerHTML = '';
+          const icon = lucide.createElement(lucide.icons[name]);
+          icon.setAttribute('width', size);
+          icon.setAttribute('height', size);
+          if (className) icon.setAttribute('class', className);
+          ref.current.appendChild(icon);
         }
-      });
-    });
-
-    // Active nav on scroll
-    const sections = document.querySelectorAll('.section');
-    const tabs = document.querySelectorAll('.tab');
-    const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
-
-    const updateActiveNav = () => {
-      let current = '';
-      sections.forEach(section => {
-        const sectionTop = section.offsetTop - 100;
-        if (window.scrollY >= sectionTop) {
-          current = section.getAttribute('id');
-        }
-      });
-
-      tabs.forEach(tab => {
-        tab.classList.remove('active');
-        if (tab.getAttribute('href') === '#' + current) {
-          tab.classList.add('active');
-          tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-        }
-      });
-
-      bottomNavItems.forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('href') === '#' + current) {
-          item.classList.add('active');
-        }
-      });
+      }, [name, size, className]);
+      return <span ref={ref} className="inline-flex" />;
     };
 
-    window.addEventListener('scroll', updateActiveNav, { passive: true });
-  </script>
+    // ============================================================
+    // MOCK DATA
+    // ============================================================
+    
+    // Online users (đại lý, hộ nông dân đang online)
+    const mockOnlineUsers = [
+      { id: '1', name: 'Anh Thành', code: 'DL-0001', type: 'dealer', tier: 'Gold', avatar: 'T', lastActive: 'Đang hoạt động' },
+      { id: '2', name: 'Chị Lan', code: 'NCC-0015', type: 'farmer', tier: 'Bronze', avatar: 'L', lastActive: '2 phút trước' },
+      { id: '3', name: 'Anh Minh', code: 'DL-0004', type: 'dealer', tier: 'Platinum', avatar: 'M', lastActive: 'Đang hoạt động' },
+      { id: '4', name: 'Ông Bảy', code: 'NCC-0023', type: 'farmer', tier: 'Silver', avatar: 'B', lastActive: '5 phút trước' },
+      { id: '5', name: 'Anh Hùng', code: 'DL-0002', type: 'dealer', tier: 'Silver', avatar: 'H', lastActive: 'Đang hoạt động' },
+      { id: '6', name: 'Cô Hoa', code: 'NCC-0031', type: 'farmer', tier: 'Bronze', avatar: 'H', lastActive: '1 phút trước' },
+    ];
 
+    const mockRooms = [
+      { id: '1', name: 'Đại lý Thành Công', code: 'DL-0001', tier: 'Gold', lastMessage: 'OK deal! Khi nào giao được?', time: '2 phút', unread: 0, hasBooking: true },
+      { id: '2', name: 'Đại lý Phú Quý', code: 'DL-0002', tier: 'Silver', lastMessage: 'Giá 8500đ/kg khô được không?', time: '15 phút', unread: 2, hasBooking: false },
+      { id: '3', name: 'NCC Lào - Savannakhet', code: 'DL-0004', tier: 'Platinum', lastMessage: 'Xe sẽ đến vào thứ 5', time: '1 giờ', unread: 0, hasBooking: true },
+      { id: '4', name: 'Đại lý Hoàng Long', code: 'DL-0003', tier: 'Bronze', lastMessage: 'Cảm ơn anh, tuần sau giao nhé', time: '3 giờ', unread: 1, hasBooking: false },
+      { id: '5', name: 'Hộ Nguyễn Văn A', code: 'NCC-0012', tier: 'Bronze', lastMessage: 'Mình có 2 tấn mủ tạp', time: '5 giờ', unread: 0, hasBooking: false },
+    ];
+
+    const mockMessages = [
+      { id: '1', sender: 'partner', name: 'Anh Thành', content: 'Chào nhà máy, mình có lô mủ nước khoảng 5 tấn', time: '09:15' },
+      { id: '2', sender: 'factory', name: 'Nhà máy', content: 'Chào anh Thành! Mủ nước loại gì ạ? DRC dự kiến bao nhiêu?', time: '09:18' },
+      { id: '3', sender: 'partner', name: 'Anh Thành', content: 'Mủ nước tươi, DRC khoảng 28-30%', time: '09:20' },
+      { id: '4', sender: 'factory', name: 'Nhà máy', content: 'Giá thị trường đang 8.200đ/kg khô. Anh muốn giá bao nhiêu?', time: '09:22' },
+      { id: '5', sender: 'partner', name: 'Anh Thành', content: 'Mình muốn 8.500đ/kg khô được không?', time: '09:25' },
+      { id: '6', sender: 'factory', name: 'Nhà máy', content: '8.400đ/kg khô được anh nhé, mình lấy hết 5 tấn', time: '09:28' },
+      { id: '7', sender: 'partner', name: 'Anh Thành', content: 'OK deal! Khi nào giao được?', time: '09:30' },
+      { id: '8', sender: 'system', content: '📋 Đã tạo Phiếu chốt mủ CM-2603-0001\n• Sản phẩm: Mủ nước\n• Khối lượng: 5 tấn\n• Giá: 8.400đ/kg khô', time: '09:32' },
+      { id: '9', sender: 'factory', name: 'Nhà máy', content: 'Mình đã tạo phiếu chốt mủ rồi anh. Tuần sau thứ 3 giao được không?', time: '09:33' },
+      { id: '10', sender: 'partner', name: 'Anh Thành', content: 'OK anh, thứ 3 tuần sau mình cho xe chở qua nhé! 👍', time: '09:35' },
+    ];
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+    const getTierColor = (tier) => {
+      switch (tier) {
+        case 'Platinum': return 'bg-purple-100 text-purple-700 border-purple-200';
+        case 'Gold': return 'bg-amber-100 text-amber-700 border-amber-200';
+        case 'Silver': return 'bg-gray-200 text-gray-700 border-gray-300';
+        default: return 'bg-orange-100 text-orange-700 border-orange-200';
+      }
+    };
+
+    const getTierGradient = (tier) => {
+      switch (tier) {
+        case 'Platinum': return 'from-purple-500 to-purple-600';
+        case 'Gold': return 'from-amber-500 to-amber-600';
+        case 'Silver': return 'from-gray-400 to-gray-500';
+        default: return 'from-orange-400 to-orange-500';
+      }
+    };
+
+    // ============================================================
+    // CHAT ROOM LIST
+    // ============================================================
+    const ChatRoomList = ({ onSelectRoom }) => {
+      const [searchTerm, setSearchTerm] = useState('');
+      
+      const filteredRooms = mockRooms.filter(room => {
+        if (!searchTerm) return true;
+        const s = searchTerm.toLowerCase();
+        return room.name.toLowerCase().includes(s) || room.code.toLowerCase().includes(s);
+      });
+
+      return (
+        <div className="flex flex-col h-full bg-gray-50">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <Icon name="MessageSquare" size={22} className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Tin nhắn</h1>
+                  <p className="text-sm text-gray-500">{mockRooms.length} cuộc hội thoại</p>
+                </div>
+              </div>
+              <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95 transition-all">
+                <Icon name="Plus" size={18} />
+                <span>Chat mới</span>
+              </button>
+            </div>
+            
+            {/* Search */}
+            <div className="relative">
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                <Icon name="Search" size={20} />
+              </div>
+              <input
+                type="text"
+                placeholder="Tìm kiếm đối tác, tin nhắn..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-3.5 bg-gray-100 border-0 rounded-2xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all placeholder:text-gray-400"
+              />
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="px-4 py-3 flex gap-3">
+            <div className="flex-1 bg-white rounded-2xl p-3 text-center shadow-sm">
+              <p className="text-2xl font-bold text-emerald-600">12</p>
+              <p className="text-xs text-gray-500">Phiếu chốt</p>
+            </div>
+            <div className="flex-1 bg-white rounded-2xl p-3 text-center shadow-sm">
+              <p className="text-2xl font-bold text-amber-600">3</p>
+              <p className="text-xs text-gray-500">Chờ giao</p>
+            </div>
+            <div className="flex-1 bg-white rounded-2xl p-3 text-center shadow-sm">
+              <p className="text-2xl font-bold text-blue-600">45T</p>
+              <p className="text-xs text-gray-500">Tháng này</p>
+            </div>
+          </div>
+
+          {/* Online Users Section */}
+          <div className="px-4 pb-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-sm font-semibold text-gray-700">Đang online</span>
+                <span className="text-xs text-gray-400">({mockOnlineUsers.filter(u => u.lastActive === 'Đang hoạt động').length})</span>
+              </div>
+              <button className="text-xs text-emerald-600 font-medium">Xem tất cả</button>
+            </div>
+            
+            {/* Horizontal scroll online users */}
+            <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+              {mockOnlineUsers.map((user, idx) => {
+                const isOnline = user.lastActive === 'Đang hoạt động';
+                return (
+                  <div 
+                    key={user.id}
+                    className="flex-shrink-0 flex flex-col items-center w-16 cursor-pointer group"
+                    style={{ animationDelay: `${idx * 50}ms` }}
+                  >
+                    <div className="relative mb-1">
+                      <div className={`w-12 h-12 bg-gradient-to-br ${getTierGradient(user.tier)} rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md group-hover:scale-110 transition-transform`}>
+                        {user.avatar}
+                      </div>
+                      {/* Online indicator */}
+                      <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+                      {/* Type badge */}
+                      <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[8px] border-2 border-white ${user.type === 'dealer' ? 'bg-blue-500 text-white' : 'bg-amber-500 text-white'}`}>
+                        {user.type === 'dealer' ? 'ĐL' : 'ND'}
+                      </div>
+                    </div>
+                    <p className="text-[10px] font-medium text-gray-700 truncate w-full text-center">{user.name}</p>
+                    <p className="text-[9px] text-gray-400 truncate w-full text-center">
+                      {isOnline ? (
+                        <span className="text-green-600">● Online</span>
+                      ) : (
+                        user.lastActive
+                      )}
+                    </p>
+                  </div>
+                );
+              })}
+              
+              {/* Add new contact button */}
+              <div className="flex-shrink-0 flex flex-col items-center w-16 cursor-pointer group">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors mb-1">
+                  <Icon name="UserPlus" size={20} />
+                </div>
+                <p className="text-[10px] font-medium text-gray-500">Thêm mới</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="px-4 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 font-medium">Cuộc trò chuyện</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+          </div>
+
+          {/* Room List */}
+          <div className="flex-1 overflow-y-auto hide-scrollbar">
+            {filteredRooms.map((room, idx) => (
+              <div
+                key={room.id}
+                onClick={() => onSelectRoom(room)}
+                className="flex items-center gap-4 px-4 py-4 bg-white hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors border-b border-gray-100 animate-fade-in"
+                style={{ animationDelay: `${idx * 50}ms` }}
+              >
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  <div className={`w-14 h-14 bg-gradient-to-br ${getTierGradient(room.tier)} rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
+                    {room.name.charAt(0)}
+                  </div>
+                  <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white ${getTierColor(room.tier)}`}>
+                    {room.tier.charAt(0)}
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-semibold text-gray-900 truncate">{room.name}</h3>
+                    <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{room.time}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-500 truncate flex-1">{room.lastMessage}</p>
+                    {room.unread > 0 && (
+                      <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-emerald-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
+                        {room.unread}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-lg">{room.code}</span>
+                    {room.hasBooking && (
+                      <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg font-medium">
+                        ✓ Có phiếu chốt
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="text-gray-300">
+                  <Icon name="ChevronRight" size={20} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // CHAT ROOM DETAIL
+    // ============================================================
+    const ChatRoomDetail = ({ room, onBack }) => {
+      const [inputValue, setInputValue] = useState('');
+      const [showBookingModal, setShowBookingModal] = useState(false);
+      const [messages, setMessages] = useState(mockMessages);
+      const [sending, setSending] = useState(false);
+      const messagesEndRef = useRef(null);
+
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages]);
+
+      const handleSend = () => {
+        if (!inputValue.trim()) return;
+        setSending(true);
+        
+        setTimeout(() => {
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            sender: 'factory',
+            name: 'Nhà máy',
+            content: inputValue,
+            time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+          }]);
+          setInputValue('');
+          setSending(false);
+        }, 300);
+      };
+
+      const handleCreateBooking = () => {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          sender: 'system',
+          content: '📋 Đã tạo Phiếu chốt mủ CM-2603-0002\n• Sản phẩm: Mủ nước\n• Khối lượng: 3 tấn\n• Giá: 8.500đ/kg khô',
+          time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        }]);
+        setShowBookingModal(false);
+      };
+
+      return (
+        <div className="flex flex-col h-full bg-gray-100 relative">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-200 px-3 py-3 flex items-center gap-2 sticky top-0 z-10">
+            <button 
+              onClick={onBack} 
+              className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            >
+              <Icon name="ArrowLeft" size={22} className="text-gray-600" />
+            </button>
+            
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className={`w-11 h-11 bg-gradient-to-br ${getTierGradient(room.tier)} rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0`}>
+                {room.name.charAt(0)}
+              </div>
+              <div className="min-w-0">
+                <h1 className="font-semibold text-gray-900 truncate">{room.name}</h1>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">{room.code}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${getTierColor(room.tier)}`}>
+                    {room.tier}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100">
+              <Icon name="Phone" size={20} className="text-gray-600" />
+            </button>
+            <button className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100">
+              <Icon name="MoreVertical" size={20} className="text-gray-600" />
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 hide-scrollbar">
+            {/* Date separator */}
+            <div className="flex items-center justify-center">
+              <span className="text-xs text-gray-500 bg-white px-4 py-1.5 rounded-full shadow-sm font-medium">
+                Hôm nay, 05/03/2026
+              </span>
+            </div>
+
+            {messages.map((msg, idx) => {
+              if (msg.sender === 'system') {
+                return (
+                  <div key={msg.id} className="flex justify-center animate-fade-in">
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl px-4 py-3 max-w-[85%] shadow-sm">
+                      <p className="text-sm text-amber-800 whitespace-pre-line leading-relaxed">{msg.content}</p>
+                      <p className="text-[10px] text-amber-500 mt-1 text-right">{msg.time}</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              const isMine = msg.sender === 'factory';
+              return (
+                <div 
+                  key={msg.id} 
+                  className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                  style={{ animationDelay: `${idx * 30}ms` }}
+                >
+                  <div className="max-w-[80%]">
+                    {!isMine && (
+                      <p className="text-xs text-gray-500 mb-1 ml-3 font-medium">{msg.name}</p>
+                    )}
+                    <div className={`rounded-2xl px-4 py-2.5 ${
+                      isMine 
+                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-br-md shadow-lg shadow-emerald-500/20' 
+                        : 'bg-white text-gray-900 rounded-bl-md shadow-sm'
+                    }`}>
+                      <p className="text-[15px] leading-relaxed">{msg.content}</p>
+                    </div>
+                    <p className={`text-[10px] text-gray-400 mt-1 ${isMine ? 'text-right mr-1' : 'ml-3'}`}>
+                      {msg.time}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick action */}
+          {!room.hasBooking && (
+            <div className="px-4 pb-2">
+              <button
+                onClick={() => setShowBookingModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl text-amber-700 font-semibold hover:from-amber-100 hover:to-orange-100 active:scale-[0.98] transition-all shadow-sm"
+              >
+                <Icon name="FileText" size={20} />
+                Tạo phiếu chốt mủ từ cuộc chat này
+              </button>
+            </div>
+          )}
+
+          {/* Input */}
+          <div className="bg-white border-t border-gray-200 px-4 py-3">
+            <div className="flex items-end gap-2">
+              <button className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 flex-shrink-0 text-gray-500">
+                <Icon name="Plus" size={22} />
+              </button>
+              <div className="flex-1 bg-gray-100 rounded-2xl px-4 py-3">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  placeholder="Nhập tin nhắn..."
+                  className="w-full bg-transparent border-0 focus:outline-none text-[15px]"
+                />
+              </div>
+              <button 
+                onClick={handleSend}
+                disabled={!inputValue.trim() || sending}
+                className={`w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0 transition-all ${
+                  inputValue.trim() 
+                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95' 
+                    : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                <Icon name="Send" size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Booking Modal */}
+          {showBookingModal && (
+            <div className="absolute inset-0 z-50 flex items-end justify-center">
+              <div 
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" 
+                onClick={() => setShowBookingModal(false)} 
+              />
+              <div className="relative w-full bg-white rounded-t-3xl max-h-[90%] overflow-hidden animate-slide-up">
+                {/* Modal Header */}
+                <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">Tạo phiếu chốt mủ</h2>
+                  <button 
+                    onClick={() => setShowBookingModal(false)} 
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500"
+                  >
+                    <Icon name="X" size={22} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="p-4 space-y-4 overflow-y-auto max-h-[65vh] hide-scrollbar">
+                  {/* Partner info */}
+                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-4 flex items-center gap-3 border border-emerald-100">
+                    <div className={`w-14 h-14 bg-gradient-to-br ${getTierGradient(room.tier)} rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md`}>
+                      {room.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-lg">{room.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-sm text-gray-600">{room.code}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTierColor(room.tier)}`}>
+                          {room.tier}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Product Type */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Loại sản phẩm <span className="text-red-500">*</span>
+                    </label>
+                    <select className="w-full px-4 py-3.5 bg-gray-100 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+                      <option>Mủ nước</option>
+                      <option>Mủ tạp</option>
+                      <option>Mủ đông</option>
+                      <option>Mủ chén</option>
+                    </select>
+                  </div>
+
+                  {/* Quantity & DRC */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        KL dự kiến (tấn) <span className="text-red-500">*</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        defaultValue="3" 
+                        className="w-full px-4 py-3.5 bg-gray-100 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right font-mono font-semibold" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        DRC dự kiến (%)
+                      </label>
+                      <input 
+                        type="number" 
+                        defaultValue="28" 
+                        className="w-full px-4 py-3.5 bg-gray-100 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right font-mono font-semibold" 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Price */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Giá thỏa thuận</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="number" 
+                        defaultValue="8500" 
+                        className="flex-1 px-4 py-3.5 bg-gray-100 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right font-mono font-semibold" 
+                      />
+                      <select className="w-32 px-3 py-3.5 bg-gray-100 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+                        <option>đ/kg khô</option>
+                        <option>đ/kg ướt</option>
+                        <option>đ/tấn</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Estimated value */}
+                  <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-4 text-center border border-amber-200">
+                    <p className="text-sm text-amber-600 font-medium">Giá trị ước tính</p>
+                    <p className="text-3xl font-bold text-amber-700 mt-1">71.400.000 đ</p>
+                    <p className="text-xs text-amber-500 mt-1">3 tấn × 28% DRC × 8.500đ/kg</p>
+                  </div>
+
+                  {/* Delivery Date */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Ngày giao dự kiến</label>
+                    <input 
+                      type="date" 
+                      defaultValue="2026-03-10"
+                      className="w-full px-4 py-3.5 bg-gray-100 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Ghi chú thương lượng</label>
+                    <textarea 
+                      rows={3} 
+                      defaultValue="Đã thỏa thuận qua chat. Giao hàng tại nhà máy Phong Điền."
+                      placeholder="Tóm tắt nội dung đã thỏa thuận..." 
+                      className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" 
+                    />
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-4 flex gap-3">
+                  <button 
+                    onClick={() => setShowBookingModal(false)} 
+                    className="flex-1 py-4 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 active:scale-[0.98] transition-all"
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    onClick={handleCreateBooking}
+                    className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    <Icon name="Check" size={20} />
+                    Tạo phiếu chốt
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ============================================================
+    // MAIN APP
+    // ============================================================
+    const App = () => {
+      const [selectedRoom, setSelectedRoom] = useState(null);
+      const [view, setView] = useState('list');
+
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          {/* Phone frame */}
+          <div className="relative">
+            {/* Title */}
+            <div className="text-center mb-4">
+              <h1 className="text-white text-2xl font-bold">B2B Chat Platform</h1>
+              <p className="text-gray-400 text-sm">Huy Anh Rubber ERP - Demo</p>
+            </div>
+            
+            {/* Phone */}
+            <div className="w-[375px] h-[750px] bg-white rounded-[3rem] shadow-2xl overflow-hidden border-[14px] border-gray-800 relative">
+              {/* Notch */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-36 h-7 bg-gray-800 rounded-b-2xl z-50" />
+              
+              {/* Screen */}
+              <div className="w-full h-full pt-7 overflow-hidden">
+                {view === 'list' ? (
+                  <ChatRoomList 
+                    onSelectRoom={(room) => { 
+                      setSelectedRoom(room); 
+                      setView('detail'); 
+                    }} 
+                  />
+                ) : (
+                  <ChatRoomDetail 
+                    room={selectedRoom} 
+                    onBack={() => setView('list')} 
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="text-center mt-4 text-gray-400 text-sm">
+              <p>Click vào một cuộc chat để xem chi tiết</p>
+              <p>Trong chat, click "Tạo phiếu chốt mủ" để xem form</p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Render
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 </body>
 </html>

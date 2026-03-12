@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quy trình từ Booking đến Sản phẩm - Huy Anh Rubber</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #1B4D3E 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #fff;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+    
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #E8A838, #fff, #2D8B6E);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+    
+    .header p {
+      color: rgba(255,255,255,0.7);
+      font-size: 1.1rem;
+    }
+    
+    /* Main Flow Container */
+    .flow-container {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    
+    /* Phase Section */
+    .phase {
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      padding: 30px;
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+    }
+    
+    .phase-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .phase-number {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+    
+    .phase-1 .phase-number { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .phase-2 .phase-number { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .phase-3 .phase-number { background: linear-gradient(135deg, #4facfe, #00f2fe); color: #000; }
+    .phase-4 .phase-number { background: linear-gradient(135deg, #43e97b, #38f9d7); color: #000; }
+    .phase-5 .phase-number { background: linear-gradient(135deg, #fa709a, #fee140); color: #000; }
+    .phase-6 .phase-number { background: linear-gradient(135deg, #E8A838, #f5af19); color: #000; }
+    
+    .phase-title {
+      flex: 1;
+    }
+    
+    .phase-title h2 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .phase-title span {
+      color: rgba(255,255,255,0.6);
+      font-size: 0.9rem;
+    }
+    
+    .phase-systems {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .phase-system {
+      background: rgba(255,255,255,0.1);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    
+    .phase-system.portal { color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.3); }
+    .phase-system.erp { color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
+    .phase-system.wms { color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.3); }
+    .phase-system.production { color: #E8A838; border: 1px solid rgba(232, 168, 56, 0.3); }
+    
+    /* Steps inside phase */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    
+    .step {
+      background: rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .step:hover {
+      transform: translateY(-5px);
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.2);
+    }
+    
+    .step-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+    }
+    
+    .phase-1 .step-icon { background: rgba(102, 126, 234, 0.3); }
+    .phase-2 .step-icon { background: rgba(240, 147, 251, 0.3); }
+    .phase-3 .step-icon { background: rgba(79, 172, 254, 0.3); }
+    .phase-4 .step-icon { background: rgba(67, 233, 123, 0.3); }
+    .phase-5 .step-icon { background: rgba(250, 112, 154, 0.3); }
+    .phase-6 .step-icon { background: rgba(232, 168, 56, 0.3); }
+    
+    .step h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .step p {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    
+    .step-actors {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .actor {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    
+    .actor.partner {
+      background: rgba(147, 51, 234, 0.3);
+      color: #c4b5fd;
+    }
+    
+    .actor.factory {
+      background: rgba(34, 197, 94, 0.3);
+      color: #86efac;
+    }
+    
+    .actor.system {
+      background: rgba(59, 130, 246, 0.3);
+      color: #93c5fd;
+    }
+    
+    .actor.warehouse {
+      background: rgba(249, 115, 22, 0.3);
+      color: #fdba74;
+    }
+    
+    .actor.both {
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(34, 197, 94, 0.3));
+      color: #fff;
+    }
+    
+    /* Arrow between phases */
+    .arrow-down {
+      display: flex;
+      justify-content: center;
+      padding: 10px 0;
+    }
+    
+    .arrow-down svg {
+      width: 40px;
+      height: 40px;
+      color: rgba(255,255,255,0.3);
+      animation: bounce 2s infinite;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(8px); }
+    }
+    
+    /* Data flow highlight */
+    .data-flow {
+      margin-top: 15px;
+      padding: 12px;
+      background: rgba(232, 168, 56, 0.1);
+      border-radius: 10px;
+      border-left: 3px solid #E8A838;
+    }
+    
+    .data-flow-title {
+      font-size: 0.8rem;
+      color: #E8A838;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    
+    .data-flow-content {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.8);
+    }
+    
+    /* Two-way indicator */
+    .two-way-indicator {
+      background: linear-gradient(90deg, rgba(147, 51, 234, 0.2), rgba(34, 197, 94, 0.2));
+      border: 1px dashed rgba(255,255,255,0.3);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+    }
+    
+    .two-way-indicator .side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 20px;
+    }
+    
+    .two-way-indicator .side.partner {
+      background: rgba(147, 51, 234, 0.3);
+    }
+    
+    .two-way-indicator .side.factory {
+      background: rgba(34, 197, 94, 0.3);
+    }
+    
+    .two-way-indicator .arrows {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #E8A838;
+      font-size: 1.2rem;
+    }
+    
+    .two-way-indicator .arrows span {
+      line-height: 1;
+    }
+    
+    /* Negotiation cycle */
+    .negotiation-cycle {
+      background: rgba(240, 147, 251, 0.1);
+      border: 1px solid rgba(240, 147, 251, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .negotiation-cycle h4 {
+      color: #f0abfc;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .cycle-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .cycle-step {
+      background: rgba(255,255,255,0.1);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .cycle-arrow {
+      color: rgba(255,255,255,0.4);
+      font-size: 1.2rem;
+    }
+    
+    .cycle-loop {
+      color: #f0abfc;
+      font-size: 0.8rem;
+      background: rgba(240, 147, 251, 0.2);
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+    
+    /* Legend */
+    .legend {
+      margin-top: 50px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 25px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .legend-dot.partner { background: #a78bfa; }
+    .legend-dot.factory { background: #4ade80; }
+    .legend-dot.system { background: #60a5fa; }
+    .legend-dot.warehouse { background: #fb923c; }
+    .legend-dot.both { background: linear-gradient(135deg, #a78bfa, #4ade80); }
+    
+    /* Summary Stats */
+    .summary {
+      margin-top: 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+    
+    .stat-card {
+      background: rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 25px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #E8A838, #f5af19);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .stat-label {
+      color: rgba(255,255,255,0.7);
+      margin-top: 8px;
+    }
+    
+    /* Footer */
+    .footer {
+      margin-top: 50px;
+      text-align: center;
+      color: rgba(255,255,255,0.5);
+      font-size: 0.9rem;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header h1 { font-size: 1.8rem; }
+      .phase { padding: 20px; }
+      .phase-header { flex-wrap: wrap; }
+      .phase-systems { margin-top: 10px; width: 100%; }
+      .two-way-indicator { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🌿 Quy Trình Từ Booking Đến Sản Phẩm</h1>
+      <p>Huy Anh Rubber Company — B2B Platform Flow</p>
+    </div>
+    
+    <div class="flow-container">
+      
+      <!-- Phase 1: Booking (Two-way) -->
+      <div class="phase phase-1">
+        <div class="phase-header">
+          <div class="phase-number">1</div>
+          <div class="phase-title">
+            <h2>Tạo & Gửi Phiếu Chốt Mủ (Booking)</h2>
+            <span>Cả 2 bên đều có thể khởi tạo giao dịch</span>
+          </div>
+          <div class="phase-systems">
+            <div class="phase-system portal">💬 Partner Portal</div>
+            <div class="phase-system erp">💬 ERP Chat</div>
+          </div>
+        </div>
+        
+        <!-- Two-way indicator -->
+        <div class="two-way-indicator">
+          <div class="side partner">
+            <span>🏪</span>
+            <span>Đại lý / NCC</span>
+          </div>
+          <div class="arrows">
+            <span>→</span>
+            <span>←</span>
+          </div>
+          <div class="side factory">
+            <span>🏭</span>
+            <span>Nhà máy</span>
+          </div>
+        </div>
+        
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon">📝</div>
+            <h3>Tạo Booking</h3>
+            <p>Mở BookingModal, nhập: Loại mủ, Số lượng (tấn), DRC dự kiến, Đơn giá (ướt/khô), Ngày giao</p>
+            <div class="step-actors">
+              <span class="actor both">Đại lý hoặc Nhà máy</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">📤</div>
+            <h3>Gửi qua Chat</h3>
+            <p>Booking hiển thị dạng BookingCard với mã PCM-xxx hoặc BK-xxx trong chat room</p>
+            <div class="step-actors">
+              <span class="actor system">Hệ thống</span>
+            </div>
+            <div class="data-flow">
+              <div class="data-flow-title">📊 Dữ liệu tạo ra</div>
+              <div class="data-flow-content">chat_messages.metadata với status = 'pending'</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">🔔</div>
+            <h3>Thông báo Realtime</h3>
+            <p>Push notification đến bên còn lại, hiện badge đỏ trên icon Chat</p>
+            <div class="step-actors">
+              <span class="actor system">Realtime</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="arrow-down">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+        </svg>
+      </div>
+      
+      <!-- Phase 2: Negotiation (Two-way) -->
+      <div class="phase phase-2">
+        <div class="phase-header">
+          <div class="phase-number">2</div>
+          <div class="phase-title">
+            <h2>Thương Lượng & Xác Nhận</h2>
+            <span>Đàm phán giá qua lại cho đến khi đồng ý</span>
+          </div>
+          <div class="phase-systems">
+            <div class="phase-system portal">💬 Partner Portal</div>
+            <div class="phase-system erp">💬 ERP Chat</div>
+          </div>
+        </div>
+        
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon">👀</div>
+            <h3>Review Booking</h3>
+            <p>Bên nhận xem BookingCard với đầy đủ thông tin: giá, số lượng, DRC, ngày giao</p>
+            <div class="step-actors">
+              <span class="actor both">Bên nhận Booking</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">💰</div>
+            <h3>Counter-Offer</h3>
+            <p>Nếu chưa đồng ý → Gửi giá đề xuất mới (counter_price), kèm ghi chú thương lượng</p>
+            <div class="step-actors">
+              <span class="actor both">Đại lý ↔ Nhà máy</span>
+            </div>
+            <div class="data-flow">
+              <div class="data-flow-title">📊 Dữ liệu cập nhật</div>
+              <div class="data-flow-content">metadata.status = 'negotiating', counter_price, negotiation_notes</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">✅</div>
+            <h3>Xác nhận Booking</h3>
+            <p>Khi đồng ý → Nhấn "Xác nhận", status chuyển thành 'confirmed'</p>
+            <div class="step-actors">
+              <span class="actor both">Bên đồng ý cuối</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Negotiation cycle diagram -->
+        <div class="negotiation-cycle">
+          <h4>🔄 Vòng thương lượng</h4>
+          <div class="cycle-flow">
+            <div class="cycle-step">
+              <span class="actor partner" style="padding: 2px 8px;">Đại lý</span>
+              <span>Gửi Booking</span>
+            </div>
+            <span class="cycle-arrow">→</span>
+            <div class="cycle-step">
+              <span class="actor factory" style="padding: 2px 8px;">Nhà máy</span>
+              <span>Counter giá</span>
+            </div>
+            <span class="cycle-arrow">→</span>
+            <div class="cycle-step">
+              <span class="actor partner" style="padding: 2px 8px;">Đại lý</span>
+              <span>Counter lại</span>
+            </div>
+            <span class="cycle-loop">↻ Lặp lại</span>
+            <span class="cycle-arrow">→</span>
+            <div class="cycle-step" style="background: rgba(74, 222, 128, 0.2); border: 1px solid rgba(74, 222, 128, 0.5);">
+              ✅ Xác nhận
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="arrow-down">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+        </svg>
+      </div>
+      
+      <!-- Phase 3: Create Deal -->
+      <div class="phase phase-3">
+        <div class="phase-header">
+          <div class="phase-number">3</div>
+          <div class="phase-title">
+            <h2>Tạo Deal Chính Thức</h2>
+            <span>Chuyển Booking thành giao dịch với điều khoản đầy đủ</span>
+          </div>
+          <div class="phase-systems">
+            <div class="phase-system erp">📋 B2B Deals (E2)</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon">➡️</div>
+            <h3>Convert to Deal</h3>
+            <p>Từ Booking đã confirm → Tạo Deal với dữ liệu kế thừa (loại mủ, SL, giá đã thống nhất)</p>
+            <div class="step-actors">
+              <span class="actor factory">Nhà máy</span>
+              <span class="actor system">Auto</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">📑</div>
+            <h3>Bổ sung Điều khoản</h3>
+            <p>Thêm: Điều kiện tạm ứng (%), Vận chuyển (EXW/FOB), Kho nhận hàng, Phí gia công</p>
+            <div class="step-actors">
+              <span class="actor factory">Nhà máy</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">🔗</div>
+            <h3>Liên kết Chat Room</h3>
+            <p>Deal gắn với chat_room.deal_id để tracking và trao đổi trong context</p>
+            <div class="step-actors">
+              <span class="actor system">Hệ thống</span>
+            </div>
+            <div class="data-flow">
+              <div class="data-flow-title">📊 Bảng mới</div>
+              <div class="data-flow-content">b2b.deals: deal_number, partner_id, quantity_kg, final_price, status='pending'</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="arrow-down">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+        </svg>
+      </div>
+      
+      <!-- Phase 4: Receive Rubber -->
+      <div class="phase phase-4">
+        <div class="phase-header">
+          <div class="phase-number">4</div>
+          <div class="phase-title">
+            <h2>Nhận Mủ Tại Kho</h2>
+            <span>Cân, đo DRC, nhập kho thực tế</span>
+          </div>
+          <div class="phase-systems">
+            <div class="phase-system wms">📦 WMS Stock-In</div>
+            <div class="phase-system wms">⚖️ Cân Keli</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon">🚛</div>
+            <h3>Xe mủ về kho</h3>
+            <p>Đại lý/NCC giao mủ đến kho nhà máy theo lịch trong Deal</p>
+            <div class="step-actors">
+              <span class="actor partner">Đại lý</span>
+              <span class="actor warehouse">Kho</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">⚖️</div>
+            <h3>Cân điện tử</h3>
+            <p>Cân Keli D2008/D12 tự động đẩy dữ liệu: Trọng lượng xe đầy, xe rỗng → Tịnh</p>
+            <div class="step-actors">
+              <span class="actor warehouse">Kho</span>
+              <span class="actor system">IoT Gateway</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">🧪</div>
+            <h3>Đo DRC thực tế</h3>
+            <p>QC lấy mẫu, đo DRC (Dry Rubber Content) thực tế để tính giá trị cuối</p>
+            <div class="step-actors">
+              <span class="actor warehouse">QC</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">📥</div>
+            <h3>Tạo Phiếu Nhập Kho</h3>
+            <p>WMS Stock-In với deal_id, số lượng thực, DRC thực, vị trí lưu kho</p>
+            <div class="step-actors">
+              <span class="actor warehouse">Kho</span>
+              <span class="actor system">WMS</span>
+            </div>
+            <div class="data-flow">
+              <div class="data-flow-title">📊 Dữ liệu tạo ra</div>
+              <div class="data-flow-content">stock_in_receipts + stock_in_items: deal_id, actual_weight, actual_drc</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="arrow-down">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+        </svg>
+      </div>
+      
+      <!-- Phase 5: Payment -->
+      <div class="phase phase-5">
+        <div class="phase-header">
+          <div class="phase-number">5</div>
+          <div class="phase-title">
+            <h2>Thanh Toán & Ghi Công Nợ</h2>
+            <span>Tạm ứng hoặc ghi nợ theo thỏa thuận</span>
+          </div>
+          <div class="phase-systems">
+            <div class="phase-system erp">💰 B2B Ledger (E5)</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon">💵</div>
+            <h3>Tạm ứng tại chỗ</h3>
+            <p>Trả tiền mặt tại kho (nếu thỏa thuận), tạo phiếu chi với deal_id</p>
+            <div class="step-actors">
+              <span class="actor factory">Kế toán</span>
+              <span class="actor partner">Đại lý</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">📒</div>
+            <h3>Ghi Sổ Công Nợ</h3>
+            <p>Nếu chưa trả → Ghi nợ vào debt_ledger với transaction_type='purchase'</p>
+            <div class="step-actors">
+              <span class="actor system">Hệ thống</span>
+            </div>
+            <div class="data-flow">
+              <div class="data-flow-title">📊 Bảng ghi</div>
+              <div class="data-flow-content">b2b.debt_ledger: partner_id, deal_id, amount, type='debit/credit'</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">📊</div>
+            <h3>Cập nhật Số Dư</h3>
+            <p>Trigger tự động tính running_balance cho partner, hiển thị trên Portal</p>
+            <div class="step-actors">
+              <span class="actor system">Trigger</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">📋</div>
+            <h3>Quyết toán Kỳ</h3>
+            <p>Cuối kỳ: Tổng hợp deals, tính chênh lệch, xuất bảng quyết toán</p>
+            <div class="step-actors">
+              <span class="actor factory">Kế toán</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="arrow-down">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+        </svg>
+      </div>
+      
+      <!-- Phase 6: Production -->
+      <div class="phase phase-6">
+        <div class="phase-header">
+          <div class="phase-number">6</div>
+          <div class="phase-title">
+            <h2>Sản Xuất & Ra Thành Phẩm</h2>
+            <span>Chế biến mủ nguyên liệu thành SVR xuất khẩu</span>
+          </div>
+          <div class="phase-systems">
+            <div class="phase-system production">🏭 Production</div>
+            <div class="phase-system wms">📦 WMS</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon">🏭</div>
+            <h3>Lên Lệnh Sản Xuất</h3>
+            <p>Tạo Production Order từ nguyên liệu đã nhập, xác định sản lượng đầu ra dự kiến</p>
+            <div class="step-actors">
+              <span class="actor factory">Sản xuất</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">⚙️</div>
+            <h3>Chế biến</h3>
+            <p>Xử lý mủ: Rửa, cán, sấy, đóng kiện theo tiêu chuẩn SVR (3L/5/10/20)</p>
+            <div class="step-actors">
+              <span class="actor factory">Công nhân</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">✅</div>
+            <h3>QC Thành phẩm</h3>
+            <p>Kiểm tra chất lượng: Độ nhớt, tạp chất, màu sắc → Phân loại grade</p>
+            <div class="step-actors">
+              <span class="actor factory">QC</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-icon">📦</div>
+            <h3>Nhập Kho Thành Phẩm</h3>
+            <p>Stock-In thành phẩm với batch_id, grade SVR, trọng lượng, ngày sản xuất</p>
+            <div class="step-actors">
+              <span class="actor warehouse">Kho TP</span>
+              <span class="actor system">WMS</span>
+            </div>
+            <div class="data-flow">
+              <div class="data-flow-title">📊 Sản phẩm cuối</div>
+              <div class="data-flow-content">batches + inventory: SVR grade (3L/5/10/20), weight → Sẵn sàng xuất khẩu</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot partner"></div>
+        <span>Đại lý / NCC</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot factory"></div>
+        <span>Nhà máy</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot both"></div>
+        <span>Cả 2 bên</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot warehouse"></div>
+        <span>Kho / QC</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot system"></div>
+        <span>Hệ thống tự động</span>
+      </div>
+    </div>
+    
+    <!-- Summary -->
+    <div class="summary">
+      <div class="stat-card">
+        <div class="stat-value">6</div>
+        <div class="stat-label">Giai đoạn chính</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">2</div>
+        <div class="stat-label">Chiều Booking</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">∞</div>
+        <div class="stat-label">Vòng thương lượng</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">5</div>
+        <div class="stat-label">Module ERP</div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>Huy Anh Rubber ERP v7 — B2B Platform</p>
+      <p style="margin-top: 5px;">Lê Duy Minh — IT Manager — 12/03/2026</p>
+    </div>
+    
+  </div>
+</body>
+</html>

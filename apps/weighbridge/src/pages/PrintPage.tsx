@@ -110,9 +110,10 @@ export default function PrintPage() {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>CÔNG TY TNHH MTV</div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>CAO SU HUY ANH PHƯỚC</div>
-            <div style={{ fontSize: 11, color: '#666' }}>Thôn Phước Hưng, xã Phước Sơn, Tuy Phước, Bình Định</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>CAO SU HUY ANH PHONG ĐIỀN</div>
+            <div style={{ fontSize: 11, color: '#666' }}>Khe Mạ, Phường Phong Điền, TP Huế, Việt Nam</div>
+            <div style={{ fontSize: 11, color: '#666' }}>MST: 3301549896</div>
           </div>
           <QRCodeImg data={qrData} size={90} />
         </div>
@@ -287,7 +288,7 @@ export default function PrintPage() {
 
         {/* Footer */}
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 10, color: '#aaa' }}>
-          Phiếu được in từ hệ thống Trạm Cân — Huy Anh Rubber ERP • {fmtDateTime(new Date().toISOString())}
+          Phiếu được in từ hệ thống Trạm Cân — Cao Su Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
         </div>
       </div>
 

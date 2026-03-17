@@ -232,6 +232,7 @@ export default function WeighingPage() {
         const deal = deals.find((d) => d.id === selectedDealId)
         rubberData.deal_id = selectedDealId
         rubberData.partner_id = (deal as any)?.partner_id
+        rubberData.supplier_name = deal?.partner_name || ''
       } else if (sourceType === 'supplier' && selectedSupplierId) {
         const sup = suppliers.find((s) => s.id === selectedSupplierId)
         rubberData.supplier_id = selectedSupplierId

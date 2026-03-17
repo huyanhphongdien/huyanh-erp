@@ -4,6 +4,7 @@ import { Button, Spin, Typography, Space, Radio, Card } from 'antd'
 import { ArrowLeftOutlined, PrinterOutlined, LoadingOutlined } from '@ant-design/icons'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
+import { supabase } from '@erp/lib/supabase'
 import type { WeighbridgeTicket, WeighbridgeImage } from '@erp/services/wms/wms.types'
 
 const { Text } = Typography
@@ -26,6 +27,7 @@ export default function PrintPage() {
   const navigate = useNavigate()
   const [ticket, setTicket] = useState<WeighbridgeTicket | null>(null)
   const [images, setImages] = useState<WeighbridgeImage[]>([])
+  const [dealInfo, setDealInfo] = useState<{ deal_number: string; partner_name: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [paperSize, setPaperSize] = useState<PaperSize>(() => {
     return (localStorage.getItem('wb_paper_size') as PaperSize) || 'a4'
@@ -49,6 +51,21 @@ export default function PrintPage() {
       ])
       setTicket(t)
       setImages(imgs)
+      // Fetch deal info if linked
+      const ext = t as any
+      if (ext?.deal_id) {
+        const { data: deal } = await supabase
+          .from('b2b_deals')
+          .select('deal_number, partner:b2b_partners!partner_id(name)')
+          .eq('id', ext.deal_id)
+          .single()
+        if (deal) {
+          setDealInfo({
+            deal_number: (deal as any).deal_number || '',
+            partner_name: (deal as any).partner?.name || '',
+          })
+        }
+      }
     } catch { /* ignore */ }
     setLoading(false)
   }
@@ -221,7 +238,8 @@ export default function PrintPage() {
             <Row2 l="Tài xế" r={ticket!.driver_name || '—'} />
             <Row2 l="Loại mủ" r={rubberLabel} />
             <Row2 l="Loại" r={ticket!.ticket_type === 'in' ? 'Xe vào' : 'Xe ra'} />
-            {ext.supplier_name && <Row2 l="NCC/Đại lý" r={ext.supplier_name} />}
+            {(dealInfo?.partner_name || ext.supplier_name) && <Row2 l="NCC/Đại lý" r={dealInfo?.partner_name || ext.supplier_name} />}
+            {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16 }}>
@@ -235,9 +253,9 @@ export default function PrintPage() {
               {ext.deal_id && (
                 <tr>
                   <td style={tdLabel}>Deal</td>
-                  <td style={tdValue}>{ext.deal_number || ext.deal_id}</td>
+                  <td style={tdValue}>{dealInfo?.deal_number || ext.deal_id}</td>
                   <td style={tdLabel}>Đại lý</td>
-                  <td style={tdValue}>{ext.supplier_name || ext.partner_name || '—'}</td>
+                  <td style={tdValue}>{dealInfo?.partner_name || ext.supplier_name || '—'}</td>
                 </tr>
               )}
               <tr>

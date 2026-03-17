@@ -1,36 +1,44 @@
 // ============================================================================
 // FILE: src/pages/wms/warehouses/WarehouseLocationPage.tsx
 // MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P2 — Bước 2.8 (IMPROVED) — Grid vị trí kho + batch info
-// ============================================================================
-// CẢI TIẾN: Join stock_batches vào mỗi ô để hiển thị:
-//   - Ô nào đang chứa hàng gì (material, batch_no)
-//   - DRC, QC status, số lượng còn
-//   - Tap ô → Bottom Sheet chi tiết
-// Design: Industrial Mobile-First (WMS_UI_DESIGN_GUIDE.md §3.4)
+// PHASE: P2 — Buoc 2.8 (IMPROVED) — Grid vị trí kho + batch info
+// REWRITE: Tailwind -> Ant Design v6
 // ============================================================================
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  ArrowLeft,
-  Plus,
-  X,
-  Package,
-  MapPin,
-  FlaskConical,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  AlertTriangle,
-  Info,
-  Eye,
-  Grid3X3,
-  List,
-  Search,
-} from 'lucide-react'
+  Card,
+  Tag,
+  Button,
+  Space,
+  Typography,
+  Spin,
+  Empty,
+  Input,
+  Segmented,
+  Modal,
+  Descriptions,
+  Progress,
+  Badge,
+} from 'antd'
+import {
+  ArrowLeftOutlined,
+  ReloadOutlined,
+  AppstoreOutlined,
+  UnorderedListOutlined,
+  EnvironmentOutlined,
+  InboxOutlined,
+  ExperimentOutlined,
+  CloseOutlined,
+  SearchOutlined,
+} from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
+import GradeBadge from '../../../components/wms/GradeBadge'
+import { QCBadge } from '../../../components/wms/QCInputForm'
+
+const { Title, Text } = Typography
+const MONO_FONT = "'JetBrains Mono', monospace"
 
 // ============================================================================
 // TYPES
@@ -44,7 +52,6 @@ interface Warehouse {
   address?: string
 }
 
-/** Lô hàng đang nằm tại 1 vị trí */
 interface LocationBatch {
   id: string
   batch_no: string
@@ -56,9 +63,9 @@ interface LocationBatch {
   latest_drc: number | null
   qc_status: string
   received_date: string
+  rubber_grade?: string
 }
 
-/** Vị trí kho + danh sách lô đang chứa */
 interface LocationWithBatches {
   id: string
   warehouse_id: string
@@ -70,9 +77,7 @@ interface LocationWithBatches {
   current_quantity: number
   is_available: boolean
   created_at: string
-  // Joined
   batches: LocationBatch[]
-  // Computed
   status: 'empty' | 'partial' | 'full' | 'unavailable'
   usage_percent: number
 }
@@ -81,19 +86,11 @@ interface LocationWithBatches {
 // CONSTANTS
 // ============================================================================
 
-const STATUS_COLORS: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  empty:       { bg: '#D1FAE5', border: '#86EFAC', text: '#166534', label: 'Trống' },
-  partial:     { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E', label: 'Đang dùng' },
-  full:        { bg: '#FEE2E2', border: '#FCA5A5', text: '#991B1B', label: 'Đầy' },
-  unavailable: { bg: '#F3F4F6', border: '#D1D5DB', text: '#9CA3AF', label: 'Không dùng' },
-}
-
-const QC_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  passed:      { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  warning:     { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500' },
-  failed:      { bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500' },
-  needs_blend: { bg: 'bg-purple-50',  text: 'text-purple-700',  dot: 'bg-purple-500' },
-  pending:     { bg: 'bg-gray-50',    text: 'text-gray-500',    dot: 'bg-gray-400' },
+const STATUS_COLORS: Record<string, { bg: string; border: string; text: string; label: string; tagColor: string }> = {
+  empty:       { bg: '#D1FAE5', border: '#86EFAC', text: '#166534', label: 'Trong',      tagColor: 'green' },
+  partial:     { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E', label: 'Đang dùng',  tagColor: 'orange' },
+  full:        { bg: '#FEE2E2', border: '#FCA5A5', text: '#991B1B', label: 'Dây',        tagColor: 'red' },
+  unavailable: { bg: '#F3F4F6', border: '#D1D5DB', text: '#9CA3AF', label: 'Không đúng', tagColor: 'default' },
 }
 
 // ============================================================================
@@ -115,18 +112,21 @@ function computeStatus(loc: { is_available: boolean; capacity: number | null; cu
 
 /** Legend */
 const Legend: React.FC = () => (
-  <div className="flex items-center gap-3 flex-wrap">
+  <Space size={12} wrap>
     {(['empty', 'partial', 'full', 'unavailable'] as const).map(s => (
-      <div key={s} className="flex items-center gap-1.5">
-        <div className="w-3 h-3 rounded-sm border"
-          style={{ backgroundColor: STATUS_COLORS[s].bg, borderColor: STATUS_COLORS[s].border }} />
-        <span className="text-[11px] text-gray-500">{STATUS_COLORS[s].label}</span>
-      </div>
+      <Space key={s} size={4}>
+        <div style={{
+          width: 12, height: 12, borderRadius: 2,
+          backgroundColor: STATUS_COLORS[s].bg,
+          border: `1px solid ${STATUS_COLORS[s].border}`,
+        }} />
+        <Text type="secondary" style={{ fontSize: 11 }}>{STATUS_COLORS[s].label}</Text>
+      </Space>
     ))}
-  </div>
+  </Space>
 )
 
-/** Grid cell — 1 ô kho */
+/** Grid cell */
 const LocationCell: React.FC<{
   loc: LocationWithBatches
   onTap: () => void
@@ -136,36 +136,46 @@ const LocationCell: React.FC<{
   const hasBatches = loc.batches.length > 0
   const firstBatch = loc.batches[0]
 
+  const QC_DOT_COLORS: Record<string, string> = {
+    passed: '#52c41a', warning: '#faad14', failed: '#ff4d4f',
+    needs_blend: '#722ed1', pending: '#999',
+  }
+
   return (
-    <button
-      type="button"
+    <div
       onClick={onTap}
-      className="w-full aspect-square rounded-xl border-2 p-1.5 flex flex-col items-center justify-center
-        transition-all active:scale-[0.93] relative overflow-hidden"
       style={{
+        width: '100%',
+        aspectRatio: '1',
+        borderRadius: 8,
+        border: `2px solid ${style.border}`,
         backgroundColor: style.bg,
-        borderColor: style.border,
-        minHeight: compact ? '60px' : '80px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 4,
+        cursor: 'pointer',
+        position: 'relative',
+        overflow: 'hidden',
+        minHeight: compact ? 60 : 80,
+        transition: 'transform 0.15s',
       }}
     >
-      {/* Mã ô */}
-      <span className="text-[10px] font-bold leading-tight"
-        style={{ color: style.text, fontFamily: "'JetBrains Mono', monospace" }}>
+      {/* Cell code */}
+      <span style={{
+        fontSize: 10, fontWeight: 700, lineHeight: 1,
+        color: style.text, fontFamily: MONO_FONT,
+      }}>
         {loc.column_name || loc.code.split('-').pop() || loc.code}
       </span>
 
-      {/* Batch info (if has stock) */}
       {hasBatches && firstBatch && (
         <>
-          {/* Material name (truncated) */}
-          <span className="text-[8px] font-medium leading-tight truncate w-full text-center mt-0.5"
-            style={{ color: style.text }}>
+          <span style={{ fontSize: 8, fontWeight: 500, lineHeight: 1, color: style.text, marginTop: 2, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
             {firstBatch.material_sku || firstBatch.material_name.slice(0, 8)}
           </span>
-
-          {/* Quantity */}
-          <span className="text-[9px] font-bold leading-tight mt-0.5"
-            style={{ color: style.text, fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1, color: style.text, marginTop: 2, fontFamily: MONO_FONT }}>
             {firstBatch.quantity_remaining > 999
               ? `${(firstBatch.quantity_remaining / 1000).toFixed(1)}k`
               : firstBatch.quantity_remaining}
@@ -173,162 +183,134 @@ const LocationCell: React.FC<{
 
           {/* QC dot */}
           {firstBatch.qc_status && (
-            <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${(QC_COLORS[firstBatch.qc_status] || QC_COLORS.pending).dot}`} />
+            <div style={{
+              position: 'absolute', top: 3, right: 3,
+              width: 8, height: 8, borderRadius: '50%',
+              backgroundColor: QC_DOT_COLORS[firstBatch.qc_status] || '#999',
+            }} />
           )}
 
           {/* Multiple batches indicator */}
           {loc.batches.length > 1 && (
-            <div className="absolute bottom-0.5 right-1 bg-white/80 rounded px-1 text-[7px] font-bold"
-              style={{ color: style.text }}>
+            <div style={{
+              position: 'absolute', bottom: 2, right: 3,
+              background: 'rgba(255,255,255,0.8)', borderRadius: 2,
+              padding: '0 3px', fontSize: 7, fontWeight: 700, color: style.text,
+            }}>
               +{loc.batches.length - 1}
             </div>
           )}
         </>
       )}
 
-      {/* Empty indicator */}
       {!hasBatches && loc.status === 'empty' && (
-        <span className="text-[8px] text-gray-400 mt-0.5">trống</span>
+        <span style={{ fontSize: 8, color: '#999', marginTop: 2 }}>trong</span>
       )}
-    </button>
+    </div>
   )
 }
 
-/** Bottom Sheet — chi tiết vị trí */
-const LocationDetail: React.FC<{
-  loc: LocationWithBatches
+/** Location Detail Modal */
+const LocationDetailModal: React.FC<{
+  loc: LocationWithBatches | null
   onClose: () => void
 }> = ({ loc, onClose }) => {
+  if (!loc) return null
   const style = STATUS_COLORS[loc.status] || STATUS_COLORS.empty
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end"
-      onClick={onClose}>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
-
-      {/* Sheet */}
-      <div className="relative bg-white rounded-t-2xl max-h-[80vh] overflow-y-auto safe-bottom"
-        onClick={e => e.stopPropagation()}
-        style={{ animation: 'slideUp 200ms ease-out' }}>
-
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
-        </div>
-
-        {/* Header */}
-        <div className="px-4 pb-3 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: style.bg, borderColor: style.border }}>
-                <MapPin className="w-6 h-6" style={{ color: style.text }} />
-              </div>
-              <div>
-                <h3 className="text-[16px] font-bold text-gray-900"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  {loc.code}
-                </h3>
-                <p className="text-[12px] text-gray-500">
-                  {loc.shelf ? `Kệ ${loc.shelf}` : ''}
-                  {loc.row_name ? ` · Hàng ${loc.row_name}` : ''}
-                  {loc.column_name ? ` · Ô ${loc.column_name}` : ''}
-                </p>
-              </div>
-            </div>
-            <button onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100">
-              <X className="w-4 h-4 text-gray-500" />
-            </button>
+    <Modal
+      open={!!loc}
+      onCancel={onClose}
+      footer={null}
+      title={
+        <Space>
+          <div style={{
+            width: 40, height: 40, borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: style.bg, border: `1px solid ${style.border}`,
+          }}>
+            <EnvironmentOutlined style={{ fontSize: 20, color: style.text }} />
           </div>
-
-          {/* Usage bar */}
-          <div className="mt-3 flex items-center gap-3">
-            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all"
-                style={{
-                  width: `${Math.min(loc.usage_percent, 100)}%`,
-                  backgroundColor: style.border,
-                }} />
-            </div>
-            <span className="text-[12px] font-bold" style={{ color: style.text }}>
-              {loc.usage_percent}%
-            </span>
+          <div>
+            <Text strong style={{ fontFamily: MONO_FONT, fontSize: 16 }}>{loc.code}</Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {loc.shelf ? `Ke ${loc.shelf}` : ''}
+              {loc.row_name ? ` - Hang ${loc.row_name}` : ''}
+              {loc.column_name ? ` - O ${loc.column_name}` : ''}
+            </Text>
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
-            <span>Đang chứa: {loc.current_quantity.toLocaleString('vi-VN')}</span>
-            <span>Sức chứa: {loc.capacity ? loc.capacity.toLocaleString('vi-VN') : '—'}</span>
-          </div>
+        </Space>
+      }
+      width={480}
+    >
+      {/* Usage bar */}
+      <div style={{ marginBottom: 16 }}>
+        <Progress
+          percent={Math.min(loc.usage_percent, 100)}
+          strokeColor={style.border}
+          format={() => <Text strong style={{ color: style.text }}>{loc.usage_percent}%</Text>}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666' }}>
+          <span>Dang chua: {loc.current_quantity.toLocaleString('vi-VN')}</span>
+          <span>Suc chua: {loc.capacity ? loc.capacity.toLocaleString('vi-VN') : '—'}</span>
         </div>
-
-        {/* Batch list */}
-        <div className="px-4 py-3">
-          {loc.batches.length === 0 ? (
-            <div className="text-center py-8">
-              <Package className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-[13px] text-gray-400">Ô này đang trống</p>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              <p className="text-[12px] font-bold text-gray-700 flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-gray-400" />
-                Lô hàng tại vị trí ({loc.batches.length})
-              </p>
-              {loc.batches.map(batch => {
-                const qc = QC_COLORS[batch.qc_status] || QC_COLORS.pending
-                return (
-                  <div key={batch.id} className="p-3 rounded-xl border border-gray-200 bg-white">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[13px] font-bold text-gray-900"
-                            style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                            {batch.batch_no}
-                          </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${qc.bg} ${qc.text}`}>
-                            {batch.qc_status === 'passed' && 'Đạt'}
-                            {batch.qc_status === 'warning' && 'Cảnh báo'}
-                            {batch.qc_status === 'failed' && 'Không đạt'}
-                            {batch.qc_status === 'needs_blend' && 'Phối trộn'}
-                            {batch.qc_status === 'pending' && 'Chờ QC'}
-                          </span>
-                        </div>
-                        <p className="text-[12px] text-gray-600 truncate">
-                          {batch.material_sku} — {batch.material_name}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          Nhập: {new Date(batch.received_date).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[15px] font-bold text-[#1B4D3E]"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {batch.quantity_remaining.toLocaleString('vi-VN')}
-                        </p>
-                        <p className="text-[11px] text-gray-400">{batch.material_unit}</p>
-                        {batch.latest_drc != null && (
-                          <div className="flex items-center gap-1 justify-end mt-0.5">
-                            <FlaskConical className="w-3 h-3 text-gray-400" />
-                            <span className="text-[11px] text-gray-500"
-                              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                              {batch.latest_drc.toFixed(1)}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Bottom padding */}
-        <div className="h-6" />
       </div>
-    </div>
+
+      {/* Batch list */}
+      {loc.batches.length === 0 ? (
+        <Empty image={<InboxOutlined style={{ fontSize: 32, color: '#ccc' }} />} description="O nay dang trong" />
+      ) : (
+        <div>
+          <Text strong style={{ fontSize: 12, color: '#555' }}>
+            <InboxOutlined /> Lô hàng tai vị trí ({loc.batches.length})
+          </Text>
+
+          <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size={8}>
+            {loc.batches.map(batch => (
+              <Card key={batch.id} size="small" style={{ borderColor: '#f0f0f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Space size={8} align="center" style={{ marginBottom: 4 }}>
+                      <Text strong style={{ fontFamily: MONO_FONT, fontSize: 13 }}>
+                        {batch.batch_no}
+                      </Text>
+                      <QCBadge result={batch.qc_status} size="sm" />
+                      {batch.rubber_grade && <GradeBadge grade={batch.rubber_grade} size="small" />}
+                    </Space>
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {batch.material_sku} — {batch.material_name}
+                      </Text>
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      Nhap: {new Date(batch.received_date).toLocaleDateString('vi-VN')}
+                    </Text>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <Text strong style={{ fontFamily: MONO_FONT, fontSize: 15, color: '#1B4D3E' }}>
+                      {batch.quantity_remaining.toLocaleString('vi-VN')}
+                    </Text>
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 11 }}>{batch.material_unit}</Text>
+                    </div>
+                    {batch.latest_drc != null && (
+                      <Space size={4} style={{ marginTop: 2 }}>
+                        <ExperimentOutlined style={{ fontSize: 11, color: '#999' }} />
+                        <Text type="secondary" style={{ fontFamily: MONO_FONT, fontSize: 11 }}>
+                          {batch.latest_drc.toFixed(1)}%
+                        </Text>
+                      </Space>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </Space>
+        </div>
+      )}
+    </Modal>
   )
 }
 
@@ -353,14 +335,13 @@ const WarehouseLocationPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   // ========================================================================
-  // LOAD DATA — warehouse + locations + batches
+  // LOAD DATA
   // ========================================================================
 
   const loadData = useCallback(async () => {
     if (!warehouseId) return
 
     try {
-      // 1. Load warehouse info
       const { data: wh, error: whErr } = await supabase
         .from('warehouses')
         .select('id, code, name, type, address')
@@ -370,7 +351,6 @@ const WarehouseLocationPage: React.FC = () => {
       if (whErr) throw whErr
       setWarehouse(wh)
 
-      // 2. Load all locations in this warehouse
       const { data: locs, error: locErr } = await supabase
         .from('warehouse_locations')
         .select('*')
@@ -381,7 +361,6 @@ const WarehouseLocationPage: React.FC = () => {
 
       if (locErr) throw locErr
 
-      // 3. Load ALL active batches in this warehouse (join material)
       const { data: batches, error: batchErr } = await supabase
         .from('stock_batches')
         .select(`
@@ -397,7 +376,6 @@ const WarehouseLocationPage: React.FC = () => {
 
       if (batchErr) throw batchErr
 
-      // 4. Map batches vào locations
       const batchMap = new Map<string, LocationBatch[]>()
       for (const b of (batches || [])) {
         const locId = b.location_id
@@ -409,7 +387,7 @@ const WarehouseLocationPage: React.FC = () => {
           material_id: b.material_id,
           material_sku: (b.material as any)?.sku || '',
           material_name: (b.material as any)?.name || '',
-          material_unit: (b.material as any)?.unit || 'bành',
+          material_unit: (b.material as any)?.unit || 'banh',
           quantity_remaining: b.quantity_remaining,
           latest_drc: b.latest_drc,
           qc_status: b.qc_status,
@@ -420,30 +398,22 @@ const WarehouseLocationPage: React.FC = () => {
         batchMap.get(locId)!.push(mapped)
       }
 
-      // 5. Merge
       const merged: LocationWithBatches[] = (locs || []).map(loc => {
         const locBatches = batchMap.get(loc.id) || []
         const { status, usage_percent } = computeStatus(loc)
-        return {
-          ...loc,
-          batches: locBatches,
-          status,
-          usage_percent,
-        }
+        return { ...loc, batches: locBatches, status, usage_percent }
       })
 
       setLocations(merged)
     } catch (e) {
-      console.error('Lỗi load dữ liệu kho:', e)
+      console.error('Loi load du lieu kho:', e)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }, [warehouseId])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  useEffect(() => { loadData() }, [loadData])
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -454,14 +424,12 @@ const WarehouseLocationPage: React.FC = () => {
   // DERIVED
   // ========================================================================
 
-  // Unique shelves
   const shelves = useMemo(() => {
     const set = new Set<string>()
     locations.forEach(l => { if (l.shelf) set.add(l.shelf) })
     return Array.from(set).sort()
   }, [locations])
 
-  // Filtered locations
   const filtered = useMemo(() => {
     let list = locations
     if (filterShelf !== 'all') {
@@ -481,7 +449,6 @@ const WarehouseLocationPage: React.FC = () => {
     return list
   }, [locations, filterShelf, searchText])
 
-  // Group by shelf
   const groupedByShelves = useMemo(() => {
     const map = new Map<string, LocationWithBatches[]>()
     for (const loc of filtered) {
@@ -492,7 +459,6 @@ const WarehouseLocationPage: React.FC = () => {
     return map
   }, [filtered])
 
-  // Stats
   const stats = useMemo(() => {
     const total = locations.length
     const empty = locations.filter(l => l.status === 'empty').length
@@ -509,138 +475,131 @@ const WarehouseLocationPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center"
-        style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-        <div className="flex items-center gap-3 text-gray-400">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span>Đang tải vị trí kho...</span>
-        </div>
+      <div style={{ minHeight: '100vh', background: '#F7F5F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" tip="Đang tải vị trí kho..." />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2] flex flex-col"
-      style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-
+    <div style={{ minHeight: '100vh', background: '#F7F5F2', display: 'flex', flexDirection: 'column' }}>
       {/* HEADER */}
-      <header className="sticky top-0 z-30 bg-[#1B4D3E] text-white safe-top">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={() => navigate(-1)}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 active:bg-white/20">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-[16px] font-bold">
-              {warehouse?.name || 'Kho'}
-              {warehouse?.code && (
-                <span className="ml-2 text-[12px] bg-white/20 px-2 py-0.5 rounded-md font-mono">
-                  {warehouse.code}
-                </span>
-              )}
-            </h1>
-            <p className="text-[12px] text-white/70">
-              {stats.total} ô · {stats.totalBatches} lô hàng
-            </p>
-          </div>
-          <button onClick={handleRefresh}
-            className={`w-10 h-10 flex items-center justify-center rounded-xl bg-white/10
-              ${refreshing ? 'animate-spin' : ''}`}>
-            <RefreshCw className="w-5 h-5" />
-          </button>
-        </div>
+      <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
+        <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+          <Space>
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ color: '#fff' }} />
+            <div>
+              <Title level={5} style={{ color: '#fff', margin: 0 }}>
+                {warehouse?.name || 'Kho'}
+                {warehouse?.code && (
+                  <Tag style={{ marginLeft: 8, background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontFamily: MONO_FONT, fontSize: 11 }}>
+                    {warehouse.code}
+                  </Tag>
+                )}
+              </Title>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+                {stats.total} o &bull; {stats.totalBatches} lô hàng
+              </Text>
+            </div>
+          </Space>
+          <Button
+            type="text"
+            icon={<ReloadOutlined spin={refreshing} />}
+            onClick={handleRefresh}
+            style={{ color: '#fff' }}
+          />
+        </Space>
 
         {/* Stats strip */}
-        <div className="flex items-center gap-3 px-4 pb-3 overflow-x-auto">
+        <Space size={16} style={{ marginTop: 8, overflowX: 'auto', width: '100%' }} wrap>
           {[
             { label: 'Tổng', value: stats.total, color: '#fff' },
-            { label: 'Trống', value: stats.empty, color: '#86EFAC' },
+            { label: 'Trong', value: stats.empty, color: '#86EFAC' },
             { label: 'Đang dùng', value: stats.partial, color: '#FCD34D' },
-            { label: 'Đầy', value: stats.full, color: '#FCA5A5' },
-            { label: 'Không dùng', value: stats.unavailable, color: '#9CA3AF' },
+            { label: 'Dây', value: stats.full, color: '#FCA5A5' },
+            { label: 'K. dung', value: stats.unavailable, color: '#9CA3AF' },
           ].map(s => (
-            <div key={s.label} className="flex items-center gap-1.5 shrink-0">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-              <span className="text-[11px] text-white/80">{s.label}:</span>
-              <span className="text-[12px] font-bold text-white">{s.value}</span>
-            </div>
+            <Space key={s.label} size={4}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: s.color }} />
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{s.label}:</Text>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{s.value}</Text>
+            </Space>
           ))}
-        </div>
-      </header>
+        </Space>
+      </div>
 
       {/* TOOLBAR */}
-      <div className="bg-white border-b border-gray-100 px-4 py-2.5 space-y-2">
-        {/* Search */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              placeholder="Tìm mã ô, lô, sản phẩm..."
-              className="w-full min-h-[40px] pl-9 pr-4 rounded-lg border border-gray-200
-                text-[14px] focus:outline-none focus:border-[#2D8B6E]"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')}
-            className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500"
-          >
-            {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
-          </button>
-        </div>
+      <div style={{ background: '#fff', borderBottom: '1px solid #f0f0f0', padding: '10px 16px' }}>
+        <Space style={{ width: '100%', marginBottom: 8 }}>
+          <Input
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            placeholder="Tìm mã o, lo, san pham..."
+            allowClear
+            style={{ flex: 1 }}
+          />
+          <Segmented
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'grid' | 'list')}
+            options={[
+              { value: 'grid', icon: <AppstoreOutlined /> },
+              { value: 'list', icon: <UnorderedListOutlined /> },
+            ]}
+          />
+        </Space>
 
-        {/* Shelf tabs */}
+        {/* Shelf filter */}
         {shelves.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-            <button
+          <Space size={6} style={{ marginBottom: 8, overflowX: 'auto', width: '100%' }} wrap>
+            <Button
+              size="small"
+              type={filterShelf === 'all' ? 'primary' : 'default'}
               onClick={() => setFilterShelf('all')}
-              className={`text-[12px] px-3 py-1.5 rounded-full border font-medium whitespace-nowrap
-                ${filterShelf === 'all'
-                  ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]'
-                  : 'bg-white text-gray-600 border-gray-200'}`}
+              style={filterShelf === 'all' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
             >
-              Tất cả
-            </button>
+              Tat ca
+            </Button>
             {shelves.map(s => (
-              <button
+              <Button
                 key={s}
+                size="small"
+                type={filterShelf === s ? 'primary' : 'default'}
                 onClick={() => setFilterShelf(s)}
-                className={`text-[12px] px-3 py-1.5 rounded-full border font-medium whitespace-nowrap
-                  ${filterShelf === s
-                    ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]'
-                    : 'bg-white text-gray-600 border-gray-200'}`}
+                style={filterShelf === s ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
               >
-                Kệ {s}
-              </button>
+                Ke {s}
+              </Button>
             ))}
-          </div>
+          </Space>
         )}
 
         <Legend />
       </div>
 
       {/* CONTENT */}
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div style={{ flex: 1, overflow: 'auto', paddingBottom: 20 }}>
         {filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm">
-              {locations.length === 0 ? 'Kho chưa có vị trí nào' : 'Không tìm thấy vị trí phù hợp'}
-            </p>
+          <div style={{ textAlign: 'center', padding: '64px 0' }}>
+            <Empty
+              image={<EnvironmentOutlined style={{ fontSize: 40, color: '#ccc' }} />}
+              description={locations.length === 0 ? 'Kho chưa có vị trí nào' : 'Không tìm thấy vị trí phu hop'}
+            />
           </div>
         ) : viewMode === 'grid' ? (
-          // GRID VIEW — grouped by shelf
-          <div className="p-4 space-y-5">
+          // GRID VIEW
+          <div style={{ padding: 16 }}>
             {Array.from(groupedByShelves.entries()).map(([shelf, locs]) => (
-              <div key={shelf}>
-                <p className="text-[12px] font-bold text-[#1B4D3E] mb-2 flex items-center gap-1.5 sticky top-0 bg-[#F7F5F2] py-1 z-10">
-                  <Grid3X3 className="w-3.5 h-3.5" />
-                  {shelf.startsWith('K') ? `Kệ ${shelf}` : shelf} · {locs.length} ô
-                </p>
-                <div className="grid grid-cols-5 gap-2">
+              <div key={shelf} style={{ marginBottom: 20 }}>
+                <Text strong style={{ color: '#1B4D3E', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <AppstoreOutlined />
+                  {shelf.startsWith('K') ? `Ke ${shelf}` : shelf} &bull; {locs.length} o
+                </Text>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: 8,
+                }}>
                   {locs.map(loc => (
                     <LocationCell
                       key={loc.id}
@@ -655,71 +614,69 @@ const WarehouseLocationPage: React.FC = () => {
           </div>
         ) : (
           // LIST VIEW
-          <div className="p-4 space-y-2">
-            {filtered.map(loc => {
-              const style = STATUS_COLORS[loc.status] || STATUS_COLORS.empty
-              const hasBatches = loc.batches.length > 0
-              return (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onClick={() => setSelectedLoc(loc)}
-                  className="w-full text-left p-3 rounded-xl border bg-white border-gray-200
-                    flex items-center gap-3 active:scale-[0.98] transition-all"
-                >
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: style.bg, border: `2px solid ${style.border}` }}>
-                    <span className="text-[11px] font-bold"
-                      style={{ color: style.text, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {loc.column_name || loc.code.split('-').pop() || '?'}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-gray-900"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {loc.code}
-                    </p>
-                    {hasBatches ? (
-                      <p className="text-[12px] text-gray-600 truncate">
-                        {loc.batches[0].material_sku} — {loc.batches[0].batch_no}
-                        {loc.batches.length > 1 && ` (+${loc.batches.length - 1})`}
-                      </p>
-                    ) : (
-                      <p className="text-[12px] text-gray-400">Trống</p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    {hasBatches && (
-                      <>
-                        <p className="text-[14px] font-bold text-[#1B4D3E]"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {loc.batches.reduce((s, b) => s + b.quantity_remaining, 0).toLocaleString('vi-VN')}
-                        </p>
-                        {loc.batches[0].latest_drc != null && (
-                          <p className="text-[11px] text-gray-400">DRC {loc.batches[0].latest_drc.toFixed(1)}%</p>
+          <div style={{ padding: 16 }}>
+            <Space direction="vertical" style={{ width: '100%' }} size={8}>
+              {filtered.map(loc => {
+                const st = STATUS_COLORS[loc.status] || STATUS_COLORS.empty
+                const hasBatches = loc.batches.length > 0
+                return (
+                  <Card
+                    key={loc.id}
+                    size="small"
+                    hoverable
+                    onClick={() => setSelectedLoc(loc)}
+                    style={{ borderLeft: `4px solid ${st.border}` }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 8,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: st.bg, border: `2px solid ${st.border}`,
+                        flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: st.text, fontFamily: MONO_FONT }}>
+                          {loc.column_name || loc.code.split('-').pop() || '?'}
+                        </span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Text strong style={{ fontFamily: MONO_FONT, fontSize: 13 }}>{loc.code}</Text>
+                        {hasBatches ? (
+                          <div>
+                            <Text type="secondary" style={{ fontSize: 12 }} ellipsis>
+                              {loc.batches[0].material_sku} — {loc.batches[0].batch_no}
+                              {loc.batches.length > 1 && ` (+${loc.batches.length - 1})`}
+                            </Text>
+                          </div>
+                        ) : (
+                          <div><Text type="secondary" style={{ fontSize: 12 }}>Trong</Text></div>
                         )}
-                      </>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
+                      </div>
+                      {hasBatches && (
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <Text strong style={{ fontFamily: MONO_FONT, fontSize: 14, color: '#1B4D3E' }}>
+                            {loc.batches.reduce((s, b) => s + b.quantity_remaining, 0).toLocaleString('vi-VN')}
+                          </Text>
+                          {loc.batches[0].latest_drc != null && (
+                            <div>
+                              <Text type="secondary" style={{ fontSize: 11 }}>DRC {loc.batches[0].latest_drc.toFixed(1)}%</Text>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )
+              })}
+            </Space>
           </div>
         )}
       </div>
 
-      {/* BOTTOM SHEET — Location detail */}
-      {selectedLoc && (
-        <LocationDetail loc={selectedLoc} onClose={() => setSelectedLoc(null)} />
-      )}
-
-      {/* Animation */}
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-      `}</style>
+      {/* Location Detail Modal */}
+      <LocationDetailModal
+        loc={selectedLoc}
+        onClose={() => setSelectedLoc(null)}
+      />
     </div>
   )
 }

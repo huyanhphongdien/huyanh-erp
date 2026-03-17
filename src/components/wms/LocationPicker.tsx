@@ -1,30 +1,38 @@
 // ============================================================================
-// FILE: src/components/wms/LocationPicker.tsx
-// MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P3 — Bước 3.9: Component chọn vị trí kho (tái sử dụng P3 + P4)
-// MÔ TẢ: Grid hiển thị các ô theo kệ, chọn vị trí nhập/xuất kho
-// PATTERN: Mobile-first, Industrial WMS UI, Glove-friendly 48px+ targets
+// LOCATION PICKER — Ant Design + Grid warehouse visualization
+// File: src/components/wms/LocationPicker.tsx
+// Rewrite: Tailwind -> Ant Design shell, keep custom grid cells
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  MapPin,
-  Check,
-  Search,
-  ChevronDown,
-  ChevronUp,
-  Package,
-  Loader2,
-  Grid3X3,
-  List,
-  X,
-  AlertCircle,
-  Info,
-} from 'lucide-react'
+  Input,
+  Spin,
+  Empty,
+  Alert,
+  Space,
+  Tag,
+  Segmented,
+  Typography,
+  Button,
+  Progress,
+  Tooltip,
+} from 'antd'
+import {
+  EnvironmentOutlined,
+  AppstoreOutlined,
+  UnorderedListOutlined,
+  CheckCircleFilled,
+  CloseOutlined,
+  ReloadOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
 
+const { Text } = Typography
+
 // ============================================================================
-// TYPES
+// TYPES (giu nguyen interface de backward-compatible)
 // ============================================================================
 
 export interface LocationData {
@@ -39,40 +47,23 @@ export interface LocationData {
 }
 
 export type LocationStatus = 'empty' | 'partial' | 'full' | 'unavailable'
-
 export type ViewMode = 'grid' | 'list'
-
-/** Mode nhập kho (cho phép ô trống + partial) hoặc xuất kho (chỉ ô có hàng) */
 export type PickerMode = 'stock-in' | 'stock-out'
 
 export interface LocationPickerProps {
-  /** ID kho — bắt buộc */
   warehouse_id: string
-  /** Vị trí đang chọn */
   selectedId?: string
-  /** Callback khi chọn/bỏ chọn vị trí */
   onSelect: (location: LocationData | null) => void
-  /** Mode: stock-in cho phép ô trống, stock-out chỉ cho ô có hàng */
   mode?: PickerMode
-  /** Cho phép chọn nhiều (dùng cho picking P4) */
   multiSelect?: boolean
-  /** Danh sách ID đã chọn (khi multiSelect=true) */
   selectedIds?: string[]
-  /** Callback khi chọn nhiều */
   onMultiSelect?: (locations: LocationData[]) => void
-  /** Label hiển thị phía trên */
   label?: string
-  /** Có hiển thị legend không */
   showLegend?: boolean
-  /** Có hiển thị search không */
   showSearch?: boolean
-  /** Có hiển thị shelf filter không */
   showShelfFilter?: boolean
-  /** Có hiển thị tổng quan summary không */
   showSummary?: boolean
-  /** Custom class cho container */
   className?: string
-  /** Disabled toàn bộ */
   disabled?: boolean
 }
 
@@ -91,59 +82,18 @@ function getLocationStatus(loc: LocationData): LocationStatus {
   return 'partial'
 }
 
-function getStatusConfig(status: LocationStatus) {
-  switch (status) {
-    case 'empty':
-      return {
-        bg: 'bg-[#D1FAE5]',
-        bgSelected: 'bg-emerald-200',
-        border: 'border-emerald-300',
-        text: 'text-emerald-800',
-        label: 'Trống',
-        dot: 'bg-emerald-400',
-      }
-    case 'partial':
-      return {
-        bg: 'bg-[#FEF3C7]',
-        bgSelected: 'bg-amber-200',
-        border: 'border-amber-300',
-        text: 'text-amber-800',
-        label: 'Đang dùng',
-        dot: 'bg-amber-400',
-      }
-    case 'full':
-      return {
-        bg: 'bg-[#FEE2E2]',
-        bgSelected: 'bg-red-200',
-        border: 'border-red-300',
-        text: 'text-red-700',
-        label: 'Đầy',
-        dot: 'bg-red-400',
-      }
-    case 'unavailable':
-      return {
-        bg: 'bg-gray-100',
-        bgSelected: 'bg-gray-200',
-        border: 'border-gray-300',
-        text: 'text-gray-400',
-        label: 'Không KD',
-        dot: 'bg-gray-400',
-      }
-  }
+const STATUS_CONFIG: Record<LocationStatus, { bg: string; color: string; label: string }> = {
+  empty: { bg: '#D1FAE5', color: '#059669', label: 'Trong' },
+  partial: { bg: '#FEF3C7', color: '#D97706', label: 'Đang dùng' },
+  full: { bg: '#FEE2E2', color: '#DC2626', label: 'Dây' },
+  unavailable: { bg: '#F3F4F6', color: '#9CA3AF', label: 'Không KD' },
 }
 
-/** Kiểm tra ô có thể chọn dựa trên mode */
 function isSelectable(loc: LocationData, mode: PickerMode): boolean {
   if (!loc.is_available) return false
   const status = getLocationStatus(loc)
-
-  if (mode === 'stock-in') {
-    // Nhập kho: cho phép ô trống + partial (chưa đầy)
-    return status === 'empty' || status === 'partial'
-  } else {
-    // Xuất kho: chỉ cho phép ô có hàng
-    return status === 'partial' || status === 'full'
-  }
+  if (mode === 'stock-in') return status === 'empty' || status === 'partial'
+  return status === 'partial' || status === 'full'
 }
 
 function getFillPercent(loc: LocationData): number {
@@ -152,248 +102,94 @@ function getFillPercent(loc: LocationData): number {
 }
 
 // ============================================================================
-// SUB-COMPONENTS
+// GRID CELL — Keep custom rendering (domain-specific)
 // ============================================================================
 
-/** Legend — giải thích màu sắc */
-const Legend: React.FC<{ mode: PickerMode }> = ({ mode }) => {
-  const items = mode === 'stock-in'
-    ? [
-        { status: 'empty' as LocationStatus, selectable: true },
-        { status: 'partial' as LocationStatus, selectable: true },
-        { status: 'full' as LocationStatus, selectable: false },
-        { status: 'unavailable' as LocationStatus, selectable: false },
-      ]
-    : [
-        { status: 'partial' as LocationStatus, selectable: true },
-        { status: 'full' as LocationStatus, selectable: true },
-        { status: 'empty' as LocationStatus, selectable: false },
-        { status: 'unavailable' as LocationStatus, selectable: false },
-      ]
-
-  return (
-    <div className="flex flex-wrap gap-3 px-1">
-      {items.map(({ status, selectable }) => {
-        const cfg = getStatusConfig(status)
-        return (
-          <div key={status} className="flex items-center gap-1.5">
-            <div className={`w-3 h-3 rounded-sm ${cfg.dot} ${!selectable ? 'opacity-40' : ''}`} />
-            <span className={`text-[11px] ${selectable ? 'text-gray-700' : 'text-gray-400'}`}>
-              {cfg.label}
-              {selectable && ' ✓'}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/** Summary bar — tổng quan kho */
-const SummaryBar: React.FC<{ locations: LocationData[] }> = ({ locations }) => {
-  const counts = useMemo(() => {
-    const result = { empty: 0, partial: 0, full: 0, unavailable: 0 }
-    locations.forEach(loc => {
-      result[getLocationStatus(loc)]++
-    })
-    return result
-  }, [locations])
-
-  return (
-    <div className="flex items-center gap-3 text-[11px]">
-      <span className="text-gray-500 font-medium">Tổng: {locations.length}</span>
-      <span className="text-emerald-600 font-semibold">{counts.empty} trống</span>
-      <span className="text-amber-600 font-semibold">{counts.partial} dùng</span>
-      <span className="text-red-600 font-semibold">{counts.full} đầy</span>
-      {counts.unavailable > 0 && (
-        <span className="text-gray-400">{counts.unavailable} N/A</span>
-      )}
-    </div>
-  )
-}
-
-/** Location Tooltip — thông tin chi tiết ô */
-const LocationTooltip: React.FC<{
-  location: LocationData
-  onClose: () => void
-}> = ({ location, onClose }) => {
-  const status = getLocationStatus(location)
-  const cfg = getStatusConfig(status)
-  const fillPct = getFillPercent(location)
-
-  return (
-    <div className="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48
-                    bg-white rounded-xl shadow-lg border border-gray-200 p-3
-                    animate-in fade-in slide-in-from-bottom-2 duration-200">
-      {/* Arrow */}
-      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 
-                      bg-white border-b border-r border-gray-200 rotate-45" />
-      
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center
-                   text-gray-400 hover:text-gray-600 rounded-full"
-      >
-        <X className="w-3 h-3" />
-      </button>
-
-      <div className="flex items-center gap-2 mb-2">
-        <MapPin className="w-3.5 h-3.5 text-[#1B4D3E]" />
-        <span className="font-bold text-sm text-gray-800">{location.code}</span>
-        <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${cfg.bg} ${cfg.text}`}>
-          {cfg.label}
-        </span>
-      </div>
-
-      {location.capacity ? (
-        <>
-          <div className="flex justify-between text-[11px] text-gray-500 mb-1">
-            <span>Sức chứa</span>
-            <span className="font-mono font-medium text-gray-700">
-              {location.current_quantity}/{location.capacity}
-            </span>
-          </div>
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                fillPct >= 80 ? 'bg-red-400' : fillPct > 0 ? 'bg-amber-400' : 'bg-emerald-400'
-              }`}
-              style={{ width: `${Math.min(fillPct, 100)}%` }}
-            />
-          </div>
-          <div className="text-right text-[10px] text-gray-400 mt-0.5">{fillPct}%</div>
-        </>
-      ) : (
-        <div className="text-[11px] text-gray-400">
-          <Package className="w-3 h-3 inline mr-1" />
-          {location.current_quantity > 0
-            ? `Đang chứa: ${location.current_quantity}`
-            : 'Chưa có hàng'}
-        </div>
-      )}
-
-      {location.shelf && (
-        <div className="text-[10px] text-gray-400 mt-1.5">
-          Kệ: {location.shelf}
-          {location.row_name && ` · Hàng: ${location.row_name}`}
-          {location.column_name && ` · Ô: ${location.column_name}`}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** Grid Cell — một ô vị trí trong grid */
 const GridCell: React.FC<{
   location: LocationData
   isSelected: boolean
   selectable: boolean
   disabled?: boolean
-  showTooltip: boolean
   onSelect: () => void
-  onToggleTooltip: () => void
-  onCloseTooltip: () => void
-}> = ({ location, isSelected, selectable, disabled, showTooltip, onSelect, onToggleTooltip, onCloseTooltip }) => {
+}> = ({ location, isSelected, selectable, disabled, onSelect }) => {
   const status = getLocationStatus(location)
-  const cfg = getStatusConfig(status)
+  const cfg = STATUS_CONFIG[status]
   const fillPct = getFillPercent(location)
 
-  const handleClick = () => {
-    if (disabled || !selectable) return
-    onSelect()
-  }
-
-  const handleLongPress = () => {
-    onToggleTooltip()
-  }
-
-  // Long press detection
-  const [pressTimer, setPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
-
-  const handleTouchStart = () => {
-    const timer = setTimeout(handleLongPress, 500)
-    setPressTimer(timer)
-  }
-
-  const handleTouchEnd = () => {
-    if (pressTimer) {
-      clearTimeout(pressTimer)
-      setPressTimer(null)
-    }
-  }
-
   return (
-    <div className="relative">
+    <Tooltip
+      title={
+        <div>
+          <div style={{ fontWeight: 600 }}>{location.code}</div>
+          <div>{cfg.label}</div>
+          {location.capacity ? (
+            <div>{location.current_quantity}/{location.capacity} ({fillPct}%)</div>
+          ) : location.current_quantity > 0 ? (
+            <div>Dang chua: {location.current_quantity}</div>
+          ) : null}
+          {location.shelf && <div>Ke: {location.shelf}{location.row_name ? ` · Hang: ${location.row_name}` : ''}{location.column_name ? ` · O: ${location.column_name}` : ''}</div>}
+        </div>
+      }
+      placement="top"
+    >
       <button
         type="button"
         disabled={disabled || !selectable}
-        onClick={handleClick}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onMouseEnter={handleLongPress}
-        onMouseLeave={onCloseTooltip}
-        className={`
-          relative w-full h-[56px] rounded-lg
-          flex flex-col items-center justify-center
-          text-[10px] font-medium transition-all duration-150
-          border
-          ${isSelected
-            ? `${cfg.bgSelected} ring-2 ring-[#2D8B6E] ring-offset-1 scale-[1.05] border-[#2D8B6E] shadow-md`
-            : `${cfg.bg} border-transparent hover:border-gray-300`
-          }
-          ${!selectable || disabled
-            ? 'opacity-40 cursor-not-allowed'
-            : 'cursor-pointer active:scale-95'
-          }
-        `}
+        onClick={onSelect}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: 56,
+          borderRadius: 8,
+          border: isSelected ? '2px solid #2D8B6E' : '1px solid transparent',
+          background: isSelected ? `${cfg.bg}` : cfg.bg,
+          boxShadow: isSelected ? '0 0 0 2px rgba(45,139,110,0.2)' : undefined,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: selectable && !disabled ? 'pointer' : 'not-allowed',
+          opacity: selectable && !disabled ? 1 : 0.4,
+          transition: 'all 0.15s',
+          transform: isSelected ? 'scale(1.05)' : undefined,
+          overflow: 'hidden',
+        }}
       >
-        {/* Mã vị trí */}
-        <span className={`font-bold text-[11px] leading-tight ${isSelected ? 'text-[#1B4D3E]' : cfg.text}`}>
+        <span style={{ fontWeight: 700, fontSize: 11, color: isSelected ? '#1B4D3E' : cfg.color, lineHeight: 1.2 }}>
           {location.code.replace(/^[A-Z]+-/, '')}
         </span>
-
-        {/* Fill indicator */}
         {location.capacity && location.is_available ? (
-          <span className={`text-[9px] mt-0.5 ${isSelected ? 'text-[#1B4D3E]/70' : 'text-gray-500'}`}>
+          <span style={{ fontSize: 9, marginTop: 2, color: '#888' }}>
             {location.current_quantity}/{location.capacity}
           </span>
         ) : location.current_quantity > 0 && location.is_available ? (
-          <span className={`text-[9px] mt-0.5 ${isSelected ? 'text-[#1B4D3E]/70' : 'text-gray-500'}`}>
+          <span style={{ fontSize: 9, marginTop: 2, color: '#888' }}>
             {location.current_quantity}
           </span>
         ) : null}
 
-        {/* Fill bar (bottom) */}
+        {/* Fill bar */}
         {location.capacity && location.is_available && fillPct > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-[3px] rounded-b-lg overflow-hidden bg-black/5">
-            <div
-              className={`h-full transition-all ${
-                fillPct >= 80 ? 'bg-red-400' : 'bg-amber-400'
-              }`}
-              style={{ width: `${Math.min(fillPct, 100)}%` }}
-            />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(0,0,0,0.05)' }}>
+            <div style={{ height: '100%', width: `${Math.min(fillPct, 100)}%`, background: fillPct >= 80 ? '#EF4444' : '#F59E0B', borderRadius: '0 0 8px 8px' }} />
           </div>
         )}
 
-        {/* Selected checkmark */}
+        {/* Selected check */}
         {isSelected && (
-          <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#2D8B6E] rounded-full 
-                          flex items-center justify-center shadow-sm">
-            <Check className="w-3 h-3 text-white" strokeWidth={3} />
+          <div style={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, background: '#2D8B6E', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckCircleFilled style={{ color: 'white', fontSize: 12 }} />
           </div>
         )}
       </button>
-
-      {/* Tooltip */}
-      {showTooltip && (
-        <LocationTooltip location={location} onClose={onCloseTooltip} />
-      )}
-    </div>
+    </Tooltip>
   )
 }
 
-/** List Item — hiển thị dạng danh sách */
+// ============================================================================
+// LIST ITEM
+// ============================================================================
+
 const ListItem: React.FC<{
   location: LocationData
   isSelected: boolean
@@ -402,66 +198,48 @@ const ListItem: React.FC<{
   onSelect: () => void
 }> = ({ location, isSelected, selectable, disabled, onSelect }) => {
   const status = getLocationStatus(location)
-  const cfg = getStatusConfig(status)
+  const cfg = STATUS_CONFIG[status]
   const fillPct = getFillPercent(location)
 
   return (
-    <button
-      type="button"
-      disabled={disabled || !selectable}
-      onClick={onSelect}
-      className={`
-        w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-        transition-all duration-150 text-left
-        ${isSelected
-          ? 'bg-[#1B4D3E]/5 ring-1 ring-[#2D8B6E]'
-          : 'bg-white hover:bg-gray-50'
-        }
-        ${!selectable || disabled
-          ? 'opacity-40 cursor-not-allowed'
-          : 'cursor-pointer active:scale-[0.98]'
-        }
-      `}
+    <div
+      onClick={selectable && !disabled ? onSelect : undefined}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '8px 12px',
+        borderRadius: 8,
+        cursor: selectable && !disabled ? 'pointer' : 'not-allowed',
+        opacity: selectable && !disabled ? 1 : 0.4,
+        background: isSelected ? 'rgba(27,77,62,0.05)' : 'white',
+        border: isSelected ? '1px solid #2D8B6E' : '1px solid transparent',
+        transition: 'all 0.15s',
+      }}
     >
-      {/* Status dot */}
-      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${cfg.dot} ${isSelected ? 'ring-2 ring-[#2D8B6E] ring-offset-1' : ''}`} />
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-[13px] text-gray-800">{location.code}</span>
-          <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded-full ${cfg.bg} ${cfg.text}`}>
+      <div style={{ width: 12, height: 12, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Space size={8}>
+          <Text strong style={{ fontSize: 13 }}>{location.code}</Text>
+          <Tag style={{ fontSize: 9, margin: 0, borderRadius: 4, padding: '0 4px' }} color={status === 'empty' ? 'green' : status === 'partial' ? 'orange' : status === 'full' ? 'red' : 'default'}>
             {cfg.label}
-          </span>
-        </div>
+          </Tag>
+        </Space>
         {location.capacity ? (
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
-              <div
-                className={`h-full rounded-full ${
-                  fillPct >= 80 ? 'bg-red-400' : fillPct > 0 ? 'bg-amber-400' : 'bg-emerald-400'
-                }`}
-                style={{ width: `${Math.min(fillPct, 100)}%` }}
-              />
-            </div>
-            <span className="text-[10px] font-mono text-gray-500">
-              {location.current_quantity}/{location.capacity} ({fillPct}%)
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <Progress percent={fillPct} size="small" showInfo={false} style={{ flex: 1, maxWidth: 120 }} strokeColor={fillPct >= 80 ? '#EF4444' : fillPct > 0 ? '#F59E0B' : '#10B981'} />
+            <Text type="secondary" style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>
+              {location.current_quantity}/{location.capacity}
+            </Text>
           </div>
         ) : (
-          <span className="text-[10px] text-gray-400 mt-0.5 block">
-            {location.current_quantity > 0 ? `Đang chứa: ${location.current_quantity}` : 'Trống'}
-          </span>
+          <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
+            {location.current_quantity > 0 ? `Dang chua: ${location.current_quantity}` : 'Trong'}
+          </Text>
         )}
       </div>
-
-      {/* Selected check */}
-      {isSelected && (
-        <div className="w-6 h-6 bg-[#2D8B6E] rounded-full flex items-center justify-center flex-shrink-0">
-          <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
-        </div>
-      )}
-    </button>
+      {isSelected && <CheckCircleFilled style={{ color: '#2D8B6E', fontSize: 18 }} />}
+    </div>
   )
 }
 
@@ -482,31 +260,21 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   showSearch = true,
   showShelfFilter = true,
   showSummary = true,
-  className = '',
   disabled = false,
 }) => {
-  // State
   const [locations, setLocations] = useState<LocationData[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
   const [activeShelf, setActiveShelf] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
-  const [tooltipId, setTooltipId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<string>('grid')
   const [collapsed, setCollapsed] = useState(false)
 
-  // ------------------------------------------------------------------
-  // LOAD LOCATIONS
-  // ------------------------------------------------------------------
+  // Load locations
   const loadLocations = useCallback(async () => {
-    if (!warehouse_id) {
-      setLocations([])
-      return
-    }
-
+    if (!warehouse_id) { setLocations([]); return }
     setLoading(true)
     setError(null)
-
     try {
       const { data, error: fetchErr } = await supabase
         .from('warehouse_locations')
@@ -515,13 +283,11 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
         .order('shelf', { ascending: true })
         .order('row_name', { ascending: true })
         .order('column_name', { ascending: true })
-
       if (fetchErr) throw fetchErr
       setLocations((data || []) as LocationData[])
     } catch (err) {
       console.error('LocationPicker: load error', err)
       setError('Không thể tải vị trí kho')
-      setLocations([])
     } finally {
       setLoading(false)
     }
@@ -529,45 +295,28 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
 
   useEffect(() => {
     loadLocations()
-    // Reset selection state when warehouse changes
     setActiveShelf(null)
     setSearchText('')
-    setTooltipId(null)
     setCollapsed(false)
   }, [loadLocations])
 
-  // ------------------------------------------------------------------
-  // COMPUTED DATA
-  // ------------------------------------------------------------------
-
-  /** Danh sách kệ */
+  // Computed
   const shelves = useMemo(() => {
     const set = new Set<string>()
-    locations.forEach(l => {
-      if (l.shelf) set.add(l.shelf)
-    })
+    locations.forEach(l => { if (l.shelf) set.add(l.shelf) })
     return [...set].sort()
   }, [locations])
 
-  /** Locations sau filter */
   const filteredLocations = useMemo(() => {
     let result = locations
-
-    // Filter by shelf
-    if (activeShelf) {
-      result = result.filter(l => l.shelf === activeShelf)
-    }
-
-    // Filter by search
+    if (activeShelf) result = result.filter(l => l.shelf === activeShelf)
     if (searchText.trim()) {
       const q = searchText.toLowerCase().trim()
       result = result.filter(l => l.code.toLowerCase().includes(q))
     }
-
     return result
   }, [locations, activeShelf, searchText])
 
-  /** Locations grouped by shelf */
   const groupedByShelf = useMemo(() => {
     const groups: Record<string, LocationData[]> = {}
     filteredLocations.forEach(loc => {
@@ -578,29 +327,22 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     return groups
   }, [filteredLocations])
 
-  // ------------------------------------------------------------------
-  // HANDLERS
-  // ------------------------------------------------------------------
+  const summary = useMemo(() => {
+    const r = { empty: 0, partial: 0, full: 0, unavailable: 0 }
+    locations.forEach(l => { r[getLocationStatus(l)]++ })
+    return r
+  }, [locations])
 
+  // Handlers
   const handleSelect = (loc: LocationData) => {
     if (disabled) return
-
     if (multiSelect && onMultiSelect) {
       const currentIds = new Set(selectedIds)
-      if (currentIds.has(loc.id)) {
-        currentIds.delete(loc.id)
-      } else {
-        currentIds.add(loc.id)
-      }
-      const selected = locations.filter(l => currentIds.has(l.id))
-      onMultiSelect(selected)
+      if (currentIds.has(loc.id)) currentIds.delete(loc.id)
+      else currentIds.add(loc.id)
+      onMultiSelect(locations.filter(l => currentIds.has(l.id)))
     } else {
-      // Toggle: bấm lại → bỏ chọn
-      if (selectedId === loc.id) {
-        onSelect(null)
-      } else {
-        onSelect(loc)
-      }
+      onSelect(selectedId === loc.id ? null : loc)
     }
   }
 
@@ -609,250 +351,174 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     return selectedId === locId
   }
 
-  // ------------------------------------------------------------------
-  // RENDER: NO WAREHOUSE
-  // ------------------------------------------------------------------
-
-  if (!warehouse_id) {
-    return (
-      <div className={`rounded-xl border border-dashed border-gray-300 p-6 text-center ${className}`}>
-        <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-400">Vui lòng chọn kho trước</p>
-      </div>
-    )
-  }
-
-  // ------------------------------------------------------------------
-  // RENDER: LOADING
-  // ------------------------------------------------------------------
-
-  if (loading) {
-    return (
-      <div className={`space-y-3 ${className}`}>
-        {label && (
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-[#1B4D3E]" />
-            <span className="text-sm font-semibold text-gray-700">{label}</span>
-          </div>
-        )}
-        <div className="grid grid-cols-5 gap-1.5">
-          {Array.from({ length: 15 }).map((_, i) => (
-            <div key={i} className="h-[56px] rounded-lg bg-gray-100 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // ------------------------------------------------------------------
-  // RENDER: ERROR
-  // ------------------------------------------------------------------
-
-  if (error) {
-    return (
-      <div className={`rounded-xl border border-red-200 bg-red-50 p-4 ${className}`}>
-        <div className="flex items-center gap-2 text-red-600 text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-        <button
-          type="button"
-          onClick={loadLocations}
-          className="mt-2 text-xs text-red-500 underline"
-        >
-          Thử lại
-        </button>
-      </div>
-    )
-  }
-
-  // ------------------------------------------------------------------
-  // RENDER: EMPTY
-  // ------------------------------------------------------------------
-
-  if (locations.length === 0) {
-    return (
-      <div className={`rounded-xl border border-dashed border-gray-300 p-6 text-center ${className}`}>
-        <Grid3X3 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-400">Chưa có vị trí nào trong kho này</p>
-        <p className="text-xs text-gray-300 mt-1">Vào Quản lý kho để tạo vị trí</p>
-      </div>
-    )
-  }
-
-  // ------------------------------------------------------------------
-  // RENDER: MAIN
-  // ------------------------------------------------------------------
-
   const selectedLocation = selectedId ? locations.find(l => l.id === selectedId) : null
 
+  // No warehouse
+  if (!warehouse_id) {
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description="Vui lòng chọn kho trước"
+        style={{ padding: 24 }}
+      />
+    )
+  }
+
+  // Loading
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 32 }}>
+        <Spin />
+        <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>Đang tải vị trí kho...</div>
+      </div>
+    )
+  }
+
+  // Error
+  if (error) {
+    return (
+      <Alert
+        type="error"
+        message={error}
+        showIcon
+        action={<Button size="small" onClick={loadLocations} icon={<ReloadOutlined />}>Thử lại</Button>}
+        style={{ borderRadius: 8 }}
+      />
+    )
+  }
+
+  // Empty
+  if (locations.length === 0) {
+    return <Empty description="Chưa có vị trí nao trong kho nay" style={{ padding: 24 }} />
+  }
+
   return (
-    <div className={`space-y-2.5 ${className}`}>
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <Space
+          style={{ cursor: 'pointer' }}
           onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-2 text-sm font-semibold text-gray-700
-                     active:opacity-70 transition-opacity"
         >
-          <MapPin className="w-4 h-4 text-[#1B4D3E]" />
-          <span>{label}</span>
+          <EnvironmentOutlined style={{ color: '#1B4D3E' }} />
+          <Text strong>{label}</Text>
           {selectedLocation && (
-            <span className="px-2 py-0.5 text-[11px] font-bold text-[#1B4D3E] bg-[#1B4D3E]/10 rounded-full">
-              {selectedLocation.code}
-            </span>
+            <Tag color="blue" style={{ margin: 0 }}>{selectedLocation.code}</Tag>
           )}
           {multiSelect && selectedIds.length > 0 && (
-            <span className="px-2 py-0.5 text-[11px] font-bold text-[#1B4D3E] bg-[#1B4D3E]/10 rounded-full">
-              {selectedIds.length} vị trí
-            </span>
+            <Tag color="blue" style={{ margin: 0 }}>{selectedIds.length} vị trí</Tag>
           )}
-          {collapsed ? (
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronUp className="w-4 h-4 text-gray-400" />
-          )}
-        </button>
-
-        {/* View mode toggle */}
+        </Space>
         {!collapsed && (
-          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'grid'
-                  ? 'bg-white text-[#1B4D3E] shadow-sm'
-                  : 'text-gray-400'
-              }`}
-            >
-              <Grid3X3 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-white text-[#1B4D3E] shadow-sm'
-                  : 'text-gray-400'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <Segmented
+            size="small"
+            value={viewMode}
+            onChange={v => setViewMode(v as string)}
+            options={[
+              { value: 'grid', icon: <AppstoreOutlined /> },
+              { value: 'list', icon: <UnorderedListOutlined /> },
+            ]}
+          />
         )}
       </div>
 
-      {/* ── Collapsed: show selected only ── */}
+      {/* Collapsed: show selected only */}
       {collapsed && selectedLocation && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-[#1B4D3E]/5 rounded-lg">
-          <div className={`w-3 h-3 rounded-full ${getStatusConfig(getLocationStatus(selectedLocation)).dot}`} />
-          <span className="text-sm font-medium text-gray-700">{selectedLocation.code}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(27,77,62,0.05)', borderRadius: 8, marginBottom: 8 }}>
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: STATUS_CONFIG[getLocationStatus(selectedLocation)].color }} />
+          <Text style={{ fontSize: 13, fontWeight: 500 }}>{selectedLocation.code}</Text>
           {selectedLocation.capacity && (
-            <span className="text-xs font-mono text-gray-500">
+            <Text type="secondary" style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
               {selectedLocation.current_quantity}/{selectedLocation.capacity}
-            </span>
+            </Text>
           )}
-          <button
-            type="button"
-            onClick={() => onSelect(null)}
-            className="ml-auto text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => onSelect(null)} style={{ marginLeft: 'auto' }} />
         </div>
       )}
 
-      {/* ── Content (when not collapsed) ── */}
+      {/* Content */}
       {!collapsed && (
         <>
           {/* Summary */}
-          {showSummary && <SummaryBar locations={locations} />}
+          {showSummary && (
+            <Space size="middle" style={{ fontSize: 11, marginBottom: 8 }}>
+              <Text type="secondary">Tong: {locations.length}</Text>
+              <Text style={{ color: '#059669', fontWeight: 600 }}>{summary.empty} trong</Text>
+              <Text style={{ color: '#D97706', fontWeight: 600 }}>{summary.partial} dung</Text>
+              <Text style={{ color: '#DC2626', fontWeight: 600 }}>{summary.full} day</Text>
+              {summary.unavailable > 0 && <Text type="secondary">{summary.unavailable} N/A</Text>}
+            </Space>
+          )}
 
-          {/* Search + Shelf Filter */}
-          <div className="flex items-center gap-2">
-            {/* Search */}
+          {/* Search + Shelf filter */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
             {showSearch && (
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm mã vị trí..."
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  className="w-full h-9 pl-8 pr-3 text-[13px] bg-gray-50 border border-gray-200
-                             rounded-lg focus:outline-none focus:ring-1 focus:ring-[#2D8B6E] focus:border-[#2D8B6E]"
-                />
-                {searchText && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchText('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+              <Input.Search
+                placeholder="Tìm mã vị trí..."
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                allowClear
+                size="small"
+                style={{ maxWidth: 200 }}
+              />
             )}
-
-            {/* Shelf Filter Chips */}
             {showShelfFilter && shelves.length > 1 && (
-              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-                <button
-                  type="button"
-                  onClick={() => setActiveShelf(null)}
-                  className={`flex-shrink-0 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg
-                    transition-colors whitespace-nowrap
-                    ${!activeShelf
-                      ? 'bg-[#1B4D3E] text-white'
-                      : 'bg-gray-100 text-gray-600 active:bg-gray-200'
-                    }`}
+              <Space size={4} wrap>
+                <Tag.CheckableTag
+                  checked={!activeShelf}
+                  onChange={() => setActiveShelf(null)}
+                  style={{ borderRadius: 6, fontSize: 11 }}
                 >
-                  Tất cả
-                </button>
+                  Tat ca
+                </Tag.CheckableTag>
                 {shelves.map(shelf => (
-                  <button
+                  <Tag.CheckableTag
                     key={shelf}
-                    type="button"
-                    onClick={() => setActiveShelf(activeShelf === shelf ? null : shelf)}
-                    className={`flex-shrink-0 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg
-                      transition-colors whitespace-nowrap
-                      ${activeShelf === shelf
-                        ? 'bg-[#1B4D3E] text-white'
-                        : 'bg-gray-100 text-gray-600 active:bg-gray-200'
-                      }`}
+                    checked={activeShelf === shelf}
+                    onChange={() => setActiveShelf(activeShelf === shelf ? null : shelf)}
+                    style={{ borderRadius: 6, fontSize: 11 }}
                   >
                     {shelf}
-                  </button>
+                  </Tag.CheckableTag>
                 ))}
-              </div>
+              </Space>
             )}
           </div>
 
           {/* Legend */}
-          {showLegend && <Legend mode={mode} />}
+          {showLegend && (
+            <Space size="middle" style={{ fontSize: 10, marginBottom: 8 }}>
+              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
+                const canSelect = mode === 'stock-in'
+                  ? (key === 'empty' || key === 'partial')
+                  : (key === 'partial' || key === 'full')
+                return (
+                  <Space key={key} size={4} style={{ opacity: canSelect ? 1 : 0.4 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 2, background: cfg.bg, border: `1px solid ${cfg.color}` }} />
+                    <span>{cfg.label}{canSelect ? ' ✓' : ''}</span>
+                  </Space>
+                )
+              })}
+            </Space>
+          )}
 
           {/* No results */}
           {filteredLocations.length === 0 && (
-            <div className="text-center py-4 text-gray-400 text-sm">
-              <Info className="w-5 h-5 mx-auto mb-1" />
-              Không tìm thấy vị trí phù hợp
-            </div>
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không tìm thấy vị trí phu hop" />
           )}
 
-          {/* ── GRID VIEW ── */}
+          {/* GRID VIEW */}
           {viewMode === 'grid' && filteredLocations.length > 0 && (
-            <div className="space-y-3">
+            <div>
               {Object.entries(groupedByShelf).map(([shelf, locs]) => (
-                <div key={shelf}>
-                  <div className="text-[11px] font-semibold text-gray-500 mb-1.5 px-0.5">
-                    Kệ {shelf}
-                    <span className="font-normal text-gray-400 ml-1">
-                      ({locs.filter(l => isSelectable(l, mode)).length} có thể chọn)
+                <div key={shelf} style={{ marginBottom: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                    Ke {shelf}
+                    <span style={{ fontWeight: 400, marginLeft: 4, color: '#bbb' }}>
+                      ({locs.filter(l => isSelectable(l, mode)).length} co the chon)
                     </span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1.5">
+                  </Text>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
                     {locs.map(loc => (
                       <GridCell
                         key={loc.id}
@@ -860,10 +526,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                         isSelected={isLocationSelected(loc.id)}
                         selectable={isSelectable(loc, mode)}
                         disabled={disabled}
-                        showTooltip={tooltipId === loc.id}
                         onSelect={() => handleSelect(loc)}
-                        onToggleTooltip={() => setTooltipId(tooltipId === loc.id ? null : loc.id)}
-                        onCloseTooltip={() => setTooltipId(null)}
                       />
                     ))}
                   </div>
@@ -872,42 +535,38 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
             </div>
           )}
 
-          {/* ── LIST VIEW ── */}
+          {/* LIST VIEW */}
           {viewMode === 'list' && filteredLocations.length > 0 && (
-            <div className="space-y-1">
+            <div>
               {Object.entries(groupedByShelf).map(([shelf, locs]) => (
-                <div key={shelf}>
-                  <div className="text-[11px] font-semibold text-gray-500 mb-1 px-1 mt-2 first:mt-0">
-                    Kệ {shelf}
+                <div key={shelf} style={{ marginBottom: 8 }}>
+                  <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                    Ke {shelf}
+                  </Text>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {locs.map(loc => (
+                      <ListItem
+                        key={loc.id}
+                        location={loc}
+                        isSelected={isLocationSelected(loc.id)}
+                        selectable={isSelectable(loc, mode)}
+                        disabled={disabled}
+                        onSelect={() => handleSelect(loc)}
+                      />
+                    ))}
                   </div>
-                  {locs.map(loc => (
-                    <ListItem
-                      key={loc.id}
-                      location={loc}
-                      isSelected={isLocationSelected(loc.id)}
-                      selectable={isSelectable(loc, mode)}
-                      disabled={disabled}
-                      onSelect={() => handleSelect(loc)}
-                    />
-                  ))}
                 </div>
               ))}
             </div>
           )}
 
           {/* Helper text */}
-          {mode === 'stock-in' && (
-            <p className="text-[10px] text-gray-400 flex items-center gap-1 px-1">
-              <Info className="w-3 h-3 flex-shrink-0" />
-              Chọn ô trống hoặc chưa đầy để nhập kho. Giữ/hover để xem chi tiết.
-            </p>
-          )}
-          {mode === 'stock-out' && (
-            <p className="text-[10px] text-gray-400 flex items-center gap-1 px-1">
-              <Info className="w-3 h-3 flex-shrink-0" />
-              Chọn ô có hàng để xuất kho. Hệ thống ưu tiên FIFO (lô cũ trước).
-            </p>
-          )}
+          <div style={{ fontSize: 10, color: '#bbb', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <InfoCircleOutlined />
+            {mode === 'stock-in'
+              ? 'Chon o trong hoac chua day de nhập kho. Hover de xem chi tiet.'
+              : 'Chon o co hang de xuất kho. He thong uu tien FIFO.'}
+          </div>
         </>
       )}
     </div>

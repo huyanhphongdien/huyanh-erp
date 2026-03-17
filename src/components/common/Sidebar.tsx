@@ -75,6 +75,7 @@ import {
   Handshake,
   BookOpen,
   ArrowLeftRight,
+  Factory,
 } from 'lucide-react';
 
 // ============================================================
@@ -259,6 +260,38 @@ const getMenuGroups = (
         icon: <BarChart3 size={18} />,
         requireB2BPurchaser: true,
       },
+      {
+        path: '/b2b/pickup-locations',
+        label: 'Địa điểm chốt hàng',
+        icon: <MapPin size={18} />,
+        requireB2BPurchaser: true,
+      },
+    ],
+  },
+
+  // ============================================================
+  // ★ KHO (WMS) — Phase 4: Deal ↔ WMS Integration
+  // ============================================================
+  {
+    title: 'KHO (WMS)',
+    icon: <Warehouse size={18} />,
+    collapsible: true,
+    items: [
+      { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> },
+      { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
+      { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
+      { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} /> },
+      { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> },
+      { path: '/wms/qc/recheck', label: 'QC Recheck', icon: <Activity size={18} /> },
+      { path: '/wms/materials', label: 'Vật liệu', icon: <Package size={18} /> },
+      { path: '/wms/warehouses', label: 'Kho hàng', icon: <Warehouse size={18} /> },
+      { path: '/wms/production', label: 'Sản xuất', icon: <Factory size={18} /> },
+      { path: '/wms/production/dashboard', label: 'Dashboard SX', icon: <TrendingUp size={18} /> },
+      { path: '/wms/production/facilities', label: 'Dây chuyền', icon: <Settings size={18} /> },
+      { path: '/wms/production/specs', label: 'Công thức BOM', icon: <FileText size={18} /> },
+      { path: '/wms/blending', label: 'Phối trộn', icon: <Droplets size={18} /> },
+      { path: '/wms/blending/suggest', label: 'Gợi ý trộn', icon: <FlaskConical size={18} /> },
+      { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> },
     ],
   },
 

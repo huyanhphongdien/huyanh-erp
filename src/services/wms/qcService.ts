@@ -14,7 +14,14 @@ import type {
   QCResult,
   QCCheckType,
   StockBatch,
+  RubberGrade,
 } from './wms.types'
+import { rubberGradeService } from './rubberGradeService'
+
+/** Helper: classify DRC -> SVR grade */
+function classifyGrade(drc: number): RubberGrade {
+  return rubberGradeService.classifyByDRC(drc)
+}
 
 // ============================================================================
 // TYPES
@@ -37,6 +44,13 @@ export interface AddQCData {
   check_type?: QCCheckType
   tester_id?: string
   notes?: string
+
+  // Rubber QC additions
+  moisture_content?: number
+  volatile_matter?: number
+  metal_content?: number
+  dirt_content?: number
+  color_lovibond?: number
 }
 
 /** Bước 6A-1: Lô cần tái kiểm (có thêm thông tin join) */
@@ -266,13 +280,21 @@ export const qcService = {
         tester_id: tester_id || null,
         notes: data.notes || evaluation.message,
         tested_at: new Date().toISOString(),
+        // Rubber QC fields
+        moisture_content: data.moisture_content || null,
+        volatile_matter: data.volatile_matter || null,
+        metal_content: data.metal_content || null,
+        dirt_content: data.dirt_content || null,
+        color_lovibond: data.color_lovibond || null,
+        grade_tested: drc_value ? classifyGrade(drc_value) : null,
+        contamination_detected: (data.metal_content && data.metal_content > 0) ? true : false,
       })
       .select('*')
       .single()
 
     if (qcErr) throw qcErr
 
-    // 6. Update stock_batches: DRC + QC status + recheck date
+    // 6. Update stock_batches: DRC + QC status + recheck date + rubber grade
     const { error: updateErr } = await supabase
       .from('stock_batches')
       .update({
@@ -281,6 +303,7 @@ export const qcService = {
         last_qc_date: today.toISOString().split('T')[0],
         qc_status: evaluation.qc_status,
         next_recheck_date: nextRecheckStr,
+        rubber_grade: drc_value ? classifyGrade(drc_value) : null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', batch_id)
@@ -411,6 +434,12 @@ export const qcService = {
     nitrogen_content?: number
     tester_id?: string
     notes?: string
+    // Rubber QC
+    moisture_content?: number
+    volatile_matter?: number
+    metal_content?: number
+    dirt_content?: number
+    color_lovibond?: number
   }): Promise<{
     qcResult: BatchQCResult
     evaluation: QCEvaluation
@@ -465,6 +494,14 @@ export const qcService = {
         tester_id: tester_id || null,
         notes: data.notes || evaluation.message,
         tested_at: new Date().toISOString(),
+        // Rubber QC fields
+        moisture_content: data.moisture_content || null,
+        volatile_matter: data.volatile_matter || null,
+        metal_content: data.metal_content || null,
+        dirt_content: data.dirt_content || null,
+        color_lovibond: data.color_lovibond || null,
+        grade_tested: drc_value ? classifyGrade(drc_value) : null,
+        contamination_detected: (data.metal_content && data.metal_content > 0) ? true : false,
       })
       .select('*')
       .single()
@@ -472,12 +509,11 @@ export const qcService = {
     if (qcErr) throw qcErr
 
     // 6. Update stock_batches
-    //    - KHÔNG update initial_drc (giữ nguyên DRC ban đầu)
-    //    - Update latest_drc, last_qc_date, qc_status, next_recheck_date
     const updateData: Record<string, any> = {
       latest_drc: drc_value,
       last_qc_date: today.toISOString().split('T')[0],
       qc_status: evaluation.qc_status,
+      rubber_grade: drc_value ? classifyGrade(drc_value) : undefined,
       updated_at: new Date().toISOString(),
     }
 
@@ -747,6 +783,67 @@ export const qcService = {
 
     return summaries
   },
+
+  // --------------------------------------------------------------------------
+  // RUBBER: DRC Trend — Xu huong DRC theo thoi gian cho 1 batch
+  // --------------------------------------------------------------------------
+  async getDRCTrend(batchId: string): Promise<{
+    date: string
+    drc: number
+    check_type: string
+  }[]> {
+    const { data, error } = await supabase
+      .from('batch_qc_results')
+      .select('drc_value, check_type, tested_at')
+      .eq('batch_id', batchId)
+      .not('drc_value', 'is', null)
+      .order('tested_at', { ascending: true })
+
+    if (error) {
+      console.error('getDRCTrend error:', error)
+      return []
+    }
+
+    return (data || []).map((r: any) => ({
+      date: r.tested_at,
+      drc: r.drc_value,
+      check_type: r.check_type,
+    }))
+  },
+
+  // --------------------------------------------------------------------------
+  // RUBBER: Evaluate full SVR — So sanh QC result voi tieu chuan grade
+  // --------------------------------------------------------------------------
+  async evaluateFullSVR(
+    grade: RubberGrade,
+    qcResult: AddQCData
+  ): Promise<{
+    passed: boolean
+    grade_confirmed: RubberGrade
+    failures: { parameter: string; value: number; limit: number; unit: string }[]
+    message: string
+  }> {
+    const result = await rubberGradeService.evaluateAgainstGradeStandard(grade, {
+      drc: qcResult.drc_value,
+      dirt: qcResult.dirt_content,
+      ash: qcResult.ash_content,
+      nitrogen: qcResult.nitrogen_content,
+      volatile: qcResult.volatile_matter,
+      pri: qcResult.pri_value,
+      mooney: qcResult.mooney_value,
+      moisture: qcResult.moisture_content,
+      color: qcResult.color_lovibond,
+    })
+
+    const message = result.passed
+      ? `Dat tieu chuan ${rubberGradeService.getGradeLabel(grade)}`
+      : `Khong dat ${result.failures.length} chi tieu: ${result.failures.map(f => f.parameter).join(', ')}`
+
+    return {
+      ...result,
+      message,
+    }
+  },
 }
 
 // ============================================================================
@@ -761,13 +858,16 @@ export const {
   addInitialQC,
   getQCHistory,
   getAllStandards: getAllQCStandards,
-  // Phase 6 — Sprint 6A
+  // Phase 6
   getBatchesDueRecheck,
   addRecheckResult,
   getDRCOverview,
   getDRCStats,
   getQCSummaryByMaterial,
   getQCSummaryAllMaterials,
+  // Rubber
+  getDRCTrend,
+  evaluateFullSVR,
 } = qcService
 
 export default qcService

@@ -11,7 +11,7 @@ import { dealService, type Deal } from './dealService'
 // INTERFACES
 // ============================================
 
-export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'booking' | 'quotation' | 'system'
+export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'booking' | 'deal' | 'quotation' | 'system'
 export type SenderType = 'factory' | 'partner' | 'system'
 
 export interface ChatAttachment {
@@ -34,6 +34,7 @@ export interface BookingMetadata {
   price_per_kg: number
   price_unit: 'wet' | 'dry'
   estimated_value: number
+  pickup_location?: string
   delivery_date: string
   notes?: string
   status: 'pending' | 'confirmed' | 'negotiating' | 'rejected'
@@ -44,6 +45,8 @@ export interface BookingMetadata {
 export interface MessageMetadata {
   // Booking
   booking?: BookingMetadata
+  // Deal (sau khi confirm booking → tạo deal)
+  deal?: import('../../types/b2b.types').DealCardMetadata
   // Pin
   pinned?: boolean
   pinned_at?: string
@@ -112,6 +115,7 @@ export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   file: 'Tệp đính kèm',
   audio: 'Tin nhắn thoại',
   booking: 'Phiếu chốt mủ',
+  deal: 'Deal',
   quotation: 'Báo giá',
   system: 'Hệ thống',
 }

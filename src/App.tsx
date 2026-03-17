@@ -146,6 +146,28 @@ import LaoShipmentPage from './pages/rubber/lao/LaoShipmentPage';
 import SettlementPage from './pages/rubber/SettlementPage';
 import RubberDashboard from './pages/rubber/RubberDashboard';
 
+// ===== P8: PRODUCTION MODULE =====
+import ProductionListPage from './pages/wms/production/ProductionListPage';
+import ProductionCreatePage from './pages/wms/production/ProductionCreatePage';
+import ProductionDetailPage from './pages/wms/production/ProductionDetailPage';
+import ProductionStagePage from './pages/wms/production/ProductionStagePage';
+import ProductionDashboardPage from './pages/wms/production/ProductionDashboardPage';
+import ProductionOutputPage from './pages/wms/production/ProductionOutputPage';
+import ProductionFacilitiesPage from './pages/wms/production/ProductionFacilitiesPage';
+import ProductionSpecsPage from './pages/wms/production/ProductionSpecsPage';
+
+// ===== P9: BLENDING MODULE =====
+import BlendListPage from './pages/wms/blending/BlendListPage';
+import BlendCreatePage from './pages/wms/blending/BlendCreatePage';
+import BlendDetailPage from './pages/wms/blending/BlendDetailPage';
+import BlendSuggestPage from './pages/wms/blending/BlendSuggestPage';
+
+// ===== P10: WMS REPORTS =====
+import WMSReportDashboardPage from './pages/wms/reports/WMSReportDashboardPage';
+import StockMovementReportPage from './pages/wms/reports/StockMovementReportPage';
+import SupplierQualityReportPage from './pages/wms/reports/SupplierQualityReportPage';
+import InventoryValueReportPage from './pages/wms/reports/InventoryValueReportPage';
+
 // ===== PROJECT MANAGEMENT MODULE =====
 import ProjectCategoryPage from './pages/projects/ProjectCategoryPage';
 import ProjectTemplateList from './pages/projects/ProjectTemplateList';
@@ -173,6 +195,7 @@ const SettlementListPage = lazy(() => import('./pages/b2b/settlements/Settlement
 const SettlementCreatePage = lazy(() => import('./pages/b2b/settlements/SettlementCreatePage'));
 const SettlementDetailPage = lazy(() => import('./pages/b2b/settlements/SettlementDetailPage'));
 const LedgerReportPage = lazy(() => import('./pages/b2b/reports/LedgerReportPage'));
+const PickupLocationSettingsPage = lazy(() => import('./pages/b2b/PickupLocationSettingsPage'));
 
 
 const queryClient = new QueryClient({
@@ -276,6 +299,8 @@ function App() {
                 <Route path="settlements/:id" element={<Suspense fallback={<LoadingSpinner />}><SettlementDetailPage /></Suspense>} />
                 {/* B2B Reports (Phase E5) */}
                 <Route path="reports" element={<Suspense fallback={<LoadingSpinner />}><LedgerReportPage /></Suspense>} />
+                {/* B2B Pickup Locations */}
+                <Route path="pickup-locations" element={<Suspense fallback={<LoadingSpinner />}><PickupLocationSettingsPage /></Suspense>} />
               </Route>
 
               {/* ===== WMS MODULE ===== */}
@@ -301,6 +326,25 @@ function App() {
                 <Route path="weighbridge" element={<WeighbridgePage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/:id" element={<WeighbridgeDetailPage />} />
+                {/* P8: Production */}
+                <Route path="production" element={<ProductionListPage />} />
+                <Route path="production/dashboard" element={<ProductionDashboardPage />} />
+                <Route path="production/new" element={<ProductionCreatePage />} />
+                <Route path="production/:id" element={<ProductionDetailPage />} />
+                <Route path="production/:id/stage/:stageNumber" element={<ProductionStagePage />} />
+                <Route path="production/:id/output" element={<ProductionOutputPage />} />
+                <Route path="production/facilities" element={<ProductionFacilitiesPage />} />
+                <Route path="production/specs" element={<ProductionSpecsPage />} />
+                {/* P9: Blending */}
+                <Route path="blending" element={<BlendListPage />} />
+                <Route path="blending/new" element={<BlendCreatePage />} />
+                <Route path="blending/suggest" element={<BlendSuggestPage />} />
+                <Route path="blending/:id" element={<BlendDetailPage />} />
+                {/* P10: Reports */}
+                <Route path="reports" element={<WMSReportDashboardPage />} />
+                <Route path="reports/stock-movement" element={<StockMovementReportPage />} />
+                <Route path="reports/supplier-quality" element={<SupplierQualityReportPage />} />
+                <Route path="reports/inventory-value" element={<InventoryValueReportPage />} />
               </Route>
 
               {/* ===== RUBBER MODULE ===== */}

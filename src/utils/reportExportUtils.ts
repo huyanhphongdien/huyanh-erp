@@ -317,13 +317,13 @@ export function exportDepartmentReportToPDF(
   autoTable(doc, {
     head: [[
       'Ma PB',
-      'Phong ban',
-      'Tong so',
-      'Hoan thanh',
-      'Dang lam',
-      'Da huy',
-      'Qua han',
-      'Ty le HT',
+      'Phòng ban',
+      'Tổng số',
+      'Hoàn thành',
+      'Đang làm',
+      'Đã hủy',
+      'Quá hạn',
+      'Tỷ lệ HT',
       'Diem TB'
     ]],
     body: tableData,
@@ -365,13 +365,13 @@ export function exportPerformanceMetricsToPDF(
   const yPosition = 40
 
   const metricsData = [
-    ['Tong so cong viec', String(metrics.total_tasks)],
-    ['Cong viec hoan thanh', String(metrics.finished_tasks)],
-    ['Ty le hoan thanh', `${metrics.completion_rate}%`],
-    ['Hoan thanh dung han', `${metrics.on_time_count} (${metrics.on_time_rate}%)`],
-    ['Cong viec qua han', `${metrics.overdue_count} (${metrics.overdue_rate}%)`],
-    ['Diem trung binh', metrics.avg_score ? metrics.avg_score.toFixed(1) : 'N/A'],
-    ['Thoi gian hoan thanh TB', metrics.avg_completion_days ? `${metrics.avg_completion_days} ngay` : 'N/A']
+    ['Tổng số công việc', String(metrics.total_tasks)],
+    ['Công việc hoàn thành', String(metrics.finished_tasks)],
+    ['Tỷ lệ hoàn thành', `${metrics.completion_rate}%`],
+    ['Hoàn thành đúng hạn', `${metrics.on_time_count} (${metrics.on_time_rate}%)`],
+    ['Công việc quá hạn', `${metrics.overdue_count} (${metrics.overdue_rate}%)`],
+    ['Điểm trung bình', metrics.avg_score ? metrics.avg_score.toFixed(1) : 'N/A'],
+    ['Thời gian hoàn thành TB', metrics.avg_completion_days ? `${metrics.avg_completion_days} ngay` : 'N/A']
   ]
 
   autoTable(doc, {
@@ -413,12 +413,12 @@ export function exportOverdueTasksToPDF(
   autoTable(doc, {
     head: [[
       'Ma CV',
-      'Cong viec',
-      'Nhan vien',
-      'Phong ban',
+      'Công việc',
+      'Nhân viên',
+      'Phòng ban',
       'Han HT',
-      'Qua han',
-      'Uu tien'
+      'Quá hạn',
+      'Ưu tiên'
     ]],
     body: tableData,
     startY: 35,
@@ -458,9 +458,9 @@ function downloadFile(data: ArrayBuffer | Blob, filename: string, mimeType: stri
 
 function getPriorityLabel(priority: string): string {
   const labels: Record<string, string> = {
-    urgent: 'Khan cap',
+    urgent: 'Khẩn cấp',
     high: 'Cao',
-    medium: 'Trung binh',
+    medium: 'Trung bình',
     low: 'Thap'
   }
   return labels[priority] || priority

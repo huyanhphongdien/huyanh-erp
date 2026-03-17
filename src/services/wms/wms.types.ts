@@ -4,7 +4,51 @@
 // NgÃ y: 10/02/2026
 // ============================================================================
 
-// ===== DANH Má»¤C =====
+// ===== CAO SU — RUBBER TYPES =====
+
+export type RubberGrade = 'SVR_3L' | 'SVR_5' | 'SVR_10' | 'SVR_20' | 'SVR_CV60'
+export type RubberType = 'cup_lump' | 'latex' | 'sheet' | 'crepe' | 'mixed'
+export type ContaminationStatus = 'clean' | 'suspected' | 'confirmed' | 'cleared'
+
+export const RUBBER_GRADE_LABELS: Record<RubberGrade, string> = {
+  SVR_3L: 'SVR 3L',
+  SVR_5: 'SVR 5',
+  SVR_10: 'SVR 10',
+  SVR_20: 'SVR 20',
+  SVR_CV60: 'SVR CV60',
+}
+
+export const RUBBER_GRADE_COLORS: Record<RubberGrade, string> = {
+  SVR_3L: '#16A34A',
+  SVR_5: '#22C55E',
+  SVR_10: '#F59E0B',
+  SVR_20: '#DC2626',
+  SVR_CV60: '#7C3AED',
+}
+
+export const RUBBER_TYPE_LABELS: Record<RubberType, string> = {
+  cup_lump: 'Mủ chén',
+  latex: 'Mủ nước',
+  sheet: 'Mủ tờ',
+  crepe: 'Mủ crepe',
+  mixed: 'Hỗn hợp',
+}
+
+export const CONTAMINATION_LABELS: Record<ContaminationStatus, string> = {
+  clean: 'Sạch',
+  suspected: 'Nghi ngờ',
+  confirmed: 'Xác nhận tạp chất',
+  cleared: 'Đã xử lý',
+}
+
+export const CONTAMINATION_COLORS: Record<ContaminationStatus, string> = {
+  clean: '#16A34A',
+  suspected: '#F59E0B',
+  confirmed: '#DC2626',
+  cleared: '#2563EB',
+}
+
+// ===== DANH MUC =====
 
 export interface MaterialCategory {
   id: string
@@ -116,6 +160,23 @@ export interface StockBatch {
   parent_batch_id?: string        // FK lô cha — NULL = lô gốc
   parent_batch?: StockBatch       // join (optional)
   sub_lot_code?: string           // 'A', 'B', 'C'... khi chia lô
+
+  // Rubber-specific fields
+  rubber_grade?: RubberGrade
+  rubber_type?: RubberType
+  moisture_content?: number
+  dry_weight?: number
+  initial_weight?: number
+  current_weight?: number
+  weight_loss?: number
+  last_weight_check?: string
+  supplier_name?: string
+  supplier_region?: string
+  supplier_reported_drc?: number
+  supplier_lab_report_url?: string
+  storage_days?: number
+  contamination_status?: ContaminationStatus
+  contamination_notes?: string
 }
 
 // ===== PHIáº¾U NHáº¬P KHO =====
@@ -133,6 +194,8 @@ export interface StockInOrder {
   production_order_id?: string
   purchase_order_id?: string
   supplier_id?: string
+  deal_id?: string                     // Phase 4: liên kết Deal B2B
+  deal?: { id: string; deal_number: string; partner_name?: string; product_name?: string }
   total_quantity?: number
   total_weight?: number
   status: StockInStatus
@@ -168,6 +231,7 @@ export interface StockInFormData {
   warehouse_id: string
   source_type?: StockInSourceType
   production_order_id?: string
+  deal_id?: string                     // Phase 4: liên kết Deal B2B
   notes?: string
 }
 
@@ -179,6 +243,14 @@ export interface StockInDetailFormData {
   batch_no?: string                    // tá»± sinh hoáº·c nháº­p tay
   initial_drc?: number                 // QC Ä‘áº§u vÃ o
   notes?: string
+
+  // Rubber intake fields
+  rubber_grade?: RubberGrade
+  rubber_type?: RubberType
+  moisture_content?: number
+  supplier_name?: string
+  supplier_region?: string
+  supplier_reported_drc?: number
 }
 
 // ===== PHIáº¾U XUáº¤T KHO =====
@@ -209,6 +281,19 @@ export interface StockOutOrder {
   created_at: string
   updated_at: string
   details?: StockOutDetail[]
+
+  // Rubber export fields
+  svr_grade?: RubberGrade
+  required_drc_min?: number
+  required_drc_max?: number
+  container_type?: '20ft' | '40ft'
+  container_id?: string
+  packing_type?: 'bale' | 'pallet' | 'bulk'
+  bale_count?: number
+  packing_requirements?: string
+  export_date?: string
+  coa_generated?: boolean
+  packing_list_generated?: boolean
 }
 
 export interface StockOutDetail {
@@ -273,6 +358,18 @@ export interface MaterialQCStandard {
   recheck_shortened_days: number
   created_at: string
   updated_at: string
+
+  // Rubber QC standards
+  rubber_grade?: RubberGrade
+  moisture_max?: number
+  volatile_matter_max?: number
+  dirt_max?: number
+  ash_max?: number
+  nitrogen_max?: number
+  pri_min?: number
+  mooney_max?: number
+  color_lovibond_max?: number
+  season?: 'all' | 'dry' | 'rainy'
 }
 
 export type QCCheckType = 'initial' | 'recheck' | 'blend' | 'export'
@@ -293,6 +390,18 @@ export interface BatchQCResult {
   tester_id?: string
   tested_at: string
   created_at: string
+
+  // Rubber QC additions
+  moisture_content?: number
+  volatile_matter?: number
+  metal_content?: number
+  dirt_content?: number
+  color_lovibond?: number
+  grade_tested?: RubberGrade
+  grade_matches_expected?: boolean
+  contamination_detected?: boolean
+  contamination_type?: string
+  supplier_drc_discrepancy?: number
 }
 
 // Patch cho wms_types.ts — CẬP NHẬT phần CÂN XE
@@ -335,6 +444,398 @@ export interface WeighbridgeImage {
   image_url: string
   capture_type: 'front' | 'rear' | 'top' | 'plate' | 'cargo'  // 'top' added Phase 7
   captured_at: string
+}
+
+// ===== RUBBER GRADE STANDARD =====
+
+export interface RubberGradeStandard {
+  id: string
+  grade: RubberGrade
+  grade_label: string
+  drc_min: number
+  drc_max: number | null
+  dirt_max: number
+  ash_max: number
+  nitrogen_max: number
+  volatile_matter_max: number
+  pri_min: number | null
+  mooney_max: number | null
+  moisture_max: number
+  color_lovibond_max: number | null
+  price_factor: number
+  is_active: boolean
+  sort_order: number
+}
+
+// ===== WEIGHT CHECK LOG =====
+
+export interface WeightCheckLog {
+  id: string
+  batch_id: string
+  previous_weight: number | null
+  new_weight: number
+  weight_change: number | null
+  change_reason: 'drying' | 'reweigh' | 'adjust'
+  checked_by: string | null
+  checked_at: string
+  notes: string | null
+}
+
+// ===== PRODUCTION (P8) =====
+
+export type ProductionStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+export type StageStatus = 'pending' | 'in_progress' | 'completed' | 'failed'
+
+export const PRODUCTION_STATUS_LABELS: Record<ProductionStatus, string> = {
+  draft: 'Nháp', scheduled: 'Đã lên lịch', in_progress: 'Đang sản xuất',
+  completed: 'Hoàn thành', cancelled: 'Đã hủy',
+}
+
+export const PRODUCTION_STATUS_COLORS: Record<ProductionStatus, string> = {
+  draft: 'default', scheduled: 'blue', in_progress: 'processing',
+  completed: 'success', cancelled: 'error',
+}
+
+export const STAGE_NAMES: Record<number, string> = {
+  1: 'Rửa', 2: 'Tán/Kéo', 3: 'Sấy', 4: 'Ép', 5: 'Đóng gói',
+}
+
+export const STAGE_DESCRIPTIONS: Record<number, string> = {
+  1: 'Rửa sạch mủ, loại bỏ tạp chất',
+  2: 'Tán/kéo dãn mủ thành tờ',
+  3: 'Sấy mủ để giảm độ ẩm',
+  4: 'Ép/lăn mủ thành bành',
+  5: 'Đóng gói bành thành sản phẩm',
+}
+
+export interface ProductionOrder {
+  id: string
+  code: string
+  product_type: string
+  target_quantity: number
+  actual_quantity?: number | null
+  yield_percent?: number | null
+  target_grade?: string | null
+  target_drc_min?: number | null
+  target_drc_max?: number | null
+  status: ProductionStatus
+  stage_current?: number | null
+  stage_status?: string | null
+  scheduled_start_date?: string | null
+  actual_start_date?: string | null
+  actual_end_date?: string | null
+  facility_id?: string | null
+  facility?: ProductionFacility
+  supervisor_id?: string | null
+  supervisor?: { id: string; full_name: string }
+  expected_grade?: string | null
+  final_grade?: string | null
+  final_drc?: number | null
+  notes?: string | null
+  created_by?: string | null
+  updated_by?: string | null
+  created_at: string
+  updated_at: string
+  items?: ProductionOrderItem[]
+  stages?: ProductionStageProgress[]
+  output_batches?: ProductionOutputBatch[]
+}
+
+export interface ProductionOrderItem {
+  id: string
+  production_order_id: string
+  source_batch_id: string
+  source_batch?: StockBatch
+  required_quantity: number
+  allocated_quantity?: number | null
+  stage_sequence?: number | null
+  drc_at_intake?: number | null
+  expected_drc_output?: number | null
+  expected_weight_loss_kg?: number | null
+  expected_weight_loss_percent?: number | null
+  actual_input_quantity?: number | null
+  actual_output_quantity?: number | null
+  actual_drc_before?: number | null
+  actual_drc_after?: number | null
+  actual_weight_loss_kg?: number | null
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProductionStageProgress {
+  id: string
+  production_order_id: string
+  stage_number: number
+  stage_name: string
+  status: StageStatus
+  started_at?: string | null
+  completed_at?: string | null
+  duration_hours?: number | null
+  input_quantity?: number | null
+  output_quantity?: number | null
+  weight_loss_kg?: number | null
+  input_drc?: number | null
+  output_drc?: number | null
+  drc_change?: number | null
+  temperature_avg?: number | null
+  humidity_avg?: number | null
+  duration_days?: number | null
+  operator_id?: string | null
+  operator?: { id: string; full_name: string }
+  qc_checkpoint_passed?: boolean
+  qc_inspector_id?: string | null
+  qc_notes?: string | null
+  notes?: string | null
+  created_at: string
+}
+
+export interface ProductionOutputBatch {
+  id: string
+  production_order_id: string
+  stock_batch_id?: string | null
+  stock_batch?: StockBatch
+  output_batch_no?: string | null
+  material_id?: string | null
+  material?: Material
+  quantity_produced: number
+  bale_count?: number | null
+  final_grade?: string | null
+  final_drc?: number | null
+  final_moisture?: number | null
+  status: 'created' | 'qc_pending' | 'qc_passed' | 'qc_failed' | 'stored'
+  warehouse_id?: string | null
+  location_id?: string | null
+  input_batches?: any
+  processing_notes?: string | null
+  created_at: string
+  updated_at: string
+  qc_results?: ProductionQCResult[]
+}
+
+export interface ProductionQCResult {
+  id: string
+  output_batch_id: string
+  drc_value?: number | null
+  moisture_content?: number | null
+  volatile_matter?: number | null
+  ash_content?: number | null
+  nitrogen_content?: number | null
+  dirt_content?: number | null
+  pri_value?: number | null
+  mooney_value?: number | null
+  color_lovibond?: number | null
+  metal_content?: number | null
+  grade_determined?: string | null
+  grade_meets_target?: boolean | null
+  result: 'passed' | 'warning' | 'failed'
+  tester_id?: string | null
+  tested_at?: string | null
+  notes?: string | null
+  created_at: string
+}
+
+export interface ProductionFacility {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  max_batch_size_kg: number
+  processing_stages?: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ProductionMaterialSpec {
+  id: string
+  target_product_grade: string
+  target_drc_min: number
+  target_drc_max?: number | null
+  expected_yield_percent: number
+  optimal_input_drc_min?: number | null
+  optimal_input_drc_max?: number | null
+  washing_duration_hours?: number | null
+  washing_water_ratio?: number | null
+  creeping_duration_hours?: number | null
+  drying_duration_days?: number | null
+  drying_temperature_target?: number | null
+  pressing_duration_hours?: number | null
+  notes?: string | null
+  is_active: boolean
+}
+
+export interface ProductionOrderFormData {
+  product_type: string
+  target_quantity: number
+  target_grade?: string
+  target_drc_min?: number
+  target_drc_max?: number
+  facility_id?: string
+  supervisor_id?: string
+  scheduled_start_date?: string
+  notes?: string
+}
+
+// ===== BLENDING (P9) =====
+
+export type BlendStatus = 'draft' | 'simulated' | 'approved' | 'in_progress' | 'completed' | 'cancelled'
+
+export const BLEND_STATUS_LABELS: Record<BlendStatus, string> = {
+  draft: 'Nháp', simulated: 'Đã mô phỏng', approved: 'Đã duyệt',
+  in_progress: 'Đang trộn', completed: 'Hoàn thành', cancelled: 'Đã hủy',
+}
+
+export const BLEND_STATUS_COLORS: Record<BlendStatus, string> = {
+  draft: 'default', simulated: 'blue', approved: 'cyan',
+  in_progress: 'processing', completed: 'success', cancelled: 'error',
+}
+
+export interface BlendOrder {
+  id: string
+  code: string
+  target_grade: string
+  target_drc: number
+  target_quantity_kg: number
+  actual_drc?: number | null
+  actual_quantity_kg?: number | null
+  result_grade?: string | null
+  grade_meets_target?: boolean | null
+  simulated_drc?: number | null
+  simulated_quantity_kg?: number | null
+  status: BlendStatus
+  output_batch_id?: string | null
+  output_batch?: StockBatch
+  output_warehouse_id?: string | null
+  output_location_id?: string | null
+  blended_by?: string | null
+  blended_at?: string | null
+  approved_by?: string | null
+  approved_at?: string | null
+  notes?: string | null
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+  items?: BlendOrderItem[]
+  qc_results?: BlendQCResult[]
+}
+
+export interface BlendOrderItem {
+  id: string
+  blend_order_id: string
+  source_batch_id: string
+  source_batch?: StockBatch
+  quantity_kg: number
+  percentage?: number | null
+  batch_drc?: number | null
+  drc_contribution?: number | null
+  batch_no?: string | null
+  material_name?: string | null
+  rubber_grade?: string | null
+  notes?: string | null
+  created_at: string
+}
+
+export interface BlendQCResult {
+  id: string
+  blend_order_id: string
+  drc_value?: number | null
+  moisture_content?: number | null
+  volatile_matter?: number | null
+  ash_content?: number | null
+  nitrogen_content?: number | null
+  dirt_content?: number | null
+  pri_value?: number | null
+  mooney_value?: number | null
+  color_lovibond?: number | null
+  metal_content?: number | null
+  grade_determined?: string | null
+  grade_meets_target?: boolean | null
+  result: 'passed' | 'warning' | 'failed'
+  tester_id?: string | null
+  tested_at?: string | null
+  notes?: string | null
+  created_at: string
+}
+
+export interface BlendSimulationResult {
+  items: Array<{
+    batch_id: string
+    batch_no: string
+    quantity_kg: number
+    drc: number
+    percentage: number
+    drc_contribution: number
+    rubber_grade?: string
+  }>
+  total_quantity_kg: number
+  simulated_drc: number
+  simulated_grade: string
+  meets_target: boolean
+  target_drc: number
+  target_grade: string
+}
+
+export interface BlendOrderFormData {
+  target_grade: string
+  target_drc: number
+  target_quantity_kg: number
+  notes?: string
+}
+
+// ===== REPORTS (P10) =====
+
+export interface StockMovementReport {
+  date: string
+  in_quantity: number
+  out_quantity: number
+  adjust_quantity: number
+  blend_in_quantity: number
+  blend_out_quantity: number
+  balance: number
+}
+
+export interface GradeProductionReport {
+  grade: string
+  production_count: number
+  total_input_kg: number
+  total_output_kg: number
+  avg_yield_percent: number
+  avg_drc: number
+  blend_count: number
+}
+
+export interface SupplierQualityReport {
+  supplier_name: string
+  supplier_region: string
+  batch_count: number
+  total_weight_kg: number
+  avg_drc: number
+  drc_min: number
+  drc_max: number
+  passed_count: number
+  warning_count: number
+  failed_count: number
+  pass_rate: number
+}
+
+export interface DRCTrendReport {
+  date: string
+  avg_drc: number
+  batch_count: number
+  grade_breakdown: Record<string, number>
+}
+
+export interface InventoryValueReport {
+  material_id: string
+  material_name: string
+  material_sku: string
+  rubber_grade: string
+  total_quantity_kg: number
+  total_dry_weight_kg: number
+  avg_drc: number
+  batch_count: number
+  warehouse_breakdown: Array<{ warehouse_name: string; quantity_kg: number }>
 }
 
 // ===== PAGINATION (tÃ¡i sá»­ dá»¥ng pattern ERP) =====

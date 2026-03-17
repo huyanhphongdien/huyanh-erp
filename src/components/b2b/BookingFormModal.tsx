@@ -24,6 +24,13 @@ import {
   PRODUCT_TYPE_LABELS,
   type BookingMetadata,
 } from '../../services/b2b/chatMessageService'
+import {
+  PICKUP_LOCATIONS,
+  COUNTRY_LABELS,
+  COUNTRY_FLAGS,
+  getLocationsByCountry,
+  getCountries,
+} from '../../constants/pickupLocations'
 import dayjs from 'dayjs'
 
 const { Text, Title } = Typography
@@ -67,12 +74,14 @@ const BookingFormModal = ({
 }: BookingFormModalProps) => {
   const [form] = Form.useForm()
   const [estimatedValue, setEstimatedValue] = useState(0)
+  const [showCustomLocation, setShowCustomLocation] = useState(false)
 
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
       form.resetFields()
       setEstimatedValue(0)
+      setShowCustomLocation(false)
     }
   }, [open, form])
 
@@ -98,6 +107,17 @@ const BookingFormModal = ({
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      // Resolve pickup location label
+      let pickupLocationLabel: string | undefined
+      if (values.pickup_location) {
+        if (values.pickup_location === 'other') {
+          pickupLocationLabel = values.custom_location?.trim() || undefined
+        } else {
+          const found = PICKUP_LOCATIONS.find(l => l.value === values.pickup_location)
+          pickupLocationLabel = found?.label || values.pickup_location
+        }
+      }
+
       const booking: BookingMetadata = {
         code: generateBookingCode(),
         product_type: values.product_type,
@@ -106,6 +126,7 @@ const BookingFormModal = ({
         price_per_kg: values.price_per_kg,
         price_unit: values.price_unit,
         estimated_value: estimatedValue,
+        pickup_location: pickupLocationLabel,
         delivery_date: values.delivery_date
           ? dayjs(values.delivery_date).format('YYYY-MM-DD')
           : dayjs().add(1, 'day').format('YYYY-MM-DD'),
@@ -119,12 +140,6 @@ const BookingFormModal = ({
   }
 
   const formatCurrency = (value: number): string => {
-    if (value >= 1000000000) {
-      return `${(value / 1000000000).toFixed(2)} tỷ`
-    }
-    if (value >= 1000000) {
-      return `${(value / 1000000).toFixed(1)} triệu`
-    }
     return value.toLocaleString('vi-VN')
   }
 
@@ -261,6 +276,55 @@ const BookingFormModal = ({
           </Col>
         </Row>
 
+        {/* Địa điểm chốt hàng */}
+        <Form.Item
+          name="pickup_location"
+          label="Địa điểm chốt hàng"
+          rules={[{ required: true, message: 'Vui lòng chọn địa điểm' }]}
+          tooltip="Chọn địa điểm sẽ tự động điền DRC dự kiến"
+        >
+          <Select
+            placeholder="Chọn địa điểm"
+            showSearch
+            optionFilterProp="label"
+            onChange={(value) => {
+              setShowCustomLocation(value === 'other')
+              // Auto-fill DRC khi chọn địa điểm
+              if (value !== 'other') {
+                const found = PICKUP_LOCATIONS.find(l => l.value === value)
+                if (found) {
+                  form.setFieldsValue({ drc_percent: found.default_drc })
+                  handleValuesChange()
+                }
+              }
+            }}
+            size="large"
+          >
+            {getCountries().map(country => (
+              <Select.OptGroup key={country} label={`${COUNTRY_FLAGS[country] || ''} ${COUNTRY_LABELS[country] || country}`}>
+                {getLocationsByCountry(country).map(loc => (
+                  <Select.Option key={loc.value} value={loc.value} label={loc.label}>
+                    {loc.label} (DRC ~{loc.default_drc}%)
+                  </Select.Option>
+                ))}
+              </Select.OptGroup>
+            ))}
+            <Select.OptGroup label="Khác">
+              <Select.Option value="other" label="Khác (nhập tay)">Khác (nhập tay)</Select.Option>
+            </Select.OptGroup>
+          </Select>
+        </Form.Item>
+
+        {showCustomLocation && (
+          <Form.Item
+            name="custom_location"
+            label="Nhập địa điểm"
+            rules={[{ required: true, message: 'Vui lòng nhập địa điểm' }]}
+          >
+            <Input placeholder="VD: Huyện XYZ, Tỉnh ABC" size="large" />
+          </Form.Item>
+        )}
+
         {/* Ngày giao hàng */}
         <Form.Item
           name="delivery_date"
@@ -302,7 +366,7 @@ const BookingFormModal = ({
             level={3}
             style={{ color: '#ffd700', margin: '4px 0 0' }}
           >
-            {estimatedValue > 0 ? `${formatCurrency(estimatedValue)} đ` : '—'}
+            {estimatedValue > 0 ? `${formatCurrency(estimatedValue)} VNĐ` : '—'}
           </Title>
         </div>
       </Form>

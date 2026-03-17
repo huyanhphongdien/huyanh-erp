@@ -48,6 +48,7 @@ import {
   SoundOutlined,
   SearchOutlined,
   SmileOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons'
 import { 
   chatRoomService, 
@@ -64,6 +65,7 @@ import {
   BOOKING_STATUS_COLORS,
 } from '../../services/b2b/chatMessageService'
 import { dealService } from '../../services/b2b/dealService'
+import { dealConfirmService } from '../../services/b2b/dealConfirmService'
 import { useAuthStore } from '../../stores/authStore'
 import { format, isToday, isYesterday, isSameDay } from 'date-fns'
 import { vi } from 'date-fns/locale'
@@ -73,8 +75,16 @@ import ChatAttachmentUpload from '../../components/b2b/ChatAttachmentUpload'
 import VoiceRecorder from '../../components/b2b/VoiceRecorder'
 import ChatAttachmentMenu from '../../components/b2b/ChatAttachmentMenu'
 import BookingFormModal from '../../components/b2b/BookingFormModal'
+import ConfirmDealModal from '../../components/b2b/ConfirmDealModal'
+import AddAdvanceModal from '../../components/b2b/AddAdvanceModal'
+import RecordDeliveryModal from '../../components/b2b/RecordDeliveryModal'
+import DealCard from '../../components/b2b/DealCard'
 import EmojiPickerPopover from '../../components/b2b/EmojiPickerPopover'
 import { chatAttachmentService } from '../../services/b2b/chatAttachmentService'
+import { dealChatActionsService } from '../../services/b2b/dealChatActionsService'
+import type { AddAdvanceFormData } from '../../components/b2b/AddAdvanceModal'
+import type { RecordDeliveryFormData } from '../../components/b2b/RecordDeliveryModal'
+import type { ConfirmDealFormData, DealCardMetadata } from '../../types/b2b.types'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -96,11 +106,7 @@ const formatDateDivider = (dateStr: string): string => {
 }
 
 const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(amount)
+  return amount.toLocaleString('vi-VN') + ' VNĐ'
 }
 
 const formatDuration = (seconds: number): string => {
@@ -212,9 +218,33 @@ const BookingCard = ({
             </Text>
           </Col>
         </Row>
-        
+
+        {/* Dia diem chot hang */}
+        {booking.pickup_location && (
+          <div style={{
+            marginTop: 8,
+            padding: '6px 10px',
+            background: 'rgba(255,255,255,0.12)',
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <EnvironmentOutlined style={{ color: '#60a5fa', fontSize: 14 }} />
+            <div>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+                Dia diem chot
+              </span>
+              <br />
+              <span style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
+                {booking.pickup_location}
+              </span>
+            </div>
+          </div>
+        )}
+
         <Divider style={{ margin: '12px 0', borderColor: 'rgba(255,255,255,0.2)' }} />
-        
+
         <div style={{ textAlign: 'right' }}>
           <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>Giá trị ước tính</Text>
           <br />
@@ -317,14 +347,16 @@ interface MessageBubbleProps {
   showAvatar: boolean
   onContextMenu: (message: ChatMessage, action: string) => void
   onBookingAction: (messageId: string, action: 'confirm' | 'reject' | 'negotiate') => void
+  onDealAction: (dealId: string, action: 'add_advance' | 'delivery' | 'view_details') => void
 }
 
-const MessageBubble = ({ 
-  message, 
-  isOwn, 
+const MessageBubble = ({
+  message,
+  isOwn,
   showAvatar,
   onContextMenu,
   onBookingAction,
+  onDealAction,
 }: MessageBubbleProps) => {
   const isRecalled = message.metadata?.recalled
   const isEdited = message.metadata?.edited
@@ -356,6 +388,18 @@ const MessageBubble = ({
             onConfirm={() => onBookingAction(message.id, 'confirm')}
             onReject={() => onBookingAction(message.id, 'reject')}
             onNegotiate={() => onBookingAction(message.id, 'negotiate')}
+          />
+        )
+
+      case 'deal':
+        const dealMeta = message.metadata?.deal as DealCardMetadata
+        return (
+          <DealCard
+            metadata={dealMeta}
+            viewerType="factory"
+            onAddAdvance={() => onDealAction(dealMeta?.deal_id, 'add_advance')}
+            onRecordDelivery={() => onDealAction(dealMeta?.deal_id, 'delivery')}
+            onViewDetails={() => onDealAction(dealMeta?.deal_id, 'view_details')}
           />
         )
 
@@ -475,12 +519,12 @@ const MessageBubble = ({
         <div
           style={{
             maxWidth: '70%',
-            padding: message.message_type === 'booking' ? 0 : '8px 12px',
+            padding: (message.message_type === 'booking' || message.message_type === 'deal') ? 0 : '8px 12px',
             borderRadius: 12,
-            backgroundColor: message.message_type === 'booking' 
-              ? 'transparent' 
+            backgroundColor: (message.message_type === 'booking' || message.message_type === 'deal')
+              ? 'transparent'
               : isOwn ? '#1677ff' : '#f0f0f0',
-            color: isOwn && message.message_type !== 'booking' ? '#fff' : 'inherit',
+            color: isOwn && message.message_type !== 'booking' && message.message_type !== 'deal' ? '#fff' : 'inherit',
             position: 'relative',
           }}
         >
@@ -534,6 +578,28 @@ const B2BChatRoomPage = () => {
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
   const [bookingSubmitting, setBookingSubmitting] = useState(false)
 
+  // Confirm Deal Modal state
+  const [confirmDealModal, setConfirmDealModal] = useState<{
+    visible: boolean
+    booking: BookingMetadata | null
+    messageId: string | null
+  }>({ visible: false, booking: null, messageId: null })
+  const [confirmDealLoading, setConfirmDealLoading] = useState(false)
+
+  // Add Advance Modal state
+  const [addAdvanceModal, setAddAdvanceModal] = useState<{
+    visible: boolean
+    deal: DealCardMetadata | null
+  }>({ visible: false, deal: null })
+  const [addAdvanceLoading, setAddAdvanceLoading] = useState(false)
+
+  // Record Delivery Modal state
+  const [deliveryModal, setDeliveryModal] = useState<{
+    visible: boolean
+    deal: DealCardMetadata | null
+  }>({ visible: false, deal: null })
+  const [deliveryLoading, setDeliveryLoading] = useState(false)
+
   // Negotiate modal
   const [negotiateModal, setNegotiateModal] = useState<{ visible: boolean; messageId: string | null }>({
     visible: false,
@@ -562,13 +628,61 @@ const B2BChatRoomPage = () => {
       setLoading(true)
       const response = await chatMessageService.getMessages({ room_id: roomId, limit: 50 })
       setMessages(response.data)
+
+      // Kiểm tra booking đã confirmed nhưng chưa có Deal → tự tạo
+      // Đảm bảo Deal luôn được tạo dù user bỏ lỡ realtime event
+      if (room?.partner_id && user?.employee_id) {
+        for (const msg of response.data) {
+          if (
+            msg.message_type === 'booking' &&
+            msg.sender_type === 'factory' &&
+            msg.metadata?.booking?.status === 'confirmed'
+          ) {
+            const existingDeal = await dealService.getDealByBookingId(msg.id)
+            if (!existingDeal) {
+              const booking = msg.metadata.booking as BookingMetadata
+              try {
+                await dealConfirmService.confirmDealFromChat(
+                  {
+                    product_type: booking.product_type,
+                    agreed_quantity_tons: booking.quantity_tons,
+                    expected_drc: booking.drc_percent,
+                    agreed_price: booking.price_per_kg,
+                    price_unit: booking.price_unit || 'wet',
+                    pickup_location: booking.pickup_location,
+                    delivery_date: booking.delivery_date,
+                    has_advance: false,
+                  },
+                  {
+                    bookingMessageId: msg.id,
+                    partnerId: room.partner_id,
+                    roomId,
+                    confirmedBy: user.employee_id,
+                    confirmerType: 'factory',
+                    bookingCode: booking.code,
+                  },
+                )
+                // Reload messages to show the new DealCard
+                const updated = await chatMessageService.getMessages({ room_id: roomId, limit: 50 })
+                setMessages(updated.data)
+                message.success(`Deal tạo tự động cho phiếu ${booking.code}`)
+              } catch (err: any) {
+                if (!err?.message?.includes('đã tồn tại') && !err?.message?.includes('đã được xác nhận')) {
+                  console.error('Auto-create deal on load:', err)
+                }
+              }
+              break // Chỉ tạo 1 deal mỗi lần load
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Error fetching messages:', error)
       message.error('Không thể tải tin nhắn')
     } finally {
       setLoading(false)
     }
-  }, [roomId])
+  }, [roomId, room?.partner_id, user?.employee_id])
 
   const markAsRead = useCallback(async () => {
     if (!roomId) return
@@ -602,25 +716,52 @@ const B2BChatRoomPage = () => {
       onUpdate: async (updatedMessage) => {
         setMessages((prev) => prev.map((m) => (m.id === updatedMessage.id ? updatedMessage : m)))
 
-        // Chiều ngược: Factory gửi booking → Đại lý xác nhận → auto-tạo Deal
+        // Chiều ngược: Factory gửi booking → Đại lý xác nhận (từ Portal)
+        // Portal hiện tại chưa có ConfirmDealModal, chỉ update status = 'confirmed'
+        // ERP bắt sự kiện này → tự tạo Deal + DealCard
         if (
           updatedMessage.message_type === 'booking' &&
           updatedMessage.sender_type === 'factory' &&
           updatedMessage.metadata?.booking?.status === 'confirmed' &&
-          room?.partner_id
+          room?.partner_id &&
+          user?.employee_id &&
+          roomId
         ) {
-          try {
-            const booking = updatedMessage.metadata.booking as BookingMetadata
-            const deal = await dealService.createDealFromBooking(room.partner_id, {
-              product_type: booking.product_type,
-              quantity_tons: booking.quantity_tons,
-              price_per_kg: booking.price_per_kg,
-              drc_percent: booking.drc_percent,
-              booking_message_id: updatedMessage.id,
-            })
-            message.success(`Đại lý đã xác nhận! Deal ${deal.deal_number} được tạo`)
-          } catch (err) {
-            console.error('Auto-create deal from partner confirmation:', err)
+          const booking = updatedMessage.metadata.booking as BookingMetadata
+          // Kiểm tra deal đã tồn tại chưa (tránh duplicate)
+          const existingDeal = await dealService.getDealByBookingId(updatedMessage.id)
+          if (!existingDeal) {
+            try {
+              const result = await dealConfirmService.confirmDealFromChat(
+                {
+                  product_type: booking.product_type,
+                  agreed_quantity_tons: booking.quantity_tons,
+                  expected_drc: booking.drc_percent,
+                  agreed_price: booking.price_per_kg,
+                  price_unit: booking.price_unit || 'wet',
+                  pickup_location: booking.pickup_location,
+                  delivery_date: booking.delivery_date,
+                  has_advance: false,
+                },
+                {
+                  bookingMessageId: updatedMessage.id,
+                  partnerId: room.partner_id,
+                  roomId,
+                  confirmedBy: user.employee_id,
+                  confirmerType: 'factory',
+                  bookingCode: booking.code,
+                },
+              )
+              message.success(`Đại lý đã xác nhận! Deal ${result.deal.deal_number} được tạo`)
+            } catch (err: any) {
+              // Nếu deal đã tồn tại thì bỏ qua
+              if (!err?.message?.includes('đã tồn tại')) {
+                console.error('Auto-create deal from partner confirmation:', err)
+              }
+              message.success('Đại lý đã xác nhận phiếu chốt mủ!')
+            }
+          } else {
+            message.success('Đại lý đã xác nhận phiếu chốt mủ!')
           }
         }
       },
@@ -779,18 +920,129 @@ const B2BChatRoomPage = () => {
       return
     }
 
-    try {
-      if (action === 'confirm') {
-        const partnerId = room?.partner_id
-        if (!partnerId) throw new Error('Không tìm thấy đối tác')
-        const { deal } = await chatMessageService.confirmBooking(messageId, partnerId)
-        message.success(`Đã xác nhận phiếu chốt mủ & tạo Deal ${deal.deal_number}`)
-      } else {
-        await chatMessageService.rejectBooking(messageId)
-        message.success('Đã từ chối phiếu chốt mủ')
+    if (action === 'confirm') {
+      // Mở ConfirmDealModal thay vì auto-confirm
+      const msg = messages.find(m => m.id === messageId)
+      const booking = msg?.metadata?.booking as BookingMetadata | undefined
+      if (booking) {
+        setConfirmDealModal({ visible: true, booking, messageId })
       }
+      return
+    }
+
+    try {
+      await chatMessageService.rejectBooking(messageId)
+      message.success('Đã từ chối phiếu chốt mủ')
     } catch (error) {
       message.error('Không thể cập nhật phiếu chốt mủ')
+    }
+  }
+
+  // Xử lý confirm deal từ modal
+  const handleConfirmDeal = async (formData: ConfirmDealFormData) => {
+    if (!confirmDealModal.messageId || !room?.partner_id || !user?.employee_id || !roomId) return
+
+    try {
+      setConfirmDealLoading(true)
+      const result = await dealConfirmService.confirmDealFromChat(formData, {
+        bookingMessageId: confirmDealModal.messageId,
+        partnerId: room.partner_id,
+        roomId,
+        confirmedBy: user.employee_id,
+        confirmerType: 'factory',
+        bookingCode: confirmDealModal.booking?.code,
+      })
+
+      const successMsg = result.advance
+        ? `Deal ${result.deal.deal_number} đã tạo + Tạm ứng ${result.advance.advance_number}`
+        : `Deal ${result.deal.deal_number} đã tạo`
+      message.success(successMsg)
+
+      setConfirmDealModal({ visible: false, booking: null, messageId: null })
+
+      // Refresh messages để thấy DealCard + booking updated
+      fetchMessages()
+    } catch (error: any) {
+      message.error(error?.message || 'Không thể tạo Deal')
+    } finally {
+      setConfirmDealLoading(false)
+    }
+  }
+
+  // Xử lý actions trên DealCard
+  const handleDealAction = (dealId: string, action: 'add_advance' | 'delivery' | 'view_details') => {
+    if (action === 'view_details') {
+      navigate(`/b2b/deals/${dealId}`)
+      return
+    }
+
+    // Tìm DealCard metadata từ messages
+    const dealMsg = messages.find(m =>
+      m.message_type === 'deal' && (m.metadata as any)?.deal?.deal_id === dealId
+    )
+    const dealMeta = (dealMsg?.metadata as any)?.deal as DealCardMetadata | undefined
+
+    if (!dealMeta) {
+      message.error('Không tìm thấy thông tin Deal')
+      return
+    }
+
+    if (action === 'add_advance') {
+      setAddAdvanceModal({ visible: true, deal: dealMeta })
+    } else if (action === 'delivery') {
+      setDeliveryModal({ visible: true, deal: dealMeta })
+    }
+  }
+
+  // Xử lý ứng thêm tiền
+  const handleAddAdvance = async (formData: AddAdvanceFormData) => {
+    if (!addAdvanceModal.deal || !room?.partner_id || !user?.employee_id || !roomId) return
+
+    try {
+      setAddAdvanceLoading(true)
+      const result = await dealChatActionsService.addAdvanceFromChat(formData, {
+        dealId: addAdvanceModal.deal.deal_id,
+        dealNumber: addAdvanceModal.deal.deal_number,
+        partnerId: room.partner_id,
+        roomId,
+        actionBy: user.employee_id,
+        actionByType: 'factory',
+      })
+
+      message.success(
+        `Đã ứng thêm ${result.amount.toLocaleString('vi-VN')} VNĐ (${result.advance_number})`
+      )
+      setAddAdvanceModal({ visible: false, deal: null })
+      fetchMessages()
+    } catch (error: any) {
+      message.error(error?.message || 'Không thể ứng thêm')
+    } finally {
+      setAddAdvanceLoading(false)
+    }
+  }
+
+  // Xử lý ghi nhận giao hàng
+  const handleRecordDelivery = async (formData: RecordDeliveryFormData) => {
+    if (!deliveryModal.deal || !room?.partner_id || !user?.employee_id || !roomId) return
+
+    try {
+      setDeliveryLoading(true)
+      await dealChatActionsService.recordDeliveryFromChat(formData, {
+        dealId: deliveryModal.deal.deal_id,
+        dealNumber: deliveryModal.deal.deal_number,
+        partnerId: room.partner_id,
+        roomId,
+        actionBy: user.employee_id,
+        actionByType: 'factory',
+      })
+
+      message.success(`Đã ghi nhận giao hàng ${formData.quantity_kg.toLocaleString('vi-VN')} kg`)
+      setDeliveryModal({ visible: false, deal: null })
+      fetchMessages()
+    } catch (error: any) {
+      message.error(error?.message || 'Không thể ghi nhận giao hàng')
+    } finally {
+      setDeliveryLoading(false)
     }
   }
 
@@ -909,6 +1161,7 @@ const B2BChatRoomPage = () => {
             showAvatar={showAvatar}
             onContextMenu={handleContextMenu}
             onBookingAction={handleBookingAction}
+            onDealAction={handleDealAction}
           />
         </div>
       )
@@ -1066,6 +1319,37 @@ const B2BChatRoomPage = () => {
         onCancel={() => setBookingModalOpen(false)}
         onSubmit={handleBookingSubmit}
         loading={bookingSubmitting}
+        partnerName={room?.partner?.name}
+      />
+
+      {/* Confirm Deal Modal */}
+      <ConfirmDealModal
+        open={confirmDealModal.visible}
+        onCancel={() => setConfirmDealModal({ visible: false, booking: null, messageId: null })}
+        onConfirm={handleConfirmDeal}
+        loading={confirmDealLoading}
+        booking={confirmDealModal.booking}
+        partnerName={room?.partner?.name}
+        showAdvanceSection={true}
+      />
+
+      {/* Add Advance Modal */}
+      <AddAdvanceModal
+        open={addAdvanceModal.visible}
+        onCancel={() => setAddAdvanceModal({ visible: false, deal: null })}
+        onConfirm={handleAddAdvance}
+        loading={addAdvanceLoading}
+        deal={addAdvanceModal.deal}
+        partnerName={room?.partner?.name}
+      />
+
+      {/* Record Delivery Modal */}
+      <RecordDeliveryModal
+        open={deliveryModal.visible}
+        onCancel={() => setDeliveryModal({ visible: false, deal: null })}
+        onConfirm={handleRecordDelivery}
+        loading={deliveryLoading}
+        deal={deliveryModal.deal}
         partnerName={room?.partner?.name}
       />
 

@@ -1,21 +1,61 @@
 // ============================================================================
-// FILE: src/pages/wms/InventoryDashboard.tsx
-// MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P5 — Bước 5.4: Dashboard tồn kho — TRANG CHÍNH WMS
-// MÔ TẢ: Cards tổng quan, bảng tồn kho, bar chart, alert cards, quick links
-// UI: Mobile-first, Industrial theme, Manager View
+// INVENTORY DASHBOARD — Ant Design + Rubber KPIs
+// File: src/pages/wms/InventoryDashboard.tsx
+// Rewrite: Tailwind -> Ant Design v6, them rubber grade distribution, dry weight
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Package, Warehouse, AlertTriangle, TrendingUp, TrendingDown,
-  ArrowRight, RefreshCw, Search, Filter, ChevronDown, ChevronRight,
-  Plus, Minus, BarChart3, Bell, ClipboardCheck, ArrowDownToLine,
-  ArrowUpFromLine, Loader2, X
-} from 'lucide-react'
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Table,
+  Tag,
+  Button,
+  Space,
+  Input,
+  Select,
+  Spin,
+  Alert,
+  Empty,
+  Typography,
+  Badge,
+  Tooltip,
+  Progress,
+} from 'antd'
+import {
+  ReloadOutlined,
+  PlusOutlined,
+  ExportOutlined,
+  InboxOutlined,
+  WarningOutlined,
+  BellOutlined,
+  ExperimentOutlined,
+  DashboardOutlined,
+  SearchOutlined,
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+} from '@ant-design/icons'
 import { inventoryService, type StockSummaryItem, type InventoryOverview } from '../../services/wms/inventoryService'
 import { alertService, type StockAlert } from '../../services/wms/alertService'
+import { supabase } from '../../lib/supabase'
+import GradeBadge from '../../components/wms/GradeBadge'
+import type { RubberGrade } from '../../services/wms/wms.types'
+import { RUBBER_GRADE_LABELS, RUBBER_GRADE_COLORS } from '../../services/wms/wms.types'
+
+const { Title, Text } = Typography
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface GradeDistribution {
+  grade: string
+  count: number
+  total_weight: number
+}
 
 // ============================================================================
 // COMPONENT
@@ -24,15 +64,17 @@ import { alertService, type StockAlert } from '../../services/wms/alertService'
 const InventoryDashboard = () => {
   const navigate = useNavigate()
 
-  // State
   const [overview, setOverview] = useState<InventoryOverview | null>(null)
   const [stockSummary, setStockSummary] = useState<StockSummaryItem[]>([])
   const [alerts, setAlerts] = useState<StockAlert[]>([])
+  const [gradeDistribution, setGradeDistribution] = useState<GradeDistribution[]>([])
+  const [avgDrc, setAvgDrc] = useState<number | null>(null)
+  const [totalDryWeight, setTotalDryWeight] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [showFilters, setShowFilters] = useState(false)
+  const [filterGrade, setFilterGrade] = useState<string>('all')
   const [error, setError] = useState<string | null>(null)
 
   // --------------------------------------------------------------------------
@@ -54,9 +96,49 @@ const InventoryDashboard = () => {
       setOverview(overviewData)
       setStockSummary(summaryData)
       setAlerts(alertsData)
+
+      // Load rubber-specific data: grade distribution + avg DRC
+      try {
+        const { data: batches } = await supabase
+          .from('stock_batches')
+          .select('rubber_grade, latest_drc, quantity_remaining, initial_weight, current_weight')
+          .eq('status', 'active')
+          .gt('quantity_remaining', 0)
+
+        if (batches && batches.length > 0) {
+          // Grade distribution
+          const gradeMap: Record<string, { count: number; total_weight: number }> = {}
+          let drcWeightSum = 0
+          let weightSum = 0
+          let drySum = 0
+
+          for (const b of batches) {
+            const grade = b.rubber_grade || 'unknown'
+            if (!gradeMap[grade]) gradeMap[grade] = { count: 0, total_weight: 0 }
+            gradeMap[grade].count++
+            gradeMap[grade].total_weight += b.quantity_remaining || 0
+
+            if (b.latest_drc && b.quantity_remaining > 0) {
+              drcWeightSum += b.latest_drc * b.quantity_remaining
+              weightSum += b.quantity_remaining
+              drySum += b.quantity_remaining * (b.latest_drc / 100)
+            }
+          }
+
+          setGradeDistribution(
+            Object.entries(gradeMap)
+              .map(([grade, data]) => ({ grade, ...data }))
+              .sort((a, b) => b.total_weight - a.total_weight)
+          )
+          setAvgDrc(weightSum > 0 ? Math.round((drcWeightSum / weightSum) * 100) / 100 : null)
+          setTotalDryWeight(Math.round(drySum))
+        }
+      } catch (err) {
+        console.error('Load rubber data error:', err)
+      }
     } catch (err: any) {
       console.error('Dashboard load error:', err)
-      setError(err.message || 'Lỗi tải dữ liệu')
+      setError(err.message || 'Loi tai du lieu')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -72,7 +154,6 @@ const InventoryDashboard = () => {
   // --------------------------------------------------------------------------
 
   const filteredSummary = stockSummary.filter(item => {
-    // Search
     if (searchText) {
       const s = searchText.toLowerCase()
       if (!item.material.name?.toLowerCase().includes(s) &&
@@ -80,406 +161,346 @@ const InventoryDashboard = () => {
         return false
       }
     }
-    // Filter status
-    if (filterStatus !== 'all' && item.stock_status !== filterStatus) {
-      return false
-    }
+    if (filterStatus !== 'all' && item.stock_status !== filterStatus) return false
     return true
   })
 
-  const topAlerts = alerts.slice(0, 5) // Hiển thị 5 cảnh báo đầu
+  const topAlerts = alerts.slice(0, 8)
+  const highAlertCount = alerts.filter(a => a.severity === 'high').length
 
   // --------------------------------------------------------------------------
-  // RENDER HELPERS
+  // TABLE COLUMNS
   // --------------------------------------------------------------------------
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'normal': return 'bg-emerald-100 text-emerald-700'
-      case 'low': return 'bg-red-100 text-red-700'
-      case 'over': return 'bg-amber-100 text-amber-700'
-      case 'out_of_stock': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-600'
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'normal': return 'Bình thường'
-      case 'low': return 'Tồn thấp'
-      case 'over': return 'Vượt mức'
-      case 'out_of_stock': return 'Hết hàng'
-      default: return status
-    }
-  }
-
-  const getSeverityStyle = (severity: string) => {
-    switch (severity) {
-      case 'high': return 'border-l-red-500 bg-red-50'
-      case 'medium': return 'border-l-amber-500 bg-amber-50'
-      case 'low': return 'border-l-blue-500 bg-blue-50'
-      default: return 'border-l-gray-400 bg-gray-50'
-    }
-  }
-
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'high': return '🔴'
-      case 'medium': return '🟡'
-      case 'low': return '🟢'
-      default: return '⚪'
-    }
-  }
+  const columns = [
+    {
+      title: 'Vật liệu',
+      key: 'material',
+      render: (_: any, record: StockSummaryItem) => (
+        <div>
+          <Text strong style={{ fontSize: 13 }}>{record.material.name}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 11 }}>{record.material.sku}</Text>
+        </div>
+      ),
+    },
+    {
+      title: 'Ton (kg)',
+      dataIndex: 'total_quantity',
+      key: 'total_quantity',
+      align: 'right' as const,
+      sorter: (a: StockSummaryItem, b: StockSummaryItem) => a.total_quantity - b.total_quantity,
+      render: (v: number) => (
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
+          {v.toLocaleString()}
+        </Text>
+      ),
+    },
+    {
+      title: 'Trọng lượng (T)',
+      dataIndex: 'total_weight',
+      key: 'total_weight',
+      align: 'right' as const,
+      render: (v: number) => (
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {(v / 1000).toFixed(1)}
+        </Text>
+      ),
+    },
+    {
+      title: 'Kho',
+      key: 'warehouses',
+      align: 'center' as const,
+      render: (_: any, record: StockSummaryItem) => record.warehouse_breakdown.length,
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'stock_status',
+      key: 'stock_status',
+      render: (status: string) => {
+        const config: Record<string, { color: string; label: string }> = {
+          normal: { color: 'success', label: 'Bình thường' },
+          low: { color: 'error', label: 'Tồn thấp' },
+          over: { color: 'warning', label: 'Vượt mức' },
+          out_of_stock: { color: 'default', label: 'Hết hàng' },
+        }
+        const c = config[status] || config.normal
+        return <Tag color={c.color}>{c.label}</Tag>
+      },
+    },
+    {
+      title: 'Min/Max',
+      key: 'minmax',
+      width: 120,
+      render: (_: any, record: StockSummaryItem) => {
+        if (!record.min_stock || record.min_stock <= 0) return <Text type="secondary">—</Text>
+        const max = record.max_stock || record.min_stock * 3
+        const pct = Math.min(100, (record.total_quantity / max) * 100)
+        return (
+          <Tooltip title={`Min: ${record.min_stock} / Max: ${record.max_stock || '—'}`}>
+            <Progress
+              percent={pct}
+              size="small"
+              showInfo={false}
+              strokeColor={
+                record.stock_status === 'low' || record.stock_status === 'out_of_stock' ? '#DC2626'
+                : record.stock_status === 'over' ? '#F59E0B'
+                : '#16A34A'
+              }
+            />
+          </Tooltip>
+        )
+      },
+    },
+  ]
 
   // --------------------------------------------------------------------------
-  // LOADING STATE
+  // LOADING
   // --------------------------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B4D3E] mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Đang tải dữ liệu kho...</p>
-        </div>
+      <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}>
+        <Spin size="large" />
+        <div style={{ marginTop: 12, color: '#999' }}>Đang tải du lieu kho...</div>
       </div>
     )
   }
 
   // --------------------------------------------------------------------------
-  // MAIN RENDER
+  // RENDER
   // --------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2]">
+    <div style={{ padding: 24 }}>
+      {/* Header */}
+      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+        <Col>
+          <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
+            <DashboardOutlined style={{ marginRight: 8 }} />
+            Kho Thành Phẩm
+          </Title>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Cap nhat: {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </Col>
+        <Col>
+          <Space>
+            <Button
+              icon={<ReloadOutlined spin={refreshing} />}
+              onClick={() => loadData(true)}
+              loading={refreshing}
+            >
+              Làm mới
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/wms/stock-in/new')}
+              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+            >
+              Nhập kho
+            </Button>
+          </Space>
+        </Col>
+      </Row>
 
-      {/* ========== HEADER ========== */}
-      <div className="bg-[#1B4D3E] text-white px-4 pt-[env(safe-area-inset-top)] pb-4">
-        <div className="flex items-center justify-between pt-3">
-          <div>
-            <h1 className="text-lg font-bold" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-              Dashboard Kho Thành Phẩm
-            </h1>
-            <p className="text-xs text-white/60 mt-0.5">
-              Cập nhật: {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
-          <button
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-            className="w-10 h-10 flex items-center justify-center rounded-full
-              bg-white/10 active:bg-white/20 transition-colors"
-          >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* ========== ERROR ========== */}
+      {/* Error */}
       {error && (
-        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-          <p className="text-sm text-red-700 flex-1">{error}</p>
-          <button onClick={() => setError(null)}>
-            <X className="w-4 h-4 text-red-400" />
-          </button>
-        </div>
+        <Alert type="error" message={error} closable onClose={() => setError(null)} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
       )}
 
-      <div className="px-4 pb-[100px]">
+      {/* KPI Cards */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={12} sm={8} lg={4}>
+          <Card bodyStyle={{ padding: 16 }}>
+            <Statistic
+              title={<Text type="secondary" style={{ fontSize: 12 }}>Tổng lô</Text>}
+              value={overview?.total_materials || 0}
+              valueStyle={{ color: '#1B4D3E', fontFamily: "'JetBrains Mono', monospace" }}
+              prefix={<InboxOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} lg={4}>
+          <Card bodyStyle={{ padding: 16 }}>
+            <Statistic
+              title={<Text type="secondary" style={{ fontSize: 12 }}>Trọng lượng (T)</Text>}
+              value={((overview?.total_weight || 0) / 1000).toFixed(1)}
+              valueStyle={{ color: '#1B4D3E', fontFamily: "'JetBrains Mono', monospace" }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} lg={4}>
+          <Card bodyStyle={{ padding: 16 }}>
+            <Statistic
+              title={<Text type="secondary" style={{ fontSize: 12 }}>TL kho / Dry (T)</Text>}
+              value={(totalDryWeight / 1000).toFixed(1)}
+              valueStyle={{ color: '#2D8B6E', fontFamily: "'JetBrains Mono', monospace" }}
+              suffix={<Text type="secondary" style={{ fontSize: 11 }}>dry</Text>}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} lg={4}>
+          <Card bodyStyle={{ padding: 16 }}>
+            <Statistic
+              title={<Text type="secondary" style={{ fontSize: 12 }}>DRC TB</Text>}
+              value={avgDrc || '—'}
+              suffix={avgDrc ? '%' : ''}
+              valueStyle={{ color: '#1B4D3E', fontFamily: "'JetBrains Mono', monospace" }}
+              prefix={<ExperimentOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} lg={4}>
+          <Card bodyStyle={{ padding: 16 }} style={{ cursor: 'pointer' }} onClick={() => navigate('/wms/alerts')}>
+            <Statistic
+              title={<Text type="secondary" style={{ fontSize: 12 }}>Cảnh báo</Text>}
+              value={overview?.total_alerts || 0}
+              valueStyle={{ color: highAlertCount > 0 ? '#DC2626' : '#16A34A', fontFamily: "'JetBrains Mono', monospace" }}
+              prefix={<Badge count={highAlertCount} size="small"><BellOutlined /></Badge>}
+            />
+          </Card>
+        </Col>
+      </Row>
 
-        {/* ========== OVERVIEW CARDS ========== */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          {/* Tổng sản phẩm */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-[#1B4D3E]/10 flex items-center justify-center">
-                <Package className="w-4 h-4 text-[#1B4D3E]" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-[#1B4D3E]"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {overview?.total_materials || 0}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">Loại sản phẩm</p>
-          </div>
-
-          {/* Tổng số lượng */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-[#2D8B6E]/10 flex items-center justify-center">
-                <BarChart3 className="w-4 h-4 text-[#2D8B6E]" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-[#1B4D3E]"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {(overview?.total_quantity || 0).toLocaleString('vi-VN')}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">Tổng tồn (bành)</p>
-          </div>
-
-          {/* Tổng khối lượng */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-[#E8A838]/10 flex items-center justify-center">
-                <Warehouse className="w-4 h-4 text-[#E8A838]" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-[#1B4D3E]"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {((overview?.total_weight || 0) / 1000).toFixed(1)}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">Tổng tồn (tấn)</p>
-          </div>
-
-          {/* Cảnh báo */}
-          <button
-            onClick={() => navigate('/wms/alerts')}
-            className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm text-left
-              active:scale-[0.97] transition-transform"
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {/* Grade Distribution */}
+        <Col xs={24} lg={10}>
+          <Card
+            title={<Space><ExperimentOutlined /> Phân bố Grade</Space>}
+            size="small"
+            bodyStyle={{ padding: 16 }}
           >
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center
-                ${(overview?.total_alerts || 0) > 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-                <Bell className={`w-4 h-4 ${(overview?.total_alerts || 0) > 0 ? 'text-red-500' : 'text-green-500'}`} />
-              </div>
-            </div>
-            <p className={`text-2xl font-bold ${(overview?.total_alerts || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {overview?.total_alerts || 0}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">Cảnh báo</p>
-          </button>
-        </div>
+            {gradeDistribution.length === 0 ? (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có du lieu grade" />
+            ) : (
+              <div>
+                {gradeDistribution.map(item => {
+                  const totalWeight = gradeDistribution.reduce((s, g) => s + g.total_weight, 0)
+                  const pct = totalWeight > 0 ? Math.round((item.total_weight / totalWeight) * 100) : 0
+                  const gradeColor = RUBBER_GRADE_COLORS[item.grade as RubberGrade] || '#6B7280'
 
-        {/* ========== QUICK ACTIONS ========== */}
-        <div className="mt-5">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Thao tác nhanh
-          </h2>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            <button
-              onClick={() => navigate('/wms/stock-in/new')}
-              className="flex items-center gap-2 px-4 py-3 bg-[#1B4D3E] text-white
-                rounded-xl text-sm font-medium whitespace-nowrap shrink-0
-                active:scale-[0.97] transition-transform shadow-sm"
-            >
-              <ArrowDownToLine className="w-4 h-4" />
-              Nhập kho
-            </button>
-            <button
-              onClick={() => navigate('/wms/stock-out/new')}
-              className="flex items-center gap-2 px-4 py-3 bg-[#E8A838] text-white
-                rounded-xl text-sm font-medium whitespace-nowrap shrink-0
-                active:scale-[0.97] transition-transform shadow-sm"
-            >
-              <ArrowUpFromLine className="w-4 h-4" />
-              Xuất kho
-            </button>
-            <button
-              onClick={() => navigate('/wms/stock-check')}
-              className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700
-                rounded-xl text-sm font-medium whitespace-nowrap shrink-0 border border-gray-200
-                active:scale-[0.97] transition-transform"
-            >
-              <ClipboardCheck className="w-4 h-4" />
-              Kiểm kê
-            </button>
-          </div>
-        </div>
-
-        {/* ========== ALERTS SECTION ========== */}
-        {topAlerts.length > 0 && (
-          <div className="mt-5">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                Cảnh báo ({alerts.length})
-              </h2>
-              {alerts.length > 5 && (
-                <button
-                  onClick={() => navigate('/wms/alerts')}
-                  className="text-xs text-[#2D8B6E] font-medium flex items-center gap-1"
-                >
-                  Xem tất cả <ChevronRight className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              {topAlerts.map(alert => (
-                <div
-                  key={alert.id}
-                  className={`border-l-4 rounded-xl p-3 ${getSeverityStyle(alert.severity)}`}
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="text-sm mt-0.5">{getSeverityIcon(alert.severity)}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 leading-tight">
-                        {alert.message}
-                      </p>
-                      {alert.detail && (
-                        <p className="text-xs text-gray-500 mt-0.5">{alert.detail}</p>
-                      )}
+                  return (
+                    <div key={item.grade} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <GradeBadge grade={item.grade as RubberGrade} size="small" />
+                      <Progress
+                        percent={pct}
+                        size="small"
+                        style={{ flex: 1 }}
+                        strokeColor={gradeColor}
+                        format={() => `${pct}%`}
+                      />
+                      <Text type="secondary" style={{ fontSize: 11, minWidth: 60, textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {(item.total_weight / 1000).toFixed(1)} T
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        ({item.count} lo)
+                      </Text>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ========== STOCK SUMMARY TABLE ========== */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-              Tồn kho theo sản phẩm
-            </h2>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg transition-colors
-                ${showFilters ? 'bg-[#1B4D3E] text-white' : 'bg-gray-100 text-gray-500'}`}
-            >
-              <Filter className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Search + Filters */}
-          {showFilters && (
-            <div className="mb-3 space-y-2"
-              style={{ animation: 'slideDown 0.2s ease-out' }}
-            >
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  placeholder="Tìm theo tên, SKU..."
-                  className="w-full pl-10 pr-4 py-3 text-[15px] bg-white border border-gray-200
-                    rounded-xl focus:outline-none focus:border-[#2D8B6E] focus:ring-1 focus:ring-[#2D8B6E]/30"
-                />
+                  )
+                })}
               </div>
+            )}
+          </Card>
+        </Col>
 
-              {/* Status filter chips */}
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { key: 'all', label: 'Tất cả' },
-                  { key: 'low', label: '⚠️ Tồn thấp' },
-                  { key: 'over', label: '📈 Vượt mức' },
-                  { key: 'out_of_stock', label: '🚫 Hết hàng' },
-                  { key: 'normal', label: '✅ Bình thường' },
-                ].map(chip => (
-                  <button
-                    key={chip.key}
-                    onClick={() => setFilterStatus(chip.key)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-                      ${filterStatus === chip.key
-                        ? 'bg-[#1B4D3E] text-white'
-                        : 'bg-white text-gray-600 border border-gray-200'}`}
+        {/* Alerts */}
+        <Col xs={24} lg={14}>
+          <Card
+            title={
+              <Space>
+                <BellOutlined />
+                Cảnh báo ({alerts.length})
+              </Space>
+            }
+            size="small"
+            bodyStyle={{ padding: topAlerts.length > 0 ? 0 : 16, maxHeight: 300, overflow: 'auto' }}
+            extra={alerts.length > 8 && (
+              <Button type="link" size="small" onClick={() => navigate('/wms/alerts')}>Xem tất cả</Button>
+            )}
+          >
+            {topAlerts.length === 0 ? (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có cảnh báo" />
+            ) : (
+              <div>
+                {topAlerts.map(alert => (
+                  <div
+                    key={alert.id}
+                    style={{
+                      padding: '8px 16px',
+                      borderBottom: '1px solid #f0f0f0',
+                      borderLeft: `3px solid ${
+                        alert.severity === 'high' ? '#DC2626'
+                        : alert.severity === 'medium' ? '#F59E0B'
+                        : '#3B82F6'
+                      }`,
+                    }}
                   >
-                    {chip.label}
-                  </button>
+                    <Text style={{ fontSize: 13 }}>{alert.message}</Text>
+                    {alert.detail && (
+                      <div><Text type="secondary" style={{ fontSize: 11 }}>{alert.detail}</Text></div>
+                    )}
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Stock Cards */}
-          <div className="space-y-2">
-            {filteredSummary.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-                <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">Không tìm thấy sản phẩm nào</p>
-              </div>
-            ) : (
-              filteredSummary.map(item => (
-                <button
-                  key={item.material_id}
-                  onClick={() => navigate(`/wms/inventory/${item.material_id}`)}
-                  className="w-full bg-white rounded-xl border border-gray-100 p-4 text-left
-                    shadow-sm active:scale-[0.98] transition-transform"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-gray-800 truncate">
-                          {item.material.name}
-                        </p>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold
-                          ${getStatusColor(item.stock_status)}`}>
-                          {getStatusLabel(item.stock_status)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {item.material.sku} • {item.material.unit}
-                      </p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-1" />
-                  </div>
-
-                  {/* Số liệu */}
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase">Tồn kho</p>
-                      <p className="text-lg font-bold text-[#1B4D3E]"
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        {item.total_quantity.toLocaleString('vi-VN')}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase">Khối lượng</p>
-                      <p className="text-sm font-semibold text-gray-700"
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        {item.total_weight.toLocaleString('vi-VN')} kg
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase">Kho</p>
-                      <p className="text-sm text-gray-600">
-                        {item.warehouse_breakdown.length} kho
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Progress bar: tồn vs min/max */}
-                  {item.min_stock > 0 && (
-                    <div className="mt-2">
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500
-                            ${item.stock_status === 'low' || item.stock_status === 'out_of_stock'
-                              ? 'bg-red-500'
-                              : item.stock_status === 'over'
-                                ? 'bg-amber-500'
-                                : 'bg-emerald-500'}`}
-                          style={{
-                            width: `${Math.min(100, (item.total_quantity / (item.max_stock || item.min_stock * 3)) * 100)}%`
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between mt-0.5">
-                        <span className="text-[9px] text-gray-400">Min: {item.min_stock}</span>
-                        {item.max_stock && (
-                          <span className="text-[9px] text-gray-400">Max: {item.max_stock}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </button>
-              ))
             )}
-          </div>
-        </div>
-      </div>
+          </Card>
+        </Col>
+      </Row>
 
-      {/* ========== ANIMATIONS ========== */}
-      <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
+      {/* Quick Actions */}
+      <Space style={{ marginBottom: 16 }}>
+        <Button type="primary" icon={<ArrowDownOutlined />} onClick={() => navigate('/wms/stock-in/new')}
+          style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+          Nhập kho
+        </Button>
+        <Button icon={<ArrowUpOutlined />} onClick={() => navigate('/wms/stock-out/new')}
+          style={{ background: '#E8A838', borderColor: '#E8A838', color: 'white' }}>
+          Xuất kho
+        </Button>
+        <Button icon={<ExperimentOutlined />} onClick={() => navigate('/wms/qc')}>QC Dashboard</Button>
+        <Button onClick={() => navigate('/wms/stock-check')}>Kiểm kê</Button>
+      </Space>
+
+      {/* Stock Summary Table */}
+      <Card
+        title="Tồn kho theo vat lieu"
+        extra={
+          <Space>
+            <Input.Search
+              placeholder="Tìm tên, SKU..."
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              allowClear
+              style={{ width: 200 }}
+              size="small"
+            />
+            <Select
+              value={filterStatus}
+              onChange={setFilterStatus}
+              size="small"
+              style={{ width: 130 }}
+              options={[
+                { value: 'all', label: 'Tất cả TT' },
+                { value: 'normal', label: 'Bình thường' },
+                { value: 'low', label: 'Tồn thấp' },
+                { value: 'over', label: 'Vượt mức' },
+                { value: 'out_of_stock', label: 'Hết hàng' },
+              ]}
+            />
+          </Space>
         }
-      `}</style>
+      >
+        <Table
+          dataSource={filteredSummary}
+          columns={columns}
+          rowKey="material_id"
+          size="small"
+          pagination={{ showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
+          onRow={(record) => ({
+            onClick: () => navigate(`/wms/inventory/${record.material_id}`),
+            style: { cursor: 'pointer' },
+          })}
+        />
+      </Card>
     </div>
   )
 }

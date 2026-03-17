@@ -1,30 +1,45 @@
 // ============================================================================
-// FILE: src/pages/wms/stock-in/StockInDetailPage.tsx
-// MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P3 — Bước 3.11 (IMPROVED — Supabase thật, join employee names)
+// STOCK IN DETAIL PAGE — Ant Design + Rubber Info
+// File: src/pages/wms/stock-in/StockInDetailPage.tsx
+// Rewrite: Tailwind -> Ant Design v6, them rubber supplier/grade/dry weight
 // ============================================================================
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
-  Package,
-  MapPin,
-  Calendar,
-  User,
-  FileText,
-  Check,
-  X,
-  Clock,
-  FlaskConical,
-  Printer,
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
-  Warehouse,
-  Loader2,
-} from 'lucide-react'
+  Card,
+  Descriptions,
+  Table,
+  Tag,
+  Button,
+  Space,
+  Typography,
+  Row,
+  Col,
+  Statistic,
+  Timeline,
+  Spin,
+  Empty,
+  Alert,
+  Divider,
+} from 'antd'
+import {
+  ArrowLeftOutlined,
+  PrinterOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ClockCircleOutlined,
+  ExperimentOutlined,
+  InboxOutlined,
+  FileTextOutlined,
+  EnvironmentOutlined,
+} from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
+import GradeBadge from '../../../components/wms/GradeBadge'
+import { QCBadge } from '../../../components/wms/QCInputForm'
+import { rubberGradeService } from '../../../services/wms/rubberGradeService'
+
+const { Title, Text } = Typography
 
 // ============================================================================
 // TYPES
@@ -43,6 +58,17 @@ interface OrderDetail {
   location_code: string | null
   drc_value: number | null
   qc_status: string
+  rubber_grade: string | null
+  dry_weight: number | null
+}
+
+interface DealInfo {
+  id: string
+  deal_number: string
+  partner_name?: string
+  product_name?: string
+  quantity_kg?: number
+  unit_price?: number
 }
 
 interface OrderData {
@@ -63,526 +89,449 @@ interface OrderData {
   created_at: string
   confirmed_at: string | null
   details: OrderDetail[]
+  deal: DealInfo | null
+  // Rubber
+  supplier_name: string | null
+  supplier_region: string | null
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const SOURCE_LABELS: Record<string, string> = {
+  production: 'Sản xuất',
+  purchase: 'Mua hàng',
+  blend: 'Phối trộn',
+  transfer: 'Chuyển kho',
+  adjust: 'Điều chỉnh',
+}
+
+const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
+  draft: { color: 'default', label: 'Nháp' },
+  confirmed: { color: 'success', label: 'Đã nhập kho' },
+  cancelled: { color: 'error', label: 'Đã hủy' },
 }
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; icon: React.ReactNode }> = {
-  draft:     { label: 'Nháp',         bg: 'bg-gray-100',     text: 'text-gray-600',     icon: <FileText size={14} /> },
-  confirmed: { label: 'Đã nhập kho',  bg: 'bg-emerald-50',   text: 'text-emerald-700',  icon: <Check size={14} /> },
-  cancelled: { label: 'Đã hủy',       bg: 'bg-red-50',       text: 'text-red-600',      icon: <X size={14} /> },
+function formatDateTime(d: string): string {
+  return new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  production: 'Sản xuất', purchase: 'Mua hàng', blend: 'Phối trộn',
-  transfer: 'Chuyển kho', adjust: 'Điều chỉnh',
-}
-
-const QC_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  passed:      { label: 'Đạt',          bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  warning:     { label: 'Cảnh báo',     bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
-  failed:      { label: 'Không đạt',    bg: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-200' },
-  needs_blend: { label: 'Cần phối trộn', bg: 'bg-purple-50', text: 'text-purple-700',  border: 'border-purple-200' },
-  pending:     { label: 'Chờ QC',       bg: 'bg-gray-50',    text: 'text-gray-500',    border: 'border-gray-200' },
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDateTime(dateStr: string): string {
-  return `${formatDate(dateStr)} ${formatTime(dateStr)}`
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString('vi-VN')
-}
-
-/** Lookup employee name by ID (cached) */
 async function getEmployeeName(empId: string | null): Promise<string> {
   if (!empId) return '—'
-  const { data, error } = await supabase
-    .from('employees')
-    .select('full_name')
-    .eq('id', empId)
-    .maybeSingle()
-
-  if (error || !data) {
-    // Fallback: try by user_id
-    const { data: d2 } = await supabase
-      .from('employees')
-      .select('full_name')
-      .eq('user_id', empId)
-      .maybeSingle()
-    return d2?.full_name || empId.slice(0, 8) + '...'
-  }
-  return data.full_name
+  const { data } = await supabase.from('employees').select('full_name').eq('id', empId).maybeSingle()
+  if (data?.full_name) return data.full_name
+  const { data: d2 } = await supabase.from('employees').select('full_name').eq('user_id', empId).maybeSingle()
+  return d2?.full_name || '—'
 }
 
 // ============================================================================
-// DRC MINI GAUGE
+// COMPONENT
 // ============================================================================
 
-function DRCMiniGauge({ value, status }: { value: number; status: string }) {
-  const min = 55
-  const max = 65
-  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100))
-  const markerColor = status === 'passed' ? '#16A34A' : status === 'warning' ? '#F59E0B' : '#DC2626'
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-[14px] font-bold" style={{ color: markerColor }}>
-        {value.toFixed(1)}%
-      </span>
-      <div className="relative w-20 h-2 rounded-full overflow-hidden bg-gray-200">
-        <div className="absolute inset-y-0 bg-red-200" style={{ left: '0%', width: '30%' }} />
-        <div className="absolute inset-y-0 bg-amber-200" style={{ left: '30%', width: '10%' }} />
-        <div className="absolute inset-y-0 bg-emerald-200" style={{ left: '40%', width: '20%' }} />
-        <div className="absolute inset-y-0 bg-amber-200" style={{ left: '60%', width: '10%' }} />
-        <div className="absolute inset-y-0 bg-red-200" style={{ left: '70%', width: '30%' }} />
-        <div className="absolute top-0 bottom-0 w-1.5 rounded-full"
-          style={{ left: `${pct}%`, transform: 'translateX(-50%)', backgroundColor: markerColor, boxShadow: `0 0 4px ${markerColor}` }} />
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// TIMELINE
-// ============================================================================
-
-interface TimelineEvent {
-  icon: React.ReactNode
-  label: string
-  time?: string
-  user?: string
-  active: boolean
-  completed: boolean
-}
-
-function Timeline({ events }: { events: TimelineEvent[] }) {
-  return (
-    <div className="relative">
-      {events.map((event, idx) => (
-        <div key={idx} className="flex gap-3 pb-6 last:pb-0">
-          <div className="flex flex-col items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0
-              ${event.completed ? 'bg-[#1B4D3E] text-white' : event.active ? 'bg-[#E8A838] text-white' : 'bg-gray-200 text-gray-400'}`}>
-              {event.icon}
-            </div>
-            {idx < events.length - 1 && (
-              <div className={`w-0.5 flex-1 min-h-[24px] ${event.completed ? 'bg-[#1B4D3E]' : 'bg-gray-200'}`} />
-            )}
-          </div>
-          <div className="pt-1 pb-2">
-            <p className={`text-[14px] font-semibold ${event.completed || event.active ? 'text-gray-900' : 'text-gray-400'}`}>
-              {event.label}
-            </p>
-            {event.time && <p className="text-[12px] text-gray-500 mt-0.5">{formatDateTime(event.time)}</p>}
-            {event.user && (
-              <p className="text-[12px] text-gray-500 flex items-center gap-1 mt-0.5">
-                <User size={11} /> {event.user}
-              </p>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ============================================================================
-// MAIN PAGE
-// ============================================================================
-
-export default function StockInDetailPage() {
-  const { id } = useParams()
+const StockInDetailPage = () => {
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
   const [order, setOrder] = useState<OrderData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expandedDetails, setExpandedDetails] = useState(true)
-  const [expandedTimeline, setExpandedTimeline] = useState(true)
 
-  // ========================================================================
-  // LOAD ORDER FROM SUPABASE
-  // ========================================================================
   useEffect(() => {
     if (!id) return
-
-    const loadOrder = async () => {
+    const load = async () => {
       setLoading(true)
+      setError(null)
       try {
-        // 1. Load order header + details with joins
-        const { data: raw, error: err } = await supabase
+        const { data, error: fetchErr } = await supabase
           .from('stock_in_orders')
           .select(`
-            *,
-            warehouse:warehouses(id, code, name),
+            id, code, type, source_type, status, notes,
+            total_quantity, total_weight, created_by, confirmed_by, confirmed_at, created_at,
+            warehouse:warehouses!warehouse_id(name, code),
+            deal:b2b_deals!deal_id(id, deal_number, product_name, quantity_kg, unit_price),
             details:stock_in_details(
-              id, material_id, batch_id, quantity, weight, unit, location_id, notes,
-              material:materials(id, sku, name, unit),
-              batch:stock_batches(id, batch_no, initial_drc, latest_drc, qc_status),
-              location:warehouse_locations(id, code, shelf, row_name, column_name)
+              id, material_id, quantity, weight, unit, notes,
+              batch:stock_batches!batch_id(
+                id, batch_no, initial_drc, latest_drc, qc_status, rubber_grade, dry_weight
+              ),
+              material:materials!material_id(id, sku, name),
+              location:warehouse_locations!location_id(id, code)
             )
           `)
           .eq('id', id)
           .single()
 
-        if (err) throw err
-        if (!raw) throw new Error('Không tìm thấy phiếu')
+        if (fetchErr) throw fetchErr
 
-        // 2. Resolve employee names
-        const [createdName, confirmedName] = await Promise.all([
-          getEmployeeName(raw.created_by),
-          getEmployeeName(raw.confirmed_by),
-        ])
+        const raw = data as any
+        const creatorName = await getEmployeeName(raw.created_by)
+        const confirmerName = raw.confirmed_by ? await getEmployeeName(raw.confirmed_by) : null
 
-        // 3. Map to OrderData
-        const details: OrderDetail[] = (raw.details || []).map((d: any) => ({
-          id: d.id,
-          material_id: d.material_id,
-          material_name: d.material?.name || '—',
-          material_sku: d.material?.sku || '—',
-          batch_id: d.batch_id,
-          batch_no: d.batch?.batch_no || '—',
-          quantity: d.quantity,
-          weight: d.weight,
-          unit: d.unit || d.material?.unit || 'bành',
-          location_code: d.location?.code || null,
-          drc_value: d.batch?.latest_drc ?? d.batch?.initial_drc ?? null,
-          qc_status: d.batch?.qc_status || 'pending',
-        }))
+        // Get supplier info from first batch
+        let supplierName: string | null = null
+        let supplierRegion: string | null = null
+        if (raw.details?.length > 0) {
+          const firstBatchId = raw.details[0]?.batch?.id
+          if (firstBatchId) {
+            const { data: batchData } = await supabase
+              .from('stock_batches')
+              .select('supplier_name, supplier_region')
+              .eq('id', firstBatchId)
+              .maybeSingle()
+            supplierName = batchData?.supplier_name || null
+            supplierRegion = batchData?.supplier_region || null
+          }
+        }
 
         setOrder({
           id: raw.id,
           code: raw.code,
           type: raw.type,
           warehouse_name: raw.warehouse?.name || '—',
-          warehouse_code: raw.warehouse?.code || '—',
-          source_type: raw.source_type || 'production',
+          warehouse_code: raw.warehouse?.code || '',
+          source_type: raw.source_type,
           status: raw.status,
           notes: raw.notes,
           total_quantity: raw.total_quantity,
           total_weight: raw.total_weight,
           created_by: raw.created_by,
-          created_by_name: createdName,
+          created_by_name: creatorName,
           confirmed_by: raw.confirmed_by,
-          confirmed_by_name: confirmedName,
+          confirmed_by_name: confirmerName,
           created_at: raw.created_at,
           confirmed_at: raw.confirmed_at,
-          details,
+          deal: raw.deal ? {
+            id: raw.deal.id,
+            deal_number: raw.deal.deal_number,
+            product_name: raw.deal.product_name,
+            quantity_kg: raw.deal.quantity_kg,
+            unit_price: raw.deal.unit_price,
+          } : null,
+          supplier_name: supplierName,
+          supplier_region: supplierRegion,
+          details: (raw.details || []).map((d: any) => ({
+            id: d.id,
+            material_id: d.material_id,
+            material_name: d.material?.name || '—',
+            material_sku: d.material?.sku || '',
+            batch_id: d.batch?.id || '',
+            batch_no: d.batch?.batch_no || '',
+            quantity: d.quantity,
+            weight: d.weight,
+            unit: d.unit || 'kg',
+            location_code: d.location?.code || null,
+            drc_value: d.batch?.latest_drc || d.batch?.initial_drc || null,
+            qc_status: d.batch?.qc_status || 'pending',
+            rubber_grade: d.batch?.rubber_grade || null,
+            dry_weight: d.batch?.dry_weight || null,
+          })),
         })
-      } catch (e: any) {
-        console.error('Lỗi load phiếu nhập:', e)
-        setError(e.message || 'Có lỗi xảy ra')
+      } catch (err: any) {
+        setError(err.message || 'Không thể tải du lieu')
       } finally {
         setLoading(false)
       }
     }
-
-    loadOrder()
+    load()
   }, [id])
 
-  // ========================================================================
-  // DERIVED
-  // ========================================================================
-
-  const statusCfg = STATUS_CONFIG[order?.status || 'draft'] || STATUS_CONFIG.draft
-
-  const timelineEvents: TimelineEvent[] = useMemo(() => {
-    if (!order) return []
-    const events: TimelineEvent[] = [
-      {
-        icon: <FileText size={14} />,
-        label: 'Tạo phiếu nháp',
-        time: order.created_at,
-        user: order.created_by_name,
-        active: order.status === 'draft',
-        completed: order.status !== 'draft',
-      },
-    ]
-
-    if (order.status === 'confirmed') {
-      events.push({
-        icon: <Check size={14} />,
-        label: 'Xác nhận nhập kho',
-        time: order.confirmed_at || undefined,
-        user: order.confirmed_by_name || undefined,
-        active: false,
-        completed: true,
-      })
-    } else if (order.status === 'cancelled') {
-      events.push({
-        icon: <X size={14} />,
-        label: 'Đã hủy phiếu',
-        time: order.confirmed_at || undefined,
-        user: order.confirmed_by_name || undefined,
-        active: false,
-        completed: true,
-      })
-    } else {
-      events.push({ icon: <Check size={14} />, label: 'Chờ xác nhận', active: false, completed: false })
-    }
-
-    return events
-  }, [order])
-
-  const qcSummary = useMemo(() => {
-    if (!order) return { passed: 0, warning: 0, failed: 0, pending: 0 }
-    return {
-      passed: order.details.filter(d => d.qc_status === 'passed').length,
-      warning: order.details.filter(d => d.qc_status === 'warning').length,
-      failed: order.details.filter(d => d.qc_status === 'failed').length,
-      pending: order.details.filter(d => d.qc_status === 'pending' || d.qc_status === 'needs_blend').length,
-    }
-  }, [order])
-
-  // ========================================================================
-  // RENDER
-  // ========================================================================
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center"
-        style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-        <Loader2 className="w-8 h-8 animate-spin text-[#2D8B6E]" />
-      </div>
-    )
+    return <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}><Spin size="large" /></div>
   }
 
-  if (error || !order) {
+  if (!order) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center p-6"
-        style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-        <div className="text-center">
-          <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-gray-700 font-bold">{error || 'Không tìm thấy phiếu'}</p>
-          <button onClick={() => navigate('/wms/stock-in')}
-            className="mt-4 px-6 py-2 bg-[#2D8B6E] text-white rounded-xl font-bold">
-            Quay lại
-          </button>
+      <div style={{ padding: 24 }}>
+        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
+        <Empty description="Không tìm thấy phiếu nhập kho" />
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <Button onClick={() => navigate('/wms/stock-in')}>Quay lại</Button>
         </div>
       </div>
     )
   }
+
+  const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.draft
+  const totalDryWeight = order.details.reduce((s, d) => s + (d.dry_weight || 0), 0)
+
+  // QC summary
+  const qcCounts = { passed: 0, warning: 0, failed: 0, pending: 0 }
+  order.details.forEach(d => {
+    const s = d.qc_status as keyof typeof qcCounts
+    if (s in qcCounts) qcCounts[s]++
+  })
+
+  // Supplier DRC discrepancy (check first batch)
+  // This would need supplier_reported_drc from batch — future enhancement
+
+  // Detail table columns
+  const detailColumns = [
+    {
+      title: 'Lo',
+      dataIndex: 'batch_no',
+      key: 'batch_no',
+      render: (v: string) => <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{v}</Text>,
+    },
+    {
+      title: 'Vật liệu',
+      key: 'material',
+      render: (_: any, r: OrderDetail) => (
+        <div>
+          <Text style={{ fontSize: 13 }}>{r.material_name}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 11 }}>{r.material_sku}</Text>
+        </div>
+      ),
+    },
+    {
+      title: 'Grade',
+      dataIndex: 'rubber_grade',
+      key: 'rubber_grade',
+      render: (v: string | null) => <GradeBadge grade={v} size="small" />,
+    },
+    {
+      title: 'SL',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      align: 'right' as const,
+      render: (v: number, r: OrderDetail) => (
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {v.toLocaleString()} {r.unit}
+        </Text>
+      ),
+    },
+    {
+      title: 'KL (kg)',
+      dataIndex: 'weight',
+      key: 'weight',
+      align: 'right' as const,
+      render: (v: number | null) => v ? (
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{v.toLocaleString()}</Text>
+      ) : '—',
+    },
+    {
+      title: 'DRC',
+      dataIndex: 'drc_value',
+      key: 'drc_value',
+      align: 'right' as const,
+      render: (v: number | null) => v ? (
+        <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", color: '#1B4D3E' }}>{v}%</Text>
+      ) : '—',
+    },
+    {
+      title: 'Kho (kg)',
+      dataIndex: 'dry_weight',
+      key: 'dry_weight',
+      align: 'right' as const,
+      render: (v: number | null) => v ? (
+        <Text style={{ fontFamily: "'JetBrains Mono', monospace", color: '#2D8B6E' }}>{v.toLocaleString()}</Text>
+      ) : '—',
+    },
+    {
+      title: 'Vị trí',
+      dataIndex: 'location_code',
+      key: 'location_code',
+      render: (v: string | null) => v ? <Tag style={{ margin: 0 }}><EnvironmentOutlined /> {v}</Tag> : '—',
+    },
+    {
+      title: 'QC',
+      dataIndex: 'qc_status',
+      key: 'qc_status',
+      render: (v: string) => <QCBadge result={v} size="sm" />,
+    },
+  ]
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2]" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={() => navigate('/wms/stock-in')}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 active:scale-95">
-            <ArrowLeft size={20} className="text-gray-700" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[16px] font-bold text-gray-900 truncate"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+    <div style={{ padding: 24 }}>
+      {/* Header */}
+      <Space style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/stock-in')}>
+          Quay lại
+        </Button>
+      </Space>
+
+      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+        <Col>
+          <Space align="center" size="middle">
+            <Title level={4} style={{ margin: 0, fontFamily: "'JetBrains Mono', monospace" }}>
               {order.code}
-            </h1>
-            <p className="text-[12px] text-gray-500">Chi tiết phiếu nhập kho</p>
-          </div>
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold rounded-full ${statusCfg.bg} ${statusCfg.text}`}>
-            {statusCfg.icon} {statusCfg.label}
-          </span>
-        </div>
-      </div>
+            </Title>
+            <Tag color={statusCfg.color} style={{ fontSize: 14 }}>{statusCfg.label}</Tag>
+          </Space>
+          <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+            {order.warehouse_name} · {SOURCE_LABELS[order.source_type] || order.source_type} · {formatDateTime(order.created_at)}
+          </Text>
+        </Col>
+        <Col>
+          <Space>
+            <Button icon={<PrinterOutlined />}>In phiếu</Button>
+          </Space>
+        </Col>
+      </Row>
 
-      {/* BODY */}
-      <div className="px-4 py-4 space-y-4 pb-32">
+      {/* Info */}
+      <Card style={{ marginBottom: 16, borderRadius: 12 }}>
+        <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small" bordered>
+          <Descriptions.Item label="Kho">{order.warehouse_name}</Descriptions.Item>
+          <Descriptions.Item label="Nguồn nhập">
+            <Tag>{SOURCE_LABELS[order.source_type] || order.source_type}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Ngày tạo">{formatDateTime(order.created_at)}</Descriptions.Item>
+          <Descriptions.Item label="Người tạo">{order.created_by_name}</Descriptions.Item>
+          {order.confirmed_by_name && (
+            <Descriptions.Item label="Người xác nhận">{order.confirmed_by_name}</Descriptions.Item>
+          )}
+          {order.confirmed_at && (
+            <Descriptions.Item label="Ngày xác nhận">{formatDateTime(order.confirmed_at)}</Descriptions.Item>
+          )}
+          {order.supplier_name && (
+            <Descriptions.Item label="Đại lý">{order.supplier_name}</Descriptions.Item>
+          )}
+          {order.supplier_region && (
+            <Descriptions.Item label="Vùng">{order.supplier_region}</Descriptions.Item>
+          )}
+          {order.notes && (
+            <Descriptions.Item label="Ghi chú" span={3}>{order.notes}</Descriptions.Item>
+          )}
+        </Descriptions>
+      </Card>
 
-        {/* INFO CARD */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className={`h-1.5 ${order.status === 'confirmed' ? 'bg-[#1B4D3E]' : order.status === 'cancelled' ? 'bg-red-500' : 'bg-gray-300'}`} />
-          <div className="p-4 space-y-3">
-            {/* Warehouse */}
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#1B4D3E]/10 flex items-center justify-center shrink-0">
-                <Warehouse size={16} className="text-[#1B4D3E]" />
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Kho nhận</p>
-                <p className="text-[15px] font-bold text-gray-900">{order.warehouse_name}</p>
-                <p className="text-[12px] text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{order.warehouse_code}</p>
-              </div>
-            </div>
-
-            <div className="border-t border-dashed border-gray-200" />
-
-            {/* Info grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-start gap-2">
-                <Calendar size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[11px] text-gray-400">Ngày tạo</p>
-                  <p className="text-[13px] font-medium text-gray-900">{formatDate(order.created_at)}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Package size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[11px] text-gray-400">Nguồn nhập</p>
-                  <p className="text-[13px] font-medium text-gray-900">
-                    {SOURCE_LABELS[order.source_type] || order.source_type}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <User size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[11px] text-gray-400">Người tạo</p>
-                  <p className="text-[13px] font-medium text-gray-900">{order.created_by_name}</p>
-                </div>
-              </div>
-              {order.confirmed_by_name && (
-                <div className="flex items-start gap-2">
-                  <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-[11px] text-gray-400">Người duyệt</p>
-                    <p className="text-[13px] font-medium text-gray-900">{order.confirmed_by_name}</p>
-                  </div>
-                </div>
+      {/* Deal card */}
+      {order.deal && (
+        <Card
+          size="small"
+          style={{ marginBottom: 16, borderRadius: 12, borderLeft: '3px solid #1890ff' }}
+        >
+          <Row justify="space-between" align="middle">
+            <Col>
+              <Space>
+                <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  Deal: {order.deal.deal_number}
+                </Text>
+                {order.deal.product_name && <Tag>{order.deal.product_name}</Tag>}
+              </Space>
+              {order.deal.quantity_kg && (
+                <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
+                  SL Deal: {(order.deal.quantity_kg / 1000).toFixed(1)} T · Don gia: {order.deal.unit_price?.toLocaleString()} d/kg
+                </Text>
               )}
-            </div>
+            </Col>
+            <Col>
+              <Button type="link" onClick={() => navigate(`/b2b/deals/${order.deal!.id}`)}>
+                Xem Deal →
+              </Button>
+            </Col>
+          </Row>
+        </Card>
+      )}
 
-            {order.notes && (
-              <>
-                <div className="border-t border-dashed border-gray-200" />
-                <p className="text-[13px] text-gray-600 italic">📝 {order.notes}</p>
-              </>
-            )}
-          </div>
-        </div>
+      {/* Summary cards */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col xs={6}>
+          <Card bodyStyle={{ padding: 12 }}>
+            <Statistic title="Tổng SL" value={order.total_quantity || 0} suffix="kg"
+              valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
+          </Card>
+        </Col>
+        <Col xs={6}>
+          <Card bodyStyle={{ padding: 12 }}>
+            <Statistic title="Trọng lượng" value={((order.total_weight || 0) / 1000).toFixed(1)} suffix="T"
+              valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
+          </Card>
+        </Col>
+        <Col xs={6}>
+          <Card bodyStyle={{ padding: 12 }}>
+            <Statistic title="TL kho (dry)" value={(totalDryWeight / 1000).toFixed(1)} suffix="T"
+              valueStyle={{ fontSize: 18, color: '#2D8B6E', fontFamily: "'JetBrains Mono'" }} />
+          </Card>
+        </Col>
+        <Col xs={6}>
+          <Card bodyStyle={{ padding: 12 }}>
+            <Statistic title="Số lô" value={order.details.length} suffix="lo"
+              valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
+          </Card>
+        </Col>
+      </Row>
 
-        {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center">
-            <p className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Tổng SL</p>
-            <p className="text-[22px] font-bold text-[#1B4D3E] mt-1"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {formatNumber(order.total_quantity || 0)}
-            </p>
-            <p className="text-[11px] text-gray-400">bành</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center">
-            <p className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Tổng KL</p>
-            <p className="text-[22px] font-bold text-[#1B4D3E] mt-1"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {formatNumber(order.total_weight || 0)}
-            </p>
-            <p className="text-[11px] text-gray-400">kg</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center">
-            <p className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Số lô</p>
-            <p className="text-[22px] font-bold text-[#1B4D3E] mt-1"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {order.details.length}
-            </p>
-            <p className="text-[11px] text-gray-400">lô hàng</p>
-          </div>
-        </div>
+      {/* QC Summary alert */}
+      {(qcCounts.warning > 0 || qcCounts.failed > 0 || qcCounts.pending > 0) && (
+        <Alert
+          type={qcCounts.failed > 0 ? 'error' : qcCounts.warning > 0 ? 'warning' : 'info'}
+          message={
+            <Space>
+              <span>QC:</span>
+              {qcCounts.passed > 0 && <Tag color="success">{qcCounts.passed} dat</Tag>}
+              {qcCounts.warning > 0 && <Tag color="warning">{qcCounts.warning} canh bao</Tag>}
+              {qcCounts.failed > 0 && <Tag color="error">{qcCounts.failed} khong dat</Tag>}
+              {qcCounts.pending > 0 && <Tag>{qcCounts.pending} cho</Tag>}
+            </Space>
+          }
+          showIcon
+          style={{ marginBottom: 16, borderRadius: 8 }}
+        />
+      )}
 
-        {/* QC SUMMARY */}
-        {(qcSummary.warning > 0 || qcSummary.failed > 0 || qcSummary.pending > 0) && (
-          <div className={`
-            rounded-xl p-3 flex items-center gap-3
-            ${qcSummary.failed > 0 ? 'bg-red-50 border border-red-200' : qcSummary.warning > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 border border-gray-200'}
-          `}>
-            <AlertTriangle size={18} className={qcSummary.failed > 0 ? 'text-red-500' : qcSummary.warning > 0 ? 'text-amber-500' : 'text-gray-400'} />
-            <div className="flex-1">
-              <p className="text-[13px] font-semibold text-gray-900">Tóm tắt QC</p>
-              <p className="text-[12px] text-gray-600">
-                {qcSummary.passed > 0 && `${qcSummary.passed} đạt`}
-                {qcSummary.warning > 0 && ` · ${qcSummary.warning} cảnh báo`}
-                {qcSummary.failed > 0 && ` · ${qcSummary.failed} không đạt`}
-                {qcSummary.pending > 0 && ` · ${qcSummary.pending} chờ QC`}
-              </p>
-            </div>
-          </div>
-        )}
+      {/* Detail table */}
+      <Card title={<Space><FileTextOutlined /> Chi tiết lô hàng ({order.details.length})</Space>} style={{ marginBottom: 16, borderRadius: 12 }}>
+        <Table
+          dataSource={order.details}
+          columns={detailColumns}
+          rowKey="id"
+          size="small"
+          pagination={false}
+        />
+      </Card>
 
-        {/* DETAIL TABLE */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <button onClick={() => setExpandedDetails(!expandedDetails)}
-            className="w-full flex items-center justify-between px-4 py-3 active:bg-gray-50">
-            <p className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
-              <Package size={16} className="text-[#2D8B6E]" />
-              Chi tiết ({order.details.length} lô)
-            </p>
-            {expandedDetails ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
-          </button>
-
-          {expandedDetails && (
-            <div className="border-t border-gray-100">
-              {order.details.map((d, idx) => {
-                const qc = QC_CONFIG[d.qc_status] || QC_CONFIG.pending
-                return (
-                  <div key={d.id} className={`px-4 py-3 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[13px] font-bold text-gray-900"
-                            style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                            {d.batch_no}
-                          </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${qc.bg} ${qc.text} ${qc.border}`}>
-                            {qc.label}
-                          </span>
-                        </div>
-                        <p className="text-[12px] text-gray-600 truncate">{d.material_sku} — {d.material_name}</p>
-                        {d.location_code && (
-                          <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-                            <MapPin size={10} /> {d.location_code}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[15px] font-bold text-[#1B4D3E]"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {formatNumber(d.quantity)}
-                        </p>
-                        <p className="text-[11px] text-gray-400">{d.unit}</p>
-                        {d.weight && <p className="text-[11px] text-gray-400">{formatNumber(d.weight)} kg</p>}
-                      </div>
-                    </div>
-                    {d.drc_value != null && (
-                      <div className="mt-2">
-                        <DRCMiniGauge value={d.drc_value} status={d.qc_status} />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* TIMELINE */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <button onClick={() => setExpandedTimeline(!expandedTimeline)}
-            className="w-full flex items-center justify-between px-4 py-3 active:bg-gray-50">
-            <p className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
-              <Clock size={16} className="text-[#2D8B6E]" />
-              Lịch sử
-            </p>
-            {expandedTimeline ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
-          </button>
-
-          {expandedTimeline && (
-            <div className="px-4 pb-4 border-t border-gray-100 pt-3">
-              <Timeline events={timelineEvents} />
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Timeline */}
+      <Card title="Lịch sử" style={{ borderRadius: 12 }}>
+        <Timeline
+          items={[
+            {
+              color: 'green',
+              children: (
+                <div>
+                  <Text strong>Tạo phiếu nhap</Text>
+                  <br />
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {formatDateTime(order.created_at)} — {order.created_by_name}
+                  </Text>
+                </div>
+              ),
+            },
+            ...(order.status === 'confirmed' && order.confirmed_at ? [{
+              color: 'blue' as const,
+              children: (
+                <div>
+                  <Text strong>Xác nhận nhập kho</Text>
+                  <br />
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {formatDateTime(order.confirmed_at)} — {order.confirmed_by_name || '—'}
+                  </Text>
+                </div>
+              ),
+            }] : []),
+            ...(order.status === 'cancelled' ? [{
+              color: 'red' as const,
+              children: <Text strong>Đã hủy phiếu</Text>,
+            }] : []),
+            ...(order.status === 'draft' ? [{
+              color: 'gray' as const,
+              children: (
+                <div>
+                  <Text type="secondary">Cho xac nhan...</Text>
+                </div>
+              ),
+            }] : []),
+          ]}
+        />
+      </Card>
     </div>
   )
 }
+
+export default StockInDetailPage

@@ -1,20 +1,52 @@
 // ============================================================================
 // FILE: src/pages/wms/InventoryDetailPage.tsx
 // MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P5 — Bước 5.5: Chi tiết tồn kho 1 sản phẩm
-// MÔ TẢ: Tồn theo kho (breakdown), tồn theo lô, line chart biến động,
-//         lịch sử xuất nhập gần đây
+// PHASE: P5 — Buoc 5.5: Chi tiết tồn kho 1 san pham
+// REWRITE: Tailwind -> Ant Design v6
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Package, Warehouse, MapPin, Calendar, BarChart3,
-  TrendingUp, TrendingDown, Clock, Loader2, ChevronDown, ChevronUp,
-  AlertTriangle, CheckCircle, Beaker
-} from 'lucide-react'
+  Card,
+  Table,
+  Tabs,
+  Tag,
+  Button,
+  Space,
+  Typography,
+  Spin,
+  Empty,
+  Row,
+  Col,
+  Statistic,
+  Descriptions,
+  Badge,
+} from 'antd'
+import {
+  ArrowLeftOutlined,
+  InboxOutlined,
+  BarChartOutlined,
+  HistoryOutlined,
+  CalendarOutlined,
+  EnvironmentOutlined,
+  RiseOutlined,
+  FallOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  ExperimentOutlined,
+  ClockCircleOutlined,
+} from '@ant-design/icons'
 import { inventoryService, type StockMovement } from '../../services/wms/inventoryService'
 import type { Material, StockBatch, InventoryTransaction } from '../../services/wms/wms.types'
+import GradeBadge from '../../components/wms/GradeBadge'
+import { QCBadge } from '../../components/wms/QCInputForm'
+import WeightLossIndicator from '../../components/wms/WeightLossIndicator'
+import ContaminationBadge from '../../components/wms/ContaminationBadge'
+
+const { Title, Text } = Typography
+
+const MONO_FONT = "'JetBrains Mono', monospace"
 
 // ============================================================================
 // COMPONENT
@@ -30,8 +62,6 @@ const InventoryDetailPage = () => {
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'batches' | 'history' | 'chart'>('batches')
-  const [expandedBatch, setExpandedBatch] = useState<string | null>(null)
 
   // --------------------------------------------------------------------------
   // LOAD DATA
@@ -56,7 +86,6 @@ const InventoryDetailPage = () => {
       setMovements(movementData)
       setTransactions(txData.data)
 
-      // Lấy material info từ batch đầu tiên hoặc query riêng
       if (batchData.length > 0 && batchData[0].material) {
         setMaterial(batchData[0].material as Material)
       }
@@ -81,55 +110,56 @@ const InventoryDetailPage = () => {
     return sum + (b.quantity_remaining || 0) * wpUnit
   }, 0)
 
-  // QC summary
   const qcPassed = batches.filter(b => b.qc_status === 'passed').length
   const qcWarning = batches.filter(b => b.qc_status === 'warning').length
   const qcFailed = batches.filter(b => b.qc_status === 'failed' || b.qc_status === 'needs_blend').length
 
   // --------------------------------------------------------------------------
-  // RENDER HELPERS
+  // HELPERS
   // --------------------------------------------------------------------------
 
-  const getQCBadge = (status: string) => {
+  const getQCTag = (status: string) => {
     switch (status) {
       case 'passed':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">✅ Đạt</span>
+        return <Tag icon={<CheckCircleOutlined />} color="success">Dat</Tag>
       case 'warning':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">⚠️ Cảnh báo</span>
+        return <Tag icon={<ExclamationCircleOutlined />} color="warning">Cảnh báo</Tag>
       case 'failed':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">❌ Không đạt</span>
+        return <Tag color="error">Không đạt</Tag>
       case 'needs_blend':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">🧪 Cần phối trộn</span>
+        return <Tag icon={<ExperimentOutlined />} color="purple">Can phoi tron</Tag>
       case 'pending':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">⏳ Chờ QC</span>
+        return <Tag icon={<ClockCircleOutlined />} color="default">Chờ QC</Tag>
       default:
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-500">{status}</span>
+        return <Tag>{status}</Tag>
     }
   }
 
-  const getTxTypeLabel = (type: string) => {
+  const getTxTypeConfig = (type: string) => {
     switch (type) {
-      case 'in': return { label: 'Nhập kho', color: 'text-emerald-600', icon: '+' }
-      case 'out': return { label: 'Xuất kho', color: 'text-red-600', icon: '-' }
-      case 'adjust': return { label: 'Điều chỉnh', color: 'text-blue-600', icon: '±' }
-      case 'transfer': return { label: 'Chuyển kho', color: 'text-purple-600', icon: '↔' }
-      case 'blend_in': return { label: 'Nhập phối trộn', color: 'text-emerald-600', icon: '+' }
-      case 'blend_out': return { label: 'Xuất phối trộn', color: 'text-amber-600', icon: '-' }
-      default: return { label: type, color: 'text-gray-600', icon: '' }
+      case 'in': return { label: 'Nhập kho', color: 'success' as const, icon: '+' }
+      case 'out': return { label: 'Xuất kho', color: 'error' as const, icon: '-' }
+      case 'adjust': return { label: 'Điều chỉnh', color: 'processing' as const, icon: '+-' }
+      case 'transfer': return { label: 'Chuyển kho', color: 'purple' as const, icon: '<>' }
+      case 'blend_in': return { label: 'Nhap phoi tron', color: 'success' as const, icon: '+' }
+      case 'blend_out': return { label: 'Xuat phoi tron', color: 'warning' as const, icon: '-' }
+      default: return { label: type, color: 'default' as const, icon: '' }
     }
   }
 
   // --------------------------------------------------------------------------
-  // CHART — Simple SVG bar chart
+  // CHART
   // --------------------------------------------------------------------------
 
   const renderChart = () => {
     if (movements.length === 0) {
       return (
-        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-          <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-400">Chưa có dữ liệu biến động</p>
-        </div>
+        <Card>
+          <Empty
+            image={<BarChartOutlined style={{ fontSize: 40, color: '#ccc' }} />}
+            description="Chưa có du lieu bien dong"
+          />
+        </Card>
       )
     }
 
@@ -138,17 +168,13 @@ const InventoryDetailPage = () => {
     const barWidth = Math.max(4, Math.floor(280 / movements.length) - 1)
 
     return (
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Biến động tồn kho 30 ngày</h3>
-
-        {/* SVG Chart */}
-        <div className="overflow-x-auto">
+      <Card title="Bien dong tồn kho 30 ngay" size="small">
+        <div style={{ overflowX: 'auto' }}>
           <svg
             width={Math.max(300, movements.length * (barWidth + 2))}
             height={chartHeight + 30}
-            className="w-full"
+            style={{ width: '100%' }}
           >
-            {/* Bars */}
             {movements.map((m, i) => {
               const barHeight = (m.balance / maxBalance) * chartHeight
               const x = i * (barWidth + 2) + 5
@@ -165,7 +191,6 @@ const InventoryDetailPage = () => {
                     fill={m.balance < (material?.min_stock || 0) ? '#EF4444' : '#2D8B6E'}
                     opacity={0.8}
                   />
-                  {/* Date label every 5 days */}
                   {i % 5 === 0 && (
                     <text
                       x={x + barWidth / 2}
@@ -181,7 +206,6 @@ const InventoryDetailPage = () => {
               )
             })}
 
-            {/* Min stock line */}
             {material?.min_stock && material.min_stock > 0 && (
               <>
                 <line
@@ -206,20 +230,135 @@ const InventoryDetailPage = () => {
           </svg>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-4 mt-2">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-sm bg-[#2D8B6E]" />
-            <span className="text-[10px] text-gray-400">Tồn bình thường</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-sm bg-red-500" />
-            <span className="text-[10px] text-gray-400">Dưới tồn min</span>
-          </div>
-        </div>
-      </div>
+        <Space style={{ marginTop: 8 }}>
+          <Space size={4}>
+            <div style={{ width: 12, height: 12, borderRadius: 2, background: '#2D8B6E' }} />
+            <Text type="secondary" style={{ fontSize: 11 }}>Ton binh thuong</Text>
+          </Space>
+          <Space size={4}>
+            <div style={{ width: 12, height: 12, borderRadius: 2, background: '#EF4444' }} />
+            <Text type="secondary" style={{ fontSize: 11 }}>Duoi ton min</Text>
+          </Space>
+        </Space>
+      </Card>
     )
   }
+
+  // --------------------------------------------------------------------------
+  // TABLE COLUMNS
+  // --------------------------------------------------------------------------
+
+  const batchColumns = [
+    {
+      title: 'Lo',
+      dataIndex: 'batch_no',
+      key: 'batch_no',
+      render: (val: string) => (
+        <Text strong style={{ fontFamily: MONO_FONT, fontSize: 13 }}>{val}</Text>
+      ),
+    },
+    {
+      title: 'QC',
+      dataIndex: 'qc_status',
+      key: 'qc_status',
+      render: (val: string) => getQCTag(val || 'pending'),
+    },
+    {
+      title: 'Grade',
+      dataIndex: 'rubber_grade',
+      key: 'rubber_grade',
+      render: (val: string) => <GradeBadge grade={val} size="small" />,
+    },
+    {
+      title: 'DRC',
+      key: 'drc',
+      render: (_: any, r: StockBatch) => (
+        <Text style={{ fontFamily: MONO_FONT }}>
+          {r.latest_drc ? `${r.latest_drc}%` : '—'}
+        </Text>
+      ),
+    },
+    {
+      title: 'SL còn',
+      dataIndex: 'quantity_remaining',
+      key: 'qty',
+      align: 'right' as const,
+      render: (val: number) => (
+        <Text strong style={{ fontFamily: MONO_FONT, color: '#1B4D3E' }}>
+          {val?.toLocaleString('vi-VN')}
+        </Text>
+      ),
+    },
+    {
+      title: 'Ngày nhập',
+      dataIndex: 'received_date',
+      key: 'date',
+      render: (val: string) => val ? new Date(val).toLocaleDateString('vi-VN') : '—',
+    },
+    {
+      title: 'Vị trí',
+      key: 'location',
+      render: (_: any, r: StockBatch) => (
+        <Text type="secondary">{(r.location as any)?.code || '—'}</Text>
+      ),
+    },
+    {
+      title: 'Hao hụt',
+      key: 'weight_loss',
+      render: (_: any, r: StockBatch) => (
+        <WeightLossIndicator
+          initialWeight={(r as any).initial_weight}
+          currentWeight={(r as any).current_weight}
+        />
+      ),
+    },
+    {
+      title: 'Tạp chất',
+      key: 'contamination',
+      render: (_: any, r: StockBatch) => (
+        <ContaminationBadge status={(r as any).contamination_status} />
+      ),
+    },
+  ]
+
+  const txColumns = [
+    {
+      title: 'Loại',
+      dataIndex: 'type',
+      key: 'type',
+      render: (val: string) => {
+        const conf = getTxTypeConfig(val)
+        return <Tag color={conf.color}>{conf.icon} {conf.label}</Tag>
+      },
+    },
+    {
+      title: 'Số lượng',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      align: 'right' as const,
+      render: (val: number, r: InventoryTransaction) => {
+        const conf = getTxTypeConfig(r.type)
+        return (
+          <Text strong style={{ fontFamily: MONO_FONT, color: conf.color === 'success' ? '#389e0d' : conf.color === 'error' ? '#cf1322' : '#1677ff' }}>
+            {conf.icon}{Math.abs(val)}
+          </Text>
+        )
+      },
+    },
+    {
+      title: 'Ngay',
+      dataIndex: 'created_at',
+      key: 'date',
+      render: (val: string) => new Date(val).toLocaleDateString('vi-VN'),
+    },
+    {
+      title: 'Ghi chú',
+      dataIndex: 'notes',
+      key: 'notes',
+      ellipsis: true,
+      render: (val: string) => <Text type="secondary">{val || '—'}</Text>,
+    },
+  ]
 
   // --------------------------------------------------------------------------
   // LOADING
@@ -227,8 +366,8 @@ const InventoryDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#1B4D3E]" />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F7F5F2' }}>
+        <Spin size="large" />
       </div>
     )
   }
@@ -238,284 +377,187 @@ const InventoryDetailPage = () => {
   // --------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2]">
-
-      {/* ========== HEADER ========== */}
-      <div className="bg-[#1B4D3E] text-white px-4 pt-[env(safe-area-inset-top)] pb-4">
-        <div className="flex items-center gap-3 pt-3">
-          <button
+    <div style={{ minHeight: '100vh', background: '#F7F5F2' }}>
+      {/* Header */}
+      <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
+        <Space align="center" style={{ marginBottom: 12 }}>
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
             onClick={() => navigate(-1)}
-            className="w-10 h-10 flex items-center justify-center rounded-full
-              bg-white/10 active:bg-white/20 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold truncate">
+            style={{ color: '#fff' }}
+          />
+          <div>
+            <Title level={5} style={{ color: '#fff', margin: 0 }}>
               {material?.name || 'Chi tiết tồn kho'}
-            </h1>
-            <p className="text-xs text-white/60 mt-0.5">
-              {material?.sku} • {material?.unit}
-            </p>
+            </Title>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
+              {material?.sku} &bull; {material?.unit}
+            </Text>
           </div>
-        </div>
+        </Space>
 
-        {/* Summary bar */}
-        <div className="grid grid-cols-3 gap-3 mt-3">
-          <div className="bg-white/10 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {totalQty.toLocaleString('vi-VN')}
-            </p>
-            <p className="text-[10px] text-white/60">Tồn ({material?.unit || 'bành'})</p>
-          </div>
-          <div className="bg-white/10 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {(totalWeight / 1000).toFixed(1)}
-            </p>
-            <p className="text-[10px] text-white/60">Khối lượng (tấn)</p>
-          </div>
-          <div className="bg-white/10 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {batches.length}
-            </p>
-            <p className="text-[10px] text-white/60">Số lô</p>
-          </div>
-        </div>
+        <Row gutter={12}>
+          <Col span={8}>
+            <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', textAlign: 'center' }}>
+              <Statistic
+                value={totalQty}
+                suffix={material?.unit || 'banh'}
+                valueStyle={{ color: '#fff', fontSize: 18, fontFamily: MONO_FONT }}
+                title={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Ton</span>}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', textAlign: 'center' }}>
+              <Statistic
+                value={(totalWeight / 1000).toFixed(1)}
+                suffix="tan"
+                valueStyle={{ color: '#fff', fontSize: 18, fontFamily: MONO_FONT }}
+                title={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Khối lượng</span>}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', textAlign: 'center' }}>
+              <Statistic
+                value={batches.length}
+                suffix="lo"
+                valueStyle={{ color: '#fff', fontSize: 18, fontFamily: MONO_FONT }}
+                title={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Số lô</span>}
+              />
+            </Card>
+          </Col>
+        </Row>
       </div>
 
-      {/* ========== TABS ========== */}
-      <div className="bg-white border-b border-gray-100 flex">
-        {[
-          { key: 'batches', label: `Theo lô (${batches.length})`, icon: Package },
-          { key: 'chart', label: 'Biến động', icon: BarChart3 },
-          { key: 'history', label: 'Lịch sử', icon: Clock },
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium
-              border-b-2 transition-colors
-              ${activeTab === tab.key
-                ? 'border-[#1B4D3E] text-[#1B4D3E]'
-                : 'border-transparent text-gray-400'}`}
-          >
-            <tab.icon className="w-3.5 h-3.5" />
-            {tab.label}
-          </button>
-        ))}
+      {/* Tabs */}
+      <div style={{ padding: '0 16px 24px' }}>
+        <Tabs
+          defaultActiveKey="batches"
+          items={[
+            {
+              key: 'batches',
+              label: (
+                <Space size={4}>
+                  <InboxOutlined />
+                  <span>Theo lo ({batches.length})</span>
+                </Space>
+              ),
+              children: (
+                <div>
+                  {/* QC Summary */}
+                  <Space style={{ marginBottom: 12 }}>
+                    {qcPassed > 0 && (
+                      <Tag icon={<CheckCircleOutlined />} color="success">{qcPassed} dat</Tag>
+                    )}
+                    {qcWarning > 0 && (
+                      <Tag icon={<ExclamationCircleOutlined />} color="warning">{qcWarning} canh bao</Tag>
+                    )}
+                    {qcFailed > 0 && (
+                      <Tag icon={<ExperimentOutlined />} color="error">{qcFailed} can xu ly</Tag>
+                    )}
+                  </Space>
+
+                  <Table
+                    dataSource={batches}
+                    columns={batchColumns}
+                    rowKey="id"
+                    size="small"
+                    pagination={false}
+                    scroll={{ x: 900 }}
+                    expandable={{
+                      expandedRowRender: (batch: StockBatch) => (
+                        <Descriptions size="small" column={2} bordered>
+                          <Descriptions.Item label="SL ban dau">{batch.initial_quantity}</Descriptions.Item>
+                          <Descriptions.Item label="SL còn lai">
+                            <Text strong style={{ color: '#1B4D3E' }}>{batch.quantity_remaining}</Text>
+                          </Descriptions.Item>
+                          <Descriptions.Item label="DRC ban đầu">
+                            {batch.initial_drc ? `${batch.initial_drc}%` : '—'}
+                          </Descriptions.Item>
+                          <Descriptions.Item label="DRC hiện tại">
+                            {batch.latest_drc ? `${batch.latest_drc}%` : '—'}
+                          </Descriptions.Item>
+                          {batch.expiry_date && (
+                            <Descriptions.Item label="Hết hạn">
+                              {new Date(batch.expiry_date).toLocaleDateString('vi-VN')}
+                            </Descriptions.Item>
+                          )}
+                          {batch.next_recheck_date && (
+                            <Descriptions.Item label="Tái kiểm">
+                              {new Date(batch.next_recheck_date).toLocaleDateString('vi-VN')}
+                            </Descriptions.Item>
+                          )}
+                        </Descriptions>
+                      ),
+                    }}
+                    locale={{ emptyText: <Empty description="Không có lô hàng nào" /> }}
+                  />
+                </div>
+              ),
+            },
+            {
+              key: 'chart',
+              label: (
+                <Space size={4}>
+                  <BarChartOutlined />
+                  <span>Bien dong</span>
+                </Space>
+              ),
+              children: (
+                <div>
+                  {renderChart()}
+
+                  <Card title="7 ngay gan nhat" size="small" style={{ marginTop: 16 }}>
+                    {movements.slice(-7).reverse().map(m => (
+                      <div key={m.date} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                        <Text type="secondary" style={{ width: 80, fontSize: 12 }}>
+                          {new Date(m.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                        </Text>
+                        <Space>
+                          {m.in_quantity > 0 && (
+                            <Text style={{ color: '#389e0d', fontSize: 12 }}>
+                              <RiseOutlined /> +{m.in_quantity}
+                            </Text>
+                          )}
+                          {m.out_quantity > 0 && (
+                            <Text style={{ color: '#cf1322', fontSize: 12 }}>
+                              <FallOutlined /> -{m.out_quantity}
+                            </Text>
+                          )}
+                        </Space>
+                        <Text strong style={{ fontFamily: MONO_FONT, width: 64, textAlign: 'right', fontSize: 12 }}>
+                          {m.balance}
+                        </Text>
+                      </div>
+                    ))}
+                  </Card>
+                </div>
+              ),
+            },
+            {
+              key: 'history',
+              label: (
+                <Space size={4}>
+                  <HistoryOutlined />
+                  <span>Lịch sử</span>
+                </Space>
+              ),
+              children: (
+                <Table
+                  dataSource={transactions}
+                  columns={txColumns}
+                  rowKey="id"
+                  size="small"
+                  pagination={false}
+                  locale={{ emptyText: <Empty description="Chưa có lich su giao dich" /> }}
+                />
+              ),
+            },
+          ]}
+        />
       </div>
-
-      <div className="px-4 pb-8">
-
-        {/* ========== TAB: BATCHES ========== */}
-        {activeTab === 'batches' && (
-          <div className="mt-4 space-y-2">
-            {/* QC Summary */}
-            <div className="flex gap-2 mb-3">
-              {qcPassed > 0 && (
-                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 rounded-lg">
-                  <CheckCircle className="w-3 h-3 text-emerald-500" />
-                  <span className="text-[10px] text-emerald-700 font-medium">{qcPassed} đạt</span>
-                </div>
-              )}
-              {qcWarning > 0 && (
-                <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg">
-                  <AlertTriangle className="w-3 h-3 text-amber-500" />
-                  <span className="text-[10px] text-amber-700 font-medium">{qcWarning} cảnh báo</span>
-                </div>
-              )}
-              {qcFailed > 0 && (
-                <div className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
-                  <Beaker className="w-3 h-3 text-red-500" />
-                  <span className="text-[10px] text-red-700 font-medium">{qcFailed} cần xử lý</span>
-                </div>
-              )}
-            </div>
-
-            {batches.map(batch => (
-              <div key={batch.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <button
-                  onClick={() => setExpandedBatch(expandedBatch === batch.id ? null : batch.id)}
-                  className="w-full p-4 text-left"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-gray-800"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {batch.batch_no}
-                        </p>
-                        {getQCBadge(batch.qc_status || 'pending')}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-gray-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {batch.received_date
-                            ? new Date(batch.received_date).toLocaleDateString('vi-VN')
-                            : '—'}
-                        </span>
-                        {batch.location && (
-                          <span className="text-xs text-gray-400 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {(batch.location as any)?.code || '—'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right flex items-center gap-2">
-                      <div>
-                        <p className="text-lg font-bold text-[#1B4D3E]"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {batch.quantity_remaining}
-                        </p>
-                        <p className="text-[10px] text-gray-400">{material?.unit || 'bành'}</p>
-                      </div>
-                      {expandedBatch === batch.id
-                        ? <ChevronUp className="w-4 h-4 text-gray-400" />
-                        : <ChevronDown className="w-4 h-4 text-gray-400" />
-                      }
-                    </div>
-                  </div>
-                </button>
-
-                {/* Expanded detail */}
-                {expandedBatch === batch.id && (
-                  <div className="px-4 pb-4 border-t border-gray-50"
-                    style={{ animation: 'slideDown 0.2s ease-out' }}
-                  >
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase">SL ban đầu</p>
-                        <p className="text-sm font-semibold text-gray-700">{batch.initial_quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase">SL còn lại</p>
-                        <p className="text-sm font-semibold text-[#1B4D3E]">{batch.quantity_remaining}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase">DRC ban đầu</p>
-                        <p className="text-sm font-semibold text-gray-700">
-                          {batch.initial_drc ? `${batch.initial_drc}%` : '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase">DRC hiện tại</p>
-                        <p className="text-sm font-semibold text-gray-700">
-                          {batch.latest_drc ? `${batch.latest_drc}%` : '—'}
-                        </p>
-                      </div>
-                      {batch.expiry_date && (
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase">Hết hạn</p>
-                          <p className="text-sm font-semibold text-gray-700">
-                            {new Date(batch.expiry_date).toLocaleDateString('vi-VN')}
-                          </p>
-                        </div>
-                      )}
-                      {batch.next_recheck_date && (
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase">Tái kiểm</p>
-                          <p className="text-sm font-semibold text-gray-700">
-                            {new Date(batch.next_recheck_date).toLocaleDateString('vi-VN')}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {batches.length === 0 && (
-              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-                <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">Không có lô hàng nào</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ========== TAB: CHART ========== */}
-        {activeTab === 'chart' && (
-          <div className="mt-4">
-            {renderChart()}
-
-            {/* Daily summary */}
-            <div className="mt-4 bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">7 ngày gần nhất</h3>
-              <div className="space-y-2">
-                {movements.slice(-7).reverse().map(m => (
-                  <div key={m.date} className="flex items-center justify-between py-1">
-                    <span className="text-xs text-gray-500 w-20">
-                      {new Date(m.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      {m.in_quantity > 0 && (
-                        <span className="text-xs text-emerald-600 font-medium flex items-center gap-0.5">
-                          <TrendingUp className="w-3 h-3" />+{m.in_quantity}
-                        </span>
-                      )}
-                      {m.out_quantity > 0 && (
-                        <span className="text-xs text-red-600 font-medium flex items-center gap-0.5">
-                          <TrendingDown className="w-3 h-3" />-{m.out_quantity}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs font-semibold text-gray-700 w-16 text-right"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {m.balance}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========== TAB: HISTORY ========== */}
-        {activeTab === 'history' && (
-          <div className="mt-4 space-y-2">
-            {transactions.map(tx => {
-              const txInfo = getTxTypeLabel(tx.type)
-              return (
-                <div key={tx.id} className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-bold ${txInfo.color}`}
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        {txInfo.icon}{Math.abs(tx.quantity)}
-                      </span>
-                      <span className="text-xs text-gray-500">{txInfo.label}</span>
-                    </div>
-                    <span className="text-[10px] text-gray-400">
-                      {new Date(tx.created_at).toLocaleDateString('vi-VN')}
-                    </span>
-                  </div>
-                  {tx.notes && (
-                    <p className="text-xs text-gray-400 mt-1 truncate">{tx.notes}</p>
-                  )}
-                </div>
-              )
-            })}
-
-            {transactions.length === 0 && (
-              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-                <Clock className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">Chưa có lịch sử giao dịch</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ========== ANIMATIONS ========== */}
-      <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   )
 }

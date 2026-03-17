@@ -30,6 +30,7 @@ import {
   CloseOutlined,
   SwapOutlined,
   FileTextOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons';
 import { colors } from '../../config/antdTheme';
 
@@ -48,6 +49,7 @@ export interface BookingMetadata {
   price_per_kg?: number;
   price_unit?: 'wet' | 'dry';
   estimated_value?: number;
+  pickup_location?: string;
   delivery_date?: string;
   notes?: string;
   status?: 'pending' | 'confirmed' | 'negotiating' | 'rejected';
@@ -195,6 +197,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
     price_per_kg,
     price_unit,
     estimated_value,
+    pickup_location,
     delivery_date,
     notes,
     status = 'pending',
@@ -267,6 +270,14 @@ const BookingCard: React.FC<BookingCardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Dia diem chot hang */}
+        {pickup_location && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+            <EnvironmentOutlined style={{ color: '#1890ff' }} />
+            <Tag color="blue">{pickup_location}</Tag>
+          </div>
+        )}
 
         {/* Counter price (if negotiating) */}
         {counter_price && status === 'negotiating' && (

@@ -13,7 +13,7 @@ export type PartnerStatus = 'pending' | 'verified' | 'suspended' | 'rejected'
 export type PartnerType = 'dealer' | 'supplier' | 'processor'
 
 export type RoomType = 'general' | 'deal' | 'support' | 'direct'
-export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'booking' | 'quotation' | 'system'
+export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'booking' | 'deal' | 'quotation' | 'system'
 export type SenderType = 'factory' | 'partner' | 'system'
 export type ParticipantRole = 'owner' | 'admin' | 'member'
 
@@ -371,3 +371,65 @@ export interface SendMessageParams {
 }
 
 export type ChatFilters = ChatRoomFilters
+
+// ============================================================================
+// CONFIRM DEAL MODAL — Types dùng chung ERP ↔ Portal
+// ============================================================================
+
+export interface ConfirmDealFormData {
+  // === Phần 1: Thông tin Deal ===
+  agreed_price: number
+  agreed_quantity_tons: number
+  expected_drc: number
+  price_unit: 'wet' | 'dry'
+  product_type: string
+  pickup_location?: string
+  delivery_date?: string
+  deal_notes?: string
+
+  // === Phần 2: Tạm ứng (optional, chỉ khi factory confirm) ===
+  has_advance: boolean
+  advance_amount?: number
+  advance_payment_method?: 'cash' | 'bank_transfer'
+  advance_receiver_name?: string
+  advance_receiver_phone?: string
+  advance_notes?: string
+}
+
+export interface DealCardMetadata {
+  deal_id: string
+  deal_number: string
+  status: string
+  booking_code?: string
+
+  // Denormalized để hiển thị nhanh
+  product_type: string
+  quantity_kg: number
+  expected_drc: number
+  agreed_price: number
+  price_unit: 'wet' | 'dry'
+  estimated_value: number
+  pickup_location?: string
+
+  // Tài chính
+  total_advanced: number
+  balance_due: number
+}
+
+export interface ConfirmDealResult {
+  deal: {
+    id: string
+    deal_number: string
+    status: string
+    estimated_value: number
+  }
+  advance?: {
+    id: string
+    advance_number: string
+    amount: number
+  }
+  ledgerEntry?: {
+    id: string
+    credit: number
+  }
+}

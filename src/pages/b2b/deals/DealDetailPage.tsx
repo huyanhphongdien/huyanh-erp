@@ -27,6 +27,8 @@ import {
   message,
   Breadcrumb,
   Statistic,
+  Tabs,
+  Badge,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -42,6 +44,9 @@ import {
   ShoppingOutlined,
   CalendarOutlined,
   FileTextOutlined,
+  InboxOutlined,
+  ExperimentOutlined,
+  WalletOutlined,
 } from '@ant-design/icons'
 import {
   dealService,
@@ -53,6 +58,9 @@ import {
 } from '../../../services/b2b/dealService'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import DealWmsTab from '../../../components/b2b/DealWmsTab'
+import DealQcTab from '../../../components/b2b/DealQcTab'
+import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -395,268 +403,320 @@ const DealDetailPage = () => {
         </Row>
       </Card>
 
-      <Row gutter={24}>
-        {/* Left Column */}
-        <Col xs={24} lg={16}>
-          {/* Deal Info */}
-          <Card
-            title={
-              <Space>
-                <FileTextOutlined />
-                <span>Thông tin giao dịch</span>
-              </Space>
-            }
-            style={{ marginBottom: 24, borderRadius: 12 }}
-          >
-            <Descriptions bordered column={{ xs: 1, sm: 2 }}>
-              <Descriptions.Item label="Mã Deal">{deal.deal_number}</Descriptions.Item>
-              <Descriptions.Item label="Loại giao dịch">
-                {deal.deal_type ? DEAL_TYPE_LABELS[deal.deal_type] : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Sản phẩm">{deal.product_name || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Mã sản phẩm">{deal.product_code || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Số lượng">
-                <Text strong style={{ color: '#1B4D3E', fontSize: 16 }}>
-                  {deal.quantity_tons?.toFixed(2) || '-'} tấn
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Đơn giá">
-                {deal.unit_price?.toLocaleString() || '-'} đ/kg
-              </Descriptions.Item>
-              <Descriptions.Item label="Giá chốt">
-                {deal.final_price ? (
-                  <Text strong style={{ color: '#52c41a' }}>
-                    {deal.final_price.toLocaleString()} đ/kg
-                  </Text>
-                ) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Giá trị">
-                <Text strong style={{ color: '#1B4D3E', fontSize: 18 }}>
-                  {formatCurrency(deal.total_value_vnd)}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Điều kiện giao hàng" span={2}>
-                {deal.delivery_terms || '-'}
-              </Descriptions.Item>
-              {deal.processing_fee_per_ton && (
-                <Descriptions.Item label="Phí gia công">
-                  {deal.processing_fee_per_ton.toLocaleString()} đ/tấn
-                </Descriptions.Item>
-              )}
-              {deal.expected_output_rate && (
-                <Descriptions.Item label="Tỷ lệ thu hồi">
-                  {deal.expected_output_rate}%
-                </Descriptions.Item>
-              )}
-              {deal.notes && (
-                <Descriptions.Item label="Ghi chú" span={2}>
-                  {deal.notes}
-                </Descriptions.Item>
-              )}
-            </Descriptions>
-          </Card>
+      <Tabs
+        defaultActiveKey="info"
+        size="large"
+        style={{ marginBottom: 24 }}
+        items={[
+          {
+            key: 'info',
+            label: (
+              <span><FileTextOutlined /> Thông tin</span>
+            ),
+            children: (
+              <Row gutter={24}>
+                {/* Left Column */}
+                <Col xs={24} lg={16}>
+                  {/* Deal Info */}
+                  <Card
+                    title={
+                      <Space>
+                        <FileTextOutlined />
+                        <span>Thông tin giao dịch</span>
+                      </Space>
+                    }
+                    style={{ marginBottom: 24, borderRadius: 12 }}
+                  >
+                    <Descriptions bordered column={{ xs: 1, sm: 2 }}>
+                      <Descriptions.Item label="Mã Deal">{deal.deal_number}</Descriptions.Item>
+                      <Descriptions.Item label="Loại giao dịch">
+                        {deal.deal_type ? DEAL_TYPE_LABELS[deal.deal_type] : '-'}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Sản phẩm">{deal.product_name || '-'}</Descriptions.Item>
+                      <Descriptions.Item label="Mã sản phẩm">{deal.product_code || '-'}</Descriptions.Item>
+                      <Descriptions.Item label="Số lượng">
+                        <Text strong style={{ color: '#1B4D3E', fontSize: 16 }}>
+                          {deal.quantity_tons?.toFixed(2) || '-'} tấn
+                        </Text>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Đơn giá">
+                        {deal.unit_price?.toLocaleString() || '-'} đ/kg
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Giá chốt">
+                        {deal.final_price ? (
+                          <Text strong style={{ color: '#52c41a' }}>
+                            {deal.final_price.toLocaleString()} đ/kg
+                          </Text>
+                        ) : '-'}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Giá trị">
+                        <Text strong style={{ color: '#1B4D3E', fontSize: 18 }}>
+                          {formatCurrency(deal.total_value_vnd)}
+                        </Text>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Điều kiện giao hàng" span={2}>
+                        {deal.delivery_terms || '-'}
+                      </Descriptions.Item>
+                      {deal.processing_fee_per_ton && (
+                        <Descriptions.Item label="Phí gia công">
+                          {deal.processing_fee_per_ton.toLocaleString()} đ/tấn
+                        </Descriptions.Item>
+                      )}
+                      {deal.expected_output_rate && (
+                        <Descriptions.Item label="Tỷ lệ thu hồi">
+                          {deal.expected_output_rate}%
+                        </Descriptions.Item>
+                      )}
+                      {deal.notes && (
+                        <Descriptions.Item label="Ghi chú" span={2}>
+                          {deal.notes}
+                        </Descriptions.Item>
+                      )}
+                    </Descriptions>
+                  </Card>
 
-          {/* Timeline (E2.2.5) */}
-          <Card
-            title={
-              <Space>
-                <HistoryOutlined />
-                <span>Lịch sử thay đổi</span>
-              </Space>
-            }
-            style={{ borderRadius: 12 }}
-          >
-            <Timeline
-              items={[
-                {
-                  color: 'green',
-                  children: (
-                    <div>
-                      <Text strong>Tạo giao dịch</Text>
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {formatDateTime(deal.created_at)}
-                      </Text>
-                    </div>
-                  ),
-                },
-                ...(deal.status !== 'pending'
-                  ? [
-                      {
-                        color: 'blue',
-                        children: (
-                          <div>
-                            <Text strong>Bắt đầu xử lý</Text>
-                            <br />
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              Trạng thái: Đang xử lý
-                            </Text>
-                          </div>
-                        ),
-                      },
-                    ]
-                  : []),
-                ...(deal.status === 'accepted' || deal.status === 'settled'
-                  ? [
-                      {
-                        color: 'green',
-                        children: (
-                          <div>
-                            <Text strong>Duyệt giao dịch</Text>
-                            {deal.final_price && (
-                              <>
-                                <br />
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                  Giá chốt: {deal.final_price.toLocaleString()} đ/kg
-                                </Text>
-                              </>
-                            )}
-                          </div>
-                        ),
-                      },
-                    ]
-                  : []),
-                ...(deal.status === 'settled'
-                  ? [
-                      {
-                        color: 'purple',
-                        children: (
-                          <div>
-                            <Text strong>Quyết toán</Text>
-                            <br />
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              Hoàn tất giao dịch
-                            </Text>
-                          </div>
-                        ),
-                      },
-                    ]
-                  : []),
-                ...(deal.status === 'cancelled'
-                  ? [
-                      {
-                        color: 'red',
-                        children: (
-                          <div>
-                            <Text strong>Hủy giao dịch</Text>
-                            {deal.notes && (
-                              <>
-                                <br />
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                  Lý do: {deal.notes}
-                                </Text>
-                              </>
-                            )}
-                          </div>
-                        ),
-                      },
-                    ]
-                  : []),
-              ]}
-            />
-          </Card>
-        </Col>
+                  {/* Timeline (E2.2.5) */}
+                  <Card
+                    title={
+                      <Space>
+                        <HistoryOutlined />
+                        <span>Lịch sử thay đổi</span>
+                      </Space>
+                    }
+                    style={{ borderRadius: 12 }}
+                  >
+                    <Timeline
+                      items={[
+                        {
+                          color: 'green',
+                          children: (
+                            <div>
+                              <Text strong>Tạo giao dịch</Text>
+                              <br />
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {formatDateTime(deal.created_at)}
+                              </Text>
+                            </div>
+                          ),
+                        },
+                        ...(deal.status !== 'pending'
+                          ? [
+                              {
+                                color: 'blue',
+                                children: (
+                                  <div>
+                                    <Text strong>Bắt đầu xử lý</Text>
+                                    <br />
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      Trạng thái: Đang xử lý
+                                    </Text>
+                                  </div>
+                                ),
+                              },
+                            ]
+                          : []),
+                        ...(deal.status === 'accepted' || deal.status === 'settled'
+                          ? [
+                              {
+                                color: 'green',
+                                children: (
+                                  <div>
+                                    <Text strong>Duyệt giao dịch</Text>
+                                    {deal.final_price && (
+                                      <>
+                                        <br />
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                          Giá chốt: {deal.final_price.toLocaleString()} đ/kg
+                                        </Text>
+                                      </>
+                                    )}
+                                  </div>
+                                ),
+                              },
+                            ]
+                          : []),
+                        ...(deal.status === 'settled'
+                          ? [
+                              {
+                                color: 'purple',
+                                children: (
+                                  <div>
+                                    <Text strong>Quyết toán</Text>
+                                    <br />
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      Hoàn tất giao dịch
+                                    </Text>
+                                  </div>
+                                ),
+                              },
+                            ]
+                          : []),
+                        ...(deal.status === 'cancelled'
+                          ? [
+                              {
+                                color: 'red',
+                                children: (
+                                  <div>
+                                    <Text strong>Hủy giao dịch</Text>
+                                    {deal.notes && (
+                                      <>
+                                        <br />
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                          Lý do: {deal.notes}
+                                        </Text>
+                                      </>
+                                    )}
+                                  </div>
+                                ),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </Card>
+                </Col>
 
-        {/* Right Column */}
-        <Col xs={24} lg={8}>
-          {/* Partner Info */}
-          <Card
-            title={
-              <Space>
-                <UserOutlined />
-                <span>Thông tin đại lý</span>
-              </Space>
-            }
-            style={{ marginBottom: 24, borderRadius: 12 }}
-            extra={
-              deal.partner?.tier && (
-                <Tag color={TIER_COLORS[deal.partner.tier]}>
-                  {deal.partner.tier.toUpperCase()}
-                </Tag>
-              )
-            }
-          >
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div>
-                <Text type="secondary">Tên đại lý</Text>
-                <br />
-                <Text strong style={{ fontSize: 16 }}>{deal.partner?.name || '-'}</Text>
-              </div>
-              <Divider style={{ margin: '12px 0' }} />
-              <div>
-                <Text type="secondary">Mã đại lý</Text>
-                <br />
-                <Text>{deal.partner?.code || '-'}</Text>
-              </div>
-              <div>
-                <Text type="secondary">Điện thoại</Text>
-                <br />
-                <Text>{deal.partner?.phone || '-'}</Text>
-              </div>
-              <div>
-                <Text type="secondary">Email</Text>
-                <br />
-                <Text>{deal.partner?.email || '-'}</Text>
-              </div>
-              <Divider style={{ margin: '12px 0' }} />
-              <Button
-                block
-                icon={<MessageOutlined />}
-                onClick={handleOpenChat}
-              >
-                Mở Chat với Đại lý
-              </Button>
-              <Button
-                block
-                type="link"
-                onClick={() => navigate(`/b2b/partners/${deal.partner_id}`)}
-              >
-                Xem hồ sơ đại lý
-              </Button>
-            </Space>
-          </Card>
+                {/* Right Column */}
+                <Col xs={24} lg={8}>
+                  {/* Partner Info */}
+                  <Card
+                    title={
+                      <Space>
+                        <UserOutlined />
+                        <span>Thông tin đại lý</span>
+                      </Space>
+                    }
+                    style={{ marginBottom: 24, borderRadius: 12 }}
+                    extra={
+                      deal.partner?.tier && (
+                        <Tag color={TIER_COLORS[deal.partner.tier]}>
+                          {deal.partner.tier.toUpperCase()}
+                        </Tag>
+                      )
+                    }
+                  >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <div>
+                        <Text type="secondary">Tên đại lý</Text>
+                        <br />
+                        <Text strong style={{ fontSize: 16 }}>{deal.partner?.name || '-'}</Text>
+                      </div>
+                      <Divider style={{ margin: '12px 0' }} />
+                      <div>
+                        <Text type="secondary">Mã đại lý</Text>
+                        <br />
+                        <Text>{deal.partner?.code || '-'}</Text>
+                      </div>
+                      <div>
+                        <Text type="secondary">Điện thoại</Text>
+                        <br />
+                        <Text>{deal.partner?.phone || '-'}</Text>
+                      </div>
+                      <div>
+                        <Text type="secondary">Email</Text>
+                        <br />
+                        <Text>{deal.partner?.email || '-'}</Text>
+                      </div>
+                      <Divider style={{ margin: '12px 0' }} />
+                      <Button
+                        block
+                        icon={<MessageOutlined />}
+                        onClick={handleOpenChat}
+                      >
+                        Mở Chat với Đại lý
+                      </Button>
+                      <Button
+                        block
+                        type="link"
+                        onClick={() => navigate(`/b2b/partners/${deal.partner_id}`)}
+                      >
+                        Xem hồ sơ đại lý
+                      </Button>
+                    </Space>
+                  </Card>
 
-          {/* Quick Stats */}
-          <Card
-            title={
-              <Space>
-                <ShoppingOutlined />
-                <span>Tổng quan</span>
-              </Space>
-            }
-            style={{ borderRadius: 12 }}
-          >
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <Statistic
-                  title="Số lượng"
-                  value={deal.quantity_tons || 0}
-                  suffix="tấn"
-                  valueStyle={{ color: '#1B4D3E' }}
-                />
-              </Col>
-              <Col span={12}>
-                <Statistic
-                  title="Đơn giá"
-                  value={deal.unit_price || 0}
-                  suffix="đ/kg"
-                  formatter={(value) => `${Number(value).toLocaleString()}`}
-                />
-              </Col>
-              <Col span={24}>
-                <Divider style={{ margin: '8px 0' }} />
-                <Statistic
-                  title="Tổng giá trị"
-                  value={deal.total_value_vnd || 0}
-                  suffix="VNĐ"
-                  valueStyle={{ color: '#1B4D3E', fontSize: 24 }}
-                  formatter={(value) => `${Number(value).toLocaleString()}`}
-                />
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-      </Row>
+                  {/* Quick Stats */}
+                  <Card
+                    title={
+                      <Space>
+                        <ShoppingOutlined />
+                        <span>Tổng quan</span>
+                      </Space>
+                    }
+                    style={{ borderRadius: 12 }}
+                  >
+                    <Row gutter={[16, 16]}>
+                      <Col span={12}>
+                        <Statistic
+                          title="Số lượng"
+                          value={deal.quantity_tons || 0}
+                          suffix="tấn"
+                          valueStyle={{ color: '#1B4D3E' }}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <Statistic
+                          title="Đơn giá"
+                          value={deal.unit_price || 0}
+                          suffix="đ/kg"
+                          formatter={(value) => `${Number(value).toLocaleString()}`}
+                        />
+                      </Col>
+                      <Col span={24}>
+                        <Divider style={{ margin: '8px 0' }} />
+                        <Statistic
+                          title="Tổng giá trị"
+                          value={deal.total_value_vnd || 0}
+                          suffix="VNĐ"
+                          valueStyle={{ color: '#1B4D3E', fontSize: 24 }}
+                          formatter={(value) => `${Number(value).toLocaleString()}`}
+                        />
+                      </Col>
+                    </Row>
+                  </Card>
+                </Col>
+              </Row>
+            ),
+          },
+          {
+            key: 'wms',
+            label: (
+              <span>
+                <InboxOutlined /> Nhập kho
+                {deal.stock_in_count ? ` (${deal.stock_in_count})` : ''}
+              </span>
+            ),
+            children: <DealWmsTab dealId={deal.id} />,
+          },
+          {
+            key: 'qc',
+            label: (
+              <span>
+                <ExperimentOutlined /> QC
+                {deal.qc_status && deal.qc_status !== 'pending' && (
+                  <Badge
+                    status={
+                      deal.qc_status === 'passed' ? 'success'
+                        : deal.qc_status === 'warning' ? 'warning'
+                        : deal.qc_status === 'failed' ? 'error'
+                        : 'default'
+                    }
+                    style={{ marginLeft: 8 }}
+                  />
+                )}
+              </span>
+            ),
+            children: <DealQcTab dealId={deal.id} deal={deal} />,
+          },
+          {
+            key: 'advances',
+            label: (
+              <span><WalletOutlined /> Tạm ứng</span>
+            ),
+            children: <DealAdvancesTab dealId={deal.id} deal={deal} />,
+          },
+        ]}
+      />
     </div>
   )
 }

@@ -38,6 +38,12 @@ export interface Deal {
   booking_id: string | null
   created_at: string
   updated_at: string | null
+  // Phase 4: WMS fields
+  actual_drc: number | null
+  actual_weight_kg: number | null
+  final_value: number | null
+  stock_in_count: number | null
+  qc_status: string | null           // 'pending' | 'passed' | 'warning' | 'failed'
   // Joined fields
   partner?: {
     id: string

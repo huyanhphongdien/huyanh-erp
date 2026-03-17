@@ -40,7 +40,7 @@ const formatCurrency = (value: number) =>
   `${new Intl.NumberFormat('vi-VN').format(value)} ₫`
 
 const entryTypeOptions = [
-  { label: 'Tat ca', value: 'all' },
+  { label: 'Tất cả', value: 'all' },
   ...Object.entries(ENTRY_TYPE_LABELS).map(([value, label]) => ({
     label,
     value,
@@ -83,7 +83,7 @@ const PartnerLedgerPage: React.FC = () => {
       setEntries(res.data)
       setTotal(res.total)
     } catch (err) {
-      message.error('Khong the tai du lieu so cai')
+      message.error('Không thể tải dữ liệu sổ cái')
     } finally {
       setLoading(false)
     }
@@ -113,12 +113,12 @@ const PartnerLedgerPage: React.FC = () => {
         credit: isDebit ? 0 : values.amount,
       }
       await ledgerService.createManualEntry(data)
-      message.success('Tao but toan thanh cong')
+      message.success('Tạo bút toán thành công')
       setModalOpen(false)
       form.resetFields()
       fetchEntries()
     } catch (err) {
-      message.error('Tao but toan that bai')
+      message.error('Tạo bút toán thất bại')
     } finally {
       setSubmitting(false)
     }
@@ -150,13 +150,13 @@ const PartnerLedgerPage: React.FC = () => {
       ),
     },
     {
-      title: 'Ma tham chieu',
+      title: 'Mã tham chiếu',
       dataIndex: 'reference_code',
       key: 'reference_code',
       width: 160,
     },
     {
-      title: 'Mo ta',
+      title: 'Mô tả',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
@@ -192,7 +192,7 @@ const PartnerLedgerPage: React.FC = () => {
         ),
     },
     {
-      title: 'So du',
+      title: 'Số dư',
       dataIndex: 'running_balance',
       key: 'running_balance',
       width: 150,
@@ -209,7 +209,7 @@ const PartnerLedgerPage: React.FC = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Space align="center" size="middle">
-            <Tooltip title="Quay lai">
+            <Tooltip title="Quay lại">
               <Button
                 icon={<ArrowLeftOutlined />}
                 onClick={() => navigate(-1)}
@@ -245,7 +245,7 @@ const PartnerLedgerPage: React.FC = () => {
         <Row gutter={16} align="middle">
           <Col>
             <RangePicker
-              placeholder={['Tu ngay', 'Den ngay']}
+              placeholder={['Từ ngày', 'Đến ngày']}
               onChange={(dates) =>
                 setDateRange(dates as [Dayjs | null, Dayjs | null] | null)
               }
@@ -262,11 +262,11 @@ const PartnerLedgerPage: React.FC = () => {
               }}
               style={{ width: 200 }}
               options={entryTypeOptions}
-              placeholder="Loai but toan"
+              placeholder="Loại bút toán"
             />
           </Col>
           <Col>
-            <Tooltip title="Tai lai">
+            <Tooltip title="Tải lại">
               <Button icon={<ReloadOutlined />} onClick={fetchEntries} />
             </Tooltip>
           </Col>
@@ -294,7 +294,7 @@ const PartnerLedgerPage: React.FC = () => {
 
       {/* Create Entry Modal */}
       <Modal
-        title="Tao but toan dieu chinh"
+        title="Tạo bút toán điều chỉnh"
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false)
@@ -313,10 +313,10 @@ const PartnerLedgerPage: React.FC = () => {
           }}
         >
           <Form.Item
-            label="So tien"
+            label="Số tiền"
             name="amount"
             rules={[
-              { required: true, message: 'Vui long nhap so tien' },
+              { required: true, message: 'Vui lòng nhập số tiền' },
               {
                 type: 'number',
                 min: 1,
@@ -330,7 +330,7 @@ const PartnerLedgerPage: React.FC = () => {
                 `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
               }
               parser={(value) => Number(value?.replace(/,/g, '') || 0) as any}
-              placeholder="Nhap so tien"
+              placeholder="Nhập số tiền"
               suffix="₫"
               min={1}
             />
@@ -339,7 +339,7 @@ const PartnerLedgerPage: React.FC = () => {
           <Form.Item
             label="Loai"
             name="type"
-            rules={[{ required: true, message: 'Vui long chon loai' }]}
+            rules={[{ required: true, message: 'Vui lòng chọn loại' }]}
           >
             <Radio.Group>
               <Radio value="debit">No</Radio>
@@ -348,17 +348,17 @@ const PartnerLedgerPage: React.FC = () => {
           </Form.Item>
 
           <Form.Item
-            label="Mo ta"
+            label="Mô tả"
             name="description"
-            rules={[{ required: true, message: 'Vui long nhap mo ta' }]}
+            rules={[{ required: true, message: 'Vui lòng nhập mô tả' }]}
           >
-            <Input placeholder="Nhap mo ta but toan" />
+            <Input placeholder="Nhập mô tả bút toán" />
           </Form.Item>
 
           <Form.Item
-            label="Ngay but toan"
+            label="Ngày bút toán"
             name="entry_date"
-            rules={[{ required: true, message: 'Vui long chon ngay' }]}
+            rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
           >
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>

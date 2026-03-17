@@ -1,37 +1,42 @@
 // ============================================================================
-// FILE: src/pages/wms/stock-out/PickingListPage.tsx
-// MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P4 — Bước 4.6 — Trang Picking (NV kho dùng trên mobile)
-// ============================================================================
-// FLOOR ASSOCIATE VIEW — Task-driven, swipe gestures, haptic feedback
-// Design: Manhattan Active WMS Mobile pattern
-// Font: Be Vietnam Pro + JetBrains Mono
+// PICKING LIST PAGE — Ant Design + Custom Swipe Gesture
+// File: src/pages/wms/stock-out/PickingListPage.tsx
+// Rewrite: Tailwind -> Ant Design v6, keep swipe-to-pick gesture
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  ArrowLeft,
-  Check,
-  X,
-  Package,
-  MapPin,
-  FlaskConical,
-  AlertTriangle,
-  CircleCheck,
-  CircleX,
-  Clock,
-  Loader2,
-  PackageMinus,
-  ChevronRight,
-  SkipForward,
-  RotateCcw,
-  Info,
-} from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
+import {
+  Button,
+  Card,
+  Tag,
+  Typography,
+  Spin,
+  Progress,
+  Space,
+  Alert,
+  Result,
+} from 'antd'
+import {
+  ArrowLeftOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ExperimentOutlined,
+  ClockCircleOutlined,
+  WarningOutlined,
+  LoadingOutlined,
+  UndoOutlined,
+  ForwardOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import { pickingService } from '../../../services/wms/pickingService'
 import stockOutService from '../../../services/wms/stockOutService'
 import type { PickingStatus } from '../../../services/wms/wms.types'
+import GradeBadge from '../../../components/wms/GradeBadge'
+import type { RubberGrade } from '../../../services/wms/wms.types'
+
+const { Text } = Typography
 
 // ============================================================================
 // TYPES
@@ -61,6 +66,8 @@ interface PickingDetail {
     qc_status: string
     latest_drc: number | null
     received_date: string
+    rubber_grade: RubberGrade | null
+    dry_weight: number | null
   } | null
   location: {
     id: string
@@ -92,62 +99,36 @@ const haptic = {
 }
 
 // ============================================================================
-// QC BADGE
+// CONSTANTS
 // ============================================================================
 
-const QCBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ status, size = 'sm' }) => {
-  const config: Record<string, { bg: string; icon: React.ReactNode; label: string }> = {
-    passed: {
-      bg: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-      icon: <CircleCheck className={size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'} />,
-      label: 'Đạt',
-    },
-    warning: {
-      bg: 'bg-amber-50 border-amber-200 text-amber-700',
-      icon: <AlertTriangle className={size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'} />,
-      label: 'Cảnh báo',
-    },
-    failed: {
-      bg: 'bg-red-50 border-red-200 text-red-700',
-      icon: <CircleX className={size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'} />,
-      label: 'Không đạt',
-    },
-    pending: {
-      bg: 'bg-gray-50 border-gray-200 text-gray-500',
-      icon: <Clock className={size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'} />,
-      label: 'Chờ kiểm',
-    },
-  }
-  const c = config[status] || config.pending
-  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs'
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 ${textSize} font-semibold rounded-full border ${c.bg}`}>
-      {c.icon} {c.label}
-    </span>
-  )
+const REASON_LABELS = {
+  sale: 'Bán hàng',
+  production: 'Sản xuất',
+  transfer: 'Chuyển kho',
+  blend: 'Phối trộn',
+  adjust: 'Điều chỉnh',
+  return: 'Trả hàng',
+} as const
+
+const QC_TAG_CONFIG: Record<string, { color: string; label: string }> = {
+  passed: { color: 'success', label: 'Đạt' },
+  warning: { color: 'warning', label: 'Cảnh báo' },
+  failed: { color: 'error', label: 'Không đạt' },
+  pending: { color: 'default', label: 'Chờ kiểm' },
 }
 
-// ============================================================================
-// PICKING STATUS BADGE
-// ============================================================================
-
-const PickingBadge: React.FC<{ status: PickingStatus }> = ({ status }) => {
-  const config: Record<string, { bg: string; label: string }> = {
-    pending: { bg: 'bg-gray-100 text-gray-500', label: 'Chờ lấy' },
-    picking: { bg: 'bg-blue-100 text-blue-700', label: 'Đang lấy' },
-    picked: { bg: 'bg-emerald-100 text-emerald-700', label: 'Đã lấy ✓' },
-    skipped: { bg: 'bg-orange-100 text-orange-600', label: 'Bỏ qua' },
-  }
-  const c = config[status] || config.pending
-  return (
-    <span className={`px-2.5 py-1 text-[11px] font-bold rounded-full ${c.bg}`}>
-      {c.label}
-    </span>
-  )
+const PICKING_TAG_CONFIG: Record<string, { color: string; label: string }> = {
+  pending: { color: 'default', label: 'Chờ lấy' },
+  picking: { color: 'processing', label: 'Đang lấy' },
+  picked: { color: 'success', label: 'Đã lấy' },
+  skipped: { color: 'orange', label: 'Bỏ qua' },
 }
 
+const monoStyle: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" }
+
 // ============================================================================
-// SWIPEABLE PICKING CARD
+// SWIPEABLE PICKING CARD — Custom DOM interaction preserved
 // ============================================================================
 
 const SwipeablePickingCard: React.FC<{
@@ -172,9 +153,9 @@ const SwipeablePickingCard: React.FC<{
   // Build location string
   const locationStr = detail.location
     ? [
-        detail.location.shelf ? `Kệ ${detail.location.shelf}` : null,
-        detail.location.row_name ? `Hàng ${detail.location.row_name}` : null,
-        detail.location.column_name ? `Ô ${detail.location.column_name}` : null,
+        detail.location.shelf ? `Ke ${detail.location.shelf}` : null,
+        detail.location.row_name ? `Hang ${detail.location.row_name}` : null,
+        detail.location.column_name ? `O ${detail.location.column_name}` : null,
       ].filter(Boolean).join(' · ') || detail.location.code
     : null
 
@@ -188,7 +169,6 @@ const SwipeablePickingCard: React.FC<{
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!canSwipe || touchStartX === null) return
     const dx = e.touches[0].clientX - touchStartX
-    // Giới hạn kéo: -120 → +120
     const clamped = Math.max(-120, Math.min(120, dx))
     setTranslateX(clamped)
   }
@@ -202,11 +182,9 @@ const SwipeablePickingCard: React.FC<{
     const threshold = 80
 
     if (translateX > threshold) {
-      // Swipe RIGHT → Đã lấy
       haptic.success()
       onPicked()
     } else if (translateX < -threshold) {
-      // Swipe LEFT → Bỏ qua
       haptic.warning()
       onSkipped()
     }
@@ -216,30 +194,52 @@ const SwipeablePickingCard: React.FC<{
     setSwiping(false)
   }
 
-  // Background hints khi swipe
   const showPickedHint = translateX > 40
   const showSkipHint = translateX < -40
 
+  // Card border color
+  const borderColor = isActive && !isDone
+    ? '#2D8B6E'
+    : isPicked
+      ? '#52c41a'
+      : isSkipped
+        ? '#fa8c16'
+        : '#f0f0f0'
+
+  const bgColor = isPicked
+    ? 'rgba(82,196,26,0.04)'
+    : isSkipped
+      ? 'rgba(250,140,22,0.04)'
+      : '#fff'
+
+  const qcCfg = QC_TAG_CONFIG[detail.batch?.qc_status || 'pending'] || QC_TAG_CONFIG.pending
+
   return (
-    <div className="relative overflow-hidden rounded-xl mb-3">
-      {/* Background layers — visible khi swipe */}
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 12, marginBottom: 12 }}>
+      {/* Background layers — visible during swipe */}
       {canSwipe && (
         <>
-          {/* Swipe right = Đã lấy (green) */}
-          <div className={`absolute inset-0 bg-emerald-500 rounded-xl flex items-center pl-5
-            transition-opacity duration-100 ${showPickedHint ? 'opacity-100' : 'opacity-0'}`}>
-            <div className="flex items-center gap-2 text-white font-bold text-sm">
-              <CircleCheck className="w-6 h-6" />
-              Đã lấy
-            </div>
+          {/* Swipe right = Picked (green) */}
+          <div style={{
+            position: 'absolute', inset: 0, backgroundColor: '#52c41a', borderRadius: 12,
+            display: 'flex', alignItems: 'center', paddingLeft: 20,
+            opacity: showPickedHint ? 1 : 0, transition: 'opacity 100ms',
+          }}>
+            <Space style={{ color: '#fff', fontWeight: 700 }}>
+              <CheckCircleOutlined style={{ fontSize: 24 }} />
+              Da lay
+            </Space>
           </div>
-          {/* Swipe left = Bỏ qua (orange) */}
-          <div className={`absolute inset-0 bg-orange-400 rounded-xl flex items-center justify-end pr-5
-            transition-opacity duration-100 ${showSkipHint ? 'opacity-100' : 'opacity-0'}`}>
-            <div className="flex items-center gap-2 text-white font-bold text-sm">
-              Bỏ qua
-              <SkipForward className="w-6 h-6" />
-            </div>
+          {/* Swipe left = Skip (orange) */}
+          <div style={{
+            position: 'absolute', inset: 0, backgroundColor: '#fa8c16', borderRadius: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 20,
+            opacity: showSkipHint ? 1 : 0, transition: 'opacity 100ms',
+          }}>
+            <Space style={{ color: '#fff', fontWeight: 700 }}>
+              Bo qua
+              <ForwardOutlined style={{ fontSize: 24 }} />
+            </Space>
           </div>
         </>
       )}
@@ -250,139 +250,158 @@ const SwipeablePickingCard: React.FC<{
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`
-          relative bg-white rounded-xl border shadow-sm
-          transition-transform ${swiping ? 'duration-0' : 'duration-200'}
-          ${isActive && !isDone
-            ? 'border-[#2D8B6E] ring-2 ring-[#2D8B6E]/20 border-l-4 border-l-[#2D8B6E]'
-            : isPicked
-              ? 'border-emerald-200 bg-emerald-50/30 border-l-4 border-l-emerald-400'
-              : isSkipped
-                ? 'border-orange-200 bg-orange-50/30 border-l-4 border-l-orange-300'
-                : 'border-gray-100 border-l-4 border-l-gray-200'}
-          ${isDone ? 'opacity-70' : ''}
-        `}
-        style={{ transform: `translateX(${translateX}px)` }}
+        style={{
+          position: 'relative',
+          backgroundColor: bgColor,
+          borderRadius: 12,
+          border: `2px solid ${borderColor}`,
+          borderLeft: `4px solid ${borderColor}`,
+          boxShadow: isActive && !isDone ? '0 0 0 3px rgba(45,139,110,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
+          transform: `translateX(${translateX}px)`,
+          transition: swiping ? 'none' : 'transform 200ms ease',
+          opacity: isDone ? 0.7 : 1,
+          padding: 16,
+        }}
       >
-        <div className="p-4">
-          {/* Row 1: Index + Batch No + Status */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold ${
-                isDone ? 'text-gray-400' : 'text-gray-500'
-              }`}>#{index + 1}</span>
-              <span className={`text-[15px] font-bold ${
-                isPicked ? 'text-emerald-700 line-through' :
-                isSkipped ? 'text-orange-500 line-through' :
-                'text-gray-900'
-              }`}
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {detail.batch?.batch_no || '—'}
-              </span>
-            </div>
-            <PickingBadge status={detail.picking_status} />
-          </div>
-
-          {/* Row 2: Material */}
-          <p className={`text-[13px] mb-2 ${isDone ? 'text-gray-400' : 'text-gray-700'}`}>
-            <Package className="w-3.5 h-3.5 inline mr-1" />
-            {detail.material?.sku} — {detail.material?.name}
-          </p>
-
-          {/* Row 3: Location + Quantity */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 text-[12px]">
-              {locationStr && (
-                <span className={`flex items-center gap-1 ${isDone ? 'text-gray-300' : 'text-gray-500'}`}>
-                  <MapPin className="w-3 h-3" />
-                  {locationStr}
-                </span>
-              )}
-              {detail.batch?.latest_drc != null && (
-                <span className={`flex items-center gap-1 ${isDone ? 'text-gray-300' : 'text-gray-500'}`}
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  <FlaskConical className="w-3 h-3" />
-                  {detail.batch.latest_drc.toFixed(1)}%
-                </span>
-              )}
-              <QCBadge status={detail.batch?.qc_status || 'pending'} />
-            </div>
-          </div>
-
-          {/* Row 4: Big quantity — prominent for warehouse staff */}
-          <div className={`mt-3 flex items-end justify-between ${
-            isDone ? 'opacity-50' : ''
-          }`}>
-            <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Số lượng cần lấy</p>
-              <p className={`text-2xl font-bold ${
-                isPicked ? 'text-emerald-600' :
-                isSkipped ? 'text-orange-400' :
-                'text-[#1B4D3E]'
-              }`}
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {detail.quantity.toLocaleString('vi-VN')}
-                <span className="text-sm font-normal text-gray-400 ml-1">
-                  {detail.material?.unit || 'kg'}
-                </span>
-              </p>
-            </div>
-            {detail.batch?.received_date && (
-              <span className="text-[11px] text-gray-400">
-                Nhập {new Date(detail.batch.received_date).toLocaleDateString('vi-VN')}
-              </span>
-            )}
-          </div>
-
-          {/* Active card: swipe hint */}
-          {isActive && !isDone && (
-            <div className="mt-3 flex items-center justify-center gap-4 text-[11px] text-gray-400 py-1">
-              <span className="flex items-center gap-1">
-                ← Bỏ qua
-              </span>
-              <span className="w-px h-3 bg-gray-200" />
-              <span className="flex items-center gap-1">
-                Đã lấy →
-              </span>
-            </div>
-          )}
-
-          {/* Undo button for done items */}
-          {isDone && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                haptic.light()
-                onUndo()
+        {/* Row 1: Index + Batch No + Grade + Status */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <Space>
+            <Text type="secondary" strong style={{ fontSize: 12 }}>#{index + 1}</Text>
+            <Text
+              strong
+              style={{
+                ...monoStyle,
+                fontSize: 15,
+                color: isPicked ? '#52c41a' : isSkipped ? '#fa8c16' : '#1B4D3E',
+                textDecoration: isDone ? 'line-through' : 'none',
               }}
-              className="mt-2 flex items-center gap-1.5 text-[12px] text-gray-400
-                active:text-gray-600 py-1"
             >
-              <RotateCcw className="w-3 h-3" />
-              Hoàn tác
-            </button>
+              {detail.batch?.batch_no || '—'}
+            </Text>
+            <GradeBadge grade={detail.batch?.rubber_grade} size="small" />
+          </Space>
+          <Tag color={PICKING_TAG_CONFIG[detail.picking_status]?.color || 'default'}>
+            {PICKING_TAG_CONFIG[detail.picking_status]?.label || 'Chờ lấy'}
+          </Tag>
+        </div>
+
+        {/* Row 2: Material */}
+        <Text style={{ fontSize: 13, color: isDone ? '#bfbfbf' : '#595959' }}>
+          {detail.material?.sku} — {detail.material?.name}
+        </Text>
+
+        {/* Row 3: Location + DRC + QC */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, fontSize: 12 }}>
+          {locationStr && (
+            <Text type={isDone ? 'secondary' : undefined} style={{ fontSize: 12 }}>
+              {locationStr}
+            </Text>
+          )}
+          {detail.batch?.latest_drc != null && (
+            <Text style={{ ...monoStyle, fontSize: 12, color: isDone ? '#bfbfbf' : '#595959' }}>
+              <ExperimentOutlined style={{ marginRight: 4 }} />
+              {detail.batch.latest_drc.toFixed(1)}%
+            </Text>
+          )}
+          {detail.batch?.dry_weight != null && (
+            <Text style={{ ...monoStyle, fontSize: 12, color: isDone ? '#bfbfbf' : '#8c8c8c' }}>
+              KL kho: {detail.batch.dry_weight.toLocaleString('vi-VN')} kg
+            </Text>
+          )}
+          <Tag color={qcCfg.color} style={{ fontSize: 11 }}>{qcCfg.label}</Tag>
+        </div>
+
+        {/* Row 4: Big quantity */}
+        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', opacity: isDone ? 0.5 : 1 }}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
+              Số lượng can lay
+            </Text>
+            <div>
+              <Text
+                strong
+                style={{
+                  ...monoStyle,
+                  fontSize: 28,
+                  color: isPicked ? '#52c41a' : isSkipped ? '#fa8c16' : '#1B4D3E',
+                }}
+              >
+                {detail.quantity.toLocaleString('vi-VN')}
+              </Text>
+              <Text type="secondary" style={{ marginLeft: 4 }}>
+                {detail.material?.unit || 'kg'}
+              </Text>
+            </div>
+          </div>
+          {detail.batch?.received_date && (
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              Nhap {new Date(detail.batch.received_date).toLocaleDateString('vi-VN')}
+            </Text>
           )}
         </div>
 
-        {/* Desktop fallback: buttons (khi không swipe được) */}
+        {/* Active card: swipe hint */}
         {isActive && !isDone && (
-          <div className="hidden md:flex border-t border-gray-100 divide-x divide-gray-100">
-            <button
+          <div style={{
+            marginTop: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 16,
+            fontSize: 11,
+            color: '#bfbfbf',
+            paddingTop: 4,
+          }}>
+            <span>&#8592; Bo qua</span>
+            <span style={{ width: 1, height: 12, backgroundColor: '#e8e8e8', display: 'inline-block' }} />
+            <span>Da lay &#8594;</span>
+          </div>
+        )}
+
+        {/* Undo button for done items */}
+        {isDone && (
+          <Button
+            type="text"
+            size="small"
+            icon={<UndoOutlined />}
+            onClick={(e) => {
+              e.stopPropagation()
+              haptic.light()
+              onUndo()
+            }}
+            style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}
+          >
+            Hoan tac
+          </Button>
+        )}
+
+        {/* Desktop fallback: buttons */}
+        {isActive && !isDone && (
+          <div
+            className="hidden md:flex"
+            style={{
+              marginTop: 12,
+              borderTop: '1px solid #f0f0f0',
+              paddingTop: 12,
+              display: 'none', // hidden on mobile, visible on md+
+              gap: 8,
+            }}
+          >
+            <Button
               onClick={() => { haptic.warning(); onSkipped() }}
-              className="flex-1 min-h-[48px] flex items-center justify-center gap-2
-                text-[13px] font-medium text-orange-600 active:bg-orange-50 transition-colors"
+              icon={<ForwardOutlined />}
+              style={{ flex: 1, color: '#fa8c16', borderColor: '#fa8c16' }}
             >
-              <SkipForward className="w-4 h-4" />
-              Bỏ qua
-            </button>
-            <button
+              Bo qua
+            </Button>
+            <Button
+              type="primary"
               onClick={() => { haptic.success(); onPicked() }}
-              className="flex-1 min-h-[48px] flex items-center justify-center gap-2
-                text-[13px] font-bold text-emerald-700 active:bg-emerald-50 transition-colors"
+              icon={<CheckCircleOutlined />}
+              style={{ flex: 1, backgroundColor: '#52c41a', borderColor: '#52c41a' }}
             >
-              <CircleCheck className="w-4 h-4" />
-              Đã lấy
-            </button>
+              Da lay
+            </Button>
           </div>
         )}
       </div>
@@ -403,7 +422,7 @@ const PickingListPage: React.FC = () => {
   const [details, setDetails] = useState<PickingDetail[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [updating, setUpdating] = useState<string | null>(null) // detail id đang update
+  const [updating, setUpdating] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
@@ -423,7 +442,6 @@ const PickingListPage: React.FC = () => {
     setError(null)
 
     try {
-      // Load order info
       const { data: order, error: orderErr } = await supabase
         .from('stock_out_orders')
         .select(`
@@ -436,12 +454,11 @@ const PickingListPage: React.FC = () => {
       if (orderErr) throw orderErr
       setOrderInfo(order as unknown as OrderInfo)
 
-      // Load picking details
       const pickingDetails = await pickingService.getPickingDetails(stockOutId)
       setDetails(pickingDetails as unknown as PickingDetail[])
     } catch (err: any) {
-      console.error('Lỗi tải dữ liệu picking:', err)
-      setError(err.message || 'Không thể tải danh sách picking')
+      console.error('Loi tai du lieu picking:', err)
+      setError(err.message || 'Không thể tải danh sach picking')
     } finally {
       setLoading(false)
     }
@@ -466,7 +483,7 @@ const PickingListPage: React.FC = () => {
     .filter(d => d.picking_status === 'picked')
     .reduce((s, d) => s + d.quantity, 0)
 
-  // Find first active (pending/picking) item
+  // Find first active item
   const activeIndex = details.findIndex(
     d => d.picking_status === 'pending' || d.picking_status === 'picking'
   )
@@ -490,7 +507,7 @@ const PickingListPage: React.FC = () => {
         )
       )
     } catch (err: any) {
-      console.error('Lỗi cập nhật:', err)
+      console.error('Loi cap nhat:', err)
       haptic.error()
       setError(err.message)
     } finally {
@@ -498,14 +515,13 @@ const PickingListPage: React.FC = () => {
     }
   }
 
-  // Complete picking → navigate back
+  // Complete picking
   const handleCompletePicking = async () => {
     if (!allDone || !stockOutId) return
     setCompleting(true)
     setError(null)
 
     try {
-      // Update order status to 'picked' if needed
       await supabase
         .from('stock_out_orders')
         .update({
@@ -515,10 +531,9 @@ const PickingListPage: React.FC = () => {
         .eq('id', stockOutId)
 
       haptic.success()
-      // Navigate to detail page
       navigate(`/wms/stock-out/${stockOutId}`)
     } catch (err: any) {
-      console.error('Lỗi hoàn tất:', err)
+      console.error('Loi hoan tat:', err)
       setError(err.message)
       haptic.error()
     } finally {
@@ -531,36 +546,31 @@ const PickingListPage: React.FC = () => {
   // ========================================================================
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center"
-        style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-[#2D8B6E] animate-spin mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">Đang tải picking list...</p>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+        <Spin size="large" tip="Đang tải picking list..." />
       </div>
     )
   }
 
   // ========================================================================
-  // ERROR
+  // ERROR / EMPTY
   // ========================================================================
   if (!orderInfo || details.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center p-6"
-        style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-        <div className="text-center max-w-sm">
-          <PackageMinus className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm mb-4">
-            {error || 'Không tìm thấy phiếu xuất hoặc chưa có dữ liệu picking'}
-          </p>
-          <button
-            onClick={() => navigate(-1)}
-            className="min-h-[48px] px-6 bg-[#2D8B6E] text-white font-bold rounded-xl
-              active:scale-[0.97] transition-transform text-[14px]"
-          >
-            Quay lại
-          </button>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+        <Result
+          status="info"
+          title={error || 'Không tìm thấy phiếu xuất hoặc chưa có dữ liệu picking'}
+          extra={
+            <Button
+              type="primary"
+              onClick={() => navigate(-1)}
+              style={{ backgroundColor: '#2D8B6E', borderColor: '#2D8B6E' }}
+            >
+              Quay lại
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -569,56 +579,66 @@ const PickingListPage: React.FC = () => {
   // RENDER
   // ========================================================================
   return (
-    <div className="min-h-screen bg-[#F7F5F2] pb-24"
-      style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F7F5F2', paddingBottom: 100 }}>
 
       {/* STICKY HEADER */}
-      <div className="sticky top-0 z-30 bg-[#1B4D3E] text-white">
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 30,
+        backgroundColor: '#1B4D3E',
+        color: '#fff',
+      }}>
         {/* Top bar */}
-        <div className="px-4 py-3 flex items-center gap-3">
-          <button
+        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
             onClick={() => navigate(`/wms/stock-out/${stockOutId}`)}
-            className="p-2 -ml-2 text-white/70 active:text-white active:scale-90 transition"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-bold truncate"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            style={{ color: 'rgba(255,255,255,0.7)' }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ ...monoStyle, fontSize: 15, fontWeight: 700 }}>
               {orderInfo.code}
-            </p>
-            <p className="text-[11px] text-white/60">
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
               {orderInfo.warehouse?.code} · {REASON_LABELS[orderInfo.reason as keyof typeof REASON_LABELS] || orderInfo.reason}
               {orderInfo.customer_name && ` · ${orderInfo.customer_name}`}
-            </p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-[22px] font-bold"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ ...monoStyle, fontSize: 22, fontWeight: 700 }}>
               {doneItems}/{totalItems}
-            </p>
-            <p className="text-[10px] text-white/50 uppercase tracking-wider">Hoàn thành</p>
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>
+              Hoàn thành
+            </div>
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="px-4 pb-3">
-          <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500 ease-out"
-              style={{
-                width: `${progressPercent}%`,
-                backgroundColor: allDone ? '#16A34A' : '#E8A838',
-              }}
-            />
-          </div>
-          <div className="flex justify-between mt-1.5 text-[11px] text-white/50">
-            <span>
-              Đã lấy: {pickedQty.toLocaleString('vi-VN')} / {totalQty.toLocaleString('vi-VN')}
+        <div style={{ padding: '0 16px 12px' }}>
+          <Progress
+            percent={progressPercent}
+            showInfo={false}
+            strokeColor={allDone ? '#16A34A' : '#E8A838'}
+            trailColor="rgba(255,255,255,0.1)"
+            size={['100%', 10]}
+            style={{ margin: 0 }}
+          />
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: 6,
+            fontSize: 11,
+            color: 'rgba(255,255,255,0.5)',
+          }}>
+            <span style={monoStyle}>
+              Da lay: {pickedQty.toLocaleString('vi-VN')} / {totalQty.toLocaleString('vi-VN')}
             </span>
             <span>
               {progressPercent}%
-              {skippedItems > 0 && ` · ${skippedItems} bỏ qua`}
+              {skippedItems > 0 && ` · ${skippedItems} bo qua`}
             </span>
           </div>
         </div>
@@ -626,27 +646,26 @@ const PickingListPage: React.FC = () => {
 
       {/* ERROR BANNER */}
       {error && (
-        <div className="px-4 pt-3">
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-            <span className="text-sm text-red-700 flex-1">{error}</span>
-            <button onClick={() => setError(null)} className="text-red-400">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+        <div style={{ padding: '12px 16px 0' }}>
+          <Alert
+            message={error}
+            type="error"
+            closable
+            onClose={() => setError(null)}
+          />
         </div>
       )}
 
       {/* INSTRUCTION HINT */}
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2 text-[12px] text-gray-400">
-          <Info className="w-3.5 h-3.5 shrink-0" />
-          <span>Vuốt phải = <strong className="text-emerald-600">Đã lấy</strong> · Vuốt trái = <strong className="text-orange-500">Bỏ qua</strong></span>
-        </div>
+      <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#bfbfbf' }}>
+        <InfoCircleOutlined />
+        <span>
+          Vuot phai = <strong style={{ color: '#52c41a' }}>Da lay</strong> · Vuot trai = <strong style={{ color: '#fa8c16' }}>Bo qua</strong>
+        </span>
       </div>
 
       {/* PICKING LIST */}
-      <div className="px-4 pt-2">
+      <div style={{ padding: '8px 16px' }}>
         {details.map((detail, i) => (
           <SwipeablePickingCard
             key={detail.id}
@@ -663,74 +682,75 @@ const PickingListPage: React.FC = () => {
 
       {/* ALL DONE CELEBRATION */}
       {allDone && (
-        <div className="px-4 py-6 text-center"
-          style={{ animation: 'fadeIn 300ms ease-out' }}>
-          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-            <CircleCheck className="w-8 h-8 text-emerald-600" />
+        <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: '50%',
+            backgroundColor: 'rgba(82,196,26,0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 12px',
+          }}>
+            <CheckCircleOutlined style={{ fontSize: 32, color: '#52c41a' }} />
           </div>
-          <p className="text-lg font-bold text-gray-900 mb-1">Picking hoàn tất!</p>
-          <p className="text-sm text-gray-500">
-            Đã lấy {pickedQty.toLocaleString('vi-VN')} từ {pickedItems} lô
-            {skippedItems > 0 && ` · ${skippedItems} lô bỏ qua`}
-          </p>
+          <Text strong style={{ fontSize: 18 }}>Picking hoan tat!</Text>
+          <div>
+            <Text type="secondary">
+              Da lay {pickedQty.toLocaleString('vi-VN')} tu {pickedItems} lo
+              {skippedItems > 0 && ` · ${skippedItems} lo bo qua`}
+            </Text>
+          </div>
         </div>
       )}
 
       {/* BOTTOM ACTION BAR */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-20"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-        <div className="max-w-lg mx-auto px-4 py-3 flex gap-3">
-          <button
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderTop: '1px solid #f0f0f0',
+        boxShadow: '0 -2px 10px rgba(0,0,0,0.05)',
+        zIndex: 20,
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+      }}>
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '12px 16px', display: 'flex', gap: 12 }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
             onClick={() => navigate(`/wms/stock-out/${stockOutId}`)}
-            className="min-h-[48px] px-4 text-[14px] font-medium text-gray-600
-              rounded-xl border border-gray-200 active:scale-[0.97] transition-transform"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <button
+            size="large"
+          />
+          <Button
+            type="primary"
+            size="large"
+            block
             onClick={handleCompletePicking}
             disabled={!allDone || completing}
-            className={`flex-1 min-h-[56px] inline-flex items-center justify-center gap-2
-              text-[15px] font-bold text-white rounded-xl
-              active:scale-[0.97] transition-transform
-              ${allDone && !completing
-                ? 'bg-[#2D8B6E] shadow-[0_2px_12px_rgba(45,139,110,0.3)]'
-                : 'bg-gray-300 cursor-not-allowed'}`}
+            loading={completing}
+            icon={!completing ? <CheckCircleOutlined /> : undefined}
+            style={{
+              height: 56,
+              fontSize: 15,
+              fontWeight: 700,
+              ...(allDone && !completing
+                ? { backgroundColor: '#2D8B6E', borderColor: '#2D8B6E' }
+                : {}),
+            }}
           >
-            {completing ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Check className="w-5 h-5" />
-            )}
-            {completing ? 'Đang xử lý...' :
+            {completing ? 'Dang xu ly...' :
               allDone ? 'Hoàn tất Picking' :
-              `Còn ${pendingItems} lô chưa lấy`}
-          </button>
+              `Con ${pendingItems} lo chua lay`}
+          </Button>
         </div>
       </div>
 
-      {/* ANIMATIONS */}
+      {/* Desktop fallback styles */}
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to   { opacity: 1; transform: scale(1); }
+        @media (min-width: 768px) {
+          .hidden.md\\:flex { display: flex !important; }
         }
       `}</style>
     </div>
   )
 }
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const REASON_LABELS = {
-  sale: 'Bán hàng',
-  production: 'Sản xuất',
-  transfer: 'Chuyển kho',
-  blend: 'Phối trộn',
-  adjust: 'Điều chỉnh',
-  return: 'Trả hàng',
-} as const
 
 export default PickingListPage

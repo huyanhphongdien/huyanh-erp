@@ -1,16 +1,46 @@
 // ============================================================================
 // FILE: src/pages/wms/StockCheckPage.tsx
 // MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P5 — Bước 5.7: Kiểm kê tồn kho
+// PHASE: P5 — Buoc 5.7: Kiểm kê tồn kho
+// REWRITE: Tailwind -> Ant Design v6
 // ============================================================================
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, ClipboardCheck, Warehouse, Package, Search,
-  Check, X, AlertTriangle, Loader2, ArrowRight, ArrowUp,
-  ArrowDown, Minus, Save
-} from 'lucide-react'
+  Card,
+  Table,
+  Tag,
+  Button,
+  Space,
+  Typography,
+  Spin,
+  Empty,
+  Input,
+  InputNumber,
+  Steps,
+  Row,
+  Col,
+  Statistic,
+  Progress,
+  Alert,
+  Result,
+  message,
+} from 'antd'
+import {
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  CheckOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  SearchOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  MinusOutlined,
+  SaveOutlined,
+  LoadingOutlined,
+  AuditOutlined,
+} from '@ant-design/icons'
 import {
   stockCheckService,
   type StockCheck,
@@ -19,11 +49,14 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 
+const { Title, Text } = Typography
+const MONO_FONT = "'JetBrains Mono', monospace"
+
 const StockCheckPage = () => {
   const navigate = useNavigate()
   const { user } = useAuthStore()
 
-  // Steps: select_warehouse → checking → review
+  // Steps: select_warehouse -> checking -> review
   const [step, setStep] = useState<'select_warehouse' | 'checking' | 'review'>('select_warehouse')
   const [warehouses, setWarehouses] = useState<any[]>([])
   const [selectedWarehouse, setSelectedWarehouse] = useState('')
@@ -66,7 +99,7 @@ const StockCheckPage = () => {
       setStockCheck(check)
       setStep('checking')
     } catch (err: any) {
-      alert(err.message || 'Lỗi tạo kiểm kê')
+      message.error(err.message || 'Loi tao kiem ke')
     } finally {
       setCreating(false)
     }
@@ -93,10 +126,10 @@ const StockCheckPage = () => {
     try {
       setSaving(true)
       const result = await stockCheckService.finalizeStockCheck(stockCheck, user.employee_id || user.id)
-      alert(`Kiểm kê hoàn tất!\n• ${result.adjustments} dòng chênh lệch\n• ${result.transactions_created} phiếu điều chỉnh`)
+      message.success(`Kiểm kê hoan tat! ${result.adjustments} dong chenh lech, ${result.transactions_created} phieu dieu chinh`)
       navigate('/wms')
     } catch (err: any) {
-      alert(err.message || 'Lỗi hoàn tất kiểm kê')
+      message.error(err.message || 'Loi hoan tat kiem ke')
     } finally {
       setSaving(false)
     }
@@ -123,235 +156,266 @@ const StockCheckPage = () => {
     return true
   })
 
-  // Helpers
-  const getDiscrepancyStyle = (disc: number) => {
-    if (disc === 0) return { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: <Check className="w-3 h-3" /> }
-    if (disc > 0) return { bg: 'bg-blue-50', text: 'text-blue-700', icon: <ArrowUp className="w-3 h-3" /> }
-    return { bg: 'bg-red-50', text: 'text-red-700', icon: <ArrowDown className="w-3 h-3" /> }
+  const getDiscrepancyTag = (disc: number) => {
+    if (disc === 0) return <Tag icon={<CheckOutlined />} color="success">Khop</Tag>
+    if (disc > 0) return <Tag icon={<ArrowUpOutlined />} color="blue">+{disc}</Tag>
+    return <Tag icon={<ArrowDownOutlined />} color="error">{disc}</Tag>
   }
 
   const warehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name || ''
 
-  // ========== STEP 1: CHỌN KHO ==========
+  const currentStepIndex = step === 'select_warehouse' ? 0 : step === 'checking' ? 1 : 2
+
+  // ========== STEP INDICATOR ==========
+  const stepsBar = (
+    <Steps
+      current={currentStepIndex}
+      size="small"
+      style={{ padding: '16px', background: '#fff', borderBottom: '1px solid #f0f0f0' }}
+      items={[
+        { title: 'Chọn kho' },
+        { title: 'Nhap so lieu' },
+        { title: 'Kết quả' },
+      ]}
+    />
+  )
+
+  // ========== STEP 1: CHON KHO ==========
   if (step === 'select_warehouse') {
     return (
-      <div className="min-h-screen bg-[#F7F5F2]">
-        <div className="bg-[#1B4D3E] text-white px-4 pt-[env(safe-area-inset-top)] pb-4">
-          <div className="flex items-center gap-3 pt-3">
-            <button onClick={() => navigate(-1)}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
+      <div style={{ minHeight: '100vh', background: '#F7F5F2' }}>
+        <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
+          <Space align="center">
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ color: '#fff' }} />
             <div>
-              <h1 className="text-base font-bold">Kiểm kê tồn kho</h1>
-              <p className="text-xs text-white/60 mt-0.5">Bước 1: Chọn kho kiểm kê</p>
+              <Title level={5} style={{ color: '#fff', margin: 0 }}>Kiểm kê tồn kho</Title>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Buoc 1: Chọn kho kiem ke</Text>
             </div>
-          </div>
+          </Space>
         </div>
 
-        <div className="px-4 py-4 space-y-3">
+        {stepsBar}
+
+        <div style={{ padding: 16 }}>
           {loadingWarehouses ? (
-            <div className="text-center py-10">
-              <Loader2 className="w-6 h-6 animate-spin text-[#1B4D3E] mx-auto" />
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <Spin size="large" />
             </div>
           ) : (
-            warehouses.map(wh => (
-              <button
-                key={wh.id}
-                onClick={() => setSelectedWarehouse(wh.id)}
-                className={`w-full p-4 rounded-xl border text-left transition-all
-                  active:scale-[0.98]
-                  ${selectedWarehouse === wh.id
-                    ? 'border-[#1B4D3E] bg-[#1B4D3E]/5 ring-1 ring-[#1B4D3E]'
-                    : 'border-gray-200 bg-white'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center
-                    ${selectedWarehouse === wh.id ? 'bg-[#1B4D3E] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    <Warehouse className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-800">{wh.name}</p>
-                    <p className="text-xs text-gray-400">{wh.code} • {wh.type === 'finished' ? 'Thành phẩm' : 'NVL'}</p>
-                  </div>
-                  {selectedWarehouse === wh.id && (
-                    <Check className="w-5 h-5 text-[#1B4D3E] ml-auto" />
-                  )}
-                </div>
-              </button>
-            ))
+            <Space direction="vertical" style={{ width: '100%' }} size={12}>
+              {warehouses.map(wh => (
+                <Card
+                  key={wh.id}
+                  hoverable
+                  onClick={() => setSelectedWarehouse(wh.id)}
+                  style={{
+                    borderColor: selectedWarehouse === wh.id ? '#1B4D3E' : '#d9d9d9',
+                    borderWidth: selectedWarehouse === wh.id ? 2 : 1,
+                    background: selectedWarehouse === wh.id ? 'rgba(27,77,62,0.04)' : '#fff',
+                  }}
+                  size="small"
+                >
+                  <Space align="center">
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 8,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: selectedWarehouse === wh.id ? '#1B4D3E' : '#f0f0f0',
+                      color: selectedWarehouse === wh.id ? '#fff' : '#999',
+                      fontSize: 18,
+                    }}>
+                      <AuditOutlined />
+                    </div>
+                    <div>
+                      <Text strong>{wh.name}</Text>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {wh.code} &bull; {wh.type === 'finished' ? 'Thành phẩm' : 'NVL'}
+                      </Text>
+                    </div>
+                    {selectedWarehouse === wh.id && (
+                      <CheckCircleOutlined style={{ color: '#1B4D3E', fontSize: 20, marginLeft: 'auto' }} />
+                    )}
+                  </Space>
+                </Card>
+              ))}
+            </Space>
           )}
         </div>
 
-        {/* Bottom bar */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3
-          pb-[max(12px,env(safe-area-inset-bottom))]">
-          <button
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          background: '#fff', borderTop: '1px solid #f0f0f0',
+          padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        }}>
+          <Button
+            type="primary"
+            block
+            size="large"
+            icon={creating ? <LoadingOutlined /> : <AuditOutlined />}
             onClick={handleCreateCheck}
             disabled={!selectedWarehouse || creating}
-            className={`w-full min-h-[48px] flex items-center justify-center gap-2
-              text-[14px] font-bold text-white rounded-xl
-              active:scale-[0.97] transition-transform
-              ${selectedWarehouse ? 'bg-[#1B4D3E]' : 'bg-gray-300 cursor-not-allowed'}`}
+            loading={creating}
+            style={{ background: selectedWarehouse ? '#1B4D3E' : undefined, borderColor: selectedWarehouse ? '#1B4D3E' : undefined }}
           >
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />}
-            {creating ? 'Đang tạo...' : 'Bắt đầu kiểm kê'}
-          </button>
+            {creating ? 'Dang tao...' : 'Bắt đầu kiem ke'}
+          </Button>
         </div>
       </div>
     )
   }
 
-  // ========== STEP 2: NHẬP SỐ LIỆU ==========
+  // ========== STEP 2: NHAP SO LIEU ==========
   if (step === 'checking') {
-    return (
-      <div className="min-h-screen bg-[#F7F5F2]">
-        <div className="bg-[#1B4D3E] text-white px-4 pt-[env(safe-area-inset-top)] pb-3">
-          <div className="flex items-center gap-3 pt-3">
-            <button onClick={() => setStep('select_warehouse')}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-base font-bold">Kiểm kê: {warehouseName}</h1>
-              <p className="text-xs text-white/60 mt-0.5">
-                {stockCheck?.code} • {checkedCount}/{items.length} đã kiểm
-              </p>
-            </div>
-          </div>
+    const progressPercent = items.length > 0 ? Math.round((checkedCount / items.length) * 100) : 0
 
-          {/* Progress */}
-          <div className="mt-2 h-1.5 bg-white/20 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#E8A838] rounded-full transition-all duration-300"
-              style={{ width: `${items.length > 0 ? (checkedCount / items.length) * 100 : 0}%` }}
-            />
+    const checkColumns = [
+      {
+        title: 'Lo',
+        dataIndex: 'batch_no',
+        key: 'batch_no',
+        width: 130,
+        render: (val: string, item: StockCheckItem) => (
+          <div>
+            <Text strong style={{ fontFamily: MONO_FONT, fontSize: 13 }}>{val}</Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: 11 }}>{item.material_name} &bull; {item.location_code || '—'}</Text>
           </div>
+        ),
+      },
+      {
+        title: 'Hệ thống',
+        dataIndex: 'system_quantity',
+        key: 'system',
+        align: 'right' as const,
+        width: 80,
+        render: (val: number) => (
+          <Text strong style={{ fontFamily: MONO_FONT }}>{val}</Text>
+        ),
+      },
+      {
+        title: 'Thực tế',
+        key: 'actual',
+        width: 110,
+        render: (_: any, item: StockCheckItem) => (
+          <InputNumber
+            value={item.actual_quantity}
+            min={0}
+            onChange={(val) => {
+              if (val !== null && val !== undefined) handleUpdateItem(item.id, val)
+            }}
+            placeholder="SL..."
+            style={{ width: '100%', fontFamily: MONO_FONT }}
+            status={
+              item.actual_quantity !== undefined && item.actual_quantity !== null && item.discrepancy !== 0
+                ? 'error'
+                : undefined
+            }
+          />
+        ),
+      },
+      {
+        title: 'Chênh lệch',
+        key: 'discrepancy',
+        align: 'center' as const,
+        width: 100,
+        render: (_: any, item: StockCheckItem) => {
+          if (item.actual_quantity === undefined || item.actual_quantity === null) return '—'
+          return getDiscrepancyTag(item.discrepancy)
+        },
+      },
+    ]
+
+    return (
+      <div style={{ minHeight: '100vh', background: '#F7F5F2' }}>
+        <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
+          <Space align="center" style={{ width: '100%' }}>
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setStep('select_warehouse')} style={{ color: '#fff' }} />
+            <div style={{ flex: 1 }}>
+              <Title level={5} style={{ color: '#fff', margin: 0 }}>Kiểm kê: {warehouseName}</Title>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
+                {stockCheck?.code} &bull; {checkedCount}/{items.length} da kiem
+              </Text>
+            </div>
+          </Space>
+          <Progress
+            percent={progressPercent}
+            showInfo={false}
+            strokeColor="#E8A838"
+            trailColor="rgba(255,255,255,0.2)"
+            style={{ marginTop: 8 }}
+            size="small"
+          />
         </div>
+
+        {stepsBar}
 
         {/* Search + Filter */}
-        <div className="px-4 py-3 bg-white border-b border-gray-100">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              placeholder="Tìm lô, sản phẩm..."
-              className="w-full pl-10 pr-4 py-2.5 text-[15px] bg-gray-50 border border-gray-200
-                rounded-xl focus:outline-none focus:border-[#2D8B6E]"
-            />
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button
+        <div style={{ padding: '12px 16px', background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
+          <Input
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            placeholder="Tìm lô, san pham..."
+            allowClear
+            style={{ marginBottom: 8 }}
+          />
+          <Space>
+            <Button
+              type={!showOnlyDiscrepancy ? 'primary' : 'default'}
+              size="small"
               onClick={() => setShowOnlyDiscrepancy(false)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium
-                ${!showOnlyDiscrepancy ? 'bg-[#1B4D3E] text-white' : 'bg-gray-100 text-gray-600'}`}
+              style={!showOnlyDiscrepancy ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
             >
-              Tất cả ({items.length})
-            </button>
-            <button
+              Tat ca ({items.length})
+            </Button>
+            <Button
+              type={showOnlyDiscrepancy ? 'primary' : 'default'}
+              size="small"
+              danger={showOnlyDiscrepancy}
               onClick={() => setShowOnlyDiscrepancy(true)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium
-                ${showOnlyDiscrepancy ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600'}`}
             >
               Chênh lệch ({summary.surplus_count + summary.shortage_count})
-            </button>
-          </div>
+            </Button>
+          </Space>
         </div>
 
-        {/* Items List */}
-        <div className="px-4 py-3 pb-[120px] space-y-2">
-          {filteredItems.map(item => {
-            const hasValue = item.actual_quantity !== undefined && item.actual_quantity !== null
-            const discStyle = hasValue ? getDiscrepancyStyle(item.discrepancy) : null
-
-            return (
-              <div key={item.id}
-                className={`bg-white rounded-xl border p-4 shadow-sm
-                  ${hasValue && item.discrepancy !== 0 ? 'border-red-200' : 'border-gray-100'}`}
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-800"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {item.batch_no}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{item.material_name} • {item.location_code || '—'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-gray-400 uppercase">Hệ thống</p>
-                    <p className="text-base font-bold text-gray-600"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {item.system_quantity}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Input actual quantity */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <label className="text-[10px] text-gray-400 uppercase mb-1 block">SL thực tế</label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={item.actual_quantity ?? ''}
-                      onChange={e => {
-                        const val = e.target.value === '' ? undefined : Number(e.target.value)
-                        if (val !== undefined) handleUpdateItem(item.id, val)
-                      }}
-                      placeholder="Nhập SL..."
-                      className={`w-full px-3 py-2.5 text-[15px] font-semibold border rounded-xl
-                        focus:outline-none focus:ring-1
-                        ${hasValue && item.discrepancy !== 0
-                          ? 'border-red-300 focus:ring-red-300 bg-red-50/30'
-                          : hasValue
-                            ? 'border-emerald-300 focus:ring-emerald-300 bg-emerald-50/30'
-                            : 'border-gray-200 focus:ring-[#2D8B6E]'}`}
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    />
-                  </div>
-
-                  {/* Discrepancy badge */}
-                  {hasValue && (
-                    <div className={`px-3 py-2 rounded-xl ${discStyle!.bg} min-w-[80px] text-center`}>
-                      <p className="text-[10px] text-gray-400 uppercase">Chênh lệch</p>
-                      <p className={`text-base font-bold ${discStyle!.text} flex items-center justify-center gap-0.5`}
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        {discStyle!.icon}
-                        {item.discrepancy > 0 ? `+${item.discrepancy}` : item.discrepancy}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+        <div style={{ padding: '12px 16px', paddingBottom: 120 }}>
+          <Table
+            dataSource={filteredItems}
+            columns={checkColumns}
+            rowKey="id"
+            size="small"
+            pagination={false}
+            scroll={{ x: 450 }}
+            rowClassName={(item: StockCheckItem) => {
+              if (item.actual_quantity !== undefined && item.actual_quantity !== null && item.discrepancy !== 0) {
+                return 'ant-table-row-warning'
+              }
+              return ''
+            }}
+          />
         </div>
 
-        {/* Bottom bar */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3
-          pb-[max(12px,env(safe-area-inset-bottom))]">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-gray-400">Đã kiểm: {checkedCount}/{items.length}</span>
-            {summary.shortage_count > 0 && (
-              <span className="text-xs text-red-500 font-medium">• {summary.shortage_count} thiếu</span>
-            )}
-            {summary.surplus_count > 0 && (
-              <span className="text-xs text-blue-500 font-medium">• {summary.surplus_count} thừa</span>
-            )}
-          </div>
-          <button
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          background: '#fff', borderTop: '1px solid #f0f0f0',
+          padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        }}>
+          <Space style={{ marginBottom: 8 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>Da kiem: {checkedCount}/{items.length}</Text>
+            {summary.shortage_count > 0 && <Text type="danger" style={{ fontSize: 12 }}>&bull; {summary.shortage_count} thieu</Text>}
+            {summary.surplus_count > 0 && <Text style={{ color: '#1677ff', fontSize: 12 }}>&bull; {summary.surplus_count} thua</Text>}
+          </Space>
+          <Button
+            block
+            size="large"
+            icon={<ArrowRightOutlined />}
             onClick={() => setStep('review')}
             disabled={checkedCount < items.length}
-            className={`w-full min-h-[48px] flex items-center justify-center gap-2
-              text-[14px] font-bold text-white rounded-xl
-              active:scale-[0.97] transition-transform
-              ${checkedCount >= items.length ? 'bg-[#E8A838]' : 'bg-gray-300 cursor-not-allowed'}`}
+            style={checkedCount >= items.length ? { background: '#E8A838', borderColor: '#E8A838', color: '#fff' } : {}}
           >
-            Xem kết quả <ArrowRight className="w-4 h-4" />
-          </button>
+            Xem ket qua
+          </Button>
         </div>
       </div>
     )
@@ -359,116 +423,137 @@ const StockCheckPage = () => {
 
   // ========== STEP 3: REVIEW & CONFIRM ==========
   return (
-    <div className="min-h-screen bg-[#F7F5F2]">
-      <div className="bg-[#1B4D3E] text-white px-4 pt-[env(safe-area-inset-top)] pb-4">
-        <div className="flex items-center gap-3 pt-3">
-          <button onClick={() => setStep('checking')}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+    <div style={{ minHeight: '100vh', background: '#F7F5F2' }}>
+      <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
+        <Space align="center">
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setStep('checking')} style={{ color: '#fff' }} />
           <div>
-            <h1 className="text-base font-bold">Kết quả kiểm kê</h1>
-            <p className="text-xs text-white/60 mt-0.5">{stockCheck?.code} • {warehouseName}</p>
+            <Title level={5} style={{ color: '#fff', margin: 0 }}>Ket qua kiem ke</Title>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
+              {stockCheck?.code} &bull; {warehouseName}
+            </Text>
           </div>
-        </div>
+        </Space>
       </div>
 
-      <div className="px-4 py-4 pb-[100px]">
+      {stepsBar}
+
+      <div style={{ padding: '16px', paddingBottom: 100 }}>
         {/* Summary cards */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="bg-emerald-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-emerald-700"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>{summary.match_count}</p>
-            <p className="text-[10px] text-emerald-600 mt-0.5">Khớp</p>
-          </div>
-          <div className="bg-blue-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-blue-700"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>+{summary.total_surplus}</p>
-            <p className="text-[10px] text-blue-600 mt-0.5">Thừa ({summary.surplus_count})</p>
-          </div>
-          <div className="bg-red-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-red-700"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}>-{summary.total_shortage}</p>
-            <p className="text-[10px] text-red-600 mt-0.5">Thiếu ({summary.shortage_count})</p>
-          </div>
-        </div>
+        <Row gutter={8} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center', background: '#f6ffed' }}>
+              <Statistic
+                value={summary.match_count}
+                valueStyle={{ fontFamily: MONO_FONT, fontSize: 20, color: '#389e0d' }}
+                title={<Text style={{ fontSize: 11, color: '#389e0d' }}>Khop</Text>}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center', background: '#f0f5ff' }}>
+              <Statistic
+                value={summary.total_surplus}
+                prefix="+"
+                valueStyle={{ fontFamily: MONO_FONT, fontSize: 20, color: '#1677ff' }}
+                title={<Text style={{ fontSize: 11, color: '#1677ff' }}>Thua ({summary.surplus_count})</Text>}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center', background: '#fff2f0' }}>
+              <Statistic
+                value={summary.total_shortage}
+                prefix="-"
+                valueStyle={{ fontFamily: MONO_FONT, fontSize: 20, color: '#cf1322' }}
+                title={<Text style={{ fontSize: 11, color: '#cf1322' }}>Thieu ({summary.shortage_count})</Text>}
+              />
+            </Card>
+          </Col>
+        </Row>
 
         {/* Discrepancy list */}
         {(summary.surplus_count + summary.shortage_count) > 0 ? (
           <>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Các dòng chênh lệch
-            </h3>
-            <div className="space-y-2">
-              {items.filter(i => i.discrepancy !== 0).map(item => {
-                const style = getDiscrepancyStyle(item.discrepancy)
-                return (
-                  <div key={item.id} className={`${style.bg} rounded-xl p-3 border-l-4
-                    ${item.discrepancy > 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-gray-800">{item.batch_no}</p>
-                        <p className="text-xs text-gray-500">{item.material_name}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-lg font-bold ${style.text}`}
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {item.discrepancy > 0 ? '+' : ''}{item.discrepancy}
-                        </p>
-                        <p className="text-[10px] text-gray-400">
-                          HT: {item.system_quantity} → TT: {item.actual_quantity}
-                        </p>
-                      </div>
+            <Title level={5} style={{ color: '#666', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+              Cac dong chenh lech
+            </Title>
+
+            <Space direction="vertical" style={{ width: '100%' }} size={8}>
+              {items.filter(i => i.discrepancy !== 0).map(item => (
+                <Card
+                  key={item.id}
+                  size="small"
+                  style={{
+                    borderLeft: `4px solid ${item.discrepancy > 0 ? '#1677ff' : '#ff4d4f'}`,
+                    background: item.discrepancy > 0 ? '#f0f5ff' : '#fff2f0',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <Text strong>{item.batch_no}</Text>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>{item.material_name}</Text>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <Text strong style={{
+                        fontFamily: MONO_FONT,
+                        fontSize: 18,
+                        color: item.discrepancy > 0 ? '#1677ff' : '#cf1322',
+                      }}>
+                        {item.discrepancy > 0 ? '+' : ''}{item.discrepancy}
+                      </Text>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        HT: {item.system_quantity} &rarr; TT: {item.actual_quantity}
+                      </Text>
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                </Card>
+              ))}
+            </Space>
 
-            {/* Warning */}
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm text-amber-700 font-medium">Xác nhận điều chỉnh?</p>
-                <p className="text-xs text-amber-600 mt-0.5">
-                  Hệ thống sẽ tạo phiếu điều chỉnh tự động cho {summary.surplus_count + summary.shortage_count} dòng chênh lệch.
-                  Hành động này không thể hoàn tác.
-                </p>
-              </div>
-            </div>
+            <Alert
+              type="warning"
+              showIcon
+              icon={<ExclamationCircleOutlined />}
+              message="Xác nhận dieu chinh?"
+              description={`He thong se tao phieu dieu chinh tu dong cho ${summary.surplus_count + summary.shortage_count} dong chenh lech. Hanh dong nay khong the hoan tac.`}
+              style={{ marginTop: 16 }}
+            />
           </>
         ) : (
-          <div className="text-center py-10">
-            <div className="w-16 h-16 mx-auto bg-emerald-50 rounded-full flex items-center justify-center mb-3">
-              <Check className="w-8 h-8 text-emerald-500" />
-            </div>
-            <p className="text-base font-bold text-emerald-700">Tồn kho hoàn toàn khớp!</p>
-            <p className="text-sm text-gray-400 mt-1">Không có chênh lệch nào được phát hiện</p>
-          </div>
+          <Result
+            status="success"
+            title="Tồn kho hoan toan khop!"
+            subTitle="Không có chênh lệch nào được phát hiện"
+          />
         )}
       </div>
 
       {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3
-        pb-[max(12px,env(safe-area-inset-bottom))] flex gap-2">
-        <button
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: '#fff', borderTop: '1px solid #f0f0f0',
+        padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        display: 'flex', gap: 8,
+      }}>
+        <Button
+          size="large"
+          icon={<ArrowLeftOutlined />}
           onClick={() => setStep('checking')}
-          className="min-h-[48px] px-4 text-[14px] font-medium text-gray-600
-            rounded-xl border border-gray-200 active:scale-[0.97] transition-transform"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <button
+        />
+        <Button
+          type="primary"
+          size="large"
+          block
+          icon={saving ? <LoadingOutlined /> : <CheckOutlined />}
           onClick={handleFinalize}
-          disabled={saving}
-          className="flex-1 min-h-[48px] flex items-center justify-center gap-2
-            text-[14px] font-bold text-white bg-[#1B4D3E] rounded-xl
-            active:scale-[0.97] transition-transform
-            shadow-[0_2px_8px_rgba(27,77,62,0.3)]"
+          loading={saving}
+          style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          {saving ? 'Đang xử lý...' : 'Xác nhận & Điều chỉnh'}
-        </button>
+          {saving ? 'Dang xu ly...' : 'Xác nhận & Dieu chinh'}
+        </Button>
       </div>
     </div>
   )

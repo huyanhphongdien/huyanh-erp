@@ -14,7 +14,18 @@ import type { Material, StockBatch } from './wms.types'
 // TYPES
 // ============================================================================
 
-export type AlertType = 'low_stock' | 'over_stock' | 'expiring' | 'expired' | 'needs_recheck' | 'needs_blend'
+export type AlertType =
+  | 'low_stock'
+  | 'over_stock'
+  | 'expiring'
+  | 'expired'
+  | 'needs_recheck'
+  | 'needs_blend'
+  // Rubber-specific
+  | 'weight_loss_excessive'
+  | 'storage_too_long'
+  | 'contamination_detected'
+  | 'grade_mismatch'
 
 export type AlertSeverity = 'high' | 'medium' | 'low'
 
@@ -57,14 +68,24 @@ export const alertService = {
     const alerts: StockAlert[] = []
 
     // Chạy song song các kiểm tra
-    const [stockAlerts, expiryAlerts, recheckAlerts, blendAlerts] = await Promise.all([
+    const [
+      stockAlerts, expiryAlerts, recheckAlerts, blendAlerts,
+      weightLossAlerts, storageAlerts, contaminationAlerts,
+    ] = await Promise.all([
       this.checkStockAlerts(),
       this.checkExpiryAlerts(),
       this.checkRecheckAlerts(),
       this.checkBlendAlerts(),
+      // Rubber-specific
+      this.checkWeightLossAlerts(),
+      this.checkStorageDurationAlerts(),
+      this.checkContaminationAlerts(),
     ])
 
-    alerts.push(...stockAlerts, ...expiryAlerts, ...recheckAlerts, ...blendAlerts)
+    alerts.push(
+      ...stockAlerts, ...expiryAlerts, ...recheckAlerts, ...blendAlerts,
+      ...weightLossAlerts, ...storageAlerts, ...contaminationAlerts,
+    )
 
     // Sort: high severity trước, rồi medium, rồi low
     const severityOrder = { high: 0, medium: 1, low: 2 }
@@ -303,6 +324,123 @@ export const alertService = {
 
   // --------------------------------------------------------------------------
   // LẤY CẢNH BÁO THEO LOẠI
+  // --------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------
+  // 5. RUBBER: HAO HUT TRONG LUONG
+  // --------------------------------------------------------------------------
+
+  async checkWeightLossAlerts(): Promise<StockAlert[]> {
+    const alerts: StockAlert[] = []
+
+    const { data: batches } = await supabase
+      .from('stock_batches')
+      .select('*, material:materials(id, sku, name, type)')
+      .eq('status', 'active')
+      .not('initial_weight', 'is', null)
+      .gt('initial_weight', 0)
+      .gt('weight_loss', 0)
+
+    for (const batch of (batches || [])) {
+      const lossPercent = (batch.weight_loss / batch.initial_weight) * 100
+
+      if (lossPercent > 3) {
+        alerts.push({
+          id: generateAlertId(),
+          type: 'weight_loss_excessive',
+          severity: lossPercent > 10 ? 'high' : lossPercent > 5 ? 'medium' : 'low',
+          material_id: batch.material_id,
+          material: batch.material,
+          batch_id: batch.id,
+          batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
+          message: `Lo ${batch.batch_no} hao hut ${lossPercent.toFixed(1)}% (${batch.weight_loss?.toFixed(1)} kg)`,
+          detail: `Ban dau: ${batch.initial_weight} kg → Hien tai: ${batch.current_weight} kg`,
+          created_at: new Date().toISOString(),
+        })
+      }
+    }
+
+    return alerts
+  },
+
+  // --------------------------------------------------------------------------
+  // 6. RUBBER: LUU KHO QUA LAU
+  // --------------------------------------------------------------------------
+
+  async checkStorageDurationAlerts(): Promise<StockAlert[]> {
+    const alerts: StockAlert[] = []
+
+    const { data: batches } = await supabase
+      .from('stock_batches')
+      .select('*, material:materials(id, sku, name, type)')
+      .eq('status', 'active')
+      .gt('storage_days', 45)
+
+    for (const batch of (batches || [])) {
+      const days = batch.storage_days || 0
+
+      let severity: 'high' | 'medium' | 'low' = 'low'
+      if (days > 90) severity = 'high'
+      else if (days > 60) severity = 'medium'
+
+      alerts.push({
+        id: generateAlertId(),
+        type: 'storage_too_long',
+        severity,
+        material_id: batch.material_id,
+        material: batch.material,
+        batch_id: batch.id,
+        batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
+        message: `Lo ${batch.batch_no} luu kho ${days} ngay`,
+        detail: days > 90
+          ? 'Can xu ly gap: ban, blend hoac chuyen kho'
+          : days > 60
+            ? 'Cần kiểm tra chất lượng và lên kế hoạch xử lý'
+            : 'Sap den han xu ly, nen uu tien xuat',
+        created_at: new Date().toISOString(),
+      })
+    }
+
+    return alerts
+  },
+
+  // --------------------------------------------------------------------------
+  // 7. RUBBER: TAP CHAT / CONTAMINATION
+  // --------------------------------------------------------------------------
+
+  async checkContaminationAlerts(): Promise<StockAlert[]> {
+    const alerts: StockAlert[] = []
+
+    const { data: batches } = await supabase
+      .from('stock_batches')
+      .select('*, material:materials(id, sku, name, type)')
+      .eq('status', 'active')
+      .in('contamination_status', ['suspected', 'confirmed'])
+
+    for (const batch of (batches || [])) {
+      const isConfirmed = batch.contamination_status === 'confirmed'
+
+      alerts.push({
+        id: generateAlertId(),
+        type: 'contamination_detected',
+        severity: isConfirmed ? 'high' : 'medium',
+        material_id: batch.material_id,
+        material: batch.material,
+        batch_id: batch.id,
+        batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
+        message: isConfirmed
+          ? `Lo ${batch.batch_no} XAC NHAN tap chat — can cach ly`
+          : `Lo ${batch.batch_no} NGHI NGO tap chat — can kiem tra`,
+        detail: batch.contamination_notes || undefined,
+        created_at: new Date().toISOString(),
+      })
+    }
+
+    return alerts
+  },
+
+  // --------------------------------------------------------------------------
+  // FILTER & COUNT
   // --------------------------------------------------------------------------
 
   async getAlertsByType(type: AlertType): Promise<StockAlert[]> {

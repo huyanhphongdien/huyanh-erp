@@ -1,38 +1,54 @@
 // ============================================================================
 // FILE: src/pages/wms/weighbridge/WeighbridgeListPage.tsx
 // MODULE: Kho Thành Phẩm (WMS) — Huy Anh Rubber ERP
-// PHASE: P7 — Sprint 7C — Lịch sử cân xe
+// PHASE: P7 — Sprint 7C — Lịch sử can xe
+// Rewrite: Tailwind -> Ant Design v6
 // ============================================================================
 
-import React, { useState, useEffect, useCallback } from 'react'
-import {
-  ArrowLeft,
-  Scale,
-  Search,
-  Filter,
-  ChevronDown,
-  ChevronUp,
-  Truck,
-  Calendar,
-  X,
-  Loader2,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Space,
+  Input,
+  Select,
+  Typography,
+  Spin,
+  Row,
+  Col,
+  Statistic,
+  DatePicker,
+  Empty,
+} from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import {
+  ArrowLeftOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  FilterOutlined,
+  CarOutlined,
+  CloseOutlined,
+} from '@ant-design/icons'
 import weighbridgeService from '../../../services/wms/weighbridgeService'
+import { dealWmsService } from '../../../services/b2b/dealWmsService'
+import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import type { WeighbridgeTicket, TicketType, WeighbridgeStatus, PaginatedResponse } from '../../../services/wms/wms.types'
+import dayjs from 'dayjs'
+
+const { Title, Text } = Typography
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const STATUS_CONFIG: Record<WeighbridgeStatus, { label: string; color: string; bg: string; dot: string }> = {
-  weighing_gross: { label: 'Chờ cân L1', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
-  weighing_tare: { label: 'Chờ cân L2', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', dot: 'bg-amber-500' },
-  completed: { label: 'Hoàn tất', color: 'text-green-700', bg: 'bg-green-50 border-green-200', dot: 'bg-green-500' },
-  cancelled: { label: 'Đã hủy', color: 'text-red-700', bg: 'bg-red-50 border-red-200', dot: 'bg-red-500' },
+const STATUS_TAG_CONFIG: Record<WeighbridgeStatus, { label: string; color: string }> = {
+  weighing_gross: { label: 'Chờ cân L1', color: 'processing' },
+  weighing_tare: { label: 'Chờ cân L2', color: 'warning' },
+  completed: { label: 'Hoàn tất', color: 'success' },
+  cancelled: { label: 'Đã hủy', color: 'error' },
 }
 
 const STATUS_OPTIONS = [
@@ -48,6 +64,9 @@ const TYPE_OPTIONS = [
   { value: 'in', label: 'Xe vào' },
   { value: 'out', label: 'Xe ra' },
 ]
+
+const MONO_FONT: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" }
+const PRIMARY_COLOR = '#1B4D3E'
 
 // ============================================================================
 // COMPONENT
@@ -70,6 +89,11 @@ export default function WeighbridgeListPage() {
   const [toDate, setToDate] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
+  // Phase 4: Deal filter
+  const [dealFilter, setDealFilter] = useState('')
+  const [activeDeals, setActiveDeals] = useState<ActiveDealForStockIn[]>([])
+  const [dealStockInIds, setDealStockInIds] = useState<string[] | null>(null)
+
   // Stats
   const [stats, setStats] = useState<{
     totalTickets: number
@@ -77,6 +101,24 @@ export default function WeighbridgeListPage() {
     inProgress: number
     totalNetWeight: number
   } | null>(null)
+
+  // Phase 4: Load active deals for filter dropdown
+  useEffect(() => {
+    dealWmsService.getActiveDealsForStockIn().then(setActiveDeals).catch(() => {})
+  }, [])
+
+  // Phase 4: When deal filter changes, resolve stock_in_ids
+  useEffect(() => {
+    if (!dealFilter) {
+      setDealStockInIds(null)
+      return
+    }
+    const resolve = async () => {
+      const stockIns = await dealWmsService.getStockInsByDeal(dealFilter)
+      setDealStockInIds(stockIns.map(si => si.stock_in_id))
+    }
+    resolve().catch(() => setDealStockInIds([]))
+  }, [dealFilter])
 
   // ============================================================================
   // DATA LOADING
@@ -127,242 +169,336 @@ export default function WeighbridgeListPage() {
     setSearch('')
     setStatusFilter('')
     setTypeFilter('')
+    setDealFilter('')
     setFromDate('')
     setToDate('')
     setPage(1)
   }
 
-  const hasFilters = search || statusFilter || typeFilter || fromDate || toDate
+  const hasFilters = !!(search || statusFilter || typeFilter || dealFilter || fromDate || toDate)
+
+  // ============================================================================
+  // TABLE COLUMNS
+  // ============================================================================
+
+  // Filter data by deal if needed
+  const filteredData = dealStockInIds
+    ? data?.data.filter(t => t.reference_type === 'stock_in' && dealStockInIds.includes(t.reference_id || ''))
+    : data?.data
+
+  const columns: ColumnsType<WeighbridgeTicket> = [
+    {
+      title: 'Biển số',
+      dataIndex: 'vehicle_plate',
+      key: 'vehicle_plate',
+      width: 130,
+      render: (plate: string, record) => (
+        <div>
+          <Text strong style={{ fontSize: 14 }}>{plate}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 12 }}>{record.code}</Text>
+        </div>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status: WeighbridgeStatus) => {
+        const cfg = STATUS_TAG_CONFIG[status]
+        return <Tag color={cfg.color}>{cfg.label}</Tag>
+      },
+    },
+    {
+      title: 'Loại',
+      dataIndex: 'ticket_type',
+      key: 'ticket_type',
+      width: 80,
+      render: (type: TicketType) => (
+        <Tag>{type === 'in' ? '📥 Vào' : '📤 Ra'}</Tag>
+      ),
+    },
+    {
+      title: 'Tài xế',
+      dataIndex: 'driver_name',
+      key: 'driver_name',
+      width: 120,
+      ellipsis: true,
+      render: (name: string | undefined) => name || <Text type="secondary">—</Text>,
+    },
+    {
+      title: 'Gross (kg)',
+      dataIndex: 'gross_weight',
+      key: 'gross_weight',
+      width: 110,
+      align: 'right',
+      render: (w: number | null) => w != null
+        ? <Text style={MONO_FONT}>{w.toLocaleString()}</Text>
+        : <Text type="secondary">—</Text>,
+    },
+    {
+      title: 'Tare (kg)',
+      dataIndex: 'tare_weight',
+      key: 'tare_weight',
+      width: 110,
+      align: 'right',
+      render: (w: number | null) => w != null
+        ? <Text style={MONO_FONT}>{w.toLocaleString()}</Text>
+        : <Text type="secondary">—</Text>,
+    },
+    {
+      title: 'NET (kg)',
+      dataIndex: 'net_weight',
+      key: 'net_weight',
+      width: 120,
+      align: 'right',
+      render: (w: number | null) => w != null
+        ? <Text strong style={{ ...MONO_FONT, color: '#15803D' }}>{w.toLocaleString()}</Text>
+        : <Text type="secondary">—</Text>,
+    },
+    {
+      title: 'Ngày tạo',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 140,
+      render: (d: string) => (
+        <div>
+          <Text style={{ fontSize: 12 }}>{new Date(d).toLocaleDateString('vi-VN')}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </div>
+      ),
+    },
+  ]
 
   // ============================================================================
   // RENDER
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
-      <div className="bg-[#1B4D3E] text-white px-4 py-4 sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/wms/weighbridge')} className="p-2 -ml-2 rounded-lg hover:bg-white/10 active:bg-white/20">
-            <ArrowLeft size={22} />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold">Lịch sử cân xe</h1>
-            <p className="text-xs text-white/70">
+      <div style={{ background: PRIMARY_COLOR, padding: '16px', position: 'sticky', top: 0, zIndex: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/wms/weighbridge')}
+            style={{ color: '#fff' }}
+          />
+          <div style={{ flex: 1 }}>
+            <Title level={5} style={{ color: '#fff', margin: 0 }}>Lịch sử cân xe</Title>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
               {data ? `${data.total} phiếu` : 'Đang tải...'}
-            </p>
+            </Text>
           </div>
-          <button
+          <Button
+            type="text"
+            icon={<ReloadOutlined spin={loading} />}
             onClick={() => { loadData(); loadStats() }}
-            className="p-2 rounded-lg hover:bg-white/10 active:bg-white/20"
-          >
-            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-          </button>
+            style={{ color: '#fff' }}
+          />
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-4 space-y-4">
-        {/* Stats cards */}
-        {stats && (
-          <div className="grid grid-cols-4 gap-2">
-            <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
-              <p className="text-lg font-bold text-gray-900">{stats.inProgress}</p>
-              <p className="text-[11px] text-gray-500">Đang cân</p>
-            </div>
-            <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
-              <p className="text-lg font-bold text-green-600">{stats.completedToday}</p>
-              <p className="text-[11px] text-gray-500">Hôm nay</p>
-            </div>
-            <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
-              <p className="text-lg font-bold text-blue-600">{stats.totalTickets}</p>
-              <p className="text-[11px] text-gray-500">Tổng phiếu</p>
-            </div>
-            <div className="bg-white rounded-xl p-3 border border-gray-200 text-center">
-              <p className="text-lg font-bold text-[#1B4D3E]">
-                {stats.totalNetWeight >= 1000 ? `${(stats.totalNetWeight / 1000).toFixed(1)}t` : `${stats.totalNetWeight}kg`}
-              </p>
-              <p className="text-[11px] text-gray-500">Tấn nay</p>
-            </div>
-          </div>
-        )}
-
-        {/* Search & Filter */}
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Tìm mã phiếu, biển số, tài xế..."
-                className="w-full h-12 pl-10 pr-4 text-[15px] bg-white border border-gray-300 rounded-xl focus:border-[#1B4D3E] outline-none"
-              />
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`h-12 px-3 rounded-xl border flex items-center gap-1.5 text-sm font-medium ${hasFilters ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]' : 'bg-white text-gray-600 border-gray-300'}`}
-            >
-              <Filter size={16} />
-              Lọc
-              {hasFilters && <span className="w-2 h-2 bg-amber-400 rounded-full" />}
-            </button>
-          </div>
-
-          {/* Filter panel */}
-          {showFilters && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái</label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-                    className="w-full h-10 px-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:border-[#1B4D3E] outline-none"
-                  >
-                    {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Loại</label>
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
-                    className="w-full h-10 px-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:border-[#1B4D3E] outline-none"
-                  >
-                    {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Từ ngày</label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-                    className="w-full h-10 px-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:border-[#1B4D3E] outline-none"
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '16px' }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          {/* Stats cards */}
+          {stats && (
+            <Row gutter={[8, 8]}>
+              <Col xs={12} sm={6}>
+                <Card size="small" style={{ borderRadius: 12, textAlign: 'center' }}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 11 }}>Đang cân</Text>}
+                    value={stats.inProgress}
+                    valueStyle={{ fontSize: 20, fontWeight: 700 }}
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Đến ngày</label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-                    className="w-full h-10 px-2 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:border-[#1B4D3E] outline-none"
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card size="small" style={{ borderRadius: 12, textAlign: 'center' }}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 11 }}>Hôm nay</Text>}
+                    value={stats.completedToday}
+                    valueStyle={{ fontSize: 20, fontWeight: 700, color: '#16A34A' }}
                   />
-                </div>
-              </div>
-              {hasFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="text-sm text-red-600 font-medium flex items-center gap-1"
-                >
-                  <X size={14} /> Xóa bộ lọc
-                </button>
-              )}
-            </div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card size="small" style={{ borderRadius: 12, textAlign: 'center' }}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 11 }}>Tổng phiếu</Text>}
+                    value={stats.totalTickets}
+                    valueStyle={{ fontSize: 20, fontWeight: 700, color: '#2563EB' }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card size="small" style={{ borderRadius: 12, textAlign: 'center' }}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 11 }}>Tấn nay</Text>}
+                    value={stats.totalNetWeight >= 1000 ? stats.totalNetWeight / 1000 : stats.totalNetWeight}
+                    precision={stats.totalNetWeight >= 1000 ? 1 : 0}
+                    suffix={stats.totalNetWeight >= 1000 ? 't' : 'kg'}
+                    valueStyle={{ fontSize: 20, fontWeight: 700, color: PRIMARY_COLOR, ...MONO_FONT }}
+                  />
+                </Card>
+              </Col>
+            </Row>
           )}
-        </div>
 
-        {/* List */}
-        {loading && !data ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={28} className="animate-spin text-gray-400" />
-          </div>
-        ) : data && data.data.length === 0 ? (
-          <div className="text-center py-16">
-            <Scale size={48} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">Chưa có phiếu cân nào</p>
-            <p className="text-sm text-gray-400 mt-1">
-              {hasFilters ? 'Thử thay đổi bộ lọc' : 'Bắt đầu bằng cách tạo phiếu cân mới'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {data?.data.map(ticket => {
-              const sc = STATUS_CONFIG[ticket.status]
-              return (
-                <button
-                  key={ticket.id}
-                  onClick={() => {
-                    if (ticket.status === 'completed' || ticket.status === 'cancelled') {
-                      navigate(`/wms/weighbridge/${ticket.id}`)
-                    } else {
-                      navigate('/wms/weighbridge')
-                    }
-                  }}
-                  className="w-full bg-white rounded-xl p-4 border border-gray-200 active:bg-gray-50 transition-colors text-left"
+          {/* Search & Filter */}
+          <Card size="small" style={{ borderRadius: 12 }}>
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Input.Search
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onSearch={handleSearch}
+                  placeholder="Tìm mã phiếu, biển số, tài xế..."
+                  allowClear
+                  size="large"
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  size="large"
+                  icon={<FilterOutlined />}
+                  type={hasFilters ? 'primary' : 'default'}
+                  onClick={() => setShowFilters(!showFilters)}
+                  style={hasFilters ? { background: PRIMARY_COLOR, borderColor: PRIMARY_COLOR } : {}}
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Icon */}
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${sc.bg} border`}>
-                      <div className={`w-2.5 h-2.5 rounded-full ${sc.dot}`} />
-                    </div>
+                  Lọc
+                </Button>
+              </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-bold text-gray-900 text-[15px]">{ticket.vehicle_plate}</span>
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${sc.bg} ${sc.color} border`}>
-                          {sc.label}
-                        </span>
-                        <span className="text-[11px] text-gray-400">{ticket.ticket_type === 'in' ? '📥 Vào' : '📤 Ra'}</span>
+              {/* Filter panel */}
+              {showFilters && (
+                <div>
+                  <Row gutter={[12, 12]}>
+                    <Col xs={12} sm={6}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Trạng thái</Text>
+                      <Select
+                        value={statusFilter}
+                        onChange={(v) => { setStatusFilter(v); setPage(1) }}
+                        options={STATUS_OPTIONS}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Loại</Text>
+                      <Select
+                        value={typeFilter}
+                        onChange={(v) => { setTypeFilter(v); setPage(1) }}
+                        options={TYPE_OPTIONS}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Từ ngày</Text>
+                      <DatePicker
+                        value={fromDate ? dayjs(fromDate) : null}
+                        onChange={(d) => { setFromDate(d ? d.format('YYYY-MM-DD') : ''); setPage(1) }}
+                        style={{ width: '100%' }}
+                        placeholder="Từ ngày"
+                      />
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Đến ngày</Text>
+                      <DatePicker
+                        value={toDate ? dayjs(toDate) : null}
+                        onChange={(d) => { setToDate(d ? d.format('YYYY-MM-DD') : ''); setPage(1) }}
+                        style={{ width: '100%' }}
+                        placeholder="Đến ngày"
+                      />
+                    </Col>
+                  </Row>
+
+                  {/* Phase 4: Deal filter */}
+                  {activeDeals.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Deal B2B</Text>
+                      <Select
+                        value={dealFilter}
+                        onChange={(v) => { setDealFilter(v); setPage(1) }}
+                        style={{ width: '100%' }}
+                        allowClear
+                        placeholder="Tất cả"
+                        options={[
+                          { value: '', label: 'Tất cả' },
+                          ...activeDeals.map(d => ({
+                            value: d.id,
+                            label: `${d.deal_number} — ${d.partner_name}`,
+                          })),
+                        ]}
+                      />
+                    </div>
+                  )}
+
+                  {hasFilters && (
+                    <Button
+                      type="link"
+                      danger
+                      icon={<CloseOutlined />}
+                      onClick={clearFilters}
+                      style={{ marginTop: 8, padding: 0 }}
+                    >
+                      Xóa bộ lọc
+                    </Button>
+                  )}
+                </div>
+              )}
+            </Space>
+          </Card>
+
+          {/* Table */}
+          <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
+            <Table
+              columns={columns}
+              dataSource={filteredData || []}
+              rowKey="id"
+              loading={loading}
+              size="middle"
+              scroll={{ x: 900 }}
+              locale={{
+                emptyText: (
+                  <Empty
+                    image={<CarOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />}
+                    description={
+                      <div>
+                        <Text type="secondary" strong>Chưa có phiếu cân nào</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {hasFilters ? 'Thử thay đổi bộ lọc' : 'Bắt đầu bằng cách tạo phiếu cân mới'}
+                        </Text>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">
-                        {ticket.code} • {ticket.driver_name || 'Không tài xế'}
-                      </p>
-
-                      {/* Weight info */}
-                      {ticket.status === 'completed' && ticket.net_weight != null && (
-                        <div className="flex items-center gap-3 mt-1.5 text-xs">
-                          <span className="text-gray-500">G: {ticket.gross_weight?.toLocaleString()}</span>
-                          <span className="text-gray-500">T: {ticket.tare_weight?.toLocaleString()}</span>
-                          <span className="font-bold text-green-700 text-sm">NET: {ticket.net_weight.toLocaleString()} kg</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Time */}
-                    <div className="text-right shrink-0">
-                      <p className="text-[11px] text-gray-400">
-                        {new Date(ticket.created_at).toLocaleDateString('vi-VN')}
-                      </p>
-                      <p className="text-[11px] text-gray-400">
-                        {new Date(ticket.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {data && data.totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 py-4">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center disabled:opacity-30"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <span className="text-sm text-gray-600 px-3">
-              {page} / {data.totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(data.totalPages, p + 1))}
-              disabled={page >= data.totalPages}
-              className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center disabled:opacity-30"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
+                    }
+                  />
+                ),
+              }}
+              pagination={{
+                current: page,
+                pageSize,
+                total: data?.total || 0,
+                showSizeChanger: false,
+                showTotal: (total) => <Text type="secondary">{total} phiếu</Text>,
+                onChange: (p) => setPage(p),
+              }}
+              onRow={(record) => ({
+                onClick: () => {
+                  if (record.status === 'completed' || record.status === 'cancelled') {
+                    navigate(`/wms/weighbridge/${record.id}`)
+                  } else {
+                    navigate('/wms/weighbridge')
+                  }
+                },
+                style: { cursor: 'pointer' },
+              })}
+            />
+          </Card>
+        </Space>
       </div>
     </div>
   )

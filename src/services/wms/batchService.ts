@@ -16,7 +16,10 @@ import type {
   BatchStatus,
   WMSPaginationParams,
   PaginatedResponse,
+  RubberGrade,
+  ContaminationStatus,
 } from './wms.types'
+import { rubberGradeService } from './rubberGradeService'
 
 // ============================================================================
 // TYPES — Form data riêng cho batch
@@ -36,8 +39,17 @@ export interface CreateBatchData {
   received_date?: string
   expiry_date?: string
   created_by?: string
-  parent_batch_id?: string        // Phase 9: lô cha khi chia sub-lot
-  sub_lot_code?: string           // Phase 9: 'A', 'B', 'C'...
+  parent_batch_id?: string
+  sub_lot_code?: string
+
+  // Rubber fields
+  rubber_grade?: RubberGrade
+  rubber_type?: 'cup_lump' | 'latex' | 'sheet' | 'crepe' | 'mixed'
+  moisture_content?: number
+  initial_weight?: number
+  supplier_name?: string
+  supplier_region?: string
+  supplier_reported_drc?: number
 }
 
 // ============================================================================
@@ -60,6 +72,9 @@ const BATCH_LIST_SELECT = `
   last_qc_date, next_recheck_date,
   batch_type, received_date, expiry_date, status,
   parent_batch_id, sub_lot_code,
+  rubber_grade, rubber_type, dry_weight, storage_days,
+  contamination_status, initial_weight, current_weight, weight_loss,
+  supplier_name, supplier_region, supplier_reported_drc,
   created_at, updated_at,
   material:materials(id, sku, name, unit),
   warehouse:warehouses(id, code, name),
@@ -199,6 +214,22 @@ export const batchService = {
       // Phase 9: Sub-lots
       parent_batch_id: data.parent_batch_id || null,
       sub_lot_code: data.sub_lot_code || null,
+
+      // Rubber fields
+      rubber_grade: data.rubber_grade || (data.initial_drc ? rubberGradeService.classifyByDRC(data.initial_drc) : null),
+      rubber_type: data.rubber_type || null,
+      moisture_content: data.moisture_content || null,
+      initial_weight: data.initial_weight || null,
+      current_weight: data.initial_weight || null,
+      dry_weight: data.initial_drc && data.initial_weight
+        ? rubberGradeService.calculateDryWeight(data.initial_weight, data.initial_drc)
+        : null,
+      weight_loss: 0,
+      supplier_name: data.supplier_name || null,
+      supplier_region: data.supplier_region || null,
+      supplier_reported_drc: data.supplier_reported_drc || null,
+      contamination_status: 'clean',
+      storage_days: 0,
     }
 
     const { data: batch, error } = await supabase
@@ -604,6 +635,55 @@ export const batchService = {
     if (error) throw error
     return data?.length ?? 0
   },
+
+  // --------------------------------------------------------------------------
+  // RUBBER: Cap nhat grade
+  // --------------------------------------------------------------------------
+  async updateRubberGrade(id: string, grade: RubberGrade): Promise<StockBatch> {
+    const { data, error } = await supabase
+      .from('stock_batches')
+      .update({
+        rubber_grade: grade,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select(BATCH_SELECT)
+      .single()
+
+    if (error) throw error
+    return data as unknown as StockBatch
+  },
+
+  // --------------------------------------------------------------------------
+  // RUBBER: Cap nhat contamination status
+  // --------------------------------------------------------------------------
+  async updateContaminationStatus(
+    id: string,
+    status: ContaminationStatus,
+    notes?: string
+  ): Promise<StockBatch> {
+    const updateData: Record<string, unknown> = {
+      contamination_status: status,
+      updated_at: new Date().toISOString(),
+    }
+    if (notes !== undefined) {
+      updateData.contamination_notes = notes
+    }
+    // Quarantine batch if contamination confirmed
+    if (status === 'confirmed') {
+      updateData.status = 'quarantine' as BatchStatus
+    }
+
+    const { data, error } = await supabase
+      .from('stock_batches')
+      .update(updateData)
+      .eq('id', id)
+      .select(BATCH_SELECT)
+      .single()
+
+    if (error) throw error
+    return data as unknown as StockBatch
+  },
 }
 
 // ============================================================================
@@ -627,6 +707,8 @@ export const {
   countByStatus: countBatchesByStatus,
   countByQCStatus: countBatchesByQCStatus,
   markExpiredBatches,
+  updateRubberGrade,
+  updateContaminationStatus,
 } = batchService
 
 export default batchService

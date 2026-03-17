@@ -55,16 +55,16 @@ const PRODUCT_OPTIONS = [
   { value: 'SVR 10', label: 'SVR 10' },
   { value: 'SVR 20', label: 'SVR 20' },
   { value: 'SVR CV50', label: 'SVR CV50' },
-  { value: 'Mu nuoc', label: 'Mu nuoc' },
-  { value: 'Mu tap', label: 'Mu tap' },
-  { value: 'Mu dong', label: 'Mu dong' },
+  { value: 'Mủ nước', label: 'Mủ nước' },
+  { value: 'Mủ tạp', label: 'Mủ tạp' },
+  { value: 'Mủ đông', label: 'Mủ đông' },
   { value: 'Khac', label: 'Khac' },
 ]
 
 const SETTLEMENT_TYPE_OPTIONS = [
-  { value: 'purchase', label: 'Mua hang' },
-  { value: 'sale', label: 'Ban hang' },
-  { value: 'processing', label: 'Gia cong' },
+  { value: 'purchase', label: 'Mua hàng' },
+  { value: 'sale', label: 'Bán hàng' },
+  { value: 'processing', label: 'Gia công' },
 ]
 
 interface Partner {
@@ -170,15 +170,15 @@ const SettlementCreatePage: React.FC = () => {
     if (currentStep === 0) {
       const values = form.getFieldsValue(['partner_id', 'settlement_type', 'product_type'])
       if (!values.partner_id) {
-        message.warning('Vui long chon doi tac')
+        message.warning('Vui lòng chọn đối tác')
         return
       }
       if (!values.settlement_type) {
-        message.warning('Vui long chon loai quyet toan')
+        message.warning('Vui lòng chọn loại quyết toán')
         return
       }
       if (!values.product_type) {
-        message.warning('Vui long chon loai san pham')
+        message.warning('Vui lòng chọn loại sản phẩm')
         return
       }
     }
@@ -248,7 +248,7 @@ const SettlementCreatePage: React.FC = () => {
       setCurrentStep(4)
       message.success('Tao phieu quyet toan thanh cong!')
     } catch (err: any) {
-      message.error(err?.message || 'Co loi xay ra khi tao phieu quyet toan')
+      message.error(err?.message || 'Có lỗi xảy ra khi tạo phiếu quyết toán')
     } finally {
       setLoading(false)
     }
@@ -266,8 +266,8 @@ const SettlementCreatePage: React.FC = () => {
     <>
       <Form.Item
         name="partner_id"
-        label="Doi tac"
-        rules={[{ required: true, message: 'Vui long chon doi tac' }]}
+        label="Đối tác"
+        rules={[{ required: true, message: 'Vui lòng chọn đối tác' }]}
       >
         <Select
           showSearch
@@ -295,18 +295,18 @@ const SettlementCreatePage: React.FC = () => {
 
       <Form.Item
         name="settlement_type"
-        label="Loai quyet toan"
-        rules={[{ required: true, message: 'Vui long chon loai quyet toan' }]}
+        label="Loại quyết toán"
+        rules={[{ required: true, message: 'Vui lòng chọn loại quyết toán' }]}
       >
-        <Select placeholder="Chon loai quyet toan" options={SETTLEMENT_TYPE_OPTIONS} />
+        <Select placeholder="Chọn loại quyết toán" options={SETTLEMENT_TYPE_OPTIONS} />
       </Form.Item>
 
       <Form.Item
         name="product_type"
-        label="Loai san pham"
-        rules={[{ required: true, message: 'Vui long chon loai san pham' }]}
+        label="Loại sản phẩm"
+        rules={[{ required: true, message: 'Vui lòng chọn loại sản phẩm' }]}
       >
-        <Select placeholder="Chon loai san pham" options={PRODUCT_OPTIONS} />
+        <Select placeholder="Chọn loại sản phẩm" options={PRODUCT_OPTIONS} />
       </Form.Item>
 
       {selectedPartner && deals.length > 0 && (
@@ -333,7 +333,7 @@ const SettlementCreatePage: React.FC = () => {
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="SDT">
-              {selectedPartner.phone || 'Chua cap nhat'}
+              {selectedPartner.phone || 'Chưa cập nhật'}
             </Descriptions.Item>
           </Descriptions>
         </Card>
@@ -348,7 +348,7 @@ const SettlementCreatePage: React.FC = () => {
           <Form.Item
             name="weighed_kg"
             label="KL can (kg)"
-            rules={[{ required: true, message: 'Vui long nhap khoi luong can' }]}
+            rules={[{ required: true, message: 'Vui lòng nhập khối lượng cân' }]}
           >
             <InputNumber
               style={{ width: '100%' }}
@@ -374,7 +374,7 @@ const SettlementCreatePage: React.FC = () => {
             <InputNumber
               style={{ width: '100%' }}
               min={0}
-              placeholder="Tu dong tinh"
+              placeholder="Tự động tính"
               formatter={(value) => (value ? formatCurrency(Number(value)) : '')}
               parser={(value) => Number(value?.replace(/\./g, '').replace(/,/g, '')) as any}
             />
@@ -387,12 +387,12 @@ const SettlementCreatePage: React.FC = () => {
           <Form.Item
             name="approved_price"
             label="Don gia duyet (VND/kg)"
-            rules={[{ required: true, message: 'Vui long nhap don gia' }]}
+            rules={[{ required: true, message: 'Vui lòng nhập đơn giá' }]}
           >
             <InputNumber
               style={{ width: '100%' }}
               min={0}
-              placeholder="Nhap don gia"
+              placeholder="Nhập đơn giá"
               formatter={(value) => (value ? formatCurrency(Number(value)) : '')}
               parser={(value) => Number(value?.replace(/\./g, '').replace(/,/g, '')) as any}
               suffix="VND"
@@ -422,17 +422,17 @@ const SettlementCreatePage: React.FC = () => {
 
       <Row gutter={16}>
         <Col span={12}>
-          <Form.Item name="vehicle_plates" label="Bien so xe">
+          <Form.Item name="vehicle_plates" label="Biến số xe">
             <Input placeholder="VD: 51C-123.45" />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item name="driver_name" label="Ten tai xe">
-            <Input placeholder="Nhap ten tai xe" />
+          <Form.Item name="driver_name" label="Tên tài xế">
+            <Input placeholder="Nhập tên tài xế" />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item name="driver_phone" label="SDT tai xe">
+          <Form.Item name="driver_phone" label="SĐT tài xế">
             <Input placeholder="Nhap SDT" />
           </Form.Item>
         </Col>
@@ -440,17 +440,17 @@ const SettlementCreatePage: React.FC = () => {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item name="weigh_date_start" label="Ngay bat dau can">
+          <Form.Item name="weigh_date_start" label="Ngày bắt đầu cân">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item name="weigh_date_end" label="Ngay ket thuc can">
+          <Form.Item name="weigh_date_end" label="Ngày kết thúc cân">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item name="stock_in_date" label="Ngay nhap kho">
+          <Form.Item name="stock_in_date" label="Ngày nhập kho">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
         </Col>
@@ -467,7 +467,7 @@ const SettlementCreatePage: React.FC = () => {
 
       <Title level={5}>Tam ung da chi</Title>
       {unlinkedAdvances.length === 0 ? (
-        <Text type="secondary">Khong co tam ung chua lien ket cho doi tac nay.</Text>
+        <Text type="secondary">Không có tạm ứng chưa liên kết cho đối tác này.</Text>
       ) : (
         <List
           bordered
@@ -541,18 +541,18 @@ const SettlementCreatePage: React.FC = () => {
 
     return (
       <>
-        <Descriptions bordered column={2} size="small" title="Thong tin doi tac">
-          <Descriptions.Item label="Doi tac">{selectedPartner?.name}</Descriptions.Item>
-          <Descriptions.Item label="Ma doi tac">{selectedPartner?.code}</Descriptions.Item>
+        <Descriptions bordered column={2} size="small" title="Thông tin đối tác">
+          <Descriptions.Item label="Đối tác">{selectedPartner?.name}</Descriptions.Item>
+          <Descriptions.Item label="Mã đối tác">{selectedPartner?.code}</Descriptions.Item>
           <Descriptions.Item label="Hang">
             <Tag color={TIER_COLORS[selectedPartner?.tier || ''] || 'default'}>
               {selectedPartner?.tier}
             </Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="Loai quyet toan">{typeLabel}</Descriptions.Item>
-          <Descriptions.Item label="San pham">{productLabel}</Descriptions.Item>
+          <Descriptions.Item label="Loại quyết toán">{typeLabel}</Descriptions.Item>
+          <Descriptions.Item label="Sản phẩm">{productLabel}</Descriptions.Item>
           {selectedDeal && (
-            <Descriptions.Item label="Deal lien ket">
+            <Descriptions.Item label="Deal liên kết">
               {selectedDeal.deal_number} - {selectedDeal.product_name}
             </Descriptions.Item>
           )}
@@ -565,7 +565,7 @@ const SettlementCreatePage: React.FC = () => {
             {formatCurrency(values.weighed_kg)}
           </Descriptions.Item>
           <Descriptions.Item label="DRC (%)">
-            {values.drc_percent ?? 'Chua nhap'}
+            {values.drc_percent ?? 'Chưa nhập'}
           </Descriptions.Item>
           <Descriptions.Item label="KL thanh pham (kg)">
             {formatCurrency(values.finished_kg)}
@@ -573,14 +573,14 @@ const SettlementCreatePage: React.FC = () => {
           <Descriptions.Item label="Don gia (VND/kg)">
             {formatCurrency(values.approved_price)}
           </Descriptions.Item>
-          <Descriptions.Item label="Bien so xe">
-            {values.vehicle_plates || 'Chua nhap'}
+          <Descriptions.Item label="Biến số xe">
+            {values.vehicle_plates || 'Chưa nhập'}
           </Descriptions.Item>
-          <Descriptions.Item label="Tai xe">
-            {values.driver_name || 'Chua nhap'}
+          <Descriptions.Item label="Tài xế">
+            {values.driver_name || 'Chưa nhập'}
             {values.driver_phone ? ` (${values.driver_phone})` : ''}
           </Descriptions.Item>
-          <Descriptions.Item label="Ngay can">
+          <Descriptions.Item label="Ngày cân">
             {values.weigh_date_start
               ? dayjs(values.weigh_date_start).format('DD/MM/YYYY')
               : ''}{' '}
@@ -588,18 +588,18 @@ const SettlementCreatePage: React.FC = () => {
               ? `- ${dayjs(values.weigh_date_end).format('DD/MM/YYYY')}`
               : ''}
           </Descriptions.Item>
-          <Descriptions.Item label="Ngay nhap kho">
+          <Descriptions.Item label="Ngày nhập kho">
             {values.stock_in_date
               ? dayjs(values.stock_in_date).format('DD/MM/YYYY')
-              : 'Chua chon'}
+              : 'Chưa chọn'}
           </Descriptions.Item>
         </Descriptions>
 
         <Divider />
 
-        <Descriptions bordered column={1} size="small" title="Hang muc quyet toan">
+        <Descriptions bordered column={1} size="small" title="Hạng mục quyết toán">
           {items.length === 0 ? (
-            <Descriptions.Item label="Hang muc">Khong co hang muc</Descriptions.Item>
+            <Descriptions.Item label="Hạng mục">Khong co hang muc</Descriptions.Item>
           ) : (
             items.map((item, idx) => (
               <Descriptions.Item key={idx} label={item.description || `Hang muc ${idx + 1}`}>
@@ -612,7 +612,7 @@ const SettlementCreatePage: React.FC = () => {
         {selectedAdvanceIds.length > 0 && (
           <>
             <Divider />
-            <Descriptions bordered column={1} size="small" title="Tam ung tru">
+            <Descriptions bordered column={1} size="small" title="Tạm ứng trừ">
               {unlinkedAdvances
                 .filter((a) => selectedAdvanceIds.includes(a.id))
                 .map((a) => (
@@ -694,10 +694,10 @@ const SettlementCreatePage: React.FC = () => {
   )
 
   const steps = [
-    { title: 'Chon doi tac', icon: <UserOutlined /> },
+    { title: 'Chọn đối tác', icon: <UserOutlined /> },
     { title: 'Thong tin can & DRC', icon: <FileTextOutlined /> },
     { title: 'Hang muc & Tam ung', icon: <DollarOutlined /> },
-    { title: 'Xac nhan', icon: <CheckCircleOutlined /> },
+    { title: 'Xác nhận', icon: <CheckCircleOutlined /> },
   ]
 
   return (
@@ -709,7 +709,7 @@ const SettlementCreatePage: React.FC = () => {
           {
             title: <a onClick={() => navigate('/b2b/settlements')}>Quyet toan</a>,
           },
-          { title: 'Tao moi' },
+          { title: 'Tạo mới' },
         ]}
       />
 

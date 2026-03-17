@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/authStore'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import WeighingPage from '@/pages/WeighingPage'
+import PrintPage from '@/pages/PrintPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const operator = useAuthStore((s) => s.operator)
@@ -36,6 +37,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <WeighingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/print/:ticketId"
+          element={
+            <ProtectedRoute>
+              <PrintPage />
             </ProtectedRoute>
           }
         />

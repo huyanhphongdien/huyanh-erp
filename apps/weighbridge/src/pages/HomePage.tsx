@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Card, Button, Typography, Space, Row, Col, Statistic, Table, Tag, Empty, Badge, Image, Popover,
+  Card, Button, Typography, Space, Row, Col, Statistic, Table, Tag, Empty, Badge, Image, Popover, Tooltip,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   PlusOutlined, ReloadOutlined, LogoutOutlined, SettingOutlined, CameraOutlined,
+  EyeOutlined, PrinterOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
@@ -171,6 +172,25 @@ export default function HomePage() {
           </Popover>
         )
       },
+    },
+    {
+      title: '', key: 'actions', width: 90, align: 'center',
+      render: (_: unknown, record: WeighbridgeTicket) => (
+        <Space size={4}>
+          <Tooltip title="Chi tiết">
+            <Button
+              type="text" size="small" icon={<EyeOutlined />}
+              onClick={(e) => { e.stopPropagation(); navigate(`/weigh/${record.id}`) }}
+            />
+          </Tooltip>
+          <Tooltip title="In phiếu">
+            <Button
+              type="text" size="small" icon={<PrinterOutlined />}
+              onClick={(e) => { e.stopPropagation(); navigate(`/print/${record.id}`) }}
+            />
+          </Tooltip>
+        </Space>
+      ),
     },
   ]
 

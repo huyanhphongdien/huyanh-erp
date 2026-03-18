@@ -60,6 +60,7 @@ import {
 import { autoSettlementService } from '../../../services/b2b/autoSettlementService'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { PRODUCT_TYPE_LABELS } from '../../../constants/rubberProducts'
 import DealWmsTab from '../../../components/b2b/DealWmsTab'
 import DealQcTab from '../../../components/b2b/DealQcTab'
 import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
@@ -502,14 +503,24 @@ const DealDetailPage = () => {
                         {deal.deal_type ? DEAL_TYPE_LABELS[deal.deal_type] : '-'}
                       </Descriptions.Item>
                       <Descriptions.Item label="Sản phẩm">{deal.product_name || '-'}</Descriptions.Item>
-                      <Descriptions.Item label="Mã sản phẩm">{deal.product_code || '-'}</Descriptions.Item>
+                      <Descriptions.Item label="Loại mủ">{deal.rubber_type ? (PRODUCT_TYPE_LABELS[deal.rubber_type] || deal.rubber_type) : (deal.product_code || '-')}</Descriptions.Item>
                       <Descriptions.Item label="Số lượng">
                         <Text strong style={{ color: '#1B4D3E', fontSize: 16 }}>
                           {deal.quantity_tons?.toFixed(2) || '-'} tấn
                         </Text>
                       </Descriptions.Item>
+                      <Descriptions.Item label="DRC dự kiến">
+                        {deal.expected_drc ? (
+                          <Text strong style={{ color: '#1890ff' }}>{deal.expected_drc}%</Text>
+                        ) : '-'}
+                      </Descriptions.Item>
                       <Descriptions.Item label="Đơn giá">
                         {deal.unit_price?.toLocaleString() || '-'} đ/kg
+                        {deal.price_unit && (
+                          <Tag color={deal.price_unit === 'dry' ? 'orange' : 'blue'} style={{ marginLeft: 8 }}>
+                            {deal.price_unit === 'dry' ? 'Giá khô' : 'Giá ướt'}
+                          </Tag>
+                        )}
                       </Descriptions.Item>
                       <Descriptions.Item label="Giá chốt">
                         {deal.final_price ? (
@@ -523,6 +534,21 @@ const DealDetailPage = () => {
                           {formatCurrency(deal.total_value_vnd)}
                         </Text>
                       </Descriptions.Item>
+                      {deal.source_region && (
+                        <Descriptions.Item label="Vùng thu mua">
+                          {deal.source_region}
+                        </Descriptions.Item>
+                      )}
+                      {deal.pickup_location_name && (
+                        <Descriptions.Item label="Địa điểm chốt">
+                          {deal.pickup_location_name}
+                        </Descriptions.Item>
+                      )}
+                      {deal.delivery_date && (
+                        <Descriptions.Item label="Ngày giao dự kiến">
+                          {formatDate(deal.delivery_date)}
+                        </Descriptions.Item>
+                      )}
                       <Descriptions.Item label="Điều kiện giao hàng" span={2}>
                         {deal.delivery_terms || '-'}
                       </Descriptions.Item>

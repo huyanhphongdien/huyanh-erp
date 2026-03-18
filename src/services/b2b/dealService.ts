@@ -44,6 +44,13 @@ export interface Deal {
   final_value: number | null
   stock_in_count: number | null
   qc_status: string | null           // 'pending' | 'passed' | 'warning' | 'failed'
+  // Deal detail fields
+  expected_drc: number | null
+  source_region: string | null
+  rubber_type: string | null
+  pickup_location_name: string | null
+  price_unit: string | null          // 'wet' | 'dry'
+  delivery_date: string | null
   // Joined fields
   partner?: {
     id: string

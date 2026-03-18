@@ -121,13 +121,14 @@ export const dealConfirmService = {
         total_value_vnd: estimatedValue,
         currency: 'VND',
         status: 'processing',
-        notes: [
-          `DRC dự kiến: ${formData.expected_drc}%`,
-          `Loại giá: ${formData.price_unit === 'wet' ? 'Giá ướt' : 'Giá khô'}`,
-          formData.pickup_location ? `Địa điểm: ${formData.pickup_location}` : '',
-          formData.delivery_date ? `Giao dự kiến: ${formData.delivery_date}` : '',
-          formData.deal_notes || '',
-        ].filter(Boolean).join('. '),
+        // Lưu vào cột riêng (không nhét notes)
+        expected_drc: formData.expected_drc,
+        rubber_type: formData.product_type,
+        price_unit: formData.price_unit,
+        pickup_location_name: formData.pickup_location || null,
+        delivery_date: formData.delivery_date || null,
+        // Notes chỉ chứa ghi chú thực sự
+        notes: formData.deal_notes || null,
         booking_id: context.bookingMessageId,
       })
       .select('*')

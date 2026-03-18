@@ -138,7 +138,7 @@ const ConfirmDealModal = ({
         expected_drc: values.expected_drc,
         agreed_price: values.agreed_price,
         price_unit: values.price_unit,
-        pickup_location: values.pickup_location || booking?.pickup_location,
+        pickup_location: Array.isArray(values.pickup_location) ? values.pickup_location[0] : (values.pickup_location || booking?.pickup_location),
         delivery_date: values.delivery_date || booking?.delivery_date,
         deal_notes: values.deal_notes,
         has_advance: hasAdvance,
@@ -300,13 +300,33 @@ const ConfirmDealModal = ({
           </Col>
         </Row>
 
-        {/* Địa điểm + Ngày giao */}
-        {booking.pickup_location && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <EnvironmentOutlined style={{ color: '#1890ff' }} />
-            <Text strong>{booking.pickup_location}</Text>
-          </div>
-        )}
+        {/* Vùng thu mua / Địa điểm chốt */}
+        <Form.Item
+          name="pickup_location"
+          label={<><EnvironmentOutlined style={{ color: '#1890ff', marginRight: 4 }} /> Vùng thu mua / Địa điểm chốt</>}
+          initialValue={booking.pickup_location || ''}
+        >
+          <Select
+            allowClear
+            showSearch
+            placeholder="Chọn hoặc nhập vùng thu mua"
+            mode="tags"
+            maxCount={1}
+            options={[
+              { value: 'Bình Phước', label: 'Bình Phước' },
+              { value: 'Tây Ninh', label: 'Tây Ninh' },
+              { value: 'Đồng Nai', label: 'Đồng Nai' },
+              { value: 'Gia Lai', label: 'Gia Lai' },
+              { value: 'Kon Tum', label: 'Kon Tum' },
+              { value: 'Đắk Lắk', label: 'Đắk Lắk' },
+              { value: 'Bình Dương', label: 'Bình Dương' },
+              { value: 'Lào - Champasak', label: 'Lào - Champasak' },
+              { value: 'Lào - Attapeu', label: 'Lào - Attapeu' },
+              { value: 'Campuchia - Ratanakiri', label: 'Campuchia - Ratanakiri' },
+              { value: 'Thái Lan', label: 'Thái Lan' },
+            ]}
+          />
+        </Form.Item>
 
         {/* Giá trị ước tính */}
         <div

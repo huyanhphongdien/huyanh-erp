@@ -28,6 +28,7 @@ import {
   Radio,
   Divider,
   List,
+  message,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -39,6 +40,7 @@ import {
   ExperimentOutlined,
   EnvironmentOutlined,
   InboxOutlined,
+  ScanOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import stockInService from '../../../services/wms/stockInService'
@@ -180,17 +182,17 @@ const AddDetailModal: React.FC<{
       onCancel={onCancel}
       width={640}
       footer={[
-        <Button key="cancel" onClick={onCancel}>Huy</Button>,
+        <Button key="cancel" onClick={onCancel}>Huỷ</Button>,
         <Button key="submit" type="primary" onClick={handleSubmit} disabled={!canSubmit}
           style={{ background: canSubmit ? '#2D8B6E' : undefined, borderColor: canSubmit ? '#2D8B6E' : undefined }}>
-          <CheckCircleOutlined /> Them vao phieu
+          <CheckCircleOutlined /> Thêm vào phiếu
         </Button>,
       ]}
       styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
     >
       {/* Material */}
       <div style={{ marginBottom: 16 }}>
-        <Text strong style={{ display: 'block', marginBottom: 4 }}>San pham *</Text>
+        <Text strong style={{ display: 'block', marginBottom: 4 }}>Sản phẩm *</Text>
         <Select
           value={materialId || undefined}
           onChange={setMaterialId}
@@ -247,7 +249,7 @@ const AddDetailModal: React.FC<{
         {drcDiscrepancy !== null && Math.abs(drcDiscrepancy) > 1 && (
           <Alert
             type={Math.abs(drcDiscrepancy) > 3 ? 'error' : 'warning'}
-            message={`Chênh lệch DRC: ${drcDiscrepancy > 0 ? '+' : ''}${drcDiscrepancy}% (QC: ${qcData?.drc_value}% vs Dai ly: ${supplierReportedDrc}%)`}
+            message={`Chênh lệch DRC: ${drcDiscrepancy > 0 ? '+' : ''}${drcDiscrepancy}% (QC: ${qcData?.drc_value}% vs Đại lý: ${supplierReportedDrc}%)`}
             showIcon
             banner
             style={{ marginTop: 4, borderRadius: 6 }}
@@ -280,7 +282,7 @@ const AddDetailModal: React.FC<{
         <Input
           value={itemNotes}
           onChange={e => setItemNotes(e.target.value)}
-          placeholder="Ghi chú cho dong nay..."
+          placeholder="Ghi chú cho dòng này..."
         />
       </div>
     </Modal>
@@ -307,6 +309,11 @@ const StockInCreatePage = () => {
   const [supplierName, setSupplierName] = useState('')
   const [supplierRegion, setSupplierRegion] = useState('')
   const [rubberType, setRubberType] = useState<string>('')
+
+  // QR scan
+  const [ticketCode, setTicketCode] = useState('')
+  const [scanLoading, setScanLoading] = useState(false)
+  const [scannedTicket, setScannedTicket] = useState<any>(null)
 
   // Step 2: Details
   const [details, setDetails] = useState<DetailItem[]>([])
@@ -354,6 +361,75 @@ const StockInCreatePage = () => {
 
   const selectedDeal = activeDeals.find(d => d.id === dealId)
   const selectedWarehouse = warehouses.find(w => w.id === warehouseId)
+
+  // Auto-fill from deal when deal is selected (purchase mode)
+  useEffect(() => {
+    if (sourceType === 'purchase' && selectedDeal) {
+      if (selectedDeal.partner_name && !supplierName) {
+        setSupplierName(selectedDeal.partner_name)
+      }
+      if (selectedDeal.product_name && !rubberType) {
+        // Try to match product_name to a rubber type
+        const matchedType = Object.entries(RUBBER_TYPE_LABELS).find(
+          ([, label]) => selectedDeal.product_name?.toLowerCase().includes(label.toLowerCase())
+        )
+        if (matchedType) {
+          setRubberType(matchedType[0])
+        }
+      }
+    }
+  }, [dealId, selectedDeal, sourceType])
+
+  // QR scan handler
+  const handleScanTicket = async (code: string) => {
+    const trimmed = code.trim()
+    if (!trimmed) {
+      message.warning('Vui lòng nhập mã phiếu cân')
+      return
+    }
+    setScanLoading(true)
+    try {
+      const { data: ticket, error: ticketError } = await supabase
+        .from('weighbridge_tickets')
+        .select('*, deal:b2b_deals!deal_id(id, deal_number, partner_id, product_name, quantity_kg)')
+        .eq('code', trimmed)
+        .single()
+
+      if (ticketError || !ticket) {
+        message.error(`Không tìm thấy phiếu cân: ${trimmed}`)
+        setScanLoading(false)
+        return
+      }
+
+      setScannedTicket(ticket)
+
+      // Auto-fill from ticket
+      if (ticket.supplier_name) {
+        setSupplierName(ticket.supplier_name)
+      }
+      if (ticket.rubber_type) {
+        setRubberType(ticket.rubber_type)
+      }
+      if (ticket.vehicle_plate) {
+        setHeaderNotes(prev => prev ? `${prev}\nBiển số xe: ${ticket.vehicle_plate}` : `Biển số xe: ${ticket.vehicle_plate}`)
+      }
+
+      // If ticket has deal_id, switch to purchase mode and select the deal
+      if (ticket.deal_id) {
+        setSourceType('purchase')
+        // Wait for deals to load, then set dealId
+        setTimeout(() => {
+          setDealId(ticket.deal_id)
+        }, 500)
+      }
+
+      message.success(`Đã tìm thấy phiếu cân: ${ticket.code} - KL ròng: ${ticket.net_weight ? `${ticket.net_weight.toLocaleString()} kg` : 'N/A'}`)
+    } catch (err: any) {
+      message.error(`Lỗi tra cứu phiếu cân: ${err.message}`)
+    } finally {
+      setScanLoading(false)
+    }
+  }
 
   // Summary calculations
   const totalQty = details.reduce((s, d) => s + d.quantity, 0)
@@ -422,13 +498,13 @@ const StockInCreatePage = () => {
       <div style={{ padding: 24 }}>
         <Result
           status="success"
-          title="Tạo phiếu nhập kho thanh cong!"
+          title="Tạo phiếu nhập kho thành công!"
           subTitle={<Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{successCode}</Text>}
           extra={[
-            <Button key="list" onClick={() => navigate('/wms/stock-in')}>Ve danh sach</Button>,
+            <Button key="list" onClick={() => navigate('/wms/stock-in')}>Về danh sách</Button>,
             <Button key="new" type="primary" onClick={() => window.location.reload()}
               style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
-              Tạo phiếu moi
+              Tạo phiếu mới
             </Button>,
           ]}
         />
@@ -468,13 +544,52 @@ const StockInCreatePage = () => {
         <Alert type="error" message={error} closable onClose={() => setError(null)} style={{ marginBottom: 16, borderRadius: 8 }} showIcon />
       )}
 
-      {/* ═══ STEP 1: Thong tin ═══ */}
+      {/* === STEP 1: Thông tin === */}
       {step === 0 && (
         <Card style={{ borderRadius: 12 }}>
+          {/* QR Scan Section */}
+          <Card
+            size="small"
+            style={{ marginBottom: 16, borderStyle: 'dashed', borderColor: '#2D8B6E', borderRadius: 8, background: '#f6ffed' }}
+          >
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text strong style={{ color: '#1B4D3E' }}>
+                <ScanOutlined style={{ marginRight: 6 }} />
+                Quét QR phiếu cân
+              </Text>
+              <Input.Search
+                value={ticketCode}
+                onChange={e => setTicketCode(e.target.value)}
+                placeholder="Nhập mã phiếu cân (VD: CX-20260318-001)"
+                enterButton="Tìm phiếu cân"
+                size="large"
+                loading={scanLoading}
+                onSearch={handleScanTicket}
+              />
+              {scannedTicket && (
+                <Alert
+                  type="success"
+                  showIcon
+                  message={`Phiếu cân: ${scannedTicket.code}`}
+                  description={
+                    <Space direction="vertical" size={2}>
+                      {scannedTicket.supplier_name && <Text>Đại lý: {scannedTicket.supplier_name}</Text>}
+                      {scannedTicket.vehicle_plate && <Text>Biển số xe: {scannedTicket.vehicle_plate}</Text>}
+                      {scannedTicket.net_weight && <Text>Khối lượng ròng: {scannedTicket.net_weight.toLocaleString()} kg</Text>}
+                      {scannedTicket.rubber_type && <Text>Loại mủ: {RUBBER_TYPE_LABELS[scannedTicket.rubber_type as RubberType] || scannedTicket.rubber_type}</Text>}
+                      {scannedTicket.deal && <Text>Deal: {scannedTicket.deal.deal_number}</Text>}
+                    </Space>
+                  }
+                  style={{ borderRadius: 6 }}
+                />
+              )}
+            </Space>
+          </Card>
+
           <Row gutter={24}>
             <Col span={12}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Kho nhap *</Text>
+                <Text strong>Kho nhập *</Text>
                 <Select
                   value={warehouseId || undefined}
                   onChange={setWarehouseId}
@@ -507,7 +622,7 @@ const StockInCreatePage = () => {
               <Select
                 value={dealId || undefined}
                 onChange={setDealId}
-                placeholder="Chon Deal de lien ket"
+                placeholder="Chọn Deal để liên kết"
                 style={{ width: '100%', marginTop: 4 }}
                 size="large"
                 allowClear
@@ -516,16 +631,16 @@ const StockInCreatePage = () => {
                 optionFilterProp="label"
                 options={activeDeals.map(d => ({
                   value: d.id,
-                  label: `${d.deal_number} — ${d.partner_name} — Con ${(d.remaining_kg / 1000).toFixed(1)} T`,
+                  label: `${d.deal_number} — ${d.partner_name} — Còn ${(d.remaining_kg / 1000).toFixed(1)} T`,
                 }))}
               />
               {selectedDeal && (
                 <Card size="small" style={{ marginTop: 8, background: '#f0f5ff', borderRadius: 8 }}>
                   <Row gutter={16}>
                     <Col span={6}><Text type="secondary">Deal</Text><br /><Text strong>{selectedDeal.deal_number}</Text></Col>
-                    <Col span={6}><Text type="secondary">Dai ly</Text><br /><Text>{selectedDeal.partner_name}</Text></Col>
+                    <Col span={6}><Text type="secondary">Đại lý</Text><br /><Text>{selectedDeal.partner_name}</Text></Col>
                     <Col span={6}><Text type="secondary">SL Deal</Text><br /><Text>{(selectedDeal.quantity_kg / 1000).toFixed(1)} T</Text></Col>
-                    <Col span={6}><Text type="secondary">Con lai</Text><br /><Text strong style={{ color: '#1890ff' }}>{(selectedDeal.remaining_kg / 1000).toFixed(1)} T</Text></Col>
+                    <Col span={6}><Text type="secondary">Còn lại</Text><br /><Text strong style={{ color: '#1890ff' }}>{(selectedDeal.remaining_kg / 1000).toFixed(1)} T</Text></Col>
                   </Row>
                 </Card>
               )}
@@ -533,26 +648,26 @@ const StockInCreatePage = () => {
           )}
 
           {/* Rubber intake fields */}
-          <Divider style={{ fontSize: 13 }}>Thong tin nguon goc (cao su)</Divider>
+          <Divider style={{ fontSize: 13 }}>Thông tin nguồn gốc (cao su)</Divider>
           <Row gutter={16}>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Dai ly / Nguon</Text>
+                <Text strong>Đại lý / Nguồn</Text>
                 <Input
                   value={supplierName}
                   onChange={e => setSupplierName(e.target.value)}
-                  placeholder="Ten dai ly"
+                  placeholder="Tên đại lý"
                   style={{ marginTop: 4 }}
                 />
               </div>
             </Col>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Vung nguon goc</Text>
+                <Text strong>Vùng nguồn gốc</Text>
                 <Input
                   value={supplierRegion}
                   onChange={e => setSupplierRegion(e.target.value)}
-                  placeholder="Binh Phuoc, Tay Ninh..."
+                  placeholder="Bình Phước, Tây Ninh..."
                   style={{ marginTop: 4 }}
                 />
               </div>
@@ -593,12 +708,12 @@ const StockInCreatePage = () => {
         </Card>
       )}
 
-      {/* ═══ STEP 2: Chi tiết ═══ */}
+      {/* === STEP 2: Chi tiết === */}
       {step === 1 && (
         <Card style={{ borderRadius: 12 }}>
           <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
             <Col>
-              <Text strong style={{ fontSize: 16 }}>Danh sách mat hang ({details.length})</Text>
+              <Text strong style={{ fontSize: 16 }}>Danh sách mặt hàng ({details.length})</Text>
             </Col>
             <Col>
               <Button type="dashed" icon={<PlusOutlined />} onClick={() => setShowAddModal(true)}>
@@ -608,7 +723,7 @@ const StockInCreatePage = () => {
           </Row>
 
           {details.length === 0 ? (
-            <Empty description="Chưa có mat hang nao. Bam 'Thêm sản phẩm' de bat dau." style={{ padding: 40 }} />
+            <Empty description="Chưa có mặt hàng nào. Bấm 'Thêm sản phẩm' để bắt đầu." style={{ padding: 40 }} />
           ) : (
             <List
               dataSource={details}
@@ -678,7 +793,7 @@ const StockInCreatePage = () => {
         </Card>
       )}
 
-      {/* ═══ STEP 3: Xác nhận ═══ */}
+      {/* === STEP 3: Xác nhận === */}
       {step === 2 && (
         <Card style={{ borderRadius: 12 }}>
           <Title level={5}>Tóm tắt phiếu nhập kho</Title>
@@ -687,13 +802,13 @@ const StockInCreatePage = () => {
           <Card size="small" style={{ marginBottom: 16, background: '#fafafa', borderRadius: 8 }}>
             <Row gutter={16}>
               <Col span={8}><Text type="secondary">Kho</Text><br /><Text strong>{selectedWarehouse?.name}</Text></Col>
-              <Col span={8}><Text type="secondary">Nguon</Text><br /><Tag>{SOURCE_OPTIONS.find(s => s.value === sourceType)?.label}</Tag></Col>
+              <Col span={8}><Text type="secondary">Nguồn</Text><br /><Tag>{SOURCE_OPTIONS.find(s => s.value === sourceType)?.label}</Tag></Col>
               {selectedDeal && <Col span={8}><Text type="secondary">Deal</Text><br /><Text strong>{selectedDeal.deal_number}</Text></Col>}
             </Row>
             {(supplierName || supplierRegion || rubberType) && (
               <Row gutter={16} style={{ marginTop: 8 }}>
-                {supplierName && <Col span={8}><Text type="secondary">Dai ly</Text><br /><Text>{supplierName}</Text></Col>}
-                {supplierRegion && <Col span={8}><Text type="secondary">Vung</Text><br /><Text>{supplierRegion}</Text></Col>}
+                {supplierName && <Col span={8}><Text type="secondary">Đại lý</Text><br /><Text>{supplierName}</Text></Col>}
+                {supplierRegion && <Col span={8}><Text type="secondary">Vùng</Text><br /><Text>{supplierRegion}</Text></Col>}
                 {rubberType && <Col span={8}><Text type="secondary">Loại mủ</Text><br /><Text>{RUBBER_TYPE_LABELS[rubberType as RubberType] || rubberType}</Text></Col>}
               </Row>
             )}
@@ -703,7 +818,7 @@ const StockInCreatePage = () => {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="So SP" value={details.length} valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
+                <Statistic title="Số SP" value={details.length} valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
               </Card>
             </Col>
             <Col span={6}>
@@ -718,7 +833,7 @@ const StockInCreatePage = () => {
             </Col>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="TL kho (dry)" value={(totalDryWeight / 1000).toFixed(1)} suffix="T" valueStyle={{ fontSize: 20, color: '#2D8B6E', fontFamily: "'JetBrains Mono'" }} />
+                <Statistic title="TL khô (dry)" value={(totalDryWeight / 1000).toFixed(1)} suffix="T" valueStyle={{ fontSize: 20, color: '#2D8B6E', fontFamily: "'JetBrains Mono'" }} />
               </Card>
             </Col>
           </Row>
@@ -727,7 +842,7 @@ const StockInCreatePage = () => {
           {hasQCFailed && (
             <Alert
               type="error"
-              message="Co mat hang KHONG DAT QC. Phieu van co the tao nhung lo se o trang thai quarantine."
+              message="Có mặt hàng KHÔNG ĐẠT QC. Phiếu vẫn có thể tạo nhưng lô sẽ ở trạng thái quarantine."
               showIcon
               style={{ marginBottom: 16, borderRadius: 8 }}
             />

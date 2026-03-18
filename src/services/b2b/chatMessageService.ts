@@ -120,13 +120,8 @@ export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   system: 'Hệ thống',
 }
 
-export const PRODUCT_TYPE_LABELS: Record<string, string> = {
-  mu_nuoc: 'Mủ nước',
-  mu_tap: 'Mủ tạp',
-  mu_dong: 'Mủ đông',
-  mu_chen: 'Mủ chén',
-  mu_to: 'Mủ tờ',
-}
+// Re-export từ constants chung — đảm bảo đồng bộ toàn hệ thống
+export { PRODUCT_TYPE_LABELS } from '../../constants/rubberProducts'
 
 export const BOOKING_STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ xác nhận',

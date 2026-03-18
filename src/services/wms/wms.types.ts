@@ -7,7 +7,7 @@
 // ===== CAO SU — RUBBER TYPES =====
 
 export type RubberGrade = 'SVR_3L' | 'SVR_5' | 'SVR_10' | 'SVR_20' | 'SVR_CV60'
-export type RubberType = 'cup_lump' | 'latex' | 'sheet' | 'crepe' | 'mixed'
+export type RubberType = 'mu_dong' | 'mu_nuoc' | 'mu_tap' | 'mu_chen' | 'mu_to' | 'cup_lump' | 'latex' | 'sheet' | 'crepe' | 'mixed'
 export type ContaminationStatus = 'clean' | 'suspected' | 'confirmed' | 'cleared'
 
 export const RUBBER_GRADE_LABELS: Record<RubberGrade, string> = {
@@ -27,6 +27,11 @@ export const RUBBER_GRADE_COLORS: Record<RubberGrade, string> = {
 }
 
 export const RUBBER_TYPE_LABELS: Record<RubberType, string> = {
+  mu_dong: 'Mủ đông',
+  mu_nuoc: 'Mủ nước',
+  mu_tap: 'Mủ tạp',
+  mu_chen: 'Mủ chén',
+  mu_to: 'Mủ tờ',
   cup_lump: 'Mủ chén',
   latex: 'Mủ nước',
   sheet: 'Mủ tờ',

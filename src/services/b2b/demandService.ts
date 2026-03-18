@@ -187,25 +187,8 @@ export const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'red',
 }
 
-export const PRODUCT_TYPE_OPTIONS = [
-  { value: 'mu_dong', label: 'Mủ đông' },
-  { value: 'mu_nuoc', label: 'Mủ nước' },
-  { value: 'mu_tap', label: 'Mủ tạp' },
-  { value: 'svr_3l', label: 'SVR 3L' },
-  { value: 'svr_5', label: 'SVR 5' },
-  { value: 'svr_10', label: 'SVR 10' },
-  { value: 'svr_20', label: 'SVR 20' },
-]
-
-export const PRODUCT_TYPE_NAMES: Record<string, string> = {
-  mu_dong: 'Mủ đông',
-  mu_nuoc: 'Mủ nước',
-  mu_tap: 'Mủ tạp',
-  svr_3l: 'SVR 3L',
-  svr_5: 'SVR 5',
-  svr_10: 'SVR 10',
-  svr_20: 'SVR 20',
-}
+// Re-export từ constants chung — đảm bảo đồng bộ toàn hệ thống
+export { PRODUCT_TYPE_FLAT_OPTIONS as PRODUCT_TYPE_OPTIONS, PRODUCT_TYPE_LABELS as PRODUCT_TYPE_NAMES } from '../../constants/rubberProducts'
 
 export const REGION_OPTIONS = [
   'Bình Phước',

@@ -391,7 +391,7 @@ const StockInCreatePage = () => {
     try {
       const { data: ticket, error: ticketError } = await supabase
         .from('weighbridge_tickets')
-        .select('*, deal:b2b_deals!deal_id(id, deal_number, partner_id, product_name, quantity_kg)')
+        .select('code, deal_id, supplier_name, vehicle_plate, net_weight, rubber_type, partner_id, expected_drc, unit_price')
         .eq('code', trimmed)
         .single()
 
@@ -401,7 +401,18 @@ const StockInCreatePage = () => {
         return
       }
 
-      setScannedTicket(ticket)
+      // Lấy deal info riêng nếu có deal_id
+      let dealInfo: any = null
+      if (ticket.deal_id) {
+        const { data: deal } = await supabase
+          .from('b2b_deals')
+          .select('id, deal_number, partner_id, product_name, quantity_kg')
+          .eq('id', ticket.deal_id)
+          .single()
+        dealInfo = deal
+      }
+
+      setScannedTicket({ ...ticket, deal: dealInfo })
 
       // Auto-fill from ticket
       if (ticket.supplier_name) {

@@ -40,6 +40,7 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   ClockCircleOutlined,
+  ToolOutlined,
 } from '@ant-design/icons'
 import {
   BarChart,
@@ -67,6 +68,7 @@ import {
   PendingBooking,
   RecentMessage,
   ActivityItem,
+  ProductionStats,
 } from '../../services/b2b/b2bDashboardService'
 import { chatMessageService } from '../../services/b2b/chatMessageService'
 import { formatDistanceToNow } from 'date-fns'
@@ -184,6 +186,7 @@ const B2BDashboardPage = () => {
   const [pendingBookings, setPendingBookings] = useState<PendingBooking[]>([])
   const [recentMessages, setRecentMessages] = useState<RecentMessage[]>([])
   const [activities, setActivities] = useState<ActivityItem[]>([])
+  const [productionStats, setProductionStats] = useState<ProductionStats | null>(null)
   const [chartType, setChartType] = useState<'production' | 'revenue'>('production')
 
   // ============================================
@@ -203,6 +206,7 @@ const B2BDashboardPage = () => {
         pendingBookingsRes,
         recentMessagesRes,
         activitiesRes,
+        productionStatsRes,
       ] = await Promise.all([
         b2bDashboardService.getKPIs(),
         b2bDashboardService.getMonthlyProduction(6),
@@ -211,6 +215,7 @@ const B2BDashboardPage = () => {
         b2bDashboardService.getPendingBookings(5),
         b2bDashboardService.getRecentUnreadMessages(5),
         b2bDashboardService.getRecentActivity(8),
+        b2bDashboardService.getProductionStats(),
       ])
 
       setKpis(kpisData)
@@ -220,6 +225,7 @@ const B2BDashboardPage = () => {
       setPendingBookings(pendingBookingsRes)
       setRecentMessages(recentMessagesRes)
       setActivities(activitiesRes)
+      setProductionStats(productionStatsRes)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
       message.error('Không thể tải dữ liệu dashboard')
@@ -401,6 +407,68 @@ const B2BDashboardPage = () => {
           />
         </Col>
       </Row>
+
+      {/* Production Stats Section */}
+      {productionStats && (productionStats.active_orders > 0 || productionStats.completed_this_month > 0 || productionStats.total_output_kg > 0 || productionStats.avg_yield > 0) && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 12 }}>
+            <Space>
+              <ToolOutlined style={{ fontSize: 16, color: '#1B4D3E' }} />
+              <Text strong style={{ fontSize: 15 }}>Sản xuất</Text>
+            </Space>
+          </div>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} lg={6}>
+              <Card style={{ borderRadius: 12, borderTop: '3px solid #E8A838' }} bodyStyle={{ padding: '16px 20px' }}>
+                <Spin spinning={loading}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 13 }}>Đang sản xuất</Text>}
+                    value={productionStats.active_orders}
+                    valueStyle={{ color: '#E8A838', fontSize: 24, fontWeight: 600 }}
+                    prefix={<ToolOutlined />}
+                  />
+                </Spin>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <Card style={{ borderRadius: 12, borderTop: '3px solid #52c41a' }} bodyStyle={{ padding: '16px 20px' }}>
+                <Spin spinning={loading}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 13 }}>Hoàn thành tháng này</Text>}
+                    value={productionStats.completed_this_month}
+                    valueStyle={{ color: '#52c41a', fontSize: 24, fontWeight: 600 }}
+                    prefix={<CheckCircleOutlined />}
+                  />
+                </Spin>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <Card style={{ borderRadius: 12, borderTop: '3px solid #1B4D3E' }} bodyStyle={{ padding: '16px 20px' }}>
+                <Spin spinning={loading}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 13 }}>Sản lượng tháng</Text>}
+                    value={Math.round(productionStats.total_output_kg / 100) / 10}
+                    suffix="tấn"
+                    valueStyle={{ color: '#1B4D3E', fontSize: 24, fontWeight: 600 }}
+                  />
+                </Spin>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <Card style={{ borderRadius: 12, borderTop: '3px solid #8B5CF6' }} bodyStyle={{ padding: '16px 20px' }}>
+                <Spin spinning={loading}>
+                  <Statistic
+                    title={<Text type="secondary" style={{ fontSize: 13 }}>Yield TB</Text>}
+                    value={productionStats.avg_yield}
+                    suffix="%"
+                    valueStyle={{ color: '#8B5CF6', fontSize: 24, fontWeight: 600 }}
+                  />
+                </Spin>
+              </Card>
+            </Col>
+          </Row>
+        </div>
+      )}
 
       {/* Charts Row */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>

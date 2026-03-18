@@ -31,7 +31,7 @@ export type BookingStatus = 'pending' | 'confirmed' | 'negotiating' | 'rejected'
 export type PartnerStatus = 'pending' | 'verified' | 'suspended' | 'rejected';
 
 // Settlement Status
-export type SettlementStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'cancelled';
+export type SettlementStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'cancelled' | 'rejected';
 
 // Advance Status
 export type AdvanceStatus = 'pending' | 'approved' | 'paid' | 'rejected';
@@ -167,6 +167,12 @@ export const settlementStatusConfig: Record<SettlementStatus, StatusConfig> = {
   },
   cancelled: {
     label: 'Đã hủy',
+    color: '#ff4d4f',
+    bgColor: '#fff2f0',
+    icon: <CloseCircleOutlined />,
+  },
+  rejected: {
+    label: 'Từ chối',
     color: '#ff4d4f',
     bgColor: '#fff2f0',
     icon: <CloseCircleOutlined />,

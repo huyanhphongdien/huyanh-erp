@@ -16,6 +16,7 @@ const STATUS_TABS = [
   { key: 'draft', label: 'Nháp' },
   { key: 'pending', label: 'Chờ duyệt' },
   { key: 'approved', label: 'Đã duyệt' },
+  { key: 'rejected', label: 'Từ chối' },
   { key: 'paid', label: 'Đã thanh toán' },
 ]
 
@@ -135,6 +136,17 @@ const SettlementListPage = () => {
     }
   }
 
+  const handleReject = async (id: string) => {
+    try {
+      await settlementService.rejectSettlement(id, 'current-user-id', 'Từ chối từ danh sách')
+      message.success('Đã từ chối quyết toán')
+      fetchSettlements()
+      fetchStatusCounts()
+    } catch {
+      message.error('Từ chối thất bại')
+    }
+  }
+
   const handleCancel = async (id: string) => {
     try {
       await settlementService.cancelSettlement(id)
@@ -192,6 +204,22 @@ const SettlementListPage = () => {
         label: 'Duyệt',
         onClick: () => handleApprove(record.id),
       })
+      items.push({
+        key: 'reject',
+        icon: <CloseCircleOutlined />,
+        label: (
+          <Popconfirm
+            title="Xác nhận từ chối?"
+            description="Bạn có chắc muốn từ chối phiếu quyết toán này?"
+            onConfirm={() => handleReject(record.id)}
+            okText="Từ chối"
+            cancelText="Không"
+          >
+            <span>Từ chối</span>
+          </Popconfirm>
+        ),
+        danger: true,
+      })
     }
 
     if (record.status === 'approved') {
@@ -200,6 +228,15 @@ const SettlementListPage = () => {
         icon: <CheckCircleOutlined />,
         label: 'Đã thanh toán',
         onClick: () => handleMarkPaid(record.id),
+      })
+    }
+
+    if (record.status === 'rejected') {
+      items.push({
+        key: 'resubmit',
+        icon: <CheckCircleOutlined />,
+        label: 'Gửi duyệt lại',
+        onClick: () => handleSubmitForApproval(record.id),
       })
     }
 

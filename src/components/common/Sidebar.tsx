@@ -237,6 +237,12 @@ const getMenuGroups = (
         badge: unreadB2BCount > 0 ? unreadB2BCount : undefined,
       },
       {
+        path: '/b2b/partners',
+        label: 'Đại lý',
+        icon: <Users size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
         path: '/b2b/deals',
         label: 'Deals',
         icon: <Handshake size={18} />,

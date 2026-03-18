@@ -80,6 +80,13 @@ export interface ActivityItem {
   icon?: string
 }
 
+export interface ProductionStats {
+  active_orders: number
+  completed_this_month: number
+  total_output_kg: number
+  avg_yield: number
+}
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -582,6 +589,62 @@ export const b2bDashboardService = {
     return activities
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, limit)
+  },
+
+  // ============================================
+  // PRODUCTION STATS
+  // ============================================
+
+  /**
+   * Thống kê sản xuất từ bảng production_orders
+   */
+  async getProductionStats(): Promise<{
+    active_orders: number
+    completed_this_month: number
+    total_output_kg: number
+    avg_yield: number
+  }> {
+    const { start, end } = getMonthRange(0)
+
+    const [activeRes, completedRes] = await Promise.all([
+      // Active orders: status in progress or stages
+      supabase
+        .from('production_orders')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['in_progress', 'stage_1', 'stage_2', 'stage_3', 'stage_4', 'stage_5']),
+
+      // Completed this month
+      supabase
+        .from('production_orders')
+        .select('actual_quantity, yield_percent')
+        .eq('status', 'completed')
+        .gte('actual_end_date', start)
+        .lte('actual_end_date', end),
+    ])
+
+    if (activeRes.error) {
+      console.error('Error getting active production orders:', activeRes.error)
+    }
+    if (completedRes.error) {
+      console.error('Error getting completed production orders:', completedRes.error)
+    }
+
+    const activeOrders = activeRes.count || 0
+    const completedData = completedRes.data || []
+    const completedThisMonth = completedData.length
+    const totalOutputKg = completedData.reduce((sum, d) => sum + (d.actual_quantity || 0), 0)
+
+    const yieldsWithValue = completedData.filter(d => d.yield_percent != null && d.yield_percent > 0)
+    const avgYield = yieldsWithValue.length > 0
+      ? yieldsWithValue.reduce((sum, d) => sum + (d.yield_percent || 0), 0) / yieldsWithValue.length
+      : 0
+
+    return {
+      active_orders: activeOrders,
+      completed_this_month: completedThisMonth,
+      total_output_kg: totalOutputKg,
+      avg_yield: Math.round(avgYield * 10) / 10,
+    }
   },
 }
 

@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabase'
 // TYPES
 // ============================================
 
-export type SettlementStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'cancelled'
+export type SettlementStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'cancelled' | 'rejected'
 export type SettlementType = 'purchase' | 'sale' | 'processing'
 
 export interface Settlement {
@@ -39,6 +39,14 @@ export interface Settlement {
   approved_by: string | null
   approved_at: string | null
   approval_notes: string | null
+  rejected_by: string | null
+  rejected_at: string | null
+  rejected_reason: string | null
+  paid_at: string | null
+  paid_by: string | null
+  payment_method: string | null
+  bank_reference: string | null
+  submitted_at: string | null
   notes: string | null
   internal_notes: string | null
   created_by: string
@@ -174,6 +182,7 @@ export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   approved: 'Đã duyệt',
   paid: 'Đã thanh toán',
   cancelled: 'Đã hủy',
+  rejected: 'Từ chối',
 }
 
 export const SETTLEMENT_STATUS_COLORS: Record<SettlementStatus, string> = {
@@ -182,6 +191,7 @@ export const SETTLEMENT_STATUS_COLORS: Record<SettlementStatus, string> = {
   approved: 'green',
   paid: 'blue',
   cancelled: 'red',
+  rejected: 'red',
 }
 
 export const SETTLEMENT_TYPE_LABELS: Record<SettlementType, string> = {
@@ -477,10 +487,21 @@ export const settlementService = {
   // ============================================
 
   async submitForApproval(id: string): Promise<Settlement> {
+    const current = await this.getSettlementById(id)
+    if (!current) throw new Error('Phiếu quyết toán không tồn tại')
+    if (current.status !== 'draft' && current.status !== 'rejected') {
+      throw new Error('Chỉ có thể gửi duyệt phiếu ở trạng thái "Nháp" hoặc "Từ chối"')
+    }
+
     const { data, error } = await supabase
       .from('b2b_settlements')
       .update({
         status: 'pending' as SettlementStatus,
+        submitted_at: new Date().toISOString(),
+        // Clear rejection fields when resubmitting
+        rejected_by: null,
+        rejected_at: null,
+        rejected_reason: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -492,6 +513,12 @@ export const settlementService = {
   },
 
   async approveSettlement(id: string, approvedBy: string, notes?: string): Promise<Settlement> {
+    const current = await this.getSettlementById(id)
+    if (!current) throw new Error('Phiếu quyết toán không tồn tại')
+    if (current.status !== 'pending') {
+      throw new Error('Chỉ có thể duyệt phiếu ở trạng thái "Chờ duyệt"')
+    }
+
     const { data, error } = await supabase
       .from('b2b_settlements')
       .update({
@@ -509,11 +536,20 @@ export const settlementService = {
     return { ...data, partner: Array.isArray(data.partner) ? data.partner[0] : data.partner } as Settlement
   },
 
-  async markPaid(id: string): Promise<Settlement> {
+  async rejectSettlement(id: string, rejectedBy: string, reason: string): Promise<Settlement> {
+    const current = await this.getSettlementById(id)
+    if (!current) throw new Error('Phiếu quyết toán không tồn tại')
+    if (current.status !== 'pending') {
+      throw new Error('Chỉ có thể từ chối phiếu ở trạng thái "Chờ duyệt"')
+    }
+
     const { data, error } = await supabase
       .from('b2b_settlements')
       .update({
-        status: 'paid' as SettlementStatus,
+        status: 'rejected' as SettlementStatus,
+        rejected_by: rejectedBy,
+        rejected_at: new Date().toISOString(),
+        rejected_reason: reason,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -522,6 +558,36 @@ export const settlementService = {
 
     if (error) throw error
     return { ...data, partner: Array.isArray(data.partner) ? data.partner[0] : data.partner } as Settlement
+  },
+
+  async markAsPaid(id: string, paymentData: { payment_method: string; bank_reference?: string; paid_by?: string }): Promise<Settlement> {
+    const current = await this.getSettlementById(id)
+    if (!current) throw new Error('Phiếu quyết toán không tồn tại')
+    if (current.status !== 'approved') {
+      throw new Error('Chỉ có thể thanh toán phiếu ở trạng thái "Đã duyệt"')
+    }
+
+    const { data, error } = await supabase
+      .from('b2b_settlements')
+      .update({
+        status: 'paid' as SettlementStatus,
+        paid_at: new Date().toISOString(),
+        paid_by: paymentData.paid_by || null,
+        payment_method: paymentData.payment_method,
+        bank_reference: paymentData.bank_reference || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select(`*, partner:b2b_partners!partner_id (id, code, name, tier)`)
+      .single()
+
+    if (error) throw error
+    return { ...data, partner: Array.isArray(data.partner) ? data.partner[0] : data.partner } as Settlement
+  },
+
+  /** @deprecated Use markAsPaid instead */
+  async markPaid(id: string): Promise<Settlement> {
+    return this.markAsPaid(id, { payment_method: 'bank_transfer' })
   },
 
   async cancelSettlement(id: string): Promise<Settlement> {
@@ -582,6 +648,7 @@ export const settlementService = {
       approved: 0,
       paid: 0,
       cancelled: 0,
+      rejected: 0,
     }
 
     for (const row of (data || []) as any[]) {

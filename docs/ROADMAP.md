@@ -1,12 +1,14 @@
 # ROADMAP — Lộ Trình Triển Khai B2B Module
 
 **Dự án:** Huy Anh Rubber ERP v8
-**Cập nhật:** 17/03/2026
+**Cập nhật:** 18/03/2026
 **Tổng quan:** Quy trình 6 giai đoạn từ Booking → Sản phẩm
 
 ---
 
 ## TIẾN ĐỘ TỔNG QUAN
+
+### B2B Module
 
 ```
 ████████████████████████████████████████████░░░░░░  75%
@@ -22,7 +24,49 @@ Phase 1-4 ██████████████ DONE    Phase 5 ⚠️ PART
 | 5 | Thanh toán & Quyết toán | ⚠️ PARTIAL | 60% |
 | 6 | Sản xuất & Thành phẩm | 🔲 PLAN | 0% |
 
-**Trạng thái:** TẠM DỪNG B2B — chuyển sang hoàn thiện WMS (P8-P10)
+### WMS Module
+
+```
+████████████████████████████████████████████████████  100%
+P1-P7 ████████ DONE    P8-P10 ████████ DONE    Redesign ████ DONE
+```
+
+| Phase | Tên | Status | Tiến độ |
+|-------|-----|--------|---------|
+| P1-P5 | Database, Danh mục, Nhập/Xuất kho, Tồn kho | ✅ DONE | 100% |
+| P6 | QC Tracking & DRC | ✅ DONE | 100% |
+| P7 | Trạm cân (Weighbridge) | ✅ DONE | 100% |
+| P8 | Lệnh sản xuất & BOM | ✅ DONE | 100% |
+| P9 | Phối trộn (Blending) | ✅ DONE | 100% |
+| P10 | Báo cáo & Dashboard WMS | ✅ DONE | 100% |
+| Redesign | UI → Ant Design + Rubber fields | ✅ DONE | 100% |
+
+### App Cân Xe (Standalone)
+
+```
+████████████████████████████████████████████████████  100%
+```
+
+| Tính năng | Status |
+|-----------|--------|
+| Đăng nhập PIN (scale_operators) | ✅ |
+| Tạo phiếu cân + liên kết Deal B2B | ✅ |
+| Web Serial API (đầu cân Keli) | ✅ |
+| Camera Dahua (3 cam qua proxy) | ✅ |
+| Auto capture ảnh khi ghi cân | ✅ |
+| In phiếu (A4/80mm/58mm) + QR Code | ✅ |
+| Deploy: can.huyanhrubber.vn | ✅ |
+
+### Vấn đề cần fix
+
+| Issue | Mức độ | Mô tả |
+|-------|--------|-------|
+| Partner routes thiếu | ⚠️ CAO | Pages tồn tại nhưng chưa có route trong App.tsx |
+| Partner menu thiếu | ⚠️ CAO | Sidebar không có menu "Đại lý" |
+| Deal → Ledger auto | 🔶 TB | Chưa tự tạo bút toán khi Deal settled |
+| Settlement approval | 🔶 TB | Chưa có luồng duyệt Draft→Pending→Approved→Paid |
+
+**Trạng thái:** WMS + App Cân Xe HOÀN THÀNH — Quay lại B2B Phase 5
 
 ---
 
@@ -156,21 +200,27 @@ Deal (actual_drc, actual_weight_kg, final_value, qc_status)
 
 ---
 
-## PHASE 6 — SẢN XUẤT & THÀNH PHẨM 🔲
+## PHASE 6 — SẢN XUẤT & THÀNH PHẨM 🔶 SẴN SÀNG
 
-**Hệ thống:** Production (chưa có) + WMS
-**Status:** CHƯA CÓ MODULE
+**Hệ thống:** Production + WMS (đã có P8-P10)
+**Status:** WMS SẴN SÀNG — cần liên kết Deal → Production
 
-### Cần xây dựng
+### WMS đã có ✅ (chỉ cần liên kết B2B)
 
-| Task | Mô tả | Phụ thuộc |
-|------|-------|-----------|
-| Production Order model | Lệnh sản xuất từ nguyên liệu đã nhập | WMS P8 |
-| Production tracking | Theo dõi tiến độ sản xuất | WMS P8 |
-| QC thành phẩm | Kiểm tra SVR grade (3L/5/10/20) | WMS P6 ✅ |
-| Stock-In thành phẩm | Nhập kho TP với batch_id, grade | WMS P3 ✅ |
-| Truy xuất nguồn gốc | Deal → Stock-In NL → Production → Stock-In TP | WMS P8 + B2B P4 ✅ |
-| Blending (pha trộn) | Sub-lots, blend batches, DRC adjustment | WMS P9 |
+| Task | Mô tả | Phụ thuộc | Status |
+|------|-------|-----------|--------|
+| Production Order model | Lệnh sản xuất từ NVL | WMS P8 ✅ | ✅ SẴN SÀNG |
+| Production tracking (5 công đoạn) | Rửa→Cán→Sấy→Ép→QC | WMS P8 ✅ | ✅ SẴN SÀNG |
+| QC thành phẩm | Kiểm tra SVR grade (3L/5/10/20) | WMS P6 ✅ | ✅ SẴN SÀNG |
+| Blending | Phối trộn lô, DRC adjustment | WMS P9 ✅ | ✅ SẴN SÀNG |
+
+### Cần xây dựng (liên kết B2B → Production)
+
+| Task | Mô tả | Ước tính |
+|------|-------|----------|
+| Deal → Production Order | Tạo lệnh SX từ Deal (chọn NVL đã nhập kho) | 1 ngày |
+| Truy xuất nguồn gốc | Deal → Stock-In NL → Production → Stock-In TP | 1 ngày |
+| Dashboard tích hợp | DealDetail → tab Sản xuất (tiến độ, yield) | 0.5 ngày |
 
 ---
 
@@ -276,20 +326,31 @@ Phase 5       Phase 6
 
 ---
 
-## KHI QUAY LẠI B2B
+## BƯỚC TIẾP THEO
 
-**Ưu tiên:** Phase 5 (Quyết toán) → Phase 6 (Sản xuất)
+### Ưu tiên 1: Fix vấn đề hiện tại (1-2 giờ)
+1. Thêm Partner routes vào `App.tsx` (`/b2b/partners`, `/b2b/partners/:id`)
+2. Thêm menu "Đại lý" vào Sidebar
 
-Phase 5 cần:
-1. Auto-settlement logic khi Deal settled
-2. DRC variance calculation (có actual_drc từ Phase 4 rồi)
+### Ưu tiên 2: Phase 5 — Quyết toán (2-3 ngày)
+1. Auto-settlement khi Deal settled (gom stock-in → tạo Settlement)
+2. DRC variance: so sánh expected vs actual → tính chênh lệch giá trị
 3. Settlement approval workflow (Draft → Pending → Approved → Paid)
 4. Portal notification cho đại lý
 
-Phase 6 phụ thuộc WMS P8 (Production Orders) + P9 (Blending) — cần hoàn thiện WMS trước.
+### Ưu tiên 3: Phase 6 — Liên kết Sản xuất (2-3 ngày)
+1. Deal → Production Order (chọn NVL từ stock-in của deal)
+2. Truy xuất nguồn gốc end-to-end
+3. DealDetail → tab Sản xuất
+
+### Tùy chọn: Cải thiện UX
+- PDF export cho Deals, Settlements
+- Mobile responsive cho B2B pages
+- Real-time notification cho Portal
 
 ---
 
 *Huy Anh Rubber ERP v8 — B2B Module Roadmap*
-*Cập nhật: 17/03/2026*
-*Tạm dừng B2B để hoàn thiện WMS (P8: Production, P9: Blending, P10: Reports)*
+*Cập nhật: 18/03/2026*
+*WMS P1-P10 + App Cân Xe: HOÀN THÀNH*
+*B2B Phase 1-4: HOÀN THÀNH | Phase 5: 60% | Phase 6: SẴN SÀNG*

@@ -47,6 +47,7 @@ import {
   InboxOutlined,
   ExperimentOutlined,
   WalletOutlined,
+  ToolOutlined,
 } from '@ant-design/icons'
 import {
   dealService,
@@ -56,11 +57,13 @@ import {
   DEAL_STATUS_COLORS,
   DEAL_TYPE_LABELS,
 } from '../../../services/b2b/dealService'
+import { autoSettlementService } from '../../../services/b2b/autoSettlementService'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import DealWmsTab from '../../../components/b2b/DealWmsTab'
 import DealQcTab from '../../../components/b2b/DealQcTab'
 import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
+import DealProductionTab from '../../../components/b2b/DealProductionTab'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -107,10 +110,12 @@ const formatDateTime = (dateStr: string | null): string => {
 interface StatusActionsProps {
   deal: Deal
   onUpdateStatus: (status: DealStatus, data?: { final_price?: number; notes?: string }) => void
+  onSettleDeal?: () => void
   loading?: boolean
+  settleLoading?: boolean
 }
 
-const StatusActions = ({ deal, onUpdateStatus, loading }: StatusActionsProps) => {
+const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoading }: StatusActionsProps) => {
   const [acceptModal, setAcceptModal] = useState(false)
   const [cancelModal, setCancelModal] = useState(false)
   const [form] = Form.useForm()
@@ -135,6 +140,33 @@ const StatusActions = ({ deal, onUpdateStatus, loading }: StatusActionsProps) =>
     } catch (error) {
       // Validation error
     }
+  }
+
+  const handleSettle = () => {
+    const pricePerKg = deal.final_price || deal.unit_price || 0
+    const actualWeight = deal.actual_weight_kg || 0
+    const actualDrc = deal.actual_drc || 0
+    const finalValue = Math.round(actualWeight * (actualDrc / 100) * pricePerKg)
+
+    Modal.confirm({
+      title: 'Tạo phiếu Quyết toán',
+      content: (
+        <div>
+          <p>Hệ thống sẽ tự động tạo phiếu quyết toán (nháp) cho Deal <strong>{deal.deal_number}</strong> với thông tin:</p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0' }}>
+            <li>Trọng lượng thực: <strong>{actualWeight.toLocaleString()} kg</strong></li>
+            <li>DRC thực tế: <strong>{actualDrc}%</strong></li>
+            <li>Đơn giá: <strong>{pricePerKg.toLocaleString()} đ/kg</strong></li>
+            <li>Giá trị ước tính: <strong>{finalValue.toLocaleString()} VNĐ</strong></li>
+          </ul>
+          <p>Phiếu quyết toán sẽ ở trạng thái <strong>Nháp</strong>. Bạn có thể chỉnh sửa trước khi duyệt.</p>
+        </div>
+      ),
+      okText: 'Tạo quyết toán',
+      cancelText: 'Hủy',
+      icon: <DollarOutlined style={{ color: '#722ed1' }} />,
+      onOk: onSettleDeal,
+    })
   }
 
   return (
@@ -168,19 +200,17 @@ const StatusActions = ({ deal, onUpdateStatus, loading }: StatusActionsProps) =>
           </Button>
         )}
 
-        {/* Accepted -> Settled */}
-        {deal.status === 'accepted' && (
-          <Popconfirm
-            title="Quyết toán deal này?"
-            description="Deal sẽ chuyển sang trạng thái 'Đã quyết toán' và không thể thay đổi"
-            onConfirm={() => onUpdateStatus('settled')}
-            okText="Xác nhận"
-            cancelText="Hủy"
+        {/* Accepted -> Auto Settlement */}
+        {deal.status === 'accepted' && deal.actual_drc != null && (
+          <Button
+            type="primary"
+            icon={<DollarOutlined />}
+            onClick={handleSettle}
+            loading={settleLoading}
+            style={{ backgroundColor: '#722ed1', borderColor: '#722ed1' }}
           >
-            <Button type="primary" icon={<DollarOutlined />} loading={loading}>
-              Quyết toán
-            </Button>
-          </Popconfirm>
+            Quyết toán
+          </Button>
         )}
 
         {/* Cancel button */}
@@ -258,6 +288,7 @@ const DealDetailPage = () => {
   const [deal, setDeal] = useState<Deal | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [settleLoading, setSettleLoading] = useState(false)
 
   // ============================================
   // DATA FETCHING
@@ -324,6 +355,42 @@ const DealDetailPage = () => {
       }
     } catch (error) {
       message.error('Không thể mở chat')
+    }
+  }
+
+  const handleAutoSettle = async () => {
+    if (!deal) return
+
+    try {
+      setSettleLoading(true)
+
+      // Kiểm tra settlement đã tồn tại chưa
+      const existing = await autoSettlementService.getExistingSettlement(deal.id)
+      if (existing) {
+        message.warning('Deal này đã có phiếu quyết toán. Đang chuyển đến phiếu quyết toán...')
+        navigate(`/b2b/settlements/${existing.id}`)
+        return
+      }
+
+      // Tạo settlement tự động
+      const result = await autoSettlementService.createAutoSettlement(deal.id)
+
+      // Cập nhật deal status sang settled
+      await dealService.updateStatus(deal.id, 'settled')
+
+      message.success(
+        `Đã tạo phiếu quyết toán ${result.settlement.code}. ` +
+        `Giá trị: ${result.summary.final_value.toLocaleString()} VNĐ, ` +
+        `Còn lại: ${result.summary.balance_due.toLocaleString()} VNĐ`
+      )
+
+      // Chuyển đến trang chi tiết settlement
+      navigate(`/b2b/settlements/${result.settlement.id}`)
+    } catch (error: any) {
+      console.error('Auto settlement error:', error)
+      message.error(error.message || 'Không thể tạo phiếu quyết toán')
+    } finally {
+      setSettleLoading(false)
     }
   }
 
@@ -396,7 +463,9 @@ const DealDetailPage = () => {
               <StatusActions
                 deal={deal}
                 onUpdateStatus={handleUpdateStatus}
+                onSettleDeal={handleAutoSettle}
                 loading={updating}
+                settleLoading={settleLoading}
               />
             </Space>
           </Col>
@@ -707,6 +776,13 @@ const DealDetailPage = () => {
               </span>
             ),
             children: <DealQcTab dealId={deal.id} deal={deal} />,
+          },
+          {
+            key: 'production',
+            label: (
+              <span><ToolOutlined /> Sản xuất</span>
+            ),
+            children: <DealProductionTab dealId={deal.id} />,
           },
           {
             key: 'advances',

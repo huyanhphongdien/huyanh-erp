@@ -483,4 +483,108 @@ export const dealWmsService = {
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
   },
+
+  /**
+   * Gửi thông báo vào chat khi có sự kiện quyết toán (tạo, duyệt, thanh toán)
+   */
+  async notifyDealChatSettlement(dealId: string, settlementCode: string, amount: number, status: string): Promise<void> {
+    const { data: deal } = await supabase
+      .from('b2b_deals')
+      .select('partner_id, deal_number')
+      .eq('id', dealId)
+      .single()
+
+    if (!deal) return
+
+    const { data: room } = await supabase
+      .from('b2b_chat_rooms')
+      .select('id')
+      .eq('partner_id', deal.partner_id)
+      .eq('room_type', 'general')
+      .maybeSingle()
+
+    if (!room) return
+
+    const formattedAmount = amount.toLocaleString('vi-VN')
+
+    let content = ''
+    if (status === 'draft') {
+      content = `Đã tạo phiếu quyết toán ${settlementCode} cho Deal ${deal.deal_number}, giá trị: ${formattedAmount} VNĐ`
+    } else if (status === 'approved') {
+      content = `Phiếu quyết toán ${settlementCode} đã được duyệt`
+    } else if (status === 'paid') {
+      content = `Đã thanh toán quyết toán ${settlementCode}, số tiền: ${formattedAmount} VNĐ`
+    } else {
+      content = `Cập nhật quyết toán ${settlementCode}: ${status}`
+    }
+
+    await supabase
+      .from('b2b_chat_messages')
+      .insert({
+        room_id: room.id,
+        sender_type: 'system',
+        sender_id: 'system',
+        message_type: 'system',
+        content,
+        metadata: {
+          notification_type: 'settlement_update',
+          deal_id: dealId,
+          settlement_code: settlementCode,
+          amount,
+          status,
+        },
+        attachments: [],
+      })
+
+    await supabase
+      .from('b2b_chat_rooms')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', room.id)
+  },
+
+  /**
+   * Gửi thông báo vào chat khi chi tạm ứng
+   */
+  async notifyDealChatAdvance(dealId: string, advanceNumber: string, amount: number): Promise<void> {
+    const { data: deal } = await supabase
+      .from('b2b_deals')
+      .select('partner_id, deal_number')
+      .eq('id', dealId)
+      .single()
+
+    if (!deal) return
+
+    const { data: room } = await supabase
+      .from('b2b_chat_rooms')
+      .select('id')
+      .eq('partner_id', deal.partner_id)
+      .eq('room_type', 'general')
+      .maybeSingle()
+
+    if (!room) return
+
+    const formattedAmount = amount.toLocaleString('vi-VN')
+
+    await supabase
+      .from('b2b_chat_messages')
+      .insert({
+        room_id: room.id,
+        sender_type: 'system',
+        sender_id: 'system',
+        message_type: 'system',
+        content: `Đã chi tạm ứng ${advanceNumber} số tiền ${formattedAmount} VNĐ cho Deal ${deal.deal_number}`,
+        metadata: {
+          notification_type: 'advance_paid',
+          deal_id: dealId,
+          advance_number: advanceNumber,
+          amount,
+        },
+        attachments: [],
+      })
+
+    await supabase
+      .from('b2b_chat_rooms')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', room.id)
+  },
 }

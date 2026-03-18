@@ -7,27 +7,20 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Row,
-  Col,
-  Statistic,
   Table,
   Tag,
-  Card,
   Spin,
   Empty,
   Button,
   Typography,
 } from 'antd'
-import {
-  ExperimentOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
-} from '@ant-design/icons'
+import { ExperimentOutlined } from '@ant-design/icons'
 import {
   dealWmsService,
   DealBatchSummary,
 } from '../../services/b2b/dealWmsService'
 import { Deal } from '../../services/b2b/dealService'
+import DrcVarianceCard from './DrcVarianceCard'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -89,57 +82,10 @@ const DealQcTab = ({ dealId, deal }: DealQcTabProps) => {
     return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
   }
 
-  const expectedDrc = deal.quantity_kg && deal.unit_price
-    ? (deal as any).expected_drc
-    : null
-  const actualDrc = deal.actual_drc
-  const drcDiff = actualDrc && expectedDrc
-    ? actualDrc - expectedDrc
-    : null
-
   return (
     <div>
-      {/* DRC Comparison Card */}
-      <Card
-        size="small"
-        style={{ marginBottom: 24, background: '#fafafa', borderRadius: 8 }}
-      >
-        <Row gutter={24}>
-          <Col xs={8}>
-            <Statistic
-              title="DRC dự kiến"
-              value={expectedDrc ?? '-'}
-              suffix={expectedDrc ? '%' : ''}
-              valueStyle={{ color: '#666' }}
-            />
-          </Col>
-          <Col xs={8}>
-            <Statistic
-              title="DRC thực tế (QC)"
-              value={actualDrc ?? '-'}
-              suffix={actualDrc ? '%' : ''}
-              valueStyle={{
-                color: actualDrc
-                  ? (expectedDrc && actualDrc >= expectedDrc ? '#52c41a' : '#cf1322')
-                  : '#999',
-              }}
-            />
-          </Col>
-          <Col xs={8}>
-            <Statistic
-              title="Chênh lệch"
-              value={drcDiff !== null ? Math.abs(drcDiff).toFixed(1) : '-'}
-              suffix={drcDiff !== null ? '%' : ''}
-              prefix={drcDiff !== null ? (drcDiff >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />) : undefined}
-              valueStyle={{
-                color: drcDiff !== null
-                  ? (drcDiff >= 0 ? '#52c41a' : '#cf1322')
-                  : '#999',
-              }}
-            />
-          </Col>
-        </Row>
-      </Card>
+      {/* DRC Variance Analysis Card */}
+      <DrcVarianceCard deal={deal} />
 
       {/* QC Status Summary */}
       {deal.qc_status && deal.qc_status !== 'pending' && (

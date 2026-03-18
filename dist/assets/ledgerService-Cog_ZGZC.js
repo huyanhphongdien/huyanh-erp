@@ -1,0 +1,21 @@
+import{s as p}from"./index-CkzPypjE.js";const A={settlement:"Quyết toán",advance:"Tạm ứng",payment:"Thanh toán",adjustment:"Điều chỉnh",opening_balance:"Số dư đầu kỳ"},q={settlement:"blue",advance:"orange",payment:"green",adjustment:"purple",opening_balance:"default"},S={async getEntries(n={}){const{partner_id:i,page:r=1,pageSize:e=20,entry_type:t,date_from:a,date_to:_,period_month:s,period_year:o,sort_by:d="entry_date",sort_order:l="desc"}=n,f=(r-1)*e,g=f+e-1;let c=p.from("b2b_partner_ledger").select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id, code, name, tier, phone
+        )
+      `,{count:"exact"});i&&(c=c.eq("partner_id",i)),t&&t!=="all"&&(c=c.eq("entry_type",t)),a&&(c=c.gte("entry_date",a)),_&&(c=c.lte("entry_date",_)),s&&(c=c.eq("period_month",s)),o&&(c=c.eq("period_year",o)),c=c.order(d,{ascending:l==="asc"});const{data:u,error:y,count:m}=await c.range(f,g);if(y)throw y;return{data:(u||[]).map(b=>({...b,partner:Array.isArray(b.partner)?b.partner[0]:b.partner})),total:m||0,page:r,pageSize:e,totalPages:Math.ceil((m||0)/e)}},async getPartnerBalance(n){const{data:i,error:r}=await p.from("b2b_partner_ledger").select("debit, credit, running_balance").eq("partner_id",n).order("entry_date",{ascending:!1}).order("created_at",{ascending:!1}).limit(1).maybeSingle();if(r)throw r;if(!i)return{total_debit:0,total_credit:0,balance:0};const{data:e,error:t}=await p.from("b2b_partner_ledger").select("debit, credit").eq("partner_id",n);if(t)throw t;const a=e||[],_=a.reduce((o,d)=>o+(d.debit||0),0),s=a.reduce((o,d)=>o+(d.credit||0),0);return{total_debit:_,total_credit:s,balance:i.running_balance||_-s}},async getAllPartnerBalances(){const{data:n,error:i}=await p.from("b2b_partner_ledger").select(`
+        partner_id, debit, credit, entry_date,
+        partner:b2b_partners!partner_id (
+          id, code, name, tier
+        )
+      `).order("entry_date",{ascending:!1});if(i)throw i;const r=new Map;for(const e of n||[]){const t=Array.isArray(e.partner)?e.partner[0]:e.partner;if(!t)continue;const a=r.get(e.partner_id);a?(a.total_debit+=e.debit||0,a.total_credit+=e.credit||0,a.balance=a.total_debit-a.total_credit):r.set(e.partner_id,{partner_id:e.partner_id,partner_code:t.code||"",partner_name:t.name||"",partner_tier:t.tier||"new",total_debit:e.debit||0,total_credit:e.credit||0,balance:(e.debit||0)-(e.credit||0),last_entry_date:e.entry_date})}return Array.from(r.values())},async createManualEntry(n){const i=new Date,{data:r,error:e}=await p.from("b2b_partner_ledger").insert({partner_id:n.partner_id,entry_type:n.entry_type||"adjustment",debit:n.debit||0,credit:n.credit||0,reference_code:n.reference_code,description:n.description,entry_date:n.entry_date||i.toISOString().split("T")[0],period_month:i.getMonth()+1,period_year:i.getFullYear(),created_by:n.created_by}).select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id, code, name, tier, phone
+        )
+      `).single();if(e)throw e;return{...r,partner:Array.isArray(r.partner)?r.partner[0]:r.partner}},async getBalanceSummary(n,i){let r=p.from("b2b_partner_ledger").select("partner_id, debit, credit");n&&(r=r.eq("period_year",n)),i&&(r=r.eq("period_month",i));const{data:e,error:t}=await r;if(t)throw t;const a=e||[],_=new Set(a.map(d=>d.partner_id)),s=a.reduce((d,l)=>d+(l.debit||0),0),o=a.reduce((d,l)=>d+(l.credit||0),0);return{total_debit:s,total_credit:o,net_balance:s-o,partner_count:_.size}},async getAgingReport(){const{data:n,error:i}=await p.from("b2b_partner_ledger").select(`
+        partner_id, debit, credit, entry_date,
+        partner:b2b_partners!partner_id (
+          id, code, name, tier
+        )
+      `);if(i)throw i;const r=new Date,e=new Map;for(const t of n||[]){const a=Array.isArray(t.partner)?t.partner[0]:t.partner;if(!a)continue;const _=new Date(t.entry_date),s=Math.floor((r.getTime()-_.getTime())/(1e3*60*60*24)),o=(t.debit||0)-(t.credit||0);e.has(t.partner_id)||e.set(t.partner_id,{partner_id:t.partner_id,partner_name:a.name||"",partner_code:a.code||"",partner_tier:a.tier||"new",current:0,days_30:0,days_60:0,days_90:0,total:0});const d=e.get(t.partner_id);d.total+=o,s<=30?d.current+=o:s<=60?d.days_30+=o:s<=90?d.days_60+=o:d.days_90+=o}return Array.from(e.values()).filter(t=>t.total!==0)}};export{A as E,q as a,S as l};

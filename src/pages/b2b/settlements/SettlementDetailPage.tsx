@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Statistic, message, Breadcrumb, Popconfirm } from 'antd'
-import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, PrinterOutlined, EditOutlined } from '@ant-design/icons'
+import { Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Select, Statistic, message, Breadcrumb, Popconfirm } from 'antd'
+import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, PrinterOutlined, EditOutlined, SendOutlined } from '@ant-design/icons'
 import { settlementService, Settlement, SettlementStatus, SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUS_COLORS, SETTLEMENT_TYPE_LABELS } from '../../../services/b2b/settlementService'
 import PaymentForm from '../../../components/b2b/PaymentForm'
+import ApprovalTimeline from '../../../components/b2b/ApprovalTimeline'
 import { SettlementStatusTag } from '../../../components/ui/StatusTag'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
@@ -33,8 +34,13 @@ const SettlementDetailPage = () => {
   const [settlement, setSettlement] = useState<Settlement | null>(null)
   const [loading, setLoading] = useState(true)
   const [approvalModalOpen, setApprovalModalOpen] = useState(false)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [markPaidModalOpen, setMarkPaidModalOpen] = useState(false)
   const [approvalForm] = Form.useForm()
+  const [rejectForm] = Form.useForm()
+  const [markPaidForm] = Form.useForm()
+  const [actionLoading, setActionLoading] = useState(false)
 
   const fetchSettlement = useCallback(async () => {
     if (!id) return
@@ -75,6 +81,44 @@ const SettlementDetailPage = () => {
       fetchSettlement()
     } catch (err) {
       message.error('Duyệt phiếu thất bại')
+    }
+  }
+
+  const handleReject = async () => {
+    if (!id) return
+    try {
+      setActionLoading(true)
+      const values = await rejectForm.validateFields()
+      await settlementService.rejectSettlement(id, 'current-user-id', values.rejected_reason)
+      message.success('Đã từ chối phiếu quyết toán')
+      setRejectModalOpen(false)
+      rejectForm.resetFields()
+      fetchSettlement()
+    } catch (err) {
+      message.error('Từ chối phiếu thất bại')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleMarkAsPaid = async () => {
+    if (!id) return
+    try {
+      setActionLoading(true)
+      const values = await markPaidForm.validateFields()
+      await settlementService.markAsPaid(id, {
+        payment_method: values.payment_method,
+        bank_reference: values.bank_reference,
+        paid_by: values.paid_by,
+      })
+      message.success('Đã cập nhật trạng thái thanh toán')
+      setMarkPaidModalOpen(false)
+      markPaidForm.resetFields()
+      fetchSettlement()
+    } catch (err) {
+      message.error('Cập nhật trạng thái thất bại')
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -152,11 +196,25 @@ const SettlementDetailPage = () => {
   const renderActionButtons = () => {
     const buttons: React.ReactNode[] = []
 
+    if (settlement.status === 'draft' || settlement.status === 'rejected') {
+      buttons.push(
+        <Popconfirm
+          key="submit"
+          title="Xác nhận gửi duyệt?"
+          description="Phiếu sẽ được chuyển sang trạng thái chờ duyệt."
+          onConfirm={handleSubmitForApproval}
+          okText="Gửi duyệt"
+          cancelText="Hủy"
+        >
+          <Button type="primary" icon={<SendOutlined />}>
+            Gửi duyệt
+          </Button>
+        </Popconfirm>
+      )
+    }
+
     if (settlement.status === 'draft') {
       buttons.push(
-        <Button key="submit" type="primary" onClick={handleSubmitForApproval}>
-          Gửi duyệt
-        </Button>,
         <Popconfirm key="delete" title="Bạn có chắc muốn xóa phiếu này?" onConfirm={handleDelete} okText="Xóa" cancelText="Hủy">
           <Button danger>Xóa</Button>
         </Popconfirm>
@@ -165,21 +223,42 @@ const SettlementDetailPage = () => {
 
     if (settlement.status === 'pending') {
       buttons.push(
-        <Button key="approve" type="primary" icon={<CheckCircleOutlined />} onClick={() => setApprovalModalOpen(true)}>
+        <Button
+          key="approve"
+          type="primary"
+          style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+          icon={<CheckCircleOutlined />}
+          onClick={() => setApprovalModalOpen(true)}
+        >
           Duyệt
+        </Button>,
+        <Button
+          key="reject"
+          danger
+          icon={<CloseCircleOutlined />}
+          onClick={() => setRejectModalOpen(true)}
+        >
+          Từ chối
         </Button>
       )
     }
 
     if (settlement.status === 'approved') {
       buttons.push(
-        <Button key="payment" type="primary" icon={<DollarOutlined />} onClick={() => setPaymentModalOpen(true)}>
+        <Button key="markpaid" type="primary" icon={<DollarOutlined />} onClick={() => setMarkPaidModalOpen(true)}>
+          Đã thanh toán
+        </Button>,
+        <Button key="payment" icon={<DollarOutlined />} onClick={() => setPaymentModalOpen(true)}>
           Ghi nhận thanh toán
         </Button>
       )
     }
 
-    if (settlement.status !== 'cancelled' && settlement.status !== 'paid') {
+    if (settlement.status === 'paid') {
+      // No action buttons - show completion in timeline
+    }
+
+    if (settlement.status !== 'cancelled' && settlement.status !== 'paid' && settlement.status !== 'rejected') {
       buttons.push(
         <Popconfirm key="cancel" title="Bạn có chắc muốn hủy phiếu này?" onConfirm={handleCancel} okText="Hủy phiếu" cancelText="Đóng">
           <Button danger icon={<CloseCircleOutlined />}>Hủy</Button>
@@ -323,18 +402,23 @@ const SettlementDetailPage = () => {
           </Card>
 
           <Card title="Trạng thái" style={{ borderRadius: 8, marginBottom: 16 }}>
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 16 }}>
               <SettlementStatusTag status={settlement.status} />
+              {settlement.status === 'paid' && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                  <Text style={{ color: '#52c41a' }}>Phiếu quyết toán đã hoàn tất thanh toán.</Text>
+                </div>
+              )}
+              {settlement.status === 'rejected' && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 6 }}>
+                  <Text style={{ color: '#ff4d4f' }}>Phiếu đã bị từ chối. Có thể chỉnh sửa và gửi duyệt lại.</Text>
+                </div>
+              )}
             </div>
-            {settlement.status === 'approved' && settlement.approved_by && (
-              <Descriptions column={1} size="small">
-                <Descriptions.Item label="Người duyệt">{settlement.approved_by}</Descriptions.Item>
-                <Descriptions.Item label="Ngày duyệt">{formatDate(settlement.approved_at)}</Descriptions.Item>
-                {settlement.approval_notes && (
-                  <Descriptions.Item label="Ghi chú duyệt">{settlement.approval_notes}</Descriptions.Item>
-                )}
-              </Descriptions>
-            )}
+          </Card>
+
+          <Card title="Lịch sử phê duyệt" style={{ borderRadius: 8, marginBottom: 16 }}>
+            <ApprovalTimeline settlement={settlement} />
           </Card>
         </Col>
       </Row>
@@ -354,6 +438,64 @@ const SettlementDetailPage = () => {
         <Form form={approvalForm} layout="vertical">
           <Form.Item name="approval_notes" label="Ghi chú duyệt">
             <Input.TextArea rows={4} placeholder="Nhập ghi chú duyệt (nếu có)" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Reject Modal */}
+      <Modal
+        title="Từ chối phiếu quyết toán"
+        open={rejectModalOpen}
+        onCancel={() => {
+          setRejectModalOpen(false)
+          rejectForm.resetFields()
+        }}
+        onOk={handleReject}
+        okText="Xác nhận từ chối"
+        okButtonProps={{ danger: true, loading: actionLoading }}
+        cancelText="Hủy"
+      >
+        <Form form={rejectForm} layout="vertical">
+          <Form.Item
+            name="rejected_reason"
+            label="Lý do từ chối"
+            rules={[{ required: true, message: 'Vui lòng nhập lý do từ chối' }]}
+          >
+            <Input.TextArea rows={4} placeholder="Nhập lý do từ chối phiếu quyết toán" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Mark as Paid Modal */}
+      <Modal
+        title="Xác nhận đã thanh toán"
+        open={markPaidModalOpen}
+        onCancel={() => {
+          setMarkPaidModalOpen(false)
+          markPaidForm.resetFields()
+        }}
+        onOk={handleMarkAsPaid}
+        okText="Xác nhận thanh toán"
+        okButtonProps={{ loading: actionLoading }}
+        cancelText="Hủy"
+      >
+        <Form form={markPaidForm} layout="vertical" initialValues={{ payment_method: 'bank_transfer' }}>
+          <Form.Item
+            name="payment_method"
+            label="Phương thức thanh toán"
+            rules={[{ required: true, message: 'Vui lòng chọn phương thức thanh toán' }]}
+          >
+            <Select>
+              <Select.Option value="bank_transfer">Chuyển khoản ngân hàng</Select.Option>
+              <Select.Option value="cash">Tiền mặt</Select.Option>
+              <Select.Option value="check">Séc</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="bank_reference" label="Mã giao dịch / Số chứng từ">
+            <Input placeholder="Nhập mã giao dịch ngân hàng hoặc số chứng từ" />
+          </Form.Item>
+          <Form.Item name="paid_by" label="Người thanh toán">
+            <Input placeholder="Nhập tên người thanh toán" />
           </Form.Item>
         </Form>
       </Modal>

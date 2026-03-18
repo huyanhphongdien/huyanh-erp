@@ -304,7 +304,7 @@ const ConfirmDealModal = ({
         <Form.Item
           name="pickup_location"
           label={<><EnvironmentOutlined style={{ color: '#1890ff', marginRight: 4 }} /> Vùng thu mua / Địa điểm chốt</>}
-          initialValue={booking.pickup_location || ''}
+          initialValue={booking.pickup_location ? [booking.pickup_location] : []}
         >
           <Select
             allowClear

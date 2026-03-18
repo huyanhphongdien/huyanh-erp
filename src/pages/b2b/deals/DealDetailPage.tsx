@@ -534,14 +534,9 @@ const DealDetailPage = () => {
                           {formatCurrency(deal.total_value_vnd)}
                         </Text>
                       </Descriptions.Item>
-                      {deal.source_region && (
-                        <Descriptions.Item label="Vùng thu mua">
-                          {deal.source_region}
-                        </Descriptions.Item>
-                      )}
-                      {deal.pickup_location_name && (
-                        <Descriptions.Item label="Địa điểm chốt">
-                          {deal.pickup_location_name}
+                      {(deal.source_region || deal.pickup_location_name) && (
+                        <Descriptions.Item label="Vùng / Địa điểm chốt">
+                          {deal.source_region || deal.pickup_location_name}
                         </Descriptions.Item>
                       )}
                       {deal.delivery_date && (

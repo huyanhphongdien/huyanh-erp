@@ -125,6 +125,7 @@ export const dealConfirmService = {
         expected_drc: formData.expected_drc,
         rubber_type: formData.product_type,
         price_unit: formData.price_unit,
+        source_region: formData.pickup_location || null,
         pickup_location_name: formData.pickup_location || null,
         delivery_date: formData.delivery_date || null,
         // Notes chỉ chứa ghi chú thực sự

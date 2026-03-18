@@ -533,6 +533,43 @@ export const settlementService = {
       .single()
 
     if (error) throw error
+
+    // Ghi bút toán công nợ: DEBIT (nhà máy nợ đại lý giá trị deal)
+    if (current.partner_id) {
+      try {
+        const grossAmount = current.gross_amount || 0
+        await supabase
+          .from('b2b_partner_ledger')
+          .insert({
+            partner_id: current.partner_id,
+            entry_type: 'settlement',
+            description: `Quyết toán ${current.code} — Giá trị deal`,
+            debit: grossAmount,
+            credit: 0,
+            reference_type: 'settlement',
+            reference_id: id,
+            entry_date: new Date().toISOString(),
+          })
+      } catch (err) {
+        console.error('Ghi ledger debit khi approve settlement thất bại:', err)
+      }
+    }
+
+    // Gửi thông báo chat
+    if (current.deal_id) {
+      try {
+        const { dealWmsService } = await import('./dealWmsService')
+        await dealWmsService.notifyDealChatSettlement(
+          current.deal_id,
+          current.code,
+          current.gross_amount || 0,
+          'approved'
+        )
+      } catch (err) {
+        console.error('Notify chat settlement approved thất bại:', err)
+      }
+    }
+
     return { ...data, partner: Array.isArray(data.partner) ? data.partner[0] : data.partner } as Settlement
   },
 
@@ -582,6 +619,46 @@ export const settlementService = {
       .single()
 
     if (error) throw error
+
+    // Ghi bút toán công nợ: CREDIT (thanh toán cho đại lý, trừ nợ)
+    if (current.partner_id) {
+      try {
+        const balanceDue = (current.gross_amount || 0) - (current.total_advance || 0)
+        const paymentAmount = balanceDue > 0 ? balanceDue : 0
+        if (paymentAmount > 0) {
+          await supabase
+            .from('b2b_partner_ledger')
+            .insert({
+              partner_id: current.partner_id,
+              entry_type: 'payment',
+              description: `Thanh toán quyết toán ${current.code} (${paymentData.payment_method === 'bank_transfer' ? 'CK' : paymentData.payment_method === 'cash' ? 'TM' : paymentData.payment_method})`,
+              debit: 0,
+              credit: paymentAmount,
+              reference_type: 'settlement',
+              reference_id: id,
+              entry_date: new Date().toISOString(),
+            })
+        }
+      } catch (err) {
+        console.error('Ghi ledger credit khi thanh toán settlement thất bại:', err)
+      }
+    }
+
+    // Gửi thông báo chat
+    if (current.deal_id) {
+      try {
+        const { dealWmsService } = await import('./dealWmsService')
+        await dealWmsService.notifyDealChatSettlement(
+          current.deal_id,
+          current.code,
+          current.gross_amount || 0,
+          'paid'
+        )
+      } catch (err) {
+        console.error('Notify chat settlement paid thất bại:', err)
+      }
+    }
+
     return { ...data, partner: Array.isArray(data.partner) ? data.partner[0] : data.partner } as Settlement
   },
 

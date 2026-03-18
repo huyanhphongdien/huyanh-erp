@@ -199,6 +199,10 @@ const SettlementCreatePage = lazy(() => import('./pages/b2b/settlements/Settleme
 const SettlementDetailPage = lazy(() => import('./pages/b2b/settlements/SettlementDetailPage'));
 const LedgerReportPage = lazy(() => import('./pages/b2b/reports/LedgerReportPage'));
 const PickupLocationSettingsPage = lazy(() => import('./pages/b2b/PickupLocationSettingsPage'));
+// B2B Demands
+const DemandListPage = lazy(() => import('./pages/b2b/demands/DemandListPage'));
+const DemandCreatePage = lazy(() => import('./pages/b2b/demands/DemandCreatePage'));
+const DemandDetailPage = lazy(() => import('./pages/b2b/demands/DemandDetailPage'));
 
 
 const queryClient = new QueryClient({
@@ -305,6 +309,10 @@ function App() {
                 <Route path="settlements/:id" element={<Suspense fallback={<LoadingSpinner />}><SettlementDetailPage /></Suspense>} />
                 {/* B2B Reports (Phase E5) */}
                 <Route path="reports" element={<Suspense fallback={<LoadingSpinner />}><LedgerReportPage /></Suspense>} />
+                {/* B2B Demands */}
+                <Route path="demands" element={<Suspense fallback={<LoadingSpinner />}><DemandListPage /></Suspense>} />
+                <Route path="demands/new" element={<Suspense fallback={<LoadingSpinner />}><DemandCreatePage /></Suspense>} />
+                <Route path="demands/:id" element={<Suspense fallback={<LoadingSpinner />}><DemandDetailPage /></Suspense>} />
                 {/* B2B Pickup Locations */}
                 <Route path="pickup-locations" element={<Suspense fallback={<LoadingSpinner />}><PickupLocationSettingsPage /></Suspense>} />
               </Route>

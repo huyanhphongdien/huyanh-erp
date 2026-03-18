@@ -1,0 +1,647 @@
+// ============================================================================
+// DEMAND SERVICE — Service quan ly Nhu cau mua B2B
+// File: src/services/b2b/demandService.ts
+// ============================================================================
+
+import { supabase } from '../../lib/supabase'
+
+// ============================================
+// TYPES
+// ============================================
+
+export type DemandStatus = 'draft' | 'published' | 'partially_filled' | 'filled' | 'closed' | 'cancelled'
+export type DemandType = 'purchase' | 'processing'
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn'
+
+export interface Demand {
+  id: string
+  code: string
+  demand_type: DemandType
+  product_type: string
+  product_name: string
+  quantity_kg: number
+  quantity_filled_kg: number
+  drc_min: number | null
+  drc_max: number | null
+  price_min: number | null
+  price_max: number | null
+  preferred_regions: string[] | null
+  deadline: string | null
+  delivery_from: string | null
+  delivery_to: string | null
+  warehouse_id: string | null
+  status: DemandStatus
+  processing_fee_per_ton: number | null
+  expected_output_rate: number | null
+  target_grade: string | null
+  notes: string | null
+  internal_notes: string | null
+  priority: string
+  published_at: string | null
+  created_at: string
+  updated_at: string
+  // computed
+  offers_count?: number
+  pending_offers_count?: number
+}
+
+export interface DemandOffer {
+  id: string
+  demand_id: string
+  partner_id: string
+  offered_quantity_kg: number
+  offered_price: number
+  offered_drc: number | null
+  offered_delivery_date: string | null
+  rubber_type: string | null
+  source_region: string | null
+  status: OfferStatus
+  deal_id: string | null
+  rejected_reason: string | null
+  notes: string | null
+  created_at: string
+  partner?: { id: string; name: string; code: string; tier: string; phone: string | null }
+}
+
+export interface DemandListParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: DemandStatus | 'all'
+  demand_type?: DemandType | 'all'
+  priority?: string | 'all'
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+}
+
+export interface PaginatedDemandResponse {
+  data: Demand[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface DemandCreateData {
+  demand_type: DemandType
+  product_type: string
+  product_name: string
+  quantity_kg: number
+  drc_min?: number | null
+  drc_max?: number | null
+  price_min?: number | null
+  price_max?: number | null
+  preferred_regions?: string[] | null
+  deadline?: string | null
+  delivery_from?: string | null
+  delivery_to?: string | null
+  warehouse_id?: string | null
+  processing_fee_per_ton?: number | null
+  expected_output_rate?: number | null
+  target_grade?: string | null
+  notes?: string | null
+  internal_notes?: string | null
+  priority?: string
+}
+
+export interface DemandUpdateData {
+  demand_type?: DemandType
+  product_type?: string
+  product_name?: string
+  quantity_kg?: number
+  drc_min?: number | null
+  drc_max?: number | null
+  price_min?: number | null
+  price_max?: number | null
+  preferred_regions?: string[] | null
+  deadline?: string | null
+  delivery_from?: string | null
+  delivery_to?: string | null
+  warehouse_id?: string | null
+  processing_fee_per_ton?: number | null
+  expected_output_rate?: number | null
+  target_grade?: string | null
+  notes?: string | null
+  internal_notes?: string | null
+  priority?: string
+  status?: DemandStatus
+}
+
+// ============================================
+// CONSTANTS
+// ============================================
+
+export const DEMAND_STATUS_LABELS: Record<DemandStatus, string> = {
+  draft: 'Nháp',
+  published: 'Đang đăng',
+  partially_filled: 'Đủ một phần',
+  filled: 'Đã đủ',
+  closed: 'Đã đóng',
+  cancelled: 'Đã hủy',
+}
+
+export const DEMAND_STATUS_COLORS: Record<DemandStatus, string> = {
+  draft: 'default',
+  published: 'blue',
+  partially_filled: 'orange',
+  filled: 'green',
+  closed: 'purple',
+  cancelled: 'red',
+}
+
+export const DEMAND_TYPE_LABELS: Record<DemandType, string> = {
+  purchase: 'Mua đứt',
+  processing: 'Gia công',
+}
+
+export const DEMAND_TYPE_COLORS: Record<DemandType, string> = {
+  purchase: 'orange',
+  processing: 'purple',
+}
+
+export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
+  pending: 'Chờ duyệt',
+  accepted: 'Đã chấp nhận',
+  rejected: 'Đã từ chối',
+  withdrawn: 'Đã rút',
+}
+
+export const OFFER_STATUS_COLORS: Record<OfferStatus, string> = {
+  pending: 'orange',
+  accepted: 'green',
+  rejected: 'red',
+  withdrawn: 'default',
+}
+
+export const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Thấp',
+  normal: 'Bình thường',
+  high: 'Cao',
+  urgent: 'Khẩn cấp',
+}
+
+export const PRIORITY_COLORS: Record<string, string> = {
+  low: 'default',
+  normal: 'blue',
+  high: 'orange',
+  urgent: 'red',
+}
+
+export const PRODUCT_TYPE_OPTIONS = [
+  { value: 'mu_dong', label: 'Mủ đông' },
+  { value: 'mu_nuoc', label: 'Mủ nước' },
+  { value: 'mu_tap', label: 'Mủ tạp' },
+  { value: 'svr_3l', label: 'SVR 3L' },
+  { value: 'svr_5', label: 'SVR 5' },
+  { value: 'svr_10', label: 'SVR 10' },
+  { value: 'svr_20', label: 'SVR 20' },
+]
+
+export const PRODUCT_TYPE_NAMES: Record<string, string> = {
+  mu_dong: 'Mủ đông',
+  mu_nuoc: 'Mủ nước',
+  mu_tap: 'Mủ tạp',
+  svr_3l: 'SVR 3L',
+  svr_5: 'SVR 5',
+  svr_10: 'SVR 10',
+  svr_20: 'SVR 20',
+}
+
+export const REGION_OPTIONS = [
+  'Bình Phước',
+  'Tây Ninh',
+  'Đồng Nai',
+  'Gia Lai',
+  'Lào',
+  'Campuchia',
+  'Thái Lan',
+]
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+const generateCode = (): string => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = (now.getMonth() + 1).toString().padStart(2, '0')
+  const day = now.getDate().toString().padStart(2, '0')
+  const random = Math.random().toString(36).substring(2, 5).toUpperCase()
+  return `NCM-${year}${month}${day}-${random}`
+}
+
+// ============================================
+// SERVICE
+// ============================================
+
+export const demandService = {
+  // ============================================
+  // CODE GENERATION
+  // ============================================
+
+  generateCode,
+
+  // ============================================
+  // CREATE
+  // ============================================
+
+  async create(data: DemandCreateData): Promise<Demand> {
+    const code = generateCode()
+
+    const { data: result, error } = await supabase
+      .from('b2b_demands')
+      .insert({
+        code,
+        demand_type: data.demand_type,
+        product_type: data.product_type,
+        product_name: data.product_name,
+        quantity_kg: data.quantity_kg,
+        quantity_filled_kg: 0,
+        drc_min: data.drc_min || null,
+        drc_max: data.drc_max || null,
+        price_min: data.price_min || null,
+        price_max: data.price_max || null,
+        preferred_regions: data.preferred_regions || null,
+        deadline: data.deadline || null,
+        delivery_from: data.delivery_from || null,
+        delivery_to: data.delivery_to || null,
+        warehouse_id: data.warehouse_id || null,
+        status: 'draft' as DemandStatus,
+        processing_fee_per_ton: data.processing_fee_per_ton || null,
+        expected_output_rate: data.expected_output_rate || null,
+        target_grade: data.target_grade || null,
+        notes: data.notes || null,
+        internal_notes: data.internal_notes || null,
+        priority: data.priority || 'normal',
+      })
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return result as Demand
+  },
+
+  // ============================================
+  // UPDATE
+  // ============================================
+
+  async update(id: string, data: DemandUpdateData): Promise<Demand> {
+    const { data: result, error } = await supabase
+      .from('b2b_demands')
+      .update({
+        ...data,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return result as Demand
+  },
+
+  // ============================================
+  // LIST & QUERY
+  // ============================================
+
+  async getList(params: DemandListParams = {}): Promise<PaginatedDemandResponse> {
+    const {
+      page = 1,
+      pageSize = 10,
+      search,
+      status,
+      demand_type,
+      priority,
+      sort_by = 'created_at',
+      sort_order = 'desc',
+    } = params
+
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    let query = supabase
+      .from('b2b_demands')
+      .select('*', { count: 'exact' })
+
+    // Filter by status
+    if (status && status !== 'all') {
+      query = query.eq('status', status)
+    }
+
+    // Filter by demand_type
+    if (demand_type && demand_type !== 'all') {
+      query = query.eq('demand_type', demand_type)
+    }
+
+    // Filter by priority
+    if (priority && priority !== 'all') {
+      query = query.eq('priority', priority)
+    }
+
+    // Search by code or product_name
+    if (search) {
+      query = query.or(`code.ilike.%${search}%,product_name.ilike.%${search}%`)
+    }
+
+    // Sorting
+    query = query.order(sort_by, { ascending: sort_order === 'asc' })
+
+    // Pagination
+    const { data, error, count } = await query.range(from, to)
+
+    if (error) throw error
+
+    // Fetch offers counts for each demand
+    const demands = data || []
+    const demandIds = demands.map(d => d.id)
+
+    let offersData: any[] = []
+    if (demandIds.length > 0) {
+      const { data: offers, error: offersError } = await supabase
+        .from('b2b_demand_offers')
+        .select('demand_id, status')
+        .in('demand_id', demandIds)
+
+      if (!offersError && offers) {
+        offersData = offers
+      }
+    }
+
+    const demandsWithCounts = demands.map(demand => {
+      const demandOffers = offersData.filter(o => o.demand_id === demand.id)
+      return {
+        ...demand,
+        offers_count: demandOffers.length,
+        pending_offers_count: demandOffers.filter(o => o.status === 'pending').length,
+      }
+    }) as Demand[]
+
+    return {
+      data: demandsWithCounts,
+      total: count || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((count || 0) / pageSize),
+    }
+  },
+
+  // ============================================
+  // GET BY ID
+  // ============================================
+
+  async getById(id: string): Promise<Demand | null> {
+    const { data, error } = await supabase
+      .from('b2b_demands')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) return null
+
+    // Get offers count
+    const { data: offers } = await supabase
+      .from('b2b_demand_offers')
+      .select('id, status')
+      .eq('demand_id', id)
+
+    return {
+      ...data,
+      offers_count: offers?.length || 0,
+      pending_offers_count: offers?.filter(o => o.status === 'pending').length || 0,
+    } as Demand
+  },
+
+  // ============================================
+  // STATUS TRANSITIONS
+  // ============================================
+
+  async publish(id: string): Promise<Demand> {
+    const { data, error } = await supabase
+      .from('b2b_demands')
+      .update({
+        status: 'published' as DemandStatus,
+        published_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as Demand
+  },
+
+  async close(id: string): Promise<Demand> {
+    const { data, error } = await supabase
+      .from('b2b_demands')
+      .update({
+        status: 'closed' as DemandStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as Demand
+  },
+
+  async cancel(id: string): Promise<Demand> {
+    const { data, error } = await supabase
+      .from('b2b_demands')
+      .update({
+        status: 'cancelled' as DemandStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as Demand
+  },
+
+  // ============================================
+  // DELETE
+  // ============================================
+
+  async delete(id: string): Promise<void> {
+    const demand = await this.getById(id)
+    if (!demand) throw new Error('Nhu cầu không tồn tại')
+    if (demand.status !== 'draft') {
+      throw new Error('Chỉ có thể xóa nhu cầu ở trạng thái "Nháp"')
+    }
+
+    const { error } = await supabase
+      .from('b2b_demands')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+  },
+
+  // ============================================
+  // OFFERS
+  // ============================================
+
+  async getOffers(demandId: string): Promise<DemandOffer[]> {
+    const { data, error } = await supabase
+      .from('b2b_demand_offers')
+      .select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id, name, code, tier, phone
+        )
+      `)
+      .eq('demand_id', demandId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return (data || []).map(offer => ({
+      ...offer,
+      partner: Array.isArray(offer.partner) ? offer.partner[0] : offer.partner,
+    })) as DemandOffer[]
+  },
+
+  async acceptOffer(offerId: string, demandId: string): Promise<{ offer: DemandOffer; deal: any }> {
+    // 1. Get the offer
+    const { data: offer, error: offerError } = await supabase
+      .from('b2b_demand_offers')
+      .select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id, name, code, tier, phone
+        )
+      `)
+      .eq('id', offerId)
+      .single()
+
+    if (offerError) throw offerError
+
+    // 2. Get the demand
+    const demand = await this.getById(demandId)
+    if (!demand) throw new Error('Nhu cầu không tồn tại')
+
+    // 3. Update offer status
+    const { error: updateOfferError } = await supabase
+      .from('b2b_demand_offers')
+      .update({
+        status: 'accepted' as OfferStatus,
+      })
+      .eq('id', offerId)
+
+    if (updateOfferError) throw updateOfferError
+
+    // 4. Create a Deal from offer
+    const dealNumber = `DL${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+
+    const { data: deal, error: dealError } = await supabase
+      .from('b2b_deals')
+      .insert({
+        deal_number: dealNumber,
+        partner_id: offer.partner_id,
+        deal_type: demand.demand_type === 'purchase' ? 'purchase' : 'processing',
+        product_name: demand.product_name,
+        quantity_kg: offer.offered_quantity_kg,
+        unit_price: offer.offered_price,
+        total_value_vnd: offer.offered_quantity_kg * offer.offered_price,
+        status: 'pending',
+        demand_id: demandId,
+        offer_id: offerId,
+        notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,
+      })
+      .select('*')
+      .single()
+
+    if (dealError) throw dealError
+
+    // 5. Update offer with deal_id
+    await supabase
+      .from('b2b_demand_offers')
+      .update({ deal_id: deal.id })
+      .eq('id', offerId)
+
+    // 6. Update demand quantity_filled_kg
+    const newFilledKg = (demand.quantity_filled_kg || 0) + offer.offered_quantity_kg
+    const newStatus: DemandStatus = newFilledKg >= demand.quantity_kg ? 'filled' : 'partially_filled'
+
+    await supabase
+      .from('b2b_demands')
+      .update({
+        quantity_filled_kg: newFilledKg,
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', demandId)
+
+    return {
+      offer: {
+        ...offer,
+        partner: Array.isArray(offer.partner) ? offer.partner[0] : offer.partner,
+        status: 'accepted',
+        deal_id: deal.id,
+      } as DemandOffer,
+      deal,
+    }
+  },
+
+  async rejectOffer(offerId: string, reason: string): Promise<void> {
+    const { error } = await supabase
+      .from('b2b_demand_offers')
+      .update({
+        status: 'rejected' as OfferStatus,
+        rejected_reason: reason,
+      })
+      .eq('id', offerId)
+
+    if (error) throw error
+  },
+
+  // ============================================
+  // LINKED DEALS
+  // ============================================
+
+  async getLinkedDeals(demandId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('b2b_deals')
+      .select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id, code, name, tier
+        )
+      `)
+      .eq('demand_id', demandId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return (data || []).map(deal => ({
+      ...deal,
+      partner: Array.isArray(deal.partner) ? deal.partner[0] : deal.partner,
+    }))
+  },
+
+  // ============================================
+  // STATISTICS
+  // ============================================
+
+  async getStats(): Promise<{ total: number; published: number; filled: number; closed: number }> {
+    const { data, error } = await supabase
+      .from('b2b_demands')
+      .select('status')
+
+    if (error) throw error
+
+    const rows = data || []
+    return {
+      total: rows.length,
+      published: rows.filter(d => d.status === 'published').length,
+      filled: rows.filter(d => d.status === 'filled').length,
+      closed: rows.filter(d => d.status === 'closed').length,
+    }
+  },
+}
+
+export default demandService

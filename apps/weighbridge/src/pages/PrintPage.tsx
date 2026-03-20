@@ -214,18 +214,24 @@ export default function PrintPage() {
       }}>
         {/* ===== HEADER ===== */}
         {isThermal ? (
-          // Thermal: compact header
+          // Thermal: compact header — use table for thermal printer compatibility
           <div style={{ textAlign: 'center', marginBottom: 4 }}>
             <div style={{ fontSize: fs, fontWeight: 700 }}>HUY ANH PHONG ĐIỀN</div>
             <div style={{ borderBottom: '1px dashed #999', margin: '3px 0' }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <QRCodeImg data={qrData} size={48} />
-              <div>
-                <div style={{ fontSize: fs + 2, fontWeight: 700 }}>PHIẾU CÂN</div>
-                <div style={{ fontSize: fs - 2 }}>{ticket!.code}</div>
-                <div style={{ fontSize: fs - 3, color: '#999' }}>{fmtDateTime(ticket!.created_at)}</div>
-              </div>
-            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: 52, verticalAlign: 'middle' }}>
+                    <QRCodeImg data={qrData} size={48} />
+                  </td>
+                  <td style={{ verticalAlign: 'middle', textAlign: 'left', paddingLeft: 6 }}>
+                    <div style={{ fontSize: fs + 2, fontWeight: 700 }}>PHIẾU CÂN</div>
+                    <div style={{ fontSize: fs - 2 }}>{ticket!.code}</div>
+                    <div style={{ fontSize: fs - 3, color: '#999' }}>{fmtDateTime(ticket!.created_at)}</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         ) : (
           // A4: full header
@@ -291,18 +297,22 @@ export default function PrintPage() {
             <Row2 l="Gross" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.gross_weight)} kg</span>} />
             <Row2 l="Tare" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.tare_weight)} kg</span>} />
             <div style={{ borderBottom: '1px solid #333', margin: '2px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: fs + 3 }}>
-              <span>NET</span>
-              <span style={{ fontFamily: mono }}>{fmt(ticket!.net_weight)} kg</span>
-            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ fontWeight: 700, fontSize: fs + 3, padding: '2px 0' }}>NET</td>
+                  <td style={{ fontWeight: 700, fontSize: fs + 3, padding: '2px 0', textAlign: 'right', fontFamily: mono }}>{fmt(ticket!.net_weight)} kg</td>
+                </tr>
+              </tbody>
+            </table>
             {deduction > 0 && (
               <>
                 <Row2 l="Tạp chất" r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(deduction)} kg</span>} />
                 <div style={{ borderBottom: '1px dashed #ccc', margin: '2px 0' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: fs + 2 }}>
-                  <span>KL Thực</span>
-                  <span style={{ fontFamily: mono }}>{fmt(actualNet)} kg</span>
-                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody><tr>
+                  <td style={{ fontWeight: 700, fontSize: fs + 2, padding: '2px 0' }}>KL Thực</td>
+                  <td style={{ fontWeight: 700, fontSize: fs + 2, padding: '2px 0', textAlign: 'right', fontFamily: mono }}>{fmt(actualNet)} kg</td>
+                </tr></tbody></table>
               </>
             )}
           </div>
@@ -357,10 +367,10 @@ export default function PrintPage() {
               {ext.expected_drc && <Row2 l={`DRC ${ext.expected_drc}%`} r={<span style={{ fontFamily: "'JetBrains Mono', monospace" }}>KL Khô: {dryWeight ? `${fmt(dryWeight)} kg` : '—'}</span>} />}
               {ext.unit_price && <Row2 l={`Giá: ${fmt(ext.unit_price)}đ/${ext.price_unit === 'dry' ? 'khô' : 'ướt'}`} r="" />}
               {estimatedValue && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: fs + 2, marginTop: 4 }}>
-                  <span>Thành tiền</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(estimatedValue)} đ</span>
-                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 4 }}><tbody><tr>
+                  <td style={{ fontWeight: 700, fontSize: fs + 2, padding: '2px 0' }}>Thành tiền</td>
+                  <td style={{ fontWeight: 700, fontSize: fs + 2, padding: '2px 0', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>{fmt(estimatedValue)} đ</td>
+                </tr></tbody></table>
               )}
             </div>
           ) : (
@@ -428,16 +438,18 @@ export default function PrintPage() {
         {isThermal ? (
           <div style={{ marginTop: 4 }}>
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: fs - 2, textAlign: 'center' }}>
-              <div style={{ width: '48%' }}>
-                <div style={{ fontWeight: 600, marginBottom: 16 }}>NV Cân</div>
-                <div style={{ borderTop: '1px dotted #999' }}></div>
-              </div>
-              <div style={{ width: '48%' }}>
-                <div style={{ fontWeight: 600, marginBottom: 16 }}>Tài xế</div>
-                <div style={{ borderTop: '1px dotted #999' }}></div>
-              </div>
-            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs - 2, textAlign: 'center' }}>
+              <tbody>
+                <tr>
+                  <td style={{ fontWeight: 600, padding: '2px 0' }}>NV Cân</td>
+                  <td style={{ fontWeight: 600, padding: '2px 0' }}>Tài xế</td>
+                </tr>
+                <tr style={{ height: 20 }}>
+                  <td style={{ borderBottom: '1px dotted #999' }}></td>
+                  <td style={{ borderBottom: '1px dotted #999' }}></td>
+                </tr>
+              </tbody>
+            </table>
             <div style={{ textAlign: 'center', marginTop: 2, fontSize: fs - 3, color: '#bbb' }}>
               HA Phong Điền • {fmtTime(new Date().toISOString())}
             </div>
@@ -474,10 +486,14 @@ export default function PrintPage() {
 
 function Row2({ l, r }: { l: React.ReactNode; r: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
-      <span style={{ color: '#666' }}>{l}</span>
-      <span>{r}</span>
-    </div>
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <tbody>
+        <tr>
+          <td style={{ color: '#666', padding: '1px 0', textAlign: 'left', whiteSpace: 'nowrap' }}>{l}</td>
+          <td style={{ padding: '1px 0', textAlign: 'right', fontWeight: 500 }}>{r}</td>
+        </tr>
+      </tbody>
+    </table>
   )
 }
 

@@ -316,6 +316,11 @@ export default function WeighingPage() {
       }
 
       message.success(`Hoàn tất — NET: ${updated.net_weight?.toLocaleString()} kg`)
+
+      // Auto navigate to print page after 1 second
+      setTimeout(() => {
+        navigate(`/print/${ticket.id}`)
+      }, 1000)
     } catch (err: any) {
       setError(err?.message || 'Không thể hoàn tất')
     } finally {

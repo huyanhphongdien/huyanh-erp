@@ -225,22 +225,16 @@ export function useKeliScale(): UseKeliScaleReturn {
             const { value, done } = await reader.read()
             if (done) break
 
-            // Decode bytes to string
-            const chunk = decoder.decode(value, { stream: true })
-            console.log('[KeliScale] Raw chunk:', JSON.stringify(chunk))
-            bufferRef.current += chunk
+            bufferRef.current += decoder.decode(value, { stream: true })
 
             // Process complete lines (separated by \r\n, \n, or \r)
             const lines = bufferRef.current.split(/\r\n|\r|\n/)
-            // Keep last incomplete line in buffer
             bufferRef.current = lines.pop() || ''
 
             for (const line of lines) {
               if (line.trim()) {
-                console.log('[KeliScale] Line:', JSON.stringify(line.trim()))
                 const reading = parseKeliOutput(line)
                 if (reading) {
-                  console.log('[KeliScale] Parsed:', reading.weight, reading.unit)
                   setLiveWeight(reading)
                 }
               }

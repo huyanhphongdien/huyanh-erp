@@ -188,7 +188,7 @@ export default function PrintPage() {
           }
           @page {
             ${isThermal
-              ? 'size: auto; margin: 0mm;'
+              ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : 'size: A4; margin: 10mm;'
             }
           }

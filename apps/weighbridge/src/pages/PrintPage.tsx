@@ -13,8 +13,8 @@ type PaperSize = 'a4' | '80mm' | '58mm'
 
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; pageSize: string; margin: string; fontSize: number }> = {
   a4: { label: 'A4 (210mm)', width: 800, pageSize: 'A4', margin: '10mm', fontSize: 13 },
-  '80mm': { label: 'Nhiệt 80mm', width: 302, pageSize: '80mm auto', margin: '2mm 2mm 0mm 2mm', fontSize: 11 },
-  '58mm': { label: 'Nhiệt 58mm', width: 218, pageSize: '58mm auto', margin: '1mm 1mm 0mm 1mm', fontSize: 10 },
+  '80mm': { label: 'Nhiệt 80mm', width: 302, pageSize: '72mm 100mm', margin: '1mm', fontSize: 11 },
+  '58mm': { label: 'Nhiệt 58mm', width: 218, pageSize: '48mm 80mm', margin: '1mm', fontSize: 10 },
 }
 
 function QRCodeImg({ data, size = 120 }: { data: string; size?: number }) {
@@ -169,11 +169,14 @@ export default function PrintPage() {
         @media print {
           .no-print { display: none !important; }
           .print-only { display: block !important; }
-          body { margin: 0; padding: 0; }
+          html, body { margin: 0; padding: 0; width: ${cfg.width}px; }
           @page {
             size: ${cfg.pageSize};
             margin: ${cfg.margin};
           }
+          /* Hide browser header/footer */
+          @page { margin-top: 0; margin-bottom: 0; }
+          thead { display: table-header-group; }
         }
       `}</style>
     </div>

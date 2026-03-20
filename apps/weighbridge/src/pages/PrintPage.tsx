@@ -11,10 +11,10 @@ const { Text } = Typography
 
 type PaperSize = 'a4' | '80mm' | '58mm'
 
-const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; pageSize: string; margin: string; fontSize: number }> = {
-  a4: { label: 'A4 (210mm)', width: 800, pageSize: 'A4', margin: '10mm', fontSize: 13 },
-  '80mm': { label: 'Nhiệt 80mm', width: 302, pageSize: '80mm 150mm', margin: '2mm', fontSize: 11 },
-  '58mm': { label: 'Nhiệt 58mm', width: 218, pageSize: '58mm 150mm', margin: '1mm', fontSize: 10 },
+const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
+  a4: { label: 'A4 (210mm)', width: 800, fontSize: 13 },
+  '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
+  '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
 }
 
 function QRCodeImg({ data, size = 120 }: { data: string; size?: number }) {
@@ -152,10 +152,22 @@ export default function PrintPage() {
       </div>
 
       {/* Preview wrapper */}
-      <div className="no-print" style={{ background: '#e5e5e5', minHeight: 'calc(100vh - 52px)', display: 'flex', justifyContent: 'center', padding: 24 }}>
+      <div className="no-print" style={{ background: '#e5e5e5', minHeight: 'calc(100vh - 52px)', display: 'flex', justifyContent: 'center', padding: 24, flexDirection: 'column', alignItems: 'center', gap: 16 }}>
         <Card style={{ width: cfg.width + 48, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }} styles={{ body: { padding: 0 } }}>
           <PrintContent />
         </Card>
+
+        {isThermal && (
+          <Card size="small" style={{ width: cfg.width + 48, background: '#fffbe6', border: '1px solid #ffe58f' }}>
+            <Text strong style={{ fontSize: 12 }}>Hướng dẫn in nhiệt (XP K200L / XP-58):</Text>
+            <div style={{ fontSize: 11, marginTop: 4, color: '#666' }}>
+              <div>1. Trong hộp thoại In → <strong>Lề: Không</strong> (None)</div>
+              <div>2. Bỏ tick <strong>"Đầu trang và chân trang"</strong></div>
+              <div>3. Nếu giấy dài quá → vào <strong>Windows Settings → Printers → XP K200L → Preferences → Paper Size</strong> → chọn <strong>72 x 100mm</strong> hoặc tạo custom size</div>
+              <div>4. Máy in có dao cắt sẽ tự cắt sau nội dung</div>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Actual print content (only visible when printing) */}
@@ -169,10 +181,16 @@ export default function PrintPage() {
         @media print {
           .no-print { display: none !important; }
           .print-only { display: block !important; }
-          html, body { margin: 0; padding: 0; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: ${isThermal ? cfg.width + 'px' : 'auto'};
+          }
           @page {
-            size: ${cfg.pageSize};
-            margin: ${cfg.margin};
+            ${isThermal
+              ? 'size: auto; margin: 0mm;'
+              : 'size: A4; margin: 10mm;'
+            }
           }
         }
       `}</style>
@@ -186,13 +204,11 @@ export default function PrintPage() {
   function PrintContent() {
     const fs = cfg.fontSize
     const mono = "'JetBrains Mono', monospace"
-    const pad = isThermal ? 4 : 10
-
     return (
       <div style={{
         width: cfg.width,
         margin: '0 auto',
-        padding: isThermal ? '8px 6px' : '24px 24px',
+        padding: isThermal ? '4px 2px' : '24px 24px',
         fontFamily: "'Be Vietnam Pro', Arial, sans-serif",
         fontSize: fs,
       }}>

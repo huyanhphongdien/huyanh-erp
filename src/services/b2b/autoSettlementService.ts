@@ -57,7 +57,7 @@ export const autoSettlementService = {
       .from('b2b_deals')
       .select(`
         id, deal_number, partner_id, product_name, product_code,
-        quantity_kg, unit_price, final_price, deal_type,
+        quantity_kg, unit_price, final_price, deal_type, price_unit,
         actual_drc, actual_weight_kg, final_value,
         partner:b2b_partners!partner_id ( id, code, name )
       `)
@@ -93,7 +93,17 @@ export const autoSettlementService = {
 
     // ─── 3. Tính giá trị thực tế ───
     const pricePerKg = deal.final_price || deal.unit_price || 0
-    const finalValue = Math.round(actualWeightKg * (actualDrc / 100) * pricePerKg)
+    const priceUnit = (deal as any).price_unit || 'wet'
+
+    if (pricePerKg <= 0) {
+      throw new Error('Deal chưa có đơn giá. Vui lòng kiểm tra đơn giá trước khi quyết toán.')
+    }
+
+    // Giá ướt: finalValue = weight × price
+    // Giá khô: finalValue = weight × (DRC/100) × price
+    const finalValue = priceUnit === 'dry'
+      ? Math.round(actualWeightKg * (actualDrc / 100) * pricePerKg)
+      : Math.round(actualWeightKg * pricePerKg)
 
     // ─── 4. Lấy tạm ứng đã chi (paid) cho Deal ───
     const { data: advances, error: advError } = await supabase
@@ -138,7 +148,9 @@ export const autoSettlementService = {
         settlement_type: (deal.deal_type === 'sale' ? 'sale' : deal.deal_type === 'processing' ? 'processing' : 'purchase') as 'purchase' | 'sale' | 'processing',
         product_type: deal.product_name,
         weighed_kg: actualWeightKg,
-        finished_kg: Math.round(actualWeightKg * (actualDrc / 100) * 100) / 100,
+        finished_kg: priceUnit === 'dry'
+          ? Math.round(actualWeightKg * (actualDrc / 100) * 100) / 100
+          : actualWeightKg,
         drc_percent: actualDrc,
         approved_price: pricePerKg,
         gross_amount: finalValue,
@@ -171,7 +183,9 @@ export const autoSettlementService = {
         description: `Phiếu nhập kho ${si.code} — ${(si.total_weight || 0).toLocaleString()} kg`,
         quantity: si.total_quantity || null,
         unit_price: pricePerKg || null,
-        amount: Math.round((si.total_weight || 0) * (actualDrc / 100) * pricePerKg),
+        amount: priceUnit === 'dry'
+          ? Math.round((si.total_weight || 0) * (actualDrc / 100) * pricePerKg)
+          : Math.round((si.total_weight || 0) * pricePerKg),
         is_credit: false,
         notes: null,
       }))

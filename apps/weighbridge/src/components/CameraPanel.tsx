@@ -432,7 +432,7 @@ export default function CameraPanel({ ticketId, disabled, onImageCountChange, ca
             onClick={captureAll}
             disabled={disabled || configuredCount === 0}
           >
-            Chụp tất cả (F12)
+            Chụp tất cả
           </Button>
           {snapshotCount > 0 && ticketId && (
             <Button

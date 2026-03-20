@@ -356,18 +356,7 @@ export default function WeighingPage() {
   // KEYBOARD SHORTCUTS
   // ============================================================================
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'F2') { e.preventDefault(); if (!ticket) handleCreate() }
-      if (e.key === 'F5') { e.preventDefault(); if (ticket && ticket.status !== 'completed') handleRecordWeight() }
-      if (e.key === 'F8') { e.preventDefault(); if (ticket?.status === 'weighing_tare' && ticket.tare_weight != null) handleComplete() }
-      if (e.key === 'F9') { e.preventDefault(); handlePrint() }
-      if (e.key === 'F12') { e.preventDefault(); /* Camera capture handled by CameraPanel */ }
-      if (e.key === 'Escape') { e.preventDefault(); navigate('/') }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [ticket, manualWeight, scale.liveWeight])
+  // Keyboard shortcuts removed to prevent accidental actions
 
   // ============================================================================
   // RENDER
@@ -662,7 +651,7 @@ export default function WeighingPage() {
                       loading={loading}
                       style={{ height: 48, background: '#D97706', borderColor: '#D97706', fontSize: 16 }}
                     >
-                      {isWeighingGross ? 'GHI CÂN LẦN 1 (F5)' : 'GHI CÂN LẦN 2 (F5)'}
+                      {isWeighingGross ? 'GHI CÂN LẦN 1' : 'GHI CÂN LẦN 2'}
                     </Button>
                   </div>
                 </Card>
@@ -750,7 +739,7 @@ export default function WeighingPage() {
                         loading={loading}
                         style={{ height: 48, background: '#16A34A', borderColor: '#16A34A' }}
                       >
-                        HOÀN TẤT (F8)
+                        HOÀN TẤT
                       </Button>
                     </Col>
                   )}
@@ -758,7 +747,7 @@ export default function WeighingPage() {
                     <Col span={12}>
                       <Button size="large" block icon={<PrinterOutlined />} onClick={handlePrint}
                         style={{ height: 48 }}>
-                        IN PHIẾU (F9)
+                        IN PHIẾU
                       </Button>
                     </Col>
                   )}
@@ -784,11 +773,7 @@ export default function WeighingPage() {
               {/* Keyboard shortcuts hint */}
               <Card size="small" style={{ borderRadius: 12, background: '#FAFAFA' }}>
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  Phím tắt: <Tag>F2</Tag> Tạo mới &nbsp;
-                  <Tag>F5</Tag> Ghi cân &nbsp;
-                  <Tag>F8</Tag> Hoàn tất &nbsp;
-                  <Tag>F9</Tag> In &nbsp;
-                  <Tag>Esc</Tag> Quay lại
+                  Trạm Cân — Cao Su Huy Anh Phong Điền
                 </Text>
               </Card>
             </Space>

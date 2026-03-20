@@ -103,6 +103,7 @@ interface MenuItem {
   requireB2BPurchaser?: boolean;
   approvalLevel?: boolean;
   badge?: number;
+  allowedEmails?: string[];
 }
 
 interface MenuGroup {
@@ -292,7 +293,7 @@ const getMenuGroups = (
       { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> },
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
-      { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} /> },
+      { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
       { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> },
       { path: '/wms/qc/recheck', label: 'QC Recheck', icon: <Activity size={18} /> },
       { path: '/wms/materials', label: 'Vật liệu', icon: <Package size={18} /> },
@@ -535,6 +536,7 @@ export function Sidebar() {
     if (item.requirePurchaseAccess && !hasPurchaseAccess) return false;
     if (item.requireB2BPurchaser && !isB2BPurchaser) return false;
     if (item.approvalLevel && !canApproveOT && !isExecutive) return false;
+    if (item.allowedEmails && !item.allowedEmails.includes(user?.email?.toLowerCase() || '')) return false;
     return true;
   };
 

@@ -86,7 +86,7 @@ export interface UseKeliScaleReturn {
 // ============================================================================
 
 const DEFAULT_CONFIG: KeliScaleConfig = {
-  baudRate: 9600,
+  baudRate: 2400,
   dataBits: 8,
   stopBits: 1,
   parity: 'none' as ParityType,

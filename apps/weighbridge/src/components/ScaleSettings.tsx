@@ -37,6 +37,7 @@ const KELI_MODELS = [
   { label: 'D2008FA (mặc định)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
   { label: 'D2008', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
   { label: 'XK3118T (cân nhỏ)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'XK3118T1-A3 (Huy Anh)', baudRate: 2400, dataBits: 8, stopBits: 1, parity: 'none' },
   { label: 'XK3190-A9 (cân sàn)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'even' },
   { label: 'XK3190-A12', baudRate: 2400, dataBits: 8, stopBits: 1, parity: 'none' },
   { label: 'XK3190-A12E', baudRate: 4800, dataBits: 8, stopBits: 1, parity: 'none' },

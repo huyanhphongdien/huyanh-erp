@@ -337,7 +337,8 @@ function App() {
                 <Route path="qc/recheck" element={<QCRecheckPage />} />
                 <Route path="qc/standards" element={<QCStandardsConfigPage />} />
                 <Route path="qc/batch/:batchId" element={<BatchQCHistoryPage />} />
-                <Route path="weighbridge" element={<WeighbridgePage />} />
+                {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}
+                <Route path="weighbridge" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/:id" element={<WeighbridgeDetailPage />} />
                 {/* P8: Production */}

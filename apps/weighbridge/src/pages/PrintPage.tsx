@@ -13,8 +13,8 @@ type PaperSize = 'a4' | '80mm' | '58mm'
 
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; pageSize: string; margin: string; fontSize: number }> = {
   a4: { label: 'A4 (210mm)', width: 800, pageSize: 'A4', margin: '10mm', fontSize: 13 },
-  '80mm': { label: 'Nhiệt 80mm', width: 302, pageSize: '80mm 297mm', margin: '2mm', fontSize: 11 },
-  '58mm': { label: 'Nhiệt 58mm', width: 218, pageSize: '58mm 297mm', margin: '1mm', fontSize: 10 },
+  '80mm': { label: 'Nhiệt 80mm', width: 302, pageSize: '80mm auto', margin: '2mm 2mm 0mm 2mm', fontSize: 11 },
+  '58mm': { label: 'Nhiệt 58mm', width: 218, pageSize: '58mm auto', margin: '1mm 1mm 0mm 1mm', fontSize: 10 },
 }
 
 function QRCodeImg({ data, size = 120 }: { data: string; size?: number }) {
@@ -199,15 +199,16 @@ export default function PrintPage() {
         {/* ===== HEADER ===== */}
         {isThermal ? (
           // Thermal: compact header
-          <div style={{ textAlign: 'center', marginBottom: 8 }}>
-            <div style={{ fontSize: fs + 1, fontWeight: 700 }}>HUY ANH PHONG ĐIỀN</div>
-            <div style={{ fontSize: fs - 2, color: '#666' }}>MST: 3301549896</div>
-            <div style={{ borderBottom: '1px dashed #999', margin: '6px 0' }} />
-            <div style={{ fontSize: fs + 4, fontWeight: 700, letterSpacing: 2 }}>PHIẾU CÂN</div>
-            <div style={{ fontSize: fs - 1, color: '#666' }}>{ticket!.code}</div>
-            <div style={{ fontSize: fs - 2, color: '#999' }}>{fmtDateTime(ticket!.created_at)}</div>
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0' }}>
-              <QRCodeImg data={qrData} size={isThermal ? 64 : 90} />
+          <div style={{ textAlign: 'center', marginBottom: 4 }}>
+            <div style={{ fontSize: fs, fontWeight: 700 }}>HUY ANH PHONG ĐIỀN</div>
+            <div style={{ borderBottom: '1px dashed #999', margin: '3px 0' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <QRCodeImg data={qrData} size={48} />
+              <div>
+                <div style={{ fontSize: fs + 2, fontWeight: 700 }}>PHIẾU CÂN</div>
+                <div style={{ fontSize: fs - 2 }}>{ticket!.code}</div>
+                <div style={{ fontSize: fs - 3, color: '#999' }}>{fmtDateTime(ticket!.created_at)}</div>
+              </div>
             </div>
           </div>
         ) : (
@@ -232,13 +233,12 @@ export default function PrintPage() {
 
         {/* ===== VEHICLE INFO ===== */}
         {isThermal ? (
-          <div style={{ marginBottom: 8, fontSize: fs }}>
-            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 4 }} />
-            <Row2 l="Biển số" r={<strong>{ticket!.vehicle_plate}</strong>} />
-            <Row2 l="Tài xế" r={ticket!.driver_name || '—'} />
-            <Row2 l="Loại mủ" r={rubberLabel} />
-            <Row2 l="Loại" r={ticket!.ticket_type === 'in' ? 'Xe vào' : 'Xe ra'} />
-            {(dealInfo?.partner_name || ext.supplier_name) && <Row2 l="NCC/Đại lý" r={dealInfo?.partner_name || ext.supplier_name} />}
+          <div style={{ marginBottom: 4, fontSize: fs }}>
+            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
+            <Row2 l="BS" r={<strong>{ticket!.vehicle_plate}</strong>} />
+            {ticket!.driver_name && <Row2 l="TX" r={ticket!.driver_name} />}
+            <Row2 l="Mủ" r={rubberLabel} />
+            {(dealInfo?.partner_name || ext.supplier_name) && <Row2 l="ĐL" r={dealInfo?.partner_name || ext.supplier_name} />}
             {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>
         ) : (
@@ -270,14 +270,12 @@ export default function PrintPage() {
 
         {/* ===== WEIGHTS ===== */}
         {isThermal ? (
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 4 }} />
-            <Row2 l="Cân L1 (Gross)" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.gross_weight)} kg</span>} />
-            {ticket!.gross_weighed_at && <Row2 l="" r={<span style={{ fontSize: fs - 2, color: '#999' }}>{fmtDateTime(ticket!.gross_weighed_at)}</span>} />}
-            <Row2 l="Cân L2 (Tare)" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.tare_weight)} kg</span>} />
-            {ticket!.tare_weighed_at && <Row2 l="" r={<span style={{ fontSize: fs - 2, color: '#999' }}>{fmtDateTime(ticket!.tare_weighed_at)}</span>} />}
-            <div style={{ borderBottom: '1px solid #333', margin: '4px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: fs + 4 }}>
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
+            <Row2 l="Gross" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.gross_weight)} kg</span>} />
+            <Row2 l="Tare" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.tare_weight)} kg</span>} />
+            <div style={{ borderBottom: '1px solid #333', margin: '2px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: fs + 3 }}>
               <span>NET</span>
               <span style={{ fontFamily: mono }}>{fmt(ticket!.net_weight)} kg</span>
             </div>
@@ -338,8 +336,8 @@ export default function PrintPage() {
         {/* ===== DRC + PRICE ===== */}
         {(ext.expected_drc || ext.unit_price) && (
           isThermal ? (
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 4 }} />
+            <div style={{ marginBottom: 4 }}>
+              <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
               {ext.expected_drc && <Row2 l={`DRC ${ext.expected_drc}%`} r={<span style={{ fontFamily: "'JetBrains Mono', monospace" }}>KL Khô: {dryWeight ? `${fmt(dryWeight)} kg` : '—'}</span>} />}
               {ext.unit_price && <Row2 l={`Giá: ${fmt(ext.unit_price)}đ/${ext.price_unit === 'dry' ? 'khô' : 'ướt'}`} r="" />}
               {estimatedValue && (
@@ -377,8 +375,8 @@ export default function PrintPage() {
 
         {/* ===== NOTES ===== */}
         {ticket!.notes && (
-          <div style={{ marginBottom: isThermal ? 4 : 16, fontSize: fs - 1, color: '#666' }}>
-            <strong>Ghi chú:</strong> {ticket!.notes}
+          <div style={{ marginBottom: isThermal ? 2 : 16, fontSize: fs - 1, color: '#666' }}>
+            <strong>GC:</strong> {ticket!.notes}
           </div>
         )}
 
@@ -412,20 +410,20 @@ export default function PrintPage() {
 
         {/* ===== SIGNATURES ===== */}
         {isThermal ? (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 4 }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: fs - 1, textAlign: 'center' }}>
-              <div style={{ width: '45%' }}>
-                <div style={{ fontWeight: 600, marginBottom: 24 }}>NV Cân</div>
+          <div style={{ marginTop: 4 }}>
+            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: fs - 2, textAlign: 'center' }}>
+              <div style={{ width: '48%' }}>
+                <div style={{ fontWeight: 600, marginBottom: 16 }}>NV Cân</div>
                 <div style={{ borderTop: '1px dotted #999' }}></div>
               </div>
-              <div style={{ width: '45%' }}>
-                <div style={{ fontWeight: 600, marginBottom: 24 }}>Tài xế</div>
+              <div style={{ width: '48%' }}>
+                <div style={{ fontWeight: 600, marginBottom: 16 }}>Tài xế</div>
                 <div style={{ borderTop: '1px dotted #999' }}></div>
               </div>
             </div>
-            <div style={{ textAlign: 'center', marginTop: 8, fontSize: fs - 3, color: '#bbb' }}>
-              Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
+            <div style={{ textAlign: 'center', marginTop: 2, fontSize: fs - 3, color: '#bbb' }}>
+              HA Phong Điền • {fmtTime(new Date().toISOString())}
             </div>
           </div>
         ) : (

@@ -124,7 +124,23 @@ function parseKeliOutput(line: string): ScaleReading | null {
     }
   }
 
-  // Format 2: "+  12345" or "  12345" (simple weight only)
+  // Format 2: "=0000.54(kg)" or "=12345.6(kg)" (Keli XK3118T1 format)
+  const xk3118Match = trimmed.match(/^=\s*([\d.]+)\s*\(?(kg|lb|t|g)?\)?$/i)
+  if (xk3118Match) {
+    const weight = parseFloat(xk3118Match[1])
+    const unit = (xk3118Match[2] || 'kg').toLowerCase()
+
+    if (isNaN(weight)) return null
+
+    return {
+      weight: Math.round(weight * 100) / 100,
+      unit,
+      stable: true,
+      timestamp: Date.now(),
+    }
+  }
+
+  // Format 3: "+  12345" or "  12345" (simple weight only)
   const simpleMatch = trimmed.match(/^([+-])?\s*([\d.]+)\s*(kg|lb|t|g)?$/i)
   if (simpleMatch) {
     const sign = simpleMatch[1] === '-' ? -1 : 1

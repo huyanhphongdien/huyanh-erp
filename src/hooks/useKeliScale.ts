@@ -273,10 +273,15 @@ export function useKeliScale(): UseKeliScaleReturn {
     try {
       setError(null)
 
-      // Close existing connection
+      // Close existing connection cleanly
       if (portRef.current) {
         readingRef.current = false
-        try { await readerRef.current?.cancel() } catch { /* ignore */ }
+        if (readerRef.current) {
+          try { await readerRef.current.cancel() } catch { /* ignore */ }
+          try { readerRef.current.releaseLock() } catch { /* ignore */ }
+          readerRef.current = null
+        }
+        await new Promise(r => setTimeout(r, 100))
         try { await portRef.current.close() } catch { /* ignore */ }
         portRef.current = null
       }
@@ -328,18 +333,35 @@ export function useKeliScale(): UseKeliScaleReturn {
   // --------------------------------------------------------------------------
 
   const disconnect = useCallback(async () => {
+    // 1. Stop read loop first
     readingRef.current = false
 
-    try { await readerRef.current?.cancel() } catch { /* ignore */ }
-    readerRef.current = null
+    // 2. Cancel reader (releases the lock on readable stream)
+    if (readerRef.current) {
+      try {
+        await readerRef.current.cancel()
+      } catch { /* already released */ }
+      try {
+        readerRef.current.releaseLock()
+      } catch { /* already released */ }
+      readerRef.current = null
+    }
 
-    try { await portRef.current?.close() } catch { /* ignore */ }
-    portRef.current = null
+    // 3. Small delay to let read loop exit cleanly
+    await new Promise(r => setTimeout(r, 100))
+
+    // 4. Close port
+    if (portRef.current) {
+      try {
+        await portRef.current.close()
+      } catch { /* already closed */ }
+      portRef.current = null
+    }
 
     setConnected(false)
     setLiveWeight(null)
     setError(null)
-    console.log('[KeliScale] Disconnected')
+    console.log('[KeliScale] Disconnected cleanly')
   }, [])
 
   // --------------------------------------------------------------------------
@@ -369,8 +391,19 @@ export function useKeliScale(): UseKeliScaleReturn {
   useEffect(() => {
     return () => {
       readingRef.current = false
-      try { readerRef.current?.cancel() } catch { /* ignore */ }
-      try { portRef.current?.close() } catch { /* ignore */ }
+      if (readerRef.current) {
+        try { readerRef.current.cancel() } catch { /* ignore */ }
+        try { readerRef.current.releaseLock() } catch { /* ignore */ }
+        readerRef.current = null
+      }
+      // Delay port close to let reader finish
+      const port = portRef.current
+      portRef.current = null
+      if (port) {
+        setTimeout(async () => {
+          try { await port.close() } catch { /* ignore */ }
+        }, 150)
+      }
     }
   }, [])
 

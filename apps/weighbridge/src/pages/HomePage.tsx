@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card, Button, Typography, Space, Row, Col, Statistic, Table, Tag, Empty, Badge, Image, Popover, Tooltip,
+  Input, DatePicker, Select,
 } from 'antd'
+import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
 import {
   PlusOutlined, ReloadOutlined, LogoutOutlined, SettingOutlined, CameraOutlined,
-  EyeOutlined, PrinterOutlined,
+  EyeOutlined, PrinterOutlined, SearchOutlined, HistoryOutlined, FilterOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
@@ -28,7 +30,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { operator, logout } = useAuthStore()
 
-  const [tickets, setTickets] = useState<WeighbridgeTicket[]>([])
+  const [allTickets, setAllTickets] = useState<WeighbridgeTicket[]>([])
   const [inProgress, setInProgress] = useState<WeighbridgeTicket[]>([])
   const [stats, setStats] = useState<{
     totalTickets: number; completedToday: number; inProgress: number; totalNetWeight: number
@@ -36,25 +38,30 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [ticketImages, setTicketImages] = useState<Record<string, WeighbridgeImage[]>>({})
 
+  // Search & Filter
+  const [searchText, setSearchText] = useState('')
+  const [filterDate, setFilterDate] = useState<dayjs.Dayjs | null>(dayjs())
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [showAllDates, setShowAllDates] = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const [allResult, statsResult] = await Promise.all([
-        weighbridgeService.getAll({ page: 1, pageSize: 50 }),
+        weighbridgeService.getAll({ page: 1, pageSize: 200 }),
         weighbridgeService.getStats(),
       ])
       const all = allResult.data || []
-      const completed = all.filter((t) => t.status === 'completed')
       const inProg = all.filter((t) => t.status === 'weighing_gross' || t.status === 'weighing_tare')
-      setTickets(completed)
+      setAllTickets(all)
       setInProgress(inProg)
       setStats(statsResult)
 
       // Load images for all tickets (completed + in-progress)
-      const allTickets = [...completed.slice(0, 20), ...inProg]
+      const allTicketsForImg = [...all.slice(0, 20), ...inProg]
       const imgMap: Record<string, WeighbridgeImage[]> = {}
       await Promise.all(
-        allTickets.map(async (t) => {
+        allTicketsForImg.map(async (t) => {
           try {
             const imgs = await weighbridgeImageService.getByTicket(t.id)
             if (imgs.length > 0) imgMap[t.id] = imgs
@@ -108,16 +115,25 @@ export default function HomePage() {
     },
     {
       title: 'NET (kg)', dataIndex: 'net_weight', width: 100, align: 'right',
+      sorter: (a: WeighbridgeTicket, b: WeighbridgeTicket) => (a.net_weight || 0) - (b.net_weight || 0),
       render: (w: number | null) => w != null
         ? <Text strong style={{ ...MONO, color: '#15803D' }}>{w.toLocaleString()}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
-      title: 'Giờ', dataIndex: 'created_at', width: 70,
+      title: 'Ngày giờ', dataIndex: 'created_at', width: 110,
+      sorter: (a: WeighbridgeTicket, b: WeighbridgeTicket) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      defaultSortOrder: 'descend' as const,
       render: (d: string) => (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+        <div>
+          <Text style={{ fontSize: 12, display: 'block' }}>
+            {new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+          </Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </div>
       ),
     },
     {
@@ -193,6 +209,33 @@ export default function HomePage() {
       ),
     },
   ]
+
+  // Filtered tickets
+  const filteredTickets = allTickets.filter(t => {
+    // Exclude in-progress (shown separately)
+    if (t.status === 'weighing_gross' || t.status === 'weighing_tare') return false
+
+    // Date filter
+    if (!showAllDates && filterDate) {
+      const ticketDate = dayjs(t.created_at).format('YYYY-MM-DD')
+      const selectedDate = filterDate.format('YYYY-MM-DD')
+      if (ticketDate !== selectedDate) return false
+    }
+
+    // Status filter
+    if (filterStatus !== 'all' && t.status !== filterStatus) return false
+
+    // Search
+    if (searchText) {
+      const s = searchText.toLowerCase()
+      const match = [t.code, t.vehicle_plate, t.driver_name]
+        .filter(Boolean)
+        .some(v => v!.toLowerCase().includes(s))
+      if (!match) return false
+    }
+
+    return true
+  })
 
   const now = new Date()
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -367,24 +410,69 @@ export default function HomePage() {
             </Card>
           )}
 
-          {/* Today's completed tickets */}
+          {/* Ticket list with search & filter */}
           <Card
             size="small"
-            title={<Text strong>Phiếu cân hôm nay</Text>}
+            title={
+              <Space>
+                <HistoryOutlined />
+                <Text strong>
+                  {showAllDates ? 'Tất cả phiếu cân' : `Phiếu cân ${filterDate?.format('DD/MM/YYYY') || 'hôm nay'}`}
+                </Text>
+                <Tag>{filteredTickets.length} phiếu</Tag>
+              </Space>
+            }
             style={{ borderRadius: 12 }}
             styles={{ body: { padding: 0 } }}
           >
+            {/* Search & Filter Bar */}
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Input
+                placeholder="Tìm mã phiếu, biển số, tài xế..."
+                prefix={<SearchOutlined style={{ color: '#bbb' }} />}
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                allowClear
+                style={{ width: 240 }}
+              />
+              <DatePicker
+                value={showAllDates ? null : filterDate}
+                onChange={v => { setFilterDate(v); setShowAllDates(false) }}
+                format="DD/MM/YYYY"
+                placeholder="Chọn ngày"
+                allowClear={false}
+                style={{ width: 140 }}
+              />
+              <Button
+                type={showAllDates ? 'primary' : 'default'}
+                size="small"
+                onClick={() => setShowAllDates(!showAllDates)}
+                style={showAllDates ? { background: PRIMARY, borderColor: PRIMARY } : {}}
+              >
+                Tất cả ngày
+              </Button>
+              <Select
+                value={filterStatus}
+                onChange={setFilterStatus}
+                style={{ width: 130 }}
+                options={[
+                  { value: 'all', label: 'Tất cả TT' },
+                  { value: 'completed', label: 'Hoàn tất' },
+                  { value: 'cancelled', label: 'Đã hủy' },
+                ]}
+              />
+            </div>
             <Table
               columns={columns}
-              dataSource={tickets}
+              dataSource={filteredTickets}
               rowKey="id"
               loading={loading}
               size="small"
-              pagination={false}
+              pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} phiếu`, size: 'small' }}
               scroll={{ x: 800 }}
               locale={{
                 emptyText: (
-                  <Empty description={<Text type="secondary">Chưa có phiếu cân hôm nay</Text>} />
+                  <Empty description={<Text type="secondary">Không có phiếu cân nào</Text>} />
                 ),
               }}
             />

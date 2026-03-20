@@ -13,8 +13,8 @@ type PaperSize = 'a4' | '80mm' | '58mm'
 
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; pageSize: string; margin: string; fontSize: number }> = {
   a4: { label: 'A4 (210mm)', width: 800, pageSize: 'A4', margin: '10mm', fontSize: 13 },
-  '80mm': { label: 'Nhiệt 80mm', width: 302, pageSize: '72mm 100mm', margin: '1mm', fontSize: 11 },
-  '58mm': { label: 'Nhiệt 58mm', width: 218, pageSize: '48mm 80mm', margin: '1mm', fontSize: 10 },
+  '80mm': { label: 'Nhiệt 80mm', width: 302, pageSize: '80mm 150mm', margin: '2mm', fontSize: 11 },
+  '58mm': { label: 'Nhiệt 58mm', width: 218, pageSize: '58mm 150mm', margin: '1mm', fontSize: 10 },
 }
 
 function QRCodeImg({ data, size = 120 }: { data: string; size?: number }) {
@@ -159,7 +159,7 @@ export default function PrintPage() {
       </div>
 
       {/* Actual print content (only visible when printing) */}
-      <div className="print-only print-content-wrapper">
+      <div className="print-only">
         <PrintContent />
       </div>
 
@@ -169,13 +169,10 @@ export default function PrintPage() {
         @media print {
           .no-print { display: none !important; }
           .print-only { display: block !important; }
-          html, body { margin: 0 !important; padding: 0 !important; }
+          html, body { margin: 0; padding: 0; }
           @page {
-            size: ${isThermal ? 'auto' : cfg.pageSize};
-            margin: ${isThermal ? '0mm' : cfg.margin};
-          }
-          .print-content-wrapper {
-            ${isThermal ? `width: ${cfg.width}px; page-break-after: always;` : ''}
+            size: ${cfg.pageSize};
+            margin: ${cfg.margin};
           }
         }
       `}</style>

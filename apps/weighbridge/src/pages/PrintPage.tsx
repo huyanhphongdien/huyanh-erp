@@ -159,7 +159,7 @@ export default function PrintPage() {
       </div>
 
       {/* Actual print content (only visible when printing) */}
-      <div className="print-only">
+      <div className="print-only print-content-wrapper">
         <PrintContent />
       </div>
 
@@ -169,14 +169,14 @@ export default function PrintPage() {
         @media print {
           .no-print { display: none !important; }
           .print-only { display: block !important; }
-          html, body { margin: 0; padding: 0; width: ${cfg.width}px; }
+          html, body { margin: 0 !important; padding: 0 !important; }
           @page {
-            size: ${cfg.pageSize};
-            margin: ${cfg.margin};
+            size: ${isThermal ? 'auto' : cfg.pageSize};
+            margin: ${isThermal ? '0mm' : cfg.margin};
           }
-          /* Hide browser header/footer */
-          @page { margin-top: 0; margin-bottom: 0; }
-          thead { display: table-header-group; }
+          .print-content-wrapper {
+            ${isThermal ? `width: ${cfg.width}px; page-break-after: always;` : ''}
+          }
         }
       `}</style>
     </div>

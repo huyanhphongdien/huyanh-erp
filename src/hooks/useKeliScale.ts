@@ -227,17 +227,22 @@ export function useKeliScale(): UseKeliScaleReturn {
 
             // Decode bytes to string
             const chunk = decoder.decode(value, { stream: true })
+            console.log('[KeliScale] Raw chunk:', JSON.stringify(chunk))
             bufferRef.current += chunk
 
-            // Process complete lines (separated by \r\n or \n)
-            const lines = bufferRef.current.split(/\r?\n/)
+            // Process complete lines (separated by \r\n, \n, or \r)
+            const lines = bufferRef.current.split(/\r\n|\r|\n/)
             // Keep last incomplete line in buffer
             bufferRef.current = lines.pop() || ''
 
             for (const line of lines) {
-              const reading = parseKeliOutput(line)
-              if (reading) {
-                setLiveWeight(reading)
+              if (line.trim()) {
+                console.log('[KeliScale] Line:', JSON.stringify(line.trim()))
+                const reading = parseKeliOutput(line)
+                if (reading) {
+                  console.log('[KeliScale] Parsed:', reading.weight, reading.unit)
+                  setLiveWeight(reading)
+                }
               }
             }
           }

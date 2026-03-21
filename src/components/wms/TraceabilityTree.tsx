@@ -34,13 +34,13 @@ const NODE_CONFIG: Record<TraceNodeType, {
     icon: <GiftOutlined />,
     color: '#52c41a',
     tagColor: 'green',
-    tagLabel: 'Thanh pham',
+    tagLabel: 'Thành phẩm',
   },
   production: {
     icon: <ToolOutlined />,
     color: '#1890ff',
     tagColor: 'blue',
-    tagLabel: 'San xuat',
+    tagLabel: 'Sản xuất',
   },
   raw_batch: {
     icon: <ExperimentOutlined />,
@@ -64,7 +64,7 @@ const NODE_CONFIG: Record<TraceNodeType, {
     icon: <UserOutlined />,
     color: '#eb2f96',
     tagColor: 'magenta',
-    tagLabel: 'Dai ly',
+    tagLabel: 'Đại lý',
   },
 }
 

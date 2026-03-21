@@ -404,12 +404,28 @@ export async function getTopEmployees(filter: StatsFilter, limit: number = 5): P
 
     if (error) throw error;
 
+    // Get approval scores for completed tasks
+    const taskIds = (tasks || []).map((t: any) => t.id);
+    const { data: approvals } = taskIds.length > 0
+      ? await supabase
+          .from('task_approvals')
+          .select('task_id, approved_score')
+          .in('task_id', taskIds)
+          .eq('action', 'approved')
+      : { data: [] };
+
+    const scoreByTask = new Map<string, number>();
+    approvals?.forEach((a: any) => {
+      if (a.approved_score) scoreByTask.set(a.task_id, a.approved_score);
+    });
+
     // Count by employee
     const empMap = new Map<string, {
       id: string;
       name: string;
       department: string;
       count: number;
+      scores: number[];
     }>();
 
     tasks?.forEach((task: any) => {
@@ -425,9 +441,12 @@ export async function getTopEmployees(filter: StatsFilter, limit: number = 5): P
           name: assignee.full_name,
           department: dept?.name || '',
           count: 0,
+          scores: [],
         });
       }
       empMap.get(empId)!.count++;
+      const score = scoreByTask.get(task.id);
+      if (score) empMap.get(empId)!.scores.push(score);
     });
 
     // Sort and limit
@@ -439,7 +458,9 @@ export async function getTopEmployees(filter: StatsFilter, limit: number = 5): P
         employee_name: e.name,
         department_name: e.department,
         completed_count: e.count,
-        average_score: 0, // TODO: Calculate from approvals
+        average_score: e.scores.length > 0
+          ? Math.round(e.scores.reduce((a, b) => a + b, 0) / e.scores.length)
+          : 0,
       }));
 
     return { data: topEmployees, error: null };

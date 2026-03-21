@@ -226,7 +226,7 @@ export const traceabilityService = {
 
       const warehouse = Array.isArray(sio.warehouse) ? sio.warehouse[0] : sio.warehouse
       const sioDetail = [
-        sio.source_type === 'deal' ? 'Tu deal' : sio.source_type === 'production' ? 'Tu san xuat' : (sio.source_type || ''),
+        sio.source_type === 'deal' ? 'Từ deal' : sio.source_type === 'production' ? 'Tu san xuat' : (sio.source_type || ''),
         warehouse?.name || '',
         formatWeight(sio.total_weight || detail.weight),
       ].filter(Boolean).join(' | ')
@@ -274,8 +274,8 @@ export const traceabilityService = {
     const DEAL_TYPE_MAP: Record<string, string> = {
       purchase: 'Mua hang',
       sale: 'Ban hang',
-      processing: 'Gia cong',
-      consignment: 'Ky gui',
+      processing: 'Gia công',
+      consignment: 'Ký gửi',
     }
 
     const dealDetail = [
@@ -340,8 +340,8 @@ export const traceabilityService = {
     const DEAL_TYPE_MAP: Record<string, string> = {
       purchase: 'Mua hang',
       sale: 'Ban hang',
-      processing: 'Gia cong',
-      consignment: 'Ky gui',
+      processing: 'Gia công',
+      consignment: 'Ký gửi',
     }
 
     const dealDetail = [

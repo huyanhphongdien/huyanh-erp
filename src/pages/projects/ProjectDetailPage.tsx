@@ -2043,6 +2043,7 @@ export const ProjectDetailPage: React.FC = () => {
   const [stats, setStats] = useState<ProjectStats>(DEFAULT_STATS)
   const [phases, setPhases] = useState<Phase[]>([])
   const [milestones, setMilestones] = useState<MilestoneItem[]>([])
+  const [projectMembers, setProjectMembers] = useState<{ employee_id: string; full_name: string }[]>([])
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -2269,9 +2270,9 @@ export const ProjectDetailPage: React.FC = () => {
             .eq('project_id', projectId)
             .order('created_at', { ascending: false })
             .limit(20),
-          // Members count
+          // Members (full list for assignment dropdowns)
           supabase.from('project_members')
-            .select('id', { count: 'exact', head: true })
+            .select('id, employee_id, is_active, employee:employees!employee_id(id, full_name)')
             .eq('project_id', projectId)
             .eq('is_active', true),
           // Risks count
@@ -2352,10 +2353,18 @@ export const ProjectDetailPage: React.FC = () => {
           phase_count: phasesData.length,
           milestone_count: msData.length,
           milestone_completed: msCompleted,
-          member_count: membersRes.count || 0,
+          member_count: (membersRes.data || []).length,
           risk_count: risksRes.count || 0,
           open_issues: issuesRes.count || 0,
         })
+
+        // Set project members for assignment dropdowns (Risk/Issue pages)
+        setProjectMembers(
+          (membersRes.data || []).map((m: any) => ({
+            employee_id: m.employee_id,
+            full_name: (m.employee as any)?.full_name || m.employee_id,
+          }))
+        )
 
       } catch (e) {
         console.error('Failed to load project:', e)
@@ -3181,6 +3190,7 @@ export const ProjectDetailPage: React.FC = () => {
         {activeTab === 'risks' && realProjectId && (
           <ProjectRiskPage
             projectId={realProjectId}
+            members={projectMembers}
           />
         )}
 

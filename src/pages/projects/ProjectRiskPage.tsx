@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { riskService } from '../../services/project/riskService'
 import { issueService } from '../../services/project/issueService'
+import { supabase } from '../../lib/supabase'
+import { sendNotificationEmail } from '../../services/emailService'
 import type {
   ProjectRisk, RiskCreateData, RiskUpdateData, RiskMatrixCell, RiskStats, RiskCategory, RiskStatus,
 } from '../../services/project/riskService'
@@ -154,6 +156,27 @@ interface ProjectRiskPageProps {
 const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = [] }) => {
   // Tab: risks | issues
   const [activeTab, setActiveTab] = useState<'risks' | 'issues'>('risks')
+
+  // All employees (for assignee dropdown - fallback when no project members)
+  const [allEmployees, setAllEmployees] = useState<{ employee_id: string; full_name: string; position?: string }[]>([])
+
+  useEffect(() => {
+    const loadEmployees = async () => {
+      const { data } = await supabase
+        .from('employees')
+        .select('id, full_name, position:positions!position_id(name)')
+        .eq('status', 'active')
+        .order('full_name')
+      if (data) {
+        setAllEmployees(data.map((e: any) => ({
+          employee_id: e.id,
+          full_name: e.full_name,
+          position: e.position?.name || '',
+        })))
+      }
+    }
+    loadEmployees()
+  }, [])
 
   // Data
   const [risks, setRisks] = useState<ProjectRisk[]>([])
@@ -601,11 +624,24 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
                 </select>
               </div>
               <div>
-                <label className="block text-[12px] font-medium text-gray-600 mb-1">Owner</label>
+                <label className="block text-[12px] font-medium text-gray-600 mb-1">Người chịu trách nhiệm</label>
                 <select value={form.owner_id} onChange={e => setForm(f => ({ ...f, owner_id: e.target.value }))}
                   className="w-full px-3 py-2.5 text-[15px] border border-gray-300 rounded-lg bg-white outline-none">
                   <option value="">— Chọn —</option>
-                  {members.map(m => <option key={m.employee_id} value={m.employee_id}>{m.full_name}</option>)}
+                  {members.length > 0 && (
+                    <optgroup label="Thành viên dự án">
+                      {members.map(m => <option key={m.employee_id} value={m.employee_id}>{m.full_name}</option>)}
+                    </optgroup>
+                  )}
+                  <optgroup label={members.length > 0 ? 'Nhân viên khác' : 'Tất cả nhân viên'}>
+                    {allEmployees
+                      .filter(e => !members.some(m => m.employee_id === e.employee_id))
+                      .map(e => (
+                        <option key={e.employee_id} value={e.employee_id}>
+                          {e.full_name}{e.position ? ` — ${e.position}` : ''}
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -682,6 +718,34 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
             assignee_id: form.assignee_id || undefined,
             due_date: form.due_date || undefined,
           })
+
+          // Gửi email thông báo cho người xử lý
+          if (form.assignee_id) {
+            try {
+              // Lấy tên dự án
+              const { data: proj } = await supabase
+                .from('projects')
+                .select('name')
+                .eq('id', projectId)
+                .single()
+
+              await sendNotificationEmail({
+                recipient_id: form.assignee_id,
+                notification_type: 'task_assigned',
+                additional_data: {
+                  task_name: `[Vấn đề] ${form.title}`,
+                  task_code: `DA-${proj?.name || projectId}`,
+                  assigner_name: 'Hệ thống quản lý dự án',
+                  description: `${form.description || ''}\n\nMức độ: ${SEVERITY_CFG[form.severity as IssueSeverity]?.label || form.severity}${form.due_date ? `\nHạn xử lý: ${new Date(form.due_date).toLocaleDateString('vi-VN')}` : ''}`,
+                  priority: form.severity === 'critical' ? 'critical' : form.severity === 'high' ? 'high' : 'medium',
+                  due_date: form.due_date || undefined,
+                },
+              })
+            } catch (emailErr) {
+              console.error('Send issue email failed:', emailErr)
+              // Non-blocking: issue vẫn tạo thành công
+            }
+          }
         }
         setShowIssueForm(false)
         setEditingIssue(null)
@@ -725,7 +789,20 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
                 <select value={form.assignee_id} onChange={e => setForm(f => ({ ...f, assignee_id: e.target.value }))}
                   className="w-full px-3 py-2.5 text-[15px] border border-gray-300 rounded-lg bg-white outline-none">
                   <option value="">— Chọn —</option>
-                  {members.map(m => <option key={m.employee_id} value={m.employee_id}>{m.full_name}</option>)}
+                  {members.length > 0 && (
+                    <optgroup label="Thành viên dự án">
+                      {members.map(m => <option key={m.employee_id} value={m.employee_id}>{m.full_name}</option>)}
+                    </optgroup>
+                  )}
+                  <optgroup label={members.length > 0 ? 'Nhân viên khác' : 'Tất cả nhân viên'}>
+                    {allEmployees
+                      .filter(e => !members.some(m => m.employee_id === e.employee_id))
+                      .map(e => (
+                        <option key={e.employee_id} value={e.employee_id}>
+                          {e.full_name}{e.position ? ` — ${e.position}` : ''}
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
               </div>
             </div>

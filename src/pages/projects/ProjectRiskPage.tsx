@@ -17,6 +17,7 @@ import { riskService } from '../../services/project/riskService'
 import { issueService } from '../../services/project/issueService'
 import { supabase } from '../../lib/supabase'
 import { sendNotificationEmail } from '../../services/emailService'
+import { useAuthStore } from '../../stores/authStore'
 import type {
   ProjectRisk, RiskCreateData, RiskUpdateData, RiskMatrixCell, RiskStats, RiskCategory, RiskStatus,
 } from '../../services/project/riskService'
@@ -154,6 +155,8 @@ interface ProjectRiskPageProps {
 }
 
 const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = [] }) => {
+  const { user } = useAuthStore()
+
   // Tab: risks | issues
   const [activeTab, setActiveTab] = useState<'risks' | 'issues'>('risks')
 
@@ -731,13 +734,15 @@ const ProjectRiskPage: React.FC<ProjectRiskPageProps> = ({ projectId, members = 
 
               await sendNotificationEmail({
                 recipient_id: form.assignee_id,
-                notification_type: 'task_assigned',
+                notification_type: 'project_issue_assigned',
                 additional_data: {
-                  task_name: `[Vấn đề] ${form.title}`,
-                  task_code: `DA-${proj?.name || projectId}`,
-                  assigner_name: 'Hệ thống quản lý dự án',
-                  description: `${form.description || ''}\n\nMức độ: ${SEVERITY_CFG[form.severity as IssueSeverity]?.label || form.severity}${form.due_date ? `\nHạn xử lý: ${new Date(form.due_date).toLocaleDateString('vi-VN')}` : ''}`,
-                  priority: form.severity === 'critical' ? 'critical' : form.severity === 'high' ? 'high' : 'medium',
+                  project_id: projectId,
+                  project_name: proj?.name || 'Dự án',
+                  issue_title: form.title,
+                  severity: form.severity,
+                  severity_label: SEVERITY_CFG[form.severity as IssueSeverity]?.label || form.severity,
+                  reporter_name: user?.full_name || user?.email || 'Không xác định',
+                  description: form.description || '',
                   due_date: form.due_date || undefined,
                 },
               })

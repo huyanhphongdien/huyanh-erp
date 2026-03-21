@@ -18,7 +18,8 @@ export type EmailNotificationType =
   | 'task_rejected'
   | 'revision_requested'
   | 'evaluation_received'
-  | 'deadline_reminder';
+  | 'deadline_reminder'
+  | 'project_issue_assigned';
 
 export type EmailStatus = 'pending' | 'sent' | 'failed';
 
@@ -221,6 +222,35 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
         <a href="${APP_URL}/my-tasks" style="display: inline-block; background-color: #3B82F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
           Xem chi tiết
         </a>
+      </div>
+    `,
+  },
+
+  // Báo cáo vấn đề dự án — gửi cho người xử lý
+  project_issue_assigned: {
+    subject: (data) => `[Huy Anh ERP] Vấn đề dự án cần xử lý: ${data.issue_title}`,
+    content: (data) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">⚠️ Vấn đề dự án cần bạn xử lý</h2>
+        <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fca5a5;">
+          <p><strong>Dự án:</strong> ${data.project_name}</p>
+          <p><strong>Vấn đề:</strong> ${data.issue_title}</p>
+          <p><strong>Mức độ:</strong> <span style="color: ${data.severity === 'critical' ? '#dc2626' : data.severity === 'high' ? '#ea580c' : '#d97706'}; font-weight: bold;">${data.severity_label}</span></p>
+          <p><strong>Người báo cáo:</strong> ${data.reporter_name}</p>
+          ${data.due_date ? `<p><strong>Hạn xử lý:</strong> <span style="color: #dc2626; font-weight: bold;">${new Date(data.due_date).toLocaleDateString('vi-VN')}</span></p>` : ''}
+        </div>
+        ${data.description ? `
+          <p><strong>Mô tả chi tiết:</strong></p>
+          <p style="background-color: #fafafa; padding: 15px; border-left: 4px solid #ef4444;">${data.description}</p>
+        ` : ''}
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+        <p>Vui lòng đăng nhập hệ thống để xem chi tiết và xử lý vấn đề này.</p>
+        <a href="${APP_URL}/projects/${data.project_id}" style="display: inline-block; background-color: #DC2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+          Xem dự án
+        </a>
+        <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
+          Email này được gửi tự động từ hệ thống Huy Anh ERP khi có vấn đề dự án cần xử lý.
+        </p>
       </div>
     `,
   },

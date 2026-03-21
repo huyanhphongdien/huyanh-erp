@@ -34,7 +34,7 @@ export interface SendEmailInput {
 // CONSTANTS
 // ============================================================================
 
-const APP_URL = 'https://huyanh-erp.vercel.app'; // Thay bằng URL thực tế
+const APP_URL = 'https://huyanhrubber.vn';
 
 const RATING_LABELS: Record<string, string> = {
   excellent: 'Xuất sắc',

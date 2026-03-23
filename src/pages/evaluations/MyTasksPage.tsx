@@ -584,12 +584,13 @@ const MyTasksPage: React.FC = () => {
       {/* Upcoming Deadlines (7 ngày tới) */}
       {(() => {
         const now = new Date()
-        const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const in7Days = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000)
         const upcoming = tasks
           .filter(t => {
             if (!t.due_date || t.status === 'finished' || t.status === 'cancelled') return false
-            const d = new Date(t.due_date)
-            return d >= now && d <= in7Days
+            const d = new Date(t.due_date + 'T00:00:00')
+            return d >= todayStart && d <= in7Days
           })
           .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
           .slice(0, 5)
@@ -606,9 +607,9 @@ const MyTasksPage: React.FC = () => {
             </div>
             <div className="space-y-2">
               {upcoming.map(t => {
-                const d = new Date(t.due_date!)
-                const isToday = d.toDateString() === now.toDateString()
-                const isTomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString()
+                const d = new Date(t.due_date! + 'T00:00:00')
+                const isToday = d.toDateString() === todayStart.toDateString()
+                const isTomorrow = d.toDateString() === new Date(todayStart.getTime() + 86400000).toDateString()
                 const dayLabel = isToday ? 'Hôm nay' : isTomorrow ? 'Ngày mai' : `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`
                 return (
                   <div

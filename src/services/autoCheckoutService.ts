@@ -21,8 +21,11 @@ import { supabase } from '../lib/supabase'
 // CONSTANTS
 // ============================================================================
 
-/** Buffer: 1 tiếng sau ca kết thúc mới auto checkout */
+/** Buffer mặc định: 1 tiếng sau ca kết thúc mới auto checkout */
 const AUTO_CHECKOUT_BUFFER_MS = 1 * 60 * 60 * 1000
+
+/** Buffer ca qua đêm: 3 tiếng sau ca kết thúc (cho phép checkout tới 09:00 cho ca 18-06) */
+const AUTO_CHECKOUT_NIGHT_BUFFER_MS = 3 * 60 * 60 * 1000
 
 /** Vietnam timezone offset: +7 hours */
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000
@@ -149,8 +152,14 @@ export const autoCheckoutService = {
       shiftEndDt = new Date(rec.date + 'T17:00:00+07:00')
     }
 
-    // ── Kiểm tra buffer: phải quá 1h sau ca ──
-    if (now.getTime() <= shiftEndDt.getTime() + AUTO_CHECKOUT_BUFFER_MS) {
+    // ── Kiểm tra buffer: phải quá buffer sau ca ──
+    // Ca qua đêm (18h-06h): buffer 3 tiếng → auto-close lúc 09:00
+    // Ca thường: buffer 1 tiếng
+    const bufferMs = (rec.shift?.crosses_midnight)
+      ? AUTO_CHECKOUT_NIGHT_BUFFER_MS
+      : AUTO_CHECKOUT_BUFFER_MS
+
+    if (now.getTime() <= shiftEndDt.getTime() + bufferMs) {
       return false // Chưa đủ điều kiện
     }
 

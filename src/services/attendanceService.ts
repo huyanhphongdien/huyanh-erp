@@ -204,8 +204,13 @@ function isInShiftWindow(
   assignmentDate: string,
   now: Date,
   bufferBeforeMinutes = 120,
-  bufferAfterMinutes = 60
+  bufferAfterMinutes?: number
 ): boolean {
+  // Ca qua đêm: buffer sau 180 phút (3h) → cho phép checkout tới 09:00 cho ca 18-06
+  // Ca thường: buffer sau 60 phút (1h)
+  if (bufferAfterMinutes === undefined) {
+    bufferAfterMinutes = shift.crosses_midnight ? 180 : 60
+  }
   const shiftStartDT = createVNDate(assignmentDate, shift.start_time)
 
   let endDate = assignmentDate

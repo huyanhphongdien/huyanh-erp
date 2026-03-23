@@ -5,8 +5,9 @@
 // 2 Tabs: Mẫu công việc (Templates) + Lịch tự động (Recurring)
 // ============================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '../../stores/authStore'
 import {
   Card, Table, Button, Modal, Form, Input, Select, InputNumber,
   Tag, Switch, Space, Typography, Tabs, message, Popconfirm,
@@ -46,8 +47,9 @@ export default function TaskTemplateListPage() {
   const [editingRule, setEditingRule] = useState<RecurringRule | null>(null)
   const [recurringForm] = Form.useForm()
 
-  // ── Employees for assignee select ──
-  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string }>>([])
+  // ── Auth + Employees for assignee select ──
+  const { user } = useAuthStore()
+  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; department_id: string | null }>>([])
 
   // ============================================================
   // DATA LOADING
@@ -81,7 +83,7 @@ export default function TaskTemplateListPage() {
     try {
       const { data } = await supabase
         .from('employees')
-        .select('id, full_name')
+        .select('id, full_name, department_id')
         .eq('status', 'active')
         .order('full_name')
       setEmployees(data || [])
@@ -95,6 +97,28 @@ export default function TaskTemplateListPage() {
     loadRecurringRules()
     loadEmployees()
   }, [loadTemplates, loadRecurringRules, loadEmployees])
+
+  // Filter employees theo quyền:
+  // - Nhân viên (level >= 5): chỉ giao cho chính mình
+  // - Trưởng/Phó phòng (level 3-4): giao cho nhân viên cùng phòng
+  // - Ban giám đốc / Admin (level <= 2): giao cho tất cả
+  const filteredEmployees = useMemo(() => {
+    const level = user?.position_level || 7
+    const isAdmin = user?.role === 'admin'
+
+    if (isAdmin || level <= 2) {
+      // BGĐ / Admin → tất cả nhân viên
+      return employees
+    }
+
+    if (level <= 4) {
+      // Trưởng/Phó phòng → nhân viên cùng phòng ban
+      return employees.filter(e => e.department_id === user?.department_id)
+    }
+
+    // Nhân viên → chỉ chính mình
+    return employees.filter(e => e.id === user?.employee_id)
+  }, [employees, user])
 
   // ============================================================
   // TEMPLATE ACTIONS
@@ -666,7 +690,7 @@ export default function TaskTemplateListPage() {
               placeholder="Chọn nhân viên"
               showSearch
               optionFilterProp="label"
-              options={employees.map(e => ({ value: e.id, label: e.full_name }))}
+              options={filteredEmployees.map(e => ({ value: e.id, label: e.full_name }))}
             />
           </Form.Item>
         </Form>

@@ -148,8 +148,14 @@ export const autoCheckoutService = {
         rec.shift.crosses_midnight || false
       )
     } else {
-      // Fallback: 17:00 VN cùng ngày
-      shiftEndDt = new Date(rec.date + 'T17:00:00+07:00')
+      // Fallback: 17:00 VN cùng ngày (ca thường) hoặc 06:00 ngày sau (ca đêm)
+      if (rec.shift?.crosses_midnight) {
+        const d = new Date(rec.date + 'T00:00:00+07:00')
+        d.setDate(d.getDate() + 1)
+        shiftEndDt = new Date(d.toISOString().split('T')[0] + 'T06:00:00+07:00')
+      } else {
+        shiftEndDt = new Date(rec.date + 'T17:00:00+07:00')
+      }
     }
 
     // ── Kiểm tra buffer: phải quá buffer sau ca ──
@@ -185,11 +191,12 @@ export const autoCheckoutService = {
       if (shortage > earlyThreshold) {
         earlyLeaveMinutes = shortage
         if (rec.status === 'late' || (rec.late_minutes ?? 0) > 0) {
-          newStatus = 'late' // Giữ late
+          newStatus = 'late_and_early'
         } else {
           newStatus = 'early_leave'
         }
       }
+      // Dưới threshold → không ghi early_leave_minutes, giữ status hiện tại
     }
 
     // ── Update ──

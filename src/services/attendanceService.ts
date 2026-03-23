@@ -608,7 +608,8 @@ export const attendanceService = {
 
     if (selectedShift) {
       const shift = selectedShift.shift
-      breakMins = shift.break_minutes || 0
+      // break_minutes mặc định 60 phút nếu null (tránh bỏ sót trừ break)
+      breakMins = shift.break_minutes ?? 60
 
       const shiftStartDT = createVNDate(selectedShift.assignment_date, shift.start_time)
       const diffMs = now.getTime() - shiftStartDT.getTime()
@@ -617,7 +618,7 @@ export const attendanceService = {
 
       if (diffMinutes > threshold) {
         status = 'late'
-        lateMinutes = diffMinutes
+        lateMinutes = Math.max(0, diffMinutes)
       }
     } else {
       // Fallback: không có shift — dùng giờ hành chính 8:00
@@ -627,7 +628,7 @@ export const attendanceService = {
 
       if (diffMinutes > 30) {
         status = 'late'
-        lateMinutes = diffMinutes
+        lateMinutes = Math.max(0, diffMinutes)
       }
     }
 
@@ -684,8 +685,9 @@ export const attendanceService = {
 
     if (openRecord.shift) {
       const shift = openRecord.shift
-      const breakMins = shift.break_minutes || 0
-      const standardMinutes = shift.standard_hours * 60
+      // Dùng break từ shift hiện tại, default 60 nếu null
+      const breakMins = shift.break_minutes ?? 60
+      const standardMinutes = (shift.standard_hours || 8) * 60
 
       workingMinutes = Math.max(0, totalElapsedMinutes - breakMins)
 

@@ -67,7 +67,7 @@ interface TaskFormProps {
   onCancel: () => void
   isLoading?: boolean
   isSelfMode?: boolean
-  initialData?: { department_id?: string; assignee_id?: string }
+  initialData?: { department_id?: string; assignee_id?: string; name?: string; description?: string; priority?: string; due_date?: string }
   currentUser?: CurrentUser | null
   isDepartmentLocked?: boolean
 }
@@ -101,13 +101,13 @@ export function TaskForm({
   isDepartmentLocked = false,
 }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskFormData>({
-    name: '',
-    description: '',
+    name: initialData?.name || '',
+    description: initialData?.description || '',
     department_id: initialData?.department_id || '',
     assignee_id: initialData?.assignee_id || '',
-    priority: 'medium',
+    priority: (initialData?.priority as any) || 'medium',
     start_date: '',
-    due_date: '',
+    due_date: initialData?.due_date || '',
     notes: '',
     initial_progress: 0,
     parent_task_id: '',
@@ -139,6 +139,10 @@ export function TaskForm({
     if (mode === 'create' && initialData) {
       setFormData(prev => ({
         ...prev,
+        name: initialData.name || prev.name,
+        description: initialData.description || prev.description,
+        priority: (initialData.priority as any) || prev.priority,
+        due_date: initialData.due_date || prev.due_date,
         department_id: initialData.department_id || prev.department_id,
         assignee_id: initialData.assignee_id || prev.assignee_id,
       }))

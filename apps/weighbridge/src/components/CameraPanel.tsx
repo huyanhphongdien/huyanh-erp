@@ -63,11 +63,22 @@ function loadCameraConfig(): CameraSlot[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      const parsed = JSON.parse(saved) as CameraSlot[]
-      // Merge with defaults in case new cameras added
+      const parsed = JSON.parse(saved)
       return DEFAULT_CAMERAS.map((def) => {
-        const found = parsed.find((p) => p.key === def.key)
-        return found ? { ...def, config: { ...def.config, ...found.config } } : def
+        const found = (parsed as any[]).find((p: any) => p.key === def.key)
+        if (!found) return def
+        // Support both old format (flat) and new format (nested config)
+        const cfg = found.config || found
+        return {
+          ...def,
+          config: {
+            ip: cfg.ip || '',
+            port: cfg.port || '80',
+            username: cfg.username || 'admin',
+            password: cfg.password || '',
+            channel: cfg.channel || 1,
+          },
+        }
       })
     }
   } catch { /* ignore */ }

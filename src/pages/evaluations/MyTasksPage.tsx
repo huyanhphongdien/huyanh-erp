@@ -589,7 +589,9 @@ const MyTasksPage: React.FC = () => {
         const upcoming = tasks
           .filter(t => {
             if (!t.due_date || t.status === 'finished' || t.status === 'cancelled') return false
-            const d = new Date(t.due_date + 'T00:00:00')
+            // Handle both "2026-03-23" and "2026-03-23T00:00:00+07:00" formats
+            const dateStr = t.due_date.split('T')[0]
+            const d = new Date(dateStr + 'T00:00:00')
             return d >= todayStart && d <= in7Days
           })
           .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
@@ -607,7 +609,8 @@ const MyTasksPage: React.FC = () => {
             </div>
             <div className="space-y-2">
               {upcoming.map(t => {
-                const d = new Date(t.due_date! + 'T00:00:00')
+                const dateStr = t.due_date!.split('T')[0]
+                const d = new Date(dateStr + 'T00:00:00')
                 const isToday = d.toDateString() === todayStart.toDateString()
                 const isTomorrow = d.toDateString() === new Date(todayStart.getTime() + 86400000).toDateString()
                 const dayLabel = isToday ? 'Hôm nay' : isTomorrow ? 'Ngày mai' : `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`

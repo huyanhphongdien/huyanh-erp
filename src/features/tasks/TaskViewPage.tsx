@@ -18,6 +18,7 @@ import { useTask, useDeleteTask } from './hooks/useTasks'
 import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import TaskChecklist from '../../components/tasks/TaskChecklist'
 
 import { SubtasksList } from './components/SubtasksList'
 import { ParentTaskInfo } from './components/ParentTaskInfo'
@@ -500,6 +501,13 @@ export function TaskViewPage() {
             <p className="text-sm text-gray-700 whitespace-pre-wrap">{t.description}</p>
           </Card>
         )}
+
+        {/* Checklist */}
+        <TaskChecklist
+          taskId={t.id}
+          readonly={t.status === 'finished' || t.status === 'cancelled'}
+          userId={user?.employee_id || undefined}
+        />
 
         {/* Ghi chú */}
         {t.notes && (

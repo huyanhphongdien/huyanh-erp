@@ -581,6 +581,60 @@ const MyTasksPage: React.FC = () => {
         <ScoreCard score={evaluationStats.averageScore} label={evaluationStats.rating} />
       </div>
 
+      {/* Upcoming Deadlines (7 ngày tới) */}
+      {(() => {
+        const now = new Date()
+        const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+        const upcoming = tasks
+          .filter(t => {
+            if (!t.due_date || t.status === 'finished' || t.status === 'cancelled') return false
+            const d = new Date(t.due_date)
+            return d >= now && d <= in7Days
+          })
+          .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
+          .slice(0, 5)
+
+        if (upcoming.length === 0) return null
+
+        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+
+        return (
+          <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarDays className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-semibold text-gray-700">Deadline sắp tới (7 ngày)</span>
+            </div>
+            <div className="space-y-2">
+              {upcoming.map(t => {
+                const d = new Date(t.due_date!)
+                const isToday = d.toDateString() === now.toDateString()
+                const isTomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString()
+                const dayLabel = isToday ? 'Hôm nay' : isTomorrow ? 'Ngày mai' : `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => navigate(`/tasks/${t.id}`)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isToday ? 'bg-red-50 border border-red-200' : 'bg-gray-50 hover:bg-gray-100'}`}
+                  >
+                    <span className={`text-xs font-bold w-16 flex-shrink-0 ${isToday ? 'text-red-600' : 'text-blue-600'}`}>
+                      {dayLabel}
+                    </span>
+                    <span className="text-sm text-gray-700 truncate flex-1">{t.name || t.code}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+                      t.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                      t.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {t.priority === 'urgent' ? 'Khẩn' : t.priority === 'high' ? 'Cao' : ''}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Overdue Warning */}
       {stats.overdue > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-4 flex items-center gap-2 sm:gap-3">

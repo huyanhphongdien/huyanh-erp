@@ -4,6 +4,7 @@ import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import WeighingPage from '@/pages/WeighingPage'
 import PrintPage from '@/pages/PrintPage'
+import SettingsPage from '@/pages/SettingsPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const operator = useAuthStore((s) => s.operator)
@@ -45,6 +46,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <PrintPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />

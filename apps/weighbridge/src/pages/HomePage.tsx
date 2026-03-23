@@ -257,7 +257,7 @@ export default function HomePage() {
           <Space>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, ...MONO }}>{timeStr}</Text>
             <Button type="text" icon={<ReloadOutlined spin={loading} />} onClick={load} style={{ color: '#fff' }} />
-            <Button type="text" icon={<SettingOutlined />} style={{ color: '#fff' }} />
+            <Button type="text" icon={<SettingOutlined />} onClick={() => navigate('/settings')} style={{ color: '#fff' }} />
             <Button type="text" icon={<LogoutOutlined />} onClick={logout} style={{ color: '#fff' }} />
           </Space>
         </div>

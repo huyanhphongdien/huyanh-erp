@@ -593,7 +593,7 @@ export default function WeighingPage() {
           <Col xs={24} lg={14}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               {/* Live Scale Display */}
-              {ticket && !isCompleted && (
+              {ticket && !isCompleted && canRecord && (
                 <Card size="small" style={{ borderRadius: 12 }}>
                   <div style={{ textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>
@@ -644,15 +644,17 @@ export default function WeighingPage() {
                       </div>
                     )}
 
-                    <Button
-                      type="primary" size="large" block
-                      icon={<ThunderboltOutlined />}
-                      onClick={handleRecordWeight}
-                      loading={loading}
-                      style={{ height: 48, background: '#D97706', borderColor: '#D97706', fontSize: 16 }}
-                    >
-                      {isWeighingGross ? 'GHI CÂN LẦN 1' : 'GHI CÂN LẦN 2'}
-                    </Button>
+                    {canRecord && (
+                      <Button
+                        type="primary" size="large" block
+                        icon={<ThunderboltOutlined />}
+                        onClick={handleRecordWeight}
+                        loading={loading}
+                        style={{ height: 48, background: '#D97706', borderColor: '#D97706', fontSize: 16 }}
+                      >
+                        {isWeighingGross ? 'GHI CÂN LẦN 1' : 'GHI CÂN LẦN 2'}
+                      </Button>
+                    )}
                   </div>
                 </Card>
               )}

@@ -182,6 +182,7 @@ import CapacityPlanningPage from './pages/projects/CapacityPlanningPage';
 // ============================================================
 // ★ B2B MODULE — Dashboard, Chat, Deals, Ledger, Settlements, Reports
 // ============================================================
+const TaskTemplateListPage = lazy(() => import('./pages/tasks/TaskTemplateListPage'));
 const B2BDashboardPage = lazy(() => import('./pages/b2b/B2BDashboardPage'));
 const B2BChatListPage = lazy(() => import('./pages/b2b/B2BChatListPage'));
 const B2BChatRoomPage = lazy(() => import('./pages/b2b/B2BChatRoomPage'));
@@ -431,6 +432,7 @@ function App() {
               <Route path="task-detail/:taskId" element={<TaskDetailPage />} />
               <Route path="my-tasks/:taskId" element={<TaskDetailPage />} />
               <Route path="reports/tasks" element={<TaskReportsPage />} />
+              <Route path="task-templates" element={<Suspense fallback={<LoadingSpinner />}><TaskTemplateListPage /></Suspense>} />
 
               {/* ===== PURCHASING MODULE ===== */}
               <Route path="purchasing">

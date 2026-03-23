@@ -36,3 +36,29 @@ SELECT jobid, schedule, command FROM cron.job WHERE jobname = 'task-daily-remind
 --   headers := '{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY", "Content-Type": "application/json"}'::jsonb,
 --   body := '{}'::jsonb
 -- );
+
+-- ============================================================================
+-- RECURRING TASK GENERATOR CRON — Chạy trước task-reminders (7:30 AM Vietnam)
+-- ============================================================================
+
+-- Recurring task generator — chạy lúc 7:30 AM Vietnam (0:30 UTC)
+SELECT cron.schedule(
+  'task-recurring-generator',
+  '30 0 * * *',
+  $$
+  SELECT net.http_post(
+    url := current_setting('app.settings.supabase_url') || '/functions/v1/task-recurring-generator',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key'),
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+
+-- Verify recurring generator job
+SELECT jobid, schedule, command FROM cron.job WHERE jobname = 'task-recurring-generator';
+
+-- Nếu muốn xóa job
+-- SELECT cron.unschedule('task-recurring-generator');

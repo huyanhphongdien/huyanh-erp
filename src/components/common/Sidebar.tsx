@@ -176,6 +176,7 @@ const getMenuGroups = (
         managerOnly: true,
         badge: pendingApprovals > 0 ? pendingApprovals : undefined,
       },
+      { path: '/task-templates', label: 'Mẫu công việc', icon: <FileText size={18} /> },
     ],
   },
   {

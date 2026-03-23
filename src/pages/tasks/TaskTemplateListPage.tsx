@@ -333,13 +333,13 @@ export default function TaskTemplateListPage() {
 
   const recurringColumns = [
     {
-      title: 'Ten',
+      title: 'Tên',
       dataIndex: 'name',
       key: 'name',
       render: (name: string) => <strong>{name}</strong>,
     },
     {
-      title: 'Mau',
+      title: 'Mẫu',
       dataIndex: 'template_id',
       key: 'template',
       render: (tid: string) => {

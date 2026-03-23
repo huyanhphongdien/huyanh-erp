@@ -348,7 +348,7 @@ export default function TaskTemplateListPage() {
             onClick={() => handleCreateTask(record.id)}
             style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
-            Tao task
+            Tạo việc
           </Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(record)} />
           <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xóa" cancelText="Hủy">

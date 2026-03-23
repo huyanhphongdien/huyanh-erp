@@ -46,6 +46,7 @@ export const TaskCreatePage: React.FC = () => {
 
   // ========== CHECK MODE ==========
   const isSelfMode = searchParams.get('mode') === 'self';
+  const templateIdFromUrl = searchParams.get('template_id');
 
   // ========== PERMISSION CHECK ==========
   const userLevel = user?.position_level || 6;
@@ -70,8 +71,15 @@ export const TaskCreatePage: React.FC = () => {
 
   // ========== LOAD TEMPLATES ==========
   useEffect(() => {
-    taskTemplateService.getAll(true).then(setTemplates).catch(() => {});
-  }, []);
+    taskTemplateService.getAll(true).then(data => {
+      setTemplates(data);
+      // Auto-select template from URL param
+      if (templateIdFromUrl && data.length > 0) {
+        const tmpl = data.find(t => t.id === templateIdFromUrl);
+        if (tmpl) handleSelectTemplate(tmpl);
+      }
+    }).catch(() => {});
+  }, [templateIdFromUrl]);
 
   // Handle template selection
   const handleSelectTemplate = (template: TaskTemplate) => {

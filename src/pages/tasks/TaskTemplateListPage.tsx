@@ -124,13 +124,17 @@ export default function TaskTemplateListPage() {
   // TEMPLATE ACTIONS
   // ============================================================
 
-  const handleCreateTask = async (templateId: string) => {
-    try {
-      const taskId = await taskTemplateService.createTaskFromTemplate(templateId)
-      message.success('Đã tạo công việc từ mẫu!')
-      navigate(`/tasks/${taskId}`)
-    } catch (err: any) {
-      message.error('Lỗi tạo task: ' + err.message)
+  const handleCreateTask = (templateId: string) => {
+    const level = user?.position_level || 7
+    const isAdmin = user?.role === 'admin'
+    const isBGD = isAdmin || level <= 2
+
+    if (level >= 5 && !isBGD) {
+      // Nhân viên → tự giao cho mình, navigate với mode=self
+      navigate(`/tasks/create?mode=self&template_id=${templateId}`)
+    } else {
+      // Trưởng phòng / BGĐ → navigate form giao việc với template
+      navigate(`/tasks/create?template_id=${templateId}`)
     }
   }
 

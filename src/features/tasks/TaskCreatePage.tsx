@@ -343,8 +343,8 @@ export const TaskCreatePage: React.FC = () => {
         </div>
       )}
 
-      {/* Template Selector */}
-      {!isSelfMode && templates.length > 0 && (
+      {/* Template Selector — hiện cả giao việc lẫn tự giao */}
+      {templates.length > 0 && (
         <div className="mb-4 sm:mb-6">
           {selectedTemplate ? (
             <div className="p-3 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-lg">

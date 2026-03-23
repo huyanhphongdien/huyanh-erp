@@ -548,7 +548,9 @@ export const settlementService = {
             credit: 0,
             reference_type: 'settlement',
             reference_id: id,
-            entry_date: new Date().toISOString(),
+            entry_date: new Date().toISOString().split('T')[0],
+            period_month: new Date().getMonth() + 1,
+            period_year: new Date().getFullYear(),
           })
       } catch (err) {
         console.error('Ghi ledger debit khi approve settlement thất bại:', err)
@@ -623,8 +625,8 @@ export const settlementService = {
     // Ghi bút toán công nợ: CREDIT (thanh toán cho đại lý, trừ nợ)
     if (current.partner_id) {
       try {
-        const balanceDue = (current.gross_amount || 0) - (current.total_advance || 0)
-        const paymentAmount = balanceDue > 0 ? balanceDue : 0
+        const creditAmount = current.remaining_amount || ((current.gross_amount || 0) - (current.total_advance || 0))
+        const paymentAmount = creditAmount > 0 ? creditAmount : 0
         if (paymentAmount > 0) {
           await supabase
             .from('b2b_partner_ledger')
@@ -636,7 +638,9 @@ export const settlementService = {
               credit: paymentAmount,
               reference_type: 'settlement',
               reference_id: id,
-              entry_date: new Date().toISOString(),
+              entry_date: new Date().toISOString().split('T')[0],
+              period_month: new Date().getMonth() + 1,
+              period_year: new Date().getFullYear(),
             })
         }
       } catch (err) {
@@ -668,6 +672,12 @@ export const settlementService = {
   },
 
   async cancelSettlement(id: string): Promise<Settlement> {
+    // Check current status
+    const { data: current } = await supabase.from('b2b_settlements').select('status').eq('id', id).single()
+    if (!current) throw new Error('Không tìm thấy phiếu quyết toán')
+    if (current.status === 'paid') throw new Error('Không thể hủy phiếu đã thanh toán')
+    if (current.status === 'cancelled') throw new Error('Phiếu đã bị hủy trước đó')
+
     const { data, error } = await supabase
       .from('b2b_settlements')
       .update({

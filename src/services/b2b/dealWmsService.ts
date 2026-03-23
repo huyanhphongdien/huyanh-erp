@@ -335,14 +335,20 @@ export const dealWmsService = {
     // 4. Tính final_value
     const { data: deal } = await supabase
       .from('b2b_deals')
-      .select('unit_price, quantity_kg')
+      .select('unit_price, quantity_kg, price_unit')
       .eq('id', dealId)
       .single()
 
     let finalValue: number | null = null
     if (deal && avgDrc && actualWeight > 0) {
-      // Giá trị thực = trọng lượng thực × DRC thực × đơn giá
-      finalValue = Math.round(actualWeight * (avgDrc / 100) * (deal.unit_price || 0))
+      const priceUnit = (deal as any).price_unit || 'wet'
+      if (priceUnit === 'dry') {
+        // Giá khô: weight × DRC/100 × price
+        finalValue = Math.round(actualWeight * (avgDrc / 100) * (deal.unit_price || 0))
+      } else {
+        // Giá ướt: weight × price (DRC chỉ dùng tham khảo)
+        finalValue = Math.round(actualWeight * (deal.unit_price || 0))
+      }
     }
 
     // 5. Tổng hợp QC status
@@ -356,7 +362,7 @@ export const dealWmsService = {
       .from('b2b_deals')
       .update({
         actual_drc: avgDrc,
-        actual_weight_kg: actualWeight,
+        // actual_weight_kg: removed — only updateDealStockInTotals writes this
         final_value: finalValue,
         qc_status: qcStatus,
         updated_at: new Date().toISOString(),

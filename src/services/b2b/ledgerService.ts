@@ -294,6 +294,8 @@ export const ledgerService = {
    */
   async createManualEntry(entryData: LedgerCreateData): Promise<LedgerEntry> {
     const now = new Date()
+    const entryDateStr = entryData.entry_date || now.toISOString().split('T')[0]
+    const entryDate = new Date(entryDateStr)
 
     const { data, error } = await supabase
       .from('b2b_partner_ledger')
@@ -304,9 +306,9 @@ export const ledgerService = {
         credit: entryData.credit || 0,
         reference_code: entryData.reference_code,
         description: entryData.description,
-        entry_date: entryData.entry_date || now.toISOString().split('T')[0],
-        period_month: now.getMonth() + 1,
-        period_year: now.getFullYear(),
+        entry_date: entryDateStr,
+        period_month: entryDate.getMonth() + 1,
+        period_year: entryDate.getFullYear(),
         created_by: entryData.created_by,
       })
       .select(`

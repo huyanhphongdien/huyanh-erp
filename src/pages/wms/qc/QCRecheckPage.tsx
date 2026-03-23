@@ -89,8 +89,8 @@ const QCRecheckPage = () => {
             .from('stock_in_orders').select('deal_id').eq('id', detail.stock_in_id).maybeSingle()
           if (stockIn?.deal_id) {
             const drcResult = await dealWmsService.updateDealActualDrc(stockIn.deal_id)
-            if (drcResult) {
-              await dealWmsService.notifyDealChatQcUpdate(stockIn.deal_id, drcResult.actual_drc || 0, drcResult.qc_status)
+            if (drcResult && drcResult.actual_drc != null) {
+              await dealWmsService.notifyDealChatQcUpdate(stockIn.deal_id, drcResult.actual_drc, drcResult.qc_status)
             }
           }
         }

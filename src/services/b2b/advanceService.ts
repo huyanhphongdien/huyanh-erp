@@ -327,6 +327,13 @@ export const advanceService = {
   // ============================================
 
   async approveAdvance(id: string, approvedBy: string): Promise<Advance> {
+    // Validate current status
+    const current = await this.getAdvanceById(id)
+    if (!current) throw new Error('Phiếu tạm ứng không tồn tại')
+    if (current.status !== 'pending') {
+      throw new Error('Chỉ có thể duyệt phiếu tạm ứng ở trạng thái "Chờ duyệt"')
+    }
+
     const { data, error } = await supabase
       .from('b2b_advances')
       .update({
@@ -344,6 +351,13 @@ export const advanceService = {
   },
 
   async markPaid(id: string, paidBy: string, bankReference?: string): Promise<Advance> {
+    // Validate current status
+    const current = await this.getAdvanceById(id)
+    if (!current) throw new Error('Phiếu tạm ứng không tồn tại')
+    if (current.status !== 'approved') {
+      throw new Error('Chỉ có thể chi phiếu tạm ứng ở trạng thái "Đã duyệt"')
+    }
+
     const { data, error } = await supabase
       .from('b2b_advances')
       .update({
@@ -358,6 +372,27 @@ export const advanceService = {
       .single()
 
     if (error) throw error
+
+    // Create ledger entry
+    try {
+      const advance = data as Advance
+      if (advance?.deal_id && advance?.partner_id) {
+        const amount = advance.amount_vnd || advance.amount || 0
+        await supabase.from('b2b_partner_ledger').insert({
+          partner_id: advance.partner_id,
+          entry_type: 'advance',
+          reference_type: 'advance',
+          reference_id: id,
+          description: `Tạm ứng ${advance.advance_number} cho Deal`,
+          debit: 0,
+          credit: amount,
+          entry_date: new Date().toISOString().split('T')[0],
+          period_month: new Date().getMonth() + 1,
+          period_year: new Date().getFullYear(),
+        })
+      }
+    } catch (err) { console.error('Ledger entry for advance failed:', err) }
+
     return data as Advance
   },
 

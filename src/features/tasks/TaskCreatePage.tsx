@@ -457,6 +457,7 @@ export const TaskCreatePage: React.FC = () => {
         </div>
       ) : (
         <TaskForm
+          key={selectedTemplate?.id || 'no-template'}
           mode="create"
           onSubmit={handleSubmit}
           onCancel={handleCancel}

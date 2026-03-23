@@ -73,11 +73,26 @@ export default function SettingsPage() {
         const parsed = JSON.parse(saved)
         return DEFAULT_CAMERAS.map(def => {
           const found = parsed.find((p: any) => p.key === def.key)
-          return found ? { ...def, config: { ...def, ...found.config } } : { ...def, config: def }
+          const cfg = found?.config || {}
+          return {
+            key: def.key,
+            label: def.label,
+            config: {
+              ip: cfg.ip || '',
+              port: cfg.port || '80',
+              username: cfg.username || 'admin',
+              password: cfg.password || '',
+              channel: cfg.channel || 1,
+            }
+          }
         })
       }
     } catch {}
-    return DEFAULT_CAMERAS.map(c => ({ ...c, config: c }))
+    return DEFAULT_CAMERAS.map(c => ({
+      key: c.key,
+      label: c.label,
+      config: { ip: c.ip, port: c.port, username: c.username, password: c.password, channel: c.channel }
+    }))
   })
 
   // ── Print config ──

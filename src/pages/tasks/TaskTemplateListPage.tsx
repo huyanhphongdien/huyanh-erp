@@ -2,7 +2,7 @@
 // TASK TEMPLATE LIST PAGE
 // File: src/pages/tasks/TaskTemplateListPage.tsx
 // ============================================================
-// 2 Tabs: Mẫu công việc (Templates) + Lich tu dong (Recurring)
+// 2 Tabs: Mẫu công việc (Templates) + Lịch tự động (Recurring)
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react'
@@ -59,7 +59,7 @@ export default function TaskTemplateListPage() {
       const data = await taskTemplateService.getAll(false)
       setTemplates(data)
     } catch (err: any) {
-      message.error('Loi tai danh sach mau: ' + err.message)
+      message.error('Lỗi tải danh sách mẫu: ' + err.message)
     } finally {
       setLoadingTemplates(false)
     }
@@ -71,7 +71,7 @@ export default function TaskTemplateListPage() {
       const data = await taskRecurringService.getAll()
       setRecurringRules(data)
     } catch (err: any) {
-      message.error('Loi tai lich tu dong: ' + err.message)
+      message.error('Lỗi tải lịch tự động: ' + err.message)
     } finally {
       setLoadingRules(false)
     }
@@ -103,10 +103,10 @@ export default function TaskTemplateListPage() {
   const handleCreateTask = async (templateId: string) => {
     try {
       const taskId = await taskTemplateService.createTaskFromTemplate(templateId)
-      message.success('Da tao cong viec tu mau!')
+      message.success('Đã tạo công việc từ mẫu!')
       navigate(`/tasks/${taskId}`)
     } catch (err: any) {
-      message.error('Loi tao task: ' + err.message)
+      message.error('Lỗi tạo task: ' + err.message)
     }
   }
 
@@ -147,10 +147,10 @@ export default function TaskTemplateListPage() {
 
       if (editingTemplate) {
         await taskTemplateService.update(editingTemplate.id, payload)
-        message.success('Da cap nhat mau!')
+        message.success('Đã cập nhật mẫu!')
       } else {
         await taskTemplateService.create(payload)
-        message.success('Da tao mau moi!')
+        message.success('Đã tạo mẫu mới!')
       }
 
       setTemplateModalOpen(false)
@@ -159,7 +159,7 @@ export default function TaskTemplateListPage() {
       loadTemplates()
     } catch (err: any) {
       if (err.errorFields) return
-      message.error('Loi luu mau: ' + err.message)
+      message.error('Lỗi lưu mẫu: ' + err.message)
     }
   }
 
@@ -169,7 +169,7 @@ export default function TaskTemplateListPage() {
       message.success('Đã xóa mẫu!')
       loadTemplates()
     } catch (err: any) {
-      message.error('Loi xoa: ' + err.message)
+      message.error('Lỗi xóa: ' + err.message)
     }
   }
 
@@ -209,10 +209,10 @@ export default function TaskTemplateListPage() {
 
       if (editingRule) {
         await taskRecurringService.update(editingRule.id, payload)
-        message.success('Da cap nhat lich!')
+        message.success('Đã cập nhật lịch!')
       } else {
         await taskRecurringService.create(payload)
-        message.success('Da tao lich moi!')
+        message.success('Đã tạo lịch mới!')
       }
 
       setRecurringModalOpen(false)
@@ -221,7 +221,7 @@ export default function TaskTemplateListPage() {
       loadRecurringRules()
     } catch (err: any) {
       if (err.errorFields) return
-      message.error('Loi luu lich: ' + err.message)
+      message.error('Lỗi lưu lịch: ' + err.message)
     }
   }
 
@@ -231,7 +231,7 @@ export default function TaskTemplateListPage() {
       message.success(rule.is_active ? 'Đã tắt lịch' : 'Đã bật lịch')
       loadRecurringRules()
     } catch (err: any) {
-      message.error('Loi cap nhat: ' + err.message)
+      message.error('Lỗi cập nhật: ' + err.message)
     }
   }
 
@@ -241,7 +241,7 @@ export default function TaskTemplateListPage() {
       message.success('Đã xóa lịch!')
       loadRecurringRules()
     } catch (err: any) {
-      message.error('Loi xoa: ' + err.message)
+      message.error('Lỗi xóa: ' + err.message)
     }
   }
 
@@ -323,7 +323,7 @@ export default function TaskTemplateListPage() {
             Tao task
           </Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(record)} />
-          <Popconfirm title="Xoa mau nay?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xóa" cancelText="Hủy">
+          <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xóa" cancelText="Hủy">
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -415,7 +415,7 @@ export default function TaskTemplateListPage() {
   return (
     <div style={{ padding: 24 }}>
       <Title level={3} style={{ color: '#1B4D3E', marginBottom: 24 }}>
-        Mẫu công việc & Lich tu dong
+        Mẫu công việc & Lịch tự động
       </Title>
 
       <Card>
@@ -431,7 +431,7 @@ export default function TaskTemplateListPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                     <Select
                       allowClear
-                      placeholder="Loc theo danh muc"
+                      placeholder="Lọc theo danh mục"
                       style={{ width: 220 }}
                       value={categoryFilter}
                       onChange={setCategoryFilter}
@@ -462,7 +462,7 @@ export default function TaskTemplateListPage() {
             },
             {
               key: 'recurring',
-              label: 'Lich tu dong',
+              label: 'Lịch tự động',
               children: (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
@@ -492,7 +492,7 @@ export default function TaskTemplateListPage() {
 
       {/* ── Create/Edit Template Modal ── */}
       <Modal
-        title={editingTemplate ? 'Sua mau cong viec' : 'Tao mau cong viec moi'}
+        title={editingTemplate ? 'Sửa mẫu công việc' : 'Tạo mẫu công việc mới'}
         open={templateModalOpen}
         onOk={handleSaveTemplate}
         onCancel={() => {
@@ -557,7 +557,7 @@ export default function TaskTemplateListPage() {
                       {...rest}
                       name={name}
                       style={{ flex: 1, marginBottom: 0 }}
-                      rules={[{ required: true, message: 'Nhap noi dung' }]}
+                      rules={[{ required: true, message: 'Nhập nội dung' }]}
                     >
                       <Input placeholder="Noi dung checklist" />
                     </Form.Item>
@@ -570,7 +570,7 @@ export default function TaskTemplateListPage() {
                   </div>
                 ))}
                 <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                  Them muc checklist
+                  Thêm mục checklist
                 </Button>
               </>
             )}
@@ -580,7 +580,7 @@ export default function TaskTemplateListPage() {
 
       {/* ── Create/Edit Recurring Modal ── */}
       <Modal
-        title={editingRule ? 'Sua lich tu dong' : 'Tao lich tu dong moi'}
+        title={editingRule ? 'Sửa lịch tự động' : 'Tạo lịch tự động mới'}
         open={recurringModalOpen}
         onOk={handleSaveRecurring}
         onCancel={() => {
@@ -663,7 +663,7 @@ export default function TaskTemplateListPage() {
           <Form.Item name="assignee_id" label="Người được giao">
             <Select
               allowClear
-              placeholder="Chon nhan vien"
+              placeholder="Chọn nhân viên"
               showSearch
               optionFilterProp="label"
               options={employees.map(e => ({ value: e.id, label: e.full_name }))}

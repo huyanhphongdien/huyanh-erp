@@ -12,11 +12,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, User, AlertCircle, Shield } from 'lucide-react';
+import { ArrowLeft, CheckCircle, User, AlertCircle, Shield, FileText, Sparkles, Plus, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { TaskForm, type TaskFormData } from './components/TaskForm';
 import { isExecutive, isManagerLevel, isEmployeeLevel } from './utils/taskPermissions';
+import { taskTemplateService, TaskTemplate, TEMPLATE_CATEGORIES } from '../../services/taskTemplateService';
+import { taskChecklistService } from '../../services/taskChecklistService';
 
 // ============================================================================
 // TYPES
@@ -59,6 +61,41 @@ export const TaskCreatePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Template & Checklist state
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
+  const [checklistItems, setChecklistItems] = useState<string[]>([]);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+
+  // ========== LOAD TEMPLATES ==========
+  useEffect(() => {
+    taskTemplateService.getAll(true).then(setTemplates).catch(() => {});
+  }, []);
+
+  // Handle template selection
+  const handleSelectTemplate = (template: TaskTemplate) => {
+    setSelectedTemplate(template);
+    const items = typeof template.checklist_items === 'string'
+      ? JSON.parse(template.checklist_items)
+      : template.checklist_items;
+    setChecklistItems((items || []).map((i: any) => i.title));
+  };
+
+  const handleClearTemplate = () => {
+    setSelectedTemplate(null);
+    setChecklistItems([]);
+  };
+
+  const handleAddChecklistItem = () => {
+    if (!newChecklistItem.trim()) return;
+    setChecklistItems(prev => [...prev, newChecklistItem.trim()]);
+    setNewChecklistItem('');
+  };
+
+  const handleRemoveChecklistItem = (index: number) => {
+    setChecklistItems(prev => prev.filter((_, i) => i !== index));
+  };
 
   // ========== LOAD DATA WITH PERMISSION FILTERING ==========
   useEffect(() => {
@@ -131,22 +168,32 @@ export const TaskCreatePage: React.FC = () => {
 
   // ========== INITIAL VALUES FOR FORM ==========
   const initialFormData = useMemo(() => {
+    const base: Record<string, any> = {};
+
     if (isSelfMode && user) {
-      return {
-        department_id: user.department_id || '',
-        assignee_id: user.employee_id || '',
-      };
+      base.department_id = user.department_id || '';
+      base.assignee_id = user.employee_id || '';
+    } else if (isUserManager && user?.department_id) {
+      base.department_id = user.department_id;
+      base.assignee_id = '';
     }
-    
-    if (isUserManager && user?.department_id) {
-      return {
-        department_id: user.department_id,
-        assignee_id: '',
-      };
+
+    // Fill from selected template
+    if (selectedTemplate) {
+      base.name = selectedTemplate.name;
+      base.description = selectedTemplate.description || '';
+      base.priority = selectedTemplate.default_priority || 'medium';
+      if (selectedTemplate.default_duration_days) {
+        const due = new Date(Date.now() + selectedTemplate.default_duration_days * 86400000);
+        base.due_date = due.toISOString().split('T')[0];
+      }
+      if (selectedTemplate.department_id && !base.department_id) {
+        base.department_id = selectedTemplate.department_id;
+      }
     }
-    
-    return undefined;
-  }, [isSelfMode, isUserManager, user]);
+
+    return Object.keys(base).length > 0 ? base : undefined;
+  }, [isSelfMode, isUserManager, user, selectedTemplate]);
 
   const isDepartmentLocked = isUserManager && !isAdmin && !isUserExecutive;
 
@@ -194,6 +241,15 @@ export const TaskCreatePage: React.FC = () => {
       if (insertError) {
         console.error('❌ Create error:', insertError);
         throw new Error(insertError.message);
+      }
+
+      // Create checklist items if any
+      if (checklistItems.length > 0) {
+        try {
+          await taskChecklistService.createBulk(data.id, checklistItems);
+        } catch (err) {
+          console.error('Checklist creation error:', err);
+        }
       }
 
       setSuccess(true);
@@ -283,6 +339,104 @@ export const TaskCreatePage: React.FC = () => {
                 Bạn chỉ có thể phân công công việc cho nhân viên trong phòng <strong>{user.department_name}</strong>
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template Selector */}
+      {!isSelfMode && templates.length > 0 && (
+        <div className="mb-4 sm:mb-6">
+          {selectedTemplate ? (
+            <div className="p-3 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-semibold text-emerald-800">
+                    Đang dùng mẫu: {selectedTemplate.name}
+                  </span>
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-700">
+                    {(TEMPLATE_CATEGORIES as any)[selectedTemplate.category]?.label || selectedTemplate.category}
+                  </span>
+                </div>
+                <button
+                  onClick={handleClearTemplate}
+                  className="text-emerald-500 hover:text-emerald-700 p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-emerald-600">
+                Đã điền sẵn: tên, mô tả, ưu tiên, thời gian{checklistItems.length > 0 ? `, ${checklistItems.length} bước checklist` : ''}. Bạn có thể chỉnh sửa bên dưới.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-800">Tạo nhanh từ mẫu</span>
+                <span className="text-xs text-blue-500">(tùy chọn)</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {templates.slice(0, 8).map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleSelectTemplate(t)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium bg-white border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                  >
+                    <span>{t.name}</span>
+                    {(typeof t.checklist_items === 'string' ? JSON.parse(t.checklist_items) : t.checklist_items)?.length > 0 && (
+                      <span className="text-[10px] text-blue-400">
+                        ({(typeof t.checklist_items === 'string' ? JSON.parse(t.checklist_items) : t.checklist_items).length} bước)
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Checklist Editor */}
+      {(checklistItems.length > 0 || selectedTemplate) && (
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-semibold text-gray-700">Checklist ({checklistItems.length} bước)</span>
+            </div>
+          </div>
+          <div className="space-y-1.5 mb-3">
+            {checklistItems.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+                <span className="text-xs text-gray-400 w-5">{idx + 1}.</span>
+                <span className="text-sm text-gray-700 flex-1">{item}</span>
+                <button
+                  onClick={() => handleRemoveChecklistItem(idx)}
+                  className="text-gray-400 hover:text-red-500 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newChecklistItem}
+              onChange={e => setNewChecklistItem(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddChecklistItem(); } }}
+              placeholder="Thêm bước mới..."
+              className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+            />
+            <button
+              onClick={handleAddChecklistItem}
+              disabled={!newChecklistItem.trim()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Thêm
+            </button>
           </div>
         </div>
       )}

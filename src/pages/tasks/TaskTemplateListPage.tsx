@@ -2,7 +2,7 @@
 // TASK TEMPLATE LIST PAGE
 // File: src/pages/tasks/TaskTemplateListPage.tsx
 // ============================================================
-// 2 Tabs: Mau cong viec (Templates) + Lich tu dong (Recurring)
+// 2 Tabs: Mẫu công việc (Templates) + Lich tu dong (Recurring)
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react'
@@ -166,7 +166,7 @@ export default function TaskTemplateListPage() {
   const handleDeleteTemplate = async (id: string) => {
     try {
       await taskTemplateService.delete(id)
-      message.success('Da xoa mau!')
+      message.success('Đã xóa mẫu!')
       loadTemplates()
     } catch (err: any) {
       message.error('Loi xoa: ' + err.message)
@@ -228,7 +228,7 @@ export default function TaskTemplateListPage() {
   const handleToggleActive = async (rule: RecurringRule) => {
     try {
       await taskRecurringService.toggleActive(rule.id, !rule.is_active)
-      message.success(rule.is_active ? 'Da tat lich' : 'Da bat lich')
+      message.success(rule.is_active ? 'Đã tắt lịch' : 'Đã bật lịch')
       loadRecurringRules()
     } catch (err: any) {
       message.error('Loi cap nhat: ' + err.message)
@@ -238,7 +238,7 @@ export default function TaskTemplateListPage() {
   const handleDeleteRule = async (id: string) => {
     try {
       await taskRecurringService.delete(id)
-      message.success('Da xoa lich!')
+      message.success('Đã xóa lịch!')
       loadRecurringRules()
     } catch (err: any) {
       message.error('Loi xoa: ' + err.message)
@@ -259,13 +259,13 @@ export default function TaskTemplateListPage() {
 
   const templateColumns = [
     {
-      title: 'Ten mau',
+      title: 'Tên mẫu',
       dataIndex: 'name',
       key: 'name',
       render: (name: string) => <strong>{name}</strong>,
     },
     {
-      title: 'Danh muc',
+      title: 'Danh mục',
       dataIndex: 'category',
       key: 'category',
       width: 140,
@@ -275,23 +275,23 @@ export default function TaskTemplateListPage() {
       },
     },
     {
-      title: 'Uu tien',
+      title: 'Ưu tiên',
       dataIndex: 'default_priority',
       key: 'priority',
       width: 100,
       render: (p: string) => {
         const map: Record<string, { color: string; label: string }> = {
-          urgent: { color: 'red', label: 'Khan cap' },
+          urgent: { color: 'red', label: 'Khẩn cấp' },
           high: { color: 'orange', label: 'Cao' },
-          medium: { color: 'blue', label: 'Trung binh' },
-          low: { color: 'default', label: 'Thap' },
+          medium: { color: 'blue', label: 'Trung bình' },
+          low: { color: 'default', label: 'Thấp' },
         }
         const cfg = map[p] || { color: 'default', label: p }
         return <Tag color={cfg.color}>{cfg.label}</Tag>
       },
     },
     {
-      title: 'Thoi gian',
+      title: 'Thời gian',
       dataIndex: 'default_duration_days',
       key: 'duration',
       width: 100,
@@ -308,7 +308,7 @@ export default function TaskTemplateListPage() {
       },
     },
     {
-      title: 'Thao tac',
+      title: 'Thao tác',
       key: 'actions',
       width: 200,
       render: (_: any, record: TaskTemplate) => (
@@ -323,7 +323,7 @@ export default function TaskTemplateListPage() {
             Tao task
           </Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(record)} />
-          <Popconfirm title="Xoa mau nay?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xoa" cancelText="Huy">
+          <Popconfirm title="Xoa mau nay?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xóa" cancelText="Hủy">
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -348,7 +348,7 @@ export default function TaskTemplateListPage() {
       },
     },
     {
-      title: 'Tan suat',
+      title: 'Tần suất',
       dataIndex: 'frequency',
       key: 'frequency',
       width: 140,
@@ -364,21 +364,21 @@ export default function TaskTemplateListPage() {
       },
     },
     {
-      title: 'Lan cuoi tao',
+      title: 'Lần cuối tạo',
       dataIndex: 'last_run_at',
       key: 'last_run',
       width: 150,
       render: (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—',
     },
     {
-      title: 'Lan tiep theo',
+      title: 'Lần tiếp theo',
       dataIndex: 'next_run_at',
       key: 'next_run',
       width: 150,
       render: (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—',
     },
     {
-      title: 'Trang thai',
+      title: 'Trạng thái',
       dataIndex: 'is_active',
       key: 'active',
       width: 100,
@@ -386,19 +386,19 @@ export default function TaskTemplateListPage() {
         <Switch
           checked={active}
           onChange={() => handleToggleActive(record)}
-          checkedChildren="Bat"
-          unCheckedChildren="Tat"
+          checkedChildren="Bật"
+          unCheckedChildren="Tắt"
         />
       ),
     },
     {
-      title: 'Thao tac',
+      title: 'Thao tác',
       key: 'actions',
       width: 120,
       render: (_: any, record: RecurringRule) => (
         <Space size="small">
           <Button size="small" icon={<EditOutlined />} onClick={() => openRecurringModal(record)} />
-          <Popconfirm title="Xoa lich nay?" onConfirm={() => handleDeleteRule(record.id)} okText="Xoa" cancelText="Huy">
+          <Popconfirm title="Xóa lịch này?" onConfirm={() => handleDeleteRule(record.id)} okText="Xóa" cancelText="Hủy">
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -415,7 +415,7 @@ export default function TaskTemplateListPage() {
   return (
     <div style={{ padding: 24 }}>
       <Title level={3} style={{ color: '#1B4D3E', marginBottom: 24 }}>
-        Mau cong viec & Lich tu dong
+        Mẫu công việc & Lich tu dong
       </Title>
 
       <Card>
@@ -425,7 +425,7 @@ export default function TaskTemplateListPage() {
           items={[
             {
               key: 'templates',
-              label: 'Mau cong viec',
+              label: 'Mẫu công việc',
               children: (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -446,7 +446,7 @@ export default function TaskTemplateListPage() {
                       onClick={() => openTemplateModal()}
                       style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                     >
-                      Tao mau moi
+                      Tạo mẫu mới
                     </Button>
                   </div>
                   <Table
@@ -472,7 +472,7 @@ export default function TaskTemplateListPage() {
                       onClick={() => openRecurringModal()}
                       style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                     >
-                      Tao lich moi
+                      Tạo lịch mới
                     </Button>
                   </div>
                   <Table
@@ -501,7 +501,7 @@ export default function TaskTemplateListPage() {
           templateForm.resetFields()
         }}
         okText="Luu"
-        cancelText="Huy"
+        cancelText="Hủy"
         okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
         width={600}
         destroyOnClose
@@ -509,18 +509,18 @@ export default function TaskTemplateListPage() {
         <Form form={templateForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="name"
-            label="Ten mau"
-            rules={[{ required: true, message: 'Vui long nhap ten mau' }]}
+            label="Tên mẫu"
+            rules={[{ required: true, message: 'Vui lòng nhập tên mẫu' }]}
           >
-            <Input placeholder="VD: Kiem tra thiet bi hang tuan" />
+            <Input placeholder="VD: Kiểm tra thiết bị hàng tuần" />
           </Form.Item>
 
-          <Form.Item name="description" label="Mo ta">
-            <Input.TextArea rows={3} placeholder="Mo ta chi tiet mau cong viec" />
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea rows={3} placeholder="Mô tả chi tiết mẫu công việc" />
           </Form.Item>
 
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item name="category" label="Danh muc" style={{ flex: 1 }} initialValue="general">
+            <Form.Item name="category" label="Danh mục" style={{ flex: 1 }} initialValue="general">
               <Select
                 options={Object.entries(TEMPLATE_CATEGORIES).map(([k, v]) => ({
                   value: k,
@@ -529,18 +529,18 @@ export default function TaskTemplateListPage() {
               />
             </Form.Item>
 
-            <Form.Item name="default_priority" label="Uu tien" style={{ flex: 1 }} initialValue="medium">
+            <Form.Item name="default_priority" label="Ưu tiên" style={{ flex: 1 }} initialValue="medium">
               <Select
                 options={[
-                  { value: 'urgent', label: 'Khan cap' },
+                  { value: 'urgent', label: 'Khẩn cấp' },
                   { value: 'high', label: 'Cao' },
-                  { value: 'medium', label: 'Trung binh' },
-                  { value: 'low', label: 'Thap' },
+                  { value: 'medium', label: 'Trung bình' },
+                  { value: 'low', label: 'Thấp' },
                 ]}
               />
             </Form.Item>
 
-            <Form.Item name="default_duration_days" label="Thoi gian (ngay)" style={{ flex: 1 }} initialValue={3}>
+            <Form.Item name="default_duration_days" label="Thời gian (ngày)" style={{ flex: 1 }} initialValue={3}>
               <InputNumber min={1} max={365} style={{ width: '100%' }} />
             </Form.Item>
           </div>
@@ -589,7 +589,7 @@ export default function TaskTemplateListPage() {
           recurringForm.resetFields()
         }}
         okText="Luu"
-        cancelText="Huy"
+        cancelText="Hủy"
         okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
         width={520}
         destroyOnClose
@@ -597,19 +597,19 @@ export default function TaskTemplateListPage() {
         <Form form={recurringForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="name"
-            label="Ten lich"
-            rules={[{ required: true, message: 'Vui long nhap ten' }]}
+            label="Tên lịch"
+            rules={[{ required: true, message: 'Vui lòng nhập tên' }]}
           >
-            <Input placeholder="VD: Kiem tra thiet bi moi thu Hai" />
+            <Input placeholder="VD: Kiểm tra thiết bị mỗi thứ Hai" />
           </Form.Item>
 
           <Form.Item
             name="template_id"
-            label="Mau cong viec"
-            rules={[{ required: true, message: 'Vui long chon mau' }]}
+            label="Mẫu công việc"
+            rules={[{ required: true, message: 'Vui lòng chọn mẫu' }]}
           >
             <Select
-              placeholder="Chon mau"
+              placeholder="Chọn mẫu"
               showSearch
               optionFilterProp="label"
               options={templates
@@ -620,16 +620,16 @@ export default function TaskTemplateListPage() {
 
           <Form.Item
             name="frequency"
-            label="Tan suat"
-            rules={[{ required: true, message: 'Vui long chon tan suat' }]}
+            label="Tần suất"
+            rules={[{ required: true, message: 'Vui lòng chọn tần suất' }]}
           >
             <Select
-              placeholder="Chon tan suat"
+              placeholder="Chọn tần suất"
               options={[
-                { value: 'daily', label: 'Hang ngay' },
-                { value: 'weekly', label: 'Hang tuan' },
-                { value: 'biweekly', label: 'Hai tuan / lan' },
-                { value: 'monthly', label: 'Hang thang' },
+                { value: 'daily', label: 'Hàng ngày' },
+                { value: 'weekly', label: 'Hàng tuần' },
+                { value: 'biweekly', label: 'Hai tuần / lần' },
+                { value: 'monthly', label: 'Hàng tháng' },
               ]}
             />
           </Form.Item>
@@ -637,11 +637,11 @@ export default function TaskTemplateListPage() {
           {(frequencyValue === 'weekly' || frequencyValue === 'biweekly') && (
             <Form.Item
               name="day_of_week"
-              label="Ngay trong tuan"
-              rules={[{ required: true, message: 'Chon ngay' }]}
+              label="Ngày trong tuần"
+              rules={[{ required: true, message: 'Chọn ngày' }]}
             >
               <Select
-                placeholder="Chon ngay"
+                placeholder="Chọn ngày"
                 options={Object.entries(DAY_LABELS).map(([k, v]) => ({
                   value: Number(k),
                   label: v,
@@ -653,14 +653,14 @@ export default function TaskTemplateListPage() {
           {frequencyValue === 'monthly' && (
             <Form.Item
               name="day_of_month"
-              label="Ngay trong thang"
-              rules={[{ required: true, message: 'Nhap ngay' }]}
+              label="Ngày trong tháng"
+              rules={[{ required: true, message: 'Nhập ngày' }]}
             >
               <InputNumber min={1} max={28} style={{ width: '100%' }} placeholder="1 - 28" />
             </Form.Item>
           )}
 
-          <Form.Item name="assignee_id" label="Nguoi duoc giao">
+          <Form.Item name="assignee_id" label="Người được giao">
             <Select
               allowClear
               placeholder="Chon nhan vien"

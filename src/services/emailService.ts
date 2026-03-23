@@ -19,7 +19,10 @@ export type EmailNotificationType =
   | 'revision_requested'
   | 'evaluation_received'
   | 'deadline_reminder'
-  | 'project_issue_assigned';
+  | 'project_issue_assigned'
+  | 'task_overdue_escalation'
+  | 'self_eval_reminder'
+  | 'approval_reminder';
 
 export type EmailStatus = 'pending' | 'sent' | 'failed';
 
@@ -271,6 +274,69 @@ const EMAIL_TEMPLATES: Record<EmailNotificationType, {
         <p>Vui lòng hoàn thành công việc trước thời hạn.</p>
         <a href="${APP_URL}/tasks/${data.task_id}" style="display: inline-block; background-color: #DC2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
           Xem công việc
+        </a>
+      </div>
+    `,
+  },
+
+  // Công việc quá hạn — escalate cho manager
+  task_overdue_escalation: {
+    subject: (data) => `[Huy Anh ERP] 🔴 Quá hạn: ${data.task_name}`,
+    content: (data) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">🔴 Công việc đã quá hạn!</h2>
+        <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #dc2626;">
+          <p><strong>Mã công việc:</strong> ${data.task_code}</p>
+          <p><strong>Tên công việc:</strong> ${data.task_name}</p>
+          <p><strong>Người thực hiện:</strong> ${data.assignee_name || 'Chưa gán'}</p>
+          <p><strong>Hạn hoàn thành:</strong> <span style="color: #dc2626; font-weight: bold;">${new Date(data.due_date).toLocaleDateString('vi-VN')}</span></p>
+          <p><strong>Quá hạn:</strong> <span style="font-size: 18px; font-weight: bold; color: #dc2626;">${data.days_overdue} ngày</span></p>
+          <p><strong>Tiến độ:</strong> ${data.progress || 0}%</p>
+        </div>
+        <p>Công việc này đã vượt quá thời hạn. Vui lòng kiểm tra và xử lý.</p>
+        <a href="${APP_URL}/tasks/${data.task_id}" style="display: inline-block; background-color: #DC2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+          Xem công việc
+        </a>
+      </div>
+    `,
+  },
+
+  // Nhắc tự đánh giá (đã hoàn thành >3 ngày chưa tự đánh giá)
+  self_eval_reminder: {
+    subject: (data) => `[Huy Anh ERP] 📝 Nhắc tự đánh giá: ${data.task_name}`,
+    content: (data) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #d97706;">📝 Nhắc nhở tự đánh giá</h2>
+        <div style="background-color: #fffbeb; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fbbf24;">
+          <p><strong>Mã công việc:</strong> ${data.task_code}</p>
+          <p><strong>Tên công việc:</strong> ${data.task_name}</p>
+          <p><strong>Hoàn thành lúc:</strong> ${data.finished_at ? new Date(data.finished_at).toLocaleDateString('vi-VN') : '—'}</p>
+          <p><strong>Đã qua:</strong> <span style="font-weight: bold; color: #d97706;">${data.days_since_finished} ngày</span> chưa tự đánh giá</p>
+        </div>
+        <p>Bạn đã hoàn thành công việc nhưng chưa tự đánh giá. Vui lòng thực hiện tự đánh giá để quản lý có thể phê duyệt.</p>
+        <a href="${APP_URL}/self-evaluation?task_id=${data.task_id}" style="display: inline-block; background-color: #D97706; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+          Tự đánh giá ngay
+        </a>
+      </div>
+    `,
+  },
+
+  // Nhắc manager phê duyệt (chờ duyệt >2 ngày)
+  approval_reminder: {
+    subject: (data) => `[Huy Anh ERP] ⏳ Chờ phê duyệt: ${data.task_name}`,
+    content: (data) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #7c3aed;">⏳ Công việc chờ phê duyệt</h2>
+        <div style="background-color: #f5f3ff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #c4b5fd;">
+          <p><strong>Mã công việc:</strong> ${data.task_code}</p>
+          <p><strong>Tên công việc:</strong> ${data.task_name}</p>
+          <p><strong>Người thực hiện:</strong> ${data.assignee_name}</p>
+          <p><strong>Gửi đánh giá lúc:</strong> ${data.submitted_at ? new Date(data.submitted_at).toLocaleDateString('vi-VN') : '—'}</p>
+          <p><strong>Chờ duyệt:</strong> <span style="font-weight: bold; color: #7c3aed;">${data.days_waiting} ngày</span></p>
+        </div>
+        <p>Nhân viên đã hoàn thành tự đánh giá. Vui lòng phê duyệt.</p>
+        <a href="${APP_URL}/approvals" style="display: inline-block; background-color: #7C3AED; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+          Phê duyệt
         </a>
       </div>
     `,

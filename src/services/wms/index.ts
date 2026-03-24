@@ -39,6 +39,10 @@ export { default as weighbridgeImageService } from './weighbridgeImageService'
 // ===== PHASE 9: Phối trộn (sẽ thêm sau) =====
 // export { blendingService } from './blendingService'
 
-// ===== PHASE 10: Báo cáo (sẽ thêm sau) =====
+// ===== PHASE 10: Báo cáo =====
 // export { wmsReportService } from './wmsReportService'
 // export { wmsDashboardService } from './wmsDashboardService'
+export { supplierScoringService } from './supplierScoringService'
+
+// ===== PHASE 11: Dự báo & Cài đặt =====
+export { forecastService } from './forecastService'

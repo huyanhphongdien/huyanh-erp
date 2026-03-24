@@ -175,6 +175,10 @@ import WMSReportDashboardPage from './pages/wms/reports/WMSReportDashboardPage';
 import StockMovementReportPage from './pages/wms/reports/StockMovementReportPage';
 import SupplierQualityReportPage from './pages/wms/reports/SupplierQualityReportPage';
 import InventoryValueReportPage from './pages/wms/reports/InventoryValueReportPage';
+import SupplierScoringPage from './pages/wms/reports/SupplierScoringPage';
+
+// ===== P11: WMS SETTINGS & FORECAST =====
+import WMSSettingsPage from './pages/wms/WMSSettingsPage';
 
 // ===== PROJECT MANAGEMENT MODULE =====
 import ProjectCategoryPage from './pages/projects/ProjectCategoryPage';
@@ -393,6 +397,9 @@ function App() {
                 <Route path="reports/stock-movement" element={<StockMovementReportPage />} />
                 <Route path="reports/supplier-quality" element={<SupplierQualityReportPage />} />
                 <Route path="reports/inventory-value" element={<InventoryValueReportPage />} />
+                <Route path="reports/supplier-scoring" element={<SupplierScoringPage />} />
+                {/* P11: Settings */}
+                <Route path="settings" element={<WMSSettingsPage />} />
                 {/* Yard Map */}
                 <Route path="yard-map" element={<YardMapPage />} />
               </Route>

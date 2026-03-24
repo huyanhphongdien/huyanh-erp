@@ -51,10 +51,88 @@ let alertCounter = 0
 const generateAlertId = () => `alert-${Date.now()}-${++alertCounter}`
 
 // ============================================================================
+// ALERT CONFIG — Ngưỡng cảnh báo cấu hình được (localStorage)
+// ============================================================================
+
+export interface AlertConfig {
+  weight_loss_percent: number    // % hao hụt cảnh báo (mặc định 5)
+  storage_days_warning: number   // ngày lưu kho cảnh báo (mặc định 30)
+  storage_days_critical: number  // ngày lưu kho nghiêm trọng (mặc định 60)
+  expiry_warning_days: number    // ngày trước hết hạn cảnh báo (mặc định 7)
+}
+
+const DEFAULT_ALERT_CONFIG: AlertConfig = {
+  weight_loss_percent: 5,
+  storage_days_warning: 30,
+  storage_days_critical: 60,
+  expiry_warning_days: 7,
+}
+
+const ALERT_CONFIG_KEY = 'wms_alert_config'
+const DISMISSED_ALERTS_KEY = 'wms_dismissed_alerts'
+
+// ============================================================================
 // SERVICE
 // ============================================================================
 
 export const alertService = {
+
+  // --------------------------------------------------------------------------
+  // CẤU HÌNH NGƯỠNG CẢNH BÁO
+  // --------------------------------------------------------------------------
+
+  /** Lấy cấu hình ngưỡng cảnh báo (từ localStorage, fallback defaults) */
+  getAlertConfig(): AlertConfig {
+    try {
+      const stored = localStorage.getItem(ALERT_CONFIG_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        return { ...DEFAULT_ALERT_CONFIG, ...parsed }
+      }
+    } catch {
+      // Lỗi parse → dùng mặc định
+    }
+    return { ...DEFAULT_ALERT_CONFIG }
+  },
+
+  /** Lưu cấu hình ngưỡng cảnh báo */
+  setAlertConfig(config: Partial<AlertConfig>): void {
+    const current = this.getAlertConfig()
+    const merged = { ...current, ...config }
+    localStorage.setItem(ALERT_CONFIG_KEY, JSON.stringify(merged))
+  },
+
+  // --------------------------------------------------------------------------
+  // DISMISSED ALERTS — Lưu trạng thái đã bỏ qua vào localStorage
+  // --------------------------------------------------------------------------
+
+  /** Lấy danh sách alert đã dismissed */
+  getDismissedAlerts(): string[] {
+    try {
+      const stored = localStorage.getItem(DISMISSED_ALERTS_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch {
+      // Lỗi parse → trả mảng rỗng
+    }
+    return []
+  },
+
+  /** Dismiss 1 alert (thêm vào danh sách dismissed) */
+  dismissAlert(alertId: string): void {
+    const dismissed = this.getDismissedAlerts()
+    if (!dismissed.includes(alertId)) {
+      dismissed.push(alertId)
+      localStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(dismissed))
+    }
+  },
+
+  /** Xóa toàn bộ dismissed alerts */
+  clearDismissed(): void {
+    localStorage.removeItem(DISMISSED_ALERTS_KEY)
+  },
 
   // --------------------------------------------------------------------------
   // KIỂM TRA TẤT CẢ CẢNH BÁO
@@ -174,6 +252,9 @@ export const alertService = {
 
     if (error) throw error
 
+    const config = this.getAlertConfig()
+    const expiryWarning = config.expiry_warning_days
+
     for (const batch of (batches || []) as any[]) {
       if (!batch.expiry_date) continue
 
@@ -194,8 +275,8 @@ export const alertService = {
           detail: `Hết hạn: ${expiryDate.toLocaleDateString('vi-VN')} | Còn ${batch.quantity_remaining} ${batch.material?.unit || ''}`,
           created_at: new Date().toISOString(),
         })
-      } else if (daysUntilExpiry <= 7) {
-        // Sắp hết hạn 7 ngày
+      } else if (daysUntilExpiry <= expiryWarning) {
+        // Sắp hết hạn (theo cấu hình)
         alerts.push({
           id: generateAlertId(),
           type: 'expiring',
@@ -208,7 +289,7 @@ export const alertService = {
           detail: `Hết hạn: ${expiryDate.toLocaleDateString('vi-VN')} | Còn ${batch.quantity_remaining} ${batch.material?.unit || ''}`,
           created_at: new Date().toISOString(),
         })
-      } else if (daysUntilExpiry <= 15) {
+      } else if (daysUntilExpiry <= expiryWarning * 2) {
         alerts.push({
           id: generateAlertId(),
           type: 'expiring',
@@ -221,7 +302,7 @@ export const alertService = {
           detail: `Hết hạn: ${expiryDate.toLocaleDateString('vi-VN')}`,
           created_at: new Date().toISOString(),
         })
-      } else if (daysUntilExpiry <= 30) {
+      } else if (daysUntilExpiry <= expiryWarning * 4) {
         alerts.push({
           id: generateAlertId(),
           type: 'expiring',
@@ -341,14 +422,17 @@ export const alertService = {
       .gt('initial_weight', 0)
       .gt('weight_loss', 0)
 
+    const config = this.getAlertConfig()
+    const weightLossThreshold = config.weight_loss_percent
+
     for (const batch of (batches || [])) {
       const lossPercent = (batch.weight_loss / batch.initial_weight) * 100
 
-      if (lossPercent > 3) {
+      if (lossPercent > weightLossThreshold * 0.6) {
         alerts.push({
           id: generateAlertId(),
           type: 'weight_loss_excessive',
-          severity: lossPercent > 10 ? 'high' : lossPercent > 5 ? 'medium' : 'low',
+          severity: lossPercent > weightLossThreshold * 2 ? 'high' : lossPercent > weightLossThreshold ? 'medium' : 'low',
           material_id: batch.material_id,
           material: batch.material,
           batch_id: batch.id,
@@ -370,18 +454,24 @@ export const alertService = {
   async checkStorageDurationAlerts(): Promise<StockAlert[]> {
     const alerts: StockAlert[] = []
 
+    const config = this.getAlertConfig()
+    const warningDays = config.storage_days_warning
+    const criticalDays = config.storage_days_critical
+    // Lấy batches lưu kho > 75% ngưỡng cảnh báo
+    const minDays = Math.floor(warningDays * 0.75)
+
     const { data: batches } = await supabase
       .from('stock_batches')
       .select('*, material:materials(id, sku, name, type)')
       .eq('status', 'active')
-      .gt('storage_days', 45)
+      .gt('storage_days', minDays)
 
     for (const batch of (batches || [])) {
       const days = batch.storage_days || 0
 
       let severity: 'high' | 'medium' | 'low' = 'low'
-      if (days > 90) severity = 'high'
-      else if (days > 60) severity = 'medium'
+      if (days > criticalDays * 1.5) severity = 'high'
+      else if (days > criticalDays) severity = 'medium'
 
       alerts.push({
         id: generateAlertId(),
@@ -392,9 +482,9 @@ export const alertService = {
         batch_id: batch.id,
         batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
         message: `Lô ${batch.batch_no} lưu kho ${days} ngày`,
-        detail: days > 90
+        detail: days > criticalDays * 1.5
           ? 'Cần xử lý gấp: bán, blend hoặc chuyển kho'
-          : days > 60
+          : days > criticalDays
             ? 'Cần kiểm tra chất lượng và lên kế hoạch xử lý'
             : 'Sắp đến hạn xử lý, nên ưu tiên xuất',
         created_at: new Date().toISOString(),

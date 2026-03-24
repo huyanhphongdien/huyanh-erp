@@ -92,7 +92,13 @@ const STATUS_CONFIG: Record<LocationStatus, { bg: string; color: string; label: 
 function isSelectable(loc: LocationData, mode: PickerMode): boolean {
   if (!loc.is_available) return false
   const status = getLocationStatus(loc)
-  if (mode === 'stock-in') return status === 'empty' || status === 'partial'
+  if (mode === 'stock-in') {
+    // Không cho chọn nếu đã đầy (current_qty >= capacity)
+    if (loc.capacity && loc.capacity > 0 && loc.current_quantity >= loc.capacity) {
+      return false
+    }
+    return status === 'empty' || status === 'partial'
+  }
   return status === 'partial' || status === 'full'
 }
 

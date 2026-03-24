@@ -183,6 +183,7 @@ const WMSReportDashboardPage = () => {
           { title: 'XNT — Xuất Nhập Tồn', desc: 'Báo cáo xuất nhập tồn theo ngày', icon: <FileTextOutlined />, path: '/wms/reports/stock-movement' },
           { title: 'Chất lượng đại lý', desc: 'Phân tích chất lượng theo đại lý cung cấp', icon: <TeamOutlined />, path: '/wms/reports/supplier-quality' },
           { title: 'Tồn kho theo vật liệu', desc: 'Giá trị tồn kho, dry weight, DRC', icon: <DatabaseOutlined />, path: '/wms/reports/inventory-value' },
+          { title: 'Chấm điểm NCC', desc: 'Đánh giá chất lượng, độ ổn định của nhà cung cấp', icon: <TeamOutlined />, path: '/wms/reports/supplier-scoring' },
         ].map((item, i) => (
           <Col xs={24} sm={12} lg={8} key={i}>
             <Card

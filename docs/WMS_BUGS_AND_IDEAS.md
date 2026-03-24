@@ -199,16 +199,16 @@ const EXPIRY_WARNING_DAYS = 7       // 7 ngày — không đổi được
 | # | Item | Loại | Trạng thái | Ghi chú |
 |---|------|------|-----------|---------|
 | B1 | No transaction | Bug | ⬜ Chưa fix | Cần Supabase RPC |
-| B2 | Missing indexes | Bug | ⬜ Chưa fix | Cần chạy SQL |
+| B2 | Missing indexes | Bug | ✅ Đã fix | P7 — wms_indexes.sql |
 | B3 | Race condition | Bug | ✅ Đã fix | dealWmsService |
 | B4 | N+1 queries | Issue | ⬜ Chưa fix | inventoryService |
-| B5 | TODO cost_price | Issue | ⬜ Chưa fix | Ý tưởng #2 |
+| B5 | TODO cost_price | Issue | ✅ Đã fix | P8 — costTrackingService |
 | B6 | Picking không optimize | Issue | ⬜ Chưa fix | Phase B |
-| B7 | Hardcoded thresholds | Issue | ⬜ Chưa fix | Ý tưởng #10 |
+| B7 | Hardcoded thresholds | Issue | ✅ Đã fix | P7 — alertService getAlertConfig() |
 | B8 | CV60 classification | Issue | ⬜ Chưa fix | Cần PRI data |
-| B9-18 | Các issue nhỏ | Issue | ⬜ Chưa fix | Xem bảng trên |
+| B9-18 | Các issue nhỏ | Issue | 🔶 Một phần | B11, B13, B16 đã fix |
 | I1 | COA Generation | Ý tưởng | ⬜ Chưa làm | 🔴 Rất cao |
-| I2 | Cost Tracking | Ý tưởng | ⬜ Chưa làm | 🔴 Rất cao |
+| I2 | Cost Tracking | Ý tưởng | ✅ Đã làm | P8 — costTrackingService |
 | I3 | Forecast | Ý tưởng | ⬜ Chưa làm | 🟡 Cao |
 | I4 | Supplier Scoring | Ý tưởng | ⬜ Chưa làm | 🟡 Cao |
 | I5 | Mobile QC | Ý tưởng | ⬜ Chưa làm | 🟡 Cao |

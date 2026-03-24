@@ -30,6 +30,7 @@ import {
   ClockCircleOutlined,
   WarningOutlined,
   RightOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons'
 import { Layers } from 'lucide-react'
 import nvlDashboardService, {
@@ -39,6 +40,7 @@ import nvlDashboardService, {
   type BatchesNeedingAction,
   type SupplierBreakdownItem,
 } from '../../services/wms/nvlDashboardService'
+import forecastService, { type GradeForecast } from '../../services/wms/forecastService'
 import { RUBBER_GRADE_LABELS, RUBBER_GRADE_COLORS } from '../../services/wms/wms.types'
 import type { RubberGrade } from '../../services/wms/wms.types'
 
@@ -204,6 +206,7 @@ const NVLDashboardPage = () => {
   const [dailyIntake, setDailyIntake] = useState<DailyIntakeItem[]>([])
   const [actionBatches, setActionBatches] = useState<BatchesNeedingAction | null>(null)
   const [supplierBreakdown, setSupplierBreakdown] = useState<SupplierBreakdownItem[]>([])
+  const [forecastData, setForecastData] = useState<GradeForecast[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -218,12 +221,13 @@ const NVLDashboardPage = () => {
       else setLoading(true)
       setError(null)
 
-      const [ov, gd, di, ab, sb] = await Promise.all([
+      const [ov, gd, di, ab, sb, fc] = await Promise.all([
         nvlDashboardService.getOverview(),
         nvlDashboardService.getGradeDistribution(),
         nvlDashboardService.getDailyIntake(7),
         nvlDashboardService.getBatchesNeedingAction(),
         nvlDashboardService.getSupplierBreakdown(10),
+        forecastService.forecastByGrade().catch(() => [] as GradeForecast[]),
       ])
 
       setOverview(ov)
@@ -231,6 +235,7 @@ const NVLDashboardPage = () => {
       setDailyIntake(di)
       setActionBatches(ab)
       setSupplierBreakdown(sb)
+      setForecastData(fc)
     } catch (err: any) {
       console.error('NVL Dashboard load error:', err)
       setError(err.message || 'Lỗi tải dữ liệu')
@@ -731,6 +736,106 @@ const NVLDashboardPage = () => {
           />
         ) : (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có dữ liệu đại lý" />
+        )}
+      </Card>
+
+      {/* ===== DỰ BÁO TỒN KHO ===== */}
+      <Card
+        title={
+          <Space>
+            <LineChartOutlined style={{ color: '#7C3AED' }} />
+            <span>Dự báo tồn kho</span>
+          </Space>
+        }
+        size="small"
+        style={{ marginTop: 16 }}
+      >
+        {forecastData.length > 0 ? (
+          <Table
+            dataSource={forecastData}
+            rowKey="grade"
+            size="small"
+            pagination={false}
+            columns={[
+              {
+                title: 'Grade',
+                dataIndex: 'grade',
+                key: 'grade',
+                render: (v: string) => {
+                  const label = RUBBER_GRADE_LABELS[v as RubberGrade] || v
+                  const color = RUBBER_GRADE_COLORS[v as RubberGrade] || '#6B7280'
+                  return <Tag color={color} style={{ fontSize: 11 }}>{label}</Tag>
+                },
+              },
+              {
+                title: 'Tồn hiện tại (kg)',
+                dataIndex: 'current_stock_kg',
+                key: 'current_stock_kg',
+                align: 'right' as const,
+                render: (v: number) => (
+                  <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
+                    {v.toLocaleString()}
+                  </Text>
+                ),
+              },
+              {
+                title: 'Tiêu thụ TB/ngày (kg)',
+                dataIndex: 'avg_daily_consumption_kg',
+                key: 'avg_daily_consumption_kg',
+                align: 'right' as const,
+                render: (v: number) => (
+                  <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    {v > 0 ? v.toLocaleString() : '—'}
+                  </Text>
+                ),
+              },
+              {
+                title: 'Còn (ngày)',
+                dataIndex: 'days_until_empty',
+                key: 'days_until_empty',
+                align: 'center' as const,
+                render: (v: number | null, r: GradeForecast) => {
+                  if (v === null) return <Text type="secondary">—</Text>
+                  const color = r.recommendation === 'CRITICAL' ? '#DC2626'
+                    : r.recommendation === 'LOW' ? '#F59E0B'
+                    : '#16A34A'
+                  return (
+                    <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", color }}>
+                      {v}
+                    </Text>
+                  )
+                },
+              },
+              {
+                title: 'Dự kiến hết',
+                dataIndex: 'forecast_date_empty',
+                key: 'forecast_date_empty',
+                render: (v: string | null) => (
+                  <Text style={{ fontSize: 12 }}>
+                    {v || '—'}
+                  </Text>
+                ),
+              },
+              {
+                title: 'Trạng thái',
+                dataIndex: 'recommendation',
+                key: 'recommendation',
+                align: 'center' as const,
+                render: (v: string) => {
+                  const map: Record<string, { color: string; label: string }> = {
+                    OK: { color: 'green', label: 'Ổn' },
+                    LOW: { color: 'orange', label: 'Thấp' },
+                    CRITICAL: { color: 'red', label: 'Nguy hiểm' },
+                    NO_DATA: { color: 'default', label: 'Không có dữ liệu' },
+                  }
+                  const item = map[v] || map.NO_DATA
+                  return <Tag color={item.color} style={{ fontSize: 11 }}>{item.label}</Tag>
+                },
+              },
+            ]}
+          />
+        ) : (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có dữ liệu dự báo" />
         )}
       </Card>
     </div>

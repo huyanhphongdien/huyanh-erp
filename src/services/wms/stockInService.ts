@@ -399,7 +399,7 @@ export const stockInService = {
     const { data: order, error: orderErr } = await supabase
       .from('stock_in_orders')
       .select(`
-        id, status, warehouse_id,
+        id, code, status, warehouse_id,
         details:stock_in_details(id, material_id, batch_id, location_id, quantity, weight)
       `)
       .eq('id', stockInId)
@@ -458,7 +458,7 @@ export const stockInService = {
           quantity: detail.quantity,
           reference_type: 'stock_in',
           reference_id: stockInId,
-          notes: `Nhập kho từ phiếu ${order.id}`,
+          notes: `Nhập kho từ phiếu ${(order as any).code || order.id}`,
           created_by: confirmedBy,
         })
 

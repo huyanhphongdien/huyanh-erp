@@ -147,7 +147,7 @@ const CustomerListPage = () => {
       setTotal(response.total)
     } catch (error) {
       console.error('Error fetching customers:', error)
-      message.error('Kh\u00F4ng th\u1EC3 t\u1EA3i danh s\u00E1ch kh\u00E1ch h\u00E0ng')
+      message.error('Không thể tải danh sách khách hàng')
     } finally {
       setLoading(false)
     }
@@ -191,7 +191,7 @@ const CustomerListPage = () => {
     setActiveTab('info')
     form.resetFields()
     form.setFieldsValue({
-      code: '(T\u1EF1 \u0111\u1ED9ng)',
+      code: '(Tự động)',
       status: 'active',
       tier: 'standard',
       default_currency: 'USD',
@@ -241,10 +241,10 @@ const CustomerListPage = () => {
 
       if (editingCustomer) {
         await salesCustomerService.update(editingCustomer.id, payload)
-        message.success('\u0110\u00E3 c\u1EADp nh\u1EADt kh\u00E1ch h\u00E0ng')
+        message.success('Đã cập nhật khách hàng')
       } else {
         await salesCustomerService.create(payload)
-        message.success('\u0110\u00E3 th\u00EAm kh\u00E1ch h\u00E0ng m\u1EDBi')
+        message.success('Đã thêm khách hàng mới')
       }
 
       setModalOpen(false)
@@ -254,7 +254,7 @@ const CustomerListPage = () => {
     } catch (error: any) {
       if (error?.errorFields) return // validation error
       console.error('Save error:', error)
-      message.error('Kh\u00F4ng th\u1EC3 l\u01B0u kh\u00E1ch h\u00E0ng')
+      message.error('Không thể lưu khách hàng')
     } finally {
       setSaving(false)
     }
@@ -263,12 +263,12 @@ const CustomerListPage = () => {
   const handleDelete = async (customer: SalesCustomer) => {
     try {
       await salesCustomerService.delete(customer.id)
-      message.success(`\u0110\u00E3 x\u00F3a kh\u00E1ch h\u00E0ng "${customer.name}"`)
+      message.success(`Đã xóa khách hàng "${customer.name}"`)
       fetchCustomers()
       fetchStats()
     } catch (error) {
       console.error('Delete error:', error)
-      message.error('Kh\u00F4ng th\u1EC3 x\u00F3a kh\u00E1ch h\u00E0ng')
+      message.error('Không thể xóa khách hàng')
     }
   }
 
@@ -278,7 +278,7 @@ const CustomerListPage = () => {
 
   const columns: ColumnsType<SalesCustomer> = [
     {
-      title: 'M\u00E3 KH',
+      title: 'Mã KH',
       dataIndex: 'code',
       key: 'code',
       width: 110,
@@ -289,7 +289,7 @@ const CustomerListPage = () => {
       ),
     },
     {
-      title: 'T\u00EAn kh\u00E1ch h\u00E0ng',
+      title: 'Tên khách hàng',
       dataIndex: 'name',
       key: 'name',
       ellipsis: true,
@@ -307,7 +307,7 @@ const CustomerListPage = () => {
       ),
     },
     {
-      title: 'Qu\u1ED1c gia',
+      title: 'Quốc gia',
       dataIndex: 'country',
       key: 'country',
       width: 140,
@@ -322,7 +322,7 @@ const CustomerListPage = () => {
         ),
     },
     {
-      title: 'Grade \u01B0u ti\u00EAn',
+      title: 'Grade ưu tiên',
       dataIndex: 'preferred_grades',
       key: 'preferred_grades',
       width: 200,
@@ -338,7 +338,7 @@ const CustomerListPage = () => {
         ),
     },
     {
-      title: 'H\u1EA1ng',
+      title: 'Hạng',
       dataIndex: 'tier',
       key: 'tier',
       width: 110,
@@ -349,7 +349,7 @@ const CustomerListPage = () => {
       ),
     },
     {
-      title: 'Thanh to\u00E1n',
+      title: 'Thanh toán',
       dataIndex: 'payment_terms',
       key: 'payment_terms',
       width: 160,
@@ -361,7 +361,7 @@ const CustomerListPage = () => {
         ),
     },
     {
-      title: 'Tr\u1EA1ng th\u00E1i',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       width: 110,
@@ -372,13 +372,13 @@ const CustomerListPage = () => {
       ),
     },
     {
-      title: 'Thao t\u00E1c',
+      title: 'Thao tác',
       key: 'actions',
       width: 130,
       fixed: 'right',
       render: (_: unknown, record: SalesCustomer) => (
         <Space size={4}>
-          <Tooltip title="Xem chi ti\u1EBFt">
+          <Tooltip title="Xem chi tiết">
             <Button
               type="text"
               size="small"
@@ -389,7 +389,7 @@ const CustomerListPage = () => {
               }}
             />
           </Tooltip>
-          <Tooltip title="S\u1EEDa">
+          <Tooltip title="Sửa">
             <Button
               type="text"
               size="small"
@@ -401,14 +401,14 @@ const CustomerListPage = () => {
             />
           </Tooltip>
           <Popconfirm
-            title="X\u00E1c nh\u1EADn x\u00F3a"
-            description={`X\u00F3a kh\u00E1ch h\u00E0ng "${record.name}"?`}
+            title="Xác nhận xóa"
+            description={`Xóa khách hàng "${record.name}"?`}
             onConfirm={() => handleDelete(record)}
-            okText="X\u00F3a"
-            cancelText="H\u1EE7y"
+            okText="Xóa"
+            cancelText="Hủy"
             okButtonProps={{ danger: true }}
           >
-            <Tooltip title="X\u00F3a">
+            <Tooltip title="Xóa">
               <Button
                 type="text"
                 size="small"
@@ -433,7 +433,7 @@ const CustomerListPage = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Title level={3} style={{ margin: 0 }}>
-            Kh\u00E1ch h\u00E0ng
+            Khách hàng
           </Title>
         </Col>
         <Col>
@@ -443,7 +443,7 @@ const CustomerListPage = () => {
             onClick={handleOpenCreate}
             style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
-            Th\u00EAm kh\u00E1ch h\u00E0ng
+            Thêm khách hàng
           </Button>
         </Col>
       </Row>
@@ -453,7 +453,7 @@ const CustomerListPage = () => {
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="T\u1ED5ng KH"
+              title="Tổng KH"
               value={stats.total}
               prefix={<UserOutlined style={{ color: '#1B4D3E' }} />}
               valueStyle={{ color: '#1B4D3E' }}
@@ -463,7 +463,7 @@ const CustomerListPage = () => {
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="\u0110ang ho\u1EA1t \u0111\u1ED9ng"
+              title="Đang hoạt động"
               value={stats.active}
               prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
               valueStyle={{ color: '#52c41a' }}
@@ -497,7 +497,7 @@ const CustomerListPage = () => {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={8} md={7}>
             <Input.Search
-              placeholder="T\u00ECm t\u00EAn, m\u00E3 kh\u00E1ch h\u00E0ng..."
+              placeholder="Tìm tên, mã khách hàng..."
               allowClear
               onSearch={handleSearch}
               onChange={(e) => {
@@ -515,10 +515,10 @@ const CustomerListPage = () => {
               }}
               style={{ width: '100%' }}
               options={[
-                { label: 'Tr\u1EA1ng th\u00E1i: T\u1EA5t c\u1EA3', value: 'all' },
-                { label: 'Ho\u1EA1t \u0111\u1ED9ng', value: 'active' },
-                { label: 'Ng\u01B0ng', value: 'inactive' },
-                { label: 'C\u1EA5m G\u0110', value: 'blacklisted' },
+                { label: 'Trạng thái: Tất cả', value: 'all' },
+                { label: 'Hoạt động', value: 'active' },
+                { label: 'Ngưng', value: 'inactive' },
+                { label: 'Cấm GĐ', value: 'blacklisted' },
               ]}
             />
           </Col>
@@ -531,7 +531,7 @@ const CustomerListPage = () => {
               }}
               style={{ width: '100%' }}
               options={[
-                { label: 'H\u1EA1ng: T\u1EA5t c\u1EA3', value: 'all' },
+                { label: 'Hạng: Tất cả', value: 'all' },
                 { label: 'Standard', value: 'standard' },
                 { label: 'Premium', value: 'premium' },
                 { label: 'Strategic', value: 'strategic' },
@@ -546,10 +546,10 @@ const CustomerListPage = () => {
                 setPagination((prev) => ({ ...prev, current: 1 }))
               }}
               allowClear
-              placeholder="Qu\u1ED1c gia"
+              placeholder="Quốc gia"
               style={{ width: '100%' }}
               options={[
-                { label: 'T\u1EA5t c\u1EA3 qu\u1ED1c gia', value: undefined },
+                { label: 'Tất cả quốc gia', value: undefined },
                 ...COUNTRY_OPTIONS.map((c) => ({
                   label: `${getCountryFlag(c.value)} ${c.label}`,
                   value: c.value,
@@ -572,7 +572,7 @@ const CustomerListPage = () => {
             pageSize: pagination.pageSize,
             total,
             showSizeChanger: true,
-            showTotal: (t) => `T\u1ED5ng ${t} kh\u00E1ch h\u00E0ng`,
+            showTotal: (t) => `Tổng ${t} khách hàng`,
             pageSizeOptions: ['10', '20', '50'],
           }}
           onChange={handleTableChange}
@@ -587,7 +587,7 @@ const CustomerListPage = () => {
 
       {/* Create / Edit Modal */}
       <Modal
-        title={editingCustomer ? 'S\u1EEDa kh\u00E1ch h\u00E0ng' : 'Th\u00EAm kh\u00E1ch h\u00E0ng'}
+        title={editingCustomer ? 'Sửa khách hàng' : 'Thêm khách hàng'}
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false)
@@ -595,8 +595,8 @@ const CustomerListPage = () => {
         }}
         onOk={handleSave}
         confirmLoading={saving}
-        okText={editingCustomer ? 'C\u1EADp nh\u1EADt' : 'T\u1EA1o m\u1EDBi'}
-        cancelText="H\u1EE7y"
+        okText={editingCustomer ? 'Cập nhật' : 'Tạo mới'}
+        cancelText="Hủy"
         width={720}
         destroyOnClose
       >
@@ -612,38 +612,38 @@ const CustomerListPage = () => {
             items={[
               {
                 key: 'info',
-                label: 'Th\u00F4ng tin',
+                label: 'Thông tin',
                 children: (
                   <>
                     <Row gutter={16}>
                       <Col span={8}>
                         <Form.Item
                           name="code"
-                          label="M\u00E3 KH"
+                          label="Mã KH"
                         >
-                          <Input disabled placeholder="T\u1EF1 \u0111\u1ED9ng" />
+                          <Input disabled placeholder="Tự động" />
                         </Form.Item>
                       </Col>
                       <Col span={16}>
                         <Form.Item
                           name="name"
-                          label="T\u00EAn kh\u00E1ch h\u00E0ng"
-                          rules={[{ required: true, message: 'Vui l\u00F2ng nh\u1EADp t\u00EAn' }]}
+                          label="Tên khách hàng"
+                          rules={[{ required: true, message: 'Vui lòng nhập tên' }]}
                         >
-                          <Input placeholder="T\u00EAn c\u00F4ng ty kh\u00E1ch h\u00E0ng" />
+                          <Input placeholder="Tên công ty khách hàng" />
                         </Form.Item>
                       </Col>
                     </Row>
                     <Row gutter={16}>
                       <Col span={8}>
-                        <Form.Item name="short_name" label="T\u00EAn vi\u1EBFt t\u1EAFt">
+                        <Form.Item name="short_name" label="Tên viết tắt">
                           <Input placeholder="VD: TKC" />
                         </Form.Item>
                       </Col>
                       <Col span={8}>
-                        <Form.Item name="country" label="Qu\u1ED1c gia">
+                        <Form.Item name="country" label="Quốc gia">
                           <Select
-                            placeholder="Ch\u1ECDn qu\u1ED1c gia"
+                            placeholder="Chọn quốc gia"
                             showSearch
                             optionFilterProp="label"
                             options={COUNTRY_OPTIONS.map((c) => ({
@@ -654,40 +654,40 @@ const CustomerListPage = () => {
                         </Form.Item>
                       </Col>
                       <Col span={8}>
-                        <Form.Item name="region" label="V\u00F9ng/Khu v\u1EF1c">
+                        <Form.Item name="region" label="Vùng/Khu vực">
                           <Input placeholder="VD: Kanto, Guangdong..." />
                         </Form.Item>
                       </Col>
                     </Row>
                     <Row gutter={16}>
                       <Col span={8}>
-                        <Form.Item name="contact_person" label="Ng\u01B0\u1EDDi li\u00EAn h\u1EC7">
-                          <Input placeholder="T\u00EAn ng\u01B0\u1EDDi li\u00EAn h\u1EC7" />
+                        <Form.Item name="contact_person" label="Người liên hệ">
+                          <Input placeholder="Tên người liên hệ" />
                         </Form.Item>
                       </Col>
                       <Col span={8}>
                         <Form.Item
                           name="email"
                           label="Email"
-                          rules={[{ type: 'email', message: 'Email kh\u00F4ng h\u1EE3p l\u1EC7' }]}
+                          rules={[{ type: 'email', message: 'Email không hợp lệ' }]}
                         >
                           <Input placeholder="email@company.com" />
                         </Form.Item>
                       </Col>
                       <Col span={8}>
-                        <Form.Item name="phone" label="\u0110i\u1EC7n tho\u1EA1i">
+                        <Form.Item name="phone" label="Điện thoại">
                           <Input placeholder="+81-..." />
                         </Form.Item>
                       </Col>
                     </Row>
-                    <Form.Item name="address" label="\u0110\u1ECBa ch\u1EC9">
-                      <Input.TextArea rows={2} placeholder="\u0110\u1ECBa ch\u1EC9 \u0111\u1EA7y \u0111\u1EE7" />
+                    <Form.Item name="address" label="Địa chỉ">
+                      <Input.TextArea rows={2} placeholder="Địa chỉ đầy đủ" />
                     </Form.Item>
                     <Row gutter={16}>
                       <Col span={8}>
-                        <Form.Item name="payment_terms" label="\u0110i\u1EC1u kho\u1EA3n thanh to\u00E1n">
+                        <Form.Item name="payment_terms" label="Điều khoản thanh toán">
                           <Select
-                            placeholder="Ch\u1ECDn"
+                            placeholder="Chọn"
                             allowClear
                             options={Object.entries(PAYMENT_TERMS_LABELS).map(
                               ([value, label]) => ({ value, label })
@@ -696,9 +696,9 @@ const CustomerListPage = () => {
                         </Form.Item>
                       </Col>
                       <Col span={8}>
-                        <Form.Item name="default_incoterm" label="Incoterm m\u1EB7c \u0111\u1ECBnh">
+                        <Form.Item name="default_incoterm" label="Incoterm mặc định">
                           <Select
-                            placeholder="Ch\u1ECDn"
+                            placeholder="Chọn"
                             options={Object.entries(INCOTERM_LABELS).map(
                               ([value, label]) => ({ value, label })
                             )}
@@ -706,9 +706,9 @@ const CustomerListPage = () => {
                         </Form.Item>
                       </Col>
                       <Col span={8}>
-                        <Form.Item name="default_currency" label="Ti\u1EC1n t\u1EC7">
+                        <Form.Item name="default_currency" label="Tiền tệ">
                           <Select
-                            placeholder="Ch\u1ECDn"
+                            placeholder="Chọn"
                             options={[
                               { value: 'USD', label: 'USD' },
                               { value: 'EUR', label: 'EUR' },
@@ -721,21 +721,21 @@ const CustomerListPage = () => {
                     </Row>
                     <Row gutter={16}>
                       <Col span={8}>
-                        <Form.Item name="credit_limit" label="H\u1EA1n m\u1EE9c t\u00EDn d\u1EE5ng (USD)">
+                        <Form.Item name="credit_limit" label="Hạn mức tín dụng (USD)">
                           <Input type="number" placeholder="0" />
                         </Form.Item>
                       </Col>
                       <Col span={8}>
                         <Form.Item
                           name="tier"
-                          label="H\u1EA1ng kh\u00E1ch h\u00E0ng"
+                          label="Hạng khách hàng"
                           rules={[{ required: true }]}
                         >
                           <Select
                             options={[
-                              { value: 'standard', label: 'Standard - Ti\u00EAu chu\u1EA9n' },
-                              { value: 'premium', label: 'Premium - Cao c\u1EA5p' },
-                              { value: 'strategic', label: 'Strategic - Chi\u1EBFn l\u01B0\u1EE3c' },
+                              { value: 'standard', label: 'Standard - Tiêu chuẩn' },
+                              { value: 'premium', label: 'Premium - Cao cấp' },
+                              { value: 'strategic', label: 'Strategic - Chiến lược' },
                             ]}
                           />
                         </Form.Item>
@@ -743,7 +743,7 @@ const CustomerListPage = () => {
                       <Col span={8}>
                         <Form.Item
                           name="status"
-                          label="Tr\u1EA1ng th\u00E1i"
+                          label="Trạng thái"
                           rules={[{ required: true }]}
                         >
                           <Select
@@ -754,25 +754,25 @@ const CustomerListPage = () => {
                         </Form.Item>
                       </Col>
                     </Row>
-                    <Form.Item name="notes" label="Ghi ch\u00FA">
-                      <Input.TextArea rows={2} placeholder="Ghi ch\u00FA th\u00EAm..." />
+                    <Form.Item name="notes" label="Ghi chú">
+                      <Input.TextArea rows={2} placeholder="Ghi chú thêm..." />
                     </Form.Item>
                   </>
                 ),
               },
               {
                 key: 'quality',
-                label: 'Ch\u1EA5t l\u01B0\u1EE3ng',
+                label: 'Chất lượng',
                 children: (
                   <>
                     <Row gutter={16}>
                       <Col span={12}>
                         <Form.Item
                           name="quality_standard"
-                          label="Ti\u00EAu chu\u1EA9n ch\u1EA5t l\u01B0\u1EE3ng"
+                          label="Tiêu chuẩn chất lượng"
                         >
                           <Select
-                            placeholder="Ch\u1ECDn ti\u00EAu chu\u1EA9n"
+                            placeholder="Chọn tiêu chuẩn"
                             allowClear
                             options={Object.entries(QUALITY_STANDARD_LABELS).map(
                               ([value, label]) => ({ value, label })
@@ -783,23 +783,23 @@ const CustomerListPage = () => {
                       <Col span={12}>
                         <Form.Item
                           name="requires_pre_shipment_sample"
-                          label="Y\u00EAu c\u1EA7u m\u1EABu tr\u01B0\u1EDBc xu\u1EA5t"
+                          label="Yêu cầu mẫu trước xuất"
                           valuePropName="checked"
                         >
                           <Switch
-                            checkedChildren="C\u00F3"
-                            unCheckedChildren="Kh\u00F4ng"
+                            checkedChildren="Có"
+                            unCheckedChildren="Không"
                           />
                         </Form.Item>
                       </Col>
                     </Row>
                     <Form.Item
                       name="preferred_grades"
-                      label="Grade \u01B0u ti\u00EAn (SVR)"
+                      label="Grade ưu tiên (SVR)"
                     >
                       <Select
                         mode="multiple"
-                        placeholder="Ch\u1ECDn c\u00E1c grade"
+                        placeholder="Chọn các grade"
                         options={SVR_GRADE_OPTIONS.map((g) => ({
                           value: g.value,
                           label: g.label,
@@ -808,7 +808,7 @@ const CustomerListPage = () => {
                     </Form.Item>
                     <Form.Item
                       name="custom_specs"
-                      label="Y\u00EAu c\u1EA7u k\u1EF9 thu\u1EADt ri\u00EAng (JSON)"
+                      label="Yêu cầu kỹ thuật riêng (JSON)"
                       help='VD: {"PRI_min": 60, "dirt_max": 0.03}'
                     >
                       <Input.TextArea

@@ -107,15 +107,15 @@ const formatDate = (date?: string): string => {
 // ============================================
 
 const STATUS_TABS: { key: string; label: string }[] = [
-  { key: 'all', label: 'T\u1EA5t c\u1EA3' },
-  { key: 'draft', label: 'Nh\u00E1p' },
-  { key: 'confirmed', label: '\u0110\u00E3 x\u00E1c nh\u1EADn' },
-  { key: 'producing', label: '\u0110ang SX' },
-  { key: 'ready', label: 'S\u1EB5n s\u00E0ng' },
-  { key: 'packing', label: '\u0110\u00F3ng g\u00F3i' },
-  { key: 'shipped', label: '\u0110\u00E3 xu\u1EA5t' },
-  { key: 'delivered', label: '\u0110\u00E3 giao' },
-  { key: 'paid', label: '\u0110\u00E3 TT' },
+  { key: 'all', label: 'Tất cả' },
+  { key: 'draft', label: 'Nháp' },
+  { key: 'confirmed', label: 'Đã xác nhận' },
+  { key: 'producing', label: 'Đang SX' },
+  { key: 'ready', label: 'Sẵn sàng' },
+  { key: 'packing', label: 'Đóng gói' },
+  { key: 'shipped', label: 'Đã xuất' },
+  { key: 'delivered', label: 'Đã giao' },
+  { key: 'paid', label: 'Đã TT' },
 ]
 
 // ============================================
@@ -171,7 +171,7 @@ const SalesOrderListPage = () => {
       setTotal(response.total)
     } catch (error) {
       console.error('Error fetching orders:', error)
-      message.error('Kh\u00F4ng th\u1EC3 t\u1EA3i danh s\u00E1ch \u0111\u01A1n h\u00E0ng')
+      message.error('Không thể tải danh sách đơn hàng')
     } finally {
       setLoading(false)
     }
@@ -228,24 +228,24 @@ const SalesOrderListPage = () => {
   const handleConfirm = async (order: SalesOrder) => {
     try {
       await salesOrderService.updateStatus(order.id, 'confirmed')
-      message.success(`\u0110\u00E3 x\u00E1c nh\u1EADn \u0111\u01A1n h\u00E0ng ${order.code}`)
+      message.success(`Đã xác nhận đơn hàng ${order.code}`)
       fetchOrders()
       fetchStats()
     } catch (error) {
       console.error('Confirm error:', error)
-      message.error('Kh\u00F4ng th\u1EC3 x\u00E1c nh\u1EADn \u0111\u01A1n h\u00E0ng')
+      message.error('Không thể xác nhận đơn hàng')
     }
   }
 
   const handleCancel = async (order: SalesOrder) => {
     try {
       await salesOrderService.cancelOrder(order.id, 'Hủy từ danh sách')
-      message.success(`\u0110\u00E3 h\u1EE7y \u0111\u01A1n h\u00E0ng ${order.code}`)
+      message.success(`Đã hủy đơn hàng ${order.code}`)
       fetchOrders()
       fetchStats()
     } catch (error) {
       console.error('Cancel error:', error)
-      message.error('Kh\u00F4ng th\u1EC3 h\u1EE7y \u0111\u01A1n h\u00E0ng')
+      message.error('Không thể hủy đơn hàng')
     }
   }
 
@@ -255,7 +255,7 @@ const SalesOrderListPage = () => {
 
   const columns: ColumnsType<SalesOrder> = [
     {
-      title: 'M\u00E3 \u0111\u01A1n',
+      title: 'Mã đơn',
       dataIndex: 'code',
       key: 'code',
       width: 130,
@@ -273,7 +273,7 @@ const SalesOrderListPage = () => {
       ),
     },
     {
-      title: 'Kh\u00E1ch h\u00E0ng',
+      title: 'Khách hàng',
       dataIndex: 'customer',
       key: 'customer',
       ellipsis: true,
@@ -309,19 +309,19 @@ const SalesOrderListPage = () => {
       render: (grade: string) => <GradeBadge grade={grade} size="small" />,
     },
     {
-      title: 'S\u1ED1 l\u01B0\u1EE3ng',
+      title: 'Số lượng',
       dataIndex: 'quantity_tons',
       key: 'quantity_tons',
       width: 110,
       align: 'right',
       render: (qty: number) => (
         <Text>
-          {qty != null ? `${qty.toLocaleString('vi-VN')} t\u1EA5n` : '-'}
+          {qty != null ? `${qty.toLocaleString('vi-VN')} tấn` : '-'}
         </Text>
       ),
     },
     {
-      title: 'Gi\u00E1 tr\u1ECB',
+      title: 'Giá trị',
       dataIndex: 'total_value_usd',
       key: 'total_value_usd',
       width: 140,
@@ -333,7 +333,7 @@ const SalesOrderListPage = () => {
       ),
     },
     {
-      title: 'Giao h\u00E0ng',
+      title: 'Giao hàng',
       dataIndex: 'delivery_date',
       key: 'delivery_date',
       width: 120,
@@ -342,7 +342,7 @@ const SalesOrderListPage = () => {
       ),
     },
     {
-      title: 'Tr\u1EA1ng th\u00E1i',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       width: 130,
@@ -353,13 +353,13 @@ const SalesOrderListPage = () => {
       ),
     },
     {
-      title: 'Thao t\u00E1c',
+      title: 'Thao tác',
       key: 'actions',
       width: 130,
       fixed: 'right',
       render: (_: unknown, record: SalesOrder) => (
         <Space size={4}>
-          <Tooltip title="Xem chi ti\u1EBFt">
+          <Tooltip title="Xem chi tiết">
             <Button
               type="text"
               size="small"
@@ -372,13 +372,13 @@ const SalesOrderListPage = () => {
           </Tooltip>
           {record.status === 'draft' && (
             <Popconfirm
-              title="X\u00E1c nh\u1EADn \u0111\u01A1n h\u00E0ng"
-              description={`X\u00E1c nh\u1EADn \u0111\u01A1n h\u00E0ng ${record.code}?`}
+              title="Xác nhận đơn hàng"
+              description={`Xác nhận đơn hàng ${record.code}?`}
               onConfirm={() => handleConfirm(record)}
-              okText="X\u00E1c nh\u1EADn"
-              cancelText="H\u1EE7y"
+              okText="Xác nhận"
+              cancelText="Hủy"
             >
-              <Tooltip title="X\u00E1c nh\u1EADn">
+              <Tooltip title="Xác nhận">
                 <Button
                   type="text"
                   size="small"
@@ -390,14 +390,14 @@ const SalesOrderListPage = () => {
           )}
           {record.status !== 'cancelled' && record.status !== 'paid' && record.status !== 'delivered' && (
             <Popconfirm
-              title="H\u1EE7y \u0111\u01A1n h\u00E0ng"
-              description={`H\u1EE7y \u0111\u01A1n h\u00E0ng ${record.code}?`}
+              title="Hủy đơn hàng"
+              description={`Hủy đơn hàng ${record.code}?`}
               onConfirm={() => handleCancel(record)}
-              okText="H\u1EE7y \u0111\u01A1n"
-              cancelText="\u0110\u00F3ng"
+              okText="Hủy đơn"
+              cancelText="Đóng"
               okButtonProps={{ danger: true }}
             >
-              <Tooltip title="H\u1EE7y">
+              <Tooltip title="Hủy">
                 <Button
                   type="text"
                   size="small"
@@ -423,7 +423,7 @@ const SalesOrderListPage = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Title level={3} style={{ margin: 0 }}>
-            \u0110\u01A1n h\u00E0ng b\u00E1n
+            Đơn hàng bán
           </Title>
         </Col>
         <Col>
@@ -433,7 +433,7 @@ const SalesOrderListPage = () => {
             onClick={() => navigate('/sales/orders/create')}
             style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
-            T\u1EA1o \u0111\u01A1n h\u00E0ng
+            Tạo đơn hàng
           </Button>
         </Col>
       </Row>
@@ -443,7 +443,7 @@ const SalesOrderListPage = () => {
         <Col xs={12} sm={4}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="T\u1ED5ng \u0111\u01A1n"
+              title="Tổng đơn"
               value={stats.total}
               prefix={<FileTextOutlined style={{ color: '#1B4D3E' }} />}
               valueStyle={{ color: '#1B4D3E' }}
@@ -453,7 +453,7 @@ const SalesOrderListPage = () => {
         <Col xs={12} sm={4}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="Nh\u00E1p"
+              title="Nháp"
               value={stats.draft}
               prefix={<EditOutlined style={{ color: '#8c8c8c' }} />}
               valueStyle={{ color: '#8c8c8c' }}
@@ -463,7 +463,7 @@ const SalesOrderListPage = () => {
         <Col xs={12} sm={4}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="\u0110\u00E3 x\u00E1c nh\u1EADn"
+              title="Đã xác nhận"
               value={stats.confirmed}
               prefix={<CheckCircleOutlined style={{ color: '#1890ff' }} />}
               valueStyle={{ color: '#1890ff' }}
@@ -473,7 +473,7 @@ const SalesOrderListPage = () => {
         <Col xs={12} sm={4}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="\u0110ang SX"
+              title="Đang SX"
               value={stats.producing}
               prefix={<InboxOutlined style={{ color: '#fa8c16' }} />}
               valueStyle={{ color: '#fa8c16' }}
@@ -483,7 +483,7 @@ const SalesOrderListPage = () => {
         <Col xs={12} sm={4}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="S\u1EB5n s\u00E0ng"
+              title="Sẵn sàng"
               value={stats.ready}
               prefix={<CarOutlined style={{ color: '#13c2c2' }} />}
               valueStyle={{ color: '#13c2c2' }}
@@ -493,7 +493,7 @@ const SalesOrderListPage = () => {
         <Col xs={12} sm={4}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
-              title="\u0110\u00E3 xu\u1EA5t"
+              title="Đã xuất"
               value={stats.shipped}
               prefix={<RocketOutlined style={{ color: '#52c41a' }} />}
               valueStyle={{ color: '#52c41a' }}
@@ -518,7 +518,7 @@ const SalesOrderListPage = () => {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={8} md={7}>
             <Input.Search
-              placeholder="T\u00ECm m\u00E3 \u0111\u01A1n, m\u00E3 KH, PO#..."
+              placeholder="Tìm mã đơn, mã KH, PO#..."
               allowClear
               onSearch={handleSearch}
               onChange={(e) => {
@@ -535,7 +535,7 @@ const SalesOrderListPage = () => {
                 setPagination((prev) => ({ ...prev, current: 1 }))
               }}
               allowClear
-              placeholder="Kh\u00E1ch h\u00E0ng"
+              placeholder="Khách hàng"
               style={{ width: '100%' }}
               showSearch
               optionFilterProp="label"
@@ -568,7 +568,7 @@ const SalesOrderListPage = () => {
                 setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | null)
                 setPagination((prev) => ({ ...prev, current: 1 }))
               }}
-              placeholder={['Ng\u00E0y \u0111\u1EB7t t\u1EEB', '\u0110\u1EBFn ng\u00E0y']}
+              placeholder={['Ngày đặt từ', 'Đến ngày']}
               format="DD/MM/YYYY"
               style={{ width: '100%' }}
               allowClear
@@ -589,7 +589,7 @@ const SalesOrderListPage = () => {
             pageSize: pagination.pageSize,
             total,
             showSizeChanger: true,
-            showTotal: (t) => `T\u1ED5ng ${t} \u0111\u01A1n h\u00E0ng`,
+            showTotal: (t) => `Tổng ${t} đơn hàng`,
             pageSizeOptions: ['10', '20', '50'],
           }}
           onChange={handleTableChange}

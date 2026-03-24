@@ -12,7 +12,7 @@ import {
 } from 'antd'
 import {
   ReloadOutlined, ExperimentOutlined, ArrowLeftOutlined,
-  CheckCircleOutlined, WarningOutlined,
+  CheckCircleOutlined, WarningOutlined, PrinterOutlined,
 } from '@ant-design/icons'
 import qcService from '../../../services/wms/qcService'
 import { supabase } from '../../../lib/supabase'
@@ -174,6 +174,11 @@ const QCRecheckPage = () => {
         onCancel={result ? handleDone : () => setModalOpen(false)}
         width={600}
         footer={result ? [
+          ...(result.result === 'passed' && selectedBatch ? [
+            <Button key="print" icon={<PrinterOutlined />} onClick={() => navigate(`/wms/batch/${selectedBatch.id}/label`)}>
+              In nhãn QR
+            </Button>,
+          ] : []),
           <Button key="done" type="primary" onClick={handleDone} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>Hoàn tất</Button>,
         ] : [
           <Button key="cancel" onClick={() => setModalOpen(false)}>Huy</Button>,

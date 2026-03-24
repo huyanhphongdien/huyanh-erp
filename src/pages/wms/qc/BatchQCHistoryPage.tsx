@@ -13,7 +13,7 @@ import {
 import {
   ArrowLeftOutlined, ExperimentOutlined, HistoryOutlined,
   CheckCircleOutlined, ExclamationCircleOutlined, CloseCircleOutlined,
-  ClockCircleOutlined, EnvironmentOutlined,
+  ClockCircleOutlined, EnvironmentOutlined, PrinterOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import qcService from '../../../services/wms/qcService'
@@ -165,6 +165,11 @@ const BatchQCHistoryPage = () => {
       {/* Header */}
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/wms/qc')}>Quay lại</Button>
+        {batchInfo.qc_status === 'passed' && (
+          <Button icon={<PrinterOutlined />} onClick={() => navigate(`/wms/batch/${batchInfo.id}/label`)}>
+            In nhãn QR
+          </Button>
+        )}
       </Space>
 
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>

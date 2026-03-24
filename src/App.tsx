@@ -117,11 +117,15 @@ import InventoryDashboard from './pages/wms/InventoryDashboard';
 import InventoryDetailPage from './pages/wms/InventoryDetailPage';
 import AlertListPage from './pages/wms/AlertListPage';
 import StockCheckPage from './pages/wms/StockCheckPage';
+import NVLDashboardPage from './pages/wms/NVLDashboardPage';
 // ✅ Phase 6: QC Tracking & DRC
 import QCDashboardPage from './pages/wms/qc/QCDashboardPage';
 import QCRecheckPage from './pages/wms/qc/QCRecheckPage';
 import QCStandardsConfigPage from './pages/wms/qc/QCStandardsConfigPage';
 import BatchQCHistoryPage from './pages/wms/qc/BatchQCHistoryPage';
+
+// ✅ Batch Label — In nhãn QR cho bãi mủ
+import BatchLabelPage from './pages/wms/BatchLabelPage';
 
 // ✅ Phase 7: Trạm cân xe (Weighbridge)
 import WeighbridgePage from './pages/wms/weighbridge/WeighbridgePage';
@@ -145,6 +149,9 @@ import RubberProfilePage from './pages/rubber/RubberProfilePage';
 import LaoShipmentPage from './pages/rubber/lao/LaoShipmentPage';
 import SettlementPage from './pages/rubber/SettlementPage';
 import RubberDashboard from './pages/rubber/RubberDashboard';
+
+// ===== YARD MAP =====
+import YardMapPage from './pages/wms/YardMapPage';
 
 // ===== P8: PRODUCTION MODULE =====
 import ProductionListPage from './pages/wms/production/ProductionListPage';
@@ -341,6 +348,7 @@ function App() {
               {/* ===== WMS MODULE ===== */}
               <Route path="wms">
                 <Route index element={<InventoryDashboard />} />
+                <Route path="nvl-dashboard" element={<NVLDashboardPage />} />
                 <Route path="materials" element={<WMSMaterialListPage />} />
                 <Route path="warehouses" element={<WMSWarehouseListPage />} />
                 <Route path="warehouses/:id/locations" element={<WMSWarehouseLocationPage />} />
@@ -358,6 +366,8 @@ function App() {
                 <Route path="qc/recheck" element={<QCRecheckPage />} />
                 <Route path="qc/standards" element={<QCStandardsConfigPage />} />
                 <Route path="qc/batch/:batchId" element={<BatchQCHistoryPage />} />
+                {/* Batch Label — In nhãn QR */}
+                <Route path="batch/:batchId/label" element={<BatchLabelPage />} />
                 {/* Trang cân chuyển sang can.huyanhrubber.vn — ERP chỉ giữ lịch sử + chi tiết */}
                 <Route path="weighbridge" element={<WeighbridgeListPage />} />
                 <Route path="weighbridge/list" element={<WeighbridgeListPage />} />
@@ -381,6 +391,8 @@ function App() {
                 <Route path="reports/stock-movement" element={<StockMovementReportPage />} />
                 <Route path="reports/supplier-quality" element={<SupplierQualityReportPage />} />
                 <Route path="reports/inventory-value" element={<InventoryValueReportPage />} />
+                {/* Yard Map */}
+                <Route path="yard-map" element={<YardMapPage />} />
               </Route>
 
               {/* ===== RUBBER MODULE ===== */}

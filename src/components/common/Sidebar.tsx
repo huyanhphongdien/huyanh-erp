@@ -78,6 +78,7 @@ import {
   Factory,
   Globe,
   ShoppingBag,
+  LayoutGrid,
 } from 'lucide-react';
 
 // ============================================================
@@ -310,6 +311,7 @@ const getMenuGroups = (
     collapsible: true,
     items: [
       { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> },
+      { path: '/wms/nvl-dashboard', label: 'Bãi NVL', icon: <Layers size={18} /> },
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
       { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
@@ -323,6 +325,7 @@ const getMenuGroups = (
       { path: '/wms/production/specs', label: 'Công thức BOM', icon: <FileText size={18} /> },
       { path: '/wms/blending', label: 'Phối trộn', icon: <Droplets size={18} /> },
       { path: '/wms/blending/suggest', label: 'Gợi ý trộn', icon: <FlaskConical size={18} /> },
+      { path: '/wms/yard-map', label: 'Bản đồ bãi', icon: <LayoutGrid size={18} /> },
       { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> },
     ],
   },

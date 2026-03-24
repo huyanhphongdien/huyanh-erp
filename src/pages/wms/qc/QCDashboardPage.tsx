@@ -13,6 +13,7 @@ import {
 import {
   ReloadOutlined, ExperimentOutlined, SettingOutlined,
   WarningOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons'
 import qcService from '../../../services/wms/qcService'
 import type { DRCOverviewItem } from '../../../services/wms/qcService'
@@ -71,6 +72,21 @@ const QCDashboardPage = () => {
     { title: 'Tái kiểm', key: 'recheck', render: (_: any, r: DRCOverviewItem) => { if (!r.next_recheck_date) return <Text type="secondary">—</Text>; const d = Math.ceil((new Date(r.next_recheck_date).getTime() - Date.now()) / 86400000); return <Tag color={d <= 0 ? 'red' : d <= 3 ? 'orange' : 'default'}>{d <= 0 ? `Quá hạn ${Math.abs(d)}d` : `${d}d`}</Tag> } },
     { title: 'Kho', key: 'wh', render: (_: any, r: DRCOverviewItem) => <Text type="secondary" style={{ fontSize: 11 }}>{r.warehouse_name}</Text> },
     { title: 'SL', dataIndex: 'quantity_remaining', key: 'qty', align: 'right' as const, render: (v: number) => <Text style={{ fontFamily: "'JetBrains Mono'" }}>{v?.toLocaleString()}</Text> },
+    {
+      title: '',
+      key: 'actions',
+      width: 60,
+      render: (_: any, r: DRCOverviewItem) =>
+        r.qc_status === 'passed' ? (
+          <Button
+            type="text"
+            size="small"
+            icon={<PrinterOutlined />}
+            title="In nhãn QR"
+            onClick={(e) => { e.stopPropagation(); navigate(`/wms/batch/${r.id}/label`) }}
+          />
+        ) : null,
+    },
   ]
 
   if (loading) return <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}><Spin size="large" /></div>

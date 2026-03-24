@@ -208,6 +208,9 @@ const DemandDetailPage = lazy(() => import('./pages/b2b/demands/DemandDetailPage
 // ===== SALES MODULE =====
 const CustomerListPage = lazy(() => import('./pages/sales/CustomerListPage'))
 const CustomerDetailPage = lazy(() => import('./pages/sales/CustomerDetailPage'));
+const SalesOrderListPage = lazy(() => import('./pages/sales/SalesOrderListPage'))
+const SalesOrderCreatePage = lazy(() => import('./pages/sales/SalesOrderCreatePage'))
+const SalesOrderDetailPage = lazy(() => import('./pages/sales/SalesOrderDetailPage'))
 
 
 const queryClient = new QueryClient({
@@ -325,6 +328,9 @@ function App() {
               {/* ===== SALES MODULE ===== */}
               <Route path="sales/customers" element={<Suspense fallback={<LoadingSpinner />}><CustomerListPage /></Suspense>} />
               <Route path="sales/customers/:customerId" element={<Suspense fallback={<LoadingSpinner />}><CustomerDetailPage /></Suspense>} />
+              <Route path="sales/orders" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderListPage /></Suspense>} />
+              <Route path="sales/orders/new" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderCreatePage /></Suspense>} />
+              <Route path="sales/orders/:orderId" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderDetailPage /></Suspense>} />
 
               {/* ===== WMS MODULE ===== */}
               <Route path="wms">

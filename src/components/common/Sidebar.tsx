@@ -296,6 +296,7 @@ const getMenuGroups = (
     allowedEmails: ['minhld@huyanhrubber.com'],
     items: [
       { path: '/sales/customers', label: 'Khách hàng', icon: <Globe size={18} /> },
+      { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} /> },
     ],
   },
 

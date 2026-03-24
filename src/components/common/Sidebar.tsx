@@ -76,6 +76,8 @@ import {
   BookOpen,
   ArrowLeftRight,
   Factory,
+  Globe,
+  ShoppingBag,
 } from 'lucide-react';
 
 // ============================================================
@@ -115,6 +117,7 @@ interface MenuGroup {
   requirePurchaseAccess?: boolean;
   requireB2BPurchaser?: boolean;
   hiddenByDefault?: boolean;
+  allowedEmails?: string[];
 }
 
 // ============================================================
@@ -280,6 +283,19 @@ const getMenuGroups = (
         icon: <MapPin size={18} />,
         requireB2BPurchaser: true,
       },
+    ],
+  },
+
+  // ============================================================
+  // ★ ĐƠN HÀNG BÁN — Quản lý khách hàng quốc tế
+  // ============================================================
+  {
+    title: 'ĐƠN HÀNG BÁN',
+    icon: <ShoppingBag size={18} />,
+    collapsible: true,
+    allowedEmails: ['minhld@huyanhrubber.com'],
+    items: [
+      { path: '/sales/customers', label: 'Khách hàng', icon: <Globe size={18} /> },
     ],
   },
 
@@ -546,6 +562,7 @@ export function Sidebar() {
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
     if (group.requireB2BPurchaser && !isB2BPurchaser && !isAdmin) return false;
+    if (group.allowedEmails && !group.allowedEmails.includes(user?.email?.toLowerCase() || '')) return false;
     if (group.hiddenByDefault) {
       const hasActiveChild = group.items.some(item =>
         location.pathname === item.path || location.pathname.startsWith(item.path + '/')

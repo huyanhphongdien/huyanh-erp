@@ -203,7 +203,11 @@ const PickupLocationSettingsPage = lazy(() => import('./pages/b2b/PickupLocation
 // B2B Demands
 const DemandListPage = lazy(() => import('./pages/b2b/demands/DemandListPage'));
 const DemandCreatePage = lazy(() => import('./pages/b2b/demands/DemandCreatePage'));
-const DemandDetailPage = lazy(() => import('./pages/b2b/demands/DemandDetailPage'));
+const DemandDetailPage = lazy(() => import('./pages/b2b/demands/DemandDetailPage'))
+
+// ===== SALES MODULE =====
+const CustomerListPage = lazy(() => import('./pages/sales/CustomerListPage'))
+const CustomerDetailPage = lazy(() => import('./pages/sales/CustomerDetailPage'));
 
 
 const queryClient = new QueryClient({
@@ -317,6 +321,10 @@ function App() {
                 {/* B2B Pickup Locations */}
                 <Route path="pickup-locations" element={<Suspense fallback={<LoadingSpinner />}><PickupLocationSettingsPage /></Suspense>} />
               </Route>
+
+              {/* ===== SALES MODULE ===== */}
+              <Route path="sales/customers" element={<Suspense fallback={<LoadingSpinner />}><CustomerListPage /></Suspense>} />
+              <Route path="sales/customers/:customerId" element={<Suspense fallback={<LoadingSpinner />}><CustomerDetailPage /></Suspense>} />
 
               {/* ===== WMS MODULE ===== */}
               <Route path="wms">

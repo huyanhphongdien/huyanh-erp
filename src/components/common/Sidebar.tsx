@@ -379,7 +379,8 @@ export function Sidebar() {
   useEffect(() => {
     const b2bPurchaserEmails = [
       'khuyennt@huyanhrubber.com',
-      'duyhh@huyanhrubber.com'
+      'duyhh@huyanhrubber.com',
+      'minhld@huyanhrubber.com',
     ];
     
     if (user?.email && b2bPurchaserEmails.includes(user.email.toLowerCase())) {

@@ -55,6 +55,8 @@ import {
 } from '@ant-design/icons'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
+import { containerService } from '../../services/sales/containerService'
+import type { ContainerSummary } from '../../services/sales/containerService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
 import type {
@@ -149,17 +151,23 @@ function SalesOrderDetailPage() {
   const [productionProgress, setProductionProgress] = useState<ProductionProgress | null>(null)
   const [progressLoading, setProgressLoading] = useState(false)
 
+  // Packing tab state
+  const [containerSummary, setContainerSummary] = useState<ContainerSummary | null>(null)
+  const [autoCreateLoading, setAutoCreateLoading] = useState(false)
+
   // ── Load data ──
   const loadOrder = useCallback(async () => {
     if (!orderId) return
     try {
       setLoading(true)
-      const [o, c] = await Promise.all([
+      const [o, c, cs] = await Promise.all([
         salesOrderService.getById(orderId),
         salesOrderService.getContainers(orderId),
+        containerService.getContainerSummary(orderId),
       ])
       setOrder(o)
       setContainers(c)
+      setContainerSummary(cs)
       if (o?.grade) {
         const std = await rubberGradeService.getByGrade(o.grade as any)
         setGradeStandard(std)
@@ -1121,38 +1129,129 @@ function SalesOrderDetailPage() {
     },
   ]
 
+  const handleAutoCreateContainers = async () => {
+    if (!orderId) return
+    try {
+      setAutoCreateLoading(true)
+      await containerService.autoCreateContainers(orderId)
+      message.success('Đã tạo container tự động')
+      loadOrder()
+    } catch (err: any) {
+      message.error(err?.message || 'Không thể tạo container tự động')
+    } finally {
+      setAutoCreateLoading(false)
+    }
+  }
+
   const renderPackingTab = () => (
-    <Card
-      title="Danh sach Container"
-      size="small"
-      extra={
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          size="small"
-          onClick={() => setContainerModalOpen(true)}
-          style={{ background: '#1B4D3E' }}
-        >
-          Them container
-        </Button>
-      }
-    >
-      {containers.length > 0 ? (
-        <Table
-          dataSource={containers}
-          columns={containerColumns}
-          rowKey="id"
-          pagination={false}
-          size="small"
-          bordered
-        />
-      ) : (
-        <Empty
-          description="Chua co container nao"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
+    <Row gutter={[16, 16]}>
+      {/* Container summary stats */}
+      {containerSummary && containerSummary.total_containers > 0 && (
+        <Col xs={24}>
+          <Card size="small">
+            <Row gutter={16}>
+              <Col xs={12} sm={4}>
+                <Statistic
+                  title="Tổng container"
+                  value={containerSummary.total_containers}
+                  valueStyle={{ color: '#1B4D3E' }}
+                />
+              </Col>
+              <Col xs={12} sm={5}>
+                <Statistic
+                  title="Đã đóng"
+                  value={containerSummary.packed}
+                  suffix={`/ ${containerSummary.total_containers}`}
+                  valueStyle={{ color: '#fa8c16' }}
+                />
+              </Col>
+              <Col xs={12} sm={5}>
+                <Statistic
+                  title="Đã seal"
+                  value={containerSummary.sealed}
+                  suffix={`/ ${containerSummary.total_containers}`}
+                  valueStyle={{ color: '#1890ff' }}
+                />
+              </Col>
+              <Col xs={12} sm={5}>
+                <Statistic
+                  title="Tổng bành"
+                  value={containerSummary.total_bales}
+                  suffix={`/ ${order.total_bales || '?'}`}
+                  valueStyle={{
+                    color: containerSummary.total_bales >= (order.total_bales || 0)
+                      ? '#52c41a'
+                      : '#fa8c16',
+                  }}
+                />
+              </Col>
+              <Col xs={12} sm={5}>
+                <Statistic
+                  title="Tổng KL"
+                  value={containerSummary.total_weight_kg}
+                  suffix="kg"
+                  valueStyle={{ color: '#1B4D3E' }}
+                />
+              </Col>
+            </Row>
+          </Card>
+        </Col>
       )}
-    </Card>
+
+      {/* Container list */}
+      <Col xs={24}>
+        <Card
+          title="Danh sách Container"
+          size="small"
+          extra={
+            <Space>
+              <Button
+                type="primary"
+                icon={<ContainerOutlined />}
+                size="small"
+                onClick={() => navigate(`/sales/orders/${order.id}/packing`)}
+                style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+              >
+                Quản lý đóng gói &rarr;
+              </Button>
+              <Button
+                icon={<PlusOutlined />}
+                size="small"
+                onClick={() => setContainerModalOpen(true)}
+              >
+                Thêm container
+              </Button>
+            </Space>
+          }
+        >
+          {containers.length > 0 ? (
+            <Table
+              dataSource={containers}
+              columns={containerColumns}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              bordered
+            />
+          ) : (
+            <Empty
+              description="Chưa có container nào"
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            >
+              <Button
+                type="primary"
+                icon={<ThunderboltOutlined />}
+                onClick={handleAutoCreateContainers}
+                loading={autoCreateLoading}
+                style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+              >
+                Tạo container tự động
+              </Button>
+            </Empty>
+          )}
+        </Card>
+      </Col>
+    </Row>
   )
 
   // ══════════════════════════════════════════════════════════════

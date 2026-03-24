@@ -295,6 +295,7 @@ const getMenuGroups = (
     collapsible: true,
     allowedEmails: ['minhld@huyanhrubber.com'],
     items: [
+      { path: '/sales/dashboard', label: 'Tổng quan', icon: <BarChart3 size={18} /> },
       { path: '/sales/customers', label: 'Khách hàng', icon: <Globe size={18} /> },
       { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} /> },
     ],

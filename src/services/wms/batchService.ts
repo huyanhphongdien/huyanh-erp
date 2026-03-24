@@ -637,6 +637,199 @@ export const batchService = {
   },
 
   // --------------------------------------------------------------------------
+  // PHASE 6: SPLIT BATCH — Tách lô thành nhiều lô nhỏ
+  // --------------------------------------------------------------------------
+  async splitBatch(
+    batchId: string,
+    splits: Array<{ weight_kg: number; yard_zone?: string; yard_row?: number; yard_col?: number }>
+  ): Promise<StockBatch[]> {
+    // 1. Get original batch
+    const { data: original, error: fetchErr } = await supabase
+      .from('stock_batches')
+      .select(BATCH_SELECT)
+      .eq('id', batchId)
+      .single()
+
+    if (fetchErr) throw fetchErr
+    if (!original) throw new Error('Không tìm thấy lô hàng')
+    if (original.status !== 'active') {
+      throw new Error('Chỉ có thể tách lô đang hoạt động')
+    }
+
+    // 2. Validate: sum of split weights <= original weight
+    const totalSplitWeight = splits.reduce((sum, s) => sum + s.weight_kg, 0)
+    const originalWeight = original.current_weight || original.initial_weight || 0
+    if (totalSplitWeight > originalWeight) {
+      throw new Error(
+        `Tổng khối lượng tách (${totalSplitWeight} kg) vượt quá khối lượng lô gốc (${originalWeight} kg)`
+      )
+    }
+
+    // 3. Create new batches: LOT-001-A, LOT-001-B...
+    const suffixes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const newBatches: StockBatch[] = []
+
+    for (let i = 0; i < splits.length; i++) {
+      const split = splits[i]
+      const suffix = suffixes[i] || String(i + 1)
+      const newBatchNo = `${original.batch_no}-${suffix}`
+
+      const { data: newBatch, error: insertErr } = await supabase
+        .from('stock_batches')
+        .insert({
+          batch_no: newBatchNo,
+          material_id: original.material_id,
+          warehouse_id: original.warehouse_id,
+          location_id: original.location_id,
+          initial_quantity: 1,
+          quantity_remaining: 1,
+          unit: original.unit || 'kg',
+          initial_drc: original.latest_drc || original.initial_drc || null,
+          latest_drc: original.latest_drc || original.initial_drc || null,
+          qc_status: original.qc_status,
+          last_qc_date: original.last_qc_date,
+          next_recheck_date: original.next_recheck_date,
+          batch_type: original.batch_type,
+          received_date: original.received_date,
+          status: 'active' as BatchStatus,
+          parent_batch_id: batchId,
+          rubber_grade: original.rubber_grade || null,
+          rubber_type: original.rubber_type || null,
+          supplier_name: original.supplier_name || null,
+          supplier_region: original.supplier_region || null,
+          supplier_reported_drc: original.supplier_reported_drc || null,
+          initial_weight: split.weight_kg,
+          current_weight: split.weight_kg,
+          dry_weight: original.latest_drc
+            ? rubberGradeService.calculateDryWeight(split.weight_kg, original.latest_drc)
+            : null,
+          contamination_status: original.contamination_status || 'clean',
+          yard_zone: split.yard_zone || null,
+          yard_row: split.yard_row || null,
+          yard_col: split.yard_col || null,
+        })
+        .select(BATCH_SELECT)
+        .single()
+
+      if (insertErr) throw insertErr
+      newBatches.push(newBatch as unknown as StockBatch)
+    }
+
+    // 4. Update original batch: status = 'depleted', quantity_remaining = 0
+    await supabase
+      .from('stock_batches')
+      .update({
+        status: 'depleted' as BatchStatus,
+        quantity_remaining: 0,
+        current_weight: 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', batchId)
+
+    // 5. Return new batches
+    return newBatches
+  },
+
+  // --------------------------------------------------------------------------
+  // PHASE 6: MERGE BATCHES — Gộp nhiều lô thành 1 lô
+  // --------------------------------------------------------------------------
+  async mergeBatches(batchIds: string[]): Promise<StockBatch> {
+    if (batchIds.length < 2) {
+      throw new Error('Cần ít nhất 2 lô để gộp')
+    }
+
+    // 1. Get all batches
+    const { data: batches, error: fetchErr } = await supabase
+      .from('stock_batches')
+      .select(BATCH_SELECT)
+      .in('id', batchIds)
+
+    if (fetchErr) throw fetchErr
+    if (!batches || batches.length !== batchIds.length) {
+      throw new Error('Không tìm thấy đủ lô hàng')
+    }
+
+    // 2. Validate: all same material, all active, all passed QC
+    const materialIds = new Set(batches.map(b => b.material_id))
+    if (materialIds.size > 1) {
+      throw new Error('Tất cả lô phải cùng loại nguyên liệu để gộp')
+    }
+
+    const nonActive = batches.filter(b => b.status !== 'active')
+    if (nonActive.length > 0) {
+      throw new Error(`Lô ${nonActive.map(b => b.batch_no).join(', ')} không ở trạng thái hoạt động`)
+    }
+
+    const nonPassed = batches.filter(b => b.qc_status !== 'passed' && b.qc_status !== 'warning')
+    if (nonPassed.length > 0) {
+      throw new Error(`Lô ${nonPassed.map(b => b.batch_no).join(', ')} chưa qua QC (cần Đạt hoặc Cảnh báo)`)
+    }
+
+    // 3. Calculate weighted average DRC
+    let totalWeight = 0
+    let totalWeightedDRC = 0
+    for (const b of batches) {
+      const w = b.current_weight || b.initial_weight || 0
+      totalWeight += w
+      if (b.latest_drc != null) {
+        totalWeightedDRC += b.latest_drc * w
+      }
+    }
+    const avgDRC = totalWeight > 0 ? Math.round((totalWeightedDRC / totalWeight) * 100) / 100 : null
+
+    // 4. Create new batch: LOT-MERGE-{timestamp}
+    const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+    const mergeBatchNo = `MERGE-${timestamp}`
+    const firstBatch = batches[0]
+
+    const { data: mergedBatch, error: mergeErr } = await supabase
+      .from('stock_batches')
+      .insert({
+        batch_no: mergeBatchNo,
+        material_id: firstBatch.material_id,
+        warehouse_id: firstBatch.warehouse_id,
+        location_id: firstBatch.location_id,
+        initial_quantity: batches.length,
+        quantity_remaining: batches.length,
+        unit: firstBatch.unit || 'kg',
+        initial_drc: avgDRC,
+        latest_drc: avgDRC,
+        qc_status: 'passed' as QCStatus,
+        last_qc_date: new Date().toISOString().split('T')[0],
+        batch_type: firstBatch.batch_type || 'production',
+        received_date: new Date().toISOString().split('T')[0],
+        status: 'active' as BatchStatus,
+        rubber_grade: avgDRC ? rubberGradeService.classifyByDRC(avgDRC) : firstBatch.rubber_grade || null,
+        rubber_type: firstBatch.rubber_type || null,
+        initial_weight: totalWeight,
+        current_weight: totalWeight,
+        dry_weight: avgDRC ? rubberGradeService.calculateDryWeight(totalWeight, avgDRC) : null,
+        contamination_status: 'clean',
+        produced_from_batches: batchIds,
+      })
+      .select(BATCH_SELECT)
+      .single()
+
+    if (mergeErr) throw mergeErr
+
+    // 5. Deplete all source batches
+    for (const b of batches) {
+      await supabase
+        .from('stock_batches')
+        .update({
+          status: 'depleted' as BatchStatus,
+          quantity_remaining: 0,
+          current_weight: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', b.id)
+    }
+
+    // 6. Return new batch
+    return mergedBatch as unknown as StockBatch
+  },
+
+  // --------------------------------------------------------------------------
   // RUBBER: Cập nhật grade
   // --------------------------------------------------------------------------
   async updateRubberGrade(id: string, grade: RubberGrade): Promise<StockBatch> {
@@ -709,6 +902,8 @@ export const {
   markExpiredBatches,
   updateRubberGrade,
   updateContaminationStatus,
+  splitBatch,
+  mergeBatches,
 } = batchService
 
 export default batchService

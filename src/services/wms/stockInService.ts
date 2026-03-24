@@ -16,6 +16,7 @@ import type {
   StockInFormData,
   StockInDetailFormData,
   StockInStatus,
+  QCStatus,
   WMSPaginationParams,
   PaginatedResponse,
 } from './wms.types'
@@ -561,6 +562,110 @@ export const stockInService = {
   },
 
   // ==========================================================================
+  // PHASE 4 — NHẬP NHANH TỪ PHIẾU CÂN
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // CREATE FROM WEIGHBRIDGE TICKET — Tạo phiếu nhập + lô hàng từ phiếu cân
+  // --------------------------------------------------------------------------
+  async createFromWeighbridgeTicket(
+    ticketId: string,
+    warehouseId: string,
+    yardPosition?: { zone: string; row: number; col: number }
+  ): Promise<{ stockIn: any; batch: any }> {
+    // 1. Get weighbridge ticket
+    const { data: ticket, error: ticketErr } = await supabase
+      .from('weighbridge_tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single()
+
+    if (ticketErr) throw ticketErr
+    if (!ticket) throw new Error('Không tìm thấy phiếu cân')
+    if (ticket.status !== 'completed') throw new Error('Phiếu cân chưa hoàn tất')
+
+    // 2. Auto generate stock-in code
+    const code = await generateCode()
+
+    // 3. Create stock_in_order
+    const { data: si, error: siErr } = await supabase
+      .from('stock_in_orders')
+      .insert({
+        code,
+        type: 'raw',
+        warehouse_id: warehouseId,
+        source_type: 'purchase',
+        deal_id: ticket.deal_id || null,
+        status: 'confirmed' as StockInStatus,
+        total_quantity: 1,
+        total_weight: ticket.net_weight || 0,
+        confirmed_at: new Date().toISOString(),
+        notes: `Nhập nhanh từ phiếu cân ${ticket.code}`,
+      })
+      .select('id, code')
+      .single()
+
+    if (siErr) throw siErr
+
+    // 4. Get material (first raw material)
+    const { data: mat } = await supabase
+      .from('materials')
+      .select('id')
+      .eq('type', 'raw')
+      .limit(1)
+      .single()
+
+    // 5. Create batch
+    const batchNo = `NVL-${(ticket.code || '').replace('CX-', '')}`
+    const { data: batch, error: batchErr } = await supabase
+      .from('stock_batches')
+      .insert({
+        batch_no: batchNo,
+        material_id: mat?.id,
+        warehouse_id: warehouseId,
+        initial_quantity: 1,
+        quantity_remaining: 1,
+        initial_weight: ticket.net_weight || 0,
+        current_weight: ticket.net_weight || 0,
+        initial_drc: ticket.expected_drc || null,
+        latest_drc: ticket.expected_drc || null,
+        qc_status: 'pending' as QCStatus,
+        status: 'active' as const,
+        rubber_type: ticket.rubber_type || null,
+        supplier_name: ticket.supplier_name || null,
+        supplier_reported_drc: ticket.expected_drc || null,
+        yard_zone: yardPosition?.zone || null,
+        yard_row: yardPosition?.row || null,
+        yard_col: yardPosition?.col || null,
+        received_date: new Date().toISOString().split('T')[0],
+      })
+      .select('id, batch_no')
+      .single()
+
+    if (batchErr) throw batchErr
+
+    // 6. Create stock_in_detail
+    await supabase.from('stock_in_details').insert({
+      stock_in_id: si!.id,
+      material_id: mat?.id,
+      batch_id: batch!.id,
+      quantity: 1,
+      weight: ticket.net_weight || 0,
+      drc_value: ticket.expected_drc || null,
+    })
+
+    // 7. Update deal if linked
+    if (ticket.deal_id) {
+      try {
+        const { dealWmsService } = await import('../b2b/dealWmsService')
+        await dealWmsService.updateDealStockInTotals(ticket.deal_id)
+      } catch { /* non-blocking */ }
+    }
+
+    return { stockIn: si, batch }
+  },
+
+  // ==========================================================================
   // PRIVATE HELPERS
   // ==========================================================================
 
@@ -662,6 +767,7 @@ export const {
   updateDetail: updateStockInDetail,
   confirmStockIn,
   cancelStockIn,
+  createFromWeighbridgeTicket,
 } = stockInService
 
 export default stockInService

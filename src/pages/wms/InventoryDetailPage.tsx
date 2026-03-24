@@ -36,6 +36,8 @@ import {
   ExclamationCircleOutlined,
   ExperimentOutlined,
   ClockCircleOutlined,
+  ScissorOutlined,
+  MergeCellsOutlined,
 } from '@ant-design/icons'
 import { inventoryService, type StockMovement } from '../../services/wms/inventoryService'
 import type { Material, StockBatch, InventoryTransaction } from '../../services/wms/wms.types'
@@ -43,6 +45,8 @@ import GradeBadge from '../../components/wms/GradeBadge'
 import { QCBadge } from '../../components/wms/QCInputForm'
 import WeightLossIndicator from '../../components/wms/WeightLossIndicator'
 import ContaminationBadge from '../../components/wms/ContaminationBadge'
+import BatchSplitModal from '../../components/wms/BatchSplitModal'
+import BatchMergeModal from '../../components/wms/BatchMergeModal'
 
 const { Title, Text } = Typography
 
@@ -62,6 +66,13 @@ const InventoryDetailPage = () => {
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Split/Merge modal state
+  const [splitBatch, setSplitBatch] = useState<StockBatch | null>(null)
+  const [splitModalOpen, setSplitModalOpen] = useState(false)
+  const [mergeBatches, setMergeBatches] = useState<StockBatch[]>([])
+  const [mergeModalOpen, setMergeModalOpen] = useState(false)
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([])
 
   // --------------------------------------------------------------------------
   // LOAD DATA
@@ -319,6 +330,28 @@ const InventoryDetailPage = () => {
         <ContaminationBadge status={(r as any).contamination_status} />
       ),
     },
+    {
+      title: '',
+      key: 'actions',
+      width: 80,
+      render: (_: any, r: StockBatch) => (
+        r.status === 'active' ? (
+          <Button
+            type="link"
+            size="small"
+            icon={<ScissorOutlined />}
+            onClick={(e) => {
+              e.stopPropagation()
+              setSplitBatch(r)
+              setSplitModalOpen(true)
+            }}
+            title="Tách lô"
+          >
+            Tách
+          </Button>
+        ) : null
+      ),
+    },
   ]
 
   const txColumns = [
@@ -446,18 +479,36 @@ const InventoryDetailPage = () => {
               ),
               children: (
                 <div>
-                  {/* QC Summary */}
-                  <Space style={{ marginBottom: 12 }}>
-                    {qcPassed > 0 && (
-                      <Tag icon={<CheckCircleOutlined />} color="success">{qcPassed} dat</Tag>
-                    )}
-                    {qcWarning > 0 && (
-                      <Tag icon={<ExclamationCircleOutlined />} color="warning">{qcWarning} canh bao</Tag>
-                    )}
-                    {qcFailed > 0 && (
-                      <Tag icon={<ExperimentOutlined />} color="error">{qcFailed} can xu ly</Tag>
-                    )}
-                  </Space>
+                  {/* QC Summary + Merge Button */}
+                  <Row justify="space-between" align="middle" style={{ marginBottom: 12 }}>
+                    <Col>
+                      <Space>
+                        {qcPassed > 0 && (
+                          <Tag icon={<CheckCircleOutlined />} color="success">{qcPassed} dat</Tag>
+                        )}
+                        {qcWarning > 0 && (
+                          <Tag icon={<ExclamationCircleOutlined />} color="warning">{qcWarning} canh bao</Tag>
+                        )}
+                        {qcFailed > 0 && (
+                          <Tag icon={<ExperimentOutlined />} color="error">{qcFailed} can xu ly</Tag>
+                        )}
+                      </Space>
+                    </Col>
+                    <Col>
+                      <Button
+                        icon={<MergeCellsOutlined />}
+                        size="small"
+                        disabled={selectedBatchIds.length < 2}
+                        onClick={() => {
+                          const selected = batches.filter(b => selectedBatchIds.includes(b.id))
+                          setMergeBatches(selected)
+                          setMergeModalOpen(true)
+                        }}
+                      >
+                        Gop lo ({selectedBatchIds.length})
+                      </Button>
+                    </Col>
+                  </Row>
 
                   <Table
                     dataSource={batches}
@@ -466,6 +517,13 @@ const InventoryDetailPage = () => {
                     size="small"
                     pagination={false}
                     scroll={{ x: 900 }}
+                    rowSelection={{
+                      selectedRowKeys: selectedBatchIds,
+                      onChange: (keys) => setSelectedBatchIds(keys as string[]),
+                      getCheckboxProps: (record: StockBatch) => ({
+                        disabled: record.status !== 'active',
+                      }),
+                    }}
                     expandable={{
                       expandedRowRender: (batch: StockBatch) => (
                         <Descriptions size="small" column={2} bordered>
@@ -558,6 +616,22 @@ const InventoryDetailPage = () => {
           ]}
         />
       </div>
+
+      {/* Split Modal */}
+      <BatchSplitModal
+        open={splitModalOpen}
+        batch={splitBatch}
+        onClose={() => { setSplitModalOpen(false); setSplitBatch(null) }}
+        onSuccess={() => { loadData(); setSelectedBatchIds([]) }}
+      />
+
+      {/* Merge Modal */}
+      <BatchMergeModal
+        open={mergeModalOpen}
+        batches={mergeBatches}
+        onClose={() => { setMergeModalOpen(false); setMergeBatches([]) }}
+        onSuccess={() => { loadData(); setSelectedBatchIds([]) }}
+      />
     </div>
   )
 }

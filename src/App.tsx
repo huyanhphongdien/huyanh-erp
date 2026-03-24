@@ -123,6 +123,7 @@ import QCDashboardPage from './pages/wms/qc/QCDashboardPage';
 import QCRecheckPage from './pages/wms/qc/QCRecheckPage';
 import QCStandardsConfigPage from './pages/wms/qc/QCStandardsConfigPage';
 import BatchQCHistoryPage from './pages/wms/qc/BatchQCHistoryPage';
+import QCQuickScanPage from './pages/wms/qc/QCQuickScanPage';
 
 // ✅ Batch Label — In nhãn QR cho bãi mủ
 import BatchLabelPage from './pages/wms/BatchLabelPage';
@@ -365,6 +366,7 @@ function App() {
                 <Route path="qc" element={<QCDashboardPage />} />
                 <Route path="qc/recheck" element={<QCRecheckPage />} />
                 <Route path="qc/standards" element={<QCStandardsConfigPage />} />
+                <Route path="qc/quick-scan" element={<QCQuickScanPage />} />
                 <Route path="qc/batch/:batchId" element={<BatchQCHistoryPage />} />
                 {/* Batch Label — In nhãn QR */}
                 <Route path="batch/:batchId/label" element={<BatchLabelPage />} />

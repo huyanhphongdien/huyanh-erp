@@ -139,11 +139,11 @@ interface FormHeader {
 // ============================================================================
 
 const REASONS: { value: StockOutReason; label: string; icon: React.ReactNode; desc: string }[] = [
-  { value: 'sale', label: 'Bán hàng', icon: <ShoppingCartOutlined />, desc: 'Xuat ban cho khach' },
+  { value: 'sale', label: 'Bán hàng', icon: <ShoppingCartOutlined />, desc: 'Xuất bán cho khách' },
   { value: 'transfer', label: 'Chuyển kho', icon: <SwapOutlined />, desc: 'Chuyển sang kho khác' },
   { value: 'blend', label: 'Phối trộn', icon: <ExperimentOutlined />, desc: 'Đưa đi phối trộn DRC' },
   { value: 'adjust', label: 'Điều chỉnh', icon: <ControlOutlined />, desc: 'Điều chỉnh tồn kho' },
-  { value: 'return', label: 'Trả hàng', icon: <RollbackOutlined />, desc: 'Tra lai NCC/SX' },
+  { value: 'return', label: 'Trả hàng', icon: <RollbackOutlined />, desc: 'Trả lại NCC/SX' },
 ]
 
 const QC_TAG: Record<string, { color: string; label: string }> = {
@@ -679,10 +679,10 @@ const StockOutCreatePage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
         <Result
           status="success"
-          title="Thanh cong!"
+          title="Thành công!"
           subTitle={
             <div>
-              <Text>Phiếu xuất kho da duoc tao</Text>
+              <Text>Phiếu xuất kho đã được tạo</Text>
               <div>
                 <Text strong style={{ ...monoStyle, color: '#1B4D3E', fontSize: 20 }}>
                   {successCode}
@@ -696,7 +696,7 @@ const StockOutCreatePage: React.FC = () => {
               onClick={() => navigate('/wms/stock-out')}
               style={{ backgroundColor: '#2D8B6E', borderColor: '#2D8B6E' }}
             >
-              Ve danh sach
+              Về danh sách
             </Button>
           }
         />
@@ -764,7 +764,7 @@ const StockOutCreatePage: React.FC = () => {
         drc != null ? <Text style={monoStyle}>{drc.toFixed(1)}%</Text> : '—',
     },
     {
-      title: 'Ton',
+      title: 'Tồn',
       dataIndex: 'quantity_remaining',
       key: 'quantity_remaining',
       width: 80,
@@ -783,7 +783,7 @@ const StockOutCreatePage: React.FC = () => {
           onClick={() => handleAddBatch(record)}
           style={{ backgroundColor: '#2D8B6E', borderColor: '#2D8B6E' }}
         >
-          Them
+          Thêm
         </Button>
       ),
     },
@@ -845,7 +845,7 @@ const StockOutCreatePage: React.FC = () => {
         drc != null ? <Text style={monoStyle}>{drc.toFixed(1)}%</Text> : '—',
     },
     {
-      title: 'SL xuat',
+      title: 'SL xuất',
       key: 'quantity',
       width: 140,
       render: (_: any, record: OutItem) => (
@@ -1022,11 +1022,11 @@ const StockOutCreatePage: React.FC = () => {
             <Card title="Kho xuất" style={{ marginBottom: 24 }}>
               {loadingWarehouses ? (
                 <div style={{ textAlign: 'center', padding: 40 }}>
-                  <Spin tip="Đang tải danh sach kho..." />
+                  <Spin tip="Đang tải danh sách kho..." />
                 </div>
               ) : (
                 <Select
-                  placeholder="Chọn kho xuat"
+                  placeholder="Chọn kho xuất"
                   value={header.warehouse_id || undefined}
                   onChange={val => setHeader(h => ({ ...h, warehouse_id: val }))}
                   style={{ width: '100%' }}
@@ -1039,7 +1039,7 @@ const StockOutCreatePage: React.FC = () => {
               )}
               {header.warehouse_id && batchStocks.length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <Text type="secondary" style={monoStyle}>{batchStocks.length} lo tồn kho</Text>
+                  <Text type="secondary" style={monoStyle}>{batchStocks.length} lô tồn kho</Text>
                 </div>
               )}
             </Card>
@@ -1063,7 +1063,7 @@ const StockOutCreatePage: React.FC = () => {
               />
               {header.reason === 'blend' && (
                 <Alert
-                  message="Khi xuat phoi tron, ban co the chon ca lo khong dat QC hoac can phoi tron"
+                  message="Khi xuất phối trộn, bạn có thể chọn cả lô không đạt QC hoặc cần phối trộn"
                   type="info"
                   showIcon
                   style={{ marginTop: 12 }}
@@ -1075,15 +1075,15 @@ const StockOutCreatePage: React.FC = () => {
             {header.reason === 'sale' && (
               <Card title="Khách hàng" style={{ marginBottom: 24 }}>
                 <Form layout="vertical">
-                  <Form.Item label="Ten khach hang">
+                  <Form.Item label="Tên khách hàng">
                     <Input
                       value={header.customer_name}
                       onChange={e => setHeader(h => ({ ...h, customer_name: e.target.value }))}
-                      placeholder="Ten khach hang..."
+                      placeholder="Tên khách hàng..."
                       size="large"
                     />
                   </Form.Item>
-                  <Form.Item label="So don hang / Ref">
+                  <Form.Item label="Số đơn hàng / Ref">
                     <Input
                       value={header.customer_order_ref}
                       onChange={e => setHeader(h => ({ ...h, customer_order_ref: e.target.value }))}
@@ -1099,7 +1099,7 @@ const StockOutCreatePage: React.FC = () => {
 
           <Col xs={24} lg={10}>
             {/* Rubber-specific fields */}
-            <Card title="Thong tin cao su" style={{ marginBottom: 24 }}>
+            <Card title="Thông tin cao su" style={{ marginBottom: 24 }}>
               <Form layout="vertical">
                 <Form.Item label="SVR Grade">
                   <Select
@@ -1143,7 +1143,7 @@ const StockOutCreatePage: React.FC = () => {
                   <Select
                     value={header.container_type || undefined}
                     onChange={val => setHeader(h => ({ ...h, container_type: val || '' }))}
-                    placeholder="Chon loai..."
+                    placeholder="Chọn loại..."
                     allowClear
                     options={[
                       { value: '20ft', label: 'Container 20ft' },
@@ -1152,7 +1152,7 @@ const StockOutCreatePage: React.FC = () => {
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
-                <Form.Item label="So banh (bale count)">
+                <Form.Item label="Số bành (bale count)">
                   <InputNumber
                     value={header.bale_count}
                     onChange={val => setHeader(h => ({ ...h, bale_count: val }))}
@@ -1169,7 +1169,7 @@ const StockOutCreatePage: React.FC = () => {
               <TextArea
                 value={header.notes}
                 onChange={e => setHeader(h => ({ ...h, notes: e.target.value }))}
-                placeholder="Ghi chú them..."
+                placeholder="Ghi chú thêm..."
                 rows={3}
               />
             </Card>
@@ -1189,7 +1189,7 @@ const StockOutCreatePage: React.FC = () => {
               <Text strong style={{ color: '#1B4D3E' }}>
                 {selectedWarehouse?.code} — {selectedWarehouse?.name}
               </Text>
-              <Text type="secondary" style={monoStyle}>{batchStocks.length} lo ton</Text>
+              <Text type="secondary" style={monoStyle}>{batchStocks.length} lô tồn</Text>
             </Space>
           </Card>
 
@@ -1199,7 +1199,7 @@ const StockOutCreatePage: React.FC = () => {
               title={
                 <Space>
                   <InboxOutlined style={{ color: '#2D8B6E' }} />
-                  <span>Danh sách xuat ({outItems.length} lo)</span>
+                  <span>Danh sách xuất ({outItems.length} lô)</span>
                   <Text strong style={{ ...monoStyle, color: '#1B4D3E' }}>
                     {totalQty.toLocaleString('vi-VN')} {outItems[0]?.material_unit || 'banh'}
                   </Text>
@@ -1236,12 +1236,12 @@ const StockOutCreatePage: React.FC = () => {
             block
             style={{ marginBottom: 16, height: 56, fontSize: 16 }}
           >
-            Them lô hàng tu kho
+            Thêm lô hàng từ kho
           </Button>
 
           {/* Batch Selection Modal */}
           <Modal
-            title={`Chon lô hàng — ${selectedWarehouse?.code || ''}`}
+            title={`Chọn lô hàng — ${selectedWarehouse?.code || ''}`}
             open={addModalOpen}
             onCancel={() => setAddModalOpen(false)}
             footer={null}
@@ -1251,7 +1251,7 @@ const StockOutCreatePage: React.FC = () => {
             {/* Filters */}
             <Space wrap style={{ marginBottom: 16 }}>
               <Input
-                placeholder="Tìm mã lo, san pham, vị trí..."
+                placeholder="Tìm mã lô, sản phẩm, vị trí..."
                 prefix={<SearchOutlined />}
                 value={searchText}
                 onChange={e => setSearchText(e.target.value)}
@@ -1263,7 +1263,7 @@ const StockOutCreatePage: React.FC = () => {
                 onChange={val => setFilterQC(val)}
                 style={{ width: 140 }}
                 options={[
-                  { value: 'all', label: 'Tat ca QC' },
+                  { value: 'all', label: 'Tất cả QC' },
                   { value: 'passed', label: 'Đạt' },
                   { value: 'warning', label: 'Cảnh báo' },
                   { value: 'needs_blend', label: 'Cần phối trộn' },
@@ -1277,7 +1277,7 @@ const StockOutCreatePage: React.FC = () => {
                   onChange={val => setFilterMaterial(val)}
                   style={{ width: 200 }}
                   options={[
-                    { value: 'all', label: 'Tat ca SP' },
+                    { value: 'all', label: 'Tất cả SP' },
                     ...materialOptions.map(m => ({ value: m.id, label: m.label })),
                   ]}
                 />
@@ -1285,12 +1285,12 @@ const StockOutCreatePage: React.FC = () => {
             </Space>
 
             <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
-              Hang ton — FIFO (lo cu truoc) — Click "Thêm" de chon
+              Hàng tồn — FIFO (lô cũ trước) — Click "Thêm" để chọn
             </Text>
 
             {loadingBatches ? (
               <div style={{ textAlign: 'center', padding: 40 }}>
-                <Spin tip="Đang tải hang ton..." />
+                <Spin tip="Đang tải hàng tồn..." />
               </div>
             ) : filteredBatches.length === 0 ? (
               <Empty
@@ -1298,8 +1298,8 @@ const StockOutCreatePage: React.FC = () => {
                   batchStocks.length === 0
                     ? 'Kho này chưa có hàng tồn'
                     : searchText || filterQC !== 'all' || filterMaterial !== 'all'
-                      ? 'Không tìm thấy lo phu hop'
-                      : 'Tat ca lo da duoc them vao phieu'
+                      ? 'Không tìm thấy lô phù hợp'
+                      : 'Tất cả lô đã được thêm vào phiếu'
                 }
               />
             ) : (
@@ -1323,7 +1323,7 @@ const StockOutCreatePage: React.FC = () => {
         <Row gutter={24}>
           <Col xs={24} lg={16}>
             {/* Summary info */}
-            <Card title={<><FileTextOutlined style={{ marginRight: 8 }} />Thong tin phiếu xuất</>} style={{ marginBottom: 24 }}>
+            <Card title={<><FileTextOutlined style={{ marginRight: 8 }} />Thông tin phiếu xuất</>} style={{ marginBottom: 24 }}>
               <Descriptions column={{ xs: 1, sm: 2 }} size="small">
                 <Descriptions.Item label="Kho xuất">
                   <Text strong>{selectedWarehouse?.code}</Text>
@@ -1336,7 +1336,7 @@ const StockOutCreatePage: React.FC = () => {
                   <Descriptions.Item label="Khách hàng">{header.customer_name}</Descriptions.Item>
                 )}
                 {header.customer_order_ref && (
-                  <Descriptions.Item label="So don hang">
+                  <Descriptions.Item label="Số đơn hàng">
                     <Text style={monoStyle}>{header.customer_order_ref}</Text>
                   </Descriptions.Item>
                 )}
@@ -1374,11 +1374,11 @@ const StockOutCreatePage: React.FC = () => {
                 message="Có lô chưa đạt QC trong phiếu"
                 description={
                   <Text>
-                    Phieu nay bao gom {outItems.filter(i => i.qc_status !== 'passed').length} lo
-                    chua dat QC ({outItems.filter(i => i.qc_status !== 'passed').map(i => (QC_TAG[i.qc_status] || QC_TAG.pending).label).join(', ')}).
+                    Phiếu này bao gồm {outItems.filter(i => i.qc_status !== 'passed').length} lô
+                    chưa đạt QC ({outItems.filter(i => i.qc_status !== 'passed').map(i => (QC_TAG[i.qc_status] || QC_TAG.pending).label).join(', ')}).
                     {header.reason === 'blend'
-                      ? ' Dieu nay phu hop cho muc dich phoi tron.'
-                      : ' Dam bao khach hang da chap nhan muc DRC nay.'
+                      ? ' Điều này phù hợp cho mục đích phối trộn.'
+                      : ' Đảm bảo khách hàng đã chấp nhận mức DRC này.'
                     }
                   </Text>
                 }
@@ -1390,7 +1390,7 @@ const StockOutCreatePage: React.FC = () => {
             )}
 
             {/* Detail items */}
-            <Card title={`Chi tiết xuất kho (${outItems.length} lo)`}>
+            <Card title={`Chi tiết xuất kho (${outItems.length} lô)`}>
               <Table<OutItem>
                 columns={reviewColumns}
                 dataSource={outItems}
@@ -1409,21 +1409,21 @@ const StockOutCreatePage: React.FC = () => {
               styles={{ body: { padding: 24 } }}
             >
               <Statistic
-                title={<span style={{ color: 'rgba(255,255,255,0.7)' }}>Tong số lượng</span>}
+                title={<span style={{ color: 'rgba(255,255,255,0.7)' }}>Tổng số lượng</span>}
                 value={totalQty}
                 suffix={outItems[0]?.material_unit || 'banh'}
                 valueStyle={{ ...monoStyle, color: '#fff', fontSize: 28 }}
               />
               <Divider style={{ borderColor: 'rgba(255,255,255,0.2)', margin: '16px 0' }} />
               <Statistic
-                title={<span style={{ color: 'rgba(255,255,255,0.7)' }}>Uoc tinh KL</span>}
+                title={<span style={{ color: 'rgba(255,255,255,0.7)' }}>Ước tính KL</span>}
                 value={totalWeight > 0 ? totalWeight : 0}
                 suffix="kg"
                 valueStyle={{ ...monoStyle, color: '#fff', fontSize: 20 }}
                 formatter={(val) => val ? (val as number).toLocaleString('vi-VN') : '—'}
               />
               <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-                {outItems.length} lo · {new Set(outItems.map(i => i.material_id)).size} san pham
+                {outItems.length} lô · {new Set(outItems.map(i => i.material_id)).size} sản phẩm
               </div>
             </Card>
           </Col>
@@ -1461,7 +1461,7 @@ const StockOutCreatePage: React.FC = () => {
                 icon={<ArrowRightOutlined />}
                 style={validateStep1() ? { backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
               >
-                Tiep: Chọn hàng xuat
+                Tiếp: Chọn hàng xuất
               </Button>
             )}
 
@@ -1474,7 +1474,7 @@ const StockOutCreatePage: React.FC = () => {
                 icon={<ArrowRightOutlined />}
                 style={validateStep2() ? { backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
               >
-                Xem lai ({outItems.length} lo)
+                Xem lại ({outItems.length} lô)
               </Button>
             )}
 
@@ -1498,7 +1498,7 @@ const StockOutCreatePage: React.FC = () => {
                   icon={<CheckCircleOutlined />}
                   style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
                 >
-                  {saving ? 'Dang xu ly...' : 'Xác nhận xuat'}
+                  {saving ? 'Đang xử lý...' : 'Xác nhận xuất'}
                 </Button>
               </>
             )}

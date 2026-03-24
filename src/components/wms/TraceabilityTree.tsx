@@ -52,7 +52,7 @@ const NODE_CONFIG: Record<TraceNodeType, {
     icon: <InboxOutlined />,
     color: '#722ed1',
     tagColor: 'purple',
-    tagLabel: 'Nhap kho',
+    tagLabel: 'Nhập kho',
   },
   deal: {
     icon: <FileTextOutlined />,
@@ -163,7 +163,7 @@ const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId }) 
         setTraceData(result)
       } catch (err: any) {
         console.error('Loi truy xuat nguon goc:', err)
-        setError(err?.message || 'Khong the truy xuat nguon goc')
+        setError(err?.message || 'Không thể truy xuất nguồn gốc')
       } finally {
         setLoading(false)
       }
@@ -183,7 +183,7 @@ const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId }) 
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '48px 0' }}>
-        <Spin size="large" tip="Dang truy xuat nguon goc..." />
+        <Spin size="large" tip="Đang truy xuất nguồn gốc..." />
       </div>
     )
   }
@@ -200,7 +200,7 @@ const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId }) 
 
   if (!traceData) {
     return (
-      <Empty description="Khong tim thay du lieu truy xuat nguon goc" />
+      <Empty description="Không tìm thấy dữ liệu truy xuất nguồn gốc" />
     )
   }
 

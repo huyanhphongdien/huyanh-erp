@@ -1,8 +1,8 @@
 // ============================================================================
 // WEIGHT TRACKING SERVICE
 // File: src/services/wms/weightTrackingService.ts
-// Theo doi hao hut trong luong cao su theo thoi gian
-// Bang: weight_check_logs, stock_batches
+// Theo dõi hao hụt trọng lượng cao su theo thời gian
+// Bảng: weight_check_logs, stock_batches
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
@@ -18,12 +18,12 @@ import type {
 export const weightTrackingService = {
 
   // --------------------------------------------------------------------------
-  // GHI NHAN KIEM TRA TRONG LUONG
+  // GHI NHẬN KIỂM TRA TRỌNG LƯỢNG
   // --------------------------------------------------------------------------
 
   /**
-   * Ghi nhan kiem tra trong luong cho 1 batch
-   * 1. Lay current_weight cua batch
+   * Ghi nhận kiểm tra trọng lượng cho 1 batch
+   * 1. Lấy current_weight của batch
    * 2. Insert weight_check_logs
    * 3. Update batch: current_weight, weight_loss, last_weight_check
    */
@@ -34,7 +34,7 @@ export const weightTrackingService = {
     checkedBy?: string,
     notes?: string
   ): Promise<WeightCheckLog | null> {
-    // 1. Lay batch hien tai
+    // 1. Lấy batch hiện tại
     const { data: batch } = await supabase
       .from('stock_batches')
       .select('current_weight, initial_weight, weight_loss')
@@ -87,10 +87,10 @@ export const weightTrackingService = {
   },
 
   // --------------------------------------------------------------------------
-  // LICH SU CAN
+  // LỊCH SỬ CÂN
   // --------------------------------------------------------------------------
 
-  /** Lay lich su can cua batch */
+  /** Lấy lịch sử cân của batch */
   async getWeightHistory(batchId: string): Promise<WeightCheckLog[]> {
     const { data, error } = await supabase
       .from('weight_check_logs')
@@ -107,10 +107,10 @@ export const weightTrackingService = {
   },
 
   // --------------------------------------------------------------------------
-  // TINH HAO HUT
+  // TÍNH HAO HỤT
   // --------------------------------------------------------------------------
 
-  /** Tinh hao hut chi tiet cho 1 batch */
+  /** Tính hao hụt chi tiết cho 1 batch */
   async calculateWeightLoss(batchId: string): Promise<{
     initial_weight: number
     current_weight: number
@@ -134,7 +134,7 @@ export const weightTrackingService = {
       ? Math.round((totalLoss / initialWeight) * 10000) / 100
       : 0
 
-    // Tinh so ngay luu kho
+    // Tính số ngày lưu kho
     const receivedDate = new Date(batch.received_date)
     const today = new Date()
     const daysInStorage = Math.floor(
@@ -156,14 +156,14 @@ export const weightTrackingService = {
   },
 
   // --------------------------------------------------------------------------
-  // CANH BAO HAO HUT
+  // CẢNH BÁO HAO HỤT
   // --------------------------------------------------------------------------
 
-  /** Lay batches co hao hut vuot nguong */
+  /** Lấy batches có hao hụt vượt ngưỡng */
   async getBatchesWithExcessiveLoss(
     thresholdPercent: number = 5
   ): Promise<StockBatch[]> {
-    // Query active batches co initial_weight > 0
+    // Query active batches có initial_weight > 0
     const { data, error } = await supabase
       .from('stock_batches')
       .select(`
@@ -190,15 +190,15 @@ export const weightTrackingService = {
   },
 
   // --------------------------------------------------------------------------
-  // CAP NHAT STORAGE DAYS
+  // CẬP NHẬT STORAGE DAYS
   // --------------------------------------------------------------------------
 
   /**
-   * Cap nhat storage_days cho tat ca batches active
-   * Nen goi dinh ky (moi ngay 1 lan)
+   * Cập nhật storage_days cho tất cả batches active
+   * Nên gọi định kỳ (mỗi ngày 1 lần)
    */
   async updateStorageDays(): Promise<number> {
-    // Lay tat ca active batches
+    // Lấy tất cả active batches
     const { data: batches, error } = await supabase
       .from('stock_batches')
       .select('id, received_date')
@@ -230,10 +230,10 @@ export const weightTrackingService = {
   },
 
   // --------------------------------------------------------------------------
-  // LUU KHO QUA LAU
+  // LƯU KHO QUÁ LÂU
   // --------------------------------------------------------------------------
 
-  /** Lay batches luu kho qua lau */
+  /** Lấy batches lưu kho quá lâu */
   async getBatchesExceedingStorageDuration(
     maxDays: number = 60
   ): Promise<StockBatch[]> {

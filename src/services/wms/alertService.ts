@@ -327,7 +327,7 @@ export const alertService = {
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
-  // 5. RUBBER: HAO HUT TRONG LUONG
+  // 5. RUBBER: HAO HỤT TRỌNG LƯỢNG
   // --------------------------------------------------------------------------
 
   async checkWeightLossAlerts(): Promise<StockAlert[]> {
@@ -353,8 +353,8 @@ export const alertService = {
           material: batch.material,
           batch_id: batch.id,
           batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
-          message: `Lo ${batch.batch_no} hao hut ${lossPercent.toFixed(1)}% (${batch.weight_loss?.toFixed(1)} kg)`,
-          detail: `Ban dau: ${batch.initial_weight} kg → Hien tai: ${batch.current_weight} kg`,
+          message: `Lô ${batch.batch_no} hao hụt ${lossPercent.toFixed(1)}% (${batch.weight_loss?.toFixed(1)} kg)`,
+          detail: `Ban đầu: ${batch.initial_weight} kg → Hiện tại: ${batch.current_weight} kg`,
           created_at: new Date().toISOString(),
         })
       }
@@ -364,7 +364,7 @@ export const alertService = {
   },
 
   // --------------------------------------------------------------------------
-  // 6. RUBBER: LUU KHO QUA LAU
+  // 6. RUBBER: LƯU KHO QUÁ LÂU
   // --------------------------------------------------------------------------
 
   async checkStorageDurationAlerts(): Promise<StockAlert[]> {
@@ -391,12 +391,12 @@ export const alertService = {
         material: batch.material,
         batch_id: batch.id,
         batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
-        message: `Lo ${batch.batch_no} luu kho ${days} ngay`,
+        message: `Lô ${batch.batch_no} lưu kho ${days} ngày`,
         detail: days > 90
-          ? 'Can xu ly gap: ban, blend hoac chuyen kho'
+          ? 'Cần xử lý gấp: bán, blend hoặc chuyển kho'
           : days > 60
             ? 'Cần kiểm tra chất lượng và lên kế hoạch xử lý'
-            : 'Sap den han xu ly, nen uu tien xuat',
+            : 'Sắp đến hạn xử lý, nên ưu tiên xuất',
         created_at: new Date().toISOString(),
       })
     }
@@ -405,7 +405,7 @@ export const alertService = {
   },
 
   // --------------------------------------------------------------------------
-  // 7. RUBBER: TAP CHAT / CONTAMINATION
+  // 7. RUBBER: TẠP CHẤT / CONTAMINATION
   // --------------------------------------------------------------------------
 
   async checkContaminationAlerts(): Promise<StockAlert[]> {
@@ -429,8 +429,8 @@ export const alertService = {
         batch_id: batch.id,
         batch: { id: batch.id, batch_no: batch.batch_no, rubber_grade: batch.rubber_grade },
         message: isConfirmed
-          ? `Lo ${batch.batch_no} XAC NHAN tap chat — can cach ly`
-          : `Lo ${batch.batch_no} NGHI NGO tap chat — can kiem tra`,
+          ? `Lô ${batch.batch_no} XÁC NHẬN tạp chất — cần cách ly`
+          : `Lô ${batch.batch_no} NGHI NGỜ tạp chất — cần kiểm tra`,
         detail: batch.contamination_notes || undefined,
         created_at: new Date().toISOString(),
       })

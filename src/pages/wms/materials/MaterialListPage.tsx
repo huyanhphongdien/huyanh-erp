@@ -192,7 +192,7 @@ const MaterialFormModal: React.FC<{
         }
       } catch (err) {
         console.error('Loi tai thanh pham:', err)
-        message.error('Không thể tải thong tin san pham')
+        message.error('Không thể tải thông tin sản phẩm')
       } finally {
         setLoadingForm(false)
       }
@@ -227,7 +227,7 @@ const MaterialFormModal: React.FC<{
           .maybeSingle()
 
         if (existing) {
-          form.setFields([{ name: 'sku', errors: [`SKU "${payload.sku}" da ton tai`] }])
+          form.setFields([{ name: 'sku', errors: [`SKU "${payload.sku}" đã tồn tại`] }])
           setSaving(false)
           return
         }
@@ -254,11 +254,11 @@ const MaterialFormModal: React.FC<{
   return (
     <Modal
       open={isOpen}
-      title={isCreate ? 'Them thanh pham moi' : 'Sua thanh pham'}
+      title={isCreate ? 'Thêm thành phẩm mới' : 'Sửa thành phẩm'}
       onCancel={onClose}
       onOk={handleSubmit}
       confirmLoading={saving}
-      okText={isCreate ? 'Tao thanh pham' : 'Luu thay doi'}
+      okText={isCreate ? 'Tạo thành phẩm' : 'Lưu thay đổi'}
       cancelText="Hủy"
       okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
       destroyOnClose
@@ -289,14 +289,14 @@ const MaterialFormModal: React.FC<{
 
           <Form.Item
             name="name"
-            label="Ten san pham"
+            label="Tên sản phẩm"
             rules={[{ required: true, message: 'Vui lòng nhập tên sản phẩm' }]}
           >
             <Input placeholder="Cao su SVR 10" />
           </Form.Item>
 
-          <Form.Item name="category_id" label="Nhom san pham">
-            <Select placeholder="— Chon nhom —" allowClear>
+          <Form.Item name="category_id" label="Nhóm sản phẩm">
+            <Select placeholder="— Chọn nhóm —" allowClear>
               {categories.map(c => (
                 <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>
               ))}
@@ -304,7 +304,7 @@ const MaterialFormModal: React.FC<{
           </Form.Item>
 
           <Form.Item name="unit_id" label="Đơn vị tính">
-            <Select placeholder="— Chon đơn vị —" allowClear>
+            <Select placeholder="— Chọn đơn vị —" allowClear>
               {units.map(u => (
                 <Select.Option key={u.id} value={u.id}>
                   {u.name}{u.symbol ? ` (${u.symbol})` : ''}
@@ -324,20 +324,20 @@ const MaterialFormModal: React.FC<{
             />
           </Form.Item>
 
-          <Form.Item name="min_stock" label="Ton toi thieu">
+          <Form.Item name="min_stock" label="Tồn tối thiểu">
             <InputNumber placeholder="0" min={0} style={{ width: '100%' }} />
           </Form.Item>
 
-          <Form.Item name="max_stock" label="Ton toi da">
+          <Form.Item name="max_stock" label="Tồn tối đa">
             <InputNumber placeholder="Không giới hạn" min={0} style={{ width: '100%' }} />
           </Form.Item>
 
-          <Form.Item name="shelf_life_days" label="Han su dung (ngay)">
+          <Form.Item name="shelf_life_days" label="Hạn sử dụng (ngày)">
             <InputNumber placeholder="365" min={0} style={{ width: '100%' }} />
           </Form.Item>
 
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea placeholder="Ghi chú ve san pham..." rows={3} />
+            <Input.TextArea placeholder="Ghi chú về sản phẩm..." rows={3} />
           </Form.Item>
         </Form>
       )}
@@ -428,7 +428,7 @@ const MaterialListPage: React.FC = () => {
       ),
     },
     {
-      title: 'Ten san pham',
+      title: 'Tên sản phẩm',
       dataIndex: 'name',
       key: 'name',
       ellipsis: true,
@@ -480,7 +480,7 @@ const MaterialListPage: React.FC = () => {
       render: (val: number) => val ? (
         <Space size={4}>
           <ClockCircleOutlined style={{ color: '#999', fontSize: 12 }} />
-          <Text type="secondary" style={{ fontSize: 12 }}>{val} ngay</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>{val} ngày</Text>
         </Space>
       ) : '—',
     },
@@ -534,7 +534,7 @@ const MaterialListPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
             <Title level={4} style={{ color: '#fff', margin: 0 }}>Thành phẩm</Title>
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{total} san pham</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{total} sản phẩm</Text>
           </div>
           <Button
             type="primary"
@@ -542,7 +542,7 @@ const MaterialListPage: React.FC = () => {
             onClick={() => setFormMaterialId('new')}
             style={{ background: '#E8A838', borderColor: '#E8A838' }}
           >
-            Them
+            Thêm
           </Button>
         </div>
 
@@ -550,7 +550,7 @@ const MaterialListPage: React.FC = () => {
           prefix={<SearchOutlined style={{ color: 'rgba(255,255,255,0.4)' }} />}
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
-          placeholder="Tim theo ten, ma SKU..."
+          placeholder="Tìm theo tên, mã SKU..."
           allowClear
           style={{
             background: 'rgba(255,255,255,0.1)',
@@ -594,7 +594,7 @@ const MaterialListPage: React.FC = () => {
               pageSize: PAGE_SIZE,
               onChange: (p) => setPage(p),
               showSizeChanger: false,
-              showTotal: (t) => `${t} san pham`,
+              showTotal: (t) => `${t} sản phẩm`,
               size: 'small',
             }}
             onRow={(record) => ({
@@ -603,13 +603,13 @@ const MaterialListPage: React.FC = () => {
             })}
             locale={{
               emptyText: hasActiveFilter ? (
-                <Empty description="Không tìm thấy san pham">
+                <Empty description="Không tìm thấy sản phẩm">
                   <Button onClick={() => { setSearchText(''); setProductFilter('all') }}>
-                    Xoa bộ lọc
+                    Xóa bộ lọc
                   </Button>
                 </Empty>
               ) : (
-                <Empty description="Chưa có san pham nao">
+                <Empty description="Chưa có sản phẩm nào">
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormMaterialId('new')}
                     style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
                     Thêm sản phẩm

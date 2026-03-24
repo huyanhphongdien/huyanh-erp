@@ -1,5 +1,5 @@
 // ============================================================================
-// BLEND SUGGEST PAGE — Goi y phoi tron
+// BLEND SUGGEST PAGE — Gợi ý phối trộn
 // File: src/pages/wms/blending/BlendSuggestPage.tsx
 // Module: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
 // ============================================================================
@@ -68,7 +68,7 @@ const BlendSuggestPage = () => {
         setBatchesNeedingBlend(batches)
       } catch (err: any) {
         console.error(err)
-        setError(err.message || 'Không thể tải danh sach lo')
+        setError(err.message || 'Không thể tải danh sách lô')
       } finally {
         setLoadingBatches(false)
       }
@@ -96,7 +96,7 @@ const BlendSuggestPage = () => {
   // Suggestion columns
   const suggestionColumns = [
     {
-      title: 'Lo doi tac',
+      title: 'Lô đối tác',
       dataIndex: 'partner_batch_no',
       key: 'partner_batch_no',
       render: (v: string) => (
@@ -113,7 +113,7 @@ const BlendSuggestPage = () => {
       ),
     },
     {
-      title: 'Ti le goi y (%)',
+      title: 'Tỉ lệ gợi ý (%)',
       dataIndex: 'suggested_ratio',
       key: 'suggested_ratio',
       align: 'right' as const,
@@ -147,7 +147,7 @@ const BlendSuggestPage = () => {
           }}
           style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
-          Tạo lệnh trộn voi lo nay
+          Tạo lệnh trộn với lô này
         </Button>
       ),
     },
@@ -167,7 +167,7 @@ const BlendSuggestPage = () => {
       </Space>
       <Title level={4} style={{ color: '#1B4D3E', marginBottom: 24 }}>
         <BulbOutlined style={{ marginRight: 8 }} />
-        Goi y phoi tron
+        Gợi ý phối trộn
       </Title>
 
       {/* Error */}
@@ -179,11 +179,11 @@ const BlendSuggestPage = () => {
       <Card style={{ borderRadius: 12, marginBottom: 24 }}>
         <Row gutter={16} align="bottom">
           <Col span={10}>
-            <Text strong style={{ display: 'block', marginBottom: 4 }}>Chon lo can phoi tron</Text>
+            <Text strong style={{ display: 'block', marginBottom: 4 }}>Chọn lô cần phối trộn</Text>
             <Select
               value={selectedBatchId || undefined}
               onChange={setSelectedBatchId}
-              placeholder="Chon lo..."
+              placeholder="Chọn lô..."
               style={{ width: '100%' }}
               showSearch
               optionFilterProp="label"
@@ -214,7 +214,7 @@ const BlendSuggestPage = () => {
               size="large"
               style={{ background: '#1B4D3E', borderColor: '#1B4D3E', width: '100%' }}
             >
-              Tim
+              Tìm
             </Button>
           </Col>
         </Row>
@@ -234,7 +234,7 @@ const BlendSuggestPage = () => {
                 <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   {selectedBatch.latest_drc || selectedBatch.initial_drc || '?'}%
                 </Text>
-                <Text style={{ marginLeft: 8 }}>Con lai:</Text>
+                <Text style={{ marginLeft: 8 }}>Còn lại:</Text>
                 <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   {selectedBatch.quantity_remaining.toLocaleString()} kg
                 </Text>
@@ -254,7 +254,7 @@ const BlendSuggestPage = () => {
         <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : suggestions.length > 0 ? (
         <Card
-          title={`Goi y phoi tron (${suggestions.length} ket qua)`}
+          title={`Gợi ý phối trộn (${suggestions.length} kết quả)`}
           style={{ borderRadius: 12 }}
           styles={{ body: { padding: 0 } }}
         >
@@ -268,7 +268,7 @@ const BlendSuggestPage = () => {
         </Card>
       ) : selectedBatchId && !loadingSuggestions ? (
         <Card style={{ borderRadius: 12 }}>
-          <Empty description="Không tìm thấy goi y phoi tron phu hop. Thu thay doi DRC mục tiêu." />
+          <Empty description="Không tìm thấy gợi ý phối trộn phù hợp. Thử thay đổi DRC mục tiêu." />
         </Card>
       ) : null}
     </div>

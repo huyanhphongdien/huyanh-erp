@@ -66,7 +66,7 @@ const ProductionFacilitiesPage = () => {
       if (err) throw err
       setFacilities((data || []) as ProductionFacility[])
     } catch (err: any) {
-      setError(err.message || 'Không thể tải du lieu')
+      setError(err.message || 'Không thể tải dữ liệu')
     } finally {
       setLoading(false)
     }
@@ -121,7 +121,7 @@ const ProductionFacilitiesPage = () => {
           .from('production_facilities')
           .insert(payload)
         if (err) throw err
-        message.success('Them nha may thanh cong')
+        message.success('Thêm nhà máy thành công')
       }
 
       setShowModal(false)
@@ -138,9 +138,9 @@ const ProductionFacilitiesPage = () => {
 
   const handleDelete = (facility: ProductionFacility) => {
     Modal.confirm({
-      title: `Xoa nha may "${facility.name}"?`,
-      content: 'Hanh dong nay khong the hoan tac.',
-      okText: 'Xoa',
+      title: `Xóa nhà máy "${facility.name}"?`,
+      content: 'Hành động này không thể hoàn tác.',
+      okText: 'Xóa',
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
@@ -160,7 +160,7 @@ const ProductionFacilitiesPage = () => {
 
   const columns = [
     {
-      title: 'Ma',
+      title: 'Mã',
       dataIndex: 'code',
       key: 'code',
       render: (v: string) => (
@@ -168,7 +168,7 @@ const ProductionFacilitiesPage = () => {
       ),
     },
     {
-      title: 'Ten',
+      title: 'Tên',
       dataIndex: 'name',
       key: 'name',
       render: (v: string) => <Text strong>{v}</Text>,
@@ -193,7 +193,7 @@ const ProductionFacilitiesPage = () => {
       dataIndex: 'is_active',
       key: 'is_active',
       render: (v: boolean) => (
-        <Tag color={v ? 'success' : 'default'}>{v ? 'Hoạt động' : 'Ngung'}</Tag>
+        <Tag color={v ? 'success' : 'default'}>{v ? 'Hoạt động' : 'Ngưng'}</Tag>
       ),
     },
     {
@@ -220,7 +220,7 @@ const ProductionFacilitiesPage = () => {
           </Space>
           <Title level={4} style={{ margin: '8px 0 0', color: '#1B4D3E' }}>
             <SettingOutlined style={{ marginRight: 8 }} />
-            Nha may san xuat
+            Nhà máy sản xuất
           </Title>
         </Col>
         <Col>
@@ -234,7 +234,7 @@ const ProductionFacilitiesPage = () => {
               onClick={openCreate}
               style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
             >
-              Them nha may
+              Thêm nhà máy
             </Button>
           </Space>
         </Col>
@@ -257,26 +257,26 @@ const ProductionFacilitiesPage = () => {
 
       {/* Add/Edit modal */}
       <Modal
-        title={editingId ? 'Cập nhật nhà máy' : 'Them nha may'}
+        title={editingId ? 'Cập nhật nhà máy' : 'Thêm nhà máy'}
         open={showModal}
         onCancel={() => { setShowModal(false); setEditingId(null) }}
         onOk={handleSave}
-        okText={editingId ? 'Cập nhật' : 'Them'}
+        okText={editingId ? 'Cập nhật' : 'Thêm'}
         confirmLoading={saving}
         okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="code" label="Mã nhà máy" rules={[{ required: true, message: 'Nhap ma nha may' }]}>
+          <Form.Item name="code" label="Mã nhà máy" rules={[{ required: true, message: 'Nhập mã nhà máy' }]}>
             <Input placeholder="VD: NM01" />
           </Form.Item>
-          <Form.Item name="name" label="Ten nha may" rules={[{ required: true, message: 'Nhap ten nha may' }]}>
-            <Input placeholder="VD: Nha may 1 - Binh Phuoc" />
+          <Form.Item name="name" label="Tên nhà máy" rules={[{ required: true, message: 'Nhập tên nhà máy' }]}>
+            <Input placeholder="VD: Nhà máy 1 - Bình Phước" />
           </Form.Item>
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={2} placeholder="Mo ta nha may..." />
+            <Input.TextArea rows={2} placeholder="Mô tả nhà máy..." />
           </Form.Item>
-          <Form.Item name="max_batch_size_kg" label="Cong suat toi da (kg/batch)"
-            rules={[{ required: true, message: 'Nhap cong suat' }]}>
+          <Form.Item name="max_batch_size_kg" label="Công suất tối đa (kg/batch)"
+            rules={[{ required: true, message: 'Nhập công suất' }]}>
             <InputNumber min={0} placeholder="0" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="is_active" label="Trạng thái" valuePropName="checked">

@@ -1,7 +1,7 @@
 // ============================================================================
 // WMS REPORT DASHBOARD PAGE — Ant Design v6
 // File: src/pages/wms/reports/WMSReportDashboardPage.tsx
-// Phase: P10 - Bao cao WMS
+// Phase: P10 - Báo cáo WMS
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
@@ -74,7 +74,7 @@ const WMSReportDashboardPage = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-            <BarChartOutlined style={{ marginRight: 8 }} />Bao cao WMS
+            <BarChartOutlined style={{ marginRight: 8 }} />Báo cáo WMS
           </Title>
         </Col>
         <Col>
@@ -97,10 +97,10 @@ const WMSReportDashboardPage = () => {
         {[
           { title: 'Nhập kho (kg)', value: kpis?.total_stock_in_kg || 0, color: '#16A34A', icon: <ImportOutlined /> },
           { title: 'Xuất kho (kg)', value: kpis?.total_stock_out_kg || 0, color: '#DC2626', icon: <ExportOutlined /> },
-          { title: 'San xuat (kg)', value: kpis?.total_production_kg || 0, color: '#2563EB', icon: <ExperimentOutlined /> },
+          { title: 'Sản xuất (kg)', value: kpis?.total_production_kg || 0, color: '#2563EB', icon: <ExperimentOutlined /> },
           { title: 'Yield TB', value: kpis?.avg_yield_percent || 0, color: '#E8A838', icon: <PercentageOutlined />, suffix: '%' },
           { title: 'DRC TB', value: kpis?.avg_drc || 0, color: '#1B4D3E', icon: <ExperimentOutlined />, suffix: '%' },
-          { title: 'Lo hoat dong', value: kpis?.total_batches_active || 0, color: '#7C3AED', icon: <DatabaseOutlined /> },
+          { title: 'Lô hoạt động', value: kpis?.total_batches_active || 0, color: '#7C3AED', icon: <DatabaseOutlined /> },
         ].map((item, i) => (
           <Col xs={12} sm={8} lg={4} key={i}>
             <Card styles={{ body: { padding: 16 } }}>
@@ -121,7 +121,7 @@ const WMSReportDashboardPage = () => {
         <Col xs={24} lg={12}>
           <Card title={<Space><AppstoreOutlined /> Phân bố Grade (tồn kho)</Space>} size="small">
             {gradeEntries.length === 0 ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có du lieu" />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có dữ liệu" />
             ) : (
               gradeEntries.map(([grade, weight]) => {
                 const pct = totalGradeWeight > 0 ? Math.round((weight / totalGradeWeight) * 100) : 0
@@ -145,7 +145,7 @@ const WMSReportDashboardPage = () => {
         <Col xs={24} lg={12}>
           <Card title={<Space><LineChartOutlined /> DRC Trend</Space>} size="small">
             {drcTrend.length === 0 ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có du lieu" />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có dữ liệu" />
             ) : (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 100, padding: '0 4px' }}>
                 {drcTrend.map((item) => {
@@ -177,12 +177,12 @@ const WMSReportDashboardPage = () => {
       <Divider />
 
       {/* Quick Links */}
-      <Title level={5} style={{ color: '#1B4D3E', marginBottom: 16 }}>Bao cao chi tiet</Title>
+      <Title level={5} style={{ color: '#1B4D3E', marginBottom: 16 }}>Báo cáo chi tiết</Title>
       <Row gutter={[16, 16]}>
         {[
-          { title: 'XNT — Xuat Nhap Ton', desc: 'Báo cáo xuất nhập tồn theo ngày', icon: <FileTextOutlined />, path: '/wms/reports/stock-movement' },
-          { title: 'Chất lượng đại lý', desc: 'Phan tich chat luong theo dai ly cung cap', icon: <TeamOutlined />, path: '/wms/reports/supplier-quality' },
-          { title: 'Tồn kho theo vat lieu', desc: 'Gia tri tồn kho, dry weight, DRC', icon: <DatabaseOutlined />, path: '/wms/reports/inventory-value' },
+          { title: 'XNT — Xuất Nhập Tồn', desc: 'Báo cáo xuất nhập tồn theo ngày', icon: <FileTextOutlined />, path: '/wms/reports/stock-movement' },
+          { title: 'Chất lượng đại lý', desc: 'Phân tích chất lượng theo đại lý cung cấp', icon: <TeamOutlined />, path: '/wms/reports/supplier-quality' },
+          { title: 'Tồn kho theo vật liệu', desc: 'Giá trị tồn kho, dry weight, DRC', icon: <DatabaseOutlined />, path: '/wms/reports/inventory-value' },
         ].map((item, i) => (
           <Col xs={24} sm={12} lg={8} key={i}>
             <Card

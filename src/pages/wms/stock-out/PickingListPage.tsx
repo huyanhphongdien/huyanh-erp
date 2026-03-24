@@ -227,7 +227,7 @@ const SwipeablePickingCard: React.FC<{
           }}>
             <Space style={{ color: '#fff', fontWeight: 700 }}>
               <CheckCircleOutlined style={{ fontSize: 24 }} />
-              Da lay
+              Đã lấy
             </Space>
           </div>
           {/* Swipe left = Skip (orange) */}
@@ -237,7 +237,7 @@ const SwipeablePickingCard: React.FC<{
             opacity: showSkipHint ? 1 : 0, transition: 'opacity 100ms',
           }}>
             <Space style={{ color: '#fff', fontWeight: 700 }}>
-              Bo qua
+              Bỏ qua
               <ForwardOutlined style={{ fontSize: 24 }} />
             </Space>
           </div>
@@ -315,7 +315,7 @@ const SwipeablePickingCard: React.FC<{
         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', opacity: isDone ? 0.5 : 1 }}>
           <div>
             <Text type="secondary" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
-              Số lượng can lay
+              Số lượng cần lấy
             </Text>
             <div>
               <Text
@@ -335,7 +335,7 @@ const SwipeablePickingCard: React.FC<{
           </div>
           {detail.batch?.received_date && (
             <Text type="secondary" style={{ fontSize: 11 }}>
-              Nhap {new Date(detail.batch.received_date).toLocaleDateString('vi-VN')}
+              Nhập {new Date(detail.batch.received_date).toLocaleDateString('vi-VN')}
             </Text>
           )}
         </div>
@@ -352,9 +352,9 @@ const SwipeablePickingCard: React.FC<{
             color: '#bfbfbf',
             paddingTop: 4,
           }}>
-            <span>&#8592; Bo qua</span>
+            <span>&#8592; Bỏ qua</span>
             <span style={{ width: 1, height: 12, backgroundColor: '#e8e8e8', display: 'inline-block' }} />
-            <span>Da lay &#8594;</span>
+            <span>Đã lấy &#8594;</span>
           </div>
         )}
 
@@ -371,7 +371,7 @@ const SwipeablePickingCard: React.FC<{
             }}
             style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}
           >
-            Hoan tac
+            Hoàn tác
           </Button>
         )}
 
@@ -392,7 +392,7 @@ const SwipeablePickingCard: React.FC<{
               icon={<ForwardOutlined />}
               style={{ flex: 1, color: '#fa8c16', borderColor: '#fa8c16' }}
             >
-              Bo qua
+              Bỏ qua
             </Button>
             <Button
               type="primary"
@@ -400,7 +400,7 @@ const SwipeablePickingCard: React.FC<{
               icon={<CheckCircleOutlined />}
               style={{ flex: 1, backgroundColor: '#52c41a', borderColor: '#52c41a' }}
             >
-              Da lay
+              Đã lấy
             </Button>
           </div>
         )}
@@ -458,7 +458,7 @@ const PickingListPage: React.FC = () => {
       setDetails(pickingDetails as unknown as PickingDetail[])
     } catch (err: any) {
       console.error('Loi tai du lieu picking:', err)
-      setError(err.message || 'Không thể tải danh sach picking')
+      setError(err.message || 'Không thể tải danh sách picking')
     } finally {
       setLoading(false)
     }
@@ -634,11 +634,11 @@ const PickingListPage: React.FC = () => {
             color: 'rgba(255,255,255,0.5)',
           }}>
             <span style={monoStyle}>
-              Da lay: {pickedQty.toLocaleString('vi-VN')} / {totalQty.toLocaleString('vi-VN')}
+              Đã lấy: {pickedQty.toLocaleString('vi-VN')} / {totalQty.toLocaleString('vi-VN')}
             </span>
             <span>
               {progressPercent}%
-              {skippedItems > 0 && ` · ${skippedItems} bo qua`}
+              {skippedItems > 0 && ` · ${skippedItems} bỏ qua`}
             </span>
           </div>
         </div>
@@ -660,7 +660,7 @@ const PickingListPage: React.FC = () => {
       <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#bfbfbf' }}>
         <InfoCircleOutlined />
         <span>
-          Vuot phai = <strong style={{ color: '#52c41a' }}>Da lay</strong> · Vuot trai = <strong style={{ color: '#fa8c16' }}>Bo qua</strong>
+          Vuốt phải = <strong style={{ color: '#52c41a' }}>Đã lấy</strong> · Vuốt trái = <strong style={{ color: '#fa8c16' }}>Bỏ qua</strong>
         </span>
       </div>
 
@@ -691,11 +691,11 @@ const PickingListPage: React.FC = () => {
           }}>
             <CheckCircleOutlined style={{ fontSize: 32, color: '#52c41a' }} />
           </div>
-          <Text strong style={{ fontSize: 18 }}>Picking hoan tat!</Text>
+          <Text strong style={{ fontSize: 18 }}>Picking hoàn tất!</Text>
           <div>
             <Text type="secondary">
-              Da lay {pickedQty.toLocaleString('vi-VN')} tu {pickedItems} lo
-              {skippedItems > 0 && ` · ${skippedItems} lo bo qua`}
+              Đã lấy {pickedQty.toLocaleString('vi-VN')} từ {pickedItems} lô
+              {skippedItems > 0 && ` · ${skippedItems} lô bỏ qua`}
             </Text>
           </div>
         </div>
@@ -736,9 +736,9 @@ const PickingListPage: React.FC = () => {
                 : {}),
             }}
           >
-            {completing ? 'Dang xu ly...' :
+            {completing ? 'Đang xử lý...' :
               allDone ? 'Hoàn tất Picking' :
-              `Con ${pendingItems} lo chua lay`}
+              `Còn ${pendingItems} lô chưa lấy`}
           </Button>
         </div>
       </div>

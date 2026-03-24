@@ -96,7 +96,7 @@ const REASON_COLORS: Record<string, string> = {
 }
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Tat ca trang thai' },
+  { value: '', label: 'Tất cả trạng thái' },
   { value: 'draft', label: 'Nháp' },
   { value: 'picking', label: 'Đang lấy' },
   { value: 'picked', label: 'Đã lấy' },
@@ -340,7 +340,7 @@ const StockOutListPage: React.FC = () => {
           onClick={handleCreateNew}
           style={{ backgroundColor: '#E8A838', borderColor: '#E8A838' }}
         >
-          Tạo phiếu xuat
+          Tạo phiếu xuất
         </Button>
       </div>
 
@@ -358,7 +358,7 @@ const StockOutListPage: React.FC = () => {
         <Col xs={12} sm={6} md={4}>
           <Card size="small">
             <Statistic
-              title="Nhap"
+              title="Nháp"
               value={draftCount}
               valueStyle={{ ...monoStyle, color: '#8c8c8c' }}
             />
@@ -385,7 +385,7 @@ const StockOutListPage: React.FC = () => {
         <Col xs={12} sm={6} md={4}>
           <Card size="small">
             <Statistic
-              title="SL da xuat"
+              title="SL đã xuất"
               value={confirmedQty}
               suffix="banh"
               valueStyle={{ ...monoStyle, color: '#1B4D3E' }}
@@ -409,7 +409,7 @@ const StockOutListPage: React.FC = () => {
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space wrap>
           <Input
-            placeholder="Tìm mã phieu, khach hang, kho..."
+            placeholder="Tìm mã phiếu, khách hàng, kho..."
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
@@ -436,7 +436,7 @@ const StockOutListPage: React.FC = () => {
             total: displayOrders.length,
             pageSize: 20,
             showSizeChanger: true,
-            showTotal: (total) => `${total} phieu`,
+            showTotal: (total) => `${total} phiếu`,
           }}
           onRow={(record) => ({
             onClick: () => handleTapRow(record),
@@ -449,7 +449,7 @@ const StockOutListPage: React.FC = () => {
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
                   activeFilter || searchText.trim()
-                    ? 'Không tìm thấy phieu'
+                    ? 'Không tìm thấy phiếu'
                     : 'Chưa có phiếu xuất kho'
                 }
               >
@@ -460,7 +460,7 @@ const StockOutListPage: React.FC = () => {
                     onClick={handleCreateNew}
                     style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
                   >
-                    Tạo phiếu xuat
+                    Tạo phiếu xuất
                   </Button>
                 )}
               </Empty>

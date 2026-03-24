@@ -1,10 +1,10 @@
 // ============================================================================
 // BLENDING SERVICE
 // File: src/services/wms/blendingService.ts
-// Module: Kho Thanh Pham (WMS) - Huy Anh Rubber ERP
-// Phase: P9 - Phoi tron (Blending)
-// Mo ta: Quan ly lenh phoi tron, mo phong DRC, QC
-// Bang: blend_orders, blend_order_items, blend_qc_results
+// Module: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
+// Phase: P9 - Phối trộn (Blending)
+// Mô tả: Quản lý lệnh phối trộn, mô phỏng DRC, QC
+// Bảng: blend_orders, blend_order_items, blend_qc_results
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
@@ -49,7 +49,7 @@ const BLEND_ORDER_LIST_SELECT = `
 // ============================================================================
 
 /**
- * Tu sinh ma lenh phoi tron: BL-{GRADE}-{YYYYMMDD}-{SEQ}
+ * Tự sinh mã lệnh phối trộn: BL-{GRADE}-{YYYYMMDD}-{SEQ}
  * VD: BL-SVR10-20260317-001
  */
 async function generateCode(grade: string): Promise<string> {
@@ -456,7 +456,7 @@ export const blendingService = {
           quantity: -item.quantity_kg,
           reference_type: 'blend_order',
           reference_id: blendId,
-          notes: `Phoi tron: ${(order as any).code}`,
+          notes: `Phối trộn: ${(order as any).code}`,
           created_at: now,
         })
     }
@@ -507,7 +507,7 @@ export const blendingService = {
         quantity: data.actual_quantity_kg,
         reference_type: 'blend_order',
         reference_id: blendId,
-        notes: `Phoi tron: ${(order as any).code} — lo moi: ${newBatch.batch_no}`,
+        notes: `Phối trộn: ${(order as any).code} — lô mới: ${newBatch.batch_no}`,
         created_at: now,
       })
 

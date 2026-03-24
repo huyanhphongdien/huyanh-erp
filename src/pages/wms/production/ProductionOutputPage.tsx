@@ -89,7 +89,7 @@ const ProductionOutputPage = () => {
       setOrder(orderData)
       setBatches(batchData)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải du lieu')
+      setError(err.message || 'Không thể tải dữ liệu')
     } finally {
       setLoading(false)
     }
@@ -124,7 +124,7 @@ const ProductionOutputPage = () => {
         final_drc: values.final_drc || undefined,
         warehouse_id: values.warehouse_id || undefined,
       })
-      message.success('Tạo lô thành phẩm thanh cong')
+      message.success('Tạo lô thành phẩm thành công')
       setShowCreateModal(false)
       createForm.resetFields()
       loadData()
@@ -181,7 +181,7 @@ const ProductionOutputPage = () => {
     return (
       <div style={{ padding: 24 }}>
         {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy lenh san xuat" />
+        <Empty description="Không tìm thấy lệnh sản xuất" />
       </div>
     )
   }
@@ -200,7 +200,7 @@ const ProductionOutputPage = () => {
 
   const columns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       key: 'batch',
       render: (_: any, r: ProductionOutputBatch) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
@@ -343,7 +343,7 @@ const ProductionOutputPage = () => {
           rowKey="id"
           size="small"
           pagination={false}
-          locale={{ emptyText: <Empty description="Chưa có lo thanh pham" /> }}
+          locale={{ emptyText: <Empty description="Chưa có lô thành phẩm" /> }}
         />
       </Card>
 
@@ -353,7 +353,7 @@ const ProductionOutputPage = () => {
         open={showCreateModal}
         onCancel={() => setShowCreateModal(false)}
         onOk={handleCreateBatch}
-        okText="Tao"
+        okText="Tạo"
         confirmLoading={createLoading}
         okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
       >
@@ -369,7 +369,7 @@ const ProductionOutputPage = () => {
               }))}
             />
           </Form.Item>
-          <Form.Item name="quantity_produced" label="San luong (kg)" rules={[{ required: true, message: 'Nhap san luong' }]}>
+          <Form.Item name="quantity_produced" label="Sản lượng (kg)" rules={[{ required: true, message: 'Nhập sản lượng' }]}>
             <InputNumber min={0} placeholder="0" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="final_grade" label="Grade">
@@ -405,7 +405,7 @@ const ProductionOutputPage = () => {
 
       {/* QC modal */}
       <Modal
-        title={<Space><ExperimentOutlined /> Kiem tra chat luong (QC)</Space>}
+        title={<Space><ExperimentOutlined /> Kiểm tra chất lượng (QC)</Space>}
         open={showQcModal}
         onCancel={() => { setShowQcModal(false); setQcBatchId('') }}
         onOk={handleQC}
@@ -422,12 +422,12 @@ const ProductionOutputPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="moisture_content" label="Do am (%)">
+              <Form.Item name="moisture_content" label="Độ ẩm (%)">
                 <InputNumber min={0} max={100} step={0.01} placeholder="0.00" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="volatile_matter" label="Chat bay hoi (%)">
+              <Form.Item name="volatile_matter" label="Chất bay hơi (%)">
                 <InputNumber min={0} max={100} step={0.01} placeholder="0.00" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -439,7 +439,7 @@ const ProductionOutputPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="nitrogen_content" label="Nito (%)">
+              <Form.Item name="nitrogen_content" label="Nitơ (%)">
                 <InputNumber min={0} max={100} step={0.01} placeholder="0.00" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -461,12 +461,12 @@ const ProductionOutputPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="color_lovibond" label="Mau (Lovibond)">
+              <Form.Item name="color_lovibond" label="Màu (Lovibond)">
                 <InputNumber min={0} step={0.1} placeholder="0.0" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="metal_content" label="Kim loai (ppm)">
+          <Form.Item name="metal_content" label="Kim loại (ppm)">
             <InputNumber min={0} step={0.01} placeholder="0.00" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="notes" label="Ghi chú">

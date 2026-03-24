@@ -75,7 +75,7 @@ const STATUS_TAG_CONFIG: Record<WeighbridgeStatus, { label: string; color: strin
 
 const TICKET_TYPE_OPTIONS: { value: TicketType; label: string; icon: string }[] = [
   { value: 'in', label: 'Xe vào (Nhập)', icon: '📥' },
-  { value: 'out', label: 'Xe ra (Xuat)', icon: '📤' },
+  { value: 'out', label: 'Xe ra (Xuất)', icon: '📤' },
 ]
 
 const REFERENCE_TYPES = [
@@ -238,7 +238,7 @@ export default function WeighbridgePage() {
       const newTicket = await weighbridgeService.create(data, userId)
       setTicket(newTicket)
       setMode('weighing')
-      setSuccess(`Tạo phiếu ${newTicket.code} thanh cong`)
+      setSuccess(`Tạo phiếu ${newTicket.code} thành công`)
     } catch (err: any) {
       setError(err?.message || 'Không thể tạo phiếu cân')
     } finally {
@@ -277,7 +277,7 @@ export default function WeighbridgePage() {
     }
 
     if (isNaN(weight) || weight <= 0) {
-      setError('Trọng lượng khong hop le')
+      setError('Trọng lượng không hợp lệ')
       return
     }
 
@@ -307,7 +307,7 @@ export default function WeighbridgePage() {
     if (reading) {
       setManualWeight(String(reading.weight))
       setWeightSource('scale')
-      setSuccess(`Doc tu can: ${reading.weight} ${reading.unit} ${reading.stable ? '(ổn định)' : '(chua on dinh)'}`)
+      setSuccess(`Đọc từ cân: ${reading.weight} ${reading.unit} ${reading.stable ? '(ổn định)' : '(chưa ổn định)'}`)
     } else {
       setError('Không đọc được từ cân. Vui lòng nhập thủ công.')
       setWeightSource('manual')
@@ -328,9 +328,9 @@ export default function WeighbridgePage() {
     try {
       const updated = await weighbridgeService.complete(ticket.id)
       setTicket(updated)
-      setSuccess(`Phieu ${updated.code} hoàn tất — NET: ${updated.net_weight?.toLocaleString()} kg`)
+      setSuccess(`Phiếu ${updated.code} hoàn tất — NET: ${updated.net_weight?.toLocaleString()} kg`)
     } catch (err: any) {
-      setError(err?.message || 'Khong the hoàn tất phiếu cân')
+      setError(err?.message || 'Không thể hoàn tất phiếu cân')
     } finally {
       setLoading(false)
     }
@@ -340,8 +340,8 @@ export default function WeighbridgePage() {
   async function handleCancel() {
     if (!ticket) return
     Modal.confirm({
-      title: 'Xác nhận huy phiếu cân',
-      content: 'Ban co chac chan muon huy phiếu cân nay?',
+      title: 'Xác nhận hủy phiếu cân',
+      content: 'Bạn có chắc chắn muốn hủy phiếu cân này?',
       okText: 'Hủy phiếu',
       cancelText: 'Không',
       okButtonProps: { danger: true },
@@ -522,9 +522,9 @@ export default function WeighbridgePage() {
                   <HistoryOutlined style={{ fontSize: 22, color: '#666' }} />
                 </div>
                 <div>
-                  <Text strong>Lịch sử can</Text>
+                  <Text strong>Lịch sử cân</Text>
                   <br />
-                  <Text type="secondary" style={{ fontSize: 13 }}>Xem phiếu cân da hoàn tất</Text>
+                  <Text type="secondary" style={{ fontSize: 13 }}>Xem phiếu cân đã hoàn tất</Text>
                 </div>
               </div>
             </Card>
@@ -588,7 +588,7 @@ export default function WeighbridgePage() {
               <Input
                 value={driverName}
                 onChange={(e) => setDriverName(e.target.value)}
-                placeholder="Ten tài xế (tuy chon)"
+                placeholder="Tên tài xế (tùy chọn)"
                 prefix={<UserOutlined />}
                 size="large"
               />
@@ -596,7 +596,7 @@ export default function WeighbridgePage() {
 
             {/* Loại xe */}
             <div>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>Loai</Text>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>Loại</Text>
               <Row gutter={12}>
                 {TICKET_TYPE_OPTIONS.map(opt => (
                   <Col span={12} key={opt.value}>
@@ -620,7 +620,7 @@ export default function WeighbridgePage() {
               <TextArea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ghi chú them (tuy chon)"
+                placeholder="Ghi chú thêm (tùy chọn)"
                 rows={2}
                 size="large"
               />
@@ -634,13 +634,13 @@ export default function WeighbridgePage() {
                 label: (
                   <Space>
                     <LinkOutlined />
-                    <span>Lien ket phiếu nhập/xuat</span>
+                    <span>Liên kết phiếu nhập/xuất</span>
                   </Space>
                 ),
                 children: (
                   <Space direction="vertical" size="middle" style={{ width: '100%' }}>
                     <div>
-                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Loai lien ket</Text>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Loại liên kết</Text>
                       <Select
                         value={referenceType}
                         onChange={setReferenceType}
@@ -726,7 +726,7 @@ export default function WeighbridgePage() {
               icon={<DisconnectOutlined />}
               onClick={() => scale.connect()}
               danger={!scale.supported}
-              title={scale.supported ? 'Bấm để kết nối đầu cân qua USB' : 'Trinh duyet khong ho tro Web Serial'}
+              title={scale.supported ? 'Bấm để kết nối đầu cân qua USB' : 'Trình duyệt không hỗ trợ Web Serial'}
             >
               {scale.supported ? 'Kết nối cân' : 'Không hỗ trợ'}
             </Button>
@@ -866,7 +866,7 @@ export default function WeighbridgePage() {
                     icon={<ThunderboltOutlined />}
                     onClick={handleReadScale}
                   >
-                    Doc tu can
+                    Đọc từ cân
                   </Button>
                 )}
               </div>
@@ -881,7 +881,7 @@ export default function WeighbridgePage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <Text strong style={{ color: '#1D4ED8' }}>
-                          💡 Goi y Tare: {tareSuggestion.lastTare?.toLocaleString()} kg
+                          💡 Gợi ý Tare: {tareSuggestion.lastTare?.toLocaleString()} kg
                         </Text>
                         <br />
                         <Text style={{ color: '#60A5FA', fontSize: 12 }}>
@@ -893,7 +893,7 @@ export default function WeighbridgePage() {
                         size="small"
                         onClick={() => tareSuggestion.lastTare && handleUseTareSuggestion(tareSuggestion.lastTare)}
                       >
-                        Dung
+                        Dùng
                       </Button>
                     </div>
                   }
@@ -941,7 +941,7 @@ export default function WeighbridgePage() {
             >
               <Space>
                 <CameraOutlined />
-                <Text strong>Camera & Anh xe ({images.length})</Text>
+                <Text strong>Camera & Ảnh xe ({images.length})</Text>
               </Space>
               {showCamera ? <UpOutlined style={{ color: '#999' }} /> : <DownOutlined style={{ color: '#999' }} />}
             </div>
@@ -967,7 +967,7 @@ export default function WeighbridgePage() {
                           setImages(prev => [...prev, img])
                           count++
                         }
-                        setSuccess(`Da chup & luu ${count}/${snapshots.length} anh tu camera`)
+                        setSuccess(`Đã chụp & lưu ${count}/${snapshots.length} ảnh từ camera`)
                       } catch (err: any) {
                         setError(err?.message || 'Lỗi khi lưu ảnh từ camera')
                       } finally {
@@ -978,10 +978,10 @@ export default function WeighbridgePage() {
 
                   {/* Manual upload buttons */}
                   <Divider style={{ margin: '8px 0' }} />
-                  <Text type="secondary" style={{ fontSize: 12 }}>📎 Upload them anh (chon tu may / chup dien thoai)</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>📎 Upload thêm ảnh (chọn từ máy / chụp điện thoại)</Text>
                   <Row gutter={[6, 6]}>
                     {(['front', 'rear', 'top', 'plate', 'cargo'] as CaptureType[]).map(type => {
-                      const labels: Record<string, string> = { front: 'Trước', rear: 'Sau', top: 'Tren', plate: 'Biến số', cargo: 'Hàng' }
+                      const labels: Record<string, string> = { front: 'Trước', rear: 'Sau', top: 'Trên', plate: 'Biển số', cargo: 'Hàng' }
                       return (
                         <Col span={Math.floor(24 / 5)} key={type}>
                           <Button
@@ -1002,7 +1002,7 @@ export default function WeighbridgePage() {
                   {uploading && (
                     <div style={{ textAlign: 'center', padding: '12px 0' }}>
                       <Spin indicator={<LoadingOutlined />} />
-                      <Text type="secondary" style={{ marginLeft: 8 }}>Dang upload anh...</Text>
+                      <Text type="secondary" style={{ marginLeft: 8 }}>Đang upload ảnh...</Text>
                     </div>
                   )}
 
@@ -1010,7 +1010,7 @@ export default function WeighbridgePage() {
                   {images.length > 0 && (
                     <div>
                       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                        Anh da luu ({images.length})
+                        Ảnh đã lưu ({images.length})
                       </Text>
                       <Row gutter={[8, 8]}>
                         {images.map(img => (

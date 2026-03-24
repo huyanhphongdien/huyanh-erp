@@ -1,8 +1,8 @@
 // ============================================================================
 // FILE: src/services/wms/stockInService.ts
-// MODULE: Kho Thanh Pham (WMS) - Huy Anh Rubber ERP
-// PHASE: P3 - Buoc 3.2 (tao phieu), 3.3 (them chi tiet), 3.4 (xac nhan)
-// MO TA: Phiếu nhập kho - tao, them chi tiet + tao lo, xac nhan -> cap nhat ton
+// MODULE: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
+// PHASE: P3 - Bước 3.2 (tạo phiếu), 3.3 (thêm chi tiết), 3.4 (xác nhận)
+// MÔ TẢ: Phiếu nhập kho - tạo, thêm chi tiết + tạo lô, xác nhận -> cập nhật tồn
 // BANG: stock_in_orders, stock_in_details, stock_batches, stock_levels,
 //       inventory_transactions, warehouse_locations
 // PATTERN: async/await, Supabase
@@ -38,7 +38,7 @@ const STOCK_IN_SELECT = `
   )
 `
 
-/** Select cho danh sach (compact) */
+/** Select cho danh sách (compact) */
 const STOCK_IN_LIST_SELECT = `
   id, code, type, warehouse_id, source_type, deal_id,
   total_quantity, total_weight, status, notes,
@@ -55,7 +55,7 @@ const STOCK_IN_LIST_SELECT = `
 // ============================================================================
 
 /**
- * Tu sinh ma phiếu nhập: NK-TP-YYYYMMDD-XXX
+ * Tự sinh mã phiếu nhập: NK-TP-YYYYMMDD-XXX
  * VD: NK-TP-20260210-001
  */
 async function generateCode(): Promise<string> {
@@ -91,7 +91,7 @@ async function generateCode(): Promise<string> {
 export const stockInService = {
 
   // ==========================================================================
-  // BUOC 3.2 - TAO PHIEU
+  // BƯỚC 3.2 - TẠO PHIẾU
   // ==========================================================================
 
   // --------------------------------------------------------------------------
@@ -100,7 +100,7 @@ export const stockInService = {
   generateCode,
 
   // --------------------------------------------------------------------------
-  // CREATE - Tao header phiếu nhập (status = draft)
+  // CREATE - Tạo header phiếu nhập (status = draft)
   // --------------------------------------------------------------------------
   async create(data: StockInFormData, createdBy?: string): Promise<StockInOrder> {
     const code = await generateCode()
@@ -130,7 +130,7 @@ export const stockInService = {
   },
 
   // --------------------------------------------------------------------------
-  // GET ALL - DS phiếu nhập, phan trang, filter
+  // GET ALL - DS phiếu nhập, phân trang, filter
   // --------------------------------------------------------------------------
   async getAll(params: WMSPaginationParams): Promise<PaginatedResponse<StockInOrder>> {
     const {
@@ -179,7 +179,7 @@ export const stockInService = {
   },
 
   // --------------------------------------------------------------------------
-  // GET BY ID - Chi tiet phieu + join details -> material, batch, location
+  // GET BY ID - Chi tiết phiếu + join details -> material, batch, location
   // --------------------------------------------------------------------------
   async getById(id: string): Promise<StockInOrder | null> {
     const { data, error } = await supabase
@@ -197,17 +197,17 @@ export const stockInService = {
   },
 
   // ==========================================================================
-  // BUOC 3.3 - THEM / SUA / XOA CHI TIET
+  // BƯỚC 3.3 - THÊM / SỬA / XÓA CHI TIẾT
   // ==========================================================================
 
   // --------------------------------------------------------------------------
-  // ADD DETAIL - Them chi tiet + tao lo moi
+  // ADD DETAIL - Thêm chi tiết + tạo lô mới
   // --------------------------------------------------------------------------
   async addDetail(
     stockInId: string,
     detail: StockInDetailFormData
   ): Promise<StockInDetail> {
-    // 1. Validate: phieu phai o trang thai draft
+    // 1. Validate: phiếu phải ở trạng thái draft
     const { data: order, error: orderErr } = await supabase
       .from('stock_in_orders')
       .select('id, status, warehouse_id')
@@ -217,10 +217,10 @@ export const stockInService = {
     if (orderErr) throw orderErr
     if (!order) throw new Error('Không tìm thấy phiếu nhập kho')
     if (order.status !== 'draft') {
-      throw new Error('Chi co the them chi tiet khi phieu o trang thai Nhap')
+      throw new Error('Chỉ có thể thêm chi tiết khi phiếu ở trạng thái Nháp')
     }
 
-    // 2. Tao lô hàng moi (stock_batches)
+    // 2. Tạo lô hàng mới (stock_batches)
     const batch = await batchService.createBatch({
       material_id: detail.material_id,
       warehouse_id: order.warehouse_id,
@@ -230,7 +230,7 @@ export const stockInService = {
       batch_type: 'production',
     })
 
-    // 3. Tao chi tiet phiếu nhập (stock_in_details)
+    // 3. Tạo chi tiết phiếu nhập (stock_in_details)
     const insertDetail = {
       stock_in_id: stockInId,
       material_id: detail.material_id,
@@ -255,17 +255,17 @@ export const stockInService = {
 
     if (detailErr) throw detailErr
 
-    // 4. Cap nhat tong số lượng / trong luong header
+    // 4. Cập nhật tổng số lượng / trọng lượng header
     await this._recalculateTotals(stockInId)
 
     return newDetail as unknown as StockInDetail
   },
 
   // --------------------------------------------------------------------------
-  // REMOVE DETAIL - Xoa chi tiet (chi khi phieu con draft)
+  // REMOVE DETAIL - Xóa chi tiết (chỉ khi phiếu còn draft)
   // --------------------------------------------------------------------------
   async removeDetail(detailId: string): Promise<void> {
-    // Lay detail + kiem tra status phieu
+    // Lấy detail + kiểm tra status phiếu
     const { data: detail, error: fetchErr } = await supabase
       .from('stock_in_details')
       .select('id, stock_in_id, batch_id')
@@ -275,7 +275,7 @@ export const stockInService = {
     if (fetchErr) throw fetchErr
     if (!detail) throw new Error('Không tìm thấy chi tiết')
 
-    // Kiem tra phieu draft
+    // Kiểm tra phiếu draft
     const { data: order, error: orderErr } = await supabase
       .from('stock_in_orders')
       .select('status')
@@ -284,10 +284,10 @@ export const stockInService = {
 
     if (orderErr) throw orderErr
     if (order?.status !== 'draft') {
-      throw new Error('Chi co the xoa chi tiet khi phieu o trang thai Nhap')
+      throw new Error('Chỉ có thể xóa chi tiết khi phiếu ở trạng thái Nháp')
     }
 
-    // Xoa lô hàng lien quan (neu co)
+    // Xóa lô hàng liên quan (nếu có)
     if (detail.batch_id) {
       await supabase
         .from('stock_batches')
@@ -295,7 +295,7 @@ export const stockInService = {
         .eq('id', detail.batch_id)
     }
 
-    // Xoa chi tiet
+    // Xóa chi tiết
     const { error: deleteErr } = await supabase
       .from('stock_in_details')
       .delete()
@@ -303,18 +303,18 @@ export const stockInService = {
 
     if (deleteErr) throw deleteErr
 
-    // Cap nhat tong
+    // Cập nhật tổng
     await this._recalculateTotals(detail.stock_in_id)
   },
 
   // --------------------------------------------------------------------------
-  // UPDATE DETAIL - Sua số lượng / vị trí (chi khi draft)
+  // UPDATE DETAIL - Sửa số lượng / vị trí (chỉ khi draft)
   // --------------------------------------------------------------------------
   async updateDetail(
     detailId: string,
     data: Partial<StockInDetailFormData>
   ): Promise<StockInDetail> {
-    // Lay detail hien tai
+    // Lấy detail hiện tại
     const { data: existing, error: fetchErr } = await supabase
       .from('stock_in_details')
       .select('id, stock_in_id, batch_id')
@@ -324,7 +324,7 @@ export const stockInService = {
     if (fetchErr) throw fetchErr
     if (!existing) throw new Error('Không tìm thấy chi tiết')
 
-    // Kiem tra phieu draft
+    // Kiểm tra phiếu draft
     const { data: order, error: orderErr } = await supabase
       .from('stock_in_orders')
       .select('status')
@@ -333,7 +333,7 @@ export const stockInService = {
 
     if (orderErr) throw orderErr
     if (order?.status !== 'draft') {
-      throw new Error('Chi co the sua chi tiet khi phieu o trang thai Nhap')
+      throw new Error('Chỉ có thể sửa chi tiết khi phiếu ở trạng thái Nháp')
     }
 
     // Update detail
@@ -357,7 +357,7 @@ export const stockInService = {
 
     if (updateErr) throw updateErr
 
-    // Dong bo quantity ve batch neu thay doi
+    // Đồng bộ quantity về batch nếu thay đổi
     if (data.quantity !== undefined && existing.batch_id) {
       await supabase
         .from('stock_batches')
@@ -369,7 +369,7 @@ export const stockInService = {
         .eq('id', existing.batch_id)
     }
 
-    // Dong bộ lọcation ve batch
+    // Đồng bộ location về batch
     if (data.location_id !== undefined && existing.batch_id) {
       await supabase
         .from('stock_batches')
@@ -380,21 +380,21 @@ export const stockInService = {
         .eq('id', existing.batch_id)
     }
 
-    // Cap nhat tong
+    // Cập nhật tổng
     await this._recalculateTotals(existing.stock_in_id)
 
     return updated as unknown as StockInDetail
   },
 
   // ==========================================================================
-  // BUOC 3.4 - XAC NHAN NHAP KHO
+  // BƯỚC 3.4 - XÁC NHẬN NHẬP KHO
   // ==========================================================================
 
   // --------------------------------------------------------------------------
-  // CONFIRM - Xac nhan nhập kho -> cap nhat tồn kho, ghi giao dich
+  // CONFIRM - Xác nhận nhập kho -> cập nhật tồn kho, ghi giao dịch
   // --------------------------------------------------------------------------
   async confirmStockIn(stockInId: string, confirmedBy: string): Promise<StockInOrder> {
-    // 1. Validate: phieu phai o status=draft, co it nhat 1 detail
+    // 1. Validate: phiếu phải ở status=draft, có ít nhất 1 detail
     const { data: order, error: orderErr } = await supabase
       .from('stock_in_orders')
       .select(`
@@ -407,7 +407,7 @@ export const stockInService = {
     if (orderErr) throw orderErr
     if (!order) throw new Error('Không tìm thấy phiếu nhập kho')
     if (order.status !== 'draft') {
-      throw new Error('Chi co the xac nhan phieu o trang thai Nhap')
+      throw new Error('Chỉ có thể xác nhận phiếu ở trạng thái Nháp')
     }
 
     const details = (order as any).details as Array<{
@@ -420,7 +420,7 @@ export const stockInService = {
     }>
 
     if (!details || details.length === 0) {
-      throw new Error('Phieu phai co it nhat 1 chi tiet truoc khi xac nhan')
+      throw new Error('Phiếu phải có ít nhất 1 chi tiết trước khi xác nhận')
     }
 
     // 2. Update header -> confirmed
@@ -437,9 +437,9 @@ export const stockInService = {
 
     if (updateOrderErr) throw updateOrderErr
 
-    // 3. Voi MOI detail -> cap nhat tồn kho
+    // 3. Với MỖI detail -> cập nhật tồn kho
     for (const detail of details) {
-      // 3a. Upsert stock_levels: tang quantity
+      // 3a. Upsert stock_levels: tăng quantity
       await this._upsertStockLevel(
         detail.material_id,
         order.warehouse_id,
@@ -457,7 +457,7 @@ export const stockInService = {
           quantity: detail.quantity,
           reference_type: 'stock_in',
           reference_id: stockInId,
-          notes: `Nhap kho tu phieu ${order.id}`,
+          notes: `Nhập kho từ phiếu ${order.id}`,
           created_by: confirmedBy,
         })
 
@@ -479,10 +479,10 @@ export const stockInService = {
       }
     }
 
-    // 4. Tinh total_quantity, total_weight -> update header
+    // 4. Tính total_quantity, total_weight -> update header
     await this._recalculateTotals(stockInId)
 
-    // 5. Phase 4: Neu co deal_id -> cap nhat deal totals + gui thong bao chat
+    // 5. Phase 4: Nếu có deal_id -> cập nhật deal totals + gửi thông báo chat
     const { data: orderWithDeal } = await supabase
       .from('stock_in_orders')
       .select('deal_id, code, total_weight')
@@ -500,18 +500,18 @@ export const stockInService = {
         )
       } catch (err) {
         console.error('Update deal after stock-in confirm failed:', err)
-        // Non-blocking: stock-in van thanh cong
+        // Non-blocking: stock-in vẫn thành công
       }
     }
 
-    // 6. Return phieu da xac nhan
+    // 6. Return phiếu đã xác nhận
     const confirmed = await this.getById(stockInId)
     if (!confirmed) throw new Error('Không thể tải phiếu sau khi xác nhận')
     return confirmed
   },
 
   // --------------------------------------------------------------------------
-  // CANCEL - Huy phieu (chi draft)
+  // CANCEL - Hủy phiếu (chỉ draft)
   // --------------------------------------------------------------------------
   async cancelStockIn(stockInId: string): Promise<StockInOrder> {
     const { data: order, error: fetchErr } = await supabase
@@ -523,10 +523,10 @@ export const stockInService = {
     if (fetchErr) throw fetchErr
     if (!order) throw new Error('Không tìm thấy phiếu nhập kho')
     if (order.status !== 'draft') {
-      throw new Error('Chi co the huy phieu o trang thai Nhap')
+      throw new Error('Chỉ có thể hủy phiếu ở trạng thái Nháp')
     }
 
-    // Xoa cac lo lien quan (chua active)
+    // Xóa các lô liên quan (chưa active)
     const { data: details } = await supabase
       .from('stock_in_details')
       .select('batch_id')
@@ -565,7 +565,7 @@ export const stockInService = {
   // ==========================================================================
 
   // --------------------------------------------------------------------------
-  // Tinh lai tong quantity / weight cua phieu
+  // Tính lại tổng quantity / weight của phiếu
   // --------------------------------------------------------------------------
   async _recalculateTotals(stockInId: string): Promise<void> {
     const { data: details, error } = await supabase
@@ -589,14 +589,14 @@ export const stockInService = {
   },
 
   // --------------------------------------------------------------------------
-  // Upsert stock_levels: tang quantity cho material + warehouse
+  // Upsert stock_levels: tăng quantity cho material + warehouse
   // --------------------------------------------------------------------------
   async _upsertStockLevel(
     materialId: string,
     warehouseId: string,
     quantityDelta: number
   ): Promise<void> {
-    // Thu tim record hien tai
+    // Thử tìm record hiện tại
     const { data: existing } = await supabase
       .from('stock_levels')
       .select('id, quantity')
@@ -605,7 +605,7 @@ export const stockInService = {
       .maybeSingle()
 
     if (existing) {
-      // Update: tang quantity
+      // Update: tăng quantity
       await supabase
         .from('stock_levels')
         .update({
@@ -614,7 +614,7 @@ export const stockInService = {
         })
         .eq('id', existing.id)
     } else {
-      // Insert moi
+      // Insert mới
       await supabase
         .from('stock_levels')
         .insert({
@@ -626,7 +626,7 @@ export const stockInService = {
   },
 
   // --------------------------------------------------------------------------
-  // Tang current_quantity cua warehouse_location
+  // Tăng current_quantity của warehouse_location
   // --------------------------------------------------------------------------
   async _increaseLocationQuantity(
     locationId: string,
@@ -638,7 +638,7 @@ export const stockInService = {
       .eq('id', locationId)
       .single()
 
-    if (fetchErr || !loc) return // Bo qua neu khong tim thay
+    if (fetchErr || !loc) return // Bỏ qua nếu không tìm thấy
 
     await supabase
       .from('warehouse_locations')

@@ -131,7 +131,7 @@ const WarehouseFormModal: React.FC<{
         .neq('id', warehouseId || '')
         .maybeSingle()
       if (existing) {
-        form.setFields([{ name: 'code', errors: ['Ma kho da ton tai'] }])
+        form.setFields([{ name: 'code', errors: ['Mã kho đã tồn tại'] }])
         setSaving(false)
         return
       }
@@ -158,7 +158,7 @@ const WarehouseFormModal: React.FC<{
       onSaved(result)
     } catch (err: any) {
       if (err.errorFields) return
-      message.error(err.message || 'Loi khi luu')
+      message.error(err.message || 'Lỗi khi lưu')
     } finally {
       setSaving(false)
     }
@@ -170,7 +170,7 @@ const WarehouseFormModal: React.FC<{
       title={
         <Space>
           <HomeOutlined style={{ color: '#1B4D3E' }} />
-          {isEditing ? 'Sửa kho' : 'Them kho moi'}
+          {isEditing ? 'Sửa kho' : 'Thêm kho mới'}
         </Space>
       }
       onCancel={onClose}
@@ -189,7 +189,7 @@ const WarehouseFormModal: React.FC<{
             <Select>
               <Select.Option value="finished">Thành phẩm</Select.Option>
               <Select.Option value="raw">Nguyên liệu</Select.Option>
-              <Select.Option value="mixed">Hon hop</Select.Option>
+              <Select.Option value="mixed">Hỗn hợp</Select.Option>
             </Select>
           </Form.Item>
 
@@ -197,7 +197,7 @@ const WarehouseFormModal: React.FC<{
             name="code"
             label="Mã kho"
             rules={[{ required: true, message: 'Vui lòng nhập mã kho' }]}
-            extra="Ma ngan, duy nhat — tu dong viet hoa"
+            extra="Mã ngắn, duy nhất — tự động viết hoa"
           >
             <Input
               placeholder="VD: KHO-A"
@@ -211,11 +211,11 @@ const WarehouseFormModal: React.FC<{
             label="Tên kho"
             rules={[{ required: true, message: 'Vui lòng nhập tên kho' }]}
           >
-            <Input placeholder="VD: Kho thanh pham A" />
+            <Input placeholder="VD: Kho thành phẩm A" />
           </Form.Item>
 
-          <Form.Item name="address" label="Dia chi / Vị trí">
-            <Input placeholder="VD: Khu A — Nha may Huy Anh" />
+          <Form.Item name="address" label="Địa chỉ / Vị trí">
+            <Input placeholder="VD: Khu A — Nhà máy Huy Anh" />
           </Form.Item>
         </Form>
       )}
@@ -267,7 +267,7 @@ export default function WarehouseListPage() {
       }
     } catch (err) {
       console.error('Load warehouses error:', err)
-      message.error('Không thể tải danh sach kho')
+      message.error('Không thể tải danh sách kho')
     } finally {
       setLoading(false)
     }
@@ -287,7 +287,7 @@ export default function WarehouseListPage() {
       message.success(`Đã cập nhật "${wh.name}"`)
     } else {
       setWarehouses(prev => [...prev, wh])
-      message.success(`Da them "${wh.name}"`)
+      message.success(`Đã thêm "${wh.name}"`)
     }
     setFormOpen(false)
     setEditId(null)
@@ -303,7 +303,7 @@ export default function WarehouseListPage() {
       render: (val: string, r: Warehouse) => (
         <div>
           <Text strong style={{ fontFamily: MONO_FONT, color: '#1B4D3E' }}>{val}</Text>
-          {!r.is_active && <Tag style={{ marginLeft: 4 }}>Ngung</Tag>}
+          {!r.is_active && <Tag style={{ marginLeft: 4 }}>Ngưng</Tag>}
         </div>
       ),
     },
@@ -346,10 +346,10 @@ export default function WarehouseListPage() {
               style={{ marginBottom: 4 }}
             />
             <Space size={4} wrap>
-              <Tag style={{ fontSize: 10, margin: 0 }}>Tong: <b>{stats.total}</b></Tag>
-              <Tag color="green" style={{ fontSize: 10, margin: 0 }}>Trong: <b>{stats.empty}</b></Tag>
-              <Tag color="orange" style={{ fontSize: 10, margin: 0 }}>Dung: <b>{stats.inUse}</b></Tag>
-              <Tag color="red" style={{ fontSize: 10, margin: 0 }}>Day: <b>{stats.full}</b></Tag>
+              <Tag style={{ fontSize: 10, margin: 0 }}>Tổng: <b>{stats.total}</b></Tag>
+              <Tag color="green" style={{ fontSize: 10, margin: 0 }}>Trống: <b>{stats.empty}</b></Tag>
+              <Tag color="orange" style={{ fontSize: 10, margin: 0 }}>Dùng: <b>{stats.inUse}</b></Tag>
+              <Tag color="red" style={{ fontSize: 10, margin: 0 }}>Đầy: <b>{stats.full}</b></Tag>
             </Space>
           </div>
         )
@@ -397,7 +397,7 @@ export default function WarehouseListPage() {
             onClick={() => { setEditId(null); setFormOpen(true) }}
             style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
-            Them kho
+            Thêm kho
           </Button>
         </Space>
       </div>
@@ -444,14 +444,14 @@ export default function WarehouseListPage() {
             })}
             locale={{
               emptyText: (
-                <Empty description="Chưa có kho nao">
+                <Empty description="Chưa có kho nào">
                   <Button
                     type="primary"
                     icon={<PlusOutlined />}
                     onClick={() => { setEditId(null); setFormOpen(true) }}
                     style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                   >
-                    Them kho
+                    Thêm kho
                   </Button>
                 </Empty>
               ),

@@ -1,8 +1,8 @@
 // ============================================================================
 // RUBBER GRADE SERVICE
 // File: src/services/wms/rubberGradeService.ts
-// Phan loai grade SVR, tinh trong luong kho, danh gia tieu chuan
-// Bang: rubber_grade_standards
+// Phân loại grade SVR, tính trọng lượng khô, đánh giá tiêu chuẩn
+// Bảng: rubber_grade_standards
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
@@ -16,7 +16,7 @@ import {
 } from './wms.types'
 
 // ============================================================================
-// CACHE — rubber_grade_standards it thay doi, cache trong memory
+// CACHE — rubber_grade_standards ít thay đổi, cache trong memory
 // ============================================================================
 
 let cachedStandards: RubberGradeStandard[] | null = null
@@ -31,7 +31,7 @@ export const rubberGradeService = {
   // QUERY
   // --------------------------------------------------------------------------
 
-  /** Lay tat ca grade standards (cached) */
+  /** Lấy tất cả grade standards (cached) */
   async getAll(): Promise<RubberGradeStandard[]> {
     if (cachedStandards) return cachedStandards
 
@@ -50,22 +50,22 @@ export const rubberGradeService = {
     return cachedStandards
   },
 
-  /** Lay standard theo grade */
+  /** Lấy standard theo grade */
   async getByGrade(grade: RubberGrade): Promise<RubberGradeStandard | null> {
     const all = await this.getAll()
     return all.find(s => s.grade === grade) || null
   },
 
-  /** Xoa cache (khi cap nhat standards) */
+  /** Xóa cache (khi cập nhật standards) */
   clearCache(): void {
     cachedStandards = null
   },
 
   // --------------------------------------------------------------------------
-  // CLASSIFICATION — Phan loai DRC -> SVR grade
+  // CLASSIFICATION — Phân loại DRC -> SVR grade
   // --------------------------------------------------------------------------
 
-  /** Phan loai DRC -> SVR grade */
+  /** Phân loại DRC -> SVR grade */
   classifyByDRC(drc: number): RubberGrade {
     if (drc >= 60) return 'SVR_3L'
     if (drc >= 55) return 'SVR_5'
@@ -74,15 +74,15 @@ export const rubberGradeService = {
   },
 
   // --------------------------------------------------------------------------
-  // CALCULATION — Tinh toan
+  // CALCULATION — Tính toán
   // --------------------------------------------------------------------------
 
-  /** Tinh trong luong kho: weight x (DRC / 100) */
+  /** Tính trọng lượng khô: weight x (DRC / 100) */
   calculateDryWeight(grossWeight: number, drc: number): number {
     return Math.round(grossWeight * (drc / 100) * 100) / 100
   },
 
-  /** Tinh hao hut */
+  /** Tính hao hụt */
   calculateShrinkage(initialWeight: number, currentWeight: number): {
     loss_kg: number
     loss_percent: number
@@ -94,12 +94,12 @@ export const rubberGradeService = {
     return { loss_kg, loss_percent }
   },
 
-  /** Tinh so banh (33.33 kg/banh) */
+  /** Tính số bành (33.33 kg/bành) */
   calculateBaleCount(weightKg: number): number {
     return Math.floor(weightKg / 33.33)
   },
 
-  /** Tinh trong luong tu so banh */
+  /** Tính trọng lượng từ số bành */
   calculateWeightFromBales(baleCount: number): number {
     return Math.round(baleCount * 33.33 * 100) / 100
   },
@@ -117,12 +117,12 @@ export const rubberGradeService = {
   },
 
   // --------------------------------------------------------------------------
-  // EVALUATION — Danh gia QC result theo tieu chuan grade
+  // EVALUATION — Đánh giá QC result theo tiêu chuẩn grade
   // --------------------------------------------------------------------------
 
   /**
-   * Kiem tra QC result co dat tieu chuan SVR grade khong
-   * Tra ve danh sach chi tieu khong dat
+   * Kiểm tra QC result có đạt tiêu chuẩn SVR grade không
+   * Trả về danh sách chỉ tiêu không đạt
    */
   async evaluateAgainstGradeStandard(
     grade: RubberGrade,
@@ -203,7 +203,7 @@ export const rubberGradeService = {
       failures.push({ parameter: 'Color', value: qcResult.color, limit: standard.color_lovibond_max, unit: 'max' })
     }
 
-    // Xac dinh grade thuc te dua tren DRC
+    // Xác định grade thực tế dựa trên DRC
     const grade_confirmed = qcResult.drc !== undefined
       ? this.classifyByDRC(qcResult.drc)
       : grade
@@ -216,7 +216,7 @@ export const rubberGradeService = {
   },
 
   /**
-   * Lay DRC range cho 1 grade (dung cho picking filter)
+   * Lấy DRC range cho 1 grade (dùng cho picking filter)
    */
   async getDRCRangeForGrade(grade: RubberGrade): Promise<{ min: number; max: number } | null> {
     const standard = await this.getByGrade(grade)

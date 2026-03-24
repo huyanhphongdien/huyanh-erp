@@ -95,7 +95,7 @@ const BlendDetailPage = () => {
       const data = await blendingService.getById(id)
       setOrder(data)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải du lieu')
+      setError(err.message || 'Không thể tải dữ liệu')
     } finally {
       setLoading(false)
     }
@@ -138,8 +138,8 @@ const BlendDetailPage = () => {
   const handleApprove = async () => {
     if (!id) return
     Modal.confirm({
-      title: 'Duyet lenh phoi tron?',
-      content: 'Lenh se chuyen sang trang thai "Đã duyệt".',
+      title: 'Duyệt lệnh phối trộn?',
+      content: 'Lệnh sẽ chuyển sang trạng thái "Đã duyệt".',
       okText: 'Duyệt',
       okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
       onOk: async () => {
@@ -160,8 +160,8 @@ const BlendDetailPage = () => {
   const handleStartBlending = async () => {
     if (!id) return
     Modal.confirm({
-      title: 'Bắt đầu phoi tron?',
-      content: 'Lenh se chuyen sang trang thai "Đang trộn".',
+      title: 'Bắt đầu phối trộn?',
+      content: 'Lệnh sẽ chuyển sang trạng thái "Đang trộn".',
       okText: 'Bắt đầu',
       okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
       onOk: async () => {
@@ -201,8 +201,8 @@ const BlendDetailPage = () => {
   const handleCancel = async () => {
     if (!id) return
     Modal.confirm({
-      title: 'Hủy lệnh phoi tron?',
-      content: 'Lenh se bi huy va khong the khoi phuc.',
+      title: 'Hủy lệnh phối trộn?',
+      content: 'Lệnh sẽ bị hủy và không thể khôi phục.',
       okText: 'Hủy lệnh',
       okButtonProps: { danger: true },
       onOk: async () => {
@@ -250,7 +250,7 @@ const BlendDetailPage = () => {
     return (
       <div style={{ padding: 24 }}>
         {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy lenh phoi tron" />
+        <Empty description="Không tìm thấy lệnh phối trộn" />
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Button onClick={() => navigate('/wms/blending')}>Quay lại</Button>
         </div>
@@ -306,7 +306,7 @@ const BlendDetailPage = () => {
           </Text>
         </Descriptions.Item>
         <Descriptions.Item label="Đạt mục tiêu">
-          {order.grade_meets_target === true && <Tag color="success">Dat</Tag>}
+          {order.grade_meets_target === true && <Tag color="success">Đạt</Tag>}
           {order.grade_meets_target === false && <Tag color="error">Không đạt</Tag>}
           {order.grade_meets_target == null && <Text type="secondary">—</Text>}
         </Descriptions.Item>
@@ -329,7 +329,7 @@ const BlendDetailPage = () => {
       {liveSimulation && (
         <Card
           size="small"
-          title={<Space><ExperimentOutlined /> So sanh DRC</Space>}
+          title={<Space><ExperimentOutlined /> So sánh DRC</Space>}
           style={{
             borderRadius: 8,
             marginBottom: 16,
@@ -352,7 +352,7 @@ const BlendDetailPage = () => {
             </Col>
             <Col span={6}>
               <div style={{ paddingTop: 8 }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>Muc tieu: {order.target_drc}%</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>Mục tiêu: {order.target_drc}%</Text>
                 <Progress
                   percent={Math.min(100, Math.round((liveSimulation.simulated_drc / order.target_drc) * 100))}
                   strokeColor={liveSimulation.meets_target ? '#16A34A' : '#DC2626'}
@@ -368,19 +368,19 @@ const BlendDetailPage = () => {
       <Row gutter={16}>
         <Col span={8}>
           <Card styles={{ body: { padding: 12 } }}>
-            <Statistic title="Tong NL (kg)" value={totalInputQty.toLocaleString()}
+            <Statistic title="Tổng NL (kg)" value={totalInputQty.toLocaleString()}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
         <Col span={8}>
           <Card styles={{ body: { padding: 12 } }}>
-            <Statistic title="Số lô nguyen lieu" value={items.length}
+            <Statistic title="Số lô nguyên liệu" value={items.length}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
         <Col span={8}>
           <Card styles={{ body: { padding: 12 } }}>
-            <Statistic title="SL mo phong (kg)" value={order.simulated_quantity_kg?.toLocaleString() || '—'}
+            <Statistic title="SL mô phỏng (kg)" value={order.simulated_quantity_kg?.toLocaleString() || '—'}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
@@ -391,7 +391,7 @@ const BlendDetailPage = () => {
   // ── Tab: Nguyên liệu ──
   const itemColumns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       key: 'batch_no',
       render: (_: any, r: BlendOrderItem) => (
         <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
@@ -432,7 +432,7 @@ const BlendDetailPage = () => {
       ),
     },
     {
-      title: '% tong',
+      title: '% tổng',
       dataIndex: 'percentage',
       key: 'percentage',
       align: 'right' as const,
@@ -472,7 +472,7 @@ const BlendDetailPage = () => {
       ) : '—',
     },
     {
-      title: 'Do am %',
+      title: 'Độ ẩm %',
       dataIndex: 'moisture_content',
       key: 'moisture_content',
       render: (v: number | null) => v != null ? (
@@ -490,7 +490,7 @@ const BlendDetailPage = () => {
       dataIndex: 'grade_meets_target',
       key: 'grade_meets_target',
       render: (v: boolean | null) => {
-        if (v === true) return <Tag color="success">Dat</Tag>
+        if (v === true) return <Tag color="success">Đạt</Tag>
         if (v === false) return <Tag color="error">Không đạt</Tag>
         return '—'
       },
@@ -506,7 +506,7 @@ const BlendDetailPage = () => {
       },
     },
     {
-      title: 'Ngay',
+      title: 'Ngày',
       dataIndex: 'tested_at',
       key: 'tested_at',
       render: (v: string | null) => <Text type="secondary" style={{ fontSize: 12 }}>{formatDateTime(v)}</Text>,
@@ -528,11 +528,11 @@ const BlendDetailPage = () => {
           onClick={() => setShowQCModal(true)}
           style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
-          Ghi nhan QC
+          Ghi nhận QC
         </Button>
       </Row>
       {qcResults.length === 0 ? (
-        <Empty description="Chưa có ket qua QC" />
+        <Empty description="Chưa có kết quả QC" />
       ) : (
         <Table
           dataSource={qcResults}
@@ -592,7 +592,7 @@ const BlendDetailPage = () => {
                 loading={actionLoading}
                 style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
               >
-                Duyet
+                Duyệt
               </Button>
             )}
             {canStart && (
@@ -603,7 +603,7 @@ const BlendDetailPage = () => {
                 loading={actionLoading}
                 style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
               >
-                Bắt đầu tron
+                Bắt đầu trộn
               </Button>
             )}
             {canComplete && (
@@ -647,7 +647,7 @@ const BlendDetailPage = () => {
 
       {/* Complete modal */}
       <Modal
-        title="Hoàn thành phoi tron"
+        title="Hoàn thành phối trộn"
         open={showCompleteModal}
         onCancel={() => setShowCompleteModal(false)}
         onOk={handleCompleteBlending}
@@ -655,7 +655,7 @@ const BlendDetailPage = () => {
         okButtonProps={{ disabled: !completeQty || !completeWarehouse, loading: actionLoading }}
       >
         <div style={{ marginBottom: 16 }}>
-          <Text strong style={{ display: 'block', marginBottom: 4 }}>San luong thuc te (kg) *</Text>
+          <Text strong style={{ display: 'block', marginBottom: 4 }}>Sản lượng thực tế (kg) *</Text>
           <InputNumber
             value={completeQty}
             onChange={v => setCompleteQty(v)}
@@ -665,7 +665,7 @@ const BlendDetailPage = () => {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <Text strong style={{ display: 'block', marginBottom: 4 }}>Kho xuat *</Text>
+          <Text strong style={{ display: 'block', marginBottom: 4 }}>Kho xuất *</Text>
           <Select
             value={completeWarehouse || undefined}
             onChange={setCompleteWarehouse}
@@ -678,7 +678,7 @@ const BlendDetailPage = () => {
           />
         </div>
         <div>
-          <Text strong style={{ display: 'block', marginBottom: 4 }}>Vị trí (tuy chon)</Text>
+          <Text strong style={{ display: 'block', marginBottom: 4 }}>Vị trí (tùy chọn)</Text>
           <Input
             value={completeLocation}
             onChange={e => setCompleteLocation(e.target.value)}
@@ -709,7 +709,7 @@ const BlendDetailPage = () => {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <Text strong style={{ display: 'block', marginBottom: 4 }}>Do am (%)</Text>
+          <Text strong style={{ display: 'block', marginBottom: 4 }}>Độ ẩm (%)</Text>
           <InputNumber
             value={qcMoisture}
             onChange={v => setQcMoisture(v)}

@@ -240,13 +240,13 @@ const BlendCreatePage = () => {
       <div style={{ padding: 24 }}>
         <Result
           status="success"
-          title="Tao lenh phoi tron thanh cong!"
+          title="Tạo lệnh phối trộn thành công!"
           subTitle={<Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{successCode}</Text>}
           extra={[
-            <Button key="list" onClick={() => navigate('/wms/blending')}>Ve danh sach</Button>,
+            <Button key="list" onClick={() => navigate('/wms/blending')}>Về danh sách</Button>,
             <Button key="new" type="primary" onClick={() => window.location.reload()}
               style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
-              Tao lenh moi
+              Tạo lệnh mới
             </Button>,
           ]}
         />
@@ -267,7 +267,7 @@ const BlendCreatePage = () => {
   // ── Batch columns (left side) ──
   const batchColumns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       dataIndex: 'batch_no',
       key: 'batch_no',
       render: (v: string) => <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{v}</Text>,
@@ -295,7 +295,7 @@ const BlendCreatePage = () => {
       },
     },
     {
-      title: 'Con lai (kg)',
+      title: 'Còn lại (kg)',
       dataIndex: 'quantity_remaining',
       key: 'quantity_remaining',
       align: 'right' as const,
@@ -309,8 +309,8 @@ const BlendCreatePage = () => {
       width: 80,
       render: (_: any, r: AvailableBatch) => (
         <Button type="link" icon={<PlusOutlined />} onClick={() => handleSelectBatch(r)} size="small">
-          Chon
-        </Button>
+          Chọn
+</Button>
       ),
     },
   ]
@@ -318,7 +318,7 @@ const BlendCreatePage = () => {
   // ── Selected items columns (right side) ──
   const selectedColumns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       key: 'batch_no',
       render: (_: any, r: SelectedBlendItem) => (
         <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{r.batch.batch_no}</Text>
@@ -342,7 +342,7 @@ const BlendCreatePage = () => {
       ),
     },
     {
-      title: '% tong',
+      title: '% tổng',
       key: 'pct',
       align: 'right' as const,
       render: (_: any, r: SelectedBlendItem) => {
@@ -389,7 +389,7 @@ const BlendCreatePage = () => {
       </Space>
       <Title level={4} style={{ color: '#1B4D3E', marginBottom: 24 }}>
         <ExperimentOutlined style={{ marginRight: 8 }} />
-        Tao lenh phoi tron
+        Tạo lệnh phối trộn
       </Title>
 
       {/* Steps */}
@@ -398,7 +398,7 @@ const BlendCreatePage = () => {
         style={{ marginBottom: 24 }}
         items={[
           { title: 'Mục tiêu' },
-          { title: 'Mô phỏng phoi tron' },
+          { title: 'Mô phỏng phối trộn' },
           { title: 'Xác nhận' },
         ]}
       />
@@ -445,7 +445,7 @@ const BlendCreatePage = () => {
             </Col>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>San luong muc tieu (kg) *</Text>
+                <Text strong>Sản lượng mục tiêu (kg) *</Text>
                 <InputNumber
                   value={targetQuantity}
                   onChange={v => setTargetQuantity(v)}
@@ -479,7 +479,7 @@ const BlendCreatePage = () => {
             <Input.TextArea
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Ghi chú lenh phoi tron..."
+              placeholder="Ghi chú lệnh phối trộn..."
               rows={2}
               style={{ marginTop: 4 }}
             />
@@ -503,7 +503,7 @@ const BlendCreatePage = () => {
               <Card
                 title={
                   <Space>
-                    <Text strong>Lo nguyen lieu kha dung</Text>
+                    <Text strong>Lô nguyên liệu khả dụng</Text>
                     <Input.Search
                       placeholder="Tìm lô..."
                       value={batchSearch}
@@ -536,7 +536,7 @@ const BlendCreatePage = () => {
             {/* RIGHT: Selected items + Simulation */}
             <Col span={10}>
               <Card
-                title={<Text strong>Nguyên liệu da chon ({selectedItems.length})</Text>}
+                title={<Text strong>Nguyên liệu đã chọn ({selectedItems.length})</Text>}
                 style={{ borderRadius: 12, marginBottom: 16 }}
                 styles={{ body: { padding: selectedItems.length > 0 ? 0 : 16 } }}
               >
@@ -559,7 +559,7 @@ const BlendCreatePage = () => {
                   title={
                     <Space>
                       <ExperimentOutlined />
-                      <Text strong>Ket qua mo phong</Text>
+                      <Text strong>Kết quả mô phỏng</Text>
                     </Space>
                   }
                   style={{
@@ -612,7 +612,7 @@ const BlendCreatePage = () => {
                       </Tag>
                     ) : (
                       <Tag icon={<CloseCircleOutlined />} color="error" style={{ fontSize: 14, padding: '4px 12px' }}>
-                        Chua dat muc tieu
+                        Chưa đạt mục tiêu
                       </Tag>
                     )}
                   </div>
@@ -633,7 +633,7 @@ const BlendCreatePage = () => {
 
           {/* Add batch quantity modal */}
           <Modal
-            title={<Space><PlusOutlined /> Nhap số lượng</Space>}
+            title={<Space><PlusOutlined /> Nhập số lượng</Space>}
             open={showBatchModal}
             onCancel={() => { setShowBatchModal(false); setSelectedRawBatch(null) }}
             onOk={handleAddBatch}
@@ -643,12 +643,12 @@ const BlendCreatePage = () => {
             {selectedRawBatch && (
               <div>
                 <Descriptions size="small" column={2} style={{ marginBottom: 16 }}>
-                  <Descriptions.Item label="Lo">{selectedRawBatch.batch_no}</Descriptions.Item>
+                  <Descriptions.Item label="Lô">{selectedRawBatch.batch_no}</Descriptions.Item>
                   <Descriptions.Item label="Grade"><GradeBadge grade={selectedRawBatch.rubber_grade} size="small" /></Descriptions.Item>
                   <Descriptions.Item label="DRC">{selectedRawBatch.latest_drc || selectedRawBatch.initial_drc || '—'}%</Descriptions.Item>
                   <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString()} kg</Descriptions.Item>
                 </Descriptions>
-                <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng phoi tron (kg) *</Text>
+                <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng phối trộn (kg) *</Text>
                 <InputNumber
                   value={batchQuantity}
                   onChange={setBatchQuantity}
@@ -667,7 +667,7 @@ const BlendCreatePage = () => {
       {/* ═══ STEP 3: Review ═══ */}
       {step === 2 && (
         <Card style={{ borderRadius: 12 }}>
-          <Title level={5}>Tóm tắt lenh phoi tron</Title>
+          <Title level={5}>Tóm tắt lệnh phối trộn</Title>
 
           <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
             <Descriptions.Item label="Grade mục tiêu">
@@ -679,7 +679,7 @@ const BlendCreatePage = () => {
             <Descriptions.Item label="Sản lượng mục tiêu">
               <Text style={{ fontFamily: "'JetBrains Mono', monospace" }}>{targetQuantity?.toLocaleString()} kg</Text>
             </Descriptions.Item>
-            <Descriptions.Item label="Số lô nguyen lieu">{selectedItems.length}</Descriptions.Item>
+            <Descriptions.Item label="Số lô nguyên liệu">{selectedItems.length}</Descriptions.Item>
             {notes && <Descriptions.Item label="Ghi chú" span={2}>{notes}</Descriptions.Item>}
           </Descriptions>
 
@@ -696,7 +696,7 @@ const BlendCreatePage = () => {
             >
               <Row gutter={16}>
                 <Col span={6}>
-                  <Statistic title="Tong NL (kg)" value={simulation.total_quantity_kg.toLocaleString()}
+                  <Statistic title="Tổng NL (kg)" value={simulation.total_quantity_kg.toLocaleString()}
                     valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
                 </Col>
                 <Col span={6}>
@@ -715,7 +715,7 @@ const BlendCreatePage = () => {
                       </Tag>
                     ) : (
                       <Tag icon={<CloseCircleOutlined />} color="error" style={{ fontSize: 14, padding: '4px 12px' }}>
-                        Chua dat
+                        Chưa đạt
                       </Tag>
                     )}
                   </div>
@@ -725,7 +725,7 @@ const BlendCreatePage = () => {
           )}
 
           {/* Items table */}
-          <Card title={`Nguyên liệu (${selectedItems.length} lo)`} size="small" style={{ marginBottom: 16 }}>
+          <Card title={`Nguyên liệu (${selectedItems.length} lô)`} size="small" style={{ marginBottom: 16 }}>
             <Table
               dataSource={selectedItems}
               columns={selectedColumns.filter(c => c.key !== 'action')}
@@ -744,7 +744,7 @@ const BlendCreatePage = () => {
               disabled={!canConfirm}
               icon={<CheckCircleOutlined />}
               style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
-              Luu & Duyet
+              Lưu & Duyệt
             </Button>
           </Space>
         </Card>

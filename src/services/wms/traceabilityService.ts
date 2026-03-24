@@ -1,9 +1,9 @@
 // ============================================================================
 // TRACEABILITY SERVICE
 // File: src/services/wms/traceabilityService.ts
-// Module: Kho Thanh Pham (WMS) - Huy Anh Rubber ERP
-// Mo ta: Truy xuat nguon goc san pham - tu thanh pham nguoc ve NVL, deal, dai ly
-// Bang: stock_batches, production_orders, production_order_items,
+// Module: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
+// Mô tả: Truy xuất nguồn gốc sản phẩm - từ thành phẩm ngược về NVL, deal, đại lý
+// Bảng: stock_batches, production_orders, production_order_items,
 //       stock_in_details, stock_in_orders, b2b_deals, b2b_partners
 // ============================================================================
 
@@ -50,7 +50,7 @@ function formatDate(dateStr: string | null | undefined): string | null {
 
 function formatWeight(kg: number | null | undefined): string {
   if (kg == null) return ''
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tan`
+  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tấn`
   return `${kg.toFixed(1)} kg`
 }
 
@@ -61,12 +61,12 @@ function formatWeight(kg: number | null | undefined): string {
 export const traceabilityService = {
 
   // --------------------------------------------------------------------------
-  // TRACE TU THANH PHAM NGUOC VE NGUON GOC
-  // Batch (TP) -> Production Order -> NVL Batches -> Stock-In -> Deal -> Dai ly
+  // TRACE TỪ THÀNH PHẨM NGƯỢC VỀ NGUỒN GỐC
+  // Batch (TP) -> Production Order -> NVL Batches -> Stock-In -> Deal -> Đại lý
   // --------------------------------------------------------------------------
 
   async traceFromBatch(batchId: string): Promise<TraceNode | null> {
-    // 1. Lay thong tin lo thanh pham
+    // 1. Lấy thông tin lô thành phẩm
     const { data: batch, error: batchErr } = await supabase
       .from('stock_batches')
       .select(`
@@ -90,21 +90,21 @@ export const traceabilityService = {
     const rootNode: TraceNode = {
       type: 'finished_product',
       id: batch.id,
-      label: `Lo thanh pham: ${batchLabel}`,
+      label: `Lô thành phẩm: ${batchLabel}`,
       detail: batchDetail,
       date: formatDate(batch.created_at),
       children: [],
     }
 
-    // 2. Tim production_output_batches co stock_batch_id = batchId
-    //    hoac production_order_items co source_batch_id = batchId (neu la NVL)
+    // 2. Tìm production_output_batches có stock_batch_id = batchId
+    //    hoặc production_order_items có source_batch_id = batchId (nếu là NVL)
     const { data: outputBatches } = await supabase
       .from('production_output_batches')
       .select('id, production_order_id, quantity_produced, final_grade, final_drc, created_at')
       .eq('stock_batch_id', batchId)
 
     if (outputBatches && outputBatches.length > 0) {
-      // Lo nay la output cua production -> truy nguoc ve production order
+      // Lô này là output của production -> truy ngược về production order
       for (const ob of outputBatches) {
         const prodNode = await this._traceProductionOrder(ob.production_order_id)
         if (prodNode) {
@@ -112,7 +112,7 @@ export const traceabilityService = {
         }
       }
     } else {
-      // Co the batch nay duoc tao truc tiep tu stock_in (khong qua san xuat)
+      // Có thể batch này được tạo trực tiếp từ stock_in (không qua sản xuất)
       const stockInNodes = await this._traceBatchToStockIn(batchId)
       rootNode.children.push(...stockInNodes)
     }
@@ -121,7 +121,7 @@ export const traceabilityService = {
   },
 
   // --------------------------------------------------------------------------
-  // TRACE TU PRODUCTION ORDER -> NVL -> STOCK-IN -> DEAL -> DAI LY
+  // TRACE TỪ PRODUCTION ORDER -> NVL -> STOCK-IN -> DEAL -> ĐẠI LÝ
   // --------------------------------------------------------------------------
 
   async _traceProductionOrder(poId: string): Promise<TraceNode | null> {
@@ -149,13 +149,13 @@ export const traceabilityService = {
     const prodNode: TraceNode = {
       type: 'production',
       id: po.id,
-      label: `Lenh san xuat: ${po.code}`,
+      label: `Lệnh sản xuất: ${po.code}`,
       detail: poDetail,
       date: formatDate(po.actual_start_date || po.created_at),
       children: [],
     }
 
-    // Lay danh sach NVL (production_order_items)
+    // Lấy danh sách NVL (production_order_items)
     const { data: items } = await supabase
       .from('production_order_items')
       .select(`
@@ -182,13 +182,13 @@ export const traceabilityService = {
         const rawNode: TraceNode = {
           type: 'raw_batch',
           id: sb.id,
-          label: `Lo NVL: ${sb.batch_no || sb.id.slice(0, 8)}`,
+          label: `Lô NVL: ${sb.batch_no || sb.id.slice(0, 8)}`,
           detail: sbDetail,
           date: formatDate(sb.created_at),
           children: [],
         }
 
-        // Truy nguoc batch NVL -> stock_in
+        // Truy ngược batch NVL -> stock_in
         const stockInNodes = await this._traceBatchToStockIn(sb.id)
         rawNode.children.push(...stockInNodes)
 
@@ -200,7 +200,7 @@ export const traceabilityService = {
   },
 
   // --------------------------------------------------------------------------
-  // TRACE TU BATCH -> STOCK_IN_DETAILS -> STOCK_IN_ORDER -> DEAL -> PARTNER
+  // TRACE TỪ BATCH -> STOCK_IN_DETAILS -> STOCK_IN_ORDER -> DEAL -> PARTNER
   // --------------------------------------------------------------------------
 
   async _traceBatchToStockIn(batchId: string): Promise<TraceNode[]> {
@@ -226,7 +226,7 @@ export const traceabilityService = {
 
       const warehouse = Array.isArray(sio.warehouse) ? sio.warehouse[0] : sio.warehouse
       const sioDetail = [
-        sio.source_type === 'deal' ? 'Từ deal' : sio.source_type === 'production' ? 'Tu san xuat' : (sio.source_type || ''),
+        sio.source_type === 'deal' ? 'Từ deal' : sio.source_type === 'production' ? 'Từ sản xuất' : (sio.source_type || ''),
         warehouse?.name || '',
         formatWeight(sio.total_weight || detail.weight),
       ].filter(Boolean).join(' | ')
@@ -234,13 +234,13 @@ export const traceabilityService = {
       const stockInNode: TraceNode = {
         type: 'stock_in',
         id: sio.id,
-        label: `Phieu nhap kho: ${sio.code}`,
+        label: `Phiếu nhập kho: ${sio.code}`,
         detail: sioDetail,
         date: formatDate(sio.created_at),
         children: [],
       }
 
-      // Neu stock_in co deal_id -> truy ve deal
+      // Nếu stock_in có deal_id -> truy về deal
       if (sio.deal_id) {
         const dealNode = await this._traceDeal(sio.deal_id)
         if (dealNode) {
@@ -272,8 +272,8 @@ export const traceabilityService = {
     if (dealErr || !deal) return null
 
     const DEAL_TYPE_MAP: Record<string, string> = {
-      purchase: 'Mua hang',
-      sale: 'Ban hang',
+      purchase: 'Mua hàng',
+      sale: 'Bán hàng',
       processing: 'Gia công',
       consignment: 'Ký gửi',
     }
@@ -299,14 +299,14 @@ export const traceabilityService = {
     if (partner) {
       const partnerDetail = [
         partner.code || '',
-        partner.tier ? `Hang ${partner.tier}` : '',
+        partner.tier ? `Hạng ${partner.tier}` : '',
         partner.phone || '',
       ].filter(Boolean).join(' | ')
 
       dealNode.children.push({
         type: 'partner',
         id: partner.id,
-        label: `Dai ly: ${partner.name}`,
+        label: `Đại lý: ${partner.name}`,
         detail: partnerDetail,
         date: null,
         children: [],
@@ -317,12 +317,12 @@ export const traceabilityService = {
   },
 
   // --------------------------------------------------------------------------
-  // TRACE TU DEAL XUOI VE THANH PHAM
+  // TRACE TỪ DEAL XUÔI VỀ THÀNH PHẨM
   // Deal -> Stock-Ins -> Batches -> Productions -> Output Batches
   // --------------------------------------------------------------------------
 
   async traceFromDeal(dealId: string): Promise<TraceNode | null> {
-    // 1. Lay thong tin deal
+    // 1. Lấy thông tin deal
     const { data: deal, error: dealErr } = await supabase
       .from('b2b_deals')
       .select(`
@@ -338,8 +338,8 @@ export const traceabilityService = {
     const partner = Array.isArray(deal.partner) ? deal.partner[0] : deal.partner
 
     const DEAL_TYPE_MAP: Record<string, string> = {
-      purchase: 'Mua hang',
-      sale: 'Ban hang',
+      purchase: 'Mua hàng',
+      sale: 'Bán hàng',
       processing: 'Gia công',
       consignment: 'Ký gửi',
     }
@@ -360,7 +360,7 @@ export const traceabilityService = {
       children: [],
     }
 
-    // 2. Tim cac phieu nhap kho tu deal nay
+    // 2. Tìm các phiếu nhập kho từ deal này
     const { data: stockIns } = await supabase
       .from('stock_in_orders')
       .select(`
@@ -387,13 +387,13 @@ export const traceabilityService = {
       const stockInNode: TraceNode = {
         type: 'stock_in',
         id: sio.id,
-        label: `Phieu nhap kho: ${sio.code}`,
+        label: `Phiếu nhập kho: ${sio.code}`,
         detail: sioDetail,
         date: formatDate(sio.created_at),
         children: [],
       }
 
-      // 3. Voi moi detail -> batch -> tim production_order_items dung batch nay
+      // 3. Với mỗi detail -> batch -> tìm production_order_items dùng batch này
       const sioDetails = (sio as any).details || []
       for (const detail of sioDetails) {
         const sb = Array.isArray(detail.batch) ? detail.batch[0] : detail.batch
@@ -409,13 +409,13 @@ export const traceabilityService = {
         const batchNode: TraceNode = {
           type: 'raw_batch',
           id: sb.id,
-          label: `Lo NVL: ${sb.batch_no || sb.id.slice(0, 8)}`,
+          label: `Lô NVL: ${sb.batch_no || sb.id.slice(0, 8)}`,
           detail: batchDetail,
           date: formatDate(sio.created_at),
           children: [],
         }
 
-        // 4. Tim production orders su dung batch nay lam NVL
+        // 4. Tìm production orders sử dụng batch này làm NVL
         const { data: poItems } = await supabase
           .from('production_order_items')
           .select('id, production_order_id, required_quantity')
@@ -440,7 +440,7 @@ export const traceabilityService = {
   },
 
   // --------------------------------------------------------------------------
-  // TRACE PRODUCTION XUOI -> OUTPUT BATCHES (thanh pham)
+  // TRACE PRODUCTION XUÔI -> OUTPUT BATCHES (thành phẩm)
   // --------------------------------------------------------------------------
 
   async _traceProductionForward(poId: string): Promise<TraceNode | null> {
@@ -467,13 +467,13 @@ export const traceabilityService = {
     const prodNode: TraceNode = {
       type: 'production',
       id: po.id,
-      label: `Lenh san xuat: ${po.code}`,
+      label: `Lệnh sản xuất: ${po.code}`,
       detail: poDetail,
       date: formatDate(po.actual_start_date || po.created_at),
       children: [],
     }
 
-    // Lay output batches
+    // Lấy output batches
     const { data: outputBatches } = await supabase
       .from('production_output_batches')
       .select(`
@@ -498,7 +498,7 @@ export const traceabilityService = {
         prodNode.children.push({
           type: 'finished_product',
           id: ob.stock_batch_id || ob.id,
-          label: `Thanh pham: ${obBatch?.batch_no || ob.id.slice(0, 8)}`,
+          label: `Thành phẩm: ${obBatch?.batch_no || ob.id.slice(0, 8)}`,
           detail: obDetail,
           date: formatDate(ob.created_at),
           children: [],

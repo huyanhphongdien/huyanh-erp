@@ -245,13 +245,13 @@ const ProductionCreatePage = () => {
       <div style={{ padding: 24 }}>
         <Result
           status="success"
-          title="Tao lenh san xuat thanh cong!"
+          title="Tạo lệnh sản xuất thành công!"
           subTitle={<Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18 }}>{successCode}</Text>}
           extra={[
-            <Button key="list" onClick={() => navigate('/wms/production')}>Ve danh sach</Button>,
+            <Button key="list" onClick={() => navigate('/wms/production')}>Về danh sách</Button>,
             <Button key="new" type="primary" onClick={() => window.location.reload()}
               style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
-              Tao lenh moi
+              Tạo lệnh mới
             </Button>,
           ]}
         />
@@ -268,7 +268,7 @@ const ProductionCreatePage = () => {
 
   const batchColumns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       dataIndex: 'batch_no',
       key: 'batch_no',
       render: (v: string) => <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{v}</Text>,
@@ -291,7 +291,7 @@ const ProductionCreatePage = () => {
       },
     },
     {
-      title: 'Con lai (kg)',
+      title: 'Còn lại (kg)',
       dataIndex: 'quantity_remaining',
       key: 'quantity_remaining',
       align: 'right' as const,
@@ -313,7 +313,7 @@ const ProductionCreatePage = () => {
       key: 'action',
       render: (_: any, r: RawBatch) => (
         <Button type="link" icon={<PlusOutlined />} onClick={() => handleSelectBatch(r)}>
-          Chon
+          Chọn
         </Button>
       ),
     },
@@ -321,7 +321,7 @@ const ProductionCreatePage = () => {
 
   const selectedColumns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       key: 'batch_no',
       render: (_: any, r: SelectedBatch) => (
         <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{r.batch.batch_no}</Text>
@@ -366,7 +366,7 @@ const ProductionCreatePage = () => {
       </Space>
       <Title level={4} style={{ color: '#1B4D3E', marginBottom: 24 }}>
         <ExperimentOutlined style={{ marginRight: 8 }} />
-        Tao lenh san xuat
+        Tạo lệnh sản xuất
       </Title>
 
       {/* Steps */}
@@ -391,7 +391,7 @@ const ProductionCreatePage = () => {
           <Row gutter={24}>
             <Col span={12}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Grade san pham *</Text>
+                <Text strong>Grade sản phẩm *</Text>
                 <Select
                   value={targetGrade || undefined}
                   onChange={setTargetGrade}
@@ -406,7 +406,7 @@ const ProductionCreatePage = () => {
             </Col>
             <Col span={12}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>San luong muc tieu (kg) *</Text>
+                <Text strong>Sản lượng mục tiêu (kg) *</Text>
                 <InputNumber
                   value={targetQuantity}
                   onChange={v => setTargetQuantity(v)}
@@ -422,7 +422,7 @@ const ProductionCreatePage = () => {
           <Row gutter={24}>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Nha may</Text>
+                <Text strong>Nhà máy</Text>
                 <Select
                   value={facilityId || undefined}
                   onChange={setFacilityId}
@@ -439,7 +439,7 @@ const ProductionCreatePage = () => {
             </Col>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Giam sat</Text>
+                <Text strong>Giám sát</Text>
                 <Select
                   value={supervisorId || undefined}
                   onChange={setSupervisorId}
@@ -457,7 +457,7 @@ const ProductionCreatePage = () => {
             </Col>
             <Col span={8}>
               <div style={{ marginBottom: 16 }}>
-                <Text strong>Ngay du kien</Text>
+                <Text strong>Ngày dự kiến</Text>
                 <Input
                   type="date"
                   value={scheduledDate}
@@ -479,7 +479,7 @@ const ProductionCreatePage = () => {
                   <Text strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                     {drcMin}% — {drcMax}%
                   </Text>
-                  <Text type="secondary">(tu dinh muc)</Text>
+                  <Text type="secondary">(từ định mức)</Text>
                 </Space>
               }
               showIcon
@@ -492,7 +492,7 @@ const ProductionCreatePage = () => {
             <Input.TextArea
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Ghi chú lenh san xuat..."
+              placeholder="Ghi chú lệnh sản xuất..."
               rows={2}
               style={{ marginTop: 4 }}
             />
@@ -514,7 +514,7 @@ const ProductionCreatePage = () => {
           {selectedBatches.length > 0 && (
             <>
               <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 8 }}>
-                Da chon ({selectedBatches.length} lo)
+                Đã chọn ({selectedBatches.length} lô)
               </Text>
               <Table
                 dataSource={selectedBatches}
@@ -527,7 +527,7 @@ const ProductionCreatePage = () => {
               <Row gutter={16} style={{ marginBottom: 24 }}>
                 <Col span={8}>
                   <Card bodyStyle={{ padding: 12 }}>
-                    <Statistic title="Tong NL (kg)" value={totalInputWeight.toLocaleString()}
+                    <Statistic title="Tổng NL (kg)" value={totalInputWeight.toLocaleString()}
                       valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
                   </Card>
                 </Col>
@@ -549,7 +549,7 @@ const ProductionCreatePage = () => {
 
           {/* Available batches */}
           <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 8 }}>
-            Lo nguyen lieu kha dung
+            Lô nguyên liệu khả dụng
           </Text>
           {loadingBatches ? (
             <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
@@ -577,7 +577,7 @@ const ProductionCreatePage = () => {
 
           {/* Add batch quantity modal */}
           <Modal
-            title={<Space><PlusOutlined /> Nhap số lượng</Space>}
+            title={<Space><PlusOutlined /> Nhập số lượng</Space>}
             open={showBatchModal}
             onCancel={() => { setShowBatchModal(false); setSelectedRawBatch(null) }}
             onOk={handleAddBatch}
@@ -587,12 +587,12 @@ const ProductionCreatePage = () => {
             {selectedRawBatch && (
               <div>
                 <Descriptions size="small" column={2} style={{ marginBottom: 16 }}>
-                  <Descriptions.Item label="Lo">{selectedRawBatch.batch_no}</Descriptions.Item>
+                  <Descriptions.Item label="Lô">{selectedRawBatch.batch_no}</Descriptions.Item>
                   <Descriptions.Item label="Grade"><GradeBadge grade={selectedRawBatch.rubber_grade} size="small" /></Descriptions.Item>
                   <Descriptions.Item label="DRC">{selectedRawBatch.latest_drc || selectedRawBatch.initial_drc || '—'}%</Descriptions.Item>
                   <Descriptions.Item label="Còn lại">{selectedRawBatch.quantity_remaining.toLocaleString()} kg</Descriptions.Item>
                 </Descriptions>
-                <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng lay (kg) *</Text>
+                <Text strong style={{ display: 'block', marginBottom: 4 }}>Số lượng lấy (kg) *</Text>
                 <InputNumber
                   value={batchQuantity}
                   onChange={setBatchQuantity}
@@ -611,7 +611,7 @@ const ProductionCreatePage = () => {
       {/* ═══ STEP 3: Xác nhận ═══ */}
       {step === 2 && (
         <Card style={{ borderRadius: 12 }}>
-          <Title level={5}>Tóm tắt lenh san xuat</Title>
+          <Title level={5}>Tóm tắt lệnh sản xuất</Title>
 
           <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
             <Descriptions.Item label="Grade">
@@ -647,7 +647,7 @@ const ProductionCreatePage = () => {
             </Col>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="Tong NL (kg)" value={totalInputWeight.toLocaleString()}
+                <Statistic title="Tổng NL (kg)" value={totalInputWeight.toLocaleString()}
                   valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
               </Card>
             </Col>
@@ -666,7 +666,7 @@ const ProductionCreatePage = () => {
           </Row>
 
           {/* Batch list */}
-          <Card title={`Nguyên liệu (${selectedBatches.length} lo)`} size="small" style={{ marginBottom: 16 }}>
+          <Card title={`Nguyên liệu (${selectedBatches.length} lô)`} size="small" style={{ marginBottom: 16 }}>
             <Table
               dataSource={selectedBatches}
               columns={selectedColumns.filter(c => c.key !== 'action')}

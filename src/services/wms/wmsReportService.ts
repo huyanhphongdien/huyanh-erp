@@ -1,9 +1,9 @@
 // ============================================================================
 // WMS REPORT SERVICE
 // File: src/services/wms/wmsReportService.ts
-// Module: Kho Thanh Pham (WMS) - Huy Anh Rubber ERP
-// Phase: P10 - Bao cao (Reports)
-// Mo ta: Bao cao XNT, san xuat, chat luong dai ly, DRC trend, tồn kho
+// Module: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
+// Phase: P10 - Báo cáo (Reports)
+// Mô tả: Báo cáo XNT, sản xuất, chất lượng đại lý, DRC trend, tồn kho
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'

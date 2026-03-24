@@ -637,7 +637,7 @@ export const batchService = {
   },
 
   // --------------------------------------------------------------------------
-  // RUBBER: Cap nhat grade
+  // RUBBER: Cập nhật grade
   // --------------------------------------------------------------------------
   async updateRubberGrade(id: string, grade: RubberGrade): Promise<StockBatch> {
     const { data, error } = await supabase
@@ -655,7 +655,7 @@ export const batchService = {
   },
 
   // --------------------------------------------------------------------------
-  // RUBBER: Cap nhat contamination status
+  // RUBBER: Cập nhật contamination status
   // --------------------------------------------------------------------------
   async updateContaminationStatus(
     id: string,

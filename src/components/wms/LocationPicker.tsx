@@ -83,9 +83,9 @@ function getLocationStatus(loc: LocationData): LocationStatus {
 }
 
 const STATUS_CONFIG: Record<LocationStatus, { bg: string; color: string; label: string }> = {
-  empty: { bg: '#D1FAE5', color: '#059669', label: 'Trong' },
+  empty: { bg: '#D1FAE5', color: '#059669', label: 'Trống' },
   partial: { bg: '#FEF3C7', color: '#D97706', label: 'Đang dùng' },
-  full: { bg: '#FEE2E2', color: '#DC2626', label: 'Dây' },
+  full: { bg: '#FEE2E2', color: '#DC2626', label: 'Đầy' },
   unavailable: { bg: '#F3F4F6', color: '#9CA3AF', label: 'Không KD' },
 }
 
@@ -125,7 +125,7 @@ const GridCell: React.FC<{
           {location.capacity ? (
             <div>{location.current_quantity}/{location.capacity} ({fillPct}%)</div>
           ) : location.current_quantity > 0 ? (
-            <div>Dang chua: {location.current_quantity}</div>
+            <div>Đang chứa: {location.current_quantity}</div>
           ) : null}
           {location.shelf && <div>Ke: {location.shelf}{location.row_name ? ` · Hang: ${location.row_name}` : ''}{location.column_name ? ` · O: ${location.column_name}` : ''}</div>}
         </div>
@@ -234,7 +234,7 @@ const ListItem: React.FC<{
           </div>
         ) : (
           <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
-            {location.current_quantity > 0 ? `Dang chua: ${location.current_quantity}` : 'Trong'}
+            {location.current_quantity > 0 ? `Đang chứa: ${location.current_quantity}` : 'Trống'}
           </Text>
         )}
       </div>
@@ -389,7 +389,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
 
   // Empty
   if (locations.length === 0) {
-    return <Empty description="Chưa có vị trí nao trong kho nay" style={{ padding: 24 }} />
+    return <Empty description="Chưa có vị trí nào trong kho này" style={{ padding: 24 }} />
   }
 
   return (
@@ -442,10 +442,10 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           {/* Summary */}
           {showSummary && (
             <Space size="middle" style={{ fontSize: 11, marginBottom: 8 }}>
-              <Text type="secondary">Tong: {locations.length}</Text>
-              <Text style={{ color: '#059669', fontWeight: 600 }}>{summary.empty} trong</Text>
-              <Text style={{ color: '#D97706', fontWeight: 600 }}>{summary.partial} dung</Text>
-              <Text style={{ color: '#DC2626', fontWeight: 600 }}>{summary.full} day</Text>
+              <Text type="secondary">Tổng: {locations.length}</Text>
+              <Text style={{ color: '#059669', fontWeight: 600 }}>{summary.empty} trống</Text>
+              <Text style={{ color: '#D97706', fontWeight: 600 }}>{summary.partial} dùng</Text>
+              <Text style={{ color: '#DC2626', fontWeight: 600 }}>{summary.full} đầy</Text>
               {summary.unavailable > 0 && <Text type="secondary">{summary.unavailable} N/A</Text>}
             </Space>
           )}
@@ -469,7 +469,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                   onChange={() => setActiveShelf(null)}
                   style={{ borderRadius: 6, fontSize: 11 }}
                 >
-                  Tat ca
+                  Tất cả
                 </Tag.CheckableTag>
                 {shelves.map(shelf => (
                   <Tag.CheckableTag
@@ -504,7 +504,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
 
           {/* No results */}
           {filteredLocations.length === 0 && (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không tìm thấy vị trí phu hop" />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không tìm thấy vị trí phù hợp" />
           )}
 
           {/* GRID VIEW */}
@@ -515,7 +515,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                   <Text type="secondary" style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>
                     Ke {shelf}
                     <span style={{ fontWeight: 400, marginLeft: 4, color: '#bbb' }}>
-                      ({locs.filter(l => isSelectable(l, mode)).length} co the chon)
+                      ({locs.filter(l => isSelectable(l, mode)).length} có thể chọn)
                     </span>
                   </Text>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
@@ -564,8 +564,8 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           <div style={{ fontSize: 10, color: '#bbb', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
             <InfoCircleOutlined />
             {mode === 'stock-in'
-              ? 'Chon o trong hoac chua day de nhập kho. Hover de xem chi tiet.'
-              : 'Chon o co hang de xuất kho. He thong uu tien FIFO.'}
+              ? 'Chọn ô trống hoặc chưa đầy để nhập kho. Hover để xem chi tiết.'
+              : 'Chọn ô có hàng để xuất kho. Hệ thống ưu tiên FIFO.'}
           </div>
         </>
       )}

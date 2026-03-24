@@ -134,7 +134,7 @@ const AlertListPage = () => {
     switch (severity) {
       case 'high': return { color: '#ff4d4f', borderColor: '#ff4d4f', tagColor: 'error', text: 'Cao' }
       case 'medium': return { color: '#faad14', borderColor: '#faad14', tagColor: 'warning', text: 'Trung bình' }
-      case 'low': return { color: '#1677ff', borderColor: '#1677ff', tagColor: 'processing', text: 'Thap' }
+      case 'low': return { color: '#1677ff', borderColor: '#1677ff', tagColor: 'processing', text: 'Thấp' }
       default: return { color: '#d9d9d9', borderColor: '#d9d9d9', tagColor: 'default', text: '' }
     }
   }
@@ -159,7 +159,7 @@ const AlertListPage = () => {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#F7F5F2' }}>
         <Spin size="large" />
-        <Text type="secondary" style={{ marginTop: 12 }}>Dang kiem tra canh bao...</Text>
+        <Text type="secondary" style={{ marginTop: 12 }}>Đang kiểm tra cảnh báo...</Text>
       </div>
     )
   }
@@ -182,7 +182,7 @@ const AlertListPage = () => {
           <div style={{ flex: 1 }}>
             <Title level={5} style={{ color: '#fff', margin: 0 }}>Cảnh báo</Title>
             <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-              {tabCounts.all} canh bao dang hoat dong
+              {tabCounts.all} cảnh báo đang hoạt động
             </Text>
           </div>
           <Button
@@ -268,7 +268,7 @@ const AlertListPage = () => {
                             onClick={() => navigate(`/wms/inventory/${alert.material_id}`)}
                             style={{ padding: 0, fontSize: 12, color: '#2D8B6E' }}
                           >
-                            Xem chi tiet <RightOutlined />
+                            Xem chi tiết <RightOutlined />
                           </Button>
                         )}
                       </Space>

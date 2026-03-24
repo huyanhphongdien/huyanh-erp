@@ -99,7 +99,7 @@ const StockCheckPage = () => {
       setStockCheck(check)
       setStep('checking')
     } catch (err: any) {
-      message.error(err.message || 'Loi tao kiem ke')
+      message.error(err.message || 'Lỗi tạo kiểm kê')
     } finally {
       setCreating(false)
     }
@@ -126,10 +126,10 @@ const StockCheckPage = () => {
     try {
       setSaving(true)
       const result = await stockCheckService.finalizeStockCheck(stockCheck, user.employee_id || user.id)
-      message.success(`Kiểm kê hoan tat! ${result.adjustments} dong chenh lech, ${result.transactions_created} phieu dieu chinh`)
+      message.success(`Kiểm kê hoàn tất! ${result.adjustments} dòng chênh lệch, ${result.transactions_created} phiếu điều chỉnh`)
       navigate('/wms')
     } catch (err: any) {
-      message.error(err.message || 'Loi hoan tat kiem ke')
+      message.error(err.message || 'Lỗi hoàn tất kiểm kê')
     } finally {
       setSaving(false)
     }
@@ -157,7 +157,7 @@ const StockCheckPage = () => {
   })
 
   const getDiscrepancyTag = (disc: number) => {
-    if (disc === 0) return <Tag icon={<CheckOutlined />} color="success">Khop</Tag>
+    if (disc === 0) return <Tag icon={<CheckOutlined />} color="success">Khớp</Tag>
     if (disc > 0) return <Tag icon={<ArrowUpOutlined />} color="blue">+{disc}</Tag>
     return <Tag icon={<ArrowDownOutlined />} color="error">{disc}</Tag>
   }
@@ -174,7 +174,7 @@ const StockCheckPage = () => {
       style={{ padding: '16px', background: '#fff', borderBottom: '1px solid #f0f0f0' }}
       items={[
         { title: 'Chọn kho' },
-        { title: 'Nhap so lieu' },
+        { title: 'Nhập số liệu' },
         { title: 'Kết quả' },
       ]}
     />
@@ -189,7 +189,7 @@ const StockCheckPage = () => {
             <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ color: '#fff' }} />
             <div>
               <Title level={5} style={{ color: '#fff', margin: 0 }}>Kiểm kê tồn kho</Title>
-              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Buoc 1: Chọn kho kiem ke</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Bước 1: Chọn kho kiểm kê</Text>
             </div>
           </Space>
         </div>
@@ -257,7 +257,7 @@ const StockCheckPage = () => {
             loading={creating}
             style={{ background: selectedWarehouse ? '#1B4D3E' : undefined, borderColor: selectedWarehouse ? '#1B4D3E' : undefined }}
           >
-            {creating ? 'Dang tao...' : 'Bắt đầu kiem ke'}
+            {creating ? 'Đang tạo...' : 'Bắt đầu kiểm kê'}
           </Button>
         </div>
       </div>
@@ -270,7 +270,7 @@ const StockCheckPage = () => {
 
     const checkColumns = [
       {
-        title: 'Lo',
+        title: 'Lô',
         dataIndex: 'batch_no',
         key: 'batch_no',
         width: 130,
@@ -333,7 +333,7 @@ const StockCheckPage = () => {
             <div style={{ flex: 1 }}>
               <Title level={5} style={{ color: '#fff', margin: 0 }}>Kiểm kê: {warehouseName}</Title>
               <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-                {stockCheck?.code} &bull; {checkedCount}/{items.length} da kiem
+                {stockCheck?.code} &bull; {checkedCount}/{items.length} đã kiểm
               </Text>
             </div>
           </Space>
@@ -355,7 +355,7 @@ const StockCheckPage = () => {
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
-            placeholder="Tìm lô, san pham..."
+            placeholder="Tìm lô, sản phẩm..."
             allowClear
             style={{ marginBottom: 8 }}
           />
@@ -366,7 +366,7 @@ const StockCheckPage = () => {
               onClick={() => setShowOnlyDiscrepancy(false)}
               style={!showOnlyDiscrepancy ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
             >
-              Tat ca ({items.length})
+              Tất cả ({items.length})
             </Button>
             <Button
               type={showOnlyDiscrepancy ? 'primary' : 'default'}
@@ -402,9 +402,9 @@ const StockCheckPage = () => {
           padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
         }}>
           <Space style={{ marginBottom: 8 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Da kiem: {checkedCount}/{items.length}</Text>
-            {summary.shortage_count > 0 && <Text type="danger" style={{ fontSize: 12 }}>&bull; {summary.shortage_count} thieu</Text>}
-            {summary.surplus_count > 0 && <Text style={{ color: '#1677ff', fontSize: 12 }}>&bull; {summary.surplus_count} thua</Text>}
+            <Text type="secondary" style={{ fontSize: 12 }}>Đã kiểm: {checkedCount}/{items.length}</Text>
+            {summary.shortage_count > 0 && <Text type="danger" style={{ fontSize: 12 }}>&bull; {summary.shortage_count} thiếu</Text>}
+            {summary.surplus_count > 0 && <Text style={{ color: '#1677ff', fontSize: 12 }}>&bull; {summary.surplus_count} thừa</Text>}
           </Space>
           <Button
             block
@@ -414,7 +414,7 @@ const StockCheckPage = () => {
             disabled={checkedCount < items.length}
             style={checkedCount >= items.length ? { background: '#E8A838', borderColor: '#E8A838', color: '#fff' } : {}}
           >
-            Xem ket qua
+            Xem kết quả
           </Button>
         </div>
       </div>
@@ -428,7 +428,7 @@ const StockCheckPage = () => {
         <Space align="center">
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setStep('checking')} style={{ color: '#fff' }} />
           <div>
-            <Title level={5} style={{ color: '#fff', margin: 0 }}>Ket qua kiem ke</Title>
+            <Title level={5} style={{ color: '#fff', margin: 0 }}>Kết quả kiểm kê</Title>
             <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
               {stockCheck?.code} &bull; {warehouseName}
             </Text>
@@ -446,7 +446,7 @@ const StockCheckPage = () => {
               <Statistic
                 value={summary.match_count}
                 valueStyle={{ fontFamily: MONO_FONT, fontSize: 20, color: '#389e0d' }}
-                title={<Text style={{ fontSize: 11, color: '#389e0d' }}>Khop</Text>}
+                title={<Text style={{ fontSize: 11, color: '#389e0d' }}>Khớp</Text>}
               />
             </Card>
           </Col>
@@ -456,7 +456,7 @@ const StockCheckPage = () => {
                 value={summary.total_surplus}
                 prefix="+"
                 valueStyle={{ fontFamily: MONO_FONT, fontSize: 20, color: '#1677ff' }}
-                title={<Text style={{ fontSize: 11, color: '#1677ff' }}>Thua ({summary.surplus_count})</Text>}
+                title={<Text style={{ fontSize: 11, color: '#1677ff' }}>Thừa ({summary.surplus_count})</Text>}
               />
             </Card>
           </Col>
@@ -466,7 +466,7 @@ const StockCheckPage = () => {
                 value={summary.total_shortage}
                 prefix="-"
                 valueStyle={{ fontFamily: MONO_FONT, fontSize: 20, color: '#cf1322' }}
-                title={<Text style={{ fontSize: 11, color: '#cf1322' }}>Thieu ({summary.shortage_count})</Text>}
+                title={<Text style={{ fontSize: 11, color: '#cf1322' }}>Thiếu ({summary.shortage_count})</Text>}
               />
             </Card>
           </Col>
@@ -476,7 +476,7 @@ const StockCheckPage = () => {
         {(summary.surplus_count + summary.shortage_count) > 0 ? (
           <>
             <Title level={5} style={{ color: '#666', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
-              Cac dong chenh lech
+              Các dòng chênh lệch
             </Title>
 
             <Space direction="vertical" style={{ width: '100%' }} size={8}>
@@ -517,15 +517,15 @@ const StockCheckPage = () => {
               type="warning"
               showIcon
               icon={<ExclamationCircleOutlined />}
-              message="Xác nhận dieu chinh?"
-              description={`He thong se tao phieu dieu chinh tu dong cho ${summary.surplus_count + summary.shortage_count} dong chenh lech. Hanh dong nay khong the hoan tac.`}
+              message="Xác nhận điều chỉnh?"
+              description={`Hệ thống sẽ tạo phiếu điều chỉnh tự động cho ${summary.surplus_count + summary.shortage_count} dòng chênh lệch. Hành động này không thể hoàn tác.`}
               style={{ marginTop: 16 }}
             />
           </>
         ) : (
           <Result
             status="success"
-            title="Tồn kho hoan toan khop!"
+            title="Tồn kho hoàn toàn khớp!"
             subTitle="Không có chênh lệch nào được phát hiện"
           />
         )}
@@ -552,7 +552,7 @@ const StockCheckPage = () => {
           loading={saving}
           style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
-          {saving ? 'Dang xu ly...' : 'Xác nhận & Dieu chinh'}
+          {saving ? 'Đang xử lý...' : 'Xác nhận & Điều chỉnh'}
         </Button>
       </div>
     </div>

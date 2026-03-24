@@ -138,7 +138,7 @@ const InventoryDashboard = () => {
       }
     } catch (err: any) {
       console.error('Dashboard load error:', err)
-      setError(err.message || 'Loi tai du lieu')
+      setError(err.message || 'Lỗi tải dữ liệu')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -185,7 +185,7 @@ const InventoryDashboard = () => {
       ),
     },
     {
-      title: 'Ton (kg)',
+      title: 'Tồn (kg)',
       dataIndex: 'total_quantity',
       key: 'total_quantity',
       align: 'right' as const,
@@ -262,7 +262,7 @@ const InventoryDashboard = () => {
     return (
       <div style={{ padding: 24, textAlign: 'center', paddingTop: 100 }}>
         <Spin size="large" />
-        <div style={{ marginTop: 12, color: '#999' }}>Đang tải du lieu kho...</div>
+        <div style={{ marginTop: 12, color: '#999' }}>Đang tải dữ liệu kho...</div>
       </div>
     )
   }
@@ -281,7 +281,7 @@ const InventoryDashboard = () => {
             Kho Thành Phẩm
           </Title>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Cap nhat: {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+            Cập nhật: {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </Col>
         <Col>
@@ -370,7 +370,7 @@ const InventoryDashboard = () => {
             bodyStyle={{ padding: 16 }}
           >
             {gradeDistribution.length === 0 ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có du lieu grade" />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có dữ liệu grade" />
             ) : (
               <div>
                 {gradeDistribution.map(item => {
@@ -392,7 +392,7 @@ const InventoryDashboard = () => {
                         {(item.total_weight / 1000).toFixed(1)} T
                       </Text>
                       <Text type="secondary" style={{ fontSize: 11 }}>
-                        ({item.count} lo)
+                        ({item.count} lô)
                       </Text>
                     </div>
                   )
@@ -462,7 +462,7 @@ const InventoryDashboard = () => {
 
       {/* Stock Summary Table */}
       <Card
-        title="Tồn kho theo vat lieu"
+        title="Tồn kho theo vật liệu"
         extra={
           <Space>
             <Input.Search

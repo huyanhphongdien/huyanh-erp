@@ -1,10 +1,10 @@
 // ============================================================================
 // PRODUCTION SERVICE
 // File: src/services/wms/productionService.ts
-// Module: Kho Thanh Pham (WMS) - Huy Anh Rubber ERP
-// Phase: P8 - Lenh san xuat
-// Mo ta: Quan ly lenh san xuat, cong doan, output batches, QC
-// Bang: production_orders, production_order_items, production_stage_progress,
+// Module: Kho Thành Phẩm (WMS) - Huy Anh Rubber ERP
+// Phase: P8 - Lệnh sản xuất
+// Mô tả: Quản lý lệnh sản xuất, công đoạn, output batches, QC
+// Bảng: production_orders, production_order_items, production_stage_progress,
 //       production_output_batches, production_qc_results,
 //       production_facilities, production_material_specs
 // ============================================================================
@@ -61,7 +61,7 @@ const PRODUCTION_ORDER_LIST_SELECT = `
 // ============================================================================
 
 /**
- * Tu sinh ma lenh san xuat: PO-{GRADE}-{YYYYMMDD}-{SEQ}
+ * Tự sinh mã lệnh sản xuất: PO-{GRADE}-{YYYYMMDD}-{SEQ}
  * VD: PO-SVR10-20260317-001
  */
 async function generateCode(grade: string): Promise<string> {
@@ -331,7 +331,7 @@ export const productionService = {
       .single()
 
     if (fetchErr) throw fetchErr
-    if (!stage) throw new Error(`Khong tim thay cong doan ${stageNumber}`)
+    if (!stage) throw new Error(`Không tìm thấy công đoạn ${stageNumber}`)
 
     let duration_hours: number | null = null
     if (stage.started_at) {

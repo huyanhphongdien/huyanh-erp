@@ -102,7 +102,7 @@ const ProductionDetailPage = () => {
       const data = await productionService.getById(id)
       setOrder(data)
     } catch (err: any) {
-      setError(err.message || 'Không thể tải du lieu')
+      setError(err.message || 'Không thể tải dữ liệu')
     } finally {
       setLoading(false)
     }
@@ -115,8 +115,8 @@ const ProductionDetailPage = () => {
   const handleStartProduction = async () => {
     if (!id) return
     Modal.confirm({
-      title: 'Bắt đầu san xuat?',
-      content: 'Lệnh sản xuất se chuyen sang trang thai "Đang SX" va tao 5 cong doan.',
+      title: 'Bắt đầu sản xuất?',
+      content: 'Lệnh sản xuất sẽ chuyển sang trạng thái "Đang SX" và tạo 5 công đoạn.',
       okText: 'Bắt đầu',
       okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
       onOk: async () => {
@@ -137,8 +137,8 @@ const ProductionDetailPage = () => {
   const handleCancelProduction = async () => {
     if (!id) return
     Modal.confirm({
-      title: 'Hủy lệnh san xuat?',
-      content: 'Lệnh sản xuất se bi huy va khong the khoi phuc.',
+      title: 'Hủy lệnh sản xuất?',
+      content: 'Lệnh sản xuất sẽ bị hủy và không thể khôi phục.',
       okText: 'Hủy lệnh',
       okButtonProps: { danger: true },
       onOk: async () => {
@@ -164,7 +164,7 @@ const ProductionDetailPage = () => {
     return (
       <div style={{ padding: 24 }}>
         {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
-        <Empty description="Không tìm thấy lenh san xuat" />
+        <Empty description="Không tìm thấy lệnh sản xuất" />
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Button onClick={() => navigate('/wms/production')}>Quay lại</Button>
         </div>
@@ -219,7 +219,7 @@ const ProductionDetailPage = () => {
       <Row gutter={16}>
         <Col span={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Tong NL (kg)" value={totalInput.toLocaleString()}
+            <Statistic title="Tổng NL (kg)" value={totalInput.toLocaleString()}
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
@@ -238,7 +238,7 @@ const ProductionDetailPage = () => {
         </Col>
         <Col span={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Thành phẩm" value={outputBatches.length} suffix="lo"
+            <Statistic title="Thành phẩm" value={outputBatches.length} suffix="lô"
               valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
           </Card>
         </Col>
@@ -249,7 +249,7 @@ const ProductionDetailPage = () => {
   // ── Tab: Nguyên liệu ──
   const inputColumns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       key: 'batch_no',
       render: (_: any, r: any) => (
         <Text strong style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
@@ -336,7 +336,7 @@ const ProductionDetailPage = () => {
                       onClick={() => navigate(`/wms/production/${id}/stage/${stage.stage_number}`)}
                       style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                     >
-                      Cap nhat
+                      Cập nhật
                     </Button>
                   )}
                   {stage.status === 'pending' && order.status === 'in_progress' && (
@@ -344,7 +344,7 @@ const ProductionDetailPage = () => {
                       size="small"
                       disabled
                     >
-                      Cho
+                      Chờ
                     </Button>
                   )}
                 </Col>
@@ -352,7 +352,7 @@ const ProductionDetailPage = () => {
               {stage.status !== 'pending' && (
                 <Row gutter={16} style={{ marginTop: 8 }}>
                   <Col span={4}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>NL vao</Text><br />
+                    <Text type="secondary" style={{ fontSize: 11 }}>NL vào</Text><br />
                     <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                       {stage.input_quantity?.toLocaleString() || '—'} kg
                     </Text>
@@ -364,7 +364,7 @@ const ProductionDetailPage = () => {
                     </Text>
                   </Col>
                   <Col span={4}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>DRC vao</Text><br />
+                    <Text type="secondary" style={{ fontSize: 11 }}>DRC vào</Text><br />
                     <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                       {stage.input_drc != null ? `${stage.input_drc}%` : '—'}
                     </Text>
@@ -376,11 +376,11 @@ const ProductionDetailPage = () => {
                     </Text>
                   </Col>
                   <Col span={4}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>Nguoi thao tac</Text><br />
+                    <Text type="secondary" style={{ fontSize: 11 }}>Người thao tác</Text><br />
                     <Text style={{ fontSize: 12 }}>{stage.operator?.full_name || '—'}</Text>
                   </Col>
                   <Col span={4}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>Thoi gian</Text><br />
+                    <Text type="secondary" style={{ fontSize: 11 }}>Thời gian</Text><br />
                     <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                       {stage.duration_hours != null ? `${stage.duration_hours}h` : '—'}
                     </Text>
@@ -392,7 +392,7 @@ const ProductionDetailPage = () => {
         }))}
       />
       {stages.length === 0 && (
-        <Empty description="Chưa có cong doan. Bắt đầu san xuat de tao 5 cong doan." />
+        <Empty description="Chưa có công đoạn. Bắt đầu sản xuất để tạo 5 công đoạn." />
       )}
     </div>
   )
@@ -400,7 +400,7 @@ const ProductionDetailPage = () => {
   // ── Tab: Thành phẩm ──
   const outputColumns = [
     {
-      title: 'Lo',
+      title: 'Lô',
       key: 'batch',
       render: (_: any, r: ProductionOutputBatch) => (
         <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
@@ -464,11 +464,11 @@ const ProductionDetailPage = () => {
           onClick={() => navigate(`/wms/production/${id}/output`)}
           style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
-          Quan ly thanh pham
+          Quản lý thành phẩm
         </Button>
       </Row>
       {outputBatches.length === 0 ? (
-        <Empty description="Chưa có thanh pham" />
+        <Empty description="Chưa có thành phẩm" />
       ) : (
         <Table
           dataSource={outputBatches}
@@ -484,10 +484,10 @@ const ProductionDetailPage = () => {
   // ── Tab: Truy xuất ──
   const TraceabilityTab = (
     <div>
-      <Title level={5}><ApartmentOutlined /> Truy xuất nguon goc</Title>
+      <Title level={5}><ApartmentOutlined /> Truy xuất nguồn gốc</Title>
       <Row gutter={24}>
         <Col span={8}>
-          <Card title="Nguyên liệu dau vao" size="small">
+          <Card title="Nguyên liệu đầu vào" size="small">
             {items.map((item, i) => (
               <div key={item.id} style={{ padding: '4px 0', borderBottom: i < items.length - 1 ? '1px solid #f0f0f0' : undefined }}>
                 <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
@@ -502,7 +502,7 @@ const ProductionDetailPage = () => {
           </Card>
         </Col>
         <Col span={8}>
-          <Card title="Công đoạn che bien" size="small">
+          <Card title="Công đoạn chế biến" size="small">
             {stages.map((stage) => (
               <div key={stage.id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
                 <Space>
@@ -513,7 +513,7 @@ const ProductionDetailPage = () => {
                 </Space>
                 {stage.weight_loss_kg != null && (
                   <Text type="secondary" style={{ display: 'block', fontSize: 11, marginLeft: 32 }}>
-                    Hao hut: {stage.weight_loss_kg} kg
+                    Hao hụt: {stage.weight_loss_kg} kg
                   </Text>
                 )}
               </div>
@@ -522,7 +522,7 @@ const ProductionDetailPage = () => {
           </Card>
         </Col>
         <Col span={8}>
-          <Card title="Thành phẩm dau ra" size="small">
+          <Card title="Thành phẩm đầu ra" size="small">
             {outputBatches.map((batch, i) => (
               <div key={batch.id} style={{ padding: '4px 0', borderBottom: i < outputBatches.length - 1 ? '1px solid #f0f0f0' : undefined }}>
                 <Space>

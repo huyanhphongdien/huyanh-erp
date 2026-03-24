@@ -208,6 +208,9 @@ export function useKeliScale(): UseKeliScaleReturn {
   // READ LOOP — Continuously read from serial port
   // --------------------------------------------------------------------------
 
+  // Debug mode: bật bằng console: window.__SCALE_DEBUG = true
+  const isDebug = () => typeof window !== 'undefined' && (window as any).__SCALE_DEBUG === true
+
   const startReading = useCallback(async (port: SerialPort) => {
     if (readingRef.current) return
     readingRef.current = true
@@ -225,7 +228,9 @@ export function useKeliScale(): UseKeliScaleReturn {
             const { value, done } = await reader.read()
             if (done) break
 
-            bufferRef.current += decoder.decode(value, { stream: true })
+            const rawText = decoder.decode(value, { stream: true })
+            if (isDebug()) console.log('[KeliScale] Raw chunk:', JSON.stringify(rawText))
+            bufferRef.current += rawText
 
             // Process complete lines (separated by \r\n, \n, or \r)
             const lines = bufferRef.current.split(/\r\n|\r|\n/)
@@ -233,8 +238,10 @@ export function useKeliScale(): UseKeliScaleReturn {
 
             for (const line of lines) {
               if (line.trim()) {
+                if (isDebug()) console.log('[KeliScale] Line:', JSON.stringify(line))
                 const reading = parseKeliOutput(line)
                 if (reading) {
+                  if (isDebug()) console.log('[KeliScale] Parsed:', reading.weight, reading.unit)
                   setLiveWeight(reading)
                 }
               }

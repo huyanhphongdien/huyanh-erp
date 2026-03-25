@@ -234,7 +234,7 @@ export default function MonthlyTimesheetPage() {
               <select value={selectedDept} onChange={e => { setSelectedDept(e.target.value); setSelectedEmployee(null) }}
                 className="text-[13px] border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:ring-1 focus:ring-[#1B4D3E]">
                 <option value="all">Tất cả phòng ban</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {(departments || []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2 text-[11px] ml-auto flex-wrap">
@@ -284,7 +284,7 @@ export default function MonthlyTimesheetPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {timesheet.employees.map((emp, idx) => {
+                  {(timesheet.employees || []).map((emp, idx) => {
                     const bg = idx % 2 === 0 ? '#ffffff' : '#f9fafb'
                     return (
                       <tr key={emp.employeeId} className="border-t border-gray-100 hover:bg-blue-50/30">

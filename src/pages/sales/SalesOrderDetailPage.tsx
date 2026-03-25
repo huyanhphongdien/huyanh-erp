@@ -323,7 +323,7 @@ function SalesOrderDetailPage() {
           onClick={() => handleStatusAction('packing')}
           loading={actionLoading}
         >
-          Dong goi
+          Đóng gói
         </Button>,
       )
     } else if (s === 'packing') {
@@ -1474,7 +1474,7 @@ function SalesOrderDetailPage() {
             key: 'info',
             label: (
               <span>
-                <FileTextOutlined /> Thong tin
+                <FileTextOutlined /> Thông tin
               </span>
             ),
             children: renderInfoTab(),
@@ -1492,7 +1492,7 @@ function SalesOrderDetailPage() {
             key: 'production',
             label: (
               <span>
-                <ToolOutlined /> San xuat
+                <ToolOutlined /> Sản xuất
               </span>
             ),
             children: renderProductionTab(),
@@ -1501,7 +1501,7 @@ function SalesOrderDetailPage() {
             key: 'packing',
             label: (
               <span>
-                <ContainerOutlined /> Dong goi
+                <ContainerOutlined /> Đóng gói
               </span>
             ),
             children: renderPackingTab(),
@@ -1510,7 +1510,7 @@ function SalesOrderDetailPage() {
             key: 'documents',
             label: (
               <span>
-                <FileDoneOutlined /> Chung tu
+                <FileDoneOutlined /> Chứng từ
               </span>
             ),
             children: renderDocumentsTab(),

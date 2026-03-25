@@ -489,7 +489,7 @@ const DemandCreatePage = () => {
     const fetchWarehouses = async () => {
       try {
         const { data, error } = await supabase
-          .from('wms_warehouses')
+          .from('warehouses')
           .select('id, name, code')
           .eq('is_active', true)
           .order('name')

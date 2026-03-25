@@ -309,6 +309,7 @@ const getMenuGroups = (
     title: 'KHO (WMS)',
     icon: <Warehouse size={18} />,
     collapsible: true,
+    allowedEmails: ['minhld@huyanhrubber.com'],
     items: [
       { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> },
       { path: '/wms/nvl-dashboard', label: 'Bãi NVL', icon: <Layers size={18} /> },

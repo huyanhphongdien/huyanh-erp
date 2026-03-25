@@ -55,6 +55,16 @@ async function checkEditPermission(
   editorEmployeeId: string,
   targetEmployeeId: string
 ): Promise<PermissionResult> {
+  // Kiểm tra admin từ auth session
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const authRole = authUser?.user_metadata?.role
+  const authEmail = authUser?.email?.toLowerCase()
+
+  // Admin role hoặc email đặc biệt → sửa được tất cả
+  if (authRole === 'admin' || authEmail === 'minhld@huyanhrubber.com') {
+    return { allowed: true }
+  }
+
   // Lấy thông tin editor
   const { data: editor } = await supabase
     .from('employees')
@@ -82,8 +92,8 @@ async function checkEditPermission(
 
   if (dept?.code === 'HAP-HCTH') return { allowed: true } // Phòng HC-TH = HR
 
-  // Trưởng phòng (level 3-4) → sửa NV trong phòng mình
-  if (level <= 4) {
+  // Trưởng/Phó phòng (level 3-5) → sửa NV trong phòng mình
+  if (level <= 5) {
     const { data: target } = await supabase
       .from('employees')
       .select('department_id')

@@ -328,7 +328,7 @@ const getMenuGroups = (
       { path: '/wms/yard-map', label: 'Bản đồ bãi', icon: <LayoutGrid size={18} /> },
       { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> },
       { path: '/wms/reports/supplier-scoring', label: 'Chấm điểm NCC', icon: <Star size={18} /> },
-      { path: '/wms/settings', label: 'Cài đặt kho', icon: <Settings size={18} /> },
+      { path: '/wms/settings', label: 'Cài đặt kho', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
     ],
   },
 

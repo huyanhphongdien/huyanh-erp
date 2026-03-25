@@ -1,5 +1,5 @@
 // ============================================================================
-// SALES ORDER DETAIL PAGE — Chi tiet Đơn hàng bán quoc te
+// SALES ORDER DETAIL PAGE — Chi tiết Đơn hàng bán quốc tế
 // File: src/pages/sales/SalesOrderDetailPage.tsx
 // ============================================================================
 
@@ -214,7 +214,7 @@ function SalesOrderDetailPage() {
       loadOrder()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || 'Khong the them container')
+      message.error(err?.message || 'Không thể thêm container')
     }
   }
 
@@ -230,7 +230,7 @@ function SalesOrderDetailPage() {
   if (!order) {
     return (
       <div style={{ padding: 24 }}>
-        <Empty description="Khong tim thay don hang" />
+        <Empty description="Không tìm thấy đơn hàng" />
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Button onClick={() => navigate('/sales/orders')}>Quay lại danh sách</Button>
         </div>
@@ -279,7 +279,7 @@ function SalesOrderDetailPage() {
         </Button>,
         <Popconfirm
           key="cancel"
-          title="Huy don hang?"
+          title="Hủy đơn hàng?"
           onConfirm={() => handleStatusAction('cancelled')}
         >
           <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
@@ -300,7 +300,7 @@ function SalesOrderDetailPage() {
         </Button>,
         <Popconfirm
           key="cancel"
-          title="Huy don hang?"
+          title="Hủy đơn hàng?"
           onConfirm={() => handleStatusAction('cancelled')}
         >
           <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
@@ -374,7 +374,7 @@ function SalesOrderDetailPage() {
   const renderInfoTab = () => (
     <Row gutter={24}>
       <Col xs={24} lg={14}>
-        <Card title="Thong tin don hang" size="small">
+        <Card title="Thông tin đơn hàng" size="small">
           <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
             <Descriptions.Item label="Mã đơn">{order.code}</Descriptions.Item>
             <Descriptions.Item label="Trạng thái">
@@ -395,10 +395,10 @@ function SalesOrderDetailPage() {
             <Descriptions.Item label="Đơn giá">
               {formatCurrency(order.unit_price, order.currency)} / tan
             </Descriptions.Item>
-            <Descriptions.Item label="Gia tri USD">
+            <Descriptions.Item label="Giá trị USD">
               {formatCurrency(order.total_value_usd)}
             </Descriptions.Item>
-            <Descriptions.Item label="Gia tri VND">{formatVND(order.total_value_vnd)}</Descriptions.Item>
+            <Descriptions.Item label="Giá trị VND">{formatVND(order.total_value_vnd)}</Descriptions.Item>
             <Descriptions.Item label="Tỷ giá">
               {order.exchange_rate ? `${order.exchange_rate.toLocaleString()} VND/USD` : '-'}
             </Descriptions.Item>
@@ -429,7 +429,7 @@ function SalesOrderDetailPage() {
             </Descriptions.Item>
             <Descriptions.Item label="So L/C">{order.lc_number || '-'}</Descriptions.Item>
             <Descriptions.Item label="NH L/C">{order.lc_bank || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Het han L/C">
+            <Descriptions.Item label="Hết hạn L/C">
               {formatDate(order.lc_expiry_date)}
             </Descriptions.Item>
             <Descriptions.Item label="Ngày đặt">{formatDate(order.order_date)}</Descriptions.Item>
@@ -484,7 +484,7 @@ function SalesOrderDetailPage() {
         )}
 
         {/* Quality specs card */}
-        <Card size="small" title="Chỉ tiêu kỹ thuật yeu cau">
+        <Card size="small" title="Chỉ tiêu kỹ thuật yêu cầu">
           <Descriptions column={2} size="small" bordered>
             <Descriptions.Item label="DRC min">{order.drc_min ?? '-'} %</Descriptions.Item>
             <Descriptions.Item label="DRC max">{order.drc_max ?? '-'} %</Descriptions.Item>
@@ -533,7 +533,7 @@ function SalesOrderDetailPage() {
       { title: 'Chỉ tiêu', dataIndex: 'parameter', key: 'parameter' },
       { title: 'Loai', dataIndex: 'type', key: 'type', render: (t) => t === 'min' ? 'Min' : 'Max' },
       {
-        title: 'Yeu cau don hang',
+        title: 'Yêu cầu đơn hàng',
         dataIndex: 'required',
         key: 'required',
         render: (v, row) => (v != null ? `${v} ${row.unit}` : '-'),
@@ -563,7 +563,7 @@ function SalesOrderDetailPage() {
     ]
 
     return (
-      <Card title="So sanh chi tieu ky thuat" size="small">
+      <Card title="So sánh chỉ tiêu kỹ thuật" size="small">
         <Table
           dataSource={rows}
           columns={columns}
@@ -1321,7 +1321,7 @@ function SalesOrderDetailPage() {
     const cancelled = order.status === 'cancelled'
 
     return (
-      <Card title="Tien trinh don hang" size="small" style={{ marginTop: 24 }}>
+      <Card title="Tiến trình đơn hàng" size="small" style={{ marginTop: 24 }}>
         <Timeline
           mode="left"
           items={[
@@ -1538,7 +1538,7 @@ function SalesOrderDetailPage() {
             <Input placeholder="Vd: MRKU1234567" />
           </Form.Item>
           <Form.Item label="Seal No." name="seal_no">
-            <Input placeholder="Seal number" />
+            <Input placeholder="Số seal" />
           </Form.Item>
           <Form.Item label="Loại container" name="container_type" initialValue="20ft">
             <Select

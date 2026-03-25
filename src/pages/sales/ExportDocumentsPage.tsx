@@ -522,7 +522,7 @@ const ExportDocumentsPage = () => {
     salesOrderService
       .getById(orderId)
       .then((data) => setOrder(data))
-      .catch(() => message.error('Khong the tai don hang'))
+      .catch(() => message.error('Không thể tải đơn hàng'))
       .finally(() => setLoading(false))
   }, [orderId])
 
@@ -607,7 +607,7 @@ const ExportDocumentsPage = () => {
   const docStatus = (generated: boolean) =>
     generated
       ? <Tag color="success" icon={<CheckCircleOutlined />}>Generated</Tag>
-      : <Tag color="default" icon={<ClockCircleOutlined />}>Chua tao</Tag>
+      : <Tag color="default" icon={<ClockCircleOutlined />}>Chưa tạo</Tag>
 
   return (
     <div style={{ padding: '0 0 24px' }}>
@@ -671,7 +671,7 @@ const ExportDocumentsPage = () => {
               size="large"
               onClick={printAll}
             >
-              In tat ca
+              In tất cả
             </Button>
           </Col>
         </Row>

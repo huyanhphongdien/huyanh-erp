@@ -1,5 +1,5 @@
 // ============================================================================
-// SALES PRODUCTION SERVICE — Lien ket Don hang ban voi Lenh san xuat
+// SALES PRODUCTION SERVICE — Lien ket Đơn hàng bán voi Lenh san xuat
 // File: src/services/sales/salesProductionService.ts
 // Module: Ban hang quoc te + San xuat — Huy Anh Rubber ERP
 // Primary color: #1B4D3E

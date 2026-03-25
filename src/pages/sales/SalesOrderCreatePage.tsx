@@ -1,5 +1,5 @@
 // ============================================================================
-// SALES ORDER CREATE PAGE — Tao don hang ban quoc te (Multi-step)
+// SALES ORDER CREATE PAGE — Tạo đơn hàng ban quoc te (Multi-step)
 // File: src/pages/sales/SalesOrderCreatePage.tsx
 // ============================================================================
 
@@ -112,7 +112,7 @@ function SalesOrderCreatePage() {
         setGradeStandards(standards)
       } catch (err) {
         console.error('Load data error:', err)
-        message.error('Khong the tai du lieu')
+        message.error('Không thể tải dữ liệu')
       }
     }
     loadData()
@@ -218,7 +218,7 @@ function SalesOrderCreatePage() {
         }
       }
 
-      message.success(asDraft ? 'Da luu nhap don hang' : 'Da xac nhan don hang')
+      message.success(asDraft ? 'Đã lưu nháp đơn hàng' : 'Đã xác nhận đơn hàng')
       navigate('/sales/orders')
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return // form validation
@@ -239,13 +239,13 @@ function SalesOrderCreatePage() {
       <Col xs={24} lg={16}>
         <Card title="Khach hang & San pham" size="small">
           <Form.Item
-            label="Khach hang"
+            label="Khách hàng"
             name="customer_id"
-            rules={[{ required: true, message: 'Vui long chon khach hang' }]}
+            rules={[{ required: true, message: 'Vui lòng chọn khách hàng' }]}
           >
             <Select
               showSearch
-              placeholder="Chon khach hang..."
+              placeholder="Chọn khách hàng..."
               optionFilterProp="label"
               onChange={handleCustomerChange}
               options={customers.map((c) => ({
@@ -260,7 +260,7 @@ function SalesOrderCreatePage() {
               <Form.Item
                 label="Grade SVR"
                 name="grade"
-                rules={[{ required: true, message: 'Vui long chon grade' }]}
+                rules={[{ required: true, message: 'Vui lòng chọn grade' }]}
               >
                 <Select
                   placeholder="Chon grade..."
@@ -281,7 +281,7 @@ function SalesOrderCreatePage() {
               <Form.Item
                 label="So luong (tan)"
                 name="quantity_tons"
-                rules={[{ required: true, message: 'Nhap so luong' }]}
+                rules={[{ required: true, message: 'Nhập số lượng' }]}
               >
                 <InputNumber min={0.1} step={1} style={{ width: '100%' }} placeholder="0" />
               </Form.Item>
@@ -290,13 +290,13 @@ function SalesOrderCreatePage() {
               <Form.Item
                 label="Don gia (USD/tan)"
                 name="unit_price"
-                rules={[{ required: true, message: 'Nhap don gia' }]}
+                rules={[{ required: true, message: 'Nhập đơn giá' }]}
               >
                 <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="0" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={4}>
-              <Form.Item label="Tien te" name="currency" initialValue="USD">
+              <Form.Item label="Tiền tệ" name="currency" initialValue="USD">
                 <Select options={CURRENCY_OPTIONS} />
               </Form.Item>
             </Col>
@@ -314,13 +314,13 @@ function SalesOrderCreatePage() {
         {selectedCustomer && (
           <Card
             size="small"
-            title="Thong tin khach hang"
+            title="Thông tin khách hàng"
             style={{ marginBottom: 16 }}
           >
             <Descriptions column={1} size="small">
               <Descriptions.Item label="Ma">{selectedCustomer.code}</Descriptions.Item>
               <Descriptions.Item label="Ten">{selectedCustomer.name}</Descriptions.Item>
-              <Descriptions.Item label="Quoc gia">
+              <Descriptions.Item label="Quốc gia">
                 {COUNTRY_OPTIONS.find((c) => c.value === selectedCustomer.country)?.label ||
                   selectedCustomer.country ||
                   '-'}
@@ -330,7 +330,7 @@ function SalesOrderCreatePage() {
                   {CUSTOMER_TIER_LABELS[selectedCustomer.tier]}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Lien he">
+              <Descriptions.Item label="Liên hệ">
                 {selectedCustomer.contact_person || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Email">{selectedCustomer.email || '-'}</Descriptions.Item>
@@ -339,13 +339,13 @@ function SalesOrderCreatePage() {
         )}
 
         {/* Auto-calc card */}
-        <Card size="small" title="Tu dong tinh toan">
+        <Card size="small" title="Tự động tính toán">
           <Row gutter={[16, 16]}>
             <Col span={12}>
-              <Statistic title="Tong banh" value={totalBales} suffix="banh" />
+              <Statistic title="Tổng bành" value={totalBales} suffix="banh" />
             </Col>
             <Col span={12}>
-              <Statistic title="So container" value={containerCount} suffix={containerType} />
+              <Statistic title="Số container" value={containerCount} suffix={containerType} />
             </Col>
             <Col span={12}>
               <Statistic
@@ -367,7 +367,7 @@ function SalesOrderCreatePage() {
   const renderStep2 = () => (
     <Row gutter={24}>
       <Col xs={24} lg={14}>
-        <Card title="Chi tieu ky thuat" size="small">
+        <Card title="Chỉ tiêu kỹ thuật" size="small">
           {selectedStandard && (
             <div style={{ marginBottom: 16 }}>
               <Tag color="blue">
@@ -431,8 +431,8 @@ function SalesOrderCreatePage() {
       </Col>
 
       <Col xs={24} lg={10}>
-        <Card title="Dong goi" size="small">
-          <Form.Item label="Loai dong goi" name="packing_type" initialValue="bale">
+        <Card title="Đóng gói" size="small">
+          <Form.Item label="Loại đóng gói" name="packing_type" initialValue="bale">
             <Select
               options={Object.entries(PACKING_TYPE_LABELS).map(([v, l]) => ({
                 value: v,
@@ -459,7 +459,7 @@ function SalesOrderCreatePage() {
           </Row>
 
           <Form.Item label="Marking instructions" name="marking_instructions">
-            <TextArea rows={4} placeholder="Huong dan danh dau tren banh/thung..." />
+            <TextArea rows={4} placeholder="Hướng dẫn đánh dấu trên bành/thùng..." />
           </Form.Item>
         </Card>
       </Col>
@@ -469,7 +469,7 @@ function SalesOrderCreatePage() {
   const renderStep3 = () => (
     <Row gutter={24}>
       <Col xs={24} lg={12}>
-        <Card title="Van chuyen" size="small">
+        <Card title="Vận chuyển" size="small">
           <Form.Item label="Incoterm" name="incoterm" initialValue="FOB">
             <Select
               options={Object.entries(INCOTERM_LABELS).map(([v, l]) => ({
@@ -481,7 +481,7 @@ function SalesOrderCreatePage() {
 
           <Row gutter={16}>
             <Col xs={24} sm={12}>
-              <Form.Item label="Cang xep hang" name="port_of_loading">
+              <Form.Item label="Cảng xếp hàng" name="port_of_loading">
                 <Select
                   allowClear
                   placeholder="Chon cang..."
@@ -493,13 +493,13 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item label="Cang dich" name="port_of_destination">
+              <Form.Item label="Cảng đích" name="port_of_destination">
                 <Input placeholder="Vd: Shanghai, Yokohama..." />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item label="Loai container" name="container_type" initialValue="20ft">
+          <Form.Item label="Loại container" name="container_type" initialValue="20ft">
             <Select
               options={Object.entries(CONTAINER_TYPE_LABELS).map(([v, l]) => ({
                 value: v,
@@ -510,7 +510,7 @@ function SalesOrderCreatePage() {
 
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item label="Ngay giao" name="delivery_date">
+              <Form.Item label="Ngày giao" name="delivery_date">
                 <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
@@ -529,12 +529,12 @@ function SalesOrderCreatePage() {
           <Divider />
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item label="Hang tau" name="shipping_line">
+              <Form.Item label="Hãng tàu" name="shipping_line">
                 <Input placeholder="Vd: Maersk, MSC..." />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Ten tau" name="vessel_name">
+              <Form.Item label="Tên tàu" name="vessel_name">
                 <Input placeholder="Vessel name" />
               </Form.Item>
             </Col>
@@ -548,11 +548,11 @@ function SalesOrderCreatePage() {
       </Col>
 
       <Col xs={24} lg={12}>
-        <Card title="Thanh toan" size="small">
-          <Form.Item label="Dieu khoan thanh toan" name="payment_terms">
+        <Card title="Thanh toán" size="small">
+          <Form.Item label="Điều khoản thanh toán" name="payment_terms">
             <Select
               allowClear
-              placeholder="Chon dieu khoan..."
+              placeholder="Chọn điều khoản..."
               options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({
                 value: v,
                 label: l,
@@ -591,17 +591,17 @@ function SalesOrderCreatePage() {
     return (
       <Row gutter={24}>
         <Col xs={24} lg={16}>
-          <Card title="Xac nhan don hang" size="small">
+          <Card title="Xác nhận đơn hàng" size="small">
             <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-              <Descriptions.Item label="Khach hang" span={2}>
+              <Descriptions.Item label="Khách hàng" span={2}>
                 {cust ? `${cust.code} — ${cust.name}` : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Grade">
                 <Tag color="blue">{grade?.label || vals.grade || '-'}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="PO# KH">{vals.customer_po || '-'}</Descriptions.Item>
-              <Descriptions.Item label="So luong">{vals.quantity_tons} tan</Descriptions.Item>
-              <Descriptions.Item label="Don gia">
+              <Descriptions.Item label="Số lượng">{vals.quantity_tons} tan</Descriptions.Item>
+              <Descriptions.Item label="Đơn giá">
                 {formatCurrency(vals.unit_price, vals.currency)} / tan
               </Descriptions.Item>
               <Descriptions.Item label="Gia tri USD">
@@ -610,27 +610,27 @@ function SalesOrderCreatePage() {
               <Descriptions.Item label="Gia tri VND">
                 {totalValueVND > 0 ? formatVND(totalValueVND) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Tong banh">{totalBales}</Descriptions.Item>
+              <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
               <Descriptions.Item label="Container">
                 {containerCount} x {vals.container_type || '20ft'}
               </Descriptions.Item>
               <Descriptions.Item label="Incoterm">
                 {INCOTERM_LABELS[vals.incoterm as Incoterm] || vals.incoterm || '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Cang xep hang">
+              <Descriptions.Item label="Cảng xếp hàng">
                 {pol?.label || vals.port_of_loading || '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Cang dich">
+              <Descriptions.Item label="Cảng đích">
                 {vals.port_of_destination || '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Ngay giao">
+              <Descriptions.Item label="Ngày giao">
                 {vals.delivery_date ? vals.delivery_date.format('DD/MM/YYYY') : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Thanh toan">
+              <Descriptions.Item label="Thanh toán">
                 {PAYMENT_TERMS_LABELS[vals.payment_terms as PaymentTerms] || vals.payment_terms || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="So L/C">{vals.lc_number || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Dong goi">
+              <Descriptions.Item label="Đóng gói">
                 {PACKING_TYPE_LABELS[vals.packing_type as PackingType] || 'Banh'}
                 {vals.shrink_wrap ? ' + Shrink wrap' : ''}
                 {vals.pallet_required ? ' + Pallet' : ''}
@@ -640,7 +640,7 @@ function SalesOrderCreatePage() {
 
             {/* Quality specs summary */}
             <Divider orientationMargin={0} plain>
-              Chi tieu ky thuat
+              Chỉ tiêu kỹ thuật
             </Divider>
             <Descriptions bordered column={{ xs: 2, sm: 3 }} size="small">
               <Descriptions.Item label="DRC">
@@ -659,9 +659,9 @@ function SalesOrderCreatePage() {
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card title="Ghi chu" size="small">
+          <Card title="Ghi chú" size="small">
             <Form.Item name="notes">
-              <TextArea rows={6} placeholder="Ghi chu cho don hang..." />
+              <TextArea rows={6} placeholder="Ghi chú cho đơn hàng..." />
             </Form.Item>
           </Card>
 
@@ -675,7 +675,7 @@ function SalesOrderCreatePage() {
                 loading={loading}
                 onClick={() => handleSubmit(true)}
               >
-                Luu nhap
+                Lưu nháp
               </Button>
               <Button
                 type="primary"
@@ -686,7 +686,7 @@ function SalesOrderCreatePage() {
                 onClick={() => handleSubmit(false)}
                 style={{ background: '#1B4D3E' }}
               >
-                Xac nhan don hang
+                Xác nhận đơn hàng
               </Button>
             </Space>
           </Card>
@@ -701,9 +701,9 @@ function SalesOrderCreatePage() {
 
   const stepItems = [
     { title: 'Khach hang & San pham', icon: <UserOutlined /> },
-    { title: 'Chat luong & Dong goi', icon: <ExperimentOutlined /> },
+    { title: 'Chất lượng & Dong goi', icon: <ExperimentOutlined /> },
     { title: 'Van chuyen & Thanh toan', icon: <TruckOutlined /> },
-    { title: 'Xac nhan', icon: <FileTextOutlined /> },
+    { title: 'Xác nhận', icon: <FileTextOutlined /> },
   ]
 
   return (
@@ -712,11 +712,11 @@ function SalesOrderCreatePage() {
       <Breadcrumb
         style={{ marginBottom: 16 }}
         items={[
-          { title: 'Don hang ban' },
+          { title: 'Đơn hàng bán' },
           {
             title: <a onClick={() => navigate('/sales/orders')}>Danh sach</a>,
           },
-          { title: 'Tao moi' },
+          { title: 'Tạo mới' },
         ]}
       />
 
@@ -724,7 +724,7 @@ function SalesOrderCreatePage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/sales/orders')} />
         <Title level={4} style={{ margin: 0 }}>
-          Tao don hang ban
+          Tạo đơn hàng ban
         </Title>
       </div>
 

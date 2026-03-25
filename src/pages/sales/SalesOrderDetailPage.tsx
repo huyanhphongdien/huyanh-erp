@@ -1,5 +1,5 @@
 // ============================================================================
-// SALES ORDER DETAIL PAGE — Chi tiet Don hang ban quoc te
+// SALES ORDER DETAIL PAGE — Chi tiet Đơn hàng bán quoc te
 // File: src/pages/sales/SalesOrderDetailPage.tsx
 // ============================================================================
 
@@ -174,7 +174,7 @@ function SalesOrderDetailPage() {
       }
     } catch (err) {
       console.error(err)
-      message.error('Khong the tai thong tin don hang')
+      message.error('Không thể tải thông tin đơn hàng')
     } finally {
       setLoading(false)
     }
@@ -190,14 +190,14 @@ function SalesOrderDetailPage() {
     try {
       setActionLoading(true)
       if (newStatus === 'cancelled') {
-        await salesOrderService.cancelOrder(order.id, 'Huy boi nguoi dung')
+        await salesOrderService.cancelOrder(order.id, 'Hủy bởi người dùng')
       } else {
         await salesOrderService.updateStatus(order.id, newStatus)
       }
       message.success(`Da cap nhat trang thai: ${ORDER_STATUS_LABELS[newStatus]}`)
       loadOrder()
     } catch (err: any) {
-      message.error(err?.message || 'Khong the cap nhat trang thai')
+      message.error(err?.message || 'Không thể cập nhật trạng thái')
     } finally {
       setActionLoading(false)
     }
@@ -208,7 +208,7 @@ function SalesOrderDetailPage() {
     try {
       const vals = await containerForm.validateFields()
       await salesOrderService.addContainer(order.id, vals)
-      message.success('Da them container')
+      message.success('Đã thêm container')
       setContainerModalOpen(false)
       containerForm.resetFields()
       loadOrder()
@@ -232,7 +232,7 @@ function SalesOrderDetailPage() {
       <div style={{ padding: 24 }}>
         <Empty description="Khong tim thay don hang" />
         <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <Button onClick={() => navigate('/sales/orders')}>Quay lai danh sach</Button>
+          <Button onClick={() => navigate('/sales/orders')}>Quay lại danh sách</Button>
         </div>
       </div>
     )
@@ -263,7 +263,7 @@ function SalesOrderDetailPage() {
       btns.push(
         <Popconfirm
           key="confirm"
-          title="Xac nhan don hang?"
+          title="Xác nhận đơn hàng?"
           onConfirm={() => handleStatusAction('confirmed')}
         >
           <Button type="primary" icon={<CheckCircleOutlined />} loading={actionLoading}>
@@ -347,7 +347,7 @@ function SalesOrderDetailPage() {
           onClick={() => handleStatusAction('delivered')}
           loading={actionLoading}
         >
-          Da giao
+          Đã giao
         </Button>,
       )
     } else if (s === 'delivered') {
@@ -376,53 +376,53 @@ function SalesOrderDetailPage() {
       <Col xs={24} lg={14}>
         <Card title="Thong tin don hang" size="small">
           <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-            <Descriptions.Item label="Ma don">{order.code}</Descriptions.Item>
-            <Descriptions.Item label="Trang thai">
+            <Descriptions.Item label="Mã đơn">{order.code}</Descriptions.Item>
+            <Descriptions.Item label="Trạng thái">
               <Tag color={ORDER_STATUS_COLORS[order.status]}>
                 {ORDER_STATUS_LABELS[order.status]}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Khach hang" span={2}>
+            <Descriptions.Item label="Khách hàng" span={2}>
               {customerName} {customerCountry ? `(${customerCountry})` : ''}
             </Descriptions.Item>
             <Descriptions.Item label="Grade">
               <Tag color="blue">{gradeLabel}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="PO# KH">{order.customer_po || '-'}</Descriptions.Item>
-            <Descriptions.Item label="So luong">
+            <Descriptions.Item label="Số lượng">
               {order.quantity_tons} tan ({order.quantity_kg?.toLocaleString()} kg)
             </Descriptions.Item>
-            <Descriptions.Item label="Don gia">
+            <Descriptions.Item label="Đơn giá">
               {formatCurrency(order.unit_price, order.currency)} / tan
             </Descriptions.Item>
             <Descriptions.Item label="Gia tri USD">
               {formatCurrency(order.total_value_usd)}
             </Descriptions.Item>
             <Descriptions.Item label="Gia tri VND">{formatVND(order.total_value_vnd)}</Descriptions.Item>
-            <Descriptions.Item label="Ty gia">
+            <Descriptions.Item label="Tỷ giá">
               {order.exchange_rate ? `${order.exchange_rate.toLocaleString()} VND/USD` : '-'}
             </Descriptions.Item>
             <Descriptions.Item label="Incoterm">
               {INCOTERM_LABELS[order.incoterm as Incoterm] || order.incoterm}
             </Descriptions.Item>
-            <Descriptions.Item label="Cang xep hang">{polLabel}</Descriptions.Item>
-            <Descriptions.Item label="Cang dich">
+            <Descriptions.Item label="Cảng xếp hàng">{polLabel}</Descriptions.Item>
+            <Descriptions.Item label="Cảng đích">
               {order.port_of_destination || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Loai container">
+            <Descriptions.Item label="Loại container">
               {order.container_count || 0} x{' '}
               {CONTAINER_TYPE_LABELS[order.container_type as keyof typeof CONTAINER_TYPE_LABELS] ||
                 order.container_type ||
                 '20ft'}
             </Descriptions.Item>
-            <Descriptions.Item label="Tong banh">{order.total_bales || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Dong goi">
+            <Descriptions.Item label="Tổng bành">{order.total_bales || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Đóng gói">
               {PACKING_TYPE_LABELS[order.packing_type as PackingType] || order.packing_type}
               {order.shrink_wrap ? ' + Shrink wrap' : ''}
               {order.pallet_required ? ' + Pallet' : ''}
             </Descriptions.Item>
             <Descriptions.Item label="KL banh">{order.bale_weight_kg} kg</Descriptions.Item>
-            <Descriptions.Item label="Thanh toan">
+            <Descriptions.Item label="Thanh toán">
               {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] ||
                 order.payment_terms ||
                 '-'}
@@ -432,13 +432,13 @@ function SalesOrderDetailPage() {
             <Descriptions.Item label="Het han L/C">
               {formatDate(order.lc_expiry_date)}
             </Descriptions.Item>
-            <Descriptions.Item label="Ngay dat">{formatDate(order.order_date)}</Descriptions.Item>
-            <Descriptions.Item label="Ngay giao">
+            <Descriptions.Item label="Ngày đặt">{formatDate(order.order_date)}</Descriptions.Item>
+            <Descriptions.Item label="Ngày giao">
               {formatDate(order.delivery_date)}
             </Descriptions.Item>
             <Descriptions.Item label="ETD">{formatDate(order.etd)}</Descriptions.Item>
             <Descriptions.Item label="ETA">{formatDate(order.eta)}</Descriptions.Item>
-            <Descriptions.Item label="Hang tau">{order.shipping_line || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Hãng tàu">{order.shipping_line || '-'}</Descriptions.Item>
             <Descriptions.Item label="Tau">{order.vessel_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="Booking ref">
               {order.booking_reference || '-'}
@@ -446,7 +446,7 @@ function SalesOrderDetailPage() {
             <Descriptions.Item label="Marking" span={2}>
               {order.marking_instructions || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Ghi chu" span={2}>
+            <Descriptions.Item label="Ghi chú" span={2}>
               {order.notes || '-'}
             </Descriptions.Item>
           </Descriptions>
@@ -458,7 +458,7 @@ function SalesOrderDetailPage() {
         {order.customer && (
           <Card
             size="small"
-            title="Khach hang"
+            title="Khách hàng"
             style={{ marginBottom: 16 }}
             extra={
               <Button
@@ -473,7 +473,7 @@ function SalesOrderDetailPage() {
             <Descriptions column={1} size="small">
               <Descriptions.Item label="Ma">{order.customer.code}</Descriptions.Item>
               <Descriptions.Item label="Ten">{order.customer.name}</Descriptions.Item>
-              <Descriptions.Item label="Quoc gia">{customerCountry || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Quốc gia">{customerCountry || '-'}</Descriptions.Item>
               <Descriptions.Item label="Hang">
                 <Tag color={CUSTOMER_TIER_COLORS[order.customer.tier]}>
                   {CUSTOMER_TIER_LABELS[order.customer.tier]}
@@ -484,7 +484,7 @@ function SalesOrderDetailPage() {
         )}
 
         {/* Quality specs card */}
-        <Card size="small" title="Chi tieu ky thuat yeu cau">
+        <Card size="small" title="Chỉ tiêu kỹ thuật yeu cau">
           <Descriptions column={2} size="small" bordered>
             <Descriptions.Item label="DRC min">{order.drc_min ?? '-'} %</Descriptions.Item>
             <Descriptions.Item label="DRC max">{order.drc_max ?? '-'} %</Descriptions.Item>
@@ -530,7 +530,7 @@ function SalesOrderDetailPage() {
     ]
 
     const columns: ColumnsType<QualityRow> = [
-      { title: 'Chi tieu', dataIndex: 'parameter', key: 'parameter' },
+      { title: 'Chỉ tiêu', dataIndex: 'parameter', key: 'parameter' },
       { title: 'Loai', dataIndex: 'type', key: 'type', render: (t) => t === 'min' ? 'Min' : 'Max' },
       {
         title: 'Yeu cau don hang',
@@ -545,7 +545,7 @@ function SalesOrderDetailPage() {
         render: (v, row) => (v != null ? `${v} ${row.unit}` : '-'),
       },
       {
-        title: 'Trang thai',
+        title: 'Trạng thái',
         key: 'status',
         render: (_: unknown, row: QualityRow) => {
           if (row.required == null || row.standard == null) return <Tag>N/A</Tag>
@@ -1108,7 +1108,7 @@ function SalesOrderDetailPage() {
         CONTAINER_TYPE_LABELS[v as keyof typeof CONTAINER_TYPE_LABELS] || v || '-',
     },
     {
-      title: 'So banh',
+      title: 'Số bành',
       dataIndex: 'bale_count',
       key: 'bale_count',
       render: (v) => v ?? '-',
@@ -1120,7 +1120,7 @@ function SalesOrderDetailPage() {
       render: (v) => (v ? v.toLocaleString() : '-'),
     },
     {
-      title: 'Trang thai',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       render: (s: ContainerStatus) => (
@@ -1283,7 +1283,7 @@ function SalesOrderDetailPage() {
     ]
 
     return (
-      <Card title="Chung tu xuat khau" size="small">
+      <Card title="Chứng từ xuất khẩu" size="small">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {docs.map((doc) => (
             <div
@@ -1385,7 +1385,7 @@ function SalesOrderDetailPage() {
       <Breadcrumb
         style={{ marginBottom: 16 }}
         items={[
-          { title: 'Don hang ban' },
+          { title: 'Đơn hàng bán' },
           {
             title: <a onClick={() => navigate('/sales/orders')}>Danh sach</a>,
           },
@@ -1424,7 +1424,7 @@ function SalesOrderDetailPage() {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic
-              title="Khach hang"
+              title="Khách hàng"
               value={customerName}
               suffix={customerCountry ? `(${customerCountry})` : undefined}
               valueStyle={{ fontSize: 14 }}
@@ -1442,13 +1442,13 @@ function SalesOrderDetailPage() {
         </Col>
         <Col xs={12} sm={4}>
           <Card size="small">
-            <Statistic title="So luong" value={order.quantity_tons} suffix="tan" />
+            <Statistic title="Số lượng" value={order.quantity_tons} suffix="tan" />
           </Card>
         </Col>
         <Col xs={12} sm={5}>
           <Card size="small">
             <Statistic
-              title="Gia tri"
+              title="Giá trị"
               value={order.total_value_usd || 0}
               precision={0}
               prefix="$"
@@ -1458,7 +1458,7 @@ function SalesOrderDetailPage() {
         <Col xs={12} sm={5}>
           <Card size="small">
             <Statistic
-              title="Ngay giao"
+              title="Ngày giao"
               value={formatDate(order.delivery_date)}
               valueStyle={{ fontSize: 14 }}
             />
@@ -1483,7 +1483,7 @@ function SalesOrderDetailPage() {
             key: 'quality',
             label: (
               <span>
-                <ExperimentOutlined /> Chat luong
+                <ExperimentOutlined /> Chất lượng
               </span>
             ),
             children: renderQualityTab(),
@@ -1540,7 +1540,7 @@ function SalesOrderDetailPage() {
           <Form.Item label="Seal No." name="seal_no">
             <Input placeholder="Seal number" />
           </Form.Item>
-          <Form.Item label="Loai container" name="container_type" initialValue="20ft">
+          <Form.Item label="Loại container" name="container_type" initialValue="20ft">
             <Select
               options={Object.entries(CONTAINER_TYPE_LABELS).map(([v, l]) => ({
                 value: v,
@@ -1550,7 +1550,7 @@ function SalesOrderDetailPage() {
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item label="So banh" name="bale_count">
+              <Form.Item label="Số bành" name="bale_count">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>

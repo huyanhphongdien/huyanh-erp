@@ -139,7 +139,7 @@ export const documentService = {
       .single()
 
     if (orderErr || !order) {
-      throw new Error('Khong the tai thong tin don hang')
+      throw new Error('Không thể tải thông tin đơn hàng')
     }
 
     // Fetch grade standard
@@ -263,7 +263,7 @@ export const documentService = {
       .single()
 
     if (orderErr || !order) {
-      throw new Error('Khong the tai thong tin don hang')
+      throw new Error('Không thể tải thông tin đơn hàng')
     }
 
     // Fetch containers with items
@@ -338,7 +338,7 @@ export const documentService = {
       .single()
 
     if (orderErr || !order) {
-      throw new Error('Khong the tai thong tin don hang')
+      throw new Error('Không thể tải thông tin đơn hàng')
     }
 
     // Check if there is an invoice
@@ -402,7 +402,7 @@ export const documentService = {
       .eq('id', orderId)
 
     if (error) {
-      throw new Error(`Khong the cap nhat trang thai chung tu: ${error.message}`)
+      throw new Error(`Không thể cập nhật trạng thái chung tu: ${error.message}`)
     }
   },
 }

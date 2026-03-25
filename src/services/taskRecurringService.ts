@@ -9,6 +9,7 @@ export interface RecurringRule {
   day_of_month: number | null
   time_of_day: string
   assignee_id: string | null
+  assignee_ids: string[] | null
   department_id: string | null
   is_active: boolean
   last_generated_at: string | null
@@ -27,6 +28,7 @@ export interface CreateRecurringData {
   day_of_month?: number
   time_of_day?: string
   assignee_id?: string
+  assignee_ids?: string[]
   department_id?: string
 }
 

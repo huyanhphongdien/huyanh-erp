@@ -86,46 +86,63 @@ Deno.serve(async (req) => {
         const durationDays = template?.default_duration_days || 7
         const dueDate = new Date(now.getTime() + durationDays * 86400000)
 
-        const taskData = {
-          name: taskName,
-          description: template?.description || null,
-          priority: template?.default_priority || 'medium',
-          status: 'in_progress',
-          due_date: dueDate.toISOString().split('T')[0],
-          assignee_id: rule.assignee_id || template?.default_assignee_id || null,
-          department_id: rule.department_id || template?.department_id || null,
-          created_at: now.toISOString(),
+        // 2c. Xác định danh sách người được giao
+        // Ưu tiên: assignee_ids (mảng) > assignee_id (đơn) > template default
+        let assigneeList: (string | null)[] = []
+        if (rule.assignee_ids && Array.isArray(rule.assignee_ids) && rule.assignee_ids.length > 0) {
+          assigneeList = rule.assignee_ids
+        } else if (rule.assignee_id) {
+          assigneeList = [rule.assignee_id]
+        } else if (template?.default_assignee_id) {
+          assigneeList = [template.default_assignee_id]
+        } else {
+          assigneeList = [null] // Tạo 1 task không giao ai
         }
 
-        // 2c. Create task
-        const { data: newTask, error: taskError } = await supabase
-          .from('tasks')
-          .insert(taskData)
-          .select('id, code, name')
-          .single()
-
-        if (taskError) {
-          console.error(`Failed to create task for rule ${rule.id}: ${taskError.message}`)
-          continue
-        }
-
-        // 2d. Create checklist items from template
-        if (template?.checklist_items && Array.isArray(template.checklist_items) && template.checklist_items.length > 0) {
-          const checklistData = template.checklist_items.map((item: any, index: number) => ({
-            task_id: newTask.id,
-            title: item.title,
-            is_completed: false,
-            sort_order: index,
-          }))
-
-          const { error: checklistError } = await supabase
-            .from('task_checklist_items')
-            .insert(checklistData)
-
-          if (checklistError) {
-            console.error(`Failed to create checklist for task ${newTask.id}: ${checklistError.message}`)
+        // 2d. Tạo task cho từng người được giao
+        for (const assigneeId of assigneeList) {
+          const taskData = {
+            name: taskName,
+            description: template?.description || null,
+            priority: template?.default_priority || 'medium',
+            status: 'draft',
+            due_date: dueDate.toISOString().split('T')[0],
+            assignee_id: assigneeId,
+            department_id: rule.department_id || template?.department_id || null,
+            created_at: now.toISOString(),
           }
-        }
+
+          const { data: newTask, error: taskError } = await supabase
+            .from('tasks')
+            .insert(taskData)
+            .select('id, code, name')
+            .single()
+
+          if (taskError) {
+            console.error(`Failed to create task for rule ${rule.id}, assignee ${assigneeId}: ${taskError.message}`)
+            continue
+          }
+
+          // Tạo checklist items từ template
+          if (template?.checklist_items && Array.isArray(template.checklist_items) && template.checklist_items.length > 0) {
+            const checklistData = template.checklist_items.map((item: any, index: number) => ({
+              task_id: newTask.id,
+              title: item.title,
+              is_completed: false,
+              sort_order: index,
+            }))
+
+            const { error: checklistError } = await supabase
+              .from('task_checklist_items')
+              .insert(checklistData)
+
+            if (checklistError) {
+              console.error(`Failed to create checklist for task ${newTask.id}: ${checklistError.message}`)
+            }
+          }
+
+          createdTasks.push(newTask.code || newTask.id)
+        } // end for assigneeList
 
         // 2e. Calculate next_generation_at based on frequency
         const nextGenerationAt = calculateNextGeneration(rule, now)
@@ -142,8 +159,6 @@ Deno.serve(async (req) => {
         if (updateError) {
           console.error(`Failed to update rule ${rule.id}: ${updateError.message}`)
         }
-
-        createdTasks.push(`${newTask.code || newTask.id}: ${newTask.name}`)
 
       } catch (ruleError) {
         console.error(`Error processing rule ${rule.id}:`, ruleError)

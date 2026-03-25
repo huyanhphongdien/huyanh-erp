@@ -215,7 +215,7 @@ export default function TaskTemplateListPage() {
         frequency: rule.frequency,
         day_of_week: rule.day_of_week,
         day_of_month: rule.day_of_month,
-        assignee_id: rule.assignee_id,
+        assignee_ids: rule.assignee_ids || (rule.assignee_id ? [rule.assignee_id] : []),
       })
     } else {
       setEditingRule(null)
@@ -233,7 +233,8 @@ export default function TaskTemplateListPage() {
         frequency: values.frequency,
         day_of_week: values.frequency === 'weekly' || values.frequency === 'biweekly' ? values.day_of_week : null,
         day_of_month: values.frequency === 'monthly' ? values.day_of_month : null,
-        assignee_id: values.assignee_id || null,
+        assignee_id: values.assignee_ids?.[0] || null,
+        assignee_ids: values.assignee_ids || [],
       }
 
       if (editingRule) {
@@ -689,13 +690,16 @@ export default function TaskTemplateListPage() {
             </Form.Item>
           )}
 
-          <Form.Item name="assignee_id" label="Người được giao">
+          <Form.Item name="assignee_ids" label="Người được giao">
             <Select
+              mode="multiple"
               allowClear
-              placeholder="Chọn nhân viên"
+              placeholder="Chọn nhân viên (nhiều người)"
               showSearch
               optionFilterProp="label"
               options={filteredEmployees.map(e => ({ value: e.id, label: e.full_name }))}
+              maxTagCount={3}
+              maxTagPlaceholder={(omitted) => `+${omitted.length} người`}
             />
           </Form.Item>
         </Form>

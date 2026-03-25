@@ -99,24 +99,25 @@ export default function TaskTemplateListPage() {
   }, [loadTemplates, loadRecurringRules, loadEmployees])
 
   // Filter employees theo quyền:
-  // - Nhân viên (level >= 5): chỉ giao cho chính mình
-  // - Trưởng/Phó phòng (level 3-4): giao cho nhân viên cùng phòng
-  // - Ban giám đốc / Admin (level <= 2): giao cho tất cả
+  // Level 1: Giám đốc, Level 2: PGĐ/Trợ lý, Level 3: PGĐ/Trợ lý BGĐ
+  // Level 4: Trưởng phòng, Level 5: Phó phòng
+  // Level 6: Nhân viên, Level 7: Thực tập sinh
   const filteredEmployees = useMemo(() => {
     const level = user?.position_level || 7
     const isAdmin = user?.role === 'admin'
+    const isManager = user?.is_manager
 
-    if (isAdmin || level <= 2) {
-      // BGĐ / Admin → tất cả nhân viên
+    if (isAdmin || level <= 3) {
+      // BGĐ / Admin / PGĐ → tất cả nhân viên
       return employees
     }
 
-    if (level <= 4) {
-      // Trưởng/Phó phòng → nhân viên cùng phòng ban
+    if (level <= 5 || isManager) {
+      // Trưởng phòng (4) + Phó phòng (5) → nhân viên cùng phòng ban
       return employees.filter(e => e.department_id === user?.department_id)
     }
 
-    // Nhân viên → chỉ chính mình
+    // Nhân viên (6+) → chỉ chính mình
     return employees.filter(e => e.id === user?.employee_id)
   }, [employees, user])
 

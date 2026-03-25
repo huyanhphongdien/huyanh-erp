@@ -430,7 +430,7 @@ const SalesOrderListPage = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => navigate('/sales/orders/create')}
+            onClick={() => navigate('/sales/orders/new')}
             style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
             Tạo đơn hàng

@@ -78,7 +78,7 @@ const Step1GeneralInfo = ({ form, onNext }: Step1Props) => {
       await form.validateFields([
         'demand_type',
         'product_type',
-        'quantity_kg',
+        'quantity_tons',
         'priority',
       ])
       onNext()
@@ -132,21 +132,20 @@ const Step1GeneralInfo = ({ form, onNext }: Step1Props) => {
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-              name="quantity_kg"
-              label="Số lượng (kg)"
+              name="quantity_tons"
+              label="Số lượng (tấn)"
               rules={[
                 { required: true, message: 'Vui lòng nhập số lượng' },
-                { type: 'number', min: 1, message: 'Số lượng phải lớn hơn 0' },
+                { type: 'number', min: 0.1, message: 'Số lượng phải lớn hơn 0' },
               ]}
             >
               <InputNumber
                 style={{ width: '100%' }}
-                min={1}
-                step={100}
-                placeholder="Nhập số lượng (kg)"
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
-                addonAfter="kg"
+                min={0.1}
+                step={1}
+                precision={1}
+                placeholder="Nhập số lượng (tấn)"
+                addonAfter="tấn"
               />
             </Form.Item>
           </Col>
@@ -374,7 +373,7 @@ const Step2DetailsConfirm = ({
           </Descriptions.Item>
           <Descriptions.Item label="Số lượng">
             <Text strong>
-              {values.quantity_kg ? `${(values.quantity_kg / 1000).toFixed(1)} tấn (${values.quantity_kg.toLocaleString()} kg)` : '-'}
+              {values.quantity_tons ? `${values.quantity_tons} tấn (${Math.round(values.quantity_tons * 1000).toLocaleString()} kg)` : '-'}
             </Text>
           </Descriptions.Item>
           <Descriptions.Item label="Ưu tiên">
@@ -516,7 +515,7 @@ const DemandCreatePage = () => {
       demand_type: values.demand_type,
       product_type: values.product_type,
       product_name: productName,
-      quantity_kg: values.quantity_kg,
+      quantity_kg: Math.round((values.quantity_tons || 0) * 1000),
       drc_min: values.drc_min || null,
       drc_max: values.drc_max || null,
       price_min: values.price_min || null,

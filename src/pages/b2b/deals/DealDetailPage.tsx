@@ -735,34 +735,50 @@ const DealDetailPage = () => {
                     }
                     style={{ borderRadius: 12 }}
                   >
-                    <Row gutter={[16, 16]}>
-                      <Col span={12}>
-                        <Statistic
-                          title="Số lượng"
-                          value={deal.quantity_tons || 0}
-                          suffix="tấn"
-                          valueStyle={{ color: '#1B4D3E' }}
-                        />
-                      </Col>
-                      <Col span={12}>
-                        <Statistic
-                          title="Đơn giá"
-                          value={deal.unit_price || 0}
-                          suffix="đ/kg"
-                          formatter={(value) => `${Number(value).toLocaleString()}`}
-                        />
-                      </Col>
-                      <Col span={24}>
-                        <Divider style={{ margin: '8px 0' }} />
-                        <Statistic
-                          title="Tổng giá trị"
-                          value={deal.total_value_vnd || 0}
-                          suffix="VNĐ"
-                          valueStyle={{ color: '#1B4D3E', fontSize: 24 }}
-                          formatter={(value) => `${Number(value).toLocaleString()}`}
-                        />
-                      </Col>
-                    </Row>
+                    {deal.deal_type === 'processing' ? (
+                      <Row gutter={[16, 16]}>
+                        <Col span={12}>
+                          <Statistic title="Phí gia công" value={deal.processing_fee_per_ton || 0} suffix="đ/tấn"
+                            formatter={v => `${Number(v).toLocaleString()}`} />
+                        </Col>
+                        <Col span={12}>
+                          <Statistic title="Tỷ lệ thu hồi" value={deal.expected_output_rate || 80} suffix="%" />
+                        </Col>
+                        <Col span={24}>
+                          <Divider style={{ margin: '8px 0' }} />
+                          <Tag color="purple">Gia công — tính tiền theo đầu ra</Tag>
+                        </Col>
+                      </Row>
+                    ) : (
+                      <Row gutter={[16, 16]}>
+                        <Col span={12}>
+                          <Statistic
+                            title="Số lượng"
+                            value={deal.quantity_tons || 0}
+                            suffix="tấn"
+                            valueStyle={{ color: '#1B4D3E' }}
+                          />
+                        </Col>
+                        <Col span={12}>
+                          <Statistic
+                            title="Đơn giá"
+                            value={deal.unit_price || 0}
+                            suffix="đ/kg"
+                            formatter={(value) => `${Number(value).toLocaleString()}`}
+                          />
+                        </Col>
+                        <Col span={24}>
+                          <Divider style={{ margin: '8px 0' }} />
+                          <Statistic
+                            title="Tổng giá trị"
+                            value={deal.total_value_vnd || 0}
+                            suffix="VNĐ"
+                            valueStyle={{ color: '#1B4D3E', fontSize: 24 }}
+                            formatter={(value) => `${Number(value).toLocaleString()}`}
+                          />
+                        </Col>
+                      </Row>
+                    )}
                   </Card>
                 </Col>
               </Row>

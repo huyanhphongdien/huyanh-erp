@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Select, Statistic, message, Breadcrumb, Popconfirm } from 'antd'
+import { Alert, Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Select, Statistic, message, Breadcrumb, Popconfirm } from 'antd'
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, PrinterOutlined, EditOutlined, SendOutlined } from '@ant-design/icons'
 import { settlementService, Settlement, SettlementStatus, SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUS_COLORS, SETTLEMENT_TYPE_LABELS } from '../../../services/b2b/settlementService'
 import PaymentForm from '../../../components/b2b/PaymentForm'
@@ -296,6 +296,9 @@ const SettlementDetailPage = () => {
               <Descriptions.Item label="Mã QT">{settlement.code}</Descriptions.Item>
               <Descriptions.Item label="Loại">
                 <Tag>{SETTLEMENT_TYPE_LABELS[settlement.settlement_type] || settlement.settlement_type}</Tag>
+                {settlement.settlement_type === 'processing' && settlement.notes && (
+                  <Alert type="info" message={settlement.notes} style={{ marginTop: 8 }} />
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Sản phẩm">{settlement.product_type || '-'}</Descriptions.Item>
               <Descriptions.Item label="KL cân">{settlement.weighed_kg ? `${formatNumber(settlement.weighed_kg)} kg` : '-'}</Descriptions.Item>

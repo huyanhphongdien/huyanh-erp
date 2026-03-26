@@ -1523,7 +1523,7 @@ function SalesOrderDetailPage() {
 
       {/* Container modal */}
       <Modal
-        title="Them Container"
+        title="Thêm Container"
         open={containerModalOpen}
         onOk={handleAddContainer}
         onCancel={() => {

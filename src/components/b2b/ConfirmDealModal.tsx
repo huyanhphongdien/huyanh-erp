@@ -75,6 +75,7 @@ const ConfirmDealModal = ({
 }: ConfirmDealModalProps) => {
   const [form] = Form.useForm()
   const [hasAdvance, setHasAdvance] = useState(false)
+  const [dealType, setDealType] = useState<string>('purchase')
 
   // Reset khi mở modal
   useEffect(() => {
@@ -96,6 +97,8 @@ const ConfirmDealModal = ({
         advance_notes: '',
       })
       setHasAdvance(false)
+      const demandType = (booking as any).demand_type || (booking as any).deal_type || 'purchase'
+      setDealType(demandType as string)
     }
   }, [open, booking, form])
 
@@ -141,6 +144,9 @@ const ConfirmDealModal = ({
         pickup_location: Array.isArray(values.pickup_location) ? values.pickup_location[0] : (values.pickup_location || booking?.pickup_location),
         delivery_date: values.delivery_date || booking?.delivery_date,
         deal_notes: values.deal_notes,
+        deal_type: dealType as 'purchase' | 'sale' | 'processing' | 'consignment',
+        processing_fee_per_ton: values.processing_fee_per_ton || null,
+        expected_output_rate: values.expected_output_rate || null,
         has_advance: hasAdvance,
         ...(hasAdvance && {
           advance_amount: values.advance_amount,
@@ -346,6 +352,19 @@ const ConfirmDealModal = ({
           </Title>
         </div>
 
+        {dealType === 'processing' && (
+          <>
+            <Form.Item label="Phí gia công (đ/tấn)" name="processing_fee_per_ton">
+              <InputNumber style={{width:'100%'}} min={0} placeholder="VD: 2,500,000"
+                formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={v => v!.replace(/,/g, '') as any} />
+            </Form.Item>
+            <Form.Item label="Tỷ lệ thu hồi dự kiến (%)" name="expected_output_rate" initialValue={80}>
+              <InputNumber style={{width:'100%'}} min={1} max={100} suffix="%" />
+            </Form.Item>
+          </>
+        )}
+
         {/* Ghi chú */}
         <Form.Item name="deal_notes" label="Ghi chú Deal">
           <TextArea
@@ -360,7 +379,7 @@ const ConfirmDealModal = ({
         {/* PHẦN 2: TẠM ỨNG */}
         {/* ============================================ */}
 
-        {showAdvanceSection && (
+        {showAdvanceSection && dealType !== 'processing' && (
           <>
             <Divider>
               <Space>

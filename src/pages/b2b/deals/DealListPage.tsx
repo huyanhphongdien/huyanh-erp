@@ -315,11 +315,16 @@ const DealListPage = () => {
       key: 'total_value_vnd',
       width: 120,
       align: 'right',
-      render: (value) => (
-        <Text strong style={{ color: '#1B4D3E' }}>
-          {formatCurrency(value)}
-        </Text>
-      ),
+      render: (value: number, record: Deal) => {
+        if (record.deal_type === 'processing') {
+          return <Tag color="purple">Gia công</Tag>
+        }
+        return (
+          <Text strong style={{ color: '#1B4D3E' }}>
+            {formatCurrency(value)}
+          </Text>
+        )
+      },
       sorter: true,
     },
     {

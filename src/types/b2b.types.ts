@@ -383,6 +383,9 @@ export interface ConfirmDealFormData {
   expected_drc: number
   price_unit: 'wet' | 'dry'
   product_type: string
+  deal_type?: 'purchase' | 'sale' | 'processing' | 'consignment'
+  processing_fee_per_ton?: number
+  expected_output_rate?: number
   pickup_location?: string
   delivery_date?: string
   deal_notes?: string

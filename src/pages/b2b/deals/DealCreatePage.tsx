@@ -222,8 +222,10 @@ interface DealInfoStepProps {
 
 const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepProps) => {
   const [totalValue, setTotalValue] = useState(0)
+  const [dealType, setDealType] = useState<string>(form.getFieldValue('deal_type') || 'purchase')
 
   const handleValuesChange = () => {
+    setDealType(form.getFieldValue('deal_type') || 'purchase')
     const quantity = form.getFieldValue('quantity_tons') || 0
     const price = form.getFieldValue('unit_price') || 0
     const total = quantity * 1000 * price // kg * price
@@ -377,17 +379,19 @@ const DealInfoStep = ({ form, selectedPartner, onBack, onNext }: DealInfoStepPro
               </Select>
             </Form.Item>
           </Col>
-          <Col xs={24} md={12}>
-            <Form.Item name="processing_fee_per_ton" label="Phí gia công (đ/tấn)">
-              <InputNumber
-                style={{ width: '100%' }}
-                min={0}
-                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
-                placeholder="Nếu có"
-              />
-            </Form.Item>
-          </Col>
+          {dealType === 'processing' && (
+            <Col xs={24} md={12}>
+              <Form.Item name="processing_fee_per_ton" label="Phí gia công (đ/tấn)">
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={0}
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => value!.replace(/\$\s?|(,*)/g, '') as any}
+                  placeholder="Nhập phí gia công"
+                />
+              </Form.Item>
+            </Col>
+          )}
         </Row>
 
         <Form.Item name="notes" label="Ghi chú">

@@ -113,12 +113,12 @@ export const dealConfirmService = {
       .insert({
         deal_number: dealNumber,
         partner_id: context.partnerId,
-        deal_type: 'purchase',
+        deal_type: formData.deal_type || 'purchase',
         product_name: productName,
         product_code: formData.product_type,
         quantity_kg: formData.agreed_quantity_tons * 1000,
         unit_price: formData.agreed_price,
-        total_value_vnd: estimatedValue,
+        total_value_vnd: formData.deal_type === 'processing' ? 0 : estimatedValue,
         currency: 'VND',
         status: 'processing',
         // Lưu vào cột riêng (không nhét notes)
@@ -149,7 +149,10 @@ export const dealConfirmService = {
     let totalAdvanced = 0
 
     // === Step 2: Tạo Advance (nếu có) ===
-    if (formData.has_advance && formData.advance_amount && formData.advance_amount > 0) {
+    // Gia công: không cho tạm ứng
+    if (formData.deal_type === 'processing' && formData.has_advance && formData.advance_amount && formData.advance_amount > 0) {
+      console.warn('Gia công không hỗ trợ tạm ứng — bỏ qua tạo advance')
+    } else if (formData.has_advance && formData.advance_amount && formData.advance_amount > 0) {
       try {
         const advanceNumber = generateAdvanceNumber()
         const purpose = [

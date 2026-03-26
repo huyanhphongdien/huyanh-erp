@@ -335,14 +335,19 @@ export const dealWmsService = {
     // 4. Tính final_value
     const { data: deal } = await supabase
       .from('b2b_deals')
-      .select('unit_price, quantity_kg, price_unit')
+      .select('unit_price, quantity_kg, price_unit, deal_type')
       .eq('id', dealId)
       .single()
 
     let finalValue: number | null = null
     if (deal && avgDrc && actualWeight > 0) {
       const priceUnit = (deal as any).price_unit || 'wet'
-      if (priceUnit === 'dry') {
+      const dealType = (deal as any).deal_type || 'purchase'
+
+      if (dealType === 'processing') {
+        // Gia công: final_value tính sau khi SX xong, không tính ở đây
+        finalValue = null
+      } else if (priceUnit === 'dry') {
         // Giá khô: weight × DRC/100 × price
         finalValue = Math.round(actualWeight * (avgDrc / 100) * (deal.unit_price || 0))
       } else {

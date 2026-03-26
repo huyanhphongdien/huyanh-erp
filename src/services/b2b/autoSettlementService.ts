@@ -58,6 +58,7 @@ export const autoSettlementService = {
       .select(`
         id, deal_number, partner_id, product_name, product_code,
         quantity_kg, unit_price, final_price, deal_type, price_unit,
+        processing_fee_per_ton, expected_output_rate,
         actual_drc, actual_weight_kg, final_value,
         partner:b2b_partners!partner_id ( id, code, name )
       `)
@@ -94,16 +95,33 @@ export const autoSettlementService = {
     // ─── 3. Tính giá trị thực tế ───
     const pricePerKg = deal.final_price || deal.unit_price || 0
     const priceUnit = (deal as any).price_unit || 'wet'
+    const dealType = (deal as any).deal_type || 'purchase'
+    const processingFeePerTon = (deal as any).processing_fee_per_ton || 0
+    const expectedOutputRate = (deal as any).expected_output_rate || 80
 
-    if (pricePerKg <= 0) {
-      throw new Error('Deal chưa có đơn giá. Vui lòng kiểm tra đơn giá trước khi quyết toán.')
+    let finalValue: number
+    let settlementNotes = ''
+
+    if (dealType === 'processing') {
+      // Gia công: Tính từ sản lượng đầu ra
+      // output_kg = input_kg × (yield / 100)
+      const estimatedOutputKg = actualWeightKg * (expectedOutputRate / 100)
+      // Phí gia công = input_tons × fee_per_ton
+      const processingFee = (actualWeightKg / 1000) * processingFeePerTon
+      // Giá trị thành phẩm ước tính (dùng giá thị trường nếu có, hoặc = 0)
+      const outputValue = pricePerKg > 0 ? Math.round(estimatedOutputKg * pricePerKg) : 0
+      // Đại lý nhận = giá trị TP - phí gia công
+      finalValue = outputValue > 0 ? outputValue - Math.round(processingFee) : Math.round(-processingFee)
+      settlementNotes = `Gia công: NVL ${(actualWeightKg/1000).toFixed(1)}T → TP ~${(estimatedOutputKg/1000).toFixed(1)}T (${expectedOutputRate}%). Phí GC: ${processingFee.toLocaleString()} VNĐ`
+    } else {
+      // Mua đứt: Tính từ khối lượng NVL
+      if (pricePerKg <= 0) {
+        throw new Error('Deal chưa có đơn giá. Vui lòng kiểm tra đơn giá trước khi quyết toán.')
+      }
+      finalValue = priceUnit === 'dry'
+        ? Math.round(actualWeightKg * (actualDrc / 100) * pricePerKg)
+        : Math.round(actualWeightKg * pricePerKg)
     }
-
-    // Giá ướt: finalValue = weight × price
-    // Giá khô: finalValue = weight × (DRC/100) × price
-    const finalValue = priceUnit === 'dry'
-      ? Math.round(actualWeightKg * (actualDrc / 100) * pricePerKg)
-      : Math.round(actualWeightKg * pricePerKg)
 
     // ─── 4. Lấy tạm ứng đã chi (paid) cho Deal ───
     const { data: advances, error: advError } = await supabase
@@ -162,7 +180,9 @@ export const autoSettlementService = {
         weigh_date_end: weighDateEnd,
         stock_in_date: weighDateStart,
         status: 'draft',
-        notes: `Tạo tự động từ Deal ${deal.deal_number}`,
+        notes: settlementNotes
+          ? `${settlementNotes}. Tạo tự động từ Deal ${deal.deal_number}`
+          : `Tạo tự động từ Deal ${deal.deal_number}`,
         created_by: createdBy,
       })
       .select(`

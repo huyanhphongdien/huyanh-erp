@@ -533,6 +533,8 @@ export const demandService = {
         status: 'pending',
         demand_id: demandId,
         offer_id: offerId,
+        processing_fee_per_ton: demand.processing_fee_per_ton || null,
+        expected_output_rate: demand.expected_output_rate || null,
         notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,
       })
       .select('*')

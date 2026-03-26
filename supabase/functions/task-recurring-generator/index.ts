@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
             description: template?.description || null,
             priority: template?.default_priority || 'medium',
             status: 'in_progress',
-            progress: 0,
+            progress: 1,
             due_date: dueDate.toISOString().split('T')[0],
             assignee_id: assigneeId,
             department_id: rule.department_id || template?.department_id || null,

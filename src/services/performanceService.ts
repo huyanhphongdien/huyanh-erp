@@ -409,7 +409,7 @@ export const performanceDashboardService = {
 
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
-        .select('id, status, due_date, assignee_id, actual_end_date')
+        .select('id, status, due_date, assignee_id, completed_date')
         .eq('status', 'finished')
         .gte('completed_date', from)
         .lte('completed_date', to);
@@ -463,7 +463,7 @@ export const performanceDashboardService = {
         if (task.due_date) {
           const dueDate = new Date(task.due_date);
           dueDate.setHours(23, 59, 59, 999);
-          const completedDate = task.actual_end_date ? new Date(task.actual_end_date) : new Date(to);
+          const completedDate = task.completed_date ? new Date(task.completed_date) : new Date(to);
           if (completedDate <= dueDate) onTimeCount++;
           else overdueCount++;
         } else {
@@ -506,7 +506,7 @@ export const performanceDashboardService = {
       let taskQuery = supabase
         .from('tasks')
         .select(`
-          id, code, name, status, due_date, assignee_id, actual_end_date,
+          id, code, name, status, due_date, assignee_id, completed_date,
           assignee:employees!tasks_assignee_id_fkey (
             id, full_name, avatar_url, department_id,
             department:departments!employees_department_id_fkey (id, name)
@@ -576,7 +576,7 @@ export const performanceDashboardService = {
         if (task.due_date) {
           const dueDate = new Date(task.due_date);
           dueDate.setHours(23, 59, 59, 999);
-          const completedDate = task.actual_end_date ? new Date(task.actual_end_date) : new Date();
+          const completedDate = task.completed_date ? new Date(task.completed_date) : new Date();
           if (completedDate <= dueDate) emp.on_time_count++;
           else emp.overdue_count++;
         } else {
@@ -685,7 +685,7 @@ export const performanceDashboardService = {
 
         const { data: tasks } = await supabase
           .from('tasks')
-          .select('id, due_date, actual_end_date')
+          .select('id, due_date, completed_date')
           .eq('status', 'finished')
           .gte('updated_at', from)
           .lte('updated_at', to);
@@ -707,7 +707,7 @@ export const performanceDashboardService = {
           if (t.due_date) {
             const due = new Date(t.due_date);
             due.setHours(23, 59, 59, 999);
-            const completed = t.actual_end_date ? new Date(t.actual_end_date) : new Date();
+            const completed = t.completed_date ? new Date(t.completed_date) : new Date();
             if (completed <= due) onTimeCount++;
           } else {
             onTimeCount++;
@@ -749,7 +749,7 @@ export const performanceDashboardService = {
 
       const { data: tasks } = await supabase
         .from('tasks')
-        .select('id, code, name, due_date, actual_end_date, updated_at')
+        .select('id, code, name, due_date, completed_date, updated_at')
         .eq('status', 'finished')
         .eq('assignee_id', employeeId)
         .gte('updated_at', from)
@@ -795,7 +795,7 @@ export const performanceDashboardService = {
         if (task.due_date) {
           const due = new Date(task.due_date);
           due.setHours(23, 59, 59, 999);
-          const completed = task.actual_end_date ? new Date(task.actual_end_date) : new Date();
+          const completed = task.completed_date ? new Date(task.completed_date) : new Date();
           onTime = completed <= due;
         }
         if (onTime) onTimeCount++; else overdueCount++;
@@ -804,7 +804,7 @@ export const performanceDashboardService = {
 
         taskDetails.push({
           code: task.code || '', name: task.name || '', score,
-          completed_date: task.actual_end_date || task.updated_at || '',
+          completed_date: task.completed_date || task.updated_at || '',
           on_time: onTime,
         });
       });

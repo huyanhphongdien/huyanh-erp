@@ -216,6 +216,9 @@ export function useKeliScale(): UseKeliScaleReturn {
     readingRef.current = true
     bufferRef.current = ''
 
+    let consecutiveErrors = 0
+    const MAX_CONSECUTIVE_ERRORS = 5
+
     try {
       while (port.readable && readingRef.current) {
         const reader = port.readable.getReader()
@@ -227,6 +230,9 @@ export function useKeliScale(): UseKeliScaleReturn {
           while (readingRef.current) {
             const { value, done } = await reader.read()
             if (done) break
+
+            // Reset error counter on successful read
+            consecutiveErrors = 0
 
             const rawText = decoder.decode(value, { stream: true })
             if (isDebug()) console.log('[KeliScale] Raw chunk:', JSON.stringify(rawText))
@@ -248,8 +254,31 @@ export function useKeliScale(): UseKeliScaleReturn {
             }
           }
         } catch (err: any) {
+          // ParityError — parity config doesn't match the scale hardware
+          if (err.name === 'ParityError' || (err.message && err.message.includes('Parity'))) {
+            console.error('[KeliScale] Parity error — cài đặt parity không khớp đầu cân. Hãy đổi parity trong Cài đặt.')
+            setError('Lỗi Parity: cài đặt không khớp đầu cân. Vào Cài đặt → đổi Parity (thử Even hoặc Odd) rồi kết nối lại.')
+            readingRef.current = false
+            setConnected(false)
+            // Close port so user can reconnect with correct config
+            try { await port.close() } catch { /* ignore */ }
+            portRef.current = null
+            break
+          }
+
           if (err.name !== 'NetworkError' && readingRef.current) {
-            console.error('[KeliScale] Read error:', err)
+            consecutiveErrors++
+            console.error(`[KeliScale] Read error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, err)
+
+            if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+              console.error('[KeliScale] Too many consecutive errors, stopping read loop')
+              setError(`Lỗi đọc cân liên tục: ${err.message || err.name}. Kiểm tra kết nối và cài đặt cân.`)
+              readingRef.current = false
+              setConnected(false)
+              try { await port.close() } catch { /* ignore */ }
+              portRef.current = null
+              break
+            }
           }
         } finally {
           reader.releaseLock()

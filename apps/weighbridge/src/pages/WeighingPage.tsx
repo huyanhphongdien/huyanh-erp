@@ -629,6 +629,15 @@ export default function WeighingPage() {
                       </div>
                     )}
 
+                    {/* Scale error */}
+                    {scale.error && (
+                      <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: 10, borderRadius: 8, marginBottom: 8 }}>
+                        <Text type="danger" style={{ fontSize: 12 }}>
+                          ⚠️ {scale.error}
+                        </Text>
+                      </div>
+                    )}
+
                     {/* Tare suggestion */}
                     {isWeighingTare && tareSuggestion && tareSuggestion.avgTare && (
                       <div style={{ background: '#FFFBE6', padding: 8, borderRadius: 8, marginBottom: 8 }}>

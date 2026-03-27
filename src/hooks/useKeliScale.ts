@@ -93,6 +93,17 @@ const DEFAULT_CONFIG: KeliScaleConfig = {
   flowControl: 'none' as FlowControlType,
 }
 
+// Configs to try when auto-detecting (most common for weighbridge scales)
+const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; label: string }> = [
+  { baudRate: 9600, parity: 'even', label: '9600/Even (XK3190-A9)' },
+  { baudRate: 9600, parity: 'none', label: '9600/None (D2008FA)' },
+  { baudRate: 9600, parity: 'odd', label: '9600/Odd' },
+  { baudRate: 2400, parity: 'none', label: '2400/None (XK3118T1)' },
+  { baudRate: 2400, parity: 'even', label: '2400/Even' },
+  { baudRate: 4800, parity: 'none', label: '4800/None (XK3190-A12E)' },
+  { baudRate: 4800, parity: 'even', label: '4800/Even' },
+]
+
 // Config key in localStorage
 const CONFIG_KEY = 'keli_scale_config'
 
@@ -157,7 +168,7 @@ function parseKeliOutput(line: string): ScaleReading | null {
     }
   }
 
-  // Format 3: "12345.5" (just a number)
+  // Format 4: "12345.5" (just a number)
   const numOnly = parseFloat(trimmed)
   if (!isNaN(numOnly) && trimmed.match(/^[+-]?[\d.]+$/)) {
     return {
@@ -169,6 +180,78 @@ function parseKeliOutput(line: string): ScaleReading | null {
   }
 
   return null
+}
+
+// ============================================================================
+// HELPER — Try to open port with a config, read for a short time, check data
+// ============================================================================
+
+async function tryConfigOnPort(
+  port: SerialPort,
+  cfg: { baudRate: number; parity: ParityType; dataBits?: number; stopBits?: number },
+  timeoutMs = 3000
+): Promise<'ok' | 'parity' | 'no_data' | 'error'> {
+  try {
+    await port.open({
+      baudRate: cfg.baudRate,
+      dataBits: cfg.dataBits ?? 8,
+      stopBits: cfg.stopBits ?? 1,
+      parity: cfg.parity,
+      flowControl: 'none',
+    })
+  } catch {
+    return 'error'
+  }
+
+  let result: 'ok' | 'parity' | 'no_data' = 'no_data'
+
+  try {
+    if (!port.readable) {
+      await port.close()
+      return 'error'
+    }
+
+    const reader = port.readable.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    // Read with timeout
+    const deadline = Date.now() + timeoutMs
+    try {
+      while (Date.now() < deadline) {
+        const readPromise = reader.read()
+        const timeoutPromise = new Promise<{ value: undefined; done: true }>(resolve =>
+          setTimeout(() => resolve({ value: undefined, done: true }), deadline - Date.now())
+        )
+        const { value, done } = await Promise.race([readPromise, timeoutPromise])
+        if (done || !value) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split(/\r\n|\r|\n/)
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.trim() && parseKeliOutput(line)) {
+            result = 'ok'
+            break
+          }
+        }
+        if (result === 'ok') break
+      }
+    } catch (err: any) {
+      if (err.name === 'ParityError' || (err.message && err.message.includes('Parity'))) {
+        result = 'parity'
+      }
+    } finally {
+      try { await reader.cancel() } catch { /* ignore */ }
+      try { reader.releaseLock() } catch { /* ignore */ }
+    }
+  } finally {
+    await new Promise(r => setTimeout(r, 100))
+    try { await port.close() } catch { /* ignore */ }
+  }
+
+  return result
 }
 
 // ============================================================================
@@ -194,6 +277,8 @@ export function useKeliScale(): UseKeliScaleReturn {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
   const readingRef = useRef(false)
   const bufferRef = useRef('')
+  // Prevent auto-reconnect after fatal error (ParityError, etc.)
+  const fatalErrorRef = useRef(false)
 
   // Save config
   const setConfig = useCallback((partial: Partial<KeliScaleConfig>) => {
@@ -202,6 +287,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       try { localStorage.setItem(CONFIG_KEY, JSON.stringify(next)) } catch { /* ignore */ }
       return next
     })
+    // Clear fatal error flag when user changes config
+    fatalErrorRef.current = false
   }, [])
 
   // --------------------------------------------------------------------------
@@ -256,11 +343,12 @@ export function useKeliScale(): UseKeliScaleReturn {
         } catch (err: any) {
           // ParityError — parity config doesn't match the scale hardware
           if (err.name === 'ParityError' || (err.message && err.message.includes('Parity'))) {
-            console.error('[KeliScale] Parity error — cài đặt parity không khớp đầu cân. Hãy đổi parity trong Cài đặt.')
-            setError('Lỗi Parity: cài đặt không khớp đầu cân. Vào Cài đặt → đổi Parity (thử Even hoặc Odd) rồi kết nối lại.')
+            console.error('[KeliScale] Parity error — cài đặt parity không khớp đầu cân')
+            setError('Lỗi Parity — đang tự động dò cấu hình đúng...')
             readingRef.current = false
             setConnected(false)
-            // Close port so user can reconnect with correct config
+            fatalErrorRef.current = true
+            // Close port so auto-detect can use it
             try { await port.close() } catch { /* ignore */ }
             portRef.current = null
             break
@@ -275,6 +363,7 @@ export function useKeliScale(): UseKeliScaleReturn {
               setError(`Lỗi đọc cân liên tục: ${err.message || err.name}. Kiểm tra kết nối và cài đặt cân.`)
               readingRef.current = false
               setConnected(false)
+              fatalErrorRef.current = true
               try { await port.close() } catch { /* ignore */ }
               portRef.current = null
               break
@@ -291,52 +380,64 @@ export function useKeliScale(): UseKeliScaleReturn {
   }, [])
 
   // --------------------------------------------------------------------------
+  // AUTO-DETECT — Try different configs to find the right one
+  // --------------------------------------------------------------------------
+
+  const autoDetect = useCallback(async (port: SerialPort): Promise<KeliScaleConfig | null> => {
+    console.log('[KeliScale] Auto-detecting config...')
+
+    for (const cfg of AUTO_DETECT_CONFIGS) {
+      setError(`Đang thử cấu hình ${cfg.label}...`)
+      console.log(`[KeliScale] Trying: ${cfg.label}`)
+
+      // Wait for port to be fully released
+      await new Promise(r => setTimeout(r, 300))
+
+      const result = await tryConfigOnPort(port, {
+        baudRate: cfg.baudRate,
+        parity: cfg.parity,
+      })
+
+      console.log(`[KeliScale] ${cfg.label} → ${result}`)
+
+      if (result === 'ok') {
+        const found: KeliScaleConfig = {
+          baudRate: cfg.baudRate,
+          dataBits: 8,
+          stopBits: 1,
+          parity: cfg.parity,
+          flowControl: 'none',
+        }
+        console.log(`[KeliScale] Auto-detect SUCCESS: ${cfg.label}`)
+        return found
+      }
+    }
+
+    return null
+  }, [])
+
+  // --------------------------------------------------------------------------
   // CONNECT — Open browser serial port picker
   // --------------------------------------------------------------------------
 
-  const connect = useCallback(async (): Promise<boolean> => {
-    if (!supported) {
-      setError('Trình duyệt không hỗ trợ Web Serial API. Dùng Chrome hoặc Edge.')
-      return false
-    }
-
+  const connectWithConfig = useCallback(async (port: SerialPort, cfg: KeliScaleConfig): Promise<boolean> => {
     try {
-      setError(null)
-
-      // Close existing connection cleanly
-      if (portRef.current) {
-        readingRef.current = false
-        if (readerRef.current) {
-          try { await readerRef.current.cancel() } catch { /* ignore */ }
-          try { readerRef.current.releaseLock() } catch { /* ignore */ }
-          readerRef.current = null
-        }
-        await new Promise(r => setTimeout(r, 100))
-        try { await portRef.current.close() } catch { /* ignore */ }
-        portRef.current = null
-      }
-
-      // Request port from user (browser shows picker dialog)
-      const port = await (navigator as any).serial.requestPort()
-
-      // Open port with Keli config
       await port.open({
-        baudRate: config.baudRate,
-        dataBits: config.dataBits,
-        stopBits: config.stopBits,
-        parity: config.parity,
-        flowControl: config.flowControl,
+        baudRate: cfg.baudRate,
+        dataBits: cfg.dataBits,
+        stopBits: cfg.stopBits,
+        parity: cfg.parity,
+        flowControl: cfg.flowControl,
       })
 
       portRef.current = port
       setConnected(true)
       setError(null)
-      console.log('[KeliScale] Connected to serial port')
+      fatalErrorRef.current = false
+      console.log(`[KeliScale] Connected — ${cfg.baudRate} baud, parity: ${cfg.parity}`)
 
-      // Start reading
       startReading(port)
 
-      // Listen for disconnect
       port.addEventListener('disconnect', () => {
         console.log('[KeliScale] Port disconnected')
         setConnected(false)
@@ -347,8 +448,65 @@ export function useKeliScale(): UseKeliScaleReturn {
 
       return true
     } catch (err: any) {
+      console.error('[KeliScale] Open error:', err)
+      return false
+    }
+  }, [startReading])
+
+  const connect = useCallback(async (): Promise<boolean> => {
+    if (!supported) {
+      setError('Trình duyệt không hỗ trợ Web Serial API. Dùng Chrome hoặc Edge.')
+      return false
+    }
+
+    try {
+      setError(null)
+      fatalErrorRef.current = false
+
+      // Close existing connection cleanly
+      if (portRef.current) {
+        readingRef.current = false
+        if (readerRef.current) {
+          try { await readerRef.current.cancel() } catch { /* ignore */ }
+          try { readerRef.current.releaseLock() } catch { /* ignore */ }
+          readerRef.current = null
+        }
+        await new Promise(r => setTimeout(r, 200))
+        try { await portRef.current.close() } catch { /* ignore */ }
+        portRef.current = null
+        await new Promise(r => setTimeout(r, 200))
+      }
+
+      // Request port from user (browser shows picker dialog)
+      const port = await (navigator as any).serial.requestPort()
+
+      // Try current config first
+      const success = await connectWithConfig(port, config)
+      if (success) return true
+
+      // If failed, try auto-detect
+      setError('Kết nối thất bại, đang tự động dò cấu hình...')
+      await new Promise(r => setTimeout(r, 300))
+
+      const detectedConfig = await autoDetect(port)
+      if (detectedConfig) {
+        // Save detected config
+        setConfigState(detectedConfig)
+        try { localStorage.setItem(CONFIG_KEY, JSON.stringify(detectedConfig)) } catch { /* ignore */ }
+
+        // Connect with detected config
+        await new Promise(r => setTimeout(r, 300))
+        const ok = await connectWithConfig(port, detectedConfig)
+        if (ok) {
+          setError(null)
+          return true
+        }
+      }
+
+      setError('Không tìm được cấu hình phù hợp. Kiểm tra kết nối cáp RS232 và đầu cân.')
+      return false
+    } catch (err: any) {
       if (err.name === 'NotFoundError') {
-        // User cancelled the picker — not an error
         return false
       }
       console.error('[KeliScale] Connect error:', err)
@@ -356,7 +514,7 @@ export function useKeliScale(): UseKeliScaleReturn {
       setConnected(false)
       return false
     }
-  }, [supported, config, startReading])
+  }, [supported, config, connectWithConfig, autoDetect])
 
   // --------------------------------------------------------------------------
   // DISCONNECT
@@ -438,38 +596,21 @@ export function useKeliScale(): UseKeliScaleReturn {
   }, [])
 
   // --------------------------------------------------------------------------
-  // AUTO-RECONNECT to previously paired port
+  // AUTO-RECONNECT to previously paired port (skip if fatal error)
   // --------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!supported) return
+    if (!supported || fatalErrorRef.current) return
 
     const tryAutoConnect = async () => {
       try {
         const ports = await (navigator as any).serial.getPorts()
-        if (ports.length > 0 && !portRef.current) {
+        if (ports.length > 0 && !portRef.current && !fatalErrorRef.current) {
           const port = ports[0]
-          try {
-            await port.open({
-              baudRate: config.baudRate,
-              dataBits: config.dataBits,
-              stopBits: config.stopBits,
-              parity: config.parity,
-              flowControl: config.flowControl,
-            })
-            portRef.current = port
-            setConnected(true)
-            console.log('[KeliScale] Auto-reconnected to previously paired port')
-            startReading(port)
-
-            port.addEventListener('disconnect', () => {
-              setConnected(false)
-              setLiveWeight(null)
-              readingRef.current = false
-              portRef.current = null
-            })
-          } catch {
-            // Port may be in use or unavailable
+          const success = await connectWithConfig(port, config)
+          if (!success) {
+            // Don't auto-detect on auto-reconnect — just silently fail
+            console.log('[KeliScale] Auto-reconnect failed, user can connect manually')
           }
         }
       } catch {
@@ -478,7 +619,9 @@ export function useKeliScale(): UseKeliScaleReturn {
     }
 
     tryAutoConnect()
-  }, [supported, config, startReading])
+    // Only run on mount, not on config changes (to avoid reconnect loops)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supported])
 
   return {
     supported,

@@ -124,6 +124,17 @@ Deno.serve(async (req) => {
 
         // 2d. Tạo task cho từng người được giao
         for (const assigneeId of assigneeList) {
+          // Lấy department_id từ nhân viên nếu rule/template không có
+          let deptId = rule.department_id || template?.department_id || null
+          if (!deptId && assigneeId) {
+            const { data: emp } = await supabase
+              .from('employees')
+              .select('department_id')
+              .eq('id', assigneeId)
+              .single()
+            if (emp?.department_id) deptId = emp.department_id
+          }
+
           const taskData = {
             name: taskName,
             description: template?.description || null,
@@ -132,7 +143,7 @@ Deno.serve(async (req) => {
             progress: 1,
             due_date: dueDate.toISOString().split('T')[0],
             assignee_id: assigneeId,
-            department_id: rule.department_id || template?.department_id || null,
+            department_id: deptId,
             created_at: now.toISOString(),
           }
 

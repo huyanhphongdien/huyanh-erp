@@ -125,8 +125,12 @@ Deno.serve(async (req) => {
           }
 
           // Tạo checklist items từ template
-          if (template?.checklist_items && Array.isArray(template.checklist_items) && template.checklist_items.length > 0) {
-            const checklistData = template.checklist_items.map((item: any, index: number) => ({
+          let checklistItems = template?.checklist_items || []
+          if (typeof checklistItems === 'string') {
+            try { checklistItems = JSON.parse(checklistItems) } catch { checklistItems = [] }
+          }
+          if (Array.isArray(checklistItems) && checklistItems.length > 0) {
+            const checklistData = checklistItems.map((item: any, index: number) => ({
               task_id: newTask.id,
               title: item.title,
               is_completed: false,

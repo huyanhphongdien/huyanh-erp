@@ -140,25 +140,28 @@ export const TaskCreatePage: React.FC = () => {
         }
 
         // 2. EMPLOYEES
+        // Emails cấp cao — không cho phép giao task cho họ
+        const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com']
+
         if (isAdmin || isUserExecutive) {
           const { data: empData, error: empError } = await supabase
             .from('employees')
-            .select('id, full_name, department_id')
+            .select('id, full_name, department_id, email')
             .eq('status', 'active')
             .order('full_name');
-          
+
           if (empError) console.warn('Employees query error:', empError);
-          setEmployees(empData || []);
+          setEmployees((empData || []).filter(e => !VIP_EMAILS.includes(e.email?.toLowerCase())));
         } else if (isUserManager && user?.department_id) {
           const { data: empData, error: empError } = await supabase
             .from('employees')
-            .select('id, full_name, department_id')
+            .select('id, full_name, department_id, email')
             .eq('department_id', user.department_id)
             .eq('status', 'active')
             .order('full_name');
-          
+
           if (empError) console.warn('Employees query error:', empError);
-          setEmployees(empData || []);
+          setEmployees((empData || []).filter(e => !VIP_EMAILS.includes(e.email?.toLowerCase())));
         } else {
           setEmployees([]);
         }

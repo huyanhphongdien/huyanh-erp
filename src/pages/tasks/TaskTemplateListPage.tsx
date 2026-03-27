@@ -81,12 +81,13 @@ export default function TaskTemplateListPage() {
 
   const loadEmployees = useCallback(async () => {
     try {
+      const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com']
       const { data } = await supabase
         .from('employees')
-        .select('id, full_name, department_id')
+        .select('id, full_name, department_id, email')
         .eq('status', 'active')
         .order('full_name')
-      setEmployees(data || [])
+      setEmployees((data || []).filter(e => !VIP_EMAILS.includes((e as any).email?.toLowerCase())))
     } catch {
       // silent
     }

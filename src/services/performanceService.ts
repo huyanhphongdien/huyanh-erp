@@ -411,8 +411,8 @@ export const performanceDashboardService = {
         .from('tasks')
         .select('id, status, due_date, assignee_id, actual_end_date')
         .eq('status', 'finished')
-        .gte('updated_at', from)
-        .lte('updated_at', to);
+        .gte('completed_date', from)
+        .lte('completed_date', to);
 
       if (tasksError) throw tasksError;
 
@@ -513,8 +513,8 @@ export const performanceDashboardService = {
           )
         `)
         .eq('status', 'finished')
-        .gte('updated_at', from)
-        .lte('updated_at', to);
+        .gte('completed_date', from)
+        .lte('completed_date', to);
 
       if (params?.department_id) {
         taskQuery = taskQuery.eq('department_id', params.department_id);

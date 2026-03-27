@@ -181,7 +181,14 @@ const getMenuGroups = (
         managerOnly: true,
         badge: pendingApprovals > 0 ? pendingApprovals : undefined,
       },
+      {
+        path: '/tasks/approve-batch',
+        label: 'Phê duyệt nhanh',
+        icon: <CheckSquare size={18} />,
+        managerOnly: true,
+      },
       { path: '/task-templates', label: 'Mẫu công việc', icon: <FileText size={18} /> },
+      { path: '/performance', label: 'Hiệu suất', icon: <TrendingUp size={18} /> },
     ],
   },
   {

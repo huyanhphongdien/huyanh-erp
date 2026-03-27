@@ -55,9 +55,14 @@ import MyTasksPage from './pages/evaluations/MyTasksPage';
 import ApprovalsPage from './pages/evaluations/ApprovalPage';
 import SelfEvaluationPage from './pages/evaluations/SelfEvaluationPage';
 import TaskDetailPage from './pages/evaluations/TaskDetailPage';
+import BatchApprovePage from './pages/tasks/BatchApprovePage';
 
 // Phase 6.3: Task Reports
 import TaskReportsPage from './features/reports/TaskReportsPage';
+
+// Performance Dashboard
+import PerformanceDashboardPage from './pages/performance/PerformanceDashboardPage';
+import EmployeePerformancePage from './pages/performance/EmployeePerformancePage';
 
 // User Settings
 import UserSettingsPage from './pages/settings/UserSettingsPage';
@@ -469,6 +474,7 @@ function App() {
               <Route path="tasks/:id/edit" element={<TaskEditPage />} />
               <Route path="my-tasks" element={<MyTasksPage />} />
               <Route path="approvals" element={<ApprovalsPage />} />
+              <Route path="tasks/approve-batch" element={<BatchApprovePage />} />
               <Route path="evaluations/self-evaluation" element={<SelfEvaluationPage />} />
               <Route path="self-evaluation" element={<SelfEvaluationPage />} />
               <Route path="task-detail/:taskId" element={<TaskDetailPage />} />
@@ -476,6 +482,10 @@ function App() {
               <Route path="reports/tasks" element={<TaskReportsPage />} />
               <Route path="tasks/kanban" element={<Suspense fallback={<LoadingSpinner />}><TaskKanbanPage /></Suspense>} />
               <Route path="task-templates" element={<Suspense fallback={<LoadingSpinner />}><TaskTemplateListPage /></Suspense>} />
+
+              {/* ===== PERFORMANCE DASHBOARD ===== */}
+              <Route path="performance" element={<PerformanceDashboardPage />} />
+              <Route path="performance/:employeeId" element={<EmployeePerformancePage />} />
 
               {/* ===== PURCHASING MODULE ===== */}
               <Route path="purchasing">

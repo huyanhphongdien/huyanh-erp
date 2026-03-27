@@ -44,6 +44,7 @@ import ParticipationRequestsTab from '../../features/tasks/components/Participat
 import { taskParticipantService } from '../../services/taskParticipantService';
 import { ExtensionRequestModal } from '../../features/tasks/components/ExtensionRequestModal';
 import { isTaskOverdue as isOverdueUtil } from '../../utils/taskUtils';
+import QuickEvalModal from '../../components/tasks/QuickEvalModal';
 
 // ============================================================================
 // TYPES
@@ -390,6 +391,8 @@ const MyTasksPage: React.FC = () => {
   const [participationRequestsCount, setParticipationRequestsCount] = useState(0);
   const [extensionModalOpen, setExtensionModalOpen] = useState(false);
   const [extensionTask, setExtensionTask] = useState<MyTask | null>(null);
+  const [showQuickEval, setShowQuickEval] = useState(false);
+  const [evalTask, setEvalTask] = useState<MyTask | null>(null);
 
   // ============================================================================
   // DATA FETCHING
@@ -526,7 +529,7 @@ const MyTasksPage: React.FC = () => {
   };
 
   const handleViewTask = (taskId: string) => navigate(`/tasks/${taskId}`);
-  const handleSelfEvaluate = (task: MyTask) => navigate(`/evaluations/self-evaluation?task_id=${task.id}`);
+  const handleSelfEvaluate = (task: MyTask) => { setEvalTask(task); setShowQuickEval(true); };
   const handleUpdateProgress = (task: MyTask) => { setSelectedTask(task); setProgressModalOpen(true); };
 
   const handleProgressUpdate = async (taskId: string, newProgress: number) => {
@@ -1046,6 +1049,13 @@ const MyTasksPage: React.FC = () => {
           onSuccess={handleExtensionSuccess}
         />
       )}
+
+      <QuickEvalModal
+        open={showQuickEval}
+        onClose={() => { setShowQuickEval(false); setEvalTask(null); }}
+        task={evalTask ? { id: evalTask.id, code: evalTask.code, name: evalTask.name } : null}
+        onSuccess={() => { fetchTasks(); fetchApprovalInfo(); }}
+      />
     </div>
   );
 };

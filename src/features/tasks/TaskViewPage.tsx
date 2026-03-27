@@ -20,6 +20,8 @@ import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import TaskChecklist from '../../components/tasks/TaskChecklist'
 import TaskStatusTimeline from '../../components/tasks/TaskStatusTimeline'
+import QuickEvalModal from '../../components/tasks/QuickEvalModal'
+import { message } from 'antd'
 
 import { SubtasksList } from './components/SubtasksList'
 import { ParentTaskInfo } from './components/ParentTaskInfo'
@@ -93,6 +95,7 @@ export function TaskViewPage() {
   const [, setCanHaveChildren] = useState(true)
   const [subtaskCount, setSubtaskCount] = useState(0)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [showQuickEval, setShowQuickEval] = useState(false)
 
   const { data: task, isLoading, error, refetch } = useTask(id || '')
   const deleteMutation = useDeleteTask()
@@ -162,6 +165,9 @@ export function TaskViewPage() {
         await subtaskService.recalculateParent(t.parent_task_id)
       }
       await refetch()
+      // Show quick eval modal
+      setShowQuickEval(true)
+      message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
     } catch (err) {
       console.error('Mark complete failed:', err)
       alert('Không thể cập nhật trạng thái')
@@ -523,10 +529,27 @@ export function TaskViewPage() {
           userId={user?.employee_id || undefined}
           onProgressChange={async (percent: number) => {
             try {
+              const roundedPercent = Math.round(percent)
+
+              // Update progress in DB
               await supabase.from('tasks').update({
-                progress: Math.round(percent),
-                ...(percent >= 100 ? { status: 'finished', completed_date: new Date().toISOString() } : {})
+                progress: roundedPercent,
+                updated_at: new Date().toISOString(),
               }).eq('id', t.id)
+
+              // Auto-complete when 100%
+              if (roundedPercent >= 100 && t.status === 'in_progress') {
+                await supabase.from('tasks').update({
+                  status: 'finished',
+                  progress: 100,
+                  completed_date: new Date().toISOString(),
+                }).eq('id', t.id)
+
+                // Show quick eval modal
+                setShowQuickEval(true)
+                message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
+              }
+
               // Auto-sync parent progress if this is a subtask
               if (t.parent_task_id) {
                 await subtaskService.recalculateParent(t.parent_task_id)
@@ -622,6 +645,14 @@ export function TaskViewPage() {
           )}
         </div>
       )}
+
+      {/* ========== QUICK EVAL MODAL ========== */}
+      <QuickEvalModal
+        open={showQuickEval}
+        onClose={() => setShowQuickEval(false)}
+        task={task ? { id: t.id, code: t.code, name: taskTitle } : null}
+        onSuccess={() => refetch()}
+      />
 
       {/* ========== DELETE DIALOG ========== */}
       {showDelete && (

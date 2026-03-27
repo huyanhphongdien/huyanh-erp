@@ -83,8 +83,31 @@ Deno.serve(async (req) => {
           ? `${template.name} — ${dateSuffix}`
           : `${rule.name} — ${dateSuffix}`
 
-        const durationDays = template?.default_duration_days || 7
-        const dueDate = new Date(now.getTime() + durationDays * 86400000)
+        // Duration tự động theo tần suất:
+        // - daily → hạn cuối ngày hôm đó (0 ngày thêm)
+        // - weekly → hạn 2 ngày
+        // - biweekly → hạn 3 ngày
+        // - monthly → hạn từ template (mặc định 7 ngày)
+        let durationDays: number
+        switch (rule.frequency) {
+          case 'daily':
+            durationDays = 0 // Hạn cuối ngày hôm nay
+            break
+          case 'weekly':
+            durationDays = 2
+            break
+          case 'biweekly':
+            durationDays = 3
+            break
+          default:
+            durationDays = template?.default_duration_days || 7
+        }
+
+        const dueDate = new Date(now)
+        dueDate.setUTCHours(16, 59, 0, 0) // 23:59 VN (16:59 UTC) = cuối ngày VN
+        if (durationDays > 0) {
+          dueDate.setDate(dueDate.getDate() + durationDays)
+        }
 
         // 2c. Xác định danh sách người được giao
         // Ưu tiên: assignee_ids (mảng) > assignee_id (đơn) > template default

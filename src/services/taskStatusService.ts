@@ -114,7 +114,7 @@ export async function changeTaskStatus(
       }
 
       // 2b. Nếu chuyển sang Cancelled hoặc On Hold, chuẩn bị cascade
-      if (newStatus === 'cancelled' || newStatus === 'on_hold') {
+      if (newStatus === 'cancelled' || newStatus === 'paused') {
         const statusLabel = newStatus === 'cancelled' ? 'Đã hủy' : 'Tạm dừng'
         warnings.push(`${subtaskCount} công việc con sẽ tự động chuyển sang "${statusLabel}"`)
       }
@@ -170,7 +170,7 @@ export async function changeTaskStatus(
 
     // 7. Cascade nếu cần
     let cascadedCount = 0
-    if (isParentTask && (newStatus === 'cancelled' || newStatus === 'on_hold')) {
+    if (isParentTask && (newStatus === 'cancelled' || newStatus === 'paused')) {
       const cascadeResult = await subtaskService.cascadeStatusToChildren(taskId, newStatus)
       cascadedCount = cascadeResult.updatedCount
       
@@ -218,7 +218,7 @@ export async function canChangeStatus(
     }
 
     // Cảnh báo cascade
-    if (newStatus === 'cancelled' || newStatus === 'on_hold') {
+    if (newStatus === 'cancelled' || newStatus === 'paused') {
       const statusLabel = newStatus === 'cancelled' ? 'Đã hủy' : 'Tạm dừng'
       warnings.push(`${subtaskCount} công việc con sẽ tự động chuyển sang "${statusLabel}"`)
     }

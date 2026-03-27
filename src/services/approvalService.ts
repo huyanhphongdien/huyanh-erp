@@ -681,7 +681,7 @@ export const approvalService = {
           updated_at: new Date().toISOString(),
         })
         .eq('id', input.task_id)
-        .in('status', ['overdue', 'in_progress', 'draft', 'assigned', 'on_hold']);
+        .in('status', ['overdue', 'in_progress', 'draft', 'assigned', 'paused']);
         // Chỉ update nếu chưa finished, tránh đụng task đã finished thật
 
       if (taskUpdateError) throw taskUpdateError;

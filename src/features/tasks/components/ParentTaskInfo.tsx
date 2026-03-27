@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   pending_review: { label: 'Chờ duyệt', color: 'text-yellow-600', bg: 'bg-yellow-100' },
   completed: { label: 'Hoàn thành', color: 'text-green-600', bg: 'bg-green-100' },
   cancelled: { label: 'Đã hủy', color: 'text-red-600', bg: 'bg-red-100' },
-  on_hold: { label: 'Tạm dừng', color: 'text-orange-600', bg: 'bg-orange-100' },
+  paused: { label: 'Tạm dừng', color: 'text-orange-600', bg: 'bg-orange-100' },
 }
 
 // ============================================================================

@@ -57,11 +57,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
     color: 'text-orange-700', 
     bg: 'bg-orange-100' 
   },
-  on_hold: { 
-    label: 'Tạm dừng', 
-    color: 'text-yellow-700', 
-    bg: 'bg-yellow-100' 
-  },
 }
 
 export function TaskStatusBadge({ status }: TaskStatusBadgeProps) {
@@ -82,7 +77,7 @@ export function TaskStatusBadge({ status }: TaskStatusBadgeProps) {
       <span className={`w-1.5 h-1.5 rounded-full ${
         status === 'draft' ? 'bg-gray-400' :
         status === 'in_progress' ? 'bg-blue-500' :
-        status === 'paused' || status === 'on_hold' ? 'bg-yellow-500' :
+        status === 'paused' ? 'bg-yellow-500' :
         status === 'finished' || status === 'completed' ? 'bg-green-500' :
         status === 'cancelled' ? 'bg-red-500' :
         status === 'pending_review' ? 'bg-orange-500' :

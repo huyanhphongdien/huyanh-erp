@@ -69,7 +69,7 @@ interface Employee {
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Bản nháp' },
   { value: 'in_progress', label: 'Đang thực hiện' },
-  { value: 'on_hold', label: 'Tạm dừng' },
+  { value: 'paused', label: 'Tạm dừng' },
   { value: 'completed', label: 'Hoàn thành' },
   { value: 'cancelled', label: 'Đã hủy' },
 ]

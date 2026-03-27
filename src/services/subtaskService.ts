@@ -440,8 +440,8 @@ export const subtaskService = {
       newStatus = 'completed'
     } else if (statuses.some(s => s === 'in_progress')) {
       newStatus = 'in_progress'
-    } else if (statuses.some(s => s === 'on_hold')) {
-      newStatus = 'on_hold'
+    } else if (statuses.some(s => s === 'paused')) {
+      newStatus = 'paused'
     } else if (statuses.every(s => s === 'draft')) {
       newStatus = 'draft'
     } else {
@@ -650,7 +650,7 @@ export const subtaskService = {
    */
   async cascadeStatusToChildren(
     parentTaskId: string,
-    newStatus: 'cancelled' | 'on_hold'
+    newStatus: 'cancelled' | 'paused'
   ): Promise<{ success: boolean; updatedCount: number; error?: string }> {
     console.log('🔄 [subtaskService.cascadeStatus] Parent:', parentTaskId, 'Status:', newStatus)
 
@@ -761,7 +761,7 @@ export const subtaskService = {
     }
 
     // Nếu chuyển sang Cancelled hoặc On Hold, cảnh báo cascade
-    if (newStatus === 'cancelled' || newStatus === 'on_hold') {
+    if (newStatus === 'cancelled' || newStatus === 'paused') {
       const count = await subtaskService.getSubtaskCount(parentTaskId)
       
       if (count > 0) {

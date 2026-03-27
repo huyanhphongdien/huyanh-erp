@@ -119,11 +119,8 @@ function calculateNextGeneration(frequency: string, dayOfWeek?: number | null, d
       break
     }
     case 'biweekly': {
-      const targetDay2 = dayOfWeek ?? 1
-      const currentDay2 = now.getDay()
-      let daysUntil2 = targetDay2 - currentDay2
-      if (daysUntil2 <= 0) daysUntil2 += 14
-      next.setDate(next.getDate() + daysUntil2)
+      // Simply add 14 days from current date
+      next.setDate(next.getDate() + 14)
       break
     }
     case 'monthly': {

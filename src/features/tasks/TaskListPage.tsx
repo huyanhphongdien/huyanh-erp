@@ -27,6 +27,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { taskService } from '../../services/taskService'
 import { useTaskPermissions } from './utils/useTaskPermissions'
 import type { TaskForPermission } from './utils/taskPermissions'
+import { isTaskOverdue as _isTaskOverdue, isTaskDueToday as _isTaskDueToday, getDaysOverdue } from '../../utils/taskUtils'
 
 // ============ TAB TYPES ============
 type TabType = 'list' | 'overview'
@@ -38,34 +39,12 @@ const TABS = [
 
 // ============ HELPER FUNCTIONS ============
 
-const COMPLETED_STATUSES = ['finished', 'completed', 'cancelled']
-
 function isTaskOverdue(task: any): boolean {
-  if (!task.due_date) return false
-  if (COMPLETED_STATUSES.includes(task.status)) return false
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const dueDate = new Date(task.due_date)
-  dueDate.setHours(0, 0, 0, 0)
-  return dueDate < today
+  return _isTaskOverdue(task.due_date, task.status)
 }
 
 function isTaskDueToday(task: any): boolean {
-  if (!task.due_date) return false
-  if (COMPLETED_STATUSES.includes(task.status)) return false
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const dueDate = new Date(task.due_date)
-  dueDate.setHours(0, 0, 0, 0)
-  return dueDate.getTime() === today.getTime()
-}
-
-function getDaysOverdue(dueDate: string): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const due = new Date(dueDate)
-  due.setHours(0, 0, 0, 0)
-  return Math.ceil((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
+  return _isTaskDueToday(task.due_date, task.status)
 }
 
 function toTaskForPermission(task: any): TaskForPermission {

@@ -66,7 +66,7 @@ export function getStatusLabel(status: string): string {
     rejected: 'Bị từ chối',
     revision_requested: 'Yêu cầu sửa',
     cancelled: 'Đã hủy',
-    on_hold: 'Tạm dừng',
+    paused: 'Tạm dừng',
   };
   return labels[status] || status;
 }
@@ -85,7 +85,7 @@ export function getStatusIcon(status: string): string {
     rejected: '✕',
     revision_requested: '↻',
     cancelled: '🚫',
-    on_hold: '⏸️',
+    paused: '⏸️',
   };
   return icons[status] || '❓';
 }
@@ -104,7 +104,7 @@ export function getStatusColors(status: string): { bg: string; text: string } {
     rejected: { bg: 'bg-red-100', text: 'text-red-700' },
     revision_requested: { bg: 'bg-orange-100', text: 'text-orange-700' },
     cancelled: { bg: 'bg-gray-200', text: 'text-gray-600' },
-    on_hold: { bg: 'bg-purple-100', text: 'text-purple-700' },
+    paused: { bg: 'bg-purple-100', text: 'text-purple-700' },
   };
   return colors[status] || { bg: 'bg-gray-100', text: 'text-gray-600' };
 }
@@ -135,7 +135,7 @@ export function getAllStatuses(): { value: string; label: string }[] {
     { value: 'rejected', label: 'Bị từ chối' },
     { value: 'revision_requested', label: 'Yêu cầu sửa' },
     { value: 'cancelled', label: 'Đã hủy' },
-    { value: 'on_hold', label: 'Tạm dừng' },
+    { value: 'paused', label: 'Tạm dừng' },
   ];
 }
 
@@ -153,7 +153,7 @@ export function calculateProgressByStatus(status: string): number {
     rejected: 0,
     revision_requested: 50,
     cancelled: 0,
-    on_hold: 0,
+    paused: 0,
   };
   return statusProgress[status] ?? 0;
 }
@@ -179,7 +179,7 @@ export type TaskStatus =
   | 'rejected'
   | 'revision_requested'
   | 'cancelled'
-  | 'on_hold';
+  | 'paused';
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 

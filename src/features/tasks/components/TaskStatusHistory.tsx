@@ -44,7 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Bị từ chối',
   revision_requested: 'Yêu cầu sửa',
   cancelled: 'Đã hủy',
-  on_hold: 'Tạm dừng',
+  paused: 'Tạm dừng',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -57,7 +57,7 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: 'bg-red-100 text-red-700',
   revision_requested: 'bg-orange-100 text-orange-700',
   cancelled: 'bg-gray-200 text-gray-600',
-  on_hold: 'bg-purple-100 text-purple-700',
+  paused: 'bg-purple-100 text-purple-700',
 };
 
 // ============================================================================

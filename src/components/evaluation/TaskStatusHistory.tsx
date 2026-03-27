@@ -20,7 +20,7 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
   pending_review: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
   completed: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
   cancelled: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
-  on_hold: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+  paused: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
   overdue: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' }
 }
 
@@ -30,7 +30,7 @@ const statusLabels: Record<string, string> = {
   pending_review: 'Chờ phê duyệt',
   completed: 'Hoàn thành',
   cancelled: 'Đã hủy',
-  on_hold: 'Tạm dừng',
+  paused: 'Tạm dừng',
   overdue: 'Quá hạn'
 }
 
@@ -241,7 +241,7 @@ export function StatusBadge({ status, size = 'md', showIcon = false }: StatusBad
     pending_review: '⏳',
     completed: '✅',
     cancelled: '❌',
-    on_hold: '⏸️',
+    paused: '⏸️',
     overdue: '⚠️'
   }
 

@@ -718,8 +718,7 @@ export type TaskStatus =
   | 'completed' 
   | 'finished'
   | 'accepted'
-  | 'cancelled' 
-  | 'on_hold'
+  | 'cancelled'
   | 'paused'
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'

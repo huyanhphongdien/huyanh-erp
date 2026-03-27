@@ -507,6 +507,15 @@ export function TaskViewPage() {
           taskId={t.id}
           readonly={t.status === 'finished' || t.status === 'cancelled'}
           userId={user?.employee_id || undefined}
+          onProgressChange={async (percent: number) => {
+            try {
+              await supabase.from('tasks').update({
+                progress: Math.round(percent),
+                ...(percent >= 100 ? { status: 'finished', completed_date: new Date().toISOString() } : {})
+              }).eq('id', t.id)
+              refetch()
+            } catch (err) { console.error('Update progress failed:', err) }
+          }}
         />
 
         {/* Ghi chú */}

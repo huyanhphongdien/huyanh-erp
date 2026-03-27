@@ -36,7 +36,7 @@ const TASK_STATUS_CONFIG: Record<string, { label: string; color: string; bg: str
   draft: { label: 'Bản nháp', color: 'text-gray-600', bg: 'bg-gray-100', description: 'Công việc chưa được giao' },
   in_progress: { label: 'Đang làm', color: 'text-blue-600', bg: 'bg-blue-100', description: 'Đang thực hiện' },
   completed: { label: 'Hoàn thành', color: 'text-green-600', bg: 'bg-green-100', description: 'Đã hoàn thành' },
-  on_hold: { label: 'Tạm dừng', color: 'text-yellow-600', bg: 'bg-yellow-100', description: 'Tạm dừng' },
+  paused: { label: 'Tạm dừng', color: 'text-yellow-600', bg: 'bg-yellow-100', description: 'Tạm dừng' },
   cancelled: { label: 'Đã hủy', color: 'text-red-600', bg: 'bg-red-100', description: 'Đã hủy' },
 };
 

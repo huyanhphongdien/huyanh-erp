@@ -42,6 +42,7 @@ import { supabase } from '../../lib/supabase';
 import ParticipationRequestsTab from '../../features/tasks/components/ParticipationRequestsTab';
 import { taskParticipantService } from '../../services/taskParticipantService';
 import { ExtensionRequestModal } from '../../features/tasks/components/ExtensionRequestModal';
+import { isTaskOverdue as isOverdueUtil } from '../../utils/taskUtils';
 
 // ============================================================================
 // TYPES
@@ -168,10 +169,7 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 function isOverdue(dueDate: string | null | undefined, status: string): boolean {
-  if (!dueDate || status === 'finished' || status === 'cancelled') return false;
-  const due = new Date(dueDate);
-  due.setHours(23, 59, 59, 999);
-  return due < new Date();
+  return isOverdueUtil(dueDate, status);
 }
 
 function isToday(dateStr: string | null | undefined): boolean {

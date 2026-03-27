@@ -325,7 +325,7 @@ export default function TaskTemplateListPage() {
       dataIndex: 'default_duration_days',
       key: 'duration',
       width: 100,
-      render: (d: number) => `${d} ngay`,
+      render: (d: number) => `${d} ngày`,
     },
     {
       title: 'Checklist',
@@ -334,7 +334,7 @@ export default function TaskTemplateListPage() {
       width: 100,
       render: (items: any) => {
         const list = typeof items === 'string' ? JSON.parse(items) : items
-        return `${(list || []).length} muc`
+        return `${(list || []).length} mục`
       },
     },
     {
@@ -388,21 +388,21 @@ export default function TaskTemplateListPage() {
           label += ` (${DAY_LABELS[record.day_of_week as keyof typeof DAY_LABELS] || ''})`
         }
         if (freq === 'monthly' && record.day_of_month) {
-          label += ` (ngay ${record.day_of_month})`
+          label += ` (ngày ${record.day_of_month})`
         }
         return label
       },
     },
     {
       title: 'Lần cuối tạo',
-      dataIndex: 'last_run_at',
+      dataIndex: 'last_generated_at',
       key: 'last_run',
       width: 150,
       render: (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—',
     },
     {
       title: 'Lần tiếp theo',
-      dataIndex: 'next_run_at',
+      dataIndex: 'next_generation_at',
       key: 'next_run',
       width: 150,
       render: (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—',
@@ -428,7 +428,14 @@ export default function TaskTemplateListPage() {
       render: (_: any, record: RecurringRule) => (
         <Space size="small">
           <Button size="small" icon={<EditOutlined />} onClick={() => openRecurringModal(record)} />
-          <Popconfirm title="Xóa lịch này?" onConfirm={() => handleDeleteRule(record.id)} okText="Xóa" cancelText="Hủy">
+          <Popconfirm
+            title="Xóa lịch tự động?"
+            description="Các công việc đã được tạo từ lịch này sẽ không bị xóa, nhưng sẽ không còn liên kết với lịch."
+            onConfirm={() => handleDeleteRule(record.id)}
+            okText="Xóa"
+            cancelText="Hủy"
+            okButtonProps={{ danger: true }}
+          >
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -530,7 +537,7 @@ export default function TaskTemplateListPage() {
           setEditingTemplate(null)
           templateForm.resetFields()
         }}
-        okText="Luu"
+        okText="Lưu"
         cancelText="Hủy"
         okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
         width={600}
@@ -589,7 +596,7 @@ export default function TaskTemplateListPage() {
                       style={{ flex: 1, marginBottom: 0 }}
                       rules={[{ required: true, message: 'Nhập nội dung' }]}
                     >
-                      <Input placeholder="Noi dung checklist" />
+                      <Input placeholder="Nội dung checklist" />
                     </Form.Item>
                     <Button
                       type="text"
@@ -618,7 +625,7 @@ export default function TaskTemplateListPage() {
           setEditingRule(null)
           recurringForm.resetFields()
         }}
-        okText="Luu"
+        okText="Lưu"
         cancelText="Hủy"
         okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
         width={520}

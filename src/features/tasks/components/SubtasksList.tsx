@@ -43,7 +43,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   pending_review: { label: 'Chờ duyệt', color: 'text-yellow-600', bg: 'bg-yellow-100', icon: AlertCircle },
   completed: { label: 'Hoàn thành', color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
   cancelled: { label: 'Đã hủy', color: 'text-red-600', bg: 'bg-red-100', icon: X },
-  on_hold: { label: 'Tạm dừng', color: 'text-orange-600', bg: 'bg-orange-100', icon: AlertTriangle },
+  paused: { label: 'Tạm dừng', color: 'text-orange-600', bg: 'bg-orange-100', icon: AlertTriangle },
 }
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {

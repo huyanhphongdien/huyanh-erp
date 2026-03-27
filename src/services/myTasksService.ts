@@ -35,6 +35,7 @@ export interface MyTask {
   evaluation_status?: string | null
   project_id?: string | null
   phase_id?: string | null
+  completed_date?: string | null
   created_at?: string
   updated_at?: string
   // Relations
@@ -89,7 +90,7 @@ const _COMPLETED_STATUSES = ['finished', 'cancelled']
 const TASK_FIELDS = `
   id, code, name, description,
   department_id, assigner_id, assignee_id,
-  start_date, due_date, status, priority, progress,
+  start_date, due_date, completed_date, status, priority, progress,
   notes, is_self_assigned, evaluation_status,
   project_id, phase_id,
   created_at, updated_at,

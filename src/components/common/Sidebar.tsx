@@ -172,6 +172,7 @@ const getMenuGroups = (
     icon: <ClipboardList size={18} />,
     items: [
       { path: '/tasks', label: 'Danh sách công việc', icon: <ClipboardList size={18} /> },
+      { path: '/tasks/kanban', label: 'Kanban', icon: <LayoutGrid size={18} /> },
       { path: '/my-tasks', label: 'Công việc của tôi', icon: <UserCheck size={18} /> },
       {
         path: '/approvals',

@@ -2,6 +2,7 @@
 import { useAuthStore } from '../../stores/authStore'
 import { Button } from '../ui'
 import { NotificationBell } from './NotificationBell'
+import { TaskNotificationBell } from './TaskNotificationBell'
 
 export function Header() {
   const { user, logout } = useAuthStore()
@@ -17,6 +18,9 @@ export function Header() {
 
         {/* User info & Actions */}
         <div className="flex items-center gap-4">
+          {/* Task Notification Bell */}
+          <TaskNotificationBell />
+
           {/* Notification Bell */}
           <NotificationBell />
           

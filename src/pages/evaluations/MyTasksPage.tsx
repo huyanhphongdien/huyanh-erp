@@ -35,6 +35,7 @@ import {
   CalendarPlus,
   UserCog,
   FolderKanban,
+  BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { myTasksService, type MyTask } from '../../services/myTasksService';
@@ -578,6 +579,123 @@ const MyTasksPage: React.FC = () => {
         <StatsCard icon={<CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />} label="Đã duyệt" value={stats.approved} color="text-green-600" bgColor="bg-green-50" isActive={activeTab === 'approved'} onClick={() => setActiveTab('approved')} />
         <ScoreCard score={evaluationStats.averageScore} label={evaluationStats.rating} />
       </div>
+
+      {/* ====== MINI CALENDAR (7 ngày tới) + WEEKLY PROGRESS ====== */}
+      {(() => {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+
+        // -- Mini Calendar: next 7 days with task counts --
+        const next7Days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(today)
+          d.setDate(today.getDate() + i)
+          const dateStr = d.toISOString().split('T')[0]
+          const count = tasks.filter(t => {
+            if (!t.due_date || t.status === 'finished' || t.status === 'cancelled') return false
+            const td = t.due_date.split('T')[0]
+            return td === dateStr
+          }).length
+          return {
+            date: d,
+            dateStr,
+            dayName: dayNames[d.getDay()],
+            isToday: i === 0,
+            count,
+          }
+        })
+
+        // -- Weekly progress: tasks completed per day this week (Mon-Sun) --
+        const weekStart = new Date(today)
+        const dayOfWeek = today.getDay()
+        weekStart.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+        const weeklyData = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(weekStart)
+          d.setDate(weekStart.getDate() + i)
+          const dateStr = d.toISOString().split('T')[0]
+          const completed = tasks.filter(t => {
+            if (!t.completed_date) return false
+            const cd = typeof t.completed_date === 'string' ? t.completed_date.split('T')[0] : ''
+            return cd === dateStr
+          }).length
+          return {
+            label: dayNames[d.getDay()],
+            completed,
+            dateStr,
+          }
+        })
+        const maxCompleted = Math.max(...weeklyData.map(d => d.completed), 1)
+
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+            {/* Mini Calendar */}
+            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarDays className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-gray-700">Lịch 7 ngày tới</span>
+              </div>
+              <div className="flex gap-1.5 sm:gap-2">
+                {next7Days.map(day => (
+                  <div
+                    key={day.dateStr}
+                    className="flex-1 text-center py-2 px-1 rounded-lg transition-colors"
+                    style={{
+                      background: day.isToday ? '#1B4D3E' : day.count > 0 ? '#f0f5ff' : '#fafafa',
+                      color: day.isToday ? '#fff' : '#333',
+                    }}
+                  >
+                    <div className="text-[10px] sm:text-xs opacity-80">{day.dayName}</div>
+                    <div className="text-base sm:text-lg font-bold leading-tight">{day.date.getDate()}</div>
+                    {day.count > 0 && (
+                      <span
+                        className="inline-flex items-center justify-center mt-0.5 min-w-[16px] h-4 px-1 text-[10px] font-bold rounded-full"
+                        style={{
+                          background: day.isToday ? 'rgba(255,255,255,0.3)' : '#1B4D3E',
+                          color: '#fff',
+                        }}
+                      >
+                        {day.count}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Weekly Progress Chart */}
+            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-semibold text-gray-700">Tiến độ tuần này</span>
+                <span className="text-xs text-gray-400 ml-auto">
+                  {weeklyData.reduce((s, d) => s + d.completed, 0)} hoàn thành
+                </span>
+              </div>
+              <div className="flex items-end gap-1 sm:gap-2" style={{ height: 80 }}>
+                {weeklyData.map(day => (
+                  <div key={day.dateStr} className="flex-1 flex flex-col items-center justify-end h-full">
+                    <div className="w-full flex justify-center mb-1">
+                      {day.completed > 0 && (
+                        <span className="text-[10px] font-bold text-gray-500">{day.completed}</span>
+                      )}
+                    </div>
+                    <div
+                      className="w-full rounded-t transition-all duration-300"
+                      style={{
+                        height: `${Math.max((day.completed / maxCompleted) * 52, day.completed > 0 ? 8 : 3)}px`,
+                        background: day.completed > 0 ? '#1B4D3E' : '#e5e7eb',
+                        minHeight: 3,
+                        borderRadius: '4px 4px 0 0',
+                      }}
+                    />
+                    <div className="text-[10px] text-gray-500 mt-1 font-medium">{day.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Upcoming Deadlines (7 ngày tới) */}
       {(() => {

@@ -7,3 +7,4 @@ export { Header } from './Header';
 export { MainLayout } from './MainLayout';
 export { Sidebar } from './Sidebar';
 export { NotificationBell } from './NotificationBell';
+export { TaskNotificationBell } from './TaskNotificationBell';

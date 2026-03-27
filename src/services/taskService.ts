@@ -406,7 +406,7 @@ export const taskService = {
     console.log('📊 [taskService.updateStatus] ID:', id, 'Status:', status)
 
     const updateData: Record<string, any> = { status }
-    
+
     if (status === 'finished') {
       updateData.completed_date = new Date().toISOString()
       updateData.progress = 100
@@ -416,12 +416,17 @@ export const taskService = {
       .from('tasks')
       .update(updateData)
       .eq('id', id)
-      .select()
+      .select('*, parent_task_id')
       .single()
 
     if (error) {
       console.error('❌ [taskService.updateStatus] Error:', error)
       throw error
+    }
+
+    // Auto-sync parent progress if this is a subtask
+    if (data.parent_task_id) {
+      await this._recalcParentProgress(data.parent_task_id)
     }
 
     console.log('✅ [taskService.updateStatus] Updated:', id)
@@ -446,12 +451,17 @@ export const taskService = {
       .from('tasks')
       .update(updateData)
       .eq('id', id)
-      .select()
+      .select('*, parent_task_id')
       .single()
 
     if (error) {
       console.error('❌ [taskService.updateProgress] Error:', error)
       throw error
+    }
+
+    // Auto-sync parent progress if this is a subtask
+    if (data.parent_task_id) {
+      await this._recalcParentProgress(data.parent_task_id)
     }
 
     console.log('✅ [taskService.updateProgress] Updated:', id)
@@ -601,6 +611,50 @@ export const taskService = {
     const mapped = mapTaskFromDB(data)
     const enriched = await enrichTasksWithAssignerLevel([mapped])
     return enriched[0] || mapped
+  },
+
+  /**
+   * Tính lại tiến độ của công việc cha từ các công việc con
+   * Gọi tự động khi cập nhật status/progress của subtask
+   */
+  async _recalcParentProgress(parentTaskId: string): Promise<void> {
+    console.log('🔄 [taskService._recalcParentProgress] Parent:', parentTaskId)
+
+    // 1. Get all subtasks
+    const { data: subtasks, error } = await supabase
+      .from('tasks')
+      .select('progress, status')
+      .eq('parent_task_id', parentTaskId)
+
+    if (error) {
+      console.error('❌ [taskService._recalcParentProgress] Error:', error)
+      return
+    }
+
+    if (!subtasks || subtasks.length === 0) return
+
+    // 2. Calculate average progress
+    const avgProgress = Math.round(
+      subtasks.reduce((sum, t) => sum + (t.progress || 0), 0) / subtasks.length
+    )
+
+    // 3. Update parent
+    const updateData: Record<string, any> = { progress: avgProgress }
+    if (avgProgress >= 100) {
+      updateData.status = 'finished'
+      updateData.completed_date = new Date().toISOString()
+    }
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update(updateData)
+      .eq('id', parentTaskId)
+
+    if (updateError) {
+      console.error('❌ [taskService._recalcParentProgress] Update error:', updateError)
+    } else {
+      console.log('✅ [taskService._recalcParentProgress] Updated parent:', parentTaskId, '-> progress:', avgProgress)
+    }
   }
 }
 

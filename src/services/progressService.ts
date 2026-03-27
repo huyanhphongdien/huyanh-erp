@@ -101,6 +101,54 @@ export function calculateProgressBySubtasks(subtasks: { progress: number }[]): n
 }
 
 // ============================================================================
+// PARENT PROGRESS AUTO-SYNC
+// ============================================================================
+
+/**
+ * Tính lại tiến độ công việc cha từ các công việc con
+ * Gọi tự động sau khi cập nhật progress/status của subtask
+ */
+async function recalcParentProgress(parentTaskId: string): Promise<void> {
+  console.log('🔄 [progressService.recalcParentProgress] Parent:', parentTaskId)
+
+  // 1. Get all subtasks
+  const { data: subtasks, error } = await supabase
+    .from('tasks')
+    .select('progress, status')
+    .eq('parent_task_id', parentTaskId)
+
+  if (error) {
+    console.error('❌ [progressService.recalcParentProgress] Error:', error)
+    return
+  }
+
+  if (!subtasks || subtasks.length === 0) return
+
+  // 2. Calculate average progress
+  const avgProgress = Math.round(
+    subtasks.reduce((sum, t) => sum + (t.progress || 0), 0) / subtasks.length
+  )
+
+  // 3. Update parent
+  const updateData: Record<string, any> = { progress: avgProgress }
+  if (avgProgress >= 100) {
+    updateData.status = 'finished'
+    updateData.completed_date = new Date().toISOString()
+  }
+
+  const { error: updateError } = await supabase
+    .from('tasks')
+    .update(updateData)
+    .eq('id', parentTaskId)
+
+  if (updateError) {
+    console.error('❌ [progressService.recalcParentProgress] Update error:', updateError)
+  } else {
+    console.log('✅ [progressService.recalcParentProgress] Updated parent:', parentTaskId, '-> progress:', avgProgress)
+  }
+}
+
+// ============================================================================
 // API FUNCTIONS
 // ============================================================================
 
@@ -120,10 +168,10 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
     throw new Error('Tiến độ phải từ 0 đến 100')
   }
 
-  // Kiểm tra progress_mode
+  // Kiểm tra progress_mode + parent_task_id
   const { data: task, error: fetchError } = await supabase
     .from('tasks')
-    .select('progress_mode, status')
+    .select('progress_mode, status, parent_task_id')
     .eq('id', taskId)
     .single()
 
@@ -166,6 +214,12 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
   }
 
   console.log('✅ [progressService] Updated progress:', taskId, '->', progress)
+
+  // Auto-sync parent progress if this is a subtask
+  if (task.parent_task_id) {
+    await recalcParentProgress(task.parent_task_id)
+  }
+
   return data
 }
 

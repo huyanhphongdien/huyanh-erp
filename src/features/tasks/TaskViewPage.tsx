@@ -19,6 +19,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import TaskChecklist from '../../components/tasks/TaskChecklist'
+import TaskStatusTimeline from '../../components/tasks/TaskStatusTimeline'
 
 import { SubtasksList } from './components/SubtasksList'
 import { ParentTaskInfo } from './components/ParentTaskInfo'
@@ -155,6 +156,11 @@ export function TaskViewPage() {
         completed_date: new Date().toISOString().split('T')[0],
       }).eq('id', id)
       if (error) throw error
+      // Auto-sync parent progress if this is a subtask
+      const t = task as any
+      if (t?.parent_task_id) {
+        await subtaskService.recalculateParent(t.parent_task_id)
+      }
       await refetch()
     } catch (err) {
       console.error('Mark complete failed:', err)
@@ -168,6 +174,10 @@ export function TaskViewPage() {
     try {
       const { error } = await supabase.from('tasks').update({ status: 'paused' }).eq('id', id)
       if (error) throw error
+      const t = task as any
+      if (t?.parent_task_id) {
+        await subtaskService.recalculateParent(t.parent_task_id)
+      }
       await refetch()
     } catch (err) { alert('Không thể tạm dừng') }
     finally { setActionLoading(null) }
@@ -179,6 +189,10 @@ export function TaskViewPage() {
     try {
       const { error } = await supabase.from('tasks').update({ status: 'in_progress' }).eq('id', id)
       if (error) throw error
+      const t = task as any
+      if (t?.parent_task_id) {
+        await subtaskService.recalculateParent(t.parent_task_id)
+      }
       await refetch()
     } catch (err) { alert('Không thể tiếp tục') }
     finally { setActionLoading(null) }
@@ -513,6 +527,10 @@ export function TaskViewPage() {
                 progress: Math.round(percent),
                 ...(percent >= 100 ? { status: 'finished', completed_date: new Date().toISOString() } : {})
               }).eq('id', t.id)
+              // Auto-sync parent progress if this is a subtask
+              if (t.parent_task_id) {
+                await subtaskService.recalculateParent(t.parent_task_id)
+              }
               refetch()
             } catch (err) { console.error('Update progress failed:', err) }
           }}
@@ -565,6 +583,11 @@ export function TaskViewPage() {
             currentUserId={user?.employee_id || ''}
             canComment={permissions.canComment}
           />
+        )}
+
+        {/* Lịch sử thay đổi trạng thái */}
+        {id && (
+          <TaskStatusTimeline taskId={id} />
         )}
 
         {/* Activity */}

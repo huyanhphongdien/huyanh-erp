@@ -234,11 +234,9 @@ function calculateNextGeneration(rule: any, from: Date): Date {
       console.warn(`Unknown frequency "${rule.frequency}" for rule ${rule.id}, defaulting to daily`)
   }
 
-  // Set time_of_day if available (e.g., "08:00")
-  if (rule.time_of_day) {
-    const [hours, minutes] = rule.time_of_day.split(':').map(Number)
-    next.setUTCHours(hours - 7, minutes, 0, 0) // Vietnam UTC+7 → UTC
-  }
+  // Set time to 22:50 UTC (5:50 AM VN) — trước cron 23:00 UTC (6:00 AM VN)
+  // Đảm bảo next_generation_at luôn < cron time để được pick up
+  next.setUTCHours(22, 50, 0, 0)
 
   return next
 }

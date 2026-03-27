@@ -189,6 +189,7 @@ const getMenuGroups = (
       },
       { path: '/task-templates', label: 'Mẫu công việc', icon: <FileText size={18} /> },
       { path: '/performance', label: 'Hiệu suất', icon: <TrendingUp size={18} /> },
+      { path: '/performance/reports', label: 'Báo cáo hiệu suất', icon: <FileBarChart size={18} />, managerOnly: true },
     ],
   },
   {

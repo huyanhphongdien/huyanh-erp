@@ -15,6 +15,7 @@ import {
   DepartmentPerformance,
   MonthlyTrend,
 } from '../../services/performanceService';
+import { attendancePerformanceService } from '../../services/attendancePerformanceService';
 
 // ============================================================================
 // CONSTANTS
@@ -254,6 +255,11 @@ export default function PerformanceDashboardPage() {
   const [trend, setTrend] = useState<MonthlyTrend[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Score mode: task-only vs combined (with attendance)
+  const [scoreMode, setScoreMode] = useState<'task' | 'combined'>('task');
+  const [attendanceScores, setAttendanceScores] = useState<Map<string, { attendance_score: number; combined_score: number; combined_grade: string }>>(new Map());
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+
   // Permissions
   const isAdmin = user?.role === 'admin';
   const userLevel = user?.position_level || 7;
@@ -316,6 +322,47 @@ export default function PerformanceDashboardPage() {
     }
     loadData();
   }, [selectedMonth, selectedYear, effectiveDeptFilter]);
+
+  // Load attendance scores when combined mode is active
+  useEffect(() => {
+    if (scoreMode !== 'combined' || rankings.length === 0) {
+      setAttendanceScores(new Map());
+      return;
+    }
+    async function loadAttendance() {
+      setLoadingAttendance(true);
+      try {
+        const results = new Map<string, { attendance_score: number; combined_score: number; combined_grade: string }>();
+        // Load attendance for each employee in ranking
+        const promises = rankings.map(async (emp) => {
+          try {
+            const combined = await attendancePerformanceService.getCombinedScore(
+              emp.employee_id, selectedMonth, selectedYear
+            );
+            results.set(emp.employee_id, {
+              attendance_score: combined.attendance_score,
+              combined_score: combined.combined_score,
+              combined_grade: combined.grade,
+            });
+          } catch {
+            // Fallback: use task score only
+            results.set(emp.employee_id, {
+              attendance_score: 100,
+              combined_score: emp.final_score,
+              combined_grade: emp.grade,
+            });
+          }
+        });
+        await Promise.all(promises);
+        setAttendanceScores(results);
+      } catch (err) {
+        console.error('Error loading attendance scores:', err);
+      } finally {
+        setLoadingAttendance(false);
+      }
+    }
+    loadAttendance();
+  }, [scoreMode, rankings, selectedMonth, selectedYear]);
 
   // Grade color for avg score
   const avgGradeColor = useMemo(() => {
@@ -392,6 +439,36 @@ export default function PerformanceDashboardPage() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+          {/* Score mode toggle */}
+          <div style={{
+            display: 'flex', borderRadius: 8, overflow: 'hidden',
+            border: '1px solid #d1d5db', marginLeft: 8,
+          }}>
+            <button
+              onClick={() => setScoreMode('task')}
+              style={{
+                padding: '6px 14px', fontSize: 12, border: 'none', cursor: 'pointer',
+                background: scoreMode === 'task' ? PRIMARY : 'white',
+                color: scoreMode === 'task' ? 'white' : '#374151',
+                fontWeight: scoreMode === 'task' ? 600 : 400,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Chỉ công việc
+            </button>
+            <button
+              onClick={() => setScoreMode('combined')}
+              style={{
+                padding: '6px 14px', fontSize: 12, border: 'none', cursor: 'pointer',
+                background: scoreMode === 'combined' ? PRIMARY : 'white',
+                color: scoreMode === 'combined' ? 'white' : '#374151',
+                fontWeight: scoreMode === 'combined' ? 600 : 400,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Kết hợp chấm công
+            </button>
+          </div>
         </div>
       </div>
 
@@ -454,14 +531,16 @@ export default function PerformanceDashboardPage() {
                 <th style={thStyle}>Task</th>
                 <th style={thStyle}>Hoàn thành</th>
                 <th style={thStyle}>Đúng hạn</th>
-                <th style={thStyle}>Điểm TB</th>
+                <th style={thStyle}>{scoreMode === 'combined' ? 'Công việc' : 'Điểm TB'}</th>
+                {scoreMode === 'combined' && <th style={thStyle}>Chấm công</th>}
+                {scoreMode === 'combined' && <th style={thStyle}>Tổng hợp</th>}
                 <th style={thStyle}>Hạng</th>
               </tr>
             </thead>
             <tbody>
               {rankings.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: '32px 16px', textAlign: 'center', color: '#9ca3af' }}>
+                  <td colSpan={scoreMode === 'combined' ? 10 : 8} style={{ padding: '32px 16px', textAlign: 'center', color: '#9ca3af' }}>
                     Chưa có dữ liệu cho kỳ này
                   </td>
                 </tr>
@@ -515,14 +594,34 @@ export default function PerformanceDashboardPage() {
                     </div>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}>{emp.final_score}</td>
+                  {scoreMode === 'combined' && (() => {
+                    const att = attendanceScores.get(emp.employee_id);
+                    return (
+                      <>
+                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: att ? (att.attendance_score >= 80 ? '#16a34a' : att.attendance_score >= 60 ? '#f59e0b' : '#ef4444') : '#9ca3af' }}>
+                          {loadingAttendance ? '...' : (att?.attendance_score ?? '—')}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: PRIMARY }}>
+                          {loadingAttendance ? '...' : (att?.combined_score ?? '—')}
+                        </td>
+                      </>
+                    );
+                  })()}
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 28, height: 24, borderRadius: 6, fontSize: 12, fontWeight: 700,
-                      color: GRADE_COLORS[emp.grade], background: GRADE_BG[emp.grade],
-                    }}>
-                      {emp.grade}
-                    </span>
+                    {(() => {
+                      const displayGrade = scoreMode === 'combined'
+                        ? (attendanceScores.get(emp.employee_id)?.combined_grade || emp.grade)
+                        : emp.grade;
+                      return (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 28, height: 24, borderRadius: 6, fontSize: 12, fontWeight: 700,
+                          color: GRADE_COLORS[displayGrade], background: GRADE_BG[displayGrade],
+                        }}>
+                          {displayGrade}
+                        </span>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}

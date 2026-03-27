@@ -63,6 +63,7 @@ import TaskReportsPage from './features/reports/TaskReportsPage';
 // Performance Dashboard
 import PerformanceDashboardPage from './pages/performance/PerformanceDashboardPage';
 import EmployeePerformancePage from './pages/performance/EmployeePerformancePage';
+import PerformanceReportPage from './pages/performance/PerformanceReportPage';
 
 // User Settings
 import UserSettingsPage from './pages/settings/UserSettingsPage';
@@ -485,6 +486,7 @@ function App() {
 
               {/* ===== PERFORMANCE DASHBOARD ===== */}
               <Route path="performance" element={<PerformanceDashboardPage />} />
+              <Route path="performance/reports" element={<PerformanceReportPage />} />
               <Route path="performance/:employeeId" element={<EmployeePerformancePage />} />
 
               {/* ===== PURCHASING MODULE ===== */}

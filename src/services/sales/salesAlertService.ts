@@ -18,7 +18,7 @@ export const salesAlertService = {
     const alerts: SalesAlert[] = []
     const today = new Date()
 
-    // 1. L/C sap het han (< 7 ngay)
+    // 1. L/C sắp hết hạn (< 7 ngày)
     const { data: lcOrders } = await supabase
       .from('sales_orders')
       .select('id, code, lc_expiry_date, customer:sales_customers!customer_id(name)')
@@ -39,7 +39,7 @@ export const salesAlertService = {
       }
     })
 
-    // 2. Don sap toi han giao (< 7 ngay)
+    // 2. Đơn sắp tới hạn giao (< 7 ngày)
     const { data: deliveryOrders } = await supabase
       .from('sales_orders')
       .select('id, code, delivery_date, customer:sales_customers!customer_id(name)')
@@ -62,7 +62,7 @@ export const salesAlertService = {
       }
     })
 
-    // 3. Chua thanh toan > 30 ngay
+    // 3. Chưa thanh toán > 30 ngày
     const { data: unpaidOrders } = await supabase
       .from('sales_orders')
       .select('id, code, etd, customer:sales_customers!customer_id(name), total_value_usd')
@@ -83,7 +83,7 @@ export const salesAlertService = {
       }
     })
 
-    // 4. Don moi chua xac nhan > 3 ngay
+    // 4. Đơn mới chưa xác nhận > 3 ngày
     const threeDaysAgo = new Date(today.getTime() - 3 * 86400000).toISOString()
     const { data: pendingOrders } = await supabase
       .from('sales_orders')

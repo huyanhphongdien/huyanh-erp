@@ -1,7 +1,7 @@
 // ============================================================================
-// EXECUTIVE DASHBOARD PAGE — Tong quan dieu hanh (BGD)
+// EXECUTIVE DASHBOARD PAGE — Tổng quan điều hành (BGĐ)
 // File: src/pages/sales/ExecutiveDashboardPage.tsx
-// Module Ban hang quoc te — Huy Anh Rubber ERP
+// Module Bán hàng quốc tế — Huy Anh Rubber ERP
 // Primary color: #1B4D3E
 // ============================================================================
 

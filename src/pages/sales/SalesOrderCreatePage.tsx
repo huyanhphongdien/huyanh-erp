@@ -72,9 +72,9 @@ const formatCurrency = (value: number | undefined | null, currency = 'USD'): str
 
 const formatVND = (value: number | undefined | null): string => {
   if (!value) return '-'
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} ty`
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} tỷ`
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} tr`
-  return new Intl.NumberFormat('vi-VN').format(value) + ' d'
+  return new Intl.NumberFormat('vi-VN').format(value) + ' đ'
 }
 
 const CURRENCY_OPTIONS = [

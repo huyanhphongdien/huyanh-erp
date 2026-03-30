@@ -566,7 +566,7 @@ const ShipmentFollowingPage = () => {
       'NO', 'Buyer', 'Contract No', 'Lot', 'PO', 'L/C', 'Booking No', 'B/L No',
       'Commodity', 'QTY (MT)', 'VOL', 'POL', 'POD', 'Incoterms', 'Payment Term',
       'Unit Price (USD)', 'Amount (USD)', 'Discount (USD)', 'Bank',
-      'Ngay trinh BTC', 'Ngay CK', 'ETD', 'DHL No', 'Payment Date', 'Status',
+      'Ngày trình BTC', 'Ngày CK', 'ETD', 'DHL No', 'Payment Date', 'Status',
     ]
 
     const rows = orders.map((o, idx) => [
@@ -653,10 +653,10 @@ const ShipmentFollowingPage = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 20 }}>
         <Col>
           <Title level={3} style={{ margin: 0, color: '#1B4D3E' }}>
-            Theo doi lo hang xuat
+            Theo dõi lô hàng xuất
           </Title>
           <Text type="secondary">
-            Shipment Following — Thay the file Excel theo doi xuat hang
+            Shipment Following — Thay thế file Excel theo dõi xuất hàng
           </Text>
         </Col>
         <Col>
@@ -666,7 +666,7 @@ const ShipmentFollowingPage = () => {
             onClick={exportToCSV}
             style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
-            Xuat Excel
+            Xuất Excel
           </Button>
         </Col>
       </Row>
@@ -719,7 +719,7 @@ const ShipmentFollowingPage = () => {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={12} md={5}>
             <RangePicker
-              placeholder={['ETD tu', 'ETD den']}
+              placeholder={['ETD từ', 'ETD đến']}
               onChange={(dates) => setEtdRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
               style={{ width: '100%' }}
               allowClear
@@ -755,7 +755,7 @@ const ShipmentFollowingPage = () => {
           </Col>
           <Col xs={12} sm={6} md={3}>
             <Select
-              placeholder="Trang thai"
+              placeholder="Trạng thái"
               value={filterStatus}
               onChange={setFilterStatus}
               style={{ width: '100%' }}
@@ -764,7 +764,7 @@ const ShipmentFollowingPage = () => {
           </Col>
           <Col xs={24} sm={12} md={5}>
             <Input.Search
-              placeholder="Tim ma don, booking, B/L..."
+              placeholder="Tìm mã đơn, booking, B/L..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onSearch={() => loadOrders()}
@@ -775,7 +775,7 @@ const ShipmentFollowingPage = () => {
           <Col xs={12} sm={6} md={4}>
             <Space>
               <Button onClick={loadOrders} type="default">
-                Lam moi
+                Làm mới
               </Button>
             </Space>
           </Col>
@@ -794,7 +794,7 @@ const ShipmentFollowingPage = () => {
           scroll={{ x: 2800 }}
           pagination={{
             pageSize: 50,
-            showTotal: (total) => `Tong ${total} lo hang`,
+            showTotal: (total) => `Tổng ${total} lô hàng`,
             showSizeChanger: true,
             pageSizeOptions: ['20', '50', '100'],
           }}
@@ -811,7 +811,7 @@ const ShipmentFollowingPage = () => {
             <Table.Summary fixed>
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0} colSpan={8} align="right">
-                  <Text strong style={{ color: '#1B4D3E' }}>TONG CONG:</Text>
+                  <Text strong style={{ color: '#1B4D3E' }}>TỔNG CỘNG:</Text>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={8} align="right">
                   <Text strong>{summary.totalQty.toFixed(1)} MT</Text>
@@ -844,7 +844,7 @@ const ShipmentFollowingPage = () => {
             </Space>
             <Space>
               <div style={{ width: 16, height: 16, background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 2 }} />
-              <Text type="secondary" style={{ fontSize: 12 }}>ETD &lt; 7 ngay</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>ETD &lt; 7 ngày</Text>
             </Space>
           </Space>
         </Col>

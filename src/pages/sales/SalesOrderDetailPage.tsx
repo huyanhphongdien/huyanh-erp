@@ -104,9 +104,9 @@ const formatCurrency = (value: number | null | undefined, currency = 'USD'): str
 
 const formatVND = (value: number | null | undefined): string => {
   if (!value) return '-'
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} ty`
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} tỷ`
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} tr`
-  return new Intl.NumberFormat('vi-VN').format(value) + ' d'
+  return new Intl.NumberFormat('vi-VN').format(value) + ' đ'
 }
 
 const formatDate = (d: string | null | undefined): string => {
@@ -200,7 +200,7 @@ function SalesOrderDetailPage() {
       } else {
         await salesOrderService.updateStatus(order.id, newStatus)
       }
-      message.success(`Da cap nhat trang thai: ${ORDER_STATUS_LABELS[newStatus]}`)
+      message.success(`Đã cập nhật trạng thái: ${ORDER_STATUS_LABELS[newStatus]}`)
       loadOrder()
     } catch (err: any) {
       message.error(err?.message || 'Không thể cập nhật trạng thái')
@@ -552,7 +552,7 @@ function SalesOrderDetailPage() {
 
     const columns: ColumnsType<QualityRow> = [
       { title: 'Chỉ tiêu', dataIndex: 'parameter', key: 'parameter' },
-      { title: 'Loai', dataIndex: 'type', key: 'type', render: (t) => t === 'min' ? 'Min' : 'Max' },
+      { title: 'Loại', dataIndex: 'type', key: 'type', render: (t) => t === 'min' ? 'Min' : 'Max' },
       {
         title: 'Yêu cầu đơn hàng',
         dataIndex: 'required',
@@ -560,7 +560,7 @@ function SalesOrderDetailPage() {
         render: (v, row) => (v != null ? `${v} ${row.unit}` : '-'),
       },
       {
-        title: `Tieu chuan ${gradeLabel}`,
+        title: `Tiêu chuẩn ${gradeLabel}`,
         dataIndex: 'standard',
         key: 'standard',
         render: (v, row) => (v != null ? `${v} ${row.unit}` : '-'),
@@ -575,9 +575,9 @@ function SalesOrderDetailPage() {
               ? row.required >= row.standard
               : row.required <= row.standard
           return inSpec ? (
-            <Tag color="green">Dat</Tag>
+            <Tag color="green">Đạt</Tag>
           ) : (
-            <Tag color="red">Khong dat</Tag>
+            <Tag color="red">Không đạt</Tag>
           )
         },
       },
@@ -597,7 +597,7 @@ function SalesOrderDetailPage() {
   }
 
   // ══════════════════════════════════════════════════════════════
-  // TAB: SAN XUAT
+  // TAB: SẢN XUẤT
   // ══════════════════════════════════════════════════════════════
 
   // ── Production tab handlers ──
@@ -1105,7 +1105,7 @@ function SalesOrderDetailPage() {
   }
 
   // ══════════════════════════════════════════════════════════════
-  // TAB: DONG GOI (Containers)
+  // TAB: ĐÓNG GÓI (Containers)
   // ══════════════════════════════════════════════════════════════
 
   const containerColumns: ColumnsType<SalesOrderContainer> = [
@@ -1113,7 +1113,7 @@ function SalesOrderDetailPage() {
       title: 'Container No.',
       dataIndex: 'container_no',
       key: 'container_no',
-      render: (v) => v || <Text type="secondary">Chua co</Text>,
+      render: (v) => v || <Text type="secondary">Chưa có</Text>,
     },
     {
       title: 'Seal No.',
@@ -1122,7 +1122,7 @@ function SalesOrderDetailPage() {
       render: (v) => v || '-',
     },
     {
-      title: 'Loai',
+      title: 'Loại',
       dataIndex: 'container_type',
       key: 'container_type',
       render: (v) =>
@@ -1276,7 +1276,7 @@ function SalesOrderDetailPage() {
   )
 
   // ══════════════════════════════════════════════════════════════
-  // TAB: CHUNG TU
+  // TAB: CHỨNG TỪ
   // ══════════════════════════════════════════════════════════════
 
   const renderDocumentsTab = () => {
@@ -1324,7 +1324,7 @@ function SalesOrderDetailPage() {
                 <Text strong={doc.done}>{doc.label}</Text>
               </Space>
               <Button size="small" type="link" disabled>
-                {doc.done ? 'Xem' : 'Tao'}
+                {doc.done ? 'Xem' : 'Tạo'}
               </Button>
             </div>
           ))}
@@ -1384,7 +1384,7 @@ function SalesOrderDetailPage() {
                     color: 'red' as const,
                     children: (
                       <Text type="danger" strong>
-                        Da huy
+                        Đã hủy
                       </Text>
                     ),
                   },
@@ -1560,8 +1560,8 @@ function SalesOrderDetailPage() {
           setContainerModalOpen(false)
           containerForm.resetFields()
         }}
-        okText="Them"
-        cancelText="Huy"
+        okText="Thêm"
+        cancelText="Hủy"
       >
         <Form form={containerForm} layout="vertical">
           <Form.Item label="Container No." name="container_no">

@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo cáo Phân tích & Kế hoạch Triển khai Module Sales Order — Huy Anh Rubber ERP</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #1B4D3E;
+  --primary-light: #2A7A60;
+  --primary-lighter: #E8F5EF;
+  --primary-50: #F0FAF5;
+  --accent: #E8A838;
+  --accent-light: #FFF3DC;
+  --danger: #C0392B;
+  --danger-light: #FDEDEB;
+  --warning: #E67E22;
+  --warning-light: #FEF5E7;
+  --info: #2980B9;
+  --info-light: #EBF5FB;
+  --success: #27AE60;
+  --success-light: #EAFAF1;
+  --text: #1A1A2E;
+  --text-secondary: #5A5A7A;
+  --text-muted: #8E8EA0;
+  --bg: #FAFAF8;
+  --surface: #FFFFFF;
+  --surface-alt: #F5F5F0;
+  --border: #E8E8E0;
+  --border-light: #F0F0EA;
+  --shadow-sm: 0 1px 3px rgba(27,77,62,0.06);
+  --shadow-md: 0 4px 12px rgba(27,77,62,0.08);
+  --shadow-lg: 0 8px 32px rgba(27,77,62,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* PRINT */
+@media print {
+  body { background: #fff; font-size: 12px; }
+  .no-print { display: none !important; }
+  .page-break { page-break-before: always; }
+  .container { max-width: 100%; padding: 0; }
+  section { box-shadow: none; border: 1px solid #ddd; }
+}
+
+/* COVER */
+.cover {
+  background: linear-gradient(135deg, var(--primary) 0%, #0D2B22 60%, #091A15 100%);
+  color: white;
+  padding: 80px 40px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.cover::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  right: -200px;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,168,56,0.15), transparent 70%);
+}
+.cover::after {
+  content: '';
+  position: absolute;
+  bottom: -100px;
+  left: -100px;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(42,122,96,0.2), transparent 70%);
+}
+.cover-content { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; }
+.cover-badge {
+  display: inline-block;
+  background: rgba(232,168,56,0.2);
+  color: var(--accent);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 32px;
+  border: 1px solid rgba(232,168,56,0.3);
+}
+.cover h1 {
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 20px;
+  letter-spacing: -0.5px;
+}
+.cover h1 span { color: var(--accent); }
+.cover-subtitle {
+  font-size: 18px;
+  font-weight: 300;
+  opacity: 0.85;
+  max-width: 600px;
+  margin-bottom: 48px;
+  line-height: 1.6;
+}
+.cover-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+.cover-meta-item { font-size: 13px; opacity: 0.7; }
+.cover-meta-item strong { display: block; font-size: 15px; opacity: 1; font-weight: 500; margin-top: 2px; }
+.cover-logo {
+  position: absolute;
+  top: 40px;
+  right: 40px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  opacity: 0.6;
+  z-index: 2;
+}
+
+/* NAV */
+.nav {
+  position: sticky;
+  top: 0;
+  background: rgba(250,250,248,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  padding: 0 20px;
+}
+.nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 8px 0;
+}
+.nav-inner::-webkit-scrollbar { display: none; }
+.nav-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.nav-item:hover { color: var(--primary); background: var(--primary-lighter); }
+.nav-item.active { color: var(--primary); background: var(--primary-lighter); }
+
+/* CONTAINER */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+/* SECTIONS */
+section {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  margin-bottom: 32px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+}
+section.highlight {
+  border-left: 4px solid var(--primary);
+}
+
+.section-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--primary);
+  color: white;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+.section-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 28px;
+}
+
+/* STAT CARDS */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  border: 1px solid var(--border-light);
+}
+.stat-card .label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .value { font-size: 28px; font-weight: 700; color: var(--primary); margin: 4px 0 2px; letter-spacing: -0.5px; }
+.stat-card .sub { font-size: 12px; color: var(--text-secondary); }
+.stat-card.accent .value { color: var(--accent); }
+.stat-card.danger .value { color: var(--danger); }
+.stat-card.info .value { color: var(--info); }
+
+/* FLOW */
+.flow-step {
+  display: flex;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border-light);
+  align-items: flex-start;
+}
+.flow-step:last-child { border-bottom: none; }
+.flow-num {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: white;
+}
+.flow-content h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.flow-content p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.flow-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+.pill-b2b { background: var(--primary-lighter); color: var(--primary); }
+.pill-wms { background: var(--info-light); color: var(--info); }
+.pill-sale { background: #FDE8E3; color: #C0392B; }
+.pill-finance { background: #F0E6FA; color: #7D3C98; }
+.pill-logistics { background: var(--warning-light); color: var(--warning); }
+.pill-hr { background: #FBEAF0; color: #993556; }
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  margin: 16px 0;
+}
+table th {
+  background: var(--surface-alt);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border);
+}
+table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text);
+}
+table tr:last-child td { border-bottom: none; }
+table th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+table th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+
+/* COMPARISON */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+.compare-card {
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.compare-card.before {
+  background: var(--danger-light);
+  border-color: rgba(192,57,43,0.15);
+}
+.compare-card.after {
+  background: var(--success-light);
+  border-color: rgba(39,174,96,0.15);
+}
+.compare-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.compare-card ul { list-style: none; font-size: 13px; color: var(--text-secondary); }
+.compare-card ul li { padding: 4px 0; padding-left: 20px; position: relative; }
+.compare-card.before ul li::before { content: '✗'; position: absolute; left: 0; color: var(--danger); font-weight: 700; }
+.compare-card.after ul li::before { content: '✓'; position: absolute; left: 0; color: var(--success); font-weight: 700; }
+
+/* BENEFIT CARDS */
+.benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.benefit-card {
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  padding: 20px;
+  border: 1px solid var(--border-light);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.benefit-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.benefit-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.benefit-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.benefit-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
+.benefit-card .metric { font-size: 22px; font-weight: 700; color: var(--primary); margin-top: 8px; }
+
+/* TIMELINE */
+.timeline { position: relative; padding-left: 32px; }
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--primary), var(--accent));
+  border-radius: 2px;
+}
+.timeline-item {
+  position: relative;
+  padding: 16px 0;
+  padding-left: 16px;
+}
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 22px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 3px var(--primary-lighter);
+}
+.timeline-item.milestone::before {
+  width: 14px;
+  height: 14px;
+  left: -26px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-light);
+}
+.timeline-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.timeline-item.milestone .timeline-date { color: var(--accent); }
+.timeline-title { font-size: 15px; font-weight: 600; margin: 4px 0; }
+.timeline-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
+.timeline-tasks {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ALERT */
+.alert-box {
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  margin: 16px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.alert-box.warning { background: var(--warning-light); border: 1px solid rgba(230,126,34,0.2); }
+.alert-box.danger { background: var(--danger-light); border: 1px solid rgba(192,57,43,0.2); }
+.alert-box.success { background: var(--success-light); border: 1px solid rgba(39,174,96,0.2); }
+.alert-box.info { background: var(--info-light); border: 1px solid rgba(41,128,185,0.2); }
+.alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+/* RISK TABLE */
+.risk-high { color: var(--danger); font-weight: 600; }
+.risk-med { color: var(--warning); font-weight: 600; }
+.risk-low { color: var(--success); font-weight: 600; }
+
+/* SIGNATURE */
+.signature-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 2px solid var(--border);
+}
+.sig-box { text-align: center; }
+.sig-box .sig-role { font-size: 13px; color: var(--text-muted); margin-bottom: 60px; }
+.sig-box .sig-line { border-top: 1px solid var(--text); width: 200px; margin: 0 auto; padding-top: 8px; }
+.sig-box .sig-name { font-size: 14px; font-weight: 600; }
+.sig-box .sig-title { font-size: 12px; color: var(--text-secondary); }
+
+/* TOC */
+.toc { columns: 2; column-gap: 32px; }
+.toc-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 14px;
+  break-inside: avoid;
+}
+.toc-item a { color: var(--text); text-decoration: none; font-weight: 500; }
+.toc-item a:hover { color: var(--primary); }
+.toc-item .toc-page { color: var(--text-muted); font-size: 13px; }
+
+/* DIAGRAM SVG */
+.diagram-wrap {
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 20px 0;
+  border: 1px solid var(--border-light);
+  overflow-x: auto;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .cover { padding: 40px 20px; min-height: auto; }
+  .cover h1 { font-size: 28px; }
+  section { padding: 24px 20px; }
+  .compare-grid { grid-template-columns: 1fr; }
+  .toc { columns: 1; }
+  .signature-block { grid-template-columns: 1fr; }
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-logo no-print">HUY ANH RUBBER</div>
+  <div class="cover-content">
+    <div class="cover-badge">Báo cáo phân tích & Kế hoạch triển khai</div>
+    <h1>Module <span>Sales Order</span><br>Đa Bộ phận Tích hợp</h1>
+    <p class="cover-subtitle">Phân tích hiện trạng, luồng vận hành, lợi ích triển khai sâu hệ thống quản lý đơn hàng xuất khẩu liên thông B2B — WMS — Sản xuất — Tài chính</p>
+    <div class="cover-meta">
+      <div class="cover-meta-item">Đơn vị<strong>Công ty TNHH MTV Cao Su Huy Anh Phong Điền</strong></div>
+      <div class="cover-meta-item">Người lập<strong>Lê Duy Minh — Trưởng phòng IT</strong></div>
+      <div class="cover-meta-item">Ngày<strong>30/03/2026</strong></div>
+      <div class="cover-meta-item">Thời gian triển khai<strong>15 ngày làm việc</strong></div>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav no-print">
+  <div class="nav-inner">
+    <a class="nav-item active" href="#toc">Mục lục</a>
+    <a class="nav-item" href="#s1">Tổng quan</a>
+    <a class="nav-item" href="#s2">Hiện trạng</a>
+    <a class="nav-item" href="#s3">Luồng vận hành</a>
+    <a class="nav-item" href="#s4">Thiết kế đa BP</a>
+    <a class="nav-item" href="#s5">Tích hợp</a>
+    <a class="nav-item" href="#s6">Lợi ích</a>
+    <a class="nav-item" href="#s7">Kế hoạch 15 ngày</a>
+    <a class="nav-item" href="#s8">Rủi ro</a>
+    <a class="nav-item" href="#s9">Kiến nghị</a>
+  </div>
+</nav>
+
+<div class="container">
+
+<!-- MỤC LỤC -->
+<section id="toc">
+  <div class="section-title">Mục lục</div>
+  <div class="toc">
+    <div class="toc-item"><a href="#s1">1. Tổng quan dự án</a></div>
+    <div class="toc-item"><a href="#s2">2. Phân tích hiện trạng</a></div>
+    <div class="toc-item"><a href="#s3">3. Luồng vận hành tổng thể</a></div>
+    <div class="toc-item"><a href="#s4">4. Thiết kế đa bộ phận</a></div>
+    <div class="toc-item"><a href="#s5">5. Ma trận tích hợp module</a></div>
+    <div class="toc-item"><a href="#s6">6. Phân tích lợi ích triển khai</a></div>
+    <div class="toc-item"><a href="#s7">7. Kế hoạch triển khai 15 ngày</a></div>
+    <div class="toc-item"><a href="#s8">8. Rủi ro & Giải pháp</a></div>
+    <div class="toc-item"><a href="#s9">9. Kiến nghị Ban Giám đốc</a></div>
+  </div>
+</section>
+
+<!-- 1. TỔNG QUAN -->
+<section id="s1" class="highlight">
+  <div class="section-number">1</div>
+  <div class="section-title">Tổng quan dự án</div>
+  <div class="section-desc">Module Sales Order là mảnh ghép thiết yếu nối đầu ra (xuất khẩu) với đầu vào (thu mua B2B + sản xuất WMS), tạo chuỗi giá trị khép kín.</div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="label">Khách hàng XK</div>
+      <div class="value">25</div>
+      <div class="sub">10 quốc gia, 4 châu lục</div>
+    </div>
+    <div class="stat-card accent">
+      <div class="label">Sản phẩm</div>
+      <div class="value">6+</div>
+      <div class="sub">SVR10, 3L, RSS3, SBR1502...</div>
+    </div>
+    <div class="stat-card info">
+      <div class="label">Bộ phận tham gia</div>
+      <div class="value">4</div>
+      <div class="sub">Sale, SX, Logistics, Kế toán</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Thời gian triển khai</div>
+      <div class="value">15</div>
+      <div class="sub">ngày làm việc</div>
+    </div>
+  </div>
+
+  <div class="alert-box info">
+    <div class="alert-icon">📌</div>
+    <div><strong>Phạm vi:</strong> Module Sales Order quản lý toàn bộ vòng đời đơn hàng xuất khẩu — từ khi BP Sale tạo đơn, qua sản xuất, đóng gói container, xuất hàng, đến khi Kế toán thu đủ tiền và hoàn tất. Đồng thời tích hợp ngược với B2B (khi thiếu NVL) và WMS (tồn kho, xuất kho thành phẩm).</div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:24px 0 12px;">Khách hàng theo quốc gia</h3>
+  <table>
+    <thead>
+      <tr><th>Quốc gia</th><th>Số KH</th><th>Khách hàng chính</th><th>Sản phẩm</th><th>Cảng đích</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Ấn Độ</strong></td><td>9</td><td>JK, ATC, PIX, KOHINOOR, RALSON</td><td>SVR10, RSS3</td><td>Chennai, Nhava Sheva</td></tr>
+      <tr><td><strong>Singapore</strong></td><td>3</td><td>Tower Global, IE Synergy, R1</td><td>SVR10, SBR1502</td><td>— (trung gian)</td></tr>
+      <tr><td><strong>Trung Quốc</strong></td><td>3</td><td>Zhejiang, Jiangsu, Winyong</td><td>SBR1502, SVR10</td><td>Shanghai, Qingdao</td></tr>
+      <tr><td><strong>Indonesia</strong></td><td>3</td><td>PT Alphen, PT Ayumas, PT Okamoto</td><td>SVR3L</td><td>Jakarta, Belawan</td></tr>
+      <tr><td><strong>Sri Lanka</strong></td><td>2</td><td>Malaya, GRI</td><td>RSS3, Compound</td><td>Colombo</td></tr>
+      <tr><td><strong>Khác</strong></td><td>5</td><td>UKKO (Đài Loan), Vitry (UAE), Prochem (Thổ), Coelsin (TBN), Karnaphuli (BD)</td><td>SVR3L, RSS</td><td>Đa dạng</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 2. HIỆN TRẠNG -->
+<section id="s2" class="page-break">
+  <div class="section-number">2</div>
+  <div class="section-title">Phân tích hiện trạng</div>
+  <div class="section-desc">Hiện tại toàn bộ quản lý đơn hàng xuất khẩu và công nợ đại lý đang vận hành trên Excel, dẫn đến nhiều rủi ro nghiệp vụ.</div>
+
+  <div class="compare-grid">
+    <div class="compare-card before">
+      <h4 style="color:var(--danger)">🔴 Hiện trạng — Excel thủ công</h4>
+      <ul>
+        <li>Công nợ đại lý: 7 sheet, 148+ dòng, 41 cột — không validation</li>
+        <li>Tạm ứng 6 đợt/mã hàng — tính tay, dễ sai số</li>
+        <li>Shipment following: ~30 cột Excel, không liên kết kho/SX</li>
+        <li>4 bộ phận gọi điện hỏi tiến độ lẫn nhau</li>
+        <li>Không cảnh báo khi đơn sắp trễ, L/C sắp hết hạn</li>
+        <li>Đại lý gọi hỏi "em còn nợ bao nhiêu" liên tục</li>
+        <li>BGĐ phải hỏi thủ công để biết tình hình</li>
+        <li>Không truy xuất nguồn gốc lô hàng → khách quốc tế lo ngại</li>
+      </ul>
+    </div>
+    <div class="compare-card after">
+      <h4 style="color:var(--success)">🟢 Sau triển khai — ERP liên thông</h4>
+      <ul>
+        <li>Công nợ tự động: KLTP × Đơn giá × DRC − Tạm ứng = Còn lại</li>
+        <li>Partner Ledger theo dõi running balance realtime</li>
+        <li>SO detail hiển thị tiến độ đủ 4 BP trên 1 trang</li>
+        <li>Mỗi BP chỉ cần mở đơn hàng → biết ngay đến lượt mình</li>
+        <li>12 loại cảnh báo tự động push cho BGĐ + phụ trách</li>
+        <li>Đại lý tự tra cứu công nợ trên B2B Portal</li>
+        <li>Executive Dashboard cập nhật realtime</li>
+        <li>Truy xuất: Bành SVR → Lô SX → Đại lý → DRC → Phiếu cân</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:24px 0 12px;">Dữ liệu công nợ thực tế (trích Excel hiện tại)</h3>
+  
+  <div class="alert-box warning">
+    <div class="alert-icon">⚠️</div>
+    <div>
+      <strong>Mủ Việt:</strong> 15+ đại lý, tổng tạm ứng ~1.4 tỷ VND, quyết toán ~3 tỷ VND (tính đến 02/2025). Nhiều mã hàng ghi chú "chưa hs TƯ" (chưa hoàn thiện hồ sơ tạm ứng) — rủi ro mất kiểm soát.<br>
+      <strong>Mủ Lào:</strong> Phạm Minh Ân 12 mã LAS1 (giá 34.7-39 triệu KIP/tấn), tổng ~23.5 tỷ KIP. Đặng Văn Minh: LAHĐ-01 (~1.5 tỷ KIP). Thanh toán 6-9 đợt/mã — phức tạp, dễ bỏ sót.<br>
+      <strong>Bàn giao 31/07/2025:</strong> 29 đại lý, tổng tạm ứng hàng chục tỷ VND, nhiều mã "hàng chưa vào" (NVL chưa về nhà máy nhưng đã ứng tiền).
+    </div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:24px 0 12px;">Bảng giá sản phẩm thực tế 2025-2026 (USD/MT)</h3>
+  <table>
+    <thead>
+      <tr><th>Sản phẩm</th><th>Giá thấp</th><th>Giá cao</th><th>Giá TB</th><th>Incoterms</th><th>Tỷ trọng</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>SVR10</strong></td><td>$1,600</td><td>$1,890</td><td>$1,700</td><td>FOB</td><td>~60%</td></tr>
+      <tr><td><strong>SVR3L</strong></td><td>$1,875</td><td>$2,240</td><td>$2,050</td><td>FOB/CIF</td><td>~25%</td></tr>
+      <tr><td><strong>RSS3</strong></td><td>$1,860</td><td>$2,170</td><td>$2,000</td><td>FOB/CIF</td><td>~10%</td></tr>
+      <tr><td>SBR1502</td><td>$1,750</td><td>$1,845</td><td>$1,800</td><td>CIF</td><td>~3%</td></tr>
+      <tr><td>RSS1</td><td>$1,940</td><td>$1,940</td><td>$1,940</td><td>FOB</td><td>~1%</td></tr>
+      <tr><td>Compound</td><td>$1,790</td><td>$1,790</td><td>$1,790</td><td>FOB</td><td>~1%</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 3. LUỒNG VẬN HÀNH -->
+<section id="s3" class="page-break">
+  <div class="section-number">3</div>
+  <div class="section-title">Luồng vận hành tổng thể</div>
+  <div class="section-desc">Chuỗi giá trị Huy Anh gồm 7 giai đoạn — từ thu mua nguyên liệu đến thu tiền xuất khẩu, liên thông 5 module ERP.</div>
+
+  <div class="flow-step">
+    <div class="flow-num" style="background:var(--primary)">1</div>
+    <div class="flow-content">
+      <h4>Thu mua nguyên liệu</h4>
+      <p>Đại lý chào giá mủ → Chat đàm phán trên B2B Platform → Chốt deal (giá, DRC, KL) → Nhà máy tạm ứng tiền → Đại lý giao mủ tươi về nhà máy. Đa tiền tệ: VND (nội địa), KIP LAK (Lào), THB (Thái).</p>
+      <div class="flow-pills">
+        <span class="pill pill-b2b">B2B Platform</span>
+        <span class="pill pill-finance">Tạm ứng đa đợt</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num" style="background:var(--info)">2</div>
+    <div class="flow-content">
+      <h4>Nhập kho & Cân xe</h4>
+      <p>Cân xe tải (cân Keli D2008FA, D12, D30) → Xác định KL tươi (KLm) → Kiểm tra DRC (%) → Tính KL quy khô (KLTP = KLm × DRC) → Tạo phiếu nhập kho → Ghi nhận batch NVL trong WMS → Cập nhật tồn kho realtime.</p>
+      <div class="flow-pills">
+        <span class="pill pill-wms">WMS P3 + P7</span>
+        <span class="pill" style="background:#F0F0EA;color:#5A5A7A">Keli RS232</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num" style="background:var(--info)">3</div>
+    <div class="flow-content">
+      <h4>Sản xuất chế biến</h4>
+      <p>Lệnh SX theo BOM → 5 công đoạn: Rửa → Tán/Kéo → Sấy → Ép bành → Đóng gói → QC thành phẩm (kiểm theo tiêu chuẩn SVR) → Nhập kho thành phẩm. Yield trung bình 80%.</p>
+      <div class="flow-pills">
+        <span class="pill pill-wms">WMS P8 + P6</span>
+        <span class="pill" style="background:#F0F0EA;color:#5A5A7A">5 công đoạn SX</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num" style="background:var(--primary)">4</div>
+    <div class="flow-content">
+      <h4>Quyết toán NCC</h4>
+      <p>KLTP thực tế × Đơn giá chốt × DRC → Thành tiền → Trừ các đợt tạm ứng → Xác nhận số còn lại → Thanh toán quyết toán (thường 3-6 đợt). Ghi sổ công nợ đại lý (partner_ledger).</p>
+      <div class="flow-pills">
+        <span class="pill pill-b2b">B2B Settlement</span>
+        <span class="pill pill-finance">Partner Ledger</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num" style="background:var(--danger)">5</div>
+    <div class="flow-content">
+      <h4>Đơn hàng xuất khẩu (Sales Order)</h4>
+      <p>BP Sale tạo SO: Khách hàng + sản phẩm + giá + specs + packing → SX kiểm NVL khả dụng → Nếu thiếu: tạo B2B Demand hoặc Lệnh SX → SX hoàn thành → QC pass → Xác nhận sẵn sàng giao.</p>
+      <div class="flow-pills">
+        <span class="pill pill-sale">Sales Order (MỚI)</span>
+        <span class="pill pill-wms">Liên kết WMS</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num" style="background:var(--warning)">6</div>
+    <div class="flow-content">
+      <h4>Logistics & Chứng từ xuất khẩu</h4>
+      <p>Đóng gói container (FIFO, auto phân bổ bành) → Seal → Booking tàu (ONE/Evergreen/Maersk) → COA + Packing List → DHL chứng từ → ETD/ETA tracking → B/L (Bill of Lading). Cảng chính: Đà Nẵng (90%).</p>
+      <div class="flow-pills">
+        <span class="pill pill-logistics">Logistics Tab</span>
+        <span class="pill" style="background:#F0F0EA;color:#5A5A7A">Container 20ft/40ft</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="flow-num" style="background:#7D3C98">7</div>
+    <div class="flow-content">
+      <h4>Thanh toán & Tài chính</h4>
+      <p>Phát hành Invoice → L/C / DP at sight / TT 100% → Thu tiền qua ngân hàng (AGRI, VTB, TP, EXIM) → Chiết khấu theo HĐ → Trừ hoa hồng broker (nếu có, ~$20/MT) → Ghi sổ cái → Hoàn tất đơn hàng.</p>
+      <div class="flow-pills">
+        <span class="pill pill-finance">Tab Tài chính (MỚI)</span>
+        <span class="pill" style="background:#F0F0EA;color:#5A5A7A">DP ~40% | TT ~25% | L/C ~20%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert-box info" style="margin-top:20px">
+    <div class="alert-icon">🔄</div>
+    <div><strong>Vòng lặp:</strong> Khi SO được xác nhận → SX kiểm NVL → Nếu thiếu → Tự động tạo B2B Purchase Demand → Đại lý nhận yêu cầu trên Portal → Quay lại bước 1. Đây là liên kết quan trọng nhất giữa Sales Order và B2B Platform.</div>
+  </div>
+</section>
+
+<!-- 4. THIẾT KẾ ĐA BỘ PHẬN -->
+<section id="s4" class="page-break">
+  <div class="section-number">4</div>
+  <div class="section-title">Thiết kế đa bộ phận</div>
+  <div class="section-desc">Mỗi đơn hàng đi qua 4 bộ phận, mỗi BP có tab riêng và quyền riêng — nhưng cùng nhìn 1 đơn hàng.</div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:0 0 12px;">Trạng thái đơn hàng & Bộ phận chịu trách nhiệm</h3>
+  <table>
+    <thead>
+      <tr><th>Trạng thái</th><th>BP phụ trách</th><th>Việc cần làm</th><th>Chuyển tiếp bởi</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="pill" style="background:#F0F0EA;color:#5A5A7A">Nháp</span></td><td>Sale</td><td>Tạo đơn: KH, sản phẩm, giá, specs, packing (wizard 4 bước)</td><td>Sale xác nhận</td></tr>
+      <tr><td><span class="pill pill-sale">Đã xác nhận</span></td><td>Sale + SX</td><td>SX kiểm NVL, lên kế hoạch SX</td><td>SX tạo lệnh SX</td></tr>
+      <tr><td><span class="pill pill-wms">Đang SX</span></td><td>Sản xuất</td><td>5 công đoạn, cập nhật tiến độ, yield</td><td>SX xác nhận sẵn sàng</td></tr>
+      <tr><td><span class="pill pill-wms">Sẵn sàng</span></td><td>SX → Logistics</td><td>TP đã QC pass, chờ đóng gói</td><td>Logistics bắt đầu</td></tr>
+      <tr><td><span class="pill pill-logistics">Đóng gói</span></td><td>Logistics</td><td>Container, seal, booking tàu</td><td>Logistics xuất hàng</td></tr>
+      <tr><td><span class="pill pill-logistics">Đã xuất</span></td><td>Logistics</td><td>B/L, DHL, trình chứng từ</td><td>Logistics hoàn tất</td></tr>
+      <tr><td><span class="pill pill-finance">Chờ thanh toán</span></td><td>Kế toán</td><td>Invoice, L/C, ghi nhận thanh toán</td><td>Kế toán xác nhận</td></tr>
+      <tr><td><span class="pill" style="background:var(--success-light);color:var(--success)">Hoàn tất</span></td><td>—</td><td>Chiết khấu, hoa hồng, sổ cái</td><td>Tự động</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:16px;font-weight:600;margin:28px 0 12px;">Ma trận phân quyền theo tab</h3>
+  <table>
+    <thead>
+      <tr><th>Tab / Chức năng</th><th>Sale</th><th>Sản xuất</th><th>Logistics</th><th>Kế toán</th><th>Admin</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Thông tin đơn hàng</strong></td><td>✅ Sửa</td><td>👁 Xem</td><td>👁 Xem</td><td>👁 Xem</td><td>✅ Full</td></tr>
+      <tr><td><strong>Chất lượng / Specs</strong></td><td>✅ Sửa</td><td>✅ Xem</td><td>👁 Xem</td><td>👁 Xem</td><td>✅ Full</td></tr>
+      <tr><td><strong>Sản xuất</strong></td><td>👁 Xem</td><td>✅ Sửa</td><td>👁 Xem</td><td>—</td><td>✅ Full</td></tr>
+      <tr><td><strong>Đóng gói / Container</strong></td><td>👁 Xem</td><td>👁 Xem</td><td>✅ Sửa</td><td>—</td><td>✅ Full</td></tr>
+      <tr><td><strong>Chứng từ XK</strong></td><td>👁 Xem</td><td>—</td><td>✅ Sửa</td><td>✅ Sửa</td><td>✅ Full</td></tr>
+      <tr><td><strong>Tài chính</strong></td><td>—</td><td>—</td><td>—</td><td>✅ Sửa</td><td>✅ Full</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:16px;font-weight:600;margin:28px 0 12px;">Form tạo đơn hàng — Wizard 4 bước</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+    <div style="background:var(--primary-50);padding:16px;border-radius:var(--radius);border:1px solid var(--primary-lighter)">
+      <div style="font-weight:600;font-size:13px;color:var(--primary);margin-bottom:8px;">Bước 1: KH & Sản phẩm</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.6">Khách hàng, PO#, Hợp đồng, Lot, Grade (SVR10...), Số lượng (tấn), Giá chốt (USD/MT), Giá HĐ, Tỷ giá</div>
+    </div>
+    <div style="background:var(--info-light);padding:16px;border-radius:var(--radius);border:1px solid rgba(41,128,185,0.15)">
+      <div style="font-weight:600;font-size:13px;color:var(--info);margin-bottom:8px;">Bước 2: Chất lượng & Đóng gói</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.6">DRC min/max, Moisture, Dirt, Ash, PRI, Mooney, Loại đóng gói (Bale 33.33/35kg), Shrink wrap, Pallet, Marking</div>
+    </div>
+    <div style="background:var(--warning-light);padding:16px;border-radius:var(--radius);border:1px solid rgba(230,126,34,0.15)">
+      <div style="font-weight:600;font-size:13px;color:var(--warning);margin-bottom:8px;">Bước 3: Vận chuyển & TT</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.6">Incoterms (FOB/CIF), Cảng xếp (DAD/HCM), Cảng đích, Container, ETD, Điều khoản TT (DP/LC/TT), Ngân hàng, Hoa hồng</div>
+    </div>
+    <div style="background:var(--success-light);padding:16px;border-radius:var(--radius);border:1px solid rgba(39,174,96,0.15)">
+      <div style="font-weight:600;font-size:13px;color:var(--success);margin-bottom:8px;">Bước 4: Xác nhận</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.6">Tóm tắt đơn hàng, Tổng giá trị ($), Tổng bành, Preview → Lưu nháp hoặc Xác nhận đơn hàng</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. TÍCH HỢP MODULE -->
+<section id="s5" class="page-break">
+  <div class="section-number">5</div>
+  <div class="section-title">Ma trận tích hợp module</div>
+  <div class="section-desc">Sales Order không hoạt động độc lập — dữ liệu liên thông giữa 5 module tạo sức mạnh cộng hưởng.</div>
+
+  <div class="diagram-wrap">
+    <svg width="100%" viewBox="0 0 700 420" style="font-family:'Be Vietnam Pro',sans-serif;">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <!-- B2B -->
+      <rect x="40" y="40" width="140" height="60" rx="10" fill="#E8F5EF" stroke="#1B4D3E" stroke-width="1.2"/>
+      <text x="110" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#1B4D3E">B2B Platform</text>
+      <text x="110" y="82" text-anchor="middle" font-size="10" fill="#2A7A60">Thu mua + Đại lý</text>
+
+      <!-- WMS -->
+      <rect x="280" y="40" width="140" height="60" rx="10" fill="#EBF5FB" stroke="#2980B9" stroke-width="1.2"/>
+      <text x="350" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#2980B9">WMS</text>
+      <text x="350" y="82" text-anchor="middle" font-size="10" fill="#2980B9">Kho + Tồn kho</text>
+
+      <!-- Sales Order (center) -->
+      <rect x="230" y="170" width="240" height="80" rx="14" fill="#1B4D3E" stroke="#0D2B22" stroke-width="1.5"/>
+      <text x="350" y="200" text-anchor="middle" font-size="16" font-weight="700" fill="white">SALES ORDER</text>
+      <text x="350" y="222" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.7)">Đơn hàng xuất khẩu — 4 BP</text>
+
+      <!-- Production -->
+      <rect x="520" y="40" width="140" height="60" rx="10" fill="#FEF5E7" stroke="#E67E22" stroke-width="1.2"/>
+      <text x="590" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#E67E22">Sản xuất</text>
+      <text x="590" y="82" text-anchor="middle" font-size="10" fill="#E67E22">BOM + Lệnh SX</text>
+
+      <!-- Finance -->
+      <rect x="280" y="320" width="140" height="60" rx="10" fill="#F0E6FA" stroke="#7D3C98" stroke-width="1.2"/>
+      <text x="350" y="345" text-anchor="middle" font-size="13" font-weight="600" fill="#7D3C98">Tài chính</text>
+      <text x="350" y="362" text-anchor="middle" font-size="10" fill="#7D3C98">Invoice + Công nợ</text>
+
+      <!-- Task System -->
+      <rect x="540" y="320" width="120" height="60" rx="10" fill="#FBEAF0" stroke="#993556" stroke-width="1.2"/>
+      <text x="600" y="345" text-anchor="middle" font-size="13" font-weight="600" fill="#993556">Task V3</text>
+      <text x="600" y="362" text-anchor="middle" font-size="10" fill="#993556">Đánh giá NV</text>
+
+      <!-- HR -->
+      <rect x="40" y="320" width="120" height="60" rx="10" fill="#FBEAF0" stroke="#993556" stroke-width="1.2"/>
+      <text x="100" y="345" text-anchor="middle" font-size="13" font-weight="600" fill="#993556">HRM</text>
+      <text x="100" y="362" text-anchor="middle" font-size="10" fill="#993556">57 nhân viên</text>
+
+      <!-- Arrows -->
+      <!-- B2B → SO -->
+      <line x1="110" y1="100" x2="270" y2="190" stroke="#1B4D3E" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="170" y="138" font-size="9" fill="#2A7A60" transform="rotate(-20 170 138)">NVL từ Deal</text>
+
+      <!-- WMS → SO -->
+      <line x1="350" y1="100" x2="350" y2="168" stroke="#2980B9" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="362" y="140" font-size="9" fill="#2980B9">Tồn kho TP</text>
+
+      <!-- Production → SO -->
+      <line x1="590" y1="100" x2="435" y2="185" stroke="#E67E22" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="530" y="138" font-size="9" fill="#E67E22" transform="rotate(20 530 138)">Lệnh SX</text>
+
+      <!-- SO → Finance -->
+      <line x1="350" y1="250" x2="350" y2="318" stroke="#7D3C98" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="362" y="290" font-size="9" fill="#7D3C98">Invoice + TT</text>
+
+      <!-- SO → B2B (ngược) -->
+      <line x1="248" y1="230" x2="130" y2="320" stroke="#1B4D3E" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+      <text x="165" y="282" font-size="9" fill="#2A7A60" transform="rotate(30 165 282)">Purchase Demand</text>
+
+      <!-- SO → Task -->
+      <line x1="450" y1="240" x2="555" y2="320" stroke="#993556" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+      <text x="510" y="275" font-size="9" fill="#993556">Auto Task</text>
+
+      <!-- B2B → Finance -->
+      <line x1="100" y1="100" x2="100" y2="318" stroke="#7D3C98" stroke-width="1" stroke-dasharray="4 3"/>
+      <line x1="100" y1="350" x2="278" y2="350" stroke="#7D3C98" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+      <text x="190" y="340" font-size="9" fill="#7D3C98">Settlement</text>
+    </svg>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:20px 0 12px;">Chi tiết liên kết dữ liệu</h3>
+  <table>
+    <thead>
+      <tr><th>Từ</th><th>→ Đến</th><th>Dữ liệu</th><th>Khi nào</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>B2B</td><td>WMS</td><td>intake_records → stock_in_orders</td><td>Đại lý giao mủ, cân xe xong</td></tr>
+      <tr><td>WMS</td><td>Sales Order</td><td>Tồn kho TP khả dụng</td><td>Sale tạo SO, SX kiểm NVL</td></tr>
+      <tr><td>Sales Order</td><td>WMS</td><td>Stock-out picking FIFO</td><td>Logistics đóng container</td></tr>
+      <tr><td>Sales Order</td><td>Production</td><td>Lệnh SX từ BOM</td><td>SO confirmed + thiếu NVL</td></tr>
+      <tr><td>Sales Order</td><td>B2B</td><td>Purchase Demand</td><td>SO confirmed + thiếu NVL</td></tr>
+      <tr><td>B2B Settlement</td><td>Finance</td><td>Công nợ NCC → partner_ledger</td><td>Quyết toán deal xong</td></tr>
+      <tr><td>Sales Order</td><td>Finance</td><td>Invoice → Payment → Sổ cái</td><td>SO shipped</td></tr>
+      <tr><td>Tất cả</td><td>Task V3</td><td>Auto tạo task + scoring</td><td>Mỗi action trong hệ thống</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 6. LỢI ÍCH -->
+<section id="s6" class="page-break">
+  <div class="section-number">6</div>
+  <div class="section-title">Phân tích lợi ích triển khai sâu</div>
+  <div class="section-desc">8 lợi ích cốt lõi khi triển khai Sales Order tích hợp B2B — WMS — Finance.</div>
+
+  <div class="benefit-grid">
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:var(--primary-lighter);color:var(--primary)">📊</div>
+      <h4>Xóa sổ 7 file Excel công nợ</h4>
+      <p>Thay thế 148+ dòng, 41 cột Excel bằng hệ thống tự tính: KLTP × Đơn giá × DRC − Tạm ứng = Còn lại. Loại bỏ sai sót khi tính tạm ứng/quyết toán nhiều đợt.</p>
+      <div class="metric">−90% thời gian đối soát</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:var(--info-light);color:var(--info)">🔗</div>
+      <h4>4 bộ phận cùng nhìn 1 đơn hàng</h4>
+      <p>Sale/SX/Logistics/KT mở SO detail → thấy ngay đến lượt mình, không cần gọi điện hỏi tiến độ. Mỗi BP chỉ thấy/sửa tab của mình.</p>
+      <div class="metric">−80% cuộc gọi nội bộ</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:var(--danger-light);color:var(--danger)">🔔</div>
+      <h4>12 cảnh báo tự động cho BGĐ</h4>
+      <p>Đơn sắp trễ (7 ngày), container chưa seal (5 ngày), L/C sắp hết hạn, NVL tồn thấp, yield thấp, công nợ quá hạn. BGĐ biết trước, không cần hỏi.</p>
+      <div class="metric">12 loại alert tự động</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:var(--success-light);color:var(--success)">🔍</div>
+      <h4>Truy xuất nguồn gốc end-to-end</h4>
+      <p>Bành SVR10 xuất cho JK India → Lô SX nào → NVL từ đại lý nào → Cân ngày nào → DRC bao nhiêu. Đáp ứng yêu cầu Toyota/Adidas supply chain.</p>
+      <div class="metric">100% truy xuất</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:#F0E6FA;color:#7D3C98">💰</div>
+      <h4>Tự động hóa tài chính</h4>
+      <p>Giá chốt vs giá HĐ, hoa hồng ($15.14/MT), chiết khấu, tỷ giá — auto tính. Kế toán verify thay vì nhập tay. Không còn sai sót chiết khấu hàng trăm triệu.</p>
+      <div class="metric">0 sai sót tính toán</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:var(--accent-light);color:#85590B">📱</div>
+      <h4>Đại lý tự tra cứu công nợ</h4>
+      <p>30+ đại lý tự xem trên B2B Portal: deal đang xử lý, số dư, lịch sử thanh toán. Minh bạch hóa = giữ chân đại lý tốt hơn.</p>
+      <div class="metric">−70% cuộc gọi đại lý</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:var(--warning-light);color:var(--warning)">📈</div>
+      <h4>Dashboard realtime cho BGĐ</h4>
+      <p>Tổng doanh thu, công nợ NCC, công nợ KH, lợi nhuận theo lô/KH/sản phẩm — cập nhật realtime. BGĐ xem bất cứ lúc nào, không cần chờ báo cáo.</p>
+      <div class="metric">Realtime 24/7</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon" style="background:#F0F0EA;color:#5A5A7A">⚡</div>
+      <h4>Nền tảng scale — 1 người IT vận hành</h4>
+      <p>Với ERP liên thông, dữ liệu chảy tự động giữa module. 1 IT Manager + hệ thống auto = đủ vận hành 57 NV, 30+ đại lý, 25 KH quốc tế.</p>
+      <div class="metric">0 người nhập liệu thêm</div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. KẾ HOẠCH 15 NGÀY -->
+<section id="s7" class="page-break">
+  <div class="section-number">7</div>
+  <div class="section-title">Kế hoạch triển khai 15 ngày</div>
+  <div class="section-desc">Chia thành 5 giai đoạn, mỗi giai đoạn 3 ngày. Sửa từ nền tảng lên, không sửa ngược.</div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="label">Tổng thời gian</div>
+      <div class="value">15</div>
+      <div class="sub">ngày làm việc (~3 tuần)</div>
+    </div>
+    <div class="stat-card accent">
+      <div class="label">Giai đoạn</div>
+      <div class="value">5</div>
+      <div class="sub">mỗi giai đoạn 3 ngày</div>
+    </div>
+    <div class="stat-card info">
+      <div class="label">Milestone kiểm tra</div>
+      <div class="value">3</div>
+      <div class="sub">BGĐ review mỗi milestone</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Rủi ro delay</div>
+      <div class="value">Thấp</div>
+      <div class="sub">Nền tảng ERP đã sẵn sàng</div>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-date">Ngày 1-3 · Giai đoạn A</div>
+      <div class="timeline-title">Nền tảng Database & Phân quyền</div>
+      <div class="timeline-desc">SQL migration thêm 16 cột mới cho sales_orders + 4 cột sales_customers. Import 25 khách hàng thực tế + sản phẩm mới (RSS1/3, SBR1502, Compound). Xây dựng salesPermissionService với phân quyền 4 BP. Setup routing module Sales.</div>
+      <div class="timeline-tasks">
+        <span class="pill" style="background:#E8F5EF;color:#1B4D3E">SQL Migration</span>
+        <span class="pill" style="background:#E8F5EF;color:#1B4D3E">Import 25 KH</span>
+        <span class="pill" style="background:#E8F5EF;color:#1B4D3E">Permission Service</span>
+        <span class="pill" style="background:#E8F5EF;color:#1B4D3E">Routing</span>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-date">Ngày 4-6 · Giai đoạn B</div>
+      <div class="timeline-title">Sales Order CRUD & Form Wizard</div>
+      <div class="timeline-desc">SalesOrderCreatePage (wizard 4 bước: KH/SP → Specs/Packing → Shipping/Payment → Confirm). SalesOrderListPage với filter theo trạng thái, KH, sản phẩm. SalesOrderDetailPage cơ bản (Tab Thông tin + Chất lượng).</div>
+      <div class="timeline-tasks">
+        <span class="pill" style="background:#EBF5FB;color:#2980B9">Create Page Wizard</span>
+        <span class="pill" style="background:#EBF5FB;color:#2980B9">List Page</span>
+        <span class="pill" style="background:#EBF5FB;color:#2980B9">Detail Page</span>
+      </div>
+    </div>
+
+    <div class="timeline-item milestone">
+      <div class="timeline-date">✦ Milestone 1 — Cuối ngày 6</div>
+      <div class="timeline-title">Sale có thể tạo và quản lý đơn hàng cơ bản</div>
+      <div class="timeline-desc">BGĐ review: tạo SO thử với JK India, SVR10, 100T, FOB Đà Nẵng.</div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-date">Ngày 7-9 · Giai đoạn C</div>
+      <div class="timeline-title">Tab SX + Logistics + Tài chính</div>
+      <div class="timeline-desc">Tab Sản xuất: kiểm NVL khả dụng (link WMS), kế hoạch SX, tiến độ 5 công đoạn, yield. Tab Đóng gói: container management, seal, booking, B/L, DHL. Tab Chứng từ: COA, Packing List, xuất PDF. Tab Tài chính: Invoice, L/C tracking, thanh toán, chiết khấu, hoa hồng.</div>
+      <div class="timeline-tasks">
+        <span class="pill" style="background:#FEF5E7;color:#E67E22">Tab Sản xuất</span>
+        <span class="pill" style="background:#FEF5E7;color:#E67E22">Tab Đóng gói</span>
+        <span class="pill" style="background:#F0E6FA;color:#7D3C98">Tab Tài chính</span>
+        <span class="pill" style="background:#FEF5E7;color:#E67E22">Tab Chứng từ</span>
+      </div>
+    </div>
+
+    <div class="timeline-item milestone">
+      <div class="timeline-date">✦ Milestone 2 — Cuối ngày 9</div>
+      <div class="timeline-title">4 bộ phận đều có tab riêng hoạt động</div>
+      <div class="timeline-desc">BGĐ review: test workflow hoàn chỉnh từ Draft → Shipped với phân quyền 4 role.</div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-date">Ngày 10-12 · Giai đoạn D</div>
+      <div class="timeline-title">Shipment Following + Executive Dashboard</div>
+      <div class="timeline-desc">Trang Theo dõi lô hàng (giống Excel hiện tại nhưng tự động cập nhật). Executive Dashboard: tổng doanh thu, đơn theo trạng thái, KH top, sản phẩm top, cảnh báo. Trang quản lý khách hàng xuất khẩu.</div>
+      <div class="timeline-tasks">
+        <span class="pill" style="background:#FDEDEB;color:#C0392B">Shipment Following</span>
+        <span class="pill" style="background:#FDEDEB;color:#C0392B">Dashboard BGĐ</span>
+        <span class="pill" style="background:#FDEDEB;color:#C0392B">Customer Mgmt</span>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-date">Ngày 13-14 · Giai đoạn E</div>
+      <div class="timeline-title">Cảnh báo tự động + Tích hợp module</div>
+      <div class="timeline-desc">12 loại cảnh báo tự động (pg_cron + Realtime). Liên kết WMS: kiểm tồn kho khi tạo SO, tạo stock-out khi ship. Liên kết B2B: tạo Purchase Demand khi thiếu NVL. Export Excel báo cáo Shipment Following.</div>
+      <div class="timeline-tasks">
+        <span class="pill" style="background:#FBEAF0;color:#993556">12 Alerts</span>
+        <span class="pill" style="background:#E8F5EF;color:#1B4D3E">Link WMS</span>
+        <span class="pill" style="background:#E8F5EF;color:#1B4D3E">Link B2B</span>
+        <span class="pill" style="background:#F0F0EA;color:#5A5A7A">Export Excel</span>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-date">Ngày 15 · Giai đoạn F</div>
+      <div class="timeline-title">Test tổng thể + Deploy Production</div>
+      <div class="timeline-desc">Test toàn bộ flow với dữ liệu thật (5 SO mẫu). Kiểm tra phân quyền đủ 4 role. npx tsc --noEmit pass. Deploy lên erp.huyanhrubber.vn. Training nhanh cho NV chủ chốt.</div>
+      <div class="timeline-tasks">
+        <span class="pill" style="background:var(--success-light);color:var(--success)">Test</span>
+        <span class="pill" style="background:var(--success-light);color:var(--success)">Deploy</span>
+        <span class="pill" style="background:var(--success-light);color:var(--success)">Training</span>
+      </div>
+    </div>
+
+    <div class="timeline-item milestone">
+      <div class="timeline-date">✦ Milestone 3 — Cuối ngày 15</div>
+      <div class="timeline-title">Module Sales Order hoàn chỉnh, sẵn sàng vận hành</div>
+      <div class="timeline-desc">BGĐ review cuối cùng: test với đơn thật, confirm go-live.</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:28px 0 12px;">Tổng hợp deliverables</h3>
+  <table>
+    <thead>
+      <tr><th>Loại</th><th>Số lượng</th><th>Chi tiết</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>SQL Migration</td><td>1 file</td><td>16 cột mới + import 25 KH + 4 sản phẩm mới</td></tr>
+      <tr><td>Service files</td><td>3-4 files</td><td>salesOrderService, salesPermissionService, salesCustomerService, shipmentService</td></tr>
+      <tr><td>UI Pages</td><td>6-8 trang</td><td>Create (wizard), List, Detail (5 tab), Shipment Following, Dashboard, Customer Mgmt</td></tr>
+      <tr><td>Cảnh báo</td><td>12 loại</td><td>6 từ SO + 6 từ module khác (WMS, B2B, HR, Task)</td></tr>
+      <tr><td>Routing</td><td>8 routes</td><td>/sales/dashboard, /orders, /orders/new, /orders/:id, /shipments, /customers...</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 8. RỦI RO -->
+<section id="s8" class="page-break">
+  <div class="section-number">8</div>
+  <div class="section-title">Rủi ro & Giải pháp</div>
+  <div class="section-desc">Đánh giá rủi ro và biện pháp giảm thiểu cho dự án triển khai 15 ngày.</div>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>Rủi ro</th><th>Mức</th><th>Xác suất</th><th>Giải pháp</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Schema thực tế khác với thiết kế (cột không tồn tại)</td><td><span class="risk-med">Trung bình</span></td><td>30%</td><td>Luôn kiểm tra schema Supabase trước khi code. Đã có nguyên tắc: verify column names trước khi viết query.</td></tr>
+      <tr><td>2</td><td>Phân quyền phức tạp, khó test đủ 4 role</td><td><span class="risk-med">Trung bình</span></td><td>25%</td><td>Xây salesPermissionService tập trung, test với 4 account mẫu (1 mỗi role) ngay từ ngày 3.</td></tr>
+      <tr><td>3</td><td>Dữ liệu cũ (Excel) cần migrate</td><td><span class="risk-low">Thấp</span></td><td>20%</td><td>Import 25 KH là đủ cho go-live. Dữ liệu công nợ cũ giữ Excel song song 1 tháng trước khi dừng hoàn toàn.</td></tr>
+      <tr><td>4</td><td>Liên kết WMS chưa hoàn chỉnh (WMS P6-P10 chưa xong)</td><td><span class="risk-med">Trung bình</span></td><td>40%</td><td>SO liên kết WMS ở mức "kiểm tồn kho" (P5 đã xong). Liên kết sâu (stock-out FIFO) sẽ hoàn thiện khi WMS P4 done.</td></tr>
+      <tr><td>5</td><td>Nhân viên chưa quen hệ thống mới</td><td><span class="risk-low">Thấp</span></td><td>15%</td><td>UI bằng tiếng Việt có dấu, wizard 4 bước trực quan. Training 30 phút/role vào ngày 15.</td></tr>
+      <tr><td>6</td><td>Trễ tiến độ do 1 developer thực hiện</td><td><span class="risk-med">Trung bình</span></td><td>25%</td><td>Buffer 1 ngày ở giai đoạn E. Nếu trễ, ưu tiên: SO CRUD + Detail (A-C) > Shipment + Dashboard (D) > Alerts (E).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="alert-box success" style="margin-top:20px">
+    <div class="alert-icon">✅</div>
+    <div><strong>Điểm mạnh:</strong> Nền tảng ERP v8 đã có sẵn (React + Supabase + Ant Design). Auth, HRM, Task, Attendance, B2B đã hoạt động. Pattern code đã chuẩn hóa — tốc độ phát triển feature mới rất nhanh. 15 ngày là khả thi với scope đã xác định.</div>
+  </div>
+</section>
+
+<!-- 9. KIẾN NGHỊ -->
+<section id="s9" class="page-break">
+  <div class="section-number">9</div>
+  <div class="section-title">Kiến nghị Ban Giám đốc</div>
+  <div class="section-desc">Đề xuất phê duyệt triển khai Module Sales Order trong 15 ngày làm việc.</div>
+
+  <div class="alert-box info">
+    <div class="alert-icon">📋</div>
+    <div>
+      <strong>Kiến nghị 1:</strong> Phê duyệt triển khai Module Sales Order theo kế hoạch 15 ngày. Module này là mảnh ghép then chốt nối đầu ra (xuất khẩu 25 KH quốc tế) với đầu vào (B2B thu mua 30+ đại lý + WMS sản xuất), tạo chuỗi giá trị khép kín cho toàn bộ hoạt động kinh doanh.
+    </div>
+  </div>
+
+  <div class="alert-box info">
+    <div class="alert-icon">📋</div>
+    <div>
+      <strong>Kiến nghị 2:</strong> Chỉ định nhân viên chủ chốt mỗi bộ phận (Sale, SX, Logistics, Kế toán) tham gia review tại 3 milestone (ngày 6, 9, 15) để đảm bảo hệ thống phù hợp nghiệp vụ thực tế.
+    </div>
+  </div>
+
+  <div class="alert-box info">
+    <div class="alert-icon">📋</div>
+    <div>
+      <strong>Kiến nghị 3:</strong> Song song triển khai, tiếp tục hoàn thiện B2B Settlement (Phase 4) và WMS P6-P10 để đạt tích hợp đầy đủ end-to-end trong quý 2/2026.
+    </div>
+  </div>
+
+  <div class="alert-box warning">
+    <div class="alert-icon">⚡</div>
+    <div>
+      <strong>Lưu ý:</strong> Module Sales Order được thiết kế "sửa từ nền tảng lên" — database trước, phân quyền trước, UI sau. Nếu gián đoạn giữa chừng, phần đã làm vẫn hoạt động ổn định, không ảnh hưởng hệ thống hiện tại.
+    </div>
+  </div>
+
+  <!-- Roadmap sau 15 ngày -->
+  <h3 style="font-size:16px;font-weight:600;margin:28px 0 12px;">Lộ trình tiếp theo sau 15 ngày</h3>
+  <table>
+    <thead>
+      <tr><th>Giai đoạn</th><th>Nội dung</th><th>Thời gian</th><th>Ưu tiên</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Tháng 4</td><td>B2B Settlement + Partner Ledger (xóa Excel công nợ)</td><td>5-7 ngày</td><td><span class="risk-high">Cao</span></td></tr>
+      <tr><td>Tháng 4-5</td><td>WMS P6-P8: QC/DRC tracking + Cân xe + Lệnh SX/BOM</td><td>10-12 ngày</td><td><span class="risk-high">Cao</span></td></tr>
+      <tr><td>Tháng 5</td><td>Finance & Accounting module (sổ cái, đối chiếu NH)</td><td>7-10 ngày</td><td><span class="risk-med">Trung bình</span></td></tr>
+      <tr><td>Tháng 5-6</td><td>WMS P9-P10: Blending + Báo cáo WMS</td><td>8 ngày</td><td><span class="risk-med">Trung bình</span></td></tr>
+      <tr><td>Tháng 6</td><td>B2B Partner Portal hoàn chỉnh (OTP, Quotation, Settlement view)</td><td>10 ngày</td><td><span class="risk-med">Trung bình</span></td></tr>
+      <tr><td>Q3 2026</td><td>Fleet Management (xe vận chuyển, Lào transport, quyết toán lái xe)</td><td>10-15 ngày</td><td><span class="risk-low">Thấp</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- SIGNATURE -->
+  <div class="signature-block">
+    <div class="sig-box">
+      <div class="sig-role">Người lập báo cáo</div>
+      <div class="sig-line">
+        <div class="sig-name">Lê Duy Minh</div>
+        <div class="sig-title">Trưởng phòng IT</div>
+      </div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-role">Phê duyệt — Ban Giám đốc</div>
+      <div class="sig-line">
+        <div class="sig-name">_______________________</div>
+        <div class="sig-title">Giám đốc / Phó Giám đốc</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:40px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-muted);font-size:12px;">
+    Công ty TNHH MTV Cao Su Huy Anh Phong Điền — ERP v8<br>
+    Khe Mạ, Phường Phong Mỹ, Phong Điền, Thừa Thiên Huế<br>
+    30/03/2026
+  </div>
+</section>
+
+</div><!-- container -->
+
+<script>
+// Sticky nav active state
+const navItems = document.querySelectorAll('.nav-item');
+const sections = document.querySelectorAll('section[id]');
+
+function updateNav() {
+  let current = '';
+  sections.forEach(s => {
+    const top = s.offsetTop - 80;
+    if (scrollY >= top) current = s.id;
+  });
+  navItems.forEach(n => {
+    n.classList.remove('active');
+    if (n.getAttribute('href') === '#' + current) n.classList.add('active');
+  });
+}
+window.addEventListener('scroll', updateNav);
+
+// Smooth scroll
+navItems.forEach(n => {
+  n.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(n.getAttribute('href'));
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>

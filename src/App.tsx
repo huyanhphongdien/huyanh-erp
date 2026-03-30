@@ -233,6 +233,7 @@ const SalesOrderDetailPage = lazy(() => import('./pages/sales/SalesOrderDetailPa
 const ContainerPackingPage = lazy(() => import('./pages/sales/ContainerPackingPage'))
 const ExportDocumentsPage = lazy(() => import('./pages/sales/ExportDocumentsPage'))
 const SalesDashboardPage = lazy(() => import('./pages/sales/SalesDashboardPage'))
+const ShipmentFollowingPage = lazy(() => import('./pages/sales/ShipmentFollowingPage'))
 
 
 const queryClient = new QueryClient({
@@ -356,6 +357,7 @@ function App() {
               <Route path="sales/orders/:orderId" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderDetailPage /></Suspense>} />
               <Route path="sales/orders/:orderId/packing" element={<Suspense fallback={<LoadingSpinner />}><ContainerPackingPage /></Suspense>} />
               <Route path="sales/orders/:orderId/documents" element={<Suspense fallback={<LoadingSpinner />}><ExportDocumentsPage /></Suspense>} />
+              <Route path="sales/shipments" element={<Suspense fallback={<LoadingSpinner />}><ShipmentFollowingPage /></Suspense>} />
 
               {/* ===== WMS MODULE ===== */}
               <Route path="wms">

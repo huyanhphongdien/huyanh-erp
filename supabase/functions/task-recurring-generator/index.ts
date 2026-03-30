@@ -144,6 +144,8 @@ Deno.serve(async (req) => {
             due_date: dueDate.toISOString().split('T')[0],
             assignee_id: assigneeId,
             department_id: deptId,
+            task_source: 'recurring',
+            is_self_assigned: false,
             created_at: now.toISOString(),
           }
 

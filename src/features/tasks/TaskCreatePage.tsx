@@ -231,6 +231,7 @@ export const TaskCreatePage: React.FC = () => {
         dbData.assigner_id = user?.employee_id || null;
         dbData.department_id = user?.department_id || null;
         dbData.is_self_assigned = true;
+        (dbData as any).task_source = 'self';
       } else {
         if (isDepartmentLocked && user?.department_id) {
           dbData.department_id = user.department_id;
@@ -241,6 +242,7 @@ export const TaskCreatePage: React.FC = () => {
         dbData.assignee_id = formData.assignee_id || null;
         dbData.assigner_id = user?.employee_id || null;
         dbData.is_self_assigned = false;
+        (dbData as any).task_source = (formData as any).project_id ? 'project' : 'assigned';
       }
 
       const { data, error: insertError } = await supabase

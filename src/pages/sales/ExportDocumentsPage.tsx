@@ -1,7 +1,7 @@
 // ============================================================================
 // EXPORT DOCUMENTS PAGE — COA, Packing List, Commercial Invoice
 // File: src/pages/sales/ExportDocumentsPage.tsx
-// Module Ban hang quoc te — Huy Anh Rubber ERP
+// Module Bán hàng quốc tế — Huy Anh Rubber ERP
 // ============================================================================
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -50,13 +50,13 @@ const { Title, Text, Paragraph } = Typography
 const CompanyHeader = () => (
   <div className="doc-company-header" style={{ textAlign: 'center', marginBottom: 24 }}>
     <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-      CONG TY TNHH MOT THANH VIEN CAO SU HUY ANH PHONG DIEN
+      CÔNG TY TNHH MỘT THÀNH VIÊN CAO SU HUY ANH PHONG ĐIỀN
     </Title>
     <Title level={5} style={{ margin: '4px 0', color: '#1B4D3E' }}>
-      HUY ANH PHONG DIEN RUBBER COMPANY LIMITED
+      HUY ANH PHONG ĐIỀN RUBBER COMPANY LIMITED
     </Title>
     <Text type="secondary">
-      Khe Ma, Phuong Phong Dien, TP Hue, Viet Nam
+      Khe Mạ, Phường Phong Điền, TP Huế, Việt Nam
     </Text>
     <br />
     <Text type="secondary">Tax ID: 3301549896</Text>

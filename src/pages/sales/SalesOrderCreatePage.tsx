@@ -1,5 +1,5 @@
 // ============================================================================
-// SALES ORDER CREATE PAGE — Tạo đơn hàng ban quoc te (Multi-step)
+// SALES ORDER CREATE PAGE — Tạo đơn hàng bán quốc tế (Multi-step)
 // File: src/pages/sales/SalesOrderCreatePage.tsx
 // ============================================================================
 
@@ -223,7 +223,7 @@ function SalesOrderCreatePage() {
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'errorFields' in err) return // form validation
       console.error(err)
-      const errMsg = err instanceof Error ? err.message : 'Khong the tao don hang'
+      const errMsg = err instanceof Error ? err.message : 'Không thể tạo đơn hàng'
       message.error(errMsg)
     } finally {
       setLoading(false)
@@ -237,7 +237,7 @@ function SalesOrderCreatePage() {
   const renderStep1 = () => (
     <Row gutter={24}>
       <Col xs={24} lg={16}>
-        <Card title="Khach hang & San pham" size="small">
+        <Card title="Khách hàng & Sản phẩm" size="small">
           <Form.Item
             label="Khách hàng"
             name="customer_id"
@@ -263,15 +263,15 @@ function SalesOrderCreatePage() {
                 rules={[{ required: true, message: 'Vui lòng chọn grade' }]}
               >
                 <Select
-                  placeholder="Chon grade..."
+                  placeholder="Chọn grade..."
                   options={SVR_GRADE_OPTIONS.map((g) => ({ value: g.value, label: g.label }))}
                   onChange={handleGradeChange}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item label="PO# khach hang" name="customer_po">
-                <Input placeholder="So PO cua khach hang" />
+              <Form.Item label="PO# khách hàng" name="customer_po">
+                <Input placeholder="Số PO của khách hàng" />
               </Form.Item>
             </Col>
           </Row>
@@ -279,7 +279,7 @@ function SalesOrderCreatePage() {
           <Row gutter={16}>
             <Col xs={24} sm={8}>
               <Form.Item
-                label="So luong (tan)"
+                label="Số lượng (tấn)"
                 name="quantity_tons"
                 rules={[{ required: true, message: 'Nhập số lượng' }]}
               >
@@ -288,7 +288,7 @@ function SalesOrderCreatePage() {
             </Col>
             <Col xs={24} sm={8}>
               <Form.Item
-                label="Don gia (USD/tan)"
+                label="Đơn giá (USD/tấn)"
                 name="unit_price"
                 rules={[{ required: true, message: 'Nhập đơn giá' }]}
               >
@@ -301,7 +301,7 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={4}>
-              <Form.Item label="Ty gia (VND)" name="exchange_rate">
+              <Form.Item label="Tỷ giá (VND)" name="exchange_rate">
                 <InputNumber min={0} step={100} style={{ width: '100%' }} placeholder="25000" />
               </Form.Item>
             </Col>
@@ -318,14 +318,14 @@ function SalesOrderCreatePage() {
             style={{ marginBottom: 16 }}
           >
             <Descriptions column={1} size="small">
-              <Descriptions.Item label="Ma">{selectedCustomer.code}</Descriptions.Item>
-              <Descriptions.Item label="Ten">{selectedCustomer.name}</Descriptions.Item>
+              <Descriptions.Item label="Mã">{selectedCustomer.code}</Descriptions.Item>
+              <Descriptions.Item label="Tên">{selectedCustomer.name}</Descriptions.Item>
               <Descriptions.Item label="Quốc gia">
                 {COUNTRY_OPTIONS.find((c) => c.value === selectedCustomer.country)?.label ||
                   selectedCustomer.country ||
                   '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Hang">
+              <Descriptions.Item label="Hạng">
                 <Tag color={CUSTOMER_TIER_COLORS[selectedCustomer.tier]}>
                   {CUSTOMER_TIER_LABELS[selectedCustomer.tier]}
                 </Tag>
@@ -342,21 +342,21 @@ function SalesOrderCreatePage() {
         <Card size="small" title="Tự động tính toán">
           <Row gutter={[16, 16]}>
             <Col span={12}>
-              <Statistic title="Tổng bành" value={totalBales} suffix="banh" />
+              <Statistic title="Tổng bành" value={totalBales} suffix="bành" />
             </Col>
             <Col span={12}>
               <Statistic title="Số container" value={containerCount} suffix={containerType} />
             </Col>
             <Col span={12}>
               <Statistic
-                title={`Gia tri ${currency}`}
+                title={`Giá trị ${currency}`}
                 value={totalValueUSD}
                 precision={2}
                 prefix="$"
               />
             </Col>
             <Col span={12}>
-              <Statistic title="Gia tri VND" value={totalValueVND > 0 ? formatVND(totalValueVND) : '-'} />
+              <Statistic title="Giá trị VND" value={totalValueVND > 0 ? formatVND(totalValueVND) : '-'} />
             </Col>
           </Row>
         </Card>
@@ -371,7 +371,7 @@ function SalesOrderCreatePage() {
           {selectedStandard && (
             <div style={{ marginBottom: 16 }}>
               <Tag color="blue">
-                Tu dong dien tu tieu chuan {selectedStandard.grade_label}
+                Tự động điền từ tiêu chuẩn {selectedStandard.grade_label}
               </Tag>
             </div>
           )}
@@ -484,7 +484,7 @@ function SalesOrderCreatePage() {
               <Form.Item label="Cảng xếp hàng" name="port_of_loading">
                 <Select
                   allowClear
-                  placeholder="Chon cang..."
+                  placeholder="Chọn cảng..."
                   options={PORT_OF_LOADING_OPTIONS.map((p) => ({
                     value: p.value,
                     label: p.label,
@@ -562,17 +562,17 @@ function SalesOrderCreatePage() {
 
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item label="So L/C" name="lc_number">
+              <Form.Item label="Số L/C" name="lc_number">
                 <Input placeholder="L/C number" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Ngan hang L/C" name="lc_bank">
+              <Form.Item label="Ngân hàng L/C" name="lc_bank">
                 <Input placeholder="Issuing bank" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Het han L/C" name="lc_expiry_date">
+              <Form.Item label="Hết hạn L/C" name="lc_expiry_date">
                 <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
@@ -600,14 +600,14 @@ function SalesOrderCreatePage() {
                 <Tag color="blue">{grade?.label || vals.grade || '-'}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="PO# KH">{vals.customer_po || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Số lượng">{vals.quantity_tons} tan</Descriptions.Item>
+              <Descriptions.Item label="Số lượng">{vals.quantity_tons} tấn</Descriptions.Item>
               <Descriptions.Item label="Đơn giá">
-                {formatCurrency(vals.unit_price, vals.currency)} / tan
+                {formatCurrency(vals.unit_price, vals.currency)} / tấn
               </Descriptions.Item>
-              <Descriptions.Item label="Gia tri USD">
+              <Descriptions.Item label="Giá trị USD">
                 {formatCurrency(totalValueUSD, 'USD')}
               </Descriptions.Item>
-              <Descriptions.Item label="Gia tri VND">
+              <Descriptions.Item label="Giá trị VND">
                 {totalValueVND > 0 ? formatVND(totalValueVND) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
@@ -629,13 +629,13 @@ function SalesOrderCreatePage() {
               <Descriptions.Item label="Thanh toán">
                 {PAYMENT_TERMS_LABELS[vals.payment_terms as PaymentTerms] || vals.payment_terms || '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="So L/C">{vals.lc_number || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Số L/C">{vals.lc_number || '-'}</Descriptions.Item>
               <Descriptions.Item label="Đóng gói">
                 {PACKING_TYPE_LABELS[vals.packing_type as PackingType] || 'Banh'}
                 {vals.shrink_wrap ? ' + Shrink wrap' : ''}
                 {vals.pallet_required ? ' + Pallet' : ''}
               </Descriptions.Item>
-              <Descriptions.Item label="KL banh">{vals.bale_weight_kg || 33.33} kg</Descriptions.Item>
+              <Descriptions.Item label="KL bành">{vals.bale_weight_kg || 33.33} kg</Descriptions.Item>
             </Descriptions>
 
             {/* Quality specs summary */}
@@ -700,9 +700,9 @@ function SalesOrderCreatePage() {
   // ══════════════════════════════════════════════════════════════
 
   const stepItems = [
-    { title: 'Khach hang & San pham', icon: <UserOutlined /> },
-    { title: 'Chất lượng & Dong goi', icon: <ExperimentOutlined /> },
-    { title: 'Van chuyen & Thanh toan', icon: <TruckOutlined /> },
+    { title: 'Khách hàng & Sản phẩm', icon: <UserOutlined /> },
+    { title: 'Chất lượng & Đóng gói', icon: <ExperimentOutlined /> },
+    { title: 'Vận chuyển & Thanh toán', icon: <TruckOutlined /> },
     { title: 'Xác nhận', icon: <FileTextOutlined /> },
   ]
 
@@ -714,7 +714,7 @@ function SalesOrderCreatePage() {
         items={[
           { title: 'Đơn hàng bán' },
           {
-            title: <a onClick={() => navigate('/sales/orders')}>Danh sach</a>,
+            title: <a onClick={() => navigate('/sales/orders')}>Danh sách</a>,
           },
           { title: 'Tạo mới' },
         ]}
@@ -724,7 +724,7 @@ function SalesOrderCreatePage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/sales/orders')} />
         <Title level={4} style={{ margin: 0 }}>
-          Tạo đơn hàng ban
+          Tạo đơn hàng bán
         </Title>
       </div>
 
@@ -745,10 +745,10 @@ function SalesOrderCreatePage() {
       {currentStep < 3 && (
         <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
           <Button onClick={prevStep} disabled={currentStep === 0}>
-            Quay lai
+            Quay lại
           </Button>
           <Button type="primary" onClick={nextStep} style={{ background: '#1B4D3E' }}>
-            Tiep theo
+            Tiếp theo
           </Button>
         </div>
       )}

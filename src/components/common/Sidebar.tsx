@@ -79,6 +79,7 @@ import {
   Globe,
   ShoppingBag,
   LayoutGrid,
+  Ship,
 } from 'lucide-react';
 
 // ============================================================
@@ -308,6 +309,7 @@ const getMenuGroups = (
       { path: '/sales/dashboard', label: 'Tổng quan', icon: <BarChart3 size={18} /> },
       { path: '/sales/customers', label: 'Khách hàng', icon: <Globe size={18} /> },
       { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} /> },
+      { path: '/sales/shipments', label: 'Theo dõi lô hàng', icon: <Ship size={18} /> },
     ],
   },
 

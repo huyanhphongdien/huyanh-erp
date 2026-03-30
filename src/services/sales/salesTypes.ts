@@ -333,6 +333,23 @@ export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
   DP: 'D/P — Trả tiền đổi chứng từ',
 }
 
+// -- Điều khoản thanh toán mở rộng (dạng string key) --
+export const PAYMENT_TERMS_EXTENDED_LABELS: Record<string, string> = {
+  dp: 'DP (Documents against Payment)',
+  dp_at_sight: 'DP trả ngay',
+  tt_100: 'TT 100%',
+  tt_scan: 'TT 100% via scan docs',
+  tt_before_etd: 'TT 100% trước ETD',
+  lc_at_sight: 'L/C trả ngay',
+  lc_30_days: 'L/C 30 ngày',
+  lc_90_days: 'L/C 90 ngày',
+  deposit_10_dp_90: '10% cọc + 90% DP',
+  deposit_20_dp_80: '20% DP + 80% CAD',
+  tt_10_dp_90: '10% TT + 90% DP',
+  tt_30_70: 'TT 30% + 70%',
+  advance_100: 'Đặt cọc 100%',
+}
+
 // -- Trạng thái container --
 export const CONTAINER_STATUS_LABELS: Record<ContainerStatus, string> = {
   planning: 'Đang lên kế hoạch',
@@ -438,6 +455,18 @@ export const COUNTRY_OPTIONS = [
   { value: 'OTHER', label: 'Khác' },
 ] as const
 
+// Ngân hàng nhận tiền
+export const BANK_OPTIONS = [
+  { value: 'VCB', label: 'Vietcombank — NH TMCP Ngoại thương VN' },
+  { value: 'BIDV', label: 'BIDV — NH Đầu tư & Phát triển VN' },
+  { value: 'VTB', label: 'VietinBank — NH Công thương VN' },
+  { value: 'ACB', label: 'ACB — NH Á Châu' },
+  { value: 'MB', label: 'MBBank — NH Quân đội' },
+  { value: 'TCB', label: 'Techcombank — NH Kỹ thương VN' },
+  { value: 'SHB', label: 'SHB — NH Sài Gòn — Hà Nội' },
+  { value: 'OTHER', label: 'Khác' },
+] as const
+
 // Cảng xếp hàng tại Việt Nam
 export const PORT_OF_LOADING_OPTIONS = [
   { value: 'HCM_CAT_LAI', label: 'Cát Lái — TP.HCM' },
@@ -446,4 +475,19 @@ export const PORT_OF_LOADING_OPTIONS = [
   { value: 'QUY_NHON', label: 'Quy Nhơn' },
   { value: 'DA_NANG', label: 'Đà Nẵng' },
   { value: 'HAI_PHONG', label: 'Hải Phòng' },
+] as const
+
+// (BANK_OPTIONS đã khai báo ở trên)
+
+// -- Cấp sản phẩm mở rộng (bao gồm SVR, RSS, SBR, Compound) --
+export const PRODUCT_GRADE_OPTIONS = [
+  { value: 'SVR_3L', label: 'SVR 3L' },
+  { value: 'SVR_5', label: 'SVR 5' },
+  { value: 'SVR_10', label: 'SVR 10' },
+  { value: 'SVR_20', label: 'SVR 20' },
+  { value: 'SVR_CV60', label: 'SVR CV60' },
+  { value: 'RSS1', label: 'RSS 1' },
+  { value: 'RSS3', label: 'RSS 3' },
+  { value: 'SBR1502', label: 'SBR 1502' },
+  { value: 'COMPOUND', label: 'Compound' },
 ] as const

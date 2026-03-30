@@ -311,7 +311,7 @@ function SalesOrderDetailPage() {
     } else if (s === 'producing') {
       btns.push(
         <Tag key="status" color="orange" style={{ fontSize: 14, padding: '4px 12px' }}>
-          Dang san xuat...
+          Đang sản xuất...
         </Tag>,
       )
     } else if (s === 'ready') {
@@ -335,7 +335,7 @@ function SalesOrderDetailPage() {
           onClick={() => handleStatusAction('shipped')}
           loading={actionLoading}
         >
-          Xuat hang
+          Xuất hàng
         </Button>,
       )
     } else if (s === 'shipped') {
@@ -359,7 +359,7 @@ function SalesOrderDetailPage() {
           onClick={() => handleStatusAction('invoiced')}
           loading={actionLoading}
         >
-          Lap hoa don
+          Lập hóa đơn
         </Button>,
       )
     }
@@ -368,7 +368,7 @@ function SalesOrderDetailPage() {
   }
 
   // ══════════════════════════════════════════════════════════════
-  // TAB: THONG TIN
+  // TAB: THÔNG TIN
   // ══════════════════════════════════════════════════════════════
 
   const renderInfoTab = () => (
@@ -390,10 +390,10 @@ function SalesOrderDetailPage() {
             </Descriptions.Item>
             <Descriptions.Item label="PO# KH">{order.customer_po || '-'}</Descriptions.Item>
             <Descriptions.Item label="Số lượng">
-              {order.quantity_tons} tan ({order.quantity_kg?.toLocaleString()} kg)
+              {order.quantity_tons} tấn ({order.quantity_kg?.toLocaleString()} kg)
             </Descriptions.Item>
             <Descriptions.Item label="Đơn giá">
-              {formatCurrency(order.unit_price, order.currency)} / tan
+              {formatCurrency(order.unit_price, order.currency)} / tấn
             </Descriptions.Item>
             <Descriptions.Item label="Giá trị USD">
               {formatCurrency(order.total_value_usd)}
@@ -421,13 +421,13 @@ function SalesOrderDetailPage() {
               {order.shrink_wrap ? ' + Shrink wrap' : ''}
               {order.pallet_required ? ' + Pallet' : ''}
             </Descriptions.Item>
-            <Descriptions.Item label="KL banh">{order.bale_weight_kg} kg</Descriptions.Item>
+            <Descriptions.Item label="KL bành">{order.bale_weight_kg} kg</Descriptions.Item>
             <Descriptions.Item label="Thanh toán">
               {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] ||
                 order.payment_terms ||
                 '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="So L/C">{order.lc_number || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Số L/C">{order.lc_number || '-'}</Descriptions.Item>
             <Descriptions.Item label="NH L/C">{order.lc_bank || '-'}</Descriptions.Item>
             <Descriptions.Item label="Hết hạn L/C">
               {formatDate(order.lc_expiry_date)}
@@ -439,7 +439,7 @@ function SalesOrderDetailPage() {
             <Descriptions.Item label="ETD">{formatDate(order.etd)}</Descriptions.Item>
             <Descriptions.Item label="ETA">{formatDate(order.eta)}</Descriptions.Item>
             <Descriptions.Item label="Hãng tàu">{order.shipping_line || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Tau">{order.vessel_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Tàu">{order.vessel_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="Booking ref">
               {order.booking_reference || '-'}
             </Descriptions.Item>
@@ -466,15 +466,15 @@ function SalesOrderDetailPage() {
                 type="link"
                 onClick={() => navigate(`/sales/customers/${order.customer!.id}`)}
               >
-                Chi tiet
+                Chi tiết
               </Button>
             }
           >
             <Descriptions column={1} size="small">
-              <Descriptions.Item label="Ma">{order.customer.code}</Descriptions.Item>
-              <Descriptions.Item label="Ten">{order.customer.name}</Descriptions.Item>
+              <Descriptions.Item label="Mã">{order.customer.code}</Descriptions.Item>
+              <Descriptions.Item label="Tên">{order.customer.name}</Descriptions.Item>
               <Descriptions.Item label="Quốc gia">{customerCountry || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Hang">
+              <Descriptions.Item label="Hạng">
                 <Tag color={CUSTOMER_TIER_COLORS[order.customer.tier]}>
                   {CUSTOMER_TIER_LABELS[order.customer.tier]}
                 </Tag>
@@ -503,7 +503,7 @@ function SalesOrderDetailPage() {
   )
 
   // ══════════════════════════════════════════════════════════════
-  // TAB: CHAT LUONG
+  // TAB: CHẤT LƯỢNG
   // ══════════════════════════════════════════════════════════════
 
   const renderQualityTab = () => {
@@ -1387,7 +1387,7 @@ function SalesOrderDetailPage() {
         items={[
           { title: 'Đơn hàng bán' },
           {
-            title: <a onClick={() => navigate('/sales/orders')}>Danh sach</a>,
+            title: <a onClick={() => navigate('/sales/orders')}>Danh sách</a>,
           },
           { title: order.code },
         ]}
@@ -1442,7 +1442,7 @@ function SalesOrderDetailPage() {
         </Col>
         <Col xs={12} sm={4}>
           <Card size="small">
-            <Statistic title="Số lượng" value={order.quantity_tons} suffix="tan" />
+            <Statistic title="Số lượng" value={order.quantity_tons} suffix="tấn" />
           </Card>
         </Col>
         <Col xs={12} sm={5}>

@@ -477,43 +477,99 @@ table th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
 @media (max-width: 768px) {
   .cover { padding: 40px 20px; min-height: auto; }
   .cover h1 { font-size: 28px; }
-  .cover-meta { flex-direction: column; gap: 8px; }
-  .cover-meta-item { min-width: 100%; text-align: left; }
-  section { padding: 24px 16px; }
+  .cover-subtitle { font-size: 15px; max-width: 100%; }
+  .cover-meta { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .cover-logo { top: 20px; right: 20px; font-size: 12px; }
+  section { padding: 24px 16px; margin-bottom: 20px; }
+  .container { padding: 20px 12px; }
   .compare-grid { grid-template-columns: 1fr; }
   .toc { columns: 1; }
-  .signature-block { grid-template-columns: 1fr; }
-  .stat-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  table { font-size: 13px; }
+  .signature-block { grid-template-columns: 1fr; text-align: center; }
+  .stat-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-card .value { font-size: 24px; }
+  table { font-size: 12px; }
   th, td { padding: 8px 6px; }
-  .section-title { font-size: 22px; }
-  .subsection-title { font-size: 18px; }
+  .section-title { font-size: 20px; }
+  .subsection-title { font-size: 16px; }
+  .flow-step { gap: 12px; padding: 14px 0; }
+  .flow-num { width: 32px; height: 32px; min-width: 32px; font-size: 14px; border-radius: 8px; }
+  .flow-content h4 { font-size: 14px; }
+  .flow-content p { font-size: 12px; }
+  .pill { font-size: 10px; padding: 2px 8px; }
+  .nav-item { padding: 6px 10px; font-size: 12px; }
+  .section-number { width: 30px; height: 30px; font-size: 14px; }
 }
 
-/* RESPONSIVE — Mobile */
+/* RESPONSIVE — Mobile nhỏ */
 @media (max-width: 480px) {
-  .cover { padding: 24px 12px; }
-  .cover h1 { font-size: 22px; line-height: 1.3; }
+  body { font-size: 13px; line-height: 1.6; }
+  .cover { padding: 32px 16px; min-height: 90vh; }
+  .cover h1 { font-size: 22px; line-height: 1.3; margin-bottom: 12px; }
   .cover h1 span { font-size: 22px; }
-  .cover-subtitle { font-size: 14px; }
-  .cover-badge { font-size: 11px; padding: 4px 12px; }
-  section { padding: 16px 12px; }
-  .section-title { font-size: 18px; }
-  .subsection-title { font-size: 16px; }
-  .stat-row { grid-template-columns: 1fr; gap: 8px; }
-  .stat-card { padding: 12px; }
-  .stat-card .value { font-size: 24px; }
-  table { font-size: 11px; display: block; overflow-x: auto; white-space: nowrap; }
-  th, td { padding: 6px 4px; }
-  .compare-grid { gap: 12px; }
-  .flow-diagram, pre { font-size: 11px; overflow-x: auto; }
-  .highlight-box { padding: 12px; }
-  .signature-block { gap: 16px; }
-  .cover-logo { font-size: 12px; letter-spacing: 4px; }
-  body { font-size: 14px; }
-  h3 { font-size: 15px; }
-  ul, ol { padding-left: 16px; }
-  .key-point { padding: 10px 12px; }
+  .cover-subtitle { font-size: 13px; margin-bottom: 24px; line-height: 1.5; }
+  .cover-badge { font-size: 10px; padding: 4px 10px; margin-bottom: 20px; letter-spacing: 0.5px; }
+  .cover-meta { grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 20px; }
+  .cover-meta-item { font-size: 11px; }
+  .cover-meta-item strong { font-size: 12px; }
+  .cover-logo { top: 16px; right: 16px; font-size: 10px; letter-spacing: 2px; }
+  .cover::before { width: 300px; height: 300px; top: -100px; right: -100px; }
+  .cover::after { width: 200px; height: 200px; bottom: -50px; left: -50px; }
+
+  .container { padding: 12px 8px; }
+  section { padding: 16px 12px; margin-bottom: 12px; border-radius: 10px; }
+  .section-number { width: 26px; height: 26px; font-size: 12px; border-radius: 8px; margin-bottom: 10px; }
+  .section-title { font-size: 17px; margin-bottom: 4px; }
+  .section-desc { font-size: 12px; margin-bottom: 16px; }
+  .subsection-title { font-size: 15px; }
+
+  .stat-row { grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 16px; }
+  .stat-card { padding: 10px; border-radius: 8px; }
+  .stat-card .label { font-size: 10px; }
+  .stat-card .value { font-size: 20px; }
+  .stat-card .sub { font-size: 10px; }
+
+  /* Bảng scroll ngang */
+  table { font-size: 11px; }
+  .table-wrapper, table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th, td { padding: 6px 5px; white-space: nowrap; }
+  th { font-size: 10px; }
+
+  .compare-grid { gap: 8px; }
+  .compare-card { padding: 14px; }
+
+  .flow-step { gap: 10px; padding: 10px 0; }
+  .flow-num { width: 28px; height: 28px; min-width: 28px; font-size: 12px; border-radius: 6px; }
+  .flow-content h4 { font-size: 13px; }
+  .flow-content p { font-size: 11px; }
+  .flow-pills { gap: 4px; }
+  .pill { font-size: 9px; padding: 2px 6px; }
+
+  .highlight-box { padding: 10px; border-radius: 8px; }
+  .key-point { padding: 8px 10px; font-size: 12px; }
+
+  h3 { font-size: 14px; }
+  ul, ol { padding-left: 16px; font-size: 12px; }
+  li { margin-bottom: 4px; }
+
+  pre, code { font-size: 10px; overflow-x: auto; }
+
+  .signature-block { grid-template-columns: 1fr; gap: 20px; text-align: center; }
+
+  .nav { padding: 0 8px; }
+  .nav-inner { padding: 6px 0; gap: 2px; }
+  .nav-item { padding: 5px 8px; font-size: 11px; }
+}
+
+/* RESPONSIVE — Rất nhỏ (iPhone SE, 320px) */
+@media (max-width: 360px) {
+  .cover h1 { font-size: 19px; }
+  .cover-subtitle { font-size: 12px; }
+  .stat-card .value { font-size: 18px; }
+  section { padding: 12px 10px; }
+  .section-title { font-size: 15px; }
+  table { font-size: 10px; }
+  th, td { padding: 4px 3px; }
+  .cover-meta { grid-template-columns: 1fr; }
 }
 </style>
 </head>

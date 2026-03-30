@@ -56,6 +56,9 @@ import {
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
 import { containerService } from '../../services/sales/containerService'
+import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
+import FinanceTab from '../../components/sales/FinanceTab'
+import { useAuthStore } from '../../stores/authStore'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
@@ -134,6 +137,9 @@ const STATUS_FLOW: SalesOrderStatus[] = [
 function SalesOrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const salesRole = getSalesRole(user)
+  const visibleTabs = getVisibleTabs(salesRole)
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
@@ -258,56 +264,71 @@ function SalesOrderDetailPage() {
   const renderActionButtons = () => {
     const s = order.status
     const btns: React.ReactNode[] = []
+    const canEdit = salesPermissions.canEditOrder(salesRole)
+    const canCancel = salesPermissions.canCancelOrder(salesRole)
+    const canEditProd = salesPermissions.canEditProduction(salesRole)
 
     if (s === 'draft') {
-      btns.push(
-        <Popconfirm
-          key="confirm"
-          title="Xác nhận đơn hàng?"
-          onConfirm={() => handleStatusAction('confirmed')}
-        >
-          <Button type="primary" icon={<CheckCircleOutlined />} loading={actionLoading}>
-            Xac nhan
-          </Button>
-        </Popconfirm>,
-        <Button
-          key="edit"
-          icon={<EditOutlined />}
-          onClick={() => navigate(`/sales/orders/${order.id}`)}
-        >
-          Sua
-        </Button>,
-        <Popconfirm
-          key="cancel"
-          title="Hủy đơn hàng?"
-          onConfirm={() => handleStatusAction('cancelled')}
-        >
-          <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
-            Huy
-          </Button>
-        </Popconfirm>,
-      )
+      if (canEdit) {
+        btns.push(
+          <Popconfirm
+            key="confirm"
+            title="Xác nhận đơn hàng?"
+            onConfirm={() => handleStatusAction('confirmed')}
+          >
+            <Button type="primary" icon={<CheckCircleOutlined />} loading={actionLoading}>
+              Xác nhận
+            </Button>
+          </Popconfirm>,
+          <Button
+            key="edit"
+            icon={<EditOutlined />}
+            onClick={() => navigate(`/sales/orders/${order.id}`)}
+          >
+            Sửa
+          </Button>,
+        )
+      }
+      if (canCancel) {
+        btns.push(
+          <Popconfirm
+            key="cancel"
+            title="Hủy đơn hàng?"
+            onConfirm={() => handleStatusAction('cancelled')}
+          >
+            <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
+              Hủy
+            </Button>
+          </Popconfirm>,
+        )
+      }
     } else if (s === 'confirmed') {
-      btns.push(
-        <Button
-          key="produce"
-          style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}
-          icon={<ToolOutlined />}
-          onClick={() => handleStatusAction('producing')}
-          loading={actionLoading}
-        >
-          Tao lenh SX
-        </Button>,
-        <Popconfirm
-          key="cancel"
-          title="Hủy đơn hàng?"
-          onConfirm={() => handleStatusAction('cancelled')}
-        >
-          <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
-            Huy
-          </Button>
-        </Popconfirm>,
-      )
+      if (canEditProd) {
+        btns.push(
+          <Button
+            key="produce"
+            style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}
+            icon={<ToolOutlined />}
+            onClick={() => handleStatusAction('producing')}
+            loading={actionLoading}
+          >
+            Tạo lệnh SX
+          </Button>,
+        )
+      }
+      if (canCancel) {
+        btns.push(
+          <Popconfirm
+            key="cancel"
+            title="Hủy đơn hàng?"
+            onConfirm={() => handleStatusAction('cancelled')}
+          >
+            <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
+              Hủy
+            </Button>
+          </Popconfirm>,
+        )
+      }
     } else if (s === 'producing') {
       btns.push(
         <Tag key="status" color="orange" style={{ fontSize: 14, padding: '4px 12px' }}>
@@ -1488,7 +1509,7 @@ function SalesOrderDetailPage() {
             ),
             children: renderQualityTab(),
           },
-          {
+          ...(visibleTabs.includes('production') ? [{
             key: 'production',
             label: (
               <span>
@@ -1496,8 +1517,8 @@ function SalesOrderDetailPage() {
               </span>
             ),
             children: renderProductionTab(),
-          },
-          {
+          }] : []),
+          ...(visibleTabs.includes('packing') ? [{
             key: 'packing',
             label: (
               <span>
@@ -1505,8 +1526,8 @@ function SalesOrderDetailPage() {
               </span>
             ),
             children: renderPackingTab(),
-          },
-          {
+          }] : []),
+          ...(visibleTabs.includes('documents') ? [{
             key: 'documents',
             label: (
               <span>
@@ -1514,7 +1535,16 @@ function SalesOrderDetailPage() {
               </span>
             ),
             children: renderDocumentsTab(),
-          },
+          }] : []),
+          ...(visibleTabs.includes('finance') ? [{
+            key: 'finance',
+            label: (
+              <span>
+                <DollarOutlined /> Tài chính
+              </span>
+            ),
+            children: <FinanceTab order={order} readOnly={!salesPermissions.canEditFinance(salesRole)} onUpdate={loadOrder} />,
+          }] : []),
         ]}
       />
 

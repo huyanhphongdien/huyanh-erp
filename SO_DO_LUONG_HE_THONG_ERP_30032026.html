@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sơ đồ Luồng Hệ thống — Huy Anh Rubber ERP v8</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #1B4D3E;
+  --primary-dark: #0D2B22;
+  --primary-light: #2A7A60;
+  --primary-50: #E8F5EF;
+  --accent: #E8A838;
+  --accent-light: #FFF8EC;
+  --b2b: #1B4D3E;
+  --b2b-light: #E8F5EF;
+  --wms: #1565C0;
+  --wms-light: #E3F2FD;
+  --sale: #C62828;
+  --sale-light: #FFEBEE;
+  --finance: #6A1B9A;
+  --finance-light: #F3E5F5;
+  --logistics: #E65100;
+  --logistics-light: #FFF3E0;
+  --production: #00838F;
+  --production-light: #E0F7FA;
+  --hr: #AD1457;
+  --hr-light: #FCE4EC;
+  --system: #37474F;
+  --system-light: #ECEFF1;
+  --text: #1A1A2E;
+  --text-2: #4A4A6A;
+  --text-3: #8A8AA0;
+  --bg: #F5F5F0;
+  --surface: #FFFFFF;
+  --border: #E0E0D8;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Be Vietnam Pro',sans-serif; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+
+/* HEADER */
+.header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  padding: 48px 40px;
+  text-align: center;
+}
+.header h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+.header h1 span { color: var(--accent); }
+.header p { font-size: 15px; opacity: 0.7; font-weight: 300; }
+
+/* NAV */
+.flow-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex; justify-content: center;
+  gap: 6px; flex-wrap: wrap;
+}
+.flow-nav a {
+  padding: 7px 16px; font-size: 12px; font-weight: 600;
+  border-radius: 20px; text-decoration: none;
+  color: var(--text-3); border: 1px solid transparent;
+  transition: all .2s; white-space: nowrap;
+}
+.flow-nav a:hover { color: var(--primary); background: var(--primary-50); }
+.flow-nav a.active { color: white; background: var(--primary); }
+
+/* CONTAINER */
+.container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+/* FLOW SECTION */
+.flow-section {
+  background: var(--surface);
+  border-radius: 16px;
+  margin-bottom: 32px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.flow-header {
+  padding: 28px 32px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.flow-icon {
+  width: 48px; height: 48px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.flow-header-text h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.flow-header-text p { font-size: 13px; color: var(--text-2); }
+.flow-body { padding: 32px; overflow-x: auto; }
+
+/* FLOWCHART ENGINE */
+.fc { display: flex; flex-direction: column; align-items: center; gap: 0; min-width: fit-content; }
+.fc-row { display: flex; align-items: flex-start; gap: 20px; justify-content: center; flex-wrap: nowrap; }
+.fc-col { display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+/* NODES */
+.node {
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  min-width: 160px;
+  max-width: 220px;
+  position: relative;
+  border: 1.5px solid;
+  line-height: 1.4;
+}
+.node-start, .node-end {
+  border-radius: 24px;
+  padding: 10px 24px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.node-decision {
+  transform: rotate(0deg);
+  border-radius: 8px;
+  border-style: dashed;
+  border-width: 2px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.node-sub { font-size: 11px; font-weight: 400; opacity: 0.75; display: block; margin-top: 3px; }
+
+/* COLOR VARIANTS */
+.n-b2b { background: var(--b2b-light); border-color: var(--b2b); color: var(--b2b); }
+.n-wms { background: var(--wms-light); border-color: var(--wms); color: var(--wms); }
+.n-sale { background: var(--sale-light); border-color: var(--sale); color: var(--sale); }
+.n-finance { background: var(--finance-light); border-color: var(--finance); color: var(--finance); }
+.n-logistics { background: var(--logistics-light); border-color: var(--logistics); color: var(--logistics); }
+.n-production { background: var(--production-light); border-color: var(--production); color: var(--production); }
+.n-hr { background: var(--hr-light); border-color: var(--hr); color: var(--hr); }
+.n-system { background: var(--system-light); border-color: var(--system); color: var(--system); }
+.n-start { background: var(--primary); border-color: var(--primary-dark); color: white; }
+.n-end { background: var(--accent); border-color: #C08520; color: #5A3800; }
+.n-decision { background: #FFFDE7; border-color: #F9A825; color: #6D4C00; }
+
+/* ARROWS */
+.arrow {
+  display: flex; flex-direction: column; align-items: center;
+  color: var(--text-3); position: relative;
+}
+.arrow-down { height: 28px; display: flex; align-items: center; justify-content: center; }
+.arrow-down::before {
+  content: '';
+  width: 1.5px; height: 18px;
+  background: var(--text-3);
+}
+.arrow-down::after {
+  content: '';
+  position: absolute; bottom: 2px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--text-3);
+}
+.arrow-label {
+  font-size: 10px; font-weight: 500; color: var(--text-3);
+  padding: 2px 8px; border-radius: 4px;
+  background: rgba(0,0,0,0.04);
+  white-space: nowrap;
+  margin: -2px 0;
+}
+.arrow-right {
+  width: 36px; height: 1.5px;
+  background: var(--text-3);
+  position: relative;
+  align-self: center;
+  margin-top: 20px;
+}
+.arrow-right::after {
+  content: '';
+  position: absolute; right: -2px; top: -4px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--text-3);
+}
+
+/* BRANCH */
+.branch { display: flex; gap: 24px; align-items: flex-start; justify-content: center; }
+.branch-label {
+  font-size: 10px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 4px; text-align: center;
+}
+
+/* LEGEND */
+.legend {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  padding: 16px 32px; border-top: 1px solid var(--border);
+  background: #FAFAF8;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
+.legend-dot { width: 12px; height: 12px; border-radius: 4px; border: 1.5px solid; }
+
+/* PARALLEL SWIM */
+.swim-lanes {
+  display: grid;
+  gap: 16px;
+  margin: 8px 0;
+}
+.swim-lane {
+  background: rgba(0,0,0,0.02);
+  border-radius: 10px;
+  padding: 14px 16px;
+  border-left: 3px solid;
+}
+.swim-lane-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 10px;
+}
+.swim-lane .fc { align-items: flex-start; }
+.swim-lane .fc-row { flex-wrap: wrap; justify-content: flex-start; }
+
+/* LOOP INDICATOR */
+.loop-back {
+  border: 1.5px dashed var(--text-3);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  padding: 8px 16px;
+  font-size: 10px;
+  color: var(--text-3);
+  text-align: center;
+  margin-top: -4px;
+  font-weight: 500;
+}
+
+/* PRINT */
+@media print {
+  .flow-nav { display: none; }
+  .flow-section { break-inside: avoid; box-shadow: none; }
+  .header { padding: 24px; }
+  body { background: white; }
+}
+@media (max-width: 768px) {
+  .flow-body { padding: 20px 16px; }
+  .node { min-width: 130px; font-size: 12px; padding: 10px 14px; }
+  .branch { flex-direction: column; align-items: center; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Sơ đồ Luồng <span>Hệ thống ERP</span></h1>
+  <p>Huy Anh Rubber — Tất cả luồng vận hành chính — 30/03/2026</p>
+</div>
+
+<nav class="flow-nav" id="nav">
+  <a href="#f0" class="active">Tổng thể</a>
+  <a href="#f1">Thu mua B2B</a>
+  <a href="#f2">Nhập kho & Cân</a>
+  <a href="#f3">Sản xuất</a>
+  <a href="#f4">Quyết toán NCC</a>
+  <a href="#f5">Sales Order</a>
+  <a href="#f6">Logistics XK</a>
+  <a href="#f7">Thanh toán XK</a>
+  <a href="#f8">Đa bộ phận</a>
+  <a href="#f9">Cảnh báo</a>
+</nav>
+
+<div class="container">
+
+<!-- ============================================================ -->
+<!-- FLOW 0: TỔNG THỂ -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f0">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--primary-50);color:var(--primary)">🔄</div>
+    <div class="flow-header-text">
+      <h2>Luồng tổng thể — Chuỗi giá trị end-to-end</h2>
+      <p>Từ thu mua nguyên liệu đến thu tiền xuất khẩu — 7 giai đoạn, 5 module ERP liên thông</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">BẮT ĐẦU</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-b2b">📞 Thu mua nguyên liệu<span class="node-sub">B2B Platform — 30+ đại lý</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Mủ tươi về NM</div></div>
+
+      <div class="node n-wms">⚖️ Cân xe & Nhập kho<span class="node-sub">WMS — Keli D2008FA</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Batch NVL</div></div>
+
+      <div class="node n-production">🏭 Sản xuất chế biến<span class="node-sub">5 công đoạn — Yield 80%</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Thành phẩm SVR</div></div>
+
+      <div class="node n-b2b">📋 Quyết toán NCC<span class="node-sub">KLTP × Giá × DRC − Tạm ứng</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Kho TP sẵn sàng</div></div>
+
+      <div class="node n-sale">📦 Đơn hàng xuất khẩu<span class="node-sub">Sales Order — 25 KH, 10 nước</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node node-decision n-decision">Đủ NVL?</div>
+
+      <div class="branch" style="margin-top:4px;">
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--b2b)">Không → Mua thêm</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-b2b" style="min-width:140px;font-size:12px">Tạo Purchase Demand<span class="node-sub">→ Quay lại Thu mua</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--logistics)">Có → Tiếp tục</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-logistics">🚢 Logistics & Chứng từ<span class="node-sub">Container, B/L, DHL</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance">💰 Thanh toán quốc tế<span class="node-sub">Invoice → L/C → Thu tiền</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node node-end n-end">HOÀN TẤT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--b2b-light);border-color:var(--b2b)"></div>B2B Platform</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--wms-light);border-color:var(--wms)"></div>WMS</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--production-light);border-color:var(--production)"></div>Sản xuất</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--sale-light);border-color:var(--sale)"></div>Sales Order</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--logistics-light);border-color:var(--logistics)"></div>Logistics</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--finance-light);border-color:var(--finance)"></div>Tài chính</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#FFFDE7;border-color:#F9A825"></div>Quyết định</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 1: THU MUA B2B -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f1">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--b2b-light);color:var(--b2b)">📞</div>
+    <div class="flow-header-text">
+      <h2>Luồng 1 — Thu mua nguyên liệu (B2B)</h2>
+      <p>Nhà máy mua mủ từ đại lý nội địa (VND) và Lào (KIP) qua B2B Platform</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">NHÀ MÁY CẦN MỦ</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-b2b">NM đăng nhu cầu mua<span class="node-sub">Purchase Demand: grade, số lượng, giá dự kiến</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Đại lý nhận thông báo</div></div>
+
+      <div class="node n-b2b">Đại lý chào giá<span class="node-sub">Quotation: giá/kg, DRC cam kết, thời gian giao</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-b2b">Chat đàm phán<span class="node-sub">B2B Chat — realtime giữa NM & ĐL</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node node-decision n-decision">Chấp nhận giá?</div>
+      <div class="branch" style="margin-top:4px;">
+        <div class="fc-col">
+          <div class="branch-label">Không</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-system" style="min-width:120px;font-size:11px">Đàm phán tiếp<span class="node-sub">hoặc từ chối</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--b2b)">Có</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-b2b">Chốt Deal<span class="node-sub">Booking → Deal confirmed</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance">Tạm ứng tiền<span class="node-sub">Nhiều đợt: 63-85% × Giá × KL</span></div>
+          <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Đại lý nhận tiền</div></div>
+          <div class="node n-logistics">Đại lý giao mủ về NM<span class="node-sub">Xe tải, biển số, tài xế</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node node-end n-end">→ CÂN XE & NHẬP KHO</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 2: CÂN XE & NHẬP KHO -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f2">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--wms-light);color:var(--wms)">⚖️</div>
+    <div class="flow-header-text">
+      <h2>Luồng 2 — Cân xe & Nhập kho</h2>
+      <p>Trạm cân Keli → Kiểm DRC → Tạo phiếu nhập kho WMS → Batch NVL</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">XE MỦ VỀ NHÀ MÁY</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-wms">Cân xe lần 1 (có tải)<span class="node-sub">Keli D2008FA — RS232 / Web Serial</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Khối lượng tổng</div></div>
+
+      <div class="node n-wms">Đổ mủ vào bể chứa</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-wms">Cân xe lần 2 (không tải)<span class="node-sub">KL mủ tươi = Lần 1 − Lần 2</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-production">Kiểm tra DRC<span class="node-sub">% Dry Rubber Content</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">KLTP = KLm × DRC</div></div>
+
+      <div class="node n-wms">Tạo phiếu nhập kho<span class="node-sub">Stock-In Order — WMS P3</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-wms">Ghi nhận Batch NVL<span class="node-sub">batch_no, material, DRC, supplier</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-wms">Cập nhật tồn kho<span class="node-sub">quantity_remaining + trigger</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+      <div class="node node-end n-end">→ SẴN SÀNG SẢN XUẤT</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 3: SẢN XUẤT -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f3">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--production-light);color:var(--production)">🏭</div>
+    <div class="flow-header-text">
+      <h2>Luồng 3 — Sản xuất chế biến</h2>
+      <p>5 công đoạn chế biến mủ thô → thành phẩm SVR xuất khẩu — Yield ~80%</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">LỆNH SẢN XUẤT (BOM)</div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Xuất NVL từ kho</div></div>
+
+      <div class="node n-production">① Rửa<span class="node-sub">Loại tạp chất — loss ~2.5%</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-production">② Tán / Kéo<span class="node-sub">Làm nhỏ, đồng đều</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-production">③ Sấy<span class="node-sub">Giảm ẩm — loss ~10.5%</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-production">④ Ép bành<span class="node-sub">33.33 kg hoặc 35 kg/bành</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-production">⑤ Đóng gói<span class="node-sub">Shrink wrap / Loose bale / Pallet</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-wms">QC thành phẩm<span class="node-sub">DRC, Dirt, Ash, Nitrogen, Volatile, PRI</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node node-decision n-decision">QC Pass?</div>
+      <div class="branch" style="margin-top:4px;">
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--sale)">Không</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-wms" style="min-width:130px;font-size:12px">Cần phối trộn<span class="node-sub">WMS P9 Blending</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--b2b)">Có</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-wms">Nhập kho thành phẩm<span class="node-sub">Stock-In TP — Batch mới</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node node-end n-end">→ KHO TP SẴN SÀNG BÁN</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 4: QUYẾT TOÁN NCC -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f4">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--finance-light);color:var(--finance)">📋</div>
+    <div class="flow-header-text">
+      <h2>Luồng 4 — Quyết toán nhà cung cấp</h2>
+      <p>Tính toán công nợ đại lý: KLTP × Đơn giá − Tạm ứng = Còn lại → Thanh toán nhiều đợt</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">TP ĐÃ NHẬP KHO</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-wms">Xác nhận KLTP thực tế<span class="node-sub">Từ batch QC pass</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">KLTP × Đơn giá phê duyệt</div></div>
+
+      <div class="node n-finance">Tính thành tiền<span class="node-sub">VND (mủ Việt) / KIP (mủ Lào)</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-finance">Trừ tạm ứng đã chi<span class="node-sub">Tổng các đợt TƯ (3-6 đợt)</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-finance">Số tiền còn lại<span class="node-sub">= Thành tiền − Tổng tạm ứng</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node node-decision n-decision">Còn lại > 0?</div>
+      <div class="branch" style="margin-top:4px;">
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--sale)">NM nợ ĐL</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance" style="min-width:140px;font-size:12px">Thanh toán quyết toán<span class="node-sub">Nhiều đợt (3-6)</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--b2b)">ĐL nợ NM</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-b2b" style="min-width:140px;font-size:12px">Ghi nợ vào kỳ sau<span class="node-sub">hoặc trừ deal tiếp</span></div>
+        </div>
+      </div>
+
+      <div class="arrow"><div class="arrow-down"></div></div>
+      <div class="node n-b2b">Cập nhật Partner Ledger<span class="node-sub">Running balance — Sổ cái công nợ ĐL</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+      <div class="node node-end n-end">CÔNG NỢ CẬP NHẬT</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 5: SALES ORDER -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f5">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--sale-light);color:var(--sale)">📦</div>
+    <div class="flow-header-text">
+      <h2>Luồng 5 — Đơn hàng xuất khẩu (Sales Order)</h2>
+      <p>Vòng đời đơn hàng: 8 trạng thái, 4 bộ phận phối hợp — Nháp → Hoàn tất</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">KHÁCH HÀNG ĐẶT HÀNG</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-sale">① Nháp<span class="node-sub">Sale tạo SO: KH, SP, giá, specs, packing</span></div>
+      <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">Sale xác nhận</div></div>
+
+      <div class="node n-sale">② Đã xác nhận<span class="node-sub">SX kiểm NVL khả dụng từ WMS</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node node-decision n-decision">Đủ NVL?</div>
+      <div class="branch" style="margin-top:4px;">
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--b2b)">Thiếu</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-b2b" style="min-width:140px;font-size:12px">Tạo B2B Demand<span class="node-sub">hoặc Lệnh SX</span></div>
+          <div class="loop-back">↻ Chờ NVL đủ rồi tiếp tục</div>
+        </div>
+        <div class="fc-col">
+          <div class="branch-label" style="color:var(--production)">Đủ</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-production">③ Đang SX<span class="node-sub">5 công đoạn, cập nhật tiến độ</span></div>
+          <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">QC pass, yield 80%</div></div>
+
+          <div class="node n-production">④ Sẵn sàng giao<span class="node-sub">SX xác nhận → Logistics</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+
+          <div class="node n-logistics">⑤ Đóng gói<span class="node-sub">Container, seal, booking tàu</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+
+          <div class="node n-logistics">⑥ Đã xuất<span class="node-sub">B/L, DHL, ETD tracking</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+
+          <div class="node n-finance">⑦ Chờ thanh toán<span class="node-sub">Invoice, L/C, DP at sight</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+
+          <div class="node n-finance">⑧ Đã thanh toán<span class="node-sub">Chiết khấu, hoa hồng, sổ cái</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+
+          <div class="node node-end n-end">ĐƠN HOÀN TẤT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 6: LOGISTICS XUẤT KHẨU -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f6">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--logistics-light);color:var(--logistics)">🚢</div>
+    <div class="flow-header-text">
+      <h2>Luồng 6 — Logistics xuất khẩu</h2>
+      <p>Đóng container → Seal → Booking tàu → Chứng từ → Xuất hàng FOB/CIF Đà Nẵng</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">TP SẴN SÀNG GIAO</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-logistics">Tạo container tự động<span class="node-sub">Từ SL tấn → số container 20ft/40ft</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-logistics">Phân bổ bành FIFO<span class="node-sub">576 bành/container (20ft) × 35kg</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-logistics">Seal container<span class="node-sub">Seal No: HA-2026-xxx</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-logistics">Booking tàu<span class="node-sub">ONE / Evergreen / Maersk — ETD</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="fc-row">
+        <div class="fc-col">
+          <div class="node n-logistics" style="min-width:130px;">Tạo COA<span class="node-sub">Certificate of Analysis</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="node n-logistics" style="min-width:130px;">Tạo Packing List<span class="node-sub">5 cont × bales × weights</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="node n-finance" style="min-width:130px;">Tạo Invoice<span class="node-sub">INV-2026-xxxx</span></div>
+        </div>
+      </div>
+
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-logistics">Gửi chứng từ qua DHL<span class="node-sub">DHL tracking number</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-logistics">Xuất hàng — B/L<span class="node-sub">Bill of Lading — Cảng Đà Nẵng</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+      <div class="node node-end n-end">→ CHỜ THANH TOÁN</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 7: THANH TOÁN XUẤT KHẨU -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f7">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--finance-light);color:var(--finance)">💰</div>
+    <div class="flow-header-text">
+      <h2>Luồng 7 — Thanh toán xuất khẩu</h2>
+      <p>3 phương thức chính: DP (40%), TT 100% (25%), L/C (20%) — Đa ngân hàng</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div class="fc">
+      <div class="node node-start n-start">HÀNG ĐÃ XUẤT</div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node n-finance">Phát hành Invoice<span class="node-sub">Subtotal + Freight + Insurance</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="node node-decision n-decision">Phương thức TT?</div>
+
+      <div class="branch" style="margin-top:4px;">
+        <div class="fc-col">
+          <div class="branch-label">DP at sight (40%)</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance" style="min-width:140px;font-size:12px">Trình bộ chứng từ<span class="node-sub">Ngân hàng thu hộ</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance" style="min-width:140px;font-size:12px">KH thanh toán khi nhận CT</div>
+        </div>
+        <div class="fc-col">
+          <div class="branch-label">TT 100% (25%)</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance" style="min-width:140px;font-size:12px">Chuyển khoản trực tiếp<span class="node-sub">Wire transfer</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="branch-label">L/C (20%)</div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance" style="min-width:140px;font-size:12px">Trình L/C<span class="node-sub">At sight / 30d / 90d</span></div>
+          <div class="arrow"><div class="arrow-down"></div></div>
+          <div class="node n-finance" style="min-width:140px;font-size:12px">NH phát hành thanh toán</div>
+        </div>
+      </div>
+
+      <div class="arrow"><div class="arrow-down"></div></div>
+      <div class="node n-finance">Ghi nhận thanh toán<span class="node-sub">Ngân hàng: AGRI / VTB / TP / EXIM</span></div>
+      <div class="arrow"><div class="arrow-down"></div></div>
+
+      <div class="fc-row">
+        <div class="fc-col">
+          <div class="node n-finance" style="min-width:130px;font-size:12px">Chiết khấu theo HĐ<span class="node-sub">Nếu có</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="node n-finance" style="min-width:130px;font-size:12px">Hoa hồng broker<span class="node-sub">~$20/MT (nếu có)</span></div>
+        </div>
+        <div class="fc-col">
+          <div class="node n-finance" style="min-width:130px;font-size:12px">Ghi sổ cái<span class="node-sub">Doanh thu − CK − HH</span></div>
+        </div>
+      </div>
+
+      <div class="arrow"><div class="arrow-down"></div></div>
+      <div class="node node-end n-end">ĐƠN HÀNG HOÀN TẤT</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 8: ĐA BỘ PHẬN -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f8">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--accent-light);color:#85590B">👥</div>
+    <div class="flow-header-text">
+      <h2>Luồng 8 — Phối hợp đa bộ phận trên 1 đơn hàng</h2>
+      <p>4 bộ phận lần lượt xử lý đơn hàng — mỗi BP có tab và quyền riêng</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div style="display:grid;gap:12px;">
+
+      <div class="swim-lane" style="border-color:var(--sale)">
+        <div class="swim-lane-title" style="color:var(--sale)">🏢 Bộ phận Sale</div>
+        <div class="fc" style="flex-direction:row;gap:10px;flex-wrap:wrap;">
+          <div class="node n-sale" style="min-width:140px">Tạo SO (Wizard 4 bước)</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-sale" style="min-width:140px">Xác nhận đơn hàng</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-sale" style="min-width:140px">Quản lý KH 25 đối tác</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--text-3);font-size:20px;">⬇</div>
+
+      <div class="swim-lane" style="border-color:var(--production)">
+        <div class="swim-lane-title" style="color:var(--production)">🏭 Bộ phận Sản xuất</div>
+        <div class="fc" style="flex-direction:row;gap:10px;flex-wrap:wrap;">
+          <div class="node n-production" style="min-width:140px">Kiểm NVL khả dụng</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-production" style="min-width:140px">Lên kế hoạch SX</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-production" style="min-width:140px">5 công đoạn SX</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-production" style="min-width:140px">QC + Xác nhận sẵn sàng</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--text-3);font-size:20px;">⬇</div>
+
+      <div class="swim-lane" style="border-color:var(--logistics)">
+        <div class="swim-lane-title" style="color:var(--logistics)">🚢 Bộ phận Logistics (XNK)</div>
+        <div class="fc" style="flex-direction:row;gap:10px;flex-wrap:wrap;">
+          <div class="node n-logistics" style="min-width:140px">Đóng container</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-logistics" style="min-width:140px">Seal + Booking tàu</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-logistics" style="min-width:140px">COA + Packing List</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-logistics" style="min-width:140px">DHL + B/L → Xuất hàng</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--text-3);font-size:20px;">⬇</div>
+
+      <div class="swim-lane" style="border-color:var(--finance)">
+        <div class="swim-lane-title" style="color:var(--finance)">💰 Bộ phận Kế toán</div>
+        <div class="fc" style="flex-direction:row;gap:10px;flex-wrap:wrap;">
+          <div class="node n-finance" style="min-width:130px">Tạo Invoice</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-finance" style="min-width:130px">L/C / DP tracking</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-finance" style="min-width:130px">Thu tiền</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-finance" style="min-width:130px">Chiết khấu + HH</div>
+          <div style="align-self:center;color:var(--text-3)">→</div>
+          <div class="node n-finance" style="min-width:130px">Sổ cái</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FLOW 9: HỆ THỐNG CẢNH BÁO -->
+<!-- ============================================================ -->
+<div class="flow-section" id="f9">
+  <div class="flow-header">
+    <div class="flow-icon" style="background:var(--sale-light);color:var(--sale)">🔔</div>
+    <div class="flow-header-text">
+      <h2>Luồng 9 — Hệ thống cảnh báo tự động</h2>
+      <p>12 loại cảnh báo từ 6 nguồn module — push đến BGĐ và người phụ trách</p>
+    </div>
+  </div>
+  <div class="flow-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+
+      <div style="background:var(--sale-light);border-radius:12px;padding:16px;border:1px solid rgba(198,40,40,0.15)">
+        <div style="font-weight:600;font-size:13px;color:var(--sale);margin-bottom:10px;">📦 Từ Sales Order</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:2;">
+          🔴 Đơn sắp tới hạn giao (< 7 ngày)<br>
+          🔴 Container chưa seal (ETD < 5 ngày)<br>
+          🟡 Đơn nháp quá 3 ngày chưa xác nhận<br>
+          🔴 Công nợ KH quá hạn (> 30 ngày)<br>
+          🔴 L/C sắp hết hạn (< 7 ngày)<br>
+          🟡 Đơn bị hủy trong tháng
+        </div>
+      </div>
+
+      <div style="background:var(--wms-light);border-radius:12px;padding:16px;border:1px solid rgba(21,101,192,0.15)">
+        <div style="font-weight:600;font-size:13px;color:var(--wms);margin-bottom:10px;">📦 Từ WMS + SX + B2B + HR</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:2;">
+          🟡 NVL tồn thấp dưới min_stock<br>
+          🔴 Lệnh SX trễ tiến độ<br>
+          🟡 Yield thấp < 75%<br>
+          🟡 Deal B2B chưa quyết toán<br>
+          🔴 Nhân viên hiệu suất hạng F<br>
+          🟡 Task quá hạn chưa hoàn thành
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <div class="fc">
+        <div class="fc-row">
+          <div class="node n-system" style="min-width:130px;">Sales Order</div>
+          <div class="node n-wms" style="min-width:100px;">WMS</div>
+          <div class="node n-production" style="min-width:100px;">SX</div>
+          <div class="node n-b2b" style="min-width:100px;">B2B</div>
+          <div class="node n-hr" style="min-width:100px;">HR/Task</div>
+        </div>
+        <div class="arrow"><div class="arrow-down"></div><div class="arrow-label">pg_cron + Realtime trigger</div></div>
+        <div class="node n-system">🔔 Alert Engine<span class="node-sub">Tổng hợp, phân loại, gửi đến đúng người</span></div>
+        <div class="arrow"><div class="arrow-down"></div></div>
+        <div class="fc-row">
+          <div class="fc-col">
+            <div class="node n-sale" style="min-width:140px;font-size:12px">👔 BGĐ Dashboard<span class="node-sub">Executive view</span></div>
+          </div>
+          <div class="fc-col">
+            <div class="node n-system" style="min-width:140px;font-size:12px">👤 BP phụ trách<span class="node-sub">Notification trong ERP</span></div>
+          </div>
+          <div class="fc-col">
+            <div class="node n-b2b" style="min-width:140px;font-size:12px">📱 Email / Push<span class="node-sub">Microsoft Graph API</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div style="text-align:center;padding:32px 0;color:var(--text-3);font-size:12px;">
+  Công ty TNHH MTV Cao Su Huy Anh Phong Điền — ERP v8 — Sơ đồ luồng hệ thống<br>
+  Người lập: Lê Duy Minh — Trưởng phòng IT — 30/03/2026
+</div>
+
+</div><!-- container -->
+
+<script>
+const nav = document.getElementById('nav');
+const links = nav.querySelectorAll('a');
+const sections = document.querySelectorAll('.flow-section');
+
+function updateActive() {
+  let current = '';
+  sections.forEach(s => {
+    if (scrollY >= s.offsetTop - 100) current = s.id;
+  });
+  links.forEach(l => {
+    l.classList.toggle('active', l.getAttribute('href') === '#' + current);
+  });
+}
+window.addEventListener('scroll', updateActive);
+links.forEach(l => {
+  l.addEventListener('click', e => {
+    e.preventDefault();
+    const t = document.querySelector(l.getAttribute('href'));
+    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>

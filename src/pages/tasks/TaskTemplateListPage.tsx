@@ -49,6 +49,7 @@ export default function TaskTemplateListPage() {
 
   // ── Auth + Employees for assignee select ──
   const { user } = useAuthStore()
+  const canDelete = user?.role === 'admin' || (user?.position_level != null && user.position_level <= 5)
   const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; department_id: string | null }>>([])
 
   // ============================================================
@@ -58,7 +59,7 @@ export default function TaskTemplateListPage() {
   const loadTemplates = useCallback(async () => {
     try {
       setLoadingTemplates(true)
-      const data = await taskTemplateService.getAll(false)
+      const data = await taskTemplateService.getAll(true)
       setTemplates(data)
     } catch (err: any) {
       message.error('Lỗi tải danh sách mẫu: ' + err.message)
@@ -362,9 +363,11 @@ export default function TaskTemplateListPage() {
             Tạo việc
           </Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openTemplateModal(record)} />
-          <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xóa" cancelText="Hủy">
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {canDelete && (
+            <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDeleteTemplate(record.id)} okText="Xóa" cancelText="Hủy">
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -437,16 +440,18 @@ export default function TaskTemplateListPage() {
       render: (_: any, record: RecurringRule) => (
         <Space size="small">
           <Button size="small" icon={<EditOutlined />} onClick={() => openRecurringModal(record)} />
-          <Popconfirm
-            title="Xóa lịch tự động?"
-            description="Các công việc đã được tạo từ lịch này sẽ không bị xóa, nhưng sẽ không còn liên kết với lịch."
-            onConfirm={() => handleDeleteRule(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {canDelete && (
+            <Popconfirm
+              title="Xóa lịch tự động?"
+              description="Các công việc đã được tạo từ lịch này sẽ không bị xóa, nhưng sẽ không còn liên kết với lịch."
+              onConfirm={() => handleDeleteRule(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

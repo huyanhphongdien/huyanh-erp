@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { createNotification } from '../../services/notificationService'
 
 // ============================================================================
 // TYPES
@@ -102,8 +103,8 @@ async function fetchBusinessTrips(
   return (data || []) as any
 }
 
-async function createBusinessTrip(params: {
-  employee_id: string
+async function createBusinessTrips(params: {
+  employee_ids: string[]  // ★ Multi-select
   start_date: string
   end_date: string
   total_days: number
@@ -112,11 +113,12 @@ async function createBusinessTrip(params: {
   trip_with: string
   reason: string
   created_by: string
+  creator_name: string
 }): Promise<void> {
   const typeId = await getBusinessTripTypeId()
   if (!typeId) throw new Error('Loại phép "Công tác" chưa được cấu hình')
 
-  // Tạo mã đơn
+  // Lấy số thứ tự mã đơn hiện tại
   const year = new Date().getFullYear()
   const { data: last } = await supabase
     .from('leave_requests')
@@ -124,56 +126,75 @@ async function createBusinessTrip(params: {
     .ilike('request_number', `CT${year}%`)
     .order('request_number', { ascending: false })
     .limit(1)
-  const num = last && last.length > 0 ? parseInt(last[0].request_number.slice(-4)) + 1 : 1
-  const requestNumber = `CT${year}-${String(num).padStart(4, '0')}`
+  let nextNum = last && last.length > 0 ? parseInt(last[0].request_number.slice(-4)) + 1 : 1
 
-  // Tạo đơn — TP/PP tạo = auto approved
-  const { error: insertError } = await supabase
-    .from('leave_requests')
-    .insert({
-      employee_id: params.employee_id,
-      leave_type_id: typeId,
-      request_number: requestNumber,
-      start_date: params.start_date,
-      end_date: params.end_date,
-      total_days: params.total_days,
-      trip_destination: params.trip_destination,
-      trip_purpose: params.trip_purpose,
-      trip_with: params.trip_with,
-      reason: params.reason || `Công tác: ${params.trip_destination}`,
-      status: 'approved',
-      approved_by: params.created_by,
-      approved_at: new Date().toISOString(),
-    })
-  if (insertError) throw insertError
+  const startVN = new Date(params.start_date).toLocaleDateString('vi-VN')
+  const endVN = new Date(params.end_date).toLocaleDateString('vi-VN')
 
-  // Tạo attendance records
-  const start = new Date(params.start_date + 'T00:00:00+07:00')
-  const end = new Date(params.end_date + 'T00:00:00+07:00')
+  for (const empId of params.employee_ids) {
+    const requestNumber = `CT${year}-${String(nextNum++).padStart(4, '0')}`
 
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split('T')[0]
+    // Tạo đơn — TP/PP tạo = auto approved
+    const { error: insertError } = await supabase
+      .from('leave_requests')
+      .insert({
+        employee_id: empId,
+        leave_type_id: typeId,
+        request_number: requestNumber,
+        start_date: params.start_date,
+        end_date: params.end_date,
+        total_days: params.total_days,
+        trip_destination: params.trip_destination,
+        trip_purpose: params.trip_purpose,
+        trip_with: params.trip_with,
+        reason: params.reason || `Công tác: ${params.trip_destination}`,
+        status: 'approved',
+        approved_by: params.created_by,
+        approved_at: new Date().toISOString(),
+      })
+    if (insertError) throw insertError
 
-    // Kiểm tra đã có attendance chưa
-    const { data: existing } = await supabase
-      .from('attendance')
-      .select('id')
-      .eq('employee_id', params.employee_id)
-      .eq('date', dateStr)
-      .maybeSingle()
+    // Tạo attendance records
+    const start = new Date(params.start_date + 'T00:00:00+07:00')
+    const end = new Date(params.end_date + 'T00:00:00+07:00')
 
-    if (existing) continue
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0]
+      const { data: existing } = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('employee_id', empId)
+        .eq('date', dateStr)
+        .maybeSingle()
+      if (existing) continue
 
-    await supabase.from('attendance').insert({
-      employee_id: params.employee_id,
-      date: dateStr,
-      status: 'business_trip',
-      work_units: 1.0,
-      working_minutes: 480,
-      notes: `Công tác: ${params.trip_destination} — ${params.trip_purpose || ''}`.trim(),
-      check_in_time: dateStr + 'T08:00:00+07:00',
-      check_out_time: dateStr + 'T17:00:00+07:00',
-    })
+      await supabase.from('attendance').insert({
+        employee_id: empId,
+        date: dateStr,
+        status: 'business_trip',
+        work_units: 1.0,
+        working_minutes: 480,
+        notes: `Công tác: ${params.trip_destination} — ${params.trip_purpose || ''}`.trim(),
+        check_in_time: dateStr + 'T08:00:00+07:00',
+        check_out_time: dateStr + 'T17:00:00+07:00',
+      })
+    }
+
+    // ★ Gửi thông báo cho NV
+    try {
+      await createNotification({
+        recipient_id: empId,
+        sender_id: params.created_by,
+        module: 'attendance',
+        notification_type: 'shift_assigned',
+        title: `Bạn được gán đi công tác: ${params.trip_destination}`,
+        message: `${params.creator_name} đã gán bạn đi công tác ${params.trip_destination} từ ${startVN} đến ${endVN} (${params.total_days} ngày).${params.trip_purpose ? ' Mục đích: ' + params.trip_purpose : ''}`,
+        reference_url: '/attendance/business-trips',
+        priority: 'normal',
+      })
+    } catch (e) {
+      console.error('[BusinessTrip] notification error:', e)
+    }
   }
 }
 
@@ -219,7 +240,7 @@ export default function BusinessTripPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   // Form state
-  const [formEmployeeId, setFormEmployeeId] = useState('')
+  const [formEmployeeIds, setFormEmployeeIds] = useState<string[]>([])
   const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0])
   const [formEndDate, setFormEndDate] = useState(new Date().toISOString().split('T')[0])
   const [formDestination, setFormDestination] = useState('')
@@ -253,7 +274,7 @@ export default function BusinessTripPage() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: createBusinessTrip,
+    mutationFn: createBusinessTrips,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-trips'] })
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
@@ -280,7 +301,7 @@ export default function BusinessTripPage() {
 
   function resetForm() {
     setShowForm(false)
-    setFormEmployeeId('')
+    setFormEmployeeIds([])
     setFormStartDate(new Date().toISOString().split('T')[0])
     setFormEndDate(new Date().toISOString().split('T')[0])
     setFormDestination('')
@@ -289,14 +310,20 @@ export default function BusinessTripPage() {
     setFormReason('')
   }
 
+  function toggleEmployee(id: string) {
+    setFormEmployeeIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!formDestination.trim()) return
-    const empId = isManager ? formEmployeeId : employeeId
-    if (!empId) return
+    const empIds = isManager ? formEmployeeIds : [employeeId]
+    if (empIds.length === 0) return
 
     createMutation.mutate({
-      employee_id: empId,
+      employee_ids: empIds,
       start_date: formStartDate,
       end_date: formEndDate,
       total_days: totalDays,
@@ -305,6 +332,7 @@ export default function BusinessTripPage() {
       trip_with: formWith.trim(),
       reason: formReason.trim() || `Công tác: ${formDestination.trim()}`,
       created_by: employeeId,
+      creator_name: user?.full_name || user?.email || '',
     })
   }
 
@@ -346,23 +374,45 @@ export default function BusinessTripPage() {
             </div>
             <div className="p-4 space-y-4">
 
-              {/* Chọn NV */}
+              {/* ★ Chọn nhiều NV */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   <User size={14} className="text-gray-400" />
                   Nhân viên <span className="text-red-500">*</span>
+                  {formEmployeeIds.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-sky-100 text-sky-700 text-[11px] font-bold rounded-full">
+                      {formEmployeeIds.length} người
+                    </span>
+                  )}
                 </label>
-                <select
-                  value={formEmployeeId}
-                  onChange={e => setFormEmployeeId(e.target.value)}
-                  required
-                  className="w-full px-3 py-3 border border-gray-300 rounded-xl text-[15px] bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-                >
-                  <option value="">-- Chọn nhân viên --</option>
+                <div className="max-h-[200px] overflow-y-auto border border-gray-300 rounded-xl bg-white divide-y divide-gray-100">
                   {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.code} - {emp.full_name}</option>
+                    <label
+                      key={emp.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors
+                        ${formEmployeeIds.includes(emp.id) ? 'bg-sky-50' : 'hover:bg-gray-50'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formEmployeeIds.includes(emp.id)}
+                        onChange={() => toggleEmployee(emp.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                      />
+                      <span className="text-[14px] text-gray-800">{emp.code} - {emp.full_name}</span>
+                    </label>
                   ))}
-                </select>
+                  {employees.length === 0 && (
+                    <p className="px-3 py-3 text-[13px] text-gray-400 text-center">Không có nhân viên</p>
+                  )}
+                </div>
+                {employees.length > 3 && (
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setFormEmployeeIds(employees.map(e => e.id))}
+                      className="text-[11px] text-sky-600 font-medium hover:underline">Chọn tất cả</button>
+                    <button type="button" onClick={() => setFormEmployeeIds([])}
+                      className="text-[11px] text-gray-500 font-medium hover:underline">Bỏ chọn</button>
+                  </div>
+                )}
               </div>
 
               {/* Địa điểm */}
@@ -481,13 +531,13 @@ export default function BusinessTripPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || !formDestination.trim() || totalDays <= 0 || (!formEmployeeId && isManager)}
+                  disabled={createMutation.isPending || !formDestination.trim() || totalDays <= 0 || (formEmployeeIds.length === 0 && isManager)}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-sky-600 rounded-xl text-sm font-semibold text-white active:bg-sky-700 disabled:opacity-50"
                 >
                   {createMutation.isPending ? (
                     <><Loader2 size={16} className="animate-spin" /> Đang tạo...</>
                   ) : (
-                    <><CheckCircle size={16} /> Gán công tác</>
+                    <><CheckCircle size={16} /> Gán công tác{formEmployeeIds.length > 1 ? ` (${formEmployeeIds.length} NV)` : ''}</>
                   )}
                 </button>
               </div>

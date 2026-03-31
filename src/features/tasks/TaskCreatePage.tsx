@@ -454,8 +454,8 @@ export const TaskCreatePage: React.FC = () => {
         </div>
       )}
 
-      {/* Checklist Editor */}
-      {(checklistItems.length > 0 || selectedTemplate) && (
+      {/* Checklist Editor — luôn hiện */}
+      {(
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">

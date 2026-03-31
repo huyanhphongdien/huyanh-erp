@@ -532,8 +532,8 @@ export const myTasksService = {
     console.log('📋 [myTasksService] getMyTasksStats:', employeeId)
 
     // ★ Chỉ thống kê tháng hiện tại
-    const now = new Date()
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
+    const statsNow = new Date()
+    const monthStart = `${statsNow.getFullYear()}-${String(statsNow.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
 
     const { data: tasks, error } = await supabase
       .from('tasks')

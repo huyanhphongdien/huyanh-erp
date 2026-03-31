@@ -205,8 +205,8 @@ export default function TaskTemplateListPage() {
   const handleDeleteTemplate = async (id: string) => {
     try {
       await taskTemplateService.delete(id)
+      setTemplates(prev => prev.filter(t => t.id !== id))
       message.success('Đã xóa mẫu!')
-      loadTemplates()
     } catch (err: any) {
       message.error('Lỗi xóa: ' + err.message)
     }
@@ -278,8 +278,8 @@ export default function TaskTemplateListPage() {
   const handleDeleteRule = async (id: string) => {
     try {
       await taskRecurringService.delete(id)
+      setRecurringRules(prev => prev.filter(r => r.id !== id))
       message.success('Đã xóa lịch!')
-      loadRecurringRules()
     } catch (err: any) {
       message.error('Lỗi xóa: ' + err.message)
     }

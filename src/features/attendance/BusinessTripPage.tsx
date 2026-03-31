@@ -238,6 +238,12 @@ export default function BusinessTripPage() {
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editDest, setEditDest] = useState('')
+  const [editPurpose, setEditPurpose] = useState('')
+  const [editWith, setEditWith] = useState('')
+  const [editStart, setEditStart] = useState('')
+  const [editEnd, setEditEnd] = useState('')
 
   // Form state
   const [formEmployeeIds, setFormEmployeeIds] = useState<string[]>([])
@@ -288,6 +294,84 @@ export default function BusinessTripPage() {
       queryClient.invalidateQueries({ queryKey: ['business-trips'] })
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
       setDeleteId(null)
+    },
+  })
+
+  // ★ Sửa đơn công tác
+  const editMutation = useMutation({
+    mutationFn: async (tripId: string) => {
+      // Lấy đơn hiện tại
+      const { data: trip } = await supabase
+        .from('leave_requests')
+        .select('employee_id, start_date, end_date')
+        .eq('id', tripId)
+        .single()
+      if (!trip) throw new Error('Không tìm thấy đơn')
+
+      const datesChanged = trip.start_date !== editStart || trip.end_date !== editEnd
+      const newTotalDays = Math.max(1, Math.ceil((new Date(editEnd).getTime() - new Date(editStart).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+
+      // Cập nhật đơn
+      const { error } = await supabase
+        .from('leave_requests')
+        .update({
+          trip_destination: editDest,
+          trip_purpose: editPurpose,
+          trip_with: editWith,
+          start_date: editStart,
+          end_date: editEnd,
+          total_days: newTotalDays,
+          reason: `Công tác: ${editDest}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tripId)
+      if (error) throw error
+
+      // Nếu ngày thay đổi → xóa attendance cũ + tạo mới
+      if (datesChanged) {
+        await supabase
+          .from('attendance')
+          .delete()
+          .eq('employee_id', trip.employee_id)
+          .eq('status', 'business_trip')
+          .gte('date', trip.start_date)
+          .lte('date', trip.end_date)
+
+        const start = new Date(editStart + 'T00:00:00+07:00')
+        const end = new Date(editEnd + 'T00:00:00+07:00')
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dateStr = d.toISOString().split('T')[0]
+          const { data: existing } = await supabase
+            .from('attendance').select('id')
+            .eq('employee_id', trip.employee_id).eq('date', dateStr).maybeSingle()
+          if (existing) continue
+
+          await supabase.from('attendance').insert({
+            employee_id: trip.employee_id,
+            date: dateStr,
+            status: 'business_trip',
+            work_units: 1.0,
+            working_minutes: 480,
+            notes: `Công tác: ${editDest} — ${editPurpose || ''}`.trim(),
+            check_in_time: dateStr + 'T08:00:00+07:00',
+            check_out_time: dateStr + 'T17:00:00+07:00',
+          })
+        }
+      } else {
+        // Chỉ update notes attendance
+        await supabase
+          .from('attendance')
+          .update({ notes: `Công tác: ${editDest} — ${editPurpose || ''}`.trim() })
+          .eq('employee_id', trip.employee_id)
+          .eq('status', 'business_trip')
+          .gte('date', editStart)
+          .lte('date', editEnd)
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-trips'] })
+      queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
+      setEditId(null)
     },
   })
 
@@ -593,64 +677,123 @@ export default function BusinessTripPage() {
                   {/* Chi tiết mở rộng */}
                   {isExpanded && (
                     <div className="px-4 pb-3 border-t border-gray-100 pt-3 space-y-2">
-                      <div className="grid grid-cols-2 gap-3 text-[13px]">
-                        <div>
-                          <span className="text-gray-400">Mã đơn</span>
-                          <p className="font-medium text-gray-700">{trip.request_number}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-400">Nhân viên</span>
-                          <p className="font-medium text-gray-700">{emp?.code} - {emp?.full_name}</p>
-                        </div>
-                        {trip.trip_purpose && (
-                          <div className="col-span-2">
-                            <span className="text-gray-400">Mục đích</span>
-                            <p className="font-medium text-gray-700">{trip.trip_purpose}</p>
+                      {editId === trip.id ? (
+                        /* ★ MODE SỬA */
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-gray-500">Địa điểm</label>
+                            <input type="text" value={editDest} onChange={e => setEditDest(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] focus:ring-2 focus:ring-sky-500 focus:outline-none" />
                           </div>
-                        )}
-                        {trip.trip_with && (
-                          <div>
-                            <span className="text-gray-400">Đi cùng</span>
-                            <p className="font-medium text-gray-700">{trip.trip_with}</p>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-gray-500">Mục đích</label>
+                            <input type="text" value={editPurpose} onChange={e => setEditPurpose(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] focus:ring-2 focus:ring-sky-500 focus:outline-none" />
                           </div>
-                        )}
-                        {creator && (
-                          <div>
-                            <span className="text-gray-400">Người gán</span>
-                            <p className="font-medium text-gray-700">{creator.full_name}</p>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-gray-500">Đi cùng</label>
+                            <input type="text" value={editWith} onChange={e => setEditWith(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] focus:ring-2 focus:ring-sky-500 focus:outline-none" />
                           </div>
-                        )}
-                      </div>
-
-                      {/* Xóa đơn */}
-                      {isManager && (
-                        <div className="pt-2 border-t border-gray-100">
-                          {deleteId === trip.id ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-red-600 flex-1">Xác nhận xóa đơn + attendance?</span>
-                              <button
-                                onClick={() => deleteMutation.mutate(trip.id)}
-                                disabled={deleteMutation.isPending}
-                                className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg active:bg-red-700 disabled:opacity-50"
-                              >
-                                {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa'}
-                              </button>
-                              <button
-                                onClick={() => setDeleteId(null)}
-                                className="px-3 py-1.5 border border-gray-300 text-xs font-semibold rounded-lg text-gray-600"
-                              >
-                                Hủy
-                              </button>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-gray-500">Từ ngày</label>
+                              <input type="date" value={editStart} onChange={e => setEditStart(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] focus:ring-2 focus:ring-sky-500 focus:outline-none" />
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => setDeleteId(trip.id)}
-                              className="flex items-center gap-1 text-xs text-red-500 font-medium active:text-red-700"
-                            >
-                              <Trash2 size={13} /> Xóa đơn công tác
-                            </button>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-gray-500">Đến ngày</label>
+                              <input type="date" value={editEnd} onChange={e => setEditEnd(e.target.value)} min={editStart}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[14px] focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+                            </div>
+                          </div>
+                          {editMutation.isError && (
+                            <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                              {(editMutation.error as Error)?.message || 'Lỗi'}
+                            </div>
                           )}
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditId(null)}
+                              className="flex-1 py-2 border border-gray-300 rounded-lg text-[13px] font-medium text-gray-600">
+                              Hủy
+                            </button>
+                            <button
+                              onClick={() => editMutation.mutate(trip.id)}
+                              disabled={editMutation.isPending || !editDest.trim()}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-sky-600 text-white rounded-lg text-[13px] font-semibold disabled:opacity-50"
+                            >
+                              {editMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                              Lưu
+                            </button>
+                          </div>
                         </div>
+                      ) : (
+                        /* MODE XEM */
+                        <>
+                          <div className="grid grid-cols-2 gap-3 text-[13px]">
+                            <div>
+                              <span className="text-gray-400">Mã đơn</span>
+                              <p className="font-medium text-gray-700">{trip.request_number}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Nhân viên</span>
+                              <p className="font-medium text-gray-700">{emp?.code} - {emp?.full_name}</p>
+                            </div>
+                            {trip.trip_purpose && (
+                              <div className="col-span-2">
+                                <span className="text-gray-400">Mục đích</span>
+                                <p className="font-medium text-gray-700">{trip.trip_purpose}</p>
+                              </div>
+                            )}
+                            {trip.trip_with && (
+                              <div>
+                                <span className="text-gray-400">Đi cùng</span>
+                                <p className="font-medium text-gray-700">{trip.trip_with}</p>
+                              </div>
+                            )}
+                            {creator && (
+                              <div>
+                                <span className="text-gray-400">Người gán</span>
+                                <p className="font-medium text-gray-700">{creator.full_name}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Sửa + Xóa */}
+                          {isManager && (
+                            <div className="pt-2 border-t border-gray-100 flex items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  setEditId(trip.id)
+                                  setEditDest(trip.trip_destination || '')
+                                  setEditPurpose(trip.trip_purpose || '')
+                                  setEditWith(trip.trip_with || '')
+                                  setEditStart(trip.start_date)
+                                  setEditEnd(trip.end_date)
+                                }}
+                                className="flex items-center gap-1 text-xs text-sky-600 font-medium active:text-sky-800"
+                              >
+                                <FileText size={13} /> Sửa
+                              </button>
+                              {deleteId === trip.id ? (
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span className="text-xs text-red-600 flex-1">Xác nhận xóa?</span>
+                                  <button onClick={() => deleteMutation.mutate(trip.id)} disabled={deleteMutation.isPending}
+                                    className="px-2 py-1 bg-red-600 text-white text-[11px] font-semibold rounded-lg disabled:opacity-50">
+                                    {deleteMutation.isPending ? '...' : 'Xóa'}
+                                  </button>
+                                  <button onClick={() => setDeleteId(null)}
+                                    className="px-2 py-1 border border-gray-300 text-[11px] rounded-lg text-gray-600">Hủy</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setDeleteId(trip.id)}
+                                  className="flex items-center gap-1 text-xs text-red-500 font-medium active:text-red-700">
+                                  <Trash2 size={13} /> Xóa
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

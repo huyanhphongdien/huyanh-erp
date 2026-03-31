@@ -105,9 +105,9 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
       footer={null}
       width={420}
       centered
-      closable={false}
-      maskClosable={false}
-      keyboard={false}
+      closable={true}
+      maskClosable={true}
+      keyboard={true}
     >
       <div style={{ textAlign: 'center', padding: '16px 0' }}>
         <StarFilled style={{ fontSize: 32, color: '#faad14', marginBottom: 8 }} />
@@ -173,9 +173,8 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
         </Button>
 
         <div style={{ marginTop: 16 }}>
-          <Text type="warning" style={{ fontSize: 13 }}>
-            <WarningOutlined style={{ marginRight: 4 }} />
-            Bạn phải đánh giá để tiếp tục
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Bạn có thể đóng và đánh giá sau
           </Text>
         </div>
       </div>

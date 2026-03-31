@@ -165,9 +165,14 @@ export function TaskViewPage() {
         await subtaskService.recalculateParent(t.parent_task_id)
       }
       await refetch()
-      // Show quick eval modal
-      setShowQuickEval(true)
-      message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
+      // Show quick eval modal — chỉ cho người phụ trách
+      const isAssignee = user?.employee_id === (task as any)?.assignee_id || user?.employee_id === (task as any)?.assignee?.id
+      if (isAssignee) {
+        setShowQuickEval(true)
+        message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
+      } else {
+        message.success('Công việc đã hoàn thành!')
+      }
     } catch (err) {
       console.error('Mark complete failed:', err)
       alert('Không thể cập nhật trạng thái')
@@ -545,9 +550,14 @@ export function TaskViewPage() {
                   completed_date: new Date().toISOString(),
                 }).eq('id', t.id)
 
-                // Show quick eval modal
-                setShowQuickEval(true)
-                message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
+                // Show quick eval modal — chỉ cho người phụ trách
+                const isAssignee2 = user?.employee_id === t.assignee_id || user?.employee_id === t.assignee?.id
+                if (isAssignee2) {
+                  setShowQuickEval(true)
+                  message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
+                } else {
+                  message.success('Công việc đã hoàn thành!')
+                }
               }
 
               // Auto-sync parent progress if this is a subtask

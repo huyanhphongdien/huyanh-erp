@@ -393,6 +393,7 @@ const MyTasksPage: React.FC = () => {
   const [extensionTask, setExtensionTask] = useState<MyTask | null>(null);
   const [showQuickEval, setShowQuickEval] = useState(false);
   const [evalTask, setEvalTask] = useState<MyTask | null>(null);
+  const [pendingEvalCount, setPendingEvalCount] = useState(0);
 
   // ============================================================================
   // DATA FETCHING
@@ -434,14 +435,27 @@ const MyTasksPage: React.FC = () => {
     } catch { setParticipationRequestsCount(0); }
   }, [user?.employee_id]);
 
+  const fetchPendingEvalCount = useCallback(async () => {
+    if (!user?.employee_id) return;
+    try {
+      const { count } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('assignee_id', user.employee_id)
+        .eq('status', 'finished')
+        .in('evaluation_status', ['none', 'pending_self_eval']);
+      setPendingEvalCount(count || 0);
+    } catch { setPendingEvalCount(0); }
+  }, [user?.employee_id]);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchTasks(), fetchApprovalInfo(), fetchParticipationRequestsCount()]);
+      await Promise.all([fetchTasks(), fetchApprovalInfo(), fetchParticipationRequestsCount(), fetchPendingEvalCount()]);
       setLoading(false);
     };
     loadData();
-  }, [fetchTasks, fetchApprovalInfo, fetchParticipationRequestsCount]);
+  }, [fetchTasks, fetchApprovalInfo, fetchParticipationRequestsCount, fetchPendingEvalCount]);
 
   useEffect(() => { setSearchParams({ tab: activeTab }); }, [activeTab, setSearchParams]);
 
@@ -572,6 +586,16 @@ const MyTasksPage: React.FC = () => {
           Làm mới
         </button>
       </div>
+
+      {/* Pending Evaluation Warning */}
+      {pendingEvalCount > 3 && (
+        <div className="p-3 sm:p-4 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2 sm:gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-amber-800">
+            Bạn có <strong>{pendingEvalCount}</strong> công việc chưa đánh giá. Vui lòng đánh giá để tiếp tục tạo công việc mới.
+          </p>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">

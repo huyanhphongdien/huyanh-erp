@@ -62,12 +62,28 @@ export const TaskCreatePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [pendingEvalCount, setPendingEvalCount] = useState(0);
 
   // Template & Checklist state
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
   const [checklistItems, setChecklistItems] = useState<string[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState('');
+
+  // ========== CHECK PENDING EVALUATIONS ==========
+  useEffect(() => {
+    const checkPending = async () => {
+      if (!user?.employee_id) return;
+      const { count } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('assignee_id', user.employee_id)
+        .eq('status', 'finished')
+        .in('evaluation_status', ['none', 'pending_self_eval']);
+      setPendingEvalCount(count || 0);
+    };
+    checkPending();
+  }, [user]);
 
   // ========== LOAD TEMPLATES ==========
   useEffect(() => {
@@ -210,6 +226,11 @@ export const TaskCreatePage: React.FC = () => {
 
   // Handle form submit
   const handleSubmit = async (formData: TaskFormData) => {
+    if (pendingEvalCount > 3 && isSelfMode) {
+      setError('Bạn có quá nhiều công việc chưa đánh giá. Vui lòng đánh giá trước.');
+      return;
+    }
+
     setError(null);
     setIsSubmitting(true);
 
@@ -407,6 +428,29 @@ export const TaskCreatePage: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pending Evaluation Warning */}
+      {pendingEvalCount > 3 && (
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-red-800 text-sm sm:text-base">
+                Bạn có {pendingEvalCount} công việc chưa đánh giá
+              </p>
+              <p className="text-xs sm:text-sm text-red-600 mt-1">
+                Vui lòng đánh giá trước khi tạo công việc mới.
+              </p>
+              <button
+                onClick={() => navigate('/my-tasks?tab=awaiting_eval')}
+                className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Đánh giá ngay
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

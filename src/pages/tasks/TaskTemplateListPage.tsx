@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import {
   Card, Table, Button, Modal, Form, Input, Select, InputNumber,
-  Tag, Switch, Space, Typography, Tabs, message, Popconfirm,
+  Tag, Switch, Space, Typography, Tabs, message, Popconfirm, Checkbox, Tooltip,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined,
@@ -152,7 +152,11 @@ export default function TaskTemplateListPage() {
         category: template.category,
         default_priority: template.default_priority,
         default_duration_days: template.default_duration_days,
-        checklist_items: checklist?.map((c: { title: string }) => c.title) || [],
+        is_routine: (template as any).is_routine || false,
+        checklist_items: checklist?.map((c: { title: string; requires_evidence?: boolean }) => ({
+          title: c.title,
+          requires_evidence: c.requires_evidence || false,
+        })) || [],
       })
     } else {
       setEditingTemplate(null)
@@ -170,9 +174,13 @@ export default function TaskTemplateListPage() {
         category: values.category || 'general',
         default_priority: values.default_priority || 'medium',
         default_duration_days: values.default_duration_days || 3,
+        is_routine: values.is_routine || false,
         checklist_items: (values.checklist_items || [])
-          .filter((t: string) => t?.trim())
-          .map((t: string) => ({ title: t.trim() })),
+          .filter((t: any) => typeof t === 'string' ? t?.trim() : t?.title?.trim())
+          .map((t: any) => typeof t === 'string'
+            ? { title: t.trim() }
+            : { title: t.title.trim(), requires_evidence: t.requires_evidence || false }
+          ),
       }
 
       if (editingTemplate) {
@@ -583,6 +591,13 @@ export default function TaskTemplateListPage() {
             </Form.Item>
           </div>
 
+          <Form.Item name="is_routine" valuePropName="checked" label="Công việc lặp lại">
+            <Switch />
+          </Form.Item>
+          <div style={{ marginTop: -12, marginBottom: 16, color: '#888', fontSize: 12 }}>
+            Task tạo từ mẫu này sẽ có trọng số 0.5 khi tính hiệu suất
+          </div>
+
           <Form.List name="checklist_items">
             {(fields, { add, remove }) => (
               <>
@@ -590,14 +605,23 @@ export default function TaskTemplateListPage() {
                   Checklist
                 </label>
                 {fields.map(({ key, name, ...rest }) => (
-                  <div key={key} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <div key={key} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                     <Form.Item
                       {...rest}
-                      name={name}
+                      name={[name, 'title']}
                       style={{ flex: 1, marginBottom: 0 }}
                       rules={[{ required: true, message: 'Nhập nội dung' }]}
                     >
                       <Input placeholder="Nội dung checklist" />
+                    </Form.Item>
+                    <Form.Item
+                      name={[name, 'requires_evidence']}
+                      valuePropName="checked"
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Tooltip title="Yêu cầu bằng chứng (ảnh/PDF)">
+                        <Checkbox>📷</Checkbox>
+                      </Tooltip>
                     </Form.Item>
                     <Button
                       type="text"
@@ -607,7 +631,7 @@ export default function TaskTemplateListPage() {
                     />
                   </div>
                 ))}
-                <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                <Button type="dashed" onClick={() => add({ title: '', requires_evidence: false })} block icon={<PlusOutlined />}>
                   Thêm mục checklist
                 </Button>
               </>

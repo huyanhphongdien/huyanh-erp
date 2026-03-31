@@ -506,7 +506,7 @@ export const performanceDashboardService = {
       let taskQuery = supabase
         .from('tasks')
         .select(`
-          id, code, name, status, due_date, assignee_id, completed_date,
+          id, code, name, status, due_date, assignee_id, completed_date, task_source,
           assignee:employees!tasks_assignee_id_fkey (
             id, full_name, avatar_url, department_id,
             department:departments!employees_department_id_fkey (id, name)
@@ -537,12 +537,21 @@ export const performanceDashboardService = {
         .in('task_id', taskIds)
         .eq('status', 'approved');
 
+      // Weight by task source: recurring=0.5, self=0.3, assigned/project=1.0
+      function getTaskWeight(task: any): number {
+        if (task.task_source === 'recurring') return 0.5;
+        if (task.task_source === 'self') return 0.3;
+        return 1.0; // assigned + project
+      }
+
       const employeeMap = new Map<string, {
         employee_id: string; employee_name: string; avatar_url: string | null;
         department_name: string; department_id: string;
         total_tasks: number; completed_tasks: number;
         on_time_count: number; overdue_count: number;
         self_scores: number[]; manager_scores: number[];
+        weighted_self_scores: { score: number; weight: number }[];
+        weighted_manager_scores: { score: number; weight: number }[];
       }>();
 
       const evalMap = new Map<string, any>();
@@ -566,6 +575,7 @@ export const performanceDashboardService = {
             total_tasks: 0, completed_tasks: 0,
             on_time_count: 0, overdue_count: 0,
             self_scores: [], manager_scores: [],
+            weighted_self_scores: [], weighted_manager_scores: [],
           });
         }
 
@@ -586,18 +596,33 @@ export const performanceDashboardService = {
         const evalKey = `${task.id}_${empId}`;
         const managerEval = evalMap.get(evalKey);
         const selfEval = selfEvalMap.get(evalKey);
+        const weight = getTaskWeight(task);
         if (managerEval) {
           emp.manager_scores.push(managerEval.score);
           emp.self_scores.push(selfEval?.self_score || managerEval.score);
+          emp.weighted_manager_scores.push({ score: managerEval.score, weight });
+          emp.weighted_self_scores.push({ score: selfEval?.self_score || managerEval.score, weight });
         }
       });
 
       const result: EmployeePerformance[] = Array.from(employeeMap.values())
         .map(emp => {
-          const avgSelf = emp.self_scores.length > 0
-            ? Math.round(emp.self_scores.reduce((a, b) => a + b, 0) / emp.self_scores.length) : 0;
-          const avgManager = emp.manager_scores.length > 0
-            ? Math.round(emp.manager_scores.reduce((a, b) => a + b, 0) / emp.manager_scores.length) : 0;
+          // Weighted average for self scores
+          let totalWeightedSelf = 0, totalSelfWeight = 0;
+          emp.weighted_self_scores.forEach(ws => {
+            totalWeightedSelf += ws.score * ws.weight;
+            totalSelfWeight += ws.weight;
+          });
+          const avgSelf = totalSelfWeight > 0 ? Math.round(totalWeightedSelf / totalSelfWeight) : 0;
+
+          // Weighted average for manager scores
+          let totalWeightedManager = 0, totalManagerWeight = 0;
+          emp.weighted_manager_scores.forEach(ws => {
+            totalWeightedManager += ws.score * ws.weight;
+            totalManagerWeight += ws.weight;
+          });
+          const avgManager = totalManagerWeight > 0 ? Math.round(totalWeightedManager / totalManagerWeight) : 0;
+
           const finalScore = avgSelf > 0 || avgManager > 0
             ? Math.round(avgSelf * 0.4 + avgManager * 0.6) : 0;
           const onTimeRate = emp.completed_tasks > 0

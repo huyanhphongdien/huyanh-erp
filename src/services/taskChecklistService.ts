@@ -14,6 +14,9 @@ export interface ChecklistItem {
   completed_by: string | null
   sort_order: number
   created_at: string
+  requires_evidence?: boolean
+  evidence_url?: string | null
+  evidence_note?: string | null
 }
 
 export interface CreateChecklistData {

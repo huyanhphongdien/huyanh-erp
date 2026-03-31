@@ -5,12 +5,13 @@
 
 import { useState, useEffect } from 'react'
 import {
-  Card, Checkbox, Input, Button, Progress, Space, Typography, Popconfirm, message, Empty,
+  Card, Checkbox, Input, Button, Progress, Space, Typography, Popconfirm, message, Empty, Tag,
 } from 'antd'
 import {
   PlusOutlined, DeleteOutlined, CheckCircleOutlined, OrderedListOutlined,
 } from '@ant-design/icons'
 import { taskChecklistService, ChecklistItem } from '../../services/taskChecklistService'
+import { supabase } from '../../lib/supabase'
 
 const { Text } = Typography
 
@@ -66,6 +67,39 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
   }
 
   async function handleToggle(item: ChecklistItem) {
+    // If requires evidence and not yet uploaded and trying to complete → prompt file upload
+    if (item.requires_evidence && !item.evidence_url && !item.is_completed) {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*,.pdf'
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (!file) return
+        try {
+          const path = `evidence/${taskId}/${item.id}_${file.name}`
+          const { data, error: uploadError } = await supabase.storage.from('task-evidence').upload(path, file)
+          if (uploadError) throw uploadError
+          if (data) {
+            const { data: { publicUrl } } = supabase.storage.from('task-evidence').getPublicUrl(path)
+            const { error: updateError } = await supabase.from('task_checklist_items').update({
+              evidence_url: publicUrl,
+              evidence_note: file.name,
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+              completed_by: userId || null,
+            }).eq('id', item.id)
+            if (updateError) throw updateError
+            await loadItems()
+            message.success('Đã đính kèm bằng chứng')
+          }
+        } catch (err: any) {
+          message.error(err.message || 'Không thể tải lên bằng chứng')
+        }
+      }
+      input.click()
+      return
+    }
+
     try {
       const updated = await taskChecklistService.toggle(item.id, !item.is_completed, userId)
       const newItems = items.map(i => i.id === item.id ? updated : i)
@@ -155,22 +189,31 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                 style={{ flex: 1 }}
               />
             ) : (
-              <Text
-                style={{
-                  flex: 1,
-                  textDecoration: item.is_completed ? 'line-through' : undefined,
-                  color: item.is_completed ? '#999' : undefined,
-                  cursor: readonly ? 'default' : 'pointer',
-                }}
-                onClick={() => {
-                  if (!readonly) {
-                    setEditingId(item.id)
-                    setEditTitle(item.title)
-                  }
-                }}
-              >
-                {item.title}
-              </Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                <Text
+                  style={{
+                    textDecoration: item.is_completed ? 'line-through' : undefined,
+                    color: item.is_completed ? '#999' : undefined,
+                    cursor: readonly ? 'default' : 'pointer',
+                  }}
+                  onClick={() => {
+                    if (!readonly) {
+                      setEditingId(item.id)
+                      setEditTitle(item.title)
+                    }
+                  }}
+                >
+                  {item.title}
+                </Text>
+                {item.requires_evidence && !item.evidence_url && (
+                  <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>📷 Cần bằng chứng</Tag>
+                )}
+                {item.evidence_url && (
+                  <a href={item.evidence_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#52c41a', whiteSpace: 'nowrap' }}>
+                    📷 Đã đính kèm
+                  </a>
+                )}
+              </div>
             )}
 
             {!readonly && (

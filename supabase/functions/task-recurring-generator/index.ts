@@ -124,15 +124,33 @@ Deno.serve(async (req) => {
 
         // 2d. Tạo task cho từng người được giao
         for (const assigneeId of assigneeList) {
-          // Lấy department_id từ nhân viên nếu rule/template không có
+          // Lấy department_id + tìm Trưởng phòng từ nhân viên
           let deptId = rule.department_id || template?.department_id || null
-          if (!deptId && assigneeId) {
+          let assignerId: string | null = rule.created_by || null
+
+          if (assigneeId) {
             const { data: emp } = await supabase
               .from('employees')
               .select('department_id')
               .eq('id', assigneeId)
               .single()
-            if (emp?.department_id) deptId = emp.department_id
+            if (emp?.department_id) {
+              if (!deptId) deptId = emp.department_id
+
+              // Tìm Trưởng/Phó phòng làm người giao việc
+              if (!assignerId) {
+                const { data: manager } = await supabase
+                  .from('employees')
+                  .select('id')
+                  .eq('department_id', emp.department_id)
+                  .eq('status', 'active')
+                  .lte('position_level', 5)
+                  .order('position_level', { ascending: true })
+                  .limit(1)
+                  .single()
+                if (manager) assignerId = manager.id
+              }
+            }
           }
 
           const taskData = {
@@ -143,6 +161,7 @@ Deno.serve(async (req) => {
             progress: 1,
             due_date: dueDate.toISOString().split('T')[0],
             assignee_id: assigneeId,
+            assigner_id: assignerId,
             department_id: deptId,
             task_source: 'recurring',
             is_self_assigned: false,

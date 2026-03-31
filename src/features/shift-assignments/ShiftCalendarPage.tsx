@@ -205,10 +205,10 @@ export function ShiftCalendarPage() {
   });
 
   // ★ Query attendance CT/P cho lịch phân ca
-  const { data: specialStatusMap = new Map() } = useQuery({
+  const { data: specialStatusObj = {} } = useQuery({
     queryKey: ['shift-calendar-special', dateFrom, dateTo, departmentId],
     queryFn: async () => {
-      const map = new Map<string, 'CT' | 'P'>()
+      const obj: Record<string, 'CT' | 'P'> = {}
       const { data: atts } = await (await import('../../lib/supabase')).supabase
         .from('attendance')
         .select('employee_id, date, status')
@@ -216,9 +216,9 @@ export function ShiftCalendarPage() {
         .gte('date', dateFrom)
         .lte('date', dateTo)
       ;(atts || []).forEach((a: any) => {
-        map.set(`${a.employee_id}_${a.date}`, a.status === 'business_trip' ? 'CT' : 'P')
+        obj[`${a.employee_id}_${a.date}`] = a.status === 'business_trip' ? 'CT' : 'P'
       })
-      return map
+      return obj
     },
     staleTime: 30 * 1000,
   })
@@ -572,7 +572,7 @@ export function ShiftCalendarPage() {
                           isToday={isToday}
                           isPast={isPast}
                           readonly={readonly}
-                          specialStatus={specialStatusMap.get(`${emp.employee_id}_${dateStr}`) || null}
+                          specialStatus={(specialStatusObj as any)[`${emp.employee_id}_${dateStr}`] || null}
                           onClick={(assignmentIndex) =>
                             handleCellClick(emp, dateStr, assignmentIndex)
                           }

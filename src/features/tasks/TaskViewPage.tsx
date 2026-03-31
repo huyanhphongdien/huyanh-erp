@@ -154,23 +154,24 @@ export function TaskViewPage() {
     if (!id) return
     setActionLoading('complete')
     try {
-      const { error } = await supabase.from('tasks').update({
-        status: 'finished', progress: 100,
-        completed_date: new Date().toISOString().split('T')[0],
-      }).eq('id', id)
-      if (error) throw error
-      // Auto-sync parent progress if this is a subtask
       const t = task as any
-      if (t?.parent_task_id) {
-        await subtaskService.recalculateParent(t.parent_task_id)
-      }
-      await refetch()
-      // Show quick eval modal — chỉ cho người phụ trách
-      const isAssignee = user?.employee_id === (task as any)?.assignee_id || user?.employee_id === (task as any)?.assignee?.id
+      const isAssignee = user?.employee_id === t?.assignee_id || user?.employee_id === t?.assignee?.id
+
       if (isAssignee) {
+        // ★ Assignee: hiện popup đánh giá TRƯỚC — chưa update status
         setShowQuickEval(true)
-        message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
+        message.info('Vui lòng đánh giá để hoàn thành công việc.')
       } else {
+        // Người khác: update finished luôn
+        const { error } = await supabase.from('tasks').update({
+          status: 'finished', progress: 100,
+          completed_date: new Date().toISOString().split('T')[0],
+        }).eq('id', id)
+        if (error) throw error
+        if (t?.parent_task_id) {
+          await subtaskService.recalculateParent(t.parent_task_id)
+        }
+        await refetch()
         message.success('Công việc đã hoàn thành!')
       }
     } catch (err) {
@@ -544,18 +545,18 @@ export function TaskViewPage() {
 
               // Auto-complete when 100%
               if (roundedPercent >= 100 && t.status === 'in_progress') {
-                await supabase.from('tasks').update({
-                  status: 'finished',
-                  progress: 100,
-                  completed_date: new Date().toISOString(),
-                }).eq('id', t.id)
-
-                // Show quick eval modal — chỉ cho người phụ trách
                 const isAssignee2 = user?.employee_id === t.assignee_id || user?.employee_id === t.assignee?.id
                 if (isAssignee2) {
+                  // ★ Assignee: hiện popup đánh giá TRƯỚC — chưa update finished
                   setShowQuickEval(true)
-                  message.success('Công việc đã hoàn thành! Vui lòng đánh giá.')
+                  message.info('Checklist hoàn tất! Vui lòng đánh giá để hoàn thành.')
                 } else {
+                  // Người khác: update finished luôn
+                  await supabase.from('tasks').update({
+                    status: 'finished',
+                    progress: 100,
+                    completed_date: new Date().toISOString(),
+                  }).eq('id', t.id)
                   message.success('Công việc đã hoàn thành!')
                 }
               }

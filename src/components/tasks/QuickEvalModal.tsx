@@ -61,6 +61,9 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
         const finalScore = Math.round(score * coefficient)
 
         await supabase.from('tasks').update({
+          status: 'finished',
+          progress: 100,
+          completed_date: new Date().toISOString().split('T')[0],
           self_score: score,
           final_score: finalScore,
           evaluation_status: 'approved',
@@ -79,6 +82,9 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
       } else {
         // SEND TO MANAGER — 48h deadline
         await supabase.from('tasks').update({
+          status: 'finished',
+          progress: 100,
+          completed_date: new Date().toISOString().split('T')[0],
           self_score: score,
           evaluation_status: 'pending_approval',
         }).eq('id', task.id)

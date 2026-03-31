@@ -506,6 +506,18 @@ export const attendanceService = {
     const today = getToday()
     const nowISO = now.toISOString()
 
+    // ★ Kiểm tra đang đi công tác → không cho check-in
+    const { data: tripRecord } = await supabase
+      .from('attendance')
+      .select('id')
+      .eq('employee_id', employeeId)
+      .eq('date', today)
+      .eq('status', 'business_trip')
+      .maybeSingle()
+    if (tripRecord) {
+      throw new Error('Bạn đang đi công tác hôm nay. Chấm công đã được tự động ghi nhận.')
+    }
+
     // ① ★ V6: Open record check — gọi autoCheckoutService thống nhất
     const openRecord = await this.getOpenAttendance(employeeId)
     if (openRecord) {

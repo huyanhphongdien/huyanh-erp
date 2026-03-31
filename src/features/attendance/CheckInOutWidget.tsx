@@ -22,6 +22,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Briefcase,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { attendanceService } from '../../services/attendanceService'
@@ -303,16 +304,20 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
       return att?.check_in_time && att?.check_out_time
     })
 
+  // ★ Kiểm tra đang đi công tác hôm nay
+  const isOnBusinessTrip = todayAttendances.some(a => a.status === 'business_trip')
+
   // ── ★ V4: Permission checks — xử lý đúng multi-shift ──
-  // canCheckIn: GPS OK + không có ca đang mở + có ca chưa hoàn thành
+  // canCheckIn: GPS OK + không có ca đang mở + có ca chưa hoàn thành + KHÔNG đi công tác
   const canCheckIn =
     gpsStatus === 'available' &&
     !openAttendance &&
     currentShiftAssignment !== null &&
-    !isComplete
+    !isComplete &&
+    !isOnBusinessTrip
 
-  // canCheckOut: có ca đang mở
-  const canCheckOut = !!openAttendance
+  // canCheckOut: có ca đang mở + KHÔNG đi công tác
+  const canCheckOut = !!openAttendance && !isOnBusinessTrip
 
   // ── Invalidate all related queries ──
   const invalidateAll = useCallback(() => {
@@ -514,6 +519,15 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
           <div className="flex items-center justify-center py-4 text-gray-400">
             <Loader2 size={20} className="animate-spin mr-2" />
             <span className="text-sm">Đang tải...</span>
+          </div>
+        ) : isOnBusinessTrip ? (
+          /* ★ Đang đi công tác — khóa check-in/out */
+          <div className="flex flex-col items-center py-3 text-sky-700">
+            <Briefcase size={28} className="mb-1" />
+            <span className="text-sm font-semibold">Đang đi công tác</span>
+            <span className="text-xs text-sky-500 mt-1">
+              Chấm công đã được tự động ghi nhận (1.0 công)
+            </span>
           </div>
         ) : allComplete ? (
           /* All shifts complete */

@@ -160,21 +160,29 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
           </Text>
         </div>
 
-        <Button
-          type="primary"
-          onClick={handleSubmit}
-          loading={loading}
-          disabled={!isValid}
-          style={{ background: '#1B4D3E', borderColor: '#1B4D3E', minWidth: 160 }}
-          icon={<StarFilled />}
-          block
-        >
-          Gửi đánh giá
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            onClick={onClose}
+            style={{ flex: 1 }}
+          >
+            Để sau
+          </Button>
+          <Button
+            type="primary"
+            onClick={handleSubmit}
+            loading={loading}
+            disabled={!isValid}
+            style={{ flex: 2, background: '#1B4D3E', borderColor: '#1B4D3E' }}
+            icon={<StarFilled />}
+          >
+            Gửi đánh giá
+          </Button>
+        </div>
 
-        <div style={{ marginTop: 16 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Bạn có thể đóng và đánh giá sau
+        <div style={{ marginTop: 12, padding: '8px 12px', background: '#f6f6f6', borderRadius: 8 }}>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            Chọn sao + ghi chú (tối thiểu 10 ký tự) để gửi đánh giá.
+            Nếu chưa sẵn sàng, bấm "Để sau" — đánh giá sẽ không được lưu và bạn có thể đánh giá lại từ "Công việc của tôi".
           </Text>
         </div>
       </div>

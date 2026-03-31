@@ -35,6 +35,10 @@ import {
   Plus,
   Bell,
   LogOut,
+  MapPin,
+  UserCheck,
+  UserX,
+  Plane,
 } from 'lucide-react'
 import {
   LineChart,
@@ -305,6 +309,14 @@ export function ManagerDashboard() {
   const [upcomingTasks, setUpcomingTasks] = useState<UpcomingTask[]>([])
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [expiringContracts, setExpiringContracts] = useState<ContractAlert[]>([])
+  // ★ New dashboard sections
+  const [todayAttendance, setTodayAttendance] = useState<{ present: number; absent: number; late: number; businessTrip: number; total: number }>({ present: 0, absent: 0, late: 0, businessTrip: 0, total: 0 })
+  const [pendingLeaves, setPendingLeaves] = useState<any[]>([])
+  const [pendingOvertimes, setPendingOvertimes] = useState<any[]>([])
+  const [activeTrips, setActiveTrips] = useState<any[]>([])
+  const [monthlyWorkUnits, setMonthlyWorkUnits] = useState<any[]>([])
+  const [weeklyAttendance, setWeeklyAttendance] = useState<any[]>([])
+
   const [projectStats, setProjectStats] = useState<{
     total: number; active: number; completed: number;
     recentProjects: { id: string; code: string; name: string; status: string; progress_pct: number }[]
@@ -331,6 +343,64 @@ export function ManagerDashboard() {
         dashboardService.getExpiringContracts(30, 5),
       ])
       if (statsResult.data) setStats(statsResult.data)
+      // ★ Load new dashboard data
+      try {
+        const today = new Date().toISOString().split('T')[0]
+        const now = new Date()
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+        const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
+
+        // Chấm công hôm nay
+        const { count: totalActive } = await supabase.from('employees').select('*', { count: 'exact', head: true }).eq('status', 'active')
+        const { data: todayAtts } = await supabase.from('attendance').select('status, late_minutes').eq('date', today)
+        const present = (todayAtts || []).filter(a => a.status !== 'business_trip').length
+        const late = (todayAtts || []).filter(a => a.status === 'late' || (a.late_minutes && a.late_minutes > 0)).length
+        const bt = (todayAtts || []).filter(a => a.status === 'business_trip').length
+        const total = totalActive || 0
+        setTodayAttendance({ present, absent: Math.max(0, total - present - bt), late, businessTrip: bt, total })
+
+        // Đơn chờ duyệt
+        const { data: leaves } = await supabase.from('leave_requests').select('id, employee_id, start_date, end_date, total_days, created_at, employee:employees!leave_requests_employee_id_fkey(full_name), leave_type:leave_types!leave_requests_leave_type_id_fkey(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        setPendingLeaves((leaves || []).map((l: any) => ({ ...l, employee: Array.isArray(l.employee) ? l.employee[0] : l.employee, leave_type: Array.isArray(l.leave_type) ? l.leave_type[0] : l.leave_type })))
+
+        const { data: ots } = await supabase.from('overtime_requests').select('id, employee_id, overtime_date, hours, created_at, employee:employees!overtime_requests_employee_id_fkey(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        setPendingOvertimes((ots || []).map((o: any) => ({ ...o, employee: Array.isArray(o.employee) ? o.employee[0] : o.employee })))
+
+        // Công tác đang diễn ra
+        const btTypeId = await (async () => { const { data } = await supabase.from('leave_types').select('id').eq('code', 'BUSINESS_TRIP').maybeSingle(); return data?.id })()
+        if (btTypeId) {
+          const { data: trips } = await supabase.from('leave_requests').select('id, start_date, end_date, trip_destination, trip_purpose, employee:employees!leave_requests_employee_id_fkey(full_name)').eq('leave_type_id', btTypeId).eq('status', 'approved').lte('start_date', today).gte('end_date', today).limit(10)
+          setActiveTrips((trips || []).map((t: any) => ({ ...t, employee: Array.isArray(t.employee) ? t.employee[0] : t.employee })))
+        }
+
+        // Tổng công tháng (top 10 thấp nhất)
+        const { data: monthAtts } = await supabase.from('attendance').select('employee_id, work_units').gte('date', monthStart).lte('date', monthEnd)
+        if (monthAtts) {
+          const empMap: Record<string, number> = {}
+          monthAtts.forEach((a: any) => { empMap[a.employee_id] = (empMap[a.employee_id] || 0) + (a.work_units || 1) })
+          const empIds = Object.keys(empMap)
+          if (empIds.length > 0) {
+            const { data: emps } = await supabase.from('employees').select('id, code, full_name').in('id', empIds).eq('status', 'active')
+            const list = (emps || []).map((e: any) => ({ ...e, totalCong: Math.round((empMap[e.id] || 0) * 10) / 10 })).sort((a: any, b: any) => a.totalCong - b.totalCong)
+            setMonthlyWorkUnits(list.slice(0, 10))
+          }
+        }
+
+        // Biểu đồ chấm công 7 ngày gần nhất
+        const weekData: any[] = []
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(); d.setDate(d.getDate() - i)
+          const ds = d.toISOString().split('T')[0]
+          const dayLabel = d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit' })
+          const { data: dayAtts } = await supabase.from('attendance').select('status, late_minutes').eq('date', ds)
+          const p = (dayAtts || []).filter((a: any) => a.status !== 'business_trip').length
+          const l = (dayAtts || []).filter((a: any) => a.status === 'late' || (a.late_minutes && a.late_minutes > 0)).length
+          const b = (dayAtts || []).filter((a: any) => a.status === 'business_trip').length
+          weekData.push({ date: dayLabel, 'Đi làm': p, 'Trễ': l, 'Công tác': b })
+        }
+        setWeeklyAttendance(weekData)
+      } catch (e) { console.error('New dashboard sections error:', e) }
+
       try {
         const { count: totalProjects } = await supabase
           .from('projects').select('*', { count: 'exact', head: true })
@@ -500,6 +570,160 @@ export function ManagerDashboard() {
             onClick={() => navigate('/approvals')}
           />
         </div>
+
+        {/* ═══════ CHẤM CÔNG HÔM NAY + BIỂU ĐỒ TUẦN ═══════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3.5 sm:gap-4">
+          {/* Chấm công hôm nay */}
+          <GlassCard className="lg:col-span-2 p-3.5 sm:p-5">
+            <SectionHeader title="Chấm công Hôm nay" icon={<UserCheck className="w-4 h-4" />}
+              action={<button onClick={() => navigate('/attendance')} className="text-xs font-semibold flex items-center gap-0.5" style={{ color: BRAND.secondary }}>Chi tiết <ChevronRight className="w-3.5 h-3.5" /></button>} />
+            <div className="grid grid-cols-2 gap-2.5 mt-1">
+              {[
+                { label: 'Đi làm', val: todayAttendance.present, color: 'bg-emerald-50 text-emerald-600', icon: <UserCheck className="w-4 h-4" /> },
+                { label: 'Vắng', val: todayAttendance.absent, color: 'bg-red-50 text-red-500', icon: <UserX className="w-4 h-4" /> },
+                { label: 'Đi trễ', val: todayAttendance.late, color: 'bg-amber-50 text-amber-600', icon: <AlertTriangle className="w-4 h-4" /> },
+                { label: 'Công tác', val: todayAttendance.businessTrip, color: 'bg-sky-50 text-sky-600', icon: <Briefcase className="w-4 h-4" /> },
+              ].map(s => (
+                <div key={s.label} className={`flex items-center gap-2.5 p-3 rounded-xl ${s.color}`}>
+                  {s.icon}
+                  <div>
+                    <div className="text-xl font-bold">{s.val}</div>
+                    <div className="text-[10px] font-medium opacity-70">{s.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[12px] text-gray-400">
+              <span>Tổng NV: {todayAttendance.total}</span>
+              <span>Tỷ lệ: {todayAttendance.total > 0 ? Math.round(todayAttendance.present / todayAttendance.total * 100) : 0}% đi làm</span>
+            </div>
+          </GlassCard>
+
+          {/* Biểu đồ chấm công 7 ngày */}
+          <GlassCard className="lg:col-span-3 p-3.5 sm:p-5">
+            <SectionHeader title="Chấm công 7 ngày gần nhất" icon={<BarChart3 className="w-4 h-4" />} />
+            <div className="h-[200px] sm:h-[220px] mt-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyAttendance} barGap={2}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="Đi làm" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Trễ" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Công tác" fill="#0EA5E9" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* ═══════ ĐƠN CHỜ DUYỆT + CÔNG TÁC ĐANG DIỄN RA ═══════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
+          {/* Đơn chờ duyệt */}
+          <GlassCard className="p-3.5 sm:p-5">
+            <SectionHeader title="Đơn chờ Duyệt" icon={<Clock className="w-4 h-4 text-amber-500" />}
+              action={
+                (pendingLeaves.length + pendingOvertimes.length) > 0
+                  ? <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[11px] font-bold rounded-full">{pendingLeaves.length + pendingOvertimes.length}</span>
+                  : undefined
+              } />
+            {pendingLeaves.length === 0 && pendingOvertimes.length === 0 ? (
+              <div className="text-center py-6">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-1.5" />
+                <p className="text-sm text-gray-400">Không có đơn chờ duyệt</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 mt-1">
+                {pendingLeaves.map((l: any) => (
+                  <div key={l.id} onClick={() => navigate('/leave-requests')}
+                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-orange-50/50 hover:bg-orange-50 cursor-pointer transition-colors">
+                    <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-800 truncate">{l.employee?.full_name}</p>
+                      <p className="text-[10px] text-gray-400">{l.leave_type?.name} • {l.total_days} ngày</p>
+                    </div>
+                    <span className="text-[10px] text-orange-500 font-medium flex-shrink-0">Nghỉ phép</span>
+                  </div>
+                ))}
+                {pendingOvertimes.map((o: any) => (
+                  <div key={o.id} onClick={() => navigate('/overtime')}
+                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-purple-50/50 hover:bg-purple-50 cursor-pointer transition-colors">
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                      <Timer className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-800 truncate">{o.employee?.full_name}</p>
+                      <p className="text-[10px] text-gray-400">{o.overtime_date} • {o.hours}h</p>
+                    </div>
+                    <span className="text-[10px] text-purple-500 font-medium flex-shrink-0">Tăng ca</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </GlassCard>
+
+          {/* Công tác đang diễn ra */}
+          <GlassCard className="p-3.5 sm:p-5">
+            <SectionHeader title="Công tác Đang diễn ra" icon={<Plane className="w-4 h-4 text-sky-500" />}
+              action={<button onClick={() => navigate('/attendance/business-trips')} className="text-xs font-semibold flex items-center gap-0.5" style={{ color: BRAND.secondary }}>Xem tất cả <ChevronRight className="w-3.5 h-3.5" /></button>} />
+            {activeTrips.length === 0 ? (
+              <div className="text-center py-6">
+                <Briefcase className="w-8 h-8 text-gray-300 mx-auto mb-1.5" />
+                <p className="text-sm text-gray-400">Không ai đi công tác hôm nay</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 mt-1">
+                {activeTrips.map((t: any) => (
+                  <div key={t.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-sky-50/50">
+                    <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center flex-shrink-0">
+                      <Briefcase className="w-4 h-4 text-sky-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-800 truncate">{t.employee?.full_name}</p>
+                      <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                        <MapPin className="w-3 h-3" />
+                        <span className="truncate">{t.trip_destination}</span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-[11px] font-medium text-sky-600">
+                        {new Date(t.end_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                      </p>
+                      <p className="text-[9px] text-gray-400">ngày về</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </GlassCard>
+        </div>
+
+        {/* ═══════ TỔNG CÔNG THÁNG — NV công thấp nhất ═══════ */}
+        {monthlyWorkUnits.length > 0 && (
+          <GlassCard className="p-3.5 sm:p-5">
+            <SectionHeader title={`Công tháng ${new Date().getMonth() + 1} — NV công thấp`} icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
+              action={<button onClick={() => navigate('/attendance/monthly')} className="text-xs font-semibold flex items-center gap-0.5" style={{ color: BRAND.secondary }}>Bảng công <ChevronRight className="w-3.5 h-3.5" /></button>} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1">
+              {monthlyWorkUnits.map((emp: any) => (
+                <div key={emp.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl ${emp.totalCong < 10 ? 'bg-red-50' : 'bg-gray-50'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${emp.totalCong < 10 ? 'bg-red-100' : 'bg-gray-200'}`}>
+                    <Users className={`w-4 h-4 ${emp.totalCong < 10 ? 'text-red-500' : 'text-gray-500'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-gray-800 truncate">{emp.full_name}</p>
+                    <p className="text-[10px] text-gray-400">{emp.code}</p>
+                  </div>
+                  <span className={`text-sm font-bold flex-shrink-0 ${emp.totalCong < 10 ? 'text-red-500' : 'text-gray-600'}`}>
+                    {emp.totalCong} <span className="text-[10px] font-normal">công</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        )}
 
         {/* ─── PROJECTS (ẩn — chưa dùng) ─── */}
         {false && projectStats.total > 0 && (

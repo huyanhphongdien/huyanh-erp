@@ -82,7 +82,7 @@ export default function TaskTemplateListPage() {
 
   const loadEmployees = useCallback(async () => {
     try {
-      const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com']
+      const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com', 'trunglxh@huyanhrubber.com']
       const { data } = await supabase
         .from('employees')
         .select('id, full_name, department_id, email')

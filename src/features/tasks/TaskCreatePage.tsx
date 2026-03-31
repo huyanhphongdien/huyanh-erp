@@ -157,7 +157,7 @@ export const TaskCreatePage: React.FC = () => {
 
         // 2. EMPLOYEES
         // Emails cấp cao — không cho phép giao task cho họ
-        const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com']
+        const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com', 'trunglxh@huyanhrubber.com']
 
         if (isAdmin || isUserExecutive) {
           const { data: empData, error: empError } = await supabase

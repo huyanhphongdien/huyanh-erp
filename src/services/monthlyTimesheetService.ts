@@ -99,7 +99,7 @@ function shiftToSymbol(shiftCode: string | null): DaySymbol {
 // VIP EMAILS — ẩn khỏi bảng chấm công (BGĐ)
 // ============================================================================
 
-const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com']
+const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com', 'trunglxh@huyanhrubber.com']
 
 // ============================================================================
 // SERVICE

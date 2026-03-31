@@ -5,16 +5,16 @@ export type SalesRole = 'sale' | 'production' | 'logistics' | 'accounting' | 'ad
 // Mapping phòng ban → role
 const DEPT_ROLE_MAP: Record<string, SalesRole> = {
   'Ban Giám đốc': 'admin',
-  'Phòng Kinh doanh': 'sale',
+  'Phòng Thu Mua 1': 'sale',
+  'Phòng Kinh doanh': 'sale',       // legacy
   'Phòng Xuất nhập khẩu': 'logistics',
   'Phòng XNK': 'logistics',
   'Phòng Kế toán': 'accounting',
   'Phòng Tài chính': 'accounting',
-  'Phòng Sản xuất': 'production',
-  'Phòng QC': 'production',
-  'Phòng Cơ Điện': 'production',
-  'Phòng R&D': 'production',
+  'Phòng Quản lý sản xuất': 'production',
   'Phòng QLSX': 'production',
+  'Phòng QC': 'production',
+  'Phòng R&D': 'production',
 }
 
 const ADMIN_EMAILS = ['minhld@huyanhrubber.com']

@@ -210,6 +210,18 @@ export default function MonthlyTimesheetPage() {
             })}
           </div>
         </div>
+
+        {/* ★ Edit Modal cho drill-down */}
+        {editModal && (
+          <EditAttendanceModal
+            open={!!editModal}
+            onClose={() => setEditModal(null)}
+            day={editModal.day}
+            employeeId={editModal.employeeId}
+            employeeName={editModal.employeeName}
+            onSaved={() => setEditModal(null)}
+          />
+        )}
       </div>
     )
   }

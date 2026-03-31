@@ -501,8 +501,8 @@ export function ManagerDashboard() {
           />
         </div>
 
-        {/* ─── PROJECTS (if any) ─── */}
-        {projectStats.total > 0 && (
+        {/* ─── PROJECTS (ẩn — chưa dùng) ─── */}
+        {false && projectStats.total > 0 && (
           <GlassCard className="p-3.5 sm:p-5">
             <SectionHeader
               title="Dự án"
@@ -850,8 +850,8 @@ export function ManagerDashboard() {
             )}
           </GlassCard>
 
-          {/* Expiring Contracts */}
-          <GlassCard className="p-3.5 sm:p-5">
+          {/* Expiring Contracts (ẩn — chưa dùng) */}
+          {false && <GlassCard className="p-3.5 sm:p-5">
             <SectionHeader
               title="HĐ Sắp hết hạn"
               icon={<FileText className="w-4 h-4 text-violet-500" />}
@@ -885,7 +885,7 @@ export function ManagerDashboard() {
                 ))}
               </div>
             )}
-          </GlassCard>
+          </GlassCard>}
         </div>
 
         {/* ─── QUICK ACTIONS ─── */}

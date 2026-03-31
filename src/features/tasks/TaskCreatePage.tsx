@@ -67,7 +67,7 @@ export const TaskCreatePage: React.FC = () => {
   // Template & Checklist state
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
-  const [checklistItems, setChecklistItems] = useState<string[]>([]);
+  const [checklistItems, setChecklistItems] = useState<Array<{ title: string; requires_evidence?: boolean }>>([]);
   const [newChecklistItem, setNewChecklistItem] = useState('');
 
   // ========== CHECK PENDING EVALUATIONS ==========
@@ -103,7 +103,7 @@ export const TaskCreatePage: React.FC = () => {
     const items = typeof template.checklist_items === 'string'
       ? JSON.parse(template.checklist_items)
       : template.checklist_items;
-    setChecklistItems((items || []).map((i: any) => i.title));
+    setChecklistItems((items || []).map((i: any) => ({ title: i.title, requires_evidence: i.requires_evidence || false })));
   };
 
   const handleClearTemplate = () => {
@@ -113,7 +113,7 @@ export const TaskCreatePage: React.FC = () => {
 
   const handleAddChecklistItem = () => {
     if (!newChecklistItem.trim()) return;
-    setChecklistItems(prev => [...prev, newChecklistItem.trim()]);
+    setChecklistItems(prev => [...prev, { title: newChecklistItem.trim(), requires_evidence: false }]);
     setNewChecklistItem('');
   };
 
@@ -467,7 +467,19 @@ export const TaskCreatePage: React.FC = () => {
             {checklistItems.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
                 <span className="text-xs text-gray-400 w-5">{idx + 1}.</span>
-                <span className="text-sm text-gray-700 flex-1">{item}</span>
+                <span className="text-sm text-gray-700 flex-1">{item.title}</span>
+                {item.requires_evidence && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded font-medium">📷</span>
+                )}
+                <button
+                  onClick={() => {
+                    setChecklistItems(prev => prev.map((it, i) => i === idx ? { ...it, requires_evidence: !it.requires_evidence } : it))
+                  }}
+                  title={item.requires_evidence ? 'Bỏ yêu cầu bằng chứng' : 'Yêu cầu bằng chứng (ảnh/PDF)'}
+                  className={`text-xs p-0.5 rounded ${item.requires_evidence ? 'text-orange-500' : 'text-gray-300 hover:text-orange-400'}`}
+                >
+                  📷
+                </button>
                 <button
                   onClick={() => handleRemoveChecklistItem(idx)}
                   className="text-gray-400 hover:text-red-500 p-0.5"

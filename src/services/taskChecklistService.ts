@@ -62,12 +62,16 @@ export const taskChecklistService = {
     return data as ChecklistItem
   },
 
-  async createBulk(taskId: string, titles: string[]): Promise<ChecklistItem[]> {
-    const items = titles.map((title, i) => ({
-      task_id: taskId,
-      title,
-      sort_order: i,
-    }))
+  async createBulk(taskId: string, titles: (string | { title: string; requires_evidence?: boolean })[]): Promise<ChecklistItem[]> {
+    const items = titles.map((item, i) => {
+      const isObj = typeof item === 'object'
+      return {
+        task_id: taskId,
+        title: isObj ? item.title : item,
+        sort_order: i,
+        requires_evidence: isObj ? (item.requires_evidence || false) : false,
+      }
+    })
 
     const { data, error } = await supabase
       .from('task_checklist_items')

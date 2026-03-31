@@ -215,9 +215,7 @@ export function ShiftCalendarPage() {
         .in('status', ['business_trip', 'leave'])
         .gte('date', dateFrom)
         .lte('date', dateTo)
-      console.log('[ShiftCalendar] specialStatus atts:', atts?.length, 'sample:', atts?.[0])
       ;(atts || []).forEach((a: any) => {
-        // Normalize date (Supabase có thể trả YYYY-MM-DD hoặc full ISO)
         const dateKey = typeof a.date === 'string' ? a.date.split('T')[0] : a.date
         obj[`${a.employee_id}_${dateKey}`] = a.status === 'business_trip' ? 'CT' : 'P'
       })
@@ -575,12 +573,7 @@ export function ShiftCalendarPage() {
                           isToday={isToday}
                           isPast={isPast}
                           readonly={readonly}
-                          specialStatus={(() => {
-                            const key = `${emp.employee_id}_${dateStr}`
-                            const val = (specialStatusObj as any)[key] || null
-                            if (val) console.log('[ShiftCell] specialStatus:', key, val)
-                            return val
-                          })()}
+                          specialStatus={(specialStatusObj as any)[`${emp.employee_id}_${dateStr}`] || null}
                           onClick={(assignmentIndex) =>
                             handleCellClick(emp, dateStr, assignmentIndex)
                           }

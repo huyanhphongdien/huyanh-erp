@@ -429,12 +429,24 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-[10px] text-gray-500 mb-0.5 block">Giờ vào</label>
-                          <input type="time" value={formCheckIn} onChange={e => setFormCheckIn(e.target.value)}
+                          <input type="text" inputMode="numeric" placeholder="VD: 06:00" maxLength={5}
+                              onKeyUp={(e) => {
+                                const v = (e.target as HTMLInputElement).value.replace(/[^\d]/g, '')
+                                if (v.length >= 3 && !(e.target as HTMLInputElement).value.includes(':')) {
+                                  (e.target as HTMLInputElement).value = v.slice(0, 2) + ':' + v.slice(2, 4)
+                                }
+                              }} value={formCheckIn} onChange={e => setFormCheckIn(e.target.value)}
                             className="w-full px-2 py-2 text-[14px] border border-gray-200 rounded-lg" />
                         </div>
                         <div>
                           <label className="text-[10px] text-gray-500 mb-0.5 block">Giờ ra</label>
-                          <input type="time" value={formCheckOut} onChange={e => setFormCheckOut(e.target.value)}
+                          <input type="text" inputMode="numeric" placeholder="VD: 06:00" maxLength={5}
+                              onKeyUp={(e) => {
+                                const v = (e.target as HTMLInputElement).value.replace(/[^\d]/g, '')
+                                if (v.length >= 3 && !(e.target as HTMLInputElement).value.includes(':')) {
+                                  (e.target as HTMLInputElement).value = v.slice(0, 2) + ':' + v.slice(2, 4)
+                                }
+                              }} value={formCheckOut} onChange={e => setFormCheckOut(e.target.value)}
                             className="w-full px-2 py-2 text-[14px] border border-gray-200 rounded-lg" />
                         </div>
                       </div>

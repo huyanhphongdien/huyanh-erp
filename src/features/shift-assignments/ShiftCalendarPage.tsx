@@ -352,7 +352,7 @@ export function ShiftCalendarPage() {
               className="text-sm border rounded-lg px-2 py-1.5 min-h-[36px] bg-white"
             >
               <option value="">Tất cả phòng ban</option>
-              {ensureArray(departments).map((dept: any) => (
+              {ensureArray(departments).filter((d: any) => d.status !== 'inactive').map((dept: any) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}
                 </option>
@@ -360,24 +360,7 @@ export function ShiftCalendarPage() {
             </select>
           </div>
 
-          {/* ★ FIX: Team dropdown dùng team.id làm value (UUID) */}
-          {ensureArray(teams).length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Users size={14} className="text-gray-400" />
-              <select
-                value={teamFilter}
-                onChange={(e) => setTeamFilter(e.target.value)}
-                className="text-sm border rounded-lg px-2 py-1.5 min-h-[36px] bg-white"
-              >
-                <option value="all">Tất cả đội</option>
-                {ensureArray(teams).map((team: any) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Team filter — ẩn (đã bỏ quản lý đội) */}
 
           <div className="flex border rounded-lg overflow-hidden ml-auto">
             <button

@@ -1,15 +1,14 @@
 // ============================================================================
-// EDIT ATTENDANCE MODAL
+// EDIT ATTENDANCE MODAL V2
 // File: src/features/attendance/EditAttendanceModal.tsx
 // ============================================================================
-// Modal sửa chấm công — 2 tab: Sửa nhanh + Chi tiết
-// Gọi từ MonthlyTimesheetPage khi click vào ô ngày
+// ★ V2: Hỗ trợ multi-shift, thêm/xóa ca, đánh vắng
 // ============================================================================
 
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  X, Clock, Save, History, AlertTriangle, Loader2, ChevronDown,
+  X, Clock, Save, History, AlertTriangle, Loader2, Plus, Trash2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
@@ -29,19 +28,17 @@ interface Props {
   onSaved: () => void
 }
 
-type Tab = 'quick' | 'detail' | 'history'
+type Tab = 'quick' | 'history'
 
-const STATUS_OPTIONS = [
-  { value: 'present', label: 'Đúng giờ', color: 'text-green-600' },
-  { value: 'late', label: 'Đi trễ', color: 'text-amber-600' },
-  { value: 'early_leave', label: 'Về sớm', color: 'text-purple-600' },
-  { value: 'late_and_early', label: 'Trễ + Về sớm', color: 'text-orange-600' },
-  { value: 'business_trip', label: 'Công tác', color: 'text-sky-600' },
-]
-
-const SYMBOL_TO_STATUS: Record<string, string> = {
-  'S': 'present', 'Đ': 'present', 'C2': 'present', 'HC': 'present',
-  'P': 'present', 'X': 'absent',
+interface AttRecord {
+  id: string
+  shift_id: string | null
+  check_in_time: string | null
+  check_out_time: string | null
+  status: string
+  working_minutes: number
+  work_units: number
+  shift?: { id: string; code: string; name: string } | null
 }
 
 // ============================================================================
@@ -54,12 +51,15 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
   const editorId = user?.employee_id || ''
 
   const [tab, setTab] = useState<Tab>('quick')
-  const [selectedShiftId, setSelectedShiftId] = useState<string>(day.shiftCode ? '' : '')
-  const [selectedStatus, setSelectedStatus] = useState(day.status || 'present')
-  const [checkInTime, setCheckInTime] = useState('')
-  const [checkOutTime, setCheckOutTime] = useState('')
-  const [reason, setReason] = useState('')
   const [error, setError] = useState('')
+
+  // ★ Form cho thêm/sửa ca
+  const [editingId, setEditingId] = useState<string | null>(null) // null = thêm mới
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [formShiftId, setFormShiftId] = useState('')
+  const [formCheckIn, setFormCheckIn] = useState('')
+  const [formCheckOut, setFormCheckOut] = useState('')
+  const [formReason, setFormReason] = useState('')
 
   // ── Permission check ──
   const { data: canEdit = false, isLoading: permLoading } = useQuery({
@@ -74,7 +74,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
     queryFn: async () => {
       const { data } = await supabase
         .from('shifts')
-        .select('id, code, name, start_time, end_time, crosses_midnight')
+        .select('id, code, name, start_time, end_time, crosses_midnight, work_units')
         .eq('is_active', true)
         .order('code')
       return data || []
@@ -82,78 +82,122 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
     enabled: open,
   })
 
-  // ── Attendance record ID (cần cho edit) ──
-  const { data: attendanceRecord } = useQuery({
-    queryKey: ['attendance-record', employeeId, day.date],
+  // ★ Lấy TẤT CẢ attendance records cho ngày này
+  const { data: dayRecords = [], refetch: refetchRecords } = useQuery({
+    queryKey: ['attendance-day-records', employeeId, day.date],
     queryFn: async () => {
       const { data } = await supabase
         .from('attendance')
-        .select('id, shift_id, check_in_time, check_out_time, status, working_minutes')
+        .select(`
+          id, shift_id, check_in_time, check_out_time, status, working_minutes, work_units,
+          shift:shifts!attendance_shift_id_fkey(id, code, name)
+        `)
         .eq('employee_id', employeeId)
         .eq('date', day.date)
-        .order('check_in_time', { ascending: false })
-        .limit(1)
-      return data?.[0] || null
+        .order('check_in_time')
+      return (data || []).map((r: any) => ({
+        ...r,
+        shift: Array.isArray(r.shift) ? r.shift[0] : r.shift,
+      })) as AttRecord[]
     },
     enabled: open,
   })
 
   // ── Edit history ──
+  const firstRecordId = dayRecords[0]?.id
   const { data: editHistory = [] } = useQuery({
-    queryKey: ['attendance-edit-history', attendanceRecord?.id],
-    queryFn: () => attendanceEditService.getEditHistory(attendanceRecord!.id),
-    enabled: tab === 'history' && !!attendanceRecord?.id,
+    queryKey: ['attendance-edit-history', firstRecordId],
+    queryFn: () => attendanceEditService.getEditHistory(firstRecordId!),
+    enabled: tab === 'history' && !!firstRecordId,
   })
 
-  // ── Init form values ──
+  // Reset form
   useEffect(() => {
     if (!open) return
     setError('')
-    setReason('')
+    setShowAddForm(false)
+    setEditingId(null)
+    setFormReason('')
+  }, [open, day.date])
 
-    // Find shift id from code
-    const shiftMatch = shifts.find(s => s.code === day.shiftCode)
-    setSelectedShiftId(shiftMatch?.id || attendanceRecord?.shift_id || '')
-    setSelectedStatus(day.status || 'present')
-
-    // Parse times for detail tab
-    if (day.checkIn) {
-      const d = new Date(day.checkIn)
-      setCheckInTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
-    } else {
-      setCheckInTime('')
-    }
-    if (day.checkOut) {
-      const d = new Date(day.checkOut)
-      setCheckOutTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
-    } else {
-      setCheckOutTime('')
-    }
-  }, [open, day, shifts, attendanceRecord])
-
-  // ── Quick edit mutation ──
-  const quickEditMutation = useMutation({
+  // ── Thêm ca mới ──
+  const addMutation = useMutation({
     mutationFn: async () => {
-      if (!attendanceRecord) {
-        // Tạo mới nếu chưa có record
-        const shift = shifts.find(s => s.id === selectedShiftId)
-        if (!shift) throw new Error('Chọn ca trước')
+      if (!formShiftId) throw new Error('Chọn ca trước')
 
-        // Default check-in = shift start time
-        const checkIn = `${day.date}T${shift.start_time}+07:00`
-        return attendanceEditService.createRecord(
-          employeeId, day.date, selectedShiftId, checkIn, null, editorId, reason
-        )
+      const shift = shifts.find(s => s.id === formShiftId)
+      if (!shift) throw new Error('Không tìm thấy ca')
+
+      // Default times from shift
+      const cinTime = formCheckIn || shift.start_time?.substring(0, 5) || '08:00'
+      const coutTime = formCheckOut || shift.end_time?.substring(0, 5) || ''
+
+      const checkInISO = `${day.date}T${cinTime}:00+07:00`
+      let checkOutISO: string | null = null
+      if (coutTime) {
+        if ((shift as any).crosses_midnight && coutTime < cinTime) {
+          const nextDay = new Date(day.date + 'T00:00:00+07:00')
+          nextDay.setDate(nextDay.getDate() + 1)
+          const nextDateStr = nextDay.toISOString().split('T')[0]
+          checkOutISO = `${nextDateStr}T${coutTime}:00+07:00`
+        } else {
+          checkOutISO = `${day.date}T${coutTime}:00+07:00`
+        }
       }
-      return attendanceEditService.quickEdit(
-        attendanceRecord.id, editorId, selectedShiftId || null, selectedStatus, reason
+
+      return attendanceEditService.createRecord(
+        employeeId, day.date, formShiftId, checkInISO, checkOutISO, editorId, formReason || 'Thêm ca'
       )
     },
     onSuccess: (result) => {
-      if (!result.success) {
-        setError(result.error || 'Lỗi không xác định')
-        return
-      }
+      if (!result.success) { setError(result.error || 'Lỗi'); return }
+      setShowAddForm(false)
+      setFormShiftId('')
+      setFormCheckIn('')
+      setFormCheckOut('')
+      setFormReason('')
+      refetchRecords()
+      queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
+      onSaved()
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
+  // ── Xóa 1 record ──
+  const deleteMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      const perm = await attendanceEditService.canEdit(editorId, employeeId)
+      if (!perm) throw new Error('Không có quyền')
+
+      const { error: delErr } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('id', recordId)
+      if (delErr) throw new Error(delErr.message)
+    },
+    onSuccess: () => {
+      refetchRecords()
+      queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
+      onSaved()
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
+  // ── Xóa tất cả (đánh vắng) ──
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const perm = await attendanceEditService.canEdit(editorId, employeeId)
+      if (!perm) throw new Error('Không có quyền')
+
+      const { error: delErr } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('date', day.date)
+      if (delErr) throw new Error(delErr.message)
+    },
+    onSuccess: () => {
+      refetchRecords()
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
       onSaved()
       onClose()
@@ -161,62 +205,40 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
     onError: (err: Error) => setError(err.message),
   })
 
-  // ── Detail edit mutation ──
-  const detailEditMutation = useMutation({
+  // ── Sửa nhanh 1 record (đổi ca) ──
+  const editMutation = useMutation({
     mutationFn: async () => {
-      if (!checkInTime) throw new Error('Nhập giờ vào')
-
-      // Build ISO times
-      const checkInISO = `${day.date}T${checkInTime}:00+07:00`
-      const checkOutISO = checkOutTime ? `${day.date}T${checkOutTime}:00+07:00` : null
-
-      // Handle crosses_midnight checkout
-      const shift = shifts.find(s => s.id === selectedShiftId)
-      let adjustedCheckOut = checkOutISO
-      if (shift?.crosses_midnight && checkOutTime && checkOutTime < checkInTime) {
-        // Checkout ngày hôm sau
-        const nextDay = new Date(day.date + 'T00:00:00+07:00')
-        nextDay.setDate(nextDay.getDate() + 1)
-        const nextDateStr = nextDay.toISOString().split('T')[0]
-        adjustedCheckOut = `${nextDateStr}T${checkOutTime}:00+07:00`
-      }
-
-      if (!attendanceRecord) {
-        // Tạo mới
-        return attendanceEditService.createRecord(
-          employeeId, day.date, selectedShiftId, checkInISO, adjustedCheckOut, editorId, reason
-        )
-      }
-
-      return attendanceEditService.detailEdit(
-        attendanceRecord.id, editorId,
-        {
-          shiftId: selectedShiftId || undefined,
-          status: selectedStatus,
-          checkInTime: checkInISO,
-          checkOutTime: adjustedCheckOut,
-        },
-        reason
+      if (!editingId || !formShiftId) throw new Error('Chọn ca')
+      return attendanceEditService.quickEdit(
+        editingId, editorId, formShiftId, 'present', formReason || 'Đổi ca'
       )
     },
     onSuccess: (result) => {
-      if (!result.success) {
-        setError(result.error || 'Lỗi không xác định')
-        return
-      }
+      if (!result.success) { setError(result.error || 'Lỗi'); return }
+      setEditingId(null)
+      refetchRecords()
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
       onSaved()
-      onClose()
     },
     onError: (err: Error) => setError(err.message),
   })
 
   if (!open) return null
 
-  const isLoading = quickEditMutation.isPending || detailEditMutation.isPending
+  const isLoading = addMutation.isPending || deleteMutation.isPending || deleteAllMutation.isPending || editMutation.isPending
+
   const dateDisplay = new Date(day.date + 'T00:00:00+07:00').toLocaleDateString('vi-VN', {
     weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
   })
+
+  const formatTime = (iso: string | null) => {
+    if (!iso) return '...'
+    const d = new Date(iso)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  // Tổng công trong ngày
+  const totalWU = dayRecords.reduce((s, r) => s + (r.work_units || 1), 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -243,7 +265,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
               <div>
                 <div className="font-medium">Không có quyền sửa</div>
                 <div className="text-[12px] text-red-500 mt-0.5">
-                  Chỉ Admin, Trưởng phòng (NV trong phòng), hoặc HR được sửa chấm công.
+                  Chỉ Admin, Trưởng phòng, hoặc HR được sửa chấm công.
                 </div>
               </div>
             </div>
@@ -253,8 +275,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
             {/* Tabs */}
             <div className="flex border-b">
               {[
-                { id: 'quick' as Tab, label: 'Sửa nhanh' },
-                { id: 'detail' as Tab, label: 'Chi tiết' },
+                { id: 'quick' as Tab, label: 'Chấm công' },
                 { id: 'history' as Tab, label: 'Lịch sử' },
               ].map(t => (
                 <button
@@ -269,7 +290,6 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
               ))}
             </div>
 
-            {/* Tab content */}
             <div className="p-4">
               {/* Error */}
               {error && (
@@ -279,191 +299,183 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
                 </div>
               )}
 
-              {/* ── TAB: Sửa nhanh ── */}
+              {/* ══════════════ TAB: Chấm công ══════════════ */}
               {tab === 'quick' && (
                 <div className="space-y-3">
-                  {/* Ca */}
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Ca làm việc</label>
-                    <select
-                      value={selectedShiftId}
-                      onChange={e => setSelectedShiftId(e.target.value)}
-                      className="w-full px-3 py-2.5 text-[14px] border border-gray-200 rounded-lg bg-white focus:border-[#1B4D3E] focus:ring-1 focus:ring-[#1B4D3E]/20"
-                    >
-                      <option value="">— Không có ca —</option>
-                      {shifts.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.start_time?.substring(0, 5)} - {s.end_time?.substring(0, 5)})
-                          {s.crosses_midnight ? ' 🌙' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
-                  {/* Trạng thái */}
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Trạng thái</label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {STATUS_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setSelectedStatus(opt.value)}
-                          className={`px-3 py-2 rounded-lg text-[13px] font-medium border transition-colors
-                            ${selectedStatus === opt.value
-                              ? 'border-[#1B4D3E] bg-[#1B4D3E]/5 text-[#1B4D3E]'
-                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'}
-                          `}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setSelectedStatus('absent')}
-                        className={`px-3 py-2 rounded-lg text-[13px] font-medium border transition-colors
-                          ${selectedStatus === 'absent'
-                            ? 'border-red-400 bg-red-50 text-red-600'
-                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'}
-                        `}
-                      >
-                        Vắng
-                      </button>
-                      <button
-                        onClick={() => setSelectedStatus('leave')}
-                        className={`px-3 py-2 rounded-lg text-[13px] font-medium border transition-colors
-                          ${selectedStatus === 'leave'
-                            ? 'border-orange-400 bg-orange-50 text-orange-600'
-                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'}
-                        `}
-                      >
-                        Nghỉ phép
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Lý do */}
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Lý do sửa</label>
-                    <input
-                      type="text"
-                      value={reason}
-                      onChange={e => setReason(e.target.value)}
-                      placeholder="VD: Phân ca nhầm, NV quên check-in..."
-                      className="w-full px-3 py-2.5 text-[14px] border border-gray-200 rounded-lg focus:border-[#1B4D3E] focus:ring-1 focus:ring-[#1B4D3E]/20"
-                    />
-                  </div>
-
-                  {/* Save button */}
-                  <button
-                    onClick={() => quickEditMutation.mutate()}
-                    disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold bg-[#1B4D3E] text-white active:bg-[#163d32] disabled:opacity-50"
-                  >
-                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    Lưu thay đổi
-                  </button>
-                </div>
-              )}
-
-              {/* ── TAB: Chi tiết ── */}
-              {tab === 'detail' && (
-                <div className="space-y-3">
-                  {/* Ca */}
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Ca làm việc</label>
-                    <select
-                      value={selectedShiftId}
-                      onChange={e => setSelectedShiftId(e.target.value)}
-                      className="w-full px-3 py-2.5 text-[14px] border border-gray-200 rounded-lg bg-white focus:border-[#1B4D3E]"
-                    >
-                      <option value="">— Không có ca —</option>
-                      {shifts.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.start_time?.substring(0, 5)} - {s.end_time?.substring(0, 5)})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Giờ vào / ra */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* ★ Danh sách các ca trong ngày */}
+                  {dayRecords.length > 0 ? (
                     <div>
-                      <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Giờ vào</label>
-                      <input
-                        type="time"
-                        value={checkInTime}
-                        onChange={e => setCheckInTime(e.target.value)}
-                        className="w-full px-3 py-2.5 text-[15px] border border-gray-200 rounded-lg focus:border-[#1B4D3E]"
-                      />
+                      <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1.5 block">
+                        Các ca trong ngày ({dayRecords.length} ca — {totalWU} công)
+                      </label>
+                      <div className="space-y-1.5">
+                        {dayRecords.map((rec, idx) => (
+                          <div key={rec.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 text-[13px]">
+                                <span className="font-semibold text-gray-800">
+                                  {rec.shift?.name || `Ca ${idx + 1}`}
+                                </span>
+                                {rec.status === 'business_trip' && (
+                                  <span className="px-1.5 py-0.5 bg-sky-100 text-sky-700 text-[10px] font-medium rounded">CT</span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-gray-500">
+                                {formatTime(rec.check_in_time)} → {formatTime(rec.check_out_time)}
+                                {rec.working_minutes > 0 && ` • ${Math.round(rec.working_minutes / 60 * 10) / 10}h`}
+                                {rec.work_units > 0 && ` • ${rec.work_units} công`}
+                              </div>
+                            </div>
+                            {/* Edit / Delete buttons */}
+                            {editingId === rec.id ? (
+                              <div className="flex gap-1">
+                                <button onClick={() => editMutation.mutate()} disabled={isLoading}
+                                  className="px-2 py-1 bg-green-600 text-white text-[10px] font-semibold rounded active:bg-green-700 disabled:opacity-50">
+                                  Lưu
+                                </button>
+                                <button onClick={() => setEditingId(null)}
+                                  className="px-2 py-1 border border-gray-300 text-[10px] rounded text-gray-600">
+                                  Hủy
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => {
+                                    setEditingId(rec.id)
+                                    setFormShiftId(rec.shift_id || '')
+                                    setFormReason('')
+                                  }}
+                                  className="px-2 py-1 border border-gray-300 text-[10px] rounded text-gray-600 hover:bg-gray-100"
+                                >
+                                  Đổi ca
+                                </button>
+                                <button
+                                  onClick={() => { if (confirm('Xóa bản ghi này?')) deleteMutation.mutate(rec.id) }}
+                                  disabled={isLoading}
+                                  className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Đổi ca form (inline) */}
+                      {editingId && (
+                        <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <label className="text-[11px] font-semibold text-gray-500 mb-1 block">Đổi sang ca</label>
+                          <select value={formShiftId} onChange={e => setFormShiftId(e.target.value)}
+                            className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg bg-white mb-2">
+                            <option value="">— Chọn ca —</option>
+                            {shifts.map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} ({s.start_time?.substring(0, 5)} - {s.end_time?.substring(0, 5)})
+                              </option>
+                            ))}
+                          </select>
+                          <input type="text" value={formReason} onChange={e => setFormReason(e.target.value)}
+                            placeholder="Lý do đổi ca..." className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg" />
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Giờ ra</label>
-                      <input
-                        type="time"
-                        value={checkOutTime}
-                        onChange={e => setCheckOutTime(e.target.value)}
-                        className="w-full px-3 py-2.5 text-[15px] border border-gray-200 rounded-lg focus:border-[#1B4D3E]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Trạng thái */}
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Trạng thái</label>
-                    <select
-                      value={selectedStatus}
-                      onChange={e => setSelectedStatus(e.target.value)}
-                      className="w-full px-3 py-2.5 text-[14px] border border-gray-200 rounded-lg bg-white focus:border-[#1B4D3E]"
-                    >
-                      {STATUS_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                      <option value="absent">Vắng</option>
-                      <option value="leave">Nghỉ phép</option>
-                    </select>
-                  </div>
-
-                  {/* Lý do */}
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase mb-1 block">Lý do sửa</label>
-                    <input
-                      type="text"
-                      value={reason}
-                      onChange={e => setReason(e.target.value)}
-                      placeholder="VD: Sửa giờ check-in do máy lỗi..."
-                      className="w-full px-3 py-2.5 text-[14px] border border-gray-200 rounded-lg focus:border-[#1B4D3E]"
-                    />
-                  </div>
-
-                  {/* Preview */}
-                  {checkInTime && checkOutTime && (
-                    <div className="bg-blue-50 rounded-lg px-3 py-2 text-[12px] text-blue-700">
-                      <Clock size={12} className="inline mr-1" />
-                      Thời gian: {checkInTime} → {checkOutTime}
-                      {(() => {
-                        const [h1, m1] = checkInTime.split(':').map(Number)
-                        const [h2, m2] = checkOutTime.split(':').map(Number)
-                        let diff = (h2 * 60 + m2) - (h1 * 60 + m1)
-                        if (diff < 0) diff += 24 * 60 // crosses midnight
-                        return ` = ${Math.round(diff / 60 * 10) / 10}h`
-                      })()}
+                  ) : (
+                    <div className="text-center py-4 text-gray-400 text-[13px]">
+                      <Clock size={24} className="mx-auto mb-2 text-gray-300" />
+                      Chưa có bản ghi chấm công
                     </div>
                   )}
 
-                  <button
-                    onClick={() => detailEditMutation.mutate()}
-                    disabled={isLoading || !checkInTime}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[14px] font-semibold bg-[#1B4D3E] text-white active:bg-[#163d32] disabled:opacity-50"
-                  >
-                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    Lưu thay đổi
-                  </button>
+                  {/* ★ THÊM CA MỚI */}
+                  {!showAddForm ? (
+                    <button
+                      onClick={() => {
+                        setShowAddForm(true)
+                        setEditingId(null)
+                        setFormShiftId('')
+                        setFormCheckIn('')
+                        setFormCheckOut('')
+                        setFormReason('')
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-[13px] font-medium text-gray-500 hover:border-[#1B4D3E] hover:text-[#1B4D3E] transition-colors"
+                    >
+                      <Plus size={15} /> Thêm ca
+                    </button>
+                  ) : (
+                    <div className="p-3 bg-green-50 rounded-xl border border-green-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] font-bold text-green-700">Thêm ca mới</span>
+                        <button onClick={() => setShowAddForm(false)} className="text-gray-400 hover:text-gray-600">
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      {/* Ca */}
+                      <select value={formShiftId} onChange={e => setFormShiftId(e.target.value)}
+                        className="w-full px-3 py-2.5 text-[13px] border border-gray-200 rounded-lg bg-white">
+                        <option value="">— Chọn ca —</option>
+                        {shifts.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.start_time?.substring(0, 5)} - {s.end_time?.substring(0, 5)})
+                            {s.crosses_midnight ? ' 🌙' : ''}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Giờ vào/ra */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-gray-500 mb-0.5 block">Giờ vào</label>
+                          <input type="time" value={formCheckIn} onChange={e => setFormCheckIn(e.target.value)}
+                            className="w-full px-2 py-2 text-[14px] border border-gray-200 rounded-lg" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-gray-500 mb-0.5 block">Giờ ra</label>
+                          <input type="time" value={formCheckOut} onChange={e => setFormCheckOut(e.target.value)}
+                            className="w-full px-2 py-2 text-[14px] border border-gray-200 rounded-lg" />
+                        </div>
+                      </div>
+
+                      {/* Lý do */}
+                      <input type="text" value={formReason} onChange={e => setFormReason(e.target.value)}
+                        placeholder="Lý do..." className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg" />
+
+                      {/* Submit */}
+                      <button
+                        onClick={() => addMutation.mutate()}
+                        disabled={isLoading || !formShiftId}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 text-white rounded-xl text-[13px] font-semibold active:bg-green-700 disabled:opacity-50"
+                      >
+                        {addMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                        Thêm ca
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ★ ĐÁNH VẮNG — Xóa tất cả attendance */}
+                  {dayRecords.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Xóa tất cả chấm công ngày ${day.date}?\nNgày này sẽ hiện "X" (vắng).`)) {
+                          deleteAllMutation.mutate()
+                        }
+                      }}
+                      disabled={isLoading}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 border border-red-300 rounded-xl text-[12px] font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <Trash2 size={13} /> Đánh vắng (xóa tất cả)
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* ── TAB: Lịch sử ── */}
+              {/* ══════════════ TAB: Lịch sử ══════════════ */}
               {tab === 'history' && (
                 <div>
-                  {!attendanceRecord?.id ? (
+                  {!firstRecordId ? (
                     <p className="text-center text-gray-400 text-[13px] py-4">Chưa có bản ghi chấm công</p>
                   ) : editHistory.length === 0 ? (
                     <p className="text-center text-gray-400 text-[13px] py-4">Chưa có lịch sử sửa</p>
@@ -478,7 +490,9 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
                             </span>
                           </div>
                           <div className="text-gray-500">
-                            <span className="font-medium">{log.edit_type === 'shift_change' ? 'Đổi ca' : log.edit_type === 'time_correction' ? 'Sửa giờ' : 'Thủ công'}</span>
+                            <span className="font-medium">
+                              {log.edit_type === 'shift_change' ? 'Đổi ca' : log.edit_type === 'time_correction' ? 'Sửa giờ' : 'Thủ công'}
+                            </span>
                             {log.reason && <span> — {log.reason}</span>}
                           </div>
                           {log.old_values?.shift_code && (

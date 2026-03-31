@@ -134,7 +134,8 @@ export default function MonthlyTimesheetPage() {
   // RENDER: Drill-down (chi tiết 1 NV)
   // ============================================================
   if (selectedEmployee) {
-    const emp = selectedEmployee
+    // ★ Lấy data live từ timesheet (sau khi refetch) thay vì dùng snapshot cũ
+    const emp = timesheet?.employees.find(e => e.employeeId === selectedEmployee.employeeId) || selectedEmployee
     return (
       <div className="min-h-screen bg-[#F7F5F2]">
         <div className="bg-white border-b sticky top-0 z-10">

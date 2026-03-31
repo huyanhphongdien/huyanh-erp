@@ -19,6 +19,10 @@ interface TaskFilter {
   priority?: string
   date_from?: string
   date_to?: string
+  due_date_from?: string
+  due_date_to?: string
+  created_date_from?: string
+  created_date_to?: string
 }
 
 interface Task {
@@ -144,12 +148,27 @@ async function fetchTasks(
     query = query.eq('priority', filter.priority)
   }
 
-  if (filter?.date_from) {
-    query = query.gte('due_date', filter.date_from)
+  // ★ Date filters — due_date
+  if (filter?.date_from || filter?.due_date_from) {
+    query = query.gte('due_date', filter.date_from || filter.due_date_from!)
+  }
+  if (filter?.date_to || filter?.due_date_to) {
+    query = query.lte('due_date', filter.date_to || filter.due_date_to!)
   }
 
-  if (filter?.date_to) {
-    query = query.lte('due_date', filter.date_to)
+  // ★ Date filters — created_at
+  if (filter?.created_date_from) {
+    query = query.gte('created_at', filter.created_date_from + 'T00:00:00')
+  }
+  if (filter?.created_date_to) {
+    query = query.lte('created_at', filter.created_date_to + 'T23:59:59')
+  }
+
+  // ★ Mặc định: chỉ hiện task tháng hiện tại (created_at >= đầu tháng)
+  if (!filter?.date_from && !filter?.due_date_from && !filter?.created_date_from && !filter?.search) {
+    const now = new Date()
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
+    query = query.gte('created_at', monthStart)
   }
 
   const { data, error, count } = await query

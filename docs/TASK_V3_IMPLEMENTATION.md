@@ -517,33 +517,122 @@ Khi nhân viên có hơn 3 task hoàn thành nhưng chưa đánh giá:
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### H.2 Công thức tính lương
+### H.2 Hai loại lương — Công thức thống nhất
 
 ```
-Lương thực nhận = Lương cơ bản × Hệ số hạng + Thưởng hiệu suất
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  LOẠI 1: LƯƠNG CỐ ĐỊNH (văn phòng, quản lý)                    │
+│  ─────────────────────────────────────────                      │
+│  Lương nền = Lương cơ bản / tháng                               │
+│  Tổng nhận = Lương_nền × Hệ_số_hạng + Thưởng                  │
+│                                                                 │
+│  VD: 8,000,000đ/tháng × 1.00 (hạng B) + 1,000,000 = 9,000,000 │
+│                                                                 │
+│  ──────────────────────────────────────────────────             │
+│                                                                 │
+│  LOẠI 2: LƯƠNG THEO CÔNG (công nhân, SX)                        │
+│  ─────────────────────────────────────────                      │
+│  Lương nền = Đơn giá ngày × Ngày công thực tế                  │
+│  Tổng nhận = Lương_nền × Hệ_số_hạng + Thưởng                  │
+│                                                                 │
+│  VD: 450,000đ/ngày × 20 ngày = 9,000,000đ                      │
+│      9,000,000 × 1.00 (hạng B) + 1,000,000 = 10,000,000        │
+│                                                                 │
+│  ──────────────────────────────────────────────────             │
+│                                                                 │
+│  → Hệ số + Thưởng áp dụng GIỐNG NHAU cho cả 2 loại            │
+│  → Chỉ khác CÁCH TÍNH LƯƠNG NỀN                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### H.3 Ví dụ minh họa
+### H.3 Database — Thêm hỗ trợ lương theo công
 
-**Nhân viên — Lương cơ bản 8.000.000đ — Thưởng tối đa 2.000.000đ**
+```sql
+-- Thêm loại lương vào salary_grades
+ALTER TABLE salary_grades
+  ADD COLUMN IF NOT EXISTS rate_type VARCHAR(10) DEFAULT 'monthly',
+  -- 'monthly' = Lương cố định / tháng
+  -- 'daily'   = Lương theo công / ngày
+  ADD COLUMN IF NOT EXISTS daily_rate NUMERIC(15,2) DEFAULT 0;
 
-| Hạng | Điểm | Lương | Thưởng | Tổng nhận | Chênh lệch |
-|------|------|-------|--------|-----------|-----------|
-| A | 95 | 8.000.000 × 1.00 = 8.000.000 | 2.000.000 × 100% = 2.000.000 | **10.000.000đ** | +2.000.000 |
-| B | 82 | 8.000.000 × 1.00 = 8.000.000 | 2.000.000 × 50% = 1.000.000 | **9.000.000đ** | +1.000.000 |
-| C | 68 | 8.000.000 × 0.95 = 7.600.000 | 0 | **7.600.000đ** | −400.000 |
-| D | 50 | 8.000.000 × 0.90 = 7.200.000 | 0 | **7.200.000đ** | −800.000 |
-| F | 35 | 8.000.000 × 0.85 = 6.800.000 | 0 | **6.800.000đ** | −1.200.000 |
+-- Thêm loại lương vào employees (override nếu khác salary_grade)
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS rate_type VARCHAR(10),
+  ADD COLUMN IF NOT EXISTS daily_rate NUMERIC(15,2);
+```
 
-**Trưởng phòng — Lương cơ bản 15.000.000đ — Thưởng tối đa 4.000.000đ**
+### H.4 Tính lương — Lấy ngày công từ chấm công
 
-| Hạng | Lương | Thưởng | Tổng nhận |
-|------|-------|--------|-----------|
-| A | 15.000.000 | 4.000.000 | **19.000.000đ** |
-| B | 15.000.000 | 2.000.000 | **17.000.000đ** |
-| C | 14.250.000 | 0 | **14.250.000đ** |
+```typescript
+// Tính lương nền cho từng NV
+function calculateBasePay(employee, month, year) {
+  const rateType = employee.rate_type || employee.salary_grade?.rate_type || 'monthly'
 
-### H.4 Trang cấu hình cho BGĐ
+  if (rateType === 'daily') {
+    // LƯƠNG THEO CÔNG
+    const dailyRate = employee.daily_rate || employee.salary_grade?.daily_rate || 0
+    const actualDays = getActualWorkingDays(employee.id, month, year) // Từ chấm công
+    return dailyRate * actualDays
+  } else {
+    // LƯƠNG CỐ ĐỊNH
+    return employee.salary_grade?.base_salary || 0
+  }
+}
+
+// Lấy ngày công thực tế từ attendance
+function getActualWorkingDays(employeeId, month, year) {
+  // Query attendance table
+  // Đếm ngày có status IN ('present', 'late', 'half_day')
+  // Trả về số ngày thực tế (VD: 20 ngày)
+}
+
+// Tính tổng lương
+function calculateTotalPay(employee, month, year, grade) {
+  const basePay = calculateBasePay(employee, month, year)
+  const coefficient = getGradeCoefficient(grade)   // A=1.00, C=0.95...
+  const bonus = getGradeBonus(grade, employee)      // A=100%, B=50%...
+
+  return (basePay * coefficient) + bonus
+}
+```
+
+### H.5 Ví dụ minh họa — Lương cố định
+
+**Nhân viên văn phòng — Lương 8.000.000đ/tháng — Thưởng tối đa 2.000.000đ**
+
+| Hạng | Điểm | Lương nền | × Hệ số | Thưởng | Tổng nhận | Chênh lệch |
+|------|------|----------|---------|--------|-----------|-----------|
+| A | 95 | 8,000,000 | × 1.00 = 8,000,000 | 2,000,000 | **10,000,000đ** | +2,000,000 |
+| B | 82 | 8,000,000 | × 1.00 = 8,000,000 | 1,000,000 | **9,000,000đ** | +1,000,000 |
+| C | 68 | 8,000,000 | × 0.95 = 7,600,000 | 0 | **7,600,000đ** | −400,000 |
+| D | 50 | 8,000,000 | × 0.90 = 7,200,000 | 0 | **7,200,000đ** | −800,000 |
+| F | 35 | 8,000,000 | × 0.85 = 6,800,000 | 0 | **6,800,000đ** | −1,200,000 |
+
+### H.6 Ví dụ minh họa — Lương theo công
+
+**Công nhân SX — Đơn giá 450.000đ/ngày — 20 ngày công — Thưởng tối đa 2.000.000đ**
+
+| Hạng | Điểm | Ngày công | Lương nền | × Hệ số | Thưởng | Tổng nhận | Chênh lệch |
+|------|------|----------|----------|---------|--------|-----------|-----------|
+| A | 95 | 20 | 9,000,000 | × 1.00 = 9,000,000 | 2,000,000 | **11,000,000đ** | +2,000,000 |
+| B | 82 | 20 | 9,000,000 | × 1.00 = 9,000,000 | 1,000,000 | **10,000,000đ** | +1,000,000 |
+| C | 68 | 20 | 9,000,000 | × 0.95 = 8,550,000 | 0 | **8,550,000đ** | −450,000 |
+| D | 50 | 20 | 9,000,000 | × 0.90 = 8,100,000 | 0 | **8,100,000đ** | −900,000 |
+| F | 35 | 20 | 9,000,000 | × 0.85 = 7,650,000 | 0 | **7,650,000đ** | −1,350,000 |
+
+**Cùng công nhân đó nhưng chỉ đi 15 ngày (nghỉ 5 ngày):**
+
+| Hạng | Ngày công | Lương nền | × Hệ số | Thưởng | Tổng nhận |
+|------|----------|----------|---------|--------|-----------|
+| A | 15 | 6,750,000 | × 1.00 = 6,750,000 | 2,000,000 | **8,750,000đ** |
+| B | 15 | 6,750,000 | × 1.00 = 6,750,000 | 1,000,000 | **7,750,000đ** |
+| C | 15 | 6,750,000 | × 0.95 = 6,412,500 | 0 | **6,412,500đ** |
+
+→ Ngày công ít hơn = lương nền thấp hơn — **công bằng**.
+
+### H.7 Trang cấu hình cho BGĐ
 
 **Route:** `/settings/performance-salary` (chỉ Admin/BGĐ truy cập)
 
@@ -551,6 +640,8 @@ Lương thực nhận = Lương cơ bản × Hệ số hạng + Thưởng hiệu
 ┌─────────────────────────────────────────────────────────────┐
 │  ⚙️ Cấu hình lương khoán theo hiệu suất                    │
 │                                                             │
+│  Hệ số theo hạng:                                          │
+│  ─────────────────                                          │
 │  Hạng │ Điểm      │ Hệ số lương │ % Thưởng │ Mô tả        │
 │  ─────┼───────────┼─────────────┼──────────┼──────────     │
 │  A    │ 90 - 100  │    1.00     │   100%   │ Xuất sắc      │
@@ -565,25 +656,55 @@ Lương thực nhận = Lương cơ bản × Hệ số hạng + Thưởng hiệu
 │  Phó phòng:     [3.000.000] đ                               │
 │  Trưởng phòng:  [4.000.000] đ                               │
 │                                                             │
+│  Áp dụng cho:                                               │
+│  ☑ Lương cố định (monthly)                                  │
+│  ☑ Lương theo công (daily)                                  │
+│                                                             │
 │                          [Lưu thay đổi]                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### H.5 Tích hợp Dashboard hiệu suất
+### H.8 Tích hợp Dashboard hiệu suất
 
 Trên trang `/performance`, thêm cột:
-- "Lương khoán" — hiện lương sau khi áp hệ số
-- "Thưởng hiệu suất" — hiện số tiền thưởng
-- "Tổng nhận" — lương + thưởng
+- "Loại lương" — Cố định / Theo công
+- "Lương nền" — Lương tháng hoặc đơn giá × ngày
+- "Hệ số" — từ hạng
+- "Thưởng" — số tiền
+- "Tổng nhận" — lương nền × hệ số + thưởng
 
 ```
 Bảng xếp hạng nhân viên — Tháng 3/2026
 
-#  │ Nhân viên      │ Phòng ban  │ Điểm │ Hạng │ Hệ số │ Thưởng      │
-───┼────────────────┼────────────┼──────┼──────┼───────┼─────────────│
-1  │ Võ Thị Kim Ngân│ Phòng QC   │  95  │  A   │ 1.00  │ 2.000.000đ  │
-2  │ Lê Văn Huy     │ Ban GĐ     │  86  │  B   │ 1.00  │ 1.000.000đ  │
-3  │ Trần Thị Bé    │ Phòng QC   │  68  │  C   │ 0.95  │ 0đ          │
+#  │ Nhân viên       │ Phòng ban │ Loại  │ Lương nền   │ Điểm│Hạng│ Hệ số│ Thưởng    │ Tổng nhận   │
+───┼─────────────────┼───────────┼───────┼─────────────┼─────┼────┼──────┼───────────┼─────────────│
+1  │ Võ Thị Kim Ngân │ QC        │ Tháng │  8,000,000  │  95 │ A  │ 1.00 │ 2,000,000 │ 10,000,000  │
+2  │ Nguyễn Văn A    │ SX        │ Công  │  9,000,000  │  85 │ B  │ 1.00 │ 1,000,000 │ 10,000,000  │
+3  │ Trần Thị Bé     │ QC        │ Tháng │  7,500,000  │  68 │ C  │ 0.95 │ 0         │  7,125,000  │
+4  │ Lê Văn C        │ SX        │ Công  │  6,750,000  │  50 │ D  │ 0.90 │ 0         │  6,075,000  │
+```
+
+### H.9 SQL Migration bổ sung
+
+```sql
+-- Bảng cấu hình lương khoán (đã có trong Phần A)
+-- + Thêm hỗ trợ lương theo công:
+
+ALTER TABLE salary_grades
+  ADD COLUMN IF NOT EXISTS rate_type VARCHAR(10) DEFAULT 'monthly',
+  ADD COLUMN IF NOT EXISTS daily_rate NUMERIC(15,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS max_performance_bonus NUMERIC(15,2) DEFAULT 0;
+
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS rate_type VARCHAR(10),
+  ADD COLUMN IF NOT EXISTS daily_rate NUMERIC(15,2);
+
+-- Cập nhật payslips để lưu thông tin hiệu suất
+ALTER TABLE payslips
+  ADD COLUMN IF NOT EXISTS performance_grade CHAR(1),
+  ADD COLUMN IF NOT EXISTS performance_score INTEGER,
+  ADD COLUMN IF NOT EXISTS performance_coefficient NUMERIC(4,2),
+  ADD COLUMN IF NOT EXISTS performance_bonus NUMERIC(15,2) DEFAULT 0;
 ```
 
 ---

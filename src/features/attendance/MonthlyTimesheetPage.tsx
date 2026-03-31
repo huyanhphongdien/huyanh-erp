@@ -149,7 +149,7 @@ export default function MonthlyTimesheetPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
             {[
-              { label: 'Đi làm', value: emp.totalWorkDays, unit: 'ngày', color: 'text-blue-600 bg-blue-50' },
+              { label: 'Công', value: emp.totalCong, unit: 'công', color: 'text-blue-600 bg-blue-50' },
               { label: 'Tổng giờ', value: emp.totalWorkingHours, unit: 'h', color: 'text-emerald-600 bg-emerald-50' },
               { label: 'Tăng ca', value: emp.totalOvertimeHours, unit: 'h', color: 'text-purple-600 bg-purple-50' },
               { label: 'Đi trễ', value: emp.totalLateDays, unit: 'lần', color: 'text-amber-600 bg-amber-50' },
@@ -309,7 +309,7 @@ export default function MonthlyTimesheetPage() {
                             </td>
                           )
                         })}
-                        <td className="px-1 py-1 text-center font-bold text-blue-600 border-l-2 border-gray-200">{emp.totalWorkDays}</td>
+                        <td className="px-1 py-1 text-center font-bold text-blue-600 border-l-2 border-gray-200">{emp.totalCong}</td>
                         <td className="px-1 py-1 text-center font-medium text-gray-700">{emp.totalWorkingHours}</td>
                         <td className="px-1 py-1 text-center">{emp.totalLateDays > 0 && <span className="text-amber-600 font-bold">{emp.totalLateDays}</span>}</td>
                         <td className="px-1 py-1 text-center">{emp.totalEarlyDays > 0 && <span className="text-purple-600 font-bold">{emp.totalEarlyDays}</span>}</td>
@@ -330,7 +330,7 @@ export default function MonthlyTimesheetPage() {
                     <td style={{ position: 'sticky', left: COL_NAME_LEFT, zIndex: 5, backgroundColor: '#f0fdf4', boxShadow: '2px 0 4px rgba(0,0,0,0.06)' }}
                       className="px-2 py-2 text-[#1B4D3E] border-r border-gray-200">Tổng ({timesheet.employees.length} NV)</td>
                     {dayHeaders.map((_, i) => <td key={i} className="border-l border-gray-50" style={{ backgroundColor: '#f0fdf4' }} />)}
-                    <td className="px-1 py-2 text-center text-blue-600 border-l-2 border-gray-200" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalWorkDays, 0)}</td>
+                    <td className="px-1 py-2 text-center text-blue-600 border-l-2 border-gray-200" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(timesheet.employees.reduce((s, e) => s + e.totalCong, 0) * 10) / 10}</td>
                     <td className="px-1 py-2 text-center text-gray-700" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(timesheet.employees.reduce((s, e) => s + e.totalWorkingHours, 0) * 10) / 10}</td>
                     <td className="px-1 py-2 text-center text-amber-600" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalLateDays, 0) || ''}</td>
                     <td className="px-1 py-2 text-center text-purple-600" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalEarlyDays, 0) || ''}</td>

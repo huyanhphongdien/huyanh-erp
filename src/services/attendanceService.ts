@@ -264,7 +264,8 @@ const SHIFT_ASSIGNMENT_SELECT = `
   shift:shifts!shift_assignments_shift_id_fkey(
     id, code, name, start_time, end_time,
     standard_hours, break_minutes, crosses_midnight,
-    late_threshold_minutes, early_leave_threshold_minutes
+    late_threshold_minutes, early_leave_threshold_minutes,
+    work_units
   ),
   team:shift_teams!shift_assignments_team_id_fkey(
     id, code, name
@@ -353,7 +354,8 @@ const ATTENDANCE_SELECT = `
   shift:shifts!attendance_shift_id_fkey(
     id, code, name, start_time, end_time,
     standard_hours, break_minutes, crosses_midnight,
-    late_threshold_minutes, early_leave_threshold_minutes
+    late_threshold_minutes, early_leave_threshold_minutes,
+    work_units
   ),
   employee:employees!attendance_employee_id_fkey(
     id, code, full_name, department_id,
@@ -616,9 +618,13 @@ export const attendanceService = {
       const diffMinutes = Math.floor(diffMs / (1000 * 60))
       const threshold = shift.late_threshold_minutes || 15
 
-      if (diffMinutes > threshold) {
+      if (diffMinutes < 0) {
+        // Check-in TRƯỚC giờ ca → không trễ
+        status = 'present'
+        lateMinutes = 0
+      } else if (diffMinutes > threshold) {
         status = 'late'
-        lateMinutes = Math.max(0, diffMinutes)
+        lateMinutes = Math.min(Math.max(0, diffMinutes), 480) // Cap 8h max
       }
     } else {
       // Fallback: không có shift — dùng giờ hành chính 8:00
@@ -626,9 +632,12 @@ export const attendanceService = {
       const diffMs = now.getTime() - defaultStart.getTime()
       const diffMinutes = Math.floor(diffMs / (1000 * 60))
 
-      if (diffMinutes > 30) {
+      if (diffMinutes < 0) {
+        status = 'present'
+        lateMinutes = 0
+      } else if (diffMinutes > 30) {
         status = 'late'
-        lateMinutes = Math.max(0, diffMinutes)
+        lateMinutes = Math.min(Math.max(0, diffMinutes), 480) // Cap 8h max
       }
     }
 
@@ -681,10 +690,12 @@ export const attendanceService = {
     let earlyLeaveMinutes = 0
     let overtimeMinutes = 0
     let workingMinutes = 0
+    let workUnits = 1.0
     let newStatus = openRecord.status
 
     if (openRecord.shift) {
       const shift = openRecord.shift
+      workUnits = (shift as any).work_units || 1.0
       // Dùng break từ shift hiện tại, default 60 nếu null
       const breakMins = shift.break_minutes ?? 60
       const standardMinutes = (shift.standard_hours || 8) * 60
@@ -758,6 +769,7 @@ export const attendanceService = {
       .update({
         check_out_time: nowISO,
         working_minutes: workingMinutes,
+        work_units: workUnits,
         overtime_minutes: Math.max(0, overtimeMinutes),
         early_leave_minutes: Math.max(0, earlyLeaveMinutes),
         status: newStatus,

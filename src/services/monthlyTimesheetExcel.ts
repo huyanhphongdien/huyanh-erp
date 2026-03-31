@@ -216,7 +216,7 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
 
     // Summary cells
     const summaryValues = [
-      { val: emp.totalWorkDays, color: '1D4ED8', bold: true },
+      { val: emp.totalCong, color: '1D4ED8', bold: true },
       { val: emp.totalWorkingHours, color: '374151', bold: false },
       { val: emp.totalLateDays || '', color: 'D97706', bold: true },
       { val: emp.totalEarlyDays || '', color: '7C3AED', bold: true },
@@ -270,7 +270,7 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
 
   // Summary totals
   const totals = [
-    employees.reduce((s, e) => s + e.totalWorkDays, 0),
+    Math.round(employees.reduce((s, e) => s + e.totalCong, 0) * 10) / 10,
     Math.round(employees.reduce((s, e) => s + e.totalWorkingHours, 0) * 10) / 10,
     employees.reduce((s, e) => s + e.totalLateDays, 0) || '',
     employees.reduce((s, e) => s + e.totalEarlyDays, 0) || '',

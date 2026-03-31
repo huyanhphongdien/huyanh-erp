@@ -51,7 +51,8 @@ export interface EmployeeMonthlySummary {
   departmentName: string
   days: DayDetail[]         // 28-31 phần tử
   // Tổng hợp
-  totalWorkDays: number     // Số ngày đi làm
+  totalWorkDays: number     // Số ngày đi làm (count)
+  totalCong: number         // Tổng công = SUM(work_units), e.g. 28.5
   totalWorkingHours: number // Tổng giờ làm
   totalOvertimeHours: number
   totalLateDays: number     // Số lần trễ
@@ -95,6 +96,12 @@ function shiftToSymbol(shiftCode: string | null): DaySymbol {
 }
 
 // ============================================================================
+// VIP EMAILS — ẩn khỏi bảng chấm công (BGĐ)
+// ============================================================================
+
+const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com']
+
+// ============================================================================
 // SERVICE
 // ============================================================================
 
@@ -115,7 +122,7 @@ export const monthlyTimesheetService = {
     // ① Lấy danh sách nhân viên
     let empQuery = supabase
       .from('employees')
-      .select('id, code, full_name, department_id, department:departments!employees_department_id_fkey(id, name)')
+      .select('id, code, full_name, email, department_id, department:departments!employees_department_id_fkey(id, name)')
       .eq('status', 'active')
       .order('full_name')
 
@@ -123,11 +130,16 @@ export const monthlyTimesheetService = {
       empQuery = empQuery.eq('department_id', departmentId)
     }
 
-    const { data: employees, error: empError } = await empQuery
+    const { data: rawEmployees, error: empError } = await empQuery
     if (empError) throw empError
 
+    // Lọc bỏ BGĐ (VIP emails)
+    const employees = (rawEmployees || []).filter(
+      e => !VIP_EMAILS.includes((e.email || '').toLowerCase())
+    )
+
     // ② Lấy attendance records trong tháng
-    const empIds = (employees || []).map(e => e.id)
+    const empIds = employees.map(e => e.id)
     if (empIds.length === 0) {
       return {
         month, year,
@@ -144,8 +156,8 @@ export const monthlyTimesheetService = {
       .select(`
         id, employee_id, date, check_in_time, check_out_time,
         working_minutes, overtime_minutes, late_minutes, early_leave_minutes,
-        status, auto_checkout, shift_id,
-        shift:shifts!attendance_shift_id_fkey(code, name, crosses_midnight)
+        status, auto_checkout, shift_id, work_units,
+        shift:shifts!attendance_shift_id_fkey(code, name, crosses_midnight, work_units)
       `)
       .in('employee_id', empIds)
       .gte('date', startDate)
@@ -181,6 +193,7 @@ export const monthlyTimesheetService = {
       // Build 1-31 days
       const days: DayDetail[] = []
       let totalWorkDays = 0
+      let totalCong = 0       // SUM(work_units)
       let totalWorkingMins = 0
       let totalOTMins = 0
       let totalLateDays = 0
@@ -217,6 +230,9 @@ export const monthlyTimesheetService = {
         } else if (att && att.check_in_time) {
           symbol = shiftToSymbol(shift?.code || null)
           totalWorkDays++
+          // work_units: ưu tiên attendance.work_units, fallback shift.work_units, default 1.0
+          const wu = att.work_units > 0 ? att.work_units : (shift?.work_units || 1.0)
+          totalCong += wu
           totalWorkingMins += att.working_minutes || 0
           totalOTMins += att.overtime_minutes || 0
           if (att.status === 'late' || att.late_minutes > 0) totalLateDays++
@@ -256,6 +272,7 @@ export const monthlyTimesheetService = {
         departmentName: dept?.name || '',
         days,
         totalWorkDays,
+        totalCong: Math.round(totalCong * 10) / 10,
         totalWorkingHours: Math.round(totalWorkingMins / 60 * 10) / 10,
         totalOvertimeHours: Math.round(totalOTMins / 60 * 10) / 10,
         totalLateDays,
@@ -267,8 +284,8 @@ export const monthlyTimesheetService = {
 
     // Department name
     let deptName = 'Tất cả phòng ban'
-    if (departmentId && employees && employees.length > 0) {
-      const dept = Array.isArray(employees[0].department) ? employees[0].department[0] : employees[0].department
+    if (departmentId && rawEmployees && rawEmployees.length > 0) {
+      const dept = Array.isArray(rawEmployees[0].department) ? rawEmployees[0].department[0] : rawEmployees[0].department
       deptName = dept?.name || ''
     }
 

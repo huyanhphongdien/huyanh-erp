@@ -33,6 +33,7 @@ const SYMBOL_STYLES: Record<string, { bg: string; text: string; label: string }>
   'HC': { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Hành chính' },
   'P':  { bg: 'bg-orange-100', text: 'text-orange-600', label: 'Nghỉ phép' },
   'CT': { bg: 'bg-sky-100',    text: 'text-sky-700',    label: 'Công tác' },
+  '2ca':{ bg: 'bg-amber-100',  text: 'text-amber-700',  label: '2 ca' },
   'X':  { bg: 'bg-red-100',    text: 'text-red-600',    label: 'Vắng' },
   '—':  { bg: 'bg-gray-50',    text: 'text-gray-300',   label: '' },
   '':   { bg: '',              text: 'text-gray-200',   label: '' },
@@ -183,6 +184,7 @@ export default function MonthlyTimesheetPage() {
                       <div className="flex items-center gap-2 text-[12px]">
                         <span className="text-gray-600">{formatTimeVN(day.checkIn)} → {formatTimeVN(day.checkOut) || '...'}</span>
                         {day.shiftName && <span className="text-gray-400 text-[11px] truncate">{day.shiftName}</span>}
+                        {day.shiftCount >= 2 && <span className="px-1 py-px rounded text-[9px] font-bold bg-amber-100 text-amber-600">{day.shiftCount}ca={day.dayWorkUnits}c</span>}
                       </div>
                     ) : day.isBusinessTrip ? (
                       <span className="text-sky-600 text-[12px]">Công tác</span>
@@ -377,6 +379,7 @@ export default function MonthlyTimesheetPage() {
             {new Date(tooltipData.day.date + 'T00:00:00+07:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}
           </div>
           {tooltipData.day.shiftName && <div className="text-gray-500">Ca: {tooltipData.day.shiftName}</div>}
+          {tooltipData.day.shiftCount >= 2 && <div className="text-amber-600 font-medium">{tooltipData.day.shiftCount} ca — {tooltipData.day.dayWorkUnits} công</div>}
           {tooltipData.day.checkIn && (
             <div className="text-gray-600">Vào: {formatTimeVN(tooltipData.day.checkIn)}{tooltipData.day.checkOut && ` → Ra: ${formatTimeVN(tooltipData.day.checkOut)}`}</div>
           )}

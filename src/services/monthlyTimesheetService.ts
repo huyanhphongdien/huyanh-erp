@@ -20,6 +20,7 @@ export type DaySymbol =
   | 'HC'   // Hành chính (ADMIN_PROD, ADMIN_OFFICE)
   | 'P'    // Nghỉ phép (approved leave)
   | 'CT'   // ★ Công tác (business_trip)
+  | '2ca'  // ★ 2 ca trong ngày
   | 'X'    // Vắng không phép
   | '—'    // Chưa tới ngày / CN
   | ''     // Trống (không có data)
@@ -43,6 +44,10 @@ export interface DayDetail {
   isBusinessTrip: boolean   // ★ Công tác
   leaveType: string | null  // "annual", "sick"...
   crossesMidnight: boolean
+  // ★ Multi-shift support
+  shiftCount: number        // Số ca trong ngày (1, 2...)
+  dayWorkUnits: number      // Tổng công trong ngày (1.0, 2.0...)
+  allShiftNames: string[]   // ["Ca sáng", "Ca đêm"]
 }
 
 /** Tổng hợp 1 NV trong tháng */
@@ -219,42 +224,71 @@ export const monthlyTimesheetService = {
         const isLeave = !!leave
 
         // Tìm attendance records cho ngày này
-        // Lưu ý: ca đêm crosses_midnight → date = ngày bắt đầu ca
+        // ★ Hỗ trợ multi-shift: NV có thể đi 2 ca/ngày (VD: Ca 1 + Ca 3 = 2.0 công)
         const dayAtts = empAttendances.filter(a => a.date === dateStr)
+        const validAtts = dayAtts.filter(a => a.check_in_time)
 
-        // Chọn record chính (ưu tiên record có check_in)
-        const att = dayAtts.find(a => a.check_in_time) || dayAtts[0] || null
+        // Record chính (hiển thị) — ưu tiên record có check_in
+        const att = validAtts[0] || dayAtts[0] || null
         const shift = att ? (Array.isArray(att.shift) ? att.shift[0] : att.shift) : null
+        const shiftCount = validAtts.length // Số ca thực tế
+
+        // ★ Tính tổng SUM từ TẤT CẢ records trong ngày
+        let dayWU = 0
+        let dayWorkMins = 0
+        let dayOTMins = 0
+        let dayLateMins = 0
+        let dayEarlyMins = 0
+        let dayAutoCheckout = false
+        let dayCrossesMidnight = false
+        const allShiftNames: string[] = []
+
+        for (const a of validAtts) {
+          const s = a.shift ? (Array.isArray(a.shift) ? a.shift[0] : a.shift) : null
+          const wu = a.work_units > 0 ? a.work_units : (s?.work_units || 1.0)
+          dayWU += wu
+          dayWorkMins += a.working_minutes || 0
+          dayOTMins += a.overtime_minutes || 0
+          dayLateMins += a.late_minutes || 0
+          dayEarlyMins += a.early_leave_minutes || 0
+          if (a.auto_checkout) dayAutoCheckout = true
+          if (s?.crosses_midnight) dayCrossesMidnight = true
+          if (s?.name) allShiftNames.push(s.name)
+        }
+
+        // Nếu chỉ có 1 record không có check_in (VD: business_trip)
+        if (validAtts.length === 0 && att) {
+          const wu = att.work_units > 0 ? att.work_units : 1.0
+          dayWU = wu
+          dayWorkMins = att.working_minutes || 0
+        }
 
         // Xác định symbol
         let symbol: DaySymbol = ''
         const isBusinessTrip = att?.status === 'business_trip'
 
         if (isBusinessTrip) {
-          // ★ Công tác — ưu tiên cao nhất khi có attendance business_trip
           symbol = 'CT'
           totalBusinessTripDays++
           totalWorkDays++
-          const wu = att.work_units > 0 ? att.work_units : 1.0
-          totalCong += wu
-          totalWorkingMins += att.working_minutes || 0
+          totalCong += dayWU
+          totalWorkingMins += dayWorkMins
         } else if (isLeave) {
           symbol = 'P'
           totalLeaveDays++
-        } else if (att && att.check_in_time) {
-          symbol = shiftToSymbol(shift?.code || null)
+        } else if (shiftCount > 0) {
+          // ★ Có ít nhất 1 ca check-in
+          symbol = shiftCount >= 2 ? '2ca' : shiftToSymbol(shift?.code || null)
           totalWorkDays++
-          // work_units: ưu tiên attendance.work_units, fallback shift.work_units, default 1.0
-          const wu = att.work_units > 0 ? att.work_units : (shift?.work_units || 1.0)
-          totalCong += wu
-          totalWorkingMins += att.working_minutes || 0
-          totalOTMins += att.overtime_minutes || 0
-          if (att.status === 'late' || att.late_minutes > 0) totalLateDays++
-          if (att.status === 'early_leave' || att.status === 'late_and_early' || att.early_leave_minutes > 15) totalEarlyDays++
+          totalCong += dayWU
+          totalWorkingMins += dayWorkMins
+          totalOTMins += dayOTMins
+          // Trễ/về sớm: chỉ tính 1 lần nếu bất kỳ ca nào trễ
+          if (validAtts.some(a => a.status === 'late' || a.late_minutes > 0)) totalLateDays++
+          if (validAtts.some(a => a.status === 'early_leave' || a.status === 'late_and_early' || a.early_leave_minutes > 15)) totalEarlyDays++
         } else if (isFuture) {
           symbol = '—'
         } else {
-          // Ngày đã qua, không có attendance, không nghỉ phép → vắng
           symbol = 'X'
           totalAbsentDays++
         }
@@ -263,20 +297,23 @@ export const monthlyTimesheetService = {
           date: dateStr,
           symbol,
           shiftCode: shift?.code || null,
-          shiftName: shift?.name || null,
+          shiftName: shiftCount >= 2 ? allShiftNames.join(' + ') : (shift?.name || null),
           checkIn: att?.check_in_time || null,
-          checkOut: att?.check_out_time || null,
-          workingMinutes: att?.working_minutes || 0,
-          overtimeMinutes: att?.overtime_minutes || 0,
-          lateMinutes: att?.late_minutes || 0,
-          earlyLeaveMinutes: att?.early_leave_minutes || 0,
+          checkOut: validAtts.length > 0 ? (validAtts[validAtts.length - 1]?.check_out_time || null) : (att?.check_out_time || null),
+          workingMinutes: dayWorkMins,
+          overtimeMinutes: dayOTMins,
+          lateMinutes: dayLateMins,
+          earlyLeaveMinutes: dayEarlyMins,
           status: att?.status || '',
-          autoCheckout: att?.auto_checkout || false,
+          autoCheckout: dayAutoCheckout,
           isWeekend,
           isLeave,
           isBusinessTrip,
           leaveType: leave?.leave_type || null,
-          crossesMidnight: shift?.crosses_midnight || false,
+          crossesMidnight: dayCrossesMidnight,
+          shiftCount,
+          dayWorkUnits: Math.round(dayWU * 10) / 10,
+          allShiftNames,
         })
       }
 

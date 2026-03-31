@@ -31,11 +31,11 @@ const GRAY_BORDER = 'D1D5DB'
 // Symbol → fill color
 const SYMBOL_FILL: Record<string, string> = {
   'S': 'DBEAFE', 'Đ': 'EDE9FE', 'C2': 'D1FAE5',
-  'HC': 'F3F4F6', 'P': 'FFEDD5', 'CT': 'E0F2FE', 'X': 'FEE2E2',
+  'HC': 'F3F4F6', 'P': 'FFEDD5', 'CT': 'E0F2FE', '2ca': 'FEF3C7', 'X': 'FEE2E2',
 }
 const SYMBOL_FONT: Record<string, string> = {
   'S': '1D4ED8', 'Đ': '6D28D9', 'C2': '047857',
-  'HC': '4B5563', 'P': 'EA580C', 'CT': '0369A1', 'X': 'DC2626',
+  'HC': '4B5563', 'P': 'EA580C', 'CT': '0369A1', '2ca': 'B45309', 'X': 'DC2626',
 }
 
 // Border style
@@ -335,6 +335,7 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
     ['HC', 'Hành chính', 'ADMIN_PROD (07-17h), ADMIN_OFFICE (08-17h)'],
     ['P', 'Nghỉ phép', 'Đã được duyệt'],
     ['CT', 'Công tác', 'Đi công tác (đã duyệt)'],
+    ['2ca', '2 ca/ngày', 'VD: Ca 1 + Ca 3 = 2.0 công'],
     ['X', 'Vắng không phép', ''],
   ]
 

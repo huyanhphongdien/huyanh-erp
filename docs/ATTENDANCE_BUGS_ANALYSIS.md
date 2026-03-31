@@ -46,6 +46,65 @@ Chưa có: work_units (công)
   Ca 12h ngày/đêm = 1.5 công
 ```
 
+### Lỗi 5: Cột "Công" trên bảng chấm công tháng TÍNH SAI 🔴
+
+```
+HIỆN TẠI: Cột "Công" = ĐẾM SỐ NGÀY đi làm (count records)
+ĐÚNG:     Cột "Công" = TỔNG work_units (1.0 hoặc 1.5 tùy ca)
+
+Ví dụ sai trên bảng công tháng 3/2026:
+
+  Hồ Thị Á:
+    Hiện: Công = 22 | Giờ = 261.7h
+    → 261.7 / 8 = 32.7 công (thực tế)
+    → Hiện 22 (chỉ đếm ngày) → SAI
+
+  Châu Quốc Vịnh:
+    Hiện: Công = 28 | Giờ = 198.8h
+    → 198.8 / 8 = 24.8 công (thực tế)
+    → Hiện 28 (đếm ngày) → SAI
+
+  Lê Thị Lệ Trinh:
+    Hiện: Công = 26 | Giờ = 166.5h
+    → Có ca D (đêm dài) + C2 → phải tính 1.5 cho ca dài
+    → Nhưng cột Công đếm 26 ngày → KHÔNG phân biệt ca 1.0 vs 1.5
+
+NGUYÊN NHÂN:
+  Code trang chấm công tháng dùng COUNT(*) thay vì SUM(work_units)
+```
+
+### Lỗi 6: Ca đêm dài qua đêm — Tính sai ngày 🟡
+
+```
+Ca đêm 18:00-06:00 (crosses_midnight = true)
+  NV check-in 18:00 ngày 30/03 → check-out 06:00 ngày 31/03
+
+Vấn đề:
+  → Ngày chấm công = 30/03 hay 31/03?
+  → Nếu ghi ngày 30/03: bảng công ngày 31/03 trống
+  → Nếu ghi ngày 31/03: bảng công ngày 30/03 trống
+  → Hiện tại: ghi theo ngày check-in (30/03) — CẦN XÁC NHẬN đúng chưa
+```
+
+### Lỗi 7: NV Hồ Thị Thủy — 0 công, 0 giờ 🟡
+
+```
+  Hồ Thị Thủy (HA-0002): Công = 0 | Giờ = 0
+  → Hoàn toàn không có data chấm công cả tháng
+  → VIP (Trợ lý BGĐ) — có thể đúng (không chấm công)
+  → Nhưng cần xác nhận: BGĐ có cần chấm công không?
+```
+
+### Lỗi 8: "Trễ" hiện sai trên bảng — NV có S (ca sáng) nhưng cột Trễ > 10 🟡
+
+```
+Ví dụ: Hoàng Văn Anh (dòng 15)
+  Công = 29 | Giờ = 221.8 | Trễ = 11 | VS = 13
+  → 11 lần trễ + 13 lần vắng sáng?
+  → Cần kiểm tra: "Trễ" là late_minutes > 0 hay count(status='late')?
+  → Nếu đếm status='late' mà late là do bug 1,436 phút → số trễ bị sai theo
+```
+
 ---
 
 ## 2. QUY TẮC TÍNH CÔNG HUY ANH
@@ -168,19 +227,75 @@ Tổng công = SUM(work_units) cho tháng đó
 
 ---
 
-## 6. KẾ HOẠCH FIX
+## 6. TỔNG HỢP TẤT CẢ LỖI
+
+| # | Lỗi | Mức | Số lượng | Ảnh hưởng |
+|---|-----|-----|---------|-----------|
+| 1 | working_minutes = 0 dù có checkout | 🔴 | 116 records | NV mất công → thiếu lương |
+| 2 | late > 480 phút (bất thường) | 🔴 | 112 records | NV bị đánh "trễ" sai → hiệu suất sai |
+| 3 | Chưa checkout (NV quên) | 🟡 | 39 records | Mất công nếu auto-checkout không fix |
+| 4 | Chưa có cột work_units | 🟡 | Toàn bộ | Không phân biệt 1.0 vs 1.5 công |
+| 5 | Cột "Công" = đếm ngày (sai) | 🔴 | Toàn bảng | Bảng chấm công tháng hiện SAI |
+| 6 | Ca đêm qua đêm — ngày nào? | 🟡 | Ca LONG_NIGHT | Cần xác nhận logic |
+| 7 | VIP 0 công cả tháng | 🟡 | 1-2 NV | Cần xác nhận BGĐ có chấm công? |
+| 8 | Số "Trễ" sai do bug late | 🟡 | Dây chuyền | Fix lỗi 2 → lỗi 8 tự hết |
+
+---
+
+## 7. KẾ HOẠCH FIX
+
+### Ưu tiên 1 — Fix data tháng 3 (trước khi chốt lương)
 
 | Bước | Việc | Effort | Rủi ro |
 |------|------|--------|--------|
-| 1 | Chạy SQL fix (mục 3 ở trên) | 10 phút | Thấp — chỉ thêm cột + fix data |
-| 2 | Sửa checkOut() thêm work_units | 30 phút | Thấp |
-| 3 | Sửa auto-checkout tính working_minutes | 1 giờ | Trung bình — cần test kỹ |
-| 4 | Sửa trang chấm công tháng hiện "Công" | 1 giờ | Thấp |
-| 5 | Test toàn bộ + verify data tháng 3 | 30 phút | — |
+| 1 | Chạy SQL: thêm cột work_units + fix data | 10 phút | Thấp |
+| 2 | Fix working_minutes = 0 (tính lại từ check_in/out) | 10 phút | Thấp |
+| 3 | Fix late > 480 phút (reset về đúng) | 10 phút | Thấp |
+| 4 | Backfill work_units (1.0 hoặc 1.5 theo ca) | 5 phút | Thấp |
 
-**Tổng: ~3 giờ**
+### Ưu tiên 2 — Fix code (tránh lặp lại tháng sau)
+
+| Bước | Việc | Effort | Rủi ro |
+|------|------|--------|--------|
+| 5 | Sửa checkOut() — thêm work_units khi checkout | 30 phút | Thấp |
+| 6 | Sửa auto-checkout — tính working_minutes + work_units | 1 giờ | Trung bình |
+| 7 | Sửa bảng chấm công tháng — Công = SUM(work_units) | 1 giờ | Thấp |
+| 8 | Sửa check-in — fix late cross-midnight | 30 phút | Trung bình |
+
+### Ưu tiên 3 — Cải thiện
+
+| Bước | Việc | Effort | Rủi ro |
+|------|------|--------|--------|
+| 9 | Thêm cột "Công" rõ ràng trên bảng chấm công | 30 phút | Thấp |
+| 10 | Nhắc nhở NV chưa checkout (notification) | 1 giờ | Thấp |
+| 11 | Test toàn bộ + verify data tháng 3 | 30 phút | — |
+
+**Tổng: ~5.5 giờ** (chia 2 đợt: fix data 30 phút + fix code 5 giờ)
+
+---
+
+## 8. SO SÁNH TRƯỚC / SAU
+
+```
+TRƯỚC:
+  Cột "Công" = đếm ngày đi làm (count records)
+  → Ca 8h = 1 công | Ca 12h = vẫn 1 công → SAI
+  → NV đi ca đêm dài bị thiệt
+
+SAU:
+  Cột "Công" = SUM(work_units)
+  → Ca 8h = 1.0 công | Ca 12h = 1.5 công → ĐÚNG
+  → NV đi ca dài được tính đúng
+
+VÍ DỤ:
+  NV Lê Thị Lệ Trinh — Tháng 3:
+    15 ngày ca HC (1.0 × 15 = 15.0 công)
+    + 5 ngày ca đêm dài (1.5 × 5 = 7.5 công)
+    + 6 ngày ca chiều (1.0 × 6 = 6.0 công)
+    = 28.5 công (thay vì 26 như hiện tại)
+```
 
 ---
 
 > Phân tích lỗi chấm công — Huy Anh Rubber ERP v8
-> 31/03/2026
+> Cập nhật: 31/03/2026

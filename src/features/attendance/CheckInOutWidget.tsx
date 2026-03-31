@@ -128,14 +128,14 @@ function isShiftInWindow(
   const startMin = timeToMinutes(shift.start_time)
   const endMin = timeToMinutes(shift.end_time)
 
-  const shiftStartDT = new Date(assignmentDate + 'T00:00:00')
-  shiftStartDT.setMinutes(startMin)
+  const shiftStartDT = new Date(assignmentDate + 'T00:00:00+07:00')
+  shiftStartDT.setMinutes(shiftStartDT.getMinutes() + startMin)
 
-  const shiftEndDT = new Date(assignmentDate + 'T00:00:00')
+  const shiftEndDT = new Date(assignmentDate + 'T00:00:00+07:00')
   if (shift.crosses_midnight) {
     shiftEndDT.setDate(shiftEndDT.getDate() + 1)
   }
-  shiftEndDT.setMinutes(endMin)
+  shiftEndDT.setMinutes(shiftEndDT.getMinutes() + endMin)
 
   // Buffer: 2h trước, 1h sau
   const windowStart = new Date(shiftStartDT.getTime() - 120 * 60 * 1000)

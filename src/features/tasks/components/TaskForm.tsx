@@ -70,6 +70,7 @@ interface TaskFormProps {
   initialData?: { department_id?: string; assignee_id?: string; name?: string; description?: string; priority?: string; due_date?: string }
   currentUser?: CurrentUser | null
   isDepartmentLocked?: boolean
+  children?: React.ReactNode  // ★ Slot cho checklist editor
 }
 
 // ============================================================================
@@ -99,6 +100,7 @@ export function TaskForm({
   initialData,
   currentUser,
   isDepartmentLocked = false,
+  children,
 }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskFormData>({
     name: initialData?.name || '',
@@ -479,6 +481,9 @@ export function TaskForm({
           />
         </div>
       </div>
+
+      {/* ★ Children slot (checklist editor) */}
+      {children}
 
       {/* Actions */}
       <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg">

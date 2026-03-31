@@ -38,6 +38,8 @@ interface ShiftCellProps {
   /** Click vào ô → mở override modal (truyền assignment index nếu multi) */
   onClick?: (assignmentIndex?: number) => void;
   readonly?: boolean;
+  /** ★ Trạng thái đặc biệt: 'CT' = Công tác, 'P' = Nghỉ phép */
+  specialStatus?: 'CT' | 'P' | null;
 }
 
 // ============================================================
@@ -90,7 +92,30 @@ export function ShiftCell({
   isPast,
   onClick,
   readonly = false,
+  specialStatus,
 }: ShiftCellProps) {
+  // ★ Công tác / Nghỉ phép — ưu tiên cao nhất
+  if (specialStatus === 'CT') {
+    return (
+      <td className="p-0.5">
+        <div className={`h-12 rounded border border-sky-300 bg-sky-100 flex items-center justify-center ${isToday ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+          title={`${date} - Công tác`}>
+          <span className="text-[11px] font-bold text-sky-700">CT</span>
+        </div>
+      </td>
+    );
+  }
+  if (specialStatus === 'P') {
+    return (
+      <td className="p-0.5">
+        <div className={`h-12 rounded border border-orange-300 bg-orange-100 flex items-center justify-center ${isToday ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+          title={`${date} - Nghỉ phép`}>
+          <span className="text-[11px] font-bold text-orange-600">P</span>
+        </div>
+      </td>
+    );
+  }
+
   // ── Sunday off (chỉ cho KT + R&D) ──
   if (isSundayOff) {
     return (

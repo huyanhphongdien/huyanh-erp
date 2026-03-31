@@ -204,6 +204,25 @@ export function ShiftCalendarPage() {
     staleTime: 30 * 1000,
   });
 
+  // ★ Query attendance CT/P cho lịch phân ca
+  const { data: specialStatusMap = new Map() } = useQuery({
+    queryKey: ['shift-calendar-special', dateFrom, dateTo, departmentId],
+    queryFn: async () => {
+      const map = new Map<string, 'CT' | 'P'>()
+      const { data: atts } = await (await import('../../lib/supabase')).supabase
+        .from('attendance')
+        .select('employee_id, date, status')
+        .in('status', ['business_trip', 'leave'])
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+      ;(atts || []).forEach((a: any) => {
+        map.set(`${a.employee_id}_${a.date}`, a.status === 'business_trip' ? 'CT' : 'P')
+      })
+      return map
+    },
+    staleTime: 30 * 1000,
+  })
+
   // ★ FIX 3: Filter by team dựa trên employee membership
   const filteredCalendar = useMemo(() => {
     const safeData = ensureArray(calendarData);
@@ -553,6 +572,7 @@ export function ShiftCalendarPage() {
                           isToday={isToday}
                           isPast={isPast}
                           readonly={readonly}
+                          specialStatus={specialStatusMap.get(`${emp.employee_id}_${dateStr}`) || null}
                           onClick={(assignmentIndex) =>
                             handleCellClick(emp, dateStr, assignmentIndex)
                           }

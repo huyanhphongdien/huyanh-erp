@@ -119,6 +119,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   late: { label: 'Đi trễ', className: 'bg-amber-100 text-amber-700' },
   early_leave: { label: 'Về sớm', className: 'bg-orange-100 text-orange-700' },
   absent: { label: 'Vắng', className: 'bg-red-100 text-red-700' },
+  business_trip: { label: 'Công tác', className: 'bg-sky-100 text-sky-700' },
   auto_checkout: { label: 'auto_checkout', className: 'bg-gray-100 text-gray-600' },
 }
 

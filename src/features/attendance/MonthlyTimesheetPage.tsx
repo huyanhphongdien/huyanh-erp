@@ -32,6 +32,7 @@ const SYMBOL_STYLES: Record<string, { bg: string; text: string; label: string }>
   'C2': { bg: 'bg-emerald-100',text: 'text-emerald-700',label: 'Ca chiều' },
   'HC': { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Hành chính' },
   'P':  { bg: 'bg-orange-100', text: 'text-orange-600', label: 'Nghỉ phép' },
+  'CT': { bg: 'bg-sky-100',    text: 'text-sky-700',    label: 'Công tác' },
   'X':  { bg: 'bg-red-100',    text: 'text-red-600',    label: 'Vắng' },
   '—':  { bg: 'bg-gray-50',    text: 'text-gray-300',   label: '' },
   '':   { bg: '',              text: 'text-gray-200',   label: '' },
@@ -123,7 +124,7 @@ export default function MonthlyTimesheetPage() {
   }
 
   const showTooltip = (day: DayDetail, e: React.MouseEvent) => {
-    if (!day.checkIn && !day.isLeave && day.symbol !== 'X') return
+    if (!day.checkIn && !day.isLeave && !day.isBusinessTrip && day.symbol !== 'X') return
     const rect = (e.target as HTMLElement).getBoundingClientRect()
     setTooltipData({ day, x: Math.min(rect.left, window.innerWidth - 260), y: rect.bottom + 4 })
   }
@@ -154,6 +155,7 @@ export default function MonthlyTimesheetPage() {
               { label: 'Tăng ca', value: emp.totalOvertimeHours, unit: 'h', color: 'text-purple-600 bg-purple-50' },
               { label: 'Đi trễ', value: emp.totalLateDays, unit: 'lần', color: 'text-amber-600 bg-amber-50' },
               { label: 'Về sớm', value: emp.totalEarlyDays, unit: 'lần', color: 'text-orange-600 bg-orange-50' },
+              { label: 'Công tác', value: emp.totalBusinessTripDays, unit: 'ngày', color: 'text-sky-600 bg-sky-50' },
               { label: 'Vắng', value: emp.totalAbsentDays, unit: 'ngày', color: 'text-red-600 bg-red-50' },
               { label: 'Nghỉ phép', value: emp.totalLeaveDays, unit: 'ngày', color: 'text-cyan-600 bg-cyan-50' },
             ].map(s => (
@@ -182,6 +184,8 @@ export default function MonthlyTimesheetPage() {
                         <span className="text-gray-600">{formatTimeVN(day.checkIn)} → {formatTimeVN(day.checkOut) || '...'}</span>
                         {day.shiftName && <span className="text-gray-400 text-[11px] truncate">{day.shiftName}</span>}
                       </div>
+                    ) : day.isBusinessTrip ? (
+                      <span className="text-sky-600 text-[12px]">Công tác</span>
                     ) : day.isLeave ? (
                       <span className="text-orange-500 text-[12px]">Nghỉ phép</span>
                     ) : day.symbol === 'X' ? (
@@ -297,7 +301,7 @@ export default function MonthlyTimesheetPage() {
                         </td>
                         {emp.days.map((day, di) => {
                           const s = SYMBOL_STYLES[day.symbol] || SYMBOL_STYLES['']
-                          const hasDetail = day.checkIn || day.isLeave || day.symbol === 'X'
+                          const hasDetail = day.checkIn || day.isLeave || day.isBusinessTrip || day.symbol === 'X'
                           return (
                             <td key={di} className={`px-0 py-1 text-center border-l border-gray-50 ${dayHeaders[di]?.isWeekend ? 'bg-red-50/40' : ''}`}
                               onMouseEnter={e => hasDetail && showTooltip(day, e)} onMouseLeave={() => setTooltipData(null)}
@@ -380,6 +384,7 @@ export default function MonthlyTimesheetPage() {
           {tooltipData.day.lateMinutes > 0 && <div className="text-amber-600">Trễ: {tooltipData.day.lateMinutes} phút</div>}
           {tooltipData.day.earlyLeaveMinutes > 15 && <div className="text-purple-600">Về sớm: {tooltipData.day.earlyLeaveMinutes} phút</div>}
           {tooltipData.day.overtimeMinutes > 0 && <div className="text-red-600">Tăng ca: {Math.round(tooltipData.day.overtimeMinutes / 60 * 10) / 10}h</div>}
+          {tooltipData.day.isBusinessTrip && <div className="text-sky-600 font-medium">Công tác</div>}
           {tooltipData.day.isLeave && <div className="text-orange-600">Nghỉ phép</div>}
           {tooltipData.day.autoCheckout && <div className="text-gray-400 text-[10px]">Auto checkout</div>}
         </div>

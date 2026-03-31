@@ -36,6 +36,7 @@ const STATUS_OPTIONS = [
   { value: 'late', label: 'Đi trễ', color: 'text-amber-600' },
   { value: 'early_leave', label: 'Về sớm', color: 'text-purple-600' },
   { value: 'late_and_early', label: 'Trễ + Về sớm', color: 'text-orange-600' },
+  { value: 'business_trip', label: 'Công tác', color: 'text-sky-600' },
 ]
 
 const SYMBOL_TO_STATUS: Record<string, string> = {

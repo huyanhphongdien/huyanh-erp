@@ -22,6 +22,7 @@ interface Employee {
 
 interface LeaveType {
   id: string
+  code?: string
   name: string
   color?: string
 }
@@ -46,6 +47,10 @@ export interface LeaveRequest {
   approved_by?: string
   approved_at?: string
   approval_notes?: string
+  // ★ Trường công tác (Phương án C)
+  trip_destination?: string
+  trip_purpose?: string
+  trip_with?: string
   created_at: string
   updated_at: string
   employee?: Employee
@@ -68,6 +73,10 @@ interface LeaveRequestFormData {
   end_date: string
   total_days: number
   reason: string
+  // ★ Trường công tác
+  trip_destination?: string
+  trip_purpose?: string
+  trip_with?: string
 }
 
 interface PaginationParams {
@@ -107,7 +116,7 @@ const LEAVE_SELECT = `
     department:departments!employees_department_id_fkey(id, name),
     position:positions!employees_position_id_fkey(id, name, level)
   ),
-  leave_type:leave_types!leave_requests_leave_type_id_fkey(id, name, color),
+  leave_type:leave_types!leave_requests_leave_type_id_fkey(id, code, name, color),
   approver:employees!leave_requests_approved_by_fkey(id, full_name)
 `
 
@@ -469,10 +478,14 @@ export const leaveRequestService = {
         approval_notes: notes || null
       })
       .eq('id', id)
-      .select()
+      .select(LEAVE_SELECT)
       .single()
 
     if (error) throw error
+
+    // ★ Auto-attendance cho công tác
+    await this._createBusinessTripAttendance(data)
+
     return data
   },
 
@@ -500,6 +513,9 @@ export const leaveRequestService = {
   // HỦY ĐƠN (người tạo tự hủy)
   // ==========================================================================
   async cancel(id: string): Promise<LeaveRequest> {
+    // Lấy đơn trước để xóa attendance nếu là công tác đã duyệt
+    const existing = await this.getById(id)
+
     const { data, error } = await supabase
       .from('leave_requests')
       .update({ status: 'cancelled' })
@@ -508,6 +524,12 @@ export const leaveRequestService = {
       .single()
 
     if (error) throw error
+
+    // ★ Xóa attendance business_trip nếu đơn đã duyệt bị hủy
+    if (existing.status === 'approved') {
+      await this._deleteBusinessTripAttendance(existing.employee_id, existing.start_date, existing.end_date)
+    }
+
     return data
   },
 
@@ -607,6 +629,74 @@ export const leaveRequestService = {
 
     if (error) throw error
     return data || []
+  },
+
+  // ==========================================================================
+  // ★ AUTO-ATTENDANCE CHO CÔNG TÁC (khi duyệt đơn)
+  // ==========================================================================
+  async _createBusinessTripAttendance(request: any): Promise<void> {
+    try {
+      // Lấy leave_type code
+      const leaveType = Array.isArray(request.leave_type) ? request.leave_type[0] : request.leave_type
+      if (!leaveType || leaveType.code !== 'BUSINESS_TRIP') return
+
+      const startDate = new Date(request.start_date + 'T00:00:00+07:00')
+      const endDate = new Date(request.end_date + 'T00:00:00+07:00')
+
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0]
+
+        // Kiểm tra đã có attendance cho ngày này chưa
+        const { data: existing } = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('employee_id', request.employee_id)
+          .eq('date', dateStr)
+          .maybeSingle()
+
+        if (existing) continue // Không ghi đè nếu đã có (VD: đã check-in)
+
+        // Tạo attendance record
+        const notes = `Công tác: ${request.trip_destination || ''} — ${request.trip_purpose || ''}`
+        await supabase.from('attendance').insert({
+          employee_id: request.employee_id,
+          date: dateStr,
+          status: 'business_trip',
+          work_units: 1.0,
+          working_minutes: 480, // 8h chuẩn
+          notes: notes.trim(),
+          check_in_time: dateStr + 'T08:00:00+07:00',
+          check_out_time: dateStr + 'T17:00:00+07:00',
+        })
+      }
+
+      console.log(`[leaveRequestService] Created business_trip attendance for ${request.employee_id}: ${request.start_date} → ${request.end_date}`)
+    } catch (error) {
+      console.error('[leaveRequestService] _createBusinessTripAttendance error:', error)
+    }
+  },
+
+  // ==========================================================================
+  // ★ XÓA ATTENDANCE CÔNG TÁC (khi hủy đơn đã duyệt)
+  // ==========================================================================
+  async _deleteBusinessTripAttendance(employeeId: string, startDate: string, endDate: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('status', 'business_trip')
+        .gte('date', startDate)
+        .lte('date', endDate)
+
+      if (error) {
+        console.error('[leaveRequestService] _deleteBusinessTripAttendance error:', error)
+      } else {
+        console.log(`[leaveRequestService] Deleted business_trip attendance for ${employeeId}: ${startDate} → ${endDate}`)
+      }
+    } catch (error) {
+      console.error('[leaveRequestService] _deleteBusinessTripAttendance exception:', error)
+    }
   }
 }
 

@@ -19,6 +19,7 @@ export type DaySymbol =
   | 'C2'   // Ca chiều (SHORT_2)
   | 'HC'   // Hành chính (ADMIN_PROD, ADMIN_OFFICE)
   | 'P'    // Nghỉ phép (approved leave)
+  | 'CT'   // ★ Công tác (business_trip)
   | 'X'    // Vắng không phép
   | '—'    // Chưa tới ngày / CN
   | ''     // Trống (không có data)
@@ -39,6 +40,7 @@ export interface DayDetail {
   autoCheckout: boolean
   isWeekend: boolean        // CN
   isLeave: boolean          // Nghỉ phép
+  isBusinessTrip: boolean   // ★ Công tác
   leaveType: string | null  // "annual", "sick"...
   crossesMidnight: boolean
 }
@@ -59,6 +61,7 @@ export interface EmployeeMonthlySummary {
   totalEarlyDays: number    // Số lần về sớm
   totalAbsentDays: number   // Vắng không phép
   totalLeaveDays: number    // Nghỉ phép
+  totalBusinessTripDays: number  // ★ Công tác
 }
 
 /** Kết quả bảng chấm công tháng */
@@ -200,6 +203,7 @@ export const monthlyTimesheetService = {
       let totalEarlyDays = 0
       let totalAbsentDays = 0
       let totalLeaveDays = 0
+      let totalBusinessTripDays = 0
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -224,7 +228,17 @@ export const monthlyTimesheetService = {
 
         // Xác định symbol
         let symbol: DaySymbol = ''
-        if (isLeave) {
+        const isBusinessTrip = att?.status === 'business_trip'
+
+        if (isBusinessTrip) {
+          // ★ Công tác — ưu tiên cao nhất khi có attendance business_trip
+          symbol = 'CT'
+          totalBusinessTripDays++
+          totalWorkDays++
+          const wu = att.work_units > 0 ? att.work_units : 1.0
+          totalCong += wu
+          totalWorkingMins += att.working_minutes || 0
+        } else if (isLeave) {
           symbol = 'P'
           totalLeaveDays++
         } else if (att && att.check_in_time) {
@@ -260,6 +274,7 @@ export const monthlyTimesheetService = {
           autoCheckout: att?.auto_checkout || false,
           isWeekend,
           isLeave,
+          isBusinessTrip,
           leaveType: leave?.leave_type || null,
           crossesMidnight: shift?.crosses_midnight || false,
         })
@@ -279,6 +294,7 @@ export const monthlyTimesheetService = {
         totalEarlyDays,
         totalAbsentDays,
         totalLeaveDays,
+        totalBusinessTripDays,
       })
     }
 

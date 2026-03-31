@@ -9,9 +9,9 @@
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { 
-  Calendar, User, FileText, Clock, Loader2, 
-  CheckCircle, XCircle, AlertTriangle 
+import {
+  Calendar, User, FileText, Clock, Loader2,
+  CheckCircle, XCircle, AlertTriangle, MapPin, Briefcase, Users
 } from 'lucide-react'
 import { leaveRequestService, leaveTypeService, employeeService } from '../../services'
 import { useAuthStore } from '../../stores/authStore'
@@ -24,6 +24,10 @@ interface LeaveRequestFormData {
   total_days: number
   is_half_day: boolean
   reason: string
+  // ★ Trường công tác
+  trip_destination: string
+  trip_purpose: string
+  trip_with: string
 }
 
 interface LeaveRequest {
@@ -38,6 +42,9 @@ interface LeaveRequest {
   reason: string
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   approval_notes?: string
+  trip_destination?: string
+  trip_purpose?: string
+  trip_with?: string
   employee?: {
     id: string
     code: string
@@ -45,6 +52,7 @@ interface LeaveRequest {
   }
   leave_type?: {
     id: string
+    code?: string
     name: string
     color: string
   }
@@ -68,7 +76,10 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
       end_date: initialData.end_date || new Date().toISOString().split('T')[0],
       total_days: initialData.total_days || 1,
       is_half_day: initialData.is_half_day || false,
-      reason: initialData.reason || ''
+      reason: initialData.reason || '',
+      trip_destination: initialData.trip_destination || '',
+      trip_purpose: initialData.trip_purpose || '',
+      trip_with: initialData.trip_with || '',
     } : {
       employee_id: user?.employee_id || '',
       leave_type_id: '',
@@ -76,7 +87,10 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
       end_date: new Date().toISOString().split('T')[0],
       total_days: 1,
       is_half_day: false,
-      reason: ''
+      reason: '',
+      trip_destination: '',
+      trip_purpose: '',
+      trip_with: '',
     }
   })
 
@@ -93,6 +107,12 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
     queryFn: () => employeeService.getAll({ page: 1, pageSize: 1000, status: 'active' }),
     enabled: !viewOnly && !(initialData && initialData.status !== 'pending')
   })
+
+  // ★ Detect loại "Công tác"
+  const selectedLeaveTypeId = watch('leave_type_id')
+  const isBusinessTrip = !!(leaveTypes || []).find(
+    (t: any) => t.id === selectedLeaveTypeId && t.code === 'BUSINESS_TRIP'
+  )
 
   // Tính số ngày nghỉ tự động
   const startDate = watch('start_date')
@@ -203,11 +223,39 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
           </div>
         </div>
 
+        {/* ★ Thông tin công tác (read-only) */}
+        {(initialData.trip_destination || initialData.trip_purpose || initialData.trip_with) && (
+          <div className="space-y-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <p className="text-xs font-semibold text-blue-700 flex items-center gap-1">
+              <Briefcase className="w-3 h-3" />
+              Thông tin công tác
+            </p>
+            {initialData.trip_destination && (
+              <div className="space-y-0.5">
+                <label className="text-xs text-gray-500">Địa điểm</label>
+                <p className="text-[15px] font-medium text-gray-900">{initialData.trip_destination}</p>
+              </div>
+            )}
+            {initialData.trip_purpose && (
+              <div className="space-y-0.5">
+                <label className="text-xs text-gray-500">Mục đích</label>
+                <p className="text-[15px] text-gray-800">{initialData.trip_purpose}</p>
+              </div>
+            )}
+            {initialData.trip_with && (
+              <div className="space-y-0.5">
+                <label className="text-xs text-gray-500">Đi cùng</label>
+                <p className="text-[15px] text-gray-800">{initialData.trip_with}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Reason */}
         <div className="space-y-2">
           <label className="text-xs text-gray-500 font-medium flex items-center gap-1">
             <FileText className="w-3 h-3" />
-            Lý do nghỉ
+            Lý do
           </label>
           <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
             <p className="text-[15px] text-gray-800">{initialData.reason}</p>
@@ -309,6 +357,59 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
           </p>
         )}
       </div>
+
+      {/* ★ Trường công tác — chỉ hiện khi loại = Công tác */}
+      {isBusinessTrip && (
+        <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <p className="text-sm font-semibold text-blue-700 flex items-center gap-1.5">
+            <Briefcase className="w-4 h-4" />
+            Thông tin công tác
+          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-gray-400" />
+              Địa điểm <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...register('trip_destination', { required: isBusinessTrip ? 'Vui lòng nhập địa điểm công tác' : false })}
+              placeholder="VD: Hồ Chí Minh, Hà Nội..."
+              className={`w-full px-4 py-3.5 sm:py-3 border rounded-xl text-[15px] sm:text-sm
+                bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                ${errors.trip_destination ? 'border-red-300' : 'border-gray-300'}`}
+            />
+            {errors.trip_destination && (
+              <p className="text-xs text-red-600">{errors.trip_destination.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <Briefcase className="w-4 h-4 text-gray-400" />
+              Mục đích
+            </label>
+            <input
+              type="text"
+              {...register('trip_purpose')}
+              placeholder="VD: Gặp khách hàng, kiểm tra nhà máy..."
+              className="w-full px-4 py-3.5 sm:py-3 border border-gray-300 rounded-xl text-[15px] sm:text-sm
+                bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-gray-400" />
+              Đi cùng
+            </label>
+            <input
+              type="text"
+              {...register('trip_with')}
+              placeholder="VD: Trưởng phòng KD, Anh Minh..."
+              className="w-full px-4 py-3.5 sm:py-3 border border-gray-300 rounded-xl text-[15px] sm:text-sm
+                bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Date range */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -440,7 +541,7 @@ export function LeaveRequestForm({ initialData, viewOnly = false, onSuccess, onC
           ) : (
             <>
               <CheckCircle className="w-4 h-4" />
-              <span>Tạo đơn nghỉ phép</span>
+              <span>{isBusinessTrip ? 'Tạo đơn công tác' : 'Tạo đơn nghỉ phép'}</span>
             </>
           )}
         </button>

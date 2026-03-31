@@ -438,12 +438,15 @@ const MyTasksPage: React.FC = () => {
   const fetchPendingEvalCount = useCallback(async () => {
     if (!user?.employee_id) return;
     try {
+      const now = new Date()
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
       const { count } = await supabase
         .from('tasks')
         .select('id', { count: 'exact', head: true })
         .eq('assignee_id', user.employee_id)
         .eq('status', 'finished')
-        .in('evaluation_status', ['none', 'pending_self_eval']);
+        .in('evaluation_status', ['none', 'pending_self_eval'])
+        .gte('created_at', monthStart);
       setPendingEvalCount(count || 0);
     } catch { setPendingEvalCount(0); }
   }, [user?.employee_id]);

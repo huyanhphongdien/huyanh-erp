@@ -157,6 +157,13 @@ export const myTasksService = {
         assigneeQuery = assigneeQuery.not('status', 'in', `(${EXCLUDED_STATUSES_FOR_EMPLOYEE.join(',')})`)
       }
 
+      // ★ Mặc định: chỉ hiện task tháng hiện tại
+      if (!filter?.from_date && !filter?.to_date && !filter?.search) {
+        const now = new Date()
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+        assigneeQuery = assigneeQuery.gte('created_at', monthStart + 'T00:00:00')
+      }
+
       // Apply filters
       if (filter?.status && filter.status !== 'all') {
         assigneeQuery = assigneeQuery.eq('status', filter.status)
@@ -524,11 +531,16 @@ export const myTasksService = {
   }> {
     console.log('📋 [myTasksService] getMyTasksStats:', employeeId)
 
+    // ★ Chỉ thống kê tháng hiện tại
+    const now = new Date()
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
+
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('id, status, due_date, progress')
       .eq('assignee_id', employeeId)
       .not('status', 'in', `(${EXCLUDED_STATUSES_FOR_EMPLOYEE.join(',')})`)
+      .gte('created_at', monthStart)
 
     if (error) {
       console.error('❌ [myTasksService] getMyTasksStats error:', error)

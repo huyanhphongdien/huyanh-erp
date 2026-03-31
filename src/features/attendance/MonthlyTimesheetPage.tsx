@@ -173,7 +173,9 @@ export default function MonthlyTimesheetPage() {
               const style = SYMBOL_STYLES[day.symbol] || SYMBOL_STYLES['']
               const hasData = day.checkIn || day.isLeave || day.symbol === 'X'
               return (
-                <div key={day.date} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] ${day.isWeekend ? 'bg-red-50/50' : 'bg-white'} ${!hasData && day.symbol === '—' ? 'opacity-50' : ''}`}>
+                <div key={day.date}
+                  onClick={() => { setTooltipData(null); setEditModal({ day, employeeId: emp.employeeId, employeeName: emp.fullName }) }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] cursor-pointer active:bg-gray-100 ${day.isWeekend ? 'bg-red-50/50' : 'bg-white'} ${!hasData && day.symbol === '—' ? 'opacity-50' : ''}`}>
                   <div className="w-14 flex-shrink-0">
                     <span className={`font-bold ${day.isWeekend ? 'text-red-400' : 'text-gray-700'}`}>{String(i + 1).padStart(2, '0')}</span>
                     <span className={`ml-1 text-[11px] ${day.isWeekend ? 'text-red-300' : 'text-gray-400'}`}>{dow}</span>

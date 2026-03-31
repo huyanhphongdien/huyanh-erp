@@ -173,24 +173,16 @@ const getMenuGroups = (
     icon: <ClipboardList size={18} />,
     items: [
       { path: '/tasks', label: 'Danh sách công việc', icon: <ClipboardList size={18} /> },
-      { path: '/tasks/kanban', label: 'Kanban', icon: <LayoutGrid size={18} /> },
       { path: '/my-tasks', label: 'Công việc của tôi', icon: <UserCheck size={18} /> },
       {
-        path: '/approvals',
+        path: '/tasks/approve-batch',
         label: 'Phê duyệt',
         icon: <CheckSquare size={18} />,
         managerOnly: true,
         badge: pendingApprovals > 0 ? pendingApprovals : undefined,
       },
-      {
-        path: '/tasks/approve-batch',
-        label: 'Phê duyệt nhanh',
-        icon: <CheckSquare size={18} />,
-        managerOnly: true,
-      },
       { path: '/task-templates', label: 'Mẫu công việc', icon: <FileText size={18} /> },
       { path: '/performance', label: 'Hiệu suất', icon: <TrendingUp size={18} /> },
-      { path: '/performance/reports', label: 'Báo cáo hiệu suất', icon: <FileBarChart size={18} />, managerOnly: true },
     ],
   },
   {

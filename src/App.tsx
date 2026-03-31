@@ -79,6 +79,9 @@ import { TeamManagementPage } from './features/shift-assignments';
 // ★ Bảng chấm công tháng
 import MonthlyTimesheetPage from './features/attendance/MonthlyTimesheetPage';
 
+// ★ Đơn công tác
+import BusinessTripPage from './features/attendance/BusinessTripPage';
+
 // ===== PURCHASING MODULE =====
 import { 
   SupplierListPage, SupplierCreatePage, SupplierEditPage, SupplierDetailPage,
@@ -463,6 +466,7 @@ function App() {
               <Route path="shifts" element={<ShiftListPage />} />
               <Route path="shift-assignments" element={<ShiftCalendarPage />} />
               <Route path="shift-teams" element={<TeamManagementPage />} />
+              <Route path="attendance/business-trips" element={<BusinessTripPage />} />
               <Route path="overtime" element={<OvertimeListPage />} />
               <Route path="overtime/approval" element={<OvertimeApprovalPage />} />
               <Route path="salary-grades" element={<SalaryGradeListPage />} />

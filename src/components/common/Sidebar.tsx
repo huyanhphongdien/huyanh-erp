@@ -155,6 +155,7 @@ const getMenuGroups = (
         icon: <CalendarClock size={18} />,
         badge: pendingLeave > 0 ? pendingLeave : undefined,
       },
+      { path: '/attendance/business-trips', label: 'Đơn công tác', icon: <Briefcase size={18} /> },
       {
         path: '/overtime',
         label: 'Tăng ca',

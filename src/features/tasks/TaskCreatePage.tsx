@@ -454,62 +454,6 @@ export const TaskCreatePage: React.FC = () => {
         </div>
       )}
 
-      {/* Checklist Editor — luôn hiện */}
-      {(
-        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
-              <span className="text-sm font-semibold text-gray-700">Checklist ({checklistItems.length} bước)</span>
-            </div>
-          </div>
-          <div className="space-y-1.5 mb-3">
-            {checklistItems.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
-                <span className="text-xs text-gray-400 w-5">{idx + 1}.</span>
-                <span className="text-sm text-gray-700 flex-1">{item.title}</span>
-                {item.requires_evidence && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded font-medium">📷</span>
-                )}
-                <button
-                  onClick={() => {
-                    setChecklistItems(prev => prev.map((it, i) => i === idx ? { ...it, requires_evidence: !it.requires_evidence } : it))
-                  }}
-                  title={item.requires_evidence ? 'Bỏ yêu cầu bằng chứng' : 'Yêu cầu bằng chứng (ảnh/PDF)'}
-                  className={`text-xs p-0.5 rounded ${item.requires_evidence ? 'text-orange-500' : 'text-gray-300 hover:text-orange-400'}`}
-                >
-                  📷
-                </button>
-                <button
-                  onClick={() => handleRemoveChecklistItem(idx)}
-                  className="text-gray-400 hover:text-red-500 p-0.5"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newChecklistItem}
-              onChange={e => setNewChecklistItem(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddChecklistItem(); } }}
-              placeholder="Thêm bước mới..."
-              className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-            />
-            <button
-              onClick={handleAddChecklistItem}
-              disabled={!newChecklistItem.trim()}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Thêm
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Error Alert */}
       {error && (
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-start gap-2">
@@ -539,6 +483,62 @@ export const TaskCreatePage: React.FC = () => {
           currentUser={user}
         />
       )}
+
+      {/* Checklist Editor — sau TaskForm */}
+      <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm font-semibold text-gray-700">Checklist ({checklistItems.length} bước)</span>
+          </div>
+        </div>
+        {checklistItems.length > 0 && (
+          <div className="space-y-1.5 mb-3">
+            {checklistItems.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+                <span className="text-xs text-gray-400 w-5">{idx + 1}.</span>
+                <span className="text-sm text-gray-700 flex-1">{item.title}</span>
+                {item.requires_evidence && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded font-medium">📷</span>
+                )}
+                <button
+                  onClick={() => {
+                    setChecklistItems(prev => prev.map((it, i) => i === idx ? { ...it, requires_evidence: !it.requires_evidence } : it))
+                  }}
+                  title={item.requires_evidence ? 'Bỏ yêu cầu bằng chứng' : 'Yêu cầu bằng chứng (ảnh/PDF)'}
+                  className={`text-xs p-0.5 rounded ${item.requires_evidence ? 'text-orange-500' : 'text-gray-300 hover:text-orange-400'}`}
+                >
+                  📷
+                </button>
+                <button
+                  onClick={() => handleRemoveChecklistItem(idx)}
+                  className="text-gray-400 hover:text-red-500 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newChecklistItem}
+            onChange={e => setNewChecklistItem(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddChecklistItem(); } }}
+            placeholder="Thêm bước mới..."
+            className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+          />
+          <button
+            onClick={handleAddChecklistItem}
+            disabled={!newChecklistItem.trim()}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Thêm
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

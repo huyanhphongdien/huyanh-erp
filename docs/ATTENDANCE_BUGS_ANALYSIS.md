@@ -297,5 +297,96 @@ VÍ DỤ:
 
 ---
 
+---
+
+## 9. ĐƠN GIẢN HÓA MODULE CHẤM CÔNG
+
+### 9.1 Bỏ Team ca (Quản lý đội ca)
+
+```
+HIỆN TẠI: 2 cách phân ca
+  1. Phân ca CÁ NHÂN (shift_assignments) → từng NV, từng ngày ✅ ĐANG DÙNG
+  2. Team ca (shift_teams) → gom NV vào team → GÂY NHẦM LẪN
+
+→ Đã phân ca cá nhân cụ thể → Team ca THỪA → BỎ
+```
+
+### 9.2 BGĐ không chấm công
+
+```
+VIP không cần chấm công:
+  - huylv@huyanhrubber.com (Giám đốc)
+  - thuyht@huyanhrubber.com (Trợ lý BGĐ)
+
+→ Ẩn khỏi bảng chấm công
+→ Không phân ca
+→ Không tính công
+```
+
+### 9.3 Gộp menu chấm công
+
+```
+TRƯỚC (9 items):                SAU (5-6 items):
+├─ Bảng chấm công              ├─ Bảng chấm công
+├─ Chấm công tháng             ├─ Chấm công tháng
+├─ Quản lý ca                  ├─ Quản lý ca
+├─ Phân ca                     ├─ Phân ca
+├─ Quản lý đội ca       ❌ BỎ  ├─ Nghỉ phép (gộp đơn + duyệt)
+├─ Đơn nghỉ phép        ─┐     ├─ Tăng ca (gộp đơn + duyệt)
+├─ Duyệt nghỉ phép      ─┘ GỘP
+├─ Tăng ca               ─┐
+├─ Duyệt tăng ca         ─┘ GỘP
+```
+
+**Logic gộp:**
+- NV mở "Nghỉ phép" → thấy **đơn của mình** + nút "Tạo đơn"
+- Manager mở "Nghỉ phép" → thấy **đơn chờ duyệt** + tab "Đơn của tôi"
+- Cùng 1 trang, 2 tab theo role → không cần trang riêng
+
+### 9.4 Files cần sửa
+
+| Sửa | File | Thay đổi |
+|-----|------|---------|
+| Sidebar | `Sidebar.tsx` | Bỏ "Quản lý đội ca", gộp nghỉ phép + tăng ca |
+| Bảng chấm công | `MonthlyAttendancePage` | Ẩn BGĐ, cột Công = SUM(work_units) |
+| Routes | `App.tsx` | Giữ routes cũ (không xóa, chỉ bỏ menu) |
+
+---
+
+## 10. TỔNG KẾ HOẠCH FIX CHẤM CÔNG
+
+### Đợt 1: Fix data tháng 3 (30 phút — SQL)
+
+```
+☐ Thêm cột work_units (shifts + attendance)
+☐ Set work_units: 1.0 cho ca thường, 1.5 cho ca dài
+☐ Fix working_minutes = 0 (tính lại từ check_in/out)
+☐ Fix late > 480 phút (reset)
+☐ Backfill work_units cho attendance
+☐ Verify data
+```
+
+### Đợt 2: Fix code (5 giờ)
+
+```
+☐ checkOut() — thêm work_units
+☐ auto-checkout — tính working_minutes + work_units
+☐ check-in — fix late cross-midnight
+☐ Bảng chấm công tháng — Công = SUM(work_units)
+☐ Ẩn BGĐ khỏi bảng chấm công
+```
+
+### Đợt 3: Đơn giản hóa menu (1 giờ)
+
+```
+☐ Bỏ "Quản lý đội ca" khỏi Sidebar
+☐ Gộp "Đơn nghỉ phép" + "Duyệt nghỉ phép"
+☐ Gộp "Tăng ca" + "Duyệt tăng ca"
+```
+
+**Tổng: ~6.5 giờ** (3 đợt)
+
+---
+
 > Phân tích lỗi chấm công — Huy Anh Rubber ERP v8
 > Cập nhật: 31/03/2026

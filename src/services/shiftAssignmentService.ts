@@ -358,14 +358,47 @@ export const shiftAssignmentService = {
 
     const batchId = crypto.randomUUID()
     const rows: any[] = []
-    
+
+    // ★ Lấy nghỉ phép + công tác đã duyệt trong khoảng thời gian
+    const { data: approvedLeaves } = await supabase
+      .from('leave_requests')
+      .select('employee_id, start_date, end_date')
+      .in('employee_id', employee_ids)
+      .eq('status', 'approved')
+      .lte('start_date', date_to)
+      .gte('end_date', date_from)
+
+    // ★ Lấy attendance business_trip
+    const { data: businessTrips } = await supabase
+      .from('attendance')
+      .select('employee_id, date')
+      .in('employee_id', employee_ids)
+      .eq('status', 'business_trip')
+      .gte('date', date_from)
+      .lte('date', date_to)
+
+    // Build set để check nhanh: "empId_date" → true
+    const offDays = new Set<string>()
+    ;(approvedLeaves || []).forEach(l => {
+      const s = new Date(l.start_date + 'T00:00:00')
+      const e = new Date(l.end_date + 'T00:00:00')
+      for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+        offDays.add(`${l.employee_id}_${d.toISOString().split('T')[0]}`)
+      }
+    })
+    ;(businessTrips || []).forEach(t => {
+      offDays.add(`${t.employee_id}_${t.date}`)
+    })
+
+    let skippedLeaveOrTrip = 0
+
     const startDate = new Date(date_from)
     const endDate = new Date(date_to)
-    
+
     let currentDate = new Date(startDate)
     while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split('T')[0]
-      
+
       const diffDays = Math.floor(
         (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
       )
@@ -377,6 +410,12 @@ export const shiftAssignmentService = {
       for (const empId of employee_ids) {
         const deptCode = empDeptMap.get(empId) || ''
         const isSundayOff = dayOfWeek === 0 && SUNDAY_OFF_DEPT_CODES.includes(deptCode)
+
+        // ★ Trừ nghỉ phép + công tác
+        if (offDays.has(`${empId}_${dateStr}`)) {
+          skippedLeaveOrTrip++
+          continue
+        }
 
         if (!isSundayOff) {
           rows.push({

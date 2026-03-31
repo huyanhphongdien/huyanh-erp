@@ -267,13 +267,16 @@ export const monthlyTimesheetService = {
         let symbol: DaySymbol = ''
         const isBusinessTrip = att?.status === 'business_trip'
 
+        // ★ Check attendance status 'leave' (tạo khi duyệt phép)
+        const isAttendanceLeave = att?.status === 'leave'
+
         if (isBusinessTrip) {
           symbol = 'CT'
           totalBusinessTripDays++
           totalWorkDays++
           totalCong += dayWU
           totalWorkingMins += dayWorkMins
-        } else if (isLeave) {
+        } else if (isLeave || isAttendanceLeave) {
           symbol = 'P'
           totalLeaveDays++
         } else if (shiftCount > 0) {

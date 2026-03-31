@@ -486,6 +486,9 @@ export const leaveRequestService = {
     // ★ Auto-attendance cho công tác
     await this._createBusinessTripAttendance(data)
 
+    // ★ Xóa shift_assignment + ghi attendance "leave" cho ngày nghỉ phép
+    await this._applyLeaveToSchedule(data)
+
     return data
   },
 
@@ -679,6 +682,54 @@ export const leaveRequestService = {
   // ==========================================================================
   // ★ XÓA ATTENDANCE CÔNG TÁC (khi hủy đơn đã duyệt)
   // ==========================================================================
+  // ==========================================================================
+  // ★ NGHỈ PHÉP → XÓA SHIFT + TẠO ATTENDANCE "leave"
+  // ==========================================================================
+  async _applyLeaveToSchedule(request: any): Promise<void> {
+    try {
+      const leaveType = Array.isArray(request.leave_type) ? request.leave_type[0] : request.leave_type
+      // Công tác đã xử lý riêng
+      if (leaveType?.code === 'BUSINESS_TRIP') return
+
+      const startDate = new Date(request.start_date + 'T00:00:00+07:00')
+      const endDate = new Date(request.end_date + 'T00:00:00+07:00')
+
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0]
+
+        // Xóa shift_assignment ngày đó
+        await supabase
+          .from('shift_assignments')
+          .delete()
+          .eq('employee_id', request.employee_id)
+          .eq('date', dateStr)
+
+        // Tạo attendance "leave" nếu chưa có
+        const { data: existing } = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('employee_id', request.employee_id)
+          .eq('date', dateStr)
+          .maybeSingle()
+
+        if (!existing) {
+          await supabase.from('attendance').insert({
+            employee_id: request.employee_id,
+            date: dateStr,
+            status: 'leave',
+            work_units: 0,
+            working_minutes: 0,
+            notes: `Nghỉ phép: ${leaveType?.name || 'N/A'}`,
+          })
+        }
+      }
+
+      console.log(`[leaveRequestService] Applied leave to schedule: ${request.employee_id} ${request.start_date} → ${request.end_date}`)
+    } catch (error) {
+      console.error('[leaveRequestService] _applyLeaveToSchedule error:', error)
+    }
+  },
+
   async _deleteBusinessTripAttendance(employeeId: string, startDate: string, endDate: string): Promise<void> {
     try {
       const { error } = await supabase

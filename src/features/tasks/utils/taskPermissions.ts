@@ -257,6 +257,13 @@ export function getTaskPermissions(
   const locked = isTaskLocked(task.evaluation_status)
   const completed = isTaskCompleted(task.status)
   
+  // ── Common checks (needed for admin too) ──
+  const isAssignee = !!userEmployeeId && task.assignee_id === userEmployeeId
+  const isAssigner = !!userEmployeeId && task.assigner_id === userEmployeeId
+  const isOwner = task.is_self_assigned === true && (isAssignee || isAssigner)
+  const isMyTask = isAssignee || isAssigner || isOwner
+  const isSameDepartment = !!task.department_id && task.department_id === userDepartmentId
+
   // ── Admin: full access (except locked) ──
   if (isAdminUser) {
     return {
@@ -270,8 +277,8 @@ export function getTaskPermissions(
       canRequestExtension: !completed,
       canComment: true,
       canAttach: true,
-      canSelfEvaluate: canTaskBeEvaluated(task.status) && !locked,
-      canMarkComplete: !completed && !locked,
+      canSelfEvaluate: isAssignee && canTaskBeEvaluated(task.status) && !locked,
+      canMarkComplete: isAssignee && !completed && !locked,
       canPause: PAUSABLE_STATUSES.includes(task.status),
       canResume: RESUMABLE_STATUSES.includes(task.status),
       canCancel: CANCELLABLE_STATUSES.includes(task.status) && !locked,
@@ -280,12 +287,6 @@ export function getTaskPermissions(
     }
   }
   
-  // ── Common checks ──
-  const isAssignee = !!userEmployeeId && task.assignee_id === userEmployeeId
-  const isAssigner = !!userEmployeeId && task.assigner_id === userEmployeeId
-  const isOwner = task.is_self_assigned === true && (isAssignee || isAssigner)
-  const isMyTask = isAssignee || isAssigner || isOwner
-  const isSameDepartment = !!task.department_id && task.department_id === userDepartmentId
   const isExec = isExecutive(userPositionLevel)
   const isManager = isManagerLevel(userPositionLevel) && !isExec
   
@@ -327,9 +328,9 @@ export function getTaskPermissions(
       canComment: canManage || isMyTask,
       canAttach: canManage || isMyTask,
       canSelfEvaluate: isAssignee && canTaskBeEvaluated(task.status) && !locked,
-      canMarkComplete: isAssignee && !completed && !locked,
-      canPause: isMyTask && PAUSABLE_STATUSES.includes(task.status),
-      canResume: isMyTask && RESUMABLE_STATUSES.includes(task.status),
+      canMarkComplete: (isAssignee || (canManage && !isAssignee)) && !completed && !locked,
+      canPause: (isMyTask || canManage) && PAUSABLE_STATUSES.includes(task.status),
+      canResume: (isMyTask || canManage) && RESUMABLE_STATUSES.includes(task.status),
       canCancel: (canManage || isMyTask) && CANCELLABLE_STATUSES.includes(task.status) && !locked,
       editDisabledReason: !canManage
         ? 'Không có quyền sửa công việc này'

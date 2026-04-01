@@ -410,30 +410,33 @@ export const performanceDashboardService = {
       // ★ Lấy final_score trực tiếp từ tasks (không phụ thuộc task_evaluations)
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
-        .select('id, status, due_date, assignee_id, completed_date, final_score, self_score')
+        .select('id, status, due_date, assignee_id, completed_date, final_score, self_score, task_source')
         .eq('status', 'finished')
         .gte('completed_date', from)
         .lte('completed_date', to);
 
       if (tasksError) throw tasksError;
 
-      // ★ Tính điểm từ tasks.final_score (set bởi auto-approve hoặc manager)
+      // ★ Tính điểm weighted từ tasks.final_score + task_source
       const evaluatedEmployees = new Set<string>();
-      const employeeScores = new Map<string, number[]>();
+      const employeeWeighted = new Map<string, { totalScore: number; totalWeight: number }>();
 
       (tasks || []).forEach((t: any) => {
         if (!t.assignee_id) return;
         const score = t.final_score || 0;
         if (score > 0) {
           evaluatedEmployees.add(t.assignee_id);
-          if (!employeeScores.has(t.assignee_id)) employeeScores.set(t.assignee_id, []);
-          employeeScores.get(t.assignee_id)!.push(score);
+          const weight = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.3 : 1.0;
+          if (!employeeWeighted.has(t.assignee_id)) employeeWeighted.set(t.assignee_id, { totalScore: 0, totalWeight: 0 });
+          const emp = employeeWeighted.get(t.assignee_id)!;
+          emp.totalScore += score * weight;
+          emp.totalWeight += weight;
         }
       });
 
       const gradeDistribution = { A: 0, B: 0, C: 0, D: 0, F: 0 };
-      employeeScores.forEach(scores => {
-        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+      employeeWeighted.forEach(data => {
+        const avg = data.totalWeight > 0 ? Math.round(data.totalScore / data.totalWeight) : 0;
         gradeDistribution[calculateDashboardGrade(avg)]++;
       });
 
@@ -452,9 +455,9 @@ export const performanceDashboardService = {
       });
 
       const totalCompleted = (tasks || []).length;
-      const totalScores = Array.from(employeeScores.values()).flat();
-      const avgScore = totalScores.length > 0
-        ? Math.round(totalScores.reduce((a, b) => a + b, 0) / totalScores.length)
+      const empAvgs = Array.from(employeeWeighted.values()).map(d => d.totalWeight > 0 ? Math.round(d.totalScore / d.totalWeight) : 0);
+      const avgScore = empAvgs.length > 0
+        ? Math.round(empAvgs.reduce((a, b) => a + b, 0) / empAvgs.length)
         : 0;
 
       return {

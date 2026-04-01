@@ -39,7 +39,7 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
       // Save self-evaluation
       await supabase.from('task_self_evaluations').insert({
         task_id: task.id,
-        employee_id: user?.id,
+        employee_id: user?.employee_id || user?.id,
         score,
         rating: stars >= 4 ? 'excellent' : stars >= 3 ? 'good' : stars >= 2 ? 'average' : 'below_average',
         notes: notes || null,

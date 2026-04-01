@@ -109,6 +109,8 @@ interface AttendanceReportData {
   checked_out: number
   late_count: number
   on_leave_count: number
+  business_trip_count: number
+  auto_accounting_count: number
   departments: Array<{ name: string; total: number; checked_in: number; not_checked_in: number; late: number }>
   late_details: Array<{ name: string; department: string; shift_name: string; check_in_time: string; late_minutes: number }>
   not_checked_in_details: Array<{ name: string; department: string; position: string }>
@@ -206,10 +208,12 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
   const todayEnd = `${today}T23:59:59+07:00`
   const monthStart = today.substring(0, 7) + '-01'
 
+  // ★ Chỉ lấy task tháng hiện tại
   const { data: allTasks } = await supabase
     .from('tasks')
     .select('id, status, priority, department_id, due_date, created_at, evaluation_status, assignee_id')
     .neq('status', 'draft')
+    .gte('created_at', `${monthStart}T00:00:00`)
 
   const tasks = allTasks || []
   const tasks_by_status: Record<string, number> = {}
@@ -294,7 +298,8 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
   const { count: rejectedToday } = await supabase.from('task_approvals').select('id', { count: 'exact', head: true })
     .eq('status', 'rejected').gte('approved_at', todayStart).lte('approved_at', todayEnd)
 
-  const { data: departments } = await supabase.from('departments').select('id, name').order('name')
+  // ★ Chỉ lấy phòng active
+  const { data: departments } = await supabase.from('departments').select('id, name').eq('status', 'active').order('name')
   const deptStats = []
   for (const dept of (departments || [])) {
     const deptTasks = tasks.filter((t: any) => t.department_id === dept.id)
@@ -348,6 +353,12 @@ async function fetchAttendanceReportData(supabase: any): Promise<AttendanceRepor
   const checkedOut = checkedInDetails.filter((a: any) => a.check_out_time).length
   const lateRecords = checkedInDetails.filter((a: any) => a.late_minutes && a.late_minutes > 0)
 
+  // ★ Đếm công tác + KT tự động
+  const { count: businessTripCount } = await supabase.from('attendance').select('id', { count: 'exact', head: true })
+    .eq('date', today).eq('status', 'business_trip')
+  const { count: autoAccountingCount } = await supabase.from('attendance').select('id', { count: 'exact', head: true })
+    .eq('date', today).ilike('notes', '%Phòng Kế toán%')
+
   // ★ Bỏ BGĐ + Phòng Kế toán (KT tự động chấm công)
   const EXCLUDED_DEPT_NAMES = ['Ban Giám đốc', 'Phòng Kế toán']
   const workingEmployees = allEmployees.filter((e: any) => !EXCLUDED_DEPT_NAMES.includes(e.department_name))
@@ -379,6 +390,8 @@ async function fetchAttendanceReportData(supabase: any): Promise<AttendanceRepor
     checked_out: checkedOut,
     late_count: lateRecords.length,
     on_leave_count: onLeaveIds.size,
+    business_trip_count: businessTripCount || 0,
+    auto_accounting_count: autoAccountingCount || 0,
     departments: Array.from(deptMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
     late_details: lateRecords.map((a: any) => ({
       name: a.full_name || 'N/A',
@@ -781,10 +794,16 @@ function buildEmailHTML(
 
     <!-- Tóm tắt nhanh -->
     <div style="background:#F8FAFC;border-radius:0 0 8px 8px;padding:10px 12px;border:1px solid #E5E7EB;border-top:none;margin-bottom:16px;">
-      <table width="100%" cellspacing="0"><tr>
-        <td style="font-size:12px;color:#6B7280;">Tổng nhân viên (trừ BGĐ): <strong style="color:#374151;">${attendanceData.total_employees}</strong></td>
-        <td style="font-size:12px;color:#6B7280;text-align:right;">Nghỉ phép: <strong style="color:#7C3AED;">${attendanceData.on_leave_count}</strong></td>
-      </tr></table>
+      <table width="100%" cellspacing="0">
+        <tr>
+          <td style="font-size:12px;color:#6B7280;">Tổng NV (trừ BGĐ+KT): <strong style="color:#374151;">${attendanceData.total_employees}</strong></td>
+          <td style="font-size:12px;color:#6B7280;text-align:right;">Nghỉ phép: <strong style="color:#7C3AED;">${attendanceData.on_leave_count}</strong></td>
+        </tr>
+        <tr>
+          <td style="font-size:12px;color:#0EA5E9;padding-top:4px;">✈️ Công tác: <strong>${attendanceData.business_trip_count}</strong></td>
+          <td style="font-size:12px;color:#059669;text-align:right;padding-top:4px;">🏦 KT (tự động): <strong>${attendanceData.auto_accounting_count}</strong></td>
+        </tr>
+      </table>
     </div>
 
     <!-- Điểm danh theo phòng ban -->

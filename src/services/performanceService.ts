@@ -585,12 +585,12 @@ export const performanceDashboardService = {
         const taskSelfScore = (task as any).self_score;
 
         if (taskFinalScore && taskFinalScore > 0) {
-          // Task đã có final_score (recurring auto, self auto, hoặc manager approved)
+          // ★ Task đã có final_score → dùng trực tiếp (không áp công thức lần 2)
           const score = taskFinalScore;
           emp.manager_scores.push(score);
-          emp.self_scores.push(taskSelfScore || score);
+          emp.self_scores.push(score);
           emp.weighted_manager_scores.push({ score, weight });
-          emp.weighted_self_scores.push({ score: taskSelfScore || score, weight });
+          emp.weighted_self_scores.push({ score, weight });
         } else if (managerEval) {
           emp.manager_scores.push(managerEval.score);
           emp.self_scores.push(selfEval?.self_score || managerEval.score);

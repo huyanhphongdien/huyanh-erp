@@ -157,8 +157,21 @@ export function TaskViewPage() {
       const t = task as any
       const isAssignee = user?.employee_id === t?.assignee_id || user?.employee_id === t?.assignee?.id
 
-      if (isAssignee) {
-        // ★ Assignee: hiện popup đánh giá TRƯỚC — chưa update status
+      const isRecurring = t?.task_source === 'recurring'
+
+      if (isRecurring) {
+        // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup
+        const { error } = await supabase.from('tasks').update({
+          status: 'finished', progress: 100,
+          completed_date: new Date().toISOString().split('T')[0],
+          self_score: 100, final_score: 80,
+          evaluation_status: 'approved',
+        }).eq('id', id)
+        if (error) throw error
+        if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
+        await refetch()
+        message.success('Hoàn thành! (Tự động 80 điểm)')
+      } else if (isAssignee) {
         setShowQuickEval(true)
         message.info('Vui lòng đánh giá để hoàn thành công việc.')
       } else {
@@ -545,16 +558,25 @@ export function TaskViewPage() {
 
               // Auto-complete when 100%
               if (roundedPercent >= 100 && t.status === 'in_progress') {
+                const isRecurring = t.task_source === 'recurring'
                 const isAssignee2 = user?.employee_id === t.assignee_id || user?.employee_id === t.assignee?.id
-                if (isAssignee2) {
-                  // ★ Assignee: hiện popup đánh giá TRƯỚC — chưa update finished
+
+                if (isRecurring) {
+                  // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup
+                  const autoScore = 80
+                  await supabase.from('tasks').update({
+                    status: 'finished', progress: 100,
+                    completed_date: new Date().toISOString(),
+                    self_score: 100, final_score: autoScore,
+                    evaluation_status: 'approved',
+                  }).eq('id', t.id)
+                  message.success('Hoàn thành! (Tự động 80 điểm)')
+                } else if (isAssignee2) {
                   setShowQuickEval(true)
                   message.info('Checklist hoàn tất! Vui lòng đánh giá để hoàn thành.')
                 } else {
-                  // Người khác: update finished luôn
                   await supabase.from('tasks').update({
-                    status: 'finished',
-                    progress: 100,
+                    status: 'finished', progress: 100,
                     completed_date: new Date().toISOString(),
                   }).eq('id', t.id)
                   message.success('Công việc đã hoàn thành!')

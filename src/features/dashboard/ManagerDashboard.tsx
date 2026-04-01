@@ -316,6 +316,7 @@ export function ManagerDashboard() {
   const [activeTrips, setActiveTrips] = useState<any[]>([])
   const [monthlyWorkUnits, setMonthlyWorkUnits] = useState<any[]>([])
   const [weeklyAttendance, setWeeklyAttendance] = useState<any[]>([])
+  const [pendingTaskApprovals, setPendingTaskApprovals] = useState(0)
 
   const [projectStats, setProjectStats] = useState<{
     total: number; active: number; completed: number;
@@ -365,6 +366,10 @@ export function ManagerDashboard() {
 
         const { data: ots } = await supabase.from('overtime_requests').select('id, employee_id, overtime_date, hours, created_at, employee:employees!overtime_requests_employee_id_fkey(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
         setPendingOvertimes((ots || []).map((o: any) => ({ ...o, employee: Array.isArray(o.employee) ? o.employee[0] : o.employee })))
+
+        // ★ Task chờ phê duyệt (evaluation_status = pending_approval)
+        const { count: taskPendingCount } = await supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('evaluation_status', 'pending_approval')
+        setPendingTaskApprovals(taskPendingCount || 0)
 
         // Công tác đang diễn ra
         const btTypeId = await (async () => { const { data } = await supabase.from('leave_types').select('id').eq('code', 'BUSINESS_TRIP').maybeSingle(); return data?.id })()
@@ -477,7 +482,7 @@ export function ManagerDashboard() {
 
   // ── Computed values ──
   const attendanceRate = todayAttendance.total > 0 ? Math.round(todayAttendance.present / todayAttendance.total * 100) : 0
-  const pendingTotal = pendingLeaves.length + pendingOvertimes.length
+  const pendingTotal = pendingLeaves.length + pendingOvertimes.length + pendingTaskApprovals
 
   return (
     <div className="min-h-screen" style={{ background: '#F8FAFB' }}>
@@ -536,7 +541,7 @@ export function ManagerDashboard() {
           </div>
 
           {/* Chờ duyệt */}
-          <div onClick={() => navigate(pendingTotal > 0 ? '/leave-requests' : '/approvals')}
+          <div onClick={() => navigate('/tasks/approve-batch')}
             className={`rounded-2xl p-4 shadow-lg cursor-pointer transition-transform hover:-translate-y-0.5 ${pendingTotal > 0 ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-amber-200' : 'bg-white text-gray-700 shadow-gray-100 border border-gray-100'}`}>
             <div className="flex items-center justify-between mb-2">
               <Bell className="w-5 h-5 opacity-80" />

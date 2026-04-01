@@ -271,10 +271,14 @@ const BatchApprovePage: React.FC = () => {
           console.error('Approval insert error for task', taskId, approvalError);
         }
 
-        // 3. Update task evaluation_status
+        // 3. Update task evaluation_status + final_score
         const { error: updateError } = await supabase
           .from('tasks')
-          .update({ evaluation_status: 'approved' })
+          .update({
+            evaluation_status: 'approved',
+            final_score: finalScore,
+            self_score: selfScore,
+          })
           .eq('id', taskId);
 
         if (updateError) throw updateError;

@@ -16,6 +16,8 @@ import { supabase } from '../lib/supabase'
 
 // Phòng ban nghỉ Chủ nhật (chỉ 2 phòng này)
 export const SUNDAY_OFF_DEPT_CODES = ['HAP-KT', 'HAP-RD']
+// ★ Phòng ban tự động chấm công — không phân ca
+export const AUTO_ATTENDANCE_DEPT_CODES = ['HAP-KT']
 
 // ============================================================================
 // TYPES
@@ -224,8 +226,14 @@ export const shiftAssignmentService = {
       empQuery = empQuery.eq('department_id', department_id)
     }
 
-    const { data: employees, error: empError } = await empQuery
+    const { data: rawEmployees, error: empError } = await empQuery
     if (empError) throw empError
+
+    // ★ Loại bỏ NV phòng ban tự động chấm công (KT)
+    const employees = (rawEmployees || []).filter((e: any) => {
+      const dept = Array.isArray(e.department) ? e.department[0] : e.department
+      return !AUTO_ATTENDANCE_DEPT_CODES.includes(dept?.code || '')
+    })
 
     if (!employees || employees.length === 0) return []
 
@@ -414,6 +422,11 @@ export const shiftAssignmentService = {
         // ★ Trừ nghỉ phép + công tác
         if (offDays.has(`${empId}_${dateStr}`)) {
           skippedLeaveOrTrip++
+          continue
+        }
+
+        // ★ Bỏ qua phòng ban tự động chấm công (KT)
+        if (AUTO_ATTENDANCE_DEPT_CODES.includes(deptCode)) {
           continue
         }
 

@@ -289,10 +289,13 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
     }
   })
 
+  // ★ Chỉ tính trong tháng hiện tại
   const { count: pendingEvals } = await supabase.from('tasks').select('id', { count: 'exact', head: true })
-    .eq('status', 'completed').or('evaluation_status.is.null,evaluation_status.eq.not_started')
+    .eq('status', 'finished').in('evaluation_status', ['none', 'pending_self_eval'])
+    .gte('created_at', `${monthStart}T00:00:00`)
   const { count: pendingApprovals } = await supabase.from('tasks').select('id', { count: 'exact', head: true })
     .eq('evaluation_status', 'pending_approval')
+    .gte('created_at', `${monthStart}T00:00:00`)
   const { count: approvedToday } = await supabase.from('task_approvals').select('id', { count: 'exact', head: true })
     .eq('status', 'approved').gte('approved_at', todayStart).lte('approved_at', todayEnd)
   const { count: rejectedToday } = await supabase.from('task_approvals').select('id', { count: 'exact', head: true })
@@ -755,7 +758,7 @@ function buildEmailHTML(
   <div style="padding:16px;">
     <p style="color:#374151;font-size:13px;margin:0 0 16px;">
       Kính gửi <strong>${recipientName}</strong>,<br>
-      Dưới đây là báo cáo tổng hợp công việc, điểm danh và dự án trong ngày:
+      Báo cáo tổng hợp hôm nay — dữ liệu thống kê trong tháng ${new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })}:
     </p>
 
     <!-- ═══════════════════════════════════════════════════ -->
@@ -872,18 +875,6 @@ function buildEmailHTML(
       </tr></table>
     </div>
 
-    <!-- Trạng thái công việc (bar chart) -->
-    <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-bottom:16px;">
-      <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#1B4D3E;">📊 Phân bổ theo Trạng thái</p>
-      ${taskStatusBlock}
-    </div>
-
-    <!-- Ưu tiên công việc (bar chart) -->
-    <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-bottom:16px;">
-      <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#1B4D3E;">🎯 Phân bổ theo Mức độ ưu tiên</p>
-      ${taskPriorityBlock}
-    </div>
-
     <!-- CV theo phòng ban -->
     ${taskData.departments.length > 0 ? `
     <div style="margin-bottom:16px;">
@@ -919,57 +910,6 @@ function buildEmailHTML(
     </div>` : `
     <div style="margin-bottom:12px;background:#F9FAFB;border-radius:8px;padding:10px;text-align:center;">
       <p style="margin:0;color:#9CA3AF;font-size:12px;">Hôm nay chưa có công việc nào hoàn thành</p>
-    </div>`}
-
-    <!-- ═══════════════════════════════════════════════════ -->
-    <!-- PHẦN 3: DỰ ÁN                                       -->
-    <!-- ═══════════════════════════════════════════════════ -->
-    ${projectData.active_projects > 0 ? `
-    ${sectionHeader('🗂️', `Dự án (${projectData.active_projects}/${projectData.total_projects} đang hoạt động)`)}
-
-    <!-- Tổng quan dự án -->
-    <div style="background:#F8FAFC;border:1px solid #E5E7EB;border-top:none;padding:10px 12px;margin-bottom:12px;">
-      <table width="100%" cellspacing="0">
-        <tr>
-          <td style="font-size:12px;color:#6B7280;padding-bottom:6px;">
-            ⚡ Có rủi ro: <strong style="color:#DC2626;">${projectData.projects.filter(p => p.open_risks > 0).length} dự án</strong>
-          </td>
-          <td style="font-size:12px;color:#6B7280;text-align:center;padding-bottom:6px;">
-            🔧 Có vấn đề: <strong style="color:#D97706;">${projectData.projects.filter(p => p.open_issues > 0).length} dự án</strong>
-          </td>
-          <td style="font-size:12px;color:#6B7280;text-align:right;padding-bottom:6px;">
-            📝 Chưa cập nhật: <strong style="color:#7C3AED;">${projectData.projects.filter(p => p.needs_update).length} dự án</strong>
-          </td>
-        </tr>
-        <tr>
-          <td colspan="3" style="padding-top:4px;border-top:1px solid #E5E7EB;">
-            <table width="100%" cellspacing="0"><tr>
-              <td style="font-size:12px;color:#6B7280;">
-                📈 Tiến độ TB: <strong style="color:#1B4D3E;">${Math.round(projectData.projects.reduce((s,p)=>s+p.progress_pct,0) / Math.max(projectData.projects.length,1))}%</strong>
-              </td>
-              <td style="font-size:12px;color:#6B7280;text-align:right;">
-                ${deltaPct(
-                  Math.round(projectData.projects.reduce((s,p)=>s+p.progress_pct,0) / Math.max(projectData.projects.length,1)),
-                  yesterdayData.projects_avg_progress
-                )}
-              </td>
-            </tr></table>
-          </td>
-        </tr>
-      </table>
-    </div>
-
-    ${projectBlock}
-
-    ${projectData.milestones_approaching.length > 0 ? `
-    <div style="margin-top:12px;margin-bottom:12px;background:#FFFBEB;border-radius:8px;padding:12px;">
-      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#D97706;">🎯 Mốc quan trọng sắp đến hạn (7 ngày tới)</p>
-      ${milestoneBlock}
-    </div>` : ''}
-    ` : `
-    ${sectionHeader('🗂️', 'Dự án')}
-    <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-top:none;padding:16px;text-align:center;margin-bottom:12px;">
-      <p style="margin:0;color:#9CA3AF;font-size:13px;">Hiện không có dự án nào đang hoạt động</p>
     </div>`}
 
     <!-- CTA -->

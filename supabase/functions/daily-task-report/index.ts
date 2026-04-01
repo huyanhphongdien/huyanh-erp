@@ -354,7 +354,8 @@ async function fetchAttendanceReportData(supabase: any): Promise<AttendanceRepor
 
   const checkedInIds = new Set(checkedInDetails.map((a: any) => a.employee_id))
   const checkedOut = checkedInDetails.filter((a: any) => a.check_out_time).length
-  const lateRecords = checkedInDetails.filter((a: any) => a.late_minutes && a.late_minutes > 0)
+  // ★ Loại KT khỏi danh sách trễ
+  const lateRecords = checkedInDetails.filter((a: any) => a.late_minutes && a.late_minutes > 0 && a.department_name !== 'Phòng Kế toán')
 
   // ★ Đếm công tác + KT tự động
   const { count: businessTripCount } = await supabase.from('attendance').select('id', { count: 'exact', head: true })
@@ -384,6 +385,11 @@ async function fetchAttendanceReportData(supabase: any): Promise<AttendanceRepor
     } else if (!onLeaveIds.has(emp.id)) {
       dept.not_checked_in++
     }
+  }
+
+  // ★ Thêm Phòng Kế toán = 100% (tự động chấm công)
+  if (autoAccountingCount && autoAccountingCount > 0) {
+    deptMap.set('Phòng Kế toán', { name: 'Phòng Kế toán', total: autoAccountingCount, checked_in: autoAccountingCount, not_checked_in: 0, late: 0 })
   }
 
   return {

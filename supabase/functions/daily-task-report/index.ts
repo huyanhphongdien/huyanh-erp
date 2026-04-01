@@ -159,7 +159,7 @@ async function fetchYesterdayData(supabase: any): Promise<YesterdayData> {
     const { data: rpcY } = await supabase.rpc('get_daily_attendance_report', { report_date: yesterday })
     if (rpcY) {
       const ciY = rpcY.checked_in_details || []
-      const empY = (rpcY.all_active_employees || []).filter((e: any) => e.department_name !== 'Ban Giám đốc')
+      const empY = (rpcY.all_active_employees || []).filter((e: any) => !['Ban Giám đốc', 'Phòng Kế toán'].includes(e.department_name))
       const onLeaveY = new Set(rpcY.on_leave_ids || [])
       const ciIdsY = new Set(ciY.map((a: any) => a.employee_id))
       att_checked_in = ciY.length
@@ -348,7 +348,9 @@ async function fetchAttendanceReportData(supabase: any): Promise<AttendanceRepor
   const checkedOut = checkedInDetails.filter((a: any) => a.check_out_time).length
   const lateRecords = checkedInDetails.filter((a: any) => a.late_minutes && a.late_minutes > 0)
 
-  const workingEmployees = allEmployees.filter((e: any) => e.department_name !== 'Ban Giám đốc')
+  // ★ Bỏ BGĐ + Phòng Kế toán (KT tự động chấm công)
+  const EXCLUDED_DEPT_NAMES = ['Ban Giám đốc', 'Phòng Kế toán']
+  const workingEmployees = allEmployees.filter((e: any) => !EXCLUDED_DEPT_NAMES.includes(e.department_name))
   const notCheckedInEmployees = workingEmployees.filter((e: any) =>
     !checkedInIds.has(e.id) && !onLeaveIds.has(e.id)
   )

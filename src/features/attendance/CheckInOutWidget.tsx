@@ -307,14 +307,18 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
   // ★ Kiểm tra đang đi công tác hôm nay
   const isOnBusinessTrip = todayAttendances.some(a => a.status === 'business_trip')
 
+  // ★ Phòng Kế toán: tự động chấm công, không cần check-in/out
+  const isAccountingDept = user?.department_name?.includes('Kế toán') || false
+
   // ── ★ V4: Permission checks — xử lý đúng multi-shift ──
-  // canCheckIn: GPS OK + không có ca đang mở + có ca chưa hoàn thành + KHÔNG đi công tác
+  // canCheckIn: GPS OK + không có ca đang mở + có ca chưa hoàn thành + KHÔNG đi công tác + KHÔNG phải KT
   const canCheckIn =
     gpsStatus === 'available' &&
     !openAttendance &&
     currentShiftAssignment !== null &&
     !isComplete &&
-    !isOnBusinessTrip
+    !isOnBusinessTrip &&
+    !isAccountingDept
 
   // ★ Khóa check-out cho đến khi làm được ≥ 50% ca (tránh bấm nhầm)
   const minCheckoutElapsed = (() => {
@@ -335,8 +339,8 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
     return Math.ceil(halfShift - elapsed)
   })()
 
-  // canCheckOut: có ca đang mở + KHÔNG đi công tác + đã làm ≥ 50% ca
-  const canCheckOut = !!openAttendance && !isOnBusinessTrip && minCheckoutElapsed
+  // canCheckOut: có ca đang mở + KHÔNG đi công tác + đã làm ≥ 50% ca + KHÔNG phải KT
+  const canCheckOut = !!openAttendance && !isOnBusinessTrip && minCheckoutElapsed && !isAccountingDept
 
   // ── Invalidate all related queries ──
   const invalidateAll = useCallback(() => {
@@ -538,6 +542,15 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
           <div className="flex items-center justify-center py-4 text-gray-400">
             <Loader2 size={20} className="animate-spin mr-2" />
             <span className="text-sm">Đang tải...</span>
+          </div>
+        ) : isAccountingDept ? (
+          /* ★ Phòng Kế toán — tự động chấm công */
+          <div className="flex flex-col items-center py-3 text-emerald-700">
+            <CheckCircle2 size={28} className="mb-1" />
+            <span className="text-sm font-semibold">Tự động chấm công</span>
+            <span className="text-xs text-emerald-500 mt-1">
+              Phòng Kế toán: 08:00 → 20:00 (T2-T7)
+            </span>
           </div>
         ) : isOnBusinessTrip ? (
           /* ★ Đang đi công tác — khóa check-in/out */

@@ -506,6 +506,17 @@ export const attendanceService = {
     const today = getToday()
     const nowISO = now.toISOString()
 
+    // ★ Kiểm tra Phòng Kế toán → tự động chấm công
+    const { data: empDept } = await supabase
+      .from('employees')
+      .select('department:departments!employees_department_id_fkey(code)')
+      .eq('id', employeeId)
+      .maybeSingle()
+    const deptCode = Array.isArray((empDept as any)?.department) ? (empDept as any)?.department[0]?.code : (empDept as any)?.department?.code
+    if (deptCode === 'HAP-KT') {
+      throw new Error('Phòng Kế toán được tự động chấm công (08:00-20:00).')
+    }
+
     // ★ Kiểm tra đang đi công tác → không cho check-in
     const { data: tripRecord } = await supabase
       .from('attendance')

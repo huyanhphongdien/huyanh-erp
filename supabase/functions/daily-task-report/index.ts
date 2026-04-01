@@ -132,6 +132,17 @@ interface ProjectReportData {
   }>
 }
 
+// ── Interface hiệu suất ──────────────────────────────────────────────────────
+interface PerformanceReportData {
+  avg_score: number
+  total_evaluated: number
+  total_completed: number
+  grade: string
+  top_employees: Array<{ name: string; department: string; score: number; grade: string }>
+  bottom_employees: Array<{ name: string; department: string; score: number; grade: string }>
+  dept_scores: Array<{ name: string; score: number; grade: string; count: number }>
+}
+
 // ── Interface so sánh hôm qua ────────────────────────────────────────────────
 interface YesterdayData {
   attendance_checked_in: number
@@ -420,6 +431,87 @@ async function fetchAttendanceReportData(supabase: any): Promise<AttendanceRepor
 }
 
 // ── Lấy dữ liệu DỰ ÁN ────────────────────────────────────────────────────────
+// ── Lấy dữ liệu HIỆU SUẤT ──────────────────────────────────────────────────
+async function fetchPerformanceData(supabase: any): Promise<PerformanceReportData> {
+  try {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
+    const monthStart = today.substring(0, 7) + '-01'
+    const monthEnd = today
+
+    // Task finished trong tháng có final_score
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('assignee_id, final_score, task_source')
+      .eq('status', 'finished')
+      .not('final_score', 'is', null)
+      .gt('final_score', 0)
+      .gte('completed_date', monthStart)
+      .lte('completed_date', monthEnd)
+
+    // Lấy employee info
+    const empIds = [...new Set((tasks || []).map((t: any) => t.assignee_id).filter(Boolean))]
+    let empMap = new Map<string, { name: string; dept: string }>()
+    if (empIds.length > 0) {
+      const { data: emps } = await supabase.from('employees')
+        .select('id, full_name, department:departments!employees_department_id_fkey(name)')
+        .in('id', empIds)
+      ;(emps || []).forEach((e: any) => {
+        const dept = Array.isArray(e.department) ? e.department[0] : e.department
+        empMap.set(e.id, { name: e.full_name, dept: dept?.name || '' })
+      })
+    }
+
+    // Tính điểm TB theo NV (weighted by task_source)
+    const empScores = new Map<string, { scores: number[]; weights: number[] }>()
+    ;(tasks || []).forEach((t: any) => {
+      if (!t.assignee_id || !t.final_score) return
+      if (!empScores.has(t.assignee_id)) empScores.set(t.assignee_id, { scores: [], weights: [] })
+      const w = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.3 : 1.0
+      empScores.get(t.assignee_id)!.scores.push(t.final_score)
+      empScores.get(t.assignee_id)!.weights.push(w)
+    })
+
+    function getGrade(s: number) { return s >= 90 ? 'A' : s >= 75 ? 'B' : s >= 60 ? 'C' : s >= 40 ? 'D' : 'F' }
+
+    const empResults: Array<{ id: string; name: string; dept: string; score: number; grade: string }> = []
+    empScores.forEach((data, empId) => {
+      let totalW = 0, totalS = 0
+      data.scores.forEach((s, i) => { totalS += s * data.weights[i]; totalW += data.weights[i] })
+      const avg = totalW > 0 ? Math.round(totalS / totalW) : 0
+      const info = empMap.get(empId)
+      empResults.push({ id: empId, name: info?.name || '', dept: info?.dept || '', score: avg, grade: getGrade(avg) })
+    })
+    empResults.sort((a, b) => b.score - a.score)
+
+    // Dept aggregation
+    const deptMap = new Map<string, { scores: number[]; name: string }>()
+    empResults.forEach(e => {
+      if (!deptMap.has(e.dept)) deptMap.set(e.dept, { name: e.dept, scores: [] })
+      deptMap.get(e.dept)!.scores.push(e.score)
+    })
+    const deptScores = Array.from(deptMap.values()).map(d => {
+      const avg = Math.round(d.scores.reduce((a, b) => a + b, 0) / d.scores.length)
+      return { name: d.name, score: avg, grade: getGrade(avg), count: d.scores.length }
+    }).sort((a, b) => b.score - a.score)
+
+    const allScores = empResults.map(e => e.score)
+    const avgScore = allScores.length > 0 ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) : 0
+
+    return {
+      avg_score: avgScore,
+      total_evaluated: empResults.length,
+      total_completed: (tasks || []).length,
+      grade: getGrade(avgScore),
+      top_employees: empResults.slice(0, 3).map(e => ({ name: e.name, department: e.dept, score: e.score, grade: e.grade })),
+      bottom_employees: empResults.length > 3 ? empResults.slice(-3).reverse().map(e => ({ name: e.name, department: e.dept, score: e.score, grade: e.grade })) : [],
+      dept_scores: deptScores,
+    }
+  } catch (err) {
+    console.error('Performance data error:', err)
+    return { avg_score: 0, total_evaluated: 0, total_completed: 0, grade: 'F', top_employees: [], bottom_employees: [], dept_scores: [] }
+  }
+}
+
 async function fetchProjectReportData(supabase: any): Promise<ProjectReportData> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
 
@@ -920,6 +1012,71 @@ function buildEmailHTML(
       <p style="margin:0;color:#9CA3AF;font-size:12px;">Hôm nay chưa có công việc nào hoàn thành</p>
     </div>`}
 
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- PHẦN 3: HIỆU SUẤT                                   -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    ${performanceData.total_evaluated > 0 ? `
+    ${sectionHeader('📈', 'Hiệu suất tháng')}
+
+    <table width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #E5E7EB;border-top:none;">
+      <tr>
+        <td width="33%" style="padding:12px 4px;text-align:center;background:#F0FDF4;">
+          <div style="font-size:28px;font-weight:700;color:#1B4D3E;">${performanceData.avg_score}</div>
+          <div style="font-size:10px;color:#6B7280;">Điểm TB</div>
+        </td>
+        <td width="33%" style="padding:12px 4px;text-align:center;background:#EFF6FF;">
+          <div style="font-size:28px;font-weight:700;color:#2563EB;">${performanceData.total_evaluated}</div>
+          <div style="font-size:10px;color:#6B7280;">NV được đánh giá</div>
+        </td>
+        <td width="33%" style="padding:12px 4px;text-align:center;background:#F9FAFB;">
+          <div style="font-size:28px;font-weight:700;color:${performanceData.grade === 'A' ? '#16A34A' : performanceData.grade === 'B' ? '#2563EB' : '#D97706'};">Hạng ${performanceData.grade}</div>
+          <div style="font-size:10px;color:#6B7280;">Xếp hạng chung</div>
+        </td>
+      </tr>
+    </table>
+
+    ${performanceData.top_employees.length > 0 ? `
+    <div style="margin-top:12px;background:#F0FDF4;border-radius:8px;padding:12px;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#16A34A;">🏆 Top NV xuất sắc</p>
+      ${performanceData.top_employees.map((e, i) => `
+        <div style="padding:6px 0;border-bottom:1px solid #D1FAE5;">
+          <span style="font-size:13px;font-weight:600;color:#1B4D3E;">${['🥇','🥈','🥉'][i] || ''} ${e.name}</span>
+          <span style="float:right;font-size:13px;font-weight:700;color:${e.score >= 90 ? '#16A34A' : '#2563EB'};">${e.score}đ (${e.grade})</span>
+          <div style="font-size:11px;color:#9CA3AF;">${e.department}</div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    ${performanceData.bottom_employees.length > 0 ? `
+    <div style="margin-top:8px;background:#FEF2F2;border-radius:8px;padding:12px;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#DC2626;">⚠️ NV cần cải thiện</p>
+      ${performanceData.bottom_employees.map(e => `
+        <div style="padding:6px 0;border-bottom:1px solid #FEE2E2;">
+          <span style="font-size:13px;font-weight:600;color:#374151;">${e.name}</span>
+          <span style="float:right;font-size:13px;font-weight:700;color:${e.score < 60 ? '#DC2626' : '#D97706'};">${e.score}đ (${e.grade})</span>
+          <div style="font-size:11px;color:#9CA3AF;">${e.department}</div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    ${performanceData.dept_scores.length > 0 ? `
+    <div style="margin-top:8px;margin-bottom:16px;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1B4D3E;">🏢 Hiệu suất theo Phòng ban</p>
+      ${performanceData.dept_scores.map(d => {
+        const barColor = d.score >= 80 ? '#16A34A' : d.score >= 60 ? '#D97706' : '#DC2626'
+        return `
+        <div style="padding:8px 0;border-bottom:1px solid #F3F4F6;">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:13px;font-weight:600;color:#1B4D3E;">${d.name}</span>
+            <span style="font-size:13px;font-weight:700;color:${barColor};">${d.score}đ (${d.grade})</span>
+          </div>
+          <div style="background:#E5E7EB;border-radius:3px;height:5px;margin:4px 0;">
+            <div style="background:${barColor};border-radius:3px;height:5px;width:${Math.min(d.score,100)}%;"></div>
+          </div>
+          <div style="font-size:11px;color:#9CA3AF;">${d.count} NV được đánh giá</div>
+        </div>`
+      }).join('')}
+    </div>` : ''}
+    ` : ''}
+
     <!-- CTA -->
     <div style="text-align:center;margin:20px 0 8px;">
       <a href="${APP_URL}" style="display:inline-block;background:#1B4D3E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
@@ -949,10 +1106,11 @@ serve(async (req) => {
     console.log('📊 [daily-task-report] Starting...')
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const [taskData, attendanceData, projectData, yesterdayData, accessToken] = await Promise.all([
+    const [taskData, attendanceData, projectData, performanceData, yesterdayData, accessToken] = await Promise.all([
       fetchTaskReportData(supabase),
       fetchAttendanceReportData(supabase),
       fetchProjectReportData(supabase),
+      fetchPerformanceData(supabase),
       fetchYesterdayData(supabase),
       getAccessToken(),
     ])

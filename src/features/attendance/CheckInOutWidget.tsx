@@ -316,8 +316,27 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
     !isComplete &&
     !isOnBusinessTrip
 
-  // canCheckOut: có ca đang mở + KHÔNG đi công tác
-  const canCheckOut = !!openAttendance && !isOnBusinessTrip
+  // ★ Khóa check-out cho đến khi làm được ≥ 50% ca (tránh bấm nhầm)
+  const minCheckoutElapsed = (() => {
+    if (!openAttendance?.check_in_time) return false
+    const stdHours = openAttendance.shift?.standard_hours || displayShift?.standard_hours || 8
+    const checkIn = new Date(openAttendance.check_in_time)
+    const elapsed = (Date.now() - checkIn.getTime()) / (1000 * 60) // phút
+    const halfShift = (stdHours * 60) / 2
+    return elapsed >= halfShift
+  })()
+
+  const checkoutLockedMinutes = (() => {
+    if (!openAttendance?.check_in_time || minCheckoutElapsed) return 0
+    const stdHours = openAttendance.shift?.standard_hours || displayShift?.standard_hours || 8
+    const checkIn = new Date(openAttendance.check_in_time)
+    const elapsed = (Date.now() - checkIn.getTime()) / (1000 * 60)
+    const halfShift = (stdHours * 60) / 2
+    return Math.ceil(halfShift - elapsed)
+  })()
+
+  // canCheckOut: có ca đang mở + KHÔNG đi công tác + đã làm ≥ 50% ca
+  const canCheckOut = !!openAttendance && !isOnBusinessTrip && minCheckoutElapsed
 
   // ── Invalidate all related queries ──
   const invalidateAll = useCallback(() => {
@@ -635,8 +654,21 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
               </button>
             )}
 
+            {/* ★ Check-out bị khóa — chưa đủ 50% ca */}
+            {!!openAttendance && !isOnBusinessTrip && !minCheckoutElapsed && (
+              <div className="w-full flex flex-col items-center gap-1 py-3 bg-gray-100 rounded-xl min-h-[48px]">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                  <LogOut size={16} />
+                  Check-out khóa
+                </div>
+                <span className="text-[11px] text-gray-400">
+                  Cần làm ≥ 50% ca — còn {checkoutLockedMinutes > 60 ? `${Math.floor(checkoutLockedMinutes / 60)}h${checkoutLockedMinutes % 60}p` : `${checkoutLockedMinutes} phút`}
+                </span>
+              </div>
+            )}
+
             {/* GPS chưa sẵn sàng + chưa check-in */}
-            {!canCheckIn && !canCheckOut && !isComplete && !allComplete && gpsStatus !== 'available' && (
+            {!canCheckIn && !canCheckOut && !isComplete && !allComplete && !openAttendance && gpsStatus !== 'available' && (
               <button
                 disabled
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold

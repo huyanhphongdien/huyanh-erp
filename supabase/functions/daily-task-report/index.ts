@@ -173,8 +173,9 @@ async function fetchYesterdayData(supabase: any): Promise<YesterdayData> {
   // Công việc hôm qua
   const { count: tasks_new } = await supabase.from('tasks').select('id', { count: 'exact', head: true })
     .neq('status', 'draft').gte('created_at', yStart).lte('created_at', yEnd)
+  // ★ Dùng completed_date thay vì updated_at
   const { count: tasks_completed } = await supabase.from('tasks').select('id', { count: 'exact', head: true })
-    .eq('status', 'finished').gte('updated_at', yStart).lte('updated_at', yEnd)
+    .eq('status', 'finished').gte('completed_date', yesterday).lte('completed_date', yesterday)
 
   // Quá hạn hôm qua (tính đến cuối ngày hôm qua)
   const { data: allTasksY } = await supabase.from('tasks')
@@ -247,14 +248,15 @@ async function fetchTaskReportData(supabase: any): Promise<TaskReportData> {
     due_date: t.due_date || '',
   }))
 
+  // ★ Hoàn thành HÔM NAY: dùng completed_date (không phải updated_at)
   const { data: completedToday } = await supabase
     .from('tasks')
     .select(`id, code, name, status, assignee_id,
       departments!tasks_department_id_fkey(name),
       assignee:employees!tasks_assignee_id_fkey(full_name)`)
     .eq('status', 'finished')
-    .gte('updated_at', todayStart)
-    .lte('updated_at', todayEnd)
+    .gte('completed_date', today)
+    .lte('completed_date', today)
 
   const completed_today_details = []
   for (const t of (completedToday || [])) {

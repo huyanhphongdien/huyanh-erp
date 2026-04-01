@@ -224,11 +224,12 @@ export const dashboardService = {
           .neq('status', 'draft')
           .gte('created_at', `${startOfWeek}T00:00:00`),
 
-        // ★ Dùng completed_date thay vì updated_at
+        // ★ CV hoàn thành: task TẠO trong tháng VÀ đã finished (cùng pool với totalTasks)
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .eq('status', 'finished')
-          .gte('completed_date', startOfMonth)
-          .lte('completed_date', endOfMonth),
+          .neq('status', 'draft')
+          .gte('created_at', `${startOfMonth}T00:00:00`)
+          .lte('created_at', `${endOfMonth}T23:59:59`),
 
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .lt('due_date', today)

@@ -214,24 +214,29 @@ export const dashboardService = {
           .gte('created_at', `${startOfMonth}T00:00:00`)
           .lte('created_at', `${endOfMonth}T23:59:59`),
 
+        // ★ Chỉ task tháng hiện tại, bỏ draft
         supabase.from('tasks').select('id', { count: 'exact', head: true })
+          .neq('status', 'draft')
           .gte('created_at', `${startOfMonth}T00:00:00`)
           .lte('created_at', `${endOfMonth}T23:59:59`),
 
         supabase.from('tasks').select('id', { count: 'exact', head: true })
+          .neq('status', 'draft')
           .gte('created_at', `${startOfWeek}T00:00:00`),
 
+        // ★ Dùng completed_date thay vì updated_at
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .eq('status', 'finished')
-          .gte('updated_at', `${startOfMonth}T00:00:00`)
-          .lte('updated_at', `${endOfMonth}T23:59:59`),
+          .gte('completed_date', startOfMonth)
+          .lte('completed_date', endOfMonth),
 
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .lt('due_date', today)
           .gte('due_date', startOfMonth)
-          .not('status', 'in', '("finished","completed","cancelled")'),
+          .not('status', 'in', '("finished","completed","cancelled","draft")'),
 
-        supabase.from('task_self_evaluations').select('id', { count: 'exact', head: true })
+        // ★ Chờ duyệt: nghỉ phép + tăng ca pending
+        supabase.from('leave_requests').select('id', { count: 'exact', head: true })
           .eq('status', 'pending'),
 
         supabase.from('leave_requests').select('id', { count: 'exact', head: true })

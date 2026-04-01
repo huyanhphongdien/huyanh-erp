@@ -475,663 +475,357 @@ export function ManagerDashboard() {
     )
   }
 
-  return (
-    <div className="min-h-screen" style={{ background: BRAND.bg }}>
+  // ── Computed values ──
+  const attendanceRate = todayAttendance.total > 0 ? Math.round(todayAttendance.present / todayAttendance.total * 100) : 0
+  const pendingTotal = pendingLeaves.length + pendingOvertimes.length
 
-      {/* ══════════════════════════════════════════════════════════════════
-          HEADER
-      ══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white/70 backdrop-blur-md border-b border-black/5 lg:sticky lg:top-0 z-20">
-        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-3 sm:py-4">
+  return (
+    <div className="min-h-screen" style={{ background: '#F8FAFB' }}>
+
+      {/* ══════════ HEADER ══════════ */}
+      <div className="bg-gradient-to-r from-[#1B4D3E] to-[#2D8B6E] lg:sticky lg:top-0 z-20">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-[22px] font-bold text-gray-900 tracking-tight truncate">
-                Xin chào, {user?.full_name || 'Người dùng'}{' '}
-                <span className="hidden sm:inline">👋</span>
+              <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">
+                {user?.full_name || 'Quản lý'}
               </h1>
-              <p className="text-gray-400 text-xs sm:text-[13px] mt-0.5 font-medium truncate">
-                {stats?.monthLabel || 'Tổng quan hệ thống'} • {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              <p className="text-emerald-200 text-xs sm:text-sm mt-0.5 font-medium truncate">
+                {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                {stats?.monthLabel ? ` • ${stats.monthLabel}` : ''}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadData(true)}
-                disabled={isRefreshing}
-                className="p-2.5 rounded-xl bg-white/80 border border-gray-200/60 text-gray-500 hover:text-gray-700 hover:bg-white transition-all disabled:opacity-50"
-                title="Làm mới"
-              >
+              <button onClick={() => loadData(true)} disabled={isRefreshing}
+                className="p-2.5 rounded-xl bg-white/15 text-white hover:bg-white/25 transition-all disabled:opacity-50">
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </button>
-              <button
-                onClick={() => navigate('/tasks/create')}
-                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl text-white text-sm font-semibold shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
-                style={{ background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.secondary})`, boxShadow: `0 4px 14px ${BRAND.primary}40` }}
-              >
+              <button onClick={() => navigate('/tasks/create')}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-[#1B4D3E] text-sm font-bold shadow-lg hover:shadow-xl transition-all">
                 <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Tạo mới</span>
+                <span className="hidden sm:inline">Tạo CV</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          MAIN CONTENT
-      ══════════════════════════════════════════════════════════════════ */}
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
+      {/* ══════════ MAIN CONTENT ══════════ */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
 
-        {/* ─── KPI CARDS — Bento Row ─── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
-          <KpiCard
-            label="Nhân viên"
-            value={stats?.totalEmployees || 0}
-            subtitle={stats?.newEmployeesThisMonth ? `+${stats.newEmployeesThisMonth} tháng này` : undefined}
-            icon={<Users />}
-            accentColor="#3B82F6"
-            iconBg="bg-blue-50 text-blue-600"
-            onClick={() => navigate('/employees')}
-          />
-          <KpiCard
-            label="Công việc tháng"
-            value={stats?.totalTasks || 0}
-            subtitle={stats?.newTasksThisWeek ? `+${stats.newTasksThisWeek} tuần này` : 'Tạo trong tháng'}
-            icon={<ClipboardList />}
-            sparkData={trendSparkCreated}
-            accentColor={BRAND.secondary}
-            iconBg="bg-emerald-50 text-emerald-600"
-            trend={stats?.newTasksThisWeek ? { value: `+${stats.newTasksThisWeek}`, isPositive: true } : undefined}
-            onClick={() => navigate('/tasks')}
-          />
-          <KpiCard
-            label="Hoàn thành"
-            value={`${stats?.completionRate || 0}%`}
-            subtitle={`${stats?.completedTasks || 0} CV trong tháng`}
-            icon={<CheckCircle2 />}
-            sparkData={trendSparkCompleted}
-            accentColor="#10B981"
-            iconBg="bg-green-50 text-green-600"
-          />
-          <KpiCard
-            label="Quá hạn"
-            value={stats?.overdueTasks || 0}
-            subtitle="Trong tháng"
-            icon={<AlertTriangle />}
-            accentColor="#EF4444"
-            iconBg="bg-red-50 text-red-500"
-            onClick={() => navigate('/tasks?filter=overdue')}
-          />
-          <KpiCard
-            label="Chờ duyệt"
-            value={stats?.pendingApprovals || 0}
-            subtitle="Đang chờ phê duyệt"
-            icon={<Clock />}
-            accentColor={BRAND.accent}
-            iconBg="bg-amber-50 text-amber-600"
-            onClick={() => navigate('/approvals')}
-          />
+        {/* ═══ TẦNG 1: HERO KPI ═══ */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Đi làm hôm nay */}
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 text-white shadow-lg shadow-emerald-200">
+            <div className="flex items-center justify-between mb-2">
+              <UserCheck className="w-5 h-5 opacity-80" />
+              <span className="text-[11px] font-medium bg-white/20 px-2 py-0.5 rounded-full">{attendanceRate}%</span>
+            </div>
+            <div className="text-3xl font-bold">{todayAttendance.present}</div>
+            <div className="text-emerald-100 text-xs mt-0.5">Đi làm hôm nay / {todayAttendance.total}</div>
+          </div>
+
+          {/* CV hoàn thành */}
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg shadow-blue-200">
+            <div className="flex items-center justify-between mb-2">
+              <CheckCircle2 className="w-5 h-5 opacity-80" />
+              <span className="text-[11px] font-medium bg-white/20 px-2 py-0.5 rounded-full">{stats?.completionRate || 0}%</span>
+            </div>
+            <div className="text-3xl font-bold">{stats?.completedTasks || 0}</div>
+            <div className="text-blue-100 text-xs mt-0.5">CV hoàn thành tháng này</div>
+          </div>
+
+          {/* Chờ duyệt */}
+          <div onClick={() => navigate(pendingTotal > 0 ? '/leave-requests' : '/approvals')}
+            className={`rounded-2xl p-4 shadow-lg cursor-pointer transition-transform hover:-translate-y-0.5 ${pendingTotal > 0 ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-amber-200' : 'bg-white text-gray-700 shadow-gray-100 border border-gray-100'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <Bell className="w-5 h-5 opacity-80" />
+              {pendingTotal > 0 && <span className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />}
+            </div>
+            <div className="text-3xl font-bold">{pendingTotal}</div>
+            <div className={`text-xs mt-0.5 ${pendingTotal > 0 ? 'text-amber-100' : 'text-gray-400'}`}>Chờ duyệt</div>
+          </div>
+
+          {/* Quá hạn */}
+          <div onClick={() => navigate('/tasks?filter=overdue')}
+            className={`rounded-2xl p-4 shadow-lg cursor-pointer transition-transform hover:-translate-y-0.5 ${(stats?.overdueTasks || 0) > 0 ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-red-200' : 'bg-white text-gray-700 shadow-gray-100 border border-gray-100'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <AlertTriangle className="w-5 h-5 opacity-80" />
+            </div>
+            <div className="text-3xl font-bold">{stats?.overdueTasks || 0}</div>
+            <div className={`text-xs mt-0.5 ${(stats?.overdueTasks || 0) > 0 ? 'text-red-100' : 'text-gray-400'}`}>Quá hạn</div>
+          </div>
         </div>
 
-        {/* ═══════ CHẤM CÔNG HÔM NAY + BIỂU ĐỒ TUẦN ═══════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3.5 sm:gap-4">
-          {/* Chấm công hôm nay */}
-          <GlassCard className="lg:col-span-2 p-3.5 sm:p-5">
-            <SectionHeader title="Chấm công Hôm nay" icon={<UserCheck className="w-4 h-4" />}
-              action={<button onClick={() => navigate('/attendance')} className="text-xs font-semibold flex items-center gap-0.5" style={{ color: BRAND.secondary }}>Chi tiết <ChevronRight className="w-3.5 h-3.5" /></button>} />
-            <div className="grid grid-cols-2 gap-2.5 mt-1">
-              {[
-                { label: 'Đi làm', val: todayAttendance.present, color: 'bg-emerald-50 text-emerald-600', icon: <UserCheck className="w-4 h-4" /> },
-                { label: 'Vắng', val: todayAttendance.absent, color: 'bg-red-50 text-red-500', icon: <UserX className="w-4 h-4" /> },
-                { label: 'Đi trễ', val: todayAttendance.late, color: 'bg-amber-50 text-amber-600', icon: <AlertTriangle className="w-4 h-4" /> },
-                { label: 'Công tác', val: todayAttendance.businessTrip, color: 'bg-sky-50 text-sky-600', icon: <Briefcase className="w-4 h-4" /> },
-              ].map(s => (
-                <div key={s.label} className={`flex items-center gap-2.5 p-3 rounded-xl ${s.color}`}>
-                  {s.icon}
-                  <div>
-                    <div className="text-xl font-bold">{s.val}</div>
+        {/* ═══ TẦNG 2: CHẤM CÔNG + ĐƠN DUYỆT ═══ */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* Chấm công chi tiết */}
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-emerald-500" /> Chấm công hôm nay
+              </h3>
+              <button onClick={() => navigate('/attendance')} className="text-xs text-emerald-600 font-semibold flex items-center gap-0.5 hover:gap-1 transition-all">
+                Chi tiết <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="p-4">
+              {/* Progress bar lớn */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                  <span>{todayAttendance.present} / {todayAttendance.total} nhân viên</span>
+                  <span className="font-bold text-emerald-600">{attendanceRate}%</span>
+                </div>
+                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all" style={{ width: `${attendanceRate}%` }} />
+                </div>
+              </div>
+              {/* 4 stat pills */}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: 'Đi làm', val: todayAttendance.present, color: 'text-emerald-600 bg-emerald-50', icon: <UserCheck className="w-3.5 h-3.5" /> },
+                  { label: 'Vắng', val: todayAttendance.absent, color: 'text-red-500 bg-red-50', icon: <UserX className="w-3.5 h-3.5" /> },
+                  { label: 'Trễ', val: todayAttendance.late, color: 'text-amber-600 bg-amber-50', icon: <Clock className="w-3.5 h-3.5" /> },
+                  { label: 'Công tác', val: todayAttendance.businessTrip, color: 'text-sky-600 bg-sky-50', icon: <Plane className="w-3.5 h-3.5" /> },
+                ].map(s => (
+                  <div key={s.label} className={`rounded-xl p-2.5 text-center ${s.color}`}>
+                    <div className="flex justify-center mb-1">{s.icon}</div>
+                    <div className="text-lg font-bold">{s.val}</div>
                     <div className="text-[10px] font-medium opacity-70">{s.label}</div>
                   </div>
+                ))}
+              </div>
+              {/* Biểu đồ 7 ngày */}
+              <div className="mt-4 pt-3 border-t border-gray-50">
+                <p className="text-[11px] text-gray-400 font-medium mb-2">7 ngày gần nhất</p>
+                <div className="h-[140px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={weeklyAttendance} barGap={2}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} width={28} />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar dataKey="Đi làm" fill="#10B981" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Trễ" fill="#F59E0B" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Công tác" fill="#0EA5E9" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
-            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[12px] text-gray-400">
-              <span>Tổng NV: {todayAttendance.total}</span>
-              <span>Tỷ lệ: {todayAttendance.total > 0 ? Math.round(todayAttendance.present / todayAttendance.total * 100) : 0}% đi làm</span>
-            </div>
-          </GlassCard>
-
-          {/* Biểu đồ chấm công 7 ngày */}
-          <GlassCard className="lg:col-span-3 p-3.5 sm:p-5">
-            <SectionHeader title="Chấm công 7 ngày gần nhất" icon={<BarChart3 className="w-4 h-4" />} />
-            <div className="h-[200px] sm:h-[220px] mt-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyAttendance} barGap={2}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="Đi làm" fill="#10B981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Trễ" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Công tác" fill="#0EA5E9" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCard>
-        </div>
-
-        {/* ═══════ ĐƠN CHỜ DUYỆT + CÔNG TÁC ĐANG DIỄN RA ═══════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
-          {/* Đơn chờ duyệt */}
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader title="Đơn chờ Duyệt" icon={<Clock className="w-4 h-4 text-amber-500" />}
-              action={
-                (pendingLeaves.length + pendingOvertimes.length) > 0
-                  ? <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[11px] font-bold rounded-full">{pendingLeaves.length + pendingOvertimes.length}</span>
-                  : undefined
-              } />
-            {pendingLeaves.length === 0 && pendingOvertimes.length === 0 ? (
-              <div className="text-center py-6">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-1.5" />
-                <p className="text-sm text-gray-400">Không có đơn chờ duyệt</p>
               </div>
-            ) : (
-              <div className="space-y-1.5 mt-1">
-                {pendingLeaves.map((l: any) => (
-                  <div key={l.id} onClick={() => navigate('/leave-requests')}
-                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-orange-50/50 hover:bg-orange-50 cursor-pointer transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-4 h-4 text-orange-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-gray-800 truncate">{l.employee?.full_name}</p>
-                      <p className="text-[10px] text-gray-400">{l.leave_type?.name} • {l.total_days} ngày</p>
-                    </div>
-                    <span className="text-[10px] text-orange-500 font-medium flex-shrink-0">Nghỉ phép</span>
-                  </div>
-                ))}
-                {pendingOvertimes.map((o: any) => (
-                  <div key={o.id} onClick={() => navigate('/overtime')}
-                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-purple-50/50 hover:bg-purple-50 cursor-pointer transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                      <Timer className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-gray-800 truncate">{o.employee?.full_name}</p>
-                      <p className="text-[10px] text-gray-400">{o.overtime_date} • {o.hours}h</p>
-                    </div>
-                    <span className="text-[10px] text-purple-500 font-medium flex-shrink-0">Tăng ca</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
+            </div>
+          </div>
 
-          {/* Công tác đang diễn ra */}
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader title="Công tác Đang diễn ra" icon={<Plane className="w-4 h-4 text-sky-500" />}
-              action={<button onClick={() => navigate('/attendance/business-trips')} className="text-xs font-semibold flex items-center gap-0.5" style={{ color: BRAND.secondary }}>Xem tất cả <ChevronRight className="w-3.5 h-3.5" /></button>} />
-            {activeTrips.length === 0 ? (
-              <div className="text-center py-6">
-                <Briefcase className="w-8 h-8 text-gray-300 mx-auto mb-1.5" />
-                <p className="text-sm text-gray-400">Không ai đi công tác hôm nay</p>
+          {/* Đơn chờ duyệt + Công tác */}
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            {/* Đơn chờ duyệt */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex-1 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-500" /> Chờ duyệt
+                  {pendingTotal > 0 && <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">{pendingTotal}</span>}
+                </h3>
               </div>
-            ) : (
-              <div className="space-y-1.5 mt-1">
-                {activeTrips.map((t: any) => (
-                  <div key={t.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-sky-50/50">
-                    <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center flex-shrink-0">
-                      <Briefcase className="w-4 h-4 text-sky-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-gray-800 truncate">{t.employee?.full_name}</p>
-                      <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                        <MapPin className="w-3 h-3" />
-                        <span className="truncate">{t.trip_destination}</span>
+              <div className="p-3">
+                {pendingLeaves.length === 0 && pendingOvertimes.length === 0 ? (
+                  <div className="text-center py-4"><CheckCircle2 className="w-7 h-7 text-emerald-400 mx-auto mb-1" /><p className="text-xs text-gray-400">Không có đơn chờ</p></div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {pendingLeaves.map((l: any) => (
+                      <div key={l.id} onClick={() => navigate('/leave-requests')} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-orange-50 cursor-pointer transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0"><Calendar className="w-3.5 h-3.5 text-orange-600" /></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-gray-800 truncate">{l.employee?.full_name}</p>
+                          <p className="text-[10px] text-gray-400">{l.leave_type?.name} • {l.total_days}d</p>
+                        </div>
                       </div>
+                    ))}
+                    {pendingOvertimes.map((o: any) => (
+                      <div key={o.id} onClick={() => navigate('/overtime')} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-purple-50 cursor-pointer transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0"><Timer className="w-3.5 h-3.5 text-purple-600" /></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-gray-800 truncate">{o.employee?.full_name}</p>
+                          <p className="text-[10px] text-gray-400">Tăng ca {o.hours}h</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Công tác */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  <Plane className="w-4 h-4 text-sky-500" /> Công tác
+                  {activeTrips.length > 0 && <span className="text-[11px] text-sky-600 font-medium">{activeTrips.length} người</span>}
+                </h3>
+                <button onClick={() => navigate('/attendance/business-trips')} className="text-xs text-sky-600 font-semibold flex items-center gap-0.5">Xem <ChevronRight className="w-3 h-3" /></button>
+              </div>
+              <div className="p-3">
+                {activeTrips.length === 0 ? (
+                  <p className="text-center py-3 text-xs text-gray-400">Không ai đi công tác</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {activeTrips.slice(0, 4).map((t: any) => (
+                      <div key={t.id} className="flex items-center gap-2 p-2 bg-sky-50/50 rounded-lg">
+                        <Briefcase className="w-3.5 h-3.5 text-sky-500 flex-shrink-0" />
+                        <span className="text-[12px] font-medium text-gray-800 flex-1 truncate">{t.employee?.full_name}</span>
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-[10px] text-sky-600 font-medium">{new Date(t.end_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ TẦNG 3: HIỆU SUẤT + TOP NV ═══ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Hiệu suất phòng ban */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-50">
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-indigo-500" /> Hiệu suất Phòng ban
+              </h3>
+            </div>
+            <div className="p-4 space-y-3">
+              {departmentPerformance.slice(0, 6).map((dept, i) => {
+                const rate = dept.completion_rate
+                const barColor = rate >= 80 ? '#10B981' : rate >= 60 ? '#F59E0B' : '#EF4444'
+                return (
+                  <div key={dept.department_id || i}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-semibold text-gray-700 truncate flex-1">{dept.department_name}</span>
+                      <span className="text-[12px] font-bold ml-2" style={{ color: barColor }}>{rate}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(rate, 100)}%`, background: barColor }} />
+                    </div>
+                    <div className="flex gap-3 mt-1 text-[10px] text-gray-400">
+                      <span>Tổng: {dept.total_tasks}</span>
+                      <span className="text-emerald-500">HT: {dept.completed_tasks}</span>
+                      {dept.avg_score > 0 && <span className="text-blue-500">Điểm: {dept.avg_score}</span>}
+                    </div>
+                  </div>
+                )
+              })}
+              {departmentPerformance.length === 0 && <p className="text-center py-4 text-xs text-gray-400">Chưa có dữ liệu</p>}
+            </div>
+          </div>
+
+          {/* Top nhân viên */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-50">
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <Award className="w-4 h-4 text-amber-500" /> Nhân viên Xuất sắc
+              </h3>
+            </div>
+            <div className="p-4 space-y-2">
+              {topEmployees.map((emp, i) => {
+                const medals = ['from-amber-400 to-amber-500', 'from-gray-300 to-gray-400', 'from-orange-300 to-orange-400']
+                return (
+                  <div key={emp.employee_id || i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white ${i < 3 ? `bg-gradient-to-br ${medals[i]}` : 'bg-gray-200 text-gray-500'}`}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-gray-800 truncate">{emp.employee_name}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{emp.department_name}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-[11px] font-medium text-sky-600">
-                        {new Date(t.end_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
-                      </p>
-                      <p className="text-[9px] text-gray-400">ngày về</p>
+                      <span className="text-sm font-bold" style={{ color: emp.avg_score >= 80 ? '#10B981' : emp.avg_score >= 60 ? '#F59E0B' : '#EF4444' }}>{emp.avg_score}</span>
+                      <span className="text-[10px] text-gray-400 ml-0.5">điểm</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
+                )
+              })}
+              {topEmployees.length === 0 && <p className="text-center py-4 text-xs text-gray-400">Chưa có dữ liệu</p>}
+            </div>
+          </div>
         </div>
 
-        {/* ═══════ TỔNG CÔNG THÁNG — NV công thấp nhất ═══════ */}
-        {monthlyWorkUnits.length > 0 && (
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader title={`Công tháng ${new Date().getMonth() + 1} — NV công thấp`} icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
-              action={<button onClick={() => navigate('/attendance/monthly')} className="text-xs font-semibold flex items-center gap-0.5" style={{ color: BRAND.secondary }}>Bảng công <ChevronRight className="w-3.5 h-3.5" /></button>} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1">
-              {monthlyWorkUnits.map((emp: any) => (
-                <div key={emp.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl ${emp.totalCong < 10 ? 'bg-red-50' : 'bg-gray-50'}`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${emp.totalCong < 10 ? 'bg-red-100' : 'bg-gray-200'}`}>
-                    <Users className={`w-4 h-4 ${emp.totalCong < 10 ? 'text-red-500' : 'text-gray-500'}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-gray-800 truncate">{emp.full_name}</p>
-                    <p className="text-[10px] text-gray-400">{emp.code}</p>
-                  </div>
-                  <span className={`text-sm font-bold flex-shrink-0 ${emp.totalCong < 10 ? 'text-red-500' : 'text-gray-600'}`}>
-                    {emp.totalCong} <span className="text-[10px] font-normal">công</span>
-                  </span>
-                </div>
-              ))}
+        {/* ═══ TẦNG 4: QUÁHẠN + CÔNG THÁNG + QUICK ACTIONS ═══ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* CV quá hạn */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500" /> CV quá hạn
+              </h3>
+              <button onClick={() => navigate('/tasks?filter=overdue')} className="text-xs text-red-500 font-semibold flex items-center gap-0.5">Xem tất cả <ChevronRight className="w-3 h-3" /></button>
             </div>
-          </GlassCard>
-        )}
-
-        {/* ─── PROJECTS (ẩn — chưa dùng) ─── */}
-        {false && projectStats.total > 0 && (
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader
-              title="Dự án"
-              icon={<FolderKanban className="w-4 h-4" />}
-              action={
-                <button onClick={() => navigate('/projects/list')}
-                  className="text-xs sm:text-sm font-semibold flex items-center gap-0.5 hover:gap-1.5 transition-all"
-                  style={{ color: BRAND.secondary }}>
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              }
-            />
-            {/* Project summary pills */}
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mb-3.5">
-              {[
-                { label: 'Tổng DA', val: projectStats.total, color: 'bg-blue-50 text-blue-600' },
-                { label: 'Đang chạy', val: projectStats.active, color: 'bg-emerald-50 text-emerald-600' },
-                { label: 'Hoàn thành', val: projectStats.completed, color: 'bg-green-50 text-green-600' },
-              ].map((p) => (
-                <div key={p.label} className={`text-center p-2.5 sm:p-3 rounded-xl ${p.color}`}>
-                  <div className="text-lg sm:text-xl font-bold">{p.val}</div>
-                  <div className="text-[10px] sm:text-xs opacity-70 font-medium">{p.label}</div>
-                </div>
-              ))}
-            </div>
-            {/* Project list */}
-            <div className="space-y-1.5">
-              {projectStats.recentProjects.map((proj) => (
-                <div
-                  key={proj.id}
-                  onClick={() => navigate(`/projects/${proj.id}`)}
-                  className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-black/[0.02] cursor-pointer transition-colors active:bg-black/[0.04]"
-                >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: `${BRAND.secondary}12` }}>
-                    <FolderKanban className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: BRAND.secondary }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{proj.name}</p>
-                    <p className="text-[10px] sm:text-xs text-gray-400">{proj.code}</p>
-                  </div>
-                  <div className="flex items-center gap-2.5 flex-shrink-0">
-                    <div className="w-16 sm:w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${proj.progress_pct}%`,
-                          background: proj.progress_pct >= 75 ? '#10B981' :
-                            proj.progress_pct >= 40 ? BRAND.secondary : BRAND.accent,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs sm:text-sm font-bold text-gray-500 w-10 text-right">
-                      {proj.progress_pct}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </GlassCard>
-        )}
-
-        {/* ─── CHARTS ROW — Bento: 2/3 + 1/3 ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {/* Trend Area Chart */}
-          <GlassCard className="lg:col-span-2 p-3.5 sm:p-5">
-            <SectionHeader
-              title={`Xu hướng Công việc ${stats?.monthLabel || ''}`}
-              icon={<TrendingUp className="w-4 h-4" />}
-              action={
-                <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs text-gray-400">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.secondary }} />
-                    Hoàn thành
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-5 h-[2px] rounded" style={{ background: BRAND.accent, opacity: 0.7 }} />
-                    Tạo mới
-                  </span>
-                </div>
-              }
-            />
-            <div className="h-48 sm:h-56 lg:h-64 -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={taskTrend}>
-                  <defs>
-                    <linearGradient id="gradCompleted" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={BRAND.secondary} stopOpacity={0.2} />
-                      <stop offset="100%" stopColor={BRAND.secondary} stopOpacity={0.02} />
-                    </linearGradient>
-                    <linearGradient id="gradCreated" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={BRAND.accent} stopOpacity={0.15} />
-                      <stop offset="100%" stopColor={BRAND.accent} stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E8E4DF" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="completed" name="Hoàn thành" stroke={BRAND.secondary}
-                    strokeWidth={2.5} fill="url(#gradCompleted)" dot={{ fill: 'white', stroke: BRAND.secondary, strokeWidth: 2, r: 3 }}
-                    activeDot={{ r: 5, stroke: BRAND.secondary, strokeWidth: 2 }} />
-                  <Area type="monotone" dataKey="created" name="Tạo mới" stroke={BRAND.accent}
-                    strokeWidth={2} strokeDasharray="6 4" fill="url(#gradCreated)"
-                    dot={false} activeDot={{ r: 4, stroke: BRAND.accent, strokeWidth: 2 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCard>
-
-          {/* Status Donut */}
-          <GlassCard className="p-3.5 sm:p-5 flex flex-col">
-            <SectionHeader title="Phân bổ Trạng thái" icon={<Target className="w-4 h-4" />} />
-            <div className="flex-1 flex items-center justify-center -mt-2 sm:mt-0">
-              <div className="relative h-40 sm:h-48 w-full max-w-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={statusDistribution} cx="50%" cy="50%" innerRadius="55%" outerRadius="80%"
-                      paddingAngle={4} dataKey="count" strokeWidth={0}>
-                      {statusDistribution.map((entry, index) => (
-                        <Cell key={index} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, _name, props) => [`${value} CV`, (props as any).payload.label]}
-                      contentStyle={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid #E5E7EB', borderRadius: '12px', fontSize: '12px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                {/* Center text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl sm:text-3xl font-bold text-gray-800">{stats?.completionRate || 0}%</span>
-                  <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Hoàn thành</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2.5 sm:gap-3 justify-center mt-2">
-              {statusDistribution.map((item) => (
-                <div key={item.status} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-[10px] sm:text-xs text-gray-500">{item.label} ({item.count})</span>
-                </div>
-              ))}
-            </div>
-          </GlassCard>
-        </div>
-
-        {/* ─── DEPT PERFORMANCE + TOP EMPLOYEES — Bento 1:1 ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
-          {/* Department Performance */}
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader
-              title="Hiệu suất Phòng ban"
-              icon={<Building2 className="w-4 h-4" />}
-              action={
-                <button onClick={() => navigate('/tasks?tab=overview')}
-                  className="text-xs sm:text-sm font-semibold flex items-center gap-0.5"
-                  style={{ color: BRAND.secondary }}>
-                  Chi tiết <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              }
-            />
-            {/* Custom horizontal bars */}
-            <div className="space-y-2.5 sm:space-y-3">
-              {departmentPerformance.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Chưa có dữ liệu</p>
+            <div className="p-3">
+              {overdueTasks.length === 0 ? (
+                <div className="text-center py-4"><CheckCircle2 className="w-7 h-7 text-emerald-400 mx-auto mb-1" /><p className="text-xs text-gray-400">Không có CV quá hạn</p></div>
               ) : (
-                departmentPerformance.slice(0, 6).map((dept, i) => (
-                  <div key={dept.department_id} className="flex items-center gap-2.5 sm:gap-3">
-                    <span className="text-xs sm:text-[13px] text-gray-500 w-20 sm:w-24 text-right truncate flex-shrink-0 font-medium">
-                      {dept.department_name}
-                    </span>
-                    <div className="flex-1 h-5 sm:h-6 bg-gray-100/80 rounded-lg overflow-hidden">
-                      <div
-                        className="h-full rounded-lg transition-all duration-700"
-                        style={{
-                          width: `${dept.completion_rate}%`,
-                          background: `linear-gradient(90deg, ${BRAND.secondary}, ${BRAND.primary})`,
-                        }}
-                      />
+                <div className="space-y-1.5">
+                  {overdueTasks.map((t) => (
+                    <div key={t.id} onClick={() => navigate(`/tasks/${t.id}`)} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-red-50 cursor-pointer transition-colors">
+                      <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${PRIORITY_COLORS[t.priority] || PRIORITY_COLORS.medium}`}>{PRIORITY_LABELS[t.priority] || 'TB'}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-gray-800 truncate">{t.name}</p>
+                        <p className="text-[10px] text-gray-400">{t.assignee_name} • {t.department_name}</p>
+                      </div>
+                      <span className="text-[11px] font-bold text-red-500 flex-shrink-0">-{t.days_overdue}d</span>
                     </div>
-                    <span className="text-xs sm:text-sm font-bold w-10 text-right flex-shrink-0"
-                      style={{ color: dept.completion_rate >= 70 ? BRAND.secondary : dept.completion_rate >= 40 ? BRAND.accent : '#EF4444' }}>
-                      {dept.completion_rate}%
-                    </span>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
-          </GlassCard>
+          </div>
 
-          {/* Top Employees */}
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader title="Nhân viên Xuất sắc" icon={<Award className="w-4 h-4" />} />
-            <div className="space-y-1.5 sm:space-y-2">
-              {topEmployees.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Chưa có dữ liệu đánh giá</p>
+          {/* Công tháng — NV thấp */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-orange-500" /> Công tháng {new Date().getMonth() + 1}
+              </h3>
+              <button onClick={() => navigate('/attendance/monthly')} className="text-xs text-emerald-600 font-semibold flex items-center gap-0.5">Bảng công <ChevronRight className="w-3 h-3" /></button>
+            </div>
+            <div className="p-3">
+              {monthlyWorkUnits.length === 0 ? (
+                <p className="text-center py-4 text-xs text-gray-400">Chưa có dữ liệu</p>
               ) : (
-                topEmployees.map((emp, index) => (
-                  <div key={emp.employee_id}
-                    className={`flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-colors ${index === 0 ? 'bg-amber-50/50' : 'hover:bg-black/[0.015]'}`}>
-                    <div className={`
-                      w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0
-                      ${index === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-sm' : ''}
-                      ${index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white' : ''}
-                      ${index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white' : ''}
-                      ${index > 2 ? 'bg-gray-100 text-gray-500' : ''}
-                    `}>
-                      {index + 1}
+                <div className="space-y-1.5">
+                  {monthlyWorkUnits.map((emp: any) => (
+                    <div key={emp.id} className={`flex items-center gap-2.5 p-2 rounded-lg ${emp.totalCong < 10 ? 'bg-red-50' : 'bg-gray-50'}`}>
+                      <span className="text-[10px] text-gray-400 w-8">{emp.code}</span>
+                      <span className="text-[12px] font-medium text-gray-800 flex-1 truncate">{emp.full_name}</span>
+                      <span className={`text-sm font-bold ${emp.totalCong < 10 ? 'text-red-500' : 'text-gray-600'}`}>{emp.totalCong}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{emp.employee_name}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 truncate">{emp.department_name}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-lg sm:text-xl font-bold" style={{ color: emp.avg_score >= 90 ? '#10B981' : BRAND.secondary }}>
-                        {emp.avg_score}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-gray-400">{emp.completed_tasks} CV</p>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
-          </GlassCard>
+          </div>
         </div>
 
-        {/* ─── OVERDUE + UPCOMING — Bento 1:1 ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
-          {/* Overdue Tasks */}
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader
-              title="Quá hạn"
-              icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
-              action={overdueTasks.length > 0 ? (
-                <button onClick={() => navigate('/tasks?filter=overdue')}
-                  className="text-xs sm:text-sm text-red-500 font-semibold flex items-center gap-0.5">
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              ) : undefined}
-            />
-            {overdueTasks.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-400 font-medium">Không có công việc quá hạn</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5 sm:space-y-2">
-                {overdueTasks.map((task) => (
-                  <div key={task.id}
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                    className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-red-50/60 hover:bg-red-50 cursor-pointer transition-colors active:bg-red-100">
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-                      <Timer className="w-4 h-4 text-red-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{task.name}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 truncate">{task.code} • {task.assignee_name}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-bold text-red-500">-{task.days_overdue}d</span>
-                      <span className={`block text-[10px] px-1.5 py-0.5 rounded-md mt-0.5 ${PRIORITY_COLORS[task.priority]}`}>
-                        {PRIORITY_LABELS[task.priority]}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
-
-          {/* Upcoming Tasks */}
-          <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader
-              title="Sắp đến hạn (trong tháng)"
-              icon={<Calendar className="w-4 h-4 text-amber-500" />}
-              action={upcomingTasks.length > 0 ? (
-                <button onClick={() => navigate('/tasks')}
-                  className="text-xs sm:text-sm text-amber-600 font-semibold flex items-center gap-0.5">
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              ) : undefined}
-            />
-            {upcomingTasks.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-400 font-medium">Không có công việc sắp đến hạn</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5 sm:space-y-2">
-                {upcomingTasks.map((task) => (
-                  <div key={task.id}
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                    className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-amber-50/50 hover:bg-amber-50 cursor-pointer transition-colors active:bg-amber-100">
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-                      <Clock className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{task.name}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 truncate">{task.code} • {task.assignee_name}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-bold text-amber-600">
-                        {task.days_until_due === 0 ? 'Hôm nay' : `${task.days_until_due}d`}
-                      </span>
-                      <span className={`block text-[10px] px-1.5 py-0.5 rounded-md mt-0.5 ${PRIORITY_COLORS[task.priority]}`}>
-                        {PRIORITY_LABELS[task.priority]}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
-        </div>
-
-        {/* ─── ACTIVITIES + CONTRACTS — Bento 2:1 ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {/* Recent Activities */}
-          <GlassCard className="lg:col-span-2 p-3.5 sm:p-5">
-            <SectionHeader title="Hoạt động Gần đây" icon={<Activity className="w-4 h-4" />} />
-            {recentActivities.length === 0 ? (
-              <div className="text-center py-8">
-                <Activity className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">Chưa có hoạt động nào</p>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {recentActivities.map((activity) => (
-                  <div key={activity.id}
-                    className="flex items-start gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-black/[0.015] transition-colors">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${ACTIVITY_COLORS[activity.action] || 'bg-gray-400'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm text-gray-700 leading-relaxed">
-                        <span className="font-semibold text-gray-800">{activity.actor_name}</span>
-                        {' '}
-                        <span className="text-gray-500">{ACTION_LABELS[activity.action] || activity.action}</span>
-                        {activity.task_name && (
-                          <> "<span className="font-semibold" style={{ color: BRAND.secondary }}>{activity.task_name}</span>"</>
-                        )}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{formatTimeAgo(activity.created_at)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
-
-          {/* Expiring Contracts (ẩn — chưa dùng) */}
-          {false && <GlassCard className="p-3.5 sm:p-5">
-            <SectionHeader
-              title="HĐ Sắp hết hạn"
-              icon={<FileText className="w-4 h-4 text-violet-500" />}
-              action={expiringContracts.length > 0 ? (
-                <button onClick={() => navigate('/contracts')}
-                  className="text-xs sm:text-sm text-violet-600 font-semibold flex items-center gap-0.5">
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              ) : undefined}
-            />
-            {expiringContracts.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-400 font-medium">Không có HĐ sắp hết hạn</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5 sm:space-y-2">
-                {expiringContracts.map((contract) => (
-                  <div key={contract.id}
-                    onClick={() => navigate('/contracts')}
-                    className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-violet-50/50 hover:bg-violet-50 cursor-pointer transition-colors active:bg-violet-100">
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                      <Briefcase className="w-4 h-4 text-violet-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{contract.employee_name}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 truncate">{contract.contract_type}</p>
-                    </div>
-                    <span className="text-sm font-bold text-violet-600 flex-shrink-0">{contract.days_until_expiry}d</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>}
-        </div>
-
-        {/* ─── QUICK ACTIONS ─── */}
-        <GlassCard className="p-3.5 sm:p-5">
-          <SectionHeader title="Thao tác Nhanh" icon={<BarChart3 className="w-4 h-4" />} />
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2.5">
+        {/* ═══ QUICK ACTIONS ═══ */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <Target className="w-4 h-4 text-gray-400" /> Thao tác nhanh
+          </h3>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[
-              { label: 'Tạo CV', icon: <ClipboardList className="w-5 h-5" />, path: '/tasks/create', bg: 'bg-blue-50 text-blue-600 hover:bg-blue-100 active:bg-blue-200' },
-              { label: 'CV của tôi', icon: <CheckCircle2 className="w-5 h-5" />, path: '/my-tasks', bg: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-200' },
-              { label: 'Phê duyệt', icon: <Clock className="w-5 h-5" />, path: '/approvals', bg: 'bg-amber-50 text-amber-600 hover:bg-amber-100 active:bg-amber-200' },
-              { label: 'Nhân viên', icon: <Users className="w-5 h-5" />, path: '/employees', bg: 'bg-violet-50 text-violet-600 hover:bg-violet-100 active:bg-violet-200' },
-              { label: 'Nghỉ phép', icon: <Calendar className="w-5 h-5" />, path: '/leave-requests', bg: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 active:bg-indigo-200' },
-              { label: 'Thống kê', icon: <BarChart3 className="w-5 h-5" />, path: '/reports/tasks', bg: 'bg-pink-50 text-pink-600 hover:bg-pink-100 active:bg-pink-200' },
-            ].map((action) => (
-              <button key={action.path} onClick={() => navigate(action.path)}
-                className={`flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl transition-colors ${action.bg}`}>
-                {action.icon}
-                <span className="text-[10px] sm:text-xs font-semibold text-center leading-tight">{action.label}</span>
+              { label: 'Tạo CV', icon: <ClipboardList className="w-5 h-5" />, path: '/tasks/create', bg: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
+              { label: 'CV của tôi', icon: <CheckCircle2 className="w-5 h-5" />, path: '/my-tasks', bg: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
+              { label: 'Phê duyệt', icon: <Clock className="w-5 h-5" />, path: '/approvals', bg: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
+              { label: 'Chấm công', icon: <UserCheck className="w-5 h-5" />, path: '/attendance', bg: 'bg-teal-50 text-teal-600 hover:bg-teal-100' },
+              { label: 'Phân ca', icon: <Calendar className="w-5 h-5" />, path: '/shift-assignments', bg: 'bg-violet-50 text-violet-600 hover:bg-violet-100' },
+              { label: 'Bảng công', icon: <BarChart3 className="w-5 h-5" />, path: '/attendance/monthly', bg: 'bg-pink-50 text-pink-600 hover:bg-pink-100' },
+            ].map(a => (
+              <button key={a.path} onClick={() => navigate(a.path)}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-colors ${a.bg}`}>
+                {a.icon}
+                <span className="text-[10px] font-semibold text-center">{a.label}</span>
               </button>
             ))}
           </div>
-        </GlassCard>
+        </div>
 
       </div>
     </div>

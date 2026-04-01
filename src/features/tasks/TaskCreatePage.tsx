@@ -288,6 +288,21 @@ export const TaskCreatePage: React.FC = () => {
 
       setSuccess(true);
 
+      // ★ Thông báo cho NV được giao
+      if (data.assignee_id && data.assignee_id !== user?.employee_id) {
+        import('../../services/notificationHelper').then(({ notify }) => {
+          notify({
+            recipientId: data.assignee_id,
+            senderId: user?.employee_id || undefined,
+            module: 'task',
+            type: 'task_assigned',
+            title: `Bạn được giao: ${data.name}`,
+            message: `${user?.full_name || 'Quản lý'} đã giao công việc cho bạn`,
+            referenceUrl: `/tasks/${data.id}`,
+          })
+        })
+      }
+
       setTimeout(() => {
         navigate(`/tasks/${data.id}`);
       }, 1500);

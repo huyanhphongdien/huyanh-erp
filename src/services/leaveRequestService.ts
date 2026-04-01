@@ -435,6 +435,22 @@ export const leaveRequestService = {
       .single()
 
     if (error) throw error
+
+    // ★ Thông báo TP/PP: có đơn phép mới
+    try {
+      const { notifyDeptManagers } = await import('./notificationHelper')
+      const { data: emp } = await supabase.from('employees').select('department_id, full_name').eq('id', formData.employee_id).single()
+      if (emp?.department_id) {
+        await notifyDeptManagers(emp.department_id, {
+          module: 'leave',
+          type: 'leave_submitted',
+          title: `Đơn nghỉ phép mới: ${emp.full_name}`,
+          message: `${formData.start_date} → ${formData.end_date} (${formData.total_days} ngày)`,
+          referenceUrl: '/leave-requests',
+        })
+      }
+    } catch (e) { console.error('[notify] leave created error:', e) }
+
     return data
   },
 
@@ -489,6 +505,20 @@ export const leaveRequestService = {
     // ★ Xóa shift_assignment + ghi attendance "leave" cho ngày nghỉ phép
     await this._applyLeaveToSchedule(data)
 
+    // ★ Thông báo cho NV: đơn được duyệt
+    try {
+      const { notify } = await import('./notificationHelper')
+      await notify({
+        recipientId: data.employee_id,
+        senderId: approverId,
+        module: 'leave',
+        type: 'leave_approved',
+        title: 'Đơn nghỉ phép đã được duyệt',
+        message: `Từ ${data.start_date} đến ${data.end_date} (${data.total_days} ngày)`,
+        referenceUrl: '/leave-requests',
+      })
+    } catch (e) { console.error('[notify] leave approved error:', e) }
+
     return data
   },
 
@@ -509,6 +539,22 @@ export const leaveRequestService = {
       .single()
 
     if (error) throw error
+
+    // ★ Thông báo cho NV: đơn bị từ chối
+    try {
+      const { notify } = await import('./notificationHelper')
+      await notify({
+        recipientId: data.employee_id,
+        senderId: approverId,
+        module: 'leave',
+        type: 'leave_rejected',
+        title: 'Đơn nghỉ phép bị từ chối',
+        message: notes || 'Không có ghi chú',
+        referenceUrl: '/leave-requests',
+        priority: 'high',
+      })
+    } catch (e) { console.error('[notify] leave rejected error:', e) }
+
     return data
   },
 

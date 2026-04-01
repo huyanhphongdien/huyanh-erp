@@ -130,14 +130,15 @@ const getMenuGroups = (
   pendingApprovals: number = 0,
   pendingOT: number = 0,
   pendingLeave: number = 0,
-  unreadB2BCount: number = 0
+  unreadB2BCount: number = 0,
+  unreadNotifications: number = 0,
 ): MenuGroup[] => [
   {
     title: 'TỔNG QUAN',
     icon: <LayoutDashboard size={18} />,
     items: [
       { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { path: '/notifications', label: 'Thông báo', icon: <Bell size={18} /> },
+      { path: '/notifications', label: 'Thông báo', icon: <Bell size={18} />, badge: unreadNotifications > 0 ? unreadNotifications : undefined },
     ],
   },
   {
@@ -546,8 +547,23 @@ export function Sidebar() {
     }
   }, [location.pathname]);
 
-  // ★ CẬP NHẬT: Truyền unreadB2BCount vào getMenuGroups
-  const menuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount, unreadB2BCount);
+  // ★ Notification count
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  useEffect(() => {
+    if (!user?.employee_id) return;
+    const load = async () => {
+      try {
+        const { countUnread } = await import('../../services/notificationHelper');
+        const count = await countUnread(user.employee_id!);
+        setUnreadNotifCount(count);
+      } catch { /* ignore */ }
+    };
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, [user?.employee_id]);
+
+  const menuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount, unreadB2BCount, unreadNotifCount);
 
   const toggleGroup = (title: string) => {
     setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));

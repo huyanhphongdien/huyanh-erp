@@ -158,6 +158,33 @@ export function TaskViewPage() {
       const isAssignee = user?.employee_id === t?.assignee_id || user?.employee_id === t?.assignee?.id
 
       const isRecurring = t?.task_source === 'recurring'
+      const isProject = t?.task_source === 'project'
+
+      // ★ Task dự án: bắt buộc phải có ảnh minh chứng
+      if (isProject) {
+        const { count: evidenceCount } = await supabase
+          .from('task_checklist_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('task_id', id)
+          .eq('requires_evidence', true)
+          .is('evidence_url', null)
+        if (evidenceCount && evidenceCount > 0) {
+          message.warning(`Còn ${evidenceCount} bước chưa có ảnh minh chứng. Vui lòng upload trước khi hoàn thành.`)
+          setActionLoading(null)
+          return
+        }
+        // Kiểm tra có ít nhất 1 evidence trong toàn task
+        const { count: totalEvidence } = await supabase
+          .from('task_checklist_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('task_id', id)
+          .not('evidence_url', 'is', null)
+        if (!totalEvidence || totalEvidence === 0) {
+          message.warning('Công việc dự án bắt buộc phải có ít nhất 1 ảnh minh chứng.')
+          setActionLoading(null)
+          return
+        }
+      }
 
       if (isRecurring) {
         // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup
@@ -559,7 +586,20 @@ export function TaskViewPage() {
               // Auto-complete when 100%
               if (roundedPercent >= 100 && t.status === 'in_progress') {
                 const isRecurring = t.task_source === 'recurring'
+                const isProject2 = t.task_source === 'project'
                 const isAssignee2 = user?.employee_id === t.assignee_id || user?.employee_id === t.assignee?.id
+
+                // ★ Project: check evidence trước
+                if (isProject2) {
+                  const { count: noEvidence } = await supabase.from('task_checklist_items')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('task_id', t.id).not('evidence_url', 'is', null)
+                  if (!noEvidence || noEvidence === 0) {
+                    message.warning('Công việc dự án cần ít nhất 1 ảnh minh chứng trước khi hoàn thành.')
+                    refetch()
+                    return
+                  }
+                }
 
                 if (isRecurring) {
                   // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup

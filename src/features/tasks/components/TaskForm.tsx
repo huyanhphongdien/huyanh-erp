@@ -345,6 +345,9 @@ export function TaskForm({
                   ))}
                 </select>
 
+                {!isSelfMode && formData.department_id && !formData.assignee_id && (
+                  <p className="text-xs text-red-500 mt-1">* Bắt buộc chọn người phụ trách</p>
+                )}
                 {!isDepartmentLocked && !formData.department_id && (
                   <p className="text-xs text-gray-500 mt-1">
                     Vui lòng chọn phòng ban để xem danh sách nhân viên
@@ -497,7 +500,7 @@ export function TaskForm({
         </button>
         <button
           type="submit"
-          disabled={isLoading || !formData.name.trim()}
+          disabled={isLoading || !formData.name.trim() || (!isSelfMode && !formData.assignee_id)}
           className={`px-6 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors ${
             isSelfMode
               ? 'bg-green-600 hover:bg-green-700'

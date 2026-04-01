@@ -407,48 +407,28 @@ export const performanceDashboardService = {
     try {
       const { from, to } = getPeriodRange(period);
 
+      // ★ Lấy final_score trực tiếp từ tasks (không phụ thuộc task_evaluations)
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
-        .select('id, status, due_date, assignee_id, completed_date')
+        .select('id, status, due_date, assignee_id, completed_date, final_score, self_score')
         .eq('status', 'finished')
         .gte('completed_date', from)
         .lte('completed_date', to);
 
       if (tasksError) throw tasksError;
 
-      const taskIds = (tasks || []).map(t => t.id);
-
-      let evaluations: any[] = [];
-      if (taskIds.length > 0) {
-        const { data: evals } = await supabase
-          .from('task_evaluations')
-          .select('task_id, score, employee_id')
-          .in('task_id', taskIds);
-        evaluations = evals || [];
-      }
-
-      let selfEvals: any[] = [];
-      if (taskIds.length > 0) {
-        const { data: se } = await supabase
-          .from('task_self_evaluations')
-          .select('task_id, self_score, employee_id')
-          .in('task_id', taskIds)
-          .eq('status', 'approved');
-        selfEvals = se || [];
-      }
-
-      const evaluatedEmployees = new Set(evaluations.map(e => e.employee_id));
-
+      // ★ Tính điểm từ tasks.final_score (set bởi auto-approve hoặc manager)
+      const evaluatedEmployees = new Set<string>();
       const employeeScores = new Map<string, number[]>();
-      evaluations.forEach(ev => {
-        const selfEv = selfEvals.find(s => s.task_id === ev.task_id && s.employee_id === ev.employee_id);
-        const selfScore = selfEv?.self_score || ev.score;
-        const managerScore = ev.score;
-        const finalScore = Math.round(selfScore * 0.4 + managerScore * 0.6);
-        if (!employeeScores.has(ev.employee_id)) {
-          employeeScores.set(ev.employee_id, []);
+
+      (tasks || []).forEach((t: any) => {
+        if (!t.assignee_id) return;
+        const score = t.final_score || 0;
+        if (score > 0) {
+          evaluatedEmployees.add(t.assignee_id);
+          if (!employeeScores.has(t.assignee_id)) employeeScores.set(t.assignee_id, []);
+          employeeScores.get(t.assignee_id)!.push(score);
         }
-        employeeScores.get(ev.employee_id)!.push(finalScore);
       });
 
       const gradeDistribution = { A: 0, B: 0, C: 0, D: 0, F: 0 };
@@ -506,7 +486,7 @@ export const performanceDashboardService = {
       let taskQuery = supabase
         .from('tasks')
         .select(`
-          id, code, name, status, due_date, assignee_id, completed_date, task_source,
+          id, code, name, status, due_date, assignee_id, completed_date, task_source, final_score, self_score,
           assignee:employees!tasks_assignee_id_fkey (
             id, full_name, avatar_url, department_id,
             department:departments!employees_department_id_fkey (id, name)
@@ -597,7 +577,21 @@ export const performanceDashboardService = {
         const managerEval = evalMap.get(evalKey);
         const selfEval = selfEvalMap.get(evalKey);
         const weight = getTaskWeight(task);
-        if (managerEval) {
+
+        // ★ Ưu tiên: task.final_score (set bởi QuickEvalModal/auto-approve)
+        //    Fallback: task_evaluations score
+        //    Fallback: task.self_score
+        const taskFinalScore = (task as any).final_score;
+        const taskSelfScore = (task as any).self_score;
+
+        if (taskFinalScore && taskFinalScore > 0) {
+          // Task đã có final_score (recurring auto, self auto, hoặc manager approved)
+          const score = taskFinalScore;
+          emp.manager_scores.push(score);
+          emp.self_scores.push(taskSelfScore || score);
+          emp.weighted_manager_scores.push({ score, weight });
+          emp.weighted_self_scores.push({ score: taskSelfScore || score, weight });
+        } else if (managerEval) {
           emp.manager_scores.push(managerEval.score);
           emp.self_scores.push(selfEval?.self_score || managerEval.score);
           emp.weighted_manager_scores.push({ score: managerEval.score, weight });

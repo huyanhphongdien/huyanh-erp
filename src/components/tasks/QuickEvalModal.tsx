@@ -57,7 +57,7 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
 
       if (source === 'self' || source === 'recurring' || source === 'project') {
         // AUTO APPROVE — no manager needed
-        const coefficient = source === 'self' ? 0.7 : 0.8 // recurring + project = 80%
+        const coefficient = source === 'self' ? 0.7 : source === 'project' ? 0.9 : 0.8 // self=70%, recurring=80%, project=90%
         const finalScore = Math.round(score * coefficient)
 
         await supabase.from('tasks').update({

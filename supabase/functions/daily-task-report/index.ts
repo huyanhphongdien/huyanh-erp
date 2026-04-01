@@ -590,6 +590,7 @@ function buildEmailHTML(
   taskData: TaskReportData,
   attendanceData: AttendanceReportData,
   projectData: ProjectReportData,
+  performanceData: PerformanceReportData,
   yesterdayData: YesterdayData,
   recipientName: string
 ): string {
@@ -1124,7 +1125,7 @@ serve(async (req) => {
       const overdueTag = taskData.overdue_tasks > 0 ? `⚠️ ${taskData.overdue_tasks} quá hạn` : '✅ Tốt'
       const attendanceTag = attendanceData.late_count > 0 ? `⏰ ${attendanceData.late_count} trễ` : '✅ Đầy đủ'
       const subject = `📊 Báo cáo ${todayLabel} — ${overdueTag} | ${attendanceTag} | Huy Anh ERP`
-      const html = buildEmailHTML(taskData, attendanceData, projectData, yesterdayData, recipient.name)
+      const html = buildEmailHTML(taskData, attendanceData, projectData, performanceData, yesterdayData, recipient.name)
       await sendEmail(accessToken, [recipient], subject, html)
       console.log(`✅ Sent to ${recipient.email}`)
     }

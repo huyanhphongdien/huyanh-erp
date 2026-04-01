@@ -224,12 +224,11 @@ export const dashboardService = {
           .neq('status', 'draft')
           .gte('created_at', `${startOfWeek}T00:00:00`),
 
-        // ★ CV hoàn thành: task TẠO trong tháng VÀ đã finished (cùng pool với totalTasks)
+        // ★ CV hoàn thành: dùng completed_date (task dự án có thể tạo tháng trước, hoàn thành tháng này)
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .eq('status', 'finished')
-          .neq('status', 'draft')
-          .gte('created_at', `${startOfMonth}T00:00:00`)
-          .lte('created_at', `${endOfMonth}T23:59:59`),
+          .gte('completed_date', startOfMonth)
+          .lte('completed_date', endOfMonth),
 
         supabase.from('tasks').select('id', { count: 'exact', head: true })
           .lt('due_date', today)
@@ -261,7 +260,8 @@ export const dashboardService = {
       const leavesToday = leavesResult.count || 0;
       const upcomingDeadlines = upcomingInMonthResult.count || 0;
 
-      const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      // ★ Cap at 100% (completedTasks có thể > totalTasks nếu task dự án tạo tháng trước)
+      const completionRate = totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
 
       return {
         data: {

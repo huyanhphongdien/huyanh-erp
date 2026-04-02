@@ -445,6 +445,33 @@ const BatchApprovePage: React.FC = () => {
       ),
     },
     {
+      title: 'Điểm cuối',
+      key: 'final_preview',
+      width: 80,
+      align: 'center' as const,
+      render: (_: any, record: PendingTask) => {
+        const ms = getManagerScore(record.id)
+        if (!ms) return <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
+        const selfScore = record.self_score ?? (ms * 20)
+        const final = Math.round(selfScore * 0.4 + (ms * 20) * 0.6)
+        const color = final >= 75 ? '#52c41a' : final >= 60 ? '#faad14' : '#ff4d4f'
+        return <Text strong style={{ fontSize: 15, color }}>{final}</Text>
+      },
+    },
+    {
+      title: 'Chênh lệch',
+      key: 'delta',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, record: PendingTask) => {
+        const ms = getManagerScore(record.id)
+        if (!ms || !record.self_score) return null
+        const delta = (ms * 20) - record.self_score
+        const color = delta > 0 ? '#52c41a' : delta < 0 ? '#ff4d4f' : '#999'
+        return <Text style={{ fontSize: 12, fontWeight: 600, color }}>{delta > 0 ? '+' : ''}{delta}</Text>
+      },
+    },
+    {
       title: 'Ghi chú',
       key: 'note',
       width: 180,

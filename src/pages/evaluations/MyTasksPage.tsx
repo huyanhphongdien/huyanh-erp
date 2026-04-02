@@ -949,9 +949,10 @@ const MyTasksPage: React.FC = () => {
                                 {canRequestExtension && (
                                   <button onClick={() => handleRequestExtension(task)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><CalendarPlus className="w-3.5 h-3.5" />Gia hạn</button>
                                 )}
-                                {activeTab === 'awaiting_eval' && (
+                                {activeTab === 'awaiting_eval' && (<>
                                   <button onClick={() => handleSelfEvaluate(task)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><Edit3 className="w-3.5 h-3.5" />Tự ĐG</button>
-                                )}
+                                  {task.completed_date && (() => { const h = Math.max(0, Math.ceil((new Date(task.completed_date).getTime() + 48*3600000 - Date.now()) / 3600000)); return <span className={`text-[10px] font-bold ${h <= 12 ? 'text-red-500' : h <= 24 ? 'text-amber-500' : 'text-gray-400'}`}>{h <= 0 ? 'Quá hạn!' : `còn ${h}h`}</span> })()}
+                                </>)}
                                 {activeTab === 'approved' && (
                                   <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg"><ExternalLink className="w-3.5 h-3.5" />Kết quả</button>
                                 )}
@@ -1035,9 +1036,10 @@ const MyTasksPage: React.FC = () => {
                           {canRequestExtension && (
                             <button onClick={() => handleRequestExtension(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><CalendarPlus className="w-3.5 h-3.5" />Gia hạn</button>
                           )}
-                          {activeTab === 'awaiting_eval' && (
+                          {activeTab === 'awaiting_eval' && (<>
                             <button onClick={() => handleSelfEvaluate(task)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg"><Edit3 className="w-3.5 h-3.5" />Tự đánh giá</button>
-                          )}
+                            {task.completed_date && (() => { const h = Math.max(0, Math.ceil((new Date(task.completed_date).getTime() + 48*3600000 - Date.now()) / 3600000)); return <span className={`text-[10px] font-bold ${h <= 12 ? 'text-red-500' : h <= 24 ? 'text-amber-500' : 'text-gray-400'}`}>{h <= 0 ? 'Quá hạn!' : `còn ${h}h`}</span> })()}
+                          </>)}
                           {activeTab === 'approved' && (
                             <button onClick={() => handleViewTask(task.id)} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg"><ExternalLink className="w-3.5 h-3.5" />Kết quả</button>
                           )}

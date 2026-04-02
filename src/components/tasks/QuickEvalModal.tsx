@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Modal, Rate, Input, Button, Typography, message } from 'antd'
-import { StarFilled, WarningOutlined } from '@ant-design/icons'
+import { StarFilled } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -17,11 +17,32 @@ interface QuickEvalModalProps {
 const STAR_LABELS = ['', 'Chưa tốt', 'Cần cải thiện', 'Trung bình', 'Tốt', 'Xuất sắc']
 const STAR_TO_SCORE = [0, 20, 40, 60, 80, 100]
 
+const SOURCE_INFO: Record<string, { label: string; coeff: number; color: string }> = {
+  self: { label: 'Tự giao', coeff: 0.7, color: '#1890ff' },
+  recurring: { label: 'Định kỳ', coeff: 0.8, color: '#722ed1' },
+  project: { label: 'Dự án', coeff: 0.9, color: '#fa8c16' },
+  assigned: { label: 'Được giao', coeff: 1.0, color: '#52c41a' },
+}
+
 export default function QuickEvalModal({ open, onClose, task, onSuccess }: QuickEvalModalProps) {
   const { user } = useAuthStore()
   const [stars, setStars] = useState(0)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
+  const [taskSource, setTaskSource] = useState<string>('assigned')
+
+  // ★ Fetch task_source khi mở modal
+  useState(() => {
+    if (!task?.id || !open) return
+    supabase.from('tasks').select('task_source, is_self_assigned').eq('id', task.id).single()
+      .then(({ data }) => {
+        if (data) setTaskSource(data.task_source || (data.is_self_assigned ? 'self' : 'assigned'))
+      })
+  })
+
+  const sourceInfo = SOURCE_INFO[taskSource] || SOURCE_INFO.assigned
+  const isAutoApprove = ['self', 'recurring', 'project'].includes(taskSource)
+  const previewScore = stars > 0 ? Math.round(STAR_TO_SCORE[stars] * sourceInfo.coeff) : 0
 
   const isValid = stars > 0 && notes.trim().length >= 10
 
@@ -145,6 +166,39 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
           {stars === 0 && (
             <div style={{ marginTop: 4 }}>
               <Text type="danger" style={{ fontSize: 12 }}>Vui lòng chọn số sao</Text>
+            </div>
+          )}
+
+          {/* ★ Hiện hệ số + điểm cuối */}
+          {stars > 0 && isAutoApprove && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: '#f0f5ff', borderRadius: 8, border: '1px solid #d6e4ff', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, color: '#666' }}>Loại công việc:</Text>
+                <span style={{ fontSize: 12, fontWeight: 600, color: sourceInfo.color, background: `${sourceInfo.color}15`, padding: '2px 8px', borderRadius: 4 }}>{sourceInfo.label}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, color: '#666' }}>Điểm tự chấm:</Text>
+                <Text style={{ fontSize: 13, fontWeight: 600 }}>{STAR_TO_SCORE[stars]} điểm</Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, color: '#666' }}>Hệ số áp dụng:</Text>
+                <Text style={{ fontSize: 13, fontWeight: 600, color: sourceInfo.color }}>× {Math.round(sourceInfo.coeff * 100)}%</Text>
+              </div>
+              <div style={{ borderTop: '1px solid #d6e4ff', paddingTop: 6, marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text strong style={{ fontSize: 13 }}>Điểm cuối cùng:</Text>
+                <Text strong style={{ fontSize: 18, color: previewScore >= 75 ? '#52c41a' : previewScore >= 60 ? '#faad14' : '#ff4d4f' }}>{previewScore} điểm</Text>
+              </div>
+            </div>
+          )}
+
+          {stars > 0 && !isAutoApprove && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: '#fff7e6', borderRadius: 8, border: '1px solid #ffd591', textAlign: 'left' }}>
+              <Text style={{ fontSize: 12, color: '#d48806' }}>
+                📋 Công việc được giao — sẽ gửi cho Quản lý phê duyệt.
+              </Text>
+              <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+                Điểm cuối = Tự chấm ({STAR_TO_SCORE[stars]}đ) × 40% + QL chấm × 60%
+              </div>
             </div>
           )}
         </div>

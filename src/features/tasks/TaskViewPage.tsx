@@ -9,7 +9,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, Trash2, Calendar, User, UserCog, Building, Flag, Clock,
   Lock, AlertTriangle, Users, Eye, Loader2, CheckCircle, PauseCircle,
-  PlayCircle, FolderKanban, ChevronRight,
+  PlayCircle, FolderKanban, ChevronRight, Award,
 } from 'lucide-react'
 import { Card } from '../../components/ui'
 import { TaskStatusBadge } from './components/TaskStatusBadge'
@@ -549,6 +549,69 @@ export function TaskViewPage() {
               </div>
             </div>
           </div>
+
+          {/* ★ Đánh giá chi tiết */}
+          {(t.evaluation_status && t.evaluation_status !== 'none') && (
+            <div className="pt-3 mt-3 border-t border-gray-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Award size={14} className="text-amber-500" />
+                <span className="text-xs font-semibold text-gray-700">Đánh giá</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  t.evaluation_status === 'approved' ? 'bg-green-100 text-green-700' :
+                  t.evaluation_status === 'pending_approval' ? 'bg-amber-100 text-amber-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {t.evaluation_status === 'approved' ? 'Đã duyệt' :
+                   t.evaluation_status === 'pending_approval' ? 'Chờ duyệt' :
+                   t.evaluation_status === 'pending_self_eval' ? 'Chờ tự ĐG' : t.evaluation_status}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                {t.task_source && (
+                  <div className="bg-gray-50 rounded-lg p-2">
+                    <span className="text-gray-400">Loại</span>
+                    <p className="font-semibold text-gray-700">{
+                      t.task_source === 'assigned' ? 'QL giao' :
+                      t.task_source === 'project' ? 'Dự án' :
+                      t.task_source === 'recurring' ? 'Định kỳ' :
+                      t.task_source === 'self' ? 'Tự giao' : t.task_source
+                    }</p>
+                  </div>
+                )}
+                {t.self_score != null && (
+                  <div className="bg-blue-50 rounded-lg p-2">
+                    <span className="text-gray-400">NV tự chấm</span>
+                    <p className="font-bold text-blue-600">{t.self_score} điểm</p>
+                  </div>
+                )}
+                {t.final_score != null && (
+                  <div className="bg-green-50 rounded-lg p-2">
+                    <span className="text-gray-400">Điểm cuối</span>
+                    <p className="font-bold text-green-600">{t.final_score} điểm</p>
+                  </div>
+                )}
+                {t.final_score != null && (
+                  <div className={`rounded-lg p-2 ${
+                    t.final_score >= 90 ? 'bg-emerald-50' :
+                    t.final_score >= 75 ? 'bg-blue-50' :
+                    t.final_score >= 60 ? 'bg-amber-50' : 'bg-red-50'
+                  }`}>
+                    <span className="text-gray-400">Hạng</span>
+                    <p className={`font-bold ${
+                      t.final_score >= 90 ? 'text-emerald-600' :
+                      t.final_score >= 75 ? 'text-blue-600' :
+                      t.final_score >= 60 ? 'text-amber-600' : 'text-red-600'
+                    }`}>{
+                      t.final_score >= 90 ? 'A' :
+                      t.final_score >= 75 ? 'B' :
+                      t.final_score >= 60 ? 'C' :
+                      t.final_score >= 40 ? 'D' : 'F'
+                    }</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Timestamps nhỏ ở footer */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 pt-3 mt-3 border-t border-gray-100 text-xs text-gray-400">

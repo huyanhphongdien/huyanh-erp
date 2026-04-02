@@ -91,7 +91,7 @@ export default function NotificationPage() {
         reference_url: n.link,
         priority: n.metadata?.priority || 'normal',
         sender_name: null,
-      }}))
+      }})
     },
     enabled: !!employeeId,
   })

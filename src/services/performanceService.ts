@@ -769,49 +769,24 @@ export const performanceDashboardService = {
       const dept = Array.isArray((employee as any).department)
         ? (employee as any).department[0] : (employee as any).department;
 
+      // ★ Dùng completed_date + tasks.final_score trực tiếp
       const { data: tasks } = await supabase
         .from('tasks')
-        .select('id, code, name, due_date, completed_date, updated_at')
+        .select('id, code, name, due_date, completed_date, task_source, self_score, final_score')
         .eq('status', 'finished')
         .eq('assignee_id', employeeId)
-        .gte('updated_at', from)
-        .lte('updated_at', to)
-        .order('updated_at', { ascending: false });
-
-      const taskIds = (tasks || []).map(t => t.id);
-
-      let evaluations: any[] = [];
-      if (taskIds.length > 0) {
-        const { data: evals } = await supabase
-          .from('task_evaluations')
-          .select('task_id, score')
-          .in('task_id', taskIds)
-          .eq('employee_id', employeeId);
-        evaluations = evals || [];
-      }
-
-      let selfEvals: any[] = [];
-      if (taskIds.length > 0) {
-        const { data: se } = await supabase
-          .from('task_self_evaluations')
-          .select('task_id, self_score')
-          .in('task_id', taskIds)
-          .eq('employee_id', employeeId)
-          .eq('status', 'approved');
-        selfEvals = se || [];
-      }
-
-      const evalMap = new Map(evaluations.map(e => [e.task_id, e]));
-      const selfEvalMap = new Map(selfEvals.map(s => [s.task_id, s]));
+        .gte('completed_date', from)
+        .lte('completed_date', to)
+        .order('completed_date', { ascending: false });
 
       const taskDetails: EmployeeTaskDetail[] = [];
-      let totalSelf = 0, selfCount = 0, totalManager = 0, managerCount = 0;
+      let totalSelf = 0, selfCount = 0, totalWeighted = 0, totalWeight = 0;
       let onTimeCount = 0, overdueCount = 0;
 
-      (tasks || []).forEach(task => {
-        const mEval = evalMap.get(task.id);
-        const sEval = selfEvalMap.get(task.id);
-        const score = mEval?.score || 0;
+      (tasks || []).forEach((task: any) => {
+        const score = task.final_score || 0;
+        const selfScore = task.self_score || 0;
+        const weight = task.task_source === 'recurring' ? 0.5 : task.task_source === 'self' ? 0.3 : 1.0;
 
         let onTime = true;
         if (task.due_date) {
@@ -821,19 +796,19 @@ export const performanceDashboardService = {
           onTime = completed <= due;
         }
         if (onTime) onTimeCount++; else overdueCount++;
-        if (mEval) { totalManager += mEval.score; managerCount++; }
-        if (sEval?.self_score) { totalSelf += sEval.self_score; selfCount++; }
+        if (selfScore > 0) { totalSelf += selfScore; selfCount++; }
+        if (score > 0) { totalWeighted += score * weight; totalWeight += weight; }
 
         taskDetails.push({
           code: task.code || '', name: task.name || '', score,
-          completed_date: task.completed_date || task.updated_at || '',
+          completed_date: task.completed_date || '',
           on_time: onTime,
         });
       });
 
       const avgSelf = selfCount > 0 ? Math.round(totalSelf / selfCount) : 0;
-      const avgManager = managerCount > 0 ? Math.round(totalManager / managerCount) : 0;
-      const finalScore = avgSelf > 0 || avgManager > 0 ? Math.round(avgSelf * 0.4 + avgManager * 0.6) : 0;
+      const avgManager = 0; // ★ Không tách manager nữa, dùng final_score trực tiếp
+      const finalScore = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : 0;
       const completedTasks = (tasks || []).length;
       const onTimeRate = completedTasks > 0 ? Math.round((onTimeCount / completedTasks) * 100) : 0;
 
@@ -846,25 +821,25 @@ export const performanceDashboardService = {
         const y = d.getFullYear();
         const mRange = getPeriodRange({ month: m, year: y });
 
+        // ★ Dùng completed_date + final_score
         const { data: mTasks } = await supabase
           .from('tasks')
-          .select('id')
+          .select('final_score, task_source')
           .eq('status', 'finished')
           .eq('assignee_id', employeeId)
-          .gte('updated_at', mRange.from)
-          .lte('updated_at', mRange.to);
+          .gte('completed_date', mRange.from)
+          .lte('completed_date', mRange.to)
+          .not('final_score', 'is', null)
+          .gt('final_score', 0);
 
         let mScore = 0;
-        const mTaskIds = (mTasks || []).map(t => t.id);
-        if (mTaskIds.length > 0) {
-          const { data: mEvals } = await supabase
-            .from('task_evaluations')
-            .select('score')
-            .in('task_id', mTaskIds)
-            .eq('employee_id', employeeId);
-          if (mEvals && mEvals.length > 0) {
-            mScore = Math.round(mEvals.reduce((a, b) => a + b.score, 0) / mEvals.length);
-          }
+        if (mTasks && mTasks.length > 0) {
+          let tw = 0, ts = 0;
+          mTasks.forEach((t: any) => {
+            const w = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.3 : 1.0;
+            tw += (t.final_score || 0) * w; ts += w;
+          });
+          mScore = ts > 0 ? Math.round(tw / ts) : 0;
         }
         trend.push({ month: `${String(m).padStart(2, '0')}/${y}`, score: mScore });
       }

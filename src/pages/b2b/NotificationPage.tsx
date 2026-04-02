@@ -53,21 +53,38 @@ export default function NotificationPage() {
   const [searchText, setSearchText] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
-  // Query: Đếm theo module
-  const { data: countByModule } = useQuery<NotificationCount>({
+  // ★ Query dùng notificationHelper (direct query, không RPC)
+  const { data: countByModule } = useQuery({
     queryKey: ['notification-count-by-module', employeeId],
-    queryFn: () => notificationService.countUnreadByModule(employeeId),
+    queryFn: async () => {
+      const { countUnread } = await import('../../services/notificationHelper')
+      const total = await countUnread(employeeId)
+      return { total, byModule: {} } as any
+    },
     enabled: !!employeeId,
   })
 
   // Query: Lấy thông báo
   const { data: allNotifications = [], isLoading, refetch } = useQuery({
     queryKey: ['notifications-page', employeeId, activeModule, showUnreadOnly],
-    queryFn: () => notificationService.getNotifications(employeeId, {
-      module: activeModule === 'all' ? undefined : activeModule,
-      is_read: showUnreadOnly ? false : undefined,
-      limit: 100,
-    }),
+    queryFn: async () => {
+      const { getNotifications: getNotifs } = await import('../../services/notificationHelper')
+      const data = await getNotifs(employeeId, 100)
+      // Filter by module (type) + read status
+      let filtered = data
+      if (activeModule !== 'all') filtered = filtered.filter((n: any) => n.type === activeModule)
+      if (showUnreadOnly) filtered = filtered.filter((n: any) => !n.is_read)
+      // Map to expected format
+      return filtered.map((n: any) => ({
+        ...n,
+        module: n.type || 'system',
+        notification_type: n.metadata?.notification_type || n.type || 'system',
+        message: n.content,
+        reference_url: n.link,
+        priority: n.metadata?.priority || 'normal',
+        sender_name: null,
+      }))
+    },
     enabled: !!employeeId,
   })
 
@@ -118,27 +135,36 @@ export default function NotificationPage() {
     return groups
   }, [filteredNotifications])
 
-  // Mutations
+  // ★ Mutations dùng notificationHelper
   const markReadMutation = useMutation({
-    mutationFn: notificationService.markAsRead,
+    mutationFn: async (id: string) => {
+      const { markRead } = await import('../../services/notificationHelper')
+      await markRead(id)
+    },
     onSuccess: () => invalidateAll(),
   })
 
   const markAllReadMutation = useMutation({
-    mutationFn: () => notificationService.markAllAsRead(
-      employeeId,
-      activeModule === 'all' ? undefined : activeModule
-    ),
+    mutationFn: async () => {
+      const { markAllRead } = await import('../../services/notificationHelper')
+      await markAllRead(employeeId)
+    },
     onSuccess: () => invalidateAll(),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: notificationService.deleteNotification,
+    mutationFn: async (id: string) => {
+      const { deleteNotification } = await import('../../services/notificationHelper')
+      await deleteNotification(id)
+    },
     onSuccess: () => invalidateAll(),
   })
 
   const deleteAllReadMutation = useMutation({
-    mutationFn: () => notificationService.deleteAllRead(employeeId),
+    mutationFn: async () => {
+      const { supabase } = await import('../../lib/supabase')
+      await supabase.from('notifications').delete().eq('employee_id', employeeId).eq('is_read', true)
+    },
     onSuccess: () => invalidateAll(),
   })
 

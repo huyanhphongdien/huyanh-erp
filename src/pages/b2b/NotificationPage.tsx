@@ -72,18 +72,26 @@ export default function NotificationPage() {
       const data = await getNotifs(employeeId, 100)
       // Filter by module (type) + read status
       let filtered = data
-      if (activeModule !== 'all') filtered = filtered.filter((n: any) => n.type === activeModule)
+      // ★ Match module: 'task' matches 'task', 'task_status_changed', 'task_assigned', etc.
+      if (activeModule !== 'all') filtered = filtered.filter((n: any) => {
+        const t = n.type || ''
+        return t === activeModule || t.startsWith(activeModule + '_') || t.startsWith(activeModule)
+      })
       if (showUnreadOnly) filtered = filtered.filter((n: any) => !n.is_read)
       // Map to expected format
-      return filtered.map((n: any) => ({
+      return filtered.map((n: any) => {
+        // Derive module from type: 'task_status_changed' → 'task', 'leave_approved' → 'leave'
+        const t = n.type || 'system'
+        const mod = t.startsWith('task') ? 'task' : t.startsWith('leave') ? 'leave' : t.startsWith('overtime') ? 'overtime' : t.startsWith('attendance') ? 'attendance' : t.startsWith('shift') ? 'shift' : 'system'
+        return {
         ...n,
-        module: n.type || 'system',
-        notification_type: n.metadata?.notification_type || n.type || 'system',
+        module: mod,
+        notification_type: n.metadata?.notification_type || t,
         message: n.content,
         reference_url: n.link,
         priority: n.metadata?.priority || 'normal',
         sender_name: null,
-      }))
+      }}))
     },
     enabled: !!employeeId,
   })

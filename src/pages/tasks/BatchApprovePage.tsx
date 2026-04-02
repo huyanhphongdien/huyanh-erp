@@ -290,6 +290,22 @@ const BatchApprovePage: React.FC = () => {
           .eq('task_id', taskId)
           .eq('status', 'pending');
 
+        // ★ Thông báo NV: task đã được duyệt
+        try {
+          const { notify } = await import('../../services/notificationHelper');
+          if (task.assignee?.id) {
+            await notify({
+              recipientId: task.assignee.id,
+              senderId: user.employee_id,
+              module: 'task',
+              type: 'task_approved',
+              title: `Công việc đã được duyệt: ${finalScore} điểm`,
+              message: `${task.name} (${task.code})`,
+              referenceUrl: `/tasks/${taskId}`,
+            });
+          }
+        } catch (e) { console.error('[notify] approved:', e); }
+
         successCount++;
       } catch (err: any) {
         console.error('Error approving task:', taskId, err);

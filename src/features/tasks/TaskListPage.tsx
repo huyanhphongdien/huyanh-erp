@@ -119,6 +119,7 @@ export function TaskListPage() {
     if (filter.due_date_to) result.due_date_to = filter.due_date_to
     if (filter.created_date_from) result.created_date_from = filter.created_date_from
     if (filter.created_date_to) result.created_date_to = filter.created_date_to
+    if (filter.task_source?.length > 0) result.task_source = filter.task_source
 
     return result
   }, [filter, effectiveDepartmentFilter])

@@ -111,6 +111,24 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
         }).eq('id', task.id)
 
         message.success('Đã gửi đánh giá cho quản lý duyệt')
+
+        // ★ Thông báo QL: có task chờ duyệt
+        try {
+          const { data: taskFull } = await supabase.from('tasks').select('assigner_id, name, department_id').eq('id', task.id).single()
+          if (taskFull?.assigner_id) {
+            const { notify } = await import('../../services/notificationHelper')
+            await notify({
+              recipientId: taskFull.assigner_id,
+              senderId: user?.employee_id || undefined,
+              module: 'task',
+              type: 'task_approval_pending',
+              title: `Chờ phê duyệt: ${task.name}`,
+              message: `${user?.full_name || 'Nhân viên'} đã tự đánh giá ${stars}★ (${score}đ)`,
+              referenceUrl: '/tasks/approve-batch',
+              priority: 'high',
+            })
+          }
+        } catch (e) { console.error('[notify] eval pending:', e) }
       }
 
       setStars(0)

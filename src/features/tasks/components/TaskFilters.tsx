@@ -27,6 +27,7 @@ export interface TaskFiltersValue {
   created_date_from: string | null;
   created_date_to: string | null;
   tags: string[];
+  task_source: string[];
 }
 
 export interface TaskFiltersProps {
@@ -56,6 +57,7 @@ export const DEFAULT_FILTERS: TaskFiltersValue = {
   due_date_to: null,
   created_date_from: null,
   created_date_to: null,
+  task_source: [],
   tags: [],
 };
 
@@ -103,6 +105,7 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
     created_date_from: value?.created_date_from ?? null,
     created_date_to: value?.created_date_to ?? null,
     tags: value?.tags ?? [],
+    task_source: value?.task_source ?? [],
   };
 
   const [isExpanded, setIsExpanded] = useState(!compact);
@@ -466,6 +469,26 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
                 active={safeValue.priority.includes('high') || safeValue.priority.includes('urgent')}
                 onClick={() => onChange({ ...DEFAULT_FILTERS, priority: ['high', 'urgent'] })}
               />
+            </div>
+            {/* ★ Filter theo loại công việc */}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {[
+                { value: 'assigned', label: 'Được giao', icon: '📋' },
+                { value: 'project', label: 'Dự án', icon: '📁' },
+                { value: 'recurring', label: 'Định kỳ', icon: '🔁' },
+                { value: 'self', label: 'Tự giao', icon: '✍️' },
+              ].map(s => (
+                <QuickFilterButton
+                  key={s.value}
+                  label={s.label}
+                  icon={s.icon}
+                  active={safeValue.task_source.includes(s.value)}
+                  onClick={() => onChange({
+                    ...DEFAULT_FILTERS,
+                    task_source: safeValue.task_source.includes(s.value) ? [] : [s.value],
+                  })}
+                />
+              ))}
             </div>
           </div>
         </div>

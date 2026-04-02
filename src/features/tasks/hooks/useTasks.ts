@@ -23,6 +23,7 @@ interface TaskFilter {
   due_date_to?: string
   created_date_from?: string
   created_date_to?: string
+  task_source?: string | string[]
 }
 
 interface Task {
@@ -162,6 +163,15 @@ async function fetchTasks(
   }
   if (filter?.created_date_to) {
     query = query.lte('created_at', filter.created_date_to + 'T23:59:59')
+  }
+
+  // ★ Filter theo loại task
+  if (filter?.task_source) {
+    if (Array.isArray(filter.task_source) && filter.task_source.length > 0) {
+      query = query.in('task_source', filter.task_source)
+    } else if (typeof filter.task_source === 'string') {
+      query = query.eq('task_source', filter.task_source)
+    }
   }
 
   // ★ Mặc định: chỉ hiện task tháng hiện tại (created_at >= đầu tháng)

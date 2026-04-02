@@ -231,14 +231,14 @@ const BatchApprovePage: React.FC = () => {
         const task = tasks.find(t => t.id === taskId);
         if (!task) continue;
 
-        const managerScore = getManagerScore(taskId);
-        const selfScore = task.self_score ?? managerScore;
+        const managerStars = getManagerScore(taskId);
+        const managerScorePoints = managerStars * 20; // ★ 1-5 sao → 20-100 điểm
+        const selfScore = task.self_score ?? managerScorePoints;
         const note = getNote(taskId);
 
         // Calculate final_score = self_score × 40% + manager_score × 60%
-        const finalScore = Math.round(selfScore * 0.4 + managerScore * 0.6);
-        const starToPercent = managerScore * 20; // 1-5 stars → 20-100
-        const rating = calculateRating(starToPercent);
+        const finalScore = Math.round(selfScore * 0.4 + managerScorePoints * 0.6);
+        const rating = calculateRating(managerScorePoints);
 
         // 1. Insert into task_evaluations
         const { error: evalError } = await createEvaluation({

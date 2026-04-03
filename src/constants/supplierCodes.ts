@@ -125,6 +125,38 @@ export function generateOrderCode(
 }
 
 /**
+ * Tạo mã lô: [Mã NCC 6]-[YYMM]-[Số thứ tự 2]
+ * VD: QIGI01-2604-01
+ * - Mã NCC: từ partner.code
+ * - YYMM: tháng tạo mã (bất biến)
+ * - Số: tự tăng theo NCC trong tháng
+ */
+export function generateLotCode(
+  partnerCode: string,
+  sequenceInMonth: number,
+  date?: Date
+): string {
+  const d = date || new Date()
+  const yy = String(d.getFullYear()).slice(-2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const seq = String(sequenceInMonth).padStart(2, '0')
+  return `${partnerCode}-${yy}${mm}-${seq}`
+}
+
+/**
+ * Parse mã lô: "QIGI01-2604-01" → { partnerCode, yymm, seq }
+ */
+export function parseLotCode(lotCode: string): { partnerCode: string; yymm: string; seq: number } | null {
+  const parts = lotCode.split('-')
+  if (parts.length < 3) return null
+  return {
+    partnerCode: parts[0],
+    yymm: parts[1],
+    seq: parseInt(parts[2], 10) || 0,
+  }
+}
+
+/**
  * Parse mã NCC: "TEHG01" → { region: "TE", name: "HG", seq: 1 }
  */
 export function parseSupplierCode(code: string): { region: string; name: string; seq: number } | null {

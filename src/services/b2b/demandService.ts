@@ -552,8 +552,17 @@ export const demandService = {
         processing_fee_per_ton: demand.processing_fee_per_ton || null,
         expected_output_rate: demand.expected_output_rate || null,
         notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,
-        // ★ Lot info from offer (fixed: lot_source → source_region)
-        lot_code: offer.lot_code || null,
+        // ★ Auto-generate lot_code: [Mã NCC]-[YYMM]-[Số]
+        lot_code: await (async () => {
+          try {
+            const partner = Array.isArray(offer.partner) ? offer.partner[0] : offer.partner
+            if (partner?.code) {
+              const { partnerService: ps } = await import('./partnerService')
+              return await ps.generateNextLotCode(partner.code)
+            }
+          } catch (e) { console.error('[acceptOffer] lot_code gen error:', e) }
+          return offer.lot_code || null
+        })(),
         lot_description: offer.lot_description || null,
         source_region: offer.source_region || null,
         expected_drc: offer.lot_drc || offer.offered_drc || null,
@@ -575,7 +584,7 @@ export const demandService = {
       const intakeId = await rubberIntakeB2BService.createFromDeal({
         deal_id: deal.id,
         partner_id: offer.partner_id,
-        lot_code: offer.lot_code || dealNumber,
+        lot_code: deal.lot_code || dealNumber,
         lot_description: offer.lot_description || offer.notes || undefined,
         product_code: demand.product_name || 'MU_CAO_SU',
         quantity_kg: offer.offered_quantity_kg,

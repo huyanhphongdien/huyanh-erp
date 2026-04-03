@@ -132,8 +132,17 @@ export const dealConfirmService = {
         source_region: formData.pickup_location || null,
         pickup_location_name: formData.pickup_location || null,
         delivery_date: formData.delivery_date || null,
-        // Lot info from booking (if available)
-        lot_code: context.lotCode || null,
+        // ★ Auto-generate lot_code: [Mã NCC]-[YYMM]-[Số]
+        lot_code: await (async () => {
+          try {
+            const { data: p } = await supabase.from('b2b_partners').select('code').eq('id', context.partnerId).single()
+            if (p?.code) {
+              const { partnerService: ps } = await import('./partnerService')
+              return await ps.generateNextLotCode(p.code)
+            }
+          } catch (e) { console.error('[dealConfirm] lot_code gen error:', e) }
+          return context.lotCode || null
+        })(),
         // Rubber region from booking (if available)
         rubber_region: context.rubberRegion || null,
         rubber_region_lat: context.rubberRegionLat || null,

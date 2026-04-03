@@ -147,6 +147,47 @@ export const partnerService = {
   },
 
   /**
+   * Tạo mã lô tiếp theo cho NCC: [Mã NCC]-[YYMM]-[Số]
+   * VD: QIGI01-2604-01, QIGI01-2604-02...
+   */
+  async generateNextLotCode(partnerCode: string): Promise<string> {
+    const { generateLotCode } = await import('../../constants/supplierCodes')
+    const now = new Date()
+    const yy = String(now.getFullYear()).slice(-2)
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const prefix = `${partnerCode}-${yy}${mm}-`
+
+    // Tìm lot_code lớn nhất trong tháng này cho NCC này
+    const { data: existing } = await supabase
+      .from('rubber_intake_batches')
+      .select('lot_code')
+      .ilike('lot_code', `${prefix}%`)
+      .order('lot_code', { ascending: false })
+      .limit(1)
+
+    let nextSeq = 1
+    if (existing && existing.length > 0 && existing[0].lot_code) {
+      const lastSeq = parseInt(existing[0].lot_code.slice(-2), 10)
+      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1
+    }
+
+    // Cũng check trong b2b_demand_offers
+    const { data: offerExisting } = await supabase
+      .from('b2b_demand_offers')
+      .select('lot_code')
+      .ilike('lot_code', `${prefix}%`)
+      .order('lot_code', { ascending: false })
+      .limit(1)
+
+    if (offerExisting && offerExisting.length > 0 && offerExisting[0].lot_code) {
+      const offerSeq = parseInt(offerExisting[0].lot_code.slice(-2), 10)
+      if (!isNaN(offerSeq) && offerSeq >= nextSeq) nextSeq = offerSeq + 1
+    }
+
+    return generateLotCode(partnerCode, nextSeq, now)
+  },
+
+  /**
    * Preview mã NCC (không lưu DB)
    */
   async previewPartnerCode(name: string, address: string): Promise<{ code: string; regionCode: string; regionName: string }> {

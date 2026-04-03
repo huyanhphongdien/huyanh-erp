@@ -737,33 +737,69 @@ export function ManagerDashboard() {
             </div>
           </div>
 
-          {/* Top nhân viên */}
+          {/* ★ Tiến độ Dự án */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-50">
+            <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
               <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                <Award className="w-4 h-4 text-amber-500" /> Nhân viên Xuất sắc
+                <FolderKanban className="w-4 h-4 text-violet-500" /> Tiến độ Dự án
               </h3>
+              <button onClick={() => navigate('/projects')} className="text-xs text-emerald-600 font-semibold flex items-center gap-0.5">Tất cả <ChevronRight className="w-3 h-3" /></button>
             </div>
-            <div className="p-4 space-y-2">
-              {topEmployees.map((emp, i) => {
-                const medals = ['from-amber-400 to-amber-500', 'from-gray-300 to-gray-400', 'from-orange-300 to-orange-400']
-                return (
-                  <div key={emp.employee_id || i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white ${i < 3 ? `bg-gradient-to-br ${medals[i]}` : 'bg-gray-200 text-gray-500'}`}>
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-semibold text-gray-800 truncate">{emp.employee_name}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{emp.department_name}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-bold" style={{ color: emp.avg_score >= 80 ? '#10B981' : emp.avg_score >= 60 ? '#F59E0B' : '#EF4444' }}>{emp.avg_score}</span>
-                      <span className="text-[10px] text-gray-400 ml-0.5">điểm</span>
-                    </div>
-                  </div>
-                )
-              })}
-              {topEmployees.length === 0 && <p className="text-center py-4 text-xs text-gray-400">Chưa có dữ liệu</p>}
+            <div className="p-3">
+              {/* Summary */}
+              <div className="flex items-center gap-3 mb-3 text-center">
+                <div className="flex-1 p-2 bg-violet-50 rounded-lg">
+                  <div className="text-lg font-bold text-violet-700">{projectStats.active}</div>
+                  <div className="text-[10px] text-violet-500">Đang chạy</div>
+                </div>
+                <div className="flex-1 p-2 bg-emerald-50 rounded-lg">
+                  <div className="text-lg font-bold text-emerald-700">{projectStats.completed}</div>
+                  <div className="text-[10px] text-emerald-500">Hoàn thành</div>
+                </div>
+                <div className="flex-1 p-2 bg-gray-50 rounded-lg">
+                  <div className="text-lg font-bold text-gray-700">{projectStats.total}</div>
+                  <div className="text-[10px] text-gray-500">Tổng</div>
+                </div>
+              </div>
+
+              {/* Project List with Progress */}
+              {projectStats.recentProjects.length === 0 ? (
+                <p className="text-center py-4 text-xs text-gray-400">Chưa có dự án</p>
+              ) : (
+                <div className="space-y-2">
+                  {projectStats.recentProjects.map((p) => {
+                    const statusColors: Record<string, string> = {
+                      in_progress: 'text-blue-600', completed: 'text-emerald-600', planning: 'text-amber-600',
+                      approved: 'text-violet-600', on_hold: 'text-gray-500', draft: 'text-gray-400',
+                    }
+                    const statusLabels: Record<string, string> = {
+                      in_progress: 'Đang chạy', completed: 'Xong', planning: 'Lập KH',
+                      approved: 'Đã duyệt', on_hold: 'Tạm dừng', draft: 'Nháp',
+                    }
+                    const pct = Math.min(p.progress_pct || 0, 100)
+                    const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : pct >= 20 ? 'bg-amber-500' : 'bg-gray-300'
+                    return (
+                      <div key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="p-2.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[10px] text-gray-400 mr-1.5">{p.code}</span>
+                            <span className="text-[12px] font-semibold text-gray-800 truncate">{p.name}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold ml-2 flex-shrink-0 ${statusColors[p.status] || 'text-gray-500'}`}>
+                            {statusLabels[p.status] || p.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-600 w-8 text-right">{pct}%</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

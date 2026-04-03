@@ -51,6 +51,10 @@ export interface Deal {
   pickup_location_name: string | null
   price_unit: string | null          // 'wet' | 'dry'
   delivery_date: string | null
+  // Lot & Rubber Intake
+  lot_code: string | null
+  lot_description: string | null
+  rubber_intake_id: string | null
   // Joined fields
   partner?: {
     id: string

@@ -544,6 +544,19 @@ const DealDetailPage = () => {
                           {formatDate(deal.delivery_date)}
                         </Descriptions.Item>
                       )}
+                      {deal.lot_code && (
+                        <Descriptions.Item label="Mã lô">
+                          <Tag color="blue" style={{ fontWeight: 600 }}>{deal.lot_code}</Tag>
+                          {deal.lot_description && <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>{deal.lot_description}</Text>}
+                        </Descriptions.Item>
+                      )}
+                      {deal.rubber_intake_id && (
+                        <Descriptions.Item label="Lý lịch mủ">
+                          <Button type="link" size="small" onClick={() => navigate(`/b2b/rubber-intake/${deal.rubber_intake_id}`)}>
+                            Xem lý lịch mủ →
+                          </Button>
+                        </Descriptions.Item>
+                      )}
                       <Descriptions.Item label="Điều kiện giao hàng" span={2}>
                         {deal.delivery_terms || '-'}
                       </Descriptions.Item>

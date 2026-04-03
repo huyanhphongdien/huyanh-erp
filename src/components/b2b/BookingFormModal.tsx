@@ -130,6 +130,7 @@ const BookingFormModal = ({
         delivery_date: values.delivery_date
           ? dayjs(values.delivery_date).format('YYYY-MM-DD')
           : dayjs().add(1, 'day').format('YYYY-MM-DD'),
+        lot_code: values.lot_code || undefined,
         notes: values.notes || undefined,
         status: 'pending',
       }
@@ -337,6 +338,11 @@ const BookingFormModal = ({
             disabledDate={(current) => current && current < dayjs().startOf('day')}
             size="large"
           />
+        </Form.Item>
+
+        {/* Mã lô */}
+        <Form.Item name="lot_code" label="Mã lô (tùy chọn)">
+          <Input placeholder="VD: LL-A-0401" size="large" maxLength={50} />
         </Form.Item>
 
         {/* Ghi chú */}

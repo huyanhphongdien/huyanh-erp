@@ -36,6 +36,7 @@ export interface BookingMetadata {
   estimated_value: number
   pickup_location?: string
   delivery_date: string
+  lot_code?: string
   notes?: string
   status: 'pending' | 'confirmed' | 'negotiating' | 'rejected'
   counter_price?: number

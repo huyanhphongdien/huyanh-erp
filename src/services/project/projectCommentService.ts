@@ -80,43 +80,15 @@ export function parseMentions(content: string, users: MentionableUser[]): string
 // SERVICE FUNCTIONS
 // ============================================================================
 
-/** Lấy danh sách người có thể tag (thành viên dự án + NV cùng phòng ban) */
-export async function getMentionableUsers(projectId: string): Promise<MentionableUser[]> {
+/** Lấy danh sách người có thể tag (tất cả NV active) */
+export async function getMentionableUsers(_projectId: string): Promise<MentionableUser[]> {
   try {
-    // Get project members
-    const { data: members } = await supabase
-      .from('project_members')
-      .select('employee_id')
-      .eq('project_id', projectId)
-
-    const memberIds = (members || []).map(m => m.employee_id)
-
-    // Get project owner
-    const { data: project } = await supabase
-      .from('projects')
-      .select('owner_id, department_id')
-      .eq('id', projectId)
-      .single()
-
-    if (project?.owner_id && !memberIds.includes(project.owner_id)) {
-      memberIds.push(project.owner_id)
-    }
-
-    // Get department employees + project members
-    let query = supabase
+    const { data: employees } = await supabase
       .from('employees')
       .select('id, full_name, avatar_url, departments:department_id(name)')
       .eq('status', 'active')
       .order('full_name')
-
-    if (project?.department_id) {
-      // All from same dept + project members
-      query = query.or(`department_id.eq.${project.department_id}${memberIds.length ? ',id.in.(${memberIds.join(",")})' : ''}`)
-    } else if (memberIds.length) {
-      query = query.in('id', memberIds)
-    }
-
-    const { data: employees } = await query.limit(50)
+      .limit(100)
 
     return (employees || []).map((e: any) => ({
       id: e.id,

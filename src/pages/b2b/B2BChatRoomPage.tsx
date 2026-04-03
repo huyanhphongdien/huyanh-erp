@@ -952,6 +952,10 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
         confirmedBy: user.employee_id,
         confirmerType: 'factory',
         bookingCode: confirmDealModal.booking?.code,
+        lotCode: confirmDealModal.booking?.lot_code,
+        rubberRegion: confirmDealModal.booking?.rubber_region,
+        rubberRegionLat: confirmDealModal.booking?.rubber_region_lat,
+        rubberRegionLng: confirmDealModal.booking?.rubber_region_lng,
       })
 
       const successMsg = result.advance

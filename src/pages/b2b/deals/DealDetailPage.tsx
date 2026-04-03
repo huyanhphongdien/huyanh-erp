@@ -535,8 +535,23 @@ const DealDetailPage = () => {
                         </Text>
                       </Descriptions.Item>
                       {(deal.source_region || deal.pickup_location_name) && (
-                        <Descriptions.Item label="Vùng / Địa điểm chốt">
+                        <Descriptions.Item label="Địa điểm bốc hàng">
                           {deal.source_region || deal.pickup_location_name}
+                        </Descriptions.Item>
+                      )}
+                      {deal.rubber_region && (
+                        <Descriptions.Item label="Vùng mủ">
+                          {deal.rubber_region}
+                          {deal.rubber_region_lat && deal.rubber_region_lng && (
+                            <a
+                              href={`https://www.google.com/maps?q=${deal.rubber_region_lat},${deal.rubber_region_lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ marginLeft: 8, fontSize: 12 }}
+                            >
+                              📍 Xem bản đồ
+                            </a>
+                          )}
                         </Descriptions.Item>
                       )}
                       {deal.delivery_date && (

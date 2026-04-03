@@ -37,6 +37,9 @@ export interface BookingMetadata {
   pickup_location?: string
   delivery_date: string
   lot_code?: string
+  rubber_region?: string
+  rubber_region_lat?: number
+  rubber_region_lng?: number
   notes?: string
   status: 'pending' | 'confirmed' | 'negotiating' | 'rejected'
   counter_price?: number

@@ -306,10 +306,10 @@ const ConfirmDealModal = ({
           </Col>
         </Row>
 
-        {/* Vùng thu mua / Địa điểm chốt */}
+        {/* Vùng thu mua / Địa điểm bốc hàng */}
         <Form.Item
           name="pickup_location"
-          label={<><EnvironmentOutlined style={{ color: '#1890ff', marginRight: 4 }} /> Vùng thu mua / Địa điểm chốt</>}
+          label={<><EnvironmentOutlined style={{ color: '#1890ff', marginRight: 4 }} /> Vùng thu mua / Địa điểm bốc hàng</>}
           initialValue={booking.pickup_location ? [booking.pickup_location] : []}
         >
           <Select

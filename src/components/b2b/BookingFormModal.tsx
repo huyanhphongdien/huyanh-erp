@@ -130,7 +130,8 @@ const BookingFormModal = ({
         delivery_date: values.delivery_date
           ? dayjs(values.delivery_date).format('YYYY-MM-DD')
           : dayjs().add(1, 'day').format('YYYY-MM-DD'),
-        lot_code: values.lot_code || undefined,
+        lot_code: undefined, // Nhà máy tự gán mã lô
+        rubber_region: values.rubber_region || undefined,
         notes: values.notes || undefined,
         status: 'pending',
       }
@@ -277,10 +278,10 @@ const BookingFormModal = ({
           </Col>
         </Row>
 
-        {/* Địa điểm chốt hàng */}
+        {/* Địa điểm bốc hàng */}
         <Form.Item
           name="pickup_location"
-          label="Địa điểm chốt hàng"
+          label="Địa điểm bốc hàng"
           rules={[{ required: true, message: 'Vui lòng chọn địa điểm' }]}
           tooltip="Chọn địa điểm sẽ tự động điền DRC dự kiến"
         >
@@ -340,9 +341,9 @@ const BookingFormModal = ({
           />
         </Form.Item>
 
-        {/* Mã lô */}
-        <Form.Item name="lot_code" label="Mã lô (tùy chọn)">
-          <Input placeholder="VD: LL-A-0401" size="large" maxLength={50} />
+        {/* Vùng mủ */}
+        <Form.Item name="rubber_region" label="Vùng mủ (tùy chọn)">
+          <Input placeholder="VD: Sơn Thủy, A Lưới, TT Huế" size="large" maxLength={200} />
         </Form.Item>
 
         {/* Ghi chú */}

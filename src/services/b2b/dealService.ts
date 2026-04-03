@@ -55,6 +55,10 @@ export interface Deal {
   lot_code: string | null
   lot_description: string | null
   rubber_intake_id: string | null
+  // Rubber Region (vùng mủ)
+  rubber_region: string | null
+  rubber_region_lat: number | null
+  rubber_region_lng: number | null
   // Joined fields
   partner?: {
     id: string

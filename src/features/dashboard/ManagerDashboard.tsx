@@ -315,6 +315,8 @@ export function ManagerDashboard() {
   const [pendingOvertimes, setPendingOvertimes] = useState<any[]>([])
   const [activeTrips, setActiveTrips] = useState<any[]>([])
   const [monthlyWorkUnits, setMonthlyWorkUnits] = useState<any[]>([])
+  const [perfKPIs, setPerfKPIs] = useState<{ total_evaluated: number; avg_score: number; total_completed: number; on_time_rate: number; grade_distribution: Record<string, number> }>({ total_evaluated: 0, avg_score: 0, total_completed: 0, on_time_rate: 0, grade_distribution: { A: 0, B: 0, C: 0, D: 0, F: 0 } })
+  const [perfTopEmployees, setPerfTopEmployees] = useState<{ name: string; dept: string; score: number; grade: string; tasks: number }[]>([])
   const [weeklyAttendance, setWeeklyAttendance] = useState<any[]>([])
   const [pendingTaskApprovals, setPendingTaskApprovals] = useState(0)
 
@@ -428,6 +430,19 @@ export function ManagerDashboard() {
           recentProjects: recentProjs || [],
         })
       } catch (e) { console.error('Project stats error:', e) }
+
+      // ★ Hiệu suất nhân viên tháng hiện tại
+      try {
+        const now = new Date()
+        const { performanceDashboardService } = await import('../../services/performanceService')
+        const kpis = await performanceDashboardService.getKPIs({ month: now.getMonth() + 1, year: now.getFullYear() })
+        setPerfKPIs(kpis)
+        const ranking = await performanceDashboardService.getEmployeeRanking({ month: now.getMonth() + 1, year: now.getFullYear(), limit: 5 })
+        setPerfTopEmployees(ranking.map((r: any) => ({
+          name: r.employee_name, dept: r.department_name, score: r.final_score, grade: r.grade, tasks: r.completed_tasks,
+        })))
+      } catch (e) { console.error('Performance stats error:', e) }
+
       setStatusDistribution(distributionResult.data)
       setTaskTrend(trendResult.data)
       setDepartmentPerformance(deptResult.data)
@@ -783,26 +798,71 @@ export function ManagerDashboard() {
             </div>
           </div>
 
-          {/* Công tháng — NV thấp */}
+          {/* ★ Hiệu suất nhân viên tháng */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
               <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-orange-500" /> Công tháng {new Date().getMonth() + 1}
+                <Award className="w-4 h-4 text-amber-500" /> Hiệu suất T{new Date().getMonth() + 1}
               </h3>
-              <button onClick={() => navigate('/attendance/monthly')} className="text-xs text-emerald-600 font-semibold flex items-center gap-0.5">Bảng công <ChevronRight className="w-3 h-3" /></button>
+              <button onClick={() => navigate('/performance')} className="text-xs text-emerald-600 font-semibold flex items-center gap-0.5">Chi tiết <ChevronRight className="w-3 h-3" /></button>
             </div>
             <div className="p-3">
-              {monthlyWorkUnits.length === 0 ? (
-                <p className="text-center py-4 text-xs text-gray-400">Chưa có dữ liệu</p>
+              {/* KPI Summary */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="text-center p-2 bg-blue-50 rounded-lg">
+                  <div className="text-lg font-bold text-blue-700">{perfKPIs.avg_score || '—'}</div>
+                  <div className="text-[10px] text-blue-500">Điểm TB</div>
+                </div>
+                <div className="text-center p-2 bg-emerald-50 rounded-lg">
+                  <div className="text-lg font-bold text-emerald-700">{perfKPIs.total_completed}</div>
+                  <div className="text-[10px] text-emerald-500">Task xong</div>
+                </div>
+                <div className="text-center p-2 bg-amber-50 rounded-lg">
+                  <div className="text-lg font-bold text-amber-700">{perfKPIs.on_time_rate}%</div>
+                  <div className="text-[10px] text-amber-500">Đúng hạn</div>
+                </div>
+              </div>
+
+              {/* Grade Distribution */}
+              <div className="flex items-center gap-1 mb-3">
+                {(['A', 'B', 'C', 'D', 'F'] as const).map(g => {
+                  const count = perfKPIs.grade_distribution[g] || 0
+                  const total = perfKPIs.total_evaluated || 1
+                  const pct = Math.round((count / total) * 100)
+                  const colors: Record<string, string> = { A: 'bg-emerald-500', B: 'bg-blue-500', C: 'bg-amber-500', D: 'bg-orange-500', F: 'bg-red-500' }
+                  return (
+                    <div key={g} className="flex-1" title={`Hạng ${g}: ${count} NV (${pct}%)`}>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className={`h-full rounded-full ${colors[g]}`} style={{ width: `${count > 0 ? Math.max(pct, 10) : 0}%` }} />
+                      </div>
+                      <div className="text-center mt-1">
+                        <span className="text-[10px] font-bold text-gray-500">{g}</span>
+                        {count > 0 && <span className="text-[9px] text-gray-400 ml-0.5">{count}</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Top 5 Employees */}
+              {perfTopEmployees.length === 0 ? (
+                <p className="text-center py-2 text-xs text-gray-400">Chưa có đánh giá</p>
               ) : (
                 <div className="space-y-1.5">
-                  {monthlyWorkUnits.map((emp: any) => (
-                    <div key={emp.id} className={`flex items-center gap-2.5 p-2 rounded-lg ${emp.totalCong < 10 ? 'bg-red-50' : 'bg-gray-50'}`}>
-                      <span className="text-[10px] text-gray-400 w-8">{emp.code}</span>
-                      <span className="text-[12px] font-medium text-gray-800 flex-1 truncate">{emp.full_name}</span>
-                      <span className={`text-sm font-bold ${emp.totalCong < 10 ? 'text-red-500' : 'text-gray-600'}`}>{emp.totalCong}</span>
-                    </div>
-                  ))}
+                  {perfTopEmployees.map((emp, i) => {
+                    const gradeColors: Record<string, string> = { A: 'bg-emerald-100 text-emerald-700', B: 'bg-blue-100 text-blue-700', C: 'bg-amber-100 text-amber-700', D: 'bg-orange-100 text-orange-700', F: 'bg-red-100 text-red-700' }
+                    return (
+                      <div key={i} className="flex items-center gap-2.5 p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <span className="text-[11px] font-bold text-gray-400 w-4">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[12px] font-medium text-gray-800 truncate block">{emp.name}</span>
+                          <span className="text-[10px] text-gray-400">{emp.dept} • {emp.tasks} task</span>
+                        </div>
+                        <span className="text-sm font-bold text-gray-700">{emp.score}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${gradeColors[emp.grade] || gradeColors.F}`}>{emp.grade}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

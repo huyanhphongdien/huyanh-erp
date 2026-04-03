@@ -60,6 +60,11 @@ export interface DemandOffer {
   rejected_reason: string | null
   notes: string | null
   created_at: string
+  // Lot info (multi-lot support)
+  lot_code: string | null
+  lot_description: string | null
+  lot_drc: number | null
+  lot_source: string | null
   partner?: { id: string; name: string; code: string; tier: string; phone: string | null }
 }
 
@@ -536,6 +541,11 @@ export const demandService = {
         processing_fee_per_ton: demand.processing_fee_per_ton || null,
         expected_output_rate: demand.expected_output_rate || null,
         notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,
+        // ★ Lot info from offer
+        lot_code: offer.lot_code || null,
+        lot_description: offer.lot_description || null,
+        source_region: offer.lot_source || null,
+        expected_drc: offer.lot_drc || offer.offered_drc || null,
       })
       .select('*')
       .single()
@@ -547,6 +557,27 @@ export const demandService = {
       .from('b2b_demand_offers')
       .update({ deal_id: deal.id })
       .eq('id', offerId)
+
+    // ★ 5b. Auto-create rubber_intake_batch (Lý lịch mủ)
+    try {
+      const { rubberIntakeB2BService } = await import('./rubberIntakeB2BService')
+      const intakeId = await rubberIntakeB2BService.createFromDeal({
+        deal_id: deal.id,
+        partner_id: offer.partner_id,
+        lot_code: offer.lot_code || `${dealNumber}`,
+        lot_description: offer.lot_description || offer.notes || undefined,
+        product_code: demand.product_name || 'MU_CAO_SU',
+        quantity_kg: offer.offered_quantity_kg,
+        drc_percent: offer.lot_drc || offer.offered_drc || undefined,
+        unit_price: offer.offered_price,
+        source_region: offer.lot_source || offer.source_region || undefined,
+        intake_date: offer.offered_delivery_date || undefined,
+      })
+      // Link back: deal → rubber_intake
+      if (intakeId) {
+        await supabase.from('b2b_deals').update({ rubber_intake_id: intakeId }).eq('id', deal.id)
+      }
+    } catch (e) { console.error('[demandService] auto-create rubber intake error:', e) }
 
     // 6. Update demand quantity_filled_kg
     const newFilledKg = (demand.quantity_filled_kg || 0) + offer.offered_quantity_kg

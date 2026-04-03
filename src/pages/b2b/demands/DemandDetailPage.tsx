@@ -309,6 +309,18 @@ const DemandDetailPage = () => {
         ),
     },
     {
+      title: 'Mã lô',
+      dataIndex: 'lot_code',
+      key: 'lot_code',
+      width: 100,
+      render: (code: string | null, record) => code ? (
+        <Space direction="vertical" size={0}>
+          <Tag color="blue">{code}</Tag>
+          {record.lot_description && <Text type="secondary" style={{ fontSize: 11 }}>{record.lot_description}</Text>}
+        </Space>
+      ) : <Text type="secondary">—</Text>,
+    },
+    {
       title: 'SL chào',
       dataIndex: 'offered_quantity_kg',
       key: 'offered_quantity_kg',

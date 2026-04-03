@@ -311,7 +311,7 @@ const SettlementDetailPage = () => {
               </Descriptions.Item>
               <Descriptions.Item label="Ngày cân">
                 {settlement.weigh_date_start || settlement.weigh_date_end
-                  ? `${formatDate(settlement.weigh_date_start)} - ${formatDate(settlement.weigh_date_end)}`
+                  ? `${formatDate(settlement.weigh_date_start || '')} - ${formatDate(settlement.weigh_date_end || '')}`
                   : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Ngày nhập kho">{formatDate(settlement.stock_in_date)}</Descriptions.Item>

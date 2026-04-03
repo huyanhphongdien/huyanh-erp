@@ -202,7 +202,7 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
         )}
 
         {/* Accepted -> Auto Settlement */}
-        {deal.status === 'accepted' && deal.actual_drc != null && (
+        {deal.status === 'accepted' && deal.actual_drc != null && deal.actual_drc > 0 && deal.actual_weight_kg != null && deal.actual_weight_kg > 0 && (
           <Button
             type="primary"
             icon={<DollarOutlined />}
@@ -692,8 +692,8 @@ const DealDetailPage = () => {
                     style={{ marginBottom: 24, borderRadius: 12 }}
                     extra={
                       deal.partner?.tier && (
-                        <Tag color={TIER_COLORS[deal.partner.tier]}>
-                          {deal.partner.tier.toUpperCase()}
+                        <Tag color={TIER_COLORS[deal.partner?.tier]}>
+                          {deal.partner?.tier?.toUpperCase()}
                         </Tag>
                       )
                     }

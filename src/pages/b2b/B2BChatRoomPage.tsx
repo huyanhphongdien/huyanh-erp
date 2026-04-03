@@ -1182,15 +1182,15 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
             <div>
               <Title level={5} style={{ margin: 0 }}>{room?.partner?.name || 'Đang tải...'}</Title>
               <Space size={4}>
-                {room?.partner?.code && <Text type="secondary" style={{ fontSize: 12 }}>{room.partner.code}</Text>}
+                {room?.partner?.code && <Text type="secondary" style={{ fontSize: 12 }}>{room?.partner?.code}</Text>}
                 {room?.partner?.tier && (
                   <Tag color={
-                    room.partner.tier === 'diamond' ? 'purple' :
-                    room.partner.tier === 'gold' ? 'gold' :
-                    room.partner.tier === 'silver' ? 'default' :
-                    room.partner.tier === 'bronze' ? 'orange' : 'cyan'
+                    room?.partner?.tier === 'diamond' ? 'purple' :
+                    room?.partner?.tier === 'gold' ? 'gold' :
+                    room?.partner?.tier === 'silver' ? 'default' :
+                    room?.partner?.tier === 'bronze' ? 'orange' : 'cyan'
                   } style={{ fontSize: 10 }}>
-                    {TIER_LABELS[room.partner.tier]}
+                    {TIER_LABELS[room?.partner?.tier]}
                   </Tag>
                 )}
               </Space>

@@ -233,11 +233,11 @@ const SettlementCreatePage: React.FC = () => {
         })),
         linked_advances: selectedAdvanceIds
           .map(id => unlinkedAdvances.find(a => a.id === id))
-          .filter(Boolean)
+          .filter((a): a is NonNullable<typeof a> => !!a)
           .map((a, idx) => ({
-            advance_id: a!.id,
-            advance_date: a!.payment_date,
-            amount: a!.amount,
+            advance_id: a.id,
+            advance_date: a.payment_date,
+            amount: a.amount,
             notes: null,
             sort_order: idx,
           })),

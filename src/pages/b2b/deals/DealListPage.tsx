@@ -270,8 +270,8 @@ const DealListPage = () => {
               {record.partner?.code}
             </Text>
             {record.partner?.tier && (
-              <Tag color={TIER_COLORS[record.partner.tier]} style={{ fontSize: 10 }}>
-                {record.partner.tier.toUpperCase()}
+              <Tag color={TIER_COLORS[record.partner?.tier]} style={{ fontSize: 10 }}>
+                {record.partner?.tier?.toUpperCase()}
               </Tag>
             )}
           </Space>

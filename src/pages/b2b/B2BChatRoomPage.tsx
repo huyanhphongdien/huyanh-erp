@@ -556,8 +556,9 @@ const MessageBubble = ({
 // MAIN COMPONENT
 // ============================================
 
-const B2BChatRoomPage = ({ embedded, onBack }: { embedded?: boolean; onBack?: () => void } = {}) => {
-  const { roomId } = useParams<{ roomId: string }>()
+const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean; onBack?: () => void; roomIdProp?: string } = {}) => {
+  const { roomId: paramRoomId } = useParams<{ roomId: string }>()
+  const roomId = roomIdProp || paramRoomId
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)

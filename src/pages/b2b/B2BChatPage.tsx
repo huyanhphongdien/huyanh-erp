@@ -297,6 +297,7 @@ export default function B2BChatPage() {
           <ChatRoomComponent
             key={roomId}
             embedded
+            roomIdProp={roomId}
             onBack={handleBackToList}
           />
         ) : (

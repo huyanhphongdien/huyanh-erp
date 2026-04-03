@@ -110,7 +110,7 @@ export const STATUS_COLORS: Record<string, string> = {
 
 const SELECT_FIELDS = `
   *,
-  supplier:rubber_suppliers!rubber_intake_batches_supplier_id_fkey(id, name, code, supplier_type)
+  supplier:rubber_suppliers(id, name, code, supplier_type)
 `
 
 export const rubberIntakeB2BService = {
@@ -253,6 +253,14 @@ export const rubberIntakeB2BService = {
     intake_date?: string
   }): Promise<string | null> {
     try {
+      if (!params.quantity_kg || params.quantity_kg <= 0 || !params.unit_price || params.unit_price <= 0) {
+        console.error('[rubberIntakeB2B] invalid quantity or price')
+        return null
+      }
+      const qtyTon = params.quantity_kg / 1000
+      const pricePerTon = params.unit_price * 1000 // đ/kg → đ/tấn
+      const totalAmount = qtyTon * pricePerTon     // tấn × đ/tấn
+
       const { data, error } = await supabase
         .from('rubber_intake_batches')
         .insert({
@@ -265,9 +273,9 @@ export const rubberIntakeB2BService = {
           net_weight_kg: params.quantity_kg,
           gross_weight_kg: params.quantity_kg,
           drc_percent: params.drc_percent || null,
-          settled_qty_ton: params.quantity_kg / 1000,
-          settled_price_per_ton: params.unit_price * 1000, // đ/kg → đ/tấn
-          total_amount: params.quantity_kg * params.unit_price,
+          settled_qty_ton: qtyTon,
+          settled_price_per_ton: pricePerTon,
+          total_amount: totalAmount,
           location_name: params.source_region || null,
           notes: params.lot_description || null,
           status: 'draft',

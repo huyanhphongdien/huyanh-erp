@@ -556,7 +556,7 @@ const MessageBubble = ({
 // MAIN COMPONENT
 // ============================================
 
-const B2BChatRoomPage = () => {
+const B2BChatRoomPage = ({ embedded, onBack }: { embedded?: boolean; onBack?: () => void } = {}) => {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -1169,12 +1169,12 @@ const B2BChatRoomPage = () => {
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: embedded ? '100%' : '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Card style={{ borderRadius: 0, borderBottom: '1px solid #f0f0f0' }} styles={{ body: { padding: '12px 16px' } }}>
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
           <Space>
-            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/b2b/chat')} />
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => onBack ? onBack() : navigate('/b2b/chat')} />
             <Avatar size={40} style={{ backgroundColor: '#87d068' }}>
               {room?.partner?.name?.charAt(0) || 'P'}
             </Avatar>

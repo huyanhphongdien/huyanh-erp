@@ -190,6 +190,7 @@ const TaskKanbanPage = lazy(() => import('./pages/tasks/TaskKanbanPage'));
 const B2BDashboardPage = lazy(() => import('./pages/b2b/B2BDashboardPage'));
 const B2BChatListPage = lazy(() => import('./pages/b2b/B2BChatListPage'));
 const B2BChatRoomPage = lazy(() => import('./pages/b2b/B2BChatRoomPage'));
+const B2BChatPage = lazy(() => import('./pages/b2b/B2BChatPage'));
 const DealListPage = lazy(() => import('./pages/b2b/deals/DealListPage'));
 const DealCreatePage = lazy(() => import('./pages/b2b/deals/DealCreatePage'));
 const DealDetailPage = lazy(() => import('./pages/b2b/deals/DealDetailPage'));
@@ -307,9 +308,9 @@ function App() {
               {/* ============================================================ */}
               <Route path="b2b">
                 <Route index element={<Suspense fallback={<LoadingSpinner />}><B2BDashboardPage /></Suspense>} />
-                {/* B2B Chat */}
-                <Route path="chat" element={<Suspense fallback={<LoadingSpinner />}><B2BChatListPage /></Suspense>} />
-                <Route path="chat/:roomId" element={<Suspense fallback={<LoadingSpinner />}><B2BChatRoomPage /></Suspense>} />
+                {/* B2B Chat — Split-screen (list + room) */}
+                <Route path="chat" element={<Suspense fallback={<LoadingSpinner />}><B2BChatPage /></Suspense>} />
+                <Route path="chat/:roomId" element={<Suspense fallback={<LoadingSpinner />}><B2BChatPage /></Suspense>} />
                 {/* B2B Partners */}
                 <Route path="partners" element={<Suspense fallback={<LoadingSpinner />}><PartnerListPage /></Suspense>} />
                 <Route path="partners/:id" element={<Suspense fallback={<LoadingSpinner />}><PartnerDetailPage /></Suspense>} />

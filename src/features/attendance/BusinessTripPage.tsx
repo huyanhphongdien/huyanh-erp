@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
-import { createNotification } from '../../services/notificationService'
+import { notify } from '../../services/notificationHelper'
 
 // ============================================================================
 // TYPES
@@ -182,14 +182,14 @@ async function createBusinessTrips(params: {
 
     // ★ Gửi thông báo cho NV
     try {
-      await createNotification({
-        recipient_id: empId,
-        sender_id: params.created_by,
+      await notify({
+        recipientId: empId,
+        senderId: params.created_by,
         module: 'attendance',
-        notification_type: 'shift_assigned',
+        type: 'attendance_business_trip',
         title: `Bạn được gán đi công tác: ${params.trip_destination}`,
         message: `${params.creator_name} đã gán bạn đi công tác ${params.trip_destination} từ ${startVN} đến ${endVN} (${params.total_days} ngày).${params.trip_purpose ? ' Mục đích: ' + params.trip_purpose : ''}`,
-        reference_url: '/attendance/business-trips',
+        referenceUrl: '/attendance/business-trips',
         priority: 'normal',
       })
     } catch (e) {

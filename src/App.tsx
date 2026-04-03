@@ -20,185 +20,167 @@ import { MainLayout } from './components/common/MainLayout';
 // Auth
 import { LoginPage } from './features/auth/LoginPage';
 
-// ===== DASHBOARD =====
-import DashboardPage from './features/dashboard/DashboardPage';
+// ===== LAZY LOADED PAGES — Mobile Performance Optimization =====
+// Heavy pages (>500 lines) and less-frequently-used pages are lazy-loaded
+// to reduce initial bundle size for mobile users on slow networks.
+
+const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage'));
 
 // Phase 3.1: Phòng ban, Chức vụ, Nhân viên
-import { DepartmentListPage } from './features/departments';
-import { PositionListPage } from './features/positions';
-import { EmployeeListPage } from './features/employees';
+const DepartmentListPage = lazy(() => import('./features/departments').then(m => ({ default: m.DepartmentListPage })));
+const PositionListPage = lazy(() => import('./features/positions').then(m => ({ default: m.PositionListPage })));
+const EmployeeListPage = lazy(() => import('./features/employees').then(m => ({ default: m.EmployeeListPage })));
 
 // Phase 3.2: Hợp đồng
-import { ContractTypeListPage } from './features/contract-types';
-import { ContractListPage } from './features/contracts';
+const ContractTypeListPage = lazy(() => import('./features/contract-types').then(m => ({ default: m.ContractTypeListPage })));
+const ContractListPage = lazy(() => import('./features/contracts').then(m => ({ default: m.ContractListPage })));
 
 // Phase 3.3: Nghỉ phép, Chấm công
-import { LeaveTypeListPage } from './features/leave-types';
-import { LeaveRequestListPage } from './features/leave-requests';
-import { AttendanceListPage } from './features/attendance';
-
-// ✅ Leave Approvals
-import LeaveApprovalPage from './features/leave-requests/LeaveApprovalPage';
+const LeaveTypeListPage = lazy(() => import('./features/leave-types').then(m => ({ default: m.LeaveTypeListPage })));
+const LeaveRequestListPage = lazy(() => import('./features/leave-requests').then(m => ({ default: m.LeaveRequestListPage })));
+const AttendanceListPage = lazy(() => import('./features/attendance').then(m => ({ default: m.AttendanceListPage })));
+const LeaveApprovalPage = lazy(() => import('./features/leave-requests/LeaveApprovalPage'));
 
 // Phase 3.4: Lương, Đánh giá
-import { SalaryGradeListPage } from './features/salary-grades';
-import { PayrollPeriodListPage } from './features/payroll';
-import { PayslipListPage } from './features/payslips';
-import { PerformanceCriteriaListPage } from './features/performance-criteria';
-import { PerformanceReviewListPage } from './features/performance-reviews';
+const SalaryGradeListPage = lazy(() => import('./features/salary-grades').then(m => ({ default: m.SalaryGradeListPage })));
+const PayrollPeriodListPage = lazy(() => import('./features/payroll').then(m => ({ default: m.PayrollPeriodListPage })));
+const PayslipListPage = lazy(() => import('./features/payslips').then(m => ({ default: m.PayslipListPage })));
+const PerformanceCriteriaListPage = lazy(() => import('./features/performance-criteria').then(m => ({ default: m.PerformanceCriteriaListPage })));
+const PerformanceReviewListPage = lazy(() => import('./features/performance-reviews').then(m => ({ default: m.PerformanceReviewListPage })));
 
 // Phase 4.1: Task Management
-import { TaskListPage, TaskCreatePage, TaskEditPage, TaskViewPage } from './features/tasks';
+const TaskListPage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskListPage })));
+const TaskCreatePage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskCreatePage })));
+const TaskEditPage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskEditPage })));
+const TaskViewPage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskViewPage })));
 
 // Phase 4.3: Evaluation & Approval
-import MyTasksPage from './pages/evaluations/MyTasksPage';
-import ApprovalsPage from './pages/evaluations/ApprovalPage';
-import SelfEvaluationPage from './pages/evaluations/SelfEvaluationPage';
-import TaskDetailPage from './pages/evaluations/TaskDetailPage';
-import BatchApprovePage from './pages/tasks/BatchApprovePage';
+const MyTasksPage = lazy(() => import('./pages/evaluations/MyTasksPage'));
+const ApprovalsPage = lazy(() => import('./pages/evaluations/ApprovalPage'));
+const SelfEvaluationPage = lazy(() => import('./pages/evaluations/SelfEvaluationPage'));
+const TaskDetailPage = lazy(() => import('./pages/evaluations/TaskDetailPage'));
+const BatchApprovePage = lazy(() => import('./pages/tasks/BatchApprovePage'));
 
 // Phase 6.3: Task Reports
-import TaskReportsPage from './features/reports/TaskReportsPage';
+const TaskReportsPage = lazy(() => import('./features/reports/TaskReportsPage'));
 
 // Performance Dashboard
-import PerformanceDashboardPage from './pages/performance/PerformanceDashboardPage';
-import EmployeePerformancePage from './pages/performance/EmployeePerformancePage';
-import PerformanceReportPage from './pages/performance/PerformanceReportPage';
+const PerformanceDashboardPage = lazy(() => import('./pages/performance/PerformanceDashboardPage'));
+const EmployeePerformancePage = lazy(() => import('./pages/performance/EmployeePerformancePage'));
+const PerformanceReportPage = lazy(() => import('./pages/performance/PerformanceReportPage'));
 
 // User Settings
-import UserSettingsPage from './pages/settings/UserSettingsPage';
+const UserSettingsPage = lazy(() => import('./pages/settings/UserSettingsPage'));
 
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
-import { ShiftListPage } from './features/shifts';
-import { ShiftCalendarPage } from './features/shift-assignments';
-import { OvertimeListPage, OvertimeApprovalPage } from './features/overtime';
-
-// ✅ Quản lý đội ca (2 team × 3 ca)
-import { TeamManagementPage } from './features/shift-assignments';
+const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
+const ShiftCalendarPage = lazy(() => import('./features/shift-assignments').then(m => ({ default: m.ShiftCalendarPage })));
+const OvertimeListPage = lazy(() => import('./features/overtime').then(m => ({ default: m.OvertimeListPage })));
+const OvertimeApprovalPage = lazy(() => import('./features/overtime').then(m => ({ default: m.OvertimeApprovalPage })));
+const TeamManagementPage = lazy(() => import('./features/shift-assignments').then(m => ({ default: m.TeamManagementPage })));
 
 // ★ Bảng chấm công tháng
-import MonthlyTimesheetPage from './features/attendance/MonthlyTimesheetPage';
+const MonthlyTimesheetPage = lazy(() => import('./features/attendance/MonthlyTimesheetPage'));
 
 // ★ Đơn công tác
-import BusinessTripPage from './features/attendance/BusinessTripPage';
+const BusinessTripPage = lazy(() => import('./features/attendance/BusinessTripPage'));
 
-// ===== PURCHASING MODULE =====
-import { 
-  SupplierListPage, SupplierCreatePage, SupplierEditPage, SupplierDetailPage,
-  CategoryListPage, TypeListPage, UnitListPage,
-  MaterialListPage, MaterialDetailPage
-} from './features/purchasing';
-import VariantAttributeManagement from './features/purchasing/pages/VariantAttributeManagement';
-import POListPage from './features/purchasing/pages/POListPage';
-import POFormPage from './features/purchasing/pages/POFormPage';
-import PODetailPage from './features/purchasing/pages/PODetailPage';
+// ===== PURCHASING MODULE (lazy) =====
+const SupplierListPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.SupplierListPage })));
+const SupplierCreatePage = lazy(() => import('./features/purchasing').then(m => ({ default: m.SupplierCreatePage })));
+const SupplierEditPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.SupplierEditPage })));
+const SupplierDetailPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.SupplierDetailPage })));
+const CategoryListPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.CategoryListPage })));
+const TypeListPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.TypeListPage })));
+const UnitListPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.UnitListPage })));
+const MaterialListPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.MaterialListPage })));
+const MaterialDetailPage = lazy(() => import('./features/purchasing').then(m => ({ default: m.MaterialDetailPage })));
+const VariantAttributeManagement = lazy(() => import('./features/purchasing/pages/VariantAttributeManagement'));
+const POListPage = lazy(() => import('./features/purchasing/pages/POListPage'));
+const POFormPage = lazy(() => import('./features/purchasing/pages/POFormPage'));
+const PODetailPage = lazy(() => import('./features/purchasing/pages/PODetailPage'));
+const InvoiceDetailPage = lazy(() => import('./features/purchasing/pages/InvoiceDetailPage'));
+const SupplierDebtPage = lazy(() => import('./features/purchasing/pages/SupplierDebtPage'));
+const PaymentListPage = lazy(() => import('./features/purchasing/pages/PaymentListPage'));
+const AccessManagementPage = lazy(() => import('./features/purchasing/pages/AccessManagementPage'));
+const PurchaseReportPage = lazy(() => import('./features/purchasing/pages/PurchaseReportPage'));
 
-// ===== PHASE P5: Payments & Debt Tracking =====
-import InvoiceDetailPage from './features/purchasing/pages/InvoiceDetailPage';
-import SupplierDebtPage from './features/purchasing/pages/SupplierDebtPage';
-import PaymentListPage from './features/purchasing/pages/PaymentListPage';
+// Notification Page
+const NotificationPage = lazy(() => import('./pages/b2b/NotificationPage'));
 
-// ===== PHASE 6: Access Control =====
-import AccessManagementPage from './features/purchasing/pages/AccessManagementPage';
+// ===== WMS MODULE (lazy) =====
+const WMSMaterialListPage = lazy(() => import('./pages/wms/materials/MaterialListPage'));
+const WMSWarehouseListPage = lazy(() => import('./pages/wms/warehouses/WarehouseListPage'));
+const WMSWarehouseLocationPage = lazy(() => import('./pages/wms/warehouses/WarehouseLocationPage'));
+const StockInListPage = lazy(() => import('./pages/wms/stock-in/StockInListPage'));
+const StockInCreatePage = lazy(() => import('./pages/wms/stock-in/StockInCreatePage'));
+const StockInDetailPage = lazy(() => import('./pages/wms/stock-in/StockInDetailPage'));
+const StockOutListPage = lazy(() => import('./pages/wms/stock-out/StockOutListPage'));
+const StockOutCreatePage = lazy(() => import('./pages/wms/stock-out/StockOutCreatePage'));
+const StockOutDetailPage = lazy(() => import('./pages/wms/stock-out/StockOutDetailPage'));
+const PickingListPage = lazy(() => import('./pages/wms/stock-out/PickingListPage'));
+const InventoryDashboard = lazy(() => import('./pages/wms/InventoryDashboard'));
+const InventoryDetailPage = lazy(() => import('./pages/wms/InventoryDetailPage'));
+const AlertListPage = lazy(() => import('./pages/wms/AlertListPage'));
+const StockCheckPage = lazy(() => import('./pages/wms/StockCheckPage'));
+const NVLDashboardPage = lazy(() => import('./pages/wms/NVLDashboardPage'));
+const QCDashboardPage = lazy(() => import('./pages/wms/qc/QCDashboardPage'));
+const QCRecheckPage = lazy(() => import('./pages/wms/qc/QCRecheckPage'));
+const QCStandardsConfigPage = lazy(() => import('./pages/wms/qc/QCStandardsConfigPage'));
+const BatchQCHistoryPage = lazy(() => import('./pages/wms/qc/BatchQCHistoryPage'));
+const QCQuickScanPage = lazy(() => import('./pages/wms/qc/QCQuickScanPage'));
+const BatchLabelPage = lazy(() => import('./pages/wms/BatchLabelPage'));
+const WeighbridgePage = lazy(() => import('./pages/wms/weighbridge/WeighbridgePage'));
+const WeighbridgeListPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeListPage'));
+const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 
-// ✅ PHASE 7: Báo cáo mua hàng
-import PurchaseReportPage from './features/purchasing/pages/PurchaseReportPage';
+// ===== Rubber Supply Chain (lazy) =====
+const RubberSupplierListPage = lazy(() => import('./pages/wms/rubber-suppliers/RubberSupplierListPage'));
+const RubberSupplierFormPage = lazy(() => import('./pages/wms/rubber-suppliers/RubberSupplierFormPage'));
+const RubberSupplierDetailPage = lazy(() => import('./pages/wms/rubber-suppliers/RubberSupplierDetailPage'));
+const RubberIntakeListPage = lazy(() => import('./pages/wms/rubber-intake/RubberIntakeListPage'));
+const RubberIntakeDetailPage = lazy(() => import('./pages/wms/rubber-intake/RubberIntakeDetailPage'));
+const RubberDailyReportPage = lazy(() => import('./pages/wms/rubber-intake/RubberDailyReportPage'));
+const RubberDebtPage = lazy(() => import('./pages/wms/rubber-intake/RubberDebtPage'));
+const VnBatchListPage = lazy(() => import('./pages/rubber/vn/VnBatchListPage'));
+const LaoTransferPage = lazy(() => import('./pages/rubber/lao/LaoTransferPage'));
+const LaoPurchasePage = lazy(() => import('./pages/rubber/lao/LaoPurchasePage'));
+const RubberProfilePage = lazy(() => import('./pages/rubber/RubberProfilePage'));
+const LaoShipmentPage = lazy(() => import('./pages/rubber/lao/LaoShipmentPage'));
+const SettlementPage = lazy(() => import('./pages/rubber/SettlementPage'));
+const RubberDashboard = lazy(() => import('./pages/rubber/RubberDashboard'));
 
-// ✅ Notification Page
-import NotificationPage from './pages/b2b/NotificationPage';
+// ===== YardMap, Production, Blending, Reports (lazy) =====
+const YardMapPage = lazy(() => import('./pages/wms/YardMapPage'));
+const ProductionListPage = lazy(() => import('./pages/wms/production/ProductionListPage'));
+const ProductionCreatePage = lazy(() => import('./pages/wms/production/ProductionCreatePage'));
+const ProductionDetailPage = lazy(() => import('./pages/wms/production/ProductionDetailPage'));
+const ProductionStagePage = lazy(() => import('./pages/wms/production/ProductionStagePage'));
+const ProductionDashboardPage = lazy(() => import('./pages/wms/production/ProductionDashboardPage'));
+const ProductionOutputPage = lazy(() => import('./pages/wms/production/ProductionOutputPage'));
+const ProductionFacilitiesPage = lazy(() => import('./pages/wms/production/ProductionFacilitiesPage'));
+const ProductionSpecsPage = lazy(() => import('./pages/wms/production/ProductionSpecsPage'));
+const BlendListPage = lazy(() => import('./pages/wms/blending/BlendListPage'));
+const BlendCreatePage = lazy(() => import('./pages/wms/blending/BlendCreatePage'));
+const BlendDetailPage = lazy(() => import('./pages/wms/blending/BlendDetailPage'));
+const BlendSuggestPage = lazy(() => import('./pages/wms/blending/BlendSuggestPage'));
+const WMSReportDashboardPage = lazy(() => import('./pages/wms/reports/WMSReportDashboardPage'));
+const StockMovementReportPage = lazy(() => import('./pages/wms/reports/StockMovementReportPage'));
+const SupplierQualityReportPage = lazy(() => import('./pages/wms/reports/SupplierQualityReportPage'));
+const InventoryValueReportPage = lazy(() => import('./pages/wms/reports/InventoryValueReportPage'));
+const SupplierScoringPage = lazy(() => import('./pages/wms/reports/SupplierScoringPage'));
+const WMSSettingsPage = lazy(() => import('./pages/wms/WMSSettingsPage'));
 
-// ===== WMS MODULE: Kho Thành phẩm =====
-// Phase 2: Danh mục
-import WMSMaterialListPage from './pages/wms/materials/MaterialListPage';
-import WMSWarehouseListPage from './pages/wms/warehouses/WarehouseListPage';
-import WMSWarehouseLocationPage from './pages/wms/warehouses/WarehouseLocationPage';
-// Phase 3: Nhập kho thành phẩm
-import StockInListPage from './pages/wms/stock-in/StockInListPage';
-import StockInCreatePage from './pages/wms/stock-in/StockInCreatePage';
-import StockInDetailPage from './pages/wms/stock-in/StockInDetailPage';
-// Phase 4: Xuất kho
-import StockOutListPage from './pages/wms/stock-out/StockOutListPage';
-import StockOutCreatePage from './pages/wms/stock-out/StockOutCreatePage';
-import StockOutDetailPage from './pages/wms/stock-out/StockOutDetailPage';
-import PickingListPage from './pages/wms/stock-out/PickingListPage';
-// Phase 5: Tồn kho & Cảnh báo
-import InventoryDashboard from './pages/wms/InventoryDashboard';
-import InventoryDetailPage from './pages/wms/InventoryDetailPage';
-import AlertListPage from './pages/wms/AlertListPage';
-import StockCheckPage from './pages/wms/StockCheckPage';
-import NVLDashboardPage from './pages/wms/NVLDashboardPage';
-// ✅ Phase 6: QC Tracking & DRC
-import QCDashboardPage from './pages/wms/qc/QCDashboardPage';
-import QCRecheckPage from './pages/wms/qc/QCRecheckPage';
-import QCStandardsConfigPage from './pages/wms/qc/QCStandardsConfigPage';
-import BatchQCHistoryPage from './pages/wms/qc/BatchQCHistoryPage';
-import QCQuickScanPage from './pages/wms/qc/QCQuickScanPage';
-
-// ✅ Batch Label — In nhãn QR cho bãi mủ
-import BatchLabelPage from './pages/wms/BatchLabelPage';
-
-// ✅ Phase 7: Trạm cân xe (Weighbridge)
-import WeighbridgePage from './pages/wms/weighbridge/WeighbridgePage';
-import WeighbridgeListPage from './pages/wms/weighbridge/WeighbridgeListPage';
-import WeighbridgeDetailPage from './pages/wms/weighbridge/WeighbridgeDetailPage';
-
-// ===== LÝ LỊCH MỦ — Phase 3.5 (Group riêng) =====
-import RubberSupplierListPage from './pages/wms/rubber-suppliers/RubberSupplierListPage';
-import RubberSupplierFormPage from './pages/wms/rubber-suppliers/RubberSupplierFormPage';
-import RubberSupplierDetailPage from './pages/wms/rubber-suppliers/RubberSupplierDetailPage';
-import RubberIntakeListPage from './pages/wms/rubber-intake/RubberIntakeListPage';
-import RubberIntakeDetailPage from './pages/wms/rubber-intake/RubberIntakeDetailPage';
-import RubberDailyReportPage from './pages/wms/rubber-intake/RubberDailyReportPage';
-import RubberDebtPage from './pages/wms/rubber-intake/RubberDebtPage';
-
-// ===== PHASE 3.6: THU MUA MỦ VIỆT + LÀO =====
-import VnBatchListPage from './pages/rubber/vn/VnBatchListPage';
-import LaoTransferPage from './pages/rubber/lao/LaoTransferPage';
-import LaoPurchasePage from './pages/rubber/lao/LaoPurchasePage';
-import RubberProfilePage from './pages/rubber/RubberProfilePage';
-import LaoShipmentPage from './pages/rubber/lao/LaoShipmentPage';
-import SettlementPage from './pages/rubber/SettlementPage';
-import RubberDashboard from './pages/rubber/RubberDashboard';
-
-// ===== YARD MAP =====
-import YardMapPage from './pages/wms/YardMapPage';
-
-// ===== P8: PRODUCTION MODULE =====
-import ProductionListPage from './pages/wms/production/ProductionListPage';
-import ProductionCreatePage from './pages/wms/production/ProductionCreatePage';
-import ProductionDetailPage from './pages/wms/production/ProductionDetailPage';
-import ProductionStagePage from './pages/wms/production/ProductionStagePage';
-import ProductionDashboardPage from './pages/wms/production/ProductionDashboardPage';
-import ProductionOutputPage from './pages/wms/production/ProductionOutputPage';
-import ProductionFacilitiesPage from './pages/wms/production/ProductionFacilitiesPage';
-import ProductionSpecsPage from './pages/wms/production/ProductionSpecsPage';
-
-// ===== P9: BLENDING MODULE =====
-import BlendListPage from './pages/wms/blending/BlendListPage';
-import BlendCreatePage from './pages/wms/blending/BlendCreatePage';
-import BlendDetailPage from './pages/wms/blending/BlendDetailPage';
-import BlendSuggestPage from './pages/wms/blending/BlendSuggestPage';
-
-// ===== P10: WMS REPORTS =====
-import WMSReportDashboardPage from './pages/wms/reports/WMSReportDashboardPage';
-import StockMovementReportPage from './pages/wms/reports/StockMovementReportPage';
-import SupplierQualityReportPage from './pages/wms/reports/SupplierQualityReportPage';
-import InventoryValueReportPage from './pages/wms/reports/InventoryValueReportPage';
-import SupplierScoringPage from './pages/wms/reports/SupplierScoringPage';
-
-// ===== P11: WMS SETTINGS & FORECAST =====
-import WMSSettingsPage from './pages/wms/WMSSettingsPage';
-
-// ===== PROJECT MANAGEMENT MODULE =====
-import ProjectCategoryPage from './pages/projects/ProjectCategoryPage';
-import ProjectTemplateList from './pages/projects/ProjectTemplateList';
-import ProjectListPage from './pages/projects/ProjectListPage';
-import ProjectCreatePage from './pages/projects/ProjectCreatePage';
-import ProjectDetailPage from './pages/projects/ProjectDetailPage';
-import ProjectGanttPage from './pages/projects/ProjectGanttPage';
-import MultiProjectGanttPage from './pages/projects/MultiProjectGanttPage';
-import ProjectResourcePage from './pages/projects/ProjectResourcePage';
-import CapacityPlanningPage from './pages/projects/CapacityPlanningPage';
+// ===== PROJECT MANAGEMENT (lazy) =====
+const ProjectCategoryPage = lazy(() => import('./pages/projects/ProjectCategoryPage'));
+const ProjectTemplateList = lazy(() => import('./pages/projects/ProjectTemplateList'));
+const ProjectListPage = lazy(() => import('./pages/projects/ProjectListPage'));
+const ProjectCreatePage = lazy(() => import('./pages/projects/ProjectCreatePage'));
+const ProjectDetailPage = lazy(() => import('./pages/projects/ProjectDetailPage'));
+const ProjectGanttPage = lazy(() => import('./pages/projects/ProjectGanttPage'));
+const MultiProjectGanttPage = lazy(() => import('./pages/projects/MultiProjectGanttPage'));
+const ProjectResourcePage = lazy(() => import('./pages/projects/ProjectResourcePage'));
+const CapacityPlanningPage = lazy(() => import('./pages/projects/CapacityPlanningPage'));
 
 // ============================================================
 // ★ B2B MODULE — Dashboard, Chat, Deals, Ledger, Settlements, Reports

@@ -67,7 +67,7 @@ Cron tạo 20 bước checklist mỗi sáng
 NV tự tạo CV cho mình (bấm "Làm mới" → chế độ tự giao)
   → NV thực hiện: tick checklist
   → NV bấm "Hoàn thành" → popup tự chấm sao
-  → TỰ ĐỘNG DUYỆT: final_score = NV × 70%
+  → TỰ ĐỘNG DUYỆT: final_score = NV × 85%
 ```
 
 ---
@@ -80,7 +80,7 @@ NV tự tạo CV cho mình (bấm "Làm mới" → chế độ tự giao)
 | **Dự án** | project | Auto | NV×90% | **1.0** | **Bắt buộc** |
 | **Lặp lại** (popup) | recurring | Auto | NV×80% | **0.5** | Không |
 | **Lặp lại** (KT auto) | recurring | Auto | 80đ cố định | **0.5** | Không |
-| **Tự giao** | self | Auto | NV×70% | **0.3** | Tùy checklist |
+| **Tự giao** | self | Auto | NV×85% | **0.5** | Tùy checklist |
 
 ---
 
@@ -173,12 +173,12 @@ final_score = 80 điểm (cố định)
 - NV tự chấm: ⭐⭐⭐⭐⭐ = **100 điểm**
 
 ```
-final_score = 100 × 70%
-            = 70 điểm
-→ Weight 0.3 (tự giao, ít giá trị nhất)
+final_score = 100 × 85%
+            = 85 điểm
+→ Weight 0.5 (tự giao, ngang recurring)
 ```
 
-→ Dù chấm 5 sao, điểm chỉ 70 vì hệ số 70%. Tự giao có weight thấp nhất.
+→ Dù chấm 5 sao, điểm chỉ 85 vì hệ số 85%. Tự giao weight ngang recurring.
 
 ---
 
@@ -194,21 +194,21 @@ final_score = 100 × 70%
 | 4 | Trực ca 01/04 | Lặp lại | 5★=100 | auto | 80 | 0.5 | 40.0 |
 | 5 | Trực ca 02/04 | Lặp lại | 4★=80 | auto | 64 | 0.5 | 32.0 |
 | 6 | Trực ca 03/04 | Lặp lại | 5★=100 | auto | 80 | 0.5 | 40.0 |
-| 7 | Dọn dẹp kho | Tự giao | 5★=100 | auto | 70 | 0.3 | 21.0 |
+| 7 | Dọn dẹp kho | Tự giao | 5★=100 | auto | 85 | 0.5 | 42.5 |
 
 ```
-Tổng Score × Weight = 92 + 76 + 72 + 40 + 32 + 40 + 21 = 373.0
-Tổng Weight = 1.0 + 1.0 + 1.0 + 0.5 + 0.5 + 0.5 + 0.3 = 4.8
+Tổng Score × Weight = 92 + 76 + 72 + 40 + 32 + 40 + 42.5 = 394.5
+Tổng Weight = 1.0 + 1.0 + 1.0 + 0.5 + 0.5 + 0.5 + 0.5 = 5.0
 
-Điểm tháng = 373.0 / 4.8 = 77.7 điểm → Hạng B (Tốt)
+Điểm tháng = 394.5 / 5.0 = 78.9 điểm → Hạng B (Tốt)
 ```
 
 **Phân tích:**
-- 3 task quan trọng (QL giao + Dự án, weight 1.0) chiếm 240/373 = **64.3%** tổng điểm
-- 3 task routine (Lặp lại, weight 0.5) chiếm 112/373 = **30.0%**
-- 1 task tự giao (weight 0.3) chiếm 21/373 = **5.6%**
+- 3 task quan trọng (QL giao + Dự án, weight 1.0) chiếm 240/394.5 = **60.8%** tổng điểm
+- 3 task routine (Lặp lại, weight 0.5) chiếm 112/394.5 = **28.4%**
+- 1 task tự giao (weight 0.5) chiếm 42.5/394.5 = **10.8%**
 
-→ **Task QL giao quyết định hạng** — đúng mục đích thiết kế.
+→ **Task QL giao vẫn quyết định hạng** — tự giao có đóng góp hợp lý hơn.
 
 ---
 
@@ -216,20 +216,20 @@ Tổng Weight = 1.0 + 1.0 + 1.0 + 0.5 + 0.5 + 0.5 + 0.3 = 4.8
 
 | # | Công việc | Loại | NV★ | Final Score | Weight | Score × Weight |
 |---|-----------|------|-----|-------------|--------|----------------|
-| 1 | Dọn dẹp kho | Tự giao | 5★=100 | 70 | 0.3 | 21.0 |
-| 2 | Sắp xếp tài liệu | Tự giao | 5★=100 | 70 | 0.3 | 21.0 |
-| 3 | Lau chùi máy | Tự giao | 5★=100 | 70 | 0.3 | 21.0 |
-| 4 | Kiểm tra đèn | Tự giao | 5★=100 | 70 | 0.3 | 21.0 |
-| 5 | Ghi chép sổ | Tự giao | 5★=100 | 70 | 0.3 | 21.0 |
+| 1 | Dọn dẹp kho | Tự giao | 5★=100 | 85 | 0.5 | 42.5 |
+| 2 | Sắp xếp tài liệu | Tự giao | 5★=100 | 85 | 0.5 | 42.5 |
+| 3 | Lau chùi máy | Tự giao | 5★=100 | 85 | 0.5 | 42.5 |
+| 4 | Kiểm tra đèn | Tự giao | 5★=100 | 85 | 0.5 | 42.5 |
+| 5 | Ghi chép sổ | Tự giao | 5★=100 | 85 | 0.5 | 42.5 |
 
 ```
-Tổng Score × Weight = 105
-Tổng Weight = 1.5
+Tổng Score × Weight = 212.5
+Tổng Weight = 2.5
 
-Điểm tháng = 105 / 1.5 = 70.0 điểm → Hạng C (Trung bình)
+Điểm tháng = 212.5 / 2.5 = 85.0 điểm → Hạng B (Tốt)
 ```
 
-→ **5 task × 5 sao = vẫn chỉ Hạng C**. Không thể gian lận lên Hạng A/B.
+→ **5 task × 5 sao = Hạng B**. Tự giao đã hợp lý hơn nhưng vẫn không thể đạt Hạng A.
 
 ---
 
@@ -279,7 +279,7 @@ Tổng Weight = 1.5
 QL giao:   2 người chấm, weight cao nhất (1.0) → quyết định hạng
 Dự án:     Tự duyệt (×90%) + BẮT BUỘC ảnh, weight cao (1.0) → quan trọng
 Lặp lại:   Tự duyệt, weight trung bình (0.5) → routine
-Tự giao:   Tự duyệt, weight thấp nhất (0.3) → không thể gian lận
+Tự giao:   Tự duyệt (×85%), weight ngang recurring (0.5) → hợp lý, không gian lận lên A
 ```
 
 ---

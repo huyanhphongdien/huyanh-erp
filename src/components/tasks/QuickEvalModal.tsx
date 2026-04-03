@@ -18,7 +18,7 @@ const STAR_LABELS = ['', 'Chưa tốt', 'Cần cải thiện', 'Trung bình', 'T
 const STAR_TO_SCORE = [0, 20, 40, 60, 80, 100]
 
 const SOURCE_INFO: Record<string, { label: string; coeff: number; color: string }> = {
-  self: { label: 'Tự giao', coeff: 0.7, color: '#1890ff' },
+  self: { label: 'Tự giao', coeff: 0.85, color: '#1890ff' },
   recurring: { label: 'Định kỳ', coeff: 0.8, color: '#722ed1' },
   project: { label: 'Dự án', coeff: 0.9, color: '#fa8c16' },
   assigned: { label: 'Được giao', coeff: 1.0, color: '#52c41a' },
@@ -78,7 +78,7 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
 
       if (source === 'self' || source === 'recurring' || source === 'project') {
         // AUTO APPROVE — no manager needed
-        const coefficient = source === 'self' ? 0.7 : source === 'project' ? 0.9 : 0.8 // self=70%, recurring=80%, project=90%
+        const coefficient = source === 'self' ? 0.85 : source === 'project' ? 0.9 : 0.8 // self=85%, recurring=80%, project=90%
         const finalScore = Math.round(score * coefficient)
 
         await supabase.from('tasks').update({

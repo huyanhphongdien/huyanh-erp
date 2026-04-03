@@ -668,7 +668,7 @@ export function Sidebar() {
           {/* Mobile close */}
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="lg:hidden p-2 text-[#94A3A8] hover:text-[#5A6B63] hover:bg-black/[0.04] rounded-lg transition-colors"
+            className="lg:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#94A3A8] hover:text-[#5A6B63] hover:bg-black/[0.04] rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
@@ -773,10 +773,10 @@ export function Sidebar() {
   return (
     <>
       {/* ─── MOBILE HEADER BAR ─── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 py-3 flex items-center justify-between safe-area-top">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 flex items-center justify-between" style={{ paddingTop: 'max(0.75rem, var(--safe-top))', paddingBottom: '0.75rem' }}>
         <button
           onClick={() => setIsMobileOpen(true)}
-          className="p-2 text-[#5A6B63] hover:text-[#1B4D3E] hover:bg-black/[0.04] rounded-xl transition-colors"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#5A6B63] hover:text-[#1B4D3E] hover:bg-black/[0.04] rounded-xl transition-colors"
         >
           <Menu size={22} />
         </button>

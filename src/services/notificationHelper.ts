@@ -9,7 +9,7 @@
 
 import { supabase } from '../lib/supabase'
 
-export type NotifyModule = 'task' | 'leave' | 'overtime' | 'attendance' | 'shift' | 'system'
+export type NotifyModule = 'task' | 'leave' | 'overtime' | 'evaluation' | 'attendance' | 'shift' | 'system'
 
 export interface NotifyParams {
   recipientId: string       // employee_id người nhận

@@ -426,7 +426,7 @@ export const performanceDashboardService = {
         const score = t.final_score || 0;
         if (score > 0) {
           evaluatedEmployees.add(t.assignee_id);
-          const weight = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.3 : 1.0;
+          const weight = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.5 : 1.0;
           if (!employeeWeighted.has(t.assignee_id)) employeeWeighted.set(t.assignee_id, { totalScore: 0, totalWeight: 0 });
           const emp = employeeWeighted.get(t.assignee_id)!;
           emp.totalScore += score * weight;
@@ -786,7 +786,7 @@ export const performanceDashboardService = {
       (tasks || []).forEach((task: any) => {
         const score = task.final_score || 0;
         const selfScore = task.self_score || 0;
-        const weight = task.task_source === 'recurring' ? 0.5 : task.task_source === 'self' ? 0.3 : 1.0;
+        const weight = task.task_source === 'recurring' ? 0.5 : task.task_source === 'self' ? 0.5 : 1.0;
 
         let onTime = true;
         if (task.due_date) {
@@ -836,7 +836,7 @@ export const performanceDashboardService = {
         if (mTasks && mTasks.length > 0) {
           let tw = 0, ts = 0;
           mTasks.forEach((t: any) => {
-            const w = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.3 : 1.0;
+            const w = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.5 : 1.0;
             tw += (t.final_score || 0) * w; ts += w;
           });
           mScore = ts > 0 ? Math.round(tw / ts) : 0;

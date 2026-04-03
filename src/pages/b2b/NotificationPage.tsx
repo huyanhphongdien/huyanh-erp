@@ -82,7 +82,7 @@ export default function NotificationPage() {
       return filtered.map((n: any) => {
         // Derive module from type: 'task_status_changed' → 'task', 'leave_approved' → 'leave'
         const t = n.type || 'system'
-        const mod = t.startsWith('task') ? 'task' : t.startsWith('leave') ? 'leave' : t.startsWith('overtime') ? 'overtime' : t.startsWith('attendance') ? 'attendance' : t.startsWith('shift') ? 'shift' : 'system'
+        const mod = t.startsWith('task') ? 'task' : t.startsWith('leave') ? 'leave' : t.startsWith('overtime') ? 'overtime' : t.startsWith('evaluation') ? 'evaluation' : t.startsWith('attendance') ? 'attendance' : t.startsWith('shift') ? 'shift' : 'system'
         return {
         ...n,
         module: mod,

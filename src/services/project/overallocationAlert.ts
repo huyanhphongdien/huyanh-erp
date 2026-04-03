@@ -287,11 +287,12 @@ async function sendNotifications(
 
   try {
     const notifications = recipientIds.map((userId) => ({
-      user_id: userId,
-      type: 'overallocation_warning',
+      employee_id: userId,
+      type: 'system',
       title: `⚠️ Quá tải: ${warning.employee_name}`,
-      message: `${warning.employee_code} đang phân bổ ${warning.total_allocation_pct}% (vượt ${warning.excess_pct}%). ${warning.suggestions[0] || ''}`,
+      content: `${warning.employee_code} đang phân bổ ${warning.total_allocation_pct}% (vượt ${warning.excess_pct}%). ${warning.suggestions[0] || ''}`,
       metadata: {
+        notification_type: 'overallocation_warning',
         employee_id: warning.employee_id,
         total_pct: warning.total_allocation_pct,
       },

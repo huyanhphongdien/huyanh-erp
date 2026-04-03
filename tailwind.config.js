@@ -13,6 +13,18 @@ export default {
         warning: '#F39C12',
         danger: '#E74C3C',
       },
+      spacing: {
+        'safe-top': 'env(safe-area-inset-top, 0px)',
+        'safe-bottom': 'env(safe-area-inset-bottom, 0px)',
+        'safe-left': 'env(safe-area-inset-left, 0px)',
+        'safe-right': 'env(safe-area-inset-right, 0px)',
+      },
+      minHeight: {
+        'touch': '2.75rem', // 44px — Apple/Google minimum touch target
+      },
+      minWidth: {
+        'touch': '2.75rem',
+      },
     },
   },
   plugins: [],

@@ -24,6 +24,7 @@ export interface ConfirmDealContext {
   partnerId: string
   roomId: string
   confirmedBy: string      // employee_id hoặc partner_user_id
+  lotCode?: string         // Mã lô từ booking (optional)
   confirmerType: 'factory' | 'partner'
   bookingCode?: string     // Mã phiếu chốt gốc
 }
@@ -128,6 +129,8 @@ export const dealConfirmService = {
         source_region: formData.pickup_location || null,
         pickup_location_name: formData.pickup_location || null,
         delivery_date: formData.delivery_date || null,
+        // Lot info from booking (if available)
+        lot_code: context.lotCode || null,
         // Notes chỉ chứa ghi chú thực sự
         notes: formData.deal_notes || null,
         booking_id: context.bookingMessageId,

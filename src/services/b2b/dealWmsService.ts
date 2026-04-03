@@ -404,22 +404,26 @@ export const dealWmsService = {
    * Gửi thông báo vào chat khi confirm nhập kho
    */
   async notifyDealChatStockIn(dealId: string, stockInCode: string, totalWeight: number): Promise<void> {
+    try {
     const { data: deal } = await supabase
       .from('b2b_deals')
       .select('partner_id, deal_number')
       .eq('id', dealId)
       .single()
 
-    if (!deal) return
+    if (!deal) { console.warn('[dealWms] notifyStockIn: deal not found:', dealId); return }
 
+    // Try deal-specific room first, then general room
     const { data: room } = await supabase
       .from('b2b_chat_rooms')
       .select('id')
       .eq('partner_id', deal.partner_id)
-      .eq('room_type', 'general')
+      .in('room_type', ['deal', 'general'])
+      .order('room_type', { ascending: true }) // deal first
+      .limit(1)
       .maybeSingle()
 
-    if (!room) return
+    if (!room) { console.warn('[dealWms] notifyStockIn: no chat room for partner:', deal.partner_id); return }
 
     await supabase
       .from('b2b_chat_messages')
@@ -442,28 +446,32 @@ export const dealWmsService = {
       .from('b2b_chat_rooms')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
+    } catch (e) { console.error('[dealWms] notifyStockIn error:', e) }
   },
 
   /**
    * Gửi thông báo vào chat khi QC hoàn thành
    */
   async notifyDealChatQcUpdate(dealId: string, actualDrc: number, qcStatus: string): Promise<void> {
+    try {
     const { data: deal } = await supabase
       .from('b2b_deals')
       .select('partner_id, deal_number')
       .eq('id', dealId)
       .single()
 
-    if (!deal) return
+    if (!deal) { console.warn('[dealWms] notifyQc: deal not found:', dealId); return }
 
     const { data: room } = await supabase
       .from('b2b_chat_rooms')
       .select('id')
       .eq('partner_id', deal.partner_id)
-      .eq('room_type', 'general')
+      .in('room_type', ['deal', 'general'])
+      .order('room_type', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
-    if (!room) return
+    if (!room) { console.warn('[dealWms] notifyQc: no chat room for partner:', deal.partner_id); return }
 
     const statusLabels: Record<string, string> = {
       passed: 'Đạt',
@@ -493,28 +501,32 @@ export const dealWmsService = {
       .from('b2b_chat_rooms')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
+    } catch (e) { console.error('[dealWms] notifyQc error:', e) }
   },
 
   /**
    * Gửi thông báo vào chat khi có sự kiện quyết toán (tạo, duyệt, thanh toán)
    */
   async notifyDealChatSettlement(dealId: string, settlementCode: string, amount: number, status: string): Promise<void> {
+    try {
     const { data: deal } = await supabase
       .from('b2b_deals')
       .select('partner_id, deal_number')
       .eq('id', dealId)
       .single()
 
-    if (!deal) return
+    if (!deal) { console.warn('[dealWms] notifySettlement: deal not found:', dealId); return }
 
     const { data: room } = await supabase
       .from('b2b_chat_rooms')
       .select('id')
       .eq('partner_id', deal.partner_id)
-      .eq('room_type', 'general')
+      .in('room_type', ['deal', 'general'])
+      .order('room_type', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
-    if (!room) return
+    if (!room) { console.warn('[dealWms] notifySettlement: no room for partner:', deal.partner_id); return }
 
     const formattedAmount = amount.toLocaleString('vi-VN')
 
@@ -551,28 +563,32 @@ export const dealWmsService = {
       .from('b2b_chat_rooms')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
+    } catch (e) { console.error('[dealWms] notifySettlement error:', e) }
   },
 
   /**
    * Gửi thông báo vào chat khi chi tạm ứng
    */
   async notifyDealChatAdvance(dealId: string, advanceNumber: string, amount: number): Promise<void> {
+    try {
     const { data: deal } = await supabase
       .from('b2b_deals')
       .select('partner_id, deal_number')
       .eq('id', dealId)
       .single()
 
-    if (!deal) return
+    if (!deal) { console.warn('[dealWms] notifyAdvance: deal not found:', dealId); return }
 
     const { data: room } = await supabase
       .from('b2b_chat_rooms')
       .select('id')
       .eq('partner_id', deal.partner_id)
-      .eq('room_type', 'general')
+      .in('room_type', ['deal', 'general'])
+      .order('room_type', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
-    if (!room) return
+    if (!room) { console.warn('[dealWms] notifyAdvance: no room for partner:', deal.partner_id); return }
 
     const formattedAmount = amount.toLocaleString('vi-VN')
 
@@ -597,5 +613,6 @@ export const dealWmsService = {
       .from('b2b_chat_rooms')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
+    } catch (e) { console.error('[dealWms] notifyAdvance error:', e) }
   },
 }

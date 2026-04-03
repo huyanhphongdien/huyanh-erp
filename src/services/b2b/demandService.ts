@@ -508,6 +508,14 @@ export const demandService = {
 
     if (offerError) throw offerError
 
+    // ★ Idempotency check: already accepted?
+    if (offer.status === 'accepted') {
+      throw new Error('Chào giá này đã được chấp nhận trước đó')
+    }
+    if (offer.deal_id) {
+      throw new Error('Chào giá này đã có Deal liên kết')
+    }
+
     // 2. Get the demand
     const demand = await this.getById(demandId)
     if (!demand) throw new Error('Nhu cầu không tồn tại')
@@ -525,6 +533,9 @@ export const demandService = {
     // 4. Create a Deal from offer
     const dealNumber = `DL${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
 
+    // ★ total_value: qty_kg × price_per_kg (price luôn là đ/kg từ offer)
+    const totalValueVnd = offer.offered_quantity_kg * offer.offered_price
+
     const { data: deal, error: dealError } = await supabase
       .from('b2b_deals')
       .insert({
@@ -534,17 +545,17 @@ export const demandService = {
         product_name: demand.product_name,
         quantity_kg: offer.offered_quantity_kg,
         unit_price: offer.offered_price,
-        total_value_vnd: offer.offered_quantity_kg * offer.offered_price,
+        total_value_vnd: totalValueVnd,
         status: 'pending',
         demand_id: demandId,
         offer_id: offerId,
         processing_fee_per_ton: demand.processing_fee_per_ton || null,
         expected_output_rate: demand.expected_output_rate || null,
         notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,
-        // ★ Lot info from offer
+        // ★ Lot info from offer (fixed: lot_source → source_region)
         lot_code: offer.lot_code || null,
         lot_description: offer.lot_description || null,
-        source_region: offer.lot_source || null,
+        source_region: offer.source_region || null,
         expected_drc: offer.lot_drc || offer.offered_drc || null,
       })
       .select('*')
@@ -564,18 +575,20 @@ export const demandService = {
       const intakeId = await rubberIntakeB2BService.createFromDeal({
         deal_id: deal.id,
         partner_id: offer.partner_id,
-        lot_code: offer.lot_code || `${dealNumber}`,
+        lot_code: offer.lot_code || dealNumber,
         lot_description: offer.lot_description || offer.notes || undefined,
         product_code: demand.product_name || 'MU_CAO_SU',
         quantity_kg: offer.offered_quantity_kg,
         drc_percent: offer.lot_drc || offer.offered_drc || undefined,
         unit_price: offer.offered_price,
-        source_region: offer.lot_source || offer.source_region || undefined,
+        source_region: offer.source_region || undefined,
         intake_date: offer.offered_delivery_date || undefined,
       })
       // Link back: deal → rubber_intake
       if (intakeId) {
         await supabase.from('b2b_deals').update({ rubber_intake_id: intakeId }).eq('id', deal.id)
+      } else {
+        console.warn('[demandService] rubber intake created but returned null id for deal:', deal.id)
       }
     } catch (e) { console.error('[demandService] auto-create rubber intake error:', e) }
 

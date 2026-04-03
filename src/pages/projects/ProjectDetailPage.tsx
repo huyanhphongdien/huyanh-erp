@@ -97,6 +97,7 @@ import ProjectReportsTab from '../../components/project/ProjectReportsTab'
 
 // PM9 — Reports & Health imports
 import { useAuthStore } from '../../stores/authStore'
+import ProjectCommentSection from './components/ProjectCommentSection'
 import { projectHealthService, type HealthResult } from '../../services/project/projectHealthService'
 import { exportStatusReportPDF, type PDFReportData } from '../../utils/exportProjectPDF'
 
@@ -2037,6 +2038,7 @@ const PlaceholderTab: React.FC<{ tabName: string; phase: string }> = ({ tabName,
 export const ProjectDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const { user } = useAuthStore()
 
   // ✅ Real data state — no more mock
   const [project, setProject] = useState<Project>(DEFAULT_PROJECT)
@@ -3143,7 +3145,20 @@ export const ProjectDetailPage: React.FC = () => {
           `}
         >
         {activeTab === 'overview' && (
-          <OverviewTab project={project} stats={stats} milestones={milestones} activities={activities} />
+          <>
+            <OverviewTab project={project} stats={stats} milestones={milestones} activities={activities} />
+            {/* ★ Bình luận dự án — @mention + notification */}
+            {realProjectId && (
+              <div className="mt-6">
+                <ProjectCommentSection
+                  projectId={realProjectId}
+                  projectName={project.name}
+                  currentUserId={user?.employee_id || user?.id || ''}
+                  currentUserName={user?.full_name || 'Người dùng'}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {activeTab === 'phases' && (

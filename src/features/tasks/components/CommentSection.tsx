@@ -1,29 +1,20 @@
 // ============================================================================
-// COMMENT SECTION COMPONENT
+// COMMENT SECTION COMPONENT — Task Comments + @mention + notification
 // File: src/features/tasks/components/CommentSection.tsx
-// Huy Anh ERP System - Phase 4.4: Task Comments
 // ============================================================================
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  MessageSquare,
-  Send,
-  Edit3,
-  Trash2,
-  Reply,
-  MoreHorizontal,
-  X,
-  ChevronDown,
-  ChevronUp,
-  User,
-  Clock,
-  AlertCircle,
+  MessageSquare, Send, Edit3, Trash2, Reply, MoreHorizontal,
+  X, ChevronDown, ChevronUp, User, Clock, AlertCircle, AtSign,
 } from 'lucide-react';
 import {
   taskCommentService,
   type TaskComment,
   formatRelativeTime,
 } from '../../../services/taskCommentService';
+import { supabase } from '../../../lib/supabase';
+import { notify } from '../../../services/notificationHelper';
 
 // ============================================================================
 // TYPES
@@ -35,42 +26,159 @@ interface CommentSectionProps {
   canComment?: boolean;
 }
 
-interface CommentItemProps {
-  comment: TaskComment;
-  currentUserId: string;
-  canComment: boolean;
-  onReply: (commentId: string) => void;
-  onEdit: (comment: TaskComment) => void;
-  onDelete: (commentId: string) => void;
-  isReply?: boolean;
+interface MentionUser {
+  id: string;
+  full_name: string;
+  avatar_url?: string | null;
+  department_name?: string;
 }
 
 // ============================================================================
-// COMMENT ITEM COMPONENT
+// MENTION DROPDOWN
+// ============================================================================
+
+function MentionDropdown({
+  users, filter, onSelect, position,
+}: {
+  users: MentionUser[]; filter: string;
+  onSelect: (u: MentionUser) => void; position: { top: number; left: number };
+}) {
+  const filtered = users.filter(u =>
+    u.full_name.toLowerCase().includes(filter.toLowerCase())
+  ).slice(0, 8);
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-48 overflow-y-auto w-64"
+      style={{ top: position.top, left: position.left }}>
+      <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Tag người</div>
+      {filtered.map(user => (
+        <button key={user.id} onClick={() => onSelect(user)}
+          className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-blue-50 text-left transition-colors">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+            {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full rounded-full object-cover" /> : user.full_name.charAt(0)}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-gray-900 truncate">{user.full_name}</div>
+            {user.department_name && <div className="text-[11px] text-gray-400 truncate">{user.department_name}</div>}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
+// COMMENT INPUT WITH @MENTION
+// ============================================================================
+
+function CommentInput({
+  value, onChange, onSubmit, placeholder, submitting, mentionUsers,
+}: {
+  value: string; onChange: (v: string) => void; onSubmit: () => void;
+  placeholder: string; submitting: boolean; mentionUsers: MentionUser[];
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showMention, setShowMention] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [mentionPos, setMentionPos] = useState({ top: 0, left: 0 });
+  const [mentionStart, setMentionStart] = useState(-1);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
+    onChange(text);
+
+    const textBefore = text.slice(0, cursorPos);
+    const atIndex = textBefore.lastIndexOf('@');
+
+    if (atIndex >= 0) {
+      const charBefore = atIndex > 0 ? textBefore[atIndex - 1] : ' ';
+      const textAfterAt = textBefore.slice(atIndex + 1);
+      const hasNewline = textAfterAt.includes('\n');
+
+      if ((charBefore === ' ' || charBefore === '\n' || atIndex === 0) && !hasNewline) {
+        setShowMention(true);
+        setMentionFilter(textAfterAt);
+        setMentionStart(atIndex);
+        setMentionPos({ top: (textareaRef.current?.offsetHeight || 40) + 4, left: 0 });
+        return;
+      }
+    }
+    setShowMention(false);
+  };
+
+  const handleSelectMention = (user: MentionUser) => {
+    const before = value.slice(0, mentionStart);
+    const after = value.slice(textareaRef.current?.selectionStart || value.length);
+    onChange(`${before}@${user.full_name} ${after}`);
+    setShowMention(false);
+    textareaRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !showMention) { e.preventDefault(); onSubmit(); }
+    if (e.key === 'Escape') setShowMention(false);
+  };
+
+  return (
+    <div className="relative">
+      <textarea ref={textareaRef} value={value} onChange={handleChange} onKeyDown={handleKeyDown}
+        placeholder={placeholder} rows={2} maxLength={5000}
+        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm min-h-[44px]"
+        disabled={submitting} />
+      {showMention && (
+        <MentionDropdown users={mentionUsers} filter={mentionFilter} onSelect={handleSelectMention} position={mentionPos} />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// RENDER CONTENT WITH @MENTION HIGHLIGHTING
+// ============================================================================
+
+function RenderContent({ content, mentionUsers }: { content: string; mentionUsers: MentionUser[] }) {
+  const sortedNames = mentionUsers.map(u => u.full_name).sort((a, b) => b.length - a.length);
+  if (sortedNames.length === 0) return <span>{content}</span>;
+
+  const escaped = sortedNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const regex = new RegExp(`(@(?:${escaped.join('|')}))`, 'g');
+  const parts = content.split(regex);
+
+  return (
+    <span>
+      {parts.map((part, i) => {
+        if (part.startsWith('@') && mentionUsers.some(u => `@${u.full_name}` === part)) {
+          return <span key={i} className="text-blue-600 font-medium bg-blue-50 px-0.5 rounded">{part}</span>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+}
+
+// ============================================================================
+// COMMENT ITEM
 // ============================================================================
 
 function CommentItem({
-  comment,
-  currentUserId,
-  canComment,
-  onReply,
-  onEdit,
-  onDelete,
-  isReply = false,
-}: CommentItemProps) {
+  comment, currentUserId, canComment, onReply, onEdit, onDelete, isReply = false, mentionUsers,
+}: {
+  comment: TaskComment; currentUserId: string; canComment: boolean;
+  onReply: (id: string) => void; onEdit: (c: TaskComment) => void; onDelete: (id: string) => void;
+  isReply?: boolean; mentionUsers: MentionUser[];
+}) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  
   const isAuthor = comment.author_id === currentUserId;
   const authorName = comment.author?.full_name || 'Người dùng';
   const authorInitial = authorName.charAt(0).toUpperCase();
 
-  // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setShowMenu(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -78,105 +186,44 @@ function CommentItem({
 
   return (
     <div className={`flex gap-3 ${isReply ? 'ml-10 mt-3' : ''}`}>
-      {/* Avatar */}
       <div className={`flex-shrink-0 ${isReply ? 'w-8 h-8' : 'w-10 h-10'} rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-medium ${isReply ? 'text-xs' : 'text-sm'}`}>
         {comment.author?.avatar_url ? (
-          <img
-            src={comment.author.avatar_url}
-            alt={authorName}
-            className="w-full h-full rounded-full object-cover"
-          />
-        ) : (
-          authorInitial
-        )}
+          <img src={comment.author.avatar_url} alt={authorName} className="w-full h-full rounded-full object-cover" />
+        ) : authorInitial}
       </div>
-
-      {/* Content */}
       <div className="flex-1 min-w-0">
-        {/* Header */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`font-medium text-gray-900 ${isReply ? 'text-sm' : ''}`}>
-            {authorName}
-          </span>
-          <span className="text-xs text-gray-400 flex items-center gap-1">
-            <Clock size={12} />
-            {formatRelativeTime(comment.created_at)}
-          </span>
-          {comment.is_edited && (
-            <span className="text-xs text-gray-400 italic">(đã chỉnh sửa)</span>
-          )}
+          <span className={`font-medium text-gray-900 ${isReply ? 'text-sm' : ''}`}>{authorName}</span>
+          <span className="text-xs text-gray-400 flex items-center gap-1"><Clock size={12} />{formatRelativeTime(comment.created_at)}</span>
+          {comment.is_edited && <span className="text-xs text-gray-400 italic">(đã sửa)</span>}
         </div>
-
-        {/* Comment Content */}
         <div className={`mt-1 text-gray-700 whitespace-pre-wrap break-words ${isReply ? 'text-sm' : ''}`}>
-          {comment.content}
+          <RenderContent content={comment.content} mentionUsers={mentionUsers} />
         </div>
-
-        {/* Actions */}
         <div className="mt-2 flex items-center gap-3">
-          {/* Reply button - chỉ hiện cho root comments */}
           {canComment && !isReply && (
-            <button
-              onClick={() => onReply(comment.id)}
-              className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
-            >
-              <Reply size={14} />
-              Trả lời
+            <button onClick={() => onReply(comment.id)} className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 min-h-[44px] sm:min-h-0">
+              <Reply size={14} /> Trả lời
             </button>
           )}
-
-          {/* Edit/Delete - chỉ hiện cho author */}
           {isAuthor && (
             <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="text-xs text-gray-400 hover:text-gray-600 p-1 rounded transition-colors"
-              >
+              <button onClick={() => setShowMenu(!showMenu)} className="text-xs text-gray-400 hover:text-gray-600 p-1 rounded min-h-[44px] sm:min-h-0 min-w-[44px] sm:min-w-0 flex items-center justify-center">
                 <MoreHorizontal size={16} />
               </button>
-
               {showMenu && (
                 <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[100px]">
-                  <button
-                    onClick={() => {
-                      onEdit(comment);
-                      setShowMenu(false);
-                    }}
-                    className="w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                  >
-                    <Edit3 size={14} />
-                    Sửa
-                  </button>
-                  <button
-                    onClick={() => {
-                      onDelete(comment.id);
-                      setShowMenu(false);
-                    }}
-                    className="w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                  >
-                    <Trash2 size={14} />
-                    Xóa
-                  </button>
+                  <button onClick={() => { onEdit(comment); setShowMenu(false); }} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"><Edit3 size={14} /> Sửa</button>
+                  <button onClick={() => { onDelete(comment.id); setShowMenu(false); }} className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 size={14} /> Xóa</button>
                 </div>
               )}
             </div>
           )}
         </div>
-
-        {/* Replies */}
         {comment.replies && comment.replies.length > 0 && (
           <div className="mt-3 space-y-3 border-l-2 border-gray-100 pl-3">
             {comment.replies.map(reply => (
-              <CommentItem
-                key={reply.id}
-                comment={reply}
-                currentUserId={currentUserId}
-                canComment={canComment}
-                onReply={onReply}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                isReply
-              />
+              <CommentItem key={reply.id} comment={reply} currentUserId={currentUserId} canComment={canComment} onReply={onReply} onEdit={onEdit} onDelete={onDelete} isReply mentionUsers={mentionUsers} />
             ))}
           </div>
         )}
@@ -190,52 +237,65 @@ function CommentItem({
 // ============================================================================
 
 export function CommentSection({ taskId, currentUserId, canComment = true }: CommentSectionProps) {
-  // State
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
+  const [taskInfo, setTaskInfo] = useState<{ name: string; code: string } | null>(null);
 
-  // Form state
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [editingComment, setEditingComment] = useState<TaskComment | null>(null);
   const [editContent, setEditContent] = useState('');
-
-  // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // ========== FETCH ==========
 
-  // ========== FETCH COMMENTS ==========
-  const fetchComments = async () => {
+  useEffect(() => {
+    if (!taskId) return;
     setLoading(true);
     setError(null);
 
-    const { data, error: fetchError } = await taskCommentService.getComments(taskId);
+    // Fetch comments
+    taskCommentService.getComments(taskId).then(({ data, error: err }) => {
+      if (err) setError(err.message);
+      else setComments(data);
+      setLoading(false);
+    });
 
-    if (fetchError) {
-      setError(fetchError.message);
-    } else {
-      setComments(data);
-    }
-
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (taskId) {
-      fetchComments();
-    }
+    // Fetch task info + department employees for @mention
+    supabase.from('tasks').select('name, code, department_id').eq('id', taskId).single()
+      .then(({ data: task }) => {
+        if (task) {
+          setTaskInfo({ name: task.name, code: task.code });
+          if (task.department_id) {
+            supabase.from('employees')
+              .select('id, full_name, avatar_url, departments:department_id(name)')
+              .eq('status', 'active')
+              .eq('department_id', task.department_id)
+              .order('full_name')
+              .limit(50)
+              .then(({ data: emps }) => {
+                setMentionUsers((emps || []).map((e: any) => ({
+                  id: e.id,
+                  full_name: e.full_name,
+                  avatar_url: e.avatar_url,
+                  department_name: Array.isArray(e.departments) ? e.departments[0]?.name : e.departments?.name,
+                })));
+              });
+          }
+        }
+      });
   }, [taskId]);
+
+  const totalCount = comments.reduce((sum, c) => sum + 1 + (c.replies?.length || 0), 0);
 
   // ========== HANDLERS ==========
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(async () => {
     if (!newComment.trim() || submitting) return;
-
     setSubmitting(true);
     setError(null);
 
@@ -249,243 +309,147 @@ export function CommentSection({ taskId, currentUserId, canComment = true }: Com
     if (createError) {
       setError(createError.message);
     } else if (data) {
-      // Add to list
       if (replyTo) {
-        // Add reply to parent comment
-        setComments(prev =>
-          prev.map(c =>
-            c.id === replyTo
-              ? { ...c, replies: [...(c.replies || []), data] }
-              : c
-          )
-        );
+        setComments(prev => prev.map(c => c.id === replyTo ? { ...c, replies: [...(c.replies || []), data] } : c));
       } else {
-        // Add root comment
         setComments(prev => [...prev, data]);
       }
+
+      // Parse @mentions and send notifications
+      const sortedUsers = [...mentionUsers].sort((a, b) => b.full_name.length - a.full_name.length);
+      for (const user of sortedUsers) {
+        if (newComment.includes(`@${user.full_name}`) && user.id !== currentUserId) {
+          // Get current user name for notification
+          const { data: sender } = await supabase.from('employees').select('full_name').eq('id', currentUserId).single();
+          const senderName = sender?.full_name || 'Đồng nghiệp';
+          notify({
+            recipientId: user.id,
+            senderId: currentUserId,
+            module: 'task',
+            type: 'task_mention',
+            title: `${senderName} đã tag bạn trong bình luận`,
+            message: `"${newComment.trim().slice(0, 80)}${newComment.length > 80 ? '...' : ''}" — ${taskInfo?.code || ''}: ${taskInfo?.name || ''}`,
+            referenceUrl: `/tasks/${taskId}`,
+          });
+        }
+      }
+
       setNewComment('');
       setReplyTo(null);
     }
 
     setSubmitting(false);
-  };
+  }, [newComment, submitting, replyTo, taskId, currentUserId, mentionUsers, taskInfo]);
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingComment || !editContent.trim() || submitting) return;
-
     setSubmitting(true);
     setError(null);
 
-    const { data, error: updateError } = await taskCommentService.updateComment(
-      editingComment.id,
-      { content: editContent.trim() }
-    );
+    const { data, error: updateError } = await taskCommentService.updateComment(editingComment.id, { content: editContent.trim() });
 
     if (updateError) {
       setError(updateError.message);
     } else if (data) {
-      // Update in list
-      setComments(prev =>
-        prev.map(c => {
-          if (c.id === data.id) {
-            return { ...c, ...data };
-          }
-          // Check replies
-          if (c.replies) {
-            return {
-              ...c,
-              replies: c.replies.map(r => (r.id === data.id ? { ...r, ...data } : r)),
-            };
-          }
-          return c;
-        })
-      );
+      setComments(prev => prev.map(c => {
+        if (c.id === data.id) return { ...c, ...data };
+        if (c.replies) return { ...c, replies: c.replies.map(r => r.id === data.id ? { ...r, ...data } : r) };
+        return c;
+      }));
       setEditingComment(null);
       setEditContent('');
     }
-
     setSubmitting(false);
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
-
     setSubmitting(true);
     const { success, error: deleteError } = await taskCommentService.deleteComment(deleteId);
-
-    if (deleteError) {
-      setError(deleteError.message);
-    } else if (success) {
-      // Remove from list
-      setComments(prev =>
-        prev
-          .filter(c => c.id !== deleteId)
-          .map(c => ({
-            ...c,
-            replies: c.replies?.filter(r => r.id !== deleteId) || [],
-          }))
-      );
+    if (deleteError) setError(deleteError.message);
+    else if (success) {
+      setComments(prev => prev.filter(c => c.id !== deleteId).map(c => ({ ...c, replies: c.replies?.filter(r => r.id !== deleteId) || [] })));
     }
-
     setDeleteId(null);
     setSubmitting(false);
   };
 
-  const handleReply = (commentId: string) => {
-    setReplyTo(commentId);
-    setEditingComment(null);
-    textareaRef.current?.focus();
-  };
-
-  const handleStartEdit = (comment: TaskComment) => {
-    setEditingComment(comment);
-    setEditContent(comment.content);
-    setReplyTo(null);
-  };
-
-  const cancelReply = () => {
-    setReplyTo(null);
-  };
-
-  const cancelEdit = () => {
-    setEditingComment(null);
-    setEditContent('');
-  };
-
-  // Find parent comment name for reply indicator
   const replyToComment = replyTo ? comments.find(c => c.id === replyTo) : null;
-
-  // Count total comments including replies
-  const totalCount = comments.reduce(
-    (sum, c) => sum + 1 + (c.replies?.length || 0),
-    0
-  );
 
   // ========== RENDER ==========
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       {/* Header */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-      >
+      <button onClick={() => setIsCollapsed(!isCollapsed)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors min-h-[44px]">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-blue-600" />
           <h3 className="font-semibold text-gray-900">Bình luận</h3>
-          {totalCount > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-              {totalCount}
-            </span>
-          )}
+          {totalCount > 0 && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">{totalCount}</span>}
         </div>
-        {isCollapsed ? (
-          <ChevronDown className="w-5 h-5 text-gray-400" />
-        ) : (
-          <ChevronUp className="w-5 h-5 text-gray-400" />
-        )}
+        {isCollapsed ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronUp className="w-5 h-5 text-gray-400" />}
       </button>
 
-      {/* Content */}
       {!isCollapsed && (
         <div className="px-4 pb-4">
-          {/* Error message */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
-              <AlertCircle size={16} />
-              {error}
+              <AlertCircle size={16} /> {error}
             </div>
           )}
 
           {/* Comment Form */}
           {canComment && !editingComment && (
-            <form onSubmit={handleSubmit} className="mb-4">
-              {/* Reply indicator */}
+            <div className="mb-4">
               {replyTo && replyToComment && (
                 <div className="mb-2 flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
                   <Reply size={14} />
-                  <span>
-                    Đang trả lời{' '}
-                    <span className="font-medium text-gray-700">
-                      {replyToComment.author?.full_name || 'Người dùng'}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={cancelReply}
-                    className="ml-auto text-gray-400 hover:text-gray-600"
-                  >
-                    <X size={16} />
-                  </button>
+                  <span>Trả lời <span className="font-medium text-gray-700">{replyToComment.author?.full_name || 'Người dùng'}</span></span>
+                  <button onClick={() => setReplyTo(null)} className="ml-auto text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"><X size={16} /></button>
                 </div>
               )}
 
               <div className="flex gap-3">
-                {/* Current user avatar */}
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white font-medium text-sm">
                   <User size={18} />
                 </div>
-
-                {/* Input */}
                 <div className="flex-1">
-                  <textarea
-                    ref={textareaRef}
+                  <CommentInput
                     value={newComment}
-                    onChange={e => setNewComment(e.target.value)}
-                    placeholder={replyTo ? 'Viết trả lời...' : 'Viết bình luận...'}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
-                    disabled={submitting}
+                    onChange={setNewComment}
+                    onSubmit={handleSubmit}
+                    placeholder={replyTo ? 'Viết trả lời... (gõ @ để tag)' : 'Viết bình luận... (gõ @ để tag)'}
+                    submitting={submitting}
+                    mentionUsers={mentionUsers}
                   />
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-gray-400">
-                      {newComment.length}/5000 ký tự
-                    </span>
-                    <button
-                      type="submit"
-                      disabled={!newComment.trim() || submitting}
-                      className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <Send size={14} />
-                      {submitting ? 'Đang gửi...' : 'Gửi'}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">{newComment.length}/5000 ký tự</span>
+                      {mentionUsers.length > 0 && <span className="text-xs text-gray-300 flex items-center gap-1"><AtSign size={11} /> Gõ @ để tag</span>}
+                    </div>
+                    <button onClick={handleSubmit} disabled={!newComment.trim() || submitting}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px]">
+                      <Send size={14} /> {submitting ? 'Đang gửi...' : 'Gửi'}
                     </button>
                   </div>
                 </div>
               </div>
-            </form>
+            </div>
           )}
 
           {/* Edit Form */}
           {editingComment && (
             <form onSubmit={handleEdit} className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2 text-sm text-yellow-700">
-                <Edit3 size={14} />
-                <span>Chỉnh sửa bình luận</span>
-              </div>
-              <textarea
-                value={editContent}
-                onChange={e => setEditContent(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none text-sm"
-                disabled={submitting}
-                autoFocus
-              />
+              <div className="flex items-center gap-2 mb-2 text-sm text-yellow-700"><Edit3 size={14} /> Chỉnh sửa bình luận</div>
+              <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={3}
+                className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 resize-none text-sm"
+                disabled={submitting} autoFocus />
               <div className="mt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-                  disabled={submitting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={!editContent.trim() || submitting}
-                  className="px-4 py-1.5 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
+                <button type="button" onClick={() => { setEditingComment(null); setEditContent(''); }} className="px-3 py-2 text-sm text-gray-600 min-h-[44px]">Hủy</button>
+                <button type="submit" disabled={!editContent.trim() || submitting}
+                  className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 disabled:opacity-50 min-h-[44px]">
+                  {submitting ? 'Đang lưu...' : 'Lưu'}
                 </button>
               </div>
             </form>
@@ -494,58 +458,37 @@ export function CommentSection({ taskId, currentUserId, canComment = true }: Com
           {/* Comments List */}
           {loading ? (
             <div className="py-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
               <p className="mt-2 text-sm text-gray-500">Đang tải bình luận...</p>
             </div>
           ) : comments.length === 0 ? (
             <div className="py-8 text-center">
               <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-2" />
               <p className="text-gray-500">Chưa có bình luận nào</p>
-              {canComment && (
-                <p className="text-sm text-gray-400 mt-1">
-                  Hãy là người đầu tiên bình luận!
-                </p>
-              )}
+              {canComment && <p className="text-sm text-gray-400 mt-1">Hãy là người đầu tiên bình luận!</p>}
             </div>
           ) : (
             <div className="space-y-4">
               {comments.map(comment => (
-                <CommentItem
-                  key={comment.id}
-                  comment={comment}
-                  currentUserId={currentUserId}
-                  canComment={canComment}
-                  onReply={handleReply}
-                  onEdit={handleStartEdit}
-                  onDelete={setDeleteId}
-                />
+                <CommentItem key={comment.id} comment={comment} currentUserId={currentUserId} canComment={canComment}
+                  onReply={setReplyTo} onEdit={c => { setEditingComment(c); setEditContent(c.content); setReplyTo(null); }}
+                  onDelete={setDeleteId} mentionUsers={mentionUsers} />
               ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation */}
       {deleteId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Xác nhận xóa</h3>
-            <p className="text-gray-500 mb-4">
-              Bạn có chắc muốn xóa bình luận này? Hành động này không thể hoàn tác.
-            </p>
+            <p className="text-gray-500 mb-4">Bạn có chắc muốn xóa bình luận này?</p>
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteId(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                disabled={submitting}
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={submitting}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
+              <button onClick={() => setDeleteId(null)} className="px-4 py-2 text-gray-600 min-h-[44px]">Hủy</button>
+              <button onClick={handleDelete} disabled={submitting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 min-h-[44px]">
                 {submitting ? 'Đang xóa...' : 'Xóa'}
               </button>
             </div>

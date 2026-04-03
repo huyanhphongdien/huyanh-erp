@@ -25,6 +25,8 @@ export interface Partner {
   tier: PartnerTier
   status: PartnerStatus
   is_active: boolean
+  region_code: string | null
+  supplier_name_code: string | null
   created_at: string
   updated_at: string | null
   // Computed stats
@@ -115,6 +117,46 @@ export const TIER_ICONS: Record<PartnerTier, string> = {
 // ============================================
 
 export const partnerService = {
+
+  /**
+   * Tạo mã NCC theo quy tắc: [Vùng 2 chữ][Tên 2 chữ][Số 2 số]
+   * VD: TEHG01 = Thừa Thiên Huế + Hữu Giới + lần 01
+   * Ref: docs/Cách đặt mã NCC NGUYÊN LIỆU CHÍNH.pdf
+   */
+  async generatePartnerCode(name: string, regionCode: string): Promise<string> {
+    const { generateNameCode } = await import('../../constants/supplierCodes')
+    const nameCode = generateNameCode(name)
+    const prefix = `${regionCode}${nameCode}`
+
+    // Tìm số thứ tự tiếp theo
+    const { data: existing } = await supabase
+      .from('b2b_partners')
+      .select('code')
+      .ilike('code', `${prefix}%`)
+      .order('code', { ascending: false })
+      .limit(1)
+
+    let nextSeq = 1
+    if (existing && existing.length > 0) {
+      const lastCode = existing[0].code
+      const lastSeq = parseInt(lastCode.slice(4), 10)
+      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1
+    }
+
+    return `${prefix}${String(nextSeq).padStart(2, '0')}`
+  },
+
+  /**
+   * Preview mã NCC (không lưu DB)
+   */
+  async previewPartnerCode(name: string, address: string): Promise<{ code: string; regionCode: string; regionName: string }> {
+    const { detectRegionFromAddress, REGION_CODE_MAP } = await import('../../constants/supplierCodes')
+    const regionCode = detectRegionFromAddress(address) || 'TE' // Default: Thừa Thiên Huế
+    const code = await this.generatePartnerCode(name, regionCode)
+    const region = REGION_CODE_MAP[regionCode]
+    return { code, regionCode, regionName: region?.name || regionCode }
+  },
+
   // ============================================
   // LIST & QUERY
   // ============================================

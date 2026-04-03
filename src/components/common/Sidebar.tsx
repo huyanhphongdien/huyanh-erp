@@ -406,6 +406,7 @@ export function Sidebar() {
       'khuyennt@huyanhrubber.com',
       'duyhh@huyanhrubber.com',
       'minhld@huyanhrubber.com',
+      'trunglxh@huyanhrubber.com',
     ];
     
     if (user?.email && b2bPurchaserEmails.includes(user.email.toLowerCase())) {

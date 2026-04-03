@@ -536,6 +536,16 @@ export const demandService = {
     // ★ total_value: qty_kg × price_per_kg (price luôn là đ/kg từ offer)
     const totalValueVnd = offer.offered_quantity_kg * offer.offered_price
 
+    // ★ Generate lot_code BEFORE insert (tách ra để tránh async issue)
+    let generatedLotCode: string | null = offer.lot_code || null
+    try {
+      const partnerData = Array.isArray(offer.partner) ? offer.partner[0] : offer.partner
+      if (partnerData?.code) {
+        const { partnerService: ps } = await import('./partnerService')
+        generatedLotCode = await ps.generateNextLotCode(partnerData.code)
+      }
+    } catch (e) { console.error('[acceptOffer] lot_code gen error:', e) }
+
     const { data: deal, error: dealError } = await supabase
       .from('b2b_deals')
       .insert({
@@ -552,17 +562,7 @@ export const demandService = {
         processing_fee_per_ton: demand.processing_fee_per_ton || null,
         expected_output_rate: demand.expected_output_rate || null,
         notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,
-        // ★ Auto-generate lot_code: [Mã NCC]-[YYMM]-[Số]
-        lot_code: await (async () => {
-          try {
-            const partner = Array.isArray(offer.partner) ? offer.partner[0] : offer.partner
-            if (partner?.code) {
-              const { partnerService: ps } = await import('./partnerService')
-              return await ps.generateNextLotCode(partner.code)
-            }
-          } catch (e) { console.error('[acceptOffer] lot_code gen error:', e) }
-          return offer.lot_code || null
-        })(),
+        lot_code: generatedLotCode,
         lot_description: offer.lot_description || null,
         source_region: offer.source_region || null,
         expected_drc: offer.lot_drc || offer.offered_drc || null,

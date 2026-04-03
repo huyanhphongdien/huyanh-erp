@@ -120,11 +120,21 @@ const InfoTab = ({ partner, stats }: InfoTabProps) => {
                         const confirmed = window.confirm(`Mã mới: ${result.code}\nVùng: ${result.regionName} (${result.regionCode})\n\nĐổi mã đại lý?`)
                         if (confirmed) {
                           const { generateNameCode } = await import('../../../constants/supplierCodes')
-                          await supabase.from('b2b_partners').update({
-                            code: result.code,
-                            region_code: result.regionCode,
-                            supplier_name_code: generateNameCode(partner.name),
-                          }).eq('id', partner.id)
+                          // b2b_partners là VIEW → update bảng gốc b2b.partners
+                          const { error: updateErr } = await supabase.rpc('update_partner_code', {
+                            p_id: partner.id,
+                            p_code: result.code,
+                            p_region_code: result.regionCode,
+                            p_name_code: generateNameCode(partner.name),
+                          })
+                          if (updateErr) {
+                            // Fallback: thử update trực tiếp qua view
+                            await supabase.from('b2b_partners').update({
+                              code: result.code,
+                              region_code: result.regionCode,
+                              supplier_name_code: generateNameCode(partner.name),
+                            }).eq('id', partner.id)
+                          }
                           message.success(`Đã đổi mã: ${result.code}`)
                           window.location.reload()
                         }

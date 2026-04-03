@@ -83,14 +83,18 @@ export const BUYER_CODES: BuyerCode[] = [
  * - Lấy chữ cái đầu + cuối của tên (không phải họ)
  */
 export function generateNameCode(fullName: string): string {
-  // Loại bỏ dấu tiếng Việt
+  // Loại bỏ dấu tiếng Việt + nội dung trong ngoặc + ký tự đặc biệt
   const normalized = removeDiacritics(fullName.trim())
-  // Lấy từ cuối cùng (tên)
+    .replace(/\([^)]*\)/g, '')   // Bỏ (Kíp), (Mạnh Quân)...
+    .replace(/[^a-zA-Z\s]/g, '') // Chỉ giữ chữ cái + space
+    .trim()
+
   const parts = normalized.split(/\s+/).filter(Boolean)
   if (parts.length === 0) return 'XX'
 
   const lastName = parts[parts.length - 1].toUpperCase()
-  if (lastName.length <= 1) return lastName.padEnd(2, 'X')
+  if (lastName.length === 0) return 'XX'
+  if (lastName.length === 1) return lastName.padEnd(2, 'X')
 
   // Ưu tiên 1: chữ đầu + chữ cuối
   return lastName[0] + lastName[lastName.length - 1]

@@ -112,6 +112,16 @@ export const dealConfirmService = {
       drc_percent: formData.expected_drc,
     })
 
+    // ★ Generate lot_code BEFORE insert
+    let generatedLotCode: string | null = context.lotCode || null
+    try {
+      const { data: partnerForLot } = await supabase.from('b2b_partners').select('code').eq('id', context.partnerId).single()
+      if (partnerForLot?.code) {
+        const { partnerService: ps } = await import('./partnerService')
+        generatedLotCode = await ps.generateNextLotCode(partnerForLot.code)
+      }
+    } catch (e) { console.error('[dealConfirm] lot_code gen error:', e) }
+
     const { data: deal, error: dealError } = await supabase
       .from('b2b_deals')
       .insert({
@@ -125,24 +135,13 @@ export const dealConfirmService = {
         total_value_vnd: formData.deal_type === 'processing' ? 0 : estimatedValue,
         currency: 'VND',
         status: 'processing',
-        // Lưu vào cột riêng (không nhét notes)
         expected_drc: formData.expected_drc,
         rubber_type: formData.product_type,
         price_unit: formData.price_unit,
         source_region: formData.pickup_location || null,
         pickup_location_name: formData.pickup_location || null,
         delivery_date: formData.delivery_date || null,
-        // ★ Auto-generate lot_code: [Mã NCC]-[YYMM]-[Số]
-        lot_code: await (async () => {
-          try {
-            const { data: p } = await supabase.from('b2b_partners').select('code').eq('id', context.partnerId).single()
-            if (p?.code) {
-              const { partnerService: ps } = await import('./partnerService')
-              return await ps.generateNextLotCode(p.code)
-            }
-          } catch (e) { console.error('[dealConfirm] lot_code gen error:', e) }
-          return context.lotCode || null
-        })(),
+        lot_code: generatedLotCode,
         // Rubber region from booking (if available)
         rubber_region: context.rubberRegion || null,
         rubber_region_lat: context.rubberRegionLat || null,

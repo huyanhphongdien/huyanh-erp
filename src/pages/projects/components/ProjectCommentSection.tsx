@@ -167,25 +167,23 @@ function CommentInput({
 // ============================================================================
 
 function RenderContent({ content, mentionableUsers }: { content: string; mentionableUsers: MentionableUser[] }) {
-  // Split content by @mentions and highlight them
-  const parts = content.split(/(@\S+(?:\s\S+)?)/g)
+  // Build regex from known user names (longest first to avoid partial matches)
+  const sortedNames = mentionableUsers.map(u => u.full_name).sort((a, b) => b.length - a.length)
+  if (sortedNames.length === 0) return <span>{content}</span>
+
+  const escaped = sortedNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const regex = new RegExp(`(@(?:${escaped.join('|')}))`, 'g')
+  const parts = content.split(regex)
 
   return (
     <span>
       {parts.map((part, i) => {
-        if (part.startsWith('@')) {
-          const name = part.slice(1)
-          const isUser = mentionableUsers.some(u =>
-            u.full_name.toLowerCase() === name.toLowerCase() ||
-            u.full_name.toLowerCase().startsWith(name.trim().toLowerCase())
+        if (part.startsWith('@') && mentionableUsers.some(u => `@${u.full_name}` === part)) {
+          return (
+            <span key={i} className="text-blue-600 font-medium bg-blue-50 px-0.5 rounded">
+              {part}
+            </span>
           )
-          if (isUser) {
-            return (
-              <span key={i} className="text-blue-600 font-medium bg-blue-50 px-0.5 rounded">
-                {part}
-              </span>
-            )
-          }
         }
         return <span key={i}>{part}</span>
       })}
@@ -331,14 +329,11 @@ export default function ProjectCommentSection({ projectId, projectName, currentU
     setSubmitting(true)
     setError(null)
 
-    // Parse @mentions
+    // Parse @mentions — match against known user names (longest first)
     const mentionedIds: string[] = []
-    const mentionRegex = /@([^\n@]+?)(?=\s|$)/g
-    let match: RegExpExecArray | null
-    while ((match = mentionRegex.exec(newComment)) !== null) {
-      const name = match[1].trim()
-      const user = mentionableUsers.find(u => u.full_name === name)
-      if (user && !mentionedIds.includes(user.id) && user.id !== currentUserId) {
+    const sortedUsers = [...mentionableUsers].sort((a, b) => b.full_name.length - a.full_name.length)
+    for (const user of sortedUsers) {
+      if (newComment.includes(`@${user.full_name}`) && user.id !== currentUserId && !mentionedIds.includes(user.id)) {
         mentionedIds.push(user.id)
       }
     }

@@ -19,6 +19,7 @@ export type TraceNodeType =
   | 'raw_batch'
   | 'stock_in'
   | 'deal'
+  | 'rubber_intake'
   | 'partner'
 
 export interface TraceNode {
@@ -264,6 +265,7 @@ export const traceabilityService = {
       .select(`
         id, deal_number, deal_type, product_name, quantity_kg,
         unit_price, total_value_vnd, status, created_at,
+        lot_code, lot_description, rubber_intake_id, source_region,
         partner:b2b_partners!partner_id(id, code, name, tier, phone)
       `)
       .eq('id', dealId)
@@ -281,6 +283,7 @@ export const traceabilityService = {
     const dealDetail = [
       DEAL_TYPE_MAP[deal.deal_type || ''] || deal.deal_type || '',
       deal.product_name || '',
+      deal.lot_code ? `Lô: ${deal.lot_code}` : '',
       deal.quantity_kg != null ? formatWeight(deal.quantity_kg) : '',
       deal.total_value_vnd != null ? `${deal.total_value_vnd.toLocaleString('vi-VN')} VND` : '',
     ].filter(Boolean).join(' | ')
@@ -292,6 +295,14 @@ export const traceabilityService = {
       detail: dealDetail,
       date: formatDate(deal.created_at),
       children: [],
+    }
+
+    // ★ Rubber Intake (Lý lịch mủ) — nếu có
+    if (deal.rubber_intake_id) {
+      const intakeNode = await this._traceRubberIntake(deal.rubber_intake_id)
+      if (intakeNode) {
+        dealNode.children.push(intakeNode)
+      }
     }
 
     // Partner
@@ -314,6 +325,40 @@ export const traceabilityService = {
     }
 
     return dealNode
+  },
+
+  // --------------------------------------------------------------------------
+  // TRACE RUBBER INTAKE (Lý lịch mủ)
+  // --------------------------------------------------------------------------
+
+  async _traceRubberIntake(intakeId: string): Promise<TraceNode | null> {
+    const { data: intake, error } = await supabase
+      .from('rubber_intake_batches')
+      .select('id, lot_code, source_type, product_code, intake_date, net_weight_kg, drc_percent, location_name, notes, status')
+      .eq('id', intakeId)
+      .single()
+
+    if (error || !intake) return null
+
+    const SOURCE_MAP: Record<string, string> = { vietnam: 'VN', lao_direct: 'Lào', lao_agent: 'Lào (ĐL)' }
+
+    const detail = [
+      intake.lot_code || '',
+      intake.product_code || '',
+      SOURCE_MAP[intake.source_type] || intake.source_type,
+      intake.drc_percent ? `DRC ${intake.drc_percent}%` : '',
+      intake.net_weight_kg ? formatWeight(intake.net_weight_kg) : '',
+      intake.location_name || '',
+    ].filter(Boolean).join(' | ')
+
+    return {
+      type: 'rubber_intake',
+      id: intake.id,
+      label: `Lý lịch mủ: ${intake.lot_code || intakeId.slice(0, 8)}`,
+      detail,
+      date: formatDate(intake.intake_date),
+      children: [],
+    }
   },
 
   // --------------------------------------------------------------------------

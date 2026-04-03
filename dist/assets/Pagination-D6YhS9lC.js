@@ -1,0 +1,3 @@
+import{j as s}from"./index-DIgijvqf.js";function n({currentPage:r,totalPages:i,onPageChange:o}){if(i<=1)return null;const l=[];for(let d=1;d<=i;d++)l.push(d);return s.jsxs("div",{className:"flex items-center justify-center gap-2 mt-4",children:[s.jsx("button",{onClick:()=>o(r-1),disabled:r===1,className:`px-3 py-1 border rounded-lg disabled:opacity-50 
+          disabled:cursor-not-allowed hover:bg-gray-100`,children:"←"}),l.map(d=>s.jsx("button",{onClick:()=>o(d),className:`px-3 py-1 border rounded-lg ${d===r?"bg-primary text-white":"hover:bg-gray-100"}`,children:d},d)),s.jsx("button",{onClick:()=>o(r+1),disabled:r===i,className:`px-3 py-1 border rounded-lg disabled:opacity-50 
+          disabled:cursor-not-allowed hover:bg-gray-100`,children:"→"})]})}export{n as P};

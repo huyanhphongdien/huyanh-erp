@@ -211,7 +211,7 @@ export const stockInService = {
     // 1. Validate: phiếu phải ở trạng thái draft
     const { data: order, error: orderErr } = await supabase
       .from('stock_in_orders')
-      .select('id, status, warehouse_id')
+      .select('id, status, warehouse_id, deal_id')
       .eq('id', stockInId)
       .single()
 
@@ -219,6 +219,21 @@ export const stockInService = {
     if (!order) throw new Error('Không tìm thấy phiếu nhập kho')
     if (order.status !== 'draft') {
       throw new Error('Chỉ có thể thêm chi tiết khi phiếu ở trạng thái Nháp')
+    }
+
+    // ★ Lấy lot_code + rubber_intake_id từ deal (nếu có)
+    let sourceLotCode: string | undefined
+    let rubberIntakeId: string | undefined
+    if (order.deal_id) {
+      const { data: deal } = await supabase
+        .from('b2b_deals')
+        .select('lot_code, rubber_intake_id')
+        .eq('id', order.deal_id)
+        .single()
+      if (deal) {
+        sourceLotCode = deal.lot_code || undefined
+        rubberIntakeId = deal.rubber_intake_id || undefined
+      }
     }
 
     // 2. Tạo lô hàng mới (stock_batches)
@@ -229,6 +244,8 @@ export const stockInService = {
       initial_quantity: detail.quantity,
       initial_drc: detail.initial_drc,
       batch_type: 'production',
+      source_lot_code: sourceLotCode,
+      rubber_intake_id: rubberIntakeId,
     })
 
     // 3. Tạo chi tiết phiếu nhập (stock_in_details)

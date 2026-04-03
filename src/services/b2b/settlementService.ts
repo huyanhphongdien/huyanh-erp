@@ -625,7 +625,11 @@ export const settlementService = {
     // Ghi bút toán công nợ: CREDIT (thanh toán cho đại lý, trừ nợ)
     if (current.partner_id) {
       try {
-        const creditAmount = current.remaining_amount || ((current.gross_amount || 0) - (current.total_advance || 0))
+        // remaining = gross - advance - đã thanh toán trước đó
+        const grossAmount = current.gross_amount || 0
+        const totalAdvance = current.total_advance || 0
+        const alreadyPaid = current.paid_amount || 0
+        const creditAmount = current.remaining_amount || Math.max(0, grossAmount - totalAdvance - alreadyPaid)
         const paymentAmount = creditAmount > 0 ? creditAmount : 0
         if (paymentAmount > 0) {
           await supabase

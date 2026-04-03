@@ -50,6 +50,10 @@ export interface CreateBatchData {
   supplier_name?: string
   supplier_region?: string
   supplier_reported_drc?: number
+
+  // B2B traceability
+  source_lot_code?: string
+  rubber_intake_id?: string
 }
 
 // ============================================================================
@@ -230,6 +234,9 @@ export const batchService = {
       supplier_reported_drc: data.supplier_reported_drc || null,
       contamination_status: 'clean',
       storage_days: 0,
+      // B2B traceability
+      source_lot_code: data.source_lot_code || null,
+      rubber_intake_id: data.rubber_intake_id || null,
     }
 
     const { data: batch, error } = await supabase

@@ -156,6 +156,15 @@ export function TaskViewPage() {
     try {
       const t = task as any
       const isAssignee = user?.employee_id === t?.assignee_id || user?.employee_id === t?.assignee?.id
+      const isManager = (user?.position_level || 7) <= 5
+      const isDeptManager = isManager && user?.department_id === t?.department_id
+
+      // ★ Chỉ assignee hoặc QL cùng phòng ban mới được mark complete
+      if (!isAssignee && !isDeptManager) {
+        message.warning('Chỉ người phụ trách hoặc quản lý phòng ban mới có thể hoàn thành công việc này.')
+        setActionLoading(null)
+        return
+      }
 
       const isRecurring = t?.task_source === 'recurring'
       const isProject = t?.task_source === 'project'
@@ -228,12 +237,12 @@ export function TaskViewPage() {
         // ★ Assigned: NV tự chấm sao → QL duyệt
         setShowQuickEval(true)
         message.info('Vui lòng đánh giá để hoàn thành công việc.')
-      } else {
-        // Người khác (participant/viewer): mark finished + auto 85 điểm
+      } else if (isDeptManager) {
+        // ★ QL phòng ban mark complete thay NV — auto 100 điểm
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
           completed_date: new Date().toISOString().split('T')[0],
-          self_score: 100, final_score: 85,
+          self_score: 100, final_score: 100,
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
@@ -241,7 +250,7 @@ export function TaskViewPage() {
           await subtaskService.recalculateParent(t.parent_task_id)
         }
         await refetch()
-        message.success('Công việc đã hoàn thành! (85 điểm)')
+        message.success('QL đã hoàn thành công việc! (100 điểm)')
       }
     } catch (err) {
       console.error('Mark complete failed:', err)

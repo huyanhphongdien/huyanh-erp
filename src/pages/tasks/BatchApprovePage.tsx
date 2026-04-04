@@ -233,7 +233,7 @@ const BatchApprovePage: React.FC = () => {
 
         const managerStars = getManagerScore(taskId);
         const managerScorePoints = managerStars * 20; // ★ 1-5 sao → 20-100 điểm
-        const selfScore = task.self_score ?? managerScorePoints;
+        const selfScore = task.self_score ?? 60; // Default 60 nếu NV chưa tự đánh giá (3 sao)
         const note = getNote(taskId);
 
         // Calculate final_score = self_score × 40% + manager_score × 60%
@@ -468,7 +468,7 @@ const BatchApprovePage: React.FC = () => {
       render: (_: any, record: PendingTask) => {
         const ms = getManagerScore(record.id)
         if (!ms) return <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
-        const selfScore = record.self_score ?? (ms * 20)
+        const selfScore = record.self_score ?? 60 // Default 60 (3 sao) nếu chưa tự đánh giá
         const final = Math.round(selfScore * 0.4 + (ms * 20) * 0.6)
         const color = final >= 75 ? '#52c41a' : final >= 60 ? '#faad14' : '#ff4d4f'
         return <Text strong style={{ fontSize: 15, color }}>{final}</Text>

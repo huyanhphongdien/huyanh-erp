@@ -94,16 +94,8 @@ const BookingFormModal = ({
     const qty = values.quantity_tons || 0
     const price = values.price_per_kg || 0
     const drc = values.drc_percent || 0
-    const priceUnit = values.price_unit || 'wet'
-
-    let estimated = 0
-    if (priceUnit === 'wet') {
-      // Giá ướt: qty(tấn) × 1000(kg) × giá/kg
-      estimated = qty * 1000 * price
-    } else {
-      // Giá khô: qty(tấn) × 1000(kg) × DRC% × giá/kg
-      estimated = qty * 1000 * (drc / 100) * price
-    }
+    // Luôn dùng giá ướt (đồng bộ với Portal)
+    const estimated = qty * 1000 * price
     setEstimatedValue(Math.round(estimated))
   }
 
@@ -127,7 +119,7 @@ const BookingFormModal = ({
         quantity_tons: values.quantity_tons,
         drc_percent: values.drc_percent,
         price_per_kg: values.price_per_kg,
-        price_unit: values.price_unit,
+        price_unit: 'wet', // Luôn giá ướt (đồng bộ Portal)
         estimated_value: estimatedValue,
         pickup_location: pickupLocationLabel,
         delivery_date: values.delivery_date
@@ -243,8 +235,8 @@ const BookingFormModal = ({
         </Row>
 
         <Row gutter={16}>
-          {/* Đơn giá */}
-          <Col span={12}>
+          {/* Đơn giá (VNĐ/kg) */}
+          <Col span={24}>
             <Form.Item
               name="price_per_kg"
               label="Đơn giá (đ/kg)"
@@ -265,22 +257,7 @@ const BookingFormModal = ({
             </Form.Item>
           </Col>
 
-          {/* Loại giá */}
-          <Col span={12}>
-            <Form.Item
-              name="price_unit"
-              label="Loại giá"
-              rules={[{ required: true }]}
-            >
-              <Select
-                size="large"
-                options={[
-                  { value: 'wet', label: 'Giá ướt' },
-                  { value: 'dry', label: 'Giá khô (theo DRC)' },
-                ]}
-              />
-            </Form.Item>
-          </Col>
+          {/* Loại giá: luôn wet — bỏ dropdown theo Portal */}
         </Row>
 
         {/* Địa điểm bốc hàng */}

@@ -16,6 +16,7 @@ export interface ChecklistItem {
   created_at: string
   requires_evidence?: boolean
   evidence_url?: string | null
+  evidence_urls?: string[] | null
   evidence_note?: string | null
 }
 

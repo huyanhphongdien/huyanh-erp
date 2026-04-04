@@ -418,19 +418,44 @@ export const performanceDashboardService = {
       if (tasksError) throw tasksError;
 
       // ★ Tính điểm weighted từ tasks.final_score + task_source
+      // ★ Participants nhận điểm bằng assignee
       const evaluatedEmployees = new Set<string>();
       const employeeWeighted = new Map<string, { totalScore: number; totalWeight: number }>();
+
+      // Fetch participants cho tất cả tasks
+      const taskIds = (tasks || []).map((t: any) => t.id);
+      let participantMap: Record<string, string[]> = {}; // taskId → [employeeIds]
+      if (taskIds.length > 0) {
+        const { data: assignments } = await supabase
+          .from('task_assignments')
+          .select('task_id, employee_id')
+          .in('task_id', taskIds)
+          .eq('role', 'participant')
+          .eq('status', 'accepted');
+        (assignments || []).forEach((a: any) => {
+          if (!participantMap[a.task_id]) participantMap[a.task_id] = [];
+          participantMap[a.task_id].push(a.employee_id);
+        });
+      }
+
+      function addScore(empId: string, score: number, weight: number) {
+        evaluatedEmployees.add(empId);
+        if (!employeeWeighted.has(empId)) employeeWeighted.set(empId, { totalScore: 0, totalWeight: 0 });
+        const emp = employeeWeighted.get(empId)!;
+        emp.totalScore += score * weight;
+        emp.totalWeight += weight;
+      }
 
       (tasks || []).forEach((t: any) => {
         if (!t.assignee_id) return;
         const score = t.final_score || 0;
         if (score > 0) {
-          evaluatedEmployees.add(t.assignee_id);
           const weight = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.5 : 1.0;
-          if (!employeeWeighted.has(t.assignee_id)) employeeWeighted.set(t.assignee_id, { totalScore: 0, totalWeight: 0 });
-          const emp = employeeWeighted.get(t.assignee_id)!;
-          emp.totalScore += score * weight;
-          emp.totalWeight += weight;
+          // Assignee
+          addScore(t.assignee_id, score, weight);
+          // Participants — cùng điểm, cùng weight
+          const participants = participantMap[t.id] || [];
+          participants.forEach(pid => addScore(pid, score, weight));
         }
       });
 
@@ -602,6 +627,50 @@ export const performanceDashboardService = {
         }
       });
 
+      // ★ Participants nhận điểm bằng assignee
+      if (taskIds.length > 0) {
+        const { data: pAssignments } = await supabase
+          .from('task_assignments')
+          .select('task_id, employee_id, employee:employees!task_assignments_employee_id_fkey(id, full_name, avatar_url, department_id, department:departments!employees_department_id_fkey(id, name))')
+          .in('task_id', taskIds)
+          .eq('role', 'participant')
+          .eq('status', 'accepted');
+
+        (pAssignments || []).forEach((pa: any) => {
+          const task = tasks.find((t: any) => t.id === pa.task_id);
+          if (!task) return;
+          const score = (task as any).final_score || 0;
+          if (score <= 0) return;
+          const weight = getTaskWeight(task);
+          const emp = Array.isArray(pa.employee) ? pa.employee[0] : pa.employee;
+          if (!emp) return;
+          const dept = Array.isArray(emp.department) ? emp.department[0] : emp.department;
+          const pid = emp.id;
+
+          if (!employeeMap.has(pid)) {
+            employeeMap.set(pid, {
+              employee_id: pid, employee_name: emp.full_name || '', avatar_url: emp.avatar_url || null,
+              department_name: dept?.name || '', department_id: emp.department_id || dept?.id || '',
+              total_tasks: 0, completed_tasks: 0, on_time_count: 0, overdue_count: 0,
+              self_scores: [], manager_scores: [], weighted_self_scores: [], weighted_manager_scores: [],
+            });
+          }
+          const empData = employeeMap.get(pid)!;
+          empData.total_tasks++;
+          empData.completed_tasks++;
+          empData.manager_scores.push(score);
+          empData.self_scores.push(score);
+          empData.weighted_manager_scores.push({ score, weight });
+          empData.weighted_self_scores.push({ score, weight });
+          // On-time check
+          if (task.due_date) {
+            const due = new Date(task.due_date); due.setHours(23, 59, 59, 999);
+            const completed = task.completed_date ? new Date(task.completed_date) : new Date();
+            if (completed <= due) empData.on_time_count++; else empData.overdue_count++;
+          } else { empData.on_time_count++; }
+        });
+      }
+
       const result: EmployeePerformance[] = Array.from(employeeMap.values())
         .map(emp => {
           // Weighted average for self scores
@@ -770,7 +839,8 @@ export const performanceDashboardService = {
         ? (employee as any).department[0] : (employee as any).department;
 
       // ★ Dùng completed_date + tasks.final_score trực tiếp
-      const { data: tasks } = await supabase
+      // ★ Bao gồm task là assignee HOẶC participant
+      const { data: assignedTasks } = await supabase
         .from('tasks')
         .select('id, code, name, due_date, completed_date, task_source, self_score, final_score')
         .eq('status', 'finished')
@@ -778,6 +848,35 @@ export const performanceDashboardService = {
         .gte('completed_date', from)
         .lte('completed_date', to)
         .order('completed_date', { ascending: false });
+
+      // Tìm thêm task mà employee là participant
+      const { data: participatedAssignments } = await supabase
+        .from('task_assignments')
+        .select('task_id')
+        .eq('employee_id', employeeId)
+        .eq('role', 'participant')
+        .eq('status', 'accepted');
+
+      const participatedTaskIds = (participatedAssignments || []).map((a: any) => a.task_id);
+      let participatedTasks: any[] = [];
+      if (participatedTaskIds.length > 0) {
+        const { data: ptasks } = await supabase
+          .from('tasks')
+          .select('id, code, name, due_date, completed_date, task_source, self_score, final_score')
+          .eq('status', 'finished')
+          .in('id', participatedTaskIds)
+          .gte('completed_date', from)
+          .lte('completed_date', to)
+          .order('completed_date', { ascending: false });
+        participatedTasks = ptasks || [];
+      }
+
+      // Merge + deduplicate
+      const seenIds = new Set<string>();
+      const tasks: any[] = [];
+      for (const t of [...(assignedTasks || []), ...participatedTasks]) {
+        if (!seenIds.has(t.id)) { seenIds.add(t.id); tasks.push(t); }
+      }
 
       const taskDetails: EmployeeTaskDetail[] = [];
       let totalSelf = 0, selfCount = 0, totalWeighted = 0, totalWeight = 0;

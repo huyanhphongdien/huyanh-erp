@@ -366,7 +366,7 @@ export function ManagerDashboard() {
         const { data: leaves } = await supabase.from('leave_requests').select('id, employee_id, start_date, end_date, total_days, created_at, employee:employees!leave_requests_employee_id_fkey(full_name), leave_type:leave_types!leave_requests_leave_type_id_fkey(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
         setPendingLeaves((leaves || []).map((l: any) => ({ ...l, employee: Array.isArray(l.employee) ? l.employee[0] : l.employee, leave_type: Array.isArray(l.leave_type) ? l.leave_type[0] : l.leave_type })))
 
-        const { data: ots } = await supabase.from('overtime_requests').select('id, employee_id, overtime_date, hours, created_at, employee:employees!overtime_requests_employee_id_fkey(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        const { data: ots } = await supabase.from('overtime_requests').select('id, employee_id, overtime_date, hours, created_at, employee:employees(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
         setPendingOvertimes((ots || []).map((o: any) => ({ ...o, employee: Array.isArray(o.employee) ? o.employee[0] : o.employee })))
 
         // ★ Task chờ phê duyệt (evaluation_status = pending_approval)
@@ -618,8 +618,8 @@ export function ManagerDashboard() {
               {/* Biểu đồ 7 ngày */}
               <div className="mt-4 pt-3 border-t border-gray-50">
                 <p className="text-[11px] text-gray-400 font-medium mb-2">7 ngày gần nhất</p>
-                <div className="h-[140px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[140px]" style={{ minWidth: 100, minHeight: 100 }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
                     <BarChart data={weeklyAttendance} barGap={2}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} />

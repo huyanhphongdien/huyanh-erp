@@ -32,6 +32,7 @@ import {
   getCountries,
 } from '../../constants/pickupLocations'
 import dayjs from 'dayjs'
+import RubberRegionPicker from './RubberRegionPicker'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -75,6 +76,7 @@ const BookingFormModal = ({
   const [form] = Form.useForm()
   const [estimatedValue, setEstimatedValue] = useState(0)
   const [showCustomLocation, setShowCustomLocation] = useState(false)
+  const [rubberRegionValue, setRubberRegionValue] = useState<{ name: string; lat?: number; lng?: number } | null>(null)
 
   // Reset form when modal opens
   useEffect(() => {
@@ -82,6 +84,7 @@ const BookingFormModal = ({
       form.resetFields()
       setEstimatedValue(0)
       setShowCustomLocation(false)
+      setRubberRegionValue(null)
     }
   }, [open, form])
 
@@ -131,7 +134,9 @@ const BookingFormModal = ({
           ? dayjs(values.delivery_date).format('YYYY-MM-DD')
           : dayjs().add(1, 'day').format('YYYY-MM-DD'),
         lot_code: undefined, // Nhà máy tự gán mã lô
-        rubber_region: values.rubber_region || undefined,
+        rubber_region: rubberRegionValue?.name || undefined,
+        rubber_region_lat: rubberRegionValue?.lat || undefined,
+        rubber_region_lng: rubberRegionValue?.lng || undefined,
         notes: values.notes || undefined,
         status: 'pending',
       }
@@ -341,9 +346,12 @@ const BookingFormModal = ({
           />
         </Form.Item>
 
-        {/* Vùng mủ */}
-        <Form.Item name="rubber_region" label="Vùng mủ (tùy chọn)">
-          <Input placeholder="VD: Sơn Thủy, A Lưới, TT Huế" size="large" maxLength={200} />
+        {/* Vùng mủ — Bản đồ + Search */}
+        <Form.Item label="Vùng mủ (tùy chọn)">
+          <RubberRegionPicker
+            value={rubberRegionValue || undefined}
+            onChange={(region) => setRubberRegionValue(region)}
+          />
         </Form.Item>
 
         {/* Ghi chú */}

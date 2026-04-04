@@ -186,6 +186,8 @@ export function TaskViewPage() {
         }
       }
 
+      const isSelf = t?.task_source === 'self'
+
       if (isRecurring) {
         // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup
         const { error } = await supabase.from('tasks').update({
@@ -198,21 +200,48 @@ export function TaskViewPage() {
         if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
         await refetch()
         message.success('Hoàn thành! (Tự động 80 điểm)')
-      } else if (isAssignee) {
-        setShowQuickEval(true)
-        message.info('Vui lòng đánh giá để hoàn thành công việc.')
-      } else {
-        // Người khác: update finished luôn
+      } else if (isSelf) {
+        // ★ Self (tự giao): auto-approve 85 điểm (×0.85), KHÔNG popup
         const { error } = await supabase.from('tasks').update({
           status: 'finished', progress: 100,
           completed_date: new Date().toISOString().split('T')[0],
+          self_score: 100, final_score: 85,
+          evaluation_status: 'approved',
+        }).eq('id', id)
+        if (error) throw error
+        if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
+        await refetch()
+        message.success('Hoàn thành! (Tự giao — 85 điểm)')
+      } else if (isProject) {
+        // ★ Project: auto-approve 90 điểm (×0.90), đã check evidence ở trên
+        const { error } = await supabase.from('tasks').update({
+          status: 'finished', progress: 100,
+          completed_date: new Date().toISOString().split('T')[0],
+          self_score: 100, final_score: 90,
+          evaluation_status: 'approved',
+        }).eq('id', id)
+        if (error) throw error
+        if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
+        await refetch()
+        message.success('Hoàn thành! (Dự án — 90 điểm)')
+      } else if (isAssignee) {
+        // ★ Assigned: NV tự chấm sao → QL duyệt
+        setShowQuickEval(true)
+        message.info('Vui lòng đánh giá để hoàn thành công việc.')
+      } else {
+        // Người khác (participant/viewer): mark finished + auto 85 điểm
+        const { error } = await supabase.from('tasks').update({
+          status: 'finished', progress: 100,
+          completed_date: new Date().toISOString().split('T')[0],
+          self_score: 100, final_score: 85,
+          evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
         if (t?.parent_task_id) {
           await subtaskService.recalculateParent(t.parent_task_id)
         }
         await refetch()
-        message.success('Công việc đã hoàn thành!')
+        message.success('Công việc đã hoàn thành! (85 điểm)')
       }
     } catch (err) {
       console.error('Mark complete failed:', err)
@@ -664,25 +693,43 @@ export function TaskViewPage() {
                   }
                 }
 
+                const isSelf2 = t.task_source === 'self'
+
                 if (isRecurring) {
-                  // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup
-                  const autoScore = 80
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
-                    completed_date: new Date().toISOString(),
-                    self_score: 100, final_score: autoScore,
+                    completed_date: new Date().toISOString().split('T')[0],
+                    self_score: 100, final_score: 80,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
                   message.success('Hoàn thành! (Tự động 80 điểm)')
+                } else if (isSelf2) {
+                  await supabase.from('tasks').update({
+                    status: 'finished', progress: 100,
+                    completed_date: new Date().toISOString().split('T')[0],
+                    self_score: 100, final_score: 85,
+                    evaluation_status: 'approved',
+                  }).eq('id', t.id)
+                  message.success('Hoàn thành! (Tự giao — 85 điểm)')
+                } else if (isProject2) {
+                  await supabase.from('tasks').update({
+                    status: 'finished', progress: 100,
+                    completed_date: new Date().toISOString().split('T')[0],
+                    self_score: 100, final_score: 90,
+                    evaluation_status: 'approved',
+                  }).eq('id', t.id)
+                  message.success('Hoàn thành! (Dự án — 90 điểm)')
                 } else if (isAssignee2) {
                   setShowQuickEval(true)
                   message.info('Checklist hoàn tất! Vui lòng đánh giá để hoàn thành.')
                 } else {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
-                    completed_date: new Date().toISOString(),
+                    completed_date: new Date().toISOString().split('T')[0],
+                    self_score: 100, final_score: 85,
+                    evaluation_status: 'approved',
                   }).eq('id', t.id)
-                  message.success('Công việc đã hoàn thành!')
+                  message.success('Công việc đã hoàn thành! (85 điểm)')
                 }
               }
 

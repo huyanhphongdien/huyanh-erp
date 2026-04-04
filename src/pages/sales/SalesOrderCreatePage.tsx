@@ -308,6 +308,16 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
           </Row>
+
+          {/* Quy cách bành — ảnh hưởng tính toán bành + container */}
+          <Form.Item label="Quy cách bành" name="bale_weight_kg" initialValue={33.33} style={{ maxWidth: 320 }}>
+            <Select
+              options={[
+                { value: 33.33, label: '33.33 kg/bành (630 bành/cont 20ft)' },
+                { value: 35, label: '35 kg/bành (600 bành/cont 20ft)' },
+              ]}
+            />
+          </Form.Item>
         </Card>
       </Col>
 
@@ -443,8 +453,13 @@ function SalesOrderCreatePage() {
             />
           </Form.Item>
 
-          <Form.Item label="KL banh (kg)" name="bale_weight_kg" initialValue={33.33}>
-            <InputNumber min={1} max={100} step={0.01} style={{ width: '100%' }} />
+          <Form.Item label="Quy cách bành" name="bale_weight_kg" initialValue={33.33}>
+            <Select
+              options={[
+                { value: 33.33, label: '33.33 kg/bành (630 bành/cont 20ft)' },
+                { value: 35, label: '35 kg/bành (600 bành/cont 20ft)' },
+              ]}
+            />
           </Form.Item>
 
           <Row gutter={16}>

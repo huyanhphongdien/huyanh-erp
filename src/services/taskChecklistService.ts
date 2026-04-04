@@ -18,6 +18,8 @@ export interface ChecklistItem {
   evidence_url?: string | null
   evidence_urls?: string[] | null
   evidence_note?: string | null
+  // Completed by info
+  completed_by_name?: string | null
 }
 
 export interface CreateChecklistData {
@@ -31,13 +33,29 @@ export const taskChecklistService = {
   async getByTaskId(taskId: string): Promise<ChecklistItem[]> {
     const { data, error } = await supabase
       .from('task_checklist_items')
-      .select('*')
+      .select('*, completer:employees!task_checklist_items_completed_by_fkey(full_name)')
       .eq('task_id', taskId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
 
-    if (error) throw error
-    return (data || []) as ChecklistItem[]
+    if (error) {
+      // Fallback nếu FK không tồn tại
+      const { data: fallback, error: fallbackErr } = await supabase
+        .from('task_checklist_items')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (fallbackErr) throw fallbackErr
+      return (fallback || []) as ChecklistItem[]
+    }
+
+    return (data || []).map((item: any) => ({
+      ...item,
+      completed_by_name: item.completer
+        ? (Array.isArray(item.completer) ? item.completer[0]?.full_name : item.completer?.full_name)
+        : null,
+    })) as ChecklistItem[]
   },
 
   async create(item: CreateChecklistData): Promise<ChecklistItem> {

@@ -261,7 +261,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                       onClick={() => { if (canEditChecklist) { setEditingId(item.id); setEditTitle(item.title) } }}>
                       {item.title}
                     </Text>
-                    {item.requires_evidence && evidenceUrls.length === 0 && (
+                    {item.requires_evidence && evidenceUrls.length === 0 && !item.is_completed && (
                       <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>📷 Cần bằng chứng</Tag>
                     )}
                     {evidenceUrls.length > 0 && (
@@ -269,6 +269,12 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                         onClick={() => { if (uploadingId === item.id) setUploadingId(null); else setUploadingId(item.id) }}>
                         <PaperClipOutlined /> {evidenceUrls.length} file
                       </Tag>
+                    )}
+                    {item.is_completed && (item as any).completed_by_name && (
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        ✓ {(item as any).completed_by_name}
+                        {item.completed_at && ` • ${new Date(item.completed_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+                      </Text>
                     )}
                   </div>
                 )}

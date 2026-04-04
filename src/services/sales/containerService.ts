@@ -40,9 +40,12 @@ export interface AddContainerItemInput {
 // CONSTANTS — Sức chứa container
 // ============================================================================
 
-const CONTAINER_CAPACITY: Record<ContainerType, { max_tons: number; max_bales: number }> = {
-  '20ft': { max_tons: 20, max_bales: 600 },
-  '40ft': { max_tons: 25, max_bales: 750 },
+// Sức chứa theo quy cách bành:
+// - 35 kg/bành: 20ft = 600 bành (21T), 40ft = 1200 bành
+// - 33.33 kg/bành: 20ft = 630 bành (21T), 40ft = 1260 bành
+const CONTAINER_CAPACITY: Record<ContainerType, { max_tons: number; max_bales_35: number; max_bales_33: number }> = {
+  '20ft': { max_tons: 21, max_bales_35: 600, max_bales_33: 630 },
+  '40ft': { max_tons: 42, max_bales_35: 1200, max_bales_33: 1260 },
 }
 
 // ============================================================================

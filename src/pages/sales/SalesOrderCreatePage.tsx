@@ -127,8 +127,10 @@ function SalesOrderCreatePage() {
   const currency = Form.useWatch('currency', form) || 'USD'
 
   const totalBales = baleWeight > 0 ? Math.ceil((quantityTons * 1000) / baleWeight) : 0
-  const containerCapacity = containerType === '40ft' ? 25 : 18
-  const containerCount = containerCapacity > 0 ? Math.ceil(quantityTons / containerCapacity) : 0
+  // Container 20ft: 600 bành (35kg) hoặc 630 bành (33.33kg) | 40ft: gấp đôi
+  const balesPerContainer20ft = baleWeight >= 35 ? 600 : 630
+  const balesPerContainer = containerType === '40ft' ? balesPerContainer20ft * 2 : balesPerContainer20ft
+  const containerCount = balesPerContainer > 0 ? Math.ceil(totalBales / balesPerContainer) : 0
   const totalValueUSD = quantityTons * unitPrice
   const totalValueVND = exchangeRate > 0 ? totalValueUSD * exchangeRate : 0
 

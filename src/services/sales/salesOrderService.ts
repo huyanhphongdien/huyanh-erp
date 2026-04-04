@@ -287,12 +287,14 @@ export const salesOrderService = {
     const code = await salesOrderService.generateCode()
 
     // Tính toán các trường tự động
-    const baleWeight = input.bale_weight_kg || 35
+    const baleWeight = input.bale_weight_kg || 33.33
     const quantityKg = input.quantity_tons * 1000
     const totalBales = Math.ceil(quantityKg / baleWeight)
     const containerType = input.container_type || '20ft'
-    const maxTonsPerContainer = containerType === '20ft' ? 20 : 25
-    const containerCount = Math.ceil(input.quantity_tons / maxTonsPerContainer)
+    // Container 20ft: 600 bành (35kg) hoặc 630 bành (33.33kg) | 40ft: gấp đôi
+    const balesPerContainer20ft = baleWeight >= 35 ? 600 : 630
+    const balesPerContainer = containerType === '40ft' ? balesPerContainer20ft * 2 : balesPerContainer20ft
+    const containerCount = Math.ceil(totalBales / balesPerContainer)
     const totalValueUsd = input.quantity_tons * input.unit_price
     const exchangeRate = input.exchange_rate || 0
     const totalValueVnd = exchangeRate > 0 ? totalValueUsd * exchangeRate : 0

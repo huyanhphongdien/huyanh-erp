@@ -11,7 +11,7 @@ import { supabase } from '../../lib/supabase'
 
 export type DemandStatus = 'draft' | 'published' | 'partially_filled' | 'filled' | 'closed' | 'cancelled'
 export type DemandType = 'purchase' | 'processing'
-export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn'
+export type OfferStatus = 'pending' | 'submitted' | 'accepted' | 'rejected' | 'withdrawn'
 
 export interface Demand {
   id: string
@@ -166,6 +166,7 @@ export const DEMAND_TYPE_COLORS: Record<DemandType, string> = {
 
 export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   pending: 'Chờ duyệt',
+  submitted: 'Chờ duyệt',
   accepted: 'Đã chấp nhận',
   rejected: 'Đã từ chối',
   withdrawn: 'Đã rút',
@@ -173,6 +174,7 @@ export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
 
 export const OFFER_STATUS_COLORS: Record<OfferStatus, string> = {
   pending: 'orange',
+  submitted: 'orange',
   accepted: 'green',
   rejected: 'red',
   withdrawn: 'default',
@@ -360,7 +362,7 @@ export const demandService = {
       return {
         ...demand,
         offers_count: demandOffers.length,
-        pending_offers_count: demandOffers.filter(o => o.status === 'pending').length,
+        pending_offers_count: demandOffers.filter(o => o.status === 'pending' || o.status === 'submitted').length,
       }
     }) as Demand[]
 
@@ -396,7 +398,7 @@ export const demandService = {
     return {
       ...data,
       offers_count: offers?.length || 0,
-      pending_offers_count: offers?.filter(o => o.status === 'pending').length || 0,
+      pending_offers_count: offers?.filter(o => o.status === 'pending' || o.status === 'submitted').length || 0,
     } as Demand
   },
 

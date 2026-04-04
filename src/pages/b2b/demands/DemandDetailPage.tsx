@@ -378,7 +378,7 @@ const DemandDetailPage = () => {
       key: 'actions',
       width: 160,
       render: (_, record) => {
-        if (record.status !== 'pending') {
+        if (record.status !== 'pending' && record.status !== 'submitted') {
           if (record.deal_id) {
             return (
               <Button
@@ -583,7 +583,7 @@ const DemandDetailPage = () => {
     return actions
   }
 
-  const pendingOffersCount = offers.filter(o => o.status === 'pending').length
+  const pendingOffersCount = offers.filter(o => o.status === 'pending' || o.status === 'submitted').length
 
   return (
     <div style={{ padding: 24 }}>

@@ -239,136 +239,157 @@ function SalesOrderCreatePage() {
   const renderStep1 = () => (
     <Row gutter={24}>
       <Col xs={24} lg={16}>
-        <Card title="Khách hàng & Sản phẩm" size="small">
-          <Form.Item
-            label="Khách hàng"
-            name="customer_id"
-            rules={[{ required: true, message: 'Vui lòng chọn khách hàng' }]}
-          >
-            <Select
-              showSearch
-              placeholder="Chọn khách hàng..."
-              optionFilterProp="label"
-              onChange={handleCustomerChange}
-              options={customers.map((c) => ({
-                value: c.id,
-                label: `${c.code} — ${c.name}${c.country ? ` (${c.country})` : ''}`,
-              }))}
-            />
-          </Form.Item>
-
+        {/* ═══ Khách hàng ═══ */}
+        <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
+          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Khách hàng</span>}>
           <Row gutter={16}>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={16}>
+              <Form.Item
+                label="Khách hàng"
+                name="customer_id"
+                rules={[{ required: true, message: 'Vui lòng chọn khách hàng' }]}
+              >
+                <Select
+                  showSearch
+                  placeholder="Chọn khách hàng..."
+                  optionFilterProp="label"
+                  onChange={handleCustomerChange}
+                  size="large"
+                  options={customers.map((c) => ({
+                    value: c.id,
+                    label: `${c.code} — ${c.name}${c.country ? ` (${c.country})` : ''}`,
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="PO# khách hàng" name="customer_po">
+                <Input placeholder="Số PO" size="large" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* ═══ Sản phẩm & Giá ═══ */}
+        <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
+          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Sản phẩm & Giá</span>}>
+          <Row gutter={16}>
+            <Col xs={24} sm={8}>
               <Form.Item
                 label="Grade SVR"
                 name="grade"
-                rules={[{ required: true, message: 'Vui lòng chọn grade' }]}
+                rules={[{ required: true, message: 'Chọn grade' }]}
               >
                 <Select
                   placeholder="Chọn grade..."
+                  size="large"
                   options={SVR_GRADE_OPTIONS.map((g) => ({ value: g.value, label: g.label }))}
                   onChange={handleGradeChange}
                 />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item label="PO# khách hàng" name="customer_po">
-                <Input placeholder="Số PO của khách hàng" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
             <Col xs={24} sm={8}>
               <Form.Item
                 label="Số lượng (tấn)"
                 name="quantity_tons"
                 rules={[{ required: true, message: 'Nhập số lượng' }]}
               >
-                <InputNumber min={0.1} step={1} style={{ width: '100%' }} placeholder="0" />
+                <InputNumber min={0.1} step={1} size="large" style={{ width: '100%' }} placeholder="0" />
               </Form.Item>
             </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item
+                label="Quy cách bành"
+                name="bale_weight_kg"
+                initialValue={33.33}
+              >
+                <Select size="large" options={[
+                  { value: 33.33, label: '33.33 kg — 630 bành/cont' },
+                  { value: 35, label: '35 kg — 600 bành/cont' },
+                ]} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
             <Col xs={24} sm={8}>
               <Form.Item
                 label="Đơn giá (USD/tấn)"
                 name="unit_price"
                 rules={[{ required: true, message: 'Nhập đơn giá' }]}
               >
-                <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="0" />
+                <InputNumber min={0} step={10} size="large" style={{ width: '100%' }} placeholder="0"
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+                />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={4}>
+            <Col xs={24} sm={8}>
               <Form.Item label="Tiền tệ" name="currency" initialValue="USD">
-                <Select options={CURRENCY_OPTIONS} />
+                <Select size="large" options={CURRENCY_OPTIONS} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={4}>
-              <Form.Item label="Tỷ giá (VND)" name="exchange_rate">
-                <InputNumber min={0} step={100} style={{ width: '100%' }} placeholder="25000" />
+            <Col xs={24} sm={8}>
+              <Form.Item label="Tỷ giá (VND)" name="exchange_rate" tooltip="Tùy chọn — để tính giá trị VND">
+                <InputNumber min={0} step={100} size="large" style={{ width: '100%' }} placeholder="25,000"
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+                />
               </Form.Item>
             </Col>
           </Row>
-
-          {/* Quy cách bành — ảnh hưởng tính toán bành + container */}
-          <Form.Item label="Quy cách bành" name="bale_weight_kg" initialValue={33.33} style={{ maxWidth: 320 }}>
-            <Select
-              options={[
-                { value: 33.33, label: '33.33 kg/bành (630 bành/cont 20ft)' },
-                { value: 35, label: '35 kg/bành (600 bành/cont 20ft)' },
-              ]}
-            />
-          </Form.Item>
         </Card>
       </Col>
 
       <Col xs={24} lg={8}>
-        {/* Customer card */}
+        {/* ═══ Thông tin khách hàng ═══ */}
         {selectedCustomer && (
-          <Card
-            size="small"
-            title="Thông tin khách hàng"
-            style={{ marginBottom: 16 }}
-          >
-            <Descriptions column={1} size="small">
-              <Descriptions.Item label="Mã">{selectedCustomer.code}</Descriptions.Item>
-              <Descriptions.Item label="Tên">{selectedCustomer.name}</Descriptions.Item>
+          <Card size="small" style={{ marginBottom: 16, borderRadius: 12, background: '#fafffe', borderColor: '#d9f7e8' }}
+            title={<span style={{ fontSize: 13, fontWeight: 600, color: '#1B4D3E' }}>Thông tin khách hàng</span>}>
+            <Descriptions column={1} size="small" labelStyle={{ color: '#888', width: 80 }}>
+              <Descriptions.Item label="Mã"><Tag style={{ fontFamily: 'monospace' }}>{selectedCustomer.code}</Tag></Descriptions.Item>
+              <Descriptions.Item label="Tên"><strong>{selectedCustomer.name}</strong></Descriptions.Item>
               <Descriptions.Item label="Quốc gia">
-                {COUNTRY_OPTIONS.find((c) => c.value === selectedCustomer.country)?.label ||
-                  selectedCustomer.country ||
-                  '-'}
+                {COUNTRY_OPTIONS.find((c) => c.value === selectedCustomer.country)?.label || selectedCustomer.country || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Hạng">
                 <Tag color={CUSTOMER_TIER_COLORS[selectedCustomer.tier]}>
                   {CUSTOMER_TIER_LABELS[selectedCustomer.tier]}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Liên hệ">
-                {selectedCustomer.contact_person || '-'}
-              </Descriptions.Item>
+              <Descriptions.Item label="Liên hệ">{selectedCustomer.contact_person || '-'}</Descriptions.Item>
               <Descriptions.Item label="Email">{selectedCustomer.email || '-'}</Descriptions.Item>
             </Descriptions>
           </Card>
         )}
 
-        {/* Auto-calc card */}
-        <Card size="small" title="Tự động tính toán">
-          <Row gutter={[16, 16]}>
+        {/* ═══ Tự động tính toán ═══ */}
+        <Card size="small" style={{ borderRadius: 12, background: 'linear-gradient(135deg, #1B4D3E 0%, #2E7D5B 100%)', border: 'none' }}>
+          <div style={{ color: '#fff', marginBottom: 16 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>Tự động tính toán</span>
+          </div>
+          <Row gutter={[16, 20]}>
             <Col span={12}>
-              <Statistic title="Tổng bành" value={totalBales} suffix="bành" />
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Tổng bành</div>
+              <div style={{ color: '#fff', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{totalBales.toLocaleString()}</div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>bành ({baleWeight} kg)</div>
             </Col>
             <Col span={12}>
-              <Statistic title="Số container" value={containerCount} suffix={containerType} />
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Số container</div>
+              <div style={{ color: '#FFD700', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{containerCount}</div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>{containerType}</div>
             </Col>
             <Col span={12}>
-              <Statistic
-                title={`Giá trị ${currency}`}
-                value={totalValueUSD}
-                precision={2}
-                prefix="$"
-              />
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Giá trị {currency}</div>
+              <div style={{ color: '#4ADE80', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
+                {currency === 'USD' ? '$' : ''}{totalValueUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </Col>
             <Col span={12}>
-              <Statistic title="Giá trị VND" value={totalValueVND > 0 ? formatVND(totalValueVND) : '-'} />
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Giá trị VND</div>
+              <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, lineHeight: 1 }}>
+                {totalValueVND > 0 ? formatVND(totalValueVND) : '—'}
+              </div>
             </Col>
           </Row>
         </Card>

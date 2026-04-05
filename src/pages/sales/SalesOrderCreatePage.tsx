@@ -474,14 +474,7 @@ function SalesOrderCreatePage() {
             />
           </Form.Item>
 
-          <Form.Item label="Quy cách bành" name="bale_weight_kg" initialValue={33.33}>
-            <Select
-              options={[
-                { value: 33.33, label: '33.33 kg/bành (630 bành/cont 20ft)' },
-                { value: 35, label: '35 kg/bành (600 bành/cont 20ft)' },
-              ]}
-            />
-          </Form.Item>
+          {/* Quy cách bành đã chọn ở Step 1 */}
 
           <Row gutter={16}>
             <Col span={12}>

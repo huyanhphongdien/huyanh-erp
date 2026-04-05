@@ -79,7 +79,7 @@ interface ShipmentOrder extends SalesOrder {
   // Logistics
   voyage_number?: string
   port_of_loading?: string
-  port_of_discharge?: string
+  port_of_destination?: string
   cutoff_date?: string
   freight_terms?: string
   // Customs

@@ -70,10 +70,12 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
   const [showAddCustom, setShowAddCustom] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const initRef = useRef(false)
   const load = useCallback(async () => {
     setLoading(true)
     let data = await salesDocumentUploadService.getByOrderId(orderId)
-    if (data.length === 0) {
+    if (data.length === 0 && !initRef.current) {
+      initRef.current = true // prevent double init
       data = await salesDocumentUploadService.initChecklist(orderId)
     }
     setDocs(data)

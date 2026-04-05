@@ -305,6 +305,8 @@ const getMenuGroups = (
       { path: '/sales/customers', label: 'Khách hàng', icon: <Globe size={18} /> },
       { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} /> },
       { path: '/sales/shipments', label: 'Theo dõi lô hàng', icon: <Ship size={18} /> },
+      { path: '/sales/ar-aging', label: 'Nợ phải thu (A/R)', icon: <Clock size={18} /> },
+      { path: '/sales/cash-flow', label: 'Dòng tiền & LC', icon: <CreditCard size={18} /> },
       { path: '/executive', label: 'Điều hành BGĐ', icon: <TrendingUp size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
     ],
   },

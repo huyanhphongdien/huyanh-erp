@@ -143,6 +143,15 @@ interface PerformanceReportData {
   dept_scores: Array<{ name: string; score: number; grade: string; count: number }>
 }
 
+// ── Interface cảnh báo đơn hàng bán ──────────────────────────────────────────
+interface SalesAlertData {
+  lc_expiring: Array<{ code: string; customer: string; lc_number: string; lc_bank: string; expiry_date: string; days_left: number; amount: number }>
+  delivery_overdue: Array<{ code: string; customer: string; grade: string; qty: number; etd: string; days_overdue: number }>
+  payment_overdue: Array<{ code: string; customer: string; amount: number; delivery_date: string; days_overdue: number; payment_terms: string }>
+  pending_drafts: Array<{ code: string; customer: string; grade: string; qty: number; created_at: string; days_pending: number }>
+  total_alerts: number
+}
+
 // ── Interface so sánh hôm qua ────────────────────────────────────────────────
 interface YesterdayData {
   attendance_checked_in: number
@@ -586,12 +595,104 @@ async function fetchProjectReportData(supabase: any): Promise<ProjectReportData>
 
 // ── HTML Mobile-First Template ─────────────────────────────────────────────────
 // FIX: Layout 1 cột, tối ưu cho màn hình điện thoại, không bị cắt
+// ── Lấy dữ liệu CẢNH BÁO ĐƠN HÀNG BÁN ─────────────────────────────────────
+async function fetchSalesAlerts(supabase: any): Promise<SalesAlertData> {
+  const now = new Date()
+  const result: SalesAlertData = { lc_expiring: [], delivery_overdue: [], payment_overdue: [], pending_drafts: [], total_alerts: 0 }
+
+  try {
+    // 1. LC sắp hết hạn (< 7 ngày)
+    const sevenDaysLater = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0]
+    const { data: lcOrders } = await supabase
+      .from('sales_orders')
+      .select('code, lc_number, lc_bank, lc_expiry_date, lc_amount, total_value_usd, customer:sales_customers!customer_id(name, short_name)')
+      .not('lc_number', 'is', null)
+      .neq('lc_number', '')
+      .lte('lc_expiry_date', sevenDaysLater)
+      .not('payment_status', 'eq', 'paid')
+
+    for (const o of (lcOrders || [])) {
+      const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
+      const daysLeft = Math.ceil((new Date(o.lc_expiry_date).getTime() - now.getTime()) / 86400000)
+      result.lc_expiring.push({
+        code: o.code, customer: customer?.short_name || customer?.name || '-',
+        lc_number: o.lc_number, lc_bank: o.lc_bank || '-',
+        expiry_date: o.lc_expiry_date, days_left: daysLeft,
+        amount: o.lc_amount || o.total_value_usd || 0,
+      })
+    }
+
+    // 2. Giao hàng trễ hạn (ETD đã qua nhưng chưa shipped)
+    const todayStr = now.toISOString().split('T')[0]
+    const { data: lateOrders } = await supabase
+      .from('sales_orders')
+      .select('code, grade, quantity_tons, etd, customer:sales_customers!customer_id(name, short_name)')
+      .in('status', ['confirmed', 'producing', 'ready', 'packing'])
+      .lt('etd', todayStr)
+      .not('etd', 'is', null)
+
+    for (const o of (lateOrders || [])) {
+      const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
+      const daysOver = Math.ceil((now.getTime() - new Date(o.etd).getTime()) / 86400000)
+      result.delivery_overdue.push({
+        code: o.code, customer: customer?.short_name || customer?.name || '-',
+        grade: o.grade?.replace('_', ' ') || '-', qty: o.quantity_tons || 0,
+        etd: o.etd, days_overdue: daysOver,
+      })
+    }
+
+    // 3. Thanh toán quá hạn (> 30 ngày sau giao hàng, chưa trả)
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0]
+    const { data: unpaidOrders } = await supabase
+      .from('sales_orders')
+      .select('code, total_value_usd, delivery_date, payment_terms, customer:sales_customers!customer_id(name, short_name)')
+      .in('status', ['shipped', 'delivered', 'invoiced'])
+      .in('payment_status', ['unpaid', 'partial'])
+      .lt('delivery_date', thirtyDaysAgo)
+      .not('delivery_date', 'is', null)
+
+    for (const o of (unpaidOrders || [])) {
+      const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
+      const daysOver = Math.ceil((now.getTime() - new Date(o.delivery_date).getTime()) / 86400000)
+      result.payment_overdue.push({
+        code: o.code, customer: customer?.short_name || customer?.name || '-',
+        amount: o.total_value_usd || 0, delivery_date: o.delivery_date,
+        days_overdue: daysOver, payment_terms: o.payment_terms || '-',
+      })
+    }
+
+    // 4. Đơn hàng pending > 3 ngày
+    const threeDaysAgo = new Date(now.getTime() - 3 * 86400000).toISOString()
+    const { data: draftOrders } = await supabase
+      .from('sales_orders')
+      .select('code, grade, quantity_tons, created_at, customer:sales_customers!customer_id(name, short_name)')
+      .eq('status', 'draft')
+      .lt('created_at', threeDaysAgo)
+
+    for (const o of (draftOrders || [])) {
+      const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
+      const daysPending = Math.ceil((now.getTime() - new Date(o.created_at).getTime()) / 86400000)
+      result.pending_drafts.push({
+        code: o.code, customer: customer?.short_name || customer?.name || '-',
+        grade: o.grade?.replace('_', ' ') || '-', qty: o.quantity_tons || 0,
+        created_at: o.created_at, days_pending: daysPending,
+      })
+    }
+
+    result.total_alerts = result.lc_expiring.length + result.delivery_overdue.length + result.payment_overdue.length + result.pending_drafts.length
+  } catch (e) {
+    console.error('fetchSalesAlerts error:', e)
+  }
+  return result
+}
+
 function buildEmailHTML(
   taskData: TaskReportData,
   attendanceData: AttendanceReportData,
   projectData: ProjectReportData,
   performanceData: PerformanceReportData,
   yesterdayData: YesterdayData,
+  salesAlerts: SalesAlertData,
   recipientName: string
 ): string {
   const today = new Date()
@@ -1078,6 +1179,56 @@ function buildEmailHTML(
     </div>` : ''}
     ` : ''}
 
+    ${salesAlerts.total_alerts > 0 ? `
+    ${sectionHeader('🚨', 'Cảnh báo Đơn hàng Bán')}
+
+    ${salesAlerts.lc_expiring.length > 0 ? `
+    <div style="margin-bottom:12px;">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#DC2626;">🔴 LC sắp hết hạn (${salesAlerts.lc_expiring.length})</p>
+      ${salesAlerts.lc_expiring.map(lc => `
+        <div style="padding:8px 10px;margin-bottom:4px;background:#FEF2F2;border-radius:6px;border-left:3px solid #DC2626;">
+          <div style="font-size:13px;font-weight:600;color:#991B1B;">${lc.code} — ${lc.customer}</div>
+          <div style="font-size:12px;color:#7F1D1D;">LC: ${lc.lc_number} | NH: ${lc.lc_bank} | $${lc.amount.toLocaleString()}</div>
+          <div style="font-size:12px;font-weight:700;color:#DC2626;">⏰ ${lc.days_left <= 0 ? 'ĐÃ HẾT HẠN' : `Còn ${lc.days_left} ngày`} (${lc.expiry_date})</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+
+    ${salesAlerts.delivery_overdue.length > 0 ? `
+    <div style="margin-bottom:12px;">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#EA580C;">🟠 Giao hàng trễ hạn (${salesAlerts.delivery_overdue.length})</p>
+      ${salesAlerts.delivery_overdue.map(o => `
+        <div style="padding:8px 10px;margin-bottom:4px;background:#FFF7ED;border-radius:6px;border-left:3px solid #EA580C;">
+          <div style="font-size:13px;font-weight:600;color:#9A3412;">${o.code} — ${o.customer}</div>
+          <div style="font-size:12px;color:#7C2D12;">${o.grade} | ${o.qty}T | ETD: ${o.etd}</div>
+          <div style="font-size:12px;font-weight:700;color:#EA580C;">⚠️ Trễ ${o.days_overdue} ngày</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+
+    ${salesAlerts.payment_overdue.length > 0 ? `
+    <div style="margin-bottom:12px;">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#D97706;">🟡 Thanh toán quá hạn > 30 ngày (${salesAlerts.payment_overdue.length})</p>
+      ${salesAlerts.payment_overdue.map(o => `
+        <div style="padding:8px 10px;margin-bottom:4px;background:#FFFBEB;border-radius:6px;border-left:3px solid #D97706;">
+          <div style="font-size:13px;font-weight:600;color:#92400E;">${o.code} — ${o.customer}</div>
+          <div style="font-size:12px;color:#78350F;">$${o.amount.toLocaleString()} | ${o.payment_terms} | Giao: ${o.delivery_date}</div>
+          <div style="font-size:12px;font-weight:700;color:#D97706;">💰 Quá hạn ${o.days_overdue} ngày</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+
+    ${salesAlerts.pending_drafts.length > 0 ? `
+    <div style="margin-bottom:12px;">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#6B7280;">⬜ Đơn hàng Draft > 3 ngày (${salesAlerts.pending_drafts.length})</p>
+      ${salesAlerts.pending_drafts.map(o => `
+        <div style="padding:6px 10px;margin-bottom:4px;background:#F9FAFB;border-radius:6px;border-left:3px solid #9CA3AF;">
+          <div style="font-size:12px;color:#374151;">${o.code} — ${o.customer} | ${o.grade} ${o.qty}T | Pending ${o.days_pending} ngày</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+    ` : ''}
+
     <!-- CTA -->
     <div style="text-align:center;margin:20px 0 8px;">
       <a href="${APP_URL}" style="display:inline-block;background:#1B4D3E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
@@ -1107,12 +1258,13 @@ serve(async (req) => {
     console.log('📊 [daily-task-report] Starting...')
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const [taskData, attendanceData, projectData, performanceData, yesterdayData, accessToken] = await Promise.all([
+    const [taskData, attendanceData, projectData, performanceData, yesterdayData, salesAlerts, accessToken] = await Promise.all([
       fetchTaskReportData(supabase),
       fetchAttendanceReportData(supabase),
       fetchProjectReportData(supabase),
       fetchPerformanceData(supabase),
       fetchYesterdayData(supabase),
+      fetchSalesAlerts(supabase),
       getAccessToken(),
     ])
 
@@ -1124,8 +1276,9 @@ serve(async (req) => {
       console.log(`📧 Sending to ${recipient.name}...`)
       const overdueTag = taskData.overdue_tasks > 0 ? `⚠️ ${taskData.overdue_tasks} quá hạn` : '✅ Tốt'
       const attendanceTag = attendanceData.late_count > 0 ? `⏰ ${attendanceData.late_count} trễ` : '✅ Đầy đủ'
-      const subject = `📊 Báo cáo ${todayLabel} — ${overdueTag} | ${attendanceTag} | Huy Anh ERP`
-      const html = buildEmailHTML(taskData, attendanceData, projectData, performanceData, yesterdayData, recipient.name)
+      const salesTag = salesAlerts.total_alerts > 0 ? ` | 🚨 ${salesAlerts.total_alerts} cảnh báo bán` : ''
+      const subject = `📊 Báo cáo ${todayLabel} — ${overdueTag} | ${attendanceTag}${salesTag} | Huy Anh ERP`
+      const html = buildEmailHTML(taskData, attendanceData, projectData, performanceData, yesterdayData, salesAlerts, recipient.name)
       await sendEmail(accessToken, [recipient], subject, html)
       console.log(`✅ Sent to ${recipient.email}`)
     }

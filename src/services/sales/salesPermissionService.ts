@@ -2,33 +2,32 @@ import { supabase } from '../../lib/supabase'
 
 export type SalesRole = 'sale' | 'production' | 'logistics' | 'accounting' | 'admin'
 
-// Mapping phòng ban → role
-const DEPT_ROLE_MAP: Record<string, SalesRole> = {
-  'Ban Giám đốc': 'admin',
-  'Phòng Thu Mua 1': 'sale',
-  'Phòng Kinh doanh': 'sale',       // legacy
-  'Phòng Xuất nhập khẩu': 'logistics',
-  'Phòng XNK': 'logistics',
-  'Phòng Kế toán': 'accounting',
-  'Phòng Tài chính': 'accounting',
-  'Phòng Quản lý sản xuất': 'production',
-  'Phòng QLSX': 'production',
-  'Phòng QC': 'production',
-  'Phòng R&D': 'production',
+// ★ Phân quyền email cụ thể cho module Đơn hàng bán
+const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
+  // Sale
+  'sales@huyanhrubber.com': 'sale',
+  // Production
+  'trunglxh@huyanhrubber.com': 'production',
+  // Logistics
+  'logistics@huyanhrubber.com': 'logistics',
+  'anhlp@huyanhrubber.com': 'logistics',
+  // Accounting
+  'yendt@huyanhrubber.com': 'accounting',
+  // Admin
+  'minhld@huyanhrubber.com': 'admin',
+  'thuyht@huyanhrubber.com': 'admin',
+  'huylv@huyanhrubber.com': 'admin',
 }
 
-const ADMIN_EMAILS = ['minhld@huyanhrubber.com']
+export function getSalesRole(user: any): SalesRole | null {
+  if (!user?.email) return null
+  const email = user.email.toLowerCase()
+  return SALES_EMAIL_ROLE_MAP[email] || null
+}
 
-export function getSalesRole(user: any): SalesRole {
-  if (!user) return 'sale'
-  if (ADMIN_EMAILS.includes(user.email?.toLowerCase())) return 'admin'
-  if (user.role === 'admin') return 'admin'
-
-  const dept = user.department_name || user.department?.name || ''
-  for (const [deptName, role] of Object.entries(DEPT_ROLE_MAP)) {
-    if (dept.toLowerCase().includes(deptName.toLowerCase())) return role
-  }
-  return 'sale' // mặc định
+/** Kiểm tra user có quyền truy cập module Sales không */
+export function hasSalesAccess(user: any): boolean {
+  return getSalesRole(user) !== null
 }
 
 export const SALES_ROLE_LABELS: Record<SalesRole, string> = {
@@ -89,7 +88,8 @@ export const salesPermissions = {
 }
 
 // Check if specific tab should be visible for role
-export function getVisibleTabs(role: SalesRole): string[] {
+export function getVisibleTabs(role: SalesRole | null): string[] {
+  if (!role) return ['info', 'quality']
   const tabs = ['info', 'quality'] // ai cũng thấy
 
   if (salesPermissions.canViewProduction(role)) tabs.push('production')
@@ -101,7 +101,8 @@ export function getVisibleTabs(role: SalesRole): string[] {
 }
 
 // Check if field is editable for role
-export function isFieldEditable(role: SalesRole, fieldGroup: string): boolean {
+export function isFieldEditable(role: SalesRole | null, fieldGroup: string): boolean {
+  if (!role) return false
   switch (fieldGroup) {
     case 'customer': return salesPermissions.canEditCustomer(role)
     case 'order_info': return salesPermissions.canEditOrder(role)

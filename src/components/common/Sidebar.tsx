@@ -18,7 +18,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { getSalesRole } from '../../services/sales/salesPermissionService';
+import { getSalesRole, hasSalesAccess } from '../../services/sales/salesPermissionService';
 import { supabase } from '../../lib/supabase';
 import { purchaseAccessService } from '../../services/purchaseAccessService';
 import { overtimeRequestService } from '../../services/overtimeRequestService';
@@ -407,7 +407,7 @@ export function Sidebar() {
   const [isB2BPurchaser, setIsB2BPurchaser] = useState(false);
 
   // ★ Sales Role — phân quyền module Đơn hàng bán
-  const salesRole = useMemo(() => getSalesRole(user), [user]);
+  const salesRole = useMemo(() => getSalesRole(user) || '', [user]);
   
   const [pendingOTCount, setPendingOTCount] = useState(0);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
@@ -610,9 +610,7 @@ export function Sidebar() {
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
     if (group.requireB2BPurchaser && !isB2BPurchaser && !isAdmin) return false;
     if (group.requireSalesRole) {
-      // Hiện group nếu user thuộc bất kỳ BP nào liên quan đến Sales
-      const validSalesRoles = ['sale', 'production', 'logistics', 'accounting', 'admin']
-      if (!validSalesRoles.includes(salesRole)) return false
+      if (!hasSalesAccess(user)) return false
     }
     if (group.allowedEmails && !group.allowedEmails.includes(user?.email?.toLowerCase() || '')) return false;
     if (group.hiddenByDefault) {

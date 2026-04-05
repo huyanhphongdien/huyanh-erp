@@ -66,12 +66,26 @@ interface ShipmentOrder extends SalesOrder {
   contract_no?: string
   lot_number?: string
   bl_number?: string
+  bl_type?: string
   dhl_number?: string
   doc_submission_date?: string
   discount_date?: string
   discount_amount?: number
+  discount_bank?: string
   bank_name?: string
+  bank_charges?: number
+  actual_payment_amount?: number
   payment_date?: string
+  // Logistics
+  voyage_number?: string
+  port_of_loading?: string
+  port_of_discharge?: string
+  cutoff_date?: string
+  freight_terms?: string
+  // Customs
+  customs_declaration_no?: string
+  customs_declaration_date?: string
+  customs_clearance_status?: string
 }
 
 // ============================================================================
@@ -532,11 +546,82 @@ const ShipmentFollowingPage = () => {
       render: (_v, record) => renderEditableCell(record, 'etd', record.etd, 'date'),
     },
     {
+      title: 'Vessel / Voyage',
+      key: 'vessel',
+      width: 140,
+      render: (_v, record) => {
+        const parts = [record.vessel_name, record.voyage_number].filter(Boolean)
+        return parts.length > 0 ? parts.join(' / ') : renderEditableCell(record, 'vessel_name', record.vessel_name)
+      },
+    },
+    {
+      title: 'ETA',
+      dataIndex: 'eta',
+      key: 'eta',
+      width: 110,
+      render: (_v, record) => renderEditableCell(record, 'eta', record.eta, 'date'),
+    },
+    {
+      title: 'B/L Type',
+      dataIndex: 'bl_type',
+      key: 'bl_type',
+      width: 100,
+      render: (_v, record) => renderEditableCell(record, 'bl_type', record.bl_type),
+    },
+    {
+      title: 'Cutoff',
+      dataIndex: 'cutoff_date',
+      key: 'cutoff_date',
+      width: 110,
+      render: (_v, record) => renderEditableCell(record, 'cutoff_date', record.cutoff_date, 'date'),
+    },
+    {
+      title: 'Tờ khai HQ',
+      dataIndex: 'customs_declaration_no',
+      key: 'customs_declaration_no',
+      width: 120,
+      render: (_v, record) => renderEditableCell(record, 'customs_declaration_no', record.customs_declaration_no),
+    },
+    {
+      title: 'Thông quan',
+      dataIndex: 'customs_clearance_status',
+      key: 'customs_clearance_status',
+      width: 100,
+      render: (v: string) => {
+        const colors: Record<string, string> = { cleared: 'green', pending: 'orange', rejected: 'red' }
+        const labels: Record<string, string> = { cleared: 'Đã TQ', pending: 'Chờ TQ', rejected: 'Từ chối' }
+        return <Tag color={colors[v] || 'default'}>{labels[v] || v || 'Chờ TQ'}</Tag>
+      },
+    },
+    {
       title: 'DHL No',
       dataIndex: 'dhl_number',
       key: 'dhl_number',
       width: 110,
       render: (_v, record) => renderEditableCell(record, 'dhl_number', record.dhl_number),
+    },
+    {
+      title: 'NH chiết khấu',
+      dataIndex: 'discount_bank',
+      key: 'discount_bank',
+      width: 110,
+      render: (_v, record) => renderEditableCell(record, 'discount_bank', record.discount_bank),
+    },
+    {
+      title: 'Phí NH',
+      dataIndex: 'bank_charges',
+      key: 'bank_charges',
+      width: 90,
+      align: 'right',
+      render: (_v, record) => renderEditableCell(record, 'bank_charges', record.bank_charges, 'number'),
+    },
+    {
+      title: 'Thực nhận',
+      dataIndex: 'actual_payment_amount',
+      key: 'actual_payment_amount',
+      width: 110,
+      align: 'right',
+      render: (_v, record) => renderEditableCell(record, 'actual_payment_amount', record.actual_payment_amount, 'number'),
     },
     {
       title: 'Payment Date',

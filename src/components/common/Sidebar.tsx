@@ -15,9 +15,10 @@
 // - ★ Thêm badge số tin chưa đọc cho B2B Chat
 // ============================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { getSalesRole } from '../../services/sales/salesPermissionService';
 import { supabase } from '../../lib/supabase';
 import { purchaseAccessService } from '../../services/purchaseAccessService';
 import { overtimeRequestService } from '../../services/overtimeRequestService';
@@ -108,6 +109,7 @@ interface MenuItem {
   approvalLevel?: boolean;
   badge?: number;
   allowedEmails?: string[];
+  requireSalesRoles?: string[]; // ['sale','logistics','accounting','admin']
 }
 
 interface MenuGroup {
@@ -120,6 +122,7 @@ interface MenuGroup {
   requireB2BPurchaser?: boolean;
   hiddenByDefault?: boolean;
   allowedEmails?: string[];
+  requireSalesRole?: boolean; // true = check getSalesRole
 }
 
 // ============================================================
@@ -299,15 +302,22 @@ const getMenuGroups = (
     title: 'ĐƠN HÀNG BÁN',
     icon: <ShoppingBag size={18} />,
     collapsible: true,
-    allowedEmails: ['minhld@huyanhrubber.com'],
+    requireSalesRole: true, // hiện cho tất cả BP liên quan (sale, sx, log, kt, admin)
     items: [
-      { path: '/sales/dashboard', label: 'Tổng quan', icon: <BarChart3 size={18} /> },
-      { path: '/sales/customers', label: 'Khách hàng', icon: <Globe size={18} /> },
-      { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} /> },
-      { path: '/sales/shipments', label: 'Theo dõi lô hàng', icon: <Ship size={18} /> },
-      { path: '/sales/ar-aging', label: 'Nợ phải thu (A/R)', icon: <Clock size={18} /> },
-      { path: '/sales/cash-flow', label: 'Dòng tiền & LC', icon: <CreditCard size={18} /> },
-      { path: '/executive', label: 'Điều hành BGĐ', icon: <TrendingUp size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
+      { path: '/sales/dashboard', label: 'Tổng quan', icon: <BarChart3 size={18} />,
+        requireSalesRoles: ['sale', 'logistics', 'accounting', 'admin'] },
+      { path: '/sales/customers', label: 'Khách hàng', icon: <Globe size={18} />,
+        requireSalesRoles: ['sale', 'accounting', 'admin'] },
+      { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} />,
+        requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin'] },
+      { path: '/sales/shipments', label: 'Theo dõi lô hàng', icon: <Ship size={18} />,
+        requireSalesRoles: ['sale', 'logistics', 'accounting', 'admin'] },
+      { path: '/sales/ar-aging', label: 'Nợ phải thu (A/R)', icon: <Clock size={18} />,
+        requireSalesRoles: ['accounting', 'admin'] },
+      { path: '/sales/cash-flow', label: 'Dòng tiền & LC', icon: <CreditCard size={18} />,
+        requireSalesRoles: ['accounting', 'admin'] },
+      { path: '/executive', label: 'Điều hành BGĐ', icon: <TrendingUp size={18} />,
+        requireSalesRoles: ['admin'] },
     ],
   },
 
@@ -395,6 +405,9 @@ export function Sidebar() {
   
   // ★ B2B Purchaser state - chỉ cho khuyennt@ và duyhh@
   const [isB2BPurchaser, setIsB2BPurchaser] = useState(false);
+
+  // ★ Sales Role — phân quyền module Đơn hàng bán
+  const salesRole = useMemo(() => getSalesRole(user), [user]);
   
   const [pendingOTCount, setPendingOTCount] = useState(0);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
@@ -588,6 +601,7 @@ export function Sidebar() {
     if (item.requireB2BPurchaser && !isB2BPurchaser) return false;
     if (item.approvalLevel && !canApproveOT && !isExecutive) return false;
     if (item.allowedEmails && !item.allowedEmails.includes(user?.email?.toLowerCase() || '')) return false;
+    if (item.requireSalesRoles && !item.requireSalesRoles.includes(salesRole)) return false;
     return true;
   };
 
@@ -595,6 +609,11 @@ export function Sidebar() {
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
     if (group.requireB2BPurchaser && !isB2BPurchaser && !isAdmin) return false;
+    if (group.requireSalesRole) {
+      // Hiện group nếu user thuộc bất kỳ BP nào liên quan đến Sales
+      const validSalesRoles = ['sale', 'production', 'logistics', 'accounting', 'admin']
+      if (!validSalesRoles.includes(salesRole)) return false
+    }
     if (group.allowedEmails && !group.allowedEmails.includes(user?.email?.toLowerCase() || '')) return false;
     if (group.hiddenByDefault) {
       const hasActiveChild = group.items.some(item =>

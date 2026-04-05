@@ -97,10 +97,15 @@ export default function CashFlowPage() {
         if (!baseDate) continue
 
         const deliveryDate = new Date(baseDate)
+        // Parse payment terms → days until expected payment
+        const pt = (o.payment_terms || '').toLowerCase()
         let paymentDays = 30 // default
-        if (o.payment_terms?.includes('60')) paymentDays = 60
-        if (o.payment_terms?.includes('90')) paymentDays = 90
-        if (o.payment_terms?.includes('TT')) paymentDays = 7
+        if (pt.includes('at_sight') || pt.includes('sight')) paymentDays = 7
+        else if (pt.includes('90')) paymentDays = 90
+        else if (pt.includes('60')) paymentDays = 60
+        else if (pt.includes('30')) paymentDays = 30
+        else if (pt.includes('tt') || pt.includes('advance')) paymentDays = 7
+        else if (pt.includes('cad') || pt.includes('dp')) paymentDays = 14
 
         const expectedPayDate = new Date(deliveryDate.getTime() + paymentDays * 86400000)
         const monthKey = `${expectedPayDate.getFullYear()}-${String(expectedPayDate.getMonth() + 1).padStart(2, '0')}`

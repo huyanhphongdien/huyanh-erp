@@ -64,7 +64,7 @@ const { RangePicker } = DatePicker
 interface ShipmentOrder extends SalesOrder {
   // Shipment-specific fields (extended on sales_orders table)
   contract_no?: string
-  lot_number?: string
+  lot_number?: number
   bl_number?: string
   bl_type?: string
   dhl_number?: string

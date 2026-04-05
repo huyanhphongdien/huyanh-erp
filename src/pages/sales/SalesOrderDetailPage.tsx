@@ -58,6 +58,7 @@ import { salesProductionService } from '../../services/sales/salesProductionServ
 import { containerService } from '../../services/sales/containerService'
 import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
 import FinanceTab from '../../components/sales/FinanceTab'
+import DocumentChecklistTab from './components/DocumentChecklistTab'
 import { useAuthStore } from '../../stores/authStore'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
@@ -1304,32 +1305,32 @@ function SalesOrderDetailPage() {
     ]
 
     return (
-      <Card title="Chứng từ xuất khẩu" size="small">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {docs.map((doc) => (
-            <div
-              key={doc.key}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                border: '1px solid #f0f0f0',
-                borderRadius: 8,
-                background: doc.done ? '#f6ffed' : '#fff',
-              }}
-            >
-              <Space>
-                <Checkbox checked={doc.done} disabled />
-                <Text strong={doc.done}>{doc.label}</Text>
-              </Space>
-              <Button size="small" type="link" disabled>
-                {doc.done ? 'Xem' : 'Tạo'}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <div>
+        {/* Sinh chứng từ (COA, PL, Invoice) */}
+        <Card title="Sinh chứng từ" size="small" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {docs.map((doc) => (
+              <div key={doc.key}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', border: '1px solid #f0f0f0', borderRadius: 8, background: doc.done ? '#f6ffed' : '#fff' }}>
+                <Space>
+                  <Checkbox checked={doc.done} disabled />
+                  <Text strong={doc.done}>{doc.label}</Text>
+                </Space>
+                <Button size="small" type="link" onClick={() => navigate(`/sales/orders/${order.id}/documents`)}>
+                  {doc.done ? 'Xem' : 'Tạo'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* ★ Upload + Checklist chứng từ gốc */}
+        <DocumentChecklistTab
+          orderId={order.id}
+          orderCode={order.code}
+          readonly={!['shipped', 'delivered', 'invoiced', 'paid'].includes(order.status)}
+        />
+      </div>
     )
   }
 

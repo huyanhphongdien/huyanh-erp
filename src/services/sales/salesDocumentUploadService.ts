@@ -1,0 +1,161 @@
+// ============================================================================
+// SALES DOCUMENT UPLOAD SERVICE — Upload + quản lý chứng từ đơn hàng bán
+// File: src/services/sales/salesDocumentUploadService.ts
+// ============================================================================
+
+import { supabase } from '../../lib/supabase'
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface SalesDocument {
+  id: string
+  sales_order_id: string
+  doc_type: string
+  doc_name: string
+  file_url: string | null
+  file_name: string | null
+  file_size: number | null
+  is_received: boolean
+  received_at: string | null
+  uploaded_by: string | null
+  notes: string | null
+  sort_order: number
+  created_at: string
+}
+
+// Danh sách chứng từ tiêu chuẩn xuất khẩu cao su
+export const STANDARD_DOCUMENTS = [
+  { doc_type: 'bl', doc_name: 'Bill of Lading (B/L)', sort_order: 1, required: true },
+  { doc_type: 'commercial_invoice', doc_name: 'Commercial Invoice', sort_order: 2, required: true },
+  { doc_type: 'packing_list', doc_name: 'Packing List', sort_order: 3, required: true },
+  { doc_type: 'coa', doc_name: 'Certificate of Analysis (COA)', sort_order: 4, required: true },
+  { doc_type: 'co', doc_name: 'Certificate of Origin (C/O)', sort_order: 5, required: true },
+  { doc_type: 'form_ae', doc_name: 'Form A/E', sort_order: 6, required: false },
+  { doc_type: 'phytosanitary', doc_name: 'Phytosanitary Certificate', sort_order: 7, required: false },
+  { doc_type: 'fumigation', doc_name: 'Fumigation Certificate', sort_order: 8, required: false },
+  { doc_type: 'lc_copy', doc_name: 'LC Copy (Thư tín dụng)', sort_order: 9, required: false },
+  { doc_type: 'insurance', doc_name: 'Insurance Certificate', sort_order: 10, required: false },
+  { doc_type: 'weight_note', doc_name: 'Weight Note (Phiếu cân)', sort_order: 11, required: false },
+  { doc_type: 'other', doc_name: 'Chứng từ khác', sort_order: 99, required: false },
+]
+
+// ============================================================================
+// SERVICE
+// ============================================================================
+
+export const salesDocumentUploadService = {
+
+  /** Lấy danh sách chứng từ của đơn hàng */
+  async getByOrderId(orderId: string): Promise<SalesDocument[]> {
+    const { data, error } = await supabase
+      .from('sales_order_documents')
+      .select('*')
+      .eq('sales_order_id', orderId)
+      .order('sort_order')
+
+    if (error) { console.error('[salesDoc] getByOrderId error:', error); return [] }
+    return data || []
+  },
+
+  /** Khởi tạo checklist chứng từ chuẩn cho đơn hàng (chạy 1 lần) */
+  async initChecklist(orderId: string): Promise<SalesDocument[]> {
+    // Check if already initialized
+    const existing = await this.getByOrderId(orderId)
+    if (existing.length > 0) return existing
+
+    const rows = STANDARD_DOCUMENTS.map(d => ({
+      sales_order_id: orderId,
+      doc_type: d.doc_type,
+      doc_name: d.doc_name,
+      sort_order: d.sort_order,
+      is_received: false,
+    }))
+
+    const { data, error } = await supabase
+      .from('sales_order_documents')
+      .insert(rows)
+      .select('*')
+
+    if (error) { console.error('[salesDoc] initChecklist error:', error); return [] }
+    return data || []
+  },
+
+  /** Upload file cho 1 chứng từ */
+  async uploadFile(docId: string, orderId: string, file: File, uploadedBy?: string): Promise<string | null> {
+    try {
+      const ext = file.name.split('.').pop() || 'pdf'
+      const path = `orders/${orderId}/${docId}_${Date.now()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('sales-documents')
+        .upload(path, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('sales-documents')
+        .getPublicUrl(path)
+
+      // Update document record
+      await supabase.from('sales_order_documents').update({
+        file_url: publicUrl,
+        file_name: file.name,
+        file_size: file.size,
+        is_received: true,
+        received_at: new Date().toISOString(),
+        uploaded_by: uploadedBy || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', docId)
+
+      return publicUrl
+    } catch (e) {
+      console.error('[salesDoc] uploadFile error:', e)
+      return null
+    }
+  },
+
+  /** Đánh dấu đã nhận (không upload file) */
+  async markReceived(docId: string, received: boolean): Promise<void> {
+    await supabase.from('sales_order_documents').update({
+      is_received: received,
+      received_at: received ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', docId)
+  },
+
+  /** Thêm chứng từ tùy chỉnh */
+  async addCustomDocument(orderId: string, docName: string): Promise<SalesDocument | null> {
+    const { data, error } = await supabase
+      .from('sales_order_documents')
+      .insert({
+        sales_order_id: orderId,
+        doc_type: 'other',
+        doc_name: docName,
+        sort_order: 99,
+        is_received: false,
+      })
+      .select('*')
+      .single()
+
+    if (error) return null
+    return data
+  },
+
+  /** Xóa chứng từ */
+  async deleteDocument(docId: string): Promise<boolean> {
+    const { error } = await supabase.from('sales_order_documents').delete().eq('id', docId)
+    return !error
+  },
+
+  /** Thống kê */
+  async getStats(orderId: string): Promise<{ total: number; received: number; uploaded: number }> {
+    const docs = await this.getByOrderId(orderId)
+    return {
+      total: docs.length,
+      received: docs.filter(d => d.is_received).length,
+      uploaded: docs.filter(d => d.file_url).length,
+    }
+  },
+}

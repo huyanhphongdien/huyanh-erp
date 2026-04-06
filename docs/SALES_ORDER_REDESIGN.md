@@ -258,27 +258,123 @@ ALTER TABLE sales_orders
 
 ---
 
-## 9. TRIỂN KHAI
+## 9. TRIỂN KHAI — 8 PHASE
 
-### Phase 1: DB + Wizard (1 ngày)
-- [ ] Migration 16 cột
-- [ ] Wizard 2 bước (Sale)
-- [ ] Logic khóa: Confirmed → lock tab Sale
+### Phase 1: Database Migration (0.5 ngày)
+```
+Thêm 16 cột vào sales_orders + cập nhật types
+```
+- [ ] ALTER TABLE: contract_date, commission_pct, commission_amount, bank_account, bank_swift
+- [ ] ALTER TABLE: ready_date, bales_per_container, pallets_per_container, bales_per_pallet
+- [ ] ALTER TABLE: remaining_amount, net_revenue, payment_received_date, discount_exchange_rate
+- [ ] ALTER TABLE: is_locked, locked_at, locked_by
+- [ ] Cập nhật salesTypes.ts interface
+- [ ] Cập nhật salesOrderService.ts CRUD
 
-### Phase 2: Detail Panel (1.5 ngày)
-- [ ] Slide-in panel 720px
-- [ ] 4 tabs: HĐ (readonly), SX, LOG, KT
-- [ ] Inline edit + auto-calc
-- [ ] LC cảnh báo 20 ngày
+### Phase 2: Wizard tạo đơn mới (0.5 ngày)
+```
+Sale nhập — 2 bước: thông tin HĐ → xác nhận
+```
+- [ ] Redesign SalesOrderCreatePage: bỏ step 2 (chất lượng), step 3 (vận chuyển)
+- [ ] Step 1: thêm fields hoa hồng, NH, SWIFT, bành/container, ngày HĐ
+- [ ] Step 1: bỏ tỷ giá (KT nhập sau)
+- [ ] Step 2: review + lưu nháp / xác nhận
+- [ ] Auto-calc: tổng tiền, tổng bành, container, hoa hồng tiền
+- [ ] Xác nhận → set is_locked=true, locked_at, locked_by
 
-### Phase 3: List View (1 ngày)
-- [ ] Table với frozen columns
-- [ ] Column groups màu theo BP
-- [ ] 4 dots tiến độ BP
-- [ ] Summary row
-- [ ] Filter + Export
+### Phase 3: Detail Panel — Tab Hợp đồng (0.5 ngày)
+```
+Slide-in panel 720px từ bên phải
+```
+- [ ] Component SalesOrderDetailPanel (slide-in overlay)
+- [ ] Tab Hợp đồng: hiện tất cả fields Sale đã nhập
+- [ ] Readonly khi is_locked=true (nền xám, disabled)
+- [ ] Nút "Mở khóa" (chỉ Admin)
+- [ ] Ghi log: ai mở khóa, lúc nào
 
-**Tổng: 3.5 ngày**
+### Phase 4: Detail Panel — Tab Sản xuất (0.5 ngày)
+```
+SX nhập ngày sẵn sàng + quản lý container
+```
+- [ ] Tab SX: field ngày hàng sẵn sàng (date input)
+- [ ] NVL check (reuse existing salesProductionService)
+- [ ] Lệnh SX link
+- [ ] Tiến độ 5 công đoạn (progress bar)
+- [ ] Container table: inline edit (container no, seal, bành)
+- [ ] Thêm/xóa container
+- [ ] Khóa khi status = Ready
+
+### Phase 5: Detail Panel — Tab Vận chuyển (0.5 ngày)
+```
+Logistics nhập booking, tàu, L/C, chiết khấu
+```
+- [ ] Tab LOG: BK, BL, hãng tàu, tàu/chuyến, POD
+- [ ] ETD, ETA (date picker)
+- [ ] DHL tracking
+- [ ] L/C NO + ngày hết hạn (cảnh báo ≤ 20 ngày đỏ)
+- [ ] Chiết khấu: số tiền + ngày CK
+- [ ] Tỷ giá CK: disabled cho LOG (KT nhập ở tab KT)
+- [ ] Auto: tiền còn lại = tổng − CK
+- [ ] Khóa khi status = Delivered
+
+### Phase 6: Detail Panel — Tab Tài chính (0.5 ngày)
+```
+Kế toán nhập tỷ giá, ngày tiền về, phí NH
+```
+- [ ] Tab KT: tỷ giá VND/USD
+- [ ] Tỷ giá CK (cập nhật cả tab LOG)
+- [ ] Ngày tiền về (date picker)
+- [ ] Trạng thái thanh toán (select: chưa TT / một phần / đã TT)
+- [ ] Phí ngân hàng (USD)
+- [ ] Bảng tổng hợp: tổng → CK → phí NH → thực nhận → hoa hồng → DT ròng
+- [ ] Auto-calc tất cả
+- [ ] Khóa khi status = Paid
+
+### Phase 7: List View — Table (1 ngày)
+```
+Bảng cột nhóm theo BP, frozen columns, inline tracking
+```
+- [ ] Redesign SalesOrderListPage → table view
+- [ ] Frozen columns: #, Mã HĐ, Buyer
+- [ ] Column groups màu: Sale (xanh), SX (xanh dương), LOG (vàng), KT (hồng)
+- [ ] 4 dots tiến độ BP (●●○○)
+- [ ] Progress bar SX
+- [ ] LC cảnh báo đỏ ≤ 20 ngày
+- [ ] Empty cells "—" xám
+- [ ] Summary row (tổng SL, tổng tiền, tổng container)
+- [ ] Filter: status, buyer, grade, date range
+- [ ] Export CSV
+- [ ] Click row → mở Detail Panel (Phase 3-6)
+
+### Phase 8: Polish + Test (0.5 ngày)
+```
+Cảnh báo, email, permission, test end-to-end
+```
+- [ ] Cập nhật salesPermissionService: khóa logic theo status
+- [ ] Cập nhật salesAlertService: LC 7→20 ngày
+- [ ] Cập nhật daily-task-report: LC 7→20 ngày
+- [ ] Cập nhật ShipmentFollowingPage: sync fields mới
+- [ ] Test: Sale tạo → xác nhận → SX nhập → LOG nhập → KT nhập → Paid
+- [ ] Test: khóa/mở khóa
+- [ ] Test: phân quyền 5 roles
+- [ ] Mobile responsive
+
+---
+
+## 10. TỔNG KẾT
+
+| Phase | Nội dung | Thời gian | Tổng |
+|-------|---------|-----------|------|
+| 1 | DB Migration | 0.5 ngày | 0.5 |
+| 2 | Wizard tạo đơn (Sale) | 0.5 ngày | 1.0 |
+| 3 | Detail — Tab Hợp đồng | 0.5 ngày | 1.5 |
+| 4 | Detail — Tab Sản xuất | 0.5 ngày | 2.0 |
+| 5 | Detail — Tab Vận chuyển | 0.5 ngày | 2.5 |
+| 6 | Detail — Tab Tài chính | 0.5 ngày | 3.0 |
+| 7 | List View — Table | 1.0 ngày | 4.0 |
+| 8 | Polish + Test | 0.5 ngày | **4.5 ngày** |
+
+**Tổng: 8 Phase — 4.5 ngày phát triển**
 
 ---
 

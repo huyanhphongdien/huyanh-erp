@@ -34,7 +34,11 @@ interface PendingTask {
   progress: number;
   self_score: number | null;
   completed_date: string | null;
+  due_date: string | null;
   evaluation_status: string;
+  difficulty: 'normal' | 'hard' | 'critical';
+  overdue_exempt: boolean;
+  task_source: string;
   assignee: {
     id: string;
     full_name: string;
@@ -97,7 +101,8 @@ const BatchApprovePage: React.FC = () => {
       let query = supabase
         .from('tasks')
         .select(`
-          id, code, name, status, progress, self_score, completed_date, evaluation_status,
+          id, code, name, status, progress, self_score, completed_date, due_date,
+          evaluation_status, difficulty, overdue_exempt, task_source,
           assignee:employees!tasks_assignee_id_fkey(id, full_name, department_id),
           department:departments!tasks_department_id_fkey(id, name)
         `)
@@ -233,12 +238,21 @@ const BatchApprovePage: React.FC = () => {
 
         const managerStars = getManagerScore(taskId);
         const managerScorePoints = managerStars * 20; // ★ 1-5 sao → 20-100 điểm
-        const selfScore = task.self_score ?? 60; // Default 60 nếu NV chưa tự đánh giá (3 sao)
         const note = getNote(taskId);
 
-        // Calculate final_score = self_score × 40% + manager_score × 60%
-        const finalScore = Math.round(selfScore * 0.4 + managerScorePoints * 0.6);
-        const rating = calculateRating(managerScorePoints);
+        // Hệ số độ khó: normal=1.0, hard=1.2, critical=1.5
+        const difficultyMultiplier = task.difficulty === 'critical' ? 1.5 : task.difficulty === 'hard' ? 1.2 : 1.0;
+        const qualityScore = Math.min(100, Math.round(managerScorePoints * difficultyMultiplier));
+
+        // Trừ điểm quá hạn (nếu không miễn trừ)
+        let overduePenalty = 0;
+        if (task.due_date && task.completed_date && !task.overdue_exempt) {
+          const daysLate = Math.max(0, Math.ceil((new Date(task.completed_date).getTime() - new Date(task.due_date).getTime()) / 86400000));
+          overduePenalty = daysLate * 2;
+        }
+
+        const finalScore = Math.max(0, qualityScore - overduePenalty);
+        const rating = calculateRating(finalScore);
 
         // 1. Insert into task_evaluations
         const { error: evalError } = await createEvaluation({
@@ -271,13 +285,13 @@ const BatchApprovePage: React.FC = () => {
           console.error('Approval insert error for task', taskId, approvalError);
         }
 
-        // 3. Update task evaluation_status + final_score
+        // 3. Update task evaluation_status + final_score + status
         const { error: updateError } = await supabase
           .from('tasks')
           .update({
+            status: 'finished',
             evaluation_status: 'approved',
             final_score: finalScore,
-            self_score: selfScore,
           })
           .eq('id', taskId);
 
@@ -435,17 +449,34 @@ const BatchApprovePage: React.FC = () => {
       },
     },
     {
-      title: 'NV tự chấm',
-      dataIndex: 'self_score',
-      key: 'self_score',
-      width: 140,
+      title: 'Độ khó',
+      dataIndex: 'difficulty',
+      key: 'difficulty',
+      width: 90,
       align: 'center',
-      render: (score: number | null) =>
-        score != null ? (
-          <Rate disabled value={score} style={{ fontSize: 14 }} />
-        ) : (
-          <Text type="secondary">Chưa chấm</Text>
-        ),
+      render: (d: string) => {
+        if (d === 'critical') return <Tag color="red">Rất khó ×1.5</Tag>;
+        if (d === 'hard') return <Tag color="orange">Khó ×1.2</Tag>;
+        return <Tag>Bình thường</Tag>;
+      },
+      filters: [
+        { text: 'Bình thường', value: 'normal' },
+        { text: 'Khó', value: 'hard' },
+        { text: 'Rất khó', value: 'critical' },
+      ],
+      onFilter: (value, record) => record.difficulty === value,
+    },
+    {
+      title: 'Trễ hạn',
+      key: 'overdue',
+      width: 80,
+      align: 'center',
+      render: (_: any, record: PendingTask) => {
+        if (!record.due_date || !record.completed_date) return <Text type="secondary">—</Text>;
+        const days = Math.ceil((new Date(record.completed_date).getTime() - new Date(record.due_date).getTime()) / 86400000);
+        if (days <= 0) return <Tag color="green">Đúng hạn</Tag>;
+        return <Tag color="red">Trễ {days}d (-{days * 2}đ)</Tag>;
+      },
     },
     {
       title: 'Manager chấm',

@@ -545,10 +545,10 @@ export const performanceDashboardService = {
         .in('task_id', taskIds)
         .eq('status', 'approved');
 
-      // Weight by task source: recurring=0.5, self=0.3, assigned/project=1.0
+      // Weight by task source: recurring/self=0.5, assigned/project=1.0
       function getTaskWeight(task: any): number {
         if (task.task_source === 'recurring') return 0.5;
-        if (task.task_source === 'self') return 0.3;
+        if (task.task_source === 'self') return 0.5;
         return 1.0; // assigned + project
       }
 
@@ -671,26 +671,35 @@ export const performanceDashboardService = {
         });
       }
 
+      // ★ Fetch department baselines for volume scoring
+      const deptIds = [...new Set(Array.from(employeeMap.values()).map(e => e.department_id).filter(Boolean))];
+      const baselineMap = new Map<string, number>();
+      if (deptIds.length > 0) {
+        const { data: baselines } = await supabase
+          .from('department_performance_baseline')
+          .select('department_id, monthly_task_target')
+          .in('department_id', deptIds);
+        (baselines || []).forEach(b => baselineMap.set(b.department_id, b.monthly_task_target));
+      }
+
       const result: EmployeePerformance[] = Array.from(employeeMap.values())
         .map(emp => {
-          // Weighted average for self scores
-          let totalWeightedSelf = 0, totalSelfWeight = 0;
-          emp.weighted_self_scores.forEach(ws => {
-            totalWeightedSelf += ws.score * ws.weight;
-            totalSelfWeight += ws.weight;
-          });
-          const avgSelf = totalSelfWeight > 0 ? Math.round(totalWeightedSelf / totalSelfWeight) : 0;
-
-          // Weighted average for manager scores
+          // ── Chất lượng: TB có trọng số từ final_score ──
           let totalWeightedManager = 0, totalManagerWeight = 0;
           emp.weighted_manager_scores.forEach(ws => {
             totalWeightedManager += ws.score * ws.weight;
             totalManagerWeight += ws.weight;
           });
-          const avgManager = totalManagerWeight > 0 ? Math.round(totalWeightedManager / totalManagerWeight) : 0;
+          const qualityScore = totalManagerWeight > 0 ? Math.round(totalWeightedManager / totalManagerWeight) : 0;
 
-          const finalScore = avgSelf > 0 || avgManager > 0
-            ? Math.round(avgSelf * 0.4 + avgManager * 0.6) : 0;
+          // ── Khối lượng: CV hoàn thành / mức chuẩn phòng ──
+          const baseline = baselineMap.get(emp.department_id) || 10;
+          const volumeScore = Math.min(100, Math.round((emp.completed_tasks / baseline) * 100));
+
+          // ── Công thức mới: CL×60% + KL×40% ──
+          const finalScore = qualityScore > 0 || volumeScore > 0
+            ? Math.round(qualityScore * 0.6 + volumeScore * 0.4) : 0;
+
           const onTimeRate = emp.completed_tasks > 0
             ? Math.round((emp.on_time_count / emp.completed_tasks) * 100) : 0;
           return {
@@ -699,7 +708,7 @@ export const performanceDashboardService = {
             department_name: emp.department_name, department_id: emp.department_id,
             total_tasks: emp.total_tasks, completed_tasks: emp.completed_tasks,
             on_time_count: emp.on_time_count, overdue_count: emp.overdue_count,
-            avg_self_score: avgSelf, avg_manager_score: avgManager,
+            avg_self_score: qualityScore, avg_manager_score: qualityScore,
             final_score: finalScore, on_time_rate: onTimeRate,
             grade: calculateDashboardGrade(finalScore),
           };

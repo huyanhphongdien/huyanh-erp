@@ -29,6 +29,7 @@ export interface TaskFormData {
   department_id: string
   assignee_id: string
   priority: string
+  difficulty: string
   start_date: string
   due_date: string
   notes: string
@@ -108,6 +109,7 @@ export function TaskForm({
     department_id: initialData?.department_id || '',
     assignee_id: initialData?.assignee_id || '',
     priority: (initialData?.priority as any) || 'medium',
+    difficulty: 'normal',
     start_date: '',
     due_date: initialData?.due_date || '',
     notes: '',
@@ -415,6 +417,23 @@ export function TaskForm({
                 {PRIORITY_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Độ khó (tính điểm hiệu suất) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Độ khó
+              </label>
+              <select
+                name="difficulty"
+                value={formData.difficulty}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="normal">Bình thường (×1.0)</option>
+                <option value="hard">Khó (×1.2)</option>
+                <option value="critical">Rất khó (×1.5)</option>
               </select>
             </div>
 

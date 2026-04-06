@@ -239,6 +239,7 @@ export const TaskCreatePage: React.FC = () => {
         name: formData.name,
         description: formData.description || null,
         priority: formData.priority || 'medium',
+        difficulty: formData.difficulty || 'normal',
         start_date: formData.start_date || null,
         due_date: formData.due_date || null,
         notes: formData.notes || null,

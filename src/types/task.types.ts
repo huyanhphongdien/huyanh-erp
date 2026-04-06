@@ -205,6 +205,9 @@ export interface Task {
   // Metadata
   notes?: string | null;
   is_self_assigned?: boolean;
+  difficulty?: 'normal' | 'hard' | 'critical';
+  overdue_exempt?: boolean;
+  task_source?: string;
   created_at: string;
   updated_at: string;
   

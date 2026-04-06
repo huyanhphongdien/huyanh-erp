@@ -586,10 +586,14 @@ function SalesOrderCreatePage() {
         <Steps current={currentStep} items={stepItems} />
       </Card>
 
-      {/* Form */}
-      <Form form={form} layout="vertical" requiredMark="optional">
-        {currentStep === 0 && renderStep1()}
-        {currentStep === 1 && renderStep4()}
+      {/* Form — dùng display:none thay vì unmount để giữ data khi back */}
+      <Form form={form} layout="vertical" requiredMark="optional" preserve>
+        <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
+          {renderStep1()}
+        </div>
+        <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
+          {renderStep4()}
+        </div>
       </Form>
 
       {/* Navigation buttons */}

@@ -612,7 +612,13 @@ function SalesOrderCreatePage() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/sales/orders')} />
+        <Button icon={<ArrowLeftOutlined />} onClick={() => {
+          if (currentStep > 0) {
+            prevStep()
+          } else {
+            navigate('/sales/orders')
+          }
+        }} />
         <Title level={4} style={{ margin: 0 }}>
           Tạo đơn hàng bán
         </Title>

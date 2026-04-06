@@ -12,24 +12,53 @@
 Sale tạo đơn → Khóa HĐ → SX nhập tiến độ → LOG nhập vận chuyển → KT nhập tài chính → Hoàn tất
 ```
 
-Mỗi bộ phận chỉ nhập phần của mình. Hệ thống tự khóa theo trạng thái đơn hàng.
-
 ### Luồng trạng thái
 
 ```
 Nháp → Đã xác nhận → Đang SX → Sẵn sàng → Đóng gói → Đã xuất → Đã giao → Đã lập HĐ → Đã TT
 ```
 
-### Màu dòng trên danh sách
+### Ai nhập ở giai đoạn nào?
 
-| Màu nền | Ý nghĩa |
-|---------|---------|
-| Xanh lá nhạt | Đã thanh toán — hoàn tất |
-| Xanh dương nhạt | Đã xuất/giao — đang chờ tiền về |
-| Vàng nhạt | Sẵn sàng nhưng thiếu thông tin LOG (BK/BL/ETD) |
-| Đỏ nhạt | Quá hạn giao hoặc L/C đã hết hạn |
-| Xám nhạt | Nháp hoặc đã hủy |
-| Trắng | Đang sản xuất — bình thường |
+```
+ Nháp    Đã XN    Đang SX    Sẵn sàng    Đóng gói    Đã xuất    Đã giao    Đã lập HĐ    Đã TT
+  │                                                                                         │
+  ├── SALE ──┤                                                                              │
+  │  (HĐ)   │                                                                              │
+             ├──── SX ──────────────────────────┤                                           │
+             │  (SX sẵn, container)             │                                           │
+                   ├──── LOG ──────────────────────────────────────┤                         │
+                   │  (BK, BL, ETD, LC, CK, DHL)                  │                         │
+                                                      ├──── KT ───────────────────┤         │
+                                                      │  (tỷ giá, TT, DT ròng)   │         │
+```
+
+---
+
+## Màu dòng trên danh sách — Nhìn vào biết ngay thiếu gì
+
+| Màu nền | Viền trái | Ý nghĩa | Cần làm gì? |
+|---------|-----------|---------|-------------|
+| 🟢 Xanh lá nhạt | Xanh lá | Đã thanh toán | Xong — không cần làm gì |
+| 🔵 Xanh dương nhạt | Xanh dương | Đã xuất/giao | KT cần nhập tỷ giá + thanh toán |
+| 🟡 Vàng nhạt | Vàng | Thiếu LOG | LOG cần nhập BK / B/L / ETD |
+| 🔴 Đỏ nhạt | Đỏ | Quá hạn giao hoặc L/C hết | Xử lý gấp! |
+| 🟠 Cam nhạt | — | L/C sắp hết hạn (≤ 7 ngày) | Cần gia hạn hoặc xuất gấp |
+| ⚪ Trắng | Xanh đậm | Đang SX — bình thường | Chờ SX xong |
+| 🩶 Xám nhạt | Xám | Nháp / Đã hủy | Sale cần xác nhận hoặc bỏ qua |
+
+### Ý nghĩa 4 chấm tiến độ
+
+```
+●●●● = Đã thanh toán (xong tất cả 4 BP)
+●●●○ = Đã xuất — chờ KT nhập tài chính
+●●○○ = Sẵn sàng/đóng gói — chờ LOG
+●○○○ = Đã xác nhận — đang SX
+○○○○ = Nháp (mới tạo)
+ HỦY = Đã hủy (tag đỏ)
+```
+
+Chấm: 🟢 HĐ (Sale) → 🔵 SX → 🟡 LOG → 🔴 KT
 
 ---
 
@@ -37,69 +66,80 @@ Nháp → Đã xác nhận → Đang SX → Sẵn sàng → Đóng gói → Đã
 
 **Email:** `sales@huyanhrubber.com`
 **Tab:** Hợp đồng
-**Khi nào nhập:** Khi có đơn hàng mới từ khách
-**Sửa được khi:** Trạng thái = Nháp + Chưa khóa
+**Sửa được khi:** Trạng thái = **Nháp** + **Chưa khóa**
 
 ### 1.1. Tạo đơn hàng mới
 
-Vào **Đơn hàng bán → Tạo đơn hàng** (nút xanh góc phải)
+**Đơn hàng bán → Tạo đơn hàng** (nút xanh góc phải)
 
-**Bước 1 — Nhập thông tin (3 phần):**
+#### Bước 1 — Nhập thông tin (3 card)
 
-#### Thông tin Hợp đồng
+**Card 1: Thông tin Hợp đồng**
+
 | Trường | Bắt buộc | Ví dụ | Ghi chú |
-|--------|----------|-------|---------|
-| Số hợp đồng | Có | `LTC2024/PD-ATC` | Số HĐ trên giấy |
-| Ngày hợp đồng | Không | `15/03/2026` | Ngày ký HĐ |
-| PO# khách hàng | Không | `PO-20260315` | Số PO bên mua |
-| Khách hàng (Buyer) | Có | `Bridgestone` | Chọn từ danh sách |
+|--------|:--------:|-------|---------|
+| Số hợp đồng | ✅ | `LTC2026/HA-BRS05` | Số HĐ trên giấy |
+| Ngày hợp đồng | | `05/04/2026` | Ngày ký HĐ |
+| PO# khách hàng | | `PO-BRS-20260405` | Số PO bên mua |
+| Khách hàng (Buyer) | ✅ | `Bridgestone` | Tự điền Incoterm, tiền tệ, thanh toán |
 
-#### Sản phẩm & Giá
+**Card 2: Sản phẩm & Giá**
+
 | Trường | Bắt buộc | Ví dụ | Ghi chú |
-|--------|----------|-------|---------|
-| Grade SVR | Có | `SVR 3L` | Chọn từ danh sách |
-| Số lượng (tấn) | Có | `725.76` | Khối lượng theo HĐ |
-| Đơn giá (USD/MT) | Có | `1,924` | Giá FOB/CIF |
-| Tiền tệ | Không | `USD` | Mặc định USD |
-| Quy cách bành | Không | `35 kg/bành` | Chọn: 33.333 kg hoặc 35 kg |
-| Bành/container | Không | `576` | Theo HĐ thực tế |
-| Đóng gói | Không | `Loose Bale` | Chọn: Loose Bale / SW Pallet / Wooden Pallet / Metal Box |
+|--------|:--------:|-------|---------|
+| Grade SVR | ✅ | `SVR 3L` | Tự điền chỉ tiêu kỹ thuật |
+| Số lượng (tấn) | ✅ | `725.76` | Theo HĐ |
+| Đơn giá (USD/MT) | ✅ | `1,850` | Giá FOB/CIF |
+| Tiền tệ | | `USD` | USD / EUR / JPY / CNY |
+| Quy cách bành | | `35 kg` | Chọn: **33.333 kg** hoặc **35 kg** |
+| Bành/container | | `576` | Theo HĐ thực tế (mặc định 576) |
+| Đóng gói | | `SW Pallet` | Chọn: **Loose Bale / SW Pallet / Wooden Pallet / Metal Box** |
 
 > **Tự động tính:** Tổng bành, Số container, Giá trị USD, Hoa hồng
 
-#### Điều khoản & Ngân hàng
-| Trường | Bắt buộc | Ví dụ | Ghi chú |
-|--------|----------|-------|---------|
-| Thanh toán | Không | `L/C at sight` | Điều khoản thanh toán |
-| Incoterm | Không | `FOB` | Mặc định FOB |
-| Ngày giao dự kiến | Không | `30/04/2026` | Deadline giao hàng |
-| Cảng xếp hàng | Không | `Cát Lái` | Cảng VN |
-| Cảng đích | Không | `Shanghai` | Cảng bên mua |
-| Hoa hồng (%) | Không | `2` | % trên tổng giá trị |
-| Ngân hàng | Không | `Vietcombank CN Huế` | Đã điền sẵn |
-| Số tài khoản | Không | `0071001046372` | Đã điền sẵn |
-| SWIFT Code | Không | `BFTVVNVX` | Đã điền sẵn |
+**Card 3: Điều khoản & Ngân hàng**
 
-**Bước 2 — Xác nhận:**
-- Xem lại tất cả thông tin
-- Nhấn **"Lưu nháp"** để lưu tạm
-- Nhấn **"Xác nhận đơn hàng"** để chuyển sang trạng thái Đã xác nhận
+| Trường | Bắt buộc | Ví dụ | Ghi chú |
+|--------|:--------:|-------|---------|
+| Thanh toán | | `L/C at sight` | Điều khoản TT |
+| Incoterm | | `FOB` | Mặc định FOB |
+| Ngày giao dự kiến | | `30/05/2026` | Deadline giao hàng |
+| Cảng xếp hàng (POL) | | `Cát Lái` | Cảng VN |
+| Cảng đích | | `Yokohama, Japan` | Cảng bên mua |
+| Hoa hồng (%) | | `2` | 0-20%, tính trên tổng giá trị |
+| Ngân hàng | | `Vietcombank CN Huế` | Điền sẵn |
+| Số tài khoản | | `0071001046372` | Điền sẵn |
+| SWIFT Code | | `BFTVVNVX` | Điền sẵn |
+
+#### Bước 2 — Xác nhận + Chỉ tiêu kỹ thuật
+
+Xem lại toàn bộ thông tin đã nhập. **Chỉ tiêu kỹ thuật** được tự động điền từ Grade, sửa nếu khách yêu cầu khác:
+
+| Chỉ tiêu | Ví dụ SVR 3L | Đơn vị |
+|-----------|-------------|--------|
+| DRC min | 60.0 | % |
+| Moisture max | 0.80 | % |
+| Dirt max | 0.020 | % |
+| Ash max | 0.50 | % |
+| Nitrogen max | 0.60 | % |
+| Volatile max | 0.20 | % |
+| PRI min | 40 | |
+| Color max | 6.0 | Lovibond |
+
+Nhấn **"Lưu nháp"** hoặc **"Xác nhận đơn hàng"**
 
 ### 1.2. Khóa hợp đồng
 
-Sau khi xác nhận thông tin đúng:
-1. Click vào đơn hàng trong danh sách → Panel mở ra
-2. Nhấn nút **"Khóa HĐ"** (góc phải header)
+Sau khi xác nhận xong:
+1. Click đơn hàng trong danh sách → Panel mở ra
+2. Nhấn **"Khóa HĐ"** (góc phải header)
 3. Xác nhận → Thông tin HĐ bị khóa, Sale không sửa được nữa
 
-> **Mở khóa:** Chỉ Admin mới mở khóa được (nút "Mở khóa" màu đỏ)
+> ⚠️ **Mở khóa:** Chỉ **Admin** mới mở khóa được
 
 ### 1.3. Chỉnh sửa đơn nháp
 
-1. Click vào đơn nháp trong danh sách
-2. Chọn tab **Hợp đồng**
-3. Nhấn **"Chỉnh sửa"** → Form edit hiện ra
-4. Sửa xong nhấn **"Lưu"**
+Click đơn nháp → Tab **Hợp đồng** → **"Chỉnh sửa"** → Sửa → **"Lưu"**
 
 ---
 
@@ -107,40 +147,39 @@ Sau khi xác nhận thông tin đúng:
 
 **Email:** `trunglxh@huyanhrubber.com`
 **Tab:** Sản xuất
-**Khi nào nhập:** Khi đơn hàng đã xác nhận, bắt đầu sản xuất
-**Sửa được khi:** Trạng thái = Đã xác nhận → Đóng gói
+**Sửa được khi:** Trạng thái = **Đã xác nhận → Đóng gói**
 
 ### 2.1. Nhập ngày sẵn sàng
 
-1. Click vào đơn hàng → Tab **Sản xuất**
-2. Tại dòng **"Ngày sẵn sàng"** → Chọn ngày
-3. Nhấn **"Lưu"**
+1. Click đơn hàng → Tab **Sản xuất**
+2. Dòng **"Ngày sẵn sàng"** → Chọn ngày → **"Lưu"**
 
-> Ngày này cho LOG biết khi nào hàng sẵn sàng để book tàu.
+> Ngày này báo cho LOG biết khi nào hàng sẵn sàng để book tàu.
 
 ### 2.2. Quản lý Container
 
 | Thao tác | Cách làm |
 |----------|----------|
-| Tạo tự động | Nhấn **"Tạo tự động"** → Hệ thống tạo đủ số container theo đơn |
-| Thêm thủ công | Điền Container No., Seal No., Bành, KL → nhấn **"Thêm"** |
-| Sửa container | Nhấn icon bút chì → sửa inline → nhấn ra ngoài để lưu |
-| Xóa container | Nhấn icon thùng rác → xác nhận |
+| Tạo tự động | Nhấn **"Tạo tự động"** → Tạo đủ số container theo đơn |
+| Thêm thủ công | Điền Container No., Seal No., Bành, KL → **"Thêm"** |
+| Sửa inline | Nhấn 🖊 → sửa trực tiếp → nhấn ra ngoài để lưu |
+| Xóa | Nhấn 🗑 → xác nhận |
 
-#### Thông tin container cần nhập
+**Thông tin container:**
+
 | Trường | Ví dụ | Ghi chú |
 |--------|-------|---------|
 | Container No. | `ABCU1234567` | 11 ký tự |
-| Seal No. | `SL123456` | Số seal container |
+| Seal No. | `SL123456` | Số seal |
 | Số bành | `576` | Bành trong container |
 | KL net (kg) | `20,160` | Khối lượng net |
 
 ### 2.3. Theo dõi tiến độ sản xuất
 
-Tab SX tự động hiện:
+Tự động hiện:
 - **5 giai đoạn:** Rửa → Tán/Kéo → Sấy → Ép → Đóng gói
-- **Thanh tiến độ:** % hoàn thành
-- **Link lệnh SX:** Nhấn "Xem lệnh SX" để sang module Sản xuất
+- **Thanh tiến độ** (%)
+- **Link lệnh SX** → nhấn để sang module Sản xuất
 
 ---
 
@@ -148,30 +187,30 @@ Tab SX tự động hiện:
 
 **Email:** `logistics@huyanhrubber.com`, `anhlp@huyanhrubber.com`
 **Tab:** Vận chuyển
-**Khi nào nhập:** Khi hàng đang SX hoặc sẵn sàng xuất
-**Sửa được khi:** Trạng thái = Đang SX → Đã giao
+**Sửa được khi:** Trạng thái = **Đang SX → Đã giao**
 
 ### 3.1. Nhập thông tin vận chuyển
 
-1. Click vào đơn hàng → Tab **Vận chuyển**
-2. Nhấn **"Chỉnh sửa"**
-3. Điền các phần:
+Click đơn hàng → Tab **Vận chuyển** → **"Chỉnh sửa"** → Điền → **"Lưu"**
 
 #### Booking & Tàu
-| Trường | Ví dụ | Ghi chú |
-|--------|-------|---------|
-| Hãng tàu | `Maersk` | |
-| Booking Ref | `BK-260407-001` | Số booking |
-| Tên tàu | `MSC ANNA` | Vessel name |
-| Voyage | `VY2604E` | Voyage number |
+
+| Trường | Ví dụ |
+|--------|-------|
+| Hãng tàu | `Maersk` |
+| Booking Ref | `BK-260407-001` |
+| Tên tàu | `MSC ANNA` |
+| Voyage | `VY2604E` |
 
 #### Vận đơn (B/L)
+
 | Trường | Ví dụ | Ghi chú |
 |--------|-------|---------|
 | B/L Number | `OOCL-BL-2026001` | Số vận đơn |
 | B/L Type | `Original` | Original / Telex Release / Surrendered |
 
 #### Ngày tháng
+
 | Trường | Ví dụ | Ghi chú |
 |--------|-------|---------|
 | ETD | `10/04/2026` | Ngày tàu chạy |
@@ -179,32 +218,30 @@ Tab SX tự động hiện:
 | Cutoff | `08/04/2026` | Hạn đóng hàng |
 
 #### DHL & L/C
+
 | Trường | Ví dụ | Ghi chú |
 |--------|-------|---------|
-| DHL Tracking | `1234567890` | Số tracking chứng từ gửi |
+| DHL Tracking | `1234567890` | Số tracking chứng từ |
 | Số L/C | `LC-2026-001` | Thư tín dụng |
 | NH phát hành | `Mizuho Bank` | Ngân hàng bên mua |
-| Hạn L/C | `10/07/2026` | Cảnh báo đỏ khi ≤ 7 ngày, cam khi ≤ 20 ngày |
+| Hạn L/C | `10/07/2026` | ⚠️ Cảnh báo khi ≤ 20 ngày |
 | Số tiền L/C | `925,000` | USD |
 
 #### Chiết khấu Ngân hàng
+
 | Trường | Ví dụ | Ghi chú |
 |--------|-------|---------|
-| NH chiết khấu | `Vietcombank` | NH chiết khấu bộ chứng từ |
-| Ngày CK | `15/04/2026` | Ngày chiết khấu |
-| Số tiền CK | `920,000` | USD — số tiền NH chuyển |
-| Phí NH | `500` | USD — phí ngân hàng |
+| NH chiết khấu | `Vietcombank` | NH CK bộ chứng từ |
+| Ngày CK | `15/04/2026` | |
+| Số tiền CK (USD) | `920,000` | Số tiền NH chuyển |
+| Phí NH (USD) | `500` | Phí ngân hàng |
 
-4. Nhấn **"Lưu"**
+> ⚠️ **Tỷ giá chiết khấu** do **Kế toán** nhập — LOG không sửa được trường này.
 
-> **Lưu ý:** Tỷ giá chiết khấu do **Kế toán** nhập, LOG không sửa được trường này.
-
-### 3.2. Cảnh báo L/C
-
-Hệ thống tự động cảnh báo:
-- **Đỏ:** L/C còn ≤ 7 ngày hoặc đã hết hạn
-- **Cam:** L/C còn ≤ 20 ngày
-- Email cảnh báo hàng ngày cho L/C sắp hết hạn
+**Tổng hợp tự động:**
+```
+Tổng HĐ → Chiết khấu → Phí NH → Còn lại
+```
 
 ---
 
@@ -212,21 +249,21 @@ Hệ thống tự động cảnh báo:
 
 **Email:** `yendt@huyanhrubber.com`
 **Tab:** Tài chính
-**Khi nào nhập:** Khi hàng đã xuất, chờ tiền về
-**Sửa được khi:** Trạng thái = Đã xuất → Đã lập HĐ
+**Sửa được khi:** Trạng thái = **Đã xuất → Đã lập HĐ**
 
 ### 4.1. Nhập tỷ giá & thanh toán
 
-1. Click vào đơn hàng → Tab **Tài chính**
-2. Nhấn **"Chỉnh sửa"**
+Click đơn hàng → Tab **Tài chính** → **"Chỉnh sửa"** → Điền → **"Lưu"**
 
 #### Tỷ giá
+
 | Trường | Ví dụ | Ghi chú |
 |--------|-------|---------|
-| Tỷ giá USD/VND | `25,400` | Tỷ giá quy đổi |
-| Tỷ giá CK | `25,350` | Tỷ giá chiết khấu (có thể khác tỷ giá chính) |
+| Tỷ giá USD/VND | `25,400` | Tỷ giá quy đổi chính |
+| Tỷ giá CK | `25,350` | Tỷ giá chiết khấu (có thể khác) |
 
 #### Thanh toán
+
 | Trường | Ví dụ | Ghi chú |
 |--------|-------|---------|
 | Trạng thái TT | `Đã TT đủ` | Chưa TT / TT một phần / Đã TT đủ |
@@ -235,21 +272,17 @@ Hệ thống tự động cảnh báo:
 | Phí NH (USD) | `500` | Phí ngân hàng |
 | NH nhận | `Vietcombank` | Ngân hàng nhận tiền |
 
-3. Nhấn **"Lưu"**
-
-### 4.2. Xem tổng hợp tài chính
-
-Tab Tài chính tự động tính:
+### 4.2. Tổng hợp tài chính (tự động)
 
 ```
-Tổng giá trị HĐ (USD)     $925,000
+Tổng giá trị HĐ (USD)      $925,000
 - Chiết khấu NH             -$920,000
-- Phí ngân hàng              -$500
+- Phí ngân hàng                -$500
 - Hoa hồng (2%)             -$18,500
-─────────────────────────────────────
-Còn lại (sau CK + phí)      $4,500
-Doanh thu ròng              -$14,000
-Quy đổi VND                 23.49 tỷ
+──────────────────────────────────────
+Còn lại (sau CK + phí)        $4,500
+Doanh thu ròng               -$14,000
+Quy đổi VND                   23.49 tỷ
 ```
 
 ---
@@ -258,71 +291,131 @@ Quy đổi VND                 23.49 tỷ
 
 **Email:** `minhld@huyanhrubber.com`, `thuyht@huyanhrubber.com`, `huylv@huyanhrubber.com`
 
-Admin có quyền:
-- Xem và sửa **tất cả** các tab, ở **mọi** trạng thái
-- **Mở khóa** đơn hàng đã khóa (nút đỏ "Mở khóa")
-- Xem Executive Dashboard
+| Quyền | Chi tiết |
+|-------|---------|
+| Xem | **Tất cả** tab, mọi đơn hàng |
+| Sửa | **Tất cả** tab, ở **mọi** trạng thái |
+| Khóa HĐ | Có |
+| Mở khóa HĐ | **Chỉ Admin** |
+| Executive Dashboard | **Chỉ Admin** |
 
 ---
 
-## Bảng tổng hợp quyền
+## Bảng tổng hợp phân quyền
 
-| Bộ phận | Tab xem được | Tab sửa được | Khi nào sửa |
-|---------|-------------|-------------|-------------|
-| Sale | HĐ, SX, LOG | HĐ | Nháp + chưa khóa |
-| Sản xuất | HĐ, SX, LOG | SX | Đã XN → Đóng gói |
-| Logistics | HĐ, SX, LOG, Chứng từ | LOG | Đang SX → Đã giao |
-| Kế toán | HĐ, LOG, Chứng từ, KT | KT | Đã xuất → Đã lập HĐ |
-| Admin | Tất cả | Tất cả | Mọi lúc |
+### Ai xem được gì?
+
+| Tab | Sale | SX | LOG | KT | Admin |
+|-----|:----:|:--:|:---:|:--:|:-----:|
+| Hợp đồng | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Sản xuất | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Vận chuyển | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Chứng từ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Tài chính | ❌ | ❌ | ❌ | ✅ | ✅ |
+
+### Ai sửa được gì, khi nào?
+
+| Tab | Role sửa | Trạng thái cho phép | Điều kiện thêm |
+|-----|----------|--------------------|---------| 
+| Hợp đồng | Sale | Nháp | + Chưa khóa |
+| Sản xuất | SX | Đã XN → Đóng gói | |
+| Vận chuyển | LOG | Đang SX → Đã giao | Tỷ giá CK: chỉ KT |
+| Tài chính | KT | Đã xuất → Đã lập HĐ | |
+| *Tất cả* | **Admin** | *Mọi lúc* | |
+
+### Khóa / Mở khóa
+
+| Thao tác | Ai được | Khi nào |
+|----------|---------|---------|
+| Khóa HĐ | Sale, Admin | Trạng thái = Nháp |
+| Mở khóa | **Chỉ Admin** | Bất kỳ lúc nào |
 
 ---
 
-## Thao tác trên danh sách
+## Hệ thống cảnh báo
 
-### Mở chi tiết đơn hàng
-- Click vào **bất kỳ dòng nào** → Panel trượt từ bên phải
-- Hoặc click **icon mắt** ở cột cuối
+### Cảnh báo trên giao diện (realtime)
 
-### Xác nhận đơn nháp
-- Click **icon tick xanh** ở cột cuối → Xác nhận
+| Cảnh báo | Điều kiện | Hiển thị |
+|----------|-----------|----------|
+| L/C hết hạn | Hạn L/C ≤ 0 ngày | 🔴 Tag đỏ + dòng đỏ |
+| L/C sắp hết | Hạn L/C ≤ 7 ngày | 🔴 Tag đỏ + Alert đỏ trong tab KT |
+| L/C cảnh báo | Hạn L/C ≤ 20 ngày | 🟠 Tag cam + Alert cam trong tab KT |
+| Quá hạn giao | Ngày giao < hôm nay, chưa xuất | 🔴 Dòng đỏ nhạt |
+| Thiếu LOG | Sẵn sàng nhưng thiếu BK/BL/ETD | 🟡 Dòng vàng nhạt |
+| Chờ tiền | Đã xuất/giao, chưa TT | 🔵 Dòng xanh dương |
 
-### Chú thích cột
+### Cảnh báo email hàng ngày (17:30)
 
-| Nhóm | Cột | Ý nghĩa |
+Gửi cho: **Giám đốc, Trợ lý BGĐ, QL Sản xuất, IT Manager**
+
+| Loại cảnh báo | Điều kiện | Mức độ |
+|--------------|-----------|--------|
+| L/C sắp hết hạn | Còn ≤ 20 ngày | ⚠️ Warning / 🚨 Critical (≤ 7 ngày) |
+| Giao hàng trễ hạn | ETD đã qua, chưa xuất | 🚨 Critical |
+| Thanh toán quá hạn | Đã giao > 30 ngày, chưa TT | 🚨 Critical |
+| Đơn nháp tồn đọng | Nháp > 3 ngày | ⚠️ Warning |
+
+### Bảng ngưỡng cảnh báo
+
+| Chỉ số | Ngưỡng | Hành động |
+|--------|--------|-----------|
+| L/C hết hạn | ≤ 20 ngày | Cảnh báo cam trên UI + email |
+| L/C hết hạn | ≤ 7 ngày | Cảnh báo đỏ trên UI + email khẩn |
+| L/C hết hạn | ≤ 0 ngày | Dòng đỏ + email khẩn |
+| Giao hàng | Quá hạn | Dòng đỏ + email |
+| Thanh toán | > 30 ngày | Email khẩn |
+| Đơn nháp | > 3 ngày | Email nhắc |
+
+---
+
+## Thao tác nhanh trên danh sách
+
+| Thao tác | Cách |
+|----------|------|
+| Xem chi tiết | Click vào dòng → Panel trượt ra |
+| Xác nhận đơn nháp | Click ✅ ở cột cuối |
+| Lọc theo trạng thái | Click tab: Nháp / Đã XN / Đang SX... |
+| Tìm kiếm | Gõ mã đơn, tên KH, PO# |
+| Lọc khách hàng | Dropdown Khách hàng |
+| Lọc grade | Dropdown Grade |
+| Lọc ngày | Chọn khoảng ngày |
+
+### Chú thích cột (nhóm màu)
+
+| Nhóm | Cột | Ai nhập |
 |------|-----|---------|
-| **Chung** | #, Mã HĐ, Buyer | Thông tin cơ bản (cố định bên trái) |
-| **Sale** (xanh lá) | Grade, Tấn, $/tấn, Tổng USD, Thanh toán, Giao | Sale nhập |
-| **SX** (xanh dương) | SX sẵn, Cont | SX nhập |
-| **LOG** (vàng) | BK, B/L, ETD, L/C hạn, CK $ | LOG nhập |
-| **KT** (đỏ) | Tỷ giá, Tiền về, TT | KT nhập |
-| **Tiến độ** | 4 chấm tròn | HĐ ● SX ● LOG ● KT |
-
-### Ý nghĩa 4 chấm tiến độ
-
-```
-●●●● = Đã thanh toán (xong tất cả)
-●●●○ = Đã xuất, chờ KT nhập
-●●○○ = Đang vận chuyển, chờ LOG
-●○○○ = Đang sản xuất
-○○○○ = Mới tạo (nháp)
-HỦY  = Đã hủy
-```
+| **Chung** (cố định trái) | #, Mã HĐ, Buyer | Tự động |
+| **Sale** 🟢 | Grade, Tấn, $/tấn, Tổng USD, Thanh toán, Giao | Sale |
+| **SX** 🔵 | SX sẵn, Cont | SX |
+| **LOG** 🟡 | BK, B/L, ETD, L/C hạn, CK $ | LOG |
+| **KT** 🔴 | Tỷ giá, Tiền về, TT | KT |
+| **Tiến độ** | 4 chấm ●●●● | Tự động |
 
 ---
 
 ## Câu hỏi thường gặp
 
-**Q: Tôi không thấy nút "Chỉnh sửa" trong tab?**
-A: Tab đã bị khóa do trạng thái đơn hàng đã chuyển qua giai đoạn của bạn, hoặc bạn không có quyền sửa tab đó. Liên hệ Admin để mở khóa.
+**Q: Tôi không thấy nút "Chỉnh sửa"?**
+A: Tab đã bị khóa do trạng thái đơn hàng vượt qua giai đoạn của bạn. Liên hệ Admin để mở khóa nếu cần sửa.
 
-**Q: Tại sao dòng đơn hàng có màu đỏ?**
-A: Đơn hàng đã quá hạn giao hoặc L/C đã hết hạn. Cần xử lý gấp.
+**Q: Tại sao dòng có màu đỏ?**
+A: Đơn hàng quá hạn giao hoặc L/C đã hết hạn → cần xử lý gấp.
 
 **Q: Tại sao dòng có màu vàng?**
-A: Hàng đã sẵn sàng nhưng thiếu thông tin vận chuyển (Booking, B/L, hoặc ETD). LOG cần nhập bổ sung.
+A: Hàng sẵn sàng nhưng thiếu thông tin LOG (Booking, B/L, ETD) → LOG cần nhập.
 
-**Q: Làm sao biết đơn nào đang chờ tiền?**
-A: Dòng có màu **xanh dương nhạt** = đã xuất/giao, đang chờ KT nhập thông tin thanh toán.
+**Q: Làm sao biết đơn nào chờ tiền?**
+A: Dòng **xanh dương nhạt** = đã xuất/giao, KT cần nhập tỷ giá + thanh toán.
 
-**Q: Admin có thể sửa đơn đã thanh toán không?**
+**Q: Sale có sửa được tỷ giá không?**
+A: Không. Tỷ giá USD/VND và tỷ giá CK chỉ KT nhập.
+
+**Q: LOG có sửa được hoa hồng không?**
+A: Không. Hoa hồng do Sale nhập khi tạo đơn, hiện trong tab Hợp đồng.
+
+**Q: Admin có sửa đơn đã thanh toán không?**
 A: Có. Admin luôn sửa được mọi tab ở mọi trạng thái.
+
+**Q: Email cảnh báo gửi lúc mấy giờ?**
+A: 17:30 hàng ngày, gửi cho Giám đốc + Trợ lý BGĐ + QL Sản xuất + IT Manager.

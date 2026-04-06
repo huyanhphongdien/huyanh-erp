@@ -20,12 +20,11 @@ const CLIENT_ID = Deno.env.get('AZURE_CLIENT_ID') || 'ee1377e6-b52c-4326-88f2-c1
 const CLIENT_SECRET = Deno.env.get('AZURE_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET') || ''
 const SENDER_EMAIL = Deno.env.get('EMAIL_FROM') || Deno.env.get('AZURE_SENDER_EMAIL') || 'huyanhphongdien@huyanhrubber.com'
 
-// ★ CHÍNH THỨC — 4 người nhận
+// ★ CHÍNH THỨC — 3 người nhận (minhld có quyền admin nhưng không nhận báo cáo)
 const REPORT_RECIPIENTS = [
   { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com', role: 'Giám đốc' },
   { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com', role: 'Trợ lý Ban Giám đốc' },
   { name: 'Lê Xuân Trung', email: 'trunglxh@huyanhrubber.com', role: 'Quản lý' },
-  { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com', role: 'IT Manager' },
 ]
 
 const APP_URL = 'https://huyanhrubber.vn'

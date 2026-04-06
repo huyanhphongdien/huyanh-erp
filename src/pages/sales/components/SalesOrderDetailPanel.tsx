@@ -199,7 +199,6 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
           <DocumentChecklistTab
             orderId={order.id}
             orderCode={order.code}
-            readonly={!salesRole || !['logistics', 'accounting', 'admin'].includes(salesRole)}
           />
         )
       case 'finance':

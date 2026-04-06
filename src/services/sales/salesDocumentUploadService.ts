@@ -26,20 +26,31 @@ export interface SalesDocument {
 }
 
 // Danh sách chứng từ tiêu chuẩn xuất khẩu cao su
+// owner: role nào được upload/sửa chứng từ này (admin luôn được)
 export const STANDARD_DOCUMENTS = [
-  { doc_type: 'bl', doc_name: 'Bill of Lading (B/L)', sort_order: 1, required: true },
-  { doc_type: 'commercial_invoice', doc_name: 'Commercial Invoice', sort_order: 2, required: true },
-  { doc_type: 'packing_list', doc_name: 'Packing List', sort_order: 3, required: true },
-  { doc_type: 'coa', doc_name: 'Certificate of Analysis (COA)', sort_order: 4, required: true },
-  { doc_type: 'co', doc_name: 'Certificate of Origin (C/O)', sort_order: 5, required: true },
-  { doc_type: 'form_ae', doc_name: 'Form A/E', sort_order: 6, required: false },
-  { doc_type: 'phytosanitary', doc_name: 'Phytosanitary Certificate', sort_order: 7, required: false },
-  { doc_type: 'fumigation', doc_name: 'Fumigation Certificate', sort_order: 8, required: false },
-  { doc_type: 'lc_copy', doc_name: 'LC Copy (Thư tín dụng)', sort_order: 9, required: false },
-  { doc_type: 'insurance', doc_name: 'Insurance Certificate', sort_order: 10, required: false },
-  { doc_type: 'weight_note', doc_name: 'Weight Note (Phiếu cân)', sort_order: 11, required: false },
-  { doc_type: 'other', doc_name: 'Chứng từ khác', sort_order: 99, required: false },
+  { doc_type: 'contract',          doc_name: 'Hợp đồng (Contract)',           sort_order: 0,  required: true,  owner: 'sale' },
+  { doc_type: 'bl',                doc_name: 'Bill of Lading (B/L)',          sort_order: 1,  required: true,  owner: 'logistics' },
+  { doc_type: 'commercial_invoice',doc_name: 'Commercial Invoice',            sort_order: 2,  required: true,  owner: 'accounting' },
+  { doc_type: 'packing_list',      doc_name: 'Packing List',                  sort_order: 3,  required: true,  owner: 'logistics' },
+  { doc_type: 'coa',               doc_name: 'Certificate of Analysis (COA)', sort_order: 4,  required: true,  owner: 'production' },
+  { doc_type: 'co',                doc_name: 'Certificate of Origin (C/O)',   sort_order: 5,  required: true,  owner: 'logistics' },
+  { doc_type: 'form_ae',           doc_name: 'Form A/E',                      sort_order: 6,  required: false, owner: 'logistics' },
+  { doc_type: 'phytosanitary',     doc_name: 'Phytosanitary Certificate',     sort_order: 7,  required: false, owner: 'logistics' },
+  { doc_type: 'fumigation',        doc_name: 'Fumigation Certificate',        sort_order: 8,  required: false, owner: 'logistics' },
+  { doc_type: 'lc_copy',           doc_name: 'LC Copy (Thư tín dụng)',        sort_order: 9,  required: false, owner: 'accounting' },
+  { doc_type: 'insurance',         doc_name: 'Insurance Certificate',         sort_order: 10, required: false, owner: 'logistics' },
+  { doc_type: 'weight_note',       doc_name: 'Weight Note (Phiếu cân)',       sort_order: 11, required: false, owner: 'production' },
+  { doc_type: 'other',             doc_name: 'Chứng từ khác',                 sort_order: 99, required: false, owner: 'all' },
 ]
+
+// Kiểm tra role có quyền upload chứng từ này không
+export function canEditDocument(docType: string, role: string | null): boolean {
+  if (!role) return false
+  if (role === 'admin') return true
+  const doc = STANDARD_DOCUMENTS.find(d => d.doc_type === docType)
+  if (!doc) return role === 'admin' // unknown doc type
+  return doc.owner === role || doc.owner === 'all'
+}
 
 // ============================================================================
 // SERVICE

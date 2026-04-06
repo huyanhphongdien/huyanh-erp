@@ -18,8 +18,10 @@ import {
   salesDocumentUploadService,
   type SalesDocument,
   STANDARD_DOCUMENTS,
+  canEditDocument,
 } from '../../../services/sales/salesDocumentUploadService'
 import { useAuthStore } from '../../../stores/authStore'
+import { getSalesRole } from '../../../services/sales/salesPermissionService'
 
 const { Text, Title } = Typography
 
@@ -63,6 +65,7 @@ interface Props {
 
 export default function DocumentChecklistTab({ orderId, orderCode, readonly = false }: Props) {
   const { user } = useAuthStore()
+  const salesRole = getSalesRole(user)
   const [docs, setDocs] = useState<SalesDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState<string | null>(null)
@@ -223,56 +226,70 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                 </div>
 
                 {/* Actions */}
-                <Space size={4}>
-                  {doc.file_url && (
-                    <>
-                      <Tooltip title="Xem trước">
-                        <Button size="small" type="link" icon={<EyeOutlined />}
-                          onClick={() => window.open(doc.file_url!, '_blank')} />
-                      </Tooltip>
-                      <Tooltip title="Tải về">
-                        <Button size="small" type="link" icon={<DownloadOutlined />}
-                          onClick={() => {
-                            const a = document.createElement('a')
-                            a.href = doc.file_url!
-                            a.download = doc.file_name || `${doc.doc_name}.pdf`
-                            a.target = '_blank'
-                            a.click()
-                          }} />
-                      </Tooltip>
-                    </>
-                  )}
-
-                  {!readonly && (
-                    <>
-                      <Tooltip title={doc.file_url ? 'Upload lại' : 'Upload file'}>
-                        <Button size="small" type={doc.file_url ? 'link' : 'primary'}
-                          icon={<UploadOutlined />}
-                          loading={uploading === doc.id}
-                          onClick={() => {
-                            fileInputRef.current?.setAttribute('data-doc-id', doc.id)
-                            fileInputRef.current?.click()
-                          }}
-                        >
-                          {!doc.file_url && 'Upload'}
-                        </Button>
-                      </Tooltip>
-
-                      <Tooltip title={doc.is_received ? 'Bỏ đánh dấu nhận' : 'Đánh dấu đã nhận'}>
-                        <Button size="small" type="link"
-                          icon={doc.is_received ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <CloseCircleOutlined />}
-                          onClick={() => handleToggleReceived(doc)}
-                        />
-                      </Tooltip>
-
-                      {doc.doc_type === 'other' && (
-                        <Popconfirm title="Xóa chứng từ này?" onConfirm={() => handleDelete(doc.id)}>
-                          <Button size="small" type="link" danger icon={<DeleteOutlined />} />
-                        </Popconfirm>
+                {(() => {
+                  const canEdit = !readonly && canEditDocument(doc.doc_type, salesRole)
+                  const ownerLabel = STANDARD_DOCUMENTS.find(d => d.doc_type === doc.doc_type)?.owner
+                  return (
+                    <Space size={4}>
+                      {/* Xem + Tải — ai cũng được */}
+                      {doc.file_url && (
+                        <>
+                          <Tooltip title="Xem trước">
+                            <Button size="small" type="link" icon={<EyeOutlined />}
+                              onClick={() => window.open(doc.file_url!, '_blank')} />
+                          </Tooltip>
+                          <Tooltip title="Tải về">
+                            <Button size="small" type="link" icon={<DownloadOutlined />}
+                              onClick={() => {
+                                const a = document.createElement('a')
+                                a.href = doc.file_url!
+                                a.download = doc.file_name || `${doc.doc_name}.pdf`
+                                a.target = '_blank'
+                                a.click()
+                              }} />
+                          </Tooltip>
+                        </>
                       )}
-                    </>
-                  )}
-                </Space>
+
+                      {/* Upload/Tick/Xóa — chỉ role owner */}
+                      {canEdit ? (
+                        <>
+                          <Tooltip title={doc.file_url ? 'Upload lại' : 'Upload file'}>
+                            <Button size="small" type={doc.file_url ? 'link' : 'primary'}
+                              icon={<UploadOutlined />}
+                              loading={uploading === doc.id}
+                              onClick={() => {
+                                fileInputRef.current?.setAttribute('data-doc-id', doc.id)
+                                fileInputRef.current?.click()
+                              }}
+                            >
+                              {!doc.file_url && 'Upload'}
+                            </Button>
+                          </Tooltip>
+
+                          <Tooltip title={doc.is_received ? 'Bỏ đánh dấu nhận' : 'Đánh dấu đã nhận'}>
+                            <Button size="small" type="link"
+                              icon={doc.is_received ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <CloseCircleOutlined />}
+                              onClick={() => handleToggleReceived(doc)}
+                            />
+                          </Tooltip>
+
+                          {doc.doc_type === 'other' && (
+                            <Popconfirm title="Xóa chứng từ này?" onConfirm={() => handleDelete(doc.id)}>
+                              <Button size="small" type="link" danger icon={<DeleteOutlined />} />
+                            </Popconfirm>
+                          )}
+                        </>
+                      ) : (
+                        !doc.file_url && ownerLabel && ownerLabel !== 'all' && (
+                          <Tag style={{ fontSize: 10, margin: 0 }}>
+                            {ownerLabel === 'sale' ? 'Sale' : ownerLabel === 'production' ? 'SX' : ownerLabel === 'logistics' ? 'LOG' : ownerLabel === 'accounting' ? 'KT' : ownerLabel}
+                          </Tag>
+                        )
+                      )}
+                    </Space>
+                  )
+                })()}
               </div>
             ))}
           </div>

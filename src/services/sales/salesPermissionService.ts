@@ -94,7 +94,7 @@ export function getVisibleTabs(role: SalesRole | null): string[] {
 
   if (['production', 'sale', 'logistics', 'admin'].includes(role)) tabs.push('production')
   if (['logistics', 'sale', 'accounting', 'admin'].includes(role)) tabs.push('shipping')
-  if (salesPermissions.canViewDocs(role)) tabs.push('documents')
+  tabs.push('documents') // tất cả BP đều xem được tab chứng từ
   if (salesPermissions.canViewFinance(role)) tabs.push('finance')
 
   return tabs

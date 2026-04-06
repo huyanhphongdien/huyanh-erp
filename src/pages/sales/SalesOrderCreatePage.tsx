@@ -339,6 +339,38 @@ function SalesOrderCreatePage() {
             </Col>
           </Row>
         </Card>
+
+        {/* ═══ Điều khoản ═══ */}
+        <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
+          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Điều khoản</span>}>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Thanh toán" name="payment_terms">
+                <Select size="large" allowClear placeholder="Chọn..."
+                  options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Incoterm" name="incoterm" initialValue="FOB">
+                <Select size="large"
+                  options={Object.entries(INCOTERM_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Ngày giao dự kiến" name="delivery_date">
+                <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Cảng xếp hàng" name="port_of_loading">
+                <Select size="large" allowClear placeholder="Chọn cảng..."
+                  options={PORT_OF_LOADING_OPTIONS.map((p) => ({ value: p.value, label: p.label }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
       </Col>
 
       <Col xs={24} lg={8}>
@@ -731,10 +763,8 @@ function SalesOrderCreatePage() {
   // ══════════════════════════════════════════════════════════════
 
   const stepItems = [
-    { title: 'Khách hàng & Sản phẩm', icon: <UserOutlined /> },
-    { title: 'Chất lượng & Đóng gói', icon: <ExperimentOutlined /> },
-    { title: 'Vận chuyển & Thanh toán', icon: <TruckOutlined /> },
-    { title: 'Xác nhận', icon: <FileTextOutlined /> },
+    { title: 'Khách hàng & Sản phẩm', icon: <UserOutlined />, description: 'BP Sale nhập' },
+    { title: 'Xác nhận đơn hàng', icon: <FileTextOutlined />, description: 'Review & lưu' },
   ]
 
   return (
@@ -767,13 +797,11 @@ function SalesOrderCreatePage() {
       {/* Form */}
       <Form form={form} layout="vertical" requiredMark="optional">
         {currentStep === 0 && renderStep1()}
-        {currentStep === 1 && renderStep2()}
-        {currentStep === 2 && renderStep3()}
-        {currentStep === 3 && renderStep4()}
+        {currentStep === 1 && renderStep4()}
       </Form>
 
       {/* Navigation buttons */}
-      {currentStep < 3 && (
+      {currentStep < 1 && (
         <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
           <Button onClick={prevStep} disabled={currentStep === 0}>
             Quay lại

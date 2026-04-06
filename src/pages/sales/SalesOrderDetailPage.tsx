@@ -1277,6 +1277,105 @@ function SalesOrderDetailPage() {
   )
 
   // ══════════════════════════════════════════════════════════════
+  // TAB: VẬN CHUYỂN (Logistics nhập)
+  // ══════════════════════════════════════════════════════════════
+
+  const renderShippingTab = () => {
+    const canEdit = salesPermissions.canEditBooking(salesRole)
+    const canEditFinanceFields = salesPermissions.canEditFinance(salesRole)
+
+    const handleShippingUpdate = async (field: string, value: any) => {
+      try {
+        await supabase.from('sales_orders').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', order.id)
+        message.success('Đã cập nhật')
+        loadOrder()
+      } catch { message.error('Lỗi cập nhật') }
+    }
+
+    return (
+      <Row gutter={24}>
+        <Col xs={24} lg={12}>
+          <Card title="Thông tin vận chuyển" size="small" style={{ marginBottom: 16 }}>
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Hãng tàu">
+                {canEdit ? <Input defaultValue={order.shipping_line || ''} onBlur={e => handleShippingUpdate('shipping_line', e.target.value)} placeholder="Maersk, MSC..." /> : (order.shipping_line || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tàu / Chuyến">
+                {canEdit ? (
+                  <Space>
+                    <Input defaultValue={order.vessel_name || ''} onBlur={e => handleShippingUpdate('vessel_name', e.target.value)} placeholder="Vessel" style={{ width: 140 }} />
+                    <Input defaultValue={order.voyage_number || ''} onBlur={e => handleShippingUpdate('voyage_number', e.target.value)} placeholder="Voyage" style={{ width: 100 }} />
+                  </Space>
+                ) : (`${order.vessel_name || '-'} / ${order.voyage_number || '-'}`)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Booking Ref">
+                {canEdit ? <Input defaultValue={order.booking_reference || ''} onBlur={e => handleShippingUpdate('booking_reference', e.target.value)} placeholder="Booking number" /> : (order.booking_reference || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="B/L Number">
+                {canEdit ? <Input defaultValue={order.bl_number || ''} onBlur={e => handleShippingUpdate('bl_number', e.target.value)} placeholder="B/L number" /> : (order.bl_number || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="B/L Type">
+                {canEdit ? <Select defaultValue={order.bl_type || undefined} onChange={v => handleShippingUpdate('bl_type', v)} placeholder="Chọn..." allowClear style={{ width: '100%' }}
+                  options={[{ value: 'original', label: 'Original' }, { value: 'telex', label: 'Telex Release' }, { value: 'surrendered', label: 'Surrendered' }]} /> : (order.bl_type || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="ETD">
+                {canEdit ? <DatePicker defaultValue={order.etd ? dayjs(order.etd) : undefined} onChange={d => handleShippingUpdate('etd', d?.format('YYYY-MM-DD'))} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.etd)}
+              </Descriptions.Item>
+              <Descriptions.Item label="ETA">
+                {canEdit ? <DatePicker defaultValue={order.eta ? dayjs(order.eta) : undefined} onChange={d => handleShippingUpdate('eta', d?.format('YYYY-MM-DD'))} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.eta)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Cutoff Date">
+                {canEdit ? <DatePicker defaultValue={order.cutoff_date ? dayjs(order.cutoff_date) : undefined} onChange={d => handleShippingUpdate('cutoff_date', d?.format('YYYY-MM-DD'))} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.cutoff_date)}
+              </Descriptions.Item>
+              <Descriptions.Item label="DHL Number">
+                {canEdit ? <Input defaultValue={order.dhl_number || ''} onBlur={e => handleShippingUpdate('dhl_number', e.target.value)} placeholder="DHL tracking" /> : (order.dhl_number || '-')}
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={12}>
+          <Card title="Hải quan" size="small" style={{ marginBottom: 16 }}>
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Số tờ khai">
+                {canEdit ? <Input defaultValue={order.customs_declaration_no || ''} onBlur={e => handleShippingUpdate('customs_declaration_no', e.target.value)} placeholder="Số tờ khai HQ" /> : (order.customs_declaration_no || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày đăng ký">
+                {canEdit ? <DatePicker defaultValue={order.customs_declaration_date ? dayjs(order.customs_declaration_date) : undefined} onChange={d => handleShippingUpdate('customs_declaration_date', d?.format('YYYY-MM-DD'))} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.customs_declaration_date)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Thông quan">
+                {canEdit ? <Select defaultValue={order.customs_clearance_status || 'pending'} onChange={v => handleShippingUpdate('customs_clearance_status', v)} style={{ width: '100%' }}
+                  options={[{ value: 'pending', label: '⏳ Chờ thông quan' }, { value: 'cleared', label: '✅ Đã thông quan' }, { value: 'rejected', label: '❌ Từ chối' }]} /> : (
+                  <Tag color={order.customs_clearance_status === 'cleared' ? 'green' : order.customs_clearance_status === 'rejected' ? 'red' : 'orange'}>
+                    {order.customs_clearance_status === 'cleared' ? 'Đã TQ' : order.customs_clearance_status === 'rejected' ? 'Từ chối' : 'Chờ TQ'}
+                  </Tag>
+                )}
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <Card title="Chiết khấu Ngân hàng" size="small">
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="NH chiết khấu">
+                {canEditFinanceFields ? <Input defaultValue={order.discount_bank || ''} onBlur={e => handleShippingUpdate('discount_bank', e.target.value)} placeholder="Ngân hàng" /> : (order.discount_bank || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày CK">
+                {canEditFinanceFields ? <DatePicker defaultValue={order.discount_date ? dayjs(order.discount_date) : undefined} onChange={d => handleShippingUpdate('discount_date', d?.format('YYYY-MM-DD'))} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.discount_date)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số tiền CK">
+                {canEditFinanceFields ? <InputNumber defaultValue={order.discount_amount || undefined} onBlur={e => handleShippingUpdate('discount_amount', Number((e.target as any).value) || null)} placeholder="USD" style={{ width: '100%' }} /> : (order.discount_amount ? `$${order.discount_amount.toLocaleString()}` : '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phí NH">
+                {canEditFinanceFields ? <InputNumber defaultValue={order.bank_charges || undefined} onBlur={e => handleShippingUpdate('bank_charges', Number((e.target as any).value) || null)} placeholder="USD" style={{ width: '100%' }} /> : (order.bank_charges ? `$${order.bank_charges.toLocaleString()}` : '-')}
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </Col>
+      </Row>
+    )
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // TAB: CHỨNG TỪ
   // ══════════════════════════════════════════════════════════════
 
@@ -1527,6 +1626,15 @@ function SalesOrderDetailPage() {
               </span>
             ),
             children: renderPackingTab(),
+          }] : []),
+          ...(visibleTabs.includes('packing') ? [{
+            key: 'shipping',
+            label: (
+              <span>
+                <TruckOutlined /> Vận chuyển
+              </span>
+            ),
+            children: renderShippingTab(),
           }] : []),
           ...(visibleTabs.includes('documents') ? [{
             key: 'documents',

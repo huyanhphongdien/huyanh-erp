@@ -584,6 +584,20 @@ export const salesOrderService = {
   },
 
   // ==========================================================================
+  // DELETE — Admin only
+  // ==========================================================================
+
+  async deleteOrder(id: string): Promise<void> {
+    // Xóa containers trước (FK constraint)
+    await supabase.from('sales_order_containers').delete().eq('sales_order_id', id)
+    // Xóa documents
+    await supabase.from('sales_order_documents').delete().eq('sales_order_id', id)
+    // Xóa đơn hàng
+    const { error } = await supabase.from('sales_orders').delete().eq('id', id)
+    if (error) throw new Error(`Không thể xóa: ${error.message}`)
+  },
+
+  // ==========================================================================
   // STATS
   // ==========================================================================
 

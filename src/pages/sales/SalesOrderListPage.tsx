@@ -29,6 +29,7 @@ import {
   SearchOutlined,
   EyeOutlined,
   CheckCircleOutlined,
+  DeleteOutlined,
   FileTextOutlined,
   EditOutlined,
   InboxOutlined,
@@ -48,6 +49,8 @@ import {
   SVR_GRADE_OPTIONS,
 } from '../../services/sales/salesTypes'
 import GradeBadge from '../../components/wms/GradeBadge'
+import { useAuthStore } from '../../stores/authStore'
+import { getSalesRole } from '../../services/sales/salesPermissionService'
 import SalesOrderDetailPanel from './components/SalesOrderDetailPanel'
 
 const { Title, Text } = Typography
@@ -123,6 +126,9 @@ const STATUS_TABS: { key: string; label: string }[] = [
 
 const SalesOrderListPage = () => {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const salesRole = getSalesRole(user)
+  const isAdmin = salesRole === 'admin'
 
   // State
   const [orders, setOrders] = useState<SalesOrder[]>([])
@@ -249,6 +255,18 @@ const SalesOrderListPage = () => {
     } catch (error) {
       console.error('Cancel error:', error)
       message.error('Không thể hủy đơn hàng')
+    }
+  }
+
+  // Delete — chỉ Admin
+  const handleDelete = async (order: SalesOrder) => {
+    try {
+      await salesOrderService.deleteOrder(order.id)
+      message.success(`Đã xóa đơn hàng ${order.code}`)
+      fetchOrders()
+      fetchStats()
+    } catch (error: any) {
+      message.error(error.message || 'Không thể xóa đơn hàng')
     }
   }
 
@@ -548,7 +566,7 @@ const SalesOrderListPage = () => {
     {
       title: '',
       key: 'actions',
-      width: 80,
+      width: isAdmin ? 110 : 80,
       fixed: 'right',
       render: (_: unknown, record: SalesOrder) => (
         <Space size={2}>
@@ -576,6 +594,26 @@ const SalesOrderListPage = () => {
                   type="text"
                   size="small"
                   icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
+          {isAdmin && (
+            <Popconfirm
+              title={`Xóa ${record.code}?`}
+              description="Xóa vĩnh viễn đơn hàng này"
+              onConfirm={() => handleDelete(record)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+            >
+              <Tooltip title="Xóa (Admin)">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
                   onClick={(e) => e.stopPropagation()}
                 />
               </Tooltip>

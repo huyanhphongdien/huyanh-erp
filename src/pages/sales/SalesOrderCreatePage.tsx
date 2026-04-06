@@ -486,30 +486,67 @@ function SalesOrderCreatePage() {
               </Descriptions.Item>
               <Descriptions.Item label="Số L/C">{vals.lc_number || '-'}</Descriptions.Item>
               <Descriptions.Item label="Đóng gói">
-                {PACKING_TYPE_LABELS[vals.packing_type as PackingType] || 'Banh'}
-                {vals.shrink_wrap ? ' + Shrink wrap' : ''}
-                {vals.pallet_required ? ' + Pallet' : ''}
+                {PACKING_TYPE_LABELS[vals.packing_type as PackingType] || vals.packing_type || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="KL bành">{vals.bale_weight_kg || 33.33} kg</Descriptions.Item>
             </Descriptions>
 
-            {/* Quality specs summary */}
-            <Divider orientationMargin={0} plain>
-              Chỉ tiêu kỹ thuật
+            {/* Quality specs — editable */}
+            <Divider plain style={{ margin: '12px 0 8px' }}>
+              Chỉ tiêu kỹ thuật (tự động từ Grade, sửa nếu cần)
             </Divider>
-            <Descriptions bordered column={{ xs: 2, sm: 3 }} size="small">
-              <Descriptions.Item label="DRC">
-                {vals.drc_min ?? '-'} ~ {vals.drc_max ?? '-'} %
-              </Descriptions.Item>
-              <Descriptions.Item label="Moisture">{vals.moisture_max ?? '-'} %</Descriptions.Item>
-              <Descriptions.Item label="Dirt">{vals.dirt_max ?? '-'} %</Descriptions.Item>
-              <Descriptions.Item label="Ash">{vals.ash_max ?? '-'} %</Descriptions.Item>
-              <Descriptions.Item label="Nitrogen">{vals.nitrogen_max ?? '-'} %</Descriptions.Item>
-              <Descriptions.Item label="Volatile">{vals.volatile_max ?? '-'} %</Descriptions.Item>
-              <Descriptions.Item label="PRI">{vals.pri_min ?? '-'}</Descriptions.Item>
-              <Descriptions.Item label="Mooney">{vals.mooney_max ?? '-'}</Descriptions.Item>
-              <Descriptions.Item label="Color">{vals.color_lovibond_max ?? '-'}</Descriptions.Item>
-            </Descriptions>
+            <Row gutter={[8, 0]}>
+              <Col xs={8} sm={4}>
+                <Form.Item label="DRC min %" name="drc_min" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="DRC max %" name="drc_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="Moisture %" name="moisture_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={10} step={0.01} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="Dirt %" name="dirt_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={1} step={0.001} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="Ash %" name="ash_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="N₂ %" name="nitrogen_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={2} step={0.01} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="Volatile %" name="volatile_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="PRI min" name="pri_min" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="Mooney" name="mooney_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={8} sm={4}>
+                <Form.Item label="Color" name="color_lovibond_max" style={{ marginBottom: 8 }}>
+                  <InputNumber size="small" min={0} max={10} step={0.5} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
           </Card>
         </Col>
 

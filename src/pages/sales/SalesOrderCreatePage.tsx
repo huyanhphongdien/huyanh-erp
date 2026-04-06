@@ -12,7 +12,6 @@ import {
   Select,
   InputNumber,
   Input,
-  Switch,
   DatePicker,
   Button,
   Space,
@@ -346,20 +345,18 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Đóng gói" name="packing_type" initialValue="bale">
+              <Form.Item label="Đóng gói" name="packing_type" initialValue="loose_bale">
                 <Select size="large" options={[
-                  { value: 'bale', label: 'Bành (Bale)' },
-                  { value: 'pallet', label: 'Pallet' },
-                  { value: 'bag', label: 'Bao (Bag)' },
+                  { value: 'loose_bale', label: 'Loose Bale' },
+                  { value: 'sw_pallet', label: 'SW Pallet (Shrink Wrap)' },
+                  { value: 'wooden_pallet', label: 'Wooden Pallet' },
+                  { value: 'metal_box', label: 'Metal Box' },
                 ]} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Shrink wrap + Pallet" style={{ marginBottom: 0 }}>
-                <Row gutter={8}>
-                  <Col span={12}><Form.Item name="shrink_wrap" valuePropName="checked" initialValue={true} noStyle><Switch checkedChildren="Shrink" unCheckedChildren="Không" /></Form.Item></Col>
-                  <Col span={12}><Form.Item name="pallet_required" valuePropName="checked" initialValue={true} noStyle><Switch checkedChildren="Pallet" unCheckedChildren="Không" /></Form.Item></Col>
-                </Row>
+              <Form.Item label="Cảng đích" name="port_of_destination">
+                <Input size="large" placeholder="Shanghai, Yokohama..." />
               </Form.Item>
             </Col>
           </Row>

@@ -11,7 +11,7 @@ export type CustomerTier = 'standard' | 'premium' | 'strategic'
 export type PaymentTerms = 'LC_30' | 'LC_60' | 'LC_90' | 'TT_30' | 'TT_60' | 'CAD' | 'DP'
 export type Incoterm = 'FOB' | 'CIF' | 'CNF' | 'DDP' | 'EXW'
 export type QualityStandard = 'TCVN_3769' | 'ISO_2000' | 'CUSTOM'
-export type PackingType = 'bale' | 'pallet' | 'bulk'
+export type PackingType = 'loose_bale' | 'sw_pallet' | 'wooden_pallet' | 'metal_box'
 export type ContainerType = '20ft' | '40ft'
 export type SalesCurrency = 'USD' | 'EUR' | 'JPY' | 'CNY'
 
@@ -410,9 +410,10 @@ export const CONTAINER_STATUS_COLORS: Record<ContainerStatus, string> = {
 
 // -- Loại đóng gói --
 export const PACKING_TYPE_LABELS: Record<PackingType, string> = {
-  bale: 'Bành (Bale)',
-  pallet: 'Pallet',
-  bulk: 'Rời (Bulk)',
+  loose_bale: 'Loose Bale',
+  sw_pallet: 'SW Pallet (Shrink Wrap)',
+  wooden_pallet: 'Wooden Pallet',
+  metal_box: 'Metal Box',
 }
 
 // -- Trạng thái hóa đơn --

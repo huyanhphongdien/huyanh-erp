@@ -48,8 +48,34 @@ export function canEditDocument(docType: string, role: string | null): boolean {
   if (!role) return false
   if (role === 'admin') return true
   const doc = STANDARD_DOCUMENTS.find(d => d.doc_type === docType)
-  if (!doc) return role === 'admin' // unknown doc type
+  if (!doc) return false
   return doc.owner === role || doc.owner === 'all'
+}
+
+// Quyền xem/tải: mỗi BP xem CT của mình + CT chung. Không xem CT BP khác.
+// viewers: danh sách role được XEM (ngoài owner + admin)
+const DOC_VIEWERS: Record<string, string[]> = {
+  contract:           ['sale', 'logistics', 'accounting', 'production'],  // HĐ — ai cũng xem
+  bl:                 ['logistics', 'accounting'],        // B/L — LOG + KT
+  commercial_invoice: ['accounting'],                     // Invoice — chỉ KT
+  packing_list:       ['logistics', 'production'],        // PL — LOG + SX
+  coa:                ['production', 'logistics'],        // COA — SX + LOG
+  co:                 ['logistics', 'accounting'],        // C/O — LOG + KT
+  form_ae:            ['logistics'],
+  phytosanitary:      ['logistics'],
+  fumigation:         ['logistics'],
+  lc_copy:            ['accounting'],                     // LC — chỉ KT
+  insurance:          ['logistics', 'accounting'],
+  weight_note:        ['production', 'logistics'],        // Phiếu cân — SX + LOG
+  other:              ['sale', 'logistics', 'accounting', 'production'],  // CT khác — ai cũng xem
+}
+
+export function canViewDocument(docType: string, role: string | null): boolean {
+  if (!role) return false
+  if (role === 'admin') return true
+  const viewers = DOC_VIEWERS[docType]
+  if (!viewers) return false
+  return viewers.includes(role)
 }
 
 // ============================================================================

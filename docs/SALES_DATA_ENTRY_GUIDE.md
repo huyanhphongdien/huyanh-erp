@@ -313,22 +313,40 @@ Mỗi đơn hàng có **checklist 13 chứng từ** tiêu chuẩn. Mỗi chứng
 
 ### Quyền từng bộ phận
 
-| BP | Xem tất cả | Upload/Tick/Xóa | Chứng từ được quản lý |
-|----|:----------:|:---------------:|----------------------|
-| **Sale** | ✅ | Chỉ CT của Sale | Hợp đồng |
-| **SX** | ✅ | Chỉ CT của SX | COA, Weight Note |
-| **LOG** | ✅ | Chỉ CT của LOG | B/L, Packing List, C/O, Form A/E, Phyto, Fumigation, Insurance |
-| **KT** | ✅ | Chỉ CT của KT | Commercial Invoice, LC Copy |
-| **Admin** | ✅ | **Tất cả** | Toàn bộ |
+| BP | Xem/Tải | Upload/Tick | Chứng từ được quản lý |
+|----|---------|:-----------:|----------------------|
+| **Sale** | Chỉ CT của Sale + CT chung | Chỉ CT của Sale | Hợp đồng |
+| **SX** | CT của SX + LOG + CT chung | Chỉ CT của SX | COA, Weight Note |
+| **LOG** | CT của LOG + SX + KT (một số) | Chỉ CT của LOG | B/L, Packing List, C/O, Form A/E, Phyto, Fumigation, Insurance |
+| **KT** | CT của KT + LOG (một số) | Chỉ CT của KT | Commercial Invoice, LC Copy |
+| **Admin** | **Tất cả** | **Tất cả** | Toàn bộ |
 
-> Chứng từ chưa có file sẽ hiện tag BP phụ trách (VD: `LOG`, `SX`) để biết ai cần upload.
+> ⚠️ **Sale không xem được** Commercial Invoice, LC Copy (CT của KT).
+> ⚠️ **SX không xem được** Commercial Invoice, LC Copy, B/L.
+> Chứng từ chưa upload hiện tag BP phụ trách (VD: `LOG`, `SX`).
+
+### Ma trận xem chứng từ chi tiết
+
+| Chứng từ | Sale | SX | LOG | KT | Admin |
+|----------|:----:|:--:|:---:|:--:|:-----:|
+| Hợp đồng | ✅ | ✅ | ✅ | ✅ | ✅ |
+| B/L | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Commercial Invoice | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Packing List | ❌ | ✅ | ✅ | ❌ | ✅ |
+| COA | ❌ | ✅ | ✅ | ❌ | ✅ |
+| C/O | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Form A/E, Phyto, Fumigation | ❌ | ❌ | ✅ | ❌ | ✅ |
+| LC Copy | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Insurance | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Weight Note | ❌ | ✅ | ✅ | ❌ | ✅ |
+| CT khác | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Cách thao tác
 
 | Thao tác | Cách | Ai được |
 |----------|------|---------|
-| Xem trước | Nhấn 👁 → mở tab mới | Tất cả |
-| Tải về | Nhấn ⬇ | Tất cả |
+| Xem trước | Nhấn 👁 → mở tab mới | Chỉ BP có quyền xem |
+| Tải về | Nhấn ⬇ | Chỉ BP có quyền xem |
 | Upload | Nhấn "Upload" → chọn file (max 10MB) | Chỉ BP phụ trách |
 | Upload lại | Nhấn icon upload → chọn file mới | Chỉ BP phụ trách |
 | Tick "Đã nhận" | Nhấn ✅/❌ | Chỉ BP phụ trách |

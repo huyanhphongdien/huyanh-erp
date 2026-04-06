@@ -19,6 +19,7 @@ import {
   type SalesDocument,
   STANDARD_DOCUMENTS,
   canEditDocument,
+  canViewDocument,
 } from '../../../services/sales/salesDocumentUploadService'
 import { useAuthStore } from '../../../stores/authStore'
 import { getSalesRole } from '../../../services/sales/salesPermissionService'
@@ -87,9 +88,10 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
 
   useEffect(() => { load() }, [load])
 
-  const received = docs.filter(d => d.is_received).length
-  const uploaded = docs.filter(d => d.file_url).length
-  const total = docs.length
+  const visibleDocs = docs.filter(d => canViewDocument(d.doc_type, salesRole))
+  const received = visibleDocs.filter(d => d.is_received).length
+  const uploaded = visibleDocs.filter(d => d.file_url).length
+  const total = visibleDocs.length
   const percent = total > 0 ? Math.round((received / total) * 100) : 0
 
   // Upload handler
@@ -185,7 +187,7 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
           <Empty description="Chưa có chứng từ" />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {docs.map((doc) => (
+            {docs.filter(doc => canViewDocument(doc.doc_type, salesRole)).map((doc) => (
               <div key={doc.id}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',

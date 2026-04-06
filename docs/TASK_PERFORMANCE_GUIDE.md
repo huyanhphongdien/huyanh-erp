@@ -66,10 +66,11 @@ Ví dụ: NV có 3 CV trong tháng:
 ### Bước 4: Tổng hợp hiệu suất
 
 ```
-Điểm hiệu suất = (TB tự đánh giá × 40%) + (TB Manager đánh giá × 60%)
+CV assigned: Điểm = Manager chấm (100% quyết định)
+CV self/recurring/project: Điểm = Tự động (hệ số cố định)
 ```
 
-> Công thức tự → 40%, Manager → 60% đảm bảo Manager có tiếng nói quyết định nhưng nhân viên vẫn có quyền tự đánh giá.
+> **Đã bỏ tự đánh giá** — NV không chấm sao nữa. CV assigned do Manager chấm trực tiếp, CV khác tự động tính.
 
 ### Bước 5: Xếp hạng
 
@@ -85,14 +86,14 @@ Ví dụ: NV có 3 CV trong tháng:
 
 ## 3. Luồng phê duyệt
 
-### CV được giao (assigned) — Manager duyệt
+### CV được giao (assigned) — Manager chấm điểm
 
 ```
 NV hoàn thành checklist 100%
   ↓
-Tự động chuyển trạng thái "Chờ duyệt"
+Tự động chuyển "Chờ duyệt" (KHÔNG cần tự đánh giá)
   ↓
-Hiện trong trang Phê duyệt của Manager
+Hiện trong trang Phê duyệt (/tasks/approve-batch)
   ↓
 Manager chọn 1 trong 3:
   ├── ✅ Duyệt + chấm điểm (1-5★) → Xong
@@ -100,14 +101,16 @@ Manager chọn 1 trong 3:
   └── 🔄 Yêu cầu bổ sung → NV bổ sung rồi nộp lại
 ```
 
+> **Đã bỏ bước tự đánh giá.** NV không cần tự chấm sao — hoàn thành checklist xong là Manager duyệt luôn.
+
 ### CV tự giao / định kỳ / dự án — Tự động duyệt
 
 ```
 NV hoàn thành checklist 100%
   ↓
-Hệ thống tự động duyệt + tính điểm
+Hệ thống tự động duyệt + tính điểm (KHÔNG cần ai duyệt)
   ↓
-Điểm = Điểm sao × Hệ số (0.8~0.9)
+Điểm: self=85đ | recurring=80đ | project=90đ
 ```
 
 ---

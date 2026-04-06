@@ -234,9 +234,33 @@ export function TaskViewPage() {
         await refetch()
         message.success('Hoàn thành! (Dự án — 90 điểm)')
       } else if (isAssignee) {
-        // ★ Assigned: NV tự chấm sao → QL duyệt
-        setShowQuickEval(true)
-        message.info('Vui lòng đánh giá để hoàn thành công việc.')
+        // ★ Assigned: đưa thẳng vào phê duyệt, bỏ tự đánh giá
+        const { error } = await supabase.from('tasks').update({
+          status: 'pending_review', progress: 100,
+          completed_date: new Date().toISOString().split('T')[0],
+          evaluation_status: 'pending_approval',
+        }).eq('id', id)
+        if (error) throw error
+        if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
+        await refetch()
+        message.success('Đã gửi cho quản lý phê duyệt')
+
+        // Thông báo QL
+        try {
+          if (t?.assigner_id) {
+            const { notify } = await import('../../services/notificationHelper')
+            await notify({
+              recipientId: t.assigner_id,
+              senderId: user?.employee_id || undefined,
+              module: 'task',
+              type: 'task_approval_pending',
+              title: `Chờ phê duyệt: ${taskTitle}`,
+              message: `${user?.full_name || 'Nhân viên'} đã hoàn thành công việc, chờ duyệt`,
+              referenceUrl: '/tasks/approve-batch',
+              priority: 'high',
+            })
+          }
+        } catch (e) { console.error('[notify] eval pending:', e) }
       } else if (isDeptManager) {
         // ★ QL phòng ban mark complete thay NV — auto 100 điểm
         const { error } = await supabase.from('tasks').update({
@@ -729,8 +753,12 @@ export function TaskViewPage() {
                   }).eq('id', t.id)
                   message.success('Hoàn thành! (Dự án — 90 điểm)')
                 } else if (isAssignee2) {
-                  setShowQuickEval(true)
-                  message.info('Checklist hoàn tất! Vui lòng đánh giá để hoàn thành.')
+                  await supabase.from('tasks').update({
+                    status: 'pending_review', progress: 100,
+                    completed_date: new Date().toISOString().split('T')[0],
+                    evaluation_status: 'pending_approval',
+                  }).eq('id', t.id)
+                  message.success('Checklist hoàn tất! Đã gửi cho quản lý phê duyệt.')
                 } else {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,

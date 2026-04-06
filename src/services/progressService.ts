@@ -192,12 +192,12 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
 
   // Tự động chuyển status khi đạt 100%
   if (progress >= 100) {
-    updateData.status = 'finished'
+    updateData.status = 'pending_review'
     updateData.completed_date = new Date().toISOString()
     updateData.progress = 100
-    // Set evaluation_status nếu chưa có
-    if (task.status !== 'finished') {
-      updateData.evaluation_status = 'pending_self_eval'
+    // Bỏ qua tự đánh giá → đưa thẳng vào phê duyệt
+    if (task.status !== 'finished' && task.status !== 'pending_review') {
+      updateData.evaluation_status = 'pending_approval'
     }
   }
 

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototype — Đơn hàng bán | Huy Anh ERP</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #F0EDE8; color: #1a1a1a; }
+.container { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+/* Header */
+.header { background: #fff; border-radius: 16px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.header-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.header h1 { font-size: 20px; font-weight: 700; color: #1B4D3E; }
+.header .code { font-size: 13px; color: #888; font-family: monospace; }
+.badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.badge-confirmed { background: #dcfce7; color: #166534; }
+.badge-draft { background: #fef3c7; color: #92400e; }
+.header-stats { display: flex; gap: 24px; margin-top: 12px; flex-wrap: wrap; }
+.stat { text-align: center; }
+.stat-value { font-size: 22px; font-weight: 700; color: #1B4D3E; }
+.stat-label { font-size: 11px; color: #888; }
+
+/* Section */
+.section { background: #fff; border-radius: 16px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.section-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+.section-header:hover { background: #fafafa; }
+.section-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
+.section-badge { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600; }
+.section-badge.editable { background: #dbeafe; color: #1d4ed8; }
+.section-badge.locked { background: #f3f4f6; color: #9ca3af; }
+.section-badge.readonly { background: #fef3c7; color: #92400e; }
+.section-body { padding: 16px 20px; }
+.section.locked .section-body { opacity: 0.6; pointer-events: none; }
+
+/* Grid */
+.grid { display: grid; gap: 12px; }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+@media (max-width: 768px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+/* Field */
+.field { }
+.field-label { font-size: 11px; color: #888; margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.field-value { font-size: 14px; font-weight: 600; color: #1a1a1a; padding: 8px 12px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; min-height: 38px; display: flex; align-items: center; }
+.field-value.editable { background: #fff; border-color: #d1d5db; cursor: text; }
+.field-value.editable:hover { border-color: #1B4D3E; }
+.field-value.highlight { background: #f0fdf4; border-color: #86efac; color: #166534; font-size: 18px; font-weight: 700; }
+.field-value.auto { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; font-weight: 700; }
+.field-value.warning { background: #fef2f2; border-color: #fca5a5; color: #dc2626; font-weight: 700; }
+.field-value.ok { background: #f0fdf4; border-color: #86efac; color: #16a34a; }
+
+/* Divider */
+.divider { height: 1px; background: #e5e7eb; margin: 16px 0; }
+.section-divider-label { font-size: 12px; color: #9ca3af; font-weight: 600; margin: 16px 0 8px; padding: 4px 0; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Timeline */
+.timeline { display: flex; align-items: center; gap: 0; padding: 16px 20px; overflow-x: auto; }
+.timeline-step { display: flex; align-items: center; gap: 0; white-space: nowrap; }
+.timeline-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.timeline-dot.done { background: #1B4D3E; color: #fff; }
+.timeline-dot.active { background: #fbbf24; color: #1a1a1a; border: 2px solid #f59e0b; }
+.timeline-dot.pending { background: #e5e7eb; color: #9ca3af; }
+.timeline-label { font-size: 10px; color: #888; margin-top: 4px; text-align: center; }
+.timeline-line { width: 24px; height: 2px; background: #d1d5db; flex-shrink: 0; }
+.timeline-line.done { background: #1B4D3E; }
+
+/* Container table */
+.mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mini-table th { background: #f9fafb; padding: 8px 10px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+.mini-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+.mini-table tr:hover { background: #f9fafb; }
+
+/* Document checklist */
+.doc-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; }
+.doc-item.done { background: #f0fdf4; }
+.doc-item.pending { background: #fff; border: 1px solid #e5e7eb; }
+.doc-icon { font-size: 16px; }
+.doc-name { flex: 1; font-size: 13px; }
+.doc-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.doc-badge.required { background: #fef2f2; color: #dc2626; }
+.doc-badge.uploaded { background: #f0fdf4; color: #16a34a; }
+
+/* Button */
+.btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: #1B4D3E; color: #fff; }
+.btn-outline { background: #fff; color: #1B4D3E; border: 1px solid #1B4D3E; }
+.btn-danger { background: #fff; color: #dc2626; border: 1px solid #fca5a5; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <h1>SO-2026-0015</h1>
+        <span class="badge badge-confirmed">Confirmed</span>
+      </div>
+      <div class="code">LTC2024/PD-ATC-EOU/DEC &nbsp;|&nbsp; ATC Tires Private Limited (India)</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="alert('In hợp đồng')">🖨️ In</button>
+      <button class="btn btn-danger" onclick="alert('Chỉ Admin')">🔓 Mở khóa</button>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="stat"><div class="stat-value">SVR 10</div><div class="stat-label">Grade</div></div>
+    <div class="stat"><div class="stat-value">725.76T</div><div class="stat-label">Số lượng</div></div>
+    <div class="stat"><div class="stat-value">$1,924.10</div><div class="stat-label">Đơn giá/MT</div></div>
+    <div class="stat"><div class="stat-value" style="color:#16a34a;">$1,396,435</div><div class="stat-label">Tổng tiền</div></div>
+    <div class="stat"><div class="stat-value">36</div><div class="stat-label">Container</div></div>
+    <div class="stat"><div class="stat-value">20,736</div><div class="stat-label">Tổng bành</div></div>
+  </div>
+</div>
+
+<!-- TIMELINE -->
+<div class="section">
+  <div style="padding:12px 20px;">
+    <div class="timeline">
+      <div class="timeline-step"><div class="timeline-dot done">✓</div><div class="timeline-line done"></div></div>
+      <div class="timeline-step"><div class="timeline-dot done">✓</div><div class="timeline-line done"></div></div>
+      <div class="timeline-step"><div class="timeline-dot active">3</div><div class="timeline-line"></div></div>
+      <div class="timeline-step"><div class="timeline-dot pending">4</div><div class="timeline-line"></div></div>
+      <div class="timeline-step"><div class="timeline-dot pending">5</div><div class="timeline-line"></div></div>
+      <div class="timeline-step"><div class="timeline-dot pending">6</div><div class="timeline-line"></div></div>
+      <div class="timeline-step"><div class="timeline-dot pending">7</div><div class="timeline-line"></div></div>
+      <div class="timeline-step"><div class="timeline-dot pending">8</div><div class="timeline-line"></div></div>
+      <div class="timeline-step"><div class="timeline-dot pending">9</div></div>
+    </div>
+    <div style="display:flex;gap:0;font-size:10px;color:#888;justify-content:space-between;padding:0 4px;margin-top:4px;">
+      <span>Draft</span><span>Confirmed</span><span style="color:#f59e0b;font-weight:700;">Producing</span><span>Ready</span><span>Packing</span><span>Shipped</span><span>Delivered</span><span>Invoiced</span><span>Paid</span>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 1: HỢP ĐỒNG (Sale) — LOCKED -->
+<div class="section locked">
+  <div class="section-header">
+    <div class="section-title">
+      <span>📋</span> HỢP ĐỒNG
+      <span class="section-badge locked">🔒 Đã khóa — Sale đã xác nhận</span>
+    </div>
+    <span style="font-size:11px;color:#9ca3af;">sales@huyanhrubber.com</span>
+  </div>
+  <div class="section-body">
+    <div class="grid grid-4">
+      <div class="field"><div class="field-label">Số hợp đồng</div><div class="field-value">LTC2024/PD-ATC-EOU/DEC</div></div>
+      <div class="field"><div class="field-label">Ngày hợp đồng</div><div class="field-value">03/02/2025</div></div>
+      <div class="field"><div class="field-label">Người mua</div><div class="field-value">ATC Tires Private Limited</div></div>
+      <div class="field"><div class="field-label">PO# khách hàng</div><div class="field-value">HA2026001</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="grid grid-4">
+      <div class="field"><div class="field-label">Grade</div><div class="field-value highlight">SVR 10</div></div>
+      <div class="field"><div class="field-label">Số lượng</div><div class="field-value">725.76 tấn</div></div>
+      <div class="field"><div class="field-label">Đơn giá</div><div class="field-value">$1,924.10/MT</div></div>
+      <div class="field"><div class="field-label">Tổng tiền</div><div class="field-value auto">$1,396,434.82</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="grid grid-4">
+      <div class="field"><div class="field-label">Quy cách bành</div><div class="field-value">35 kg/bành</div></div>
+      <div class="field"><div class="field-label">Bành/container</div><div class="field-value">576</div></div>
+      <div class="field"><div class="field-label">Pallet/container</div><div class="field-value">16</div></div>
+      <div class="field"><div class="field-label">Đóng gói</div><div class="field-value">Shrink wrap + Pallet</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="grid grid-4">
+      <div class="field"><div class="field-label">Incoterm</div><div class="field-value">FOB Da Nang Port</div></div>
+      <div class="field"><div class="field-label">Thanh toán</div><div class="field-value">100% D/P at sight</div></div>
+      <div class="field"><div class="field-label">Thời gian giao</div><div class="field-value">August 2025</div></div>
+      <div class="field"><div class="field-label">Hoa hồng</div><div class="field-value">2% ($27,929)</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="grid grid-3">
+      <div class="field"><div class="field-label">Ngân hàng</div><div class="field-value">Vietcombank CN Huế</div></div>
+      <div class="field"><div class="field-label">Số tài khoản</div><div class="field-value" style="font-family:monospace;">0071001046372</div></div>
+      <div class="field"><div class="field-label">SWIFT</div><div class="field-value" style="font-family:monospace;">BFTVVNVX</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2: SẢN XUẤT & ĐÓNG GÓI (SX) — EDITABLE -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">
+      <span>🏭</span> SẢN XUẤT & ĐÓNG GÓI
+      <span class="section-badge editable">✏️ SX đang nhập</span>
+    </div>
+    <span style="font-size:11px;color:#1d4ed8;">trunglxh@huyanhrubber.com</span>
+  </div>
+  <div class="section-body">
+    <div class="grid grid-3">
+      <div class="field">
+        <div class="field-label">Ngày hàng sẵn sàng</div>
+        <div class="field-value editable">15/07/2025</div>
+      </div>
+      <div class="field">
+        <div class="field-label">NVL check</div>
+        <div class="field-value ok">854 tấn ✅ Đủ NVL</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Lệnh sản xuất</div>
+        <div class="field-value" style="color:#1d4ed8;cursor:pointer;">PO-SVR10-250401-001 →</div>
+      </div>
+    </div>
+
+    <div class="section-divider-label">Tiến độ sản xuất</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <div style="flex:1;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;">
+        <div style="width:70%;height:100%;background:linear-gradient(90deg,#1B4D3E,#2E7D5B);border-radius:4px;"></div>
+      </div>
+      <span style="font-size:14px;font-weight:700;color:#1B4D3E;">70%</span>
+    </div>
+    <div style="display:flex;gap:4px;font-size:12px;">
+      <span style="padding:4px 10px;background:#dcfce7;color:#166534;border-radius:6px;">✅ Rửa</span>
+      <span style="padding:4px 10px;background:#dcfce7;color:#166534;border-radius:6px;">✅ Tán/Kéo</span>
+      <span style="padding:4px 10px;background:#dcfce7;color:#166534;border-radius:6px;">✅ Sấy</span>
+      <span style="padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:6px;">🔄 Ép</span>
+      <span style="padding:4px 10px;background:#f3f4f6;color:#9ca3af;border-radius:6px;">⏳ Đóng gói</span>
+    </div>
+
+    <div class="section-divider-label">Container (SX quản lý)</div>
+    <table class="mini-table">
+      <thead><tr><th>#</th><th>Container No</th><th>Seal</th><th>Bành</th><th>Gross</th><th>Tare</th><th>Net</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>MSKU-1234567</td><td>ABC123</td><td>576/576</td><td>21,200</td><td>2,200</td><td>19,000</td><td><span style="color:#16a34a;font-weight:600;">✅ Sealed</span></td></tr>
+        <tr><td>2</td><td>MSKU-2345678</td><td>DEF456</td><td>576/576</td><td>21,150</td><td>2,180</td><td>18,970</td><td><span style="color:#16a34a;font-weight:600;">✅ Sealed</span></td></tr>
+        <tr><td>3</td><td>MSKU-3456789</td><td>—</td><td>320/576</td><td>—</td><td>—</td><td>—</td><td><span style="color:#f59e0b;font-weight:600;">🔄 Packing</span></td></tr>
+        <tr><td colspan="8" style="text-align:center;color:#888;font-style:italic;">... 33 container nữa</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:8px;"><button class="btn btn-outline">+ Thêm container</button></div>
+  </div>
+</div>
+
+<!-- SECTION 3: VẬN CHUYỂN (LOG) — READONLY (chưa đến lượt) -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">
+      <span>🚢</span> VẬN CHUYỂN
+      <span class="section-badge readonly">⏳ Chờ SX hoàn tất</span>
+    </div>
+    <span style="font-size:11px;color:#9ca3af;">logistics@huyanhrubber.com</span>
+  </div>
+  <div class="section-body">
+    <div class="section-divider-label">Booking & Tàu</div>
+    <div class="grid grid-3">
+      <div class="field"><div class="field-label">Số BK (Booking)</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+      <div class="field"><div class="field-label">Số BL (B/L)</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+      <div class="field"><div class="field-label">Hãng tàu</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+    </div>
+    <div class="grid grid-4" style="margin-top:8px;">
+      <div class="field"><div class="field-label">POL</div><div class="field-value">Da Nang Port</div></div>
+      <div class="field"><div class="field-label">POD</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+      <div class="field"><div class="field-label">ETD</div><div class="field-value editable" style="color:#ccc;">—</div></div>
+      <div class="field"><div class="field-label">ETA</div><div class="field-value editable" style="color:#ccc;">—</div></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:8px;">
+      <div class="field"><div class="field-label">DHL</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+      <div class="field"><div class="field-label">Tàu / Chuyến</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+    </div>
+
+    <div class="section-divider-label">L/C</div>
+    <div class="grid grid-3">
+      <div class="field"><div class="field-label">L/C NO</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+      <div class="field">
+        <div class="field-label">Ngày hết hạn L/C</div>
+        <div class="field-value warning">15/05/2025 — 🔴 Còn 12 ngày</div>
+      </div>
+      <div class="field"><div class="field-label">Tiền còn lại</div><div class="field-value auto">$1,391,434.82</div></div>
+    </div>
+
+    <div class="section-divider-label">Chiết khấu</div>
+    <div class="grid grid-4">
+      <div class="field"><div class="field-label">Số tiền CK</div><div class="field-value editable">$5,000</div></div>
+      <div class="field"><div class="field-label">Ngày CK</div><div class="field-value editable">20/08/2025</div></div>
+      <div class="field"><div class="field-label">Tỷ giá CK (KT nhập)</div><div class="field-value" style="background:#fef3c7;border-color:#fcd34d;">25,200 <span style="font-size:10px;color:#92400e;">KT</span></div></div>
+      <div class="field"><div class="field-label">Tiền còn lại</div><div class="field-value auto">$1,391,434.82</div></div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- SECTION 5: TÀI CHÍNH (KT) -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">
+      <span>💰</span> TÀI CHÍNH
+      <span class="section-badge readonly">⏳ Chờ giao hàng</span>
+    </div>
+    <span style="font-size:11px;color:#9ca3af;">yendt@huyanhrubber.com</span>
+  </div>
+  <div class="section-body">
+    <div class="grid grid-3">
+      <div class="field"><div class="field-label">Tỷ giá (VND/USD)</div><div class="field-value editable">25,000</div></div>
+      <div class="field"><div class="field-label">Giá trị VND</div><div class="field-value auto">34,911 triệu đ</div></div>
+      <div class="field"><div class="field-label">Ngày tiền về</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:8px;">
+      <div class="field"><div class="field-label">Trạng thái TT</div><div class="field-value" style="background:#fef2f2;color:#dc2626;">Chưa thanh toán</div></div>
+      <div class="field"><div class="field-label">Phí ngân hàng</div><div class="field-value editable" style="color:#ccc;">Chưa nhập</div></div>
+    </div>
+
+    <div class="section-divider-label">Tổng hợp</div>
+    <div style="background:#f9fafb;border-radius:12px;padding:16px;border:1px solid #e5e7eb;">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;">
+        <span>Tổng hợp đồng</span><span style="font-weight:700;">$1,396,434.82</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;color:#dc2626;">
+        <span>Chiết khấu</span><span>−$5,000.00</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;color:#dc2626;">
+        <span>Phí NH</span><span>−$150.00</span>
+      </div>
+      <div style="height:1px;background:#d1d5db;margin:8px 0;"></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:16px;font-weight:700;color:#1B4D3E;">
+        <span>Thực nhận</span><span>$1,391,284.82</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;color:#f59e0b;">
+        <span>Hoa hồng (2%)</span><span>−$27,928.70</span>
+      </div>
+      <div style="height:1px;background:#d1d5db;margin:8px 0;"></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:18px;font-weight:700;color:#1B4D3E;">
+        <span>DOANH THU RÒNG</span><span>$1,363,356.12</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div style="text-align:center;padding:16px;font-size:11px;color:#9ca3af;">
+  Huy Anh ERP — Module Đơn hàng bán — Prototype v2 — 05/04/2026
+</div>
+
+</div>
+</body>
+</html>

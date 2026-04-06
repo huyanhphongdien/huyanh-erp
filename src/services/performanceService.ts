@@ -692,9 +692,14 @@ export const performanceDashboardService = {
           });
           const qualityScore = totalManagerWeight > 0 ? Math.round(totalWeightedManager / totalManagerWeight) : 0;
 
-          // ── Khối lượng: CV hoàn thành / mức chuẩn phòng ──
-          const baseline = baselineMap.get(emp.department_id) || 10;
-          const volumeScore = Math.min(100, Math.round((emp.completed_tasks / baseline) * 100));
+          // ── Khối lượng: CV hoàn thành / kỳ vọng (tỷ lệ theo ngày trong tháng) ──
+          const monthlyBaseline = baselineMap.get(emp.department_id) || 10;
+          const now = new Date();
+          const dayOfMonth = now.getDate();
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const monthProgress = Math.max(0.1, dayOfMonth / daysInMonth); // tối thiểu 10%
+          const expectedTasks = Math.max(1, Math.round(monthlyBaseline * monthProgress));
+          const volumeScore = Math.min(100, Math.round((emp.completed_tasks / expectedTasks) * 100));
 
           // ── Công thức mới: CL×60% + KL×40% ──
           const finalScore = qualityScore > 0 || volumeScore > 0

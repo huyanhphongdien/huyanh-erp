@@ -69,94 +69,113 @@ Trọng số theo loại:
 - assigned / project = **1.0**
 - self / recurring = **0.5**
 
-#### Thành phần 2: Điểm khối lượng (40%)
+#### Thành phần 2: Điểm khối lượng (40%) — tính theo tỷ lệ ngày
 
 ```
-Điểm KL = min(100, số CV hoàn thành / mức chuẩn phòng × 100)
+Kỳ vọng = Mức chuẩn phòng × (Ngày hiện tại / Số ngày trong tháng)
+Điểm KL = min(100, CV hoàn thành / Kỳ vọng × 100)
 ```
 
-Mỗi phòng ban có **mức chuẩn** riêng (số CV kỳ vọng/tháng/người):
+> **Tại sao tính theo ngày?** Nếu chỉ dùng mức chuẩn cả tháng, NV bị đánh giá thấp đầu tháng (chưa kịp làm đủ). Chia theo tỷ lệ ngày = công bằng bất kỳ lúc nào trong tháng.
 
-| Phòng ban | Mức chuẩn (CV/tháng) | Ghi chú |
-|-----------|:--------------------:|---------|
+**Ví dụ: Ngày 6/4 (6/30 tháng = 20%)**
+
+| Phòng | Chuẩn/tháng | Kỳ vọng đến 6/4 | NV có 4 CV → KL |
+|-------|:-----------:|:---------------:|:--------------:|
+| QLSX | 15 | 15 × 20% = 3 | 4/3 = 133% → **100** |
+| KT | 8 | 8 × 20% = 2 | 4/2 = 200% → **100** |
+
+**Ví dụ: Ngày 25/4 (25/30 tháng = 83%)**
+
+| Phòng | Chuẩn/tháng | Kỳ vọng đến 25/4 | NV có 4 CV → KL |
+|-------|:-----------:|:----------------:|:--------------:|
+| QLSX | 15 | 15 × 83% = 12 | 4/12 = 33% → **33** |
+| KT | 8 | 8 × 83% = 7 | 4/7 = 57% → **57** |
+
+Mức chuẩn mỗi phòng:
+
+| Phòng ban | Chuẩn/tháng | Ghi chú |
+|-----------|:-----------:|---------|
 | Quản lý SX | 15 | Nhiều CV định kỳ hàng ngày |
 | Kho / Logistics | 12 | CV trung bình |
-| Kế toán | 8 | Ít CV hơn nhưng phức tạp |
-| Kinh doanh | 10 | CV theo đơn hàng |
-| Hành chính | 10 | CV đa dạng |
+| Kế toán | 8 | Ít CV nhưng phức tạp |
+| Các phòng khác | 10 | Mặc định |
 
-> Manager/Admin có thể điều chỉnh mức chuẩn phòng. Nếu chưa set → mặc định 10 CV/tháng.
+> Admin có thể điều chỉnh mức chuẩn phòng trong bảng `department_performance_baseline`.
 
 #### Cộng thêm: Trừ điểm quá hạn
 
 ```
-Điểm sau trừ = Điểm cuối - (Số ngày trễ TB × 2)
+Khi Manager duyệt CV assigned:
+  Điểm CV = Manager sao × 20 × Hệ số khó - (Ngày trễ × 2)
+
 Tối thiểu = 0 điểm
 ```
 
-Manager có quyền tick **"Miễn trừ trễ hạn"** khi duyệt cho trường hợp bất khả kháng (chờ NVL, máy hỏng...).
+Manager có quyền tick **"Miễn trừ trễ hạn"** khi duyệt (bất khả kháng: chờ NVL, máy hỏng...).
+
+| Trễ | Trừ | 5★ normal | 4★ hard (×1.2) | 3★ critical (×1.5) |
+|:---:|:---:|:---------:|:--------------:|:------------------:|
+| 0 ngày | 0 | 100 | 96 | 90 |
+| 3 ngày | -6 | 94 | 90 | 84 |
+| 7 ngày | -14 | 86 | 82 | 76 |
 
 ---
 
 ### Ví dụ tính điểm đầy đủ
 
-**NV Phạm Bá Lượng — Phòng QLSX — Tháng 4/2026**
-Mức chuẩn phòng: 15 CV/tháng
+**NV Ngô Thị Khuyên — Phòng Thu Mua — Ngày 6/4/2026**
+Mức chuẩn phòng: 10 CV/tháng
 
 **Bước 1: Tính điểm chất lượng**
 
 | # | Công việc | Loại | Điểm | Trọng số | Điểm × TS |
 |---|-----------|------|:----:|:--------:|:---------:|
-| 1 | Kiểm tra máy sấy | assigned | 80 (4★) | 1.0 | 80.0 |
-| 2 | Bảo trì dàn henging | assigned | 60 (3★) | 1.0 | 60.0 |
-| 3 | Xử lý sự cố máy ép | assigned (khó ×1.2) | 96 | 1.0 | 96.0 |
-| 4 | Báo cáo tuần 1 | recurring | 80 | 0.5 | 40.0 |
-| 5 | Báo cáo tuần 2 | recurring | 80 | 0.5 | 40.0 |
-| 6 | Báo cáo tuần 3 | recurring | 80 | 0.5 | 40.0 |
-| 7 | Báo cáo tuần 4 | recurring | 80 | 0.5 | 40.0 |
-| 8-18 | CV hàng ngày (×11) | recurring | 80 | 0.5×11 | 440.0 |
-| 19 | Sắp xếp kho | self | 85 | 0.5 | 42.5 |
-| 20 | Đề xuất cải tiến | self | 85 | 0.5 | 42.5 |
-| | **Tổng** | | | **11.5** | **921.0** |
+| 1 | Liên hệ NCC mới | assigned | 80 (4★) | 1.0 | 80.0 |
+| 2 | Đàm phán giá | assigned (khó ×1.2) | 96 | 1.0 | 96.0 |
+| 3 | Báo cáo tuần | recurring | 80 | 0.5 | 40.0 |
+| 4 | Cập nhật bảng giá | self | 85 | 0.5 | 42.5 |
+| | **Tổng** | | | **3.0** | **258.5** |
 
 ```
-Điểm CL = 921.0 / 11.5 = 80.1
+Điểm CL = 258.5 / 3.0 = 86.2
 ```
 
-**Bước 2: Tính điểm khối lượng**
+**Bước 2: Tính điểm khối lượng** (ngày 6/4)
 
 ```
-Điểm KL = min(100, 20 / 15 × 100) = min(100, 133) = 100
+Kỳ vọng = 10 × (6/30) = 2 CV
+Điểm KL = min(100, 4 / 2 × 100) = 100  ← vượt kỳ vọng!
 ```
 
 **Bước 3: Tổng hợp**
 
 ```
-Điểm cuối = (80.1 × 60%) + (100 × 40%) = 48.1 + 40 = 88.1
+Điểm cuối = (86.2 × 60%) + (100 × 40%) = 51.7 + 40 = 91.7 → Hạng A ✅
 ```
 
-**Bước 4: Trừ quá hạn** (giả sử 1 CV trễ 3 ngày, không miễn trừ)
+**So sánh: Nếu không tính theo ngày (cách cũ):**
 
 ```
-Ngày trễ TB = 3 / 20 = 0.15 ngày → trừ = 0.15 × 2 = 0.3đ
-Điểm cuối = 88.1 - 0.3 = 87.8 → Hạng B (Tốt)
+Điểm KL cũ = min(100, 4 / 10 × 100) = 40  ← bị phạt vì mới đầu tháng
+Điểm cũ = 86.2×60% + 40×40% = 51.7 + 16 = 67.7 → Hạng C ❌ (không công bằng)
 ```
 
 ---
 
-### So sánh: Làm nhiều vs Làm ít
+### So sánh: Làm nhiều vs Làm ít (cuối tháng, kỳ vọng = chuẩn)
 
-| NV | CV xong | Điểm CL | Điểm KL | Trễ | Cuối cùng | Hạng |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **A** (làm nhiều, tốt) | 20 | 80 | 100 | 0 | 80×60%+100×40% = **88** | **B** |
-| **B** (làm ít, giỏi) | 5 | 90 | 33 | 0 | 90×60%+33×40% = **67** | **C** |
-| **C** (chuẩn, giỏi) | 15 | 90 | 100 | 0 | 90×60%+100×40% = **94** | **A** |
-| **D** (làm nhiều, TB) | 18 | 65 | 100 | 2d | 65×60%+100×40%-0.2 = **79** | **B** |
-| **E** (làm ít, TB) | 3 | 65 | 20 | 0 | 65×60%+20×40% = **47** | **D** |
+| NV | CV xong | Điểm CL | Điểm KL | Cuối cùng | Hạng |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **A** (làm nhiều, tốt) | 20 | 80 | 100 | 80×60%+100×40% = **88** | **B** |
+| **B** (làm ít, giỏi) | 5 | 90 | 33 | 90×60%+33×40% = **67** | **C** |
+| **C** (chuẩn, giỏi) | 15 | 90 | 100 | 90×60%+100×40% = **94** | **A** |
+| **D** (làm nhiều, TB) | 18 | 65 | 100 | 65×60%+100×40% = **79** | **B** |
+| **E** (làm ít, TB) | 3 | 65 | 20 | 65×60%+20×40% = **47** | **D** |
 
-> NV C (đủ chuẩn + chất lượng cao) đạt hạng A — đây là mục tiêu lý tưởng.
-> NV B (làm ít dù giỏi) chỉ được C — khuyến khích nhận thêm CV.
-> NV A (làm nhiều) được B — nếu nâng chất lượng lên sẽ đạt A.
+> **NV C** (đủ chuẩn + chất lượng cao) = Hạng A → mục tiêu lý tưởng.
+> **NV B** (làm ít dù giỏi) = Hạng C → khuyến khích nhận thêm CV.
+> **NV A** (làm nhiều) = Hạng B → nâng chất lượng lên sẽ đạt A.
 
 ### Xếp hạng
 
@@ -405,27 +424,26 @@ Nội dung:
 ## Tổng kết công thức
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    TÍNH ĐIỂM HIỆU SUẤT                      │
-│                                                              │
-│  ĐIỂM CUỐI = (Chất lượng × 60%) + (Khối lượng × 40%)       │
-│                        - (Ngày trễ TB × 2)                   │
-│                                                              │
-│  ── Chất lượng ──                                            │
-│  CV assigned:  Manager chấm 1-5★ × hệ số độ khó (1.0~1.5)  │
-│  CV project:   Auto 90đ                                     │
-│  CV self:      Auto 85đ                                     │
-│  CV recurring: Auto 80đ                                     │
-│  → TB có trọng số: assigned/project=1.0, self/recurring=0.5 │
-│                                                              │
-│  ── Khối lượng ──                                            │
-│  = min(100, số CV hoàn thành / mức chuẩn phòng × 100)       │
-│                                                              │
-│  ── Quá hạn ──                                               │
-│  = Ngày trễ trung bình × 2 (Manager có thể miễn trừ)        │
-│                                                              │
-│  Xếp hạng: A(≥90) B(75-89) C(60-74) D(40-59) F(<40)        │
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                     TÍNH ĐIỂM HIỆU SUẤT                       │
+│                                                                │
+│  ĐIỂM CUỐI = (Chất lượng × 60%) + (Khối lượng × 40%)         │
+│                                                                │
+│  ── Chất lượng (CL) ──                                        │
+│  CV assigned:  Manager chấm 1-5★ × hệ số khó (1.0/1.2/1.5)  │
+│                - ngày trễ × 2 (miễn trừ nếu bất khả kháng)   │
+│  CV project:   Auto 90đ                                       │
+│  CV self:      Auto 85đ                                       │
+│  CV recurring: Auto 80đ                                       │
+│  → TB có trọng số: assigned/project=1.0, self/recurring=0.5   │
+│                                                                │
+│  ── Khối lượng (KL) ──                                        │
+│  Kỳ vọng = Chuẩn phòng × (ngày hiện tại / ngày trong tháng)  │
+│  Điểm KL = min(100, CV hoàn thành / Kỳ vọng × 100)           │
+│  → Công bằng bất kỳ thời điểm nào trong tháng                │
+│                                                                │
+│  Xếp hạng: A(≥90) B(75-89) C(60-74) D(40-59) F(<40)          │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---

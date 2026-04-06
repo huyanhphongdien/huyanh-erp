@@ -148,22 +148,24 @@ export const salesOrderService = {
     const year = new Date().getFullYear()
     const prefix = `SO-${year}-`
 
+    // Lấy tất cả mã SO-YYYY-XXXX, lọc đúng format số
     const { data } = await supabase
       .from('sales_orders')
       .select('code')
       .like('code', `${prefix}%`)
-      .order('code', { ascending: false })
-      .limit(1)
 
+    let maxNum = 0
     if (data && data.length > 0) {
-      const lastCode = data[0].code // e.g. "SO-2026-0042"
-      const lastNum = parseInt(lastCode.replace(prefix, ''), 10)
-      if (!isNaN(lastNum)) {
-        return `${prefix}${String(lastNum + 1).padStart(4, '0')}`
+      for (const row of data) {
+        const suffix = row.code.replace(prefix, '')
+        const num = parseInt(suffix, 10)
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num
+        }
       }
     }
 
-    return `${prefix}0001`
+    return `${prefix}${String(maxNum + 1).padStart(4, '0')}`
   },
 
   // ==========================================================================

@@ -356,7 +356,7 @@ export const salesOrderService = {
         color_lovibond_max: input.color_lovibond_max ?? qualitySpecs.color_lovibond_max ?? null,
 
         // Đóng gói
-        packing_type: input.packing_type || 'bale',
+        packing_type: input.packing_type || 'loose_bale',
         bale_weight_kg: baleWeight,
         total_bales: totalBales,
         shrink_wrap: input.shrink_wrap ?? true,
@@ -390,6 +390,16 @@ export const salesOrderService = {
         packing_list_generated: false,
         invoice_generated: false,
         bl_received: false,
+
+        // Hợp đồng (v4)
+        contract_no: input.contract_no || null,
+        contract_date: input.contract_date || null,
+        commission_pct: input.commission_pct || null,
+        commission_amount: input.commission_amount || null,
+        bank_account: input.bank_account || null,
+        bank_swift: input.bank_swift || null,
+        bank_name: input.bank_name || null,
+        bales_per_container: input.bales_per_container || null,
 
         // Ghi chú
         notes: input.notes || null,

@@ -225,10 +225,22 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                 {/* Actions */}
                 <Space size={4}>
                   {doc.file_url && (
-                    <Tooltip title="Xem file">
-                      <Button size="small" type="link" icon={<EyeOutlined />}
-                        onClick={() => window.open(doc.file_url!, '_blank')} />
-                    </Tooltip>
+                    <>
+                      <Tooltip title="Xem trước">
+                        <Button size="small" type="link" icon={<EyeOutlined />}
+                          onClick={() => window.open(doc.file_url!, '_blank')} />
+                      </Tooltip>
+                      <Tooltip title="Tải về">
+                        <Button size="small" type="link" icon={<DownloadOutlined />}
+                          onClick={() => {
+                            const a = document.createElement('a')
+                            a.href = doc.file_url!
+                            a.download = doc.file_name || `${doc.doc_name}.pdf`
+                            a.target = '_blank'
+                            a.click()
+                          }} />
+                      </Tooltip>
+                    </>
                   )}
 
                   {!readonly && (
@@ -246,14 +258,12 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
                         </Button>
                       </Tooltip>
 
-                      {!doc.file_url && (
-                        <Tooltip title={doc.is_received ? 'Đánh dấu chưa nhận' : 'Đánh dấu đã nhận'}>
-                          <Button size="small" type="link"
-                            icon={doc.is_received ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <CloseCircleOutlined />}
-                            onClick={() => handleToggleReceived(doc)}
-                          />
-                        </Tooltip>
-                      )}
+                      <Tooltip title={doc.is_received ? 'Bỏ đánh dấu nhận' : 'Đánh dấu đã nhận'}>
+                        <Button size="small" type="link"
+                          icon={doc.is_received ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <CloseCircleOutlined />}
+                          onClick={() => handleToggleReceived(doc)}
+                        />
+                      </Tooltip>
 
                       {doc.doc_type === 'other' && (
                         <Popconfirm title="Xóa chứng từ này?" onConfirm={() => handleDelete(doc.id)}>

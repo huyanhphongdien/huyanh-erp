@@ -601,8 +601,8 @@ async function fetchSalesAlerts(supabase: any): Promise<SalesAlertData> {
   const result: SalesAlertData = { lc_expiring: [], delivery_overdue: [], payment_overdue: [], pending_drafts: [], total_alerts: 0 }
 
   try {
-    // 1. LC sắp hết hạn (< 7 ngày)
-    const sevenDaysLater = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0]
+    // 1. LC sắp hết hạn (< 20 ngày)
+    const sevenDaysLater = new Date(now.getTime() + 20 * 86400000).toISOString().split('T')[0]
     const { data: lcOrders } = await supabase
       .from('sales_orders')
       .select('code, lc_number, lc_bank, lc_expiry_date, lc_amount, total_value_usd, customer:sales_customers!customer_id(name, short_name)')

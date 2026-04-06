@@ -143,6 +143,47 @@ export interface SalesOrder {
   invoice_generated: boolean
   bl_received: boolean
 
+  // Hợp đồng (v4)
+  contract_date?: string
+  commission_pct?: number
+  commission_amount?: number
+  bank_account?: string
+  bank_swift?: string
+  bales_per_container?: number
+  pallets_per_container?: number
+  bales_per_pallet?: number
+
+  // Sản xuất (v4)
+  ready_date?: string
+
+  // Vận chuyển mở rộng (v4)
+  voyage_number?: string
+  bl_type?: string
+  cutoff_date?: string
+  customs_declaration_no?: string
+  customs_declaration_date?: string
+  customs_clearance_status?: string
+  discount_date?: string
+  discount_amount?: number
+  discount_bank?: string
+  discount_exchange_rate?: number
+  dhl_number?: string
+
+  // Tài chính (v4)
+  remaining_amount?: number
+  net_revenue?: number
+  payment_received_date?: string
+  payment_status?: string
+  actual_payment_amount?: number
+  bank_charges?: number
+  bank_name?: string
+  lc_amount?: number
+
+  // Khóa (v4)
+  is_locked?: boolean
+  locked_at?: string
+  locked_by?: string
+
   // Ghi chú
   notes?: string
   internal_notes?: string

@@ -29,9 +29,9 @@ export const salesAlertService = {
       if (!o.lc_expiry_date) return
       const expiry = new Date(o.lc_expiry_date)
       const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000)
-      if (days <= 7 && days > 0) {
+      if (days <= 20 && days > 0) {
         alerts.push({
-          id: `lc-${o.id}`, type: 'lc_expiry', severity: days <= 3 ? 'critical' : 'warning',
+          id: `lc-${o.id}`, type: 'lc_expiry', severity: days <= 7 ? 'critical' : 'warning',
           title: 'L/C sắp hết hạn', message: `Đơn ${o.code} — L/C hết hạn trong ${days} ngày`,
           order_id: o.id, order_code: o.code, customer_name: (o.customer as any)?.name || '',
           date: o.lc_expiry_date, days_remaining: days,

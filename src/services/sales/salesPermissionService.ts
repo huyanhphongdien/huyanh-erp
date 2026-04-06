@@ -87,20 +87,62 @@ export const salesPermissions = {
   canViewDashboard: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin'].includes(role),
 }
 
-// Check if specific tab should be visible for role
+// ★ v4: Tabs cho detail panel
 export function getVisibleTabs(role: SalesRole | null): string[] {
-  if (!role) return ['info', 'quality']
-  const tabs = ['info', 'quality'] // ai cũng thấy
+  if (!role) return ['contract']
+  const tabs = ['contract'] // ai cũng thấy tab HĐ
 
-  if (salesPermissions.canViewProduction(role)) tabs.push('production')
-  if (['logistics', 'sale', 'admin'].includes(role)) tabs.push('packing')
+  if (['production', 'sale', 'logistics', 'admin'].includes(role)) tabs.push('production')
+  if (['logistics', 'sale', 'accounting', 'admin'].includes(role)) tabs.push('shipping')
   if (salesPermissions.canViewDocs(role)) tabs.push('documents')
   if (salesPermissions.canViewFinance(role)) tabs.push('finance')
 
   return tabs
 }
 
-// Check if field is editable for role
+// ★ v4: Tab nào editable theo status + role
+export type SalesOrderStatus = 'draft' | 'confirmed' | 'producing' | 'ready' | 'packing' | 'shipped' | 'delivered' | 'invoiced' | 'paid' | 'cancelled'
+
+export function isTabEditable(role: SalesRole | null, tab: string, status: SalesOrderStatus, isLocked: boolean): boolean {
+  if (!role) return false
+  if (role === 'admin') return true // Admin luôn sửa được
+
+  switch (tab) {
+    case 'contract':
+      // Sale sửa khi Draft + chưa khóa
+      return role === 'sale' && status === 'draft' && !isLocked
+
+    case 'production':
+      // SX sửa khi Confirmed → Packing
+      return role === 'production' && ['confirmed', 'producing', 'ready', 'packing'].includes(status)
+
+    case 'shipping':
+      // LOG sửa khi Producing → Delivered
+      return role === 'logistics' && ['producing', 'ready', 'packing', 'shipped', 'delivered'].includes(status)
+
+    case 'finance':
+      // KT sửa khi Shipped → Invoiced
+      return role === 'accounting' && ['shipped', 'delivered', 'invoiced'].includes(status)
+
+    default:
+      return false
+  }
+}
+
+// ★ v4: Kiểm tra field cụ thể — tỷ giá CK do KT nhập nhưng hiện ở tab LOG
+export function isFieldEditableV4(role: SalesRole | null, field: string): boolean {
+  if (!role) return false
+  if (role === 'admin') return true
+
+  // Tỷ giá CK: chỉ KT nhập
+  if (field === 'discount_exchange_rate') return role === 'accounting'
+  // Tỷ giá USD/VND: chỉ KT nhập
+  if (field === 'exchange_rate') return role === 'accounting'
+
+  return false
+}
+
+// Check if field is editable for role (legacy — giữ tương thích)
 export function isFieldEditable(role: SalesRole | null, fieldGroup: string): boolean {
   if (!role) return false
   switch (fieldGroup) {
@@ -109,7 +151,7 @@ export function isFieldEditable(role: SalesRole | null, fieldGroup: string): boo
     case 'quality': return salesPermissions.canEditOrder(role)
     case 'production': return salesPermissions.canEditProduction(role)
     case 'booking': return salesPermissions.canEditBooking(role)
-    case 'container': return salesPermissions.canEditContainer(role)
+    case 'container': return ['production', 'admin'].includes(role) // v4: SX quản lý container
     case 'bl_dhl': return salesPermissions.canEditBL(role)
     case 'coa_pl': return salesPermissions.canCreateCOA(role)
     case 'invoice': return salesPermissions.canCreateInvoice(role)

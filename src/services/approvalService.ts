@@ -463,8 +463,8 @@ export const approvalService = {
           assignee:employees!tasks_assignee_id_fkey(id, code, full_name, avatar_url),
           assigner:employees!tasks_assigner_id_fkey(id, full_name, position_id)
         `)
-        // Lấy task hoàn thành (finished) HOẶC quá hạn (overdue)
-        .in('status', ['finished', 'overdue'])
+        // Lấy task hoàn thành (finished), quá hạn (overdue), hoặc chờ đánh giá (pending_review)
+        .in('status', ['finished', 'overdue', 'pending_review'])
         // Loại task đã vào evaluation flow của manager (approved/rejected)
         // pending_self_eval = chưa tự đánh giá → vẫn phải hiện
         // pending_approval = đã tự đánh giá → thuộc tab "Chờ phê duyệt"

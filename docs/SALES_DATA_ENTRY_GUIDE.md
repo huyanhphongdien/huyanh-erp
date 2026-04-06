@@ -287,7 +287,51 @@ Quy đổi VND                   23.49 tỷ
 
 ---
 
-## 5. Quản trị (Admin)
+## 5. Chứng từ xuất khẩu — Ai upload gì?
+
+**Tab:** Chứng từ (xem được: LOG, KT, Admin)
+
+Mỗi đơn hàng có **checklist 12 chứng từ** tiêu chuẩn. Bộ phận nào chuẩn bị chứng từ đó thì upload lên.
+
+### Danh sách chứng từ
+
+| # | Chứng từ | Bắt buộc | Ai chuẩn bị | Ghi chú |
+|---|----------|:--------:|-------------|---------|
+| 1 | **Bill of Lading (B/L)** | ✅ | LOG | Vận đơn đường biển |
+| 2 | **Commercial Invoice** | ✅ | KT | Hóa đơn thương mại |
+| 3 | **Packing List** | ✅ | LOG / SX | Phiếu đóng gói |
+| 4 | **Certificate of Analysis (COA)** | ✅ | SX / QC | Chứng nhận phân tích chất lượng |
+| 5 | **Certificate of Origin (C/O)** | ✅ | LOG | Giấy chứng nhận xuất xứ |
+| 6 | Form A/E | | LOG | Mẫu ưu đãi thuế quan |
+| 7 | Phytosanitary Certificate | | LOG | Chứng nhận kiểm dịch thực vật |
+| 8 | Fumigation Certificate | | LOG | Chứng nhận hun trùng |
+| 9 | LC Copy (Thư tín dụng) | | KT | Bản copy L/C |
+| 10 | Insurance Certificate | | LOG / KT | Chứng nhận bảo hiểm (CIF) |
+| 11 | Weight Note (Phiếu cân) | | SX | Phiếu cân container |
+| 12 | Chứng từ khác | | Ai cần | Tùy yêu cầu KH |
+
+### Cách upload
+
+1. Mở đơn hàng → Tab **Chứng từ**
+2. Tìm chứng từ cần upload → nhấn **"Upload"**
+3. Chọn file (tối đa **10MB**, PDF/JPG/PNG)
+4. Sau khi upload xong, tick **"Đã nhận"** để đánh dấu
+
+### Ai thao tác gì?
+
+| BP | Upload | Tick "Đã nhận" | Thêm chứng từ khác | Xóa |
+|----|:------:|:--------------:|:-------------------:|:---:|
+| Sale | ❌ | ❌ | ❌ | ❌ |
+| SX | ❌ | ❌ | ❌ | ❌ |
+| LOG | ✅ | ✅ | ✅ | ✅ |
+| KT | ✅ | ✅ | ✅ | ✅ |
+| Admin | ✅ | ✅ | ✅ | ✅ |
+
+> **Lưu ý:** Sale và SX không thấy tab Chứng từ. Chỉ LOG, KT, Admin xem và thao tác được.
+
+---
+
+## 6. Quản trị (Admin)
 
 **Email:** `minhld@huyanhrubber.com`, `thuyht@huyanhrubber.com`, `huylv@huyanhrubber.com`
 

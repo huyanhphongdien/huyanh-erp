@@ -253,6 +253,71 @@ const SalesOrderListPage = () => {
   }
 
   // ============================================
+  // ROW COLOR — v4: nhìn vào biết ngay thiếu gì
+  // ============================================
+  //
+  // 🟢 Xanh lá: Đã thanh toán (xong)
+  // 🔵 Xanh dương: Đã xuất/giao — chờ tiền
+  // 🟡 Vàng: Thiếu logistics (chưa có BK/BL/ETD)
+  // 🔴 Đỏ nhạt: Quá hạn giao hoặc L/C hết hạn
+  // ⚪ Trắng: Đang sản xuất (bình thường)
+  // 🩶 Xám: Nháp / Hủy
+
+  const getRowStyle = (r: SalesOrder): React.CSSProperties => {
+    if (r.status === 'cancelled') return { background: '#f5f5f5', opacity: 0.6 }
+    if (r.status === 'paid') return { background: '#f6ffed' } // xanh lá nhạt — xong
+
+    // Quá hạn giao?
+    if (r.delivery_date) {
+      const overdue = Math.ceil((Date.now() - new Date(r.delivery_date).getTime()) / 86400000)
+      if (overdue > 0 && !['shipped', 'delivered', 'paid'].includes(r.status)) {
+        return { background: '#fff1f0' } // đỏ nhạt — quá hạn giao
+      }
+    }
+    // L/C hết hạn?
+    if (r.lc_expiry_date) {
+      const lcDays = Math.ceil((new Date(r.lc_expiry_date).getTime() - Date.now()) / 86400000)
+      if (lcDays <= 0) return { background: '#fff1f0' } // đỏ nhạt
+      if (lcDays <= 7) return { background: '#fff7e6' } // cam nhạt
+    }
+
+    if (['shipped', 'delivered', 'invoiced'].includes(r.status)) {
+      return { background: '#e6f4ff' } // xanh dương nhạt — chờ tiền
+    }
+
+    // Đã confirm nhưng thiếu logistics
+    if (['confirmed', 'producing', 'ready', 'packing'].includes(r.status)) {
+      const missingLog = !r.booking_reference || !r.bl_number || !r.etd
+      if (missingLog && ['ready', 'packing'].includes(r.status)) {
+        return { background: '#fffbe6' } // vàng nhạt — thiếu LOG
+      }
+    }
+
+    if (r.status === 'draft') return { background: '#fafafa' } // xám nhạt
+
+    return {} // trắng — bình thường
+  }
+
+  // Left border accent theo trạng thái thiếu
+  const getRowBorderLeft = (r: SalesOrder): string => {
+    if (r.status === 'paid') return '3px solid #52c41a'
+    if (r.status === 'cancelled') return '3px solid #d9d9d9'
+    if (['shipped', 'delivered', 'invoiced'].includes(r.status)) return '3px solid #1677ff'
+
+    if (r.delivery_date) {
+      const overdue = Math.ceil((Date.now() - new Date(r.delivery_date).getTime()) / 86400000)
+      if (overdue > 0 && !['shipped', 'delivered', 'paid'].includes(r.status)) return '3px solid #ff4d4f'
+    }
+
+    if (['ready', 'packing'].includes(r.status) && (!r.booking_reference || !r.bl_number || !r.etd)) {
+      return '3px solid #faad14'
+    }
+
+    if (r.status === 'draft') return '3px solid #d9d9d9'
+    return '3px solid #1B4D3E'
+  }
+
+  // ============================================
   // TABLE COLUMNS — v4: Color-coded groups
   // ============================================
 
@@ -685,6 +750,15 @@ const SalesOrderListPage = () => {
         </Row>
       </Card>
 
+      {/* Color Legend */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', fontSize: 12, color: '#666' }}>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#f6ffed', border: '1px solid #b7eb8f', marginRight: 4, verticalAlign: 'middle' }} /> Đã TT</span>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#e6f4ff', border: '1px solid #91caff', marginRight: 4, verticalAlign: 'middle' }} /> Chờ tiền</span>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#fffbe6', border: '1px solid #ffe58f', marginRight: 4, verticalAlign: 'middle' }} /> Thiếu LOG</span>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#fff1f0', border: '1px solid #ffa39e', marginRight: 4, verticalAlign: 'middle' }} /> Quá hạn / L/C hết</span>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#fafafa', border: '1px solid #d9d9d9', marginRight: 4, verticalAlign: 'middle' }} /> Nháp</span>
+      </div>
+
       {/* Table */}
       <Card style={{ borderRadius: 8 }}>
         <Table<SalesOrder>
@@ -734,7 +808,11 @@ const SalesOrderListPage = () => {
               setPanelOrderId(record.id)
               setPanelOpen(true)
             },
-            style: { cursor: 'pointer' },
+            style: {
+              cursor: 'pointer',
+              ...getRowStyle(record),
+              borderLeft: getRowBorderLeft(record),
+            },
           })}
           size="middle"
         />

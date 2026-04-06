@@ -1,523 +1,398 @@
-# Thiết kế lại Đơn Hàng Bán — Mỗi BP 1 phần, readonly cho BP khác
+# Thiết kế lại Đơn Hàng Bán — 4 Section, 1 trang, khóa sau xác nhận
 
 > **Ngày:** 05/04/2026
-> **Tham chiếu:** Sales Contract No.: LTC2024/PD-ATC-EOU/DEC (03 Feb 2025)
-> **Buyer mẫu:** ATC Tires Private Limited (India)
-> **Yêu cầu:** Mỗi bộ phận chỉ nhập phần của mình, các BP khác chỉ xem (readonly)
+> **Tham chiếu:** Sales Contract LTC2024/PD-ATC-EOU/DEC (ATC Tires)
+> **Nguyên tắc:** Mỗi BP sửa phần mình, phần khác readonly. Sale xác nhận → khóa luôn.
 
 ---
 
-## 0. PHÂN TÍCH HỢP ĐỒNG MẪU
+## 1. NGUYÊN TẮC CHÍNH
 
-Từ Sales Contract "LTC2024/PD-ATC-EOU/DEC":
-
-### Thông tin hợp đồng (Sale nhập)
+### 1.1 Một trang — 4 section scroll dọc
 ```
-Số HĐ:          LTC2024/PD-ATC-EOU/DEC
-Ngày:            03 February 2025
-Seller:          Huy Anh Rubber Company Limited
-Buyer:           ATC Tires Private Limited (India)
+Không dùng tabs — 1 trang hiện hết, scroll xuống xem toàn bộ.
+Mỗi section có header ghi rõ BP nào sửa.
+BP không có quyền → section hiện readonly (xám nhạt, không click được).
 ```
 
-### Sản phẩm (Sale nhập)
+### 1.2 Khóa sau xác nhận
 ```
-Commodity:       NATURAL RUBBER SVR10 (Item code 11-01280)
-Quantity:        725.76 MTS
-Unit Price:      USD 1,924.10/MT FOB DA NANG PORT
-Amount:          USD 1,396,434.82
+Sale tạo đơn (Draft) → Sale bấm "Xác nhận"
+  → KHÓA TOÀN BỘ section Hợp đồng (Sale không sửa được nữa)
+  → Các BP khác bắt đầu nhập phần mình
+
+Muốn sửa lại? → Phải "Mở khóa" (chỉ Admin được)
 ```
 
-### Đóng gói (Sale nhập — thông tin cố định theo HĐ)
-```
-Packing:         35 Kgs/Bale; 576 bales/16 shrink wrapped plastic pallets/01 x 20'
-Total:           20,736 bales/576 shrink wrapped plastic pallets/36 x 20'
-```
-
-**Phân tích:**
-- Quy cách: **35 kg/bành**
-- Mỗi container 20ft: **576 bành** (không phải 600)
-- Mỗi pallet: **576/16 = 36 bành/pallet**
-- Tổng: **20,736 bành / 36 container 20ft**
-- Verify: 725.76 × 1000 / 35 = 20,736 bành ✅
-- Container: 20,736 / 576 = 36 container ✅
-
-### Vận chuyển (Sale + Logistics)
-```
-Port of Loading:     Da Nang Port, Viet Nam
-Time of Shipment:    August 2025
-Partial Shipment:    Allowed
-Transhipment:        Allowed
-Load port charges:   THC on seller's account
-```
-
-### Thanh toán (Sale nhập)
-```
-Term of Payment:     100% D/P at sight
-```
-
-### Chứng từ yêu cầu
-```
-Documents:
-  - 3/3 Original Bill of Lading marked freight collect
-  - Commercial Invoice
-  - Packing List
-  - Certificate of Origin
-```
-
-### Quy tắc phát hiện
-
-| Từ HĐ | Field trong ERP | Ai nhập |
-|--------|----------------|---------|
-| No. | `contract_no` | Sale |
-| Date | `contract_date` | Sale |
-| Buyer | `customer_id` | Sale |
-| Commodity | `grade` | Sale |
-| Quantity (MTS) | `quantity_tons` | Sale |
-| Unit Price (USD/MT) | `unit_price` | Sale |
-| Amount (USD) | `total_value_usd` (auto) | Auto |
-| FOB DA NANG | `incoterm` + `port_of_loading` | Sale |
-| 35 Kgs/Bale | `bale_weight_kg` | Sale |
-| 576 bales/01 x 20' | `bales_per_container` | Sale |
-| D/P at sight | `payment_terms` | Sale |
-| Port of Loading | `port_of_loading` | Sale |
-| Time of Shipment | `delivery_date` | Sale |
-
-### ⚠️ Phát hiện: Container capacity khác với default
-
-```
-Hợp đồng: 576 bành/container (35kg, shrink wrap + pallet)
-ERP hiện tại: 600 bành/container (35kg)
-
-Lý do chênh lệch: 
-  576 = 16 pallet × 36 bành/pallet
-  600 = không tính pallet, xếp tự do
-
-→ CẦN: Cho phép Sale nhập số bành/container thay vì hardcode
-```
+### 1.3 Bốn nhóm người dùng
+| Nhóm | Email | Section sửa |
+|------|-------|------------|
+| **Sale** | sales@huyanhrubber.com | Hợp đồng |
+| **Sản xuất** | trunglxh@huyanhrubber.com | Sản xuất & Đóng gói |
+| **Logistics** | logistics@, anhlp@ | Vận chuyển + Chứng từ |
+| **Kế toán** | yendt@huyanhrubber.com | Tài chính |
+| **Admin** | minhld@, thuyht@, huylv@ | Tất cả + Mở khóa |
 
 ---
 
-## 1. TỔNG QUAN LUỒNG MỚI
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         TẠO ĐƠN HÀNG                                      │
-│                                                                            │
-│  BP Sale tạo đơn (2 bước) → Draft → Confirmed                             │
-│  Sau đó các BP khác vào tab của mình để nhập tiếp                          │
-│                                                                            │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│  │ Hợp đồng │ │ Sản xuất │ │ Đóng gói │ │ Vận chuyển│ │ Tài chính│         │
-│  │ (Sale)   │ │ (SX)     │ │ (LOG)    │ │ (LOG)    │ │ (KT)    │         │
-│  │ ✏️ Sửa   │ │ ✏️ Sửa   │ │ ✏️ Sửa   │ │ ✏️ Sửa   │ │ ✏️ Sửa   │         │
-│  │ 🔒 khác  │ │ 🔒 khác  │ │ 🔒 khác  │ │ 🔒 khác  │ │ 🔒 khác  │         │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘         │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 2. TAB HỢP ĐỒNG — BP SALE nhập
-
-**Ai sửa:** `sales@huyanhrubber.com` + Admin
-**Ai xem:** Tất cả BP
-
-### Form tạo đơn (Wizard 2 bước)
+## 2. LAYOUT 1 TRANG
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Bước 1: Thông tin Hợp đồng                                     │
+│ SO-2026-0015 — ATC Tires Private Ltd        Status: [Confirmed] │
+│ LTC2024/PD-ATC-EOU/DEC                     SVR 10 | 725.76 MT  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌── Thông tin chung ─────────────────────────────────────────┐ │
-│  │ Số hợp đồng:    [HA2026001        ]  (auto hoặc nhập tay) │ │
-│  │ Ngày hợp đồng:  [05/04/2026       ]                       │ │
-│  │ Người mua:       [KH-ATC — ATC Tires Private Limited  ▼]  │ │
-│  │ PO# khách hàng: [123456789        ]  (tùy chọn)           │ │
-│  └────────────────────────────────────────────────────────────┘ │
+│ ╔═══════════════════════════════════════════════════════════════╗
+│ ║ 📋 HỢP ĐỒNG                        Sale nhập    🔒 ĐÃ KHÓA  ║
+│ ╠═══════════════════════════════════════════════════════════════╣
+│ ║                                                               ║
+│ ║  Số HĐ:        LTC2024/PD-ATC-EOU/DEC                       ║
+│ ║  Ngày HĐ:      03/02/2025                                    ║
+│ ║  Người mua:     ATC Tires Private Limited (India)             ║
+│ ║  PO# KH:       HA2026001                                     ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  Grade:         SVR 10 (Item code 11-01280)                  ║
+│ ║  Số lượng:      725.76 tấn                                   ║
+│ ║  Đơn giá:       $1,924.10/MT FOB                             ║
+│ ║  Tổng tiền:     $1,396,434.82                                ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  Quy cách:      35 kg/bành | 576 bành/cont | 16 pallet/cont ║
+│ ║  Tổng bành:     20,736 | Container: 36 × 20ft               ║
+│ ║  Đóng gói:      Shrink wrap + Pallet                         ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  Incoterm:      FOB Da Nang Port                             ║
+│ ║  Thanh toán:    100% D/P at sight                            ║
+│ ║  Thời gian giao: August 2025                                 ║
+│ ║  Cảng xếp:      Da Nang Port, Vietnam                       ║
+│ ║  Hoa hồng:      2% ($27,928.70)                             ║
+│ ║  Ngân hàng:     Vietcombank CN Huế | 0071001046372 | BFTVVNVX║
+│ ║                                                               ║
+│ ╚═══════════════════════════════════════════════════════════════╝
 │                                                                 │
-│  ┌── Sản phẩm ────────────────────────────────────────────────┐ │
-│  │ Hàng hóa (Grade):  [SVR 10                            ▼]  │ │
-│  │ Số lượng (tấn):    [20          ]                          │ │
-│  │ Đơn giá (USD/tấn): [1,650       ]                          │ │
-│  │ Tổng tiền:          $33,000.00  (auto = SL × Đơn giá)     │ │
-│  └────────────────────────────────────────────────────────────┘ │
+│ ╔═══════════════════════════════════════════════════════════════╗
+│ ║ 🏭 SẢN XUẤT & ĐÓNG GÓI                      SX nhập  ✏️    ║
+│ ╠═══════════════════════════════════════════════════════════════╣
+│ ║                                                               ║
+│ ║  Ngày hàng sẵn sàng:  [15/07/2025    ] ← SX nhập            ║
+│ ║                                                               ║
+│ ║  NVL check: 854 tấn có sẵn ✅ Đủ                             ║
+│ ║  Lệnh SX:  PO-SVR10-250401-001                              ║
+│ ║  Tiến độ:  ████████████████░░░░░░ 70%                        ║
+│ ║                                                               ║
+│ ║  Container 1: MSKU-1234567 | Seal: ABC123 | 576 bành | ✅   ║
+│ ║  Container 2: MSKU-2345678 | Seal: DEF456 | 576 bành | ✅   ║
+│ ║  ... (36 container)                                          ║
+│ ║  [+ Thêm container]                                          ║
+│ ║                                                               ║
+│ ╚═══════════════════════════════════════════════════════════════╝
 │                                                                 │
-│  ┌── Quy cách đóng gói ───────────────────────────────────────┐ │
-│  │ Quy cách bành:     [35 kg — 576 bành/cont             ▼]  │ │
-│  │                     [33.33 kg — 630 bành/cont          ▼]  │ │
-│  │                     [Tùy chỉnh...                      ▼]  │ │
-│  │ Bành/container:    [576         ]  (nhập tay nếu tùy chỉnh)│ │
-│  │ Bành/pallet:       [36          ]  (tùy chọn)              │ │
-│  │ Pallet/container:  [16          ]  (auto = bành/cont ÷ bành/pallet) │ │
-│  │ Shrink wrap:        [✓]  Pallet: [✓]                      │ │
-│  └────────────────────────────────────────────────────────────┘ │
+│ ╔═══════════════════════════════════════════════════════════════╗
+│ ║ 🚢 VẬN CHUYỂN                            Logistics nhập ✏️  ║
+│ ╠═══════════════════════════════════════════════════════════════╣
+│ ║                                                               ║
+│ ║  Số BK:         [BK-250701-ATC       ]                       ║
+│ ║  Số BL:         [OOLU-1234567        ]                       ║
+│ ║  Hãng tàu:      [OOCL               ]                       ║
+│ ║  Tàu / Chuyến:  [OOCL Tokyo ] / [V.025]                     ║
+│ ║  POL:            Da Nang Port (từ HĐ)                        ║
+│ ║  POD:           [Chennai, India      ]                       ║
+│ ║  ETD:           [01/08/2025          ]                       ║
+│ ║  ETA:           [15/08/2025          ]                       ║
+│ ║  DHL:           [1234567890          ]                       ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  L/C NO:        [LC-ATC-2025-015     ]                       ║
+│ ║  Hết hạn L/C:   [30/09/2025          ]                       ║
+│ ║                  🟢 Còn 87 ngày                               ║
+│ ║                  (🔴 ĐỎ khi ≤ 20 ngày | ⚫ ĐÃ HẾT HẠN)      ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  Chiết khấu:    [$5,000              ] ← LOG nhập            ║
+│ ║  Ngày CK:       [20/08/2025          ] ← LOG nhập            ║
+│ ║  Tỷ giá CK:     [25,200              ] ← KT nhập            ║
+│ ║  Tiền còn lại:   $1,391,434.82  (auto = Tổng − CK)          ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  Tờ khai HQ:    [30156/NKD-ĐN        ]                      ║
+│ ║  Thông quan:    [✅ Đã thông quan     ▼]                     ║
+│ ║                                                               ║
+│ ╚═══════════════════════════════════════════════════════════════╝
 │                                                                 │
-│  ┌── Điều khoản ──────────────────────────────────────────────┐ │
-│  │ Điều kiện thương mại: [FOB — Giao lên tàu            ▼]   │ │
-│  │ Điều kiện thanh toán: [T/T trả trước 30%             ▼]   │ │
-│  │ Thời gian giao hàng:  [15/05/2026    ]                    │ │
-│  │ Cảng xếp hàng:        [Đà Nẵng                       ▼]   │ │
-│  │ Hoa hồng (%):          [2            ] %                   │ │
-│  └────────────────────────────────────────────────────────────┘ │
+│ ╔═══════════════════════════════════════════════════════════════╗
+│ ║ 📄 CHỨNG TỪ                              Logistics upload ✏️║
+│ ╠═══════════════════════════════════════════════════════════════╣
+│ ║  ✅ Bill of Lading (3/3 Original)    [📎 2 file]  [Xem]      ║
+│ ║  ✅ Commercial Invoice               [📎 1 file]  [Xem]      ║
+│ ║  ✅ Packing List                      [📎 1 file]  [Xem]      ║
+│ ║  ✅ Certificate of Origin            [📎 1 file]  [Xem]      ║
+│ ║  ⭕ Fumigation Certificate                       [Upload]     ║
+│ ║  ⭕ Insurance Certificate                        [Upload]     ║
+│ ║  Progress: 4/6 (67%)                                         ║
+│ ╚═══════════════════════════════════════════════════════════════╝
 │                                                                 │
-│  ┌── Ngân hàng ───────────────────────────────────────────────┐ │
-│  │ Ngân hàng:  [Vietcombank - CN Huế                      ]   │ │
-│  │ Số TK:      [0071001046372                             ]   │ │
-│  │ SWIFT:      [BFTVVNVX                                  ]   │ │
-│  └────────────────────────────────────────────────────────────┘ │
+│ ╔═══════════════════════════════════════════════════════════════╗
+│ ║ 💰 TÀI CHÍNH                              Kế toán nhập ✏️   ║
+│ ╠═══════════════════════════════════════════════════════════════╣
+│ ║                                                               ║
+│ ║  Tỷ giá:          [25,000        ] VND/USD  ← KT nhập       ║
+│ ║  Giá trị VND:      34,911 triệu đ  (auto)                   ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  Ngày tiền về:    [15/09/2025    ] ← KT nhập                ║
+│ ║  Trạng thái TT:   [Chưa thanh toán ▼]                       ║
+│ ║  ─────────────────────────────────────────────────────────── ║
+│ ║  TỔNG HỢP:                                                  ║
+│ ║  Tổng HĐ:         $1,396,434.82                             ║
+│ ║  Chiết khấu:       −$5,000.00 (LOG nhập)                    ║
+│ ║  Phí NH:           −$150.00 (KT nhập)                       ║
+│ ║  Thực nhận:        $1,391,284.82                             ║
+│ ║  Hoa hồng (2%):    −$27,928.70 (Sale nhập)                  ║
+│ ║  Doanh thu ròng:   $1,363,356.12                             ║
+│ ║                                                               ║
+│ ╚═══════════════════════════════════════════════════════════════╝
 │                                                                 │
-│                                             [Tiếp theo →]      │
-├─────────────────────────────────────────────────────────────────┤
-│ Bước 2: Xác nhận                                                │
-│  Review tất cả → [Lưu nháp] hoặc [Xác nhận đơn hàng]          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Tab Info (readonly cho BP khác)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 📋 Thông tin Hợp đồng                        [Sửa] (chỉ Sale) │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Số HĐ:      HA2026001              Ngày:     05/04/2026       │
-│  Người mua:  ATC Tires Private Ltd  PO#:      123456789        │
-│  ─────────────────────────────────────────────────────────────  │
-│  Grade:      SVR 10                 SL:       20 tấn           │
-│  Đơn giá:    $1,650/tấn            Tổng:     $33,000          │
-│  ─────────────────────────────────────────────────────────────  │
-│  Bành:       33.33 kg              Tổng bành: 601              │
-│  Đóng gói:   Bale + Shrink + Pallet Container: 1 × 20ft       │
-│  ─────────────────────────────────────────────────────────────  │
-│  Incoterm:   FOB                   Thanh toán: TT 30%          │
-│  Giao hàng:  15/05/2026            Cảng:      Đà Nẵng          │
-│  Hoa hồng:   2%                    NH:        VCB Huế          │
+│ ── 📊 TIẾN TRÌNH ──────────────────────────────────────────── │
+│ Draft ✅ → Confirmed ✅ → Producing 🔄 → Ready → Shipped →    │
+│ → Delivered → Invoiced → Paid                                  │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. TAB SẢN XUẤT — BP SẢN XUẤT nhập
+## 3. QUY TẮC KHÓA
 
-**Ai sửa:** `trunglxh@huyanhrubber.com` + Admin
-**Ai xem:** Sale, Logistics
-
-### Nội dung
+### 3.1 Sale xác nhận → Khóa section Hợp đồng
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ 🏭 Sản xuất                                                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ★ Ngày hàng sẵn sàng:  [10/05/2026    ]  ← SX nhập           │
-│                                                                 │
-│  ── Kiểm tra NVL ──────────────────────────────────────────    │
-│  NVL cần:     23.5 tấn (yield 85%)                             │
-│  NVL có sẵn:  28.0 tấn ✅ Đủ                                   │
-│  Batch phù hợp: 5 batch (DRC 50-55%)                           │
-│  [Phân bổ NVL]                                                  │
-│                                                                 │
-│  ── Lệnh sản xuất ────────────────────────────────────────    │
-│  PO-SVR10-260405-001                                           │
-│  Tiến độ: ████████████████████████████░░░░ 75%                 │
-│  Rửa ✅ → Tán/Kéo ✅ → Sấy ✅ → Ép 🔄 → Đóng gói ⏳          │
-│                                                                 │
-│  Khi hoàn tất → Auto status: Ready                             │
-└─────────────────────────────────────────────────────────────────┘
+Trạng thái: Draft
+  → Sale sửa thoải mái
+  → Bấm "Xác nhận đơn hàng"
+  → Status: Confirmed
+  → Section "Hợp đồng" → 🔒 KHÓA (readonly, nền xám)
+  → Không sửa được: SL, giá, grade, KH, payment terms...
+  → Muốn sửa? → Admin bấm "Mở khóa" → quay về Draft
 ```
 
-**Fields SX nhập:**
-| Field | Mô tả |
-|-------|-------|
-| `ready_date` | Ngày hàng sẵn sàng giao (★ field mới) |
+### 3.2 Ma trận khóa theo status
 
----
+| Status | Hợp đồng (Sale) | SX & Đóng gói (SX) | Vận chuyển (LOG) | Tài chính (KT) |
+|--------|:---------------:|:------------------:|:----------------:|:--------------:|
+| **Draft** | ✏️ Sửa | 🔒 | 🔒 | 🔒 |
+| **Confirmed** | 🔒 KHÓA | ✏️ Sửa | 🔒 | 🔒 |
+| **Producing** | 🔒 | ✏️ Sửa | ✏️ Sửa | 🔒 |
+| **Ready** | 🔒 | 🔒 KHÓA | ✏️ Sửa | 🔒 |
+| **Packing** | 🔒 | ✏️ Đóng gói | ✏️ Sửa | 🔒 |
+| **Shipped** | 🔒 | 🔒 | ✏️ Sửa | ✏️ Sửa |
+| **Delivered** | 🔒 | 🔒 | 🔒 KHÓA | ✏️ Sửa |
+| **Invoiced** | 🔒 | 🔒 | 🔒 | ✏️ Sửa |
+| **Paid** | 🔒 | 🔒 | 🔒 | 🔒 TẤT CẢ KHÓA |
 
-## 4. TAB ĐÓNG GÓI — BP LOGISTICS nhập
+**Logic:**
+- Mỗi BP chỉ sửa được khi đến lượt mình
+- Khi BP chuyển status → section của BP đó bị khóa
+- Paid = tất cả khóa (đơn hàng hoàn tất)
 
-**Ai sửa:** `logistics@huyanhrubber.com`, `anhlp@huyanhrubber.com` + Admin
-**Ai xem:** Sale, SX
-
-### Nội dung
+### 3.3 Nút "Mở khóa" (chỉ Admin)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ 📦 Đóng gói                                                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Container 1:  MSKU-1234567                                    │
-│  ├── Seal: ABC123456                                           │
-│  ├── Bành: 601 / 630                                           │
-│  ├── Gross: 21,200 kg | Tare: 2,200 kg | Net: 19,000 kg       │
-│  └── Status: ✅ Sealed                                          │
-│                                                                 │
-│  [+ Thêm container]  [Auto tạo container]                      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+Admin thấy nút 🔓 Mở khóa trên section đã khóa
+  → Bấm → confirm "Bạn chắc chắn muốn mở khóa?"
+  → Section mở lại cho BP sửa
+  → Ghi log: ai mở, lúc nào, lý do
 ```
 
 ---
 
-## 5. TAB VẬN CHUYỂN — BP LOGISTICS nhập
+## 4. CHI TIẾT FIELDS TỪNG SECTION
 
-**Ai sửa:** `logistics@huyanhrubber.com`, `anhlp@huyanhrubber.com` + Admin
-**Ai xem:** Sale, Kế toán
+### 4.1 Section HỢP ĐỒNG (Sale nhập)
 
-### Nội dung
+| Field | Type | Bắt buộc | Ghi chú |
+|-------|------|---------|---------|
+| Số hợp đồng | Text | ✅ | VD: LTC2024/PD-ATC-EOU/DEC |
+| Ngày hợp đồng | Date | ✅ | |
+| Người mua (KH) | Select | ✅ | Từ danh sách KH |
+| PO# khách hàng | Text | | |
+| Grade SVR | Select | ✅ | SVR 3L, 5, 10, 20, RSS... |
+| Số lượng (tấn) | Number | ✅ | VD: 725.76 |
+| Đơn giá (USD/MT) | Number | ✅ | VD: 1,924.10 |
+| **Tổng tiền (USD)** | **Auto** | | **= SL × Đơn giá** |
+| Quy cách bành (kg) | Select | ✅ | 33.33 / 35 / tùy chỉnh |
+| Bành/container | Number | ✅ | VD: 576 (theo HĐ) |
+| Pallet/container | Number | | VD: 16 |
+| **Tổng bành** | **Auto** | | **= ceil(SL × 1000 / KL_bành)** |
+| **Số container** | **Auto** | | **= ceil(Tổng_bành / bành_per_cont)** |
+| Shrink wrap | Toggle | | |
+| Pallet | Toggle | | |
+| Incoterm | Select | ✅ | FOB / CIF / CNF / DDP / EXW |
+| Điều kiện thanh toán | Select | ✅ | D/P at sight, LC 30/60/90, TT... |
+| Thời gian giao hàng | Date/Text | ✅ | VD: "August 2025" hoặc ngày cụ thể |
+| Cảng xếp hàng (POL) | Select | ✅ | Đà Nẵng, Hải Phòng... |
+| Hoa hồng (%) | Number | | VD: 2 |
+| **Hoa hồng (tiền)** | **Auto** | | **= Tổng × %** |
+| Ngân hàng | Text | | VD: Vietcombank CN Huế |
+| Số tài khoản | Text | | VD: 0071001046372 |
+| SWIFT | Text | | VD: BFTVVNVX |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 🚢 Vận chuyển                                  (LOG nhập)      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌── Booking & Tàu ──────────────────────────────────────────┐ │
-│  │ Số BK (Booking):    [BK-260407-ATC     ]                  │ │
-│  │ Số BL (B/L):        [OOLU-1234567      ]                  │ │
-│  │ Hãng tàu:           [OOCL              ]                  │ │
-│  │ Tàu / Chuyến:       [OOCL Tokyo  ] / [V.025   ]          │ │
-│  │ POL:                 Đà Nẵng (auto từ HĐ)                │ │
-│  │ POD:                [Chennai, India     ]                  │ │
-│  │ ETD:                [10/04/2026         ]                  │ │
-│  │ ETA:                [25/04/2026         ]                  │ │
-│  │ Cutoff:             [08/04/2026         ]                  │ │
-│  │ DHL:                [1234567890         ]                  │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌── L/C ─────────────────────────────────────────────────────┐ │
-│  │ L/C NO:             [LC-ATC-2026-015    ]                  │ │
-│  │ Ngày hết hạn L/C:   [15/06/2026         ]                 │ │
-│  │                     ⚠️ Còn 71 ngày (xanh)                  │ │
-│  │                     🔴 Còn 5 ngày (đỏ khi ≤ 20 ngày)      │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌── Chiết khấu ─────────────────────────────────────────────┐ │
-│  │ Số tiền chiết khấu: [$500              ]                   │ │
-│  │ Ngày chiết khấu:    [20/04/2026        ]                   │ │
-│  │ Số tiền còn lại:     $32,500  (auto = Tổng - CK)          │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌── Hải quan ────────────────────────────────────────────────┐ │
-│  │ Số tờ khai:         [30156/NKD-ĐN      ]                  │ │
-│  │ Ngày đăng ký:       [09/04/2026        ]                   │ │
-│  │ Thông quan:         [✅ Đã thông quan   ▼]                 │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+### 4.2 Section SẢN XUẤT & ĐÓNG GÓI (SX nhập)
 
-### Cảnh báo L/C hết hạn
+| Field | Type | Ghi chú |
+|-------|------|---------|
+| Ngày hàng sẵn sàng | Date | ★ SX nhập |
+| NVL check | Auto | Kiểm tra batch có sẵn |
+| Lệnh sản xuất | Link | Tạo/xem PO |
+| Tiến độ 5 công đoạn | Progress | Rửa→Tán→Sấy→Ép→Đóng gói |
+| Container (CRUD) | Table | Tạo/gán bành/seal/cân |
+
+### 4.3 Section VẬN CHUYỂN (Logistics nhập)
+
+| Field | Type | Ai nhập | Ghi chú |
+|-------|------|---------|---------|
+| Số BK (Booking) | Text | LOG | |
+| Số BL (B/L) | Text | LOG | |
+| Hãng tàu | Text | LOG | |
+| Tàu / Chuyến | Text | LOG | |
+| POL | Auto | | Từ HĐ (Sale) |
+| POD | Text | LOG | Cảng đích |
+| ETD | Date | LOG | |
+| ETA | Date | LOG | |
+| DHL | Text | LOG | Tracking number |
+| L/C NO | Text | LOG | |
+| Ngày hết hạn L/C | Date | LOG | 🔴 ≤ 20 ngày = ĐỎ |
+| Chiết khấu (USD) | Number | LOG | |
+| Ngày chiết khấu | Date | LOG | |
+| Tỷ giá chiết khấu | Number | **KT** | ★ Kế toán nhập |
+| **Tiền còn lại** | **Auto** | | **= Tổng − Chiết khấu** |
+| Tờ khai HQ | Text | LOG | |
+| Thông quan | Select | LOG | Chờ / Đã TQ / Từ chối |
+
+### 4.4 Section TÀI CHÍNH (Kế toán nhập)
+
+| Field | Type | Ghi chú |
+|-------|------|---------|
+| Tỷ giá (VND/USD) | Number | ★ KT nhập |
+| **Giá trị VND** | **Auto** | **= Tổng USD × Tỷ giá** |
+| Ngày tiền về | Date | ★ KT nhập |
+| Trạng thái TT | Select | Chưa TT / Một phần / Đã TT |
+| Phí ngân hàng | Number | KT nhập |
+| **Thực nhận** | **Auto** | **= Tổng − CK − Phí NH** |
+| **Doanh thu ròng** | **Auto** | **= Thực nhận − Hoa hồng** |
+
+---
+
+## 5. CẢNH BÁO L/C
+
 ```
 Ngày hết hạn L/C — Quy tắc hiện màu:
-  > 20 ngày:   🟢 Xanh (bình thường)
-  ≤ 20 ngày:   🔴 Đỏ (cảnh báo)
-  ≤ 0 ngày:    ⚫ Đen + chữ "ĐÃ HẾT HẠN"
-```
 
-### Auto tính
-```
-Số tiền còn lại = Tổng tiền (Sale nhập) − Số tiền chiết khấu (LOG nhập)
-```
+  > 20 ngày:    🟢 Xanh lá  "Còn X ngày"
+  ≤ 20 ngày:    🔴 ĐỎ       "⚠️ Còn X ngày — SẮP HẾT HẠN"
+  ≤ 0 ngày:     ⚫ Đen       "❌ ĐÃ HẾT HẠN"
 
----
-
-## 6. TAB CHỨNG TỪ — BP LOGISTICS nhập
-
-**Ai sửa:** `logistics@`, `anhlp@` + Admin (upload file)
-**Ai sửa Invoice:** `yendt@` (Kế toán sinh Invoice)
-**Ai xem:** Tất cả
-
-### Nội dung (đã có — giữ nguyên)
-- Sinh COA, Packing List, Invoice
-- Upload 12 loại chứng từ gốc
-- Checklist đã nhận / chưa nhận
-
----
-
-## 7. TAB TÀI CHÍNH — BP KẾ TOÁN nhập
-
-**Ai sửa:** `yendt@huyanhrubber.com` + Admin
-**Ai xem:** Admin
-
-### Nội dung
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 💰 Tài chính                                   (KT nhập)       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌── Tỷ giá & Giá trị ──────────────────────────────────────┐ │
-│  │ Tỷ giá (VND):       [25,000           ]  ← KT nhập       │ │
-│  │ Giá trị VND:         825,000,000 đ  (auto = USD × tỷ giá)│ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌── Thanh toán ──────────────────────────────────────────────┐ │
-│  │ Trạng thái:         [Chưa thanh toán   ▼]                 │ │
-│  │ Ngày thanh toán:    [               ]                      │ │
-│  │ Số tiền thực nhận:  [$32,500        ]                      │ │
-│  │ Phí ngân hàng:      [$150           ]                      │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌── Tổng hợp ───────────────────────────────────────────────┐ │
-│  │ Tổng HĐ:           $33,000                                │ │
-│  │ Chiết khấu:         -$500 (LOG nhập)                      │ │
-│  │ Phí NH:             -$150 (KT nhập)                       │ │
-│  │ ─────────────────────────────────────────────────────────  │ │
-│  │ Thực nhận:          $32,350                                │ │
-│  │ Hoa hồng (2%):      -$660                                 │ │
-│  │ ─────────────────────────────────────────────────────────  │ │
-│  │ Doanh thu ròng:     $31,690                                │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+Hiện tại: 7 ngày → Đổi thành 20 ngày
+Áp dụng: Tab vận chuyển + Shipment Following + Email báo cáo
 ```
 
 ---
 
-## 8. MA TRẬN PHÂN QUYỀN FIELD
+## 6. AUTO TÍNH TOÁN
 
-### Ai nhập field nào
-
-| Field | Sale | SX | LOG | KT | Ghi chú |
-|-------|:----:|:--:|:---:|:--:|---------|
-| **Số hợp đồng** | ✏️ | 🔒 | 🔒 | 🔒 | Auto hoặc nhập tay |
-| **Ngày hợp đồng** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Người mua (KH)** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Grade SVR** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Số lượng** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Đơn giá** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Tổng tiền** | auto | 🔒 | 🔒 | 🔒 | = SL × Đơn giá |
-| **Incoterm** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Payment terms** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Thời gian giao** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Cảng xếp hàng** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Quy cách bành** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Đóng gói** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Hoa hồng (%)** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Ngân hàng** | ✏️ | 🔒 | 🔒 | 🔒 | |
-| **Ngày hàng sẵn sàng** | 🔒 | ✏️ | 🔒 | 🔒 | SX nhập |
-| **Container / Seal** | 🔒 | 🔒 | ✏️ | 🔒 | LOG nhập |
-| **Booking (BK)** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **B/L number** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **Hãng tàu / Tàu** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **ETD / ETA** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **L/C NO** | 🔒 | 🔒 | ✏️ | 🔒 | LOG nhập |
-| **Ngày hết hạn L/C** | 🔒 | 🔒 | ✏️ | 🔒 | 🔴 ≤ 20 ngày |
-| **POL / POD** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **Chiết khấu** | 🔒 | 🔒 | ✏️ | 🔒 | LOG nhập |
-| **Ngày chiết khấu** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **Số tiền còn lại** | auto | auto | auto | auto | = Tổng − CK |
-| **DHL** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **Tờ khai HQ** | 🔒 | 🔒 | ✏️ | 🔒 | |
-| **Tỷ giá (VND)** | 🔒 | 🔒 | 🔒 | ✏️ | KT nhập |
-| **Giá trị VND** | auto | auto | auto | auto | = USD × tỷ giá |
-| **Ngày thanh toán** | 🔒 | 🔒 | 🔒 | ✏️ | |
-| **Số tiền thực nhận** | 🔒 | 🔒 | 🔒 | ✏️ | |
-| **Phí ngân hàng** | 🔒 | 🔒 | 🔒 | ✏️ | |
+| Field | Công thức | Trigger |
+|-------|----------|---------|
+| Tổng tiền (USD) | SL × Đơn giá | Sale nhập |
+| Tổng bành | ceil(SL × 1000 / KL_bành) | Sale nhập |
+| Số container | ceil(Tổng_bành / bành_per_cont) | Sale nhập |
+| Hoa hồng (tiền) | Tổng × Hoa hồng% | Sale nhập |
+| Tiền còn lại | Tổng − Chiết khấu | LOG nhập CK |
+| Giá trị VND | Tổng USD × Tỷ giá | KT nhập tỷ giá |
+| Thực nhận | Tổng − CK − Phí NH | KT nhập phí |
+| Doanh thu ròng | Thực nhận − Hoa hồng | Auto |
 
 ---
 
-## 9. THAY ĐỔI SO VỚI HIỆN TẠI
-
-### Fields mới cần thêm vào DB
+## 7. DB MIGRATION
 
 ```sql
 ALTER TABLE sales_orders
-  ADD COLUMN IF NOT EXISTS contract_date DATE,           -- Ngày hợp đồng
-  ADD COLUMN IF NOT EXISTS commission_pct NUMERIC(5,2),   -- Hoa hồng (%)
-  ADD COLUMN IF NOT EXISTS commission_amount NUMERIC(15,2),-- Hoa hồng (tiền)
-  ADD COLUMN IF NOT EXISTS bank_account VARCHAR(50),      -- Số TK ngân hàng
-  ADD COLUMN IF NOT EXISTS bank_swift VARCHAR(20),        -- SWIFT code
-  ADD COLUMN IF NOT EXISTS ready_date DATE,               -- Ngày hàng sẵn sàng (SX nhập)
-  ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(15,2),-- Số tiền còn lại (auto)
-  ADD COLUMN IF NOT EXISTS net_revenue NUMERIC(15,2);     -- Doanh thu ròng (auto)
-```
-
-### Thay đổi cảnh báo L/C
-
-```
-Hiện tại: cảnh báo khi ≤ 7 ngày
-Mới:      cảnh báo khi ≤ 20 ngày (theo yêu cầu chị Liễu)
-```
-
-### Thay đổi wizard
-
-```
-Hiện tại: 2 bước (KH+SP → Xác nhận)
-Mới:      2 bước giữ nguyên nhưng thêm fields:
-          + Hoa hồng (%)
-          + Ngân hàng (tên + số TK + SWIFT)
-          + Ngày hợp đồng
-```
-
-### Thay đổi L/C
-
-```
-Hiện tại: L/C nằm ở Tab Tài chính (KT nhập)
-Mới:      L/C chuyển sang Tab Vận chuyển (LOG nhập)
-          Vì chị Liễu (logistics) là người nhập L/C NO + ngày hết hạn
-```
-
-### Thay đổi Tỷ giá
-
-```
-Hiện tại: Sale nhập tỷ giá ở Step 1
-Mới:      KT nhập tỷ giá ở Tab Tài chính
-          Sale KHÔNG nhập tỷ giá (readonly)
+  ADD COLUMN IF NOT EXISTS contract_date DATE,
+  ADD COLUMN IF NOT EXISTS commission_pct NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS commission_amount NUMERIC(15,2),
+  ADD COLUMN IF NOT EXISTS bank_account VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS bank_swift VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS ready_date DATE,
+  ADD COLUMN IF NOT EXISTS bales_per_container INTEGER,
+  ADD COLUMN IF NOT EXISTS pallets_per_container INTEGER,
+  ADD COLUMN IF NOT EXISTS bales_per_pallet INTEGER,
+  ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(15,2),
+  ADD COLUMN IF NOT EXISTS net_revenue NUMERIC(15,2),
+  ADD COLUMN IF NOT EXISTS payment_received_date DATE,
+  ADD COLUMN IF NOT EXISTS discount_exchange_rate NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS locked_by UUID;
 ```
 
 ---
 
-## 10. AUTO-TÍNH TOÁN
+## 8. THAY ĐỔI SO VỚI HIỆN TẠI
 
-| Field | Công thức | Ai trigger |
-|-------|----------|-----------|
-| Tổng tiền (USD) | SL (tấn) × Đơn giá (USD/tấn) | Sale nhập SL + giá |
-| Tổng bành | ceil(SL × 1000 / KL_bành) | Sale chọn quy cách |
-| Số container | ceil(Tổng_bành / bành_per_cont) | Auto từ tổng bành |
-| Số tiền còn lại | Tổng tiền − Chiết khấu | LOG nhập CK |
-| Giá trị VND | Tổng tiền × Tỷ giá | KT nhập tỷ giá |
-| Hoa hồng (tiền) | Tổng tiền × Hoa hồng (%) | Sale nhập % |
-| Doanh thu ròng | Thực nhận − Hoa hồng | KT nhập thực nhận |
+| # | Thay đổi | Lý do |
+|---|---------|-------|
+| 1 | Wizard 4 bước → 2 bước | Sale chỉ nhập HĐ |
+| 2 | 5 tabs → 1 trang 4 sections | Nhìn toàn bộ, không chuyển tab |
+| 3 | Sale nhập tỷ giá → KT nhập | KT mới biết tỷ giá |
+| 4 | LC ở Tab Tài chính → Section Vận chuyển | LOG nhập LC |
+| 5 | Tỷ giá CK ở LOG → KT nhập | KT nhập tỷ giá CK |
+| 6 | Cảnh báo LC 7 ngày → 20 ngày | Theo yêu cầu chị Liễu |
+| 7 | Confirmed → KHÓA section Sale | Không sửa sau xác nhận |
+| 8 | Container 600/630 → nhập tay | HĐ mẫu dùng 576 |
+| 9 | Thêm: hoa hồng, NH, SWIFT | Theo HĐ mẫu |
+| 10 | Thêm: ngày tiền về, doanh thu ròng | KT cần |
+| 11 | Thêm: tiền còn lại auto | = Tổng − CK |
+| 12 | Đóng gói → SX quản lý | Không phải LOG |
 
 ---
 
-## 11. DANH SÁCH FILE CẦN SỬA
+## 9. FILES CẦN SỬA
 
 | # | File | Thay đổi |
 |---|------|---------|
-| 1 | `SalesOrderCreatePage.tsx` | Thêm fields: hoa hồng, NH, ngày HĐ. Bỏ tỷ giá |
-| 2 | `SalesOrderDetailPage.tsx` | Tab Vận chuyển: thêm L/C, đổi cảnh báo 20 ngày |
-| 3 | `SalesOrderDetailPage.tsx` | Tab Tài chính: thêm tỷ giá, doanh thu ròng |
-| 4 | `salesPermissionService.ts` | L/C fields → logistics (không còn KT) |
-| 5 | `salesAlertService.ts` | LC cảnh báo: 7 ngày → 20 ngày |
-| 6 | `daily-task-report/index.ts` | LC cảnh báo: 7 ngày → 20 ngày |
-| 7 | `salesTypes.ts` | Thêm interface fields mới |
-| 8 | Database | ALTER TABLE thêm 8 cột |
+| 1 | Database | ALTER TABLE 16 cột mới |
+| 2 | `SalesOrderCreatePage.tsx` | Wizard 2 bước + fields mới |
+| 3 | `SalesOrderDetailPage.tsx` | Đổi từ tabs → 4 sections scroll |
+| 4 | `salesPermissionService.ts` | Khóa logic theo status |
+| 5 | `salesOrderService.ts` | Lock/unlock + auto-calc |
+| 6 | `salesAlertService.ts` | LC 7→20 ngày |
+| 7 | `daily-task-report/index.ts` | LC 7→20 ngày |
+| 8 | `salesTypes.ts` | Thêm interface fields |
+| 9 | `ShipmentFollowingPage.tsx` | Cập nhật cột mới |
 
 ---
 
-## 12. ƯU TIÊN TRIỂN KHAI
+## 10. TRIỂN KHAI
 
-### Phase 1 (0.5 ngày)
-- [ ] DB migration: 8 cột mới
-- [ ] Wizard: thêm hoa hồng, NH, ngày HĐ, bỏ tỷ giá từ Sale
-- [ ] Tab Info: hiện readonly cho BP khác
+### Phase 1: DB + Wizard + Khóa (1 ngày)
+- [ ] Migration 16 cột
+- [ ] Wizard: thêm fields (hoa hồng, NH, SWIFT, bành/container)
+- [ ] Bỏ tỷ giá khỏi wizard Sale
+- [ ] Logic khóa: Confirmed → lock section Sale
 
-### Phase 2 (0.5 ngày)
-- [ ] Tab Vận chuyển: chuyển L/C từ KT sang LOG
-- [ ] Cảnh báo L/C: 7 → 20 ngày
-- [ ] Auto tính: số tiền còn lại
+### Phase 2: Detail Page → 4 Sections (1.5 ngày)
+- [ ] Đổi tabs → sections scroll
+- [ ] Section Hợp đồng (readonly khi confirmed)
+- [ ] Section SX & Đóng gói (SX sửa)
+- [ ] Section Vận chuyển (LOG sửa, LC, CK, tỷ giá CK do KT)
+- [ ] Section Tài chính (KT sửa: tỷ giá, ngày tiền về, phí NH)
+- [ ] Auto-calc: tiền còn lại, giá trị VND, doanh thu ròng
 
-### Phase 3 (0.5 ngày)
-- [ ] Tab Tài chính: thêm tỷ giá (KT nhập), doanh thu ròng
-- [ ] Tab Sản xuất: thêm field ngày hàng sẵn sàng
+### Phase 3: Cảnh báo + Polish (0.5 ngày)
+- [ ] LC cảnh báo 20 ngày (đỏ)
+- [ ] Email báo cáo: 20 ngày
+- [ ] Nút "Mở khóa" cho Admin
+- [ ] Test end-to-end
 
-**Tổng: 1.5 ngày**
+**Tổng: 3 ngày**
 
 ---
 
-> **Tài liệu thiết kế lại Đơn Hàng Bán — Phân công theo BP**
+> **Thiết kế lại Đơn Hàng Bán — 1 trang, 4 section, khóa theo status**
 > Công ty TNHH MTV Cao su Huy Anh Phong Điền
 > Cập nhật: 05/04/2026

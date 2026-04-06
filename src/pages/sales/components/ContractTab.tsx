@@ -84,8 +84,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       bales_per_container: order.bales_per_container,
       packing_type: order.packing_type,
       commission_pct: order.commission_pct,
+      bank_name: order.bank_name,
       bank_account: order.bank_account,
       bank_swift: order.bank_swift,
+      contract_no: order.contract_no,
       notes: order.notes,
     })
     setEditing(true)
@@ -115,8 +117,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         bales_per_container: vals.bales_per_container,
         packing_type: vals.packing_type,
         commission_pct: vals.commission_pct || null,
+        bank_name: vals.bank_name || null,
         bank_account: vals.bank_account || null,
         bank_swift: vals.bank_swift || null,
+        contract_no: vals.contract_no || null,
         notes: vals.notes || null,
       }
 
@@ -178,7 +182,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
 
         {/* Section: Hợp đồng */}
         <SectionHeader title="Hợp đồng" color="#1B4D3E" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Số hợp đồng" name="contract_no">
+            <Input placeholder="LTC2024/PD-ATC" />
+          </Form.Item>
           <Form.Item label="Ngày HĐ" name="contract_date">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
@@ -240,7 +247,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
 
         {/* Section: Ngân hàng */}
         <SectionHeader title="Ngân hàng" color="#1B4D3E" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Ngân hàng" name="bank_name">
+            <Input placeholder="Vietcombank CN Huế" />
+          </Form.Item>
           <Form.Item label="Số tài khoản" name="bank_account">
             <Input />
           </Form.Item>
@@ -277,8 +287,8 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       {/* Section: Hợp đồng */}
       <SectionHeader title="Hợp đồng" color="#1B4D3E" />
       <Descriptions column={2} size="small" bordered>
-        <Descriptions.Item label="Mã HĐ">
-          <strong>{order.code}</strong>
+        <Descriptions.Item label="Số HĐ">
+          <strong>{order.contract_no || order.code}</strong>
         </Descriptions.Item>
         <Descriptions.Item label="Ngày HĐ">{fmtDate(order.contract_date || order.order_date)}</Descriptions.Item>
         <Descriptions.Item label="Khách hàng" span={2}>
@@ -340,11 +350,12 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         </Descriptions.Item>
       </Descriptions>
 
-      {(order.bank_account || order.bank_swift) && (
+      {(order.bank_name || order.bank_account || order.bank_swift) && (
         <>
           <Divider style={{ margin: '12px 0' }} />
           <SectionHeader title="Ngân hàng" color="#1B4D3E" />
-          <Descriptions column={2} size="small" bordered>
+          <Descriptions column={3} size="small" bordered>
+            <Descriptions.Item label="Ngân hàng">{order.bank_name || '—'}</Descriptions.Item>
             <Descriptions.Item label="Tài khoản">{order.bank_account || '—'}</Descriptions.Item>
             <Descriptions.Item label="SWIFT">{order.bank_swift || '—'}</Descriptions.Item>
           </Descriptions>

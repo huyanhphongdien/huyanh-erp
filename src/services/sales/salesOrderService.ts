@@ -69,6 +69,16 @@ export interface CreateSalesOrderData {
   lc_bank?: string
   lc_expiry_date?: string
 
+  // Hợp đồng (v4)
+  contract_no?: string
+  contract_date?: string
+  commission_pct?: number
+  commission_amount?: number
+  bank_account?: string
+  bank_swift?: string
+  bank_name?: string
+  bales_per_container?: number
+
   // Ghi chú
   notes?: string
   internal_notes?: string

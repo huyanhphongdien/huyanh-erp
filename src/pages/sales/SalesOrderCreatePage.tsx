@@ -189,13 +189,16 @@ function SalesOrderCreatePage() {
       const values = await form.validateFields()
       setLoading(true)
 
-      // Convert dayjs to string
+      // Convert dayjs to string + calc commission
+      const totalUsd = (values.quantity_tons || 0) * (values.unit_price || 0)
       const payload: CreateSalesOrderData = {
         ...values,
         delivery_date: values.delivery_date ? values.delivery_date.format('YYYY-MM-DD') : undefined,
+        contract_date: values.contract_date ? values.contract_date.format('YYYY-MM-DD') : undefined,
         etd: values.etd ? values.etd.format('YYYY-MM-DD') : undefined,
         eta: values.eta ? values.eta.format('YYYY-MM-DD') : undefined,
         lc_expiry_date: values.lc_expiry_date ? values.lc_expiry_date.format('YYYY-MM-DD') : undefined,
+        commission_amount: values.commission_pct ? totalUsd * (values.commission_pct / 100) : undefined,
       }
 
       const created = await salesOrderService.create(payload)

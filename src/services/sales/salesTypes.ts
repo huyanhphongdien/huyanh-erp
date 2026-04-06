@@ -145,6 +145,7 @@ export interface SalesOrder {
   bl_received: boolean
 
   // Hợp đồng (v4)
+  contract_no?: string
   contract_date?: string
   commission_pct?: number
   commission_amount?: number

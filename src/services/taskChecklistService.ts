@@ -5,6 +5,15 @@
 
 import { supabase } from '../lib/supabase'
 
+export interface EvidenceFile {
+  url: string
+  name: string
+  size?: number
+  uploaded_by: string       // employee_id
+  uploaded_by_name: string  // tên người tải
+  uploaded_at: string       // ISO datetime
+}
+
 export interface ChecklistItem {
   id: string
   task_id: string
@@ -18,6 +27,7 @@ export interface ChecklistItem {
   evidence_url?: string | null
   evidence_urls?: string[] | null
   evidence_note?: string | null
+  evidence_metadata?: EvidenceFile[] | null
   // Completed by info
   completed_by_name?: string | null
 }

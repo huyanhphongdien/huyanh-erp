@@ -194,10 +194,22 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
         setUploadProgress(Math.round(((i + 1) / total) * 100))
       }
 
+      // Build per-file metadata
+      const existingMeta: any[] = item?.evidence_metadata || []
+      const newMeta = pendingFiles.map((f, i) => ({
+        url: urls[existingUrls.length + i],
+        name: f.name,
+        size: f.size,
+        uploaded_by: user?.employee_id || userId || null,
+        uploaded_by_name: user?.full_name || user?.email || 'Unknown',
+        uploaded_at: new Date().toISOString(),
+      }))
+
       const { error: updateError } = await supabase.from('task_checklist_items').update({
         evidence_url: urls[0],
         evidence_urls: urls,
         evidence_note: pendingFiles.map(f => f.name).join(', '),
+        evidence_metadata: [...existingMeta, ...newMeta],
         is_completed: true,
         completed_at: new Date().toISOString(),
         completed_by: userId || null,
@@ -279,12 +291,12 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                   </div>
                 )}
 
-                {/* Nút upload cho item chưa có evidence */}
-                {!readonly && item.requires_evidence && evidenceUrls.length === 0 && !item.is_completed && (
+                {/* Nút upload — mọi người tham gia đều tải được */}
+                {!readonly && (
                   <Button size="small" type="link" icon={<UploadOutlined />}
-                    onClick={() => { setUploadingId(item.id); setPendingFiles([]) }}
-                    style={{ color: '#fa8c16', padding: '0 4px' }}>
-                    Upload
+                    onClick={() => { setUploadingId(uploadingId === item.id ? null : item.id); setPendingFiles([]) }}
+                    style={{ color: evidenceUrls.length > 0 ? '#1890ff' : '#fa8c16', padding: '0 4px' }}>
+                    {evidenceUrls.length > 0 ? '' : 'Upload'}
                   </Button>
                 )}
 
@@ -295,19 +307,20 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                 )}
               </div>
 
-              {/* ★ Evidence Gallery + Upload Panel */}
-              {(isUploadPanel || evidenceUrls.length > 0) && uploadingId === item.id && (
+              {/* ★ Evidence Gallery + Upload Panel — mở khi click upload/tag file */}
+              {isUploadPanel && (
                 <div style={{ padding: '8px 10px', background: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
 
-                  {/* Existing files grid */}
+                  {/* Existing files grid — hiện ai tải, lúc nào */}
                   {evidenceUrls.length > 0 && (
                     <div style={{ marginBottom: 8 }}>
                       <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
                         Đã tải ({evidenceUrls.length}/{MAX_FILES})
                       </Text>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 6 }}>
                         {evidenceUrls.map((url, i) => {
                           const { type, color } = getFileIcon(url)
+                          const meta = (item.evidence_metadata || []).find((m: any) => m.url === url)
                           return (
                             <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 6, background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6, textDecoration: 'none', transition: 'border-color 0.2s' }}>
@@ -322,9 +335,18 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                                   <FileOutlined style={{ fontSize: 20, color }} />
                                 </div>
                               )}
-                              <Text style={{ fontSize: 10, marginTop: 2, color: '#666', textAlign: 'center', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                File {i + 1}
-                              </Text>
+                              {meta ? (
+                                <div style={{ fontSize: 9, marginTop: 3, color: '#666', textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
+                                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {meta.uploaded_by_name?.split(' ').pop() || 'N/A'}
+                                  </div>
+                                  <div style={{ color: '#999' }}>
+                                    {new Date(meta.uploaded_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <Text style={{ fontSize: 10, marginTop: 2, color: '#666' }}>File {i + 1}</Text>
+                              )}
                             </a>
                           )
                         })}
@@ -332,8 +354,8 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                     </div>
                   )}
 
-                  {/* Upload zone */}
-                  {evidenceUrls.length < MAX_FILES && !item.is_completed && (
+                  {/* Upload zone — cho phép tải thêm file */}
+                  {evidenceUrls.length < MAX_FILES && !readonly && (
                     <>
                       {/* Drag & drop zone */}
                       <div

@@ -12,6 +12,7 @@ import {
   ToolOutlined,
   CarOutlined,
   DollarOutlined,
+  FolderOpenOutlined,
   CloseOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
@@ -29,6 +30,7 @@ import ContractTab from './ContractTab'
 import ProductionTab from './ProductionTab'
 import ShippingTab from './ShippingTab'
 import FinanceTabV4 from './FinanceTabV4'
+import DocumentChecklistTab from './DocumentChecklistTab'
 
 // ============================================================================
 // TYPES
@@ -45,6 +47,7 @@ const TAB_META: Record<string, { icon: React.ReactNode; label: string; color: st
   contract: { icon: <FileTextOutlined />, label: 'Hợp đồng', color: '#1B4D3E' },
   production: { icon: <ToolOutlined />, label: 'Sản xuất', color: '#1677ff' },
   shipping: { icon: <CarOutlined />, label: 'Vận chuyển', color: '#d48806' },
+  documents: { icon: <FolderOpenOutlined />, label: 'Chứng từ', color: '#722ed1' },
   finance: { icon: <DollarOutlined />, label: 'Tài chính', color: '#cf1322' },
 }
 
@@ -189,6 +192,14 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             salesRole={salesRole}
             editable={isEditable('shipping')}
             onSaved={handleSaved}
+          />
+        )
+      case 'documents':
+        return (
+          <DocumentChecklistTab
+            orderId={order.id}
+            orderCode={order.code}
+            readonly={!salesRole || !['logistics', 'accounting', 'admin'].includes(salesRole)}
           />
         )
       case 'finance':

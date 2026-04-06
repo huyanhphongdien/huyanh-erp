@@ -61,8 +61,9 @@ Vào **Đơn hàng bán → Tạo đơn hàng** (nút xanh góc phải)
 | Số lượng (tấn) | Có | `725.76` | Khối lượng theo HĐ |
 | Đơn giá (USD/MT) | Có | `1,924` | Giá FOB/CIF |
 | Tiền tệ | Không | `USD` | Mặc định USD |
-| Quy cách bành | Không | `35 kg/bành` | 35 hoặc 33.33 |
+| Quy cách bành | Không | `35 kg/bành` | Chọn: 33.333 kg hoặc 35 kg |
 | Bành/container | Không | `576` | Theo HĐ thực tế |
+| Đóng gói | Không | `Loose Bale` | Chọn: Loose Bale / SW Pallet / Wooden Pallet / Metal Box |
 
 > **Tự động tính:** Tổng bành, Số container, Giá trị USD, Hoa hồng
 
@@ -73,8 +74,8 @@ Vào **Đơn hàng bán → Tạo đơn hàng** (nút xanh góc phải)
 | Incoterm | Không | `FOB` | Mặc định FOB |
 | Ngày giao dự kiến | Không | `30/04/2026` | Deadline giao hàng |
 | Cảng xếp hàng | Không | `Cát Lái` | Cảng VN |
+| Cảng đích | Không | `Shanghai` | Cảng bên mua |
 | Hoa hồng (%) | Không | `2` | % trên tổng giá trị |
-| Đóng gói | Không | `Bale` | Bành/Pallet |
 | Ngân hàng | Không | `Vietcombank CN Huế` | Đã điền sẵn |
 | Số tài khoản | Không | `0071001046372` | Đã điền sẵn |
 | SWIFT Code | Không | `BFTVVNVX` | Đã điền sẵn |

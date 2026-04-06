@@ -102,7 +102,7 @@ const BatchApprovePage: React.FC = () => {
           department:departments!tasks_department_id_fkey(id, name)
         `)
         .eq('evaluation_status', 'pending_approval')
-        .eq('status', 'finished')
+        .in('status', ['finished', 'pending_review'])
         .order('completed_date', { ascending: false });
 
       // If manager (not admin), filter by their department

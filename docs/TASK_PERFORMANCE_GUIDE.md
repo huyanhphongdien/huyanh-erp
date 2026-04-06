@@ -30,7 +30,18 @@ Tạo CV → Giao NV → Thực hiện → Checklist 100% → Phê duyệt → C
 
 ## 2. Công thức tính điểm
 
-### Bước 1: Chuyển sao → điểm
+> **Đã bỏ tự đánh giá.** NV không cần chấm sao — hoàn thành xong là Manager duyệt + chấm điểm luôn.
+
+### Nguồn điểm theo loại CV
+
+| Loại CV | Ai chấm điểm? | Cách tính | Ví dụ |
+|---------|---------------|-----------|-------|
+| **assigned** | **Manager chấm** (1-5★) | Điểm sao × 1.0 | Manager chấm 4★ = 80đ |
+| **project** | Tự động | Cố định 90đ | Hoàn thành = 90đ |
+| **self** | Tự động | Cố định 85đ | Hoàn thành = 85đ |
+| **recurring** | Tự động | Cố định 80đ | Hoàn thành = 80đ |
+
+### Bảng quy đổi sao → điểm (Manager chấm CV assigned)
 
 | Số sao | Điểm | Xếp loại |
 |:------:|:----:|----------|
@@ -40,47 +51,42 @@ Tạo CV → Giao NV → Thực hiện → Checklist 100% → Phê duyệt → C
 | 2 ★ | 40 | Cần cải thiện |
 | 1 ★ | 20 | Chưa tốt |
 
-### Bước 2: Áp dụng hệ số theo loại CV
+### Tính điểm hiệu suất tháng (nhiều CV)
 
 ```
-Điểm cuối = Điểm sao × Hệ số loại CV
-
-Ví dụ: CV assigned được 4★ = 80 × 1.0 = 80 điểm
-        CV self được 5★ = 100 × 0.85 = 85 điểm
-        CV recurring được 4★ = 80 × 0.8 = 64 điểm
+Điểm tháng = Σ(điểm CV × trọng số) / Σ(trọng số)
 ```
 
-### Bước 3: Tính điểm trung bình (nhiều CV)
+**Trọng số theo loại:**
+- assigned = **1.0** (quan trọng nhất — do Manager đánh giá)
+- project = **1.0**
+- self = **0.5** (ít trọng lượng hơn)
+- recurring = **0.5**
+
+**Ví dụ: NV Phạm Bá Lượng — tháng 4/2026**
+
+| # | Công việc | Loại | Điểm | Trọng số | Điểm × TS |
+|---|-----------|------|:----:|:--------:|:---------:|
+| 1 | Kiểm tra máy sấy | assigned | 80 (4★) | 1.0 | 80.0 |
+| 2 | Bảo trì dàn henging | assigned | 60 (3★) | 1.0 | 60.0 |
+| 3 | Báo cáo tuần | recurring | 80 | 0.5 | 40.0 |
+| 4 | Sắp xếp kho | self | 85 | 0.5 | 42.5 |
+| 5 | Kiểm kê hàng ngày | recurring | 80 | 0.5 | 40.0 |
+| | **Tổng** | | | **3.5** | **262.5** |
 
 ```
-Điểm TB = Σ(điểm × trọng số) / Σ(trọng số)
-
-Ví dụ: NV có 3 CV trong tháng:
-  - CV assigned: 80đ × 1.0 = 80
-  - CV self: 85đ × 0.5 = 42.5  
-  - CV recurring: 64đ × 0.5 = 32
-  
-  Điểm TB = (80 + 42.5 + 32) / (1.0 + 0.5 + 0.5) = 77.25 điểm
+Điểm tháng = 262.5 / 3.5 = 75.0 → Hạng B (Tốt)
 ```
 
-### Bước 4: Tổng hợp hiệu suất
+### Xếp hạng
 
-```
-CV assigned: Điểm = Manager chấm (100% quyết định)
-CV self/recurring/project: Điểm = Tự động (hệ số cố định)
-```
-
-> **Đã bỏ tự đánh giá** — NV không chấm sao nữa. CV assigned do Manager chấm trực tiếp, CV khác tự động tính.
-
-### Bước 5: Xếp hạng
-
-| Hạng | Điểm | Ý nghĩa |
-|:----:|:----:|---------|
-| **A** | ≥ 90 | Xuất sắc — xem xét khen thưởng |
-| **B** | 75–89 | Tốt — hoàn thành tốt nhiệm vụ |
-| **C** | 60–74 | Trung bình — cần cố gắng thêm |
-| **D** | 40–59 | Yếu — cần cải thiện rõ ràng |
-| **F** | < 40 | Không đạt — xem xét kỷ luật |
+| Hạng | Điểm | Ý nghĩa | Hành động |
+|:----:|:----:|---------|-----------|
+| **A** | ≥ 90 | Xuất sắc | Xem xét khen thưởng, tăng lương |
+| **B** | 75–89 | Tốt | Hoàn thành tốt, giữ nguyên |
+| **C** | 60–74 | Trung bình | Cần theo dõi, coaching |
+| **D** | 40–59 | Yếu | Cần cải thiện rõ ràng, cảnh báo |
+| **F** | < 40 | Không đạt | Xem xét kỷ luật, chuyển vị trí |
 
 ---
 
@@ -265,42 +271,157 @@ Nội dung:
 
 ---
 
-## 10. Hướng tối ưu hiệu suất
+## 10. Đánh giá hệ thống hiện tại
 
 ### Đang hoạt động tốt
 
-- Công thức tính điểm rõ ràng, minh bạch
-- Hệ số theo loại CV hợp lý (assigned > project > self > recurring)
-- Phê duyệt nhanh: tự động duyệt CV tự giao/định kỳ
-- Checklist có bằng chứng + theo dõi ai tải
-- Dashboard realtime, không cần chờ cuối tháng
+| Tính năng | Chi tiết |
+|-----------|---------|
+| Công thức tính điểm | Rõ ràng, minh bạch, có trọng số theo loại CV |
+| Phê duyệt nhanh | Tự giao/định kỳ/dự án → auto-approve, không cần chờ |
+| Bỏ tự đánh giá | NV hoàn thành → thẳng vào Manager duyệt, tiết kiệm 1 bước |
+| Checklist + bằng chứng | Upload ảnh, biết ai tải, lúc nào |
+| Nhiều người tham gia | Mỗi người upload bằng chứng riêng, cùng được tính điểm |
+| Dashboard realtime | Xem hiệu suất ngay, không cần chờ cuối tháng |
+| Cảnh báo email | 17:30 hàng ngày — quá hạn, sắp hạn, nháp tồn |
 
-### Có thể cải thiện
+### Chưa tốt / Có thể cải thiện
 
-| Vấn đề | Hiện tại | Đề xuất |
+| Vấn đề | Hiện tại | Tác động |
 |--------|----------|---------|
-| Độ khó CV | Không phân biệt | Thêm trường `difficulty` (easy/medium/hard) → hệ số 0.8/1.0/1.2 |
-| Deadline quá hạn | Chỉ cảnh báo | Trừ điểm tự động: mỗi ngày trễ -2 điểm |
-| Người tham gia | Cùng điểm assignee | Có thể cho % (VD: tham gia = 70% điểm) |
-| Lịch sử sửa | Không track | Thêm audit log cho checklist changes |
-| Template CV | Có nhưng chưa tự gắn checklist | Tự động tạo checklist từ template |
-| Phê duyệt batch | Từng cái một | Cho chọn nhiều + duyệt 1 lần |
+| Không phân biệt độ khó | CV dễ = CV khó | NV chọn CV dễ để lấy điểm cao |
+| Quá hạn chỉ cảnh báo | Trễ 1 ngày = trễ 30 ngày | Không tạo áp lực hoàn thành đúng hạn |
+| Participant = 100% điểm | Tham gia ít = làm chính | Không công bằng |
+| Phê duyệt batch chậm | Manager duyệt từng cái | Tốn thời gian khi nhiều CV |
+| Template chưa auto-checklist | Tạo CV xong phải thêm checklist tay | Mất thời gian lặp lại |
+| Không track lịch sử sửa checklist | Ai sửa gì không biết | Khó audit |
+
+---
+
+## 11. Đề xuất cải tiến (theo mức ưu tiên)
+
+### Ưu tiên cao — Nên làm ngay
+
+#### 1. Trừ điểm khi quá hạn
+
+```
+Công thức đề xuất:
+  Điểm cuối = Điểm gốc - (Số ngày trễ × 2)
+  Tối thiểu = 0 điểm
+
+Ví dụ: Manager chấm 4★ (80đ) nhưng trễ 5 ngày
+  → 80 - (5 × 2) = 70 điểm
+```
+
+| Trễ | Trừ | 5★ (100đ) | 4★ (80đ) | 3★ (60đ) |
+|:---:|:---:|:---------:|:--------:|:--------:|
+| 0 ngày | 0 | 100 | 80 | 60 |
+| 3 ngày | -6 | 94 | 74 | 54 |
+| 7 ngày | -14 | 86 | 66 | 46 |
+| 15 ngày | -30 | 70 | 50 | 30 |
+
+> **Tác động:** NV có động lực hoàn thành đúng hạn. Manager vẫn chấm điểm chất lượng, hệ thống tự trừ phần trễ.
+
+#### 2. Phân biệt độ khó công việc
+
+| Độ khó | Hệ số | Ví dụ |
+|--------|:-----:|-------|
+| Dễ (easy) | ×0.8 | Kiểm kê, báo cáo định kỳ |
+| Bình thường (medium) | ×1.0 | Bảo trì máy, kiểm tra QC |
+| Khó (hard) | ×1.2 | Xử lý sự cố, dự án phức tạp |
+| Rất khó (critical) | ×1.5 | Vấn đề khẩn cấp, deadline gấp |
+
+```
+Điểm cuối = Điểm sao × Hệ số loại CV × Hệ số độ khó
+
+Ví dụ: CV assigned khó, Manager chấm 4★
+  → 80 × 1.0 × 1.2 = 96 điểm (thưởng vì làm việc khó)
+```
+
+> **Tác động:** NV được khuyến khích nhận CV khó. CV dễ không bị phạt nhưng được ít điểm hơn.
+
+#### 3. Điểm tham gia theo mức đóng góp
+
+| Vai trò | % điểm | Lý do |
+|---------|:------:|-------|
+| assignee (người chính) | 100% | Chịu trách nhiệm chính |
+| participant (tham gia) | 70% | Hỗ trợ, không chịu trách nhiệm chính |
+| reviewer (kiểm tra) | 0% | Chỉ kiểm tra, không tham gia trực tiếp |
+| watcher (theo dõi) | 0% | Chỉ xem |
+
+```
+Ví dụ: CV assigned 80đ
+  → Assignee: 80đ
+  → Participant: 80 × 70% = 56đ
+```
+
+### Ưu tiên trung bình — Nên làm sau
+
+#### 4. Template tự động tạo checklist
+
+Khi tạo CV từ template → tự động gắn checklist mẫu, không cần nhập tay.
+
+#### 5. Phê duyệt batch nhanh hơn
+
+Cho phép Manager:
+- Chọn nhiều CV → chấm cùng 1 mức sao → duyệt 1 lần
+- Gợi ý sao dựa trên tỷ lệ đúng hạn
+
+#### 6. Audit log cho checklist
+
+Ghi lại: ai thêm/sửa/xóa checklist item, lúc nào → phòng gian lận.
+
+### Ưu tiên thấp — Nâng cấp tương lai
+
+#### 7. KPI cá nhân tùy chỉnh
+
+Mỗi NV có bộ KPI riêng (VD: số CV hoàn thành/tháng, tỷ lệ đúng hạn, điểm TB). Gắn vào đánh giá cuối kỳ.
+
+#### 8. Gamification
+
+- Badge: "Hoàn thành 10 CV liên tiếp đúng hạn"
+- Leaderboard: Top 5 NV mỗi phòng
+- Streak: Số ngày liên tiếp hoàn thành CV
+
+---
+
+## Tổng kết công thức hiện tại
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                  TÍNH ĐIỂM HIỆU SUẤT                    │
+│                                                          │
+│  CV assigned:  Manager chấm 1-5★ → 20~100đ × 1.0       │
+│  CV project:   Auto 90đ                                 │
+│  CV self:      Auto 85đ                                 │
+│  CV recurring: Auto 80đ                                 │
+│                                                          │
+│  Điểm tháng = Σ(điểm × trọng số) / Σ(trọng số)         │
+│    assigned/project: trọng số 1.0                        │
+│    self/recurring:   trọng số 0.5                        │
+│                                                          │
+│  Xếp hạng: A(≥90) B(75-89) C(60-74) D(40-59) F(<40)    │
+└──────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## FAQ
 
-**Q: Tại sao CV tự giao chỉ được 85% điểm?**
-A: Vì CV tự giao không có người kiểm tra bên ngoài, nên giảm 15% để công bằng với CV được giao (có Manager đánh giá).
+**Q: NV có cần tự chấm sao không?**
+A: Không. Đã bỏ tự đánh giá. NV chỉ cần hoàn thành checklist → hệ thống tự chuyển cho Manager duyệt.
+
+**Q: Tại sao CV tự giao chỉ được 85 điểm?**
+A: Vì không có Manager kiểm tra chất lượng. CV được giao (assigned) do Manager đánh giá nên được tối đa 100đ.
 
 **Q: Người tham gia có được tính điểm không?**
-A: Có — participant (người tham gia) được tính cùng điểm với người được giao. Reviewer và watcher thì không.
+A: Có — participant được tính cùng điểm với assignee. Reviewer và watcher thì không.
 
 **Q: CV quá hạn có bị trừ điểm không?**
-A: Hiện tại chưa tự động trừ. Nhưng Manager có thể chấm điểm thấp hơn khi duyệt.
+A: Hiện tại chưa tự động trừ. Manager có thể chấm thấp hơn. Đề xuất: tự động trừ 2đ/ngày trễ.
 
 **Q: Làm sao biết ai tải bằng chứng nào?**
-A: Mỗi file hiện tên người tải + thời gian ngay dưới thumbnail. Click vào tag file để xem chi tiết.
+A: Dưới mỗi file thumbnail hiện tên người tải + thời gian.
 
 **Q: Email báo cáo gửi khi nào?**
-A: 17:30 hàng ngày, tự động qua Azure/Microsoft Graph API.
+A: 17:30 hàng ngày — quá hạn, sắp hạn, nháp tồn, L/C, thanh toán.

@@ -96,7 +96,7 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
       return
     }
     setUploading(docId)
-    const url = await salesDocumentUploadService.uploadFile(docId, orderId, file, user?.employee_id)
+    const url = await salesDocumentUploadService.uploadFile(docId, orderId, file, user?.employee_id ?? undefined)
     if (url) {
       message.success('Tải lên thành công!')
       await load()

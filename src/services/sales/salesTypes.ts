@@ -119,6 +119,7 @@ export interface SalesOrder {
   shipping_line?: string
   vessel_name?: string
   booking_reference?: string
+  bl_number?: string
 
   // Ngày tháng
   order_date: string

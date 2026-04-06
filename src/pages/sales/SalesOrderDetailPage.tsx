@@ -27,6 +27,7 @@ import {
   InputNumber,
   Select,
   Popconfirm,
+  DatePicker,
   message,
   Checkbox,
   Progress,
@@ -53,6 +54,8 @@ import {
   LinkOutlined,
   LoadingOutlined,
 } from '@ant-design/icons'
+import dayjs from 'dayjs'
+import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
 import { containerService } from '../../services/sales/containerService'
@@ -265,9 +268,9 @@ function SalesOrderDetailPage() {
   const renderActionButtons = () => {
     const s = order.status
     const btns: React.ReactNode[] = []
-    const canEdit = salesPermissions.canEditOrder(salesRole)
-    const canCancel = salesPermissions.canCancelOrder(salesRole)
-    const canEditProd = salesPermissions.canEditProduction(salesRole)
+    const canEdit = salesRole ? salesPermissions.canEditOrder(salesRole) : false
+    const canCancel = salesRole ? salesPermissions.canCancelOrder(salesRole) : false
+    const canEditProd = salesRole ? salesPermissions.canEditProduction(salesRole) : false
 
     if (s === 'draft') {
       if (canEdit) {
@@ -1281,8 +1284,8 @@ function SalesOrderDetailPage() {
   // ══════════════════════════════════════════════════════════════
 
   const renderShippingTab = () => {
-    const canEdit = salesPermissions.canEditBooking(salesRole)
-    const canEditFinanceFields = salesPermissions.canEditFinance(salesRole)
+    const canEdit = salesRole ? salesPermissions.canEditBooking(salesRole) : false
+    const canEditFinanceFields = salesRole ? salesPermissions.canEditFinance(salesRole) : false
 
     const handleShippingUpdate = async (field: string, value: any) => {
       try {
@@ -1652,7 +1655,7 @@ function SalesOrderDetailPage() {
                 <DollarOutlined /> Tài chính
               </span>
             ),
-            children: <FinanceTab order={order} readOnly={!salesPermissions.canEditFinance(salesRole)} onUpdate={loadOrder} />,
+            children: <FinanceTab order={order} readOnly={!salesRole || !salesPermissions.canEditFinance(salesRole)} onUpdate={loadOrder} />,
           }] : []),
         ]}
       />

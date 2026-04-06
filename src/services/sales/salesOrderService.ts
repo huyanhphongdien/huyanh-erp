@@ -744,6 +744,57 @@ export const salesOrderService = {
 
     return data as SalesOrderContainer
   },
+
+  // ==========================================================================
+  // LOCK / UNLOCK — v4
+  // ==========================================================================
+
+  async lockOrder(id: string, userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('sales_orders')
+      .update({
+        is_locked: true,
+        locked_at: new Date().toISOString(),
+        locked_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+
+    if (error) throw new Error(`Không thể khóa đơn hàng: ${error.message}`)
+  },
+
+  async unlockOrder(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('sales_orders')
+      .update({
+        is_locked: false,
+        locked_at: null,
+        locked_by: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+
+    if (error) throw new Error(`Không thể mở khóa đơn hàng: ${error.message}`)
+  },
+
+  // ==========================================================================
+  // UPDATE FIELDS — v4: cập nhật field bất kỳ (bypass status check cho BP khác)
+  // ==========================================================================
+
+  async updateFields(id: string, fields: Partial<SalesOrder>): Promise<SalesOrder> {
+    const { data, error } = await supabase
+      .from('sales_orders')
+      .update({
+        ...fields,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select(SELECT_WITH_CUSTOMER)
+      .single()
+
+    if (error) throw new Error(`Không thể cập nhật: ${error.message}`)
+    return data as SalesOrder
+  },
 }
 
 export default salesOrderService

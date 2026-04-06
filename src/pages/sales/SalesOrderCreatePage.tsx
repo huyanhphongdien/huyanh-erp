@@ -21,7 +21,6 @@ import {
   Col,
   Descriptions,
   Tag,
-  Statistic,
   Divider,
   message,
   Breadcrumb,
@@ -31,8 +30,6 @@ import {
   SaveOutlined,
   CheckCircleOutlined,
   UserOutlined,
-  ExperimentOutlined,
-  TruckOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
@@ -46,14 +43,13 @@ import {
   PAYMENT_TERMS_LABELS,
   PACKING_TYPE_LABELS,
   PORT_OF_LOADING_OPTIONS,
-  CONTAINER_TYPE_LABELS,
   CUSTOMER_TIER_LABELS,
   CUSTOMER_TIER_COLORS,
   COUNTRY_OPTIONS,
 } from '../../services/sales/salesTypes'
-import type { Incoterm, PaymentTerms, PackingType, ContainerType } from '../../services/sales/salesTypes'
+import type { Incoterm, PaymentTerms, PackingType } from '../../services/sales/salesTypes'
 
-const { Title, Text } = Typography
+const { Title } = Typography
 const { TextArea } = Input
 
 // ============================================================================
@@ -70,12 +66,6 @@ const formatCurrency = (value: number | undefined | null, currency = 'USD'): str
   }).format(value)
 }
 
-const formatVND = (value: number | undefined | null): string => {
-  if (!value) return '-'
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} tỷ`
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} tr`
-  return new Intl.NumberFormat('vi-VN').format(value) + ' đ'
-}
 
 const CURRENCY_OPTIONS = [
   { value: 'USD', label: 'USD' },
@@ -98,7 +88,7 @@ function SalesOrderCreatePage() {
   const [customers, setCustomers] = useState<SalesCustomer[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<SalesCustomer | null>(null)
   const [gradeStandards, setGradeStandards] = useState<RubberGradeStandard[]>([])
-  const [selectedStandard, setSelectedStandard] = useState<RubberGradeStandard | null>(null)
+  const [, setSelectedStandard] = useState<RubberGradeStandard | null>(null)
 
   // ── Load customers & grade standards ──
   useEffect(() => {
@@ -121,18 +111,17 @@ function SalesOrderCreatePage() {
   // ── Auto-calc values ──
   const quantityTons = Form.useWatch('quantity_tons', form) || 0
   const unitPrice = Form.useWatch('unit_price', form) || 0
-  const exchangeRate = Form.useWatch('exchange_rate', form) || 0
-  const baleWeight = Form.useWatch('bale_weight_kg', form) || 33.33
+  const baleWeight = Form.useWatch('bale_weight_kg', form) || 35
+  const balesPerContInput = Form.useWatch('bales_per_container', form) || 576
   const containerType = Form.useWatch('container_type', form) || '20ft'
   const currency = Form.useWatch('currency', form) || 'USD'
+  const commissionPct = Form.useWatch('commission_pct', form) || 0
 
   const totalBales = baleWeight > 0 ? Math.ceil((quantityTons * 1000) / baleWeight) : 0
-  // Container 20ft: 600 bành (35kg) hoặc 630 bành (33.33kg) | 40ft: gấp đôi
-  const balesPerContainer20ft = baleWeight >= 35 ? 600 : 630
-  const balesPerContainer = containerType === '40ft' ? balesPerContainer20ft * 2 : balesPerContainer20ft
+  const balesPerContainer = containerType === '40ft' ? balesPerContInput * 2 : balesPerContInput
   const containerCount = balesPerContainer > 0 ? Math.ceil(totalBales / balesPerContainer) : 0
   const totalValueUSD = quantityTons * unitPrice
-  const totalValueVND = exchangeRate > 0 ? totalValueUSD * exchangeRate : 0
+  const commissionAmt = totalValueUSD * (commissionPct / 100)
 
   // ── Customer selection ──
   const handleCustomerChange = useCallback(
@@ -239,32 +228,31 @@ function SalesOrderCreatePage() {
   const renderStep1 = () => (
     <Row gutter={24}>
       <Col xs={24} lg={16}>
-        {/* ═══ Khách hàng ═══ */}
+        {/* ═══ Thông tin Hợp đồng ═══ */}
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
-          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Khách hàng</span>}>
+          title={<span style={{ fontSize: 14, fontWeight: 600 }}>📋 Thông tin Hợp đồng</span>}>
           <Row gutter={16}>
-            <Col xs={24} sm={16}>
-              <Form.Item
-                label="Khách hàng"
-                name="customer_id"
-                rules={[{ required: true, message: 'Vui lòng chọn khách hàng' }]}
-              >
-                <Select
-                  showSearch
-                  placeholder="Chọn khách hàng..."
-                  optionFilterProp="label"
-                  onChange={handleCustomerChange}
-                  size="large"
-                  options={customers.map((c) => ({
-                    value: c.id,
-                    label: `${c.code} — ${c.name}${c.country ? ` (${c.country})` : ''}`,
-                  }))}
-                />
+            <Col xs={24} sm={8}>
+              <Form.Item label="Số hợp đồng" name="contract_no" rules={[{ required: true, message: 'Nhập số HĐ' }]}>
+                <Input placeholder="VD: LTC2024/PD-ATC" size="large" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Ngày hợp đồng" name="contract_date">
+                <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
               <Form.Item label="PO# khách hàng" name="customer_po">
                 <Input placeholder="Số PO" size="large" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24}>
+              <Form.Item label="Khách hàng (Buyer)" name="customer_id" rules={[{ required: true, message: 'Chọn buyer' }]}>
+                <Select showSearch placeholder="Chọn khách hàng..." optionFilterProp="label" onChange={handleCustomerChange} size="large"
+                  options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}${c.country ? ` (${c.country})` : ''}` }))} />
               </Form.Item>
             </Col>
           </Row>
@@ -275,74 +263,52 @@ function SalesOrderCreatePage() {
           title={<span style={{ fontSize: 14, fontWeight: 600 }}>Sản phẩm & Giá</span>}>
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item
-                label="Grade SVR"
-                name="grade"
-                rules={[{ required: true, message: 'Chọn grade' }]}
-              >
-                <Select
-                  placeholder="Chọn grade..."
-                  size="large"
+              <Form.Item label="Grade SVR" name="grade" rules={[{ required: true, message: 'Chọn grade' }]}>
+                <Select placeholder="Chọn grade..." size="large"
                   options={SVR_GRADE_OPTIONS.map((g) => ({ value: g.value, label: g.label }))}
-                  onChange={handleGradeChange}
-                />
+                  onChange={handleGradeChange} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item
-                label="Số lượng (tấn)"
-                name="quantity_tons"
-                rules={[{ required: true, message: 'Nhập số lượng' }]}
-              >
-                <InputNumber min={0.1} step={1} size="large" style={{ width: '100%' }} placeholder="0" />
+              <Form.Item label="Số lượng (tấn)" name="quantity_tons" rules={[{ required: true, message: 'Nhập SL' }]}>
+                <InputNumber min={0.01} step={1} size="large" style={{ width: '100%' }} placeholder="725.76"
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v) => Number(v?.replace(/,/g, '') || 0) as any} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item
-                label="Quy cách bành"
-                name="bale_weight_kg"
-                initialValue={33.33}
-              >
-                <Select size="large" options={[
-                  { value: 33.33, label: '33.33 kg — 630 bành/cont' },
-                  { value: 35, label: '35 kg — 600 bành/cont' },
-                ]} />
+              <Form.Item label="Đơn giá (USD/MT)" name="unit_price" rules={[{ required: true, message: 'Nhập giá' }]}>
+                <InputNumber min={0} step={10} size="large" style={{ width: '100%' }} placeholder="1,924"
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v) => Number(v?.replace(/,/g, '') || 0) as any} />
               </Form.Item>
             </Col>
           </Row>
-
           <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item
-                label="Đơn giá (USD/tấn)"
-                name="unit_price"
-                rules={[{ required: true, message: 'Nhập đơn giá' }]}
-              >
-                <InputNumber min={0} step={10} size="large" style={{ width: '100%' }} placeholder="0"
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
-                />
-              </Form.Item>
-            </Col>
             <Col xs={24} sm={8}>
               <Form.Item label="Tiền tệ" name="currency" initialValue="USD">
                 <Select size="large" options={CURRENCY_OPTIONS} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Tỷ giá (VND)" name="exchange_rate" tooltip="Tùy chọn — để tính giá trị VND">
-                <InputNumber min={0} step={100} size="large" style={{ width: '100%' }} placeholder="25,000"
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
-                />
+              <Form.Item label="Quy cách bành" name="bale_weight_kg" initialValue={35}>
+                <Select size="large" options={[
+                  { value: 35, label: '35 kg/bành' },
+                  { value: 33.33, label: '33.33 kg/bành' },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Bành/container" name="bales_per_container" initialValue={576}>
+                <InputNumber min={1} max={1000} size="large" style={{ width: '100%' }} placeholder="576" />
               </Form.Item>
             </Col>
           </Row>
         </Card>
 
-        {/* ═══ Điều khoản ═══ */}
+        {/* ═══ Điều khoản & Ngân hàng ═══ */}
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
-          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Điều khoản</span>}>
+          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Điều khoản & Ngân hàng</span>}>
           <Row gutter={16}>
             <Col xs={24} sm={12}>
               <Form.Item label="Thanh toán" name="payment_terms">
@@ -364,9 +330,51 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item label="Cảng xếp hàng" name="port_of_loading">
+              <Form.Item label="Cảng xếp hàng (POL)" name="port_of_loading">
                 <Select size="large" allowClear placeholder="Chọn cảng..."
                   options={PORT_OF_LOADING_OPTIONS.map((p) => ({ value: p.value, label: p.label }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Hoa hồng (%)" name="commission_pct">
+                <InputNumber min={0} max={20} step={0.5} size="large" style={{ width: '100%' }} placeholder="2" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Đóng gói" name="packing_type" initialValue="bale">
+                <Select size="large" options={[
+                  { value: 'bale', label: 'Bành (Bale)' },
+                  { value: 'pallet', label: 'Pallet' },
+                  { value: 'bag', label: 'Bao (Bag)' },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Shrink wrap + Pallet" style={{ marginBottom: 0 }}>
+                <Row gutter={8}>
+                  <Col span={12}><Form.Item name="shrink_wrap" valuePropName="checked" initialValue={true} noStyle><Switch checkedChildren="Shrink" unCheckedChildren="Không" /></Form.Item></Col>
+                  <Col span={12}><Form.Item name="pallet_required" valuePropName="checked" initialValue={true} noStyle><Switch checkedChildren="Pallet" unCheckedChildren="Không" /></Form.Item></Col>
+                </Row>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Divider style={{ margin: '12px 0' }} />
+          <Row gutter={16}>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Ngân hàng" name="bank_name" initialValue="Vietcombank CN Huế">
+                <Input size="large" placeholder="Vietcombank CN Huế" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Số tài khoản" name="bank_account" initialValue="0071001046372">
+                <Input size="large" placeholder="0071001046372" style={{ fontFamily: 'monospace' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="SWIFT Code" name="bank_swift" initialValue="BFTVVNVX">
+                <Input size="large" placeholder="BFTVVNVX" style={{ fontFamily: 'monospace' }} />
               </Form.Item>
             </Col>
           </Row>
@@ -418,226 +426,10 @@ function SalesOrderCreatePage() {
               </div>
             </Col>
             <Col span={12}>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Giá trị VND</div>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Hoa hồng</div>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, lineHeight: 1 }}>
-                {totalValueVND > 0 ? formatVND(totalValueVND) : '—'}
+                {commissionAmt > 0 ? `$${commissionAmt.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
               </div>
-            </Col>
-          </Row>
-        </Card>
-      </Col>
-    </Row>
-  )
-
-  const renderStep2 = () => (
-    <Row gutter={24}>
-      <Col xs={24} lg={14}>
-        <Card title="Chỉ tiêu kỹ thuật" size="small">
-          {selectedStandard && (
-            <div style={{ marginBottom: 16 }}>
-              <Tag color="blue">
-                Tự động điền từ tiêu chuẩn {selectedStandard.grade_label}
-              </Tag>
-            </div>
-          )}
-          <Row gutter={16}>
-            <Col xs={12} sm={8}>
-              <Form.Item label="DRC min (%)" name="drc_min">
-                <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="DRC max (%)" name="drc_max">
-                <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="Moisture max (%)" name="moisture_max">
-                <InputNumber min={0} max={10} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="Dirt max (%)" name="dirt_max">
-                <InputNumber min={0} max={1} step={0.001} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="Ash max (%)" name="ash_max">
-                <InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="Nitrogen max (%)" name="nitrogen_max">
-                <InputNumber min={0} max={2} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="Volatile max (%)" name="volatile_max">
-                <InputNumber min={0} max={5} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="PRI min" name="pri_min">
-                <InputNumber min={0} max={100} step={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="Mooney max" name="mooney_max">
-                <InputNumber min={0} max={100} step={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Form.Item label="Color max" name="color_lovibond_max">
-                <InputNumber min={0} max={10} step={0.5} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Card>
-      </Col>
-
-      <Col xs={24} lg={10}>
-        <Card title="Đóng gói" size="small">
-          <Form.Item label="Loại đóng gói" name="packing_type" initialValue="bale">
-            <Select
-              options={Object.entries(PACKING_TYPE_LABELS).map(([v, l]) => ({
-                value: v,
-                label: l,
-              }))}
-            />
-          </Form.Item>
-
-          {/* Quy cách bành đã chọn ở Step 1 */}
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="Shrink wrap" name="shrink_wrap" valuePropName="checked" initialValue={false}>
-                <Switch />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Pallet" name="pallet_required" valuePropName="checked" initialValue={false}>
-                <Switch />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item label="Marking instructions" name="marking_instructions">
-            <TextArea rows={4} placeholder="Hướng dẫn đánh dấu trên bành/thùng..." />
-          </Form.Item>
-        </Card>
-      </Col>
-    </Row>
-  )
-
-  const renderStep3 = () => (
-    <Row gutter={24}>
-      <Col xs={24} lg={12}>
-        <Card title="Vận chuyển" size="small">
-          <Form.Item label="Incoterm" name="incoterm" initialValue="FOB">
-            <Select
-              options={Object.entries(INCOTERM_LABELS).map(([v, l]) => ({
-                value: v,
-                label: l,
-              }))}
-            />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col xs={24} sm={12}>
-              <Form.Item label="Cảng xếp hàng" name="port_of_loading">
-                <Select
-                  allowClear
-                  placeholder="Chọn cảng..."
-                  options={PORT_OF_LOADING_OPTIONS.map((p) => ({
-                    value: p.value,
-                    label: p.label,
-                  }))}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item label="Cảng đích" name="port_of_destination">
-                <Input placeholder="Vd: Shanghai, Yokohama..." />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item label="Loại container" name="container_type" initialValue="20ft">
-            <Select
-              options={Object.entries(CONTAINER_TYPE_LABELS).map(([v, l]) => ({
-                value: v,
-                label: l,
-              }))}
-            />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Ngày giao" name="delivery_date">
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="ETD" name="etd">
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="ETA" name="eta">
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider />
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Hãng tàu" name="shipping_line">
-                <Input placeholder="Vd: Maersk, MSC..." />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Tên tàu" name="vessel_name">
-                <Input placeholder="Vessel name" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Booking ref" name="booking_reference">
-                <Input placeholder="Booking number" />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Card>
-      </Col>
-
-      <Col xs={24} lg={12}>
-        <Card title="Thanh toán" size="small">
-          <Form.Item label="Điều khoản thanh toán" name="payment_terms">
-            <Select
-              allowClear
-              placeholder="Chọn điều khoản..."
-              options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({
-                value: v,
-                label: l,
-              }))}
-            />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Số L/C" name="lc_number">
-                <Input placeholder="L/C number" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Ngân hàng L/C" name="lc_bank">
-                <Input placeholder="Issuing bank" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Hết hạn L/C" name="lc_expiry_date">
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-              </Form.Item>
             </Col>
           </Row>
         </Card>
@@ -670,8 +462,8 @@ function SalesOrderCreatePage() {
               <Descriptions.Item label="Giá trị USD">
                 {formatCurrency(totalValueUSD, 'USD')}
               </Descriptions.Item>
-              <Descriptions.Item label="Giá trị VND">
-                {totalValueVND > 0 ? formatVND(totalValueVND) : '-'}
+              <Descriptions.Item label="Hoa hồng">
+                {commissionAmt > 0 ? `$${commissionAmt.toLocaleString('en-US', { maximumFractionDigits: 0 })} (${vals.commission_pct || 0}%)` : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
               <Descriptions.Item label="Container">

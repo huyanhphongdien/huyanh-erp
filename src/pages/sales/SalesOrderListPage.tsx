@@ -29,7 +29,6 @@ import {
   SearchOutlined,
   EyeOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
   FileTextOutlined,
   EditOutlined,
   InboxOutlined,
@@ -47,9 +46,9 @@ import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
   SVR_GRADE_OPTIONS,
-  COUNTRY_OPTIONS,
 } from '../../services/sales/salesTypes'
 import GradeBadge from '../../components/wms/GradeBadge'
+import SalesOrderDetailPanel from './components/SalesOrderDetailPanel'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -148,6 +147,10 @@ const SalesOrderListPage = () => {
   const [gradeFilter, setGradeFilter] = useState<string | undefined>(undefined)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+
+  // Detail panel v4
+  const [panelOrderId, setPanelOrderId] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   // ============================================
   // DATA FETCHING
@@ -250,132 +253,257 @@ const SalesOrderListPage = () => {
   }
 
   // ============================================
-  // TABLE COLUMNS
+  // TABLE COLUMNS — v4: Color-coded groups
   // ============================================
 
+  // ── Helpers ──
+  const gray = (v: any) => v ? v : <span style={{ color: '#d9d9d9' }}>—</span>
+  const mono = (v: any) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v}</span>
+
+  // ── Progress dots: HĐ / SX / LOG / KT ──
+  const progressDots = (r: SalesOrder) => {
+    const STATUS_PHASE: Record<string, number> = {
+      draft: 0, confirmed: 1, producing: 1, ready: 2, packing: 2,
+      shipped: 3, delivered: 3, invoiced: 4, paid: 4, cancelled: -1,
+    }
+    const phase = STATUS_PHASE[r.status] ?? 0
+    if (r.status === 'cancelled') return <Tag color="red" style={{ fontSize: 10, padding: '0 4px' }}>HỦY</Tag>
+    const colors = ['#1B4D3E', '#1677ff', '#d48806', '#cf1322']
+    const labels = ['HĐ', 'SX', 'LOG', 'KT']
+    return (
+      <Space size={2}>
+        {colors.map((c, i) => (
+          <Tooltip key={i} title={labels[i]}>
+            <span style={{
+              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+              background: i < phase ? c : i === phase ? c : '#e8e8e8',
+              opacity: i <= phase ? 1 : 0.4,
+              border: i === phase ? `2px solid ${c}` : 'none',
+              boxSizing: 'border-box',
+            }} />
+          </Tooltip>
+        ))}
+      </Space>
+    )
+  }
+
+  // ── LC expiry badge ──
+  const lcBadge = (d: string | undefined | null) => {
+    if (!d) return gray(null)
+    const days = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
+    const formatted = formatDate(d)
+    if (days <= 0) return <Tag color="red" style={{ fontSize: 11 }}>{formatted}</Tag>
+    if (days <= 7) return <Tag color="red" style={{ fontSize: 11 }}>{formatted}</Tag>
+    if (days <= 20) return <Tag color="orange" style={{ fontSize: 11 }}>{formatted}</Tag>
+    return <span style={{ fontSize: 12 }}>{formatted}</span>
+  }
+
+  // ── Column header with color bar ──
+  const groupTitle = (title: string, color: string) => (
+    <span style={{ borderBottom: `3px solid ${color}`, paddingBottom: 2, fontWeight: 600, fontSize: 11 }}>
+      {title}
+    </span>
+  )
+
   const columns: ColumnsType<SalesOrder> = [
+    // ═══ FROZEN: #, Mã HĐ, Buyer ═══
     {
-      title: 'Mã đơn',
+      title: '#',
+      key: 'index',
+      width: 40,
+      fixed: 'left',
+      render: (_: unknown, __: SalesOrder, idx: number) => (
+        <span style={{ color: '#999', fontSize: 11 }}>{(pagination.current - 1) * pagination.pageSize + idx + 1}</span>
+      ),
+    },
+    {
+      title: 'Mã HĐ',
       dataIndex: 'code',
       key: 'code',
-      width: 130,
-      render: (code: string, record: SalesOrder) => (
-        <Text
-          code
-          style={{ fontFamily: 'monospace', fontSize: 13, cursor: 'pointer' }}
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/sales/orders/${record.id}`)
-          }}
-        >
-          {code}
-        </Text>
-      ),
+      width: 120,
+      fixed: 'left',
+      render: (code: string) => mono(<strong>{code}</strong>),
     },
     {
-      title: 'Khách hàng',
+      title: 'Buyer',
       dataIndex: 'customer',
       key: 'customer',
+      width: 140,
+      fixed: 'left',
       ellipsis: true,
-      width: 200,
-      render: (_: unknown, record: SalesOrder) => {
-        const cust = record.customer
-        if (!cust) return <Text type="secondary">-</Text>
-        return (
-          <Space size={4}>
-            {cust.country && <span>{getCountryFlag(cust.country)}</span>}
-            <Text strong>{cust.name}</Text>
-          </Space>
-        )
+      render: (_: unknown, r: SalesOrder) => {
+        const c = r.customer
+        if (!c) return gray(null)
+        return <span style={{ fontSize: 12 }}>{c.country ? getCountryFlag(c.country) + ' ' : ''}{c.short_name || c.name}</span>
       },
     },
+
+    // ═══ SALE GROUP (green) ═══
     {
-      title: 'PO#',
-      dataIndex: 'customer_po',
-      key: 'customer_po',
-      width: 120,
-      render: (po?: string) =>
-        po ? (
-          <Text style={{ fontSize: 13 }}>{po}</Text>
-        ) : (
-          <Text type="secondary">-</Text>
-        ),
-    },
-    {
-      title: 'Grade',
+      title: groupTitle('Grade', '#1B4D3E'),
       dataIndex: 'grade',
       key: 'grade',
-      width: 110,
-      render: (grade: string) => <GradeBadge grade={grade} size="small" />,
+      width: 80,
+      render: (g: string) => <GradeBadge grade={g} size="small" />,
     },
     {
-      title: 'Số lượng',
+      title: groupTitle('Tấn', '#1B4D3E'),
       dataIndex: 'quantity_tons',
-      key: 'quantity_tons',
+      key: 'qty',
+      width: 70,
+      align: 'right',
+      render: (v: number) => v != null ? mono(v.toLocaleString('vi-VN')) : gray(null),
+    },
+    {
+      title: groupTitle('$/tấn', '#1B4D3E'),
+      dataIndex: 'unit_price',
+      key: 'unit_price',
+      width: 80,
+      align: 'right',
+      render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
+    },
+    {
+      title: groupTitle('Tổng USD', '#1B4D3E'),
+      dataIndex: 'total_value_usd',
+      key: 'total_usd',
       width: 110,
       align: 'right',
-      render: (qty: number) => (
-        <Text>
-          {qty != null ? `${qty.toLocaleString('vi-VN')} tấn` : '-'}
-        </Text>
-      ),
+      render: (v: number) => v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null),
     },
     {
-      title: 'Giá trị',
-      dataIndex: 'total_value_usd',
-      key: 'total_value_usd',
-      width: 140,
-      align: 'right',
-      render: (val?: number) => (
-        <Text strong style={{ color: val ? '#1B4D3E' : undefined }}>
-          {val != null ? `${formatCurrency(val)} USD` : '-'}
-        </Text>
-      ),
+      title: groupTitle('Thanh toán', '#1B4D3E'),
+      dataIndex: 'payment_terms',
+      key: 'payment_terms',
+      width: 80,
+      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
-      title: 'Giao hàng',
+      title: groupTitle('Giao', '#1B4D3E'),
       dataIndex: 'delivery_date',
-      key: 'delivery_date',
-      width: 120,
-      render: (date?: string) => (
-        <Text>{formatDate(date)}</Text>
-      ),
+      key: 'delivery',
+      width: 90,
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+    },
+
+    // ═══ SX GROUP (blue) ═══
+    {
+      title: groupTitle('SX sẵn', '#1677ff'),
+      dataIndex: 'ready_date',
+      key: 'ready_date',
+      width: 90,
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 130,
-      render: (status: SalesOrderStatus) => (
-        <Tag color={ORDER_STATUS_COLORS[status]}>
-          {ORDER_STATUS_LABELS[status]}
-        </Tag>
-      ),
+      title: groupTitle('Cont', '#1677ff'),
+      dataIndex: 'container_count',
+      key: 'containers',
+      width: 55,
+      align: 'center',
+      render: (v: number) => v ? mono(v) : gray(null),
+    },
+
+    // ═══ LOG GROUP (yellow/orange) ═══
+    {
+      title: groupTitle('BK', '#d48806'),
+      dataIndex: 'booking_reference',
+      key: 'bk',
+      width: 80,
+      ellipsis: true,
+      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
-      title: 'Thao tác',
+      title: groupTitle('B/L', '#d48806'),
+      dataIndex: 'bl_number',
+      key: 'bl',
+      width: 80,
+      ellipsis: true,
+      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
+    },
+    {
+      title: groupTitle('ETD', '#d48806'),
+      dataIndex: 'etd',
+      key: 'etd',
+      width: 90,
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+    },
+    {
+      title: groupTitle('L/C hạn', '#d48806'),
+      dataIndex: 'lc_expiry_date',
+      key: 'lc_expiry',
+      width: 100,
+      render: (d: string) => lcBadge(d),
+    },
+    {
+      title: groupTitle('CK $', '#d48806'),
+      dataIndex: 'discount_amount',
+      key: 'discount',
+      width: 80,
+      align: 'right',
+      render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
+    },
+
+    // ═══ KT GROUP (red/pink) ═══
+    {
+      title: groupTitle('Tỷ giá', '#cf1322'),
+      dataIndex: 'exchange_rate',
+      key: 'exrate',
+      width: 80,
+      align: 'right',
+      render: (v: number) => v ? mono(v.toLocaleString('vi-VN')) : gray(null),
+    },
+    {
+      title: groupTitle('Tiền về', '#cf1322'),
+      dataIndex: 'payment_received_date',
+      key: 'payment_date',
+      width: 90,
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+    },
+    {
+      title: groupTitle('TT', '#cf1322'),
+      dataIndex: 'payment_status',
+      key: 'pay_status',
+      width: 65,
+      render: (v: string) => {
+        if (!v || v === 'unpaid') return gray(null)
+        if (v === 'paid') return <Tag color="green" style={{ fontSize: 10, padding: '0 4px' }}>TT</Tag>
+        return <Tag color="blue" style={{ fontSize: 10, padding: '0 4px' }}>1P</Tag>
+      },
+    },
+
+    // ═══ STATUS ═══
+    {
+      title: 'Tiến độ',
+      key: 'progress',
+      width: 90,
+      align: 'center',
+      render: (_: unknown, r: SalesOrder) => progressDots(r),
+    },
+
+    // ═══ ACTIONS (fixed right) ═══
+    {
+      title: '',
       key: 'actions',
-      width: 130,
+      width: 80,
       fixed: 'right',
       render: (_: unknown, record: SalesOrder) => (
-        <Space size={4}>
-          <Tooltip title="Xem chi tiết">
+        <Space size={2}>
+          <Tooltip title="Xem">
             <Button
               type="text"
               size="small"
               icon={<EyeOutlined />}
               onClick={(e) => {
                 e.stopPropagation()
-                navigate(`/sales/orders/${record.id}`)
+                setPanelOrderId(record.id)
+                setPanelOpen(true)
               }}
             />
           </Tooltip>
           {record.status === 'draft' && (
             <Popconfirm
-              title="Xác nhận đơn hàng"
-              description={`Xác nhận đơn hàng ${record.code}?`}
+              title={`Xác nhận ${record.code}?`}
               onConfirm={() => handleConfirm(record)}
-              okText="Xác nhận"
+              okText="OK"
               cancelText="Hủy"
             >
               <Tooltip title="Xác nhận">
@@ -383,26 +511,6 @@ const SalesOrderListPage = () => {
                   type="text"
                   size="small"
                   icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </Tooltip>
-            </Popconfirm>
-          )}
-          {record.status !== 'cancelled' && record.status !== 'paid' && record.status !== 'delivered' && (
-            <Popconfirm
-              title="Hủy đơn hàng"
-              description={`Hủy đơn hàng ${record.code}?`}
-              onConfirm={() => handleCancel(record)}
-              okText="Hủy đơn"
-              cancelText="Đóng"
-              okButtonProps={{ danger: true }}
-            >
-              <Tooltip title="Hủy">
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<CloseCircleOutlined />}
                   onClick={(e) => e.stopPropagation()}
                 />
               </Tooltip>
@@ -593,14 +701,52 @@ const SalesOrderListPage = () => {
             pageSizeOptions: ['10', '20', '50'],
           }}
           onChange={handleTableChange}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 2000 }}
+          summary={() => {
+            if (!orders.length) return null
+            const totalQty = orders.reduce((s, o) => s + (o.quantity_tons || 0), 0)
+            const totalUSD = orders.reduce((s, o) => s + (o.total_value_usd || o.quantity_tons * o.unit_price || 0), 0)
+            const totalDiscount = orders.reduce((s, o) => s + (o.discount_amount || 0), 0)
+            return (
+              <Table.Summary fixed>
+                <Table.Summary.Row>
+                  <Table.Summary.Cell index={0} colSpan={4} align="right">
+                    <strong style={{ fontSize: 12 }}>Tổng trang:</strong>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={4} align="right">
+                    <strong style={{ fontFamily: 'monospace', fontSize: 12 }}>{totalQty.toLocaleString('vi-VN')}</strong>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={5} />
+                  <Table.Summary.Cell index={6} align="right">
+                    <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#1B4D3E' }}>{formatCurrency(totalUSD)}</strong>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={7} colSpan={9} />
+                  <Table.Summary.Cell index={16} align="right">
+                    <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#d48806' }}>{totalDiscount > 0 ? formatCurrency(totalDiscount) : ''}</strong>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={17} colSpan={4} />
+                </Table.Summary.Row>
+              </Table.Summary>
+            )
+          }}
           onRow={(record) => ({
-            onClick: () => navigate(`/sales/orders/${record.id}`),
+            onClick: () => {
+              setPanelOrderId(record.id)
+              setPanelOpen(true)
+            },
             style: { cursor: 'pointer' },
           })}
           size="middle"
         />
       </Card>
+
+      {/* v4: Slide-in Detail Panel */}
+      <SalesOrderDetailPanel
+        orderId={panelOrderId}
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        onOrderUpdated={fetchOrders}
+      />
     </div>
   )
 }

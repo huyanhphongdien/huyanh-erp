@@ -139,7 +139,7 @@ const formatDate = (value?: string | null): string => {
 const ShipmentFollowingPage = () => {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const salesRole: SalesRole = useMemo(() => getSalesRole(user), [user])
+  const salesRole = useMemo(() => getSalesRole(user), [user])
 
   // ========== State ==========
   const [loading, setLoading] = useState(false)
@@ -234,6 +234,7 @@ const ShipmentFollowingPage = () => {
     const accountingFields = ['discount_amount', 'discount_date', 'bank_name', 'payment_date']
 
     if (salesRole === 'admin') return true
+    if (!salesRole) return false
     if (logisticsFields.includes(field) && salesPermissions.canEditShipmentLogistics(salesRole)) return true
     if (accountingFields.includes(field) && salesPermissions.canEditShipmentFinance(salesRole)) return true
     return false

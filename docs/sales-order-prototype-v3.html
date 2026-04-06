@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototype v3 — Đơn hàng bán (Table View) | Huy Anh ERP</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #f5f5f5; font-size: 13px; }
+
+/* Header */
+.page-header { background: #1B4D3E; color: #fff; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+.page-header h1 { font-size: 16px; font-weight: 700; }
+.header-actions { display: flex; gap: 8px; }
+.header-actions button { padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 12px; cursor: pointer; }
+.header-actions button:hover { background: rgba(255,255,255,0.1); }
+.header-actions button.primary { background: #fff; color: #1B4D3E; font-weight: 600; border: none; }
+
+/* Filter bar */
+.filter-bar { background: #fff; padding: 10px 16px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.filter-bar label { font-size: 12px; color: #666; }
+.filter-bar select, .filter-bar input { padding: 5px 10px; border: 1px solid #d0d0d0; border-radius: 4px; font-size: 12px; }
+.filter-bar .count { margin-left: auto; font-size: 12px; color: #f59e0b; font-weight: 600; }
+
+/* Table */
+.table-wrapper { overflow-x: auto; background: #fff; }
+table { border-collapse: collapse; width: 100%; min-width: 3200px; }
+thead { position: sticky; top: 0; z-index: 10; }
+
+/* Column group headers */
+.col-group-header th {
+  padding: 6px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; border-bottom: 2px solid;
+}
+.col-group-sale { background: #f0fdf4; color: #166534; border-color: #16a34a !important; }
+.col-group-sx { background: #eff6ff; color: #1e40af; border-color: #2563eb !important; }
+.col-group-log { background: #fef3c7; color: #92400e; border-color: #f59e0b !important; }
+.col-group-kt { background: #fce7f3; color: #9d174d; border-color: #ec4899 !important; }
+.col-group-status { background: #f3f4f6; color: #374151; border-color: #6b7280 !important; }
+
+/* Column headers */
+th { padding: 8px 6px; font-size: 11px; font-weight: 600; color: #555; text-align: left; background: #fafafa; border-bottom: 1px solid #e0e0e0; white-space: nowrap; position: relative; cursor: pointer; }
+th:hover { background: #f0f0f0; }
+th.frozen { position: sticky; z-index: 5; background: #fafafa; }
+th.frozen-1 { left: 0; }
+th.frozen-2 { left: 40px; }
+th.frozen-3 { left: 160px; }
+
+/* Cells */
+td { padding: 7px 6px; border-bottom: 1px solid #f0f0f0; white-space: nowrap; font-size: 12px; }
+td.frozen { position: sticky; z-index: 3; background: #fff; }
+td.frozen-1 { left: 0; }
+td.frozen-2 { left: 40px; }
+td.frozen-3 { left: 160px; }
+tr:hover td { background: #f8fafc; }
+tr:hover td.frozen { background: #f0f7ff; }
+tr.selected td { background: #eff6ff; }
+tr.selected td.frozen { background: #dbeafe; }
+
+/* Cell colors */
+.cell-empty { color: #d1d5db; font-style: italic; }
+.cell-warning { background: #fef2f2; color: #dc2626; font-weight: 600; }
+.cell-ok { color: #16a34a; font-weight: 600; }
+.cell-money { font-family: 'JetBrains Mono', monospace; text-align: right; }
+.cell-date { font-family: 'JetBrains Mono', monospace; color: #555; }
+.cell-editable { background: #fffff0; cursor: text; }
+.cell-editable:hover { background: #fefce8; outline: 2px solid #f59e0b; outline-offset: -2px; }
+
+/* Status badge */
+.status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.status-draft { background: #f3f4f6; color: #6b7280; }
+.status-confirmed { background: #dbeafe; color: #1e40af; }
+.status-producing { background: #fef3c7; color: #92400e; }
+.status-ready { background: #d1fae5; color: #065f46; }
+.status-shipped { background: #e0e7ff; color: #3730a3; }
+.status-paid { background: #dcfce7; color: #166534; }
+
+/* LC warning */
+.lc-ok { color: #16a34a; }
+.lc-warn { color: #dc2626; font-weight: 700; background: #fef2f2; padding: 2px 6px; border-radius: 4px; }
+.lc-expired { color: #fff; background: #dc2626; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+
+/* Completion dots */
+.completion { display: flex; gap: 3px; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-green { background: #16a34a; }
+.dot-yellow { background: #f59e0b; }
+.dot-red { background: #dc2626; }
+.dot-gray { background: #d1d5db; }
+
+/* Row number */
+.row-num { text-align: center; font-size: 11px; color: #999; width: 40px; }
+
+/* Frozen shadow */
+td.frozen-3, th.frozen-3 { border-right: 2px solid #e0e0e0; box-shadow: 2px 0 4px rgba(0,0,0,0.05); }
+
+/* Legend */
+.legend { padding: 8px 16px; background: #fff; border-top: 1px solid #e0e0e0; display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; color: #888; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <div>
+    <h1>📋 Đơn hàng bán — Table View</h1>
+    <div style="font-size:11px;opacity:0.7;">Tổng quan tất cả đơn hàng — Mỗi cột 1 field, mỗi nhóm 1 màu</div>
+  </div>
+  <div class="header-actions">
+    <button>🔍 Tìm kiếm</button>
+    <button>📥 Export CSV</button>
+    <button>⚙️ Cột</button>
+    <button class="primary">+ Tạo đơn mới</button>
+  </div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <label>Từ ngày:</label>
+  <input type="date" value="2026-03-01">
+  <label>Đến ngày:</label>
+  <input type="date" value="2026-04-06">
+  <label>Status:</label>
+  <select>
+    <option>Tất cả</option>
+    <option>Draft</option>
+    <option>Confirmed</option>
+    <option selected>Producing</option>
+    <option>Shipped</option>
+    <option>Paid</option>
+  </select>
+  <label>Buyer:</label>
+  <select>
+    <option>Tất cả</option>
+    <option selected>ATC Tires</option>
+    <option>Goutam Ent.</option>
+    <option>Glostar</option>
+  </select>
+  <div class="count">Tổng: 4 đơn | $2,195,435</div>
+</div>
+
+<!-- TABLE -->
+<div class="table-wrapper" style="height: calc(100vh - 130px);">
+<table>
+  <!-- COLUMN GROUP HEADERS -->
+  <thead>
+  <tr class="col-group-header">
+    <th colspan="1" class="col-group-status" style="border-color:#6b7280;">&nbsp;</th>
+    <th colspan="2" class="col-group-status">CHUNG</th>
+    <th colspan="9" class="col-group-sale">📋 HỢP ĐỒNG (Sale)</th>
+    <th colspan="3" class="col-group-sx">🏭 SẢN XUẤT (SX)</th>
+    <th colspan="9" class="col-group-log">🚢 VẬN CHUYỂN (Logistics)</th>
+    <th colspan="5" class="col-group-kt">💰 TÀI CHÍNH (Kế toán)</th>
+    <th colspan="2" class="col-group-status">TIẾN ĐỘ</th>
+  </tr>
+
+  <!-- COLUMN HEADERS -->
+  <tr>
+    <!-- Frozen -->
+    <th class="frozen frozen-1" style="width:40px;">#</th>
+    <th class="frozen frozen-2" style="width:120px;">Mã HĐ</th>
+    <th class="frozen frozen-3" style="width:140px;">Buyer</th>
+
+    <!-- Sale -->
+    <th style="background:#f0fdf4;">Grade</th>
+    <th style="background:#f0fdf4;">SL (MT)</th>
+    <th style="background:#f0fdf4;">Đơn giá</th>
+    <th style="background:#f0fdf4;">Tổng (USD)</th>
+    <th style="background:#f0fdf4;">Incoterm</th>
+    <th style="background:#f0fdf4;">Thanh toán</th>
+    <th style="background:#f0fdf4;">Bành/Cont</th>
+    <th style="background:#f0fdf4;">Containers</th>
+    <th style="background:#f0fdf4;">Giao hàng</th>
+
+    <!-- SX -->
+    <th style="background:#eff6ff;">Ngày SX sẵn</th>
+    <th style="background:#eff6ff;">Tiến độ SX</th>
+    <th style="background:#eff6ff;">Cont sealed</th>
+
+    <!-- LOG -->
+    <th style="background:#fef3c7;">Số BK</th>
+    <th style="background:#fef3c7;">Số BL</th>
+    <th style="background:#fef3c7;">Tàu</th>
+    <th style="background:#fef3c7;">ETD</th>
+    <th style="background:#fef3c7;">ETA</th>
+    <th style="background:#fef3c7;">L/C NO</th>
+    <th style="background:#fef3c7;">L/C hạn</th>
+    <th style="background:#fef3c7;">Chiết khấu</th>
+    <th style="background:#fef3c7;">DHL</th>
+
+    <!-- KT -->
+    <th style="background:#fce7f3;">Tỷ giá</th>
+    <th style="background:#fce7f3;">VND</th>
+    <th style="background:#fce7f3;">Ngày tiền về</th>
+    <th style="background:#fce7f3;">Phí NH</th>
+    <th style="background:#fce7f3;">Doanh thu ròng</th>
+
+    <!-- Status -->
+    <th>Status</th>
+    <th>Tiến độ BP</th>
+  </tr>
+  </thead>
+
+  <tbody>
+  <!-- ROW 1: ATC Tires — Producing -->
+  <tr class="selected">
+    <td class="frozen frozen-1 row-num">1</td>
+    <td class="frozen frozen-2" style="font-weight:700;color:#1B4D3E;">LTC2024/PD-ATC</td>
+    <td class="frozen frozen-3">ATC Tires (IN)</td>
+
+    <td><span style="background:#1B4D3E;color:#fff;padding:2px 8px;border-radius:4px;">SVR 10</span></td>
+    <td class="cell-money">725.76</td>
+    <td class="cell-money">$1,924.10</td>
+    <td class="cell-money" style="font-weight:700;color:#1B4D3E;">$1,396,435</td>
+    <td>FOB</td>
+    <td>D/P at sight</td>
+    <td>576</td>
+    <td>36 × 20ft</td>
+    <td class="cell-date">Aug 2025</td>
+
+    <td class="cell-date cell-editable">15/07/2025</td>
+    <td><div style="display:flex;align-items:center;gap:6px;"><div style="width:60px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="width:70%;height:100%;background:#f59e0b;"></div></div><span style="font-size:11px;color:#f59e0b;font-weight:600;">70%</span></div></td>
+    <td>3/36</td>
+
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+
+    <td><span class="status status-producing">Producing</span></td>
+    <td>
+      <div class="completion">
+        <div class="dot dot-green" title="Sale ✓"></div>
+        <div class="dot dot-yellow" title="SX 70%"></div>
+        <div class="dot dot-gray" title="LOG chờ"></div>
+        <div class="dot dot-gray" title="KT chờ"></div>
+      </div>
+    </td>
+  </tr>
+
+  <!-- ROW 2: Goutam — Shipped -->
+  <tr>
+    <td class="frozen frozen-1 row-num">2</td>
+    <td class="frozen frozen-2" style="font-weight:700;color:#1B4D3E;">HA20260024</td>
+    <td class="frozen frozen-3">GOUTAM ENT. (IN)</td>
+
+    <td><span style="background:#1B4D3E;color:#fff;padding:2px 8px;border-radius:4px;">SVR 10</span></td>
+    <td class="cell-money">99.00</td>
+    <td class="cell-money">$2,100.00</td>
+    <td class="cell-money" style="font-weight:700;">$207,900</td>
+    <td>FOB</td>
+    <td>LC 60</td>
+    <td>630</td>
+    <td>5 × 20ft</td>
+    <td class="cell-date">04/04/2026</td>
+
+    <td class="cell-date">28/03/2026</td>
+    <td><div style="display:flex;align-items:center;gap:6px;"><div style="width:60px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:#16a34a;"></div></div><span style="font-size:11px;color:#16a34a;font-weight:600;">100%</span></div></td>
+    <td class="cell-ok">5/5 ✓</td>
+
+    <td class="cell-editable">BK-260401</td>
+    <td class="cell-editable">OOLU-789012</td>
+    <td class="cell-editable">COSCO Star</td>
+    <td class="cell-date cell-editable">01/04/2026</td>
+    <td class="cell-date cell-editable">15/04/2026</td>
+    <td class="cell-editable">LC-GOU-2026</td>
+    <td class="lc-ok">30/06/2026 (86d)</td>
+    <td class="cell-money cell-editable">$1,200</td>
+    <td class="cell-editable">DHL-99887</td>
+
+    <td class="cell-editable" style="background:#fce7f3;">25,100</td>
+    <td class="cell-money" style="color:#9d174d;">5,218M</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+
+    <td><span class="status status-shipped">Shipped</span></td>
+    <td>
+      <div class="completion">
+        <div class="dot dot-green" title="Sale ✓"></div>
+        <div class="dot dot-green" title="SX ✓"></div>
+        <div class="dot dot-green" title="LOG ✓"></div>
+        <div class="dot dot-yellow" title="KT đang nhập"></div>
+      </div>
+    </td>
+  </tr>
+
+  <!-- ROW 3: SIA Cargo — with LC WARNING -->
+  <tr>
+    <td class="frozen frozen-1 row-num">3</td>
+    <td class="frozen frozen-2" style="font-weight:700;color:#1B4D3E;">HA20260023</td>
+    <td class="frozen frozen-3">SIA Cargo (LV)</td>
+
+    <td><span style="background:#1B4D3E;color:#fff;padding:2px 8px;border-radius:4px;">SVR 5</span></td>
+    <td class="cell-money">135.00</td>
+    <td class="cell-money">$2,050.00</td>
+    <td class="cell-money" style="font-weight:700;">$276,750</td>
+    <td>CIF</td>
+    <td>LC 30</td>
+    <td>576</td>
+    <td>7 × 20ft</td>
+    <td class="cell-date">31/03/2026</td>
+
+    <td class="cell-date">20/03/2026</td>
+    <td><div style="display:flex;align-items:center;gap:6px;"><div style="width:60px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:#16a34a;"></div></div><span style="font-size:11px;color:#16a34a;font-weight:600;">100%</span></div></td>
+    <td class="cell-ok">7/7 ✓</td>
+
+    <td>BK-260325</td>
+    <td>MSCU-456789</td>
+    <td>MSC Tokyo</td>
+    <td class="cell-date">28/03/2026</td>
+    <td class="cell-date">12/04/2026</td>
+    <td>LC-SIA-2026</td>
+    <td class="lc-warn">🔴 18/04/2026 (12d)</td>
+    <td class="cell-money">$800</td>
+    <td>DHL-55443</td>
+
+    <td style="background:#fce7f3;">25,200</td>
+    <td class="cell-money" style="color:#9d174d;">6,974M</td>
+    <td class="cell-date" style="background:#fce7f3;">15/04/2026</td>
+    <td class="cell-money" style="background:#fce7f3;">$120</td>
+    <td class="cell-money cell-ok">$275,830</td>
+
+    <td><span class="status status-shipped">Delivered</span></td>
+    <td>
+      <div class="completion">
+        <div class="dot dot-green"></div>
+        <div class="dot dot-green"></div>
+        <div class="dot dot-green"></div>
+        <div class="dot dot-green"></div>
+      </div>
+    </td>
+  </tr>
+
+  <!-- ROW 4: Glostar — Draft -->
+  <tr>
+    <td class="frozen frozen-1 row-num">4</td>
+    <td class="frozen frozen-2" style="font-weight:700;color:#1B4D3E;">HA20260026</td>
+    <td class="frozen frozen-3">PT. GLOSTAR (ID)</td>
+
+    <td><span style="background:#1B4D3E;color:#fff;padding:2px 8px;border-radius:4px;">SVR 20</span></td>
+    <td class="cell-money">200.00</td>
+    <td class="cell-money">$1,570.00</td>
+    <td class="cell-money" style="font-weight:700;">$314,000</td>
+    <td>FOB</td>
+    <td>TT 30%</td>
+    <td>630</td>
+    <td>10 × 20ft</td>
+    <td class="cell-date">May 2026</td>
+
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+    <td class="cell-empty">—</td>
+
+    <td><span class="status status-draft">Draft</span></td>
+    <td>
+      <div class="completion">
+        <div class="dot dot-yellow" title="Sale đang nhập"></div>
+        <div class="dot dot-gray"></div>
+        <div class="dot dot-gray"></div>
+        <div class="dot dot-gray"></div>
+      </div>
+    </td>
+  </tr>
+
+  <!-- SUMMARY ROW -->
+  <tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #1B4D3E;">
+    <td class="frozen frozen-1"></td>
+    <td class="frozen frozen-2" style="color:#1B4D3E;">TỔNG</td>
+    <td class="frozen frozen-3">4 đơn hàng</td>
+    <td></td>
+    <td class="cell-money" style="color:#1B4D3E;">1,159.76</td>
+    <td></td>
+    <td class="cell-money" style="color:#1B4D3E;font-size:14px;">$2,195,085</td>
+    <td></td><td></td><td></td>
+    <td>58 cont</td>
+    <td></td>
+    <td></td><td></td><td></td>
+    <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+    <td class="cell-money">$2,000</td>
+    <td></td>
+    <td></td><td></td><td></td><td></td><td></td>
+    <td></td>
+    <td></td>
+  </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><div class="dot dot-green"></div> Hoàn tất</div>
+  <div class="legend-item"><div class="dot dot-yellow"></div> Đang làm</div>
+  <div class="legend-item"><div class="dot dot-red"></div> Có lỗi</div>
+  <div class="legend-item"><div class="dot dot-gray"></div> Chờ</div>
+  <div class="legend-item">|</div>
+  <div class="legend-item" style="color:#f0fdf4;background:#f0fdf4;border:1px solid #86efac;padding:2px 8px;border-radius:4px;">Sale</div>
+  <div class="legend-item" style="color:#eff6ff;background:#eff6ff;border:1px solid #93c5fd;padding:2px 8px;border-radius:4px;">SX</div>
+  <div class="legend-item" style="color:#fef3c7;background:#fef3c7;border:1px solid #fcd34d;padding:2px 8px;border-radius:4px;">LOG</div>
+  <div class="legend-item" style="color:#fce7f3;background:#fce7f3;border:1px solid #f9a8d4;padding:2px 8px;border-radius:4px;">KT</div>
+  <div class="legend-item">|</div>
+  <div class="legend-item" style="background:#fffff0;padding:2px 8px;border:1px solid #fcd34d;border-radius:4px;">Editable</div>
+  <div class="legend-item"><span class="lc-warn" style="font-size:11px;">LC ≤ 20 ngày</span></div>
+  <div class="legend-item">|</div>
+  <div class="legend-item">Prototype v3 — 05/04/2026</div>
+</div>
+
+</body>
+</html>

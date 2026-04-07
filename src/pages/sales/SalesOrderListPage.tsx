@@ -451,6 +451,13 @@ const SalesOrderListPage = () => {
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
+      title: 'Ngày sẵn hàng',
+      dataIndex: 'ready_date',
+      key: 'ready_date',
+      width: 95,
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+    },
+    {
       title: 'Ngân hàng',
       dataIndex: 'bank_name',
       key: 'bank',

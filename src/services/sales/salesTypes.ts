@@ -533,25 +533,25 @@ export const COUNTRY_OPTIONS = [
 
 // Ngân hàng nhận tiền
 export const BANK_OPTIONS = [
-  { value: 'VCB', label: 'Vietcombank — NH TMCP Ngoại thương VN' },
-  { value: 'BIDV', label: 'BIDV — NH Đầu tư & Phát triển VN' },
-  { value: 'VTB', label: 'VietinBank — NH Công thương VN' },
-  { value: 'ACB', label: 'ACB — NH Á Châu' },
-  { value: 'MB', label: 'MBBank — NH Quân đội' },
-  { value: 'TCB', label: 'Techcombank — NH Kỹ thương VN' },
-  { value: 'SHB', label: 'SHB — NH Sài Gòn — Hà Nội' },
+  { value: 'VTB', label: 'Viettin Bank — Hue Branch' },
+  { value: 'BIDV', label: 'BIDV — Hue Branch' },
+  { value: 'AGRI', label: 'Agribank — Hue Branch' },
+  { value: 'TPB', label: 'TP Bank — Hue Branch' },
+  { value: 'EXIM', label: 'Exim Bank — Hue Branch' },
+  { value: 'UOB', label: 'UOB — Ho Chi Minh City' },
+  { value: 'VCB', label: 'Vietcombank — Hue Branch' },
   { value: 'OTHER', label: 'Khác' },
 ] as const
 
-// Auto-fill bank details khi chọn ngân hàng
+// Auto-fill bank details khi chọn ngân hàng (USD accounts)
 export const BANK_DETAILS: Record<string, { name: string; account: string; swift: string }> = {
-  VCB: { name: 'Vietcombank CN Huế', account: '0071001046372', swift: 'BFTVVNVX' },
-  VTB: { name: 'Vietinbank CN Huế', account: '111002648221', swift: 'ICBVVNVX460' },
-  BIDV: { name: 'BIDV CN Huế', account: '', swift: 'BIDVVNVX' },
-  ACB: { name: 'ACB', account: '', swift: 'ASCBVNVX' },
-  MB: { name: 'MBBank', account: '', swift: 'MSCBVNVX' },
-  TCB: { name: 'Techcombank', account: '', swift: 'VTCBVNVX' },
-  SHB: { name: 'SHB', account: '', swift: 'SHBAVNVX' },
+  VTB: { name: 'Viettin Bank, Hue Branch', account: '111002648221', swift: 'ICBVVNVX460' },
+  BIDV: { name: 'BIDV, Hue Branch', account: '5510020372', swift: 'BIDVVNVX' },
+  AGRI: { name: 'Agribank, Hue Branch', account: '4000201014000', swift: 'VBAAVNVX540' },
+  TPB: { name: 'TP Bank, Hue Branch', account: '78468686868', swift: 'TPNVVNVX' },
+  EXIM: { name: 'Exim Bank, Hue Branch', account: '100201085', swift: 'EBVIVNVXXXXX' },
+  UOB: { name: 'UOB, Ho Chi Minh City', account: '1039019421', swift: 'UOVBVNVX' },
+  VCB: { name: 'Vietcombank, Hue Branch', account: '0071001046372', swift: 'BFTVVNVX' },
 }
 
 // Cảng xếp hàng tại Việt Nam

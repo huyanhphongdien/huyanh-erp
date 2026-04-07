@@ -82,6 +82,27 @@ export interface CreateSalesOrderData {
   // Ghi chú
   notes?: string
   internal_notes?: string
+
+  // Multi-item (v5)
+  items?: Array<{
+    grade: string
+    quantity_tons: number
+    unit_price: number
+    currency?: string
+    bale_weight_kg?: number
+    bales_per_container?: number
+    packing_type?: string
+    drc_min?: number
+    drc_max?: number
+    moisture_max?: number
+    dirt_max?: number
+    ash_max?: number
+    nitrogen_max?: number
+    volatile_max?: number
+    pri_min?: number
+    mooney_max?: number
+    color_lovibond_max?: number
+  }>
 }
 
 export interface SalesOrderListParams {
@@ -113,7 +134,8 @@ export interface SalesOrderStats {
 // ============================================================================
 
 const CUSTOMER_JOIN = 'customer:sales_customers!customer_id(id,code,name,short_name,country,tier)'
-const SELECT_WITH_CUSTOMER = `*,${CUSTOMER_JOIN}`
+const ITEMS_JOIN = 'items:sales_order_items(*)'
+const SELECT_WITH_CUSTOMER = `*,${CUSTOMER_JOIN},${ITEMS_JOIN}`
 
 // ============================================================================
 // VALID STATUS TRANSITIONS
@@ -410,6 +432,58 @@ export const salesOrderService = {
 
     if (error) {
       throw new Error(`Không thể tạo đơn hàng: ${error.message}`)
+    }
+
+    // ★ Insert items nếu có (multi-product)
+    if (input.items && input.items.length > 0) {
+      const itemRows = input.items.map((item, idx) => {
+        const qtyKg = item.quantity_tons * 1000
+        const bw = item.bale_weight_kg || 33.33
+        const totalBales = Math.round(qtyKg / bw)
+        const bpc = item.bales_per_container || 576
+        return {
+          sales_order_id: data.id,
+          grade: item.grade,
+          quantity_tons: item.quantity_tons,
+          unit_price: item.unit_price,
+          currency: item.currency || 'USD',
+          total_value_usd: item.quantity_tons * item.unit_price,
+          quantity_kg: qtyKg,
+          bale_weight_kg: bw,
+          total_bales: totalBales,
+          bales_per_container: bpc,
+          container_count: Math.ceil(totalBales / bpc),
+          packing_type: item.packing_type || 'loose_bale',
+          drc_min: item.drc_min ?? null,
+          drc_max: item.drc_max ?? null,
+          moisture_max: item.moisture_max ?? null,
+          dirt_max: item.dirt_max ?? null,
+          ash_max: item.ash_max ?? null,
+          nitrogen_max: item.nitrogen_max ?? null,
+          volatile_max: item.volatile_max ?? null,
+          pri_min: item.pri_min ?? null,
+          mooney_max: item.mooney_max ?? null,
+          color_lovibond_max: item.color_lovibond_max ?? null,
+          sort_order: idx,
+        }
+      })
+      await supabase.from('sales_order_items').insert(itemRows)
+
+      // Update tổng trên order header
+      const totalTons = itemRows.reduce((s, i) => s + i.quantity_tons, 0)
+      const totalUsd = itemRows.reduce((s, i) => s + (i.total_value_usd || 0), 0)
+      const totalBalesAll = itemRows.reduce((s, i) => s + (i.total_bales || 0), 0)
+      const totalContainers = itemRows.reduce((s, i) => s + (i.container_count || 0), 0)
+      await supabase.from('sales_orders').update({
+        quantity_tons: totalTons,
+        quantity_kg: totalTons * 1000,
+        total_value_usd: totalUsd,
+        total_bales: totalBalesAll,
+        container_count: totalContainers,
+        // Giữ grade = grade đầu tiên (hoặc multi)
+        grade: itemRows.length === 1 ? itemRows[0].grade : itemRows.map(i => i.grade).join(' + '),
+        unit_price: itemRows.length === 1 ? itemRows[0].unit_price : Math.round(totalUsd / totalTons),
+      }).eq('id', data.id)
     }
 
     return data as SalesOrder

@@ -91,6 +91,46 @@ function SalesOrderCreatePage() {
   const [gradeStandards, setGradeStandards] = useState<RubberGradeStandard[]>([])
   const [, setSelectedStandard] = useState<RubberGradeStandard | null>(null)
 
+  // Multi-item state
+  interface OrderItem {
+    key: string
+    grade: string
+    quantity_tons: number
+    unit_price: number
+    bale_weight_kg: number
+    bales_per_container: number
+    packing_type: string
+  }
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([
+    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale' },
+  ])
+
+  const addItem = () => {
+    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale' }])
+  }
+
+  const removeItem = (key: string) => {
+    if (orderItems.length <= 1) return
+    setOrderItems(prev => prev.filter(i => i.key !== key))
+  }
+
+  const updateItem = (key: string, field: string, value: any) => {
+    setOrderItems(prev => prev.map(i => i.key === key ? { ...i, [field]: value } : i))
+  }
+
+  // Totals from items
+  const itemsTotalTons = orderItems.reduce((s, i) => s + (i.quantity_tons || 0), 0)
+  const itemsTotalUSD = orderItems.reduce((s, i) => s + (i.quantity_tons || 0) * (i.unit_price || 0), 0)
+  const itemsTotalBales = orderItems.reduce((s, i) => {
+    const bw = i.bale_weight_kg || 35
+    return s + Math.round((i.quantity_tons * 1000) / bw)
+  }, 0)
+  const itemsTotalContainers = orderItems.reduce((s, i) => {
+    const bw = i.bale_weight_kg || 35
+    const bales = Math.round((i.quantity_tons * 1000) / bw)
+    return s + (i.bales_per_container > 0 ? Math.ceil(bales / i.bales_per_container) : 0)
+  }, 0)
+
   // ── Load customers & grade standards ──
   useEffect(() => {
     const loadData = async () => {
@@ -190,16 +230,32 @@ function SalesOrderCreatePage() {
       const values = await form.validateFields()
       setLoading(true)
 
-      // Convert dayjs to string + calc commission
-      const totalUsd = (values.quantity_tons || 0) * (values.unit_price || 0)
+      // Validate items
+      const validItems = orderItems.filter(i => i.grade && i.quantity_tons > 0 && i.unit_price > 0)
+      if (validItems.length === 0) {
+        message.error('Vui lòng thêm ít nhất 1 sản phẩm')
+        setLoading(false)
+        return
+      }
+
+      // Convert dayjs to string + calc from items
       const payload: CreateSalesOrderData = {
         ...values,
+        // Set header from first item (or combined)
+        grade: validItems.length === 1 ? validItems[0].grade : validItems.map(i => i.grade).join(' + '),
+        quantity_tons: itemsTotalTons,
+        unit_price: validItems.length === 1 ? validItems[0].unit_price : Math.round(itemsTotalUSD / itemsTotalTons),
+        bale_weight_kg: validItems[0].bale_weight_kg,
+        bales_per_container: validItems[0].bales_per_container,
+        packing_type: validItems[0].packing_type as any,
         delivery_date: values.delivery_date ? values.delivery_date.format('YYYY-MM-DD') : undefined,
         contract_date: values.contract_date ? values.contract_date.format('YYYY-MM-DD') : undefined,
         etd: values.etd ? values.etd.format('YYYY-MM-DD') : undefined,
         eta: values.eta ? values.eta.format('YYYY-MM-DD') : undefined,
         lc_expiry_date: values.lc_expiry_date ? values.lc_expiry_date.format('YYYY-MM-DD') : undefined,
-        commission_amount: values.commission_pct ? totalUsd * (values.commission_pct / 100) : undefined,
+        commission_amount: values.commission_pct ? itemsTotalUSD * (values.commission_pct / 100) : undefined,
+        // Multi-item data
+        items: validItems,
       }
 
       const created = await salesOrderService.create(payload)
@@ -262,52 +318,67 @@ function SalesOrderCreatePage() {
           </Row>
         </Card>
 
-        {/* ═══ Sản phẩm & Giá ═══ */}
+        {/* ═══ Sản phẩm & Giá — Multi-item ═══ */}
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
-          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Sản phẩm & Giá</span>}>
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Grade SVR" name="grade" rules={[{ required: true, message: 'Chọn grade' }]}>
-                <Select placeholder="Chọn grade..." size="large"
-                  options={SVR_GRADE_OPTIONS.map((g) => ({ value: g.value, label: g.label }))}
-                  onChange={handleGradeChange} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Số lượng (tấn)" name="quantity_tons" rules={[{ required: true, message: 'Nhập SL' }]}>
-                <InputNumber min={0.01} step={1} size="large" style={{ width: '100%' }} placeholder="725.76"
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => Number(v?.replace(/,/g, '') || 0) as any} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Đơn giá (USD/MT)" name="unit_price" rules={[{ required: true, message: 'Nhập giá' }]}>
-                <InputNumber min={0} step={10} size="large" style={{ width: '100%' }} placeholder="1,924"
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => Number(v?.replace(/,/g, '') || 0) as any} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Tiền tệ" name="currency" initialValue="USD">
-                <Select size="large" options={CURRENCY_OPTIONS} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Quy cách bành" name="bale_weight_kg" initialValue={35}>
-                <Select size="large" options={[
-                  { value: 35, label: '35 kg/bành' },
-                  { value: 33.33, label: '33.33 kg/bành' },
-                ]} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Bành/container" name="bales_per_container" initialValue={576}>
-                <InputNumber min={1} max={1000} size="large" style={{ width: '100%' }} placeholder="576" />
-              </Form.Item>
-            </Col>
-          </Row>
+          title={<Space><span style={{ fontSize: 14, fontWeight: 600 }}>Sản phẩm & Giá</span><Tag color="blue">{orderItems.length} sản phẩm</Tag></Space>}
+          extra={<Button size="small" type="dashed" onClick={addItem} icon={<span>+</span>}>Thêm SP</Button>}>
+
+          {orderItems.map((item, idx) => (
+            <div key={item.key} style={{ background: idx % 2 === 0 ? '#fafafa' : '#fff', padding: '12px', borderRadius: 8, marginBottom: 8, border: '1px solid #f0f0f0' }}>
+              <Row gutter={[12, 8]} align="middle">
+                <Col xs={24} sm={5}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Grade</div>
+                  <Select value={item.grade || undefined} placeholder="Chọn..." style={{ width: '100%' }}
+                    options={SVR_GRADE_OPTIONS.map(g => ({ value: g.value, label: g.label }))}
+                    onChange={(v) => updateItem(item.key, 'grade', v)} />
+                </Col>
+                <Col xs={12} sm={4}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Tấn</div>
+                  <InputNumber value={item.quantity_tons || undefined} min={0.01} step={1} style={{ width: '100%' }} placeholder="725"
+                    onChange={(v) => updateItem(item.key, 'quantity_tons', v || 0)} />
+                </Col>
+                <Col xs={12} sm={4}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>$/tấn</div>
+                  <InputNumber value={item.unit_price || undefined} min={0} step={10} style={{ width: '100%' }} placeholder="1,924"
+                    onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
+                </Col>
+                <Col xs={12} sm={3}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>KG/bành</div>
+                  <Select value={item.bale_weight_kg} style={{ width: '100%' }}
+                    options={[{ value: 35, label: '35' }, { value: 33.33, label: '33.33' }]}
+                    onChange={(v) => updateItem(item.key, 'bale_weight_kg', v)} />
+                </Col>
+                <Col xs={12} sm={3}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Bành/cont</div>
+                  <InputNumber value={item.bales_per_container} min={1} style={{ width: '100%' }}
+                    onChange={(v) => updateItem(item.key, 'bales_per_container', v || 576)} />
+                </Col>
+                <Col xs={12} sm={3}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Đóng gói</div>
+                  <Select value={item.packing_type} style={{ width: '100%' }}
+                    options={[
+                      { value: 'loose_bale', label: 'Loose Bale' },
+                      { value: 'sw_pallet', label: 'SW Pallet' },
+                      { value: 'wooden_pallet', label: 'Wooden Pallet' },
+                      { value: 'metal_box', label: 'Metal Box' },
+                    ]}
+                    onChange={(v) => updateItem(item.key, 'packing_type', v)} />
+                </Col>
+                <Col xs={4} sm={2} style={{ textAlign: 'center' }}>
+                  {orderItems.length > 1 && (
+                    <Button type="text" danger size="small" onClick={() => removeItem(item.key)} style={{ marginTop: 16 }}>Xóa</Button>
+                  )}
+                </Col>
+              </Row>
+              {item.quantity_tons > 0 && item.unit_price > 0 && (
+                <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
+                  {Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)).toLocaleString()} bành |
+                  {' '}{Math.ceil(Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)) / (item.bales_per_container || 576))} cont |
+                  {' '}${(item.quantity_tons * item.unit_price).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </div>
+              )}
+            </div>
+          ))}
         </Card>
 
         {/* ═══ Điều khoản & Ngân hàng ═══ */}
@@ -427,24 +498,24 @@ function SalesOrderCreatePage() {
           <Row gutter={[16, 20]}>
             <Col span={12}>
               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Tổng bành</div>
-              <div style={{ color: '#fff', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{totalBales.toLocaleString()}</div>
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>bành ({baleWeight} kg)</div>
+              <div style={{ color: '#fff', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{itemsTotalBales.toLocaleString()}</div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>bành</div>
             </Col>
             <Col span={12}>
               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Số container</div>
-              <div style={{ color: '#FFD700', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{containerCount}</div>
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>{containerType}</div>
+              <div style={{ color: '#FFD700', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{itemsTotalContainers}</div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>20ft</div>
             </Col>
             <Col span={12}>
               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Giá trị {currency}</div>
               <div style={{ color: '#4ADE80', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
-                {currency === 'USD' ? '$' : ''}{totalValueUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </Col>
             <Col span={12}>
               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Hoa hồng</div>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, lineHeight: 1 }}>
-                {commissionAmt > 0 ? `$${commissionAmt.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
+                {commissionPct > 0 ? `$${(itemsTotalUSD * commissionPct / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
               </div>
             </Col>
           </Row>

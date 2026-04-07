@@ -200,6 +200,37 @@ export interface SalesOrder {
 
   // Joined
   customer?: Pick<SalesCustomer, 'id' | 'code' | 'name' | 'short_name' | 'country' | 'tier'>
+  items?: SalesOrderItem[]
+}
+
+// ===== SẢN PHẨM TRONG ĐƠN HÀNG (sales_order_items) =====
+
+export interface SalesOrderItem {
+  id: string
+  sales_order_id: string
+  grade: string
+  quantity_tons: number
+  unit_price: number
+  currency?: string
+  total_value_usd?: number
+  quantity_kg?: number
+  bale_weight_kg?: number
+  total_bales?: number
+  bales_per_container?: number
+  container_count?: number
+  packing_type?: string
+  drc_min?: number
+  drc_max?: number
+  moisture_max?: number
+  dirt_max?: number
+  ash_max?: number
+  nitrogen_max?: number
+  volatile_max?: number
+  pri_min?: number
+  mooney_max?: number
+  color_lovibond_max?: number
+  sort_order?: number
+  created_at?: string
 }
 
 // ===== CONTAINER TRONG ĐƠN HÀNG (sales_order_containers) =====

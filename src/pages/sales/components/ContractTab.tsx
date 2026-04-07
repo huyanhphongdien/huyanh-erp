@@ -370,7 +370,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           <Tag>{INCOTERM_LABELS[order.incoterm as Incoterm] || order.incoterm || '—'}</Tag>
         </Descriptions.Item>
         <Descriptions.Item label="Thanh toán">
-          {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] || order.payment_terms || '—'}
+          {order.items && order.items.length > 0
+            ? order.items.map((it: any) => it.payment_terms ? it.payment_terms.split(',').map((pt: string) => PAYMENT_TERMS_LABELS[pt as PaymentTerms] || pt).join(' + ') : '').filter(Boolean).join(' / ') || '—'
+            : PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] || order.payment_terms || '—'}
         </Descriptions.Item>
         <Descriptions.Item label="Cảng xếp hàng">
           {PORT_OF_LOADING_OPTIONS.find(p => p.value === order.port_of_loading)?.label || order.port_of_loading || '—'}

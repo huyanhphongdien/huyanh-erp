@@ -536,12 +536,40 @@ export const myTasksService = {
     const statsNow = new Date()
     const monthStart = `${statsNow.getFullYear()}-${String(statsNow.getMonth() + 1).padStart(2, '0')}-01T00:00:00`
 
-    const { data: tasks, error } = await supabase
+    // Query 1: Tasks là assignee
+    const { data: assigneeTasks, error } = await supabase
       .from('tasks')
-      .select('id, status, due_date, progress')
+      .select('id, status, due_date, progress, evaluation_status')
       .eq('assignee_id', employeeId)
       .not('status', 'in', `(${EXCLUDED_STATUSES_FOR_EMPLOYEE.join(',')})`)
       .gte('created_at', monthStart)
+
+    // Query 2: Tasks là participant
+    const { data: participantAssignments } = await supabase
+      .from('task_assignments')
+      .select('task_id')
+      .eq('employee_id', employeeId)
+      .eq('role', 'participant')
+      .eq('status', 'accepted')
+
+    const pTaskIds = (participantAssignments || []).map(a => a.task_id)
+    let participantTasks: any[] = []
+    if (pTaskIds.length > 0) {
+      const { data: pTasks } = await supabase
+        .from('tasks')
+        .select('id, status, due_date, progress, evaluation_status')
+        .in('id', pTaskIds)
+        .not('status', 'in', `(${EXCLUDED_STATUSES_FOR_EMPLOYEE.join(',')})`)
+        .gte('created_at', monthStart)
+      participantTasks = pTasks || []
+    }
+
+    // Merge + deduplicate
+    const seenIds = new Set<string>()
+    const tasks: any[] = []
+    for (const t of [...(assigneeTasks || []), ...participantTasks]) {
+      if (!seenIds.has(t.id)) { seenIds.add(t.id); tasks.push(t) }
+    }
 
     if (error) {
       console.error('❌ [myTasksService] getMyTasksStats error:', error)

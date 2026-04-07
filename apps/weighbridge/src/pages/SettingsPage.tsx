@@ -10,6 +10,7 @@ import {
   CheckCircleOutlined, CloseCircleOutlined, UserOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
+import { useKeliScale } from '@erp/hooks/useKeliScale'
 
 const { Title, Text } = Typography
 const PRIMARY = '#1B4D3E'
@@ -56,6 +57,7 @@ const PROXY_PORT = 3456
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { operator } = useAuthStore()
+  const scale = useKeliScale()
 
   // ── Scale config ──
   const [scaleConfig, setScaleConfig] = useState(() => {
@@ -260,15 +262,33 @@ export default function SettingsPage() {
               </Col>
             </Row>
 
+            {/* Kết nối cổng COM */}
+            <div style={{ marginTop: 16 }}>
+              {scale.connected ? (
+                <Alert type="success" showIcon style={{ borderRadius: 8, marginBottom: 12 }}
+                  message={<span>Đã kết nối cân — <strong style={{ fontFamily: 'monospace' }}>{scale.liveWeight ? `${scale.liveWeight.weight.toLocaleString()} kg` : 'đang đọc...'}</strong></span>}
+                  action={<Button size="small" danger onClick={() => scale.disconnect()}>Ngắt kết nối</Button>}
+                />
+              ) : (
+                <Button type="primary" size="large" block
+                  style={{ background: PRIMARY, height: 48, fontSize: 15, fontWeight: 600, borderRadius: 8 }}
+                  icon={<WifiOutlined />}
+                  onClick={() => scale.connect()}
+                >
+                  Kết nối cổng COM (chọn cổng cân)
+                </Button>
+              )}
+            </div>
+
             <Alert
               type="info"
               showIcon
-              style={{ marginTop: 16, borderRadius: 8 }}
-              message="Hướng dẫn kết nối"
+              style={{ marginTop: 12, borderRadius: 8 }}
+              message="Hướng dẫn"
               description={
                 <div style={{ fontSize: 12 }}>
                   <div>1. Cắm cáp USB-to-RS232 từ đầu cân vào máy tính</div>
-                  <div>2. Trên trang cân, nhấn <strong>"Kết nối cân"</strong> → chọn cổng COM</div>
+                  <div>2. Nhấn <strong>"Kết nối cổng COM"</strong> → chọn cổng COM</div>
                   <div>3. Nếu không đọc được → thử đổi Baud Rate (2400 hoặc 9600)</div>
                   <div>4. Dùng Chrome hoặc Edge (Web Serial API)</div>
                 </div>

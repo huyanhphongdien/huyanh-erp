@@ -259,10 +259,9 @@ export default function HomePage() {
           </Space>
           <Space>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, ...MONO }}>{timeStr}</Text>
-            <Tag color={scale.connected ? 'green' : 'default'} style={{ fontSize: 11 }}>
+            <Tag color={scale.connected ? 'green' : 'red'} style={{ fontSize: 11, cursor: 'pointer' }} onClick={() => navigate('/settings')}>
               {scale.connected ? '● Cân OK' : '○ Chưa kết nối'}
             </Tag>
-            <ScaleSettings scale={scale} />
             <Button type="text" icon={<ReloadOutlined spin={loading} />} onClick={load} style={{ color: '#fff' }} />
             <Button type="text" icon={<SettingOutlined />} onClick={() => navigate('/settings')} style={{ color: '#fff' }} />
             <Button type="text" icon={<LogoutOutlined />} onClick={logout} style={{ color: '#fff' }} />

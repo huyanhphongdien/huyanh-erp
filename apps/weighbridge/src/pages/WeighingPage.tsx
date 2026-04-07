@@ -387,13 +387,10 @@ export default function WeighingPage() {
               {isCompleted ? 'Hoàn tất' : isWeighingTare ? 'Chờ cân L2' : 'Chờ cân L1'}
             </Tag>
           )}
-          {/* Scale status — kết nối qua icon ⚙️ */}
-          <Space size={4}>
-            <Tag color={scale.connected ? 'green' : 'red'}>
-              {scale.connected ? '● Đã kết nối cân' : '○ Chưa kết nối'}
-            </Tag>
-            <ScaleSettings scale={scale} />
-          </Space>
+          {/* Scale status — click để vào Settings kết nối */}
+          <Tag color={scale.connected ? 'green' : 'red'} style={{ cursor: 'pointer' }} onClick={() => navigate('/settings')}>
+            {scale.connected ? '● Đã kết nối cân' : '○ Chưa kết nối — Nhấn để cài đặt'}
+          </Tag>
         </div>
       </div>
 

@@ -195,11 +195,8 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
           <Form.Item label="Booking Ref" name="booking_reference">
             <Input placeholder="Booking number" />
           </Form.Item>
-          <Form.Item label="Tên tàu" name="vessel_name">
-            <Input placeholder="Vessel name" />
-          </Form.Item>
-          <Form.Item label="Voyage" name="voyage_number">
-            <Input placeholder="Voyage number" />
+          <Form.Item label="Tàu / Chuyến" name="vessel_name">
+            <Input placeholder="VD: MSC ANNA / VY2604E" />
           </Form.Item>
         </div>
 
@@ -290,8 +287,7 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       <Descriptions column={2} size="small" bordered>
         <Descriptions.Item label="Hãng tàu">{order.shipping_line || '—'}</Descriptions.Item>
         <Descriptions.Item label="Booking Ref">{order.booking_reference || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Tàu">{order.vessel_name || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Voyage">{order.voyage_number || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Tàu / Chuyến">{order.vessel_name || '—'}</Descriptions.Item>
       </Descriptions>
 
       <Divider style={{ margin: '12px 0' }} />

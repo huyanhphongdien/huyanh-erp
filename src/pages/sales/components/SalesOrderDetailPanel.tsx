@@ -47,7 +47,7 @@ const TAB_META: Record<string, { icon: React.ReactNode; label: string; color: st
   contract: { icon: <FileTextOutlined />, label: 'Hợp đồng', color: '#1B4D3E' },
   production: { icon: <ToolOutlined />, label: 'Sản xuất', color: '#1677ff' },
   shipping: { icon: <CarOutlined />, label: 'Vận chuyển', color: '#d48806' },
-  documents: { icon: <FolderOpenOutlined />, label: 'Chứng từ', color: '#722ed1' },
+  // documents: { icon: <FolderOpenOutlined />, label: 'Chứng từ', color: '#722ed1' }, // tạm ẩn
   finance: { icon: <DollarOutlined />, label: 'Tài chính', color: '#cf1322' },
 }
 

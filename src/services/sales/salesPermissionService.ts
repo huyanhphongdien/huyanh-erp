@@ -1,5 +1,3 @@
-import { supabase } from '../../lib/supabase'
-
 export type SalesRole = 'sale' | 'production' | 'logistics' | 'accounting' | 'admin'
 
 // ★ Phân quyền email cụ thể cho module Đơn hàng bán
@@ -94,7 +92,7 @@ export function getVisibleTabs(role: SalesRole | null): string[] {
 
   if (['production', 'sale', 'logistics', 'admin'].includes(role)) tabs.push('production')
   if (['logistics', 'sale', 'accounting', 'admin'].includes(role)) tabs.push('shipping')
-  tabs.push('documents') // tất cả BP đều xem được tab chứng từ
+  // tabs.push('documents') // tạm ẩn tab chứng từ
   if (salesPermissions.canViewFinance(role)) tabs.push('finance')
 
   return tabs

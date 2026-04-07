@@ -287,7 +287,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       {/* Section: Hợp đồng */}
       <SectionHeader title="Hợp đồng" color="#1B4D3E" />
       <Descriptions column={2} size="small" bordered>
-        <Descriptions.Item label="Số HĐ">
+        <Descriptions.Item label="Số HĐ (Contract No.)">
           <strong>{order.contract_no || order.code}</strong>
         </Descriptions.Item>
         <Descriptions.Item label="Ngày HĐ">{fmtDate(order.contract_date || order.order_date)}</Descriptions.Item>

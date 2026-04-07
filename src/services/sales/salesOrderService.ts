@@ -244,10 +244,10 @@ export const salesOrderService = {
       query = query.lte('order_date', date_to)
     }
 
-    // Tìm kiếm theo mã đơn, mã PO khách hàng, cấp mủ
+    // Tìm kiếm thông minh: số HĐ, mã hệ thống, PO#, grade, booking, B/L, ngân hàng
     if (search) {
       query = query.or(
-        `code.ilike.%${search}%,customer_po.ilike.%${search}%,grade.ilike.%${search}%`,
+        `contract_no.ilike.%${search}%,code.ilike.%${search}%,customer_po.ilike.%${search}%,grade.ilike.%${search}%,booking_reference.ilike.%${search}%,bl_number.ilike.%${search}%,bank_name.ilike.%${search}%,vessel_name.ilike.%${search}%`,
       )
     }
 

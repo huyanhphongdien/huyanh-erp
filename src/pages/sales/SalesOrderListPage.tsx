@@ -114,9 +114,9 @@ const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'confirmed', label: 'Đã xác nhận' },
   { key: 'producing', label: 'Đang SX' },
   { key: 'ready', label: 'Sẵn sàng' },
-  { key: 'packing', label: 'Đóng gói' },
   { key: 'shipped', label: 'Đã xuất' },
   { key: 'delivered', label: 'Đã giao' },
+  { key: 'invoiced', label: 'Đã lập HĐ' },
   { key: 'paid', label: 'Đã TT' },
 ]
 
@@ -669,7 +669,7 @@ const SalesOrderListPage = () => {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={8} md={7}>
             <Input.Search
-              placeholder="Tìm mã đơn, mã KH, PO#..."
+              placeholder="Tìm số HĐ, booking, B/L, grade, ngân hàng..."
               allowClear
               onSearch={handleSearch}
               onChange={(e) => {

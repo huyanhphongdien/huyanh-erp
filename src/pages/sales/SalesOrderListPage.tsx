@@ -773,37 +773,6 @@ const SalesOrderListPage = () => {
           onChange={handleTableChange}
           scroll={{ x: 1600 }}
           size="small"
-          summary={() => {
-            if (!orders.length) return null
-            const totalQty = orders.reduce((s, o) => s + (o.quantity_tons || 0), 0)
-            const totalUSD = orders.reduce((s, o) => s + (o.total_value_usd || o.quantity_tons * o.unit_price || 0), 0)
-            const totalDiscount = orders.reduce((s, o) => s + ((o as any).discount_amount || 0), 0)
-            const totalRemaining = totalUSD - totalDiscount
-            return (
-              <Table.Summary fixed>
-                <Table.Summary.Row>
-                  <Table.Summary.Cell index={0} colSpan={4} align="right">
-                    <strong style={{ fontSize: 12 }}>Tổng:</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={4} align="right">
-                    <strong style={{ fontFamily: 'monospace', fontSize: 12 }}>{totalQty.toLocaleString('vi-VN')}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} colSpan={5} />
-                  <Table.Summary.Cell index={10} align="right">
-                    <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#1B4D3E' }}>{formatCurrency(totalUSD)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={11} align="right">
-                    <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#d48806' }}>{totalDiscount > 0 ? formatCurrency(totalDiscount) : ''}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={12} />
-                  <Table.Summary.Cell index={13} align="right">
-                    <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#1677ff' }}>{totalRemaining > 0 ? formatCurrency(totalRemaining) : ''}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={14} colSpan={3} />
-                </Table.Summary.Row>
-              </Table.Summary>
-            )
-          }}
           onRow={(record) => ({
             onClick: () => {
               setPanelOrderId(record.id)

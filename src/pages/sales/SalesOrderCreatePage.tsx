@@ -365,17 +365,28 @@ function SalesOrderCreatePage() {
                     ]}
                     onChange={(v) => updateItem(item.key, 'packing_type', v)} />
                 </Col>
-                <Col xs={24} sm={5}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Thanh toán (chọn nhiều)</div>
-                  <Select
-                    mode="multiple"
-                    value={item.payment_terms ? item.payment_terms.split(',').filter(Boolean) : []}
-                    placeholder="Chọn hình thức..."
-                    style={{ width: '100%' }}
-                    maxTagCount={2}
-                    options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
-                    onChange={(vals: string[]) => updateItem(item.key, 'payment_terms', vals.join(','))}
-                  />
+                <Col xs={24}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 4, marginTop: 4 }}>Thanh toán</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {Object.entries(PAYMENT_TERMS_LABELS).map(([val, label]) => {
+                      const selected = (item.payment_terms || '').split(',').includes(val)
+                      return (
+                        <Tag
+                          key={val}
+                          style={{ cursor: 'pointer', fontSize: 11, padding: '2px 8px', borderRadius: 4, userSelect: 'none',
+                            background: selected ? '#1B4D3E' : '#fff', color: selected ? '#fff' : '#666',
+                            border: selected ? '1px solid #1B4D3E' : '1px solid #d9d9d9' }}
+                          onClick={() => {
+                            const current = (item.payment_terms || '').split(',').filter(Boolean)
+                            const next = selected ? current.filter(v => v !== val) : [...current, val]
+                            updateItem(item.key, 'payment_terms', next.join(','))
+                          }}
+                        >
+                          {selected ? '✓ ' : ''}{label}
+                        </Tag>
+                      )
+                    })}
+                  </div>
                 </Col>
                 <Col xs={4} sm={1} style={{ textAlign: 'center' }}>
                   {orderItems.length > 1 && (

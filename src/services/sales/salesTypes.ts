@@ -399,14 +399,14 @@ export const INCOTERM_LABELS: Record<Incoterm, string> = {
 
 // -- Điều khoản thanh toán --
 export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
-  LC_30: 'L/C trả chậm 30 ngày',
-  LC_60: 'L/C trả chậm 60 ngày',
-  LC_90: 'L/C trả chậm 90 ngày',
-  TT_30: 'T/T trả trước 30%',
-  TT_60: 'T/T trả trước 60%',
-  TT_100: 'T/T trả trước 100%',
-  CAD: 'CAD — Nhờ thu kèm chứng từ',
-  DP: 'D/P — Trả tiền đổi chứng từ',
+  LC_30: 'L/C 30 ngày',
+  LC_60: 'L/C 60 ngày',
+  LC_90: 'L/C 90 ngày',
+  TT_30: 'T/T 30%',
+  TT_60: 'T/T 60%',
+  TT_100: 'T/T 100%',
+  CAD: 'CAD',
+  DP: 'D/P',
 }
 
 // -- Điều khoản thanh toán mở rộng (dạng string key) --

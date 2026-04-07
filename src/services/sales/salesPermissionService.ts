@@ -8,9 +8,9 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   'sales@huyanhrubber.com': 'sale',
   // Production
   'trunglxh@huyanhrubber.com': 'production',
-  // Logistics
-  'logistics@huyanhrubber.com': 'logistics',
-  'anhlp@huyanhrubber.com': 'logistics',
+  // Logistics → Admin (full access)
+  'logistics@huyanhrubber.com': 'admin',
+  'anhlp@huyanhrubber.com': 'admin',
   // Accounting
   'yendt@huyanhrubber.com': 'accounting',
   // Admin

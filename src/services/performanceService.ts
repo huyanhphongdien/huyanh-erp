@@ -920,10 +920,30 @@ export const performanceDashboardService = {
       });
 
       const avgSelf = selfCount > 0 ? Math.round(totalSelf / selfCount) : 0;
-      const avgManager = 0; // ★ Không tách manager nữa, dùng final_score trực tiếp
-      const finalScore = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : 0;
+      const avgManager = 0;
+      const qualityScore = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : 0;
       const completedTasks = (tasks || []).length;
       const onTimeRate = completedTasks > 0 ? Math.round((onTimeCount / completedTasks) * 100) : 0;
+
+      // ★ Công thức mới: CL×60% + KL×40% (tính theo tỷ lệ ngày trong tháng)
+      const deptId = dept?.id || employee.department_id || '';
+      let monthlyBaseline = 10;
+      if (deptId) {
+        const { data: bl } = await supabase
+          .from('department_performance_baseline')
+          .select('monthly_task_target')
+          .eq('department_id', deptId)
+          .maybeSingle();
+        if (bl) monthlyBaseline = bl.monthly_task_target;
+      }
+      const now2 = new Date();
+      const dayOfMonth = now2.getDate();
+      const daysInMonth = new Date(now2.getFullYear(), now2.getMonth() + 1, 0).getDate();
+      const monthProgress = Math.max(0.1, dayOfMonth / daysInMonth);
+      const expectedTasks = Math.max(1, Math.round(monthlyBaseline * monthProgress));
+      const volumeScore = Math.min(100, Math.round((completedTasks / expectedTasks) * 100));
+      const finalScore = qualityScore > 0 || volumeScore > 0
+        ? Math.round(qualityScore * 0.6 + volumeScore * 0.4) : 0;
 
       // 6-month trend
       const trend: Array<{ month: string; score: number }> = [];
@@ -952,7 +972,12 @@ export const performanceDashboardService = {
             const w = t.task_source === 'recurring' ? 0.5 : t.task_source === 'self' ? 0.5 : 1.0;
             tw += (t.final_score || 0) * w; ts += w;
           });
-          mScore = ts > 0 ? Math.round(tw / ts) : 0;
+          const mQuality = ts > 0 ? Math.round(tw / ts) : 0;
+          // Khối lượng theo tháng đó (dùng full month baseline)
+          const mDays = new Date(y, m, 0).getDate();
+          const mExpected = Math.max(1, monthlyBaseline);
+          const mVolume = Math.min(100, Math.round((mTasks.length / mExpected) * 100));
+          mScore = Math.round(mQuality * 0.6 + mVolume * 0.4);
         }
         trend.push({ month: `${String(m).padStart(2, '0')}/${y}`, score: mScore });
       }

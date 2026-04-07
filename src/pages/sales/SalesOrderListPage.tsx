@@ -381,11 +381,9 @@ const SalesOrderListPage = () => {
     return <span style={{ fontSize: 12 }}>{formatted}</span>
   }
 
-  // ── Column header with color bar ──
-  const groupTitle = (title: string, color: string) => (
-    <span style={{ borderBottom: `3px solid ${color}`, paddingBottom: 2, fontWeight: 600, fontSize: 11 }}>
-      {title}
-    </span>
+  // ── Header style ──
+  const hdr = (title: string) => (
+    <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{title}</span>
   )
 
   const columns: ColumnsType<SalesOrder> = [
@@ -400,15 +398,15 @@ const SalesOrderListPage = () => {
       ),
     },
     {
-      title: 'Số HĐ',
+      title: hdr('Số HĐ'),
       dataIndex: 'contract_no',
       key: 'contract_no',
-      width: 130,
+      width: 120,
       fixed: 'left',
       render: (_: string, r: SalesOrder) => mono(<strong>{(r as any).contract_no || r.code}</strong>),
     },
     {
-      title: 'Người mua',
+      title: hdr('Người mua'),
       dataIndex: 'customer',
       key: 'customer',
       width: 150,
@@ -421,14 +419,14 @@ const SalesOrderListPage = () => {
       },
     },
     {
-      title: 'Loại hàng',
+      title: hdr('Loại hàng'),
       dataIndex: 'grade',
       key: 'grade',
       width: 90,
       render: (g: string) => g ? <GradeBadge grade={g} size="small" /> : gray(null),
     },
     {
-      title: 'Số LOT',
+      title: hdr('Số LOT'),
       dataIndex: 'customer_po',
       key: 'lot',
       width: 100,
@@ -436,7 +434,7 @@ const SalesOrderListPage = () => {
       render: (v: string) => v ? <span style={{ fontSize: 11, fontFamily: 'monospace' }}>{v}</span> : gray(null),
     },
     {
-      title: 'Số lượng',
+      title: hdr('SL (tấn)'),
       dataIndex: 'quantity_tons',
       key: 'qty',
       width: 75,
@@ -444,21 +442,21 @@ const SalesOrderListPage = () => {
       render: (v: number) => v != null ? mono(v.toLocaleString('vi-VN')) : gray(null),
     },
     {
-      title: 'Hạn giao',
+      title: hdr('Hạn giao'),
       dataIndex: 'delivery_date',
       key: 'delivery',
       width: 90,
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
-      title: 'Ngày sẵn hàng',
+      title: hdr('Sẵn hàng'),
       dataIndex: 'ready_date',
       key: 'ready_date',
-      width: 95,
+      width: 85,
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
-      title: 'Ngân hàng',
+      title: hdr('Ngân hàng'),
       dataIndex: 'bank_name',
       key: 'bank',
       width: 110,
@@ -466,7 +464,7 @@ const SalesOrderListPage = () => {
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
-      title: 'Số BKG',
+      title: hdr('Số BKG'),
       dataIndex: 'booking_reference',
       key: 'bkg',
       width: 100,
@@ -474,14 +472,14 @@ const SalesOrderListPage = () => {
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
-      title: 'ETD',
+      title: hdr('ETD'),
       dataIndex: 'etd',
       key: 'etd',
       width: 90,
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
-      title: 'Đơn giá',
+      title: hdr('Đ.giá'),
       dataIndex: 'unit_price',
       key: 'unit_price',
       width: 80,
@@ -489,7 +487,7 @@ const SalesOrderListPage = () => {
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
     {
-      title: 'Thành tiền (INV)',
+      title: hdr('Thành tiền'),
       dataIndex: 'total_value_usd',
       key: 'total_usd',
       width: 110,
@@ -497,26 +495,26 @@ const SalesOrderListPage = () => {
       render: (v: number) => v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null),
     },
     {
-      title: 'Chiết khấu',
+      title: hdr('CK'),
       dataIndex: 'discount_amount',
       key: 'discount',
-      width: 95,
+      width: 85,
       align: 'right',
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
     {
-      title: 'NH nhận CK',
+      title: hdr('NH CK'),
       dataIndex: 'discount_bank',
       key: 'discount_bank',
-      width: 110,
+      width: 90,
       ellipsis: true,
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
-      title: 'Còn lại',
+      title: hdr('Còn lại'),
       dataIndex: 'remaining_amount',
       key: 'remaining',
-      width: 100,
+      width: 90,
       align: 'right',
       render: (v: number, r: SalesOrder) => {
         const remaining = v ?? ((r.total_value_usd || 0) - ((r as any).discount_amount || 0) - ((r as any).bank_charges || 0))
@@ -524,16 +522,16 @@ const SalesOrderListPage = () => {
       },
     },
     {
-      title: 'Ngày tiền về',
+      title: hdr('Tiền về'),
       dataIndex: 'payment_received_date',
       key: 'payment_date',
-      width: 95,
+      width: 80,
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
-      title: 'Tiến độ',
+      title: hdr('T.độ'),
       key: 'progress',
-      width: 80,
+      width: 60,
       align: 'center',
       render: (_: unknown, r: SalesOrder) => progressDots(r),
     },

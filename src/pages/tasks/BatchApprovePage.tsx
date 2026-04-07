@@ -265,8 +265,14 @@ const BatchApprovePage: React.FC = () => {
 
         if (evalError) {
           console.error('Evaluation insert error for task', taskId, evalError);
-          // Continue anyway - evaluation might already exist
+          // Skip - evaluation might already exist from previous attempt
         }
+
+        // Also update task_self_evaluations if exists
+        await supabase.from('task_self_evaluations')
+          .update({ status: 'approved' })
+          .eq('task_id', taskId)
+          .eq('status', 'pending');
 
         // 2. Insert into task_approvals
         const { error: approvalError } = await supabase
@@ -276,7 +282,7 @@ const BatchApprovePage: React.FC = () => {
             approver_id: user.employee_id,
             action: 'approved',
             approved_score: finalScore,
-            original_score: selfScore,
+            original_score: managerScorePoints,
             rating,
             comments: note || 'Phê duyệt nhanh hàng loạt',
           });

@@ -522,21 +522,6 @@ const SalesOrderListPage = () => {
       align: 'center',
       render: (_: unknown, r: SalesOrder) => progressDots(r),
     },
-      render: (v: string) => {
-        if (!v || v === 'unpaid') return gray(null)
-        if (v === 'paid') return <Tag color="green" style={{ fontSize: 10, padding: '0 4px' }}>TT</Tag>
-        return <Tag color="blue" style={{ fontSize: 10, padding: '0 4px' }}>1P</Tag>
-      },
-    },
-
-    // ═══ STATUS ═══
-    {
-      title: 'Tiến độ',
-      key: 'progress',
-      width: 90,
-      align: 'center',
-      render: (_: unknown, r: SalesOrder) => progressDots(r),
-    },
 
     // ═══ ACTIONS (fixed right) ═══
     {

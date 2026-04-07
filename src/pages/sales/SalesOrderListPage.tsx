@@ -389,11 +389,11 @@ const SalesOrderListPage = () => {
   )
 
   const columns: ColumnsType<SalesOrder> = [
-    // ═══ FROZEN: #, Mã HĐ, Buyer ═══
+    // ═══ CỘT THEO YÊU CẦU ═══
     {
       title: '#',
       key: 'index',
-      width: 40,
+      width: 35,
       fixed: 'left',
       render: (_: unknown, __: SalesOrder, idx: number) => (
         <span style={{ color: '#999', fontSize: 11 }}>{(pagination.current - 1) * pagination.pageSize + idx + 1}</span>
@@ -403,18 +403,15 @@ const SalesOrderListPage = () => {
       title: 'Số HĐ',
       dataIndex: 'contract_no',
       key: 'contract_no',
-      width: 140,
+      width: 130,
       fixed: 'left',
-      render: (_: string, r: SalesOrder) => {
-        const display = (r as any).contract_no || r.code
-        return mono(<strong>{display}</strong>)
-      },
+      render: (_: string, r: SalesOrder) => mono(<strong>{(r as any).contract_no || r.code}</strong>),
     },
     {
-      title: 'Buyer',
+      title: 'Người mua',
       dataIndex: 'customer',
       key: 'customer',
-      width: 140,
+      width: 150,
       fixed: 'left',
       ellipsis: true,
       render: (_: unknown, r: SalesOrder) => {
@@ -423,25 +420,53 @@ const SalesOrderListPage = () => {
         return <span style={{ fontSize: 12 }}>{c.country ? getCountryFlag(c.country) + ' ' : ''}{c.short_name || c.name}</span>
       },
     },
-
-    // ═══ SALE GROUP (green) ═══
     {
-      title: groupTitle('Grade', '#1B4D3E'),
+      title: 'Loại hàng',
       dataIndex: 'grade',
       key: 'grade',
-      width: 80,
-      render: (g: string) => <GradeBadge grade={g} size="small" />,
+      width: 90,
+      render: (g: string) => g ? <GradeBadge grade={g} size="small" /> : gray(null),
     },
     {
-      title: groupTitle('Tấn', '#1B4D3E'),
+      title: 'Số lượng',
       dataIndex: 'quantity_tons',
       key: 'qty',
-      width: 70,
+      width: 75,
       align: 'right',
       render: (v: number) => v != null ? mono(v.toLocaleString('vi-VN')) : gray(null),
     },
     {
-      title: groupTitle('$/tấn', '#1B4D3E'),
+      title: 'Hạn giao',
+      dataIndex: 'delivery_date',
+      key: 'delivery',
+      width: 90,
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+    },
+    {
+      title: 'Ngân hàng',
+      dataIndex: 'bank_name',
+      key: 'bank',
+      width: 110,
+      ellipsis: true,
+      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
+    },
+    {
+      title: 'BLC',
+      dataIndex: 'bl_number',
+      key: 'blc',
+      width: 90,
+      ellipsis: true,
+      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
+    },
+    {
+      title: 'ETD',
+      dataIndex: 'etd',
+      key: 'etd',
+      width: 90,
+      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+    },
+    {
+      title: 'Đơn giá',
       dataIndex: 'unit_price',
       key: 'unit_price',
       width: 80,
@@ -449,7 +474,7 @@ const SalesOrderListPage = () => {
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
     {
-      title: groupTitle('Tổng USD', '#1B4D3E'),
+      title: 'Thành tiền',
       dataIndex: 'total_value_usd',
       key: 'total_usd',
       width: 110,
@@ -457,98 +482,46 @@ const SalesOrderListPage = () => {
       render: (v: number) => v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null),
     },
     {
-      title: groupTitle('Thanh toán', '#1B4D3E'),
-      dataIndex: 'payment_terms',
-      key: 'payment_terms',
-      width: 80,
-      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
-    },
-    {
-      title: groupTitle('Giao', '#1B4D3E'),
-      dataIndex: 'delivery_date',
-      key: 'delivery',
-      width: 90,
-      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
-    },
-
-    // ═══ SX GROUP (blue) ═══
-    {
-      title: groupTitle('SX sẵn', '#1677ff'),
-      dataIndex: 'ready_date',
-      key: 'ready_date',
-      width: 90,
-      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
-    },
-    {
-      title: groupTitle('Cont', '#1677ff'),
-      dataIndex: 'container_count',
-      key: 'containers',
-      width: 55,
-      align: 'center',
-      render: (v: number) => v ? mono(v) : gray(null),
-    },
-
-    // ═══ LOG GROUP (yellow/orange) ═══
-    {
-      title: groupTitle('BK', '#d48806'),
-      dataIndex: 'booking_reference',
-      key: 'bk',
-      width: 80,
-      ellipsis: true,
-      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
-    },
-    {
-      title: groupTitle('B/L', '#d48806'),
-      dataIndex: 'bl_number',
-      key: 'bl',
-      width: 80,
-      ellipsis: true,
-      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
-    },
-    {
-      title: groupTitle('ETD', '#d48806'),
-      dataIndex: 'etd',
-      key: 'etd',
-      width: 90,
-      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
-    },
-    {
-      title: groupTitle('L/C hạn', '#d48806'),
-      dataIndex: 'lc_expiry_date',
-      key: 'lc_expiry',
-      width: 100,
-      render: (d: string) => lcBadge(d),
-    },
-    {
-      title: groupTitle('CK $', '#d48806'),
+      title: 'Chiết khấu',
       dataIndex: 'discount_amount',
       key: 'discount',
-      width: 80,
+      width: 95,
       align: 'right',
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
-
-    // ═══ KT GROUP (red/pink) ═══
     {
-      title: groupTitle('Tỷ giá', '#cf1322'),
-      dataIndex: 'exchange_rate',
-      key: 'exrate',
-      width: 80,
-      align: 'right',
-      render: (v: number) => v ? mono(v.toLocaleString('vi-VN')) : gray(null),
+      title: 'NH nhận CK',
+      dataIndex: 'discount_bank',
+      key: 'discount_bank',
+      width: 110,
+      ellipsis: true,
+      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
-      title: groupTitle('Tiền về', '#cf1322'),
+      title: 'Còn lại',
+      dataIndex: 'remaining_amount',
+      key: 'remaining',
+      width: 100,
+      align: 'right',
+      render: (v: number, r: SalesOrder) => {
+        const remaining = v ?? ((r.total_value_usd || 0) - ((r as any).discount_amount || 0) - ((r as any).bank_charges || 0))
+        return remaining ? <strong style={{ color: '#1677ff', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(remaining)}</strong> : gray(null)
+      },
+    },
+    {
+      title: 'Ngày tiền về',
       dataIndex: 'payment_received_date',
       key: 'payment_date',
-      width: 90,
+      width: 95,
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
-      title: groupTitle('TT', '#cf1322'),
-      dataIndex: 'payment_status',
-      key: 'pay_status',
-      width: 65,
+      title: 'Tiến độ',
+      key: 'progress',
+      width: 80,
+      align: 'center',
+      render: (_: unknown, r: SalesOrder) => progressDots(r),
+    },
       render: (v: string) => {
         if (!v || v === 'unpaid') return gray(null)
         if (v === 'paid') return <Tag color="green" style={{ fontSize: 10, padding: '0 4px' }}>TT</Tag>
@@ -821,25 +794,29 @@ const SalesOrderListPage = () => {
             if (!orders.length) return null
             const totalQty = orders.reduce((s, o) => s + (o.quantity_tons || 0), 0)
             const totalUSD = orders.reduce((s, o) => s + (o.total_value_usd || o.quantity_tons * o.unit_price || 0), 0)
-            const totalDiscount = orders.reduce((s, o) => s + (o.discount_amount || 0), 0)
+            const totalDiscount = orders.reduce((s, o) => s + ((o as any).discount_amount || 0), 0)
+            const totalRemaining = totalUSD - totalDiscount
             return (
               <Table.Summary fixed>
                 <Table.Summary.Row>
                   <Table.Summary.Cell index={0} colSpan={4} align="right">
-                    <strong style={{ fontSize: 12 }}>Tổng trang:</strong>
+                    <strong style={{ fontSize: 12 }}>Tổng:</strong>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={4} align="right">
                     <strong style={{ fontFamily: 'monospace', fontSize: 12 }}>{totalQty.toLocaleString('vi-VN')}</strong>
                   </Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} />
-                  <Table.Summary.Cell index={6} align="right">
+                  <Table.Summary.Cell index={5} colSpan={5} />
+                  <Table.Summary.Cell index={10} align="right">
                     <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#1B4D3E' }}>{formatCurrency(totalUSD)}</strong>
                   </Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} colSpan={9} />
-                  <Table.Summary.Cell index={16} align="right">
+                  <Table.Summary.Cell index={11} align="right">
                     <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#d48806' }}>{totalDiscount > 0 ? formatCurrency(totalDiscount) : ''}</strong>
                   </Table.Summary.Cell>
-                  <Table.Summary.Cell index={17} colSpan={4} />
+                  <Table.Summary.Cell index={12} />
+                  <Table.Summary.Cell index={13} align="right">
+                    <strong style={{ fontFamily: 'monospace', fontSize: 12, color: '#1677ff' }}>{totalRemaining > 0 ? formatCurrency(totalRemaining) : ''}</strong>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={14} colSpan={3} />
                 </Table.Summary.Row>
               </Table.Summary>
             )

@@ -428,6 +428,14 @@ const SalesOrderListPage = () => {
       render: (g: string) => g ? <GradeBadge grade={g} size="small" /> : gray(null),
     },
     {
+      title: 'Số LOT',
+      dataIndex: 'customer_po',
+      key: 'lot',
+      width: 100,
+      ellipsis: true,
+      render: (v: string) => v ? <span style={{ fontSize: 11, fontFamily: 'monospace' }}>{v}</span> : gray(null),
+    },
+    {
       title: 'Số lượng',
       dataIndex: 'quantity_tons',
       key: 'qty',
@@ -451,10 +459,10 @@ const SalesOrderListPage = () => {
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
-      title: 'BLC',
-      dataIndex: 'bl_number',
-      key: 'blc',
-      width: 90,
+      title: 'Số BKG',
+      dataIndex: 'booking_reference',
+      key: 'bkg',
+      width: 100,
       ellipsis: true,
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
@@ -474,7 +482,7 @@ const SalesOrderListPage = () => {
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
     {
-      title: 'Thành tiền',
+      title: 'Thành tiền (INV)',
       dataIndex: 'total_value_usd',
       key: 'total_usd',
       width: 110,

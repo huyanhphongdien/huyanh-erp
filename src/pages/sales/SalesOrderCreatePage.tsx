@@ -329,7 +329,7 @@ function SalesOrderCreatePage() {
                   <InputNumber value={item.bales_per_container} min={1} style={{ width: '100%' }}
                     onChange={(v) => updateItem(item.key, 'bales_per_container', v || 576)} />
                 </Col>
-                <Col xs={12} sm={3}>
+                <Col xs={12} sm={4}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Đóng gói</div>
                   <Select value={item.packing_type} style={{ width: '100%' }}
                     options={[

@@ -122,60 +122,85 @@ Manager có quyền tick **"Miễn trừ trễ hạn"** khi duyệt (bất khả
 
 ---
 
-### Ví dụ tính điểm đầy đủ
+### Ví dụ thực tế #1: Lê Duy Minh — Phòng QLSX — Ngày 7/4/2026
 
-**NV Ngô Thị Khuyên — Phòng Thu Mua — Ngày 6/4/2026**
-Mức chuẩn phòng: 10 CV/tháng
+Mức chuẩn phòng QLSX: **15 CV/tháng**
 
-**Bước 1: Tính điểm chất lượng**
+**Bước 1: Liệt kê CV đã hoàn thành**
 
-| # | Công việc | Loại | Điểm | Trọng số | Điểm × TS |
-|---|-----------|------|:----:|:--------:|:---------:|
-| 1 | Liên hệ NCC mới | assigned | 80 (4★) | 1.0 | 80.0 |
-| 2 | Đàm phán giá | assigned (khó ×1.2) | 96 | 1.0 | 96.0 |
-| 3 | Báo cáo tuần | recurring | 80 | 0.5 | 40.0 |
-| 4 | Cập nhật bảng giá | self | 85 | 0.5 | 42.5 |
-| | **Tổng** | | | **3.0** | **258.5** |
+| # | Công việc | Loại | Điểm | Trọng số |
+|---|-----------|------|:----:|:--------:|
+| 1-24 | 24 task dự án B2B Platform | project | 85đ (mỗi task) | 1.0 |
 
 ```
-Điểm CL = 258.5 / 3.0 = 86.2
+Tổng trọng số = 24 × 1.0 = 24.0
+Tổng điểm × TS = 24 × 85 × 1.0 = 2040
 ```
 
-**Bước 2: Tính điểm khối lượng** (ngày 6/4)
+**Bước 2: Tính điểm chất lượng**
 
 ```
-Kỳ vọng = 10 × (6/30) = 2 CV
-Điểm KL = min(100, 4 / 2 × 100) = 100  ← vượt kỳ vọng!
+CL = 2040 / 24.0 = 85đ
 ```
 
-**Bước 3: Tổng hợp**
+**Bước 3: Tính điểm khối lượng** (ngày 7/4)
 
 ```
-Điểm cuối = (86.2 × 60%) + (100 × 40%) = 51.7 + 40 = 91.7 → Hạng A ✅
+Tỷ lệ tháng = 7 / 30 = 23%
+Kỳ vọng = 15 × 23% = 4 CV (làm tròn)
+Thực tế = 24 CV
+KL = min(100, 24 / 4 × 100) = min(100, 600) = 100  ← cap tại 100
 ```
 
-**So sánh: Nếu không tính theo ngày (cách cũ):**
+**Bước 4: Tổng hợp**
 
 ```
-Điểm KL cũ = min(100, 4 / 10 × 100) = 40  ← bị phạt vì mới đầu tháng
-Điểm cũ = 86.2×60% + 40×40% = 51.7 + 16 = 67.7 → Hạng C ❌ (không công bằng)
+Điểm cuối = CL × 60% + KL × 40%
+           = 85 × 60% + 100 × 40%
+           = 51 + 40
+           = 91đ → Hạng A ✅
 ```
+
+> **Giải thích:** Điểm CL chỉ 85 (project auto = 85đ), nhưng khối lượng vượt xa kỳ vọng (24 vs 4 CV) nên KL = 100 → kéo tổng lên 91.
 
 ---
 
-### So sánh: Làm nhiều vs Làm ít (cuối tháng, kỳ vọng = chuẩn)
+### Ví dụ thực tế #2: Giả sử cuối tháng — cùng NV
 
-| NV | CV xong | Điểm CL | Điểm KL | Cuối cùng | Hạng |
-|---|:---:|:---:|:---:|:---:|:---:|
-| **A** (làm nhiều, tốt) | 20 | 80 | 100 | 80×60%+100×40% = **88** | **B** |
-| **B** (làm ít, giỏi) | 5 | 90 | 33 | 90×60%+33×40% = **67** | **C** |
-| **C** (chuẩn, giỏi) | 15 | 90 | 100 | 90×60%+100×40% = **94** | **A** |
-| **D** (làm nhiều, TB) | 18 | 65 | 100 | 65×60%+100×40% = **79** | **B** |
-| **E** (làm ít, TB) | 3 | 65 | 20 | 65×60%+20×40% = **47** | **D** |
+**Ngày 30/4 — vẫn chỉ 24 CV, không thêm gì:**
 
-> **NV C** (đủ chuẩn + chất lượng cao) = Hạng A → mục tiêu lý tưởng.
-> **NV B** (làm ít dù giỏi) = Hạng C → khuyến khích nhận thêm CV.
-> **NV A** (làm nhiều) = Hạng B → nâng chất lượng lên sẽ đạt A.
+```
+Kỳ vọng = 15 × (30/30) = 15 CV
+KL = min(100, 24 / 15 × 100) = min(100, 160) = 100  ← vẫn vượt chuẩn
+
+Điểm = 85 × 60% + 100 × 40% = 91đ → vẫn A ✅
+```
+
+**Ngày 30/4 — chỉ có 5 CV:**
+
+```
+KL = min(100, 5 / 15 × 100) = 33
+
+Điểm = 85 × 60% + 33 × 40% = 51 + 13.2 = 64đ → Hạng C ❌
+```
+
+> Kết luận: NV làm ít CV bị giảm phần khối lượng 40%, dù chất lượng cao.
+
+---
+
+### Bảng so sánh tổng hợp (cuối tháng, kỳ vọng = chuẩn phòng)
+
+| NV | CV xong | CL | KL | Tính | Điểm | Hạng |
+|---|:---:|:---:|:---:|------|:---:|:---:|
+| **A** (nhiều + tốt) | 24 | 85 | 100 | 85×60%+100×40% | **91** | **A** |
+| **B** (ít + giỏi) | 5 | 90 | 33 | 90×60%+33×40% | **67** | **C** |
+| **C** (chuẩn + giỏi) | 15 | 90 | 100 | 90×60%+100×40% | **94** | **A** |
+| **D** (nhiều + TB) | 18 | 65 | 100 | 65×60%+100×40% | **79** | **B** |
+| **E** (ít + TB) | 3 | 65 | 20 | 65×60%+20×40% | **47** | **D** |
+
+> **NV C** (đủ chuẩn + chất lượng cao) = **Hạng A** → mục tiêu lý tưởng.
+> **NV B** (làm ít dù giỏi) = **Hạng C** → cần nhận thêm CV.
+> **NV A** (làm nhiều) = **Hạng A** → khối lượng bù cho chất lượng.
 
 ### Xếp hạng
 

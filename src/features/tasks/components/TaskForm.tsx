@@ -129,6 +129,7 @@ export function TaskForm({
         department_id: task.department_id || '',
         assignee_id: task.assignee_id || '',
         priority: task.priority || 'medium',
+        difficulty: (task as any).difficulty || 'normal',
         start_date: task.start_date ? task.start_date.split('T')[0] : '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         notes: task.notes || '',

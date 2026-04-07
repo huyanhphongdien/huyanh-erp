@@ -807,7 +807,6 @@ const SalesOrderListPage = () => {
               borderLeft: getRowBorderLeft(record),
             },
           })}
-          size="middle"
         />
       </Card>
 

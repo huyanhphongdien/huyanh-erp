@@ -328,7 +328,7 @@ export function useKeliScale(): UseKeliScaleReturn {
             consecutiveErrors = 0
 
             const rawText = decoder.decode(value, { stream: true })
-            const rawBytes = value ? Array.from(value).map(b => b.toString(16).padStart(2, '0')).join(' ') : ''
+            const rawBytes = value ? Array.from(new Uint8Array(value)).map(b => b.toString(16).padStart(2, '0')).join(' ') : ''
             console.log(`[KeliScale] 📥 Raw (${value?.length || 0} bytes):`, JSON.stringify(rawText), '| HEX:', rawBytes)
             bufferRef.current += rawText
 

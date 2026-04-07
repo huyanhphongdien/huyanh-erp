@@ -365,11 +365,17 @@ function SalesOrderCreatePage() {
                     ]}
                     onChange={(v) => updateItem(item.key, 'packing_type', v)} />
                 </Col>
-                <Col xs={12} sm={3}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Thanh toán</div>
-                  <Select value={item.payment_terms || undefined} placeholder="Chọn..." style={{ width: '100%' }} allowClear
+                <Col xs={24} sm={5}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Thanh toán (chọn nhiều)</div>
+                  <Select
+                    mode="multiple"
+                    value={item.payment_terms ? item.payment_terms.split(',').filter(Boolean) : []}
+                    placeholder="Chọn hình thức..."
+                    style={{ width: '100%' }}
+                    maxTagCount={2}
                     options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
-                    onChange={(v) => updateItem(item.key, 'payment_terms', v || '')} />
+                    onChange={(vals: string[]) => updateItem(item.key, 'payment_terms', vals.join(','))}
+                  />
                 </Col>
                 <Col xs={4} sm={1} style={{ textAlign: 'center' }}>
                   {orderItems.length > 1 && (

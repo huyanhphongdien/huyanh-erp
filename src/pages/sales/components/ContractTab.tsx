@@ -329,6 +329,38 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         </Descriptions.Item>
       </Descriptions>
 
+      {/* Chi tiết sản phẩm (multi-item) */}
+      {order.items && order.items.length > 1 && (
+        <>
+          <Divider style={{ margin: '12px 0' }} />
+          <SectionHeader title="Chi tiết sản phẩm" color="#1B4D3E" />
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+            <thead>
+              <tr style={{ background: '#fafafa' }}>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, color: '#666' }}>Grade</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, color: '#666' }}>Tấn</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, color: '#666' }}>$/tấn</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right', fontSize: 11, color: '#666' }}>Thành tiền</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, color: '#666' }}>Đóng gói</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, color: '#666' }}>Thanh toán</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items.map((item: any, i: number) => (
+                <tr key={item.id || i} style={{ borderTop: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '6px 10px' }}><Tag color="green">{item.grade}</Tag></td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{item.quantity_tons}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>${item.unit_price?.toLocaleString()}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>${item.total_value_usd?.toLocaleString()}</td>
+                  <td style={{ padding: '6px 10px', fontSize: 11 }}>{item.packing_type?.replace('_', ' ') || '—'}</td>
+                  <td style={{ padding: '6px 10px', fontSize: 11 }}>{item.payment_terms ? item.payment_terms.split(',').join(' + ') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
       <Divider style={{ margin: '12px 0' }} />
 
       {/* Section: Điều khoản & Ngân hàng */}

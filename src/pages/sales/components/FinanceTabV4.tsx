@@ -86,11 +86,12 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
   const totalUSD = order.total_value_usd || (order.quantity_tons * order.unit_price)
   const exchangeRate = order.exchange_rate || 0
   const totalVND = exchangeRate > 0 ? totalUSD * exchangeRate : (order.total_value_vnd || 0)
+  const deposit = order.deposit_amount || 0
   const discount = order.discount_amount || 0
   const bankCharges = order.bank_charges || 0
   const commissionAmt = order.commission_amount || (totalUSD * (order.commission_pct || 0) / 100)
-  const remainingAmount = order.remaining_amount ?? (totalUSD - discount - bankCharges)
-  const netRevenue = order.net_revenue ?? (totalUSD - discount - bankCharges - commissionAmt)
+  const remainingAmount = order.remaining_amount ?? (totalUSD - deposit - discount - bankCharges)
+  const netRevenue = order.net_revenue ?? (totalUSD - deposit - discount - bankCharges - commissionAmt)
   const discountExRate = order.discount_exchange_rate || 0
 
   // L/C warning
@@ -128,7 +129,8 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
       // Recalc
       const totalVndCalc = exRate > 0 ? totalUSD * exRate : null
       const discountVnd = discExRate > 0 && discount > 0 ? discount * discExRate : null
-      const netRev = totalUSD - discount - charges - commissionAmt
+      const dep = order.deposit_amount || 0
+      const netRev = totalUSD - dep - discount - charges - commissionAmt
 
       const updateData: Record<string, any> = {
         exchange_rate: exRate || null,
@@ -140,7 +142,7 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         bank_charges: charges || null,
         bank_name: vals.bank_name || null,
         net_revenue: netRev,
-        remaining_amount: totalUSD - discount - charges,
+        remaining_amount: totalUSD - dep - discount - charges,
       }
 
       await salesOrderService.updateFields(order.id, updateData)
@@ -288,6 +290,7 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
           <tbody>
             <SummaryRow label="Tổng giá trị HĐ (USD)" value={fmtUSD(totalUSD)} />
+            <SummaryRow label="Đặt cọc" value={deposit > 0 ? `- ${fmtUSD(deposit)}` : '—'} color="#722ed1" />
             <SummaryRow label="Chiết khấu NH" value={discount > 0 ? `- ${fmtUSD(discount)}` : '—'} color="#d48806" />
             <SummaryRow label="Phí ngân hàng" value={bankCharges > 0 ? `- ${fmtUSD(bankCharges)}` : '—'} color="#cf1322" />
             <SummaryRow label="Hoa hồng" value={commissionAmt > 0 ? `- ${fmtUSD(commissionAmt)} (${order.commission_pct || 0}%)` : '—'} color="#722ed1" />

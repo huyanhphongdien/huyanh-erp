@@ -181,41 +181,16 @@ function SalesOrderCreatePage() {
     [customers, form],
   )
 
-  // ── Grade selection → auto-fill quality specs ──
-  const handleGradeChange = useCallback(
-    (grade: string) => {
-      const std = gradeStandards.find((s) => s.grade === grade) || null
-      setSelectedStandard(std)
-      if (std) {
-        form.setFieldsValue({
-          drc_min: std.drc_min,
-          drc_max: std.drc_max ?? undefined,
-          moisture_max: std.moisture_max,
-          dirt_max: std.dirt_max,
-          ash_max: std.ash_max,
-          nitrogen_max: std.nitrogen_max,
-          volatile_max: std.volatile_matter_max,
-          pri_min: std.pri_min ?? undefined,
-          mooney_max: std.mooney_max ?? undefined,
-          color_lovibond_max: std.color_lovibond_max ?? undefined,
-        })
-      }
-    },
-    [gradeStandards, form],
-  )
-
   // ── Step validation & navigation ──
-  const stepFields: string[][] = [
-    ['customer_id', 'grade', 'quantity_tons', 'unit_price'],
-    [],
-    [],
-    [],
-  ]
-
   const nextStep = async () => {
     try {
-      if (stepFields[currentStep].length > 0) {
-        await form.validateFields(stepFields[currentStep])
+      // Validate form fields
+      await form.validateFields(['customer_id', 'contract_no'])
+      // Validate items
+      const validItems = orderItems.filter(i => i.grade && i.quantity_tons > 0 && i.unit_price > 0)
+      if (validItems.length === 0) {
+        message.error('Vui lòng thêm ít nhất 1 sản phẩm (chọn Grade, nhập Tấn, $/tấn)')
+        return
       }
       setCurrentStep((s) => Math.min(s + 1, 3))
     } catch {
@@ -433,16 +408,6 @@ function SalesOrderCreatePage() {
             <Col xs={24} sm={8}>
               <Form.Item label="Hoa hồng (%)" name="commission_pct">
                 <InputNumber min={0} max={20} step={0.5} size="large" style={{ width: '100%' }} placeholder="2" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Đóng gói" name="packing_type" initialValue="loose_bale">
-                <Select size="large" options={[
-                  { value: 'loose_bale', label: 'Loose Bale' },
-                  { value: 'sw_pallet', label: 'SW Pallet (Shrink Wrap)' },
-                  { value: 'wooden_pallet', label: 'Wooden Pallet' },
-                  { value: 'metal_box', label: 'Metal Box' },
-                ]} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>

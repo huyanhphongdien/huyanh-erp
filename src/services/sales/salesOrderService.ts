@@ -664,8 +664,9 @@ export const salesOrderService = {
   // ==========================================================================
 
   async deleteOrder(id: string): Promise<void> {
-    // Xóa theo thứ tự FK: invoices → containers → documents → order
+    // Xóa theo thứ tự FK: invoices → items → containers → documents → order
     await supabase.from('sales_invoices').delete().eq('sales_order_id', id)
+    await supabase.from('sales_order_items').delete().eq('sales_order_id', id)
     await supabase.from('sales_order_containers').delete().eq('sales_order_id', id)
     await supabase.from('sales_order_documents').delete().eq('sales_order_id', id)
     const { error } = await supabase.from('sales_orders').delete().eq('id', id)

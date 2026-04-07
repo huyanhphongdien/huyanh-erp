@@ -310,8 +310,6 @@ const getMenuGroups = (
         requireSalesRoles: ['sale', 'accounting', 'admin'] },
       { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} />,
         requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin'] },
-      { path: '/sales/shipments', label: 'Theo dõi lô hàng', icon: <Ship size={18} />,
-        requireSalesRoles: ['sale', 'logistics', 'accounting', 'admin'] },
       { path: '/sales/ar-aging', label: 'Nợ phải thu (A/R)', icon: <Clock size={18} />,
         requireSalesRoles: ['accounting', 'admin'] },
       { path: '/sales/cash-flow', label: 'Dòng tiền & LC', icon: <CreditCard size={18} />,

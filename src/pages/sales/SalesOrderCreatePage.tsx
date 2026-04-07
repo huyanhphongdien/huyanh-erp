@@ -45,6 +45,8 @@ import {
   CUSTOMER_TIER_LABELS,
   CUSTOMER_TIER_COLORS,
   COUNTRY_OPTIONS,
+  BANK_OPTIONS,
+  BANK_DETAILS,
 } from '../../services/sales/salesTypes'
 import type { Incoterm, PaymentTerms, PackingType } from '../../services/sales/salesTypes'
 
@@ -363,21 +365,35 @@ function SalesOrderCreatePage() {
           <Divider style={{ margin: '12px 0' }} />
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item label="Ngân hàng" name="bank_name" initialValue="Vietcombank CN Huế">
-                <Input size="large" placeholder="Vietcombank CN Huế" />
+              <Form.Item label="Ngân hàng" name="bank_code" initialValue="VCB">
+                <Select size="large" onChange={(val: string) => {
+                  const details = BANK_DETAILS[val]
+                  if (details) {
+                    form.setFieldsValue({
+                      bank_name: details.name,
+                      bank_account: details.account,
+                      bank_swift: details.swift,
+                    })
+                  } else {
+                    form.setFieldsValue({ bank_name: '', bank_account: '', bank_swift: '' })
+                  }
+                }}
+                  options={BANK_OPTIONS.map(b => ({ value: b.value, label: b.label }))}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
               <Form.Item label="Số tài khoản" name="bank_account" initialValue="0071001046372">
-                <Input size="large" placeholder="0071001046372" style={{ fontFamily: 'monospace' }} />
+                <Input size="large" style={{ fontFamily: 'monospace' }} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
               <Form.Item label="SWIFT Code" name="bank_swift" initialValue="BFTVVNVX">
-                <Input size="large" placeholder="BFTVVNVX" style={{ fontFamily: 'monospace' }} />
+                <Input size="large" style={{ fontFamily: 'monospace' }} />
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item name="bank_name" hidden><Input /></Form.Item>
         </Card>
       </Col>
 

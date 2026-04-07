@@ -511,6 +511,17 @@ export const BANK_OPTIONS = [
   { value: 'OTHER', label: 'Khác' },
 ] as const
 
+// Auto-fill bank details khi chọn ngân hàng
+export const BANK_DETAILS: Record<string, { name: string; account: string; swift: string }> = {
+  VCB: { name: 'Vietcombank CN Huế', account: '0071001046372', swift: 'BFTVVNVX' },
+  VTB: { name: 'Vietinbank CN Huế', account: '111002648221', swift: 'ICBVVNVX460' },
+  BIDV: { name: 'BIDV CN Huế', account: '', swift: 'BIDVVNVX' },
+  ACB: { name: 'ACB', account: '', swift: 'ASCBVNVX' },
+  MB: { name: 'MBBank', account: '', swift: 'MSCBVNVX' },
+  TCB: { name: 'Techcombank', account: '', swift: 'VTCBVNVX' },
+  SHB: { name: 'SHB', account: '', swift: 'SHBAVNVX' },
+}
+
 // Cảng xếp hàng tại Việt Nam
 export const PORT_OF_LOADING_OPTIONS = [
   { value: 'HCM_CAT_LAI', label: 'Cát Lái — TP.HCM' },

@@ -765,6 +765,45 @@ const SalesOrderListPage = () => {
           columns={columns}
           dataSource={orders}
           loading={loading}
+          expandable={{
+            expandedRowRender: (record) => {
+              const items = (record as any).items as any[] || []
+              if (items.length <= 1) return null
+              return (
+                <div style={{ padding: '4px 0' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
+                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: '#666' }}>Loại hàng</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: '#666' }}>Số lượng</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: '#666' }}>Đơn giá</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: '#666' }}>Thành tiền</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: '#666' }}>Tổng bành</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: '#666' }}>Container</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: '#666' }}>KG/bành</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: '#666' }}>Đóng gói</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item: any, i: number) => (
+                        <tr key={item.id || i} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                          <td style={{ padding: '6px 12px' }}><Tag color="green">{item.grade}</Tag></td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.quantity_tons} tấn</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>${item.unit_price?.toLocaleString()}</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>${item.total_value_usd?.toLocaleString()}</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.total_bales?.toLocaleString()}</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.container_count}</td>
+                          <td style={{ padding: '6px 12px' }}>{item.bale_weight_kg} kg</td>
+                          <td style={{ padding: '6px 12px', fontSize: 11 }}>{item.packing_type === 'sw_pallet' ? 'SW Pallet' : item.packing_type === 'wooden_pallet' ? 'Wooden Pallet' : item.packing_type === 'metal_box' ? 'Metal Box' : 'Loose Bale'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            },
+            rowExpandable: (record) => ((record as any).items?.length || 0) > 1,
+          }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,

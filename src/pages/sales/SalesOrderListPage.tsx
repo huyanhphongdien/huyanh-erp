@@ -523,61 +523,19 @@ const SalesOrderListPage = () => {
       render: (_: unknown, r: SalesOrder) => progressDots(r),
     },
 
-    // ═══ ACTIONS (fixed right) ═══
+    // ═══ ACTIONS ═══
     {
       title: '',
       key: 'actions',
-      width: isAdmin ? 110 : 80,
+      width: 50,
       fixed: 'right',
       render: (_: unknown, record: SalesOrder) => (
-        <Space size={2}>
-          <Tooltip title="Xem">
-            <Button
-              type="text"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={(e) => {
-                e.stopPropagation()
-                setPanelOrderId(record.id)
-                setPanelOpen(true)
-              }}
-            />
-          </Tooltip>
-          {record.status === 'draft' && (
-            <Popconfirm
-              title={`Xác nhận ${record.code}?`}
-              onConfirm={() => handleConfirm(record)}
-              okText="OK"
-              cancelText="Hủy"
-            >
-              <Tooltip title="Xác nhận">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </Tooltip>
-            </Popconfirm>
-          )}
+        <Space size={0}>
+          <Button type="text" size="small" icon={<EyeOutlined />}
+            onClick={(e) => { e.stopPropagation(); setPanelOrderId(record.id); setPanelOpen(true) }} />
           {isAdmin && (
-            <Popconfirm
-              title={`Xóa ${record.code}?`}
-              description="Xóa vĩnh viễn đơn hàng này"
-              onConfirm={() => handleDelete(record)}
-              okText="Xóa"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true }}
-            >
-              <Tooltip title="Xóa (Admin)">
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </Tooltip>
+            <Popconfirm title={`Xóa ${(record as any).contract_no || record.code}?`} onConfirm={() => handleDelete(record)} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
             </Popconfirm>
           )}
         </Space>
@@ -813,7 +771,8 @@ const SalesOrderListPage = () => {
             pageSizeOptions: ['10', '20', '50'],
           }}
           onChange={handleTableChange}
-          scroll={{ x: 2000 }}
+          scroll={{ x: 1600 }}
+          size="small"
           summary={() => {
             if (!orders.length) return null
             const totalQty = orders.reduce((s, o) => s + (o.quantity_tons || 0), 0)

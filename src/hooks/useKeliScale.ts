@@ -120,10 +120,16 @@ function parseKeliOutput(line: string): ScaleReading | null {
     /^(ST|US|OL),\s*(GS|NT|TR),\s*([+-])\s*([\d.]+)\s*(kg|lb|t|g)?/i
   )
   if (fullMatch) {
-    const stable = fullMatch[1].toUpperCase() === 'ST'
+    const statusCode = fullMatch[1].toUpperCase()
+    const stable = statusCode === 'ST'
+    const overload = statusCode === 'OL'
     const sign = fullMatch[3] === '-' ? -1 : 1
     const weight = parseFloat(fullMatch[4]) * sign
     const unit = (fullMatch[5] || 'kg').toLowerCase()
+
+    if (overload) {
+      console.error(`[KeliScale] ⚠️ OVERLOAD (OL) detected! Weight: ${weight} ${unit} — Cân quá tải!`)
+    }
 
     if (isNaN(weight)) return null
 
@@ -295,7 +301,7 @@ export function useKeliScale(): UseKeliScaleReturn {
   // READ LOOP — Continuously read from serial port
   // --------------------------------------------------------------------------
 
-  // Debug mode: bật bằng console: window.__SCALE_DEBUG = true
+  // Debug mode: luôn bật log cơ bản, chi tiết bật bằng: window.__SCALE_DEBUG = true
   const isDebug = () => typeof window !== 'undefined' && (window as any).__SCALE_DEBUG === true
 
   const startReading = useCallback(async (port: SerialPort) => {
@@ -322,7 +328,8 @@ export function useKeliScale(): UseKeliScaleReturn {
             consecutiveErrors = 0
 
             const rawText = decoder.decode(value, { stream: true })
-            if (isDebug()) console.log('[KeliScale] Raw chunk:', JSON.stringify(rawText))
+            const rawBytes = value ? Array.from(value).map(b => b.toString(16).padStart(2, '0')).join(' ') : ''
+            console.log(`[KeliScale] 📥 Raw (${value?.length || 0} bytes):`, JSON.stringify(rawText), '| HEX:', rawBytes)
             bufferRef.current += rawText
 
             // Process complete lines (separated by \r\n, \n, or \r)
@@ -331,11 +338,12 @@ export function useKeliScale(): UseKeliScaleReturn {
 
             for (const line of lines) {
               if (line.trim()) {
-                if (isDebug()) console.log('[KeliScale] Line:', JSON.stringify(line))
                 const reading = parseKeliOutput(line)
                 if (reading) {
-                  if (isDebug()) console.log('[KeliScale] Parsed:', reading.weight, reading.unit)
+                  console.log(`[KeliScale] ✅ Weight: ${reading.weight} ${reading.unit} | Stable: ${reading.stable} | Line: ${JSON.stringify(line)}`)
                   setLiveWeight(reading)
+                } else {
+                  console.warn(`[KeliScale] ❌ Cannot parse: ${JSON.stringify(line)}`)
                 }
               }
             }
@@ -434,7 +442,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       setConnected(true)
       setError(null)
       fatalErrorRef.current = false
-      console.log(`[KeliScale] Connected — ${cfg.baudRate} baud, parity: ${cfg.parity}`)
+      console.log(`[KeliScale] ✅ Connected — Model: XK3118T1-A3 | Baud: ${cfg.baudRate} | Parity: ${cfg.parity} | DataBits: ${cfg.dataBits} | StopBits: ${cfg.stopBits}`)
+      console.log(`[KeliScale] 📡 Listening for weight data... (check console for raw bytes)`)
 
       startReading(port)
 

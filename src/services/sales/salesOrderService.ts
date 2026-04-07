@@ -301,7 +301,7 @@ export const salesOrderService = {
     // Tính toán các trường tự động
     const baleWeight = input.bale_weight_kg || 33.33
     const quantityKg = input.quantity_tons * 1000
-    const totalBales = Math.ceil(quantityKg / baleWeight)
+    const totalBales = Math.round(quantityKg / baleWeight)
     const containerType = input.container_type || '20ft'
     // Container 20ft: 600 bành (35kg) hoặc 630 bành (33.33kg) | 40ft: gấp đôi
     const balesPerContainer20ft = baleWeight >= 35 ? 600 : 630
@@ -452,7 +452,7 @@ export const salesOrderService = {
       input.exchange_rate !== undefined
     ) {
       const quantityKg = quantityTons * 1000
-      const totalBales = Math.ceil(quantityKg / baleWeight)
+      const totalBales = Math.round(quantityKg / baleWeight)
       const maxTonsPerContainer = containerType === '20ft' ? 20 : 25
       const containerCount = Math.ceil(quantityTons / maxTonsPerContainer)
       const totalValueUsd = quantityTons * unitPrice

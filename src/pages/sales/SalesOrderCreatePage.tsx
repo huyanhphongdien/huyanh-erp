@@ -118,7 +118,7 @@ function SalesOrderCreatePage() {
   const currency = Form.useWatch('currency', form) || 'USD'
   const commissionPct = Form.useWatch('commission_pct', form) || 0
 
-  const totalBales = baleWeight > 0 ? Math.ceil((quantityTons * 1000) / baleWeight) : 0
+  const totalBales = baleWeight > 0 ? Math.round((quantityTons * 1000) / baleWeight) : 0
   const balesPerContainer = containerType === '40ft' ? balesPerContInput * 2 : balesPerContInput
   const containerCount = balesPerContainer > 0 ? Math.ceil(totalBales / balesPerContainer) : 0
   const totalValueUSD = quantityTons * unitPrice

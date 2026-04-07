@@ -126,7 +126,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
 
       // Recalc derived fields
       const qtyKg = vals.quantity_tons * 1000
-      const totalBales = Math.ceil(qtyKg / (vals.bale_weight_kg || 33.33))
+      const totalBales = Math.round(qtyKg / (vals.bale_weight_kg || 33.33))
       const totalValueUsd = vals.quantity_tons * vals.unit_price
       const containerCount = vals.bales_per_container > 0
         ? Math.ceil(totalBales / vals.bales_per_container)

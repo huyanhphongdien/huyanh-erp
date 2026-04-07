@@ -71,7 +71,7 @@ export default function CashFlowPage() {
       const { data: orders } = await supabase
         .from('sales_orders')
         .select(`
-          id, code, total_value_usd, actual_payment_amount, payment_status,
+          id, code, total_value_usd, actual_payment_amount, deposit_amount, payment_status,
           delivery_date, etd, payment_terms, currency, status,
           customer:sales_customers!customer_id(name, short_name)
         `)

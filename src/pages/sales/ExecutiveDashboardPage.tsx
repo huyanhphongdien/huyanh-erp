@@ -152,13 +152,13 @@ export default function ExecutiveDashboardPage() {
     // Revenue this month (all orders created this month)
     const { data: monthOrders } = await supabase
       .from('sales_orders')
-      .select('total_value_usd, payment_date, payment_received_amount, status')
+      .select('total_value_usd, actual_payment_amount, deposit_amount, discount_amount, bank_charges, payment_status, status')
       .gte('order_date', startDate)
       .lt('order_date', endDate)
       .not('status', 'eq', 'cancelled')
 
     const revenue = monthOrders?.reduce((s, o) => s + (o.total_value_usd || 0), 0) || 0
-    const collected = monthOrders?.reduce((s, o) => s + (o.payment_received_amount || 0), 0) || 0
+    const collected = monthOrders?.reduce((s, o) => s + (o.actual_payment_amount || 0) + (o.deposit_amount || 0), 0) || 0
     const count = monthOrders?.length || 0
 
     setKpi({

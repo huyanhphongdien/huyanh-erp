@@ -68,7 +68,7 @@ export default function ARAgingReportPage() {
         .from('sales_orders')
         .select(`
           id, code, customer_id, quantity_tons, unit_price, total_value_usd, currency,
-          payment_status, payment_date, actual_payment_amount, delivery_date, etd, confirmed_at,
+          payment_status, payment_date, actual_payment_amount, deposit_amount, delivery_date, etd, confirmed_at,
           status, created_at,
           customer:sales_customers!customer_id(id, code, name, short_name, country)
         `)
@@ -87,7 +87,7 @@ export default function ARAgingReportPage() {
 
         const custId = customer.id
         const totalValue = o.total_value_usd || (o.quantity_tons * o.unit_price) || 0
-        const paidAmount = o.actual_payment_amount || 0
+        const paidAmount = (o.actual_payment_amount || 0) + (o.deposit_amount || 0)
         const outstanding = Math.max(0, totalValue - paidAmount)
         if (outstanding <= 0) continue
 

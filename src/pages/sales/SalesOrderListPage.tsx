@@ -753,6 +753,7 @@ const SalesOrderListPage = () => {
                         <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: '#666' }}>Container</th>
                         <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: '#666' }}>KG/bành</th>
                         <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: '#666' }}>Đóng gói</th>
+                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: '#666' }}>Thanh toán</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -766,6 +767,7 @@ const SalesOrderListPage = () => {
                           <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.container_count}</td>
                           <td style={{ padding: '6px 12px' }}>{item.bale_weight_kg} kg</td>
                           <td style={{ padding: '6px 12px', fontSize: 11 }}>{item.packing_type === 'sw_pallet' ? 'SW Pallet' : item.packing_type === 'wooden_pallet' ? 'Wooden Pallet' : item.packing_type === 'metal_box' ? 'Metal Box' : 'Loose Bale'}</td>
+                          <td style={{ padding: '6px 12px', fontSize: 11 }}>{item.payment_terms ? item.payment_terms.replace('_', ' ') : '—'}</td>
                         </tr>
                       ))}
                     </tbody>

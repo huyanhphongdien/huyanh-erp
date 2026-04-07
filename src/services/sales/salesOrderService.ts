@@ -89,6 +89,7 @@ export interface CreateSalesOrderData {
     quantity_tons: number
     unit_price: number
     currency?: string
+    payment_terms?: string
     bale_weight_kg?: number
     bales_per_container?: number
     packing_type?: string
@@ -447,6 +448,7 @@ export const salesOrderService = {
           quantity_tons: item.quantity_tons,
           unit_price: item.unit_price,
           currency: item.currency || 'USD',
+          payment_terms: item.payment_terms || null,
           total_value_usd: item.quantity_tons * item.unit_price,
           quantity_kg: qtyKg,
           bale_weight_kg: bw,

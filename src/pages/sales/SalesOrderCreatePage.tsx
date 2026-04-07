@@ -100,13 +100,14 @@ function SalesOrderCreatePage() {
     bale_weight_kg: number
     bales_per_container: number
     packing_type: string
+    payment_terms: string
   }
   const [orderItems, setOrderItems] = useState<OrderItem[]>([
-    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale' },
+    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', payment_terms: '' },
   ])
 
   const addItem = () => {
-    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale' }])
+    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', payment_terms: '' }])
   }
 
   const removeItem = (key: string) => {
@@ -364,9 +365,15 @@ function SalesOrderCreatePage() {
                     ]}
                     onChange={(v) => updateItem(item.key, 'packing_type', v)} />
                 </Col>
-                <Col xs={4} sm={2} style={{ textAlign: 'center' }}>
+                <Col xs={12} sm={3}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Thanh toán</div>
+                  <Select value={item.payment_terms || undefined} placeholder="Chọn..." style={{ width: '100%' }} allowClear
+                    options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                    onChange={(v) => updateItem(item.key, 'payment_terms', v || '')} />
+                </Col>
+                <Col xs={4} sm={1} style={{ textAlign: 'center' }}>
                   {orderItems.length > 1 && (
-                    <Button type="text" danger size="small" onClick={() => removeItem(item.key)} style={{ marginTop: 16 }}>Xóa</Button>
+                    <Button type="text" danger size="small" onClick={() => removeItem(item.key)} style={{ marginTop: 16 }}>X</Button>
                   )}
                 </Col>
               </Row>
@@ -385,12 +392,6 @@ function SalesOrderCreatePage() {
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
           title={<span style={{ fontSize: 14, fontWeight: 600 }}>Điều khoản & Ngân hàng</span>}>
           <Row gutter={16}>
-            <Col xs={24} sm={12}>
-              <Form.Item label="Thanh toán" name="payment_terms">
-                <Select size="large" allowClear placeholder="Chọn..."
-                  options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
-              </Form.Item>
-            </Col>
             <Col xs={24} sm={12}>
               <Form.Item label="Incoterm" name="incoterm" initialValue="FOB">
                 <Select size="large"

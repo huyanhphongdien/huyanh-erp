@@ -212,6 +212,7 @@ export interface SalesOrderItem {
   quantity_tons: number
   unit_price: number
   currency?: string
+  payment_terms?: string
   total_value_usd?: number
   quantity_kg?: number
   bale_weight_kg?: number

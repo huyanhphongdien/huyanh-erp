@@ -11,6 +11,8 @@ import {
   EyeOutlined, PrinterOutlined, SearchOutlined, HistoryOutlined, FilterOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
+import { useKeliScale } from '@erp/hooks/useKeliScale'
+import ScaleSettings from '@/components/ScaleSettings'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
 import type { WeighbridgeTicket, WeighbridgeStatus, WeighbridgeImage } from '@erp/services/wms/wms.types'
@@ -29,6 +31,7 @@ const STATUS_MAP: Record<WeighbridgeStatus, { label: string; color: string }> = 
 export default function HomePage() {
   const navigate = useNavigate()
   const { operator, logout } = useAuthStore()
+  const scale = useKeliScale()
 
   const [allTickets, setAllTickets] = useState<WeighbridgeTicket[]>([])
   const [inProgress, setInProgress] = useState<WeighbridgeTicket[]>([])
@@ -256,8 +259,11 @@ export default function HomePage() {
           </Space>
           <Space>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, ...MONO }}>{timeStr}</Text>
+            <Tag color={scale.connected ? 'green' : 'default'} style={{ fontSize: 11 }}>
+              {scale.connected ? '● Cân OK' : '○ Chưa kết nối'}
+            </Tag>
+            <ScaleSettings scale={scale} />
             <Button type="text" icon={<ReloadOutlined spin={loading} />} onClick={load} style={{ color: '#fff' }} />
-            <Button type="text" icon={<SettingOutlined />} onClick={() => navigate('/settings')} style={{ color: '#fff' }} />
             <Button type="text" icon={<LogoutOutlined />} onClick={logout} style={{ color: '#fff' }} />
           </Space>
         </div>

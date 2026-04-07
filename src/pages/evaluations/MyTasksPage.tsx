@@ -482,12 +482,21 @@ const MyTasksPage: React.FC = () => {
   }, [tasks]);
 
   const evaluationStats = useMemo(() => {
-    if (approvalInfoMap.size === 0) return { averageScore: 0, rating: '-' };
-    let totalScore = 0; let count = 0;
-    approvalInfoMap.forEach((info) => { if (info.score && info.score > 0) { totalScore += info.score; count++; } });
-    const avg = count > 0 ? Math.round(totalScore / count) : 0;
+    // Dùng tasks.final_score + trọng số theo task_source (đồng bộ công thức CL×60%+KL×40%)
+    const scoredTasks = tasks.filter(t => t.status === 'finished' && (t as any).final_score > 0);
+    if (scoredTasks.length === 0) return { averageScore: 0, rating: '-' };
+    let totalWeighted = 0, totalWeight = 0;
+    scoredTasks.forEach(t => {
+      const src = (t as any).task_source || 'assigned';
+      const w = (src === 'recurring' || src === 'self') ? 0.5 : 1.0;
+      totalWeighted += ((t as any).final_score || 0) * w;
+      totalWeight += w;
+    });
+    const qualityScore = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : 0;
+    // Không tính khối lượng ở đây — chỉ hiện chất lượng TB (khối lượng hiện ở dashboard hiệu suất)
+    const avg = qualityScore;
     return { averageScore: avg, rating: RATING_CONFIG[getRatingFromScore(avg)]?.label || '-' };
-  }, [approvalInfoMap]);
+  }, [tasks]);
 
   const tabCounts: Record<TabKey, number> = {
     in_progress: stats.inProgress, awaiting_eval: stats.awaitingEval,

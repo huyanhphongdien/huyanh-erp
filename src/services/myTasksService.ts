@@ -92,6 +92,7 @@ const TASK_FIELDS = `
   department_id, assigner_id, assignee_id,
   start_date, due_date, completed_date, status, priority, progress,
   notes, is_self_assigned, evaluation_status,
+  task_source, final_score, difficulty,
   project_id, phase_id,
   created_at, updated_at,
   department:departments(id, name),

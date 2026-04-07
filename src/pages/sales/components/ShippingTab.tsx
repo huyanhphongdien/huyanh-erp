@@ -102,6 +102,10 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       lc_bank: order.lc_bank,
       lc_expiry_date: order.lc_expiry_date ? dayjs(order.lc_expiry_date) : null,
       lc_amount: order.lc_amount,
+      // Đặt cọc
+      deposit_amount: order.deposit_amount,
+      deposit_date: order.deposit_date ? dayjs(order.deposit_date) : null,
+      deposit_note: order.deposit_note,
       // Chiết khấu
       discount_bank: order.discount_bank,
       discount_date: order.discount_date ? dayjs(order.discount_date) : null,
@@ -136,17 +140,21 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         lc_bank: vals.lc_bank || null,
         lc_expiry_date: vals.lc_expiry_date?.format('YYYY-MM-DD') || null,
         lc_amount: vals.lc_amount || null,
+        deposit_amount: vals.deposit_amount || null,
+        deposit_date: vals.deposit_date?.format('YYYY-MM-DD') || null,
+        deposit_note: vals.deposit_note || null,
         discount_bank: vals.discount_bank || null,
         discount_date: vals.discount_date?.format('YYYY-MM-DD') || null,
         discount_amount: vals.discount_amount || null,
         bank_charges: vals.bank_charges || null,
       }
 
-      // Auto calc remaining_amount
+      // Auto calc: Còn lại = Thành tiền - Đặt cọc - Chiết khấu - Phí NH
       const totalUSD = order.total_value_usd || (order.quantity_tons * order.unit_price)
+      const deposit = vals.deposit_amount || 0
       const discount = vals.discount_amount || 0
       const bankCharges = vals.bank_charges || 0
-      updateData.remaining_amount = totalUSD - discount - bankCharges
+      updateData.remaining_amount = totalUSD - deposit - discount - bankCharges
 
       await salesOrderService.updateFields(order.id, updateData)
       message.success('Đã cập nhật vận chuyển')
@@ -162,9 +170,10 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
 
   // ── Computed ──
   const totalUSD = order.total_value_usd || (order.quantity_tons * order.unit_price)
+  // Còn lại = Tổng HĐ - Đặt cọc - Chiết khấu - Phí NH
   const remainingAmount = (order.remaining_amount != null)
     ? order.remaining_amount
-    : totalUSD - (order.discount_amount || 0) - (order.bank_charges || 0)
+    : totalUSD - (order.deposit_amount || 0) - (order.discount_amount || 0) - (order.bank_charges || 0)
 
   // ══════════════════════════════════════════════════════════════
   // EDIT MODE
@@ -244,6 +253,20 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
           </Form.Item>
           <Form.Item label="Số tiền L/C (USD)" name="lc_amount">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+          </Form.Item>
+        </div>
+
+        {/* Đặt cọc */}
+        <SectionHeader title="Đặt cọc" color="#722ed1" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Số tiền đặt cọc (USD)" name="deposit_amount">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+          </Form.Item>
+          <Form.Item label="Ngày đặt cọc" name="deposit_date">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item label="Ghi chú" name="deposit_note">
+            <Input placeholder="VD: T/T 30% trước giao hàng" />
           </Form.Item>
         </div>
 
@@ -338,6 +361,16 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
 
       <Divider style={{ margin: '12px 0' }} />
 
+      {/* Đặt cọc */}
+      <SectionHeader title="Đặt cọc" color="#722ed1" />
+      <Descriptions column={3} size="small" bordered>
+        <Descriptions.Item label="Số tiền">{fmtCurrency(order.deposit_amount)}</Descriptions.Item>
+        <Descriptions.Item label="Ngày">{fmtDate(order.deposit_date)}</Descriptions.Item>
+        <Descriptions.Item label="Ghi chú">{order.deposit_note || '—'}</Descriptions.Item>
+      </Descriptions>
+
+      <Divider style={{ margin: '12px 0' }} />
+
       {/* Chiết khấu */}
       <SectionHeader title="Chiết khấu Ngân hàng" color="#d48806" />
       <Descriptions column={2} size="small" bordered>
@@ -353,13 +386,14 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       <SectionHeader title="Tổng hợp" color="#666" />
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: 'repeat(5, 1fr)',
         gap: 12,
         padding: 12,
         background: '#fafafa',
         borderRadius: 8,
       }}>
         <SummaryCard label="Tổng HĐ" value={fmtCurrency(totalUSD)} color="#1B4D3E" />
+        <SummaryCard label="Đặt cọc" value={fmtCurrency(order.deposit_amount)} color="#722ed1" />
         <SummaryCard label="Chiết khấu" value={fmtCurrency(order.discount_amount)} color="#d48806" />
         <SummaryCard label="Phí NH" value={fmtCurrency(order.bank_charges)} color="#cf1322" />
         <SummaryCard label="Còn lại" value={fmtCurrency(remainingAmount)} color="#1677ff" bold />

@@ -171,6 +171,11 @@ export interface SalesOrder {
   discount_exchange_rate?: number
   dhl_number?: string
 
+  // Đặt cọc
+  deposit_amount?: number
+  deposit_date?: string
+  deposit_note?: string
+
   // Tài chính (v4)
   remaining_amount?: number
   net_revenue?: number

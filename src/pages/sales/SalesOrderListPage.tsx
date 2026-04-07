@@ -495,6 +495,14 @@ const SalesOrderListPage = () => {
       render: (v: number) => v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null),
     },
     {
+      title: hdr('Đặt cọc'),
+      dataIndex: 'deposit_amount',
+      key: 'deposit',
+      width: 85,
+      align: 'right',
+      render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
+    },
+    {
       title: hdr('CK'),
       dataIndex: 'discount_amount',
       key: 'discount',
@@ -517,7 +525,7 @@ const SalesOrderListPage = () => {
       width: 90,
       align: 'right',
       render: (v: number, r: SalesOrder) => {
-        const remaining = v ?? ((r.total_value_usd || 0) - ((r as any).discount_amount || 0) - ((r as any).bank_charges || 0))
+        const remaining = v ?? ((r.total_value_usd || 0) - ((r as any).deposit_amount || 0) - ((r as any).discount_amount || 0) - ((r as any).bank_charges || 0))
         return remaining ? <strong style={{ color: '#1677ff', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(remaining)}</strong> : gray(null)
       },
     },

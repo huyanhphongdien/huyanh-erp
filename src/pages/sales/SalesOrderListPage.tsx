@@ -400,12 +400,15 @@ const SalesOrderListPage = () => {
       ),
     },
     {
-      title: 'Mã HĐ',
-      dataIndex: 'code',
-      key: 'code',
-      width: 120,
+      title: 'Số HĐ',
+      dataIndex: 'contract_no',
+      key: 'contract_no',
+      width: 140,
       fixed: 'left',
-      render: (code: string) => mono(<strong>{code}</strong>),
+      render: (_: string, r: SalesOrder) => {
+        const display = (r as any).contract_no || r.code
+        return mono(<strong>{display}</strong>)
+      },
     },
     {
       title: 'Buyer',

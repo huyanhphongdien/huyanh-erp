@@ -335,7 +335,13 @@ export const monthlyTimesheetService = {
           recalcCong += isLong ? 1.5 : 1.0
           recalcWorkDays++
         } else if (sym === '2ca') {
-          recalcCong += day.dayWorkUnits > 0 ? day.dayWorkUnits : 2.0
+          // Tính từ từng ca thực tế trong ngày
+          let multiCong = 0
+          for (const sn of day.allShiftNames) {
+            const isLong = sn.includes('Dài') || sn.includes('Long')
+            multiCong += isLong ? 1.5 : 1.0
+          }
+          recalcCong += multiCong > 0 ? multiCong : 2.0
           recalcWorkDays++
         } else if (sym === 'CT') {
           recalcCong += 1.0

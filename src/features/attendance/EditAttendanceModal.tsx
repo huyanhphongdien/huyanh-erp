@@ -206,50 +206,18 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
   })
 
   // ── Sửa nhanh ký hiệu (1 click) ──
-  const SYMBOL_SHIFT_MAP: Record<string, { shiftCode: string; status: string }> = {
-    'HC': { shiftCode: 'ADMIN_PROD', status: 'present' },
-    'S': { shiftCode: 'SHORT_1', status: 'present' },
-    'C2': { shiftCode: 'SHORT_2', status: 'present' },
-    'Đ': { shiftCode: 'SHORT_3', status: 'present' },
-    'Đ_dài': { shiftCode: 'LONG_NIGHT', status: 'present' },
-    'S_dài': { shiftCode: 'LONG_DAY', status: 'present' },
-    'CT': { shiftCode: '', status: 'business_trip' },
-    'X': { shiftCode: '', status: 'absent' },
-    'P': { shiftCode: '', status: 'leave' },
-  }
-
+  // Delegates to attendanceEditService.setDaySymbol so we get:
+  //   - real shift start/end times (no hardcoded 08:00→17:00)
+  //   - crosses_midnight handling for ca đêm
+  //   - permission check on the server
+  //   - audit log in attendance_edit_logs
   const symbolMutation = useMutation({
     mutationFn: async (symbol: string) => {
-      const mapping = SYMBOL_SHIFT_MAP[symbol]
-      if (!mapping) throw new Error('Ký hiệu không hợp lệ')
-
-      // Xóa tất cả records cũ trong ngày
-      await supabase.from('attendance').delete().eq('employee_id', employeeId).eq('date', day.date)
-
-      if (symbol === 'X') {
-        // Vắng — không tạo record
-        return
-      }
-
-      // Tìm shift ID
-      let shiftId: string | null = null
-      if (mapping.shiftCode) {
-        const shift = shifts.find(s => s.code === mapping.shiftCode)
-        shiftId = shift?.id || null
-      }
-
-      const workUnits = (mapping.shiftCode === 'LONG_DAY' || mapping.shiftCode === 'LONG_NIGHT') ? 1.5 : 1.0
-
-      await supabase.from('attendance').insert({
-        employee_id: employeeId,
-        date: day.date,
-        shift_id: shiftId,
-        status: mapping.status,
-        work_units: workUnits,
-        working_minutes: workUnits === 1.5 ? 660 : 480,
-        check_in_time: `${day.date}T01:00:00+00:00`,
-        check_out_time: `${day.date}T10:00:00+00:00`,
-      })
+      const result = await attendanceEditService.setDaySymbol(
+        employeeId, day.date, symbol, editorId, `Sửa nhanh ${day.date}`
+      )
+      if (!result.success) throw new Error(result.error || 'Lỗi')
+      return result
     },
     onSuccess: () => {
       refetchRecords()

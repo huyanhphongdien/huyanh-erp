@@ -411,6 +411,166 @@ export const attendanceEditService = {
   },
 
   /**
+   * Sửa nhanh ký hiệu — xóa hết record cũ trong ngày, tạo record mới theo symbol
+   * - Lấy giờ thực từ shifts table (không hardcode 08:00→17:00)
+   * - Xử lý crosses_midnight cho ca đêm
+   * - Ghi audit log
+   * - Permission check
+   *
+   * symbol: 'HC' | 'S' | 'C2' | 'Đ' | 'S_dài' | 'Đ_dài' | 'CT' | 'P' | 'X'
+   */
+  async setDaySymbol(
+    employeeId: string,
+    date: string,
+    symbol: string,
+    editorEmployeeId: string,
+    reason?: string,
+  ): Promise<AttendanceEditResult> {
+    try {
+      // ① Permission
+      const perm = await checkEditPermission(editorEmployeeId, employeeId)
+      if (!perm.allowed) return { success: false, error: perm.reason }
+
+      // ② Symbol → shift code
+      const SYMBOL_MAP: Record<string, { shiftCode: string; status: string }> = {
+        'HC':    { shiftCode: 'ADMIN_PROD', status: 'present' },
+        'S':     { shiftCode: 'SHORT_1',    status: 'present' },
+        'C2':    { shiftCode: 'SHORT_2',    status: 'present' },
+        'Đ':     { shiftCode: 'SHORT_3',    status: 'present' },
+        'S_dài': { shiftCode: 'LONG_DAY',   status: 'present' },
+        'Đ_dài': { shiftCode: 'LONG_NIGHT', status: 'present' },
+        'CT':    { shiftCode: '',           status: 'business_trip' },
+        'P':     { shiftCode: '',           status: 'leave' },
+        'X':     { shiftCode: '',           status: 'absent' },
+      }
+      const mapping = SYMBOL_MAP[symbol]
+      if (!mapping) return { success: false, error: 'Ký hiệu không hợp lệ: ' + symbol }
+
+      // ③ Snapshot old records (for log + idempotency)
+      const { data: oldRecs } = await supabase
+        .from('attendance')
+        .select('id, shift_id, status, work_units, shift:shifts!attendance_shift_id_fkey(code)')
+        .eq('employee_id', employeeId)
+        .eq('date', date)
+      const oldValues = {
+        records_count: oldRecs?.length || 0,
+        shift_codes: (oldRecs || [])
+          .map((r: any) => Array.isArray(r.shift) ? r.shift[0]?.code : r.shift?.code)
+          .filter(Boolean),
+        statuses: (oldRecs || []).map((r: any) => r.status),
+      }
+
+      // ④ Delete all existing records for this day
+      const { error: delErr } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('date', date)
+      if (delErr) return { success: false, error: delErr.message }
+
+      // ⑤ X = Vắng → no record (just deletion)
+      if (symbol === 'X') {
+        // Note: cannot log to attendance_edit_logs without an attendance_id FK.
+        // Deletion is recorded by the absence of a record going forward.
+        return { success: true, record: null }
+      }
+
+      // ⑥ Look up shift (if any)
+      let shiftData: any = null
+      if (mapping.shiftCode) {
+        const { data: s } = await supabase
+          .from('shifts')
+          .select('id, code, name, start_time, end_time, work_units, standard_hours, break_minutes, crosses_midnight')
+          .eq('code', mapping.shiftCode)
+          .single()
+        shiftData = s
+        if (!shiftData) return { success: false, error: `Không tìm thấy ca: ${mapping.shiftCode}` }
+      }
+
+      // ⑦ Build check_in / check_out from shift's start_time / end_time
+      let checkInISO: string
+      let checkOutISO: string
+      let workingMinutes = 0
+      let workUnits = 1.0
+
+      if (shiftData) {
+        const startTime = shiftData.start_time?.substring(0, 5) || '08:00'
+        const endTime = shiftData.end_time?.substring(0, 5) || '17:00'
+        workUnits = Number(shiftData.work_units) || 1.0
+
+        checkInISO = `${date}T${startTime}:00+07:00`
+
+        if (shiftData.crosses_midnight && endTime < startTime) {
+          // End time on next day
+          const nextDay = new Date(date + 'T00:00:00+07:00')
+          nextDay.setDate(nextDay.getDate() + 1)
+          const nextDateStr = nextDay.toISOString().split('T')[0]
+          checkOutISO = `${nextDateStr}T${endTime}:00+07:00`
+        } else {
+          checkOutISO = `${date}T${endTime}:00+07:00`
+        }
+
+        const elapsed = Math.max(0, Math.floor(
+          (new Date(checkOutISO).getTime() - new Date(checkInISO).getTime()) / (1000 * 60)
+        ))
+        workingMinutes = Math.max(0, elapsed - (shiftData.break_minutes || 60))
+      } else {
+        // CT (business trip) or P (leave) — no shift, mark a default 8h window
+        checkInISO = `${date}T08:00:00+07:00`
+        checkOutISO = `${date}T17:00:00+07:00`
+        workingMinutes = 480
+        workUnits = mapping.status === 'business_trip' ? 1.0 : 0
+      }
+
+      // ⑧ Insert new record
+      const { data: created, error: insErr } = await supabase
+        .from('attendance')
+        .insert({
+          employee_id: employeeId,
+          date,
+          shift_date: date,
+          shift_id: shiftData?.id || null,
+          check_in_time: checkInISO,
+          check_out_time: checkOutISO,
+          working_minutes: workingMinutes,
+          overtime_minutes: 0,
+          late_minutes: 0,
+          early_leave_minutes: 0,
+          break_minutes: shiftData?.break_minutes || 60,
+          work_units: workUnits,
+          status: mapping.status,
+          auto_checkout: false,
+          is_gps_verified: false,
+        })
+        .select()
+        .single()
+
+      if (insErr) return { success: false, error: insErr.message }
+
+      // ⑨ Audit log
+      await supabase.from('attendance_edit_logs').insert({
+        attendance_id: created.id,
+        edited_by: editorEmployeeId,
+        old_values: oldValues,
+        new_values: {
+          symbol,
+          shift_code: shiftData?.code || null,
+          status: mapping.status,
+          work_units: workUnits,
+          check_in: checkInISO,
+          check_out: checkOutISO,
+        },
+        reason: reason || `Sửa nhanh: đặt ký hiệu ${symbol}`,
+        edit_type: 'shift_change',
+      })
+
+      return { success: true, record: created }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  },
+
+  /**
    * Lấy lịch sử sửa của 1 attendance record
    */
   async getEditHistory(attendanceId: string) {

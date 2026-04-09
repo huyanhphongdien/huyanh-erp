@@ -12,8 +12,8 @@ import {
   Download,
   Building2,
   Loader2,
-  ArrowLeft,
   Eye,
+  X,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
@@ -27,16 +27,16 @@ import EditAttendanceModal from './EditAttendanceModal'
 // ============================================================================
 
 const SYMBOL_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  'S':  { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Ca sáng/ngày' },
-  'Đ':  { bg: 'bg-violet-100', text: 'text-violet-700', label: 'Ca đêm' },
-  'C2': { bg: 'bg-emerald-100',text: 'text-emerald-700',label: 'Ca chiều' },
-  'HC': { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Hành chính' },
-  'P':  { bg: 'bg-orange-100', text: 'text-orange-600', label: 'Nghỉ phép' },
-  'CT': { bg: 'bg-sky-100',    text: 'text-sky-700',    label: 'Công tác' },
-  '2ca':{ bg: 'bg-amber-100',  text: 'text-amber-700',  label: '2 ca' },
-  'X':  { bg: 'bg-red-100',    text: 'text-red-600',    label: 'Vắng' },
-  '—':  { bg: 'bg-gray-50',    text: 'text-gray-300',   label: '' },
-  '':   { bg: '',              text: 'text-gray-200',   label: '' },
+  'HC': { bg: 'bg-blue-100',    text: 'text-blue-700',    label: 'Hành chính' },
+  'S':  { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Ca sáng/ngày' },
+  'C2': { bg: 'bg-orange-100',  text: 'text-orange-700',  label: 'Ca chiều' },
+  'Đ':  { bg: 'bg-violet-100',  text: 'text-violet-700',  label: 'Ca đêm' },
+  'CT': { bg: 'bg-cyan-100',    text: 'text-cyan-700',    label: 'Công tác' },
+  'P':  { bg: 'bg-yellow-100',  text: 'text-yellow-700',  label: 'Nghỉ phép' },
+  '2ca':{ bg: 'bg-pink-100',    text: 'text-pink-700',    label: '2 ca' },
+  'X':  { bg: 'bg-red-100',     text: 'text-red-600',     label: 'Vắng' },
+  '—':  { bg: 'bg-gray-50',     text: 'text-gray-300',    label: '' },
+  '':   { bg: '',               text: 'text-gray-200',    label: '' },
 }
 
 const MONTHS_VN = [
@@ -130,105 +130,13 @@ export default function MonthlyTimesheetPage() {
     setTooltipData({ day, x: Math.min(rect.left, window.innerWidth - 260), y: rect.bottom + 4 })
   }
 
-  // ============================================================
-  // RENDER: Drill-down (chi tiết 1 NV)
-  // ============================================================
-  if (selectedEmployee) {
-    // ★ Lấy data live từ timesheet (sau khi refetch) thay vì dùng snapshot cũ
-    const emp = timesheet?.employees.find(e => e.employeeId === selectedEmployee.employeeId) || selectedEmployee
-    return (
-      <div className="min-h-screen bg-[#F7F5F2]">
-        <div className="bg-white border-b sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-            <button onClick={() => setSelectedEmployee(null)} className="p-2 rounded-lg active:bg-gray-100">
-              <ArrowLeft size={20} className="text-gray-600" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-[15px] font-bold text-gray-800 truncate">{emp.fullName}</h2>
-              <p className="text-[12px] text-gray-500">{emp.employeeCode} • {emp.departmentName} • {MONTHS_VN[selectedMonth]} {selectedYear}</p>
-            </div>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
-            {[
-              { label: 'Công', value: emp.totalCong, unit: 'công', color: 'text-blue-600 bg-blue-50' },
-              { label: 'Tổng giờ', value: emp.totalWorkingHours, unit: 'h', color: 'text-emerald-600 bg-emerald-50' },
-              { label: 'Tăng ca', value: emp.totalOvertimeHours, unit: 'h', color: 'text-purple-600 bg-purple-50' },
-              { label: 'Đi trễ', value: emp.totalLateDays, unit: 'lần', color: 'text-amber-600 bg-amber-50' },
-              { label: 'Về sớm', value: emp.totalEarlyDays, unit: 'lần', color: 'text-orange-600 bg-orange-50' },
-              { label: 'Công tác', value: emp.totalBusinessTripDays, unit: 'ngày', color: 'text-sky-600 bg-sky-50' },
-              { label: 'Vắng', value: emp.totalAbsentDays, unit: 'ngày', color: 'text-red-600 bg-red-50' },
-              { label: 'Nghỉ phép', value: emp.totalLeaveDays, unit: 'ngày', color: 'text-cyan-600 bg-cyan-50' },
-            ].map(s => (
-              <div key={s.label} className={`rounded-xl px-3 py-2.5 ${s.color}`}>
-                <div className="text-[11px] font-medium opacity-70">{s.label}</div>
-                <div className="text-lg font-bold">{s.value}<span className="text-[11px] font-normal ml-0.5">{s.unit}</span></div>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-1">
-            {emp.days.map((day, i) => {
-              const dt = new Date(day.date + 'T00:00:00+07:00')
-              const dow = WEEKDAY_VN[dt.getDay()]
-              const style = SYMBOL_STYLES[day.symbol] || SYMBOL_STYLES['']
-              const hasData = day.checkIn || day.isLeave || day.symbol === 'X'
-              return (
-                <div key={day.date}
-                  onClick={() => { setTooltipData(null); setEditModal({ day, employeeId: emp.employeeId, employeeName: emp.fullName }) }}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] cursor-pointer active:bg-gray-100 ${day.isWeekend ? 'bg-red-50/50' : 'bg-white'} ${!hasData && day.symbol === '—' ? 'opacity-50' : ''}`}>
-                  <div className="w-14 flex-shrink-0">
-                    <span className={`font-bold ${day.isWeekend ? 'text-red-400' : 'text-gray-700'}`}>{String(i + 1).padStart(2, '0')}</span>
-                    <span className={`ml-1 text-[11px] ${day.isWeekend ? 'text-red-300' : 'text-gray-400'}`}>{dow}</span>
-                  </div>
-                  <div className={`w-8 h-7 rounded flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${style.bg} ${style.text}`}>{day.symbol}</div>
-                  <div className="flex-1 min-w-0">
-                    {day.checkIn ? (
-                      <div className="flex items-center gap-2 text-[12px]">
-                        <span className="text-gray-600">{formatTimeVN(day.checkIn)} → {formatTimeVN(day.checkOut) || '...'}</span>
-                        {day.shiftName && <span className="text-gray-400 text-[11px] truncate">{day.shiftName}</span>}
-                        {day.shiftCount >= 2 && <span className="px-1 py-px rounded text-[9px] font-bold bg-amber-100 text-amber-600">{day.shiftCount}ca={day.dayWorkUnits}c</span>}
-                      </div>
-                    ) : day.isBusinessTrip ? (
-                      <span className="text-sky-600 text-[12px]">Công tác</span>
-                    ) : day.isLeave ? (
-                      <span className="text-orange-500 text-[12px]">Nghỉ phép</span>
-                    ) : day.symbol === 'X' ? (
-                      <span className="text-red-400 text-[12px]">Vắng không phép</span>
-                    ) : null}
-                  </div>
-                  <div className="w-14 text-right flex-shrink-0">
-                    {day.workingMinutes > 0 && <span className="text-[12px] font-medium text-gray-600">{Math.round(day.workingMinutes / 60 * 10) / 10}h</span>}
-                  </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    {day.lateMinutes > 0 && <span className="px-1 py-px rounded text-[9px] font-bold bg-amber-100 text-amber-600">T{day.lateMinutes}p</span>}
-                    {day.earlyLeaveMinutes > 15 && <span className="px-1 py-px rounded text-[9px] font-bold bg-purple-100 text-purple-600">V{day.earlyLeaveMinutes}p</span>}
-                    {day.overtimeMinutes > 0 && <span className="px-1 py-px rounded text-[9px] font-bold bg-red-100 text-red-600">OT{Math.round(day.overtimeMinutes / 60 * 10) / 10}h</span>}
-                    {day.autoCheckout && <span className="px-1 py-px rounded text-[9px] bg-gray-200 text-gray-500">auto</span>}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* ★ Edit Modal cho drill-down */}
-        {editModal && (
-          <EditAttendanceModal
-            open={!!editModal}
-            onClose={() => setEditModal(null)}
-            day={editModal.day}
-            employeeId={editModal.employeeId}
-            employeeName={editModal.employeeName}
-            onSaved={() => setEditModal(null)}
-          />
-        )}
-      </div>
-    )
-  }
+  // ★ Live data from timesheet (after refetch) for slide-in panel
+  const liveSelectedEmp = selectedEmployee
+    ? (timesheet?.employees.find(e => e.employeeId === selectedEmployee.employeeId) || selectedEmployee)
+    : null
 
   // ============================================================
-  // RENDER: Grid view (phòng ban)
+  // RENDER: Grid view (phòng ban) — single render path with slide-in panel
   // ============================================================
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -290,15 +198,15 @@ export default function MonthlyTimesheetPage() {
                     <th style={{ position: 'sticky', left: COL_NAME_LEFT, zIndex: 12, width: COL_NAME, minWidth: COL_NAME, backgroundColor: '#1B4D3E', boxShadow: '2px 0 4px rgba(0,0,0,0.15)' }}
                       className="px-2 py-2 text-left border-r border-[#2D8B6E]">Họ và tên</th>
                     {dayHeaders.map(h => (
-                      <th key={h.day} className={`px-0 py-1.5 text-center border-l border-[#2D8B6E]/40 ${h.isWeekend ? 'bg-red-800/30' : ''}`} style={{ width: 36, minWidth: 36 }}>
-                        <div className="text-[11px] font-bold">{String(h.day).padStart(2, '0')}</div>
-                        <div className={`text-[9px] font-normal ${h.isWeekend ? 'text-red-200' : 'text-white/60'}`}>{h.weekday}</div>
+                      <th key={h.day} className={`px-0 py-1.5 text-center border-l border-[#2D8B6E]/40 ${h.isWeekend ? 'bg-red-600' : ''}`} style={{ width: 36, minWidth: 36 }}>
+                        <div className="text-[12px] font-bold">{String(h.day).padStart(2, '0')}</div>
+                        <div className={`text-[9px] font-normal ${h.isWeekend ? 'text-red-100' : 'text-white/60'}`}>{h.weekday}</div>
                       </th>
                     ))}
-                    <th className="px-2 py-2 text-center border-l-2 border-white/30 bg-[#163d32]" style={{ minWidth: 48 }}>Công</th>
-                    <th className="px-2 py-2 text-center bg-[#163d32]" style={{ minWidth: 36 }}>Trễ</th>
-                    <th className="px-2 py-2 text-center bg-[#163d32]" style={{ minWidth: 36 }}>Vắng</th>
-                    <th className="px-1 py-2 text-center bg-[#163d32]" style={{ minWidth: 32 }}></th>
+                    <th className="px-2 py-2 text-center border-l-2 border-white/30 bg-emerald-800" style={{ minWidth: 48 }}>Công</th>
+                    <th className="px-2 py-2 text-center bg-amber-700" style={{ minWidth: 40 }}>Trễ</th>
+                    <th className="px-2 py-2 text-center bg-red-700" style={{ minWidth: 40 }}>Vắng</th>
+                    <th className="px-1 py-2 text-center bg-gray-700" style={{ minWidth: 36 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -314,22 +222,23 @@ export default function MonthlyTimesheetPage() {
                           <div className="text-[10px] text-gray-400">{emp.employeeCode}</div>
                         </td>
                         {emp.days.map((day, di) => {
+                          const isWE = dayHeaders[di]?.isWeekend
                           const s = SYMBOL_STYLES[day.symbol] || SYMBOL_STYLES['']
                           const hasDetail = day.checkIn || day.isLeave || day.isBusinessTrip || day.symbol === 'X'
                           return (
-                            <td key={di} className={`px-0 py-1 text-center border-l border-gray-50 ${dayHeaders[di]?.isWeekend ? 'bg-red-50/40' : ''}`}
+                            <td key={di} className={`px-0 py-1.5 text-center border-l border-gray-50 ${isWE ? 'bg-red-50' : ''}`}
                               onMouseEnter={e => hasDetail && showTooltip(day, e)} onMouseLeave={() => setTooltipData(null)}
                               onClick={() => { setTooltipData(null); setEditModal({ day, employeeId: emp.employeeId, employeeName: emp.fullName }) }}
                               style={{ cursor: 'pointer' }}>
-                              <div className={`mx-auto w-7 h-6 rounded flex items-center justify-center text-[10px] font-bold ${s.bg} ${s.text} ${day.lateMinutes > 0 ? 'ring-1 ring-amber-400' : ''} ${day.overtimeMinutes > 0 ? 'ring-1 ring-red-400' : ''}`}>
+                              <div className={`mx-auto w-7 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-transform hover:scale-110 ${isWE && day.symbol === '—' ? 'bg-red-100 text-red-300' : `${s.bg} ${s.text}`} ${day.lateMinutes > 0 ? 'ring-1 ring-amber-400' : ''} ${day.overtimeMinutes > 0 ? 'ring-1 ring-red-400' : ''}`}>
                                 {day.symbol}
                               </div>
                             </td>
                           )
                         })}
-                        <td className="px-1 py-1 text-center font-bold text-[14px] text-[#1B4D3E] border-l-2 border-gray-200">{emp.totalCong}</td>
-                        <td className="px-1 py-1 text-center">{emp.totalLateDays > 0 && <span className="text-amber-600 font-bold">{emp.totalLateDays}</span>}</td>
-                        <td className="px-1 py-1 text-center">{emp.totalAbsentDays > 0 && <span className="text-red-500 font-bold">{emp.totalAbsentDays}</span>}</td>
+                        <td className="px-1 py-1.5 text-center font-bold text-[15px] text-emerald-800 border-l-2 border-gray-200">{emp.totalCong}</td>
+                        <td className="px-1 py-1.5 text-center">{emp.totalLateDays > 0 ? <span className="text-amber-600 font-bold text-[13px]">{emp.totalLateDays}</span> : <span className="text-gray-300">—</span>}</td>
+                        <td className="px-1 py-1.5 text-center">{emp.totalAbsentDays > 0 ? <span className="text-red-500 font-bold text-[13px]">{emp.totalAbsentDays}</span> : <span className="text-gray-300">—</span>}</td>
                         <td className="px-1 py-1 text-center">
                           <button onClick={() => setSelectedEmployee(emp)} className="p-1 rounded hover:bg-gray-200 active:bg-gray-300" title="Xem chi tiết">
                             <Eye size={13} className="text-gray-400" />
@@ -364,6 +273,101 @@ export default function MonthlyTimesheetPage() {
           </div>
         )}
       </div>
+
+      {/* Slide-in Detail Panel */}
+      {liveSelectedEmp && (() => {
+        const emp = liveSelectedEmp
+        // Count by symbol category for stats
+        let statHC = 0, statShift = 0, statCT = 0, statP = 0, statX = 0
+        emp.days.forEach(d => {
+          if (d.symbol === 'HC') statHC++
+          else if (['S', 'C2', 'Đ', '2ca'].includes(d.symbol)) statShift++
+          else if (d.symbol === 'CT') statCT++
+          else if (d.symbol === 'P') statP++
+          else if (d.symbol === 'X') statX++
+        })
+        return (
+          <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/30 z-40 animate-in fade-in"
+              onClick={() => setSelectedEmployee(null)} />
+            {/* Panel */}
+            <div className="fixed top-0 right-0 w-[380px] max-w-[92vw] h-screen bg-white shadow-2xl z-50 overflow-y-auto animate-in slide-in-from-right duration-300">
+              {/* Header */}
+              <div className="sticky top-0 z-10 bg-[#1B4D3E] text-white px-4 py-3 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="text-[16px] font-bold truncate">{emp.fullName}</div>
+                  <div className="text-[12px] text-white/70 truncate">{emp.employeeCode} • {emp.departmentName}</div>
+                  <div className="text-[11px] text-white/60">{MONTHS_VN[selectedMonth]} {selectedYear}</div>
+                </div>
+                <button onClick={() => setSelectedEmployee(null)} className="p-1.5 rounded-lg hover:bg-white/10 active:bg-white/20 flex-shrink-0">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* KPI cards */}
+              <div className="px-4 pt-4 grid grid-cols-3 gap-2">
+                <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                  <div className="text-[22px] font-bold text-emerald-800 leading-none">{emp.totalCong}</div>
+                  <div className="text-[10px] text-gray-600 mt-1">Tổng công</div>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-3 text-center">
+                  <div className="text-[22px] font-bold text-amber-700 leading-none">{emp.totalLateDays}</div>
+                  <div className="text-[10px] text-gray-600 mt-1">Ngày trễ</div>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <div className="text-[22px] font-bold text-red-600 leading-none">{emp.totalAbsentDays}</div>
+                  <div className="text-[10px] text-gray-600 mt-1">Vắng</div>
+                </div>
+              </div>
+
+              {/* Statistics breakdown */}
+              <div className="px-4 pt-4">
+                <div className="text-[13px] font-semibold text-gray-700 mb-2">Thống kê</div>
+                <table className="w-full text-[12px]">
+                  <tbody>
+                    <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">HC (Hành chính)</td><td className="text-right font-semibold">{statHC}</td></tr>
+                    <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">Ca sáng/chiều/đêm</td><td className="text-right font-semibold">{statShift}</td></tr>
+                    <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">Công tác</td><td className="text-right font-semibold text-cyan-700">{statCT}</td></tr>
+                    <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">Nghỉ phép</td><td className="text-right font-semibold text-yellow-700">{statP}</td></tr>
+                    <tr><td className="py-1.5 text-gray-600">Vắng</td><td className="text-right font-semibold text-red-600">{statX}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Daily breakdown */}
+              <div className="px-4 pt-4 pb-6">
+                <div className="text-[13px] font-semibold text-gray-700 mb-2">Chi tiết từng ngày</div>
+                <div className="flex flex-col gap-1">
+                  {emp.days.map((day, i) => {
+                    const dt = new Date(day.date + 'T00:00:00+07:00')
+                    const dow = WEEKDAY_VN[dt.getDay()]
+                    const style = SYMBOL_STYLES[day.symbol] || SYMBOL_STYLES['']
+                    return (
+                      <div key={day.date}
+                        onClick={() => { setEditModal({ day, employeeId: emp.employeeId, employeeName: emp.fullName }) }}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 active:bg-gray-100 ${day.isWeekend ? 'bg-red-50/40' : i % 2 === 0 ? 'bg-gray-50/50' : ''}`}>
+                        <span className={`text-[11px] w-12 flex-shrink-0 ${day.isWeekend ? 'text-red-400' : 'text-gray-500'}`}>
+                          {String(i + 1).padStart(2, '0')}/{dow}
+                        </span>
+                        <div className={`w-7 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${style.bg} ${style.text}`}>{day.symbol}</div>
+                        <span className="text-[11px] text-gray-600 flex-1 truncate">
+                          {day.checkIn ? `${formatTimeVN(day.checkIn)}→${formatTimeVN(day.checkOut) || '...'}` :
+                            day.isBusinessTrip ? 'Công tác' :
+                            day.isLeave ? 'Nghỉ phép' :
+                            day.symbol === 'X' ? 'Vắng' : ''}
+                        </span>
+                        {day.dayWorkUnits > 0 && <span className="text-[11px] font-semibold text-emerald-700 flex-shrink-0">{day.dayWorkUnits}c</span>}
+                        {day.lateMinutes > 0 && <span className="text-[9px] font-bold bg-amber-100 text-amber-600 px-1 rounded flex-shrink-0">T{day.lateMinutes}p</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
 
       {/* Edit Modal */}
       {editModal && (

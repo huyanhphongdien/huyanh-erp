@@ -245,7 +245,7 @@ export const monthlyTimesheetService = {
 
         for (const a of validAtts) {
           const s = a.shift ? (Array.isArray(a.shift) ? a.shift[0] : a.shift) : null
-          const wu = a.work_units > 0 ? a.work_units : (s?.work_units || 1.0)
+          const wu = (a.work_units != null && a.work_units >= 0) ? Number(a.work_units) : (s?.work_units || 1.0)
           dayWU += wu
           dayWorkMins += a.working_minutes || 0
           dayOTMins += a.overtime_minutes || 0
@@ -258,7 +258,7 @@ export const monthlyTimesheetService = {
 
         // Nếu chỉ có 1 record không có check_in (VD: business_trip)
         if (validAtts.length === 0 && att) {
-          const wu = att.work_units > 0 ? att.work_units : 1.0
+          const wu = (att.work_units != null && att.work_units >= 0) ? Number(att.work_units) : 1.0
           dayWU = wu
           dayWorkMins = att.working_minutes || 0
         }

@@ -361,6 +361,8 @@ const MessageBubble = ({
   const isRecalled = message.metadata?.recalled
   const isEdited = message.metadata?.edited
   const isPinned = message.metadata?.pinned
+  const [hovered, setHovered] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const contextMenuItems: MenuProps['items'] = [
     { key: 'copy', icon: <CopyOutlined />, label: 'Sao chép', onClick: () => onContextMenu(message, 'copy') },
@@ -517,6 +519,8 @@ const MessageBubble = ({
 
       <Dropdown menu={{ items: contextMenuItems }} trigger={['contextMenu']}>
         <div
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
           style={{
             maxWidth: '70%',
             padding: (message.message_type === 'booking' || message.message_type === 'deal') ? 0 : '8px 12px',
@@ -529,10 +533,43 @@ const MessageBubble = ({
           }}
         >
           {isPinned && (
-            <PushpinOutlined 
-              style={{ position: 'absolute', top: -8, right: -8, color: '#faad14', fontSize: 14 }} 
+            <PushpinOutlined
+              style={{ position: 'absolute', top: -8, right: -8, color: '#faad14', fontSize: 14 }}
             />
           )}
+
+          {/* Always-available action menu trigger (click) — needed for image/file/touch where contextMenu doesn't work */}
+          <Dropdown
+            menu={{ items: contextMenuItems }}
+            trigger={['click']}
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            placement={isOwn ? 'bottomRight' : 'bottomLeft'}
+          >
+            <Button
+              type="text"
+              size="small"
+              icon={<MoreOutlined style={{ fontSize: 14, color: '#fff' }} />}
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(true) }}
+              style={{
+                position: 'absolute',
+                top: 4,
+                [isOwn ? 'left' : 'right']: 4,
+                width: 24,
+                height: 24,
+                minWidth: 24,
+                borderRadius: '50%',
+                background: 'rgba(0,0,0,0.45)',
+                opacity: hovered || menuOpen ? 1 : 0,
+                transition: 'opacity 0.15s',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2,
+              }}
+            />
+          </Dropdown>
 
           {renderContent()}
 

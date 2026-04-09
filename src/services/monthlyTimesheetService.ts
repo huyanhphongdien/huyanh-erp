@@ -320,14 +320,38 @@ export const monthlyTimesheetService = {
         })
       }
 
+      // ★ Tính lại totalCong từ SYMBOL (không dùng work_units từ DB)
+      // Vì check-in/out chưa chính xác, ký hiệu đã được sửa theo thực tế
+      let recalcCong = 0
+      let recalcWorkDays = 0
+      for (const day of days) {
+        const sym = day.symbol
+        if (sym === 'HC' || sym === 'S' || sym === 'C2') {
+          recalcCong += 1.0
+          recalcWorkDays++
+        } else if (sym === 'Đ') {
+          // Ca đêm ngắn (SHORT_3) = 1.0, ca đêm dài (LONG_NIGHT) = 1.5
+          const isLong = day.shiftCode === 'LONG_NIGHT' || day.shiftCode === 'LONG_DAY'
+          recalcCong += isLong ? 1.5 : 1.0
+          recalcWorkDays++
+        } else if (sym === '2ca') {
+          recalcCong += day.dayWorkUnits > 0 ? day.dayWorkUnits : 2.0
+          recalcWorkDays++
+        } else if (sym === 'CT') {
+          recalcCong += 1.0
+          recalcWorkDays++
+        }
+        // P, X, —, '' = 0 công
+      }
+
       result.push({
         employeeId: emp.id,
         employeeCode: emp.code,
         fullName: emp.full_name,
         departmentName: dept?.name || '',
         days,
-        totalWorkDays,
-        totalCong: Math.round(totalCong * 10) / 10,
+        totalWorkDays: recalcWorkDays,
+        totalCong: Math.round(recalcCong * 10) / 10,
         totalWorkingHours: Math.round(totalWorkingMins / 60 * 10) / 10,
         totalOvertimeHours: Math.round(totalOTMins / 60 * 10) / 10,
         totalLateDays,

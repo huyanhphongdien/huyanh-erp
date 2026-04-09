@@ -321,18 +321,20 @@ export const monthlyTimesheetService = {
       }
 
       // ★ Tính lại totalCong từ SYMBOL (không dùng work_units từ DB)
-      // Vì check-in/out chưa chính xác, ký hiệu đã được sửa theo thực tế
+      // Vì check-in/out chưa chính xác, ký hiệu đã được sửa theo thực tế.
+      // Cũng ghi lại day.dayWorkUnits theo logic này để per-day display khớp với tổng.
       let recalcCong = 0
       let recalcWorkDays = 0
       for (const day of days) {
         const sym = day.symbol
+        let dayCong = 0
         if (sym === 'HC' || sym === 'S' || sym === 'C2') {
-          recalcCong += 1.0
+          dayCong = 1.0
           recalcWorkDays++
         } else if (sym === 'Đ') {
           // Ca đêm ngắn (SHORT_3) = 1.0, ca đêm dài (LONG_NIGHT) = 1.5
           const isLong = day.shiftCode === 'LONG_NIGHT' || day.shiftCode === 'LONG_DAY'
-          recalcCong += isLong ? 1.5 : 1.0
+          dayCong = isLong ? 1.5 : 1.0
           recalcWorkDays++
         } else if (sym === '2ca') {
           // Tính từ từng ca thực tế trong ngày
@@ -341,13 +343,15 @@ export const monthlyTimesheetService = {
             const isLong = sn.includes('Dài') || sn.includes('Long')
             multiCong += isLong ? 1.5 : 1.0
           }
-          recalcCong += multiCong > 0 ? multiCong : 2.0
+          dayCong = multiCong > 0 ? multiCong : 2.0
           recalcWorkDays++
         } else if (sym === 'CT') {
-          recalcCong += 1.0
+          dayCong = 1.0
           recalcWorkDays++
         }
         // P, X, —, '' = 0 công
+        day.dayWorkUnits = Math.round(dayCong * 10) / 10
+        recalcCong += dayCong
       }
 
       result.push({

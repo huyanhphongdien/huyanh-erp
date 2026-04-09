@@ -171,7 +171,7 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
   // Kiểm tra progress_mode + parent_task_id
   const { data: task, error: fetchError } = await supabase
     .from('tasks')
-    .select('progress_mode, status, parent_task_id')
+    .select('progress_mode, status, parent_task_id, task_source')
     .eq('id', taskId)
     .single()
 
@@ -192,12 +192,34 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
 
   // Tự động chuyển status khi đạt 100%
   if (progress >= 100) {
-    updateData.status = 'pending_review'
     updateData.completed_date = new Date().toISOString()
     updateData.progress = 100
-    // Bỏ qua tự đánh giá → đưa thẳng vào phê duyệt
-    if (task.status !== 'finished' && task.status !== 'pending_review') {
-      updateData.evaluation_status = 'pending_approval'
+
+    const source = (task as any).task_source || 'assigned'
+    if (source === 'recurring') {
+      // Recurring: auto-approve 80đ, không cần duyệt
+      updateData.status = 'finished'
+      updateData.self_score = 100
+      updateData.final_score = 80
+      updateData.evaluation_status = 'approved'
+    } else if (source === 'self') {
+      // Self: auto-approve 85đ
+      updateData.status = 'finished'
+      updateData.self_score = 100
+      updateData.final_score = 85
+      updateData.evaluation_status = 'approved'
+    } else if (source === 'project') {
+      // Project: auto-approve 90đ
+      updateData.status = 'finished'
+      updateData.self_score = 100
+      updateData.final_score = 90
+      updateData.evaluation_status = 'approved'
+    } else {
+      // Assigned: chờ Manager duyệt
+      updateData.status = 'pending_review'
+      if (task.status !== 'finished' && task.status !== 'pending_review') {
+        updateData.evaluation_status = 'pending_approval'
+      }
     }
   }
 

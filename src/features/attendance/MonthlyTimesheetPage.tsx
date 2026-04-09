@@ -282,7 +282,7 @@ export default function MonthlyTimesheetPage() {
         ) : (
           <div ref={tableRef} className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="border-collapse text-[12px]" style={{ minWidth: COL_STT + COL_NAME + daysInMonth * 38 + 320 }}>
+              <table className="border-collapse text-[12px]" style={{ minWidth: COL_STT + COL_NAME + daysInMonth * 36 + 160 }}>
                 <thead>
                   <tr className="bg-[#1B4D3E] text-white">
                     <th style={{ position: 'sticky', left: 0, zIndex: 12, width: COL_STT, minWidth: COL_STT, backgroundColor: '#1B4D3E' }}
@@ -295,13 +295,10 @@ export default function MonthlyTimesheetPage() {
                         <div className={`text-[9px] font-normal ${h.isWeekend ? 'text-red-200' : 'text-white/60'}`}>{h.weekday}</div>
                       </th>
                     ))}
-                    <th className="px-2 py-2 text-center border-l-2 border-white/30 bg-[#163d32]" style={{ minWidth: 44 }}>Công</th>
-                    <th className="px-2 py-2 text-center bg-[#163d32]" style={{ minWidth: 44 }}>Giờ</th>
+                    <th className="px-2 py-2 text-center border-l-2 border-white/30 bg-[#163d32]" style={{ minWidth: 48 }}>Công</th>
                     <th className="px-2 py-2 text-center bg-[#163d32]" style={{ minWidth: 36 }}>Trễ</th>
-                    <th className="px-2 py-2 text-center bg-[#163d32]" style={{ minWidth: 36 }}>VS</th>
-                    <th className="px-2 py-2 text-center bg-[#163d32]" style={{ minWidth: 36 }}>OT</th>
                     <th className="px-2 py-2 text-center bg-[#163d32]" style={{ minWidth: 36 }}>Vắng</th>
-                    <th className="px-1 py-2 text-center bg-[#163d32]" style={{ minWidth: 32 }}><Eye size={12} className="mx-auto" /></th>
+                    <th className="px-1 py-2 text-center bg-[#163d32]" style={{ minWidth: 32 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -330,11 +327,8 @@ export default function MonthlyTimesheetPage() {
                             </td>
                           )
                         })}
-                        <td className="px-1 py-1 text-center font-bold text-blue-600 border-l-2 border-gray-200">{emp.totalCong}</td>
-                        <td className="px-1 py-1 text-center font-medium text-gray-700">{emp.totalWorkingHours}</td>
+                        <td className="px-1 py-1 text-center font-bold text-[14px] text-[#1B4D3E] border-l-2 border-gray-200">{emp.totalCong}</td>
                         <td className="px-1 py-1 text-center">{emp.totalLateDays > 0 && <span className="text-amber-600 font-bold">{emp.totalLateDays}</span>}</td>
-                        <td className="px-1 py-1 text-center">{emp.totalEarlyDays > 0 && <span className="text-purple-600 font-bold">{emp.totalEarlyDays}</span>}</td>
-                        <td className="px-1 py-1 text-center">{emp.totalOvertimeHours > 0 && <span className="text-red-600 font-bold">{emp.totalOvertimeHours}</span>}</td>
                         <td className="px-1 py-1 text-center">{emp.totalAbsentDays > 0 && <span className="text-red-500 font-bold">{emp.totalAbsentDays}</span>}</td>
                         <td className="px-1 py-1 text-center">
                           <button onClick={() => setSelectedEmployee(emp)} className="p-1 rounded hover:bg-gray-200 active:bg-gray-300" title="Xem chi tiết">
@@ -351,11 +345,8 @@ export default function MonthlyTimesheetPage() {
                     <td style={{ position: 'sticky', left: COL_NAME_LEFT, zIndex: 5, backgroundColor: '#f0fdf4', boxShadow: '2px 0 4px rgba(0,0,0,0.06)' }}
                       className="px-2 py-2 text-[#1B4D3E] border-r border-gray-200">Tổng ({timesheet.employees.length} NV)</td>
                     {dayHeaders.map((_, i) => <td key={i} className="border-l border-gray-50" style={{ backgroundColor: '#f0fdf4' }} />)}
-                    <td className="px-1 py-2 text-center text-blue-600 border-l-2 border-gray-200" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(timesheet.employees.reduce((s, e) => s + e.totalCong, 0) * 10) / 10}</td>
-                    <td className="px-1 py-2 text-center text-gray-700" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(timesheet.employees.reduce((s, e) => s + e.totalWorkingHours, 0) * 10) / 10}</td>
+                    <td className="px-1 py-2 text-center text-[14px] text-[#1B4D3E] border-l-2 border-gray-200" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(timesheet.employees.reduce((s, e) => s + e.totalCong, 0) * 10) / 10}</td>
                     <td className="px-1 py-2 text-center text-amber-600" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalLateDays, 0) || ''}</td>
-                    <td className="px-1 py-2 text-center text-purple-600" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalEarlyDays, 0) || ''}</td>
-                    <td className="px-1 py-2 text-center text-red-600" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(timesheet.employees.reduce((s, e) => s + e.totalOvertimeHours, 0) * 10) / 10 || ''}</td>
                     <td className="px-1 py-2 text-center text-red-500" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalAbsentDays, 0) || ''}</td>
                     <td style={{ backgroundColor: '#f0fdf4' }} />
                   </tr>

@@ -28,7 +28,7 @@ interface Props {
   onSaved: () => void
 }
 
-type Tab = 'quick' | 'history'
+type Tab = 'symbol' | 'quick' | 'history'
 
 interface AttRecord {
   id: string
@@ -50,7 +50,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
   const queryClient = useQueryClient()
   const editorId = user?.employee_id || ''
 
-  const [tab, setTab] = useState<Tab>('quick')
+  const [tab, setTab] = useState<Tab>('symbol')
   const [error, setError] = useState('')
 
   // ★ Form cho thêm/sửa ca
@@ -205,6 +205,61 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
     onError: (err: Error) => setError(err.message),
   })
 
+  // ── Sửa nhanh ký hiệu (1 click) ──
+  const SYMBOL_SHIFT_MAP: Record<string, { shiftCode: string; status: string }> = {
+    'HC': { shiftCode: 'ADMIN_PROD', status: 'present' },
+    'S': { shiftCode: 'SHORT_1', status: 'present' },
+    'C2': { shiftCode: 'SHORT_2', status: 'present' },
+    'Đ': { shiftCode: 'SHORT_3', status: 'present' },
+    'Đ_dài': { shiftCode: 'LONG_NIGHT', status: 'present' },
+    'S_dài': { shiftCode: 'LONG_DAY', status: 'present' },
+    'CT': { shiftCode: '', status: 'business_trip' },
+    'X': { shiftCode: '', status: 'absent' },
+    'P': { shiftCode: '', status: 'leave' },
+  }
+
+  const symbolMutation = useMutation({
+    mutationFn: async (symbol: string) => {
+      const mapping = SYMBOL_SHIFT_MAP[symbol]
+      if (!mapping) throw new Error('Ký hiệu không hợp lệ')
+
+      // Xóa tất cả records cũ trong ngày
+      await supabase.from('attendance').delete().eq('employee_id', employeeId).eq('date', day.date)
+
+      if (symbol === 'X') {
+        // Vắng — không tạo record
+        return
+      }
+
+      // Tìm shift ID
+      let shiftId: string | null = null
+      if (mapping.shiftCode) {
+        const shift = shifts.find(s => s.code === mapping.shiftCode)
+        shiftId = shift?.id || null
+      }
+
+      const workUnits = (mapping.shiftCode === 'LONG_DAY' || mapping.shiftCode === 'LONG_NIGHT') ? 1.5 : 1.0
+
+      await supabase.from('attendance').insert({
+        employee_id: employeeId,
+        date: day.date,
+        shift_id: shiftId,
+        status: mapping.status,
+        work_units: workUnits,
+        working_minutes: workUnits === 1.5 ? 660 : 480,
+        check_in_time: `${day.date}T01:00:00+00:00`,
+        check_out_time: `${day.date}T10:00:00+00:00`,
+      })
+    },
+    onSuccess: () => {
+      refetchRecords()
+      queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
+      onSaved()
+      onClose()
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
   // ── Sửa nhanh 1 record (đổi ca) ──
   const editMutation = useMutation({
     mutationFn: async () => {
@@ -275,7 +330,8 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
             {/* Tabs */}
             <div className="flex border-b">
               {[
-                { id: 'quick' as Tab, label: 'Chấm công' },
+                { id: 'symbol' as Tab, label: 'Sửa nhanh' },
+                { id: 'quick' as Tab, label: 'Chi tiết ca' },
                 { id: 'history' as Tab, label: 'Lịch sử' },
               ].map(t => (
                 <button
@@ -299,7 +355,40 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
                 </div>
               )}
 
-              {/* ══════════════ TAB: Chấm công ══════════════ */}
+              {/* ══════════════ TAB: Sửa nhanh ký hiệu ══════════════ */}
+              {tab === 'symbol' && (
+                <div className="space-y-3">
+                  <p className="text-[12px] text-gray-500">Chọn ký hiệu → tự ghi vào DB. Ký hiệu hiện tại: <strong className="text-[14px]">{day.symbol || '(trống)'}</strong></p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { sym: 'HC', label: 'HC (Hành chính)', bg: 'bg-blue-100', text: 'text-blue-700', wu: '1.0' },
+                      { sym: 'S', label: 'Ca sáng (Ngắn)', bg: 'bg-green-100', text: 'text-green-700', wu: '1.0' },
+                      { sym: 'C2', label: 'Ca chiều', bg: 'bg-orange-100', text: 'text-orange-700', wu: '1.0' },
+                      { sym: 'Đ', label: 'Ca đêm (Ngắn)', bg: 'bg-purple-100', text: 'text-purple-700', wu: '1.0' },
+                      { sym: 'S_dài', label: 'Ca ngày (Dài)', bg: 'bg-green-200', text: 'text-green-800', wu: '1.5' },
+                      { sym: 'Đ_dài', label: 'Ca đêm (Dài)', bg: 'bg-purple-200', text: 'text-purple-800', wu: '1.5' },
+                      { sym: 'CT', label: 'Công tác', bg: 'bg-cyan-100', text: 'text-cyan-700', wu: '1.0' },
+                      { sym: 'P', label: 'Nghỉ phép', bg: 'bg-yellow-100', text: 'text-yellow-700', wu: '0' },
+                      { sym: 'X', label: 'Vắng', bg: 'bg-red-100', text: 'text-red-700', wu: '0' },
+                    ].map(item => (
+                      <button
+                        key={item.sym}
+                        disabled={isLoading}
+                        onClick={() => symbolMutation.mutate(item.sym)}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all active:scale-95
+                          ${day.symbol === item.sym.replace('_dài', '') ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-gray-200 hover:border-gray-300'}
+                          ${item.bg}`}
+                      >
+                        <span className={`text-[16px] font-bold ${item.text}`}>{item.sym.replace('_dài', '')}</span>
+                        <span className="text-[10px] text-gray-600 leading-tight text-center">{item.label}</span>
+                        <span className="text-[10px] text-gray-400">{item.wu} công</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ══════════════ TAB: Chi tiết ca ══════════════ */}
               {tab === 'quick' && (
                 <div className="space-y-3">
 

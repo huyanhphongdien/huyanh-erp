@@ -693,7 +693,8 @@ export const leaveRequestService = {
       const endDate = new Date(request.end_date + 'T00:00:00+07:00')
 
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0]
+        // Format local date (không dùng toISOString vì nó trả UTC → lùi 1 ngày ở VN timezone)
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
         // Kiểm tra đã có attendance cho ngày này chưa
         const { data: existing } = await supabase
@@ -741,7 +742,8 @@ export const leaveRequestService = {
       const endDate = new Date(request.end_date + 'T00:00:00+07:00')
 
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0]
+        // Format local date (không dùng toISOString vì nó trả UTC → lùi 1 ngày ở VN timezone)
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
         // Xóa shift_assignment ngày đó
         await supabase

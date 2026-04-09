@@ -48,6 +48,7 @@ export interface DayDetail {
   shiftCount: number        // Số ca trong ngày (1, 2...)
   dayWorkUnits: number      // Tổng công trong ngày (1.0, 2.0...)
   allShiftNames: string[]   // ["Ca sáng", "Ca đêm"]
+  allShiftWorkUnits: number[]  // [1.0, 1.5] — work_units chuẩn của từng ca từ shifts table
 }
 
 /** Tổng hợp 1 NV trong tháng */
@@ -242,10 +243,12 @@ export const monthlyTimesheetService = {
         let dayAutoCheckout = false
         let dayCrossesMidnight = false
         const allShiftNames: string[] = []
+        const allShiftWorkUnits: number[] = []
 
         for (const a of validAtts) {
           const s = a.shift ? (Array.isArray(a.shift) ? a.shift[0] : a.shift) : null
-          const wu = (a.work_units != null && a.work_units >= 0) ? Number(a.work_units) : (s?.work_units || 1.0)
+          const shiftWU = s?.work_units != null ? Number(s.work_units) : 1.0
+          const wu = (a.work_units != null && a.work_units >= 0) ? Number(a.work_units) : shiftWU
           dayWU += wu
           dayWorkMins += a.working_minutes || 0
           dayOTMins += a.overtime_minutes || 0
@@ -254,6 +257,7 @@ export const monthlyTimesheetService = {
           if (a.auto_checkout) dayAutoCheckout = true
           if (s?.crosses_midnight) dayCrossesMidnight = true
           if (s?.name) allShiftNames.push(s.name)
+          allShiftWorkUnits.push(shiftWU)
         }
 
         // Nếu chỉ có 1 record không có check_in (VD: business_trip)
@@ -317,6 +321,7 @@ export const monthlyTimesheetService = {
           shiftCount,
           dayWorkUnits: Math.round(dayWU * 10) / 10,
           allShiftNames,
+          allShiftWorkUnits,
         })
       }
 
@@ -337,13 +342,11 @@ export const monthlyTimesheetService = {
           dayCong = isLong ? 1.5 : 1.0
           recalcWorkDays++
         } else if (sym === '2ca') {
-          // Tính từ từng ca thực tế trong ngày
-          let multiCong = 0
-          for (const sn of day.allShiftNames) {
-            const isLong = sn.includes('Dài') || sn.includes('Long')
-            multiCong += isLong ? 1.5 : 1.0
-          }
-          dayCong = multiCong > 0 ? multiCong : 2.0
+          // Tính từ work_units chuẩn của từng ca trong shifts table
+          // (SHORT_* = 1.0, LONG_* = 1.5, ADMIN_* = 1.0)
+          // → 2 ca ngắn = 2.0; 1 ngắn + 1 dài = 2.5; 2 ca dài = 3.0
+          const sumFromShifts = day.allShiftWorkUnits.reduce((acc, wu) => acc + wu, 0)
+          dayCong = sumFromShifts > 0 ? sumFromShifts : 2.0
           recalcWorkDays++
         } else if (sym === 'CT') {
           dayCong = 1.0

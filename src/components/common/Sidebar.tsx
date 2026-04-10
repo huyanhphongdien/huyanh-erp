@@ -585,12 +585,6 @@ export function Sidebar() {
     return () => clearInterval(interval);
   }, [user?.employee_id]);
 
-  const allMenuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount, unreadB2BCount, unreadNotifCount);
-  // Filter out groups where no items are visible (avoid empty group headers)
-  const menuGroups = allMenuGroups.filter(g =>
-    isGroupVisible(g) && g.items.some(item => isItemVisible(item))
-  );
-
   const toggleGroup = (title: string) => {
     setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));
   };
@@ -625,6 +619,12 @@ export function Sidebar() {
     }
     return true;
   };
+
+  // ── Build filtered menu (must be AFTER isGroupVisible/isItemVisible) ──
+  const allMenuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount, unreadB2BCount, unreadNotifCount);
+  const menuGroups = allMenuGroups.filter(g =>
+    isGroupVisible(g) && g.items.some(item => isItemVisible(item))
+  );
 
   // ══════════════════════════════════════════════════════════
   // RENDER MENU ITEM — NEW DESIGN

@@ -44,6 +44,20 @@ const BRAND = {
 // TYPES (unchanged)
 // ============================================================================
 
+interface AttendanceToday {
+  checkedIn: boolean
+  checkInTime: string | null
+  checkOutTime: string | null
+  shiftName: string | null
+}
+
+interface MonthlyAttSummary {
+  totalCong: number
+  lateDays: number
+  absentDays: number
+  workDays: number
+}
+
 interface DashboardStats {
   totalTasks: number
   pendingEvaluation: number
@@ -53,6 +67,8 @@ interface DashboardStats {
   pendingLeaveRequests: number
   recentTasks: RecentTask[]
   myProjectCount: number
+  attendanceToday: AttendanceToday
+  monthlySummary: MonthlyAttSummary
 }
 
 interface RecentTask {
@@ -202,6 +218,8 @@ export function EmployeeDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalTasks: 0, pendingEvaluation: 0, completedTasks: 0, inProgressTasks: 0,
     remainingLeaveDays: 12, pendingLeaveRequests: 0, recentTasks: [], myProjectCount: 0,
+    attendanceToday: { checkedIn: false, checkInTime: null, checkOutTime: null, shiftName: null },
+    monthlySummary: { totalCong: 0, lateDays: 0, absentDays: 0, workDays: 0 },
   })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -251,10 +269,79 @@ export function EmployeeDashboard() {
           .eq('employee_id', employeeId).eq('is_active', true)
         myProjectCount = count || 0
       } catch {}
+
+      // ── Attendance: today's check-in ──
+      const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) // YYYY-MM-DD
+      let attendanceToday: AttendanceToday = { checkedIn: false, checkInTime: null, checkOutTime: null, shiftName: null }
+      try {
+        const { data: todayAtt } = await supabase
+          .from('attendance')
+          .select('check_in_time, check_out_time, shift:shifts!attendance_shift_id_fkey(name)')
+          .eq('employee_id', employeeId)
+          .eq('date', todayStr)
+          .order('check_in_time', { ascending: true })
+          .limit(1)
+        if (todayAtt && todayAtt.length > 0) {
+          const a = todayAtt[0] as any
+          attendanceToday = {
+            checkedIn: !!a.check_in_time,
+            checkInTime: a.check_in_time,
+            checkOutTime: a.check_out_time,
+            shiftName: Array.isArray(a.shift) ? a.shift[0]?.name : a.shift?.name,
+          }
+        }
+      } catch {}
+
+      // ── Attendance: monthly summary ──
+      const now = new Date()
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      let monthlySummary: MonthlyAttSummary = { totalCong: 0, lateDays: 0, absentDays: 0, workDays: 0 }
+      try {
+        const { data: monthAtt } = await supabase
+          .from('attendance')
+          .select('date, status, late_minutes, work_units, shift:shifts!attendance_shift_id_fkey(work_units)')
+          .eq('employee_id', employeeId)
+          .gte('date', monthStart)
+          .lte('date', todayStr)
+        if (monthAtt) {
+          // Group by date to handle multi-shift days
+          const byDate = new Map<string, typeof monthAtt>()
+          for (const a of monthAtt) {
+            const arr = byDate.get(a.date) || []
+            arr.push(a)
+            byDate.set(a.date, arr)
+          }
+          let cong = 0, late = 0, workDays = 0
+          byDate.forEach((records) => {
+            const hasCheckIn = records.some((r: any) => r.status !== 'leave' && r.status !== 'absent')
+            if (hasCheckIn) {
+              workDays++
+              let dayCong = 0
+              for (const r of records as any[]) {
+                const s = Array.isArray(r.shift) ? r.shift[0] : r.shift
+                const wu = (r.work_units != null && r.work_units > 0) ? Number(r.work_units) : (s?.work_units ? Number(s.work_units) : 1.0)
+                dayCong += wu
+              }
+              cong += dayCong
+              if (records.some((r: any) => r.late_minutes > 0 || r.status === 'late')) late++
+            }
+          })
+          // Count absent: weekdays from monthStart to today that have NO attendance record and are NOT weekend
+          let absent = 0
+          for (let d = new Date(monthStart + 'T00:00:00+07:00'); d <= new Date(todayStr + 'T00:00:00+07:00'); d.setDate(d.getDate() + 1)) {
+            const ds = d.toISOString().split('T')[0]
+            if (d.getDay() === 0) continue // skip Sunday
+            if (!byDate.has(ds)) absent++
+          }
+          monthlySummary = { totalCong: Math.round(cong * 10) / 10, lateDays: late, absentDays: absent, workDays }
+        }
+      } catch {}
+
       setStats({
         totalTasks: totalTasks || 0, pendingEvaluation: pendingEvalTasks?.length || 0,
         completedTasks: completedData?.length || 0, inProgressTasks: inProgressData?.length || 0,
         remainingLeaveDays: remainingDays, pendingLeaveRequests: pendingLeave || 0, recentTasks, myProjectCount,
+        attendanceToday, monthlySummary,
       })
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
@@ -326,8 +413,73 @@ export function EmployeeDashboard() {
       {/* ══════ MAIN CONTENT ══════ */}
       <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
 
+        {/* ─── CHECK-IN CARD (most important daily action) ─── */}
+        <Link to="/attendance">
+          <GlassCard className="p-4 sm:p-5 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-[0.04]"
+              style={{ background: stats.attendanceToday.checkedIn
+                ? 'linear-gradient(135deg, #10B981, #059669)'
+                : 'linear-gradient(135deg, #F59E0B, #D97706)' }} />
+            <div className="relative z-10 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`p-3 rounded-xl flex-shrink-0 ${stats.attendanceToday.checkedIn ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  {stats.attendanceToday.checkedIn ? (
+                    <>
+                      <p className="text-[15px] font-bold text-emerald-700">✓ Đã chấm công hôm nay</p>
+                      <p className="text-[12px] text-gray-500 truncate">
+                        {stats.attendanceToday.checkInTime &&
+                          new Date(stats.attendanceToday.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}
+                        {stats.attendanceToday.checkOutTime &&
+                          ` → ${new Date(stats.attendanceToday.checkOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}`}
+                        {stats.attendanceToday.shiftName && ` • ${stats.attendanceToday.shiftName}`}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[15px] font-bold text-amber-700">Chưa chấm công hôm nay</p>
+                      <p className="text-[12px] text-gray-500">Bấm vào đây để check-in →</p>
+                    </>
+                  )}
+                </div>
+              </div>
+              <ChevronRight className={`w-5 h-5 flex-shrink-0 ${stats.attendanceToday.checkedIn ? 'text-emerald-400' : 'text-amber-400'}`} />
+            </div>
+          </GlassCard>
+        </Link>
+
         {/* ─── STATS GRID ─── */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3.5">
+          {/* Attendance stats — first row */}
+          <StatCard
+            title="Công tháng này"
+            value={stats.monthlySummary.totalCong}
+            subtitle={`${stats.monthlySummary.workDays} ngày đi làm`}
+            icon={<Calendar />}
+            accentColor={BRAND.primary}
+            iconBg="bg-emerald-50 text-emerald-600"
+            link="/attendance/monthly"
+          />
+          <StatCard
+            title="Đi trễ"
+            value={stats.monthlySummary.lateDays}
+            subtitle="lần trong tháng"
+            icon={<Timer />}
+            accentColor="#F59E0B"
+            iconBg="bg-amber-50 text-amber-600"
+            link="/attendance/monthly"
+          />
+          <StatCard
+            title="Vắng"
+            value={stats.monthlySummary.absentDays}
+            subtitle="ngày chưa chấm công"
+            icon={<AlertCircle />}
+            accentColor="#EF4444"
+            iconBg="bg-red-50 text-red-600"
+            link="/attendance/monthly"
+          />
           <StatCard
             title="Công việc"
             value={stats.totalTasks}

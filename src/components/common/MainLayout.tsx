@@ -3,9 +3,11 @@
 // File: src/components/common/MainLayout.tsx
 // ============================================================
 
-import { Suspense } from 'react'
+import { Suspense, lazy } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+
+const AIChatWidget = lazy(() => import('../../features/ai-chat/AIChatWidget'))
 
 function PageLoader() {
   return (
@@ -24,6 +26,9 @@ export function MainLayout() {
           <Outlet />
         </Suspense>
       </main>
+      <Suspense fallback={null}>
+        <AIChatWidget />
+      </Suspense>
     </div>
   )
 }

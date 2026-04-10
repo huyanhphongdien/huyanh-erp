@@ -573,6 +573,28 @@ const MessageBubble = ({
             />
           </Dropdown>
 
+          {/* Quoted reply */}
+          {message.reply_to && (
+            <div style={{
+              padding: '6px 10px',
+              marginBottom: 6,
+              borderLeft: `3px solid ${isOwn ? 'rgba(255,255,255,0.5)' : '#1B4D3E'}`,
+              borderRadius: 4,
+              background: isOwn ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.04)',
+              fontSize: 12,
+            }}>
+              <div style={{ fontWeight: 600, fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.8)' : '#1B4D3E', marginBottom: 2 }}>
+                {message.reply_to.sender_type === 'partner' ? 'Đại lý' : 'Nhà máy'}
+              </div>
+              <div style={{
+                color: isOwn ? 'rgba(255,255,255,0.7)' : '#666',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 250,
+              }}>
+                {message.reply_to.content || (message.reply_to.message_type === 'image' ? '📷 Ảnh' : '📎 File')}
+              </div>
+            </div>
+          )}
+
           {renderContent()}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 4 }}>
@@ -673,7 +695,15 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
     try {
       setLoading(true)
       const response = await chatMessageService.getMessages({ room_id: roomId, limit: 50 })
-      setMessages(response.data)
+      // Enrich reply_to references
+      const enriched = response.data.map(msg => {
+        if (msg.reply_to_id) {
+          const replyMsg = response.data.find(m => m.id === msg.reply_to_id)
+          if (replyMsg) return { ...msg, reply_to: replyMsg }
+        }
+        return msg
+      })
+      setMessages(enriched)
 
       // Kiểm tra booking đã confirmed nhưng chưa có Deal → tự tạo
       // Đảm bảo Deal luôn được tạo dù user bỏ lỡ realtime event
@@ -754,7 +784,14 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
 
     const channel = chatMessageService.subscribeToRoom(roomId, {
       onInsert: (newMessage) => {
-        setMessages((prev) => [...prev, newMessage])
+        setMessages((prev) => {
+          // Enrich reply_to if present
+          if (newMessage.reply_to_id) {
+            const replyMsg = prev.find(m => m.id === newMessage.reply_to_id)
+            if (replyMsg) return [...prev, { ...newMessage, reply_to: replyMsg }]
+          }
+          return [...prev, newMessage]
+        })
         if (newMessage.sender_type === 'partner') {
           chatMessageService.markMessageAsRead(newMessage.id)
         }

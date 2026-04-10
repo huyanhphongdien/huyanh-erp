@@ -48,6 +48,9 @@ import {
   ExperimentOutlined,
   WalletOutlined,
   ToolOutlined,
+  AuditOutlined,
+  SafetyCertificateOutlined,
+  FileProtectOutlined,
 } from '@ant-design/icons'
 import {
   dealService,
@@ -65,6 +68,9 @@ import DealWmsTab from '../../../components/b2b/DealWmsTab'
 import DealQcTab from '../../../components/b2b/DealQcTab'
 import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
 import DealProductionTab from '../../../components/b2b/DealProductionTab'
+import DealProcessingTab from '../../../components/b2b/DealProcessingTab'
+import DealAcceptanceTab from '../../../components/b2b/DealAcceptanceTab'
+import DealContractTab from '../../../components/b2b/DealContractTab'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -855,6 +861,27 @@ const DealDetailPage = () => {
               <span><WalletOutlined /> Tạm ứng</span>
             ),
             children: <DealAdvancesTab dealId={deal.id} deal={deal} />,
+          },
+          {
+            key: 'processing',
+            label: (
+              <span><AuditOutlined /> Xử lý mủ</span>
+            ),
+            children: <DealProcessingTab dealId={deal.id} />,
+          },
+          {
+            key: 'acceptance',
+            label: (
+              <span><SafetyCertificateOutlined /> Biên bản</span>
+            ),
+            children: <DealAcceptanceTab dealId={deal.id} />,
+          },
+          {
+            key: 'contract',
+            label: (
+              <span><FileProtectOutlined /> Hợp đồng</span>
+            ),
+            children: <DealContractTab dealId={deal.id} />,
           },
         ]}
       />

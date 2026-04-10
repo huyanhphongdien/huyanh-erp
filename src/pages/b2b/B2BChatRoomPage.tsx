@@ -38,6 +38,7 @@ import {
   DeleteOutlined,
   RollbackOutlined,
   CopyOutlined,
+  MessageOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   DollarOutlined,

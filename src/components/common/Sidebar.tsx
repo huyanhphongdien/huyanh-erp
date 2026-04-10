@@ -181,13 +181,14 @@ const getMenuGroups = (
         managerOnly: true,
         badge: pendingApprovals > 0 ? pendingApprovals : undefined,
       },
-      { path: '/task-templates', label: 'Mẫu công việc', icon: <FileText size={18} /> },
-      { path: '/performance', label: 'Hiệu suất', icon: <TrendingUp size={18} /> },
+      { path: '/task-templates', label: 'Mẫu công việc', icon: <FileText size={18} />, managerOnly: true },
+      { path: '/performance', label: 'Hiệu suất', icon: <TrendingUp size={18} />, managerOnly: true },
     ],
   },
   {
     title: 'QUẢN LÝ DỰ ÁN',
     icon: <FolderKanban size={18} />,
+    executiveOnly: true,
     collapsible: true,
     items: [
       { path: '/projects/list', label: 'Danh sách DA', icon: <ListTodo size={18} /> },
@@ -353,6 +354,7 @@ const getMenuGroups = (
   {
     title: 'QUẢN TRỊ',
     icon: <Shield size={18} />,
+    executiveOnly: true,
     items: [
       { path: '/purchasing/access', label: 'Phân quyền mua hàng', icon: <Shield size={18} />, bgdOnly: true },
     ],
@@ -583,7 +585,11 @@ export function Sidebar() {
     return () => clearInterval(interval);
   }, [user?.employee_id]);
 
-  const menuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount, unreadB2BCount, unreadNotifCount);
+  const allMenuGroups = getMenuGroups(0, pendingOTCount, pendingLeaveCount, unreadB2BCount, unreadNotifCount);
+  // Filter out groups where no items are visible (avoid empty group headers)
+  const menuGroups = allMenuGroups.filter(g =>
+    isGroupVisible(g) && g.items.some(item => isItemVisible(item))
+  );
 
   const toggleGroup = (title: string) => {
     setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));

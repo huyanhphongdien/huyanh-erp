@@ -315,6 +315,7 @@ export function ManagerDashboard() {
   const [pendingOvertimes, setPendingOvertimes] = useState<any[]>([])
   const [activeTrips, setActiveTrips] = useState<any[]>([])
   const [monthlyWorkUnits, setMonthlyWorkUnits] = useState<any[]>([])
+  const [absentEmployees, setAbsentEmployees] = useState<{ id: string; name: string; code: string }[]>([])
   const [perfKPIs, setPerfKPIs] = useState<{ total_evaluated: number; avg_score: number; total_completed: number; on_time_rate: number; grade_distribution: Record<string, number> }>({ total_evaluated: 0, avg_score: 0, total_completed: 0, on_time_rate: 0, grade_distribution: { A: 0, B: 0, C: 0, D: 0, F: 0 } })
   const [perfTopEmployees, setPerfTopEmployees] = useState<{ name: string; dept: string; score: number; grade: string; tasks: number }[]>([])
   const [weeklyAttendance, setWeeklyAttendance] = useState<any[]>([])
@@ -361,6 +362,19 @@ export function ManagerDashboard() {
         const bt = (todayAtts || []).filter(a => a.status === 'business_trip').length
         const total = totalActive || 0
         setTodayAttendance({ present, absent: Math.max(0, total - present - bt), late, businessTrip: bt, total })
+
+        // Danh sách NV chưa check-in hôm nay (top 15)
+        try {
+          const { data: allActive } = await supabase.from('employees').select('id, code, full_name').eq('status', 'active')
+          const { data: todayCheckedIn } = await supabase.from('attendance').select('employee_id').eq('date', today)
+          const checkedInIds = new Set((todayCheckedIn || []).map((a: any) => a.employee_id))
+          const VIP = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com', 'trunglxh@huyanhrubber.com']
+          const absentList = (allActive || [])
+            .filter((e: any) => !checkedInIds.has(e.id))
+            .slice(0, 15)
+            .map((e: any) => ({ id: e.id, name: e.full_name, code: e.code }))
+          setAbsentEmployees(absentList)
+        } catch {}
 
         // Đơn chờ duyệt
         const { data: leaves } = await supabase.from('leave_requests').select('id, employee_id, start_date, end_date, total_days, created_at, employee:employees!leave_requests_employee_id_fkey(full_name), leave_type:leave_types!leave_requests_leave_type_id_fkey(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
@@ -615,6 +629,23 @@ export function ManagerDashboard() {
                   </div>
                 ))}
               </div>
+              {/* Danh sách NV chưa check-in */}
+              {absentEmployees.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-50">
+                  <p className="text-[11px] text-gray-400 font-medium mb-2">
+                    <UserX className="w-3 h-3 inline mr-1" />
+                    Chưa check-in ({absentEmployees.length} NV)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {absentEmployees.map(e => (
+                      <span key={e.id} className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded-lg text-[11px] font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                        {e.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Biểu đồ 7 ngày */}
               <div className="mt-4 pt-3 border-t border-gray-50">
                 <p className="text-[11px] text-gray-400 font-medium mb-2">7 ngày gần nhất</p>

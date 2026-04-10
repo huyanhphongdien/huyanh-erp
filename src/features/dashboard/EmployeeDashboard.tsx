@@ -27,6 +27,8 @@ import {
   Calendar,
   FolderKanban,
   ArrowUpRight,
+  Camera,
+  MapPin,
 } from 'lucide-react'
 
 // ============================================================================
@@ -419,41 +421,50 @@ export function EmployeeDashboard() {
       <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
 
         {/* ─── CHECK-IN CARD (most important daily action) ─── */}
-        <Link to="/attendance/qr-checkin">
-          <GlassCard className="p-4 sm:p-5 relative overflow-hidden">
-            <div className="absolute inset-0 opacity-[0.04]"
-              style={{ background: stats.attendanceToday.checkedIn
-                ? 'linear-gradient(135deg, #10B981, #059669)'
-                : 'linear-gradient(135deg, #F59E0B, #D97706)' }} />
-            <div className="relative z-10 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`p-3 rounded-xl flex-shrink-0 ${stats.attendanceToday.checkedIn ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                  <Clock className="w-6 h-6" />
-                </div>
-                <div className="min-w-0">
-                  {stats.attendanceToday.checkedIn ? (
-                    <>
-                      <p className="text-[15px] font-bold text-emerald-700">✓ Đã chấm công hôm nay</p>
-                      <p className="text-[12px] text-gray-500 truncate">
-                        {stats.attendanceToday.checkInTime &&
-                          new Date(stats.attendanceToday.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}
-                        {stats.attendanceToday.checkOutTime &&
-                          ` → ${new Date(stats.attendanceToday.checkOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}`}
-                        {stats.attendanceToday.shiftName && ` • ${stats.attendanceToday.shiftName}`}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-[15px] font-bold text-amber-700">Chưa chấm công hôm nay</p>
-                      <p className="text-[12px] text-gray-500">Bấm vào đây để check-in →</p>
-                    </>
-                  )}
-                </div>
+        <GlassCard className="p-4 sm:p-5 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.04]"
+            style={{ background: stats.attendanceToday.checkedIn
+              ? 'linear-gradient(135deg, #10B981, #059669)'
+              : 'linear-gradient(135deg, #F59E0B, #D97706)' }} />
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 min-w-0 mb-3">
+              <div className={`p-2.5 rounded-xl flex-shrink-0 ${stats.attendanceToday.checkedIn ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                <Clock className="w-5 h-5" />
               </div>
-              <ChevronRight className={`w-5 h-5 flex-shrink-0 ${stats.attendanceToday.checkedIn ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <div className="min-w-0">
+                {stats.attendanceToday.checkedIn ? (
+                  <>
+                    <p className="text-[14px] font-bold text-emerald-700">✓ Đã chấm công hôm nay</p>
+                    <p className="text-[12px] text-gray-500 truncate">
+                      {stats.attendanceToday.checkInTime &&
+                        new Date(stats.attendanceToday.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}
+                      {stats.attendanceToday.checkOutTime &&
+                        ` → ${new Date(stats.attendanceToday.checkOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}`}
+                      {stats.attendanceToday.shiftName && ` • ${stats.attendanceToday.shiftName}`}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[14px] font-bold text-amber-700">Chưa chấm công hôm nay</p>
+                    <p className="text-[12px] text-gray-500">Chọn cách check-in bên dưới</p>
+                  </>
+                )}
+              </div>
             </div>
-          </GlassCard>
-        </Link>
+            <div className="grid grid-cols-2 gap-2">
+              <Link to="/attendance/qr-checkin"
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all active:scale-[0.97]"
+                style={{ background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.secondary})` }}>
+                <Camera className="w-4 h-4" /> Quét QR
+              </Link>
+              <Link to="/attendance"
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold border-2 transition-all active:scale-[0.97]"
+                style={{ borderColor: BRAND.primary, color: BRAND.primary }}>
+                <MapPin className="w-4 h-4" /> GPS Check-in
+              </Link>
+            </div>
+          </div>
+        </GlassCard>
 
         {/* ─── STATS GRID ─── */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3.5">

@@ -47,6 +47,7 @@ import {
   Timer,
   CalendarDays,
   AlarmClockPlus,
+  ScanLine,
   ClipboardCheck,
   Shield,
   UsersRound,
@@ -149,6 +150,7 @@ const getMenuGroups = (
     icon: <Clock size={18} />,
     collapsible: true,
     items: [
+      { path: '/attendance/qr-checkin', label: 'Chấm công QR', icon: <ScanLine size={18} /> },
       { path: '/attendance', label: 'Bảng chấm công', icon: <Clock size={18} /> },
       { path: '/attendance/monthly', label: 'Chấm công tháng', icon: <Calendar size={18} />, managerOnly: true },
       { path: '/shifts', label: 'Quản lý ca', icon: <Timer size={18} />, executiveOnly: true },

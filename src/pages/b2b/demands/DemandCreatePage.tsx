@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react'
+import PartnerMatchSuggestions from '../../../components/b2b/PartnerMatchSuggestions'
 import { useNavigate } from 'react-router-dom'
 import {
   Card,
@@ -274,6 +275,17 @@ const Step1GeneralInfo = ({ form, onNext }: Step1Props) => {
           </>
         )}
       </Form>
+
+      {/* Auto-matching suggestions */}
+      <div style={{ marginTop: 16 }}>
+        <PartnerMatchSuggestions
+          criteria={{
+            product_type: form.getFieldValue('product_type'),
+            min_drc: form.getFieldValue('drc_min'),
+            quantity_tons: form.getFieldValue('quantity_tons'),
+          }}
+        />
+      </div>
 
       <Divider />
 

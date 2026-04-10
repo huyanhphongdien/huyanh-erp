@@ -419,7 +419,7 @@ export function EmployeeDashboard() {
       <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
 
         {/* ─── CHECK-IN CARD (most important daily action) ─── */}
-        <Link to="/attendance">
+        <Link to="/attendance/qr-checkin">
           <GlassCard className="p-4 sm:p-5 relative overflow-hidden">
             <div className="absolute inset-0 opacity-[0.04]"
               style={{ background: stats.attendanceToday.checkedIn

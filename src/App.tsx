@@ -81,6 +81,7 @@ const TeamManagementPage = lazy(() => import('./features/shift-assignments').the
 
 // ★ Bảng chấm công tháng
 const MonthlyTimesheetPage = lazy(() => import('./features/attendance/MonthlyTimesheetPage'));
+const QRCheckInPage = lazy(() => import('./features/attendance/QRCheckInPage'));
 
 // ★ Đơn công tác
 const BusinessTripPage = lazy(() => import('./features/attendance/BusinessTripPage'));
@@ -455,6 +456,7 @@ function App() {
               <Route path="leave-approvals" element={<LeaveApprovalPage />} />
               <Route path="attendance" element={<AttendanceListPage />} />
               <Route path="attendance/monthly" element={<MonthlyTimesheetPage />} />
+              <Route path="attendance/qr-checkin" element={<Suspense fallback={<LoadingSpinner />}><QRCheckInPage /></Suspense>} />
               <Route path="shifts" element={<ShiftListPage />} />
               <Route path="shift-assignments" element={<ShiftCalendarPage />} />
               <Route path="shift-teams" element={<TeamManagementPage />} />

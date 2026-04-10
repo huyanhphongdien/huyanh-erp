@@ -290,6 +290,12 @@ const getMenuGroups = (
         requireB2BPurchaser: true,
       },
       {
+        path: '/b2b/analytics',
+        label: 'Phân tích B2B',
+        icon: <TrendingUp size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
         path: '/b2b/reports',
         label: 'Báo cáo công nợ',
         icon: <BarChart3 size={18} />,

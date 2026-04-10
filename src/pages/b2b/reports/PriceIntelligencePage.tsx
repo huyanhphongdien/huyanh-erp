@@ -33,40 +33,48 @@ export default function PriceIntelligencePage() {
   const { data: priceTrend = [], isLoading: loadingTrend } = useQuery({
     queryKey: ['price-trend', productType],
     queryFn: async () => {
-      const months: { month: string; avgPrice: number; minPrice: number; maxPrice: number; dealCount: number }[] = []
+      // Single query for all 12 months instead of N+1
+      const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+      const startStr = startDate.toISOString().split('T')[0]
 
+      let query = supabase
+        .from('b2b_deals')
+        .select('unit_price, created_at')
+        .gte('created_at', startStr)
+        .not('status', 'eq', 'cancelled')
+        .gt('unit_price', 0)
+
+      if (productType !== 'all') query = query.eq('product_code', productType)
+
+      const { data } = await query
+      if (!data) return []
+
+      // Group by month
+      const monthMap: Record<string, number[]> = {}
+      data.forEach(d => {
+        const dt = new Date(d.created_at)
+        const key = `${dt.getMonth() + 1}/${dt.getFullYear()}`
+        if (!monthMap[key]) monthMap[key] = []
+        monthMap[key].push(d.unit_price)
+      })
+
+      // Build sorted array for last 12 months
+      const months: { month: string; avgPrice: number; minPrice: number; maxPrice: number; dealCount: number }[] = []
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const year = d.getFullYear()
-        const month = d.getMonth() + 1
-        const start = `${year}-${String(month).padStart(2, '0')}-01`
-        const end = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`
-
-        let query = supabase
-          .from('b2b_deals')
-          .select('unit_price')
-          .gte('created_at', start)
-          .lt('created_at', end)
-          .not('status', 'eq', 'cancelled')
-          .gt('unit_price', 0)
-
-        if (productType !== 'all') query = query.eq('product_code', productType)
-
-        const { data } = await query
-        if (data && data.length > 0) {
-          const prices = data.map(d => d.unit_price)
+        const key = `${d.getMonth() + 1}/${d.getFullYear()}`
+        const prices = monthMap[key]
+        if (prices && prices.length > 0) {
           months.push({
-            month: `T${month}/${String(year).slice(-2)}`,
+            month: `T${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}`,
             avgPrice: Math.round(prices.reduce((s, p) => s + p, 0) / prices.length),
             minPrice: Math.min(...prices),
             maxPrice: Math.max(...prices),
             dealCount: prices.length,
           })
-        } else {
-          months.push({ month: `T${month}/${String(year).slice(-2)}`, avgPrice: 0, minPrice: 0, maxPrice: 0, dealCount: 0 })
         }
       }
-      return months.filter(m => m.dealCount > 0)
+      return months
     },
   })
 

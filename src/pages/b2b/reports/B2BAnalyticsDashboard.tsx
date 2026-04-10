@@ -95,16 +95,24 @@ export default function B2BAnalyticsDashboard() {
     queryFn: async () => {
       const { data: settlements } = await supabase
         .from('b2b_settlements')
-        .select('id, settlement_number, total_amount, currency, status, created_at, partner:b2b_partners!b2b_settlements_partner_id_fkey(name)')
+        .select('id, settlement_number, total_amount, currency, status, created_at, partner_id')
         .in('status', ['pending', 'approved', 'draft'])
         .order('created_at', { ascending: true })
         .limit(20)
+
+      // Fetch partner names separately (FK join may not work on views)
+      const partnerIds = [...new Set((settlements || []).map((s: any) => s.partner_id).filter(Boolean))]
+      const partnerMap = new Map<string, string>()
+      if (partnerIds.length > 0) {
+        const { data: partners } = await supabase.from('b2b_partners').select('id, name').in('id', partnerIds)
+        ;(partners || []).forEach((p: any) => partnerMap.set(p.id, p.name))
+      }
 
       return (settlements || []).map((s: any) => {
         const days = Math.floor((Date.now() - new Date(s.created_at).getTime()) / 86400000)
         return {
           ...s,
-          partner: Array.isArray(s.partner) ? s.partner[0] : s.partner,
+          partner: { name: partnerMap.get(s.partner_id) || '—' },
           agingDays: days,
           agingColor: days > 30 ? 'red' : days > 14 ? 'orange' : 'green',
         }

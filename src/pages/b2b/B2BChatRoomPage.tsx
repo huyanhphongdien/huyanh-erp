@@ -365,6 +365,7 @@ const MessageBubble = ({
   const [menuOpen, setMenuOpen] = useState(false)
 
   const contextMenuItems: MenuProps['items'] = [
+    { key: 'reply', icon: <MessageOutlined />, label: 'Trả lời', onClick: () => onContextMenu(message, 'reply') },
     { key: 'copy', icon: <CopyOutlined />, label: 'Sao chép', onClick: () => onContextMenu(message, 'copy') },
     ...(isOwn ? [
       { key: 'edit', icon: <EditOutlined />, label: 'Chỉnh sửa', onClick: () => onContextMenu(message, 'edit') },
@@ -613,6 +614,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   const [sending, setSending] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null)
+  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null)
   
   // Upload & Voice states
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -839,10 +841,12 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
           room_id: roomId,
           sender_id: user.employee_id,
           content: inputValue.trim(),
+          reply_to_id: replyToMessage?.id,
         })
       }
 
       setInputValue('')
+      setReplyToMessage(null)
     } catch (error) {
       console.error('Error sending message:', error)
       message.error('Không thể gửi tin nhắn')
@@ -899,6 +903,11 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
 
   const handleContextMenu = async (msg: ChatMessage, action: string) => {
     switch (action) {
+      case 'reply':
+        setReplyToMessage(msg)
+        setEditingMessage(null)
+        break
+
       case 'copy':
         await navigator.clipboard.writeText(msg.content)
         message.success('Đã sao chép')
@@ -1262,6 +1271,17 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
         {renderMessages()}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Reply indicator */}
+      {replyToMessage && (
+        <div style={{ padding: '8px 16px', backgroundColor: '#f0fdf4', borderTop: '1px solid #bbf7d0', borderLeft: '3px solid #1B4D3E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <Text strong style={{ fontSize: 12, color: '#1B4D3E' }}>Trả lời {replyToMessage.sender_type === 'partner' ? 'đại lý' : 'nhà máy'}</Text>
+            <Text style={{ fontSize: 12, color: '#666', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyToMessage.content || '(ảnh/file)'}</Text>
+          </div>
+          <Button type="text" size="small" onClick={() => setReplyToMessage(null)}>✕</Button>
+        </div>
+      )}
 
       {/* Edit indicator */}
       {editingMessage && (

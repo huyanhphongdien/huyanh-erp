@@ -199,6 +199,7 @@ const DealCreatePage = lazy(() => import('./pages/b2b/deals/DealCreatePage'));
 const DealDetailPage = lazy(() => import('./pages/b2b/deals/DealDetailPage'));
 // Partners
 const PartnerListPage = lazy(() => import('./pages/b2b/partners/PartnerListPage'));
+const PartnerRequestsPage = lazy(() => import('./pages/b2b/partners/PartnerRequestsPage'));
 const PartnerDetailPage = lazy(() => import('./pages/b2b/partners/PartnerDetailPage'));
 // Phase E5: Công nợ & Quyết toán
 const LedgerOverviewPage = lazy(() => import('./pages/b2b/ledger/LedgerOverviewPage'));
@@ -320,6 +321,7 @@ function App() {
                 <Route path="chat/:roomId" element={<Suspense fallback={<LoadingSpinner />}><B2BChatPage /></Suspense>} />
                 {/* B2B Partners */}
                 <Route path="partners" element={<Suspense fallback={<LoadingSpinner />}><PartnerListPage /></Suspense>} />
+                <Route path="partners/requests" element={<Suspense fallback={<LoadingSpinner />}><PartnerRequestsPage /></Suspense>} />
                 <Route path="partners/:id" element={<Suspense fallback={<LoadingSpinner />}><PartnerDetailPage /></Suspense>} />
                 {/* B2B Deals */}
                 <Route path="deals" element={<Suspense fallback={<LoadingSpinner />}><DealListPage /></Suspense>} />

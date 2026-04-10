@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>QR Check-in — In dán cổng nhà máy</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 40px; background: #f5f5f5; }
+  .card { display: inline-block; background: #fff; border: 3px solid #1B4D3E; border-radius: 16px; padding: 30px 40px; margin: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .card h1 { color: #1B4D3E; font-size: 22px; margin: 0 0 5px; }
+  .card h2 { color: #666; font-size: 14px; margin: 0 0 20px; font-weight: normal; }
+  .card canvas { display: block; margin: 0 auto; }
+  .card p { color: #1B4D3E; font-size: 16px; font-weight: bold; margin: 15px 0 0; }
+  .card .sub { color: #999; font-size: 11px; margin-top: 5px; }
+  .instructions { max-width: 600px; margin: 30px auto; text-align: left; background: #fff; border-radius: 12px; padding: 20px 30px; }
+  .instructions h3 { color: #1B4D3E; }
+  .instructions li { margin: 8px 0; font-size: 14px; color: #333; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .instructions, .no-print { display: none; }
+    .card { border-width: 2px; box-shadow: none; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1 style="color: #1B4D3E;">🏭 Mã QR Chấm Công — Cổng Nhà Máy</h1>
+<p class="no-print" style="color: #666;">Bấm <strong>Ctrl+P</strong> để in. Dán ở cổng vào/ra nhà máy.</p>
+
+<div id="cards"></div>
+
+<div class="instructions no-print">
+  <h3>Hướng dẫn</h3>
+  <ol>
+    <li><strong>In</strong> trang này ra (Ctrl+P), chọn khổ A4</li>
+    <li><strong>Ép plastic / laminate</strong> để chống nước</li>
+    <li><strong>Dán</strong> ở cổng nhà máy (nơi NV đi qua mỗi ngày), cao ~1.2-1.5m</li>
+    <li>NV mở <code>huyanhrubber.vn</code> → bấm <strong>"Chấm công QR"</strong> → quét mã → Done</li>
+  </ol>
+  <h3>Bảo mật</h3>
+  <ul>
+    <li>QR chứa secret key ngẫu nhiên — không ai tạo QR giả được</li>
+    <li>NV phải đứng ở cổng mới quét được (không chụp ảnh quét ở nhà — QR nhỏ, camera cần gần)</li>
+    <li>Nếu muốn xoay secret hàng tháng: tạo lại trang này và in QR mới</li>
+  </ul>
+</div>
+
+<script>
+  // Generate random secret (use this same secret in the ERP validation if needed later)
+  const secret = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const locations = [
+    { id: 'GATE_MAIN', label: 'Cổng chính', desc: 'Nhà máy Huy Anh — Phong Điền' },
+    { id: 'GATE_BACK', label: 'Cổng phụ', desc: 'Khu vực kho / sản xuất' },
+  ];
+
+  const container = document.getElementById('cards');
+
+  locations.forEach(loc => {
+    const payload = `HUYANH_CHECKIN:${loc.id}:${secret}`;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <h1>📱 QUÉT ĐỂ CHẤM CÔNG</h1>
+      <h2>${loc.desc}</h2>
+      <div id="qr-${loc.id}"></div>
+      <p>${loc.label}</p>
+      <div class="sub">Mở huyanhrubber.vn → Chấm công QR → Quét mã này</div>
+    `;
+    container.appendChild(card);
+
+    // Generate QR
+    const qr = qrcode(0, 'M');
+    qr.addData(payload);
+    qr.make();
+
+    const qrDiv = card.querySelector(`#qr-${loc.id}`);
+    const canvas = document.createElement('canvas');
+    const size = 250;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const cellSize = size / qr.getModuleCount();
+
+    for (let r = 0; r < qr.getModuleCount(); r++) {
+      for (let c = 0; c < qr.getModuleCount(); c++) {
+        ctx.fillStyle = qr.isDark(r, c) ? '#1B4D3E' : '#ffffff';
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize + 1, cellSize + 1);
+      }
+    }
+    qrDiv.appendChild(canvas);
+  });
+
+  console.log('QR Secret:', secret);
+  console.log('Payload format: HUYANH_CHECKIN:{location}:{secret}');
+</script>
+
+</body>
+</html>

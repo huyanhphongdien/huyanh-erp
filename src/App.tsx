@@ -189,6 +189,8 @@ const CapacityPlanningPage = lazy(() => import('./pages/projects/CapacityPlannin
 const TaskTemplateListPage = lazy(() => import('./pages/tasks/TaskTemplateListPage'));
 const TaskKanbanPage = lazy(() => import('./pages/tasks/TaskKanbanPage'));
 const B2BDashboardPage = lazy(() => import('./pages/b2b/B2BDashboardPage'));
+const AuctionListPage = lazy(() => import('./pages/b2b/auctions/AuctionListPage'));
+const AuctionDetailPage = lazy(() => import('./pages/b2b/auctions/AuctionDetailPage'));
 const B2BChatListPage = lazy(() => import('./pages/b2b/B2BChatListPage'));
 const B2BChatRoomPage = lazy(() => import('./pages/b2b/B2BChatRoomPage'));
 const B2BChatPage = lazy(() => import('./pages/b2b/B2BChatPage'));
@@ -339,6 +341,9 @@ function App() {
                 {/* B2B Rubber Intake (Lý lịch mủ) */}
                 <Route path="rubber-intake" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakePage /></Suspense>} />
                 <Route path="rubber-intake/:id" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakeDetailPage /></Suspense>} />
+                {/* B2B Auctions (Phase B1) */}
+                <Route path="auctions" element={<Suspense fallback={<LoadingSpinner />}><AuctionListPage /></Suspense>} />
+                <Route path="auctions/:id" element={<Suspense fallback={<LoadingSpinner />}><AuctionDetailPage /></Suspense>} />
                 {/* B2B Pickup Locations */}
                 <Route path="pickup-locations" element={<Suspense fallback={<LoadingSpinner />}><PickupLocationSettingsPage /></Suspense>} />
               </Route>

@@ -266,6 +266,12 @@ const getMenuGroups = (
         requireB2BPurchaser: true,
       },
       {
+        path: '/b2b/auctions',
+        label: 'Đấu giá',
+        icon: <Timer size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
         path: '/b2b/rubber-intake',
         label: 'Lý lịch mủ',
         icon: <FileCheck size={18} />,

@@ -318,6 +318,8 @@ export function ManagerDashboard() {
   const [absentEmployees, setAbsentEmployees] = useState<{ id: string; name: string; code: string }[]>([])
   const [perfKPIs, setPerfKPIs] = useState<{ total_evaluated: number; avg_score: number; total_completed: number; on_time_rate: number; grade_distribution: Record<string, number> }>({ total_evaluated: 0, avg_score: 0, total_completed: 0, on_time_rate: 0, grade_distribution: { A: 0, B: 0, C: 0, D: 0, F: 0 } })
   const [perfTopEmployees, setPerfTopEmployees] = useState<{ name: string; dept: string; score: number; grade: string; tasks: number }[]>([])
+  // ★ Sales KPI (executive/admin only)
+  const [salesKpi, setSalesKpi] = useState<{ revenue: number; orders: number; collected: number; uncollected: number } | null>(null)
   const [weeklyAttendance, setWeeklyAttendance] = useState<any[]>([])
   const [pendingTaskApprovals, setPendingTaskApprovals] = useState(0)
 
@@ -457,6 +459,29 @@ export function ManagerDashboard() {
         })))
       } catch (e) { console.error('Performance stats error:', e) }
 
+      // ★ Sales KPI (executive/admin: role check via user metadata)
+      try {
+        const isExecOrAdmin = user?.role === 'admin' || (user?.position_level && user.position_level <= 3)
+        if (isExecOrAdmin) {
+          const now = new Date()
+          const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+          const monthEnd = now.getMonth() === 11
+            ? `${now.getFullYear() + 1}-01-01`
+            : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}-01`
+          const { data: orders } = await supabase
+            .from('sales_orders')
+            .select('total_value_usd, actual_payment_amount, deposit_amount, status')
+            .gte('order_date', monthStart)
+            .lt('order_date', monthEnd)
+            .not('status', 'eq', 'cancelled')
+          if (orders) {
+            const revenue = orders.reduce((s, o) => s + (o.total_value_usd || 0), 0)
+            const collected = orders.reduce((s, o) => s + (o.actual_payment_amount || 0) + (o.deposit_amount || 0), 0)
+            setSalesKpi({ revenue: Math.round(revenue), orders: orders.length, collected: Math.round(collected), uncollected: Math.round(revenue - collected) })
+          }
+        }
+      } catch (e) { console.error('Sales KPI error:', e) }
+
       setStatusDistribution(distributionResult.data)
       setTaskTrend(trendResult.data)
       setDepartmentPerformance(deptResult.data)
@@ -590,6 +615,35 @@ export function ManagerDashboard() {
             <div className={`text-xs mt-0.5 ${(stats?.overdueTasks || 0) > 0 ? 'text-red-100' : 'text-gray-400'}`}>Quá hạn</div>
           </div>
         </div>
+
+        {/* ═══ SALES KPI (executive/admin only) ═══ */}
+        {salesKpi && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200 cursor-pointer hover:-translate-y-0.5 transition-transform" onClick={() => navigate('/sales/dashboard')}>
+              <div className="flex items-center justify-between mb-2">
+                <TrendingUp className="w-5 h-5 opacity-80" />
+                <span className="text-[11px] font-medium bg-white/20 px-2 py-0.5 rounded-full">Doanh thu</span>
+              </div>
+              <div className="text-2xl font-bold">${salesKpi.revenue.toLocaleString('en-US')}</div>
+              <div className="text-indigo-100 text-xs mt-0.5">{salesKpi.orders} đơn hàng tháng này</div>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Đã thu</div>
+              <div className="text-2xl font-bold text-emerald-600">${salesKpi.collected.toLocaleString('en-US')}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{salesKpi.revenue > 0 ? Math.round(salesKpi.collected / salesKpi.revenue * 100) : 0}% doanh thu</div>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Chưa thu</div>
+              <div className="text-2xl font-bold text-amber-600">${salesKpi.uncollected.toLocaleString('en-US')}</div>
+              <div className="text-xs text-gray-400 mt-0.5">Cần theo dõi</div>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => navigate('/executive')}>
+              <div className="text-xs text-gray-500 mb-1">Chi tiết bán hàng</div>
+              <div className="text-lg font-bold text-gray-700 flex items-center gap-1">Xem thêm <ChevronRight className="w-4 h-4" /></div>
+              <div className="text-xs text-gray-400 mt-0.5">Pipeline, shipments, KH...</div>
+            </div>
+          </div>
+        )}
 
         {/* ═══ TẦNG 2: CHẤM CÔNG + ĐƠN DUYỆT ═══ */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

@@ -254,12 +254,8 @@ export const chatMessageService = {
       })
       .eq('id', messageData.room_id)
 
-    // Increment message count via RPC (if available), otherwise skip
-    const { error: rpcError } = await supabase.rpc('increment_message_count', { row_id: messageData.room_id })
-    if (rpcError) {
-      // RPC not available — message_count sẽ được tính từ view hoặc trigger
-      console.warn('increment_message_count RPC not available:', rpcError.message)
-    }
+    // Note: message_count increment removed — was calling a non-existent RPC
+    // function causing 404 errors. Count can be derived from messages if needed.
 
     return data as ChatMessage
   },

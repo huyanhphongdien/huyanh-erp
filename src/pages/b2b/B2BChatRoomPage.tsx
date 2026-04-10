@@ -582,6 +582,11 @@ const MessageBubble = ({
             <Text type="secondary" style={{ fontSize: 10, color: isOwn ? 'rgba(255,255,255,0.7)' : undefined }}>
               {formatMessageTime(message.sent_at)}
             </Text>
+            {isOwn && (
+              (message as any).read_at
+                ? <span style={{ color: '#67e8f9', fontSize: 11, fontWeight: 700 }}>✓✓</span>
+                : <CheckCircleOutlined style={{ fontSize: 10, color: isOwn ? 'rgba(255,255,255,0.5)' : '#d9d9d9' }} />
+            )}
           </div>
         </div>
       </Dropdown>

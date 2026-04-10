@@ -217,7 +217,7 @@ export function EmployeeDashboard() {
   const { user } = useAuthStore()
   const [stats, setStats] = useState<DashboardStats>({
     totalTasks: 0, pendingEvaluation: 0, completedTasks: 0, inProgressTasks: 0,
-    remainingLeaveDays: 12, pendingLeaveRequests: 0, recentTasks: [], myProjectCount: 0,
+    remainingLeaveDays: 14, pendingLeaveRequests: 0, recentTasks: [], myProjectCount: 0,
     attendanceToday: { checkedIn: false, checkInTime: null, checkOutTime: null, shiftName: null },
     monthlySummary: { totalCong: 0, lateDays: 0, absentDays: 0, workDays: 0 },
   })
@@ -247,12 +247,17 @@ export function EmployeeDashboard() {
       const { count: pendingLeave } = await supabase
         .from('leave_requests').select('*', { count: 'exact', head: true })
         .eq('employee_id', employeeId).eq('status', 'pending')
+      // Phép năm: 14 ngày/năm. Chỉ trừ phép từ 01/05/2026 (trước đó chưa dùng ERP).
+      // Từ 2027 trở đi tính bình thường từ 01/01.
+      const ANNUAL_LEAVE_DAYS = 14
+      const ERP_LEAVE_START = '2026-05-01' // Ngày bắt đầu tính phép trên ERP
       const currentYear = new Date().getFullYear()
+      const leaveCountFrom = currentYear <= 2026 ? ERP_LEAVE_START : `${currentYear}-01-01`
       const { data: usedLeave } = await supabase
         .from('leave_requests').select('total_days').eq('employee_id', employeeId)
-        .eq('status', 'approved').gte('start_date', `${currentYear}-01-01`).lte('end_date', `${currentYear}-12-31`)
+        .eq('status', 'approved').gte('start_date', leaveCountFrom).lte('end_date', `${currentYear}-12-31`)
       const totalUsedDays = usedLeave?.reduce((sum, l) => sum + (l.total_days || 0), 0) || 0
-      const remainingDays = Math.max(0, 12 - totalUsedDays)
+      const remainingDays = Math.max(0, ANNUAL_LEAVE_DAYS - totalUsedDays)
       const { data: recentTasksData } = await supabase
         .from('task_assignments').select(`id, task:tasks(id, name, code, status, due_date, priority)`)
         .eq('employee_id', employeeId).order('created_at', { ascending: false }).limit(5)

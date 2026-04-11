@@ -87,6 +87,8 @@ const QRCheckInPage = lazy(() => import('./features/attendance/QRCheckInPage'));
 const ProductionStepTrackerPage = lazy(() => import('./pages/production/ProductionStepTrackerPage'));
 const DowntimeLogPage = lazy(() => import('./pages/production/DowntimeLogPage'));
 const ShiftReportPage = lazy(() => import('./pages/production/ShiftReportPage'));
+const ProductionLiveBoard = lazy(() => import('./pages/production/ProductionLiveBoard'));
+const OEEDashboardPage = lazy(() => import('./pages/production/OEEDashboardPage'));
 
 // ★ Đơn công tác
 const BusinessTripPage = lazy(() => import('./features/attendance/BusinessTripPage'));
@@ -478,6 +480,8 @@ function App() {
               <Route path="production/steps/:orderId" element={<Suspense fallback={<LoadingSpinner />}><ProductionStepTrackerPage /></Suspense>} />
               <Route path="production/downtimes" element={<Suspense fallback={<LoadingSpinner />}><DowntimeLogPage /></Suspense>} />
               <Route path="production/shift-reports" element={<Suspense fallback={<LoadingSpinner />}><ShiftReportPage /></Suspense>} />
+              <Route path="production/live" element={<Suspense fallback={<LoadingSpinner />}><ProductionLiveBoard /></Suspense>} />
+              <Route path="production/oee" element={<Suspense fallback={<LoadingSpinner />}><OEEDashboardPage /></Suspense>} />
               <Route path="shifts" element={<ShiftListPage />} />
               <Route path="shift-assignments" element={<ShiftCalendarPage />} />
               <Route path="shift-teams" element={<TeamManagementPage />} />

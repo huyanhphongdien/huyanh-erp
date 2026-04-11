@@ -341,7 +341,7 @@ const getMenuGroups = (
     title: 'KHO (WMS)',
     icon: <Warehouse size={18} />,
     collapsible: true,
-    allowedEmails: ['minhld@huyanhrubber.com'],
+    executiveOnly: true,
     items: [
       { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> },
       { path: '/wms/nvl-dashboard', label: 'Bãi NVL', icon: <Layers size={18} /> },
@@ -428,9 +428,10 @@ export function Sidebar() {
   const [unreadB2BCount, setUnreadB2BCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  const isAdmin = user?.role === 'admin';
-  const userLevel = user?.position_level || 7;
-  const isExecutive = userLevel <= 3;
+  const ADMIN_EMAILS = ['minhld@huyanhrubber.com'];
+  const isAdmin = user?.role === 'admin' || ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
+  const userLevel = user?.position_level || (isAdmin ? 1 : 7);
+  const isExecutive = isAdmin || userLevel <= 3;
   const isBGD = isAdmin || userLevel <= 3;
   const canApproveOT = userLevel >= 4 && userLevel <= 5;
   const isManager = user?.role === 'admin' || user?.role === 'manager' || user?.is_manager;

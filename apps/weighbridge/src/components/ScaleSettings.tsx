@@ -34,15 +34,25 @@ const STOP_BITS_OPTIONS = [
 ]
 
 const KELI_MODELS = [
-  { label: 'D2008FA (mặc định)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
-  { label: 'D2008', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
-  { label: 'XK3118T (cân nhỏ)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
-  { label: 'XK3118T1-A3 (Huy Anh)', baudRate: 2400, dataBits: 8, stopBits: 1, parity: 'none' },
-  { label: 'XK3190-A9 (cân sàn / cân lớn)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'even' },
-  { label: 'XK3190-A12', baudRate: 2400, dataBits: 8, stopBits: 1, parity: 'none' },
-  { label: 'XK3190-A12E', baudRate: 4800, dataBits: 8, stopBits: 1, parity: 'none' },
-  { label: 'YH-T7 (cân điện tử)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
-  { label: 'Tùy chỉnh', baudRate: 0, dataBits: 8, stopBits: 1, parity: 'none' },
+  // Cân nhỏ (< 5T)
+  { label: 'XK3118T (cân nhỏ ≤3T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'XK3118T1-A3 (Huy Anh ≤5T)', baudRate: 2400, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'YH-T7 (cân điện tử ≤5T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  // Cân trung (5-30T)
+  { label: 'D2008FA (cân sàn ≤30T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'D2008 (≤30T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'XK3190-A12 (≤30T)', baudRate: 2400, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'XK3190-A12E (≤30T)', baudRate: 4800, dataBits: 8, stopBits: 1, parity: 'none' },
+  // Cân xe tải lớn (30-200T) ★
+  { label: 'XK3190-A9 (cân xe tải ≤80T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'even' },
+  { label: 'XK3190-A9+ (cân xe tải ≤150T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'even' },
+  { label: 'XK3190-A9+L (cân xe ≤200T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'even' },
+  { label: 'XK3190-DS3 (digital ≤150T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'XK3190-DS6 (digital ≤200T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'D2008FP (cân xe ≤100T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'QS-D (truck scale ≤200T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'even' },
+  // Tùy chỉnh
+  { label: 'Tùy chỉnh (nhập tay)', baudRate: 0, dataBits: 8, stopBits: 1, parity: 'none' },
 ]
 
 interface ScaleSettingsProps {

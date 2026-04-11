@@ -94,14 +94,16 @@ const DEFAULT_CONFIG: KeliScaleConfig = {
 }
 
 // Configs to try when auto-detecting (most common for weighbridge scales)
+// Order: most common truck scales first → small scales
 const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; label: string }> = [
-  { baudRate: 9600, parity: 'even', label: '9600/Even (XK3190-A9)' },
-  { baudRate: 9600, parity: 'none', label: '9600/None (D2008FA)' },
+  { baudRate: 9600, parity: 'even', label: '9600/Even (XK3190-A9/A9+/QS-D truck scale)' },
+  { baudRate: 9600, parity: 'none', label: '9600/None (D2008FA/DS3/DS6)' },
   { baudRate: 9600, parity: 'odd', label: '9600/Odd' },
   { baudRate: 2400, parity: 'none', label: '2400/None (XK3118T1)' },
   { baudRate: 2400, parity: 'even', label: '2400/Even' },
   { baudRate: 4800, parity: 'none', label: '4800/None (XK3190-A12E)' },
   { baudRate: 4800, parity: 'even', label: '4800/Even' },
+  { baudRate: 19200, parity: 'none', label: '19200/None (high-speed truck scale)' },
 ]
 
 // Config key in localStorage

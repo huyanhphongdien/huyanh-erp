@@ -1,0 +1,3 @@
+- [Netlify deploy targets](deploy_targets.md) — huyanhrubber.com.vn = trang công ty (ĐỪNG deploy ERP lên đây); huyanhrubber.vn = ERP
+- [UI Design Pattern](ui_design_pattern.md) — AdvancedDataTable + inline tabs (KHÔNG navigate sang trang detail riêng), filter row, floating eye button, Excel export
+- [Modules cần test](modules_to_test.md) — 5 module rewrite (Deals, PO, StockIn, Settlements, RubberIntake) + B2B workflow 48 items

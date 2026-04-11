@@ -155,10 +155,10 @@ export default function ProductionLiveBoard() {
       {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
-          { label: 'Lệnh SX đang chạy', value: orders.filter((o: any) => o.status === 'in_progress').length, color: '#10b981', icon: '🔄' },
-          { label: 'Sản lượng hôm nay', value: `${todaySummary.output}T`, color: '#3b82f6', icon: '📦' },
-          { label: 'Dừng máy', value: `${todaySummary.downtime}p`, color: todaySummary.downtime > 60 ? '#ef4444' : '#f59e0b', icon: '⏱️' },
-          { label: 'Chờ sản xuất', value: orders.filter((o: any) => o.status === 'planned').length, color: '#8b5cf6', icon: '⏳' },
+          { label: 'Lệnh SX đang chạy', value: orders.filter((o: any) => o.status === 'in_progress').length || '—', color: '#10b981', icon: '🔄' },
+          { label: 'Sản lượng hôm nay', value: todaySummary.output > 0 ? `${todaySummary.output} tấn` : '—', color: '#3b82f6', icon: '📦' },
+          { label: 'Dừng máy', value: todaySummary.downtime > 0 ? `${todaySummary.downtime} phút` : '—', color: todaySummary.downtime > 60 ? '#ef4444' : '#f59e0b', icon: '⏱️' },
+          { label: 'Chờ sản xuất', value: orders.filter((o: any) => o.status === 'planned').length || '—', color: '#8b5cf6', icon: '⏳' },
         ].map((kpi, i) => (
           <div key={i} style={{
             background: 'rgba(255,255,255,0.05)',
@@ -166,8 +166,8 @@ export default function ProductionLiveBoard() {
             padding: '20px 24px',
             border: '1px solid rgba(255,255,255,0.08)',
           }}>
-            <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 8 }}>{kpi.icon} {kpi.label}</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: kpi.color, fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ fontSize: 14, color: '#9ca3af', marginBottom: 10 }}>{kpi.icon} {kpi.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: typeof kpi.value === 'number' && kpi.value > 0 ? kpi.color : '#4b5563', fontFamily: "'JetBrains Mono', monospace" }}>
               {kpi.value}
             </div>
           </div>
@@ -181,8 +181,14 @@ export default function ProductionLiveBoard() {
             <Spin indicator={<LoadingOutlined style={{ fontSize: 40, color: '#10b981' }} />} />
           </div>
         ) : orders.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 60, color: '#6b7280' }}>
-            Không có lệnh sản xuất đang chạy
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 80 }}>
+            <div style={{ fontSize: 64, marginBottom: 16, opacity: 0.3 }}>🏭</div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>
+              Không có lệnh sản xuất đang chạy
+            </div>
+            <div style={{ fontSize: 14, color: '#4b5563' }}>
+              Tạo lệnh SX mới tại menu "Lệnh sản xuất" để bắt đầu giám sát
+            </div>
           </div>
         ) : (
           orders.map((order: any) => {

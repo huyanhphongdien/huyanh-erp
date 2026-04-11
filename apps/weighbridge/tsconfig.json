@@ -16,12 +16,20 @@
     "noUnusedParameters": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@erp/*": ["../../src/*"]
-    },
-    "baseUrl": "."
+    }
   },
-  "include": ["src", "../../src"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "../../src/hooks/**/*.ts",
+    "../../src/services/**/*.ts",
+    "../../src/lib/**/*.ts",
+    "../../src/stores/**/*.ts",
+    "../../src/types/**/*.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -41,9 +41,9 @@ export default function ShiftReportPage() {
       render: (v) => v ? <Tag color="blue">{v}</Tag> : '—' },
     { key: 'actual_output_kg', title: 'Sản lượng (kg)', dataIndex: 'actual_output_kg', width: 120, align: 'right', sortable: true,
       render: (v) => v ? <Text strong>{Number(v).toLocaleString('vi-VN')}</Text> : '—', exportRender: (v) => v || 0 },
-    { key: 'yield_percent', title: 'Yield %', dataIndex: 'yield_percent', width: 80, align: 'center',
+    { key: 'yield_percent', title: 'Đạt KH %', dataIndex: 'yield_percent', width: 80, align: 'center',
       render: (v) => v ? <Tag color={v >= 90 ? 'success' : v >= 70 ? 'warning' : 'error'}>{v}%</Tag> : '—' },
-    { key: 'total_downtime_minutes', title: 'Downtime', dataIndex: 'total_downtime_minutes', width: 90, align: 'right',
+    { key: 'total_downtime_minutes', title: 'Dừng máy', dataIndex: 'total_downtime_minutes', width: 90, align: 'right',
       render: (v) => v ? `${v} phút` : '0' },
     { key: 'qc_pass_rate', title: 'QC Pass', dataIndex: 'qc_pass_rate', width: 80, align: 'center',
       render: (v) => v ? <Tag color={v >= 95 ? 'success' : 'warning'}>{v}%</Tag> : '—' },
@@ -69,9 +69,9 @@ export default function ShiftReportPage() {
         </Card></Col>
       </Row>
       <Descriptions size="small" column={{ xs: 1, sm: 2 }} labelStyle={{ fontWeight: 600 }}>
-        <Descriptions.Item label="Availability">{r.oee_availability || 0}%</Descriptions.Item>
-        <Descriptions.Item label="Performance">{r.oee_performance || 0}%</Descriptions.Item>
-        <Descriptions.Item label="Quality">{r.oee_quality || 0}%</Descriptions.Item>
+        <Descriptions.Item label="Khả dụng (A)">{r.oee_availability || 0}%</Descriptions.Item>
+        <Descriptions.Item label="Hiệu suất (P)">{r.oee_performance || 0}%</Descriptions.Item>
+        <Descriptions.Item label="Chất lượng (Q)">{r.oee_quality || 0}%</Descriptions.Item>
         <Descriptions.Item label="Bành đạt">{r.passed_bales || 0} / {r.total_bales || 0}</Descriptions.Item>
         <Descriptions.Item label="Bàn giao ca sau">{r.handover_notes || '—'}</Descriptions.Item>
         <Descriptions.Item label="Sự cố">{r.incidents || '—'}</Descriptions.Item>
@@ -93,13 +93,13 @@ export default function ShiftReportPage() {
             <Statistic title="OEE trung bình" value={oeeSummary.avg_oee} suffix="%" valueStyle={{ color: '#1B4D3E' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 12 }}>
-            <Statistic title="Availability" value={oeeSummary.avg_availability} suffix="%" />
+            <Statistic title="Khả dụng" value={oeeSummary.avg_availability} suffix="%" />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 12 }}>
-            <Statistic title="Performance" value={oeeSummary.avg_performance} suffix="%" />
+            <Statistic title="Hiệu suất" value={oeeSummary.avg_performance} suffix="%" />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 12 }}>
-            <Statistic title="Quality" value={oeeSummary.avg_quality} suffix="%" />
+            <Statistic title="Chất lượng" value={oeeSummary.avg_quality} suffix="%" />
           </Card></Col>
         </Row>
       )}

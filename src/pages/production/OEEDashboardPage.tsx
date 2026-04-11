@@ -64,9 +64,9 @@ export default function OEEDashboardPage() {
       .map(([date, v]) => ({
         date: new Date(date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
         OEE: v.o.length > 0 ? Math.round(v.o.reduce((s, n) => s + n, 0) / v.o.length) : 0,
-        Availability: v.a.length > 0 ? Math.round(v.a.reduce((s, n) => s + n, 0) / v.a.length) : 0,
-        Performance: v.p.length > 0 ? Math.round(v.p.reduce((s, n) => s + n, 0) / v.p.length) : 0,
-        Quality: v.q.length > 0 ? Math.round(v.q.reduce((s, n) => s + n, 0) / v.q.length) : 0,
+        'Khả dụng': v.a.length > 0 ? Math.round(v.a.reduce((s, n) => s + n, 0) / v.a.length) : 0,
+        'Hiệu suất': v.p.length > 0 ? Math.round(v.p.reduce((s, n) => s + n, 0) / v.p.length) : 0,
+        'Chất lượng': v.q.length > 0 ? Math.round(v.q.reduce((s, n) => s + n, 0) / v.q.length) : 0,
       }))
       .sort((a, b) => a.date.localeCompare(b.date))
   })()
@@ -105,19 +105,19 @@ export default function OEEDashboardPage() {
           </Col>
           <Col xs={6}>
             <Card style={{ borderRadius: 12, borderTop: '4px solid #3b82f6' }}>
-              <Statistic title="Availability" value={oee.avg_availability} suffix="%" valueStyle={{ fontSize: 28, color: '#3b82f6' }} />
+              <Statistic title="Khả dụng (A)" value={oee.avg_availability} suffix="%" valueStyle={{ fontSize: 28, color: '#3b82f6' }} />
               <Text type="secondary" style={{ fontSize: 12 }}>(Thời gian chạy / Kế hoạch)</Text>
             </Card>
           </Col>
           <Col xs={6}>
             <Card style={{ borderRadius: 12, borderTop: '4px solid #8b5cf6' }}>
-              <Statistic title="Performance" value={oee.avg_performance} suffix="%" valueStyle={{ fontSize: 28, color: '#8b5cf6' }} />
+              <Statistic title="Hiệu suất (P)" value={oee.avg_performance} suffix="%" valueStyle={{ fontSize: 28, color: '#8b5cf6' }} />
               <Text type="secondary" style={{ fontSize: 12 }}>(SL thực tế / SL kế hoạch)</Text>
             </Card>
           </Col>
           <Col xs={6}>
             <Card style={{ borderRadius: 12, borderTop: '4px solid #10b981' }}>
-              <Statistic title="Quality" value={oee.avg_quality} suffix="%" valueStyle={{ fontSize: 28, color: '#10b981' }} />
+              <Statistic title="Chất lượng (Q)" value={oee.avg_quality} suffix="%" valueStyle={{ fontSize: 28, color: '#10b981' }} />
               <Text type="secondary" style={{ fontSize: 12 }}>(Đạt chất lượng / Tổng)</Text>
             </Card>
           </Col>
@@ -127,7 +127,7 @@ export default function OEEDashboardPage() {
       <Row gutter={16}>
         {/* OEE Trend */}
         <Col xs={24} lg={14}>
-          <Card title={<><BarChartOutlined /> OEE Trend</>} style={{ borderRadius: 12, marginBottom: 16 }}>
+          <Card title={<><BarChartOutlined /> Xu hướng OEE</>} style={{ borderRadius: 12, marginBottom: 16 }}>
             {trendData.length === 0 ? <Empty description="Chưa có dữ liệu báo cáo ca" /> : (
               <div style={{ height: 300 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -138,9 +138,9 @@ export default function OEEDashboardPage() {
                     <Tooltip formatter={(v: number) => `${v}%`} />
                     <Legend />
                     <Bar dataKey="OEE" fill="#1B4D3E" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Availability" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Performance" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Quality" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Khả dụng" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Hiệu suất" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Chất lượng" fill="#10b981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -150,11 +150,11 @@ export default function OEEDashboardPage() {
 
         {/* Downtime Pareto */}
         <Col xs={24} lg={10}>
-          <Card title="🔧 Downtime Pareto" style={{ borderRadius: 12, marginBottom: 16 }}>
+          <Card title="🔧 Pareto dừng máy" style={{ borderRadius: 12, marginBottom: 16 }}>
             {paretoData.length === 0 ? <Empty description="Chưa có sự cố" /> : (
               <>
                 <div style={{ marginBottom: 12 }}>
-                  <Text strong>Tổng downtime: {totalDowntimeMinutes} phút</Text>
+                  <Text strong>Tổng thời gian dừng: {totalDowntimeMinutes} phút</Text>
                 </div>
                 {paretoData.map((p, i) => (
                   <div key={p.category} style={{ marginBottom: 10 }}>
@@ -182,7 +182,7 @@ export default function OEEDashboardPage() {
               A = (Planned − Downtime) / Planned × 100<br />
               P = Actual Output / Planned Output × 100<br />
               Q = Passed Units / Total Units × 100<br /><br />
-              🟢 ≥85% World Class &nbsp; 🟡 60-84% Typical &nbsp; 🔴 &lt;60% Cần cải thiện
+              🟢 ≥85% Đẳng cấp thế giới &nbsp; 🟡 60-84% Trung bình &nbsp; 🔴 &lt;60% Cần cải thiện
             </div>
           </Card>
         </Col>

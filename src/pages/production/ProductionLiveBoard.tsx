@@ -157,7 +157,7 @@ export default function ProductionLiveBoard() {
         {[
           { label: 'Lệnh SX đang chạy', value: orders.filter((o: any) => o.status === 'in_progress').length, color: '#10b981', icon: '🔄' },
           { label: 'Sản lượng hôm nay', value: `${todaySummary.output}T`, color: '#3b82f6', icon: '📦' },
-          { label: 'Downtime', value: `${todaySummary.downtime}p`, color: todaySummary.downtime > 60 ? '#ef4444' : '#f59e0b', icon: '⏱️' },
+          { label: 'Dừng máy', value: `${todaySummary.downtime}p`, color: todaySummary.downtime > 60 ? '#ef4444' : '#f59e0b', icon: '⏱️' },
           { label: 'Chờ sản xuất', value: orders.filter((o: any) => o.status === 'planned').length, color: '#8b5cf6', icon: '⏳' },
         ].map((kpi, i) => (
           <div key={i} style={{
@@ -268,8 +268,8 @@ export default function ProductionLiveBoard() {
         padding: '8px 24px', fontSize: 13, color: '#9ca3af',
         display: 'flex', justifyContent: 'space-between',
       }}>
-        <span>Auto-refresh: 10s • Supabase Realtime</span>
-        <span>HUY ANH RUBBER ERP v8 — Module QLSX</span>
+        <span>Tự động cập nhật: 10 giây</span>
+        <span>HUY ANH RUBBER — Quản lý sản xuất</span>
       </div>
     </div>
   )

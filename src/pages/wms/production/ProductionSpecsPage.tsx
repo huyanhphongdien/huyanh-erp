@@ -131,13 +131,13 @@ const ProductionSpecsPage = () => {
 
   const columns = [
     {
-      title: 'Grade',
+      title: 'Loại SP',
       dataIndex: 'target_product_grade',
       key: 'target_product_grade',
       render: (v: string) => <GradeBadge grade={v} size="small" />,
     },
     {
-      title: 'DRC min (%)',
+      title: 'DRC tối thiểu (%)',
       dataIndex: 'target_drc_min',
       key: 'target_drc_min',
       align: 'right' as const,
@@ -146,7 +146,7 @@ const ProductionSpecsPage = () => {
       ),
     },
     {
-      title: 'DRC max (%)',
+      title: 'DRC tối đa (%)',
       dataIndex: 'target_drc_max',
       key: 'target_drc_max',
       align: 'right' as const,
@@ -155,7 +155,7 @@ const ProductionSpecsPage = () => {
       ) : '—',
     },
     {
-      title: 'Yield (%)',
+      title: 'Tỉ lệ thu hồi (%)',
       dataIndex: 'expected_yield_percent',
       key: 'expected_yield_percent',
       align: 'right' as const,
@@ -177,7 +177,7 @@ const ProductionSpecsPage = () => {
       },
     },
     {
-      title: 'Rua (h)',
+      title: 'Rửa (giờ)',
       dataIndex: 'washing_duration_hours',
       key: 'washing_duration_hours',
       align: 'right' as const,
@@ -186,7 +186,7 @@ const ProductionSpecsPage = () => {
       ) : '—',
     },
     {
-      title: 'Keo (h)',
+      title: 'Kéo/Tán (giờ)',
       dataIndex: 'creeping_duration_hours',
       key: 'creeping_duration_hours',
       align: 'right' as const,
@@ -195,7 +195,7 @@ const ProductionSpecsPage = () => {
       ) : '—',
     },
     {
-      title: 'Say (ngay)',
+      title: 'Sấy (ngày)',
       dataIndex: 'drying_duration_days',
       key: 'drying_duration_days',
       align: 'right' as const,
@@ -204,7 +204,7 @@ const ProductionSpecsPage = () => {
       ) : '—',
     },
     {
-      title: 'Ep (h)',
+      title: 'Ép (giờ)',
       dataIndex: 'pressing_duration_hours',
       key: 'pressing_duration_hours',
       align: 'right' as const,
@@ -233,7 +233,7 @@ const ProductionSpecsPage = () => {
           </Space>
           <Title level={4} style={{ margin: '8px 0 0', color: '#1B4D3E' }}>
             <FileTextOutlined style={{ marginRight: 8 }} />
-            Dinh muc san xuat
+            Định mức sản xuất
           </Title>
         </Col>
         <Col>
@@ -271,18 +271,18 @@ const ProductionSpecsPage = () => {
         width={640}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="target_product_grade" label="Grade">
+          <Form.Item name="target_product_grade" label="Loại sản phẩm">
             <Select disabled options={Object.entries(RUBBER_GRADE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="target_drc_min" label="DRC min (%)" rules={[{ required: true, message: 'Nhap DRC min' }]}>
+              <Form.Item name="target_drc_min" label="DRC tối thiểu (%)" rules={[{ required: true, message: 'Nhập DRC tối thiểu' }]}>
                 <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="target_drc_max" label="DRC max (%)">
+              <Form.Item name="target_drc_max" label="DRC tối đa (%)">
                 <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -290,7 +290,7 @@ const ProductionSpecsPage = () => {
 
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="expected_yield_percent" label="Yield mong doi (%)" rules={[{ required: true, message: 'Nhập yield' }]}>
+              <Form.Item name="expected_yield_percent" label="Tỉ lệ thu hồi (%)" rules={[{ required: true, message: 'Nhập tỉ lệ thu hồi' }]}>
                 <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -309,7 +309,7 @@ const ProductionSpecsPage = () => {
           <Title level={5} style={{ marginTop: 8 }}>Thoi gian cong doan</Title>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="washing_duration_hours" label="Rua (gio)">
+              <Form.Item name="washing_duration_hours" label="Rửa (giờ)">
                 <InputNumber min={0} step={0.5} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -319,14 +319,14 @@ const ProductionSpecsPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="creeping_duration_hours" label="Keo/tan (gio)">
+              <Form.Item name="creeping_duration_hours" label="Kéo/Tán (giờ)">
                 <InputNumber min={0} step={0.5} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="drying_duration_days" label="Say (ngay)">
+              <Form.Item name="drying_duration_days" label="Sấy (ngày)">
                 <InputNumber min={0} step={0.5} style={{ width: '100%' }} />
               </Form.Item>
             </Col>

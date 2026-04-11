@@ -42,6 +42,7 @@ export interface Settlement {
   rejected_by: string | null
   rejected_at: string | null
   rejected_reason: string | null
+  paid_amount: number
   paid_at: string | null
   paid_by: string | null
   payment_method: string | null

@@ -59,15 +59,17 @@ export const sopService = {
   },
 
   async getById(id: string): Promise<SOPDocument & { steps: SOPStep[] }> {
-    const [{ data: doc }, { data: steps }] = await Promise.all([
+    const [docResult, stepsResult] = await Promise.all([
       supabase.from('sop_documents').select('*, department:departments(name)').eq('id', id).single(),
       supabase.from('sop_steps').select('*').eq('sop_id', id).order('step_number'),
     ])
-    if (!doc) throw new Error('SOP not found')
+    if (docResult.error) throw docResult.error
+    if (stepsResult.error) throw stepsResult.error
+    if (!docResult.data) throw new Error('SOP not found')
     return {
-      ...doc,
-      department: Array.isArray(doc.department) ? doc.department[0] : doc.department,
-      steps: steps || [],
+      ...docResult.data,
+      department: Array.isArray(docResult.data.department) ? docResult.data.department[0] : docResult.data.department,
+      steps: stepsResult.data || [],
     }
   },
 

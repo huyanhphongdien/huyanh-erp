@@ -95,7 +95,7 @@ export default function OEEDashboardPage() {
       </div>
 
       {/* OEE KPI Cards */}
-      {loadingOEE ? <Spin /> : oee && (
+      {loadingOEE ? <Spin /> : !oee || oee.report_count === 0 ? null : (
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col xs={6}>
             <Card style={{ borderRadius: 12, borderTop: `4px solid ${oeeColor(oee.avg_oee)}` }}>

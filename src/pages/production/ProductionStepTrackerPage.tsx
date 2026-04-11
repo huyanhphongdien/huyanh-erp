@@ -76,14 +76,16 @@ export default function ProductionStepTrackerPage() {
     enabled: !!orderId,
   })
 
-  // Init steps if empty
+  // Init steps if empty (run once after first load)
+  const [stepsInited, setStepsInited] = useState(false)
   useEffect(() => {
-    if (orderId && !isLoading && steps.length === 0) {
+    if (orderId && !isLoading && steps.length === 0 && !stepsInited) {
+      setStepsInited(true)
       productionStepService.initSteps(orderId).then(() => {
         queryClient.invalidateQueries({ queryKey: ['production-steps', orderId] })
       })
     }
-  }, [orderId, isLoading, steps.length])
+  }, [orderId, isLoading, steps.length, stepsInited])
 
   // Auto-select current active step
   useEffect(() => {

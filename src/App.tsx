@@ -90,6 +90,7 @@ const ShiftReportPage = lazy(() => import('./pages/production/ShiftReportPage'))
 const ProductionLiveBoard = lazy(() => import('./pages/production/ProductionLiveBoard'));
 const OEEDashboardPage = lazy(() => import('./pages/production/OEEDashboardPage'));
 const SOPListPage = lazy(() => import('./pages/production/SOPListPage'));
+const SOPTrainingPage = lazy(() => import('./pages/production/SOPTrainingPage'));
 const SafetySignsPage = lazy(() => import('./pages/production/SafetySignsPage'));
 
 // ★ Đơn công tác
@@ -485,6 +486,7 @@ function App() {
               <Route path="production/live" element={<Suspense fallback={<LoadingSpinner />}><ProductionLiveBoard /></Suspense>} />
               <Route path="production/oee" element={<Suspense fallback={<LoadingSpinner />}><OEEDashboardPage /></Suspense>} />
               <Route path="production/sop" element={<Suspense fallback={<LoadingSpinner />}><SOPListPage /></Suspense>} />
+              <Route path="production/training" element={<Suspense fallback={<LoadingSpinner />}><SOPTrainingPage /></Suspense>} />
               <Route path="production/safety-signs" element={<Suspense fallback={<LoadingSpinner />}><SafetySignsPage /></Suspense>} />
               <Route path="shifts" element={<ShiftListPage />} />
               <Route path="shift-assignments" element={<ShiftCalendarPage />} />

@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Typography, Tag, Progress, Spin } from 'antd'
 import {
   ThunderboltOutlined, ClockCircleOutlined, CheckCircleOutlined,
@@ -23,6 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string
 }
 
 export default function ProductionLiveBoard() {
+  const queryClient = useQueryClient()
   const [currentTime, setCurrentTime] = useState(new Date())
 
   // Clock
@@ -103,13 +104,20 @@ export default function ProductionLiveBoard() {
     refetchInterval: 30000,
   })
 
-  // Supabase Realtime subscription
+  // Supabase Realtime subscription — trigger refetch on changes
   useEffect(() => {
     const channel = supabase
       .channel('production-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_orders' }, () => {})
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_step_logs' }, () => {})
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'production_downtimes' }, () => {})
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_orders' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['production-live-orders'] })
+        queryClient.invalidateQueries({ queryKey: ['production-live-summary'] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_step_logs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['production-live-steps'] })
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'production_downtimes' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['production-live-summary'] })
+      })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }

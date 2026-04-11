@@ -48,6 +48,7 @@ import {
   CalendarDays,
   AlarmClockPlus,
   ScanLine,
+  Monitor,
   ClipboardCheck,
   Shield,
   UsersRound,
@@ -335,6 +336,29 @@ const getMenuGroups = (
   },
 
   // ============================================================
+  // ============================================================
+  // ★ QUẢN LÝ SẢN XUẤT — Module QLSX (chỉ minhld@)
+  // ============================================================
+  {
+    title: 'QUẢN LÝ SẢN XUẤT',
+    icon: <Factory size={18} />,
+    collapsible: true,
+    allowedEmails: ['minhld@huyanhrubber.com'],
+    items: [
+      { path: '/wms/production', label: 'Lệnh sản xuất', icon: <ClipboardList size={18} /> },
+      { path: '/wms/production/dashboard', label: 'Dashboard SX', icon: <TrendingUp size={18} /> },
+      { path: '/production/live', label: 'Live Board', icon: <Monitor size={18} /> },
+      { path: '/production/shift-reports', label: 'Báo cáo ca', icon: <Timer size={18} /> },
+      { path: '/production/downtimes', label: 'Downtime / Sự cố', icon: <AlertTriangle size={18} /> },
+      { path: '/production/oee', label: 'OEE', icon: <TrendingUp size={18} /> },
+      { path: '/production/sop', label: 'SOP', icon: <FileText size={18} /> },
+      { path: '/production/training', label: 'Huấn luyện', icon: <UserCheck size={18} /> },
+      { path: '/production/safety-signs', label: 'Biển hiệu AT', icon: <AlertTriangle size={18} /> },
+      { path: '/wms/production/facilities', label: 'Dây chuyền', icon: <Settings size={18} /> },
+      { path: '/wms/production/specs', label: 'Công thức BOM', icon: <FileText size={18} /> },
+    ],
+  },
+
   // ★ KHO (WMS) — Phase 4: Deal ↔ WMS Integration
   // ============================================================
   {

@@ -74,7 +74,7 @@ export default function DealInlineDetail({ deal }: Props) {
             <Descriptions.Item label="Trạng thái"><Tag color={DEAL_STATUS_COLORS[deal.status]}>{DEAL_STATUS_LABELS[deal.status]}</Tag></Descriptions.Item>
             <Descriptions.Item label="Đại lý">{deal.partner?.name || '—'} <Text type="secondary">({deal.partner?.code})</Text></Descriptions.Item>
             <Descriptions.Item label="Sản phẩm">{deal.product_name || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Số lượng">{deal.quantity_tons?.toFixed(1)} tấn ({(deal.quantity_kg || 0).toLocaleString('vi-VN')} kg)</Descriptions.Item>
+            <Descriptions.Item label="Số lượng">{deal.quantity_tons ? `${deal.quantity_tons.toFixed(1)} tấn` : '—'} ({(deal.quantity_kg || 0).toLocaleString('vi-VN')} kg)</Descriptions.Item>
             <Descriptions.Item label="Đơn giá">{Number(deal.unit_price || 0).toLocaleString('vi-VN')} VNĐ/kg</Descriptions.Item>
             <Descriptions.Item label="Vùng">{deal.source_region || '—'}</Descriptions.Item>
             <Descriptions.Item label="Nơi bốc">{deal.pickup_location_name || '—'}</Descriptions.Item>
@@ -83,10 +83,19 @@ export default function DealInlineDetail({ deal }: Props) {
             <Descriptions.Item label="Nhập kho">{deal.stock_in_count || 0} phiếu · {deal.actual_weight_kg ? `${(deal.actual_weight_kg / 1000).toFixed(1)}T` : '—'}</Descriptions.Item>
             <Descriptions.Item label="QC">{deal.qc_status ? <Tag color={deal.qc_status === 'passed' ? 'success' : deal.qc_status === 'failed' ? 'error' : 'warning'}>{deal.qc_status}</Tag> : '—'}</Descriptions.Item>
           </Descriptions>
-          <div style={{ marginTop: 12 }}>
-            <Button type="link" icon={<MessageOutlined />} onClick={() => {
-              // navigate to chat
-              navigate(`/b2b/chat`)
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <Button type="link" icon={<MessageOutlined />} onClick={async () => {
+              if (!deal.partner_id) return
+              try {
+                const { data: room } = await (await import('../../lib/supabase')).supabase
+                  .from('b2b_chat_rooms')
+                  .select('id')
+                  .eq('partner_id', deal.partner_id)
+                  .limit(1)
+                  .maybeSingle()
+                if (room) navigate(`/b2b/chat/${room.id}`)
+                else navigate('/b2b/chat')
+              } catch { navigate('/b2b/chat') }
             }}>Mở chat đại lý</Button>
           </div>
         </div>

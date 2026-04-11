@@ -529,12 +529,12 @@ export function Sidebar() {
       if (!isB2BPurchaser) return;
       try {
         const { count, error } = await supabase
-          .schema('b2b')
-          .from('chat_messages')
+          .from('b2b_chat_messages')
           .select('*', { count: 'exact', head: true })
           .eq('sender_type', 'partner')
-           .is('read_at', null);
-        
+          .is('read_at', null)
+          .is('deleted_at', null);
+
         if (!error) {
           setUnreadB2BCount(count || 0);
         }

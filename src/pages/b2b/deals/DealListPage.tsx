@@ -1,67 +1,26 @@
 // ============================================================================
-// DEAL LIST PAGE — Danh sách Deals/Giao dịch B2B
+// DEAL LIST PAGE V2 — AdvancedDataTable with filter row + Excel export
 // File: src/pages/b2b/deals/DealListPage.tsx
-// Phase: E2.1.1, E2.1.3, E2.1.4, E2.1.5, E2.1.6, E2.1.7
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { Tag, Typography, Button, Tabs, message, Popconfirm } from 'antd'
 import {
-  Card,
-  Table,
-  Tabs,
-  Input,
-  Select,
-  Button,
-  Space,
-  Tag,
-  Typography,
-  Row,
-  Col,
-  Tooltip,
-  Dropdown,
-  Badge,
-  DatePicker,
-  Popconfirm,
-  message,
-} from 'antd'
-import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
-import type { FilterValue, SorterResult } from 'antd/es/table/interface'
-import type { MenuProps } from 'antd'
-import {
-  PlusOutlined,
-  SearchOutlined,
-  EyeOutlined,
-  MessageOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  MoreOutlined,
-  ReloadOutlined,
-  FilterOutlined,
-  ExportOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  SyncOutlined,
+  PlusOutlined, EyeOutlined, MessageOutlined, DeleteOutlined,
 } from '@ant-design/icons'
 import {
   dealService,
   Deal,
   DealStatus,
-  DealListParams,
   DEAL_STATUS_LABELS,
   DEAL_STATUS_COLORS,
   DEAL_TYPE_LABELS,
-  DEAL_TYPE_COLORS,
 } from '../../../services/b2b/dealService'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
+import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
 
-const { Title, Text } = Typography
-const { RangePicker } = DatePicker
-
-// ============================================
-// CONSTANTS
-// ============================================
+const { Text } = Typography
 
 const STATUS_TABS = [
   { key: 'all', label: 'Tất cả' },
@@ -69,480 +28,228 @@ const STATUS_TABS = [
   { key: 'processing', label: 'Đang xử lý' },
   { key: 'accepted', label: 'Đã duyệt' },
   { key: 'settled', label: 'Đã quyết toán' },
+  { key: 'cancelled', label: 'Đã hủy' },
 ]
 
-const TIER_COLORS: Record<string, string> = {
-  diamond: 'purple',
-  gold: 'gold',
-  silver: 'default',
-  bronze: 'orange',
-  new: 'cyan',
+const formatCurrency = (v: number | null): string => {
+  if (!v) return '—'
+  if (v >= 1e9) return `${(v / 1e9).toFixed(2)} tỷ`
+  if (v >= 1e6) return `${(v / 1e6).toFixed(1)} tr`
+  return v.toLocaleString('vi-VN')
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
+const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
 
-const formatCurrency = (value: number | null): string => {
-  if (!value) return '-'
-  if (value >= 1000000000) {
-    return `${(value / 1000000000).toFixed(2)} tỷ`
-  }
-  if (value >= 1000000) {
-    return `${(value / 1000000).toFixed(1)} tr`
-  }
-  return value.toLocaleString('vi-VN')
-}
-
-const formatDate = (dateStr: string): string => {
-  return format(new Date(dateStr), 'dd/MM/yyyy', { locale: vi })
-}
-
-const formatDateTime = (dateStr: string): string => {
-  return format(new Date(dateStr), 'dd/MM/yyyy HH:mm', { locale: vi })
-}
-
-// ============================================
-// MAIN COMPONENT
-// ============================================
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 const DealListPage = () => {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState('all')
 
-  // State
-  const [deals, setDeals] = useState<Deal[]>([])
-  const [loading, setLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
-
-  // Filters
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get('status') || 'all')
-  const [searchText, setSearchText] = useState('')
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
+  const { data: allDeals = [], isLoading, refetch } = useQuery({
+    queryKey: ['b2b-deals-all'],
+    queryFn: async () => {
+      const response = await dealService.getDeals({ page: 1, pageSize: 500 })
+      return response.data
+    },
+    staleTime: 60000,
   })
 
-  // ============================================
-  // DATA FETCHING
-  // ============================================
+  // Filter by tab
+  const tabDeals = useMemo(() => {
+    if (activeTab === 'all') return allDeals
+    return allDeals.filter(d => d.status === activeTab)
+  }, [allDeals, activeTab])
 
-  const fetchDeals = useCallback(async () => {
-    try {
-      setLoading(true)
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: allDeals.length }
+    allDeals.forEach(d => { counts[d.status] = (counts[d.status] || 0) + 1 })
+    return counts
+  }, [allDeals])
 
-      const params: DealListParams = {
-        page: pagination.current,
-        pageSize: pagination.pageSize,
-        search: searchText || undefined,
-        status: activeTab !== 'all' ? (activeTab as DealStatus) : undefined,
-      }
-
-      const response = await dealService.getDeals(params)
-      setDeals(response.data)
-      setTotal(response.total)
-    } catch (error) {
-      console.error('Error fetching deals:', error)
-      message.error('Không thể tải danh sách giao dịch')
-    } finally {
-      setLoading(false)
-    }
-  }, [pagination, searchText, activeTab])
-
-  const fetchStatusCounts = useCallback(async () => {
-    try {
-      const stats = await dealService.getStatsByStatus()
-      const allCount = Object.values(stats).reduce((a: number, b: number) => a + b, 0)
-      setStatusCounts({ all: allCount, ...stats })
-    } catch (error) {
-      console.error('Error fetching status counts:', error)
-    }
-  }, [])
-
-  // Effects
-  useEffect(() => {
-    fetchDeals()
-  }, [fetchDeals])
-
-  useEffect(() => {
-    fetchStatusCounts()
-  }, [fetchStatusCounts])
-
-  // ============================================
-  // HANDLERS
-  // ============================================
-
-  const handleTabChange = (key: string) => {
-    setActiveTab(key)
-    setPagination(prev => ({ ...prev, current: 1 }))
-    setSearchParams({ status: key })
-  }
-
-  const handleSearch = (value: string) => {
-    setSearchText(value)
-    setPagination(prev => ({ ...prev, current: 1 }))
-  }
-
-  const handleTableChange = (
-    pag: TablePaginationConfig,
-    filters: Record<string, FilterValue | null>,
-    sorter: SorterResult<Deal> | SorterResult<Deal>[]
-  ) => {
-    setPagination({
-      current: pag.current || 1,
-      pageSize: pag.pageSize || 10,
-    })
-  }
-
-  const handleViewDeal = (deal: Deal) => {
-    navigate(`/b2b/deals/${deal.id}`)
-  }
-
-  const handleOpenChat = async (deal: Deal) => {
-    try {
-      // Tìm chat room của partner
-      const room = await dealService.getChatRoomByPartner(deal.partner_id)
-      if (room) {
-        navigate(`/b2b/chat/${room.id}`)
-      } else {
-        message.info('Chưa có phòng chat với đại lý này')
-      }
-    } catch (error) {
-      message.error('Không thể mở chat')
-    }
-  }
-
-  const handleUpdateStatus = async (deal: Deal, newStatus: DealStatus) => {
-    try {
-      await dealService.updateStatus(deal.id, newStatus)
-      message.success(`Đã chuyển trạng thái sang "${DEAL_STATUS_LABELS[newStatus]}"`)
-      fetchDeals()
-      fetchStatusCounts()
-    } catch (error) {
-      message.error('Không thể cập nhật trạng thái')
-    }
-  }
-
-  const handleDeleteDeal = async (deal: Deal) => {
+  const handleDelete = async (deal: Deal) => {
     try {
       await dealService.deleteDeal(deal.id)
       message.success('Đã xóa giao dịch')
-      fetchDeals()
-      fetchStatusCounts()
-    } catch (error: any) {
-      message.error(error.message || 'Không thể xóa giao dịch')
+      refetch()
+    } catch (e: any) {
+      message.error(e.message || 'Không thể xóa')
     }
   }
 
-  const handleRefresh = () => {
-    fetchDeals()
-    fetchStatusCounts()
-  }
-
-  // ============================================
-  // TABLE COLUMNS (E2.1.3)
-  // ============================================
-
-  const columns: ColumnsType<Deal> = [
+  const columns: ColumnDef<Deal>[] = [
     {
+      key: 'deal_number',
       title: 'Mã Deal',
       dataIndex: 'deal_number',
-      key: 'deal_number',
       width: 140,
-      fixed: 'left',
-      render: (text, record) => (
-        <Button type="link" onClick={() => handleViewDeal(record)} style={{ padding: 0 }}>
-          <Text strong>{text}</Text>
-        </Button>
-      ),
-      sorter: true,
-    },
-    {
-      title: 'Đại lý',
-      key: 'partner',
-      width: 200,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{record.partner?.name || '-'}</Text>
-          <Space size={4}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {record.partner?.code}
-            </Text>
-            {record.partner?.tier && (
-              <Tag color={TIER_COLORS[record.partner?.tier]} style={{ fontSize: 10 }}>
-                {record.partner?.tier?.toUpperCase()}
-              </Tag>
-            )}
-          </Space>
-        </Space>
-      ),
-    },
-    {
-      title: 'Loại',
-      dataIndex: 'deal_type',
-      key: 'deal_type',
-      width: 100,
-      render: (type) => type ? (
-        <Tag color={DEAL_TYPE_COLORS[type as keyof typeof DEAL_TYPE_COLORS]}>
-          {DEAL_TYPE_LABELS[type as keyof typeof DEAL_TYPE_LABELS]}
-        </Tag>
-      ) : '-',
-    },
-    {
-      title: 'Sản phẩm',
-      dataIndex: 'product_name',
-      key: 'product_name',
-      width: 120,
-      ellipsis: true,
-      render: (text) => text || '-',
-    },
-    {
-      title: 'Số lượng',
-      key: 'quantity',
-      width: 100,
-      align: 'right',
-      render: (_, record) => (
-        <Text strong>
-          {record.quantity_tons?.toFixed(1) || '-'} tấn
+      sortable: true,
+      render: (v, r) => (
+        <Text strong style={{ color: '#1B4D3E', cursor: 'pointer' }} onClick={() => navigate(`/b2b/deals/${r.id}`)}>
+          {v}
         </Text>
       ),
-      sorter: true,
+      exportRender: (v) => v || '',
     },
     {
+      key: 'partner_name',
+      title: 'Đại lý',
+      dataIndex: ['partner', 'name'],
+      width: 180,
+      sortable: true,
+      render: (_, r) => (
+        <div>
+          <Text strong style={{ fontSize: 13 }}>{r.partner?.name || '—'}</Text>
+          <div style={{ fontSize: 11, color: '#999' }}>
+            {r.partner?.code}
+            {r.partner?.tier && <Tag style={{ marginLeft: 4, fontSize: 10 }}>{r.partner.tier}</Tag>}
+          </div>
+        </div>
+      ),
+      exportRender: (_, r) => r.partner?.name || '',
+    },
+    {
+      key: 'product_name',
+      title: 'Sản phẩm',
+      dataIndex: 'product_name',
+      width: 120,
+      ellipsis: true,
+      exportRender: (v) => v || '',
+    },
+    {
+      key: 'quantity',
+      title: 'Số lượng (tấn)',
+      dataIndex: 'quantity_tons',
+      width: 110,
+      align: 'right',
+      sortable: true,
+      render: (v) => v ? <Text strong>{v.toFixed(1)}</Text> : '—',
+      exportRender: (v) => v || 0,
+    },
+    {
+      key: 'unit_price',
+      title: 'Đơn giá',
+      dataIndex: 'unit_price',
+      width: 100,
+      align: 'right',
+      sortable: true,
+      render: (v) => v ? `${Number(v).toLocaleString('vi-VN')}` : '—',
+      exportRender: (v) => v || 0,
+    },
+    {
+      key: 'total_value',
       title: 'Giá trị',
       dataIndex: 'total_value_vnd',
-      key: 'total_value_vnd',
       width: 120,
       align: 'right',
-      render: (value: number, record: Deal) => {
-        if (record.deal_type === 'processing') {
-          return <Tag color="purple">Gia công</Tag>
-        }
-        return (
-          <Text strong style={{ color: '#1B4D3E' }}>
-            {formatCurrency(value)}
-          </Text>
-        )
-      },
-      sorter: true,
+      sortable: true,
+      render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{formatCurrency(v)}</Text>,
+      exportRender: (v) => v || 0,
     },
     {
+      key: 'expected_drc',
+      title: 'DRC (%)',
+      dataIndex: 'expected_drc',
+      width: 80,
+      align: 'center',
+      render: (v, r) => {
+        if (r.actual_drc) return <Tag color="blue">{r.actual_drc}%</Tag>
+        return v ? `${v}%` : '—'
+      },
+      exportRender: (_, r) => r.actual_drc || r.expected_drc || '',
+    },
+    {
+      key: 'status',
       title: 'Trạng thái',
       dataIndex: 'status',
-      key: 'status',
       width: 120,
-      render: (status: DealStatus) => (
-        <Tag color={DEAL_STATUS_COLORS[status]}>
-          {DEAL_STATUS_LABELS[status]}
-        </Tag>
-      ),
+      filterType: 'select',
+      filterOptions: STATUS_TABS.filter(t => t.key !== 'all').map(t => ({ value: t.key, label: t.label })),
+      render: (v: DealStatus) => <Tag color={DEAL_STATUS_COLORS[v]}>{DEAL_STATUS_LABELS[v]}</Tag>,
+      exportRender: (v) => DEAL_STATUS_LABELS[v as DealStatus] || v,
     },
     {
+      key: 'source_region',
+      title: 'Vùng',
+      dataIndex: 'source_region',
+      width: 100,
+      ellipsis: true,
+    },
+    {
+      key: 'created_at',
       title: 'Ngày tạo',
       dataIndex: 'created_at',
-      key: 'created_at',
-      width: 110,
-      render: (date) => formatDate(date),
-      sorter: true,
+      width: 100,
+      sortable: true,
+      render: (v) => formatDate(v),
+      exportRender: (v) => v ? new Date(v).toLocaleDateString('vi-VN') : '',
     },
     {
-      title: 'Thao tác',
       key: 'actions',
-      width: 120,
-      fixed: 'right',
-      render: (_, record) => {
-        const statusActions: MenuProps['items'] = []
-
-        if (record.status === 'pending') {
-          statusActions.push({
-            key: 'processing',
-            icon: <SyncOutlined />,
-            label: 'Bắt đầu xử lý',
-            onClick: () => handleUpdateStatus(record, 'processing'),
-          })
-        }
-
-        if (record.status === 'processing') {
-          statusActions.push({
-            key: 'accepted',
-            icon: <CheckCircleOutlined />,
-            label: 'Duyệt',
-            onClick: () => handleUpdateStatus(record, 'accepted'),
-          })
-        }
-
-        if (record.status === 'accepted') {
-          statusActions.push({
-            key: 'settled',
-            icon: <CheckCircleOutlined />,
-            label: 'Quyết toán',
-            onClick: () => handleUpdateStatus(record, 'settled'),
-          })
-        }
-
-        if (record.status !== 'cancelled' && record.status !== 'settled') {
-          statusActions.push({ type: 'divider' })
-          statusActions.push({
-            key: 'cancelled',
-            icon: <CloseCircleOutlined />,
-            label: 'Hủy',
-            danger: true,
-            onClick: () => handleUpdateStatus(record, 'cancelled'),
-          })
-        }
-
-        const moreItems: MenuProps['items'] = [
-          {
-            key: 'view',
-            icon: <EyeOutlined />,
-            label: 'Xem chi tiết',
-            onClick: () => handleViewDeal(record),
-          },
-          {
-            key: 'chat',
-            icon: <MessageOutlined />,
-            label: 'Mở chat',
-            onClick: () => handleOpenChat(record),
-          },
-          ...(statusActions.length > 0 ? [{ type: 'divider' as const }] : []),
-          ...statusActions,
-          ...(record.status === 'pending' ? [
-            { type: 'divider' as const },
-            {
-              key: 'delete',
-              icon: <DeleteOutlined />,
-              label: 'Xóa',
-              danger: true,
-              onClick: () => handleDeleteDeal(record),
-            },
-          ] : []),
-        ]
-
-        return (
-          <Space>
-            <Tooltip title="Xem chi tiết">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
-                onClick={() => handleViewDeal(record)}
-              />
-            </Tooltip>
-            <Tooltip title="Mở chat">
-              <Button
-                type="text"
-                size="small"
-                icon={<MessageOutlined />}
-                onClick={() => handleOpenChat(record)}
-              />
-            </Tooltip>
-            <Dropdown menu={{ items: moreItems }} trigger={['click']}>
-              <Button type="text" size="small" icon={<MoreOutlined />} />
-            </Dropdown>
-          </Space>
-        )
-      },
+      title: '',
+      width: 90,
+      filterable: false,
+      render: (_, r) => (
+        <div style={{ display: 'flex', gap: 4 }}>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/b2b/deals/${r.id}`)} />
+          <Button type="link" size="small" icon={<MessageOutlined />} onClick={async () => {
+            try {
+              const room = await dealService.getChatRoomByPartner(r.partner_id)
+              if (room) navigate(`/b2b/chat/${room.id}`)
+              else message.info('Chưa có phòng chat')
+            } catch { message.error('Lỗi') }
+          }} />
+          {r.status === 'pending' && (
+            <Popconfirm title="Xóa deal này?" onConfirm={() => handleDelete(r)} okText="Xóa" cancelText="Hủy">
+              <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
+        </div>
+      ),
     },
   ]
 
-  // ============================================
-  // RENDER
-  // ============================================
-
   return (
-    <div style={{ padding: 24 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Title level={3} style={{ margin: 0 }}>Quản lý Giao dịch</Title>
-            <Text type="secondary">Danh sách các deals với đại lý</Text>
-          </Col>
-          <Col>
-            <Space>
-              <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
-                Làm mới
-              </Button>
-              <Button icon={<ExportOutlined />}>
-                Xuất Excel
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => navigate('/b2b/deals/create')}
-              >
-                Tạo Deal
-              </Button>
-            </Space>
-          </Col>
-        </Row>
-      </div>
+    <div style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}>
+      {/* Tabs */}
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        style={{ marginBottom: 16 }}
+        items={STATUS_TABS.map(tab => ({
+          key: tab.key,
+          label: (
+            <span>
+              {tab.label}
+              {statusCounts[tab.key] > 0 && (
+                <Tag style={{ marginLeft: 6, fontSize: 10 }}>{statusCounts[tab.key]}</Tag>
+              )}
+            </span>
+          ),
+        }))}
+        tabBarExtraContent={
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/b2b/deals/new')} style={{ background: '#1B4D3E' }}>
+            Tạo Deal
+          </Button>
+        }
+      />
 
-      {/* Main Card */}
-      <Card
-        style={{ borderRadius: 12 }}
-        bodyStyle={{ padding: 0 }}
-      >
-        {/* Tabs (E2.1.4) */}
-        <Tabs
-          activeKey={activeTab}
-          onChange={handleTabChange}
-          style={{ padding: '0 24px' }}
-          items={STATUS_TABS.map(tab => ({
-            key: tab.key,
-            label: (
-              <Space>
-                {tab.label}
-                {statusCounts[tab.key] !== undefined && (
-                  <Badge
-                    count={statusCounts[tab.key]}
-                    style={{
-                      backgroundColor: tab.key === activeTab ? '#1B4D3E' : '#d9d9d9',
-                    }}
-                    showZero
-                  />
-                )}
-              </Space>
-            ),
-          }))}
-        />
-
-        {/* Filters (E2.1.5, E2.1.6) */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
-          <Row gutter={16}>
-            <Col flex="auto">
-              <Input
-                placeholder="Tìm theo mã deal..."
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                value={searchText}
-                onChange={(e) => handleSearch(e.target.value)}
-                allowClear
-                style={{ maxWidth: 300 }}
-              />
-            </Col>
-          </Row>
-        </div>
-
-        {/* Table (E2.1.1, E2.1.7) */}
-        <Table
-          columns={columns}
-          dataSource={deals}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} giao dịch`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 1200 }}
-          style={{ padding: '0 24px 24px' }}
-        />
-      </Card>
+      {/* Table */}
+      <AdvancedDataTable<Deal>
+        columns={columns}
+        dataSource={tabDeals}
+        rowKey="id"
+        loading={isLoading}
+        title={`Deals B2B`}
+        dateRangeField="created_at"
+        onRefresh={() => refetch()}
+        onRowClick={(r) => navigate(`/b2b/deals/${r.id}`)}
+        exportFileName="B2B_Deals"
+        pageSize={50}
+      />
     </div>
   )
 }

@@ -6,7 +6,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Tag, Typography, Button, Tabs, message } from 'antd'
+import { Tag, Typography, Button, Tabs } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import {
   dealService,
@@ -69,16 +69,6 @@ const DealListPage = () => {
     return counts
   }, [allDeals])
 
-  const handleDelete = async (deal: Deal) => {
-    try {
-      await dealService.deleteDeal(deal.id)
-      message.success('Đã xóa giao dịch')
-      refetch()
-    } catch (e: any) {
-      message.error(e.message || 'Không thể xóa')
-    }
-  }
-
   const columns: ColumnDef<Deal>[] = [
     {
       key: 'deal_number',
@@ -86,10 +76,8 @@ const DealListPage = () => {
       dataIndex: 'deal_number',
       width: 140,
       sortable: true,
-      render: (v, r) => (
-        <Text strong style={{ color: '#1B4D3E', cursor: 'pointer' }} onClick={() => navigate(`/b2b/deals/${r.id}`)}>
-          {v}
-        </Text>
+      render: (v) => (
+        <Text strong style={{ color: '#1B4D3E' }}>{v}</Text>
       ),
       exportRender: (v) => v || '',
     },
@@ -223,7 +211,6 @@ const DealListPage = () => {
         title={`Deals B2B`}
         dateRangeField="created_at"
         onRefresh={() => refetch()}
-        onViewDetail={(r) => {}} // toggle handled by expandedRowRender
         expandedRowRender={(deal) => <DealInlineDetail deal={deal} />}
         exportFileName="B2B_Deals"
         pageSize={50}

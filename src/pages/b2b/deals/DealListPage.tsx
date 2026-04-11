@@ -17,6 +17,7 @@ import {
   DEAL_TYPE_LABELS,
 } from '../../../services/b2b/dealService'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
+import DealInlineDetail from '../../../components/b2b/DealInlineDetail'
 
 const { Text } = Typography
 
@@ -222,7 +223,8 @@ const DealListPage = () => {
         title={`Deals B2B`}
         dateRangeField="created_at"
         onRefresh={() => refetch()}
-        onViewDetail={(r) => navigate(`/b2b/deals/${r.id}`)}
+        onViewDetail={(r) => {}} // toggle handled by expandedRowRender
+        expandedRowRender={(deal) => <DealInlineDetail deal={deal} />}
         exportFileName="B2B_Deals"
         pageSize={50}
       />

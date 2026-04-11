@@ -366,11 +366,15 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
                           </td>
                         )
                       })}
-                      {/* Floating detail button */}
-                      {onViewDetail && (
+                      {/* Floating detail button — toggles expand if expandedRowRender exists, else calls onViewDetail */}
+                      {(onViewDetail || expandedRowRender) && (
                         <td style={{ position: 'relative', width: 0, padding: 0, border: 'none', overflow: 'visible' }}>
                           <div
-                            onClick={(e) => { e.stopPropagation(); onViewDetail(row) }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (expandedRowRender) toggleExpand(key)
+                              else onViewDetail?.(row)
+                            }}
                             style={{
                               position: 'absolute',
                               right: 12,
@@ -386,13 +390,16 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
                               justifyContent: 'center',
                               boxShadow: '0 2px 8px rgba(27,77,62,0.4)',
                               cursor: 'pointer',
-                              opacity: hoveredRow === key ? 1 : 0,
+                              opacity: hoveredRow === key || isExpanded ? 1 : 0,
                               transition: 'opacity 0.15s, transform 0.15s',
                               zIndex: 5,
+                              background: isExpanded ? '#059669' : '#1B4D3E',
                             }}
-                            title="Xem chi tiết"
+                            title={isExpanded ? 'Thu gọn' : 'Xem chi tiết'}
                           >
-                            <EyeOutlined style={{ fontSize: 14 }} />
+                            {isExpanded
+                              ? <ExpandOutlined style={{ fontSize: 12, transform: 'rotate(45deg)' }} />
+                              : <EyeOutlined style={{ fontSize: 14 }} />}
                           </div>
                         </td>
                       )}

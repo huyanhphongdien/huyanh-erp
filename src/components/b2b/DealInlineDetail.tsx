@@ -60,7 +60,7 @@ export default function DealInlineDetail({ deal }: Props) {
             </Col>
             <Col xs={6}>
               <Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-                <Statistic title="Còn nợ" value={(deal.total_value_vnd || 0) - (deal.total_advanced || 0)} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: Number(v) > 0 ? '#cf1322' : '#52c41a' }} />
+                <Statistic title="Còn nợ" value={(deal.total_value_vnd || 0) - (deal.total_advanced || 0)} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: ((deal.total_value_vnd || 0) - (deal.total_advanced || 0)) > 0 ? '#cf1322' : '#52c41a' }} />
               </Card>
             </Col>
             <Col xs={6}>

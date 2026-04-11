@@ -89,6 +89,8 @@ const DowntimeLogPage = lazy(() => import('./pages/production/DowntimeLogPage'))
 const ShiftReportPage = lazy(() => import('./pages/production/ShiftReportPage'));
 const ProductionLiveBoard = lazy(() => import('./pages/production/ProductionLiveBoard'));
 const OEEDashboardPage = lazy(() => import('./pages/production/OEEDashboardPage'));
+const SOPListPage = lazy(() => import('./pages/production/SOPListPage'));
+const SafetySignsPage = lazy(() => import('./pages/production/SafetySignsPage'));
 
 // ★ Đơn công tác
 const BusinessTripPage = lazy(() => import('./features/attendance/BusinessTripPage'));
@@ -482,6 +484,8 @@ function App() {
               <Route path="production/shift-reports" element={<Suspense fallback={<LoadingSpinner />}><ShiftReportPage /></Suspense>} />
               <Route path="production/live" element={<Suspense fallback={<LoadingSpinner />}><ProductionLiveBoard /></Suspense>} />
               <Route path="production/oee" element={<Suspense fallback={<LoadingSpinner />}><OEEDashboardPage /></Suspense>} />
+              <Route path="production/sop" element={<Suspense fallback={<LoadingSpinner />}><SOPListPage /></Suspense>} />
+              <Route path="production/safety-signs" element={<Suspense fallback={<LoadingSpinner />}><SafetySignsPage /></Suspense>} />
               <Route path="shifts" element={<ShiftListPage />} />
               <Route path="shift-assignments" element={<ShiftCalendarPage />} />
               <Route path="shift-teams" element={<TeamManagementPage />} />

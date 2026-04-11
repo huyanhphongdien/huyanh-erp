@@ -9,7 +9,7 @@ import { Input, Select, DatePicker, Button, Tag, Tooltip, Space, Typography, Dro
 import {
   SearchOutlined, DownloadOutlined, FilterOutlined, ClearOutlined,
   SortAscendingOutlined, SortDescendingOutlined, ReloadOutlined,
-  ExpandOutlined,
+  ExpandOutlined, EyeOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
@@ -46,6 +46,7 @@ export interface AdvancedDataTableProps<T = any> {
   dateRangeField?: string  // field name for global date range filter
   onRefresh?: () => void
   onRowClick?: (record: T) => void
+  onViewDetail?: (record: T) => void
   expandedRowRender?: (record: T) => React.ReactNode
   exportFileName?: string
   pageSize?: number
@@ -77,6 +78,7 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
   dateRangeField,
   onRefresh,
   onRowClick,
+  onViewDetail,
   expandedRowRender,
   exportFileName = 'export',
   pageSize = 50,
@@ -90,6 +92,7 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [hoveredRow, setHoveredRow] = useState<string | null>(null)
   const [page, setPage] = useState(0)
 
   const getRowKey = useCallback((record: T) => {
@@ -332,13 +335,14 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
                   <>
                     <tr key={key}
                       style={{
-                        background: idx % 2 === 0 ? '#fff' : '#fafafa',
-                        cursor: onRowClick ? 'pointer' : 'default',
+                        background: hoveredRow === key ? '#f0fdf4' : idx % 2 === 0 ? '#fff' : '#fafafa',
+                        cursor: onRowClick || onViewDetail ? 'pointer' : 'default',
                         borderBottom: '1px solid #f0f0f0',
+                        position: 'relative',
                       }}
                       onClick={() => onRowClick?.(row)}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f0fdf4')}
-                      onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa')}
+                      onMouseEnter={() => setHoveredRow(key)}
+                      onMouseLeave={() => setHoveredRow(null)}
                     >
                       {expandedRowRender && (
                         <td style={{ padding: '6px 4px', textAlign: 'center', borderRight: '1px solid #f0f0f0', cursor: 'pointer' }}
@@ -362,6 +366,36 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
                           </td>
                         )
                       })}
+                      {/* Floating detail button */}
+                      {onViewDetail && (
+                        <td style={{ position: 'relative', width: 0, padding: 0, border: 'none', overflow: 'visible' }}>
+                          <div
+                            onClick={(e) => { e.stopPropagation(); onViewDetail(row) }}
+                            style={{
+                              position: 'absolute',
+                              right: 12,
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              width: 32,
+                              height: 32,
+                              borderRadius: '50%',
+                              background: '#1B4D3E',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(27,77,62,0.4)',
+                              cursor: 'pointer',
+                              opacity: hoveredRow === key ? 1 : 0,
+                              transition: 'opacity 0.15s, transform 0.15s',
+                              zIndex: 5,
+                            }}
+                            title="Xem chi tiết"
+                          >
+                            <EyeOutlined style={{ fontSize: 14 }} />
+                          </div>
+                        </td>
+                      )}
                     </tr>
                     {expandedRowRender && isExpanded && (
                       <tr key={`${key}-expand`}>

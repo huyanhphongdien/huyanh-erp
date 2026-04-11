@@ -6,10 +6,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Tag, Typography, Button, Tabs, message, Popconfirm } from 'antd'
-import {
-  PlusOutlined, EyeOutlined, MessageOutlined, DeleteOutlined,
-} from '@ant-design/icons'
+import { Tag, Typography, Button, Tabs, message } from 'antd'
+import { PlusOutlined } from '@ant-design/icons'
 import {
   dealService,
   Deal,
@@ -187,29 +185,7 @@ const DealListPage = () => {
       render: (v) => formatDate(v),
       exportRender: (v) => v ? new Date(v).toLocaleDateString('vi-VN') : '',
     },
-    {
-      key: 'actions',
-      title: '',
-      width: 90,
-      filterable: false,
-      render: (_, r) => (
-        <div style={{ display: 'flex', gap: 4 }}>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/b2b/deals/${r.id}`)} />
-          <Button type="link" size="small" icon={<MessageOutlined />} onClick={async () => {
-            try {
-              const room = await dealService.getChatRoomByPartner(r.partner_id)
-              if (room) navigate(`/b2b/chat/${room.id}`)
-              else message.info('Chưa có phòng chat')
-            } catch { message.error('Lỗi') }
-          }} />
-          {r.status === 'pending' && (
-            <Popconfirm title="Xóa deal này?" onConfirm={() => handleDelete(r)} okText="Xóa" cancelText="Hủy">
-              <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          )}
-        </div>
-      ),
-    },
+    // Actions column removed — floating eye button handles detail view
   ]
 
   return (
@@ -246,7 +222,7 @@ const DealListPage = () => {
         title={`Deals B2B`}
         dateRangeField="created_at"
         onRefresh={() => refetch()}
-        onRowClick={(r) => navigate(`/b2b/deals/${r.id}`)}
+        onViewDetail={(r) => navigate(`/b2b/deals/${r.id}`)}
         exportFileName="B2B_Deals"
         pageSize={50}
       />

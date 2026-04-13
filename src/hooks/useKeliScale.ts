@@ -809,9 +809,27 @@ export function useKeliScale(): UseKeliScaleReturn {
         const ports = await (navigator as any).serial.getPorts()
         if (ports.length > 0 && !portRef.current && !fatalErrorRef.current) {
           const port = ports[0]
+
+          // Try auto-detect first to find the right config
+          console.log('[KeliScale] Auto-reconnect: running auto-detect...')
+          const detectedConfig = await autoDetect(port)
+          if (detectedConfig) {
+            setConfigState(detectedConfig)
+            try { localStorage.setItem(CONFIG_KEY, JSON.stringify(detectedConfig)) } catch { /* ignore */ }
+            await new Promise(r => setTimeout(r, 300))
+            const ok = await connectWithConfig(port, detectedConfig)
+            if (ok) {
+              console.log('[KeliScale] Auto-reconnect with detected config SUCCESS')
+              return
+            }
+          }
+
+          // Fallback: try saved config
+          await new Promise(r => setTimeout(r, 300))
+          try { await port.close() } catch { /* ignore */ }
+          await new Promise(r => setTimeout(r, 300))
           const success = await connectWithConfig(port, config)
           if (!success) {
-            // Don't auto-detect on auto-reconnect — just silently fail
             console.log('[KeliScale] Auto-reconnect failed, user can connect manually')
           }
         }

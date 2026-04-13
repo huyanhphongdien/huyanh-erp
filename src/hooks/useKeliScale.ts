@@ -225,38 +225,42 @@ function parseBinaryFrame(rawBytes: number[]): ScaleReading | null {
   console.log(`[KeliScale] 🔍 Binary frame (${frame.length} bytes): ${frameHex}`)
 
   // D2008FA binary frame format (between STX and ETX):
-  //   Byte 0: Sign '+' (0x2B) or '-' (0x2D)
-  //   Byte 1-N: Weight digits (ASCII '0'-'9')
-  //   Last byte: Decimal point indicator + status
-  //     'A' (0x41) = 0 decimal places
-  //     'B' (0x42) = 1 decimal place
-  //     'C' (0x43) = 2 decimal places
-  //     'D' (0x44) = 3 decimal places
-  //     'E' (0x45) = 4 decimal places
+  //   Byte 0:     Sign '+' (0x2B) or '-' (0x2D)
+  //   Byte 1..N-2: Weight digits (ASCII '0'-'9')
+  //   Byte N-1:   Decimal point position (ASCII digit: '0'=0dp, '1'=1dp, '2'=2dp, etc.)
+  //   Byte N:     Status byte (letter: 'B','D', etc.)
+  //
+  // Example: "+00006001D" → sign=+, digits="0000600", dp='1'=1 decimal, status='D'
+  //          → raw=600, weight=600/10=60.0 kg
 
   const asciiChars = frame.filter(b => b >= 0x20 && b <= 0x7E).map(b => String.fromCharCode(b)).join('')
   console.log(`[KeliScale] 🔍 Frame ASCII: "${asciiChars}"`)
 
-  if (asciiChars.length >= 3) {
-    // Extract sign
+  if (asciiChars.length >= 4) {
+    // Byte 0: sign
     const sign = asciiChars[0] === '-' ? -1 : 1
 
-    // Last char = decimal point indicator (A=0, B=1, C=2, D=3, E=4)
-    const lastChar = asciiChars[asciiChars.length - 1].toUpperCase()
-    const dpMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4 }
-    const decimalPlaces = dpMap[lastChar] ?? 0
+    // Last byte: status (letter)
+    const statusChar = asciiChars[asciiChars.length - 1]
 
-    // Middle part = weight digits
-    const digitStr = asciiChars.slice(1, -1).replace(/[^0-9]/g, '')
+    // Second-to-last byte: decimal point position (ASCII digit)
+    const dpChar = asciiChars[asciiChars.length - 2]
+    const decimalPlaces = (dpChar >= '0' && dpChar <= '9') ? parseInt(dpChar, 10) : 0
+
+    // Middle bytes: weight digits (between sign and dp byte)
+    const digitStr = asciiChars.slice(1, -2).replace(/[^0-9]/g, '')
     const rawWeight = parseInt(digitStr, 10)
 
     if (!isNaN(rawWeight)) {
       const weight = sign * rawWeight / Math.pow(10, decimalPlaces)
-      const stable = true // D2008FA binary doesn't have clear stability bit in this format
 
-      console.log(`[KeliScale] ✅ Binary parsed: ${weight} kg (decimals: ${decimalPlaces}, raw: ${rawWeight}, stable: ${stable})`)
+      // Status byte: 'B' bit1=stable? Various models use different conventions
+      // For now treat as stable if we got a valid reading
+      const stable = true
+
+      console.log(`[KeliScale] ✅ Binary parsed: ${weight} kg (digits="${digitStr}", dp=${decimalPlaces}, status=${statusChar})`)
       return {
-        weight: Math.round(weight * 1000) / 1000, // keep up to 3 decimal places
+        weight: Math.round(weight * 1000) / 1000,
         unit: 'kg',
         stable,
         timestamp: Date.now(),
@@ -264,13 +268,13 @@ function parseBinaryFrame(rawBytes: number[]): ScaleReading | null {
     }
   }
 
-  // Fallback: try pure digit extraction without decimal point byte
+  // Fallback: try pure digit extraction
   const digitMatch = asciiChars.match(/([+-])?\s*([\d.]+)/)
   if (digitMatch) {
-    const sign = digitMatch[1] === '-' ? -1 : 1
-    const weight = parseFloat(digitMatch[2]) * sign
+    const fallbackSign = digitMatch[1] === '-' ? -1 : 1
+    const weight = parseFloat(digitMatch[2]) * fallbackSign
     if (!isNaN(weight)) {
-      console.log(`[KeliScale] ✅ Binary fallback parsed: ${weight} kg`)
+      console.log(`[KeliScale] ✅ Binary fallback: ${weight} kg`)
       return {
         weight: Math.round(weight * 100) / 100,
         unit: 'kg',

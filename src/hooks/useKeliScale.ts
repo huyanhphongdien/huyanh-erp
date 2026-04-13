@@ -121,7 +121,7 @@ const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; dataBit
 const CONFIG_KEY = 'keli_scale_config'
 
 // ============================================================================
-// PARSER — Parse Keli output formats
+// PARSER — Parse Keli output formats (text + binary)
 // ============================================================================
 
 function parseKeliOutput(line: string): ScaleReading | null {
@@ -202,8 +202,128 @@ function parseKeliOutput(line: string): ScaleReading | null {
 }
 
 // ============================================================================
+// BINARY FRAME PARSER — Parse STX/ETX binary protocol (120T truck scales)
+// ============================================================================
+// Many large Keli indicators (XK3190-A9, D2008FA) use binary continuous output:
+//   Frame: STX(0x02) + [status] + [sign] + [weight digits] + [dp] + ETX(0x03)
+//   Or:    STX(0x02) + [6-8 data bytes] + ETX(0x03) + optional CR LF
+//
+// Some variants:
+//   - 0x02 SS DD DD DD DD DD DD PP 0x03  (10 bytes: STX + status + 6 digits + decimal_pos + ETX)
+//   - Weight digits are ASCII '0'-'9' (0x30-0x39) or BCD encoded
+
+function parseBinaryFrame(rawBytes: number[]): ScaleReading | null {
+  // Look for STX (0x02) ... ETX (0x03) frame
+  const stxIdx = rawBytes.indexOf(0x02)
+  if (stxIdx === -1) return null
+
+  const etxIdx = rawBytes.indexOf(0x03, stxIdx + 1)
+  if (etxIdx === -1) return null
+
+  const frame = rawBytes.slice(stxIdx + 1, etxIdx)
+  const frameHex = frame.map(b => b.toString(16).padStart(2, '0')).join(' ')
+  console.log(`[KeliScale] 🔍 Binary frame (${frame.length} bytes): ${frameHex}`)
+
+  // Try to extract weight from frame
+  // Method 1: ASCII digits in frame (most common)
+  const asciiChars = frame.filter(b => b >= 0x20 && b <= 0x7E).map(b => String.fromCharCode(b)).join('')
+  console.log(`[KeliScale] 🔍 Frame ASCII: "${asciiChars}"`)
+
+  // Extract sign
+  const sign = asciiChars.includes('-') ? -1 : 1
+
+  // Extract digits and decimal point
+  const digitMatch = asciiChars.match(/([+-])?\s*([\d.]+)/)
+  if (digitMatch) {
+    const weight = parseFloat(digitMatch[2]) * sign
+    if (!isNaN(weight)) {
+      // Check stability from status byte (bit patterns vary by model)
+      const statusByte = frame[0]
+      const stable = statusByte !== undefined ? (statusByte & 0x20) !== 0 || (statusByte & 0x40) !== 0 : true
+
+      console.log(`[KeliScale] ✅ Binary parsed: ${weight} kg (stable: ${stable})`)
+      return {
+        weight: Math.round(weight * 100) / 100,
+        unit: 'kg',
+        stable,
+        timestamp: Date.now(),
+      }
+    }
+  }
+
+  // Method 2: BCD encoded weight (each nibble = one digit)
+  // Common in older Keli indicators: 6 bytes = 12 BCD digits
+  if (frame.length >= 4) {
+    const bcdDigits: number[] = []
+    for (const byte of frame) {
+      const hi = (byte >> 4) & 0x0F
+      const lo = byte & 0x0F
+      if (hi <= 9 && lo <= 9) {
+        bcdDigits.push(hi, lo)
+      }
+    }
+    if (bcdDigits.length >= 4) {
+      const bcdStr = bcdDigits.join('')
+      const bcdWeight = parseInt(bcdStr, 10)
+      if (!isNaN(bcdWeight) && bcdWeight > 0) {
+        console.log(`[KeliScale] ✅ BCD parsed: ${bcdWeight} (raw: ${bcdStr})`)
+        return {
+          weight: bcdWeight,
+          unit: 'kg',
+          stable: true,
+          timestamp: Date.now(),
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+// Extract binary frames from raw byte buffer, returns { readings, remainingBytes }
+function extractBinaryFrames(rawBytes: number[]): { readings: ScaleReading[]; remaining: number[] } {
+  const readings: ScaleReading[] = []
+  let searchFrom = 0
+
+  while (searchFrom < rawBytes.length) {
+    const stxIdx = rawBytes.indexOf(0x02, searchFrom)
+    if (stxIdx === -1) break
+
+    const etxIdx = rawBytes.indexOf(0x03, stxIdx + 1)
+    if (etxIdx === -1) {
+      // Incomplete frame — keep from STX onward for next read
+      return { readings, remaining: rawBytes.slice(stxIdx) }
+    }
+
+    const reading = parseBinaryFrame(rawBytes.slice(stxIdx, etxIdx + 1))
+    if (reading) readings.push(reading)
+    searchFrom = etxIdx + 1
+  }
+
+  // Keep last 50 bytes max as potential partial frame
+  const keepFrom = Math.max(0, rawBytes.length - 50)
+  const lastStx = rawBytes.lastIndexOf(0x02, rawBytes.length - 1)
+  const remaining = lastStx >= keepFrom ? rawBytes.slice(lastStx) : []
+
+  return { readings, remaining }
+}
+
+// ============================================================================
 // HELPER — Try to open port with a config, read for a short time, check data
 // ============================================================================
+
+// D2008FA query commands — some indicators only respond to commands, not continuous output
+const QUERY_COMMANDS = ['CP\r\n', 'R\r\n', 'W\r\n', 'P\r\n']
+
+async function sendCommand(port: SerialPort, cmd: string): Promise<void> {
+  if (!port.writable) return
+  const writer = port.writable.getWriter()
+  try {
+    await writer.write(new TextEncoder().encode(cmd))
+  } finally {
+    writer.releaseLock()
+  }
+}
 
 async function tryConfigOnPort(
   port: SerialPort,
@@ -230,10 +350,16 @@ async function tryConfigOnPort(
       return 'error'
     }
 
+    // Send query commands to wake up indicators in command mode (D2008FA)
+    for (const cmd of QUERY_COMMANDS) {
+      try { await sendCommand(port, cmd) } catch { /* ignore */ }
+    }
+
     const reader = port.readable.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     let totalBytesReceived = 0
+    const rawByteBuffer: number[] = []
 
     // Read with timeout
     const deadline = Date.now() + timeoutMs
@@ -247,7 +373,13 @@ async function tryConfigOnPort(
         if (done || !value) break
 
         totalBytesReceived += value.length
+
+        // Collect raw bytes for binary frame detection
+        for (let i = 0; i < value.length; i++) rawByteBuffer.push(value[i])
+
         buffer += decoder.decode(value, { stream: true })
+
+        // Check text lines
         const lines = buffer.split(/\r\n|\r|\n/)
         buffer = lines.pop() || ''
 
@@ -258,6 +390,13 @@ async function tryConfigOnPort(
           }
         }
         if (result === 'ok') break
+
+        // Check binary frames (STX/ETX)
+        const { readings } = extractBinaryFrames(rawByteBuffer)
+        if (readings.length > 0) {
+          result = 'ok'
+          break
+        }
       }
     } catch (err: any) {
       if (err.name === 'ParityError' || (err.message && err.message.includes('Parity'))) {
@@ -268,9 +407,10 @@ async function tryConfigOnPort(
       try { reader.releaseLock() } catch { /* ignore */ }
     }
 
-    // If we received bytes but couldn't parse any lines → garbled data (wrong baud/parity)
+    // If we received bytes but couldn't parse any lines or frames → garbled
     if (result === 'no_data' && totalBytesReceived > 10) {
-      console.log(`[KeliScale] tryConfig: received ${totalBytesReceived} bytes but no valid lines — garbled data`)
+      const hexSample = rawByteBuffer.slice(0, 30).map(b => b.toString(16).padStart(2, '0')).join(' ')
+      console.log(`[KeliScale] tryConfig: ${totalBytesReceived} bytes, no valid data. Sample: ${hexSample}`)
       result = 'garbled'
     }
   } finally {
@@ -304,6 +444,7 @@ export function useKeliScale(): UseKeliScaleReturn {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
   const readingRef = useRef(false)
   const bufferRef = useRef('')
+  const rawByteBufferRef = useRef<number[]>([])
   // Prevent auto-reconnect after fatal error (ParityError, etc.)
   const fatalErrorRef = useRef(false)
 
@@ -322,16 +463,19 @@ export function useKeliScale(): UseKeliScaleReturn {
   // READ LOOP — Continuously read from serial port
   // --------------------------------------------------------------------------
 
-  // Debug mode: luôn bật log cơ bản, chi tiết bật bằng: window.__SCALE_DEBUG = true
-  const isDebug = () => typeof window !== 'undefined' && (window as any).__SCALE_DEBUG === true
-
   const startReading = useCallback(async (port: SerialPort) => {
     if (readingRef.current) return
     readingRef.current = true
     bufferRef.current = ''
+    rawByteBufferRef.current = []
 
     let consecutiveErrors = 0
     const MAX_CONSECUTIVE_ERRORS = 5
+
+    // Send query commands for D2008FA command mode
+    for (const cmd of QUERY_COMMANDS) {
+      try { await sendCommand(port, cmd) } catch { /* ignore */ }
+    }
 
     try {
       while (port.readable && readingRef.current) {
@@ -348,14 +492,23 @@ export function useKeliScale(): UseKeliScaleReturn {
             // Reset error counter on successful read
             consecutiveErrors = 0
 
+            // Collect raw bytes for binary frame detection
+            const bytes = new Uint8Array(value)
+            for (let i = 0; i < bytes.length; i++) rawByteBufferRef.current.push(bytes[i])
+            // Keep buffer bounded (max 500 bytes)
+            if (rawByteBufferRef.current.length > 500) {
+              rawByteBufferRef.current = rawByteBufferRef.current.slice(-200)
+            }
+
             const rawText = decoder.decode(value, { stream: true })
-            const rawBytes = value ? Array.from(new Uint8Array(value)).map(b => b.toString(16).padStart(2, '0')).join(' ') : ''
-            console.log(`[KeliScale] 📥 Raw (${value?.length || 0} bytes):`, JSON.stringify(rawText), '| HEX:', rawBytes)
+            const rawHex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ')
+            console.log(`[KeliScale] 📥 Raw (${bytes.length} bytes):`, JSON.stringify(rawText), '| HEX:', rawHex)
             bufferRef.current += rawText
 
-            // Process complete lines (separated by \r\n, \n, or \r)
+            // === Method 1: Text lines (separated by \r\n, \n, or \r) ===
             const lines = bufferRef.current.split(/\r\n|\r|\n/)
             bufferRef.current = lines.pop() || ''
+            let textParsed = false
 
             for (const line of lines) {
               if (line.trim()) {
@@ -363,9 +516,20 @@ export function useKeliScale(): UseKeliScaleReturn {
                 if (reading) {
                   console.log(`[KeliScale] ✅ Weight: ${reading.weight} ${reading.unit} | Stable: ${reading.stable} | Line: ${JSON.stringify(line)}`)
                   setLiveWeight(reading)
+                  textParsed = true
                 } else {
-                  console.warn(`[KeliScale] ❌ Cannot parse: ${JSON.stringify(line)}`)
+                  console.warn(`[KeliScale] ❌ Cannot parse text: ${JSON.stringify(line)}`)
                 }
+              }
+            }
+
+            // === Method 2: Binary frames (STX/ETX) — fallback for D2008FA binary mode ===
+            if (!textParsed) {
+              const { readings, remaining } = extractBinaryFrames(rawByteBufferRef.current)
+              rawByteBufferRef.current = remaining
+              for (const reading of readings) {
+                console.log(`[KeliScale] ✅ Binary weight: ${reading.weight} ${reading.unit}`)
+                setLiveWeight(reading)
               }
             }
           }

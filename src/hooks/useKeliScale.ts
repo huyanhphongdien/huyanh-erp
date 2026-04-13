@@ -95,15 +95,26 @@ const DEFAULT_CONFIG: KeliScaleConfig = {
 
 // Configs to try when auto-detecting (most common for weighbridge scales)
 // Order: most common truck scales first → small scales
-const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; label: string }> = [
-  { baudRate: 9600, parity: 'even', label: '9600/Even (XK3190-A9/A9+/QS-D truck scale)' },
-  { baudRate: 9600, parity: 'none', label: '9600/None (D2008FA/DS3/DS6)' },
-  { baudRate: 9600, parity: 'odd', label: '9600/Odd' },
-  { baudRate: 2400, parity: 'none', label: '2400/None (XK3118T1)' },
-  { baudRate: 2400, parity: 'even', label: '2400/Even' },
-  { baudRate: 4800, parity: 'none', label: '4800/None (XK3190-A12E)' },
-  { baudRate: 4800, parity: 'even', label: '4800/Even' },
-  { baudRate: 19200, parity: 'none', label: '19200/None (high-speed truck scale)' },
+// Some 120T truck scales use 7 data bits + even parity + 2 stop bits
+const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; dataBits?: number; stopBits?: number; label: string }> = [
+  // 8 data bits (most common)
+  { baudRate: 9600, parity: 'even', label: '9600/8/Even/1 (XK3190-A9/A9+/QS-D)' },
+  { baudRate: 9600, parity: 'none', label: '9600/8/None/1 (D2008FA/DS3/DS6)' },
+  // 7 data bits + even parity (common for large truck scales 120T)
+  { baudRate: 9600, parity: 'even', dataBits: 7, stopBits: 2, label: '9600/7/Even/2 (120T truck scale)' },
+  { baudRate: 9600, parity: 'even', dataBits: 7, stopBits: 1, label: '9600/7/Even/1 (truck scale)' },
+  { baudRate: 9600, parity: 'none', dataBits: 7, stopBits: 2, label: '9600/7/None/2' },
+  { baudRate: 9600, parity: 'odd', label: '9600/8/Odd/1' },
+  { baudRate: 2400, parity: 'none', label: '2400/8/None/1 (XK3118T1)' },
+  { baudRate: 2400, parity: 'even', dataBits: 7, stopBits: 2, label: '2400/7/Even/2 (old truck scale)' },
+  { baudRate: 2400, parity: 'even', label: '2400/8/Even/1' },
+  { baudRate: 4800, parity: 'none', label: '4800/8/None/1 (XK3190-A12E)' },
+  { baudRate: 4800, parity: 'even', label: '4800/8/Even/1' },
+  { baudRate: 4800, parity: 'even', dataBits: 7, stopBits: 2, label: '4800/7/Even/2' },
+  { baudRate: 19200, parity: 'none', label: '19200/8/None/1 (high-speed)' },
+  { baudRate: 1200, parity: 'none', label: '1200/8/None/1 (legacy)' },
+  { baudRate: 1200, parity: 'even', dataBits: 7, stopBits: 2, label: '1200/7/Even/2 (legacy)' },
+  { baudRate: 115200, parity: 'none', label: '115200/8/None/1 (modern)' },
 ]
 
 // Config key in localStorage
@@ -414,6 +425,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       const result = await tryConfigOnPort(port, {
         baudRate: cfg.baudRate,
         parity: cfg.parity,
+        dataBits: cfg.dataBits,
+        stopBits: cfg.stopBits,
       })
 
       console.log(`[KeliScale] ${cfg.label} → ${result}`)
@@ -421,8 +434,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       if (result === 'ok') {
         const found: KeliScaleConfig = {
           baudRate: cfg.baudRate,
-          dataBits: 8,
-          stopBits: 1,
+          dataBits: cfg.dataBits ?? 8,
+          stopBits: cfg.stopBits ?? 1,
           parity: cfg.parity,
           flowControl: 'none',
         }

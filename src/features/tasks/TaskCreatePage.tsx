@@ -62,28 +62,12 @@ export const TaskCreatePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [pendingEvalCount, setPendingEvalCount] = useState(0);
 
   // Template & Checklist state
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
-  const [checklistItems, setChecklistItems] = useState<Array<{ title: string; requires_evidence?: boolean }>>([]);
+  const [checklistItems, setChecklistItems] = useState<string[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState('');
-
-  // ========== CHECK PENDING EVALUATIONS ==========
-  useEffect(() => {
-    const checkPending = async () => {
-      if (!user?.employee_id) return;
-      const { count } = await supabase
-        .from('tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('assignee_id', user.employee_id)
-        .eq('status', 'finished')
-        .in('evaluation_status', ['none', 'pending_self_eval']);
-      setPendingEvalCount(count || 0);
-    };
-    checkPending();
-  }, [user]);
 
   // ========== LOAD TEMPLATES ==========
   useEffect(() => {
@@ -103,7 +87,7 @@ export const TaskCreatePage: React.FC = () => {
     const items = typeof template.checklist_items === 'string'
       ? JSON.parse(template.checklist_items)
       : template.checklist_items;
-    setChecklistItems((items || []).map((i: any) => ({ title: i.title, requires_evidence: i.requires_evidence || false })));
+    setChecklistItems((items || []).map((i: any) => i.title));
   };
 
   const handleClearTemplate = () => {
@@ -113,7 +97,7 @@ export const TaskCreatePage: React.FC = () => {
 
   const handleAddChecklistItem = () => {
     if (!newChecklistItem.trim()) return;
-    setChecklistItems(prev => [...prev, { title: newChecklistItem.trim(), requires_evidence: false }]);
+    setChecklistItems(prev => [...prev, newChecklistItem.trim()]);
     setNewChecklistItem('');
   };
 
@@ -157,7 +141,7 @@ export const TaskCreatePage: React.FC = () => {
 
         // 2. EMPLOYEES
         // Emails cấp cao — không cho phép giao task cho họ
-        const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com', 'trunglxh@huyanhrubber.com']
+        const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com']
 
         if (isAdmin || isUserExecutive) {
           const { data: empData, error: empError } = await supabase
@@ -226,11 +210,6 @@ export const TaskCreatePage: React.FC = () => {
 
   // Handle form submit
   const handleSubmit = async (formData: TaskFormData) => {
-    if (pendingEvalCount > 3 && isSelfMode) {
-      setError('Bạn có quá nhiều công việc chưa đánh giá. Vui lòng đánh giá trước.');
-      return;
-    }
-
     setError(null);
     setIsSubmitting(true);
 
@@ -239,7 +218,6 @@ export const TaskCreatePage: React.FC = () => {
         name: formData.name,
         description: formData.description || null,
         priority: formData.priority || 'medium',
-        difficulty: formData.difficulty || 'normal',
         start_date: formData.start_date || null,
         due_date: formData.due_date || null,
         notes: formData.notes || null,
@@ -263,10 +241,8 @@ export const TaskCreatePage: React.FC = () => {
         
         dbData.assignee_id = formData.assignee_id || null;
         dbData.assigner_id = user?.employee_id || null;
-        // ★ Nếu giao cho chính mình → tự giao
-        const isSelfAssign = formData.assignee_id === user?.employee_id;
-        dbData.is_self_assigned = isSelfAssign;
-        (dbData as any).task_source = (formData as any).project_id ? 'project' : isSelfAssign ? 'self' : 'assigned';
+        dbData.is_self_assigned = false;
+        (dbData as any).task_source = formData.project_id ? 'project' : 'assigned';
       }
 
       const { data, error: insertError } = await supabase
@@ -290,21 +266,6 @@ export const TaskCreatePage: React.FC = () => {
       }
 
       setSuccess(true);
-
-      // ★ Thông báo cho NV được giao
-      if (data.assignee_id && data.assignee_id !== user?.employee_id) {
-        import('../../services/notificationHelper').then(({ notify }) => {
-          notify({
-            recipientId: data.assignee_id,
-            senderId: user?.employee_id || undefined,
-            module: 'task',
-            type: 'task_assigned',
-            title: `Bạn được giao: ${data.name}`,
-            message: `${user?.full_name || 'Quản lý'} đã giao công việc cho bạn`,
-            referenceUrl: `/tasks/${data.id}`,
-          })
-        })
-      }
 
       setTimeout(() => {
         navigate(`/tasks/${data.id}`);
@@ -449,25 +410,46 @@ export const TaskCreatePage: React.FC = () => {
         </div>
       )}
 
-      {/* Pending Evaluation Warning */}
-      {pendingEvalCount > 3 && (
-        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start gap-2 sm:gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-red-800 text-sm sm:text-base">
-                Bạn có {pendingEvalCount} công việc chưa đánh giá
-              </p>
-              <p className="text-xs sm:text-sm text-red-600 mt-1">
-                Vui lòng đánh giá trước khi tạo công việc mới.
-              </p>
-              <button
-                onClick={() => navigate('/my-tasks?tab=awaiting_eval')}
-                className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Đánh giá ngay
-              </button>
+      {/* Checklist Editor */}
+      {(checklistItems.length > 0 || selectedTemplate) && (
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-semibold text-gray-700">Checklist ({checklistItems.length} bước)</span>
             </div>
+          </div>
+          <div className="space-y-1.5 mb-3">
+            {checklistItems.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+                <span className="text-xs text-gray-400 w-5">{idx + 1}.</span>
+                <span className="text-sm text-gray-700 flex-1">{item}</span>
+                <button
+                  onClick={() => handleRemoveChecklistItem(idx)}
+                  className="text-gray-400 hover:text-red-500 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newChecklistItem}
+              onChange={e => setNewChecklistItem(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddChecklistItem(); } }}
+              placeholder="Thêm bước mới..."
+              className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+            />
+            <button
+              onClick={handleAddChecklistItem}
+              disabled={!newChecklistItem.trim()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Thêm
+            </button>
           </div>
         </div>
       )}
@@ -499,66 +481,7 @@ export const TaskCreatePage: React.FC = () => {
           isDepartmentLocked={isDepartmentLocked}
           initialData={initialFormData}
           currentUser={user}
-        >
-          {/* ★ Checklist Editor — bên trong form, trước nút Tạo */}
-          <div className="px-4 sm:px-6 py-4 border-t border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span className="text-sm font-semibold text-gray-700">Checklist ({checklistItems.length} bước)</span>
-              </div>
-            </div>
-            {checklistItems.length > 0 && (
-              <div className="space-y-1.5 mb-3">
-                {checklistItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
-                    <span className="text-xs text-gray-400 w-5">{idx + 1}.</span>
-                    <span className="text-sm text-gray-700 flex-1">{item.title}</span>
-                    {item.requires_evidence && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded font-medium">📷</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setChecklistItems(prev => prev.map((it, i) => i === idx ? { ...it, requires_evidence: !it.requires_evidence } : it))
-                      }}
-                      title={item.requires_evidence ? 'Bỏ yêu cầu bằng chứng' : 'Yêu cầu bằng chứng (ảnh/PDF)'}
-                      className={`text-xs p-0.5 rounded ${item.requires_evidence ? 'text-orange-500' : 'text-gray-300 hover:text-orange-400'}`}
-                    >
-                      📷
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveChecklistItem(idx)}
-                      className="text-gray-400 hover:text-red-500 p-0.5"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newChecklistItem}
-                onChange={e => setNewChecklistItem(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddChecklistItem(); } }}
-                placeholder="Thêm bước mới..."
-                className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-              />
-              <button
-                type="button"
-                onClick={handleAddChecklistItem}
-                disabled={!newChecklistItem.trim()}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Thêm
-              </button>
-            </div>
-          </div>
-        </TaskForm>
+        />
       )}
     </div>
   );

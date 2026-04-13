@@ -86,10 +86,10 @@ export interface UseKeliScaleReturn {
 // ============================================================================
 
 const DEFAULT_CONFIG: KeliScaleConfig = {
-  baudRate: 2400,
+  baudRate: 9600,
   dataBits: 8,
   stopBits: 1,
-  parity: 'none' as ParityType,
+  parity: 'even' as ParityType,
   flowControl: 'none' as FlowControlType,
 }
 
@@ -197,8 +197,8 @@ function parseKeliOutput(line: string): ScaleReading | null {
 async function tryConfigOnPort(
   port: SerialPort,
   cfg: { baudRate: number; parity: ParityType; dataBits?: number; stopBits?: number },
-  timeoutMs = 3000
-): Promise<'ok' | 'parity' | 'no_data' | 'error'> {
+  timeoutMs = 4000
+): Promise<'ok' | 'parity' | 'no_data' | 'garbled' | 'error'> {
   try {
     await port.open({
       baudRate: cfg.baudRate,
@@ -211,7 +211,7 @@ async function tryConfigOnPort(
     return 'error'
   }
 
-  let result: 'ok' | 'parity' | 'no_data' = 'no_data'
+  let result: 'ok' | 'parity' | 'no_data' | 'garbled' = 'no_data'
 
   try {
     if (!port.readable) {
@@ -222,6 +222,7 @@ async function tryConfigOnPort(
     const reader = port.readable.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let totalBytesReceived = 0
 
     // Read with timeout
     const deadline = Date.now() + timeoutMs
@@ -234,6 +235,7 @@ async function tryConfigOnPort(
         const { value, done } = await Promise.race([readPromise, timeoutPromise])
         if (done || !value) break
 
+        totalBytesReceived += value.length
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split(/\r\n|\r|\n/)
         buffer = lines.pop() || ''
@@ -253,6 +255,12 @@ async function tryConfigOnPort(
     } finally {
       try { await reader.cancel() } catch { /* ignore */ }
       try { reader.releaseLock() } catch { /* ignore */ }
+    }
+
+    // If we received bytes but couldn't parse any lines → garbled data (wrong baud/parity)
+    if (result === 'no_data' && totalBytesReceived > 10) {
+      console.log(`[KeliScale] tryConfig: received ${totalBytesReceived} bytes but no valid lines — garbled data`)
+      result = 'garbled'
     }
   } finally {
     await new Promise(r => setTimeout(r, 100))
@@ -491,13 +499,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       // Request port from user (browser shows picker dialog)
       const port = await (navigator as any).serial.requestPort()
 
-      // Try current config first
-      const success = await connectWithConfig(port, config)
-      if (success) return true
-
-      // If failed, try auto-detect
-      setError('Kết nối thất bại, đang tự động dò cấu hình...')
-      await new Promise(r => setTimeout(r, 300))
+      // Always auto-detect first — try all configs to find one that returns valid weight data
+      setError('Đang tự động dò cấu hình đầu cân...')
 
       const detectedConfig = await autoDetect(port)
       if (detectedConfig) {
@@ -512,6 +515,17 @@ export function useKeliScale(): UseKeliScaleReturn {
           setError(null)
           return true
         }
+      }
+
+      // Fallback: try current config directly (user may have set it manually)
+      console.log('[KeliScale] Auto-detect failed, trying saved config...')
+      await new Promise(r => setTimeout(r, 300))
+      try { await port.close() } catch { /* ignore */ }
+      await new Promise(r => setTimeout(r, 300))
+      const success = await connectWithConfig(port, config)
+      if (success) {
+        setError(null)
+        return true
       }
 
       setError('Không tìm được cấu hình phù hợp. Kiểm tra kết nối cáp RS232 và đầu cân.')

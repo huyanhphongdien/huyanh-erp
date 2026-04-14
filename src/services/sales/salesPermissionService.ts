@@ -121,8 +121,10 @@ export function isTabEditable(role: SalesRole | null, tab: string, status: Sales
       return role === 'logistics' && ['producing', 'ready', 'packing', 'shipped', 'delivered'].includes(status)
 
     case 'finance':
-      // KT sửa khi Shipped → Invoiced
-      return role === 'accounting' && ['shipped', 'delivered', 'invoiced'].includes(status)
+      // KT sửa khi Confirmed → Paid (kế toán cần điền tỷ giá, đặt cọc, NH nhận
+      // ngay từ lúc đơn được xác nhận, không đợi tới shipped vì khách thường
+      // chuyển cọc trước khi hàng giao). Khóa khi draft/cancelled.
+      return role === 'accounting' && !['draft', 'cancelled'].includes(status)
 
     default:
       return false

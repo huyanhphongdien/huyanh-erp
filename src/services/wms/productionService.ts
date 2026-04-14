@@ -248,7 +248,7 @@ export const productionService = {
     // 1. Validate order exists and is draft/scheduled
     const { data: order, error: fetchErr } = await supabase
       .from('production_orders')
-      .select('id, status')
+      .select('id, status, code')
       .eq('id', poId)
       .single()
 
@@ -258,9 +258,76 @@ export const productionService = {
       throw new Error('Chỉ có thể bắt đầu khi lệnh ở trạng thái Nhập hoặc Đã lên lịch')
     }
 
+    // ★ Idempotency: nếu đã có stages rồi → từ chối (startProduction chỉ chạy 1 lần)
+    const { count: existingStages } = await supabase
+      .from('production_stage_progress')
+      .select('id', { count: 'exact', head: true })
+      .eq('production_order_id', poId)
+    if (existingStages && existingStages > 0) {
+      throw new Error('Lệnh sản xuất đã được bắt đầu trước đó — không thể start lần 2')
+    }
+
     const now = new Date().toISOString()
 
-    // 2. Create 5 stage records
+    // ★ 2. Consume NVL: reduce source batches' quantity_remaining
+    //    Đọc tất cả input items + check đủ số lượng
+    const { data: items, error: itemsErr } = await supabase
+      .from('production_order_items')
+      .select('id, source_batch_id, allocated_quantity')
+      .eq('production_order_id', poId)
+    if (itemsErr) throw itemsErr
+
+    const validItems = (items || []).filter(it => it.source_batch_id && it.allocated_quantity > 0)
+
+    // Validate từng batch có đủ quantity_remaining trước khi trừ
+    for (const item of validItems) {
+      const { data: batch } = await supabase
+        .from('stock_batches')
+        .select('id, batch_no, quantity_remaining, material_id')
+        .eq('id', item.source_batch_id!)
+        .single()
+      if (!batch) throw new Error(`Không tìm thấy lô NVL ${item.source_batch_id}`)
+      if (Number(batch.quantity_remaining) < Number(item.allocated_quantity)) {
+        throw new Error(
+          `Lô ${batch.batch_no} không đủ NVL: cần ${item.allocated_quantity} kg, còn ${batch.quantity_remaining} kg`,
+        )
+      }
+    }
+
+    // Trừ batch + ghi inventory_transaction cho mỗi item
+    for (const item of validItems) {
+      const { data: batch } = await supabase
+        .from('stock_batches')
+        .select('quantity_remaining, material_id, warehouse_id')
+        .eq('id', item.source_batch_id!)
+        .single()
+      if (!batch) continue
+
+      const newQty = Math.max(0, Number(batch.quantity_remaining) - Number(item.allocated_quantity))
+      await supabase
+        .from('stock_batches')
+        .update({
+          quantity_remaining: newQty,
+          current_weight: newQty,
+          status: newQty === 0 ? 'depleted' : 'active',
+          updated_at: now,
+        })
+        .eq('id', item.source_batch_id!)
+
+      await supabase.from('inventory_transactions').insert({
+        material_id: batch.material_id,
+        warehouse_id: batch.warehouse_id,
+        batch_id: item.source_batch_id,
+        type: 'production_out',
+        quantity: -Number(item.allocated_quantity),
+        reference_type: 'production_order',
+        reference_id: poId,
+        notes: `Xuất NVL cho lệnh SX ${order.code}`,
+        created_at: now,
+      })
+    }
+
+    // 3. Create 5 stage records
     const stageRecords = []
     for (let i = 1; i <= 5; i++) {
       stageRecords.push({
@@ -278,7 +345,7 @@ export const productionService = {
 
     if (stageErr) throw stageErr
 
-    // 3. Update order status
+    // 4. Update order status
     const { data: updated, error: updateErr } = await supabase
       .from('production_orders')
       .update({
@@ -406,13 +473,15 @@ export const productionService = {
     actual_quantity: number
     final_grade: string
     final_drc: number
+    warehouse_id?: string | null
+    location_id?: string | null
   }): Promise<ProductionOrder> {
     const now = new Date().toISOString()
 
     // Calculate yield_percent from total input
     const { data: items, error: itemsErr } = await supabase
       .from('production_order_items')
-      .select('required_quantity')
+      .select('required_quantity, source_batch:stock_batches(material_id, warehouse_id)')
       .eq('production_order_id', poId)
 
     if (itemsErr) throw itemsErr
@@ -422,6 +491,15 @@ export const productionService = {
       ? Math.round((data.actual_quantity / totalInput) * 10000) / 100
       : null
 
+    // Lấy thông tin order để biết code + target_material_id + target_grade
+    const { data: order } = await supabase
+      .from('production_orders')
+      .select('id, code, target_grade, final_grade')
+      .eq('id', poId)
+      .single()
+    if (!order) throw new Error('Không tìm thấy lệnh sản xuất')
+
+    // Update PO status + final numbers
     const { data: updated, error } = await supabase
       .from('production_orders')
       .update({
@@ -438,11 +516,163 @@ export const productionService = {
       .single()
 
     if (error) throw error
+
+    // ★ NEW: Tạo output stock_batch cho thành phẩm (Gap #1 fix)
+    //    Idempotency: nếu đã có stock_batch cho PO này rồi → skip
+    const { count: existing } = await supabase
+      .from('stock_batches')
+      .select('id', { count: 'exact', head: true })
+      .eq('production_order_id', poId)
+      .eq('batch_type', 'production')
+
+    if (!existing || existing === 0) {
+      // Lấy material_id từ source batch đầu tiên (giả định cùng material với input)
+      // Hoặc tìm material theo grade nếu có
+      const firstSource: any = (items || [])[0]?.source_batch
+      const sourceMaterialId = Array.isArray(firstSource)
+        ? firstSource[0]?.material_id
+        : firstSource?.material_id
+      const sourceWarehouseId = Array.isArray(firstSource)
+        ? firstSource[0]?.warehouse_id
+        : firstSource?.warehouse_id
+
+      // Fallback: tìm material theo target_grade hoặc final_grade nếu không có source
+      let materialId = sourceMaterialId
+      if (!materialId) {
+        const { data: mat } = await supabase
+          .from('materials')
+          .select('id')
+          .eq('sku', data.final_grade || order.target_grade)
+          .limit(1)
+          .maybeSingle()
+        materialId = mat?.id || null
+      }
+
+      if (materialId) {
+        const batchNo = `TP-PR-${now.slice(2, 10).replace(/-/g, '')}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`
+        const warehouseId = data.warehouse_id || sourceWarehouseId || null
+
+        const { data: newBatch, error: batchErr } = await supabase
+          .from('stock_batches')
+          .insert({
+            batch_no: batchNo,
+            material_id: materialId,
+            warehouse_id: warehouseId,
+            location_id: data.location_id || null,
+            initial_quantity: data.actual_quantity,
+            quantity_remaining: data.actual_quantity,
+            unit: 'kg',
+            initial_drc: data.final_drc,
+            latest_drc: data.final_drc,
+            qc_status: 'pending',
+            batch_type: 'production',
+            production_order_id: poId,
+            received_date: now.split('T')[0],
+            status: 'active',
+            rubber_grade: data.final_grade,
+            initial_weight: data.actual_quantity,
+            current_weight: data.actual_quantity,
+            weight_loss: 0,
+            contamination_status: 'clean',
+            storage_days: 0,
+          })
+          .select('id, batch_no')
+          .single()
+
+        if (batchErr) {
+          console.error('[completeProduction] stock_batch insert failed:', batchErr)
+        } else if (newBatch) {
+          // Link ngược production_output_batches (nếu có) → stock_batch
+          await supabase
+            .from('production_output_batches')
+            .update({ stock_batch_id: newBatch.id })
+            .eq('production_order_id', poId)
+            .is('stock_batch_id', null)
+
+          // Inventory transaction
+          await supabase.from('inventory_transactions').insert({
+            material_id: materialId,
+            warehouse_id: warehouseId,
+            batch_id: newBatch.id,
+            type: 'production_in',
+            quantity: data.actual_quantity,
+            reference_type: 'production_order',
+            reference_id: poId,
+            notes: `Nhập kho thành phẩm từ lệnh SX ${order.code} — lô mới: ${newBatch.batch_no}`,
+            created_at: now,
+          })
+        }
+      } else {
+        console.warn('[completeProduction] no material_id — skip stock_batch creation for PO', poId)
+      }
+    }
+
     return updated as unknown as ProductionOrder
   },
 
   async cancelProduction(poId: string, reason?: string): Promise<ProductionOrder> {
     const now = new Date().toISOString()
+
+    // Lấy status hiện tại để biết có cần restore NVL không
+    const { data: current } = await supabase
+      .from('production_orders')
+      .select('id, code, status')
+      .eq('id', poId)
+      .single()
+    if (!current) throw new Error('Không tìm thấy lệnh sản xuất')
+
+    // ★ NEW (Gap #2 fix): Nếu PO đã được start (in_progress/completed) → NVL đã bị trừ
+    //    → Cần hoàn trả lại stock_batches.quantity_remaining
+    const needsRestore = current.status === 'in_progress' || current.status === 'completed'
+
+    if (needsRestore) {
+      const { data: items } = await supabase
+        .from('production_order_items')
+        .select('source_batch_id, allocated_quantity')
+        .eq('production_order_id', poId)
+
+      for (const item of (items || [])) {
+        if (!item.source_batch_id || !item.allocated_quantity) continue
+
+        const { data: batch } = await supabase
+          .from('stock_batches')
+          .select('quantity_remaining, material_id, warehouse_id')
+          .eq('id', item.source_batch_id)
+          .single()
+        if (!batch) continue
+
+        const restoredQty = Number(batch.quantity_remaining) + Number(item.allocated_quantity)
+        await supabase
+          .from('stock_batches')
+          .update({
+            quantity_remaining: restoredQty,
+            current_weight: restoredQty,
+            status: 'active',  // Đảo lại từ depleted nếu cần
+            updated_at: now,
+          })
+          .eq('id', item.source_batch_id)
+
+        await supabase.from('inventory_transactions').insert({
+          material_id: batch.material_id,
+          warehouse_id: batch.warehouse_id,
+          batch_id: item.source_batch_id,
+          type: 'production_cancel_restore',
+          quantity: Number(item.allocated_quantity),
+          reference_type: 'production_order',
+          reference_id: poId,
+          notes: `Hoàn lại NVL do hủy lệnh SX ${current.code}. Lý do: ${reason || 'Không có'}`,
+          created_at: now,
+        })
+      }
+
+      // Nếu PO đã 'completed' và có output batch trong stock → đánh dấu cancelled
+      // (nhưng không xóa vì có thể đã dùng cho deal khác — ERP quản lý tiếp)
+      await supabase
+        .from('stock_batches')
+        .update({ status: 'cancelled', updated_at: now })
+        .eq('production_order_id', poId)
+        .eq('batch_type', 'production')
+    }
 
     const { data: updated, error } = await supabase
       .from('production_orders')

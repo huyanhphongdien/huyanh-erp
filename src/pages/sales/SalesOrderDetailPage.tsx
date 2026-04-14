@@ -60,6 +60,7 @@ import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
 import { containerService } from '../../services/sales/containerService'
 import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
+import OrderActionButtons from './components/OrderActionButtons'
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
 import { useAuthStore } from '../../stores/authStore'
@@ -262,134 +263,23 @@ function SalesOrderDetailPage() {
     ''
 
   // ══════════════════════════════════════════════════════════════
-  // ACTION BUTTONS
+  // ACTION BUTTONS — dùng chung OrderActionButtons component
   // ══════════════════════════════════════════════════════════════
 
-  const renderActionButtons = () => {
-    const s = order.status
-    const btns: React.ReactNode[] = []
+  // Các button đặc thù cho trang detail (không phải chuyển trạng thái chuẩn)
+  const renderExtraEditButton = () => {
+    if (order.status !== 'draft') return null
     const canEdit = salesRole ? salesPermissions.canEditOrder(salesRole) : false
-    const canCancel = salesRole ? salesPermissions.canCancelOrder(salesRole) : false
-    const canEditProd = salesRole ? salesPermissions.canEditProduction(salesRole) : false
-
-    if (s === 'draft') {
-      if (canEdit) {
-        btns.push(
-          <Popconfirm
-            key="confirm"
-            title="Xác nhận đơn hàng?"
-            onConfirm={() => handleStatusAction('confirmed')}
-          >
-            <Button type="primary" icon={<CheckCircleOutlined />} loading={actionLoading}>
-              Xác nhận
-            </Button>
-          </Popconfirm>,
-          <Button
-            key="edit"
-            icon={<EditOutlined />}
-            onClick={() => navigate(`/sales/orders/${order.id}`)}
-          >
-            Sửa
-          </Button>,
-        )
-      }
-      if (canCancel) {
-        btns.push(
-          <Popconfirm
-            key="cancel"
-            title="Hủy đơn hàng?"
-            onConfirm={() => handleStatusAction('cancelled')}
-          >
-            <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
-              Hủy
-            </Button>
-          </Popconfirm>,
-        )
-      }
-    } else if (s === 'confirmed') {
-      if (canEditProd) {
-        btns.push(
-          <Button
-            key="produce"
-            style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}
-            icon={<ToolOutlined />}
-            onClick={() => handleStatusAction('producing')}
-            loading={actionLoading}
-          >
-            Tạo lệnh SX
-          </Button>,
-        )
-      }
-      if (canCancel) {
-        btns.push(
-          <Popconfirm
-            key="cancel"
-            title="Hủy đơn hàng?"
-            onConfirm={() => handleStatusAction('cancelled')}
-          >
-            <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>
-              Hủy
-            </Button>
-          </Popconfirm>,
-        )
-      }
-    } else if (s === 'producing') {
-      btns.push(
-        <Tag key="status" color="orange" style={{ fontSize: 14, padding: '4px 12px' }}>
-          Đang sản xuất...
-        </Tag>,
-      )
-    } else if (s === 'ready') {
-      btns.push(
-        <Button
-          key="pack"
-          style={{ background: '#722ed1', borderColor: '#722ed1', color: '#fff' }}
-          icon={<ContainerOutlined />}
-          onClick={() => handleStatusAction('packing')}
-          loading={actionLoading}
-        >
-          Đóng gói
-        </Button>,
-      )
-    } else if (s === 'packing') {
-      btns.push(
-        <Button
-          key="ship"
-          style={{ background: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
-          icon={<TruckOutlined />}
-          onClick={() => handleStatusAction('shipped')}
-          loading={actionLoading}
-        >
-          Xuất hàng
-        </Button>,
-      )
-    } else if (s === 'shipped') {
-      btns.push(
-        <Button
-          key="deliver"
-          type="primary"
-          icon={<CheckCircleOutlined />}
-          onClick={() => handleStatusAction('delivered')}
-          loading={actionLoading}
-        >
-          Đã giao
-        </Button>,
-      )
-    } else if (s === 'delivered') {
-      btns.push(
-        <Button
-          key="invoice"
-          style={{ background: '#faad14', borderColor: '#faad14', color: '#fff' }}
-          icon={<DollarOutlined />}
-          onClick={() => handleStatusAction('invoiced')}
-          loading={actionLoading}
-        >
-          Lập hóa đơn
-        </Button>,
-      )
-    }
-
-    return btns
+    if (!canEdit) return null
+    return (
+      <Button
+        key="edit"
+        icon={<EditOutlined />}
+        onClick={() => navigate(`/sales/orders/${order.id}`)}
+      >
+        Sửa
+      </Button>
+    )
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -1540,7 +1430,10 @@ function SalesOrderDetailPage() {
             {ORDER_STATUS_LABELS[order.status]}
           </Tag>
         </Space>
-        <Space wrap>{renderActionButtons()}</Space>
+        <Space wrap>
+          <OrderActionButtons order={order} salesRole={salesRole} onSaved={loadOrder} />
+          {renderExtraEditButton()}
+        </Space>
       </div>
 
       {/* Info row */}

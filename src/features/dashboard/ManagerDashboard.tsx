@@ -683,23 +683,6 @@ export function ManagerDashboard() {
                   </div>
                 ))}
               </div>
-              {/* Danh sách NV chưa check-in */}
-              {absentEmployees.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-50">
-                  <p className="text-[11px] text-gray-400 font-medium mb-2">
-                    <UserX className="w-3 h-3 inline mr-1" />
-                    Chưa check-in ({absentEmployees.length} NV)
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {absentEmployees.map(e => (
-                      <span key={e.id} className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded-lg text-[11px] font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                        {e.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
               {/* Biểu đồ 7 ngày */}
               <div className="mt-4 pt-3 border-t border-gray-50">
                 <p className="text-[11px] text-gray-400 font-medium mb-2">7 ngày gần nhất</p>

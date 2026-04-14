@@ -476,39 +476,53 @@ export const demandService = {
   // ============================================
 
   async getOffers(demandId: string): Promise<DemandOffer[]> {
-    const { data, error } = await supabase
+    // b2b_demand_offers và b2b_partners là views (tables gốc ở schema b2b),
+    // PostgREST không detect được FK giữa views → fetch riêng + merge client-side.
+    const { data: offers, error } = await supabase
       .from('b2b_demand_offers')
-      .select(`
-        *,
-        partner:b2b_partners!partner_id (
-          id, name, code, tier, phone
-        )
-      `)
+      .select('*')
       .eq('demand_id', demandId)
       .order('created_at', { ascending: false })
 
     if (error) throw error
+    if (!offers || offers.length === 0) return []
 
-    return (data || []).map(offer => ({
+    const partnerIds = Array.from(new Set(offers.map(o => o.partner_id).filter(Boolean)))
+    const partnersMap = new Map<string, any>()
+    if (partnerIds.length > 0) {
+      const { data: partners } = await supabase
+        .from('b2b_partners')
+        .select('id, name, code, tier, phone')
+        .in('id', partnerIds)
+      for (const p of partners || []) partnersMap.set(p.id, p)
+    }
+
+    return offers.map(offer => ({
       ...offer,
-      partner: Array.isArray(offer.partner) ? offer.partner[0] : offer.partner,
+      partner: partnersMap.get(offer.partner_id) || null,
     })) as DemandOffer[]
   },
 
   async acceptOffer(offerId: string, demandId: string): Promise<{ offer: DemandOffer; deal: any }> {
-    // 1. Get the offer
-    const { data: offer, error: offerError } = await supabase
+    // 1. Get the offer — fetch offer + partner riêng (không có FK detectable giữa views)
+    const { data: rawOffer, error: offerError } = await supabase
       .from('b2b_demand_offers')
-      .select(`
-        *,
-        partner:b2b_partners!partner_id (
-          id, name, code, tier, phone
-        )
-      `)
+      .select('*')
       .eq('id', offerId)
       .single()
 
     if (offerError) throw offerError
+
+    let partner = null
+    if (rawOffer?.partner_id) {
+      const { data: partnerRow } = await supabase
+        .from('b2b_partners')
+        .select('id, name, code, tier, phone')
+        .eq('id', rawOffer.partner_id)
+        .maybeSingle()
+      partner = partnerRow
+    }
+    const offer = { ...rawOffer, partner }
 
     // ★ Idempotency check: already accepted?
     if (offer.status === 'accepted') {

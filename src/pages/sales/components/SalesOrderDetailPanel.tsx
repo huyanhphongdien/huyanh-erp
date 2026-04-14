@@ -31,7 +31,6 @@ import ProductionTab from './ProductionTab'
 import ShippingTab from './ShippingTab'
 import FinanceTabV4 from './FinanceTabV4'
 import DocumentChecklistTab from './DocumentChecklistTab'
-import OrderActionButtons from './OrderActionButtons'
 
 // ============================================================================
 // TYPES
@@ -237,12 +236,6 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
               </span>
             )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-              <OrderActionButtons
-                order={order}
-                salesRole={salesRole}
-                onSaved={() => { loadOrder(); onOrderUpdated?.() }}
-                size="small"
-              />
               {isLocked ? (
                 canUnlock && (
                   <Popconfirm

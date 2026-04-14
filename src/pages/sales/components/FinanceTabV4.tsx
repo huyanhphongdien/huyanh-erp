@@ -29,6 +29,7 @@ import { salesOrderService } from '../../../services/sales/salesOrderService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { PAYMENT_TERMS_LABELS, type PaymentTerms } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
+import OrderActionButtons from './OrderActionButtons'
 
 // ============================================================================
 // HELPERS
@@ -237,12 +238,15 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
       )}
 
       {/* Action bar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        {canEdit && (
-          <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
-            Chỉnh sửa
-          </Button>
-        )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+        <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="finance" size="small" />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {canEdit && (
+            <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
+              Chỉnh sửa
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tỷ giá */}

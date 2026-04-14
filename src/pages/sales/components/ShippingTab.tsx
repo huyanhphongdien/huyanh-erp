@@ -30,6 +30,7 @@ import { salesOrderService } from '../../../services/sales/salesOrderService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import { isFieldEditableV4 } from '../../../services/sales/salesPermissionService'
+import OrderActionButtons from './OrderActionButtons'
 
 // ============================================================================
 // HELPERS
@@ -297,12 +298,15 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
   return (
     <div style={{ padding: '8px 0' }}>
       {/* Action bar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        {canEditLogistics && (
-          <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
-            Chỉnh sửa
-          </Button>
-        )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+        <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="shipping" size="small" />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {canEditLogistics && (
+            <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
+              Chỉnh sửa
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Booking & Tàu */}

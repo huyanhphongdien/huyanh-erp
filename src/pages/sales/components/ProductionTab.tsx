@@ -42,6 +42,7 @@ import type { ContainerSummary } from '../../../services/sales/containerService'
 import type { SalesOrder, SalesOrderContainer, ContainerStatus } from '../../../services/sales/salesTypes'
 import { CONTAINER_TYPE_LABELS } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
+import OrderActionButtons from './OrderActionButtons'
 
 // ============================================================================
 // CONSTANTS
@@ -530,6 +531,9 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
 
   return (
     <div style={{ padding: '8px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="production" size="small" />
+      </div>
       {renderProductionProgress()}
       {renderReadyDate()}
       {renderContainers()}

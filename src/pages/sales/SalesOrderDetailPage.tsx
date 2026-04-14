@@ -60,7 +60,6 @@ import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
 import { containerService } from '../../services/sales/containerService'
 import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
-import OrderActionButtons from './components/OrderActionButtons'
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
 import { useAuthStore } from '../../stores/authStore'
@@ -1430,10 +1429,7 @@ function SalesOrderDetailPage() {
             {ORDER_STATUS_LABELS[order.status]}
           </Tag>
         </Space>
-        <Space wrap>
-          <OrderActionButtons order={order} salesRole={salesRole} onSaved={loadOrder} />
-          {renderExtraEditButton()}
-        </Space>
+        <Space wrap>{renderExtraEditButton()}</Space>
       </div>
 
       {/* Info row */}

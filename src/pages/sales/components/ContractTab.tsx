@@ -33,6 +33,7 @@ import {
   type PackingType,
 } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
+import OrderActionButtons from './OrderActionButtons'
 
 type EditItem = {
   id?: string
@@ -539,14 +540,17 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   return (
     <div style={{ padding: '8px 0' }}>
       {/* Action bar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        {canEdit ? (
-          <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
-            Chỉnh sửa
-          </Button>
-        ) : isLocked ? (
-          <Tag icon={<LockOutlined />} color="default">Đã khóa</Tag>
-        ) : null}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+        <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="contract" size="small" />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {canEdit ? (
+            <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
+              Chỉnh sửa
+            </Button>
+          ) : isLocked ? (
+            <Tag icon={<LockOutlined />} color="default">Đã khóa</Tag>
+          ) : null}
+        </div>
       </div>
 
       {/* Section: Hợp đồng */}

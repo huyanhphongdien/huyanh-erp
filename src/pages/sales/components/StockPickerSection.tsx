@@ -260,37 +260,41 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
         </Space>
       }
     >
-      {/* Summary */}
+      {/* Summary — hiển thị tấn cho dễ đọc */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
           <Statistic
             title="Cần"
-            value={targetKg}
-            suffix="kg"
+            value={targetKg / 1000}
+            precision={3}
+            suffix="tấn"
             valueStyle={{ fontSize: 16, color: '#1677ff' }}
           />
         </Col>
         <Col xs={12} sm={6}>
           <Statistic
             title="Đã cấp"
-            value={existingTotal}
-            suffix="kg"
+            value={existingTotal / 1000}
+            precision={3}
+            suffix="tấn"
             valueStyle={{ fontSize: 16, color: '#52c41a' }}
           />
         </Col>
         <Col xs={12} sm={6}>
           <Statistic
             title="Đang chọn"
-            value={selectedTotal}
-            suffix="kg"
+            value={selectedTotal / 1000}
+            precision={3}
+            suffix="tấn"
             valueStyle={{ fontSize: 16, color: '#fa8c16' }}
           />
         </Col>
         <Col xs={12} sm={6}>
           <Statistic
             title={isSufficient ? 'Đủ ✓' : 'Còn thiếu'}
-            value={remaining}
-            suffix="kg"
+            value={remaining / 1000}
+            precision={3}
+            suffix="tấn"
             valueStyle={{
               fontSize: 16,
               color: isSufficient ? '#52c41a' : '#cf1322',

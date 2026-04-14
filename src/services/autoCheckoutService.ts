@@ -40,6 +40,13 @@ function timeToMinutes(timeStr: string): number {
   return h * 60 + (m || 0)
 }
 
+/** Cộng/trừ ngày theo pure string — không phụ thuộc TZ runtime */
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d + days))
+  return date.toISOString().split('T')[0]
+}
+
 /** Tạo Date object cho shift_end theo timezone VN */
 function getShiftEndVN(date: string, endTime: string, crossesMidnight: boolean): Date {
   // Tạo date ở timezone VN
@@ -49,13 +56,7 @@ function getShiftEndVN(date: string, endTime: string, crossesMidnight: boolean):
   const endM = endMin % 60
 
   // Tạo timestamp string VN: "2026-03-10T06:00:00+07:00"
-  let endDate = date
-  if (crossesMidnight) {
-    // end_time thuộc ngày hôm sau
-    const d = new Date(date + 'T00:00:00+07:00')
-    d.setDate(d.getDate() + 1)
-    endDate = d.toISOString().split('T')[0]
-  }
+  const endDate = crossesMidnight ? addDaysToDateStr(date, 1) : date
 
   const vnTimeStr = `${endDate}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:00+07:00`
   return new Date(vnTimeStr)
@@ -103,8 +104,9 @@ export const autoCheckoutService = {
    */
   async tryCloseForEmployee(employeeId: string): Promise<boolean> {
     const now = getNowVN()
-    const today = now.toISOString().split('T')[0]
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // ★ V6.2: dùng múi giờ VN, không phụ thuộc TZ runtime
+    const today = now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
+    const yesterday = addDaysToDateStr(today, -1)
 
     // Tìm record đang mở
     const { data, error } = await supabase
@@ -150,9 +152,7 @@ export const autoCheckoutService = {
     } else {
       // Fallback: 17:00 VN cùng ngày (ca thường) hoặc 06:00 ngày sau (ca đêm)
       if (rec.shift?.crosses_midnight) {
-        const d = new Date(rec.date + 'T00:00:00+07:00')
-        d.setDate(d.getDate() + 1)
-        shiftEndDt = new Date(d.toISOString().split('T')[0] + 'T06:00:00+07:00')
+        shiftEndDt = new Date(addDaysToDateStr(rec.date, 1) + 'T06:00:00+07:00')
       } else {
         shiftEndDt = new Date(rec.date + 'T17:00:00+07:00')
       }

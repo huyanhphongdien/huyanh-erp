@@ -501,10 +501,9 @@ export const attendanceEditService = {
         checkInISO = `${date}T${startTime}:00+07:00`
 
         if (shiftData.crosses_midnight && endTime < startTime) {
-          // End time on next day
-          const nextDay = new Date(date + 'T00:00:00+07:00')
-          nextDay.setDate(nextDay.getDate() + 1)
-          const nextDateStr = nextDay.toISOString().split('T')[0]
+          // End time on next day — pure string math, TZ-safe
+          const [y, m, d] = date.split('-').map(Number)
+          const nextDateStr = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().split('T')[0]
           checkOutISO = `${nextDateStr}T${endTime}:00+07:00`
         } else {
           checkOutISO = `${date}T${endTime}:00+07:00`

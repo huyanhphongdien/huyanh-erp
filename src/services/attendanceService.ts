@@ -165,17 +165,22 @@ function validateGPS(lat: number, lng: number, config: GPSConfig): {
 }
 
 // ============================================================================
-// DATE HELPERS — ★ V6: Tất cả dùng +07:00 explicit
+// DATE HELPERS — ★ V6.2: Tất cả dùng múi giờ VN (Asia/Ho_Chi_Minh)
 // ============================================================================
 
 function getToday(): string {
-  return new Date().toISOString().split('T')[0]
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
 }
 
 function getYesterday(): string {
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().split('T')[0]
+  return addDaysToDateStr(getToday(), -1)
+}
+
+/** Cộng/trừ ngày theo pure string — không phụ thuộc timezone runtime */
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d + days))
+  return date.toISOString().split('T')[0]
 }
 
 /** Chuyển time string "HH:MM:SS" → phút trong ngày */
@@ -215,9 +220,7 @@ function isInShiftWindow(
 
   let endDate = assignmentDate
   if (shift.crosses_midnight) {
-    const d = new Date(assignmentDate + 'T00:00:00+07:00')
-    d.setDate(d.getDate() + 1)
-    endDate = d.toISOString().split('T')[0]
+    endDate = addDaysToDateStr(assignmentDate, 1)
   }
   const shiftEndDT = createVNDate(endDate, shift.end_time)
 
@@ -285,10 +288,9 @@ async function getRelevantAssignments(
   employeeId: string,
   now: Date
 ): Promise<RelevantAssignment[]> {
-  const today = now.toISOString().split('T')[0]
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = yesterday.toISOString().split('T')[0]
+  // ★ V6.2: dùng múi giờ VN, không phụ thuộc TZ runtime
+  const today = now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
+  const yesterdayStr = addDaysToDateStr(today, -1)
 
   const { data, error } = await supabase
     .from('shift_assignments')

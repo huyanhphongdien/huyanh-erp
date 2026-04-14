@@ -8,7 +8,7 @@
 
 export type CustomerStatus = 'active' | 'inactive' | 'blacklisted'
 export type CustomerTier = 'standard' | 'premium' | 'strategic'
-export type PaymentTerms = 'LC_30' | 'LC_60' | 'LC_90' | 'TT_30' | 'TT_60' | 'TT_100' | 'CAD' | 'DP'
+export type PaymentTerms = 'LC_30' | 'LC_60' | 'LC_90' | 'TT_10' | 'TT_30' | 'TT_60' | 'TT_100' | 'CAD' | 'DP'
 export type Incoterm = 'FOB' | 'CIF' | 'CNF' | 'DDP' | 'EXW'
 export type QualityStandard = 'TCVN_3769' | 'ISO_2000' | 'CUSTOM'
 export type PackingType = 'loose_bale' | 'sw_pallet' | 'wooden_pallet' | 'metal_box'
@@ -407,6 +407,7 @@ export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
   LC_30: 'L/C 30 ngày',
   LC_60: 'L/C 60 ngày',
   LC_90: 'L/C 90 ngày',
+  TT_10: 'T/T 10%',
   TT_30: 'T/T 30%',
   TT_60: 'T/T 60%',
   TT_100: 'T/T 100%',

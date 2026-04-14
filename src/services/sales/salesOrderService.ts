@@ -615,6 +615,18 @@ export const salesOrderService = {
     if (error) {
       throw new Error(`Không thể chuyển trạng thái đơn hàng: ${error.message}`)
     }
+
+    // Khi đơn xuất hàng → chốt tất cả MTS allocations sang status='shipped'
+    // để kho biết hàng đã ra khỏi và ngăn release ngược.
+    if (newStatus === 'shipped') {
+      try {
+        const { stockAllocationService } = await import('./stockAllocationService')
+        await stockAllocationService.markAllShippedForOrder(id)
+      } catch (e) {
+        console.error('[updateStatus] Failed to mark allocations shipped:', e)
+        // Non-blocking: sales status đã update rồi, chỉ log
+      }
+    }
   },
 
   // ==========================================================================

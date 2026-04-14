@@ -41,6 +41,11 @@ export const wmsReportService = {
     if (error) throw error
 
     // Group by date
+    // Transaction types:
+    //   in / production_in / sales_release → nhập
+    //   out / production_out / sales_allocation → xuất
+    //   blend_in / blend_out → phối trộn
+    //   adjust → kiểm kê
     const dayMap: Record<string, StockMovementReport> = {}
     for (const row of data || []) {
       const date = (row as any).created_at?.substring(0, 10) || ''
@@ -49,11 +54,17 @@ export const wmsReportService = {
       }
       const qty = Number((row as any).quantity) || 0
       const type = (row as any).type as string
-      if (type === 'in') dayMap[date].in_quantity += qty
-      else if (type === 'out') dayMap[date].out_quantity += qty
-      else if (type === 'adjust') dayMap[date].adjust_quantity += qty
-      else if (type === 'blend_in') dayMap[date].blend_in_quantity += qty
-      else if (type === 'blend_out') dayMap[date].blend_out_quantity += qty
+      if (type === 'in' || type === 'production_in' || type === 'sales_release') {
+        dayMap[date].in_quantity += qty
+      } else if (type === 'out' || type === 'production_out' || type === 'sales_allocation') {
+        dayMap[date].out_quantity += qty
+      } else if (type === 'adjust') {
+        dayMap[date].adjust_quantity += qty
+      } else if (type === 'blend_in') {
+        dayMap[date].blend_in_quantity += qty
+      } else if (type === 'blend_out') {
+        dayMap[date].blend_out_quantity += qty
+      }
     }
 
     // Calculate running balance
@@ -344,13 +355,17 @@ export const wmsReportService = {
         .gt('quantity_remaining', 0),
     ])
 
-    // Stock in/out totals
+    // Stock in/out totals — bao gồm luồng production + sales allocation
     let total_stock_in_kg = 0
     let total_stock_out_kg = 0
     for (const row of txRes.data || []) {
       const qty = Number((row as any).quantity) || 0
-      if ((row as any).type === 'in' || (row as any).type === 'blend_in') total_stock_in_kg += qty
-      else if ((row as any).type === 'out' || (row as any).type === 'blend_out') total_stock_out_kg += qty
+      const type = (row as any).type as string
+      if (type === 'in' || type === 'blend_in' || type === 'production_in' || type === 'sales_release') {
+        total_stock_in_kg += qty
+      } else if (type === 'out' || type === 'blend_out' || type === 'production_out' || type === 'sales_allocation') {
+        total_stock_out_kg += qty
+      }
     }
 
     // Production totals

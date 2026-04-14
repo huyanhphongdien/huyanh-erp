@@ -78,6 +78,31 @@ const STOCK_OUT_LIST_SELECT = `
  * Tự sinh mã phiếu xuất: XK-TP-YYYYMMDD-XXX
  * VD: XK-TP-20260211-001
  */
+/**
+ * Validate: kho phải đúng loại (raw ↔ raw, finished ↔ finished, mixed ↔ cả 2)
+ * Ngăn user xuất NVL khỏi kho thành phẩm hoặc ngược lại
+ */
+async function _assertWarehouseTypeMatches(
+  warehouseId: string,
+  orderType: 'raw' | 'finished',
+): Promise<void> {
+  const { data: wh, error } = await supabase
+    .from('warehouses')
+    .select('id, name, type')
+    .eq('id', warehouseId)
+    .single()
+  if (error || !wh) throw new Error('Không tìm thấy kho')
+  const whType = (wh as any).type as 'raw' | 'finished' | 'mixed' | null
+  if (!whType || whType === 'mixed') return
+  if (whType !== orderType) {
+    const orderLabel = orderType === 'raw' ? 'Nguyên liệu' : 'Thành phẩm'
+    const whLabel = whType === 'raw' ? 'Nguyên liệu' : 'Thành phẩm'
+    throw new Error(
+      `Kho "${(wh as any).name}" là kho ${whLabel}, không thể xuất hàng ${orderLabel}. Chọn kho khác hoặc dùng kho hỗn hợp (mixed).`,
+    )
+  }
+}
+
 async function generateCode(): Promise<string> {
   const now = new Date()
   const yyyy = String(now.getFullYear())
@@ -120,11 +145,14 @@ export const stockOutService = {
   // CREATE — Tạo header phiếu xuất (status = draft)
   // --------------------------------------------------------------------------
   async create(data: StockOutFormData, createdBy?: string): Promise<StockOutOrder> {
+    const orderType: 'raw' | 'finished' = (data.type || 'finished') as 'raw' | 'finished'
+    await _assertWarehouseTypeMatches(data.warehouse_id, orderType)
+
     const code = await generateCode()
 
     const insertData = {
       code,
-      type: data.type || 'finished',
+      type: orderType,
       warehouse_id: data.warehouse_id,
       reason: data.reason || 'sale',
       customer_name: data.customer_name || null,

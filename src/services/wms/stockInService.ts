@@ -59,6 +59,31 @@ const STOCK_IN_LIST_SELECT = `
  * Tự sinh mã phiếu nhập: NK-TP-YYYYMMDD-XXX
  * VD: NK-TP-20260210-001
  */
+/**
+ * Validate: kho phải đúng loại (raw ↔ raw, finished ↔ finished, mixed ↔ cả 2)
+ * Ngăn user nhập NVL vào kho thành phẩm hoặc ngược lại
+ */
+async function _assertWarehouseTypeMatches(
+  warehouseId: string,
+  orderType: 'raw' | 'finished',
+): Promise<void> {
+  const { data: wh, error } = await supabase
+    .from('warehouses')
+    .select('id, code, name, type')
+    .eq('id', warehouseId)
+    .single()
+  if (error || !wh) throw new Error('Không tìm thấy kho')
+  const whType = (wh as any).type as 'raw' | 'finished' | 'mixed' | null
+  if (!whType || whType === 'mixed') return
+  if (whType !== orderType) {
+    const orderLabel = orderType === 'raw' ? 'Nguyên liệu' : 'Thành phẩm'
+    const whLabel = whType === 'raw' ? 'Nguyên liệu' : 'Thành phẩm'
+    throw new Error(
+      `Kho "${(wh as any).name}" là kho ${whLabel}, không thể nhập/xuất hàng ${orderLabel}. Chọn kho khác hoặc dùng kho hỗn hợp (mixed).`,
+    )
+  }
+}
+
 async function generateCode(): Promise<string> {
   const now = new Date()
   const yyyy = String(now.getFullYear())
@@ -104,11 +129,14 @@ export const stockInService = {
   // CREATE - Tạo header phiếu nhập (status = draft)
   // --------------------------------------------------------------------------
   async create(data: StockInFormData, createdBy?: string): Promise<StockInOrder> {
+    const orderType: 'raw' | 'finished' = (data.type || 'finished') as 'raw' | 'finished'
+    await _assertWarehouseTypeMatches(data.warehouse_id, orderType)
+
     const code = await generateCode()
 
     const insertData = {
       code,
-      type: data.type || 'finished',
+      type: orderType,
       warehouse_id: data.warehouse_id,
       source_type: data.source_type || 'production',
       production_order_id: data.production_order_id || null,
@@ -600,6 +628,9 @@ export const stockInService = {
     if (ticketErr) throw ticketErr
     if (!ticket) throw new Error('Không tìm thấy phiếu cân')
     if (ticket.status !== 'completed') throw new Error('Phiếu cân chưa hoàn tất')
+
+    // Phiếu cân luôn là NVL → kho phải là raw hoặc mixed
+    await _assertWarehouseTypeMatches(warehouseId, 'raw')
 
     // 2. Auto generate stock-in code
     const code = await generateCode()

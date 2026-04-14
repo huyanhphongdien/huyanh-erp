@@ -83,6 +83,37 @@ function throwIfError<T>(result: { data: T | null; error: any }, defaultMsg: str
   return result.data
 }
 
+/**
+ * Adjust stock_levels.quantity cho material + warehouse (+ delta tăng, - delta giảm).
+ * Dùng khi MTS allocate (delta âm) hoặc release (delta dương) để giữ bảng
+ * tồn kho tổng hợp không lệch với stock_batches.
+ */
+async function _adjustStockLevel(
+  materialId: string,
+  warehouseId: string,
+  delta: number,
+): Promise<void> {
+  if (!materialId || !warehouseId || delta === 0) return
+  const { data: existing } = await supabase
+    .from('stock_levels')
+    .select('id, quantity')
+    .eq('material_id', materialId)
+    .eq('warehouse_id', warehouseId)
+    .maybeSingle()
+
+  if (existing) {
+    const newQty = Math.max(0, Number(existing.quantity || 0) + delta)
+    await supabase
+      .from('stock_levels')
+      .update({ quantity: newQty, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+  } else if (delta > 0) {
+    await supabase
+      .from('stock_levels')
+      .insert({ material_id: materialId, warehouse_id: warehouseId, quantity: delta })
+  }
+}
+
 // ============================================================================
 // SERVICE
 // ============================================================================
@@ -290,6 +321,9 @@ export const stockAllocationService = {
         notes: `Cấp phát cho đơn ${order.code}`,
         created_at: now,
       })
+
+      // Sync stock_levels để báo cáo tồn tổng hợp không lệch
+      await _adjustStockLevel(batch.material_id, batch.warehouse_id, -Number(req.quantity_kg))
     }
 
     // 5. Auto-bump sales_orders.status: confirmed → ready (skip producing)
@@ -356,6 +390,9 @@ export const stockAllocationService = {
         notes: `Release allocation: ${reason || 'Không rõ lý do'}`,
         created_at: now,
       })
+
+      // Sync stock_levels: hoàn lại tồn tổng hợp
+      await _adjustStockLevel(batch.material_id, batch.warehouse_id, Number(alloc.quantity_kg))
     }
 
     // Mark allocation released

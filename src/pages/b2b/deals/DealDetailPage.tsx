@@ -288,7 +288,8 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
 // ============================================
 
 const DealDetailPage = () => {
-  const { dealId } = useParams<{ dealId: string }>()
+  // Route declared as 'deals/:id' in App.tsx → param key is 'id', not 'dealId'
+  const { id: dealId } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
   // State

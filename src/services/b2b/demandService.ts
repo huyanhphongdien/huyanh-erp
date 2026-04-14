@@ -476,53 +476,46 @@ export const demandService = {
   // ============================================
 
   async getOffers(demandId: string): Promise<DemandOffer[]> {
-    // b2b_demand_offers và b2b_partners là views (tables gốc ở schema b2b),
-    // PostgREST không detect được FK giữa views → fetch riêng + merge client-side.
-    const { data: offers, error } = await supabase
+    // FK b2b_demand_offers.partner_id → b2b.partners đã được tạo trong migration
+    // phase 1.3 → PostgREST giờ detect được embedded resource.
+    const { data, error } = await supabase
       .from('b2b_demand_offers')
-      .select('*')
+      .select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id, name, code, tier, phone
+        )
+      `)
       .eq('demand_id', demandId)
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    if (!offers || offers.length === 0) return []
 
-    const partnerIds = Array.from(new Set(offers.map(o => o.partner_id).filter(Boolean)))
-    const partnersMap = new Map<string, any>()
-    if (partnerIds.length > 0) {
-      const { data: partners } = await supabase
-        .from('b2b_partners')
-        .select('id, name, code, tier, phone')
-        .in('id', partnerIds)
-      for (const p of partners || []) partnersMap.set(p.id, p)
-    }
-
-    return offers.map(offer => ({
+    return (data || []).map(offer => ({
       ...offer,
-      partner: partnersMap.get(offer.partner_id) || null,
+      partner: Array.isArray(offer.partner) ? offer.partner[0] : offer.partner,
     })) as DemandOffer[]
   },
 
   async acceptOffer(offerId: string, demandId: string): Promise<{ offer: DemandOffer; deal: any }> {
-    // 1. Get the offer — fetch offer + partner riêng (không có FK detectable giữa views)
+    // 1. Get the offer + partner via PostgREST embedded resource
+    // (FK đã tạo trong migration phase 1.3 — PostgREST detect được)
     const { data: rawOffer, error: offerError } = await supabase
       .from('b2b_demand_offers')
-      .select('*')
+      .select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id, name, code, tier, phone
+        )
+      `)
       .eq('id', offerId)
       .single()
 
     if (offerError) throw offerError
-
-    let partner = null
-    if (rawOffer?.partner_id) {
-      const { data: partnerRow } = await supabase
-        .from('b2b_partners')
-        .select('id, name, code, tier, phone')
-        .eq('id', rawOffer.partner_id)
-        .maybeSingle()
-      partner = partnerRow
+    const offer = {
+      ...rawOffer,
+      partner: Array.isArray(rawOffer.partner) ? rawOffer.partner[0] : rawOffer.partner,
     }
-    const offer = { ...rawOffer, partner }
 
     // ★ Idempotency check: already accepted?
     if (offer.status === 'accepted') {
@@ -568,13 +561,11 @@ export const demandService = {
         quantity_kg: offer.offered_quantity_kg,
         unit_price: offer.offered_price,
         total_value_vnd: totalValueVnd,
-        // ★ V2: 'processing' (DB CHECK constraint không cho 'pending').
-        status: 'processing',
+        // ★ V3: 'pending' OK sau migration 14/04 (DB CHECK đã sync với code TS).
+        status: 'pending',
         demand_id: demandId,
-        // ★ V2: KHÔNG set offer_id — FK của deals.offer_id trỏ tới b2b.supplier_offers
-        // (bảng khác trong schema b2b, đang rỗng) chứ không phải public.b2b_demand_offers
-        // nơi thực sự lưu offers. Insert sẽ fail FK constraint.
-        // Liên kết 1 chiều qua offer.deal_id sau khi tạo deal (đủ để truy ngược).
+        // ★ V3: offer_id OK sau migration 14/04 — FK đã trỏ về public.b2b_demand_offers
+        offer_id: offerId,
         processing_fee_per_ton: demand.processing_fee_per_ton || null,
         expected_output_rate: demand.expected_output_rate || null,
         notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,

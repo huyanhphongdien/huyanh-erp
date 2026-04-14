@@ -63,17 +63,17 @@ export default function ARAgingReportPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      // Get all invoiced/shipped/delivered orders that are NOT fully paid
+      // V2: Lấy đơn từ confirmed trở đi (kể cả chưa shipped — kế toán cần thấy
+      // đơn nào còn nợ ngay từ lúc xác nhận). Loại draft/cancelled/paid.
       const { data: orders, error } = await supabase
         .from('sales_orders')
         .select(`
           id, code, customer_id, quantity_tons, unit_price, total_value_usd, currency,
-          payment_status, payment_date, actual_payment_amount, deposit_amount, delivery_date, etd, confirmed_at,
-          status, created_at,
-          customer:sales_customers!customer_id(id, code, name, short_name, country)
+          payment_status, delivery_date, etd, confirmed_at, status, created_at,
+          customer:sales_customers!customer_id(id, code, name, short_name, country),
+          payments:sales_order_payments!sales_order_id(amount, payment_type, payment_date)
         `)
-        .in('status', ['shipped', 'delivered', 'invoiced'])
-        .in('payment_status', ['unpaid', 'partial'])
+        .in('status', ['confirmed','producing','ready','packing','shipped','delivered','invoiced'])
 
       if (error) throw error
 
@@ -87,7 +87,11 @@ export default function ARAgingReportPage() {
 
         const custId = customer.id
         const totalValue = o.total_value_usd || (o.quantity_tons * o.unit_price) || 0
-        const paidAmount = (o.actual_payment_amount || 0) + (o.deposit_amount || 0)
+        // V2: tính paid từ bảng sales_order_payments (loại fee_offset)
+        const paymentList = Array.isArray(o.payments) ? o.payments : []
+        const paidAmount = paymentList
+          .filter((p: any) => p.payment_type !== 'fee_offset')
+          .reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
         const outstanding = Math.max(0, totalValue - paidAmount)
         if (outstanding <= 0) continue
 

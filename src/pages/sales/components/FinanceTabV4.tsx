@@ -30,6 +30,7 @@ import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { PAYMENT_TERMS_LABELS, type PaymentTerms } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
+import PaymentHistorySection from './PaymentHistorySection'
 
 // ============================================================================
 // HELPERS
@@ -282,6 +283,16 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         <Descriptions.Item label="Phí NH">{fmtUSD(order.bank_charges)}</Descriptions.Item>
         <Descriptions.Item label="NH nhận">{order.bank_name || '—'}</Descriptions.Item>
       </Descriptions>
+
+      <Divider style={{ margin: '12px 0' }} />
+
+      {/* Lịch sử thanh toán (mới) */}
+      <PaymentHistorySection
+        orderId={order.id}
+        totalValueUsd={totalUSD}
+        canEdit={!!editable && (salesRole === 'accounting' || salesRole === 'admin')}
+        onSaved={onSaved}
+      />
 
       <Divider style={{ margin: '12px 0' }} />
 

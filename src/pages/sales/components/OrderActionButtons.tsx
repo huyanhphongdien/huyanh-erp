@@ -102,12 +102,10 @@ const ACTIONS: ActionDef[] = [
     label: 'Lập hóa đơn', icon: <DollarOutlined />,
     variant: { bgColor: '#faad14' },
   },
-  {
-    from: 'invoiced', to: 'paid', tab: 'finance', permission: 'canEditFinance',
-    label: 'Đã thanh toán', icon: <DollarOutlined />,
-    variant: { bgColor: '#52c41a' },
-    confirm: { title: 'Đã nhận đủ tiền?', description: "Đơn hàng sẽ chuyển sang 'Đã thanh toán'" },
-  },
+  // NOTE: button 'Đã thanh toán' (invoiced → paid) đã bỏ. Sau migration payment
+  // history, status được auto-bump bởi salesOrderPaymentService khi tổng
+  // payments đủ — kế toán chỉ cần thêm khoản thu trong section "Lịch sử
+  // thanh toán" của tab Tài chính.
 ]
 
 interface Props {

@@ -47,6 +47,7 @@ import type { SalesOrder, SalesOrderContainer, ContainerStatus } from '../../../
 import { CONTAINER_TYPE_LABELS } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
+import StockPickerSection from './StockPickerSection'
 
 // ============================================================================
 // CONSTANTS
@@ -558,11 +559,28 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
   // RENDER
   // ══════════════════════════════════════════════════════════════
 
+  // Hiển thị StockPickerSection (MTS flow) khi:
+  //  - Đơn ở status confirmed/producing/ready
+  //  - Đơn KHÔNG có production_order_id (nếu đã có Lệnh SX → đi flow MTO)
+  //  - Role production hoặc admin
+  const showStockPicker =
+    order.status &&
+    ['confirmed', 'producing', 'ready'].includes(order.status) &&
+    !order.production_order_id &&
+    (salesRole === 'production' || salesRole === 'admin')
+
   return (
     <div style={{ padding: '8px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="production" size="small" />
       </div>
+      {showStockPicker && (
+        <StockPickerSection
+          order={order}
+          canEdit={editable && (salesRole === 'production' || salesRole === 'admin')}
+          onSaved={onSaved}
+        />
+      )}
       {renderProductionProgress()}
       {renderReadyDate()}
       {renderContainers()}

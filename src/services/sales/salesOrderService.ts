@@ -659,6 +659,18 @@ export const salesOrderService = {
     if (error) {
       throw new Error(`Không thể hủy đơn hàng: ${error.message}`)
     }
+
+    // ★ Release tất cả stock allocations về kho (MTS flow)
+    try {
+      const { stockAllocationService } = await import('./stockAllocationService')
+      const releasedCount = await stockAllocationService.releaseAllByOrder(id, `Hủy đơn: ${reason}`)
+      if (releasedCount > 0) {
+        console.log(`[cancelOrder] Released ${releasedCount} stock allocations for cancelled order ${existing.code}`)
+      }
+    } catch (e) {
+      console.error('[cancelOrder] Failed to release allocations:', e)
+      // Không throw — đơn đã cancelled, allocations không release được cần xử lý riêng
+    }
   },
 
   // ==========================================================================

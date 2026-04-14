@@ -12,7 +12,6 @@ import { Button, Popconfirm, Space, message } from 'antd'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ToolOutlined,
   ContainerOutlined,
   TruckOutlined,
   DollarOutlined,
@@ -69,11 +68,11 @@ const ACTIONS: ActionDef[] = [
     confirm: { title: 'Hủy đơn hàng?' },
   },
   // ── Tab Sản xuất ──
-  {
-    from: 'confirmed', to: 'producing', tab: 'production', permission: 'canEditProduction',
-    label: 'Tạo lệnh SX', icon: <ToolOutlined />,
-    variant: { bgColor: '#fa8c16' },
-  },
+  // NOTE: `confirmed → producing` KHÔNG được flip qua button này.
+  // Phải gọi salesProductionService.createProductionFromSalesOrder() để
+  // tạo production_orders row + gán NVL (có UI NVL flow ở trang detail
+  // đầy đủ). ProductionTab khi status='confirmed' sẽ hiện link dẫn qua
+  // trang đó thay vì button flip status.
   {
     from: 'producing', to: 'ready', tab: 'production', permission: 'canEditProduction',
     label: 'Sẵn sàng', icon: <CheckCircleOutlined />,

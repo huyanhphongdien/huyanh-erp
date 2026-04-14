@@ -23,8 +23,10 @@ import {
   Descriptions,
   Spin,
   Empty,
+  Alert,
   message,
 } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
 import {
   PlusOutlined,
@@ -33,6 +35,8 @@ import {
   LinkOutlined,
   DeleteOutlined,
   EditOutlined,
+  ThunderboltOutlined,
+  ArrowRightOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
@@ -78,6 +82,7 @@ interface Props {
 // ============================================================================
 
 export default function ProductionTab({ order, salesRole, editable, onSaved }: Props) {
+  const navigate = useNavigate()
   const [productionProgress, setProductionProgress] = useState<ProductionProgress | null>(null)
   const [progressLoading, setProgressLoading] = useState(false)
   const [containers, setContainers] = useState<SalesOrderContainer[]>([])
@@ -204,12 +209,36 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
 
   const renderProductionProgress = () => {
     if (!order.production_order_id) {
+      // Khi đơn ở confirmed, hiện link dẫn tới trang detail đầy đủ
+      // để chọn NVL và tạo Lệnh SX thực sự.
+      const canCreate = order.status === 'confirmed' &&
+        (salesRole === 'production' || salesRole === 'admin')
       return (
         <Card size="small" style={{ marginBottom: 16 }}>
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description="Chưa có lệnh sản xuất"
           />
+          {canCreate && (
+            <Alert
+              type="info"
+              showIcon
+              icon={<ThunderboltOutlined />}
+              style={{ marginTop: 12 }}
+              message="Tạo lệnh sản xuất cho đơn này"
+              description="Tạo lệnh SX cần chọn các lô NVL (batch) trong kho. Mở trang chi tiết đầy đủ để check NVL và tạo lệnh."
+              action={
+                <Button
+                  type="primary"
+                  icon={<ArrowRightOutlined />}
+                  onClick={() => navigate(`/sales/orders/${order.id}`)}
+                  style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+                >
+                  Mở trang chi tiết
+                </Button>
+              }
+            />
+          )}
         </Card>
       )
     }

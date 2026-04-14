@@ -631,6 +631,24 @@ export const productionService = {
       }
     }
 
+    // ★ Sprint 3: Auto-sync Sales order status khi PO hoàn tất
+    //    Nếu PO này link với sales_order, bump sales.status: producing → ready
+    const { data: linkedSalesOrder } = await supabase
+      .from('sales_orders')
+      .select('id, code, status')
+      .eq('production_order_id', poId)
+      .maybeSingle()
+
+    if (linkedSalesOrder && linkedSalesOrder.status === 'producing') {
+      try {
+        const { salesOrderService } = await import('../sales/salesOrderService')
+        await salesOrderService.updateStatus(linkedSalesOrder.id, 'ready')
+        console.log(`[completeProduction] Auto-bumped sales order ${linkedSalesOrder.code} → ready`)
+      } catch (e) {
+        console.error('[completeProduction] Failed to bump sales order status:', e)
+      }
+    }
+
     return updated as unknown as ProductionOrder
   },
 
@@ -710,6 +728,31 @@ export const productionService = {
       .single()
 
     if (error) throw error
+
+    // ★ Sprint 3: Nếu PO link với sales_order, unlink + revert sales status
+    //    Sale team cần re-try tạo lệnh SX mới. Dùng direct update vì
+    //    updateStatus() không cho backward transition.
+    const { data: linkedSalesOrder } = await supabase
+      .from('sales_orders')
+      .select('id, code, status')
+      .eq('production_order_id', poId)
+      .maybeSingle()
+
+    if (linkedSalesOrder) {
+      // Revert về confirmed để có thể tạo lệnh SX mới
+      const revertStatus = linkedSalesOrder.status === 'producing' ? 'confirmed' : linkedSalesOrder.status
+      await supabase
+        .from('sales_orders')
+        .update({
+          production_order_id: null,
+          status: revertStatus,
+          updated_at: now,
+          internal_notes: `Lệnh SX ${current.code} bị hủy (${reason || 'không rõ lý do'}). Cần tạo lệnh mới.`,
+        })
+        .eq('id', linkedSalesOrder.id)
+      console.log(`[cancelProduction] Reverted sales order ${linkedSalesOrder.code} → ${revertStatus}`)
+    }
+
     return updated as unknown as ProductionOrder
   },
 

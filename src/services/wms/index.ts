@@ -7,9 +7,7 @@
 export * from './wms.types'
 
 // ===== PHASE 2: Danh mục cơ bản =====
-export { default as wmsMaterialCategoryService } from './materialCategoryService'
 export { default as wmsWarehouseService } from './warehouseService'
-export { default as wmsWarehouseLocationService } from './warehouseLocationService'
 export { default as wmsMaterialService } from './wmsMaterialService'
 
 // ===== PHASE 3: Nhập kho (sẽ thêm sau) =====

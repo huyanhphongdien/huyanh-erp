@@ -141,7 +141,6 @@ const QCStandardsConfigPage = lazy(() => import('./pages/wms/qc/QCStandardsConfi
 const BatchQCHistoryPage = lazy(() => import('./pages/wms/qc/BatchQCHistoryPage'));
 const QCQuickScanPage = lazy(() => import('./pages/wms/qc/QCQuickScanPage'));
 const BatchLabelPage = lazy(() => import('./pages/wms/BatchLabelPage'));
-const WeighbridgePage = lazy(() => import('./pages/wms/weighbridge/WeighbridgePage'));
 const WeighbridgeListPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeListPage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
 

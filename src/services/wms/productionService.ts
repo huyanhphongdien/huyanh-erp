@@ -107,6 +107,28 @@ export const productionService = {
   // --------------------------------------------------------------------------
 
   async create(data: ProductionOrderFormData, createdBy?: string): Promise<ProductionOrder> {
+    // ★ Sprint 4: Facility capacity check
+    //    Nếu chọn facility, check target_quantity không vượt max_batch_size_kg
+    if (data.facility_id) {
+      const { data: facility } = await supabase
+        .from('production_facilities')
+        .select('id, code, name, max_batch_size_kg, is_active')
+        .eq('id', data.facility_id)
+        .single()
+
+      if (!facility) {
+        throw new Error('Không tìm thấy cơ sở sản xuất')
+      }
+      if (!facility.is_active) {
+        throw new Error(`Cơ sở "${facility.name}" đang không hoạt động`)
+      }
+      if (facility.max_batch_size_kg && Number(data.target_quantity) > Number(facility.max_batch_size_kg)) {
+        throw new Error(
+          `Số lượng yêu cầu (${data.target_quantity} kg) vượt quá công suất tối đa của "${facility.name}" (${facility.max_batch_size_kg} kg). Chia nhỏ lệnh SX hoặc chọn cơ sở khác.`,
+        )
+      }
+    }
+
     const code = await generateCode(data.target_grade || data.product_type)
 
     const insertData = {
@@ -157,6 +179,8 @@ export const productionService = {
       status,
       from_date,
       to_date,
+      facility_id,
+      target_grade,
     } = params || { page: 1, pageSize: 20 }
 
     const from = (page - 1) * pageSize
@@ -167,6 +191,8 @@ export const productionService = {
       .select(PRODUCTION_ORDER_LIST_SELECT, { count: 'exact' })
 
     if (status) query = query.eq('status', status)
+    if (facility_id) query = query.eq('facility_id', facility_id)
+    if (target_grade) query = query.eq('target_grade', target_grade)
     if (from_date) query = query.gte('created_at', `${from_date}T00:00:00`)
     if (to_date) query = query.lte('created_at', `${to_date}T23:59:59`)
 
@@ -812,6 +838,8 @@ export const productionService = {
     // Determine grade from DRC
     let grade_determined: string | null = null
     let grade_meets_target: boolean | null = null
+    let drc_out_of_tolerance = false
+    let toleranceNote: string | null = null
 
     if (data.drc_value != null) {
       grade_determined = rubberGradeService.classifyByDRC(data.drc_value)
@@ -826,19 +854,30 @@ export const productionService = {
       if (outputBatch) {
         const { data: po } = await supabase
           .from('production_orders')
-          .select('target_grade')
+          .select('target_grade, target_drc_min, target_drc_max')
           .eq('id', outputBatch.production_order_id)
           .single()
 
         if (po?.target_grade) {
           grade_meets_target = grade_determined === po.target_grade
         }
+
+        // ★ Sprint 4: DRC tolerance check vs target_drc_min/max
+        if (po?.target_drc_min != null && data.drc_value < Number(po.target_drc_min)) {
+          drc_out_of_tolerance = true
+          toleranceNote = `DRC ${data.drc_value}% dưới ngưỡng tối thiểu ${po.target_drc_min}%`
+        } else if (po?.target_drc_max != null && data.drc_value > Number(po.target_drc_max)) {
+          drc_out_of_tolerance = true
+          toleranceNote = `DRC ${data.drc_value}% vượt ngưỡng tối đa ${po.target_drc_max}%`
+        }
       }
     }
 
-    // Determine result based on grade match and QC values
+    // Determine result based on grade match, DRC tolerance, and QC values
     let result: 'passed' | 'warning' | 'failed'
-    if (grade_meets_target === false) {
+    if (drc_out_of_tolerance) {
+      result = 'warning'
+    } else if (grade_meets_target === false) {
       result = 'warning'
     } else if (data.moisture_content != null && data.moisture_content > 0.8) {
       result = 'failed'
@@ -865,7 +904,9 @@ export const productionService = {
       result,
       tester_id: data.tester_id ?? null,
       tested_at: now,
-      notes: data.notes ?? null,
+      notes: toleranceNote
+        ? `${toleranceNote}${data.notes ? ` · ${data.notes}` : ''}`
+        : (data.notes ?? null),
     }
 
     const { data: qcResult, error } = await supabase

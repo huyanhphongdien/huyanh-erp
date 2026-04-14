@@ -855,6 +855,8 @@ export interface WMSPaginationParams {
   type?: string
   from_date?: string
   to_date?: string
+  facility_id?: string
+  target_grade?: string
 }
 
 export interface PaginatedResponse<T> {

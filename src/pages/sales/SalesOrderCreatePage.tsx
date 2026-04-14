@@ -158,12 +158,16 @@ function SalesOrderCreatePage() {
   const containerType = Form.useWatch('container_type', form) || '20ft'
   const currency = Form.useWatch('currency', form) || 'USD'
   const commissionPct = Form.useWatch('commission_pct', form) || 0
+  const commissionUsdPerMt = Form.useWatch('commission_usd_per_mt', form) || 0
 
   const totalBales = baleWeight > 0 ? Math.round((quantityTons * 1000) / baleWeight) : 0
   const balesPerContainer = containerType === '40ft' ? balesPerContInput * 2 : balesPerContInput
   const containerCount = balesPerContainer > 0 ? Math.ceil(totalBales / balesPerContainer) : 0
   const totalValueUSD = quantityTons * unitPrice
-  const commissionAmt = totalValueUSD * (commissionPct / 100)
+  // Ưu tiên USD/MT nếu có; nếu không thì dùng %
+  const commissionAmt = commissionUsdPerMt > 0
+    ? quantityTons * commissionUsdPerMt
+    : totalValueUSD * (commissionPct / 100)
 
   // ── Customer selection ──
   const handleCustomerChange = useCallback(
@@ -229,7 +233,9 @@ function SalesOrderCreatePage() {
         etd: values.etd ? values.etd.format('YYYY-MM-DD') : undefined,
         eta: values.eta ? values.eta.format('YYYY-MM-DD') : undefined,
         lc_expiry_date: values.lc_expiry_date ? values.lc_expiry_date.format('YYYY-MM-DD') : undefined,
-        commission_amount: values.commission_pct ? itemsTotalUSD * (values.commission_pct / 100) : undefined,
+        commission_amount: values.commission_usd_per_mt
+          ? itemsTotalTons * values.commission_usd_per_mt
+          : (values.commission_pct ? itemsTotalUSD * (values.commission_pct / 100) : undefined),
         // Multi-item data
         items: validItems,
       }
@@ -406,8 +412,15 @@ function SalesOrderCreatePage() {
           </Row>
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item label="Hoa hồng (%)" name="commission_pct">
-                <InputNumber min={0} max={20} step={0.5} size="large" style={{ width: '100%' }} placeholder="2" />
+              <Form.Item label="Hoa hồng (%)" name="commission_pct" tooltip="Tính theo % tổng giá trị đơn. Dùng % HOẶC USD/MT, không dùng cả hai.">
+                <InputNumber min={0} max={20} step={0.5} size="large" style={{ width: '100%' }} placeholder="2"
+                  disabled={commissionUsdPerMt > 0} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt" tooltip="Số USD trên mỗi tấn. Dùng khi hợp đồng môi giới tính theo đô/tấn thay vì %.">
+                <InputNumber min={0} max={1000} step={1} size="large" style={{ width: '100%' }} placeholder="25"
+                  disabled={commissionPct > 0} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
@@ -498,8 +511,17 @@ function SalesOrderCreatePage() {
             <Col span={12}>
               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Hoa hồng</div>
               <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, lineHeight: 1 }}>
-                {commissionPct > 0 ? `$${(itemsTotalUSD * commissionPct / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}
+                {commissionUsdPerMt > 0
+                  ? `$${(itemsTotalTons * commissionUsdPerMt).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                  : commissionPct > 0
+                    ? `$${(itemsTotalUSD * commissionPct / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                    : '—'}
               </div>
+              {commissionUsdPerMt > 0 && (
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 }}>
+                  ${commissionUsdPerMt}/MT
+                </div>
+              )}
             </Col>
           </Row>
         </Card>
@@ -533,7 +555,9 @@ function SalesOrderCreatePage() {
                 {formatCurrency(totalValueUSD, 'USD')}
               </Descriptions.Item>
               <Descriptions.Item label="Hoa hồng">
-                {commissionAmt > 0 ? `$${commissionAmt.toLocaleString('en-US', { maximumFractionDigits: 0 })} (${vals.commission_pct || 0}%)` : '-'}
+                {commissionAmt > 0
+                  ? `$${commissionAmt.toLocaleString('en-US', { maximumFractionDigits: 0 })} (${vals.commission_usd_per_mt ? `$${vals.commission_usd_per_mt}/MT` : `${vals.commission_pct || 0}%`})`
+                  : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
               <Descriptions.Item label="Container">

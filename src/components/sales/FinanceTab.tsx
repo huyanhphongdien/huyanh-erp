@@ -91,8 +91,12 @@ export default function FinanceTab({ order, readOnly = false, onUpdate }: Financ
   }
 
   // ── Commission total ──
-  const commissionRate = Form.useWatch('commission_rate', form) || (order as any).commission_rate || 0
-  const commissionTotal = commissionRate * (order.quantity_tons || 0)
+  // Ưu tiên USD/MT; fallback về % nếu không có
+  const commissionUsdPerMt = Form.useWatch('commission_usd_per_mt', form) || (order as any).commission_usd_per_mt || 0
+  const commissionPct = Form.useWatch('commission_pct', form) || (order as any).commission_pct || 0
+  const commissionTotal = commissionUsdPerMt > 0
+    ? commissionUsdPerMt * (order.quantity_tons || 0)
+    : (order.total_value_usd || 0) * (commissionPct / 100)
 
   // ── Discount amount ──
   const discountAmount = Form.useWatch('discount_amount', form) || (order as any).discount_amount || 0
@@ -142,8 +146,9 @@ export default function FinanceTab({ order, readOnly = false, onUpdate }: Financ
       }
 
       // Commission fields
-      if (values.commission_rate !== undefined) updateData.commission_rate = values.commission_rate || 0
-      if (values.commission_total !== undefined) updateData.commission_total = commissionTotal
+      if (values.commission_usd_per_mt !== undefined) updateData.commission_usd_per_mt = values.commission_usd_per_mt || null
+      if (values.commission_pct !== undefined) updateData.commission_pct = values.commission_pct || null
+      updateData.commission_amount = commissionTotal || null
       if (values.broker !== undefined) updateData.broker = values.broker || null
       if (values.commission_paid !== undefined) updateData.commission_paid = values.commission_paid || false
       if (values.commission_paid_date !== undefined) {
@@ -188,7 +193,8 @@ export default function FinanceTab({ order, readOnly = false, onUpdate }: Financ
     discount_amount: ext.discount_amount || 0,
     discount_date: ext.discount_date ? dayjs(ext.discount_date) : null,
     btc_submission_date: ext.btc_submission_date ? dayjs(ext.btc_submission_date) : null,
-    commission_rate: ext.commission_rate || 0,
+    commission_usd_per_mt: (ext.commission_usd_per_mt ?? (order as any).commission_usd_per_mt) || 0,
+    commission_pct: (ext.commission_pct ?? (order as any).commission_pct) || 0,
     broker: ext.broker || '',
     commission_paid: ext.commission_paid || false,
     commission_paid_date: ext.commission_paid_date ? dayjs(ext.commission_paid_date) : null,
@@ -352,17 +358,31 @@ export default function FinanceTab({ order, readOnly = false, onUpdate }: Financ
             style={{ marginBottom: 16 }}
           >
             <Row gutter={16}>
-              <Col xs={24} sm={12}>
-                <Form.Item label="Mức hoa hồng (USD/MT)" name="commission_rate">
+              <Col xs={24} sm={8}>
+                <Form.Item label="Mức hoa hồng (USD/MT)" name="commission_usd_per_mt" tooltip="Tính theo USD trên mỗi tấn. Dùng USD/MT HOẶC %, không dùng cả hai.">
                   <InputNumber
                     min={0}
+                    max={1000}
                     step={1}
                     style={{ width: '100%' }}
-                    placeholder="0"
+                    placeholder="25"
+                    disabled={commissionPct > 0}
                   />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={12}>
+              <Col xs={24} sm={8}>
+                <Form.Item label="Hoa hồng (%)" name="commission_pct" tooltip="Tính theo % tổng giá trị đơn.">
+                  <InputNumber
+                    min={0}
+                    max={20}
+                    step={0.1}
+                    style={{ width: '100%' }}
+                    placeholder="2"
+                    disabled={commissionUsdPerMt > 0}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
                 <Statistic
                   title="Tổng hoa hồng"
                   value={commissionTotal}

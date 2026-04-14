@@ -84,6 +84,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       bales_per_container: order.bales_per_container,
       packing_type: order.packing_type,
       commission_pct: order.commission_pct,
+      commission_usd_per_mt: order.commission_usd_per_mt,
       bank_name: order.bank_name,
       bank_account: order.bank_account,
       bank_swift: order.bank_swift,
@@ -117,6 +118,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         bales_per_container: vals.bales_per_container,
         packing_type: vals.packing_type,
         commission_pct: vals.commission_pct || null,
+        commission_usd_per_mt: vals.commission_usd_per_mt || null,
         bank_name: vals.bank_name || null,
         bank_account: vals.bank_account || null,
         bank_swift: vals.bank_swift || null,
@@ -131,9 +133,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       const containerCount = vals.bales_per_container > 0
         ? Math.ceil(totalBales / vals.bales_per_container)
         : order.container_count
-      const commissionAmount = vals.commission_pct
-        ? totalValueUsd * (vals.commission_pct / 100)
-        : null
+      const commissionAmount = vals.commission_usd_per_mt
+        ? vals.quantity_tons * vals.commission_usd_per_mt
+        : (vals.commission_pct ? totalValueUsd * (vals.commission_pct / 100) : null)
 
       updateData.quantity_kg = qtyKg
       updateData.total_bales = totalBales
@@ -157,7 +159,10 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   const totalValueUSD = (order.quantity_tons || 0) * (order.unit_price || 0)
   const totalBales = order.total_bales || 0
   const containerCount = order.container_count || 0
-  const commissionAmt = order.commission_amount || (totalValueUSD * (order.commission_pct || 0) / 100)
+  const commissionAmt = order.commission_amount
+    || ((order.commission_usd_per_mt || 0) > 0
+        ? (order.quantity_tons || 0) * (order.commission_usd_per_mt || 0)
+        : totalValueUSD * (order.commission_pct || 0) / 100)
 
   // ══════════════════════════════════════════════════════════════
   // EDIT MODE
@@ -240,8 +245,11 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           <Form.Item label="Ngày giao" name="delivery_date">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
-          <Form.Item label="Hoa hồng (%)" name="commission_pct">
-            <InputNumber min={0} max={10} step={0.1} style={{ width: '100%' }} />
+          <Form.Item label="Hoa hồng (%)" name="commission_pct" tooltip="Tính theo % tổng giá trị. Dùng % HOẶC USD/MT.">
+            <InputNumber min={0} max={20} step={0.1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt" tooltip="Số USD trên mỗi tấn. Dùng khi môi giới tính theo đô/tấn.">
+            <InputNumber min={0} max={1000} step={1} style={{ width: '100%' }} />
           </Form.Item>
         </div>
 
@@ -380,7 +388,11 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         <Descriptions.Item label="Cảng đích">{order.port_of_destination || '—'}</Descriptions.Item>
         <Descriptions.Item label="Ngày giao">{fmtDate(order.delivery_date)}</Descriptions.Item>
         <Descriptions.Item label="Hoa hồng">
-          {commissionAmt > 0 ? `${fmtCurrency(commissionAmt)} (${order.commission_pct}%)` : '—'}
+          {commissionAmt > 0
+            ? `${fmtCurrency(commissionAmt)} (${(order.commission_usd_per_mt || 0) > 0
+                ? `$${order.commission_usd_per_mt}/MT`
+                : `${order.commission_pct || 0}%`})`
+            : '—'}
         </Descriptions.Item>
       </Descriptions>
 

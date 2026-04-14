@@ -89,7 +89,10 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
   const deposit = order.deposit_amount || 0
   const discount = order.discount_amount || 0
   const bankCharges = order.bank_charges || 0
-  const commissionAmt = order.commission_amount || (totalUSD * (order.commission_pct || 0) / 100)
+  const commissionAmt = order.commission_amount
+    || ((order.commission_usd_per_mt || 0) > 0
+        ? (order.quantity_tons || 0) * (order.commission_usd_per_mt || 0)
+        : totalUSD * (order.commission_pct || 0) / 100)
   const remainingAmount = order.remaining_amount ?? (totalUSD - deposit - discount - bankCharges)
   const netRevenue = order.net_revenue ?? (totalUSD - deposit - discount - bankCharges - commissionAmt)
   const discountExRate = order.discount_exchange_rate || 0
@@ -293,7 +296,9 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
             <SummaryRow label="Đặt cọc" value={deposit > 0 ? `- ${fmtUSD(deposit)}` : '—'} color="#722ed1" />
             <SummaryRow label="Chiết khấu NH" value={discount > 0 ? `- ${fmtUSD(discount)}` : '—'} color="#d48806" />
             <SummaryRow label="Phí ngân hàng" value={bankCharges > 0 ? `- ${fmtUSD(bankCharges)}` : '—'} color="#cf1322" />
-            <SummaryRow label="Hoa hồng" value={commissionAmt > 0 ? `- ${fmtUSD(commissionAmt)} (${order.commission_pct || 0}%)` : '—'} color="#722ed1" />
+            <SummaryRow label="Hoa hồng" value={commissionAmt > 0
+              ? `- ${fmtUSD(commissionAmt)} (${(order.commission_usd_per_mt || 0) > 0 ? `$${order.commission_usd_per_mt}/MT` : `${order.commission_pct || 0}%`})`
+              : '—'} color="#722ed1" />
             <tr><td colSpan={2}><Divider style={{ margin: '6px 0' }} /></td></tr>
             <SummaryRow label="Còn lại (sau CK + phí)" value={fmtUSD(remainingAmount)} bold />
             <SummaryRow label="Doanh thu ròng (sau hoa hồng)" value={fmtUSD(netRevenue)} bold color="#1B4D3E" />

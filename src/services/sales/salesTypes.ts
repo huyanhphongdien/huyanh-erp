@@ -148,6 +148,7 @@ export interface SalesOrder {
   contract_no?: string
   contract_date?: string
   commission_pct?: number
+  commission_usd_per_mt?: number
   commission_amount?: number
   bank_account?: string
   bank_swift?: string

@@ -73,6 +73,7 @@ export interface CreateSalesOrderData {
   contract_no?: string
   contract_date?: string
   commission_pct?: number
+  commission_usd_per_mt?: number
   commission_amount?: number
   bank_account?: string
   bank_swift?: string
@@ -418,6 +419,7 @@ export const salesOrderService = {
         contract_no: input.contract_no || null,
         contract_date: input.contract_date || null,
         commission_pct: input.commission_pct || null,
+        commission_usd_per_mt: input.commission_usd_per_mt || null,
         commission_amount: input.commission_amount || null,
         bank_account: input.bank_account || null,
         bank_swift: input.bank_swift || null,

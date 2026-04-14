@@ -382,7 +382,7 @@ export const salesOrderService = {
         packing_type: input.packing_type || 'loose_bale',
         bale_weight_kg: baleWeight,
         total_bales: totalBales,
-        shrink_wrap: input.shrink_wrap ?? true,
+        shrink_wrap: input.shrink_wrap ?? false,
         pallet_required: input.pallet_required ?? false,
         marking_instructions: input.marking_instructions || null,
 

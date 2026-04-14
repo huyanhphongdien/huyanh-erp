@@ -11,6 +11,7 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   'anhlp@huyanhrubber.com': 'admin',
   // Accounting
   'yendt@huyanhrubber.com': 'accounting',
+  'phulv@huyanhrubber.com': 'accounting',
   // Admin
   'minhld@huyanhrubber.com': 'admin',
   'thuyht@huyanhrubber.com': 'admin',

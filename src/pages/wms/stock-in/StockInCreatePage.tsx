@@ -83,14 +83,25 @@ interface DetailItem {
   qcFormData?: QCFormData
 }
 
-type SourceType = 'production' | 'purchase' | 'blend' | 'transfer' | 'adjust'
+type StockType = 'raw' | 'finished'
+type SourceType = 'production' | 'purchase' | 'blend' | 'transfer' | 'adjust' | 'return' | 'repack'
 
-const SOURCE_OPTIONS = [
+// Nguồn nhập hợp lệ theo loại kho:
+//   - NVL: mua hàng từ nông trại, phối trộn (NVL out), chuyển kho NVL, điều chỉnh
+//   - TP: sản xuất, phối trộn (TP output), khách trả, đóng gói lại, chuyển kho TP, điều chỉnh
+const SOURCE_OPTIONS_RAW = [
+  { value: 'purchase', label: 'Mua hàng (nông trại)' },
+  { value: 'transfer', label: 'Chuyển kho NVL' },
+  { value: 'adjust', label: 'Điều chỉnh kiểm kê' },
+]
+
+const SOURCE_OPTIONS_FINISHED = [
   { value: 'production', label: 'Sản xuất' },
-  { value: 'purchase', label: 'Mua hàng' },
   { value: 'blend', label: 'Phối trộn' },
-  { value: 'transfer', label: 'Chuyển kho' },
-  { value: 'adjust', label: 'Điều chỉnh' },
+  { value: 'return', label: 'Khách trả hàng' },
+  { value: 'repack', label: 'Đóng gói lại' },
+  { value: 'transfer', label: 'Chuyển kho TP' },
+  { value: 'adjust', label: 'Điều chỉnh kiểm kê' },
 ]
 
 const RUBBER_TYPE_OPTIONS = Object.entries(RUBBER_TYPE_LABELS).map(([value, label]) => ({
@@ -300,9 +311,12 @@ const StockInCreatePage = () => {
   // Wizard state
   const [step, setStep] = useState(0) // 0, 1, 2
 
+  // Top-level mode: NVL vs TP (quyết định loại kho + source options + fields hiển thị)
+  const [stockType, setStockType] = useState<StockType>('raw')
+
   // Step 1: Header
   const [warehouseId, setWarehouseId] = useState('')
-  const [sourceType, setSourceType] = useState<SourceType>('production')
+  const [sourceType, setSourceType] = useState<SourceType>('purchase')
   const [dealId, setDealId] = useState('')
   const [headerNotes, setHeaderNotes] = useState('')
   // Rubber fields
@@ -344,6 +358,21 @@ const StockInCreatePage = () => {
     }
     load()
   }, [])
+
+  // Filter warehouses theo stockType: raw → kho NVL + mixed, finished → kho TP + mixed
+  const filteredWarehouses = useMemo(() => {
+    return warehouses.filter(w => {
+      if (!w.type || w.type === 'mixed') return true
+      return w.type === stockType
+    })
+  }, [warehouses, stockType])
+
+  // Khi đổi mode NVL ↔ TP: reset kho + source về default hợp lệ
+  useEffect(() => {
+    setWarehouseId('')
+    setSourceType(stockType === 'raw' ? 'purchase' : 'production')
+    setDealId('')
+  }, [stockType])
 
   // Load deals when source = purchase
   useEffect(() => {
@@ -464,7 +493,7 @@ const StockInCreatePage = () => {
     try {
       const currentUserId = user?.employee_id || user?.id || 'system'
       const order = await stockInService.create({
-        type: 'finished',
+        type: stockType,
         warehouse_id: warehouseId,
         source_type: sourceType,
         deal_id: dealId || undefined,
@@ -558,7 +587,31 @@ const StockInCreatePage = () => {
       {/* === STEP 1: Thông tin === */}
       {step === 0 && (
         <Card style={{ borderRadius: 12 }}>
-          {/* QR Scan Section */}
+          {/* Top-level toggle: NVL vs TP */}
+          <div style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8 }}>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>Loại phiếu nhập *</Text>
+            <Radio.Group
+              value={stockType}
+              onChange={e => setStockType(e.target.value)}
+              buttonStyle="solid"
+              size="large"
+            >
+              <Radio.Button value="raw" style={{ minWidth: 200, textAlign: 'center' }}>
+                📦 Nhập Nguyên liệu (NVL)
+              </Radio.Button>
+              <Radio.Button value="finished" style={{ minWidth: 200, textAlign: 'center' }}>
+                🏭 Nhập Thành phẩm (TP)
+              </Radio.Button>
+            </Radio.Group>
+            <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
+              {stockType === 'raw'
+                ? 'Nhập cao su thô từ nông trại / nhà cung cấp vào kho NVL'
+                : 'Nhập thành phẩm từ khách trả hàng, đóng gói lại, chuyển kho, hoặc điều chỉnh kiểm kê'}
+            </div>
+          </div>
+
+          {/* QR Scan Section — chỉ hiện với NVL */}
+          {stockType === 'raw' && (
           <Card
             size="small"
             style={{ marginBottom: 16, borderStyle: 'dashed', borderColor: '#2D8B6E', borderRadius: 8, background: '#f6ffed' }}
@@ -596,6 +649,7 @@ const StockInCreatePage = () => {
               )}
             </Space>
           </Card>
+          )}
 
           <Row gutter={24}>
             <Col span={12}>
@@ -604,11 +658,12 @@ const StockInCreatePage = () => {
                 <Select
                   value={warehouseId || undefined}
                   onChange={setWarehouseId}
-                  placeholder="Chọn kho"
+                  placeholder={stockType === 'raw' ? 'Chọn kho NVL' : 'Chọn kho TP'}
                   style={{ width: '100%', marginTop: 4 }}
                   size="large"
                   loading={loadingWH}
-                  options={warehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+                  notFoundContent={filteredWarehouses.length === 0 ? `Không có kho ${stockType === 'raw' ? 'NVL' : 'TP'} nào` : undefined}
+                  options={filteredWarehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
                 />
               </div>
             </Col>
@@ -620,7 +675,7 @@ const StockInCreatePage = () => {
                   onChange={v => setSourceType(v as SourceType)}
                   style={{ width: '100%', marginTop: 4 }}
                   size="large"
-                  options={SOURCE_OPTIONS}
+                  options={stockType === 'raw' ? SOURCE_OPTIONS_RAW : SOURCE_OPTIONS_FINISHED}
                 />
               </div>
             </Col>
@@ -658,45 +713,49 @@ const StockInCreatePage = () => {
             </div>
           )}
 
-          {/* Rubber intake fields */}
-          <Divider style={{ fontSize: 13 }}>Thông tin nguồn gốc (cao su)</Divider>
-          <Row gutter={16}>
-            <Col span={8}>
-              <div style={{ marginBottom: 16 }}>
-                <Text strong>Đại lý / Nguồn</Text>
-                <Input
-                  value={supplierName}
-                  onChange={e => setSupplierName(e.target.value)}
-                  placeholder="Tên đại lý"
-                  style={{ marginTop: 4 }}
-                />
-              </div>
-            </Col>
-            <Col span={8}>
-              <div style={{ marginBottom: 16 }}>
-                <Text strong>Vùng nguồn gốc</Text>
-                <Input
-                  value={supplierRegion}
-                  onChange={e => setSupplierRegion(e.target.value)}
-                  placeholder="Bình Phước, Tây Ninh..."
-                  style={{ marginTop: 4 }}
-                />
-              </div>
-            </Col>
-            <Col span={8}>
-              <div style={{ marginBottom: 16 }}>
-                <Text strong>Loại mủ</Text>
-                <Select
-                  value={rubberType || undefined}
-                  onChange={setRubberType}
-                  placeholder="Chọn loại"
-                  style={{ width: '100%', marginTop: 4 }}
-                  allowClear
-                  options={RUBBER_TYPE_OPTIONS}
-                />
-              </div>
-            </Col>
-          </Row>
+          {/* Rubber intake fields — chỉ hiện cho NVL (nguồn từ nông trại) */}
+          {stockType === 'raw' && (
+            <>
+              <Divider style={{ fontSize: 13 }}>Thông tin nguồn gốc (cao su)</Divider>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <div style={{ marginBottom: 16 }}>
+                    <Text strong>Đại lý / Nguồn</Text>
+                    <Input
+                      value={supplierName}
+                      onChange={e => setSupplierName(e.target.value)}
+                      placeholder="Tên đại lý"
+                      style={{ marginTop: 4 }}
+                    />
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div style={{ marginBottom: 16 }}>
+                    <Text strong>Vùng nguồn gốc</Text>
+                    <Input
+                      value={supplierRegion}
+                      onChange={e => setSupplierRegion(e.target.value)}
+                      placeholder="Bình Phước, Tây Ninh..."
+                      style={{ marginTop: 4 }}
+                    />
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div style={{ marginBottom: 16 }}>
+                    <Text strong>Loại mủ</Text>
+                    <Select
+                      value={rubberType || undefined}
+                      onChange={setRubberType}
+                      placeholder="Chọn loại"
+                      style={{ width: '100%', marginTop: 4 }}
+                      allowClear
+                      options={RUBBER_TYPE_OPTIONS}
+                    />
+                  </div>
+                </Col>
+              </Row>
+            </>
+          )}
 
           {/* Notes */}
           <div style={{ marginBottom: 16 }}>
@@ -813,7 +872,7 @@ const StockInCreatePage = () => {
           <Card size="small" style={{ marginBottom: 16, background: '#fafafa', borderRadius: 8 }}>
             <Row gutter={16}>
               <Col span={8}><Text type="secondary">Kho</Text><br /><Text strong>{selectedWarehouse?.name}</Text></Col>
-              <Col span={8}><Text type="secondary">Nguồn</Text><br /><Tag>{SOURCE_OPTIONS.find(s => s.value === sourceType)?.label}</Tag></Col>
+              <Col span={8}><Text type="secondary">Nguồn</Text><br /><Tag>{(stockType === 'raw' ? SOURCE_OPTIONS_RAW : SOURCE_OPTIONS_FINISHED).find(s => s.value === sourceType)?.label || sourceType}</Tag></Col>
               {selectedDeal && <Col span={8}><Text type="secondary">Deal</Text><br /><Text strong>{selectedDeal.deal_number}</Text></Col>}
             </Row>
             {(supplierName || supplierRegion || rubberType) && (

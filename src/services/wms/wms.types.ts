@@ -187,7 +187,7 @@ export interface StockBatch {
 // ===== PHIáº¾U NHáº¬P KHO =====
 
 export type StockInStatus = 'draft' | 'confirmed' | 'cancelled'
-export type StockInSourceType = 'production' | 'purchase' | 'blend' | 'transfer' | 'adjust'
+export type StockInSourceType = 'production' | 'purchase' | 'blend' | 'transfer' | 'adjust' | 'return' | 'repack'
 
 export interface StockInOrder {
   id: string

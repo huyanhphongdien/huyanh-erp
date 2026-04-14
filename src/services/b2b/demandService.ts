@@ -536,23 +536,19 @@ export const demandService = {
     const demand = await this.getById(demandId)
     if (!demand) throw new Error('Nhu cầu không tồn tại')
 
-    // 3. Update offer status
-    const { error: updateOfferError } = await supabase
-      .from('b2b_demand_offers')
-      .update({
-        status: 'accepted' as OfferStatus,
-      })
-      .eq('id', offerId)
+    // ★ V2: Đảo thứ tự — TẠO DEAL TRƯỚC, update offer status SAU.
+    // Lý do: nếu deal insert fail mà offer đã marked 'accepted' thì offer bị
+    // mồ côi (status='accepted' nhưng không có deal_id). Thứ tự mới đảm bảo:
+    // - Deal tạo fail → offer vẫn ở 'submitted', user retry được
+    // - Deal tạo OK → offer được update accepted + deal_id trong cùng request
 
-    if (updateOfferError) throw updateOfferError
-
-    // 4. Create a Deal from offer
+    // 3. Tạo Deal từ offer
     const dealNumber = `DL${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
 
-    // ★ total_value: qty_kg × price_per_kg (price luôn là đ/kg từ offer)
+    // total_value: qty_kg × price_per_kg (price luôn là đ/kg từ offer)
     const totalValueVnd = offer.offered_quantity_kg * offer.offered_price
 
-    // ★ Generate lot_code BEFORE insert (tách ra để tránh async issue)
+    // Generate lot_code BEFORE insert (tách ra để tránh async issue)
     let generatedLotCode: string | null = offer.lot_code || null
     try {
       const partnerData = Array.isArray(offer.partner) ? offer.partner[0] : offer.partner
@@ -572,9 +568,13 @@ export const demandService = {
         quantity_kg: offer.offered_quantity_kg,
         unit_price: offer.offered_price,
         total_value_vnd: totalValueVnd,
-        status: 'pending',
+        // ★ V2: 'processing' (DB CHECK constraint không cho 'pending').
+        status: 'processing',
         demand_id: demandId,
-        offer_id: offerId,
+        // ★ V2: KHÔNG set offer_id — FK của deals.offer_id trỏ tới b2b.supplier_offers
+        // (bảng khác trong schema b2b, đang rỗng) chứ không phải public.b2b_demand_offers
+        // nơi thực sự lưu offers. Insert sẽ fail FK constraint.
+        // Liên kết 1 chiều qua offer.deal_id sau khi tạo deal (đủ để truy ngược).
         processing_fee_per_ton: demand.processing_fee_per_ton || null,
         expected_output_rate: demand.expected_output_rate || null,
         notes: `Tạo từ chào giá cho nhu cầu ${demand.code}`,
@@ -588,11 +588,21 @@ export const demandService = {
 
     if (dealError) throw dealError
 
-    // 5. Update offer with deal_id
-    await supabase
+    // 4. Update offer: status + deal_id (chỉ chạy khi deal insert OK)
+    const { error: updateOfferError } = await supabase
       .from('b2b_demand_offers')
-      .update({ deal_id: deal.id })
+      .update({
+        status: 'accepted' as OfferStatus,
+        deal_id: deal.id,
+      })
       .eq('id', offerId)
+
+    if (updateOfferError) {
+      // Rollback: xóa deal vừa tạo để tránh deal mồ côi không có offer link
+      console.error('[acceptOffer] offer update failed, rolling back deal:', updateOfferError)
+      await supabase.from('b2b_deals').delete().eq('id', deal.id)
+      throw updateOfferError
+    }
 
     // ★ 5b. Auto-create rubber_intake_batch (Lý lịch mủ)
     try {

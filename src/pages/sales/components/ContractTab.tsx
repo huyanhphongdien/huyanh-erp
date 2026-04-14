@@ -17,20 +17,33 @@ import {
   Space,
   message,
 } from 'antd'
-import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined } from '@ant-design/icons'
+import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
-import type { SalesOrder } from '../../../services/sales/salesTypes'
+import { supabase } from '../../../lib/supabase'
+import type { SalesOrder, SalesOrderItem } from '../../../services/sales/salesTypes'
 import {
   INCOTERM_LABELS,
   PAYMENT_TERMS_LABELS,
   PACKING_TYPE_LABELS,
   PORT_OF_LOADING_OPTIONS,
+  SVR_GRADE_OPTIONS,
   type Incoterm,
   type PaymentTerms,
   type PackingType,
 } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
+
+type EditItem = {
+  id?: string
+  grade: string
+  quantity_tons: number
+  unit_price: number
+  bale_weight_kg: number
+  bales_per_container: number
+  packing_type: string
+  payment_terms?: string
+}
 
 // ============================================================================
 // TYPES
@@ -64,12 +77,32 @@ const fmtDate = (d: string | undefined | null) => {
 export default function ContractTab({ order, salesRole, editable, onSaved }: Props) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editItems, setEditItems] = useState<EditItem[]>([])
   const [form] = Form.useForm()
 
   const isLocked = !!order.is_locked
   const canEdit = editable && !isLocked
+  const hasItems = (order.items?.length || 0) > 0
+
+  const itemsTotalTons = editItems.reduce((s, i) => s + (Number(i.quantity_tons) || 0), 0)
+  const itemsTotalUSD = editItems.reduce((s, i) => s + (Number(i.quantity_tons) || 0) * (Number(i.unit_price) || 0), 0)
 
   const startEdit = () => {
+    // Khởi tạo items editor nếu đơn có items
+    if (hasItems && order.items) {
+      setEditItems(order.items.map((it: SalesOrderItem) => ({
+        id: it.id,
+        grade: it.grade,
+        quantity_tons: it.quantity_tons,
+        unit_price: it.unit_price,
+        bale_weight_kg: it.bale_weight_kg || 33.33,
+        bales_per_container: it.bales_per_container || 576,
+        packing_type: it.packing_type || 'loose_bale',
+        payment_terms: it.payment_terms,
+      })))
+    } else {
+      setEditItems([])
+    }
     form.setFieldsValue({
       customer_po: order.customer_po,
       quantity_tons: order.quantity_tons,
@@ -104,19 +137,24 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       const vals = await form.validateFields()
       setSaving(true)
 
+      // Validate items nếu dùng items editor
+      if (hasItems) {
+        const validItems = editItems.filter(i => i.grade && i.quantity_tons > 0 && i.unit_price > 0)
+        if (validItems.length === 0) {
+          message.error('Phải có ít nhất 1 sản phẩm hợp lệ')
+          setSaving(false)
+          return
+        }
+      }
+
       const updateData: Record<string, any> = {
         customer_po: vals.customer_po || null,
-        quantity_tons: vals.quantity_tons,
-        unit_price: vals.unit_price,
         incoterm: vals.incoterm,
         payment_terms: vals.payment_terms || null,
         port_of_loading: vals.port_of_loading || null,
         port_of_destination: vals.port_of_destination || null,
         delivery_date: vals.delivery_date?.format('YYYY-MM-DD') || null,
         contract_date: vals.contract_date?.format('YYYY-MM-DD') || null,
-        bale_weight_kg: vals.bale_weight_kg,
-        bales_per_container: vals.bales_per_container,
-        packing_type: vals.packing_type,
         commission_pct: vals.commission_pct || null,
         commission_usd_per_mt: vals.commission_usd_per_mt || null,
         bank_name: vals.bank_name || null,
@@ -126,28 +164,85 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         notes: vals.notes || null,
       }
 
-      // Recalc derived fields
-      const qtyKg = vals.quantity_tons * 1000
-      const totalBales = Math.round(qtyKg / (vals.bale_weight_kg || 33.33))
-      // Với đơn multi-item, tổng tiền đã lưu chính xác theo sum(items).
-      // Chỉ recompute total_value_usd nếu single-item hoặc qty/unit_price thực sự thay đổi.
-      const isMultiItem = (order.items?.length || 0) > 1
-      const qtyChanged = vals.quantity_tons !== order.quantity_tons
-      const priceChanged = vals.unit_price !== order.unit_price
-      const totalValueUsd = (isMultiItem && !qtyChanged && !priceChanged)
-        ? (order.total_value_usd ?? vals.quantity_tons * vals.unit_price)
-        : vals.quantity_tons * vals.unit_price
-      const containerCount = vals.bales_per_container > 0
-        ? Math.ceil(totalBales / vals.bales_per_container)
-        : order.container_count
+      let totalTons: number
+      let totalValueUsd: number
+      let totalBales: number
+      let containerCount: number
+      let aggregatedGrade: string
+      let firstItem: EditItem | undefined
+
+      if (hasItems) {
+        // ── Replace sales_order_items với giá trị mới ──
+        const { error: delErr } = await supabase
+          .from('sales_order_items')
+          .delete()
+          .eq('sales_order_id', order.id)
+        if (delErr) throw delErr
+
+        const itemRows = editItems.map((it, idx) => {
+          const qtyKg = it.quantity_tons * 1000
+          const bw = it.bale_weight_kg || 33.33
+          const bales = Math.round(qtyKg / bw)
+          const bpc = it.bales_per_container || 576
+          return {
+            sales_order_id: order.id,
+            grade: it.grade,
+            quantity_tons: it.quantity_tons,
+            unit_price: it.unit_price,
+            currency: order.currency || 'USD',
+            payment_terms: it.payment_terms || null,
+            total_value_usd: it.quantity_tons * it.unit_price,
+            quantity_kg: qtyKg,
+            bale_weight_kg: bw,
+            total_bales: bales,
+            bales_per_container: bpc,
+            container_count: Math.ceil(bales / bpc),
+            packing_type: it.packing_type || 'loose_bale',
+            sort_order: idx,
+          }
+        })
+        const { error: insErr } = await supabase.from('sales_order_items').insert(itemRows)
+        if (insErr) throw insErr
+
+        totalTons = itemRows.reduce((s, i) => s + i.quantity_tons, 0)
+        totalValueUsd = itemRows.reduce((s, i) => s + (i.total_value_usd || 0), 0)
+        totalBales = itemRows.reduce((s, i) => s + (i.total_bales || 0), 0)
+        containerCount = itemRows.reduce((s, i) => s + (i.container_count || 0), 0)
+        aggregatedGrade = itemRows.length === 1 ? itemRows[0].grade : itemRows.map(i => i.grade).join(' + ')
+        firstItem = editItems[0]
+      } else {
+        // Legacy single-item flow — không có items table
+        totalTons = vals.quantity_tons
+        totalValueUsd = vals.quantity_tons * vals.unit_price
+        const qtyKg = vals.quantity_tons * 1000
+        totalBales = Math.round(qtyKg / (vals.bale_weight_kg || 33.33))
+        containerCount = vals.bales_per_container > 0
+          ? Math.ceil(totalBales / vals.bales_per_container)
+          : order.container_count || 0
+        aggregatedGrade = order.grade || ''
+      }
+
+      const avgUnitPrice = totalTons > 0 ? Math.round((totalValueUsd / totalTons) * 100) / 100 : 0
       const commissionAmount = vals.commission_usd_per_mt
-        ? vals.quantity_tons * vals.commission_usd_per_mt
+        ? totalTons * vals.commission_usd_per_mt
         : (vals.commission_pct ? totalValueUsd * (vals.commission_pct / 100) : null)
 
-      updateData.quantity_kg = qtyKg
-      updateData.total_bales = totalBales
+      updateData.quantity_tons = totalTons
+      updateData.quantity_kg = totalTons * 1000
+      updateData.unit_price = avgUnitPrice
       updateData.total_value_usd = totalValueUsd
+      updateData.total_bales = totalBales
       updateData.container_count = containerCount
+      updateData.grade = aggregatedGrade
+      if (hasItems && firstItem) {
+        updateData.bale_weight_kg = firstItem.bale_weight_kg
+        updateData.bales_per_container = firstItem.bales_per_container
+        updateData.packing_type = firstItem.packing_type
+      } else {
+        updateData.bale_weight_kg = vals.bale_weight_kg
+        updateData.bales_per_container = vals.bales_per_container
+        updateData.packing_type = vals.packing_type
+      }
       updateData.commission_amount = commissionAmount
 
       await salesOrderService.updateFields(order.id, updateData)
@@ -210,25 +305,178 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
 
         {/* Section: Sản phẩm & Giá */}
         <SectionHeader title="Sản phẩm & Giá" color="#1B4D3E" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="Số lượng (tấn)" name="quantity_tons" rules={[{ required: true }]}>
-            <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="Đơn giá (USD/tấn)" name="unit_price" rules={[{ required: true }]}>
-            <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="KL bành (kg)" name="bale_weight_kg">
-            <InputNumber min={1} max={100} style={{ width: '100%' }} />
-          </Form.Item>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="Bành/container" name="bales_per_container">
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="Loại đóng gói" name="packing_type">
-            <Select options={Object.entries(PACKING_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
-          </Form.Item>
-        </div>
+        {hasItems ? (
+          <>
+            <div style={{ overflowX: 'auto', marginBottom: 12 }}>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+                <thead>
+                  <tr style={{ background: '#fafafa' }}>
+                    <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, color: '#666', minWidth: 110 }}>Grade</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 90 }}>Tấn</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 100 }}>$/tấn</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 100 }}>Thành tiền</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 80 }}>KL bành</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontSize: 11, color: '#666', minWidth: 80 }}>Bành/cont</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, color: '#666', minWidth: 130 }}>Đóng gói</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, color: '#666', minWidth: 110 }}>Thanh toán</th>
+                    <th style={{ padding: '6px 8px', width: 32 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {editItems.map((it, idx) => (
+                    <tr key={idx} style={{ borderTop: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '4px 6px' }}>
+                        <Select
+                          size="small"
+                          value={it.grade}
+                          style={{ width: '100%' }}
+                          onChange={(v) => {
+                            const next = [...editItems]; next[idx] = { ...it, grade: v }; setEditItems(next)
+                          }}
+                          options={SVR_GRADE_OPTIONS.map((g) => ({ value: g.value, label: g.label }))}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <InputNumber
+                          size="small"
+                          min={0}
+                          step={0.01}
+                          value={it.quantity_tons}
+                          style={{ width: '100%' }}
+                          onChange={(v) => {
+                            const next = [...editItems]; next[idx] = { ...it, quantity_tons: Number(v) || 0 }; setEditItems(next)
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <InputNumber
+                          size="small"
+                          min={0}
+                          step={0.01}
+                          value={it.unit_price}
+                          style={{ width: '100%' }}
+                          onChange={(v) => {
+                            const next = [...editItems]; next[idx] = { ...it, unit_price: Number(v) || 0 }; setEditItems(next)
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#1B4D3E' }}>
+                        ${(it.quantity_tons * it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <InputNumber
+                          size="small"
+                          min={1}
+                          max={100}
+                          value={it.bale_weight_kg}
+                          style={{ width: '100%' }}
+                          onChange={(v) => {
+                            const next = [...editItems]; next[idx] = { ...it, bale_weight_kg: Number(v) || 33.33 }; setEditItems(next)
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <InputNumber
+                          size="small"
+                          min={1}
+                          value={it.bales_per_container}
+                          style={{ width: '100%' }}
+                          onChange={(v) => {
+                            const next = [...editItems]; next[idx] = { ...it, bales_per_container: Number(v) || 576 }; setEditItems(next)
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <Select
+                          size="small"
+                          value={it.packing_type}
+                          style={{ width: '100%' }}
+                          onChange={(v) => {
+                            const next = [...editItems]; next[idx] = { ...it, packing_type: v }; setEditItems(next)
+                          }}
+                          options={Object.entries(PACKING_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <Select
+                          size="small"
+                          allowClear
+                          value={it.payment_terms}
+                          style={{ width: '100%' }}
+                          onChange={(v) => {
+                            const next = [...editItems]; next[idx] = { ...it, payment_terms: v }; setEditItems(next)
+                          }}
+                          options={Object.entries(PAYMENT_TERMS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                        <Button
+                          size="small"
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          disabled={editItems.length <= 1}
+                          onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: '#fafafa', fontWeight: 600 }}>
+                    <td style={{ padding: '6px 8px', fontSize: 11 }}>Tổng</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{itemsTotalTons.toFixed(2)}</td>
+                    <td />
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', color: '#1B4D3E' }}>
+                      ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td colSpan={5} />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <Button
+              size="small"
+              icon={<PlusOutlined />}
+              style={{ marginBottom: 12 }}
+              onClick={() => setEditItems([
+                ...editItems,
+                {
+                  grade: 'SVR_10',
+                  quantity_tons: 0,
+                  unit_price: 0,
+                  bale_weight_kg: editItems[0]?.bale_weight_kg || 33.33,
+                  bales_per_container: editItems[0]?.bales_per_container || 576,
+                  packing_type: editItems[0]?.packing_type || 'loose_bale',
+                },
+              ])}
+            >
+              Thêm dòng
+            </Button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+              <Form.Item label="Số lượng (tấn)" name="quantity_tons" rules={[{ required: true }]}>
+                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item label="Đơn giá (USD/tấn)" name="unit_price" rules={[{ required: true }]}>
+                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item label="KL bành (kg)" name="bale_weight_kg">
+                <InputNumber min={1} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+              <Form.Item label="Bành/container" name="bales_per_container">
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item label="Loại đóng gói" name="packing_type">
+                <Select options={Object.entries(PACKING_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
+              </Form.Item>
+            </div>
+          </>
+        )}
 
         {/* Section: Điều khoản */}
         <SectionHeader title="Điều khoản" color="#1B4D3E" />

@@ -231,7 +231,7 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
                 <Button
                   type="primary"
                   icon={<ArrowRightOutlined />}
-                  onClick={() => navigate(`/sales/orders/${order.id}`)}
+                  onClick={() => navigate(`/sales/orders/${order.id}?tab=production`)}
                   style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                 >
                   Mở trang chi tiết

@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card,
   Tabs,
@@ -141,6 +141,8 @@ const STATUS_FLOW: SalesOrderStatus[] = [
 function SalesOrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') || 'info'
   const { user } = useAuthStore()
   const salesRole = getSalesRole(user)
   const visibleTabs = getVisibleTabs(salesRole)
@@ -1481,7 +1483,7 @@ function SalesOrderDetailPage() {
 
       {/* Tabs */}
       <Tabs
-        defaultActiveKey="info"
+        defaultActiveKey={initialTab}
         items={[
           {
             key: 'info',

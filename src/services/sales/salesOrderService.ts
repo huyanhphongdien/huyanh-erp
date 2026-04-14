@@ -486,7 +486,7 @@ export const salesOrderService = {
         container_count: totalContainers,
         // Giữ grade = grade đầu tiên (hoặc multi)
         grade: itemRows.length === 1 ? itemRows[0].grade : itemRows.map(i => i.grade).join(' + '),
-        unit_price: itemRows.length === 1 ? itemRows[0].unit_price : Math.round(totalUsd / totalTons),
+        unit_price: itemRows.length === 1 ? itemRows[0].unit_price : Math.round((totalUsd / totalTons) * 100) / 100,
       }).eq('id', data.id)
     }
 

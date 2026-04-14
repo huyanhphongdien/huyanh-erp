@@ -129,7 +129,14 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       // Recalc derived fields
       const qtyKg = vals.quantity_tons * 1000
       const totalBales = Math.round(qtyKg / (vals.bale_weight_kg || 33.33))
-      const totalValueUsd = vals.quantity_tons * vals.unit_price
+      // Với đơn multi-item, tổng tiền đã lưu chính xác theo sum(items).
+      // Chỉ recompute total_value_usd nếu single-item hoặc qty/unit_price thực sự thay đổi.
+      const isMultiItem = (order.items?.length || 0) > 1
+      const qtyChanged = vals.quantity_tons !== order.quantity_tons
+      const priceChanged = vals.unit_price !== order.unit_price
+      const totalValueUsd = (isMultiItem && !qtyChanged && !priceChanged)
+        ? (order.total_value_usd ?? vals.quantity_tons * vals.unit_price)
+        : vals.quantity_tons * vals.unit_price
       const containerCount = vals.bales_per_container > 0
         ? Math.ceil(totalBales / vals.bales_per_container)
         : order.container_count
@@ -156,7 +163,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   }
 
   // ── Computed ──
-  const totalValueUSD = (order.quantity_tons || 0) * (order.unit_price || 0)
+  // Ưu tiên giá trị đã tính chính xác trong DB (tổng các items), tránh recompute
+  // từ quantity × unit_price (unit_price multi-item là trung bình đã làm tròn).
+  const totalValueUSD = order.total_value_usd ?? ((order.quantity_tons || 0) * (order.unit_price || 0))
   const totalBales = order.total_bales || 0
   const containerCount = order.container_count || 0
   const commissionAmt = order.commission_amount

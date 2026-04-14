@@ -224,7 +224,7 @@ function SalesOrderCreatePage() {
         // Set header from first item (or combined)
         grade: validItems.length === 1 ? validItems[0].grade : validItems.map(i => i.grade).join(' + '),
         quantity_tons: itemsTotalTons,
-        unit_price: validItems.length === 1 ? validItems[0].unit_price : Math.round(itemsTotalUSD / itemsTotalTons),
+        unit_price: validItems.length === 1 ? validItems[0].unit_price : Math.round((itemsTotalUSD / itemsTotalTons) * 100) / 100,
         bale_weight_kg: validItems[0].bale_weight_kg,
         bales_per_container: validItems[0].bales_per_container,
         packing_type: validItems[0].packing_type as any,

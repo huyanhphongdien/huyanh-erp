@@ -377,6 +377,25 @@ export const productionService = {
   }): Promise<ProductionStageProgress> {
     const now = new Date().toISOString()
 
+    // ★ Stage dependency enforcement: không cho complete stage N nếu stage N-1 chưa completed
+    if (stageNumber > 1) {
+      const { data: prevStage } = await supabase
+        .from('production_stage_progress')
+        .select('status')
+        .eq('production_order_id', poId)
+        .eq('stage_number', stageNumber - 1)
+        .maybeSingle()
+
+      if (!prevStage) {
+        throw new Error(`Không tìm thấy công đoạn ${stageNumber - 1}`)
+      }
+      if (prevStage.status !== 'completed') {
+        throw new Error(
+          `Không thể hoàn tất công đoạn ${stageNumber} khi công đoạn ${stageNumber - 1} chưa hoàn tất (hiện trạng: ${prevStage.status})`,
+        )
+      }
+    }
+
     // Calculate weight_loss_kg and drc_change
     let weight_loss_kg: number | null = null
     let drc_change: number | null = null
@@ -392,13 +411,18 @@ export const productionService = {
     // Calculate duration_hours from started_at
     const { data: stage, error: fetchErr } = await supabase
       .from('production_stage_progress')
-      .select('id, started_at')
+      .select('id, started_at, status')
       .eq('production_order_id', poId)
       .eq('stage_number', stageNumber)
       .single()
 
     if (fetchErr) throw fetchErr
     if (!stage) throw new Error(`Không tìm thấy công đoạn ${stageNumber}`)
+
+    // Idempotency: không cho complete 2 lần
+    if (stage.status === 'completed') {
+      throw new Error(`Công đoạn ${stageNumber} đã hoàn tất trước đó`)
+    }
 
     let duration_hours: number | null = null
     if (stage.started_at) {

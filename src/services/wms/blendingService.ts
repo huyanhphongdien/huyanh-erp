@@ -9,6 +9,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { rubberGradeService } from './rubberGradeService'
+import { adjustLevelsAndLocation } from './inventorySync'
 import type {
   BlendOrder,
   BlendOrderItem,
@@ -394,7 +395,7 @@ export const blendingService = {
         id, code, target_grade, target_drc, simulated_drc,
         items:blend_order_items(
           id, source_batch_id, quantity_kg, batch_drc,
-          source_batch:stock_batches(id, batch_no, material_id, latest_drc, initial_drc)
+          source_batch:stock_batches(id, batch_no, material_id, warehouse_id, location_id, latest_drc, initial_drc)
         )
       `)
       .eq('id', blendId)
@@ -445,12 +446,18 @@ export const blendingService = {
         }
       }
 
-      // Insert blend_out inventory transaction
+      // Insert blend_out inventory transaction — dùng warehouse gốc của
+      // source batch để stock_levels/kho nguồn bị trừ đúng chỗ (KHÔNG dùng
+      // output_warehouse_id — đó là kho đích của lô output mới).
+      const srcMaterialId = item.source_batch?.material_id
+      const srcWarehouseId = item.source_batch?.warehouse_id
+      const srcLocationId = item.source_batch?.location_id || null
+
       await supabase
         .from('inventory_transactions')
         .insert({
-          material_id: item.source_batch?.material_id,
-          warehouse_id: data.output_warehouse_id,
+          material_id: srcMaterialId,
+          warehouse_id: srcWarehouseId,
           batch_id: item.source_batch_id,
           type: 'blend_out',
           quantity: -item.quantity_kg,
@@ -459,6 +466,14 @@ export const blendingService = {
           notes: `Phối trộn: ${(order as any).code}`,
           created_at: now,
         })
+
+      // Đồng bộ stock_levels + warehouse_locations kho nguồn (xuất)
+      await adjustLevelsAndLocation({
+        material_id: srcMaterialId,
+        warehouse_id: srcWarehouseId,
+        location_id: srcLocationId,
+        delta_kg: -Number(item.quantity_kg),
+      })
     }
 
     // 4. Create output stock_batch
@@ -510,6 +525,14 @@ export const blendingService = {
         notes: `Phối trộn: ${(order as any).code} — lô mới: ${newBatch.batch_no}`,
         created_at: now,
       })
+
+    // Đồng bộ stock_levels + warehouse_locations kho đích (nhập lô output)
+    await adjustLevelsAndLocation({
+      material_id: firstMaterialId,
+      warehouse_id: data.output_warehouse_id,
+      location_id: data.output_location_id || null,
+      delta_kg: Number(data.actual_quantity_kg),
+    })
 
     // 5. Update blend order
     const tolerance = 2

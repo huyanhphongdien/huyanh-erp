@@ -10,6 +10,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { batchService } from './batchService'
+import { recordInventoryMove } from './inventorySync'
 import type {
   StockInOrder,
   StockInDetail,
@@ -701,6 +702,22 @@ export const stockInService = {
       weight: ticket.net_weight || 0,
       drc_value: ticket.expected_drc || null,
     })
+
+    // 6b. Đồng bộ stock_levels + inventory_transactions cho phiếu cân
+    //     (nhập NVL — delta dương). Warehouse_locations không đụng vì
+    //     phiếu cân dùng yard_zone/row/col riêng, không phải bảng warehouse_locations.
+    if (mat?.id && ticket.net_weight) {
+      await recordInventoryMove({
+        material_id: mat.id,
+        warehouse_id: warehouseId,
+        batch_id: batch!.id,
+        delta_kg: Number(ticket.net_weight),
+        type: 'weighbridge_in',
+        reference_type: 'stock_in',
+        reference_id: si!.id,
+        notes: `Nhập NVL từ phiếu cân ${ticket.code}`,
+      })
+    }
 
     // 7. Update deal if linked
     if (ticket.deal_id) {

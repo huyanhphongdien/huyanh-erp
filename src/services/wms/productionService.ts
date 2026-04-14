@@ -12,6 +12,7 @@
 import { supabase } from '../../lib/supabase'
 import { rubberGradeService } from './rubberGradeService'
 import { STAGE_NAMES } from './wms.types'
+import { adjustLevelsAndLocation } from './inventorySync'
 import type {
   ProductionOrder,
   ProductionOrderItem,
@@ -324,12 +325,13 @@ export const productionService = {
     for (const item of validItems) {
       const { data: batch } = await supabase
         .from('stock_batches')
-        .select('quantity_remaining, material_id, warehouse_id')
+        .select('quantity_remaining, material_id, warehouse_id, location_id')
         .eq('id', item.source_batch_id!)
         .single()
       if (!batch) continue
 
-      const newQty = Math.max(0, Number(batch.quantity_remaining) - Number(item.allocated_quantity))
+      const consumedQty = Number(item.allocated_quantity)
+      const newQty = Math.max(0, Number(batch.quantity_remaining) - consumedQty)
       await supabase
         .from('stock_batches')
         .update({
@@ -345,11 +347,19 @@ export const productionService = {
         warehouse_id: batch.warehouse_id,
         batch_id: item.source_batch_id,
         type: 'production_out',
-        quantity: -Number(item.allocated_quantity),
+        quantity: -consumedQty,
         reference_type: 'production_order',
         reference_id: poId,
         notes: `Xuất NVL cho lệnh SX ${order.code}`,
         created_at: now,
+      })
+
+      // Đồng bộ stock_levels + warehouse_locations (xuất NVL)
+      await adjustLevelsAndLocation({
+        material_id: batch.material_id,
+        warehouse_id: batch.warehouse_id,
+        location_id: (batch as any).location_id,
+        delta_kg: -consumedQty,
       })
     }
 
@@ -651,6 +661,14 @@ export const productionService = {
             notes: `Nhập kho thành phẩm từ lệnh SX ${order.code} — lô mới: ${newBatch.batch_no}`,
             created_at: now,
           })
+
+          // Đồng bộ stock_levels + warehouse_locations (nhập TP)
+          await adjustLevelsAndLocation({
+            material_id: materialId,
+            warehouse_id: warehouseId,
+            location_id: data.location_id || null,
+            delta_kg: Number(data.actual_quantity),
+          })
         }
       } else {
         console.warn('[completeProduction] no material_id — skip stock_batch creation for PO', poId)
@@ -704,7 +722,7 @@ export const productionService = {
 
         const { data: batch } = await supabase
           .from('stock_batches')
-          .select('quantity_remaining, material_id, warehouse_id')
+          .select('quantity_remaining, material_id, warehouse_id, location_id')
           .eq('id', item.source_batch_id)
           .single()
         if (!batch) continue
@@ -731,15 +749,53 @@ export const productionService = {
           notes: `Hoàn lại NVL do hủy lệnh SX ${current.code}. Lý do: ${reason || 'Không có'}`,
           created_at: now,
         })
+
+        // Đồng bộ stock_levels + warehouse_locations (hoàn NVL về kho)
+        await adjustLevelsAndLocation({
+          material_id: batch.material_id,
+          warehouse_id: batch.warehouse_id,
+          location_id: (batch as any).location_id,
+          delta_kg: Number(item.allocated_quantity),
+        })
       }
 
       // Nếu PO đã 'completed' và có output batch trong stock → đánh dấu cancelled
-      // (nhưng không xóa vì có thể đã dùng cho deal khác — ERP quản lý tiếp)
+      // và rút stock_levels cho các TP batch đó (vì chúng đã được nhập kho rồi).
+      // KHÔNG xóa batch vì có thể đã dùng cho deal khác — ERP quản lý tiếp.
+      const { data: cancelledTpBatches } = await supabase
+        .from('stock_batches')
+        .select('id, material_id, warehouse_id, location_id, quantity_remaining')
+        .eq('production_order_id', poId)
+        .eq('batch_type', 'production')
+        .eq('status', 'active')
+
       await supabase
         .from('stock_batches')
         .update({ status: 'cancelled', updated_at: now })
         .eq('production_order_id', poId)
         .eq('batch_type', 'production')
+
+      for (const tp of (cancelledTpBatches || [])) {
+        const qty = Number((tp as any).quantity_remaining || 0)
+        if (qty <= 0) continue
+        await supabase.from('inventory_transactions').insert({
+          material_id: (tp as any).material_id,
+          warehouse_id: (tp as any).warehouse_id,
+          batch_id: (tp as any).id,
+          type: 'production_cancel_out',
+          quantity: -qty,
+          reference_type: 'production_order',
+          reference_id: poId,
+          notes: `Xóa TP khỏi kho do hủy lệnh SX ${current.code}`,
+          created_at: now,
+        })
+        await adjustLevelsAndLocation({
+          material_id: (tp as any).material_id,
+          warehouse_id: (tp as any).warehouse_id,
+          location_id: (tp as any).location_id,
+          delta_kg: -qty,
+        })
+      }
     }
 
     const { data: updated, error } = await supabase

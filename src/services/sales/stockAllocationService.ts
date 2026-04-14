@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { adjustLevelsAndLocation } from '../wms/inventorySync'
 
 export type AllocationStatus = 'reserved' | 'packed' | 'shipped' | 'released'
 
@@ -83,36 +84,9 @@ function throwIfError<T>(result: { data: T | null; error: any }, defaultMsg: str
   return result.data
 }
 
-/**
- * Adjust stock_levels.quantity cho material + warehouse (+ delta tăng, - delta giảm).
- * Dùng khi MTS allocate (delta âm) hoặc release (delta dương) để giữ bảng
- * tồn kho tổng hợp không lệch với stock_batches.
- */
-async function _adjustStockLevel(
-  materialId: string,
-  warehouseId: string,
-  delta: number,
-): Promise<void> {
-  if (!materialId || !warehouseId || delta === 0) return
-  const { data: existing } = await supabase
-    .from('stock_levels')
-    .select('id, quantity')
-    .eq('material_id', materialId)
-    .eq('warehouse_id', warehouseId)
-    .maybeSingle()
-
-  if (existing) {
-    const newQty = Math.max(0, Number(existing.quantity || 0) + delta)
-    await supabase
-      .from('stock_levels')
-      .update({ quantity: newQty, updated_at: new Date().toISOString() })
-      .eq('id', existing.id)
-  } else if (delta > 0) {
-    await supabase
-      .from('stock_levels')
-      .insert({ material_id: materialId, warehouse_id: warehouseId, quantity: delta })
-  }
-}
+// NOTE: trước đây có _adjustStockLevel() local — đã thay bằng
+// adjustLevelsAndLocation() từ wms/inventorySync.ts để dùng chung 1 helper
+// và tự động sync thêm warehouse_locations.
 
 // ============================================================================
 // SERVICE
@@ -245,7 +219,7 @@ export const stockAllocationService = {
     const batchIds = requests.map(r => r.stock_batch_id)
     const { data: batches, error: batchErr } = await supabase
       .from('stock_batches')
-      .select('id, batch_no, rubber_grade, quantity_remaining, qc_status, status, material_id, warehouse_id')
+      .select('id, batch_no, rubber_grade, quantity_remaining, qc_status, status, material_id, warehouse_id, location_id')
       .in('id', batchIds)
     if (batchErr) throw batchErr
     if (!batches || batches.length !== batchIds.length) {
@@ -322,8 +296,13 @@ export const stockAllocationService = {
         created_at: now,
       })
 
-      // Sync stock_levels để báo cáo tồn tổng hợp không lệch
-      await _adjustStockLevel(batch.material_id, batch.warehouse_id, -Number(req.quantity_kg))
+      // Sync stock_levels + warehouse_locations (xuất TP cho sales)
+      await adjustLevelsAndLocation({
+        material_id: batch.material_id,
+        warehouse_id: batch.warehouse_id,
+        location_id: batch.location_id,
+        delta_kg: -Number(req.quantity_kg),
+      })
     }
 
     // 5. Auto-bump sales_orders.status: confirmed → ready (skip producing)
@@ -363,7 +342,7 @@ export const stockAllocationService = {
     // Restore stock_batch quantity_remaining
     const { data: batch } = await supabase
       .from('stock_batches')
-      .select('quantity_remaining, material_id, warehouse_id')
+      .select('quantity_remaining, material_id, warehouse_id, location_id')
       .eq('id', alloc.stock_batch_id)
       .single()
     if (batch) {
@@ -391,8 +370,13 @@ export const stockAllocationService = {
         created_at: now,
       })
 
-      // Sync stock_levels: hoàn lại tồn tổng hợp
-      await _adjustStockLevel(batch.material_id, batch.warehouse_id, Number(alloc.quantity_kg))
+      // Sync stock_levels + warehouse_locations: hoàn lại tồn tổng hợp
+      await adjustLevelsAndLocation({
+        material_id: batch.material_id,
+        warehouse_id: batch.warehouse_id,
+        location_id: (batch as any).location_id,
+        delta_kg: Number(alloc.quantity_kg),
+      })
     }
 
     // Mark allocation released

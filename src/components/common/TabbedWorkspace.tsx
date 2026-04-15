@@ -110,22 +110,66 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Tab bar */}
-      <Tabs
-        type="editable-card"
-        hideAdd
-        activeKey={effectiveActiveKey || undefined}
-        onChange={handleChange}
-        onEdit={handleEdit}
-        items={tabItems}
-        size="small"
+      {/* Tab bar — branded để nổi bật, dùng màu chính của ERP (#1B4D3E) */}
+      <div
+        className="tabbed-workspace-bar"
         style={{
-          marginBottom: 0,
-          padding: '4px 8px 0 8px',
-          background: '#fafafa',
-          borderBottom: '1px solid #e8e8e8',
+          background: 'linear-gradient(to bottom, #F0EDE8 0%, #E5E1D8 100%)',
+          padding: '8px 12px 0 12px',
+          borderBottom: '3px solid #1B4D3E',
+          boxShadow: '0 2px 6px rgba(27, 77, 62, 0.15)',
+          flexShrink: 0,
         }}
-      />
+      >
+        <Tabs
+          type="editable-card"
+          hideAdd
+          activeKey={effectiveActiveKey || undefined}
+          onChange={handleChange}
+          onEdit={handleEdit}
+          items={tabItems}
+          size="middle"
+          tabBarStyle={{ margin: 0, borderBottom: 'none' }}
+        />
+      </div>
+      <style>{`
+        .tabbed-workspace-bar .ant-tabs-tab {
+          background: #ffffff !important;
+          border: 1px solid #d0cec9 !important;
+          border-radius: 6px 6px 0 0 !important;
+          padding: 6px 14px !important;
+          margin-right: 4px !important;
+          transition: all 0.15s ease !important;
+          color: #595959 !important;
+          font-weight: 500 !important;
+        }
+        .tabbed-workspace-bar .ant-tabs-tab:hover {
+          background: #f6ffed !important;
+          border-color: #2D8B6E !important;
+          color: #1B4D3E !important;
+        }
+        .tabbed-workspace-bar .ant-tabs-tab-active {
+          background: #1B4D3E !important;
+          border-color: #1B4D3E !important;
+          border-bottom: 1px solid #1B4D3E !important;
+          box-shadow: 0 -2px 4px rgba(27, 77, 62, 0.2) !important;
+        }
+        .tabbed-workspace-bar .ant-tabs-tab-active .ant-tabs-tab-btn {
+          color: #ffffff !important;
+          font-weight: 700 !important;
+        }
+        .tabbed-workspace-bar .ant-tabs-tab-active .ant-tabs-tab-remove {
+          color: rgba(255,255,255,0.85) !important;
+        }
+        .tabbed-workspace-bar .ant-tabs-tab-active .ant-tabs-tab-remove:hover {
+          color: #ffffff !important;
+          background: rgba(255,255,255,0.15) !important;
+          border-radius: 50% !important;
+        }
+        .tabbed-workspace-bar .ant-tabs-nav::before {
+          border-bottom: none !important;
+        }
+      `}</style>
 
       {/* Content area */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>

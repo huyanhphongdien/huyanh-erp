@@ -265,12 +265,14 @@ export const stockInService = {
       }
     }
 
-    // 2. Tạo lô hàng mới (stock_batches)
+    // 2. Tạo lô hàng mới (stock_batches) — lưu quantity_remaining theo KG
+    //    để đồng bộ với sales_orders.quantity_kg, MTS allocation, reports.
+    //    detail.quantity là số đơn vị (kiện/bành/thùng), detail.weight là kg.
     const batch = await batchService.createBatch({
       material_id: detail.material_id,
       warehouse_id: order.warehouse_id,
       location_id: detail.location_id,
-      initial_quantity: detail.quantity,
+      initial_quantity: detail.weight || detail.quantity,
       initial_drc: detail.initial_drc,
       batch_type: 'production',
       source_lot_code: sourceLotCode,
@@ -404,13 +406,15 @@ export const stockInService = {
 
     if (updateErr) throw updateErr
 
-    // Đồng bộ quantity về batch nếu thay đổi
-    if (data.quantity !== undefined && existing.batch_id) {
+    // Đồng bộ quantity về batch nếu thay đổi — dùng weight (kg) làm
+    // canonical cho stock_batches.quantity_remaining
+    if ((data.quantity !== undefined || data.weight !== undefined) && existing.batch_id) {
+      const newKg = Number(data.weight ?? data.quantity ?? 0)
       await supabase
         .from('stock_batches')
         .update({
-          initial_quantity: data.quantity,
-          quantity_remaining: data.quantity,
+          initial_quantity: newKg,
+          quantity_remaining: newKg,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.batch_id)
@@ -485,15 +489,19 @@ export const stockInService = {
     if (updateOrderErr) throw updateOrderErr
 
     // 3. Với MỖI detail -> cập nhật tồn kho
+    //    stock_levels + inventory_transactions lưu KG (đồng bộ sales),
+    //    warehouse_locations giữ count vì capacity là slot-count.
     for (const detail of details) {
-      // 3a. Upsert stock_levels: tăng quantity
+      const deltaKg = Number(detail.weight || detail.quantity || 0)
+
+      // 3a. Upsert stock_levels: tăng theo kg
       await this._upsertStockLevel(
         detail.material_id,
         order.warehouse_id,
-        detail.quantity
+        deltaKg
       )
 
-      // 3b. Insert inventory_transactions (type='in')
+      // 3b. Insert inventory_transactions (type='in') theo kg
       await supabase
         .from('inventory_transactions')
         .insert({
@@ -501,14 +509,14 @@ export const stockInService = {
           warehouse_id: order.warehouse_id,
           batch_id: detail.batch_id,
           type: 'in',
-          quantity: detail.quantity,
+          quantity: deltaKg,
           reference_type: 'stock_in',
           reference_id: stockInId,
           notes: `Nhập kho từ phiếu ${(order as any).code || order.id}`,
           created_by: confirmedBy,
         })
 
-      // 3c. Update warehouse_locations.current_quantity
+      // 3c. Update warehouse_locations.current_quantity theo số đơn vị (count)
       if (detail.location_id) {
         await this._increaseLocationQuantity(detail.location_id, detail.quantity)
       }

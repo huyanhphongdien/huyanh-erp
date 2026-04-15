@@ -466,19 +466,23 @@ export const stockOutService = {
     if (updateOrderErr) throw updateOrderErr
 
     // 3. Với MỖI detail đã picked → cập nhật tồn kho
+    //    batch + stock_levels + tx theo KG (đồng bộ sales),
+    //    warehouse_locations theo count (slot-count).
     for (const detail of pickedDetails) {
-      // 3a. Giảm stock_batches.quantity_remaining
-      //     Nếu quantity_remaining = 0 → status = 'depleted'
-      await batchService.updateQuantity(detail.batch_id, -detail.quantity)
+      const deltaKg = Number(detail.weight || detail.quantity || 0)
 
-      // 3b. Giảm stock_levels.quantity
+      // 3a. Giảm stock_batches.quantity_remaining theo kg
+      //     Nếu quantity_remaining = 0 → status = 'depleted'
+      await batchService.updateQuantity(detail.batch_id, -deltaKg)
+
+      // 3b. Giảm stock_levels.quantity theo kg
       await this._upsertStockLevel(
         detail.material_id,
         order.warehouse_id,
-        -detail.quantity  // delta âm = giảm
+        -deltaKg
       )
 
-      // 3c. Insert inventory_transactions (type='out')
+      // 3c. Insert inventory_transactions (type='out') theo kg
       await supabase
         .from('inventory_transactions')
         .insert({
@@ -486,14 +490,14 @@ export const stockOutService = {
           warehouse_id: order.warehouse_id,
           batch_id: detail.batch_id,
           type: 'out',
-          quantity: -detail.quantity,  // Âm = xuất
+          quantity: -deltaKg,
           reference_type: 'stock_out',
           reference_id: stockOutId,
           notes: `Xuất kho từ phiếu ${(order as any).code}`,
           created_by: confirmedBy || null,
         })
 
-      // 3d. Giảm warehouse_locations.current_quantity
+      // 3d. Giảm warehouse_locations.current_quantity theo count
       if (detail.location_id) {
         await this._decreaseLocationQuantity(detail.location_id, detail.quantity)
       }

@@ -240,6 +240,14 @@ export const qcService = {
   async addInitialQC(data: AddQCData): Promise<{
     qcResult: BatchQCResult
     evaluation: QCEvaluation
+    /** D4: Khi result='failed', trả kèm điểm NCC hiện tại để UI show toast */
+    supplierImpact?: {
+      supplier_name: string
+      overall_score: number
+      grade: string
+      pass_rate: number
+      total_batches: number
+    } | null
   }> {
     const { batch_id, drc_value, tester_id } = data
 
@@ -310,9 +318,28 @@ export const qcService = {
 
     if (updateErr) throw updateErr
 
+    // D4: Supplier quality feedback loop — khi QC đầu vào fail
+    let supplierImpact = null
+    if (evaluation.result === 'failed') {
+      try {
+        const { supplierScoringService } = await import('./supplierScoringService')
+        const score = await supplierScoringService.getSupplierImpactFromBatch(batch_id)
+        if (score) {
+          supplierImpact = {
+            supplier_name: score.supplier_name,
+            overall_score: score.overall_score,
+            grade: score.grade,
+            pass_rate: score.pass_rate,
+            total_batches: score.total_batches,
+          }
+        }
+      } catch { /* non-blocking */ }
+    }
+
     return {
       qcResult: qcResult as unknown as BatchQCResult,
       evaluation,
+      supplierImpact,
     }
   },
 
@@ -444,6 +471,14 @@ export const qcService = {
     qcResult: BatchQCResult
     evaluation: QCEvaluation
     batchUpdated: boolean
+    /** D4: Khi result='failed', trả kèm điểm NCC hiện tại để UI show toast */
+    supplierImpact?: {
+      supplier_name: string
+      overall_score: number
+      grade: string
+      pass_rate: number
+      total_batches: number
+    } | null
   }> {
     const { batch_id, drc_value, tester_id } = data
 
@@ -531,10 +566,30 @@ export const qcService = {
 
     if (updateErr) throw updateErr
 
+    // D4: Khi recheck fail → tính điểm NCC hiện tại (sau khi DB đã update)
+    //     để UI show toast "NCC X tụt hạng xuống Y"
+    let supplierImpact = null
+    if (evaluation.result === 'failed') {
+      try {
+        const { supplierScoringService } = await import('./supplierScoringService')
+        const score = await supplierScoringService.getSupplierImpactFromBatch(batch_id)
+        if (score) {
+          supplierImpact = {
+            supplier_name: score.supplier_name,
+            overall_score: score.overall_score,
+            grade: score.grade,
+            pass_rate: score.pass_rate,
+            total_batches: score.total_batches,
+          }
+        }
+      } catch { /* non-blocking */ }
+    }
+
     return {
       qcResult: qcResult as unknown as BatchQCResult,
       evaluation,
       batchUpdated: true,
+      supplierImpact,
     }
   },
 

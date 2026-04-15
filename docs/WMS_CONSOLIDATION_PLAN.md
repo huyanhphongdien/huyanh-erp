@@ -110,12 +110,19 @@ KHO (WMS)
 
 ### Phase D — Kiến trúc / Scale (8-12h, dài hạn)
 
-**D1. Pallet master + tracking**
+**D1. Pallet master + tracking — ⏸ DEFERRED (2026-04-15)**
 - [ ] Tạo table `pallets` (id, code, warehouse_id, location_id, current_batch_ids, max_capacity_kg)
 - [ ] Stock-in assign batch vào pallet thay vì chỉ location
 - [ ] Stock-out pick theo pallet thay vì batch rời
 - [ ] Pallet label printing (tương tự BatchLabelPage)
 - **Rationale:** cao su xuất khẩu đóng pallet, hiện tại chưa có model để track physical unit này.
+- **Defer reason (2026-04-15):** Task này là rewrite level feature — tạo
+  bảng DB mới + migrate tồn kho hiện có vào pallet + sửa stock-in/out
+  flow để assign pallet_id + tạo label print layout. Không thể squeeze
+  vào session refactor chung. Cần dedicated sprint 4-6h khi business
+  ưu tiên (hiện tại container-level tracking đã đủ cho xuất khẩu theo
+  đơn hàng, pallet chỉ cần khi scale lên hàng trăm container/tháng
+  hoặc khi khách yêu cầu truy xuất granular hơn).
 
 **D2. Production real-time NVL consume tracking**
 - [ ] ProductionStagePage hiện chỉ start/complete. Thêm section "NVL consumed so far" live-update qua Supabase realtime.

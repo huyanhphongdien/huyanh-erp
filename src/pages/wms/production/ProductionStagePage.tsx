@@ -26,12 +26,14 @@ import {
   Checkbox,
   Statistic,
   message,
+  Progress,
 } from 'antd'
 import {
   ArrowLeftOutlined,
   PlayCircleOutlined,
   CheckCircleOutlined,
   ExperimentOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import productionService from '../../../services/wms/productionService'
@@ -68,6 +70,14 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
   const [actionLoading, setActionLoading] = useState(false)
   const [operators, setOperators] = useState<{ id: string; full_name: string }[]>([])
 
+  // D2: NVL consume live stats
+  const [nvlStats, setNvlStats] = useState<{
+    allocated_kg: number
+    consumed_kg: number
+    item_count: number
+    last_update: string | null
+  } | null>(null)
+
   // Form state
   const [inputQty, setInputQty] = useState<number | null>(null)
   const [outputQty, setOutputQty] = useState<number | null>(null)
@@ -80,6 +90,65 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
   const [qcPassed, setQcPassed] = useState(false)
   const [qcNotes, setQcNotes] = useState('')
   const [notes, setNotes] = useState('')
+
+  // D2: Load + subscribe NVL consume stats (realtime)
+  useEffect(() => {
+    if (!id) return
+
+    const loadNvlStats = async () => {
+      // Allocated: sum production_order_items.allocated_quantity cho order này
+      const { data: items } = await supabase
+        .from('production_order_items')
+        .select('allocated_quantity')
+        .eq('production_order_id', id)
+      const allocated = (items || []).reduce(
+        (s, i: any) => s + (Number(i.allocated_quantity) || 0), 0,
+      )
+
+      // Consumed: sum abs(quantity) từ inventory_transactions reference_type='production_order'
+      const { data: txs } = await supabase
+        .from('inventory_transactions')
+        .select('quantity, created_at')
+        .eq('reference_type', 'production_order')
+        .eq('reference_id', id)
+        .order('created_at', { ascending: false })
+      const consumed = (txs || []).reduce(
+        (s, t: any) => s + Math.abs(Number(t.quantity) || 0), 0,
+      )
+      const last = (txs && txs.length > 0 ? (txs[0] as any).created_at : null) as string | null
+
+      setNvlStats({
+        allocated_kg: allocated,
+        consumed_kg: consumed,
+        item_count: (items || []).length,
+        last_update: last,
+      })
+    }
+
+    loadNvlStats()
+
+    const channel = supabase
+      .channel(`nvl-consume-${id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_transactions',
+        filter: `reference_id=eq.${id}`,
+      }, () => {
+        loadNvlStats()
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'production_order_items',
+        filter: `production_order_id=eq.${id}`,
+      }, () => {
+        loadNvlStats()
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [id])
 
   useEffect(() => {
     if (!id) return
@@ -225,6 +294,69 @@ const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionS
           </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {/* D2: NVL consumption live stats — subscribe inventory_transactions realtime */}
+      {nvlStats && nvlStats.item_count > 0 && (
+        <Card
+          style={{ borderRadius: 12, marginBottom: 16, borderLeft: '3px solid #2D8B6E' }}
+          size="small"
+          title={
+            <Space>
+              <ThunderboltOutlined style={{ color: '#2D8B6E' }} />
+              <span>NVL đã tiêu thụ</span>
+              <Tag color="green" style={{ marginLeft: 8 }}>LIVE</Tag>
+            </Space>
+          }
+        >
+          <Row gutter={16} align="middle">
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Kế hoạch"
+                value={nvlStats.allocated_kg}
+                suffix="kg"
+                valueStyle={{ fontSize: 18, color: '#1B4D3E', fontFamily: "'JetBrains Mono', monospace" }}
+                formatter={v => Number(v).toLocaleString('vi-VN')}
+              />
+            </Col>
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Đã tiêu thụ"
+                value={nvlStats.consumed_kg}
+                suffix="kg"
+                valueStyle={{
+                  fontSize: 18,
+                  color: nvlStats.consumed_kg > nvlStats.allocated_kg ? '#DC2626' : '#2D8B6E',
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+                formatter={v => Number(v).toLocaleString('vi-VN')}
+              />
+            </Col>
+            <Col xs={24} sm={8}>
+              <Text type="secondary" style={{ fontSize: 11 }}>Tiến độ so với kế hoạch</Text>
+              <Progress
+                percent={nvlStats.allocated_kg > 0
+                  ? Math.min(100, Math.round((nvlStats.consumed_kg / nvlStats.allocated_kg) * 100))
+                  : 0}
+                strokeColor={nvlStats.consumed_kg > nvlStats.allocated_kg ? '#DC2626' : '#2D8B6E'}
+                status={nvlStats.consumed_kg > nvlStats.allocated_kg ? 'exception' : 'active'}
+              />
+            </Col>
+          </Row>
+          {nvlStats.last_update && (
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+              Cập nhật gần nhất: {new Date(nvlStats.last_update).toLocaleString('vi-VN')}
+            </Text>
+          )}
+          {nvlStats.consumed_kg > nvlStats.allocated_kg && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginTop: 8 }}
+              message={`Vượt kế hoạch ${(nvlStats.consumed_kg - nvlStats.allocated_kg).toLocaleString('vi-VN')} kg — kiểm tra lại`}
+            />
+          )}
+        </Card>
+      )}
 
       {/* Form */}
       <Card style={{ borderRadius: 12, marginBottom: 16 }}>

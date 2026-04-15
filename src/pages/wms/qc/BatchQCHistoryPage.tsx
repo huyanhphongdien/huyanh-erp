@@ -328,11 +328,26 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
             ),
           },
           {
-            key: 'traceability',
-            label: (<Space><ExperimentOutlined />Truy xuất nguồn gốc</Space>),
+            key: 'trace-backward',
+            label: (<Space><ExperimentOutlined />Truy xuất ngược</Space>),
             children: (
-              <Card style={{ borderRadius: 12 }}>
-                <TraceabilityTree batchId={batchInfo.id} />
+              <Card
+                style={{ borderRadius: 12 }}
+                title="Từ lô này → NVL / Deal / Đại lý"
+              >
+                <TraceabilityTree batchId={batchInfo.id} direction="backward" />
+              </Card>
+            ),
+          },
+          {
+            key: 'trace-forward',
+            label: (<Space><ExperimentOutlined />Truy xuất xuôi</Space>),
+            children: (
+              <Card
+                style={{ borderRadius: 12 }}
+                title="Từ lô này → Lệnh SX / Xuất kho / Khách hàng (recall)"
+              >
+                <TraceabilityTree batchId={batchInfo.id} direction="forward" />
               </Card>
             ),
           },

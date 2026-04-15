@@ -218,6 +218,31 @@ export const supplierScoringService = {
     const scores = await this.getAllScores()
     return scores.sort((a, b) => b.overall_score - a.overall_score)
   },
+
+  /**
+   * D4: Lấy điểm chất lượng hiện tại của NCC cho 1 batch cụ thể.
+   * Dùng trong QC feedback loop: sau khi mark fail, show ngay impact
+   * lên operator để họ biết NCC này giờ đang xếp hạng gì.
+   * Trả null nếu batch không có supplier_name.
+   */
+  async getSupplierImpactFromBatch(batchId: string): Promise<SupplierScore | null> {
+    const { data: batch } = await supabase
+      .from('stock_batches')
+      .select('supplier_name')
+      .eq('id', batchId)
+      .single()
+
+    const supplierName = (batch as any)?.supplier_name
+    if (!supplierName) return null
+
+    const { data: siblingBatches } = await supabase
+      .from('stock_batches')
+      .select('quantity_remaining, initial_drc, latest_drc, supplier_reported_drc, qc_status')
+      .eq('supplier_name', supplierName)
+
+    if (!siblingBatches || siblingBatches.length === 0) return null
+    return buildScore(supplierName, siblingBatches as any)
+  },
 }
 
 export default supplierScoringService

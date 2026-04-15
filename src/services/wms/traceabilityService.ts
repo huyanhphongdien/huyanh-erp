@@ -18,6 +18,8 @@ export type TraceNodeType =
   | 'production'
   | 'raw_batch'
   | 'stock_in'
+  | 'stock_out'
+  | 'customer'
   | 'deal'
   | 'rubber_intake'
   | 'partner'
@@ -479,6 +481,127 @@ export const traceabilityService = {
       }
 
       rootNode.children.push(stockInNode)
+    }
+
+    return rootNode
+  },
+
+  // --------------------------------------------------------------------------
+  // D3: FORWARD TRACEABILITY — Từ 1 batch tìm tất cả đích đến xuôi dòng
+  //     Dùng cho quality recall: "batch này lỗi, đã đi đâu?"
+  // --------------------------------------------------------------------------
+
+  async traceFromBatchForward(batchId: string): Promise<TraceNode | null> {
+    // 1. Lấy thông tin batch gốc
+    const { data: batch, error: batchErr } = await supabase
+      .from('stock_batches')
+      .select(`
+        id, batch_no, initial_drc, latest_drc, initial_quantity, quantity_remaining,
+        rubber_grade, batch_type, status, created_at,
+        material:materials(id, sku, name, type)
+      `)
+      .eq('id', batchId)
+      .single()
+
+    if (batchErr || !batch) return null
+
+    const mat = Array.isArray(batch.material) ? batch.material[0] : batch.material
+    const isRaw = (mat as any)?.type === 'raw' || batch.batch_type === 'raw'
+
+    const rootDetail = [
+      mat?.name || '',
+      batch.rubber_grade || '',
+      batch.latest_drc != null ? `DRC ${batch.latest_drc}%` : '',
+      formatWeight(batch.initial_quantity),
+    ].filter(Boolean).join(' | ')
+
+    const rootNode: TraceNode = {
+      type: isRaw ? 'raw_batch' : 'finished_product',
+      id: batch.id,
+      label: `Lô${isRaw ? ' NVL' : ' TP'}: ${batch.batch_no}`,
+      detail: rootDetail,
+      date: formatDate(batch.created_at),
+      children: [],
+    }
+
+    // 2a. NVL: tìm lệnh sản xuất dùng batch này → output batches
+    if (isRaw) {
+      const { data: poItems } = await supabase
+        .from('production_order_items')
+        .select('id, production_order_id, required_quantity, allocated_quantity')
+        .eq('source_batch_id', batchId)
+
+      if (poItems && poItems.length > 0) {
+        const seen = new Set<string>()
+        for (const poItem of poItems) {
+          if (seen.has(poItem.production_order_id)) continue
+          seen.add(poItem.production_order_id)
+          const prodNode = await this._traceProductionForward(poItem.production_order_id)
+          if (prodNode) rootNode.children.push(prodNode)
+        }
+      }
+    }
+
+    // 2b. Bất kể NVL hay TP — tìm stock_out_details consume batch này
+    //     (NVL có thể xuất chuyển kho/bán; TP xuất bán cho khách)
+    const { data: outDetails } = await supabase
+      .from('stock_out_details')
+      .select(`
+        id, stock_out_id, quantity, weight,
+        stock_out:stock_out_orders(
+          id, code, reason, customer_name, customer_order_ref,
+          total_weight, status, confirmed_at, created_at,
+          warehouse:warehouses(id, code, name)
+        )
+      `)
+      .eq('batch_id', batchId)
+
+    if (outDetails && outDetails.length > 0) {
+      const REASON_LABELS: Record<string, string> = {
+        sale: 'Bán hàng',
+        production: 'Sản xuất',
+        transfer: 'Chuyển kho',
+        blend: 'Phối trộn',
+        adjust: 'Điều chỉnh',
+        return: 'Trả hàng',
+      }
+      const seenOrders = new Set<string>()
+      for (const det of outDetails) {
+        const so = Array.isArray(det.stock_out) ? det.stock_out[0] : det.stock_out
+        if (!so || seenOrders.has(so.id)) continue
+        seenOrders.add(so.id)
+
+        const wh = Array.isArray((so as any).warehouse) ? (so as any).warehouse[0] : (so as any).warehouse
+        const outDetail = [
+          REASON_LABELS[so.reason] || so.reason || '',
+          wh?.name || '',
+          formatWeight(det.weight || det.quantity),
+          so.status || '',
+        ].filter(Boolean).join(' | ')
+
+        const outNode: TraceNode = {
+          type: 'stock_out',
+          id: so.id,
+          label: `Phiếu xuất: ${so.code}`,
+          detail: outDetail,
+          date: formatDate(so.confirmed_at || so.created_at),
+          children: [],
+        }
+
+        // Nếu có khách hàng → thêm node customer con
+        if (so.customer_name) {
+          outNode.children.push({
+            type: 'customer',
+            id: `${so.id}-customer`,
+            label: `Khách: ${so.customer_name}`,
+            detail: so.customer_order_ref ? `Đơn ${so.customer_order_ref}` : '',
+            date: null,
+            children: [],
+          })
+        }
+
+        rootNode.children.push(outNode)
+      }
     }
 
     return rootNode

@@ -122,7 +122,16 @@ const QCQuickScanPage = () => {
         ash_content: ashContent || undefined,
       }
 
-      let res: { evaluation: QCEvaluation }
+      let res: {
+        evaluation: QCEvaluation
+        supplierImpact?: {
+          supplier_name: string
+          overall_score: number
+          grade: string
+          pass_rate: number
+          total_batches: number
+        } | null
+      }
 
       if (isPending) {
         res = await qcService.addInitialQC(qcData)
@@ -131,6 +140,15 @@ const QCQuickScanPage = () => {
       }
 
       setEvaluation(res.evaluation)
+
+      // D4: Nếu fail và có supplier impact → hiển thị toast cảnh báo
+      if (res.supplierImpact) {
+        const si = res.supplierImpact
+        message.warning({
+          content: `NCC "${si.supplier_name}" giờ đạt ${si.overall_score.toFixed(0)}/100 (hạng ${si.grade}) — pass rate ${si.pass_rate.toFixed(0)}% trên ${si.total_batches} lô`,
+          duration: 6,
+        })
+      }
 
       // Add to recent list
       setRecentQCs(prev => [{

@@ -14,6 +14,8 @@ import {
   InboxOutlined,
   FileTextOutlined,
   UserOutlined,
+  ExportOutlined,
+  ShopOutlined,
 } from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
 import { traceabilityService, type TraceNode, type TraceNodeType } from '../../services/wms/traceabilityService'
@@ -71,6 +73,18 @@ const NODE_CONFIG: Record<TraceNodeType, {
     color: '#13c2c2',
     tagColor: 'cyan',
     tagLabel: 'Phiếu cân',
+  },
+  stock_out: {
+    icon: <ExportOutlined />,
+    color: '#f5222d',
+    tagColor: 'red',
+    tagLabel: 'Xuất kho',
+  },
+  customer: {
+    icon: <ShopOutlined />,
+    color: '#fa541c',
+    tagColor: 'volcano',
+    tagLabel: 'Khách hàng',
   },
 }
 
@@ -131,17 +145,23 @@ function collectAllKeys(dataNodes: DataNode[]): React.Key[] {
 // ============================================================================
 
 export interface TraceabilityTreeProps {
-  /** ID lo thanh pham - truy xuat nguoc ve NVL, deal, dai ly */
+  /** ID lô thành phẩm/NVL */
   batchId?: string
-  /** ID deal - truy xuat xuoi ve thanh pham */
+  /** ID deal - truy xuất xuôi về thành phẩm */
   dealId?: string
+  /**
+   * 'backward' (default) — từ batch TP ngược về NVL/deal/đại lý (dùng `traceFromBatch`)
+   * 'forward' — từ batch xuôi tới production/stock-out/khách hàng (dùng `traceFromBatchForward`)
+   * Nếu dùng `dealId`, luôn là forward (từ deal xuôi về thành phẩm).
+   */
+  direction?: 'backward' | 'forward'
 }
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId }) => {
+const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId, direction = 'backward' }) => {
   const [loading, setLoading] = useState(false)
   const [traceData, setTraceData] = useState<TraceNode | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -161,7 +181,9 @@ const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId }) 
         let result: TraceNode | null = null
 
         if (batchId) {
-          result = await traceabilityService.traceFromBatch(batchId)
+          result = direction === 'forward'
+            ? await traceabilityService.traceFromBatchForward(batchId)
+            : await traceabilityService.traceFromBatch(batchId)
         } else if (dealId) {
           result = await traceabilityService.traceFromDeal(dealId)
         }
@@ -176,7 +198,7 @@ const TraceabilityTree: React.FC<TraceabilityTreeProps> = ({ batchId, dealId }) 
     }
 
     fetchTrace()
-  }, [batchId, dealId])
+  }, [batchId, dealId, direction])
 
   const { treeData, expandedKeys } = useMemo(() => {
     if (!traceData) return { treeData: [], expandedKeys: [] }

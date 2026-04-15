@@ -416,20 +416,21 @@ export const chatRoomService = {
   // ============================================
 
   /**
-   * Subscribe to room updates
-   * Lưu ý: Phải dùng schema: 'b2b' cho realtime
+   * Subscribe to room updates.
+   * Dùng schema 'public' vì canonical table là public.b2b_chat_rooms.
    */
   subscribeToRooms(
     callback: (payload: { eventType: string; new: ChatRoom; old: ChatRoom }) => void
   ) {
+    const channelName = `b2b-chat-rooms-${Math.random().toString(36).slice(2, 8)}`
     return supabase
-      .channel('b2b-chat-rooms')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: '*',
-          schema: 'b2b',
-          table: 'chat_rooms',
+          schema: 'public',
+          table: 'b2b_chat_rooms',
         },
         (payload) => {
           callback({
@@ -443,19 +444,21 @@ export const chatRoomService = {
   },
 
   /**
-   * Subscribe to new messages (để update last_message)
+   * Subscribe to new messages (để update last_message).
+   * Dùng schema 'public' để match canonical table b2b_chat_messages.
    */
   subscribeToMessages(
     callback: (payload: { eventType: string; new: unknown; old: unknown }) => void
   ) {
+    const channelName = `b2b-chat-messages-all-${Math.random().toString(36).slice(2, 8)}`
     return supabase
-      .channel('b2b-chat-messages-all')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'b2b',
-          table: 'chat_messages',
+          schema: 'public',
+          table: 'b2b_chat_messages',
         },
         (payload) => {
           callback({

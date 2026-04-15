@@ -528,8 +528,14 @@ export const chatMessageService = {
   // ============================================
 
   /**
-   * Subscribe to messages of a specific room
-   * Lưu ý: Phải dùng schema: 'b2b' cho realtime
+   * Subscribe to messages of a specific room.
+   *
+   * Canonical table là public.b2b_chat_messages (Portal insert thẳng vào
+   * đây, Sidebar unread count cũng đọc từ đây). Subscription cũ dùng
+   * schema:'b2b', table:'chat_messages' — sai schema, realtime không
+   * bao giờ fire event → user phải F5 mới thấy tin nhắn mới.
+   *
+   * Migration đi kèm: docs/migrations/b2b_chat_realtime_publication.sql
    */
   subscribeToRoom(
     roomId: string,
@@ -539,14 +545,17 @@ export const chatMessageService = {
       onDelete?: (message: ChatMessage) => void
     }
   ) {
+    // Unique channel per (room, instance) để 2 tab mở cùng 1 room
+    // không dùng chung channel gây duplicate/miss event
+    const channelName = `chat-room-${roomId}-${Math.random().toString(36).slice(2, 8)}`
     return supabase
-      .channel(`chat-room-${roomId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'b2b',
-          table: 'chat_messages',
+          schema: 'public',
+          table: 'b2b_chat_messages',
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
@@ -557,8 +566,8 @@ export const chatMessageService = {
         'postgres_changes',
         {
           event: 'UPDATE',
-          schema: 'b2b',
-          table: 'chat_messages',
+          schema: 'public',
+          table: 'b2b_chat_messages',
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
@@ -569,8 +578,8 @@ export const chatMessageService = {
         'postgres_changes',
         {
           event: 'DELETE',
-          schema: 'b2b',
-          table: 'chat_messages',
+          schema: 'public',
+          table: 'b2b_chat_messages',
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {

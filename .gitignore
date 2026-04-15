@@ -1,1 +1,4 @@
 node_modules
+
+# Weighbridge: extracted bundle working dir — distribute via camera-proxy-win32.zip
+apps/weighbridge/camera-proxy-win32/

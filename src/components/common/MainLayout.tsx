@@ -6,6 +6,10 @@
 import { Suspense } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import TabbedWorkspace from './TabbedWorkspace'
+// Side-effect import: đăng ký tất cả tab components vào registry
+// để tabs có thể restore sau khi user F5 reload
+import '../../lib/tabRegistry'
 
 function PageLoader() {
   return (
@@ -19,10 +23,14 @@ export function MainLayout() {
   return (
     <div className="flex min-h-screen" style={{ background: '#F0EDE8' }}>
       <Sidebar />
-      <main className="flex-1 overflow-auto lg:pt-0 pt-[calc(3.5rem+var(--safe-top))] pb-safe">
-        <Suspense fallback={<PageLoader />}>
-          <Outlet />
-        </Suspense>
+      <main className="flex-1 overflow-hidden lg:pt-0 pt-[calc(3.5rem+var(--safe-top))] pb-safe flex flex-col">
+        {/* TabbedWorkspace: khi có tabs → hiện tab bar + keep-alive content,
+            khi không có tabs → chỉ render Outlet như layout thường */}
+        <TabbedWorkspace>
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
+        </TabbedWorkspace>
       </main>
     </div>
   )

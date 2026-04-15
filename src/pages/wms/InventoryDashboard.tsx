@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../hooks/useOpenTab'
 import {
   Card,
   Row,
@@ -63,6 +64,7 @@ interface GradeDistribution {
 
 const InventoryDashboard = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   const [overview, setOverview] = useState<InventoryOverview | null>(null)
   const [stockSummary, setStockSummary] = useState<StockSummaryItem[]>([])
@@ -496,7 +498,13 @@ const InventoryDashboard = () => {
           size="small"
           pagination={{ showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
           onRow={(record) => ({
-            onClick: () => navigate(`/wms/inventory/${record.material_id}`),
+            onClick: () => openTab({
+              key: `inventory-${record.material_id}`,
+              title: `Tồn: ${(record as any).material_name || record.material_id.slice(0, 8)}`,
+              componentId: 'inventory-detail',
+              props: { materialId: record.material_id },
+              path: `/wms/inventory/${record.material_id}`,
+            }),
             style: { cursor: 'pointer' },
           })}
         />

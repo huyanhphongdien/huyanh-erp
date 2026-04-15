@@ -10,6 +10,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import stockInService from '../../../services/wms/stockInService'
 import type { StockInOrder } from '../../../services/wms/wms.types'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 
 const { Text } = Typography
 
@@ -34,6 +35,17 @@ const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-
 
 export default function StockInListPage() {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
+
+  const openDetail = (order: StockInOrder) => {
+    openTab({
+      key: `stock-in-${order.id}`,
+      title: `Phiếu ${(order as any).code || order.id.slice(0, 8)}`,
+      componentId: 'stock-in-detail',
+      props: { id: order.id },
+      path: `/wms/stock-in/${order.id}`,
+    })
+  }
 
   const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ['stock-in-orders-all'],
@@ -95,7 +107,7 @@ export default function StockInListPage() {
         <Descriptions.Item label="Ghi chú">{(order as any).notes || '—'}</Descriptions.Item>
       </Descriptions>
       <div style={{ marginTop: 8 }}>
-        <Button type="link" onClick={() => navigate(`/wms/stock-in/${order.id}`)}>Xem chi tiết đầy đủ →</Button>
+        <Button type="link" onClick={() => openDetail(order)}>Xem chi tiết đầy đủ →</Button>
       </div>
     </div>
   )

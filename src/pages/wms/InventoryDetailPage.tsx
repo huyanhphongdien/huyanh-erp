@@ -56,8 +56,13 @@ const MONO_FONT = "'JetBrains Mono', monospace"
 // COMPONENT
 // ============================================================================
 
-const InventoryDetailPage = () => {
-  const { materialId } = useParams<{ materialId: string }>()
+interface InventoryDetailPageProps {
+  materialId?: string
+}
+
+const InventoryDetailPage = ({ materialId: propMaterialId }: InventoryDetailPageProps = {}) => {
+  const { materialId: paramMaterialId } = useParams<{ materialId: string }>()
+  const materialId = propMaterialId || paramMaterialId
   const navigate = useNavigate()
 
   // State

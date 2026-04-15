@@ -133,8 +133,14 @@ async function getEmployeeName(empId: string | null): Promise<string> {
 // COMPONENT
 // ============================================================================
 
-const StockInDetailPage = () => {
-  const { id } = useParams<{ id: string }>()
+// Accept optional id prop cho tab mode — fallback useParams cho direct URL
+interface StockInDetailPageProps {
+  id?: string
+}
+
+const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
+  const { id: paramId } = useParams<{ id: string }>()
+  const id = propId || paramId
   const navigate = useNavigate()
 
   const [order, setOrder] = useState<OrderData | null>(null)

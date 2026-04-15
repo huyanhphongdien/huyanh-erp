@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Table,
@@ -131,6 +132,7 @@ const monoStyle: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospac
 
 const StockOutListPage: React.FC = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   // State
   const [orders, setOrders] = useState<StockOutOrder[]>([])
@@ -205,7 +207,13 @@ const StockOutListPage: React.FC = () => {
 
   // Handlers
   const handleTapRow = (record: StockOutOrder) => {
-    navigate(`/wms/stock-out/${record.id}`)
+    openTab({
+      key: `stock-out-${record.id}`,
+      title: `Phiếu ${(record as any).code || record.id.slice(0, 8)}`,
+      componentId: 'stock-out-detail',
+      props: { id: record.id },
+      path: `/wms/stock-out/${record.id}`,
+    })
   }
 
   const handleCreateNew = () => {

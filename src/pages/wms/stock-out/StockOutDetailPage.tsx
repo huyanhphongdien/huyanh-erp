@@ -164,8 +164,13 @@ function DRCDisplay({ value, status }: { value: number; status: string }) {
 // ============================================================================
 // MAIN PAGE
 // ============================================================================
-export default function StockOutDetailPage() {
-  const { id } = useParams()
+interface StockOutDetailPageProps {
+  id?: string
+}
+
+export default function StockOutDetailPage({ id: propId }: StockOutDetailPageProps = {}) {
+  const { id: paramId } = useParams()
+  const id = propId || paramId
   const navigate = useNavigate()
   const [order, setOrder] = useState<OutOrderData | null>(null)
   const [loading, setLoading] = useState(true)

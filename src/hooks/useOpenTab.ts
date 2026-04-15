@@ -46,7 +46,11 @@ export function useOpenTab() {
         navigate(input.path)
         return
       }
+      // Thêm tab vào store + navigate URL sang path của tab đó. Bắt buộc
+      // phải navigate vì TabbedWorkspace render theo location.pathname —
+      // nếu URL không khớp tab.path, tab content sẽ không hiện.
       addTab(input)
+      navigate(input.path)
     },
     [addTab, navigate],
   )

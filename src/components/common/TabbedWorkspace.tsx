@@ -37,41 +37,39 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Khi active tab đổi, sync URL về browser address bar
-  // để user có thể copy link / back/forward hoạt động hợp lý
-  useEffect(() => {
-    if (!activeKey) return
-    const active = tabs.find((t) => t.key === activeKey)
-    if (active && active.path && active.path !== location.pathname) {
-      navigate(active.path, { replace: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeKey])
+  // ★ Quy tắc hiển thị:
+  //   - Nếu URL hiện tại khớp với path của 1 tab → hiện tab đó, ẩn children
+  //   - Nếu URL không khớp tab nào (user navigate sidebar sang trang khác) →
+  //     ẩn toàn bộ tab content, chỉ hiện children (list/dashboard theo URL).
+  //     Tabs vẫn giữ trong store — click vào tab bar sẽ focus lại.
+  const matchingTab = tabs.find((t) => t.path === location.pathname)
+  const effectiveActiveKey = matchingTab ? matchingTab.key : null
 
   // Keyboard shortcuts: Ctrl+W close tab, Ctrl+Tab next tab
   useEffect(() => {
     const onKeydown = (e: KeyboardEvent) => {
-      if (!activeKey) return
+      if (!effectiveActiveKey) return
       // Ctrl/Cmd + W: close active tab
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'w') {
         e.preventDefault()
-        closeTab(activeKey)
+        closeTab(effectiveActiveKey)
       }
-      // Ctrl/Cmd + Tab: next tab
+      // Ctrl/Cmd + Tab: next tab — click-through nên cũng navigate
       if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
         e.preventDefault()
-        const idx = tabs.findIndex((t) => t.key === activeKey)
+        const idx = tabs.findIndex((t) => t.key === effectiveActiveKey)
         if (idx < 0) return
         const nextIdx = (idx + 1) % tabs.length
-        setActive(tabs[nextIdx].key)
+        const nextTab = tabs[nextIdx]
+        setActive(nextTab.key)
+        navigate(nextTab.path)
       }
     }
     window.addEventListener('keydown', onKeydown)
     return () => window.removeEventListener('keydown', onKeydown)
-  }, [activeKey, tabs, closeTab, setActive])
+  }, [effectiveActiveKey, tabs, closeTab, setActive, navigate])
 
-  // Build tab items cho Ant Design Tabs
-  // Content là empty — chúng ta tự render bên dưới để giữ mount state
+  // Build tab items cho Ant Design Tabs — content để null, tự render bên dưới
   const tabItems: TabsProps['items'] = tabs.map((tab) => ({
     key: tab.key,
     label: <TabLabel tab={tab} onCloseOthers={closeOthers} onCloseAll={closeAll} />,
@@ -79,13 +77,33 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
     closable: true,
   }))
 
+  // Khi user click vào tab bar → cần navigate đến path của tab đó
+  // (không chỉ setActive trong store — vì render logic dựa vào URL match)
+  const handleChange = (key: string) => {
+    const tab = tabs.find((t) => t.key === key)
+    if (!tab) return
+    setActive(key)
+    navigate(tab.path)
+  }
+
   const handleEdit: TabsProps['onEdit'] = (key, action) => {
     if (action === 'remove' && typeof key === 'string') {
+      const wasActive = key === effectiveActiveKey
       closeTab(key)
+      // Sau khi đóng, nếu tab bị đóng là tab đang xem → navigate sang
+      // tab kế bên (nếu còn) hoặc về /wms (fallback)
+      if (wasActive) {
+        const remaining = tabs.filter((t) => t.key !== key)
+        if (remaining.length > 0) {
+          const idx = tabs.findIndex((t) => t.key === key)
+          const next = remaining[Math.min(idx, remaining.length - 1)]
+          navigate(next.path)
+        }
+      }
     }
   }
 
-  // Nếu không có tab nào → chỉ render children (fallback navigation mode)
+  // Nếu không có tab nào → chỉ render children (tab bar không hiển thị)
   if (tabs.length === 0) {
     return <>{children}</>
   }
@@ -96,8 +114,8 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
       <Tabs
         type="editable-card"
         hideAdd
-        activeKey={activeKey || undefined}
-        onChange={setActive}
+        activeKey={effectiveActiveKey || undefined}
+        onChange={handleChange}
         onEdit={handleEdit}
         items={tabItems}
         size="small"
@@ -109,14 +127,21 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
         }}
       />
 
-      {/* Content area — render TẤT CẢ tabs, display:none cho inactive */}
-      {/* Thêm wrapper cho children (nếu user navigate đến list page khi có tab) */}
+      {/* Content area */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {tabs.map((tab) => (
-          <TabContent key={tab.key} tab={tab} isActive={tab.key === activeKey} />
-        ))}
-        {/* Fallback: khi user navigate sang URL không khớp tab nào, hiện children */}
-        {!tabs.some((t) => t.path === location.pathname) && (
+        {matchingTab ? (
+          // URL khớp 1 tab → render TẤT CẢ tabs, display:none cho inactive
+          // (keep-alive: inactive tab vẫn mount để giữ state)
+          tabs.map((tab) => (
+            <TabContent
+              key={tab.key}
+              tab={tab}
+              isActive={tab.key === matchingTab.key}
+            />
+          ))
+        ) : (
+          // URL không khớp tab nào → chỉ hiện children (list/dashboard theo URL)
+          // Tabs vẫn giữ trong store, user click tab sẽ focus lại
           <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
             {children}
           </div>

@@ -547,6 +547,7 @@ export const chatMessageService = {
     // Unique channel per (room, mount instance) để 2 tab mở cùng 1 room
     // hoặc 2 mount không dùng chung channel gây duplicate/miss event
     const channelName = `chat-room-${roomId}-${Math.random().toString(36).slice(2, 8)}`
+    console.log('[chat-realtime] subscribing to', { channelName, roomId })
     return supabase
       .channel(channelName)
       .on(
@@ -558,6 +559,7 @@ export const chatMessageService = {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
+          console.log('[chat-realtime] INSERT event received', payload)
           callbacks.onInsert?.(payload.new as ChatMessage)
         }
       )
@@ -570,6 +572,7 @@ export const chatMessageService = {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
+          console.log('[chat-realtime] UPDATE event received', payload)
           callbacks.onUpdate?.(payload.new as ChatMessage)
         }
       )
@@ -582,10 +585,16 @@ export const chatMessageService = {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
+          console.log('[chat-realtime] DELETE event received', payload)
           callbacks.onDelete?.(payload.old as ChatMessage)
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        console.log('[chat-realtime] subscription status:', status, err || '')
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('[chat-realtime] subscription problem — postgres_changes sẽ không hoạt động')
+        }
+      })
   },
 
   // ============================================

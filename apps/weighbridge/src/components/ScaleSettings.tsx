@@ -37,6 +37,7 @@ const KELI_MODELS = [
   // Cân nhỏ (< 5T)
   { label: 'XK3118T (cân nhỏ ≤3T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
   { label: 'XK3118T1-A3 (Huy Anh ≤5T)', baudRate: 2400, dataBits: 8, stopBits: 1, parity: 'none' },
+  { label: 'XK3118K8 (Keli electronic ≤5T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
   { label: 'YH-T7 (cân điện tử ≤5T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },
   // Cân trung (5-30T)
   { label: 'D2008FA (cân sàn ≤30T)', baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' },

@@ -133,7 +133,7 @@ const BlendSuggestPage = () => {
     {
       title: '',
       key: 'action',
-      width: 200,
+      width: 220,
       render: (_: any, r: any) => (
         <Button
           type="primary"
@@ -142,12 +142,15 @@ const BlendSuggestPage = () => {
           onClick={() => {
             const params = new URLSearchParams()
             params.set('batch_id', selectedBatchId)
+            params.set('partner_batch_id', r.partner_batch_id)
+            params.set('ratio', String(r.suggested_ratio))
             if (targetDrc) params.set('drc', String(targetDrc))
+            if (selectedBatch?.rubber_grade) params.set('grade', selectedBatch.rubber_grade)
             navigate(`/wms/blending/new?${params.toString()}`)
           }}
           style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
-          Tạo lệnh trộn với lô này
+          Tạo lệnh trộn từ gợi ý
         </Button>
       ),
     },

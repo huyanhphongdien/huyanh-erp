@@ -626,7 +626,7 @@ export const stockInService = {
     ticketId: string,
     warehouseId: string,
     yardPosition?: { zone: string; row: number; col: number }
-  ): Promise<{ stockIn: any; batch: any }> {
+  ): Promise<{ stockIn: any; batch: any; reused?: boolean }> {
     // 1. Get weighbridge ticket
     const { data: ticket, error: ticketErr } = await supabase
       .from('weighbridge_tickets')
@@ -637,6 +637,24 @@ export const stockInService = {
     if (ticketErr) throw ticketErr
     if (!ticket) throw new Error('Không tìm thấy phiếu cân')
     if (ticket.status !== 'completed') throw new Error('Phiếu cân chưa hoàn tất')
+
+    // Idempotency: nếu phiếu nhập đã tồn tại cho ticket này (matched via notes),
+    // trả về record cũ thay vì tạo trùng. Tránh double inventory khi re-trigger.
+    if (ticket.code) {
+      const { data: existing } = await supabase
+        .from('stock_in_orders')
+        .select('id, code')
+        .like('notes', `%phiếu cân ${ticket.code}%`)
+        .limit(1)
+      if (existing && existing.length > 0) {
+        const { data: existingBatch } = await supabase
+          .from('stock_batches')
+          .select('id, batch_no')
+          .eq('batch_no', `NVL-${(ticket.code || '').replace('CX-', '')}`)
+          .limit(1)
+        return { stockIn: existing[0], batch: existingBatch?.[0] || null, reused: true }
+      }
+    }
 
     // Phiếu cân luôn là NVL → kho phải là raw hoặc mixed
     await _assertWarehouseTypeMatches(warehouseId, 'raw')

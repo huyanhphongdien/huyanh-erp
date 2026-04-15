@@ -147,17 +147,68 @@ const BlendCreatePage = () => {
     load()
   }, [step])
 
-  // Pre-select batch from URL params
+  // Auto-advance wizard to step 2 khi URL có batch_id (deep link từ BlendSuggestPage)
+  // Step 1 vẫn chạy bình thường nếu user vào không qua link
   useEffect(() => {
-    const preselectedBatchId = searchParams.get('batch_id')
-    if (preselectedBatchId && availableBatches.length > 0) {
-      const batch = availableBatches.find(b => b.id === preselectedBatchId)
-      if (batch && !selectedItems.some(s => s.batch.id === preselectedBatchId)) {
-        setSelectedRawBatch(batch)
-        setShowBatchModal(true)
-      }
+    if (searchParams.get('batch_id') && step === 0 && targetGrade) {
+      setStep(1)
     }
-  }, [availableBatches, searchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetGrade])
+
+  // Pre-select batch(es) from URL params:
+  //  - batch_id alone           → mở modal để user nhập quantity (UX cũ)
+  //  - batch_id + partner_batch_id + ratio → auto-fill cả 2 lô với quantity
+  //    tính sẵn từ tỉ lệ gợi ý (C5 — tạo lệnh trộn từ gợi ý)
+  const [autoFilled, setAutoFilled] = useState(false)
+  useEffect(() => {
+    if (autoFilled) return
+    if (availableBatches.length === 0) return
+
+    const baseBatchId = searchParams.get('batch_id')
+    if (!baseBatchId) return
+
+    const base = availableBatches.find(b => b.id === baseBatchId)
+    if (!base) return
+
+    const partnerBatchId = searchParams.get('partner_batch_id')
+    const ratioStr = searchParams.get('ratio')
+
+    if (partnerBatchId && ratioStr) {
+      // Auto-fill cả 2 lô theo tỉ lệ gợi ý từ BlendSuggestPage
+      const partner = availableBatches.find(b => b.id === partnerBatchId)
+      if (!partner) return
+
+      const partnerRatioPct = Number(ratioStr) // % partner trong hỗn hợp
+      if (!Number.isFinite(partnerRatioPct) || partnerRatioPct <= 0 || partnerRatioPct >= 100) return
+
+      // source_qty dùng hết lô base, partner_qty tính theo tỉ lệ
+      let sourceQty = base.quantity_remaining
+      let partnerQty = (sourceQty * partnerRatioPct) / (100 - partnerRatioPct)
+
+      // Cap partner theo tồn kho thực tế → scale cả 2 về tỉ lệ
+      if (partnerQty > partner.quantity_remaining) {
+        partnerQty = partner.quantity_remaining
+        sourceQty = (partnerQty * (100 - partnerRatioPct)) / partnerRatioPct
+      }
+
+      sourceQty = Math.round(sourceQty)
+      partnerQty = Math.round(partnerQty)
+
+      if (sourceQty > 0 && partnerQty > 0) {
+        setSelectedItems([
+          { batch: base, quantity_kg: sourceQty },
+          { batch: partner, quantity_kg: partnerQty },
+        ])
+        setAutoFilled(true)
+      }
+    } else if (!selectedItems.some(s => s.batch.id === baseBatchId)) {
+      // Legacy flow: chỉ base batch → mở modal
+      setSelectedRawBatch(base)
+      setShowBatchModal(true)
+      setAutoFilled(true)
+    }
+  }, [availableBatches, searchParams, autoFilled, selectedItems])
 
   // ── SIMULATION (real-time) ──
   const simulation = useMemo(() => {

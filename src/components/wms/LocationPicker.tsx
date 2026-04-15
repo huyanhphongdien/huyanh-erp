@@ -26,6 +26,7 @@ import {
   CloseOutlined,
   ReloadOutlined,
   InfoCircleOutlined,
+  BulbOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
 
@@ -65,6 +66,8 @@ export interface LocationPickerProps {
   showSummary?: boolean
   className?: string
   disabled?: boolean
+  /** C4: hiện nút "Gợi ý" → auto-pick vị trí trống nhất (fewest-used) */
+  showAutoSuggest?: boolean
 }
 
 // ============================================================================
@@ -267,6 +270,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   showShelfFilter = true,
   showSummary = true,
   disabled = false,
+  showAutoSuggest = true,
 }) => {
   const [locations, setLocations] = useState<LocationData[]>([])
   const [loading, setLoading] = useState(false)
@@ -357,6 +361,47 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     return selectedId === locId
   }
 
+  // C4: Heuristic "gợi ý vị trí tối ưu" cho stock-in
+  //  1. Chỉ xét vị trí available, status ≠ 'full'
+  //  2. Ưu tiên vị trí trong shelf có ít batch nhất (turnover cao,
+  //     thường ở gần cửa vì được nhập/xuất nhiều)
+  //  3. Trong shelf đó chọn vị trí có current_quantity thấp nhất (trống nhất)
+  //  4. Fallback về vị trí empty đầu tiên
+  const suggestLocation = (): LocationData | null => {
+    const candidates = locations.filter(l => {
+      if (!l.is_available) return false
+      const s = getLocationStatus(l)
+      return s !== 'full' && s !== 'unavailable'
+    })
+    if (candidates.length === 0) return null
+
+    // Đếm số batch đang chiếm mỗi shelf (proxy cho turnover)
+    const shelfOccupancy: Record<string, number> = {}
+    locations.forEach(l => {
+      if (l.shelf) {
+        shelfOccupancy[l.shelf] = (shelfOccupancy[l.shelf] || 0) + (l.current_quantity > 0 ? 1 : 0)
+      }
+    })
+
+    const sorted = [...candidates].sort((a, b) => {
+      const shelfA = shelfOccupancy[a.shelf || ''] || 0
+      const shelfB = shelfOccupancy[b.shelf || ''] || 0
+      if (shelfA !== shelfB) return shelfA - shelfB
+      return a.current_quantity - b.current_quantity
+    })
+    return sorted[0]
+  }
+
+  const handleAutoSuggest = () => {
+    const suggestion = suggestLocation()
+    if (!suggestion) return
+    if (multiSelect && onMultiSelect) {
+      onMultiSelect([...locations.filter(l => selectedIds.includes(l.id)), suggestion])
+    } else {
+      onSelect(suggestion)
+    }
+  }
+
   const selectedLocation = selectedId ? locations.find(l => l.id === selectedId) : null
 
   // No warehouse
@@ -416,15 +461,30 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           )}
         </Space>
         {!collapsed && (
-          <Segmented
-            size="small"
-            value={viewMode}
-            onChange={v => setViewMode(v as string)}
-            options={[
-              { value: 'grid', icon: <AppstoreOutlined /> },
-              { value: 'list', icon: <UnorderedListOutlined /> },
-            ]}
-          />
+          <Space size={4}>
+            {showAutoSuggest && mode === 'stock-in' && !multiSelect && !disabled && (
+              <Tooltip title="Tự chọn vị trí trống nhất (shelf ít batch + current_quantity thấp)">
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<BulbOutlined style={{ color: '#E8A838' }} />}
+                  onClick={handleAutoSuggest}
+                  disabled={locations.length === 0}
+                >
+                  Gợi ý
+                </Button>
+              </Tooltip>
+            )}
+            <Segmented
+              size="small"
+              value={viewMode}
+              onChange={v => setViewMode(v as string)}
+              options={[
+                { value: 'grid', icon: <AppstoreOutlined /> },
+                { value: 'list', icon: <UnorderedListOutlined /> },
+              ]}
+            />
+          </Space>
         )}
       </div>
 

@@ -61,6 +61,11 @@ export interface CreateStockCheckData {
   warehouse_id: string
   notes?: string
   created_by?: string
+  /**
+   * Cycle count mode: nếu cung cấp, chỉ đếm các batch nằm ở location_ids đã chọn.
+   * Nếu bỏ qua / rỗng → kiểm kê toàn bộ kho (mặc định).
+   */
+  location_ids?: string[]
 }
 
 export interface UpdateCheckItemData {
@@ -104,8 +109,8 @@ export const stockCheckService = {
   async createStockCheck(data: CreateStockCheckData): Promise<StockCheck> {
     const code = await generateCode()
 
-    // 1. Lấy tất cả batches active trong kho
-    const { data: batches, error: batchErr } = await supabase
+    // 1. Lấy tất cả batches active trong kho (hoặc filter theo location_ids cho cycle count)
+    let query = supabase
       .from('stock_batches')
       .select(`
         id, batch_no, material_id, quantity_remaining, location_id,
@@ -117,10 +122,19 @@ export const stockCheckService = {
       .gt('quantity_remaining', 0)
       .order('received_date', { ascending: true })
 
+    if (data.location_ids && data.location_ids.length > 0) {
+      query = query.in('location_id', data.location_ids)
+    }
+
+    const { data: batches, error: batchErr } = await query
+
     if (batchErr) throw batchErr
 
     if (!batches || batches.length === 0) {
-      throw new Error('Kho này không có lô hàng nào để kiểm kê')
+      const scope = data.location_ids && data.location_ids.length > 0
+        ? 'các vị trí đã chọn'
+        : 'kho này'
+      throw new Error(`Không có lô hàng nào ở ${scope} để kiểm kê`)
     }
 
     // 2. Tạo header — lưu vào local state (không tạo bảng riêng trong DB)

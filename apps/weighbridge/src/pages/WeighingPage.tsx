@@ -10,6 +10,8 @@ import {
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
+import stockInService from '@erp/services/wms/stockInService'
+import { supabase } from '@erp/lib/supabase'
 import { useKeliScale } from '@erp/hooks/useKeliScale'
 import { dealWmsService } from '@erp/services/b2b/dealWmsService'
 import type { ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
@@ -313,6 +315,35 @@ export default function WeighingPage() {
         try {
           await dealWmsService.updateDealStockInTotals(selectedDealId)
         } catch { /* non-blocking */ }
+      }
+
+      // C1: Auto-sync → tạo phiếu nhập kho NVL từ phiếu cân (feature flag)
+      // Chọn kho raw/mixed đầu tiên đang active. Không chặn luồng print nếu lỗi.
+      if (import.meta.env.VITE_AUTO_WEIGHBRIDGE_SYNC === 'true') {
+        try {
+          const { data: rawWh } = await supabase
+            .from('warehouses')
+            .select('id, code, name')
+            .eq('is_active', true)
+            .in('type', ['raw', 'mixed'])
+            .order('code', { ascending: true })
+            .limit(1)
+          if (rawWh && rawWh.length > 0) {
+            const result = await stockInService.createFromWeighbridgeTicket(
+              ticket.id,
+              rawWh[0].id,
+            )
+            if (result.reused) {
+              message.info(`Phiếu nhập đã tồn tại: ${result.stockIn?.code || ''}`)
+            } else {
+              message.success(`Đã tạo phiếu nhập NVL: ${result.stockIn?.code || ''}`)
+            }
+          } else {
+            console.warn('[auto-sync] không tìm thấy kho NVL active')
+          }
+        } catch (syncErr: any) {
+          console.warn('[auto-sync] tạo phiếu nhập thất bại:', syncErr?.message || syncErr)
+        }
       }
 
       message.success(`Hoàn tất — NET: ${updated.net_weight?.toLocaleString()} kg`)

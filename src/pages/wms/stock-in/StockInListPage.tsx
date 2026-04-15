@@ -5,7 +5,7 @@
 
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Tag, Typography, Button, Descriptions, Card, Row, Col, Statistic } from 'antd'
+import { Tag, Typography, Button, Descriptions, Card, Row, Col, Statistic, Space } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import stockInService from '../../../services/wms/stockInService'
 import type { StockInOrder } from '../../../services/wms/wms.types'
@@ -32,6 +32,14 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
+
+// Trích mã phiếu cân từ `notes` (format: "Nhập nhanh từ phiếu cân CX-YYYYMMDD-NNN")
+// Trả về null nếu notes không match pattern weighbridge origin.
+const extractWeighbridgeCode = (notes: string | null | undefined): string | null => {
+  if (!notes) return null
+  const match = notes.match(/phiếu cân\s+(CX-[\w-]+)/i)
+  return match ? match[1] : null
+}
 
 export default function StockInListPage() {
   const navigate = useNavigate()
@@ -63,10 +71,24 @@ export default function StockInListPage() {
       filterType: 'select', filterOptions: Object.entries(TYPE_LABELS).map(([v, l]) => ({ value: v, label: l })),
       render: (v) => <Tag color={TYPE_COLORS[v]}>{TYPE_LABELS[v] || v}</Tag>,
       exportRender: (v) => TYPE_LABELS[v] || v },
-    { key: 'source_type', title: 'Nguồn', dataIndex: 'source_type', width: 110,
+    { key: 'source_type', title: 'Nguồn', dataIndex: 'source_type', width: 180,
       filterType: 'select', filterOptions: Object.entries(SOURCE_LABELS).map(([v, l]) => ({ value: v, label: l })),
-      render: (v) => <Tag color={SOURCE_COLORS[v]}>{SOURCE_LABELS[v] || v}</Tag>,
-      exportRender: (v) => SOURCE_LABELS[v] || v },
+      render: (v, r) => {
+        const ticketCode = extractWeighbridgeCode((r as any).notes)
+        return (
+          <Space size={4} wrap>
+            <Tag color={SOURCE_COLORS[v]}>{SOURCE_LABELS[v] || v}</Tag>
+            {ticketCode && (
+              <Tag color="cyan" style={{ margin: 0 }}>⚖ {ticketCode}</Tag>
+            )}
+          </Space>
+        )
+      },
+      exportRender: (v, r) => {
+        const ticketCode = extractWeighbridgeCode((r as any).notes)
+        return ticketCode ? `${SOURCE_LABELS[v] || v} (${ticketCode})` : (SOURCE_LABELS[v] || v)
+      },
+    },
     { key: 'warehouse', title: 'Kho', dataIndex: ['warehouse', 'name'], width: 140,
       render: (_, r) => (r as any).warehouse?.name || '—',
       exportRender: (_, r) => (r as any).warehouse?.name || '' },

@@ -26,6 +26,8 @@ import {
   Alert,
   Result,
   message,
+  Radio,
+  Select,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -67,6 +69,37 @@ const StockCheckPage = () => {
   const [searchText, setSearchText] = useState('')
   const [showOnlyDiscrepancy, setShowOnlyDiscrepancy] = useState(false)
 
+  // C2: Cycle count mode — full warehouse hoặc filter theo location
+  const [countMode, setCountMode] = useState<'full' | 'cycle'>('full')
+  const [locations, setLocations] = useState<Array<{ id: string; code: string; shelf?: string | null }>>([])
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
+  const [loadingLocations, setLoadingLocations] = useState(false)
+
+  // Load locations khi chọn kho (cho cycle count)
+  useEffect(() => {
+    if (!selectedWarehouse) {
+      setLocations([])
+      setSelectedLocationIds([])
+      return
+    }
+    const loadLocations = async () => {
+      setLoadingLocations(true)
+      try {
+        const { data } = await supabase
+          .from('warehouse_locations')
+          .select('id, code, shelf')
+          .eq('warehouse_id', selectedWarehouse)
+          .order('code')
+        setLocations(data || [])
+      } catch (err) {
+        console.error('Load locations:', err)
+      } finally {
+        setLoadingLocations(false)
+      }
+    }
+    loadLocations()
+  }, [selectedWarehouse])
+
   // Load warehouses
   useEffect(() => {
     const load = async () => {
@@ -89,12 +122,19 @@ const StockCheckPage = () => {
   // Create stock check
   const handleCreateCheck = async () => {
     if (!selectedWarehouse) return
+    if (countMode === 'cycle' && selectedLocationIds.length === 0) {
+      message.warning('Chọn ít nhất 1 vị trí cho chế độ kiểm kê theo vị trí')
+      return
+    }
     try {
       setCreating(true)
       const check = await stockCheckService.createStockCheck({
         warehouse_id: selectedWarehouse,
         created_by: user?.employee_id || user?.id,
-        notes: '',
+        notes: countMode === 'cycle'
+          ? `Kiểm kê theo vị trí (${selectedLocationIds.length} ví trí)`
+          : '',
+        location_ids: countMode === 'cycle' ? selectedLocationIds : undefined,
       })
       setStockCheck(check)
       setStep('checking')
@@ -207,7 +247,7 @@ const StockCheckPage = () => {
                 <Card
                   key={wh.id}
                   hoverable
-                  onClick={() => setSelectedWarehouse(wh.id)}
+                  onClick={() => { setSelectedWarehouse(wh.id); setSelectedLocationIds([]) }}
                   style={{
                     borderColor: selectedWarehouse === wh.id ? '#1B4D3E' : '#d9d9d9',
                     borderWidth: selectedWarehouse === wh.id ? 2 : 1,
@@ -239,6 +279,51 @@ const StockCheckPage = () => {
                 </Card>
               ))}
             </Space>
+          )}
+
+          {/* C2: Mode toggle + location picker (chỉ hiện khi đã chọn kho) */}
+          {selectedWarehouse && (
+            <Card
+              size="small"
+              style={{ marginTop: 12, borderRadius: 8 }}
+              bodyStyle={{ padding: 12 }}
+            >
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>Phạm vi kiểm kê</Text>
+              <Radio.Group
+                value={countMode}
+                onChange={e => { setCountMode(e.target.value); setSelectedLocationIds([]) }}
+                buttonStyle="solid"
+                size="middle"
+                style={{ width: '100%' }}
+              >
+                <Radio.Button value="full" style={{ width: '50%', textAlign: 'center' }}>
+                  🏬 Toàn bộ kho
+                </Radio.Button>
+                <Radio.Button value="cycle" style={{ width: '50%', textAlign: 'center' }}>
+                  📍 Theo vị trí (cycle)
+                </Radio.Button>
+              </Radio.Group>
+              {countMode === 'cycle' && (
+                <div style={{ marginTop: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
+                    Chọn vị trí cần đếm. Chỉ batch ở vị trí đã chọn sẽ được đưa vào đợt kiểm kê.
+                  </Text>
+                  <Select
+                    mode="multiple"
+                    placeholder="Chọn vị trí..."
+                    value={selectedLocationIds}
+                    onChange={setSelectedLocationIds}
+                    loading={loadingLocations}
+                    style={{ width: '100%' }}
+                    maxTagCount={3}
+                    options={locations.map(l => ({
+                      value: l.id,
+                      label: l.shelf ? `${l.code} · Kệ ${l.shelf}` : l.code,
+                    }))}
+                  />
+                </div>
+              )}
+            </Card>
           )}
         </div>
 

@@ -41,6 +41,11 @@ export interface AlertConfig {
   // Dự báo
   forecast_days: number             // default 30
   stockout_warning_days: number     // default 7
+  // C3: DRC warning range (%)
+  drc_warning_min: number           // default 55 — dưới mức này là warning
+  drc_warning_max: number           // default 70 — trên mức này là warning
+  drc_critical_min: number          // default 50 — dưới mức này là critical
+  drc_critical_max: number          // default 75 — trên mức này là critical
 }
 
 export const DEFAULT_ALERT_CONFIG: AlertConfig = {
@@ -51,6 +56,10 @@ export const DEFAULT_ALERT_CONFIG: AlertConfig = {
   expiry_warning_days: 7,
   forecast_days: 30,
   stockout_warning_days: 7,
+  drc_warning_min: 55,
+  drc_warning_max: 70,
+  drc_critical_min: 50,
+  drc_critical_max: 75,
 }
 
 const ALERT_CONFIG_KEY = 'wms_alert_config'

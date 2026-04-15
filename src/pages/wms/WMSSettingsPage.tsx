@@ -27,6 +27,7 @@ import {
   ClockCircleOutlined,
   CalendarOutlined,
   LineChartOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import forecastService, {
   type AlertConfig,
@@ -233,6 +234,80 @@ const WMSSettingsPage = () => {
               max={90}
               step={1}
               addonAfter="ngày"
+              style={{ width: '100%' }}
+            />
+          </Col>
+        </Row>
+      </Card>
+
+      {/* Section 3b: DRC range (C3) */}
+      <Card
+        title={
+          <Space>
+            <ExperimentOutlined style={{ color: '#059669' }} />
+            <span>Ngưỡng DRC (%)</span>
+          </Space>
+        }
+        style={{ marginBottom: 16 }}
+      >
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+          DRC nằm ngoài khoảng "warning" sẽ cảnh báo vàng; ngoài khoảng "critical" cảnh báo đỏ.
+          Dùng cho QC dashboard và alert list.
+        </Text>
+        <Row gutter={[24, 16]}>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ marginBottom: 8 }}>
+              <Text strong>Warning DRC min</Text>
+            </div>
+            <InputNumber
+              value={config.drc_warning_min}
+              onChange={v => handleChange('drc_warning_min', v)}
+              min={0}
+              max={100}
+              step={0.5}
+              addonAfter="%"
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ marginBottom: 8 }}>
+              <Text strong>Warning DRC max</Text>
+            </div>
+            <InputNumber
+              value={config.drc_warning_max}
+              onChange={v => handleChange('drc_warning_max', v)}
+              min={0}
+              max={100}
+              step={0.5}
+              addonAfter="%"
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ marginBottom: 8 }}>
+              <Text strong>Critical DRC min</Text>
+            </div>
+            <InputNumber
+              value={config.drc_critical_min}
+              onChange={v => handleChange('drc_critical_min', v)}
+              min={0}
+              max={100}
+              step={0.5}
+              addonAfter="%"
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ marginBottom: 8 }}>
+              <Text strong>Critical DRC max</Text>
+            </div>
+            <InputNumber
+              value={config.drc_critical_max}
+              onChange={v => handleChange('drc_critical_max', v)}
+              min={0}
+              max={100}
+              step={0.5}
+              addonAfter="%"
               style={{ width: '100%' }}
             />
           </Col>

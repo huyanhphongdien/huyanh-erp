@@ -75,8 +75,7 @@ const STOCK_OUT_LIST_SELECT = `
 // ============================================================================
 
 /**
- * Tự sinh mã phiếu xuất: XK-TP-YYYYMMDD-XXX
- * VD: XK-TP-20260211-001
+ * Tự sinh mã phiếu xuất: XK-TP-YYYYMMDD-XXX (finished) hoặc XK-NVL-YYYYMMDD-XXX (raw)
  */
 /**
  * Validate: kho phải đúng loại (raw ↔ raw, finished ↔ finished, mixed ↔ cả 2)
@@ -103,12 +102,13 @@ async function _assertWarehouseTypeMatches(
   }
 }
 
-async function generateCode(): Promise<string> {
+async function generateCode(orderType: 'raw' | 'finished' = 'finished'): Promise<string> {
   const now = new Date()
   const yyyy = String(now.getFullYear())
   const mm = String(now.getMonth() + 1).padStart(2, '0')
   const dd = String(now.getDate()).padStart(2, '0')
-  const prefix = `XK-TP-${yyyy}${mm}${dd}`
+  const typeSegment = orderType === 'raw' ? 'NVL' : 'TP'
+  const prefix = `XK-${typeSegment}-${yyyy}${mm}${dd}`
 
   const { data, error } = await supabase
     .from('stock_out_orders')
@@ -148,7 +148,7 @@ export const stockOutService = {
     const orderType: 'raw' | 'finished' = (data.type || 'finished') as 'raw' | 'finished'
     await _assertWarehouseTypeMatches(data.warehouse_id, orderType)
 
-    const code = await generateCode()
+    const code = await generateCode(orderType)
 
     const insertData = {
       code,

@@ -29,7 +29,7 @@ import {
   LayoutDashboard, Building2, Briefcase, Users,
   FileText, ScrollText, Palmtree, CalendarClock, Clock,
   Wallet, Calendar, Receipt,
-  Target, Star,
+  Target,
   ClipboardList, UserCheck, CheckSquare,
   LogOut,
   BarChart3,
@@ -57,7 +57,6 @@ import {
   MapPin,
   PackagePlus,
   PackageMinus,
-  Activity,
   AlertTriangle,
   FlaskConical,
   History,
@@ -359,7 +358,7 @@ const getMenuGroups = (
     ],
   },
 
-  // ★ KHO (WMS) — Phase 4: Deal ↔ WMS Integration
+  // ★ KHO (WMS) — Phase A consolidation: 15 → 12 items, inline tabs trong /wms, /wms/qc, /wms/reports
   // ============================================================
   {
     title: 'KHO (WMS)',
@@ -367,20 +366,17 @@ const getMenuGroups = (
     collapsible: true,
     executiveOnly: true,
     items: [
-      { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> },
-      { path: '/wms/nvl-dashboard', label: 'Bãi NVL', icon: <Layers size={18} /> },
+      { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> }, // tabs: overview | nvl | alerts | stock-check
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
       { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
-      { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> },
-      { path: '/wms/qc/recheck', label: 'QC Recheck', icon: <Activity size={18} /> },
+      { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> }, // tabs: dashboard | recheck | quick-scan | standards
       { path: '/wms/materials', label: 'Vật liệu', icon: <Package size={18} /> },
       { path: '/wms/warehouses', label: 'Kho hàng', icon: <Warehouse size={18} /> },
       { path: '/wms/blending', label: 'Phối trộn', icon: <Droplets size={18} /> },
       { path: '/wms/blending/suggest', label: 'Gợi ý trộn', icon: <FlaskConical size={18} /> },
       { path: '/wms/yard-map', label: 'Bản đồ bãi', icon: <LayoutGrid size={18} /> },
-      { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> },
-      { path: '/wms/reports/supplier-scoring', label: 'Chấm điểm NCC', icon: <Star size={18} /> },
+      { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> }, // tabs: dashboard | stock-movement | supplier-quality | inventory-value | supplier-scoring
       { path: '/wms/settings', label: 'Cài đặt kho', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
     ],
   },

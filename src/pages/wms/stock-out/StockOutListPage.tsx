@@ -96,6 +96,9 @@ const REASON_COLORS: Record<string, string> = {
   return: 'orange',
 }
 
+const TYPE_LABELS: Record<string, string> = { raw: 'NVL', finished: 'TP' }
+const TYPE_COLORS: Record<string, string> = { raw: 'orange', finished: 'green' }
+
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'draft', label: 'Nháp' },
@@ -238,6 +241,13 @@ const StockOutListPage: React.FC = () => {
       ),
     },
     {
+      title: 'Loại',
+      dataIndex: 'type',
+      key: 'type',
+      width: 80,
+      render: (t: string) => <Tag color={TYPE_COLORS[t] || 'default'}>{TYPE_LABELS[t] || t || '—'}</Tag>,
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
@@ -338,7 +348,7 @@ const StockOutListPage: React.FC = () => {
               <ExportOutlined style={{ marginRight: 8 }} />
               Phiếu xuất kho
             </Title>
-            <Text type="secondary">Thành phẩm</Text>
+            <Text type="secondary">NVL & Thành phẩm</Text>
           </div>
         </Space>
         <Button

@@ -35,6 +35,7 @@ import {
   Badge,
   Divider,
   List,
+  Radio,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -119,6 +120,7 @@ interface OutItem {
   rubber_grade: RubberGrade | null
 }
 
+type StockType = 'raw' | 'finished'
 type StockOutReason = 'sale' | 'production' | 'transfer' | 'blend' | 'adjust' | 'return'
 
 interface FormHeader {
@@ -170,6 +172,9 @@ const StockOutCreatePage: React.FC = () => {
 
   // Step wizard
   const [step, setStep] = useState(0) // 0-indexed for Ant Steps
+
+  // Top-level mode: NVL vs TP (quyết định loại kho xuất + reason mặc định)
+  const [stockType, setStockType] = useState<StockType>('finished')
 
   // Step 1: Header
   const [header, setHeader] = useState<FormHeader>({
@@ -328,6 +333,21 @@ const StockOutCreatePage: React.FC = () => {
   // DERIVED
   // ========================================================================
 
+  // Filter kho theo stockType: raw → chỉ kho NVL + mixed; finished → chỉ kho TP + mixed
+  const filteredWarehouses = useMemo(() => {
+    return warehouses.filter(w => w.type === 'mixed' || w.type === stockType)
+  }, [warehouses, stockType])
+
+  // Khi đổi NVL ↔ TP: reset kho + reason về default hợp lệ
+  useEffect(() => {
+    setHeader(h => ({
+      ...h,
+      warehouse_id: '',
+      reason: stockType === 'raw' ? 'transfer' : 'sale',
+    }))
+    setOutItems([])
+  }, [stockType])
+
   const selectedWarehouse = warehouses.find(w => w.id === header.warehouse_id)
 
   const materialOptions = useMemo(() => {
@@ -443,7 +463,8 @@ const StockOutCreatePage: React.FC = () => {
     const yyyy = String(now.getFullYear())
     const mm = String(now.getMonth() + 1).padStart(2, '0')
     const dd = String(now.getDate()).padStart(2, '0')
-    const prefix = `XK-TP-${yyyy}${mm}${dd}`
+    const typeSegment = stockType === 'raw' ? 'NVL' : 'TP'
+    const prefix = `XK-${typeSegment}-${yyyy}${mm}${dd}`
 
     const { data, error: err } = await supabase
       .from('stock_out_orders')
@@ -478,7 +499,7 @@ const StockOutCreatePage: React.FC = () => {
         .from('stock_out_orders')
         .insert({
           code,
-          type: 'finished',
+          type: stockType,
           warehouse_id: header.warehouse_id,
           reason: header.reason,
           customer_name: header.customer_name || null,
@@ -540,7 +561,7 @@ const StockOutCreatePage: React.FC = () => {
         .from('stock_out_orders')
         .insert({
           code,
-          type: 'finished',
+          type: stockType,
           warehouse_id: header.warehouse_id,
           reason: header.reason,
           customer_name: header.customer_name || null,
@@ -1019,6 +1040,29 @@ const StockOutCreatePage: React.FC = () => {
       {step === 0 && (
         <Row gutter={24}>
           <Col xs={24} lg={14}>
+            {/* Top-level toggle: NVL vs TP (mirror stock-in) */}
+            <Card style={{ marginBottom: 16 }}>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>Loại phiếu xuất *</Text>
+              <Radio.Group
+                value={stockType}
+                onChange={e => setStockType(e.target.value)}
+                buttonStyle="solid"
+                size="large"
+              >
+                <Radio.Button value="raw" style={{ minWidth: 200, textAlign: 'center' }}>
+                  📦 Xuất Nguyên liệu (NVL)
+                </Radio.Button>
+                <Radio.Button value="finished" style={{ minWidth: 200, textAlign: 'center' }}>
+                  🏭 Xuất Thành phẩm (TP)
+                </Radio.Button>
+              </Radio.Group>
+              <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
+                {stockType === 'raw'
+                  ? 'Xuất cao su thô từ kho NVL (chuyển kho, phối trộn, điều chỉnh…)'
+                  : 'Xuất thành phẩm từ kho TP (bán hàng, chuyển kho, trả hàng…)'}
+              </div>
+            </Card>
+
             <Card title="Kho xuất" style={{ marginBottom: 24 }}>
               {loadingWarehouses ? (
                 <div style={{ textAlign: 'center', padding: 40 }}>
@@ -1026,12 +1070,13 @@ const StockOutCreatePage: React.FC = () => {
                 </div>
               ) : (
                 <Select
-                  placeholder="Chọn kho xuất"
+                  placeholder={stockType === 'raw' ? 'Chọn kho NVL' : 'Chọn kho TP'}
                   value={header.warehouse_id || undefined}
                   onChange={val => setHeader(h => ({ ...h, warehouse_id: val }))}
                   style={{ width: '100%' }}
                   size="large"
-                  options={warehouses.map(w => ({
+                  notFoundContent={filteredWarehouses.length === 0 ? `Không có kho ${stockType === 'raw' ? 'NVL' : 'TP'} nào` : undefined}
+                  options={filteredWarehouses.map(w => ({
                     value: w.id,
                     label: `${w.code} — ${w.name}`,
                   }))}

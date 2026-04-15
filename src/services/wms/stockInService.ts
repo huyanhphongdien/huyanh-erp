@@ -57,8 +57,7 @@ const STOCK_IN_LIST_SELECT = `
 // ============================================================================
 
 /**
- * Tự sinh mã phiếu nhập: NK-TP-YYYYMMDD-XXX
- * VD: NK-TP-20260210-001
+ * Tự sinh mã phiếu nhập: NK-TP-YYYYMMDD-XXX (finished) hoặc NK-NVL-YYYYMMDD-XXX (raw)
  */
 /**
  * Validate: kho phải đúng loại (raw ↔ raw, finished ↔ finished, mixed ↔ cả 2)
@@ -85,12 +84,13 @@ async function _assertWarehouseTypeMatches(
   }
 }
 
-async function generateCode(): Promise<string> {
+async function generateCode(orderType: 'raw' | 'finished' = 'finished'): Promise<string> {
   const now = new Date()
   const yyyy = String(now.getFullYear())
   const mm = String(now.getMonth() + 1).padStart(2, '0')
   const dd = String(now.getDate()).padStart(2, '0')
-  const prefix = `NK-TP-${yyyy}${mm}${dd}`
+  const typeSegment = orderType === 'raw' ? 'NVL' : 'TP'
+  const prefix = `NK-${typeSegment}-${yyyy}${mm}${dd}`
 
   const { data, error } = await supabase
     .from('stock_in_orders')
@@ -133,7 +133,7 @@ export const stockInService = {
     const orderType: 'raw' | 'finished' = (data.type || 'finished') as 'raw' | 'finished'
     await _assertWarehouseTypeMatches(data.warehouse_id, orderType)
 
-    const code = await generateCode()
+    const code = await generateCode(orderType)
 
     const insertData = {
       code,

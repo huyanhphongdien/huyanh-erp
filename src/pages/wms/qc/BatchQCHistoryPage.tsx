@@ -8,8 +8,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Card, Descriptions, Timeline, Tag, Button, Space, Typography,
-  Row, Col, Statistic, Spin, Empty, Divider,
+  Row, Col, Statistic, Spin, Empty, Divider, Tabs,
 } from 'antd'
+import TraceabilityTree from '../../../components/wms/TraceabilityTree'
 import {
   ArrowLeftOutlined, ExperimentOutlined, HistoryOutlined,
   CheckCircleOutlined, ExclamationCircleOutlined, CloseCircleOutlined,
@@ -190,6 +191,15 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
         </Col>
       </Row>
 
+      <Tabs
+        defaultActiveKey="qc"
+        size="large"
+        items={[
+          {
+            key: 'qc',
+            label: (<Space><HistoryOutlined />QC & Lịch sử</Space>),
+            children: (
+              <>
       {/* Batch Info */}
       <Card style={{ marginBottom: 16, borderRadius: 12 }}>
         <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small" bordered>
@@ -267,7 +277,7 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
       )}
 
       {/* QC History Timeline */}
-      <Card title={<Space><HistoryOutlined /> Lịch sử QC ({qcHistory.length})</Space>} style={{ borderRadius: 12 }}>
+      <Card title={<Space><HistoryOutlined /> Lịch sử QC ({qcHistory.length})</Space>} style={{ marginBottom: 16, borderRadius: 12 }}>
         {qcHistory.length === 0 ? (
           <Empty description="Chưa có ket qua QC" />
         ) : (
@@ -314,6 +324,20 @@ const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = 
           />
         )}
       </Card>
+              </>
+            ),
+          },
+          {
+            key: 'traceability',
+            label: (<Space><ExperimentOutlined />Truy xuất nguồn gốc</Space>),
+            children: (
+              <Card style={{ borderRadius: 12 }}>
+                <TraceabilityTree batchId={batchInfo.id} />
+              </Card>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }

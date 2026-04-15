@@ -66,6 +66,12 @@ const NODE_CONFIG: Record<TraceNodeType, {
     tagColor: 'magenta',
     tagLabel: 'Đại lý',
   },
+  rubber_intake: {
+    icon: <InboxOutlined />,
+    color: '#13c2c2',
+    tagColor: 'cyan',
+    tagLabel: 'Phiếu cân',
+  },
 }
 
 // ============================================================================

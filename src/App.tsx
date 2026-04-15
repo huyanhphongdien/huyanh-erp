@@ -131,6 +131,9 @@ const StockOutCreatePage = lazy(() => import('./pages/wms/stock-out/StockOutCrea
 const StockOutDetailPage = lazy(() => import('./pages/wms/stock-out/StockOutDetailPage'));
 const PickingListPage = lazy(() => import('./pages/wms/stock-out/PickingListPage'));
 const InventoryDashboard = lazy(() => import('./pages/wms/InventoryDashboard'));
+const WMSInventoryTabbedPage = lazy(() => import('./pages/wms/WMSInventoryTabbedPage'));
+const WMSQCTabbedPage = lazy(() => import('./pages/wms/qc/WMSQCTabbedPage'));
+const WMSReportsTabbedPage = lazy(() => import('./pages/wms/reports/WMSReportsTabbedPage'));
 const InventoryDetailPage = lazy(() => import('./pages/wms/InventoryDetailPage'));
 const AlertListPage = lazy(() => import('./pages/wms/AlertListPage'));
 const StockCheckPage = lazy(() => import('./pages/wms/StockCheckPage'));
@@ -379,8 +382,9 @@ function App() {
 
               {/* ===== WMS MODULE ===== */}
               <Route path="wms">
-                <Route index element={<InventoryDashboard />} />
-                <Route path="nvl-dashboard" element={<NVLDashboardPage />} />
+                {/* Phase A: Inventory tabbed wrapper — overview | nvl | alerts | stock-check */}
+                <Route index element={<WMSInventoryTabbedPage />} />
+                <Route path="nvl-dashboard" element={<Navigate to="/wms?tab=nvl" replace />} />
                 <Route path="materials" element={<WMSMaterialListPage />} />
                 <Route path="warehouses" element={<WMSWarehouseListPage />} />
                 <Route path="warehouses/:id/locations" element={<WMSWarehouseLocationPage />} />
@@ -392,12 +396,14 @@ function App() {
                 <Route path="stock-out/:id" element={<StockOutDetailPage />} />
                 <Route path="stock-out/:id/pick" element={<PickingListPage />} />
                 <Route path="inventory/:materialId" element={<InventoryDetailPage />} />
-                <Route path="alerts" element={<AlertListPage />} />
-                <Route path="stock-check" element={<StockCheckPage />} />
-                <Route path="qc" element={<QCDashboardPage />} />
-                <Route path="qc/recheck" element={<QCRecheckPage />} />
-                <Route path="qc/standards" element={<QCStandardsConfigPage />} />
-                <Route path="qc/quick-scan" element={<QCQuickScanPage />} />
+                {/* Phase A: redirect to consolidated /wms inventory tabbed */}
+                <Route path="alerts" element={<Navigate to="/wms?tab=alerts" replace />} />
+                <Route path="stock-check" element={<Navigate to="/wms?tab=stock-check" replace />} />
+                {/* Phase A: QC tabbed wrapper — dashboard | recheck | quick-scan | standards */}
+                <Route path="qc" element={<WMSQCTabbedPage />} />
+                <Route path="qc/recheck" element={<Navigate to="/wms/qc?tab=recheck" replace />} />
+                <Route path="qc/standards" element={<Navigate to="/wms/qc?tab=standards" replace />} />
+                <Route path="qc/quick-scan" element={<Navigate to="/wms/qc?tab=quick-scan" replace />} />
                 <Route path="qc/batch/:batchId" element={<BatchQCHistoryPage />} />
                 {/* Batch Label — In nhãn QR */}
                 <Route path="batch/:batchId/label" element={<BatchLabelPage />} />
@@ -419,12 +425,12 @@ function App() {
                 <Route path="blending/new" element={<BlendCreatePage />} />
                 <Route path="blending/suggest" element={<BlendSuggestPage />} />
                 <Route path="blending/:id" element={<BlendDetailPage />} />
-                {/* P10: Reports */}
-                <Route path="reports" element={<WMSReportDashboardPage />} />
-                <Route path="reports/stock-movement" element={<StockMovementReportPage />} />
-                <Route path="reports/supplier-quality" element={<SupplierQualityReportPage />} />
-                <Route path="reports/inventory-value" element={<InventoryValueReportPage />} />
-                <Route path="reports/supplier-scoring" element={<SupplierScoringPage />} />
+                {/* P10: Reports — Phase A tabbed wrapper (dashboard | stock-movement | supplier-quality | inventory-value | supplier-scoring) */}
+                <Route path="reports" element={<WMSReportsTabbedPage />} />
+                <Route path="reports/stock-movement" element={<Navigate to="/wms/reports?tab=stock-movement" replace />} />
+                <Route path="reports/supplier-quality" element={<Navigate to="/wms/reports?tab=supplier-quality" replace />} />
+                <Route path="reports/inventory-value" element={<Navigate to="/wms/reports?tab=inventory-value" replace />} />
+                <Route path="reports/supplier-scoring" element={<Navigate to="/wms/reports?tab=supplier-scoring" replace />} />
                 {/* P11: Settings */}
                 <Route path="settings" element={<WMSSettingsPage />} />
                 {/* Yard Map */}

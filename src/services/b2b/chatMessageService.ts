@@ -547,7 +547,6 @@ export const chatMessageService = {
     // Unique channel per (room, mount instance) để 2 tab mở cùng 1 room
     // hoặc 2 mount không dùng chung channel gây duplicate/miss event
     const channelName = `chat-room-${roomId}-${Math.random().toString(36).slice(2, 8)}`
-    console.log('[chat-realtime] subscribing to', { channelName, roomId })
     return supabase
       .channel(channelName)
       .on(
@@ -559,7 +558,6 @@ export const chatMessageService = {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log('[chat-realtime] INSERT event received', payload)
           callbacks.onInsert?.(payload.new as ChatMessage)
         }
       )
@@ -572,7 +570,6 @@ export const chatMessageService = {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log('[chat-realtime] UPDATE event received', payload)
           callbacks.onUpdate?.(payload.new as ChatMessage)
         }
       )
@@ -585,14 +582,18 @@ export const chatMessageService = {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log('[chat-realtime] DELETE event received', payload)
           callbacks.onDelete?.(payload.old as ChatMessage)
         }
       )
-      .subscribe((status, err) => {
-        console.log('[chat-realtime] subscription status:', status, err || '')
+      .subscribe((status) => {
+        // Giữ lại warning cho trường hợp subscription fail để catch regression
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error('[chat-realtime] subscription problem — postgres_changes sẽ không hoạt động')
+          console.error(
+            '[chat-realtime] subscription lost — status:', status,
+            '\nVerify: (1) b2b.chat_messages ở trong supabase_realtime publication,',
+            '(2) REPLICA IDENTITY FULL, (3) RLS SELECT policy cho authenticated.',
+            '\nMigration: docs/migrations/b2b_chat_realtime_publication.sql'
+          )
         }
       })
   },

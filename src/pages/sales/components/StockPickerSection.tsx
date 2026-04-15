@@ -73,9 +73,17 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
     [selections],
   )
   const grandTotal = existingTotal + selectedTotal
-  const remaining = Math.max(0, targetKg - grandTotal)
+  const overageKg = grandTotal - targetKg // + dư, - thiếu
+  const overagePct = targetKg > 0 ? (overageKg / targetKg) * 100 : 0
+  // Trạng thái hiển thị ô tổng kết:
+  //   underfill: thiếu (< target)
+  //   exact: vừa đủ (±0.5 kg → coi như tròn)
+  //   surplus: dư (> target)
+  const fillState: 'underfill' | 'exact' | 'surplus' =
+    overageKg < -0.5 ? 'underfill' : overageKg > 0.5 ? 'surplus' : 'exact'
   const isSufficient = grandTotal >= targetKg && selectedTotal > 0
-  const isOverAllocated = grandTotal > targetKg * 1.05
+  // Ngưỡng 2% — chuẩn hợp đồng xuất khẩu cao su ±2%
+  const isOverAllocated = grandTotal > targetKg * 1.02
 
   const handleAllocate = async () => {
     const requests = Object.entries(selections)
@@ -291,13 +299,26 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
         </Col>
         <Col xs={12} sm={6}>
           <Statistic
-            title={isSufficient ? 'Đủ ✓' : 'Còn thiếu'}
-            value={remaining / 1000}
+            title={
+              fillState === 'underfill'
+                ? 'Còn thiếu'
+                : fillState === 'exact'
+                ? 'Vừa đủ ✓'
+                : `Dư (+${overagePct.toFixed(2)}%)`
+            }
+            value={Math.abs(overageKg) / 1000}
             precision={3}
             suffix="tấn"
             valueStyle={{
               fontSize: 16,
-              color: isSufficient ? '#52c41a' : '#cf1322',
+              color:
+                fillState === 'underfill'
+                  ? '#cf1322'
+                  : fillState === 'exact'
+                  ? '#52c41a'
+                  : isOverAllocated
+                  ? '#cf1322'  // dư >2% → đỏ (vượt ngưỡng)
+                  : '#fa8c16', // dư ≤2% → cam (cảnh báo nhẹ)
             }}
           />
         </Col>
@@ -346,13 +367,14 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
             <Alert
               type="error"
               showIcon
-              message="Cấp phát vượt quá 5% so với nhu cầu"
+              message={`Cấp phát vượt 2% so với nhu cầu (đang dư ${overagePct.toFixed(2)}%)`}
+              description="Hợp đồng xuất khẩu cao su chuẩn ±2%. Giảm bớt hoặc chia nhỏ đơn."
               style={{ marginBottom: 8 }}
             />
           )}
           <Popconfirm
             title="Cấp phát các lô đã chọn?"
-            description={`Sẽ trừ ${selectedTotal} kg khỏi kho và gán vào đơn. Status đơn sẽ chuyển sang "Sẵn sàng".`}
+            description={`Sẽ trừ ${selectedTotal.toLocaleString('vi-VN')} kg khỏi kho và gán vào đơn. Status đơn sẽ chuyển sang "Sẵn sàng".`}
             onConfirm={handleAllocate}
             disabled={!isSufficient || isOverAllocated}
           >
@@ -368,7 +390,7 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
           </Popconfirm>
           {!isSufficient && (
             <div style={{ color: '#cf1322', fontSize: 11, marginTop: 4 }}>
-              Phải chọn đủ hoặc vượt {targetKg.toLocaleString('vi-VN')} kg mới cấp phát được (all-or-nothing)
+              Phải chọn đủ {targetKg.toLocaleString('vi-VN')} kg (cho phép dư tối đa 2%)
             </div>
           )}
         </div>

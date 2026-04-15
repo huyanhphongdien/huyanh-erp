@@ -209,9 +209,11 @@ export const stockAllocationService = {
         `Cấp phát không đủ: cần ${targetKg} kg, đã có ${existingTotal} kg, cấp thêm ${requestedTotal} kg → tổng ${newTotal} kg (còn thiếu ${targetKg - newTotal} kg). Chọn thêm lô.`,
       )
     }
-    if (newTotal > targetKg * 1.05) {
+    // Ngưỡng 2% — chuẩn hợp đồng xuất khẩu cao su ±2%
+    if (newTotal > targetKg * 1.02) {
+      const overPct = ((newTotal - targetKg) / targetKg) * 100
       throw new Error(
-        `Cấp phát vượt mức: cần ${targetKg} kg, tổng đang chọn ${newTotal} kg (vượt hơn 5%). Giảm bớt hoặc chia nhỏ đơn.`,
+        `Cấp phát vượt mức: cần ${targetKg} kg, tổng đang chọn ${newTotal} kg (dư ${overPct.toFixed(2)}% > ngưỡng 2%). Giảm bớt hoặc chia nhỏ đơn.`,
       )
     }
 

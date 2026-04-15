@@ -48,6 +48,7 @@ import { useOpenTab } from '../../hooks/useOpenTab'
 import { supabase } from '../../lib/supabase'
 import { yardService, type YardCell, type YardConfig, type YardBatchInfo } from '../../services/wms/yardService'
 import { RUBBER_GRADE_COLORS, RUBBER_TYPE_LABELS, type RubberGrade } from '../../services/wms/wms.types'
+import GradeBadge from '../../components/wms/GradeBadge'
 
 const { Title, Text } = Typography
 const MONO_FONT = "'JetBrains Mono', monospace"
@@ -390,9 +391,7 @@ const BatchDetailModal: React.FC<{
               {QC_STATUS_LABELS[batch.qc_status] || batch.qc_status}
             </Tag>
             {batch.rubber_grade && (
-              <Tag color={RUBBER_GRADE_COLORS[batch.rubber_grade as RubberGrade] || '#888'} style={{ color: '#fff' }}>
-                {batch.rubber_grade.replace('_', ' ')}
-              </Tag>
+              <GradeBadge grade={batch.rubber_grade as RubberGrade} size="small" />
             )}
           </div>
         </Space>
@@ -579,7 +578,9 @@ const AssignBatchModal: React.FC<{
           <Card size="small" style={{ marginTop: 12, borderColor: PRIMARY }}>
             <Descriptions column={2} size="small">
               <Descriptions.Item label="Mã lô">{b.batch_no}</Descriptions.Item>
-              <Descriptions.Item label="Grade">{b.rubber_grade?.replace('_', ' ') || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Grade">
+                {b.rubber_grade ? <GradeBadge grade={b.rubber_grade as RubberGrade} size="small" /> : '—'}
+              </Descriptions.Item>
               <Descriptions.Item label="DRC">{b.latest_drc != null ? `${b.latest_drc.toFixed(1)}%` : '—'}</Descriptions.Item>
               <Descriptions.Item label="Khối lượng">{formatWeight(b.current_weight || 0)}</Descriptions.Item>
               <Descriptions.Item label="QC">

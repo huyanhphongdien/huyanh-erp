@@ -60,6 +60,8 @@ import {
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import GradeBadge from '../../../components/wms/GradeBadge'
+import WarehousePicker from '../../../components/wms/WarehousePicker'
+import { useActiveWarehouses } from '../../../hooks/useActiveWarehouses'
 import type { RubberGrade } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_LABELS } from '../../../services/wms/wms.types'
 
@@ -201,9 +203,8 @@ const StockOutCreatePage: React.FC = () => {
   const [filterQC, setFilterQC] = useState<string>('all')
   const [filterMaterial, setFilterMaterial] = useState<string>('all')
 
-  // Data loading
-  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([])
-  const [loadingWarehouses, setLoadingWarehouses] = useState(true)
+  // Data — warehouses via shared hook (same cache as other pages)
+  const { data: warehouses = [] } = useActiveWarehouses()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   // Submission
@@ -235,21 +236,6 @@ const StockOutCreatePage: React.FC = () => {
       }
     }
     getUser()
-  }, [])
-
-  useEffect(() => {
-    const load = async () => {
-      setLoadingWarehouses(true)
-      const { data, error } = await supabase
-        .from('warehouses')
-        .select('id, code, name, type')
-        .eq('is_active', true)
-        .order('code')
-
-      if (!error && data) setWarehouses(data)
-      setLoadingWarehouses(false)
-    }
-    load()
   }, [])
 
   const loadBatchStocks = useCallback(async (warehouseId: string) => {
@@ -332,11 +318,6 @@ const StockOutCreatePage: React.FC = () => {
   // ========================================================================
   // DERIVED
   // ========================================================================
-
-  // Filter kho theo stockType: raw → chỉ kho NVL + mixed; finished → chỉ kho TP + mixed
-  const filteredWarehouses = useMemo(() => {
-    return warehouses.filter(w => w.type === 'mixed' || w.type === stockType)
-  }, [warehouses, stockType])
 
   // Khi đổi NVL ↔ TP: reset kho + reason về default hợp lệ
   useEffect(() => {
@@ -1064,24 +1045,11 @@ const StockOutCreatePage: React.FC = () => {
             </Card>
 
             <Card title="Kho xuất" style={{ marginBottom: 24 }}>
-              {loadingWarehouses ? (
-                <div style={{ textAlign: 'center', padding: 40 }}>
-                  <Spin tip="Đang tải danh sách kho..." />
-                </div>
-              ) : (
-                <Select
-                  placeholder={stockType === 'raw' ? 'Chọn kho NVL' : 'Chọn kho TP'}
-                  value={header.warehouse_id || undefined}
-                  onChange={val => setHeader(h => ({ ...h, warehouse_id: val }))}
-                  style={{ width: '100%' }}
-                  size="large"
-                  notFoundContent={filteredWarehouses.length === 0 ? `Không có kho ${stockType === 'raw' ? 'NVL' : 'TP'} nào` : undefined}
-                  options={filteredWarehouses.map(w => ({
-                    value: w.id,
-                    label: `${w.code} — ${w.name}`,
-                  }))}
-                />
-              )}
+              <WarehousePicker
+                value={header.warehouse_id}
+                onChange={val => setHeader(h => ({ ...h, warehouse_id: val }))}
+                stockType={stockType}
+              />
               {header.warehouse_id && batchStocks.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <Text type="secondary" style={monoStyle}>{batchStocks.length} lô tồn kho</Text>

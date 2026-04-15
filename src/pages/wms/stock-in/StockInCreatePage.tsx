@@ -44,6 +44,8 @@ import {
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
 import stockInService from '../../../services/wms/stockInService'
+import { useActiveWarehouses } from '../../../hooks/useActiveWarehouses'
+import WarehousePicker from '../../../components/wms/WarehousePicker'
 import { dealWmsService } from '../../../services/b2b/dealWmsService'
 import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import { useAuthStore } from '../../../stores/authStore'
@@ -338,9 +340,8 @@ const StockInCreatePage = () => {
   const [details, setDetails] = useState<DetailItem[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
 
-  // Data
-  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([])
-  const [loadingWH, setLoadingWH] = useState(true)
+  // Data — warehouses via shared hook, dùng chung cache với các page khác
+  const { data: warehouses = [] } = useActiveWarehouses()
   const [activeDeals, setActiveDeals] = useState<ActiveDealForStockIn[]>([])
   const [loadingDeals, setLoadingDeals] = useState(false)
 
@@ -348,29 +349,6 @@ const StockInCreatePage = () => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successCode, setSuccessCode] = useState<string | null>(null)
-
-  // Load warehouses
-  useEffect(() => {
-    const load = async () => {
-      setLoadingWH(true)
-      const { data } = await supabase
-        .from('warehouses')
-        .select('id, code, name, type')
-        .eq('is_active', true)
-        .order('name')
-      if (data) setWarehouses(data)
-      setLoadingWH(false)
-    }
-    load()
-  }, [])
-
-  // Filter warehouses theo stockType: raw → kho NVL + mixed, finished → kho TP + mixed
-  const filteredWarehouses = useMemo(() => {
-    return warehouses.filter(w => {
-      if (!w.type || w.type === 'mixed') return true
-      return w.type === stockType
-    })
-  }, [warehouses, stockType])
 
   // Khi đổi mode NVL ↔ TP: reset kho + source về default hợp lệ
   useEffect(() => {
@@ -660,15 +638,11 @@ const StockInCreatePage = () => {
             <Col span={12}>
               <div style={{ marginBottom: 16 }}>
                 <Text strong>Kho nhập *</Text>
-                <Select
-                  value={warehouseId || undefined}
+                <WarehousePicker
+                  value={warehouseId}
                   onChange={setWarehouseId}
-                  placeholder={stockType === 'raw' ? 'Chọn kho NVL' : 'Chọn kho TP'}
-                  style={{ width: '100%', marginTop: 4 }}
-                  size="large"
-                  loading={loadingWH}
-                  notFoundContent={filteredWarehouses.length === 0 ? `Không có kho ${stockType === 'raw' ? 'NVL' : 'TP'} nào` : undefined}
-                  options={filteredWarehouses.map(w => ({ value: w.id, label: `${w.name} (${w.code})` }))}
+                  stockType={stockType}
+                  style={{ marginTop: 4 }}
                 />
               </div>
             </Col>

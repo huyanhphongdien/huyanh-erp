@@ -2,45 +2,64 @@
 // WMS SERVICES INDEX — Re-export tất cả services của module Kho Thành phẩm
 // File: src/services/wms/index.ts
 // ============================================================================
+// Phase B consolidation (2026-04-15): barrel full coverage — 25/25 services.
+// Consumer side: `import { stockOutService } from '../../services/wms'`.
+// Trước đó: phải import trực tiếp từ từng file.
+// ============================================================================
 
 // ===== TYPES =====
 export * from './wms.types'
 
-// ===== PHASE 2: Danh mục cơ bản =====
-export { default as wmsWarehouseService } from './warehouseService'
-export { default as wmsMaterialService } from './wmsMaterialService'
+// ===== Phase 2: Danh mục cơ bản =====
+export { warehouseService, WAREHOUSE_TYPE_LABELS, WAREHOUSE_TYPE_COLORS } from './warehouseService'
+export { wmsMaterialService } from './wmsMaterialService'
 
-// ===== PHASE 3: Nhập kho (sẽ thêm sau) =====
-// export { batchService } from './batchService'
-// export { stockInService } from './stockInService'
+// ===== Phase 3: Nhập kho =====
+export { batchService } from './batchService'
+export { stockInService } from './stockInService'
 
-// ===== PHASE 4: Xuất kho (sẽ thêm sau) =====
-// export { pickingService } from './pickingService'
-// export { stockOutService } from './stockOutService'
+// ===== Phase 4: Xuất kho =====
+export { pickingService } from './pickingService'
+export { stockOutService } from './stockOutService'
 
-// ===== PHASE 5: Tồn kho (sẽ thêm sau) =====
-// export { inventoryService } from './inventoryService'
-// export { alertService } from './alertService'
-// export { stockCheckService } from './stockCheckService'
+// ===== Phase 5: Tồn kho =====
+export { inventoryService } from './inventoryService'
+export { alertService } from './alertService'
+export { stockCheckService } from './stockCheckService'
+export {
+  recordInventoryMove,
+  adjustLevelsAndLocation,
+  type InventoryTxType,
+  type RecordMoveParams,
+} from './inventorySync'
 
-// ===== PHASE 6: QC & DRC (sẽ thêm sau) =====
-// export { qcService } from './qcService'
+// ===== Phase 6: QC & DRC =====
+export { qcService } from './qcService'
+export { rubberGradeService } from './rubberGradeService'
 
-// ===== PHASE 7: Cân xe =====
-export { default as weighbridgeService } from './weighbridgeService'
-export { default as weighbridgeImageService } from './weighbridgeImageService'
+// ===== Phase 7: Cân xe =====
+export { weighbridgeService } from './weighbridgeService'
+export { weighbridgeImageService } from './weighbridgeImageService'
 
-// ===== PHASE 8: Lệnh SX & BOM (sẽ thêm sau) =====
-// export { bomService } from './bomService'
-// export { productionService } from './productionService'
+// ===== Phase 8: Lệnh SX & BOM =====
+export { productionService } from './productionService'
+export { costTrackingService } from './costTrackingService'
 
-// ===== PHASE 9: Phối trộn (sẽ thêm sau) =====
-// export { blendingService } from './blendingService'
+// ===== Phase 9: Phối trộn =====
+export { blendingService } from './blendingService'
 
-// ===== PHASE 10: Báo cáo =====
-// export { wmsReportService } from './wmsReportService'
-// export { wmsDashboardService } from './wmsDashboardService'
+// ===== Phase 10: Báo cáo & Dashboard =====
+export { wmsReportService } from './wmsReportService'
+export { nvlDashboardService } from './nvlDashboardService'
 export { supplierScoringService } from './supplierScoringService'
+export { traceabilityService } from './traceabilityService'
 
-// ===== PHASE 11: Dự báo & Cài đặt =====
-export { forecastService } from './forecastService'
+// ===== Phase 11: Dự báo, Bản đồ bãi, Cài đặt =====
+export { forecastService, DEFAULT_ALERT_CONFIG } from './forecastService'
+export { yardService } from './yardService'
+
+// ============================================================================
+// Back-compat aliases — cho code cũ đang import `wms*Service` prefix
+// (chỉ giữ cho tới khi refactor toàn bộ consumer sang tên gốc)
+// ============================================================================
+export { warehouseService as wmsWarehouseService } from './warehouseService'

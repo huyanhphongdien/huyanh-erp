@@ -195,6 +195,21 @@ export const batchService = {
       data.batch_type || 'production'
     )
 
+    // Ưu tiên grade theo thứ tự: caller truyền → material.sku map → DRC
+    // fallback. Tránh gán nhầm RSS/Latex thành SVR_3L khi DRC=60%.
+    let resolvedGrade: string | null = data.rubber_grade || null
+    if (!resolvedGrade && data.material_id) {
+      const { data: mat } = await supabase
+        .from('materials')
+        .select('sku')
+        .eq('id', data.material_id)
+        .maybeSingle()
+      resolvedGrade = rubberGradeService.resolveGrade({
+        sku: mat?.sku,
+        drc: data.initial_drc,
+      })
+    }
+
     const insertData = {
       batch_no: batchNo,
       material_id: data.material_id,
@@ -220,7 +235,7 @@ export const batchService = {
       sub_lot_code: data.sub_lot_code || null,
 
       // Rubber fields
-      rubber_grade: data.rubber_grade || (data.initial_drc ? rubberGradeService.classifyByDRC(data.initial_drc) : null),
+      rubber_grade: resolvedGrade,
       rubber_type: data.rubber_type || null,
       moisture_content: data.moisture_content || null,
       initial_weight: data.initial_weight || null,

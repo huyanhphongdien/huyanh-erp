@@ -157,7 +157,12 @@ const AddDetailModal: React.FC<{
   const qtyNum = quantity || 0
   const weightCalc = selectedMaterial?.weight_per_unit ? qtyNum * selectedMaterial.weight_per_unit : qtyNum
   const canSubmit = materialId && qtyNum > 0 && qcData !== null
-  const autoGrade = qcData?.drc_value ? rubberGradeService.classifyByDRC(qcData.drc_value) : undefined
+  // Ưu tiên grade từ material SKU (chính xác cho RSS/Latex/SVR L/CV),
+  // chỉ fallback sang phân loại theo DRC nếu SKU không match pattern
+  const autoGrade = rubberGradeService.resolveGrade({
+    sku: selectedMaterial?.sku,
+    drc: qcData?.drc_value,
+  }) || undefined
   const dryWeight = qcData?.drc_value && weightCalc > 0
     ? rubberGradeService.calculateDryWeight(weightCalc, qcData.drc_value) : 0
 

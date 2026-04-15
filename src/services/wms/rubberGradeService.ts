@@ -65,12 +65,56 @@ export const rubberGradeService = {
   // CLASSIFICATION — Phân loại DRC -> SVR grade
   // --------------------------------------------------------------------------
 
-  /** Phân loại DRC -> SVR grade */
+  /**
+   * Phân loại DRC → SVR grade. CHỈ dùng khi material chưa biết grade cụ thể.
+   * RSS / Latex / SVR L / CV KHÔNG phân loại được bằng DRC đơn thuần — phải
+   * dựa vào material.sku (gradeFromSku) để tránh gán nhầm RSS/Latex thành SVR.
+   */
   classifyByDRC(drc: number): RubberGrade {
     if (drc >= 60) return 'SVR_3L'
     if (drc >= 55) return 'SVR_5'
     if (drc >= 50) return 'SVR_10'
     return 'SVR_20'
+  },
+
+  /**
+   * Map material SKU → RubberGrade. Là nguồn sự thật chính cho grade của
+   * lô hàng vì nó dùng danh mục thành phẩm cố định thay vì đoán từ DRC.
+   *
+   * Trả về null nếu SKU không khớp pattern thành phẩm — caller có thể fallback
+   * sang classifyByDRC cho các lô SVR generic.
+   */
+  gradeFromSku(sku: string | null | undefined): RubberGrade | null {
+    if (!sku) return null
+    const s = sku.toUpperCase().replace(/\s+/g, '')
+    // Latex
+    if (s.includes('LAT-HA') || s.includes('LATEX')) return 'LATEX_60'
+    // RSS
+    if (s.includes('RSS1') || s.includes('RSS-1')) return 'RSS_1'
+    if (s.includes('RSS3') || s.includes('RSS-3')) return 'RSS_3'
+    // SVR CV — phải check trước SVR 50/60 chung
+    if (s.includes('CV50')) return 'SVR_CV50'
+    if (s.includes('CV60')) return 'SVR_CV60'
+    // SVR 3L (check trước SVR-L để không nhầm)
+    if (s.includes('SVR3L') || s.includes('SVR-3L')) return 'SVR_3L'
+    // SVR L
+    if (s.endsWith('SVR-L') || s.endsWith('SVRL')) return 'SVR_L'
+    // SVR numeric
+    if (s.includes('SVR10') || s.includes('SVR-10')) return 'SVR_10'
+    if (s.includes('SVR20') || s.includes('SVR-20')) return 'SVR_20'
+    if (s.includes('SVR5') || s.includes('SVR-5')) return 'SVR_5'
+    return null
+  },
+
+  /**
+   * Helper tổng hợp: ưu tiên SKU → fallback DRC → null.
+   * Dùng cho mọi nơi tạo batch mới (stock-in, production, blending).
+   */
+  resolveGrade(params: { sku?: string | null; drc?: number | null }): RubberGrade | null {
+    const fromSku = this.gradeFromSku(params.sku)
+    if (fromSku) return fromSku
+    if (params.drc != null && params.drc > 0) return this.classifyByDRC(params.drc)
+    return null
   },
 
   // --------------------------------------------------------------------------

@@ -6,24 +6,44 @@
 
 // ===== CAO SU — RUBBER TYPES =====
 
-export type RubberGrade = 'SVR_3L' | 'SVR_5' | 'SVR_10' | 'SVR_20' | 'SVR_CV60'
+export type RubberGrade =
+  | 'SVR_L'
+  | 'SVR_3L'
+  | 'SVR_5'
+  | 'SVR_10'
+  | 'SVR_20'
+  | 'SVR_CV50'
+  | 'SVR_CV60'
+  | 'RSS_1'
+  | 'RSS_3'
+  | 'LATEX_60'
 export type RubberType = 'mu_dong' | 'mu_nuoc' | 'mu_tap' | 'mu_chen' | 'mu_to' | 'cup_lump' | 'latex' | 'sheet' | 'crepe' | 'mixed'
 export type ContaminationStatus = 'clean' | 'suspected' | 'confirmed' | 'cleared'
 
 export const RUBBER_GRADE_LABELS: Record<RubberGrade, string> = {
+  SVR_L: 'SVR L',
   SVR_3L: 'SVR 3L',
   SVR_5: 'SVR 5',
   SVR_10: 'SVR 10',
   SVR_20: 'SVR 20',
+  SVR_CV50: 'SVR CV50',
   SVR_CV60: 'SVR CV60',
+  RSS_1: 'RSS 1',
+  RSS_3: 'RSS 3',
+  LATEX_60: 'Latex HA 60%',
 }
 
 export const RUBBER_GRADE_COLORS: Record<RubberGrade, string> = {
+  SVR_L: '#059669',
   SVR_3L: '#16A34A',
   SVR_5: '#22C55E',
   SVR_10: '#F59E0B',
   SVR_20: '#DC2626',
+  SVR_CV50: '#6D28D9',
   SVR_CV60: '#7C3AED',
+  RSS_1: '#0891B2',
+  RSS_3: '#0E7490',
+  LATEX_60: '#EC4899',
 }
 
 export const RUBBER_TYPE_LABELS: Record<RubberType, string> = {

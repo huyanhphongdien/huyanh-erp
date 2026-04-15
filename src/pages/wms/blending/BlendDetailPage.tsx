@@ -65,8 +65,13 @@ function formatDateTime(d: string | null | undefined): string {
 // COMPONENT
 // ============================================================================
 
-const BlendDetailPage = () => {
-  const { id } = useParams<{ id: string }>()
+interface BlendDetailPageProps {
+  id?: string
+}
+
+const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
+  const { id: paramId } = useParams<{ id: string }>()
+  const id = propId || paramId
   const navigate = useNavigate()
 
   const [order, setOrder] = useState<BlendOrder | null>(null)

@@ -72,8 +72,13 @@ const printStyles = `
 // PAGE COMPONENT
 // ============================================================================
 
-const BatchLabelPage = () => {
-  const { batchId } = useParams<{ batchId: string }>()
+interface BatchLabelPageProps {
+  batchId?: string
+}
+
+const BatchLabelPage = ({ batchId: propBatchId }: BatchLabelPageProps = {}) => {
+  const { batchId: paramBatchId } = useParams<{ batchId: string }>()
+  const batchId = propBatchId || paramBatchId
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const printRef = useRef<HTMLDivElement>(null)

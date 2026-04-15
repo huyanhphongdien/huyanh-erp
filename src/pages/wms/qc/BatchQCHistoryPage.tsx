@@ -79,8 +79,13 @@ const RESULT_COLORS: Record<string, string> = {
 // COMPONENT
 // ============================================================================
 
-const BatchQCHistoryPage = () => {
-  const { batchId } = useParams<{ batchId: string }>()
+interface BatchQCHistoryPageProps {
+  batchId?: string
+}
+
+const BatchQCHistoryPage = ({ batchId: propBatchId }: BatchQCHistoryPageProps = {}) => {
+  const { batchId: paramBatchId } = useParams<{ batchId: string }>()
+  const batchId = propBatchId || paramBatchId
   const navigate = useNavigate()
 
   const [batchInfo, setBatchInfo] = useState<BatchInfo | null>(null)

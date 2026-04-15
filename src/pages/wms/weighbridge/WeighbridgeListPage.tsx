@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Table,
@@ -74,6 +75,7 @@ const PRIMARY_COLOR = '#1B4D3E'
 
 export default function WeighbridgeListPage() {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   // State
   const [data, setData] = useState<PaginatedResponse<WeighbridgeTicket> | null>(null)
@@ -489,7 +491,13 @@ export default function WeighbridgeListPage() {
               onRow={(record) => ({
                 onClick: () => {
                   if (record.status === 'completed' || record.status === 'cancelled') {
-                    navigate(`/wms/weighbridge/${record.id}`)
+                    openTab({
+                      key: `weighbridge-${record.id}`,
+                      title: `Phiếu cân ${(record as any).code || record.id.slice(0, 8)}`,
+                      componentId: 'weighbridge-detail',
+                      props: { id: record.id },
+                      path: `/wms/weighbridge/${record.id}`,
+                    })
                   } else {
                     navigate('/wms/weighbridge')
                   }

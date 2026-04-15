@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card, Row, Col, Statistic, Table, Tag, Button, Space,
   Input, Select, Typography, Spin, Alert, Empty, Progress,
@@ -29,6 +30,27 @@ const { Title, Text } = Typography
 
 const QCDashboardPage = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
+
+  const openBatchQC = (batchId: string, batchNo?: string) => {
+    openTab({
+      key: `batch-qc-${batchId}`,
+      title: `QC lô ${batchNo || batchId.slice(0, 8)}`,
+      componentId: 'batch-qc-history',
+      props: { batchId },
+      path: `/wms/qc/batch/${batchId}`,
+    })
+  }
+
+  const openBatchLabel = (batchId: string, batchNo?: string) => {
+    openTab({
+      key: `batch-label-${batchId}`,
+      title: `Nhãn ${batchNo || batchId.slice(0, 8)}`,
+      componentId: 'batch-label',
+      props: { batchId },
+      path: `/wms/batch/${batchId}/label`,
+    })
+  }
   const [stats, setStats] = useState<DRCStats | null>(null)
   const [batches, setBatches] = useState<DRCOverviewItem[]>([])
   const [gradeDistribution, setGradeDistribution] = useState<{ grade: string; count: number; weight: number }[]>([])
@@ -83,7 +105,7 @@ const QCDashboardPage = () => {
             size="small"
             icon={<PrinterOutlined />}
             title="In nhãn QR"
-            onClick={(e) => { e.stopPropagation(); navigate(`/wms/batch/${r.id}/label`) }}
+            onClick={(e) => { e.stopPropagation(); openBatchLabel(r.id, (r as any).batch_no) }}
           />
         ) : null,
     },
@@ -148,7 +170,7 @@ const QCDashboardPage = () => {
       </Space>}>
         <Table dataSource={filtered} columns={columns} rowKey="id" size="small"
           pagination={{ showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
-          onRow={r => ({ onClick: () => navigate(`/wms/qc/batch/${r.id}`), style: { cursor: 'pointer' } })} />
+          onRow={r => ({ onClick: () => openBatchQC(r.id, (r as any).batch_no), style: { cursor: 'pointer' } })} />
       </Card>
     </div>
   )

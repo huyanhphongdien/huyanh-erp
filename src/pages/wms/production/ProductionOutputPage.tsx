@@ -55,8 +55,13 @@ const { Title, Text } = Typography
 // COMPONENT
 // ============================================================================
 
-const ProductionOutputPage = () => {
-  const { id } = useParams<{ id: string }>()
+interface ProductionOutputPageProps {
+  id?: string
+}
+
+const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) => {
+  const { id: paramId } = useParams<{ id: string }>()
+  const id = propId || paramId
   const navigate = useNavigate()
 
   const [order, setOrder] = useState<ProductionOrder | null>(null)

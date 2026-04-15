@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Table,
@@ -226,6 +227,17 @@ const WarehouseFormModal: React.FC<{
 // ===== MAIN COMPONENT =====
 export default function WarehouseListPage() {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
+
+  const openLocationTab = (r: any) => {
+    openTab({
+      key: `warehouse-location-${r.id}`,
+      title: `Vị trí ${r.code || r.name || r.id.slice(0, 8)}`,
+      componentId: 'warehouse-location',
+      props: { id: r.id },
+      path: `/wms/warehouses/${r.id}/locations`,
+    })
+  }
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [locationStats, setLocationStats] = useState<Record<string, LocationStats>>({})
   const [loading, setLoading] = useState(true)
@@ -371,7 +383,7 @@ export default function WarehouseListPage() {
             type="text"
             size="small"
             icon={<RightOutlined />}
-            onClick={() => navigate(`/wms/warehouses/${r.id}/locations`)}
+            onClick={() => openLocationTab(r)}
           />
         </Space>
       ),
@@ -435,7 +447,7 @@ export default function WarehouseListPage() {
             loading={loading}
             pagination={false}
             onRow={(record) => ({
-              onClick: () => navigate(`/wms/warehouses/${record.id}/locations`),
+              onClick: () => openLocationTab(record),
               style: {
                 cursor: 'pointer',
                 opacity: record.is_active ? 1 : 0.5,

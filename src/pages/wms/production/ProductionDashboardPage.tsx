@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Table,
@@ -46,6 +47,17 @@ const { Title, Text } = Typography
 
 const ProductionDashboardPage = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
+
+  const openProductionTab = (record: any) => {
+    openTab({
+      key: `production-${record.id}`,
+      title: `Lệnh SX ${record.code || record.id.slice(0, 8)}`,
+      componentId: 'production-detail',
+      props: { id: record.id },
+      path: `/wms/production/${record.id}`,
+    })
+  }
 
   const [allOrders, setAllOrders] = useState<ProductionOrder[]>([])
   const [inProgressOrders, setInProgressOrders] = useState<ProductionOrder[]>([])
@@ -253,7 +265,7 @@ const ProductionDashboardPage = () => {
               size="small"
               pagination={false}
               onRow={(record) => ({
-                onClick: () => navigate(`/wms/production/${record.id}`),
+                onClick: () => openProductionTab(record),
                 style: { cursor: 'pointer' },
               })}
               locale={{ emptyText: 'Không có lệnh đang sản xuất' }}

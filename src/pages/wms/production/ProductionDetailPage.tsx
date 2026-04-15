@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Descriptions,
@@ -85,9 +86,15 @@ function stageStatusLabel(s: StageStatus): string {
 // COMPONENT
 // ============================================================================
 
-const ProductionDetailPage = () => {
-  const { id } = useParams<{ id: string }>()
+interface ProductionDetailPageProps {
+  id?: string
+}
+
+const ProductionDetailPage = ({ id: propId }: ProductionDetailPageProps = {}) => {
+  const { id: paramId } = useParams<{ id: string }>()
+  const id = propId || paramId
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   const [order, setOrder] = useState<ProductionOrder | null>(null)
   const [loading, setLoading] = useState(true)
@@ -333,7 +340,13 @@ const ProductionDetailPage = () => {
                     <Button
                       type="primary"
                       size="small"
-                      onClick={() => navigate(`/wms/production/${id}/stage/${stage.stage_number}`)}
+                      onClick={() => openTab({
+                        key: `production-${id}-stage-${stage.stage_number}`,
+                        title: `SX ${order?.code || ''} — Stage ${stage.stage_number}`,
+                        componentId: 'production-stage',
+                        props: { id, stageNumber: String(stage.stage_number) },
+                        path: `/wms/production/${id}/stage/${stage.stage_number}`,
+                      })}
                       style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                     >
                       Cập nhật
@@ -461,7 +474,13 @@ const ProductionDetailPage = () => {
         <Button
           type="primary"
           icon={<InboxOutlined />}
-          onClick={() => navigate(`/wms/production/${id}/output`)}
+          onClick={() => openTab({
+            key: `production-${id}-output`,
+            title: `SX ${order?.code || ''} — Thành phẩm`,
+            componentId: 'production-output',
+            props: { id },
+            path: `/wms/production/${id}/output`,
+          })}
           style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
         >
           Quản lý thành phẩm

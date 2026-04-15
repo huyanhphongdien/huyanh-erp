@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Table,
@@ -42,6 +43,7 @@ const { Title, Text } = Typography
 
 const BlendListPage = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   const [orders, setOrders] = useState<BlendOrder[]>([])
   const [totalOrders, setTotalOrders] = useState(0)
@@ -250,7 +252,13 @@ const BlendListPage = () => {
             onChange: (p, ps) => { setPage(p); setPageSize(ps) },
           }}
           onRow={(record) => ({
-            onClick: () => navigate(`/wms/blending/${record.id}`),
+            onClick: () => openTab({
+              key: `blend-${record.id}`,
+              title: `Lệnh trộn ${(record as any).code || record.id.slice(0, 8)}`,
+              componentId: 'blend-detail',
+              props: { id: record.id },
+              path: `/wms/blending/${record.id}`,
+            }),
             style: { cursor: 'pointer' },
           })}
         />

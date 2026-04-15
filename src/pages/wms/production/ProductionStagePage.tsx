@@ -49,8 +49,15 @@ const { Title, Text } = Typography
 // COMPONENT
 // ============================================================================
 
-const ProductionStagePage = () => {
-  const { id, stageNumber: stageNumStr } = useParams<{ id: string; stageNumber: string }>()
+interface ProductionStagePageProps {
+  id?: string
+  stageNumber?: string
+}
+
+const ProductionStagePage = ({ id: propId, stageNumber: propStage }: ProductionStagePageProps = {}) => {
+  const params = useParams<{ id: string; stageNumber: string }>()
+  const id = propId || params.id
+  const stageNumStr = propStage || params.stageNumber
   const navigate = useNavigate()
   const stageNumber = parseInt(stageNumStr || '1', 10)
 

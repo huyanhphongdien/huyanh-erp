@@ -44,6 +44,7 @@ import {
   InboxOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../hooks/useOpenTab'
 import { supabase } from '../../lib/supabase'
 import { yardService, type YardCell, type YardConfig, type YardBatchInfo } from '../../services/wms/yardService'
 import { RUBBER_GRADE_COLORS, RUBBER_TYPE_LABELS, type RubberGrade } from '../../services/wms/wms.types'
@@ -813,6 +814,7 @@ const YardConfigDrawer: React.FC<{
 
 const YardMapPage: React.FC = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   // Data
   const [cells, setCells] = useState<YardCell[]>([])
@@ -961,11 +963,23 @@ const YardMapPage: React.FC = () => {
   }
 
   const handleNavigateQC = (batchId: string) => {
-    navigate(`/wms/qc/batch/${batchId}`)
+    openTab({
+      key: `batch-qc-${batchId}`,
+      title: `QC lô ${batchId.slice(0, 8)}`,
+      componentId: 'batch-qc-history',
+      props: { batchId },
+      path: `/wms/qc/batch/${batchId}`,
+    })
   }
 
   const handleNavigateDetail = (batchId: string) => {
-    navigate(`/wms/qc/batch/${batchId}`)
+    openTab({
+      key: `batch-qc-${batchId}`,
+      title: `QC lô ${batchId.slice(0, 8)}`,
+      componentId: 'batch-qc-history',
+      props: { batchId },
+      path: `/wms/qc/batch/${batchId}`,
+    })
   }
 
   const handleConfigSave = () => {

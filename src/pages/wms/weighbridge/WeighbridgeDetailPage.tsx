@@ -78,9 +78,14 @@ const PRIMARY_COLOR = '#1B4D3E'
 // COMPONENT
 // ============================================================================
 
-export default function WeighbridgeDetailPage() {
+interface WeighbridgeDetailPageProps {
+  id?: string
+}
+
+export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailPageProps = {}) {
   const navigate = useNavigate()
-  const { id } = useParams<{ id: string }>()
+  const { id: paramId } = useParams<{ id: string }>()
+  const id = propId || paramId
 
   const [ticket, setTicket] = useState<WeighbridgeTicket | null>(null)
   const [loading, setLoading] = useState(true)

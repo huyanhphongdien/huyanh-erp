@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../hooks/useOpenTab'
 import {
   Card,
   Row,
@@ -200,6 +201,17 @@ function BarChart({ data }: { data: DailyIntakeItem[] }) {
 
 const NVLDashboardPage = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
+
+  const openBatchQCTab = (record: any) => {
+    openTab({
+      key: `batch-qc-${record.id}`,
+      title: `QC lô ${record.batch_no || record.id.slice(0, 8)}`,
+      componentId: 'batch-qc-history',
+      props: { batchId: record.id },
+      path: `/wms/qc/batch/${record.id}`,
+    })
+  }
 
   const [overview, setOverview] = useState<NVLOverview | null>(null)
   const [gradeDist, setGradeDist] = useState<GradeDistItem[]>([])
@@ -440,7 +452,7 @@ const NVLDashboardPage = () => {
                   pagination={false}
                   showHeader={false}
                   onRow={(record) => ({
-                    onClick: () => navigate(`/wms/qc/batch/${record.id}`),
+                    onClick: () => openBatchQCTab(record),
                     style: { cursor: 'pointer' },
                   })}
                   columns={[
@@ -491,7 +503,7 @@ const NVLDashboardPage = () => {
                   pagination={false}
                   showHeader={false}
                   onRow={(record) => ({
-                    onClick: () => navigate(`/wms/qc/batch/${record.id}`),
+                    onClick: () => openBatchQCTab(record),
                     style: { cursor: 'pointer' },
                   })}
                   columns={[
@@ -532,7 +544,7 @@ const NVLDashboardPage = () => {
                   pagination={false}
                   showHeader={false}
                   onRow={(record) => ({
-                    onClick: () => navigate(`/wms/qc/batch/${record.id}`),
+                    onClick: () => openBatchQCTab(record),
                     style: { cursor: 'pointer' },
                   })}
                   columns={[

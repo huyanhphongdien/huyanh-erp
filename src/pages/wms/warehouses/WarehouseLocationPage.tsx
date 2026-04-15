@@ -318,9 +318,14 @@ const LocationDetailModal: React.FC<{
 // MAIN COMPONENT
 // ============================================================================
 
-const WarehouseLocationPage: React.FC = () => {
+interface WarehouseLocationPageProps {
+  id?: string
+}
+
+const WarehouseLocationPage: React.FC<WarehouseLocationPageProps> = ({ id: propId }) => {
   const navigate = useNavigate()
-  const { id: warehouseId } = useParams<{ id: string }>()
+  const { id: paramId } = useParams<{ id: string }>()
+  const warehouseId = propId || paramId
 
   // Data
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null)

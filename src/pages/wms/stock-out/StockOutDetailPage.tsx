@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Tag,
@@ -172,6 +173,7 @@ export default function StockOutDetailPage({ id: propId }: StockOutDetailPagePro
   const { id: paramId } = useParams()
   const id = propId || paramId
   const navigate = useNavigate()
+  const openTab = useOpenTab()
   const [order, setOrder] = useState<OutOrderData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -489,7 +491,13 @@ export default function StockOutDetailPage({ id: propId }: StockOutDetailPagePro
           {order.status === 'picking' && (
             <Button
               type="primary"
-              onClick={() => navigate(`/wms/stock-out/${order.id}/picking`)}
+              onClick={() => openTab({
+                key: `picking-${order.id}`,
+                title: `Picking ${order.code || order.id.slice(0, 8)}`,
+                componentId: 'picking-list',
+                props: { stockOutId: order.id },
+                path: `/wms/stock-out/${order.id}/pick`,
+              })}
               style={{ backgroundColor: '#E8A838', borderColor: '#E8A838' }}
             >
               Picking List

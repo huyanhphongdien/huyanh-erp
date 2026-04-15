@@ -413,9 +413,14 @@ const SwipeablePickingCard: React.FC<{
 // MAIN COMPONENT
 // ============================================================================
 
-const PickingListPage: React.FC = () => {
+interface PickingListPageProps {
+  stockOutId?: string
+}
+
+const PickingListPage: React.FC<PickingListPageProps> = ({ stockOutId: propStockOutId }) => {
   const navigate = useNavigate()
-  const { id: stockOutId } = useParams<{ id: string }>()
+  const { id: paramStockOutId } = useParams<{ id: string }>()
+  const stockOutId = propStockOutId || paramStockOutId
 
   // Data
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)

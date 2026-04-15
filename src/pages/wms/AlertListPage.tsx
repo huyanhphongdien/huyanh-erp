@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../hooks/useOpenTab'
 import {
   Card,
   Tabs,
@@ -68,6 +69,7 @@ const TABS: TabDef[] = [
 
 const AlertListPage = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   const [alerts, setAlerts] = useState<StockAlert[]>([])
   const [loading, setLoading] = useState(true)
@@ -265,7 +267,13 @@ const AlertListPage = () => {
                           <Button
                             type="link"
                             size="small"
-                            onClick={() => navigate(`/wms/inventory/${alert.material_id}`)}
+                            onClick={() => openTab({
+                              key: `inventory-${alert.material_id}`,
+                              title: `Tồn: ${(alert as any).material_name || (alert.material_id || '').slice(0, 8)}`,
+                              componentId: 'inventory-detail',
+                              props: { materialId: alert.material_id },
+                              path: `/wms/inventory/${alert.material_id}`,
+                            })}
                             style={{ padding: 0, fontSize: 12, color: '#2D8B6E' }}
                           >
                             Xem chi tiết <RightOutlined />

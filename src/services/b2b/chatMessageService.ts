@@ -530,12 +530,11 @@ export const chatMessageService = {
   /**
    * Subscribe to messages of a specific room.
    *
-   * Canonical table là public.b2b_chat_messages (Portal insert thẳng vào
-   * đây, Sidebar unread count cũng đọc từ đây). Subscription cũ dùng
-   * schema:'b2b', table:'chat_messages' — sai schema, realtime không
-   * bao giờ fire event → user phải F5 mới thấy tin nhắn mới.
-   *
-   * Migration đi kèm: docs/migrations/b2b_chat_realtime_publication.sql
+   * Base table là b2b.chat_messages (public.b2b_chat_messages chỉ là VIEW
+   * không publish realtime được). Subscription phải trỏ vào base table
+   * với schema:'b2b'. Migration đi kèm add b2b.chat_messages vào
+   * supabase_realtime publication:
+   *   docs/migrations/b2b_chat_realtime_publication.sql
    */
   subscribeToRoom(
     roomId: string,
@@ -545,8 +544,8 @@ export const chatMessageService = {
       onDelete?: (message: ChatMessage) => void
     }
   ) {
-    // Unique channel per (room, instance) để 2 tab mở cùng 1 room
-    // không dùng chung channel gây duplicate/miss event
+    // Unique channel per (room, mount instance) để 2 tab mở cùng 1 room
+    // hoặc 2 mount không dùng chung channel gây duplicate/miss event
     const channelName = `chat-room-${roomId}-${Math.random().toString(36).slice(2, 8)}`
     return supabase
       .channel(channelName)
@@ -554,8 +553,8 @@ export const chatMessageService = {
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'public',
-          table: 'b2b_chat_messages',
+          schema: 'b2b',
+          table: 'chat_messages',
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
@@ -566,8 +565,8 @@ export const chatMessageService = {
         'postgres_changes',
         {
           event: 'UPDATE',
-          schema: 'public',
-          table: 'b2b_chat_messages',
+          schema: 'b2b',
+          table: 'chat_messages',
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
@@ -578,8 +577,8 @@ export const chatMessageService = {
         'postgres_changes',
         {
           event: 'DELETE',
-          schema: 'public',
-          table: 'b2b_chat_messages',
+          schema: 'b2b',
+          table: 'chat_messages',
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {

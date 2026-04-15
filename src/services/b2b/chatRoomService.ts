@@ -417,7 +417,9 @@ export const chatRoomService = {
 
   /**
    * Subscribe to room updates.
-   * Dùng schema 'public' vì canonical table là public.b2b_chat_rooms.
+   * Base table là b2b.chat_rooms (public.b2b_chat_rooms chỉ là VIEW —
+   * không publish realtime được). Migration kèm add b2b.chat_rooms
+   * vào supabase_realtime publication.
    */
   subscribeToRooms(
     callback: (payload: { eventType: string; new: ChatRoom; old: ChatRoom }) => void
@@ -429,8 +431,8 @@ export const chatRoomService = {
         'postgres_changes',
         {
           event: '*',
-          schema: 'public',
-          table: 'b2b_chat_rooms',
+          schema: 'b2b',
+          table: 'chat_rooms',
         },
         (payload) => {
           callback({
@@ -445,7 +447,7 @@ export const chatRoomService = {
 
   /**
    * Subscribe to new messages (để update last_message).
-   * Dùng schema 'public' để match canonical table b2b_chat_messages.
+   * Base table là b2b.chat_messages.
    */
   subscribeToMessages(
     callback: (payload: { eventType: string; new: unknown; old: unknown }) => void
@@ -457,8 +459,8 @@ export const chatRoomService = {
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'public',
-          table: 'b2b_chat_messages',
+          schema: 'b2b',
+          table: 'chat_messages',
         },
         (payload) => {
           callback({

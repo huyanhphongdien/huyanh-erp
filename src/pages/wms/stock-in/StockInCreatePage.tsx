@@ -888,22 +888,30 @@ const StockInCreatePage = () => {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="Số SP" value={details.length} valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
+                <Statistic title="Số mặt hàng" value={details.length} valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
               </Card>
             </Col>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="Tổng SL" value={totalQty} suffix="kg" valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
+                <Statistic
+                  title="Số đơn vị"
+                  value={totalQty}
+                  suffix={(() => {
+                    const units = new Set(details.map(d => d.material?.unit || 'đv'))
+                    return units.size === 1 ? Array.from(units)[0] : 'đv'
+                  })()}
+                  valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }}
+                />
               </Card>
             </Col>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="Trọng lượng" value={(totalWeight / 1000).toFixed(1)} suffix="T" valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
+                <Statistic title="Trọng lượng" value={(totalWeight / 1000).toFixed(3)} suffix="T" valueStyle={{ fontSize: 20, fontFamily: "'JetBrains Mono'" }} />
               </Card>
             </Col>
             <Col span={6}>
               <Card bodyStyle={{ padding: 12 }}>
-                <Statistic title="TL khô (dry)" value={(totalDryWeight / 1000).toFixed(1)} suffix="T" valueStyle={{ fontSize: 20, color: '#2D8B6E', fontFamily: "'JetBrains Mono'" }} />
+                <Statistic title="TL khô (dry)" value={(totalDryWeight / 1000).toFixed(3)} suffix="T" valueStyle={{ fontSize: 20, color: '#2D8B6E', fontFamily: "'JetBrains Mono'" }} />
               </Card>
             </Col>
           </Row>

@@ -61,7 +61,8 @@ const server = http.createServer((req, res) => {
       }
 
       if (!stdout || stdout.length < 100) {
-        console.error(`Camera ${ip}: empty or too small response (${stdout?.length} bytes)`)
+        const len = stdout ? stdout.length : 0
+        console.error(`Camera ${ip}: empty or too small response (${len} bytes)`)
         res.writeHead(502, { 'Content-Type': 'text/plain' })
         res.end(`Camera error: empty response`)
         return

@@ -401,6 +401,63 @@ export const dealWmsService = {
   },
 
   /**
+   * S2: Cập nhật deal totals sau khi confirm stock-out (chiều xuất — deal sale)
+   * Mirror pattern updateDealStockInTotals nhưng cho delivered_weight_kg.
+   */
+  async updateDealStockOutTotals(dealId: string): Promise<void> {
+    const { data: stockOuts } = await supabase
+      .from('stock_out_orders')
+      .select('id, total_weight, status')
+      .eq('deal_id', dealId)
+
+    const confirmedStockOuts = (stockOuts || []).filter((so: any) => so.status === 'confirmed')
+    const totalWeight = confirmedStockOuts.reduce((sum: number, so: any) => sum + (so.total_weight || 0), 0)
+
+    await supabase
+      .from('b2b_deals')
+      .update({
+        stock_out_count: confirmedStockOuts.length,
+        delivered_weight_kg: totalWeight,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', dealId)
+  },
+
+  /**
+   * S2: Lấy danh sách deal SALE đang active để user chọn khi xuất kho
+   * (mirror getActiveDealsForStockIn nhưng filter deal_type='sale')
+   */
+  async getActiveDealsForStockOut(): Promise<ActiveDealForStockIn[]> {
+    const { data: deals } = await supabase
+      .from('b2b_deals')
+      .select(`
+        id, deal_number, deal_type, product_name, quantity_kg,
+        delivered_weight_kg, status,
+        partner:b2b_partners!partner_id(name)
+      `)
+      .in('status', ['active', 'confirmed', 'in_progress'])
+      .eq('deal_type', 'sale')
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    const result: ActiveDealForStockIn[] = (deals || []).map((d: any) => {
+      const quantityKg = Number(d.quantity_kg) || 0
+      const deliveredKg = Number(d.delivered_weight_kg) || 0
+      return {
+        id: d.id,
+        deal_number: d.deal_number,
+        partner_name: d.partner?.name || '—',
+        product_name: d.product_name || '',
+        quantity_kg: quantityKg,
+        received_kg: deliveredKg, // reuse field name, semantics = "delivered" với sale
+        remaining_kg: Math.max(0, quantityKg - deliveredKg),
+      }
+    })
+
+    return result.filter(d => d.remaining_kg > 0)
+  },
+
+  /**
    * Gửi thông báo vào chat khi confirm nhập kho
    */
   async notifyDealChatStockIn(dealId: string, stockInCode: string, totalWeight: number): Promise<void> {

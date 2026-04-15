@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import stockInService from '@erp/services/wms/stockInService'
+import stockOutService from '@erp/services/wms/stockOutService'
 import { supabase } from '@erp/lib/supabase'
 import { useKeliScale } from '@erp/hooks/useKeliScale'
 import { dealWmsService } from '@erp/services/b2b/dealWmsService'
@@ -317,9 +318,13 @@ export default function WeighingPage() {
         } catch { /* non-blocking */ }
       }
 
-      // C1: Auto-sync → tạo phiếu nhập kho NVL từ phiếu cân (feature flag)
-      // Chọn kho raw/mixed đầu tiên đang active. Không chặn luồng print nếu lỗi.
-      if (import.meta.env.VITE_AUTO_WEIGHBRIDGE_SYNC === 'true') {
+      // C1: Auto-sync INBOUND → tạo phiếu nhập kho NVL từ phiếu cân
+      //     (feature flag VITE_AUTO_WEIGHBRIDGE_SYNC). Chỉ chạy cho
+      //     ticket_type='in' — tránh lỡ tạo stock-in từ outbound ticket.
+      if (
+        ticket.ticket_type === 'in' &&
+        import.meta.env.VITE_AUTO_WEIGHBRIDGE_SYNC === 'true'
+      ) {
         try {
           const { data: rawWh } = await supabase
             .from('warehouses')
@@ -339,10 +344,44 @@ export default function WeighingPage() {
               message.success(`Đã tạo phiếu nhập NVL: ${result.stockIn?.code || ''}`)
             }
           } else {
-            console.warn('[auto-sync] không tìm thấy kho NVL active')
+            console.warn('[auto-sync in] không tìm thấy kho NVL active')
           }
         } catch (syncErr: any) {
-          console.warn('[auto-sync] tạo phiếu nhập thất bại:', syncErr?.message || syncErr)
+          console.warn('[auto-sync in] tạo phiếu nhập thất bại:', syncErr?.message || syncErr)
+        }
+      }
+
+      // S3: Auto-sync OUTBOUND → tạo phiếu xuất kho TP draft từ phiếu cân
+      //     (feature flag VITE_AUTO_WEIGHBRIDGE_OUT_SYNC riêng với C1).
+      //     Draft only — user phải pick batch + confirm manual.
+      //     Chọn kho finished/mixed đầu tiên. Errors non-blocking.
+      if (
+        ticket.ticket_type === 'out' &&
+        import.meta.env.VITE_AUTO_WEIGHBRIDGE_OUT_SYNC === 'true'
+      ) {
+        try {
+          const { data: tpWh } = await supabase
+            .from('warehouses')
+            .select('id, code, name')
+            .eq('is_active', true)
+            .in('type', ['finished', 'mixed'])
+            .order('code', { ascending: true })
+            .limit(1)
+          if (tpWh && tpWh.length > 0) {
+            const result = await stockOutService.createDraftFromWeighbridgeTicketOut(
+              ticket.id,
+              tpWh[0].id,
+            )
+            if (result.reused) {
+              message.info(`Phiếu xuất draft đã tồn tại: ${result.stockOut?.code || ''}`)
+            } else {
+              message.success(`Đã tạo phiếu xuất draft: ${result.stockOut?.code || ''}`)
+            }
+          } else {
+            console.warn('[auto-sync out] không tìm thấy kho TP active')
+          }
+        } catch (syncErr: any) {
+          console.warn('[auto-sync out] tạo phiếu xuất thất bại:', syncErr?.message || syncErr)
         }
       }
 

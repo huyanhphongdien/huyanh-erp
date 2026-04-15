@@ -99,6 +99,14 @@ const REASON_COLORS: Record<string, string> = {
 const TYPE_LABELS: Record<string, string> = { raw: 'NVL', finished: 'TP' }
 const TYPE_COLORS: Record<string, string> = { raw: 'orange', finished: 'green' }
 
+// S3: Parse notes để detect phiếu xuất tự động sinh từ phiếu cân.
+// Format: "Từ phiếu cân CX-YYYYMMDD-NNN · 51K-12345"
+const extractWeighbridgeCode = (notes: string | null | undefined): string | null => {
+  if (!notes) return null
+  const match = notes.match(/phiếu cân\s+(CX-[\w-]+)/i)
+  return match ? match[1] : null
+}
+
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'draft', label: 'Nháp' },
@@ -269,12 +277,20 @@ const StockOutListPage: React.FC = () => {
       title: 'Lý do',
       dataIndex: 'reason',
       key: 'reason',
-      width: 110,
-      render: (reason: string) => (
-        <Tag color={REASON_COLORS[reason] || 'default'}>
-          {REASON_LABELS[reason] || reason}
-        </Tag>
-      ),
+      width: 180,
+      render: (reason: string, record: StockOutOrder) => {
+        const ticketCode = extractWeighbridgeCode((record as any).notes)
+        return (
+          <Space size={4} wrap>
+            <Tag color={REASON_COLORS[reason] || 'default'}>
+              {REASON_LABELS[reason] || reason}
+            </Tag>
+            {ticketCode && (
+              <Tag color="cyan" style={{ margin: 0 }}>⚖ {ticketCode}</Tag>
+            )}
+          </Space>
+        )
+      },
     },
     {
       title: 'Grade',

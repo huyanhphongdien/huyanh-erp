@@ -34,6 +34,24 @@ export interface StockOutFormData {
   customer_name?: string
   customer_order_ref?: string
   notes?: string
+  // Rubber-specific header fields (cho phiếu xuất TP bán container)
+  svr_grade?: string | null
+  required_drc_min?: number | null
+  required_drc_max?: number | null
+  container_type?: string | null
+  bale_count?: number | null
+  // S2: Link tới deal sale — khi confirm sẽ update delivered_weight_kg của deal
+  deal_id?: string | null
+}
+
+/** Data thêm 1 dòng đã picked vào phiếu (flow chọn batch manual) */
+export interface ManualPickedDetail {
+  material_id: string
+  batch_id: string
+  location_id?: string | null
+  quantity: number
+  /** weight kg, để tính inventory. Nếu null sẽ fallback quantity khi confirm. */
+  weight?: number | null
 }
 
 /** Data thêm sản phẩm vào phiếu xuất (auto picking) */
@@ -150,7 +168,7 @@ export const stockOutService = {
 
     const code = await generateCode(orderType)
 
-    const insertData = {
+    const insertData: Record<string, any> = {
       code,
       type: orderType,
       warehouse_id: data.warehouse_id,
@@ -162,6 +180,14 @@ export const stockOutService = {
       created_by: createdBy || null,
       total_quantity: 0,
       total_weight: 0,
+      // Rubber-specific header fields (nullable, chỉ set khi page truyền vào)
+      svr_grade: data.svr_grade || null,
+      required_drc_min: data.required_drc_min ?? null,
+      required_drc_max: data.required_drc_max ?? null,
+      container_type: data.container_type || null,
+      bale_count: data.bale_count ?? null,
+      // S2: link tới deal sale (nullable, chỉ khi reason='sale')
+      deal_id: data.deal_id || null,
     }
 
     const { data: order, error } = await supabase
@@ -172,6 +198,71 @@ export const stockOutService = {
 
     if (error) throw error
     return order as unknown as StockOutOrder
+  },
+
+  // --------------------------------------------------------------------------
+  // ADD PICKED DETAILS — Bulk insert details với picking_status='picked'
+  // cho flow chọn batch manual ở StockOutCreatePage (thay thế inline insert)
+  // --------------------------------------------------------------------------
+  async addPickedDetails(
+    stockOutId: string,
+    items: ManualPickedDetail[],
+    pickedBy?: string,
+  ): Promise<StockOutDetail[]> {
+    if (items.length === 0) {
+      throw new Error('Không có dòng nào để thêm')
+    }
+
+    // 1. Validate phiếu đang draft/picking
+    const { data: order, error: orderErr } = await supabase
+      .from('stock_out_orders')
+      .select('id, status')
+      .eq('id', stockOutId)
+      .single()
+
+    if (orderErr) throw orderErr
+    if (!order) throw new Error('Không tìm thấy phiếu xuất kho')
+    if (order.status !== 'draft' && order.status !== 'picking') {
+      throw new Error('Chỉ có thể thêm sản phẩm khi phiếu Nháp hoặc Đang picking')
+    }
+
+    const now = new Date().toISOString()
+    const insertRows = items.map(it => ({
+      stock_out_id: stockOutId,
+      material_id: it.material_id,
+      batch_id: it.batch_id,
+      location_id: it.location_id || null,
+      quantity: it.quantity,
+      weight: it.weight && it.weight > 0 ? it.weight : null,
+      picking_status: 'picked' as PickingStatus,
+      picked_at: now,
+      picked_by: pickedBy || null,
+    }))
+
+    const { data: inserted, error: insErr } = await supabase
+      .from('stock_out_details')
+      .insert(insertRows)
+      .select(`
+        *,
+        material:materials(id, sku, name, type, unit, weight_per_unit),
+        batch:stock_batches(id, batch_no, initial_drc, latest_drc, qc_status, received_date),
+        location:warehouse_locations(id, code, shelf, row_name, column_name)
+      `)
+
+    if (insErr) throw insErr
+
+    // 2. Auto-transition draft → picking nếu còn ở draft
+    if (order.status === 'draft') {
+      await supabase
+        .from('stock_out_orders')
+        .update({ status: 'picking' as StockOutStatus, updated_at: now })
+        .eq('id', stockOutId)
+    }
+
+    // 3. Recalculate totals
+    await this._recalculateTotals(stockOutId)
+
+    return (inserted || []) as unknown as StockOutDetail[]
   },
 
   // --------------------------------------------------------------------------
@@ -506,7 +597,23 @@ export const stockOutService = {
     // 4. Tính lại total (chỉ tính picked, không tính skipped)
     await this._recalculateTotals(stockOutId, true)
 
-    // 5. Return phiếu đã xác nhận
+    // 5. S2: Nếu phiếu có deal_id → update delivered_weight_kg của deal
+    //    Non-blocking (log error nhưng không fail confirm).
+    const { data: orderFull } = await supabase
+      .from('stock_out_orders')
+      .select('deal_id')
+      .eq('id', stockOutId)
+      .single()
+    if (orderFull && (orderFull as any).deal_id) {
+      try {
+        const { dealWmsService } = await import('../b2b/dealWmsService')
+        await dealWmsService.updateDealStockOutTotals((orderFull as any).deal_id)
+      } catch (e) {
+        console.error('[stockOut] deal sync failed (non-blocking):', e)
+      }
+    }
+
+    // 6. Return phiếu đã xác nhận
     const confirmed = await this.getById(stockOutId)
     if (!confirmed) throw new Error('Không thể tải phiếu sau khi xác nhận')
     return confirmed
@@ -552,6 +659,89 @@ export const stockOutService = {
 
     if (updateErr) throw updateErr
     return cancelled as unknown as StockOutOrder
+  },
+
+  // ==========================================================================
+  // S3 — WEIGHBRIDGE OUTBOUND AUTO-SYNC
+  // ==========================================================================
+
+  /**
+   * Tạo phiếu xuất DRAFT từ phiếu cân outbound (ticket_type='out').
+   * Mirror pattern createFromWeighbridgeTicket (inbound) nhưng:
+   *  - Draft thay vì confirmed (user phải pick batch trước khi confirm)
+   *  - Notes format giống nhau → StockInListPage/StockOutListPage extract
+   *    mã ticket qua regex chung.
+   *  - Idempotent: nếu đã có phiếu xuất với notes match → return cũ.
+   */
+  async createDraftFromWeighbridgeTicketOut(
+    ticketId: string,
+    warehouseId: string,
+    createdBy?: string,
+  ): Promise<{ stockOut: any; reused?: boolean }> {
+    // 1. Fetch ticket + validate
+    const { data: ticket, error: ticketErr } = await supabase
+      .from('weighbridge_tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single()
+
+    if (ticketErr) throw ticketErr
+    if (!ticket) throw new Error('Không tìm thấy phiếu cân')
+    if (ticket.status !== 'completed') throw new Error('Phiếu cân chưa hoàn tất')
+    if (ticket.ticket_type !== 'out') {
+      throw new Error(`Phiếu cân không phải outbound (type=${ticket.ticket_type})`)
+    }
+
+    // 2. Idempotency check — match notes pattern
+    if (ticket.code) {
+      const { data: existing } = await supabase
+        .from('stock_out_orders')
+        .select('id, code, status')
+        .like('notes', `%phiếu cân ${ticket.code}%`)
+        .limit(1)
+      if (existing && existing.length > 0) {
+        return { stockOut: existing[0], reused: true }
+      }
+    }
+
+    // 3. Ticket đã có reference_type='stock_out' + reference_id → đã link sẵn,
+    //    không tạo mới
+    if (ticket.reference_type === 'stock_out' && ticket.reference_id) {
+      const { data: linked } = await supabase
+        .from('stock_out_orders')
+        .select('id, code, status')
+        .eq('id', ticket.reference_id)
+        .single()
+      if (linked) return { stockOut: linked, reused: true }
+    }
+
+    // 4. Validate kho TP (outbound mặc định là TP hàng bán)
+    await _assertWarehouseTypeMatches(warehouseId, 'finished')
+
+    // 5. Create draft header
+    const code = await generateCode('finished')
+    const { data: order, error: insErr } = await supabase
+      .from('stock_out_orders')
+      .insert({
+        code,
+        type: 'finished',
+        warehouse_id: warehouseId,
+        reason: 'sale' as StockOutReason,
+        customer_name: null,
+        customer_order_ref: null,
+        notes: `Từ phiếu cân ${ticket.code}${ticket.vehicle_plate ? ` · ${ticket.vehicle_plate}` : ''}`,
+        status: 'draft' as StockOutStatus,
+        created_by: createdBy || null,
+        total_quantity: 0,
+        total_weight: ticket.net_weight || 0,
+        container_type: null,
+        bale_count: null,
+      })
+      .select('id, code, status')
+      .single()
+
+    if (insErr) throw insErr
+    return { stockOut: order }
   },
 
   // ==========================================================================

@@ -62,6 +62,9 @@ import { supabase } from '../../../lib/supabase'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import WarehousePicker from '../../../components/wms/WarehousePicker'
 import { useActiveWarehouses } from '../../../hooks/useActiveWarehouses'
+import stockOutService from '../../../services/wms/stockOutService'
+import { dealWmsService } from '../../../services/b2b/dealWmsService'
+import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import type { RubberGrade } from '../../../services/wms/wms.types'
 import { RUBBER_GRADE_LABELS } from '../../../services/wms/wms.types'
 
@@ -136,6 +139,7 @@ interface FormHeader {
   required_drc_max: number | null
   container_type: string
   bale_count: number | null
+  deal_id: string | null
 }
 
 // ============================================================================
@@ -190,7 +194,12 @@ const StockOutCreatePage: React.FC = () => {
     required_drc_max: null,
     container_type: '',
     bale_count: null,
+    deal_id: null,
   })
+
+  // S2: Deal sale options (load khi reason='sale')
+  const [activeDeals, setActiveDeals] = useState<ActiveDealForStockIn[]>([])
+  const [loadingDeals, setLoadingDeals] = useState(false)
 
   // Step 2: Stock in warehouse + selected items
   const [batchStocks, setBatchStocks] = useState<BatchStock[]>([])
@@ -202,6 +211,9 @@ const StockOutCreatePage: React.FC = () => {
   const [searchText, setSearchText] = useState('')
   const [filterQC, setFilterQC] = useState<string>('all')
   const [filterMaterial, setFilterMaterial] = useState<string>('all')
+
+  // S4: Auto-pick FIFO
+  const [autoPickTargetKg, setAutoPickTargetKg] = useState<number | null>(null)
 
   // Data — warehouses via shared hook (same cache as other pages)
   const { data: warehouses = [] } = useActiveWarehouses()
@@ -325,9 +337,32 @@ const StockOutCreatePage: React.FC = () => {
       ...h,
       warehouse_id: '',
       reason: stockType === 'raw' ? 'transfer' : 'sale',
+      deal_id: null,
     }))
     setOutItems([])
   }, [stockType])
+
+  // S2: Load deal sale options khi reason='sale' (chỉ TP)
+  useEffect(() => {
+    if (header.reason !== 'sale' || stockType !== 'finished') {
+      setActiveDeals([])
+      setHeader(h => ({ ...h, deal_id: null }))
+      return
+    }
+    const load = async () => {
+      setLoadingDeals(true)
+      try {
+        const deals = await dealWmsService.getActiveDealsForStockOut()
+        setActiveDeals(deals)
+      } catch (err) {
+        console.error('Load active sale deals:', err)
+      }
+      setLoadingDeals(false)
+    }
+    load()
+  }, [header.reason, stockType])
+
+  const selectedDeal = activeDeals.find(d => d.id === header.deal_id)
 
   const selectedWarehouse = warehouses.find(w => w.id === header.warehouse_id)
 
@@ -435,35 +470,127 @@ const StockOutCreatePage: React.FC = () => {
     setOutItems(prev => prev.filter(i => i.tempId !== tempId))
   }
 
-  // ========================================================================
-  // SAVE / CONFIRM
-  // ========================================================================
+  // S4: Auto-pick FIFO — oldest batch trước, fulfill target kg
+  // Respect filter hiện tại (QC/material), cho phép partial batch.
+  // Decision khi target > tổng available: pick max + warn (không block).
+  const handleAutoPickFIFO = () => {
+    if (!autoPickTargetKg || autoPickTargetKg <= 0) return
 
-  const generateCode = async (): Promise<string> => {
-    const now = new Date()
-    const yyyy = String(now.getFullYear())
-    const mm = String(now.getMonth() + 1).padStart(2, '0')
-    const dd = String(now.getDate()).padStart(2, '0')
-    const typeSegment = stockType === 'raw' ? 'NVL' : 'TP'
-    const prefix = `XK-${typeSegment}-${yyyy}${mm}${dd}`
+    // Candidates: chưa trong outItems, pass current filter, có weight info
+    const addedIds = new Set(outItems.map(i => i.batch_id))
+    const candidates = filteredBatches
+      .filter(b => !addedIds.has(b.id))
+      .filter(b => b.weight_per_unit) // bỏ batch không có weight_per_unit để tính kg chính xác
+      .sort((a, b) =>
+        new Date(a.received_date).getTime() - new Date(b.received_date).getTime(),
+      )
 
-    const { data, error: err } = await supabase
-      .from('stock_out_orders')
-      .select('code')
-      .like('code', `${prefix}-%`)
-      .order('code', { ascending: false })
-      .limit(1)
-
-    if (err) throw err
-
-    let seq = 1
-    if (data && data.length > 0) {
-      const lastSeq = parseInt(data[0].code.split('-').pop() || '0', 10)
-      seq = lastSeq + 1
+    if (candidates.length === 0) {
+      setError('Không có lô phù hợp (kiểm tra filter QC/material)')
+      return
     }
 
-    return `${prefix}-${String(seq).padStart(3, '0')}`
+    let remainingKg = autoPickTargetKg
+    const picked: OutItem[] = []
+    for (const b of candidates) {
+      if (remainingKg <= 0) break
+      const wpu = b.weight_per_unit || 0
+      const fullBatchKg = b.quantity_remaining * wpu
+
+      if (fullBatchKg <= remainingKg) {
+        // Pick full batch
+        picked.push({
+          tempId: `out-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${b.id.slice(0, 4)}`,
+          batch_id: b.id,
+          batch_no: b.batch_no,
+          material_id: b.material_id,
+          material_name: b.material_name,
+          material_sku: b.material_sku,
+          material_unit: b.material_unit,
+          weight_per_unit: b.weight_per_unit,
+          location_id: b.location_id,
+          location_code: b.location_code,
+          quantity: b.quantity_remaining,
+          max_quantity: b.quantity_remaining,
+          weight: fullBatchKg,
+          latest_drc: b.latest_drc,
+          qc_status: b.qc_status,
+          rubber_grade: b.rubber_grade,
+        })
+        remainingKg -= fullBatchKg
+      } else {
+        // Partial: cần floor qty để không vượt remainingKg
+        const partialQty = Math.floor(remainingKg / wpu)
+        if (partialQty <= 0) continue
+        const partialWeight = partialQty * wpu
+        picked.push({
+          tempId: `out-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${b.id.slice(0, 4)}`,
+          batch_id: b.id,
+          batch_no: b.batch_no,
+          material_id: b.material_id,
+          material_name: b.material_name,
+          material_sku: b.material_sku,
+          material_unit: b.material_unit,
+          weight_per_unit: b.weight_per_unit,
+          location_id: b.location_id,
+          location_code: b.location_code,
+          quantity: partialQty,
+          max_quantity: b.quantity_remaining,
+          weight: partialWeight,
+          latest_drc: b.latest_drc,
+          qc_status: b.qc_status,
+          rubber_grade: b.rubber_grade,
+        })
+        remainingKg -= partialWeight
+        break
+      }
+    }
+
+    if (picked.length === 0) {
+      setError('Không fill được lô nào — target có thể nhỏ hơn weight_per_unit của lô nhỏ nhất')
+      return
+    }
+
+    setOutItems(prev => [...prev, ...picked])
+    setAddModalOpen(false)
+
+    const filledKg = autoPickTargetKg - remainingKg
+    if (remainingKg > 0) {
+      setError(
+        `Chỉ fill được ${filledKg.toLocaleString('vi-VN')} kg / ${autoPickTargetKg.toLocaleString('vi-VN')} kg mục tiêu — tồn kho không đủ`,
+      )
+    }
+    setAutoPickTargetKg(null)
   }
+
+  // ========================================================================
+  // SAVE / CONFIRM — Dùng service layer thay vì inline SQL (S1 refactor)
+  // ========================================================================
+
+  /** Build StockOutFormData chung cho create draft/confirmed */
+  const buildFormData = () => ({
+    type: stockType,
+    warehouse_id: header.warehouse_id,
+    reason: header.reason,
+    customer_name: header.customer_name || undefined,
+    customer_order_ref: header.customer_order_ref || undefined,
+    notes: header.notes || undefined,
+    svr_grade: header.svr_grade || null,
+    required_drc_min: header.required_drc_min,
+    required_drc_max: header.required_drc_max,
+    container_type: header.container_type || null,
+    bale_count: header.bale_count,
+    deal_id: header.deal_id || null,
+  })
+
+  /** Convert outItems (UI state) → ManualPickedDetail[] cho service */
+  const buildPickedDetails = () => outItems.map(item => ({
+    material_id: item.material_id,
+    batch_id: item.batch_id,
+    location_id: item.location_id,
+    quantity: item.quantity,
+    weight: item.weight > 0 ? item.weight : null,
+  }))
 
   const handleSaveDraft = async () => {
     if (!currentUserId) {
@@ -474,48 +601,29 @@ const StockOutCreatePage: React.FC = () => {
     setError(null)
 
     try {
-      const code = await generateCode()
-
-      const { data: order, error: hErr } = await supabase
-        .from('stock_out_orders')
-        .insert({
-          code,
-          type: stockType,
-          warehouse_id: header.warehouse_id,
-          reason: header.reason,
-          customer_name: header.customer_name || null,
-          customer_order_ref: header.customer_order_ref || null,
-          total_quantity: totalQty,
-          total_weight: totalWeight > 0 ? totalWeight : null,
-          status: 'draft',
-          notes: header.notes || null,
-          created_by: currentUserId,
-          svr_grade: header.svr_grade || null,
-          required_drc_min: header.required_drc_min,
-          required_drc_max: header.required_drc_max,
-          container_type: header.container_type || null,
-          bale_count: header.bale_count,
-        })
-        .select('id, code')
-        .single()
-
-      if (hErr) throw hErr
-
-      const details = outItems.map(item => ({
-        stock_out_id: order.id,
-        material_id: item.material_id,
-        batch_id: item.batch_id,
-        location_id: item.location_id || null,
-        quantity: item.quantity,
-        weight: item.weight > 0 ? item.weight : null,
-        picking_status: 'pending',
-      }))
-
+      const order = await stockOutService.create(buildFormData(), currentUserId)
+      // Draft: chỉ insert details nhưng giữ picking_status='pending' để user picking sau
+      // Dùng direct insert vì service addPickedDetails mark luôn 'picked'
+      const now = new Date().toISOString()
       const { error: dErr } = await supabase
         .from('stock_out_details')
-        .insert(details)
-
+        .insert(outItems.map(item => ({
+          stock_out_id: order.id,
+          material_id: item.material_id,
+          batch_id: item.batch_id,
+          location_id: item.location_id || null,
+          quantity: item.quantity,
+          weight: item.weight > 0 ? item.weight : null,
+          picking_status: 'pending',
+        })))
       if (dErr) throw dErr
+
+      // Recalc totals
+      await supabase.from('stock_out_orders').update({
+        total_quantity: totalQty,
+        total_weight: totalWeight > 0 ? totalWeight : null,
+        updated_at: now,
+      }).eq('id', order.id)
 
       setSuccessCode(order.code)
       setTimeout(() => navigate('/wms/stock-out'), 1500)
@@ -536,133 +644,20 @@ const StockOutCreatePage: React.FC = () => {
     setError(null)
 
     try {
-      const code = await generateCode()
+      // 3-step service flow:
+      // 1. Create draft header (với full rubber fields)
+      // 2. addPickedDetails → bulk insert details picking_status='picked'
+      // 3. confirmStockOut → validate + inventory sync (batch deplete, stock_levels,
+      //    inventory_transactions, warehouse_locations) ĐÚNG KG
+      const order = await stockOutService.create(buildFormData(), currentUserId)
+      await stockOutService.addPickedDetails(
+        order.id,
+        buildPickedDetails(),
+        currentUserId,
+      )
+      const confirmed = await stockOutService.confirmStockOut(order.id, currentUserId)
 
-      const { data: order, error: hErr } = await supabase
-        .from('stock_out_orders')
-        .insert({
-          code,
-          type: stockType,
-          warehouse_id: header.warehouse_id,
-          reason: header.reason,
-          customer_name: header.customer_name || null,
-          customer_order_ref: header.customer_order_ref || null,
-          total_quantity: totalQty,
-          total_weight: totalWeight > 0 ? totalWeight : null,
-          status: 'confirmed',
-          notes: header.notes || null,
-          created_by: currentUserId,
-          confirmed_by: currentUserId,
-          confirmed_at: new Date().toISOString(),
-          svr_grade: header.svr_grade || null,
-          required_drc_min: header.required_drc_min,
-          required_drc_max: header.required_drc_max,
-          container_type: header.container_type || null,
-          bale_count: header.bale_count,
-        })
-        .select('id, code')
-        .single()
-
-      if (hErr) throw hErr
-
-      const details = outItems.map(item => ({
-        stock_out_id: order.id,
-        material_id: item.material_id,
-        batch_id: item.batch_id,
-        location_id: item.location_id || null,
-        quantity: item.quantity,
-        weight: item.weight > 0 ? item.weight : null,
-        picking_status: 'picked',
-        picked_at: new Date().toISOString(),
-        picked_by: currentUserId,
-      }))
-
-      const { error: dErr } = await supabase
-        .from('stock_out_details')
-        .insert(details)
-
-      if (dErr) throw dErr
-
-      // Update stock_batches, stock_levels, inventory_transactions
-      for (const item of outItems) {
-        const { data: batch, error: bErr } = await supabase
-          .from('stock_batches')
-          .select('quantity_remaining')
-          .eq('id', item.batch_id)
-          .single()
-
-        if (bErr) throw bErr
-
-        const newQty = batch.quantity_remaining - item.quantity
-        const updateData: Record<string, any> = {
-          quantity_remaining: newQty,
-          updated_at: new Date().toISOString(),
-        }
-        if (newQty <= 0) updateData.status = 'depleted'
-
-        const { error: uErr } = await supabase
-          .from('stock_batches')
-          .update(updateData)
-          .eq('id', item.batch_id)
-
-        if (uErr) throw uErr
-
-        const { data: sl, error: slErr } = await supabase
-          .from('stock_levels')
-          .select('id, quantity')
-          .eq('material_id', item.material_id)
-          .eq('warehouse_id', header.warehouse_id)
-          .maybeSingle()
-
-        if (slErr) throw slErr
-
-        if (sl) {
-          const { error: slUpErr } = await supabase
-            .from('stock_levels')
-            .update({
-              quantity: sl.quantity - item.quantity,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', sl.id)
-
-          if (slUpErr) throw slUpErr
-        }
-
-        if (item.location_id) {
-          const { data: loc, error: locErr } = await supabase
-            .from('warehouse_locations')
-            .select('id, current_quantity')
-            .eq('id', item.location_id)
-            .maybeSingle()
-
-          if (!locErr && loc) {
-            await supabase
-              .from('warehouse_locations')
-              .update({
-                current_quantity: Math.max(0, loc.current_quantity - item.quantity),
-              })
-              .eq('id', loc.id)
-          }
-        }
-
-        const { error: txErr } = await supabase
-          .from('inventory_transactions')
-          .insert({
-            material_id: item.material_id,
-            warehouse_id: header.warehouse_id,
-            batch_id: item.batch_id,
-            type: 'out',
-            quantity: -item.quantity,
-            reference_type: 'stock_out',
-            reference_id: order.id,
-            notes: `Xuất kho: ${code}`,
-            created_by: currentUserId,
-          })
-
-        if (txErr) throw txErr
-      }
-
-      setSuccessCode(order.code)
+      setSuccessCode((confirmed as any).code || order.code)
       setTimeout(() => navigate('/wms/stock-out'), 1500)
     } catch (err: any) {
       console.error('Loi xac nhan xuất kho:', err)
@@ -1088,6 +1083,38 @@ const StockOutCreatePage: React.FC = () => {
             {header.reason === 'sale' && (
               <Card title="Khách hàng" style={{ marginBottom: 24 }}>
                 <Form layout="vertical">
+                  {/* S2: Deal sale picker — chỉ cho TP, liên kết delivered_weight_kg */}
+                  {stockType === 'finished' && (
+                    <Form.Item label="Deal B2B (tuỳ chọn)">
+                      <Select
+                        value={header.deal_id || undefined}
+                        onChange={val => setHeader(h => ({ ...h, deal_id: val || null }))}
+                        placeholder="Chọn Deal sale để link"
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        loading={loadingDeals}
+                        size="large"
+                        options={activeDeals.map(d => ({
+                          value: d.id,
+                          label: `${d.deal_number} — ${d.partner_name} — Còn ${(d.remaining_kg / 1000).toFixed(1)} T`,
+                        }))}
+                      />
+                      {selectedDeal && (
+                        <Alert
+                          type="info"
+                          style={{ marginTop: 8, borderRadius: 6 }}
+                          message={
+                            <Space wrap size={12}>
+                              <Text>Deal: <Text strong>{selectedDeal.deal_number}</Text></Text>
+                              <Text>Đã giao: <Text strong>{(selectedDeal.received_kg / 1000).toFixed(1)} T</Text></Text>
+                              <Text>Còn lại: <Text strong style={{ color: '#1890ff' }}>{(selectedDeal.remaining_kg / 1000).toFixed(1)} T</Text></Text>
+                            </Space>
+                          }
+                        />
+                      )}
+                    </Form.Item>
+                  )}
                   <Form.Item label="Tên khách hàng">
                     <Input
                       value={header.customer_name}
@@ -1240,6 +1267,37 @@ const StockOutCreatePage: React.FC = () => {
             </Card>
           )}
 
+          {/* S4: Auto-pick FIFO row */}
+          <Card
+            size="small"
+            style={{ marginBottom: 12, borderLeft: '3px solid #E8A838' }}
+            bodyStyle={{ padding: 12 }}
+          >
+            <Space wrap style={{ width: '100%' }}>
+              <Text strong>⚡ Auto-fill FIFO:</Text>
+              <InputNumber
+                value={autoPickTargetKg}
+                onChange={v => setAutoPickTargetKg(v)}
+                placeholder="Mục tiêu kg"
+                min={0}
+                step={100}
+                style={{ width: 180 }}
+                addonAfter="kg"
+              />
+              <Button
+                type="primary"
+                onClick={handleAutoPickFIFO}
+                disabled={!autoPickTargetKg || autoPickTargetKg <= 0 || batchStocks.length === 0}
+                style={{ background: '#E8A838', borderColor: '#E8A838' }}
+              >
+                Tự chọn lô (FIFO)
+              </Button>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                Tự pick lô cũ nhất đến khi đủ target. Respect filter QC/material hiện tại.
+              </Text>
+            </Space>
+          </Card>
+
           {/* Add batch button */}
           <Button
             type="dashed"
@@ -1249,7 +1307,7 @@ const StockOutCreatePage: React.FC = () => {
             block
             style={{ marginBottom: 16, height: 56, fontSize: 16 }}
           >
-            Thêm lô hàng từ kho
+            Thêm lô hàng từ kho (chọn tay)
           </Button>
 
           {/* Batch Selection Modal */}

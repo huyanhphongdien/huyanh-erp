@@ -26,12 +26,15 @@ import type {
 // CONSTANTS
 // ============================================================================
 
+// Note: bỏ join employees!stock_in_orders_*_by_fkey vì FK đã DROP ở
+// migration v3 (audit cols nullable, có thể là scale_operators). Hệ quả:
+// list/detail không hiện tên người tạo/xác nhận — nếu cần show, lookup
+// riêng qua employee_id ở component (FacilityPicker pattern).
+
 /** Select string cho phiếu nhập - join details + material + batch + location */
 const STOCK_IN_SELECT = `
   *,
   warehouse:warehouses(id, code, name, type),
-  creator:employees!stock_in_orders_created_by_fkey(full_name),
-  confirmer:employees!stock_in_orders_confirmed_by_fkey(full_name),
   details:stock_in_details(
     *,
     material:materials(id, sku, name, type, unit, weight_per_unit),
@@ -47,8 +50,6 @@ const STOCK_IN_LIST_SELECT = `
   created_by, confirmed_by, confirmed_at,
   created_at, updated_at,
   warehouse:warehouses(id, code, name),
-  creator:employees!stock_in_orders_created_by_fkey(full_name),
-  confirmer:employees!stock_in_orders_confirmed_by_fkey(full_name),
   deal:b2b_deals!deal_id(id, deal_number)
 `
 

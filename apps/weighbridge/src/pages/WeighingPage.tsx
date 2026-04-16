@@ -98,6 +98,9 @@ export default function WeighingPage() {
   const [transferOptions, setTransferOptions] = useState<InterFacilityTransfer[]>([])
   const [selectedTransferId, setSelectedTransferId] = useState<string>('')
   const [loadingTransfers, setLoadingTransfers] = useState(false)
+  // Khi user chọn transfer → tổng KL hàng dự kiến (sum items.weight_planned_kg).
+  // Dùng để compute TARE = GROSS - planned ở cân OUT TL/LAO.
+  const [transferPlannedKg, setTransferPlannedKg] = useState<number>(0)
 
   // Deal/Supplier
   const [deals, setDeals] = useState<ActiveDealForStockIn[]>([])
@@ -386,24 +389,39 @@ export default function WeighingPage() {
     setError('')
     try {
       let updated: WeighbridgeTicket
-      // S3 + F3: OUT flow — cân 1 lần. Tare phụ thuộc context:
-      //   • Có Container (Sales Order export) → tare = container_tare cố định (20ft=2300, 40ft=3800)
-      //   • Có Transfer hoặc xuất lẻ → tare = 0, weight nhập = NET trực tiếp (vì xe tải bình thường,
-      //     không phải container chuẩn — trọng lượng hàng đã biết trước qua planned)
+      // S3 + F3: OUT flow — cân 1 lần. weight nhập = TỔNG CÂN (gross). Tare phụ thuộc context:
+      //   • Có Container (SO export) → tare cố định = container_tare (20ft=2300, 40ft=3800)
+      //   • Có Transfer + planned > 0 → TARE xe = GROSS - planned (NET = planned)
+      //     (KL hàng đã biết trước, cân chỉ để xác định tare xe — không bị "trốn")
+      //   • Xuất lẻ hoặc transfer chưa có planned → tare = 0, NET = weight (giả lập đơn giản)
       if (ticket.ticket_type === 'out') {
-        const isContainerShipment = !!selectedContainerId  // chỉ container SO mới có tare cố định
+        const isContainerShipment = !!selectedContainerId
+        const isTransferWithPlanned = !!selectedTransferId && transferPlannedKg > 0
         const containerType = selectedContainer?.container_type || '20ft'
-        const tareKg = isContainerShipment
-          ? (CONTAINER_TARE_KG[containerType] || CONTAINER_TARE_KG['20ft'])
-          : 0
+
+        let tareKg = 0
+        let ctxLabel = 'xuất lẻ (NET trực tiếp)'
+
+        if (isContainerShipment) {
+          tareKg = CONTAINER_TARE_KG[containerType] || CONTAINER_TARE_KG['20ft']
+          ctxLabel = `container ${containerType}, tare ${tareKg.toLocaleString()} kg`
+        } else if (isTransferWithPlanned) {
+          // GROSS = weight nhập, NET = planned (KL hàng đã biết), TARE = GROSS - planned
+          tareKg = Math.max(0, Math.round((weight - transferPlannedKg) * 100) / 100)
+          if (weight < transferPlannedKg) {
+            // Edge case: GROSS < planned → fallback NET = GROSS
+            tareKg = 0
+            ctxLabel = `transfer (cân ${weight} < KL dự kiến ${transferPlannedKg}, fallback NET=GROSS)`
+          } else {
+            ctxLabel = `transfer: TARE xe = ${tareKg.toLocaleString('vi-VN')} kg, NET hàng = ${transferPlannedKg.toLocaleString('vi-VN')} kg`
+          }
+        }
+
         updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
         updated = await weighbridgeService.updateTareWeight(ticket.id, tareKg, operator?.id)
         setTicket(updated)
         const c = recalculate(weight, tareKg, deductionKg, expectedDrc, unitPrice, priceUnit)
-        const ctxLabel = isContainerShipment
-          ? `container ${containerType}, tare ${tareKg.toLocaleString()} kg`
-          : (selectedTransferId ? 'transfer (NET trực tiếp)' : 'xuất lẻ (NET trực tiếp)')
-        setSuccess(`Cân OUT: ${weight.toLocaleString()} kg (${ctxLabel}) → NET ${c.net_weight.toLocaleString()} kg`)
+        setSuccess(`Cân OUT: gross ${weight.toLocaleString()} kg | ${ctxLabel} → NET ${c.net_weight.toLocaleString('vi-VN')} kg`)
         setManualWeight(null)
         if (cameraCaptureRef.current) {
           cameraCaptureRef.current('OUT').catch(() => {})
@@ -733,12 +751,27 @@ export default function WeighingPage() {
                     </Text>
                     <Select
                       value={selectedTransferId || undefined}
-                      onChange={(v) => {
+                      onChange={async (v) => {
                         setSelectedTransferId(v || '')
-                        // Auto-fill biển số xe từ phiếu chuyển
                         const tr = transferOptions.find((x) => x.id === v)
+                        // Auto-fill biển số xe từ phiếu chuyển
                         if (tr?.vehicle_plate && !vehiclePlate) setVehiclePlate(tr.vehicle_plate)
                         if (tr?.driver_name && !driverName) setDriverName(tr.driver_name)
+                        // F3 cân OUT: load planned KL hàng (sum items.weight_planned_kg)
+                        // dùng để compute TARE = GROSS - planned khi user nhập số cân
+                        if (v) {
+                          try {
+                            const full = await transferService.getById(v)
+                            const planned = (full?.items || []).reduce(
+                              (s, i) => s + (i.weight_planned_kg || 0), 0,
+                            )
+                            setTransferPlannedKg(planned)
+                          } catch {
+                            setTransferPlannedKg(0)
+                          }
+                        } else {
+                          setTransferPlannedKg(0)
+                        }
                       }}
                       placeholder={loadingTransfers ? 'Đang tải...' : 'Chọn phiếu chuyển (hoặc bỏ trống nếu không phải transfer)'}
                       style={{ width: '100%' }}
@@ -755,19 +788,31 @@ export default function WeighingPage() {
                       const tr = transferOptions.find((x) => x.id === selectedTransferId)
                       if (!tr) return null
                       return (
-                        <div style={{ padding: 8, background: '#F0FDF4', borderRadius: 8, fontSize: 12, border: '1px solid #BBF7D0' }}>
+                        <div style={{ padding: 10, background: '#F0FDF4', borderRadius: 8, fontSize: 12, border: '1px solid #BBF7D0' }}>
                           <Space size={4} wrap>
                             <Tag color="blue">{tr.from_facility?.code}</Tag>→
                             <Tag color="green">{tr.to_facility?.code}</Tag>
                             <Text type="secondary">|</Text>
                             <Text>Mã: <Text strong>{tr.code}</Text></Text>
+                            {ticketDirection === 'out' && transferPlannedKg > 0 && (
+                              <>
+                                <Text type="secondary">|</Text>
+                                <Text>📦 KL hàng: <Text strong style={{ color: '#1B4D3E' }}>{transferPlannedKg.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Text></Text>
+                              </>
+                            )}
                             {ticketDirection === 'in' && tr.weight_out_kg && (
                               <>
                                 <Text type="secondary">|</Text>
-                                <Text>Cân xuất: <Text strong>{tr.weight_out_kg.toLocaleString('vi-VN')} kg</Text></Text>
+                                <Text>Cân xuất TL: <Text strong>{tr.weight_out_kg.toLocaleString('vi-VN')} kg</Text></Text>
                               </>
                             )}
                           </Space>
+                          {ticketDirection === 'out' && transferPlannedKg > 0 && (
+                            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #BBF7D0', color: '#1B4D3E' }}>
+                              💡 Cân scale cho ra <Text strong>tổng</Text> (xe + hàng).
+                              Hệ thống tự tính: <Text code>TARE xe = TỔNG cân − {transferPlannedKg.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Text>
+                            </div>
+                          )}
                         </div>
                       )
                     })()}

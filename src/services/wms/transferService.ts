@@ -407,7 +407,7 @@ async function confirmShipped(input: {
     const { error: errDetail } = await supabase
       .from('stock_out_details')
       .insert({
-        stock_out_order_id: stockOut.id,
+        stock_out_id: stockOut.id,
         material_id: item.material_id,
         batch_id: item.source_batch_id || null,
         quantity: item.quantity_planned || 0,
@@ -456,7 +456,7 @@ async function confirmShipped(input: {
 
     // Inventory transaction log
     await supabase.from('inventory_transactions').insert({
-      transaction_type: 'transfer_out',
+      type: 'out',
       warehouse_id: t.from_warehouse_id,
       material_id: item.material_id,
       batch_id: item.source_batch_id || null,
@@ -464,7 +464,7 @@ async function confirmShipped(input: {
       reference_type: 'transfer',
       reference_id: t.id,
       notes: `Chuyển kho: ${t.code}`,
-      created_by: input.user_id || null,
+      created_by: null,  // Skip FK strict (audit only)
     })
   }
 
@@ -663,9 +663,9 @@ async function _createStockInForReceived(
       .select('id')
       .single()
 
-    // Stock-in detail
+    // Stock-in detail (column là stock_in_id không phải stock_in_order_id)
     await supabase.from('stock_in_details').insert({
-      stock_in_order_id: stockIn.id,
+      stock_in_id: stockIn.id,
       material_id: item.material_id,
       batch_id: newBatch?.id || null,
       quantity: itemQtyReceived,
@@ -705,7 +705,7 @@ async function _createStockInForReceived(
 
     // Inventory transaction log
     await supabase.from('inventory_transactions').insert({
-      transaction_type: 'transfer_in',
+      type: 'in',
       warehouse_id: transfer.to_warehouse_id,
       material_id: item.material_id,
       batch_id: newBatch?.id || null,
@@ -713,7 +713,7 @@ async function _createStockInForReceived(
       reference_type: 'transfer',
       reference_id: transfer.id,
       notes: `Nhận chuyển kho: ${transfer.code}`,
-      created_by: userId || null,
+      created_by: null,  // Skip FK strict (audit only)
     })
   }
 

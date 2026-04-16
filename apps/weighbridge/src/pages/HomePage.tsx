@@ -52,9 +52,11 @@ export default function HomePage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // F2.7: Filter theo facility hiện tại — mỗi instance app cân chỉ thấy phiếu của NM đó
+      const facilityId = facility?.id || null
       const [allResult, statsResult] = await Promise.all([
-        weighbridgeService.getAll({ page: 1, pageSize: 200 }),
-        weighbridgeService.getStats(),
+        weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facilityId }),
+        weighbridgeService.getStats(undefined, undefined, facilityId),
       ])
       const all = allResult.data || []
       const inProg = all.filter((t) => t.status === 'weighing_gross' || t.status === 'weighing_tare')
@@ -79,7 +81,7 @@ export default function HomePage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [facility?.id])
 
   useEffect(() => { load() }, [load])
 
@@ -247,24 +249,46 @@ export default function HomePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-      {/* Header */}
-      <div style={{ background: PRIMARY, padding: '12px 20px', position: 'sticky', top: 0, zIndex: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 1200, margin: '0 auto' }}>
-          <Space size={12}>
-            <span style={{ fontSize: 24 }}>⚖️</span>
-            <div>
-              <Title level={5} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
-                TRẠM CÂN {facility ? facility.name.toUpperCase() : 'HUY ANH'}
-              </Title>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-                {operator?.name} • {operator?.station || 'Trạm 1'}
-                {facility && <> • <span style={{ color: '#FFD54F' }}>🏭 {facility.code}</span></>}
-              </Text>
+      {/* Header — 3-column layout: logo (trái), tên trạm cân (giữa), actions (phải) */}
+      <div style={{ background: PRIMARY, padding: '10px 20px', position: 'sticky', top: 0, zIndex: 20 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            gap: 16,
+            maxWidth: 1400,
+            margin: '0 auto',
+          }}
+        >
+          {/* TRÁI — Logo + tên công ty */}
+          <Space size={10} align="center">
+            <img
+              src="/logo.png"
+              alt="Huy Anh Rubber"
+              style={{ height: 40, width: 40, borderRadius: 6, background: '#fff', padding: 4 }}
+            />
+            <div style={{ lineHeight: 1.2 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>Công ty TNHH MTV</div>
+              <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>Cao su Huy Anh</div>
             </div>
           </Space>
-          <Space>
+
+          {/* GIỮA — Tên trạm cân (lớn, nổi bật) */}
+          <div style={{ textAlign: 'center' }}>
+            <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 20, letterSpacing: 1 }}>
+              ⚖️ TRẠM CÂN {facility ? facility.name.toUpperCase() : 'HUY ANH'}
+            </Title>
+            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>
+              {operator?.name} • {operator?.station || 'Trạm 1'}
+              {facility && <> • <span style={{ color: '#FFD54F' }}>🏭 {facility.code}</span></>}
+            </Text>
+          </div>
+
+          {/* PHẢI — Time + status + buttons */}
+          <Space size={6} style={{ justifySelf: 'end' }}>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, ...MONO }}>{timeStr}</Text>
-            <Tag color={scale.connected ? 'green' : 'red'} style={{ fontSize: 11, cursor: 'pointer' }} onClick={() => navigate('/settings')}>
+            <Tag color={scale.connected ? 'green' : 'red'} style={{ fontSize: 11, cursor: 'pointer', margin: 0 }} onClick={() => navigate('/settings')}>
               {scale.connected ? '● Cân OK' : '○ Chưa kết nối'}
             </Tag>
             <Button type="text" icon={<ReloadOutlined spin={loading} />} onClick={load} style={{ color: '#fff' }} />

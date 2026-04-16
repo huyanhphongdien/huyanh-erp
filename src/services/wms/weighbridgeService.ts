@@ -234,8 +234,10 @@ async function cancel(id: string, reason?: string): Promise<WeighbridgeTicket> {
 async function getAll(params: WMSPaginationParams & {
   ticket_type?: TicketType
   vehicle_plate?: string
+  /** F2 multi-facility: lọc theo nhà máy phát sinh phiếu */
+  facility_id?: string | null
 }): Promise<PaginatedResponse<WeighbridgeTicket>> {
-  const { page = 1, pageSize = 20, search, status, from_date, to_date, ticket_type, vehicle_plate } = params
+  const { page = 1, pageSize = 20, search, status, from_date, to_date, ticket_type, vehicle_plate, facility_id } = params
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
@@ -248,6 +250,7 @@ async function getAll(params: WMSPaginationParams & {
   if (vehicle_plate) query = query.ilike('vehicle_plate', `%${vehicle_plate}%`)
   if (from_date) query = query.gte('created_at', from_date)
   if (to_date) query = query.lte('created_at', to_date + 'T23:59:59.999Z')
+  if (facility_id) query = query.eq('facility_id', facility_id)
 
   if (search) {
     query = query.or(`code.ilike.%${search}%,vehicle_plate.ilike.%${search}%,driver_name.ilike.%${search}%`)
@@ -404,7 +407,7 @@ async function getPlateHistory(search?: string, limit = 20): Promise<string[]> {
 /**
  * Thống kê nhanh — dùng cho header dashboard
  */
-async function getStats(fromDate?: string, toDate?: string): Promise<{
+async function getStats(fromDate?: string, toDate?: string, facilityId?: string | null): Promise<{
   totalTickets: number
   completedToday: number
   inProgress: number
@@ -413,18 +416,22 @@ async function getStats(fromDate?: string, toDate?: string): Promise<{
   const today = new Date().toISOString().split('T')[0]
 
   // Đang cân (chưa hoàn tất)
-  const { count: inProgress } = await supabase
+  let inProgressQuery = supabase
     .from('weighbridge_tickets')
     .select('id', { count: 'exact', head: true })
     .in('status', ['weighing_gross', 'weighing_tare'])
+  if (facilityId) inProgressQuery = inProgressQuery.eq('facility_id', facilityId)
+  const { count: inProgress } = await inProgressQuery
 
   // Hoàn tất hôm nay
-  const { data: todayData, count: completedToday } = await supabase
+  let todayQuery = supabase
     .from('weighbridge_tickets')
     .select('net_weight', { count: 'exact' })
     .eq('status', 'completed')
     .gte('completed_at', `${today}T00:00:00.000Z`)
     .lte('completed_at', `${today}T23:59:59.999Z`)
+  if (facilityId) todayQuery = todayQuery.eq('facility_id', facilityId)
+  const { data: todayData, count: completedToday } = await todayQuery
 
   // Tổng net weight hôm nay
   const totalNetWeight = (todayData || [])
@@ -434,9 +441,10 @@ async function getStats(fromDate?: string, toDate?: string): Promise<{
   let totalQuery = supabase
     .from('weighbridge_tickets')
     .select('id', { count: 'exact', head: true })
-  
+
   if (fromDate) totalQuery = totalQuery.gte('created_at', fromDate)
   if (toDate) totalQuery = totalQuery.lte('created_at', toDate + 'T23:59:59.999Z')
+  if (facilityId) totalQuery = totalQuery.eq('facility_id', facilityId)
 
   const { count: totalTickets } = await totalQuery
 

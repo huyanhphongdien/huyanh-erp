@@ -545,29 +545,54 @@ export default function WeighingPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-      {/* Header */}
+      {/* Header — 3-column layout giống HomePage */}
       <div style={{ background: PRIMARY, padding: '10px 20px', position: 'sticky', top: 0, zIndex: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, maxWidth: 1200, margin: '0 auto' }}>
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')} style={{ color: '#fff' }} />
-          <Title level={5} style={{ color: '#fff', margin: 0, flex: 1 }}>
-            {isCreate ? 'Tạo phiếu cân mới' : `Phiếu ${ticket?.code}`}
-            {currentFacility && (
-              <Tag color="gold" style={{ marginLeft: 8, fontSize: 12 }}>
-                🏭 {currentFacility.code}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            gap: 16,
+            maxWidth: 1400,
+            margin: '0 auto',
+          }}
+        >
+          {/* TRÁI — Back button + logo + tên công ty */}
+          <Space size={8} align="center">
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')} style={{ color: '#fff' }} />
+            <img
+              src="/logo.png"
+              alt="Huy Anh Rubber"
+              style={{ height: 36, width: 36, borderRadius: 6, background: '#fff', padding: 3 }}
+            />
+            <div style={{ lineHeight: 1.2 }}>
+              <div style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>Công ty TNHH MTV</div>
+              <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>Cao su Huy Anh</div>
+            </div>
+          </Space>
+
+          {/* GIỮA — Tên trạm cân + mã phiếu */}
+          <div style={{ textAlign: 'center' }}>
+            <Title level={4} style={{ color: '#fff', margin: 0, fontSize: 18, letterSpacing: 0.5 }}>
+              ⚖️ TRẠM CÂN {currentFacility ? currentFacility.name.toUpperCase() : 'HUY ANH'}
+            </Title>
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
+              {isCreate ? 'Tạo phiếu cân mới' : `Phiếu ${ticket?.code}`}
+              {currentFacility && <> • <span style={{ color: '#FFD54F' }}>🏭 {currentFacility.code}</span></>}
+            </Text>
+          </div>
+
+          {/* PHẢI — Status tags */}
+          <Space size={6} style={{ justifySelf: 'end' }}>
+            {ticket && (
+              <Tag color={isCompleted ? 'success' : isWeighingTare ? 'warning' : 'processing'} style={{ margin: 0 }}>
+                {isCompleted ? 'Hoàn tất' : isWeighingTare ? 'Chờ cân L2' : 'Chờ cân L1'}
               </Tag>
             )}
-          </Title>
-          {ticket && (
-            <Tag color={
-              isCompleted ? 'success' : isWeighingTare ? 'warning' : 'processing'
-            }>
-              {isCompleted ? 'Hoàn tất' : isWeighingTare ? 'Chờ cân L2' : 'Chờ cân L1'}
+            <Tag color={scale.connected ? 'green' : 'red'} style={{ cursor: 'pointer', margin: 0 }} onClick={() => navigate('/settings')}>
+              {scale.connected ? '● Cân OK' : '○ Chưa kết nối'}
             </Tag>
-          )}
-          {/* Scale status — click để vào Settings kết nối */}
-          <Tag color={scale.connected ? 'green' : 'red'} style={{ cursor: 'pointer' }} onClick={() => navigate('/settings')}>
-            {scale.connected ? '● Đã kết nối cân' : '○ Chưa kết nối — Nhấn để cài đặt'}
-          </Tag>
+          </Space>
         </div>
       </div>
 

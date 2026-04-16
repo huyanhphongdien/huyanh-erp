@@ -496,6 +496,7 @@ const InventoryDashboard = () => {
           columns={columns}
           rowKey="material_id"
           size="small"
+          scroll={{ x: 1200 }}
           pagination={{ showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
           onRow={(record) => ({
             onClick: () => openTab({

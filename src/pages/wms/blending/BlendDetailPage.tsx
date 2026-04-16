@@ -658,6 +658,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
         onOk={handleCompleteBlending}
         okText="Hoàn thành"
         okButtonProps={{ disabled: !completeQty || !completeWarehouse, loading: actionLoading }}
+        width={700}
       >
         <div style={{ marginBottom: 16 }}>
           <Text strong style={{ display: 'block', marginBottom: 4 }}>Sản lượng thực tế (kg) *</Text>
@@ -697,6 +698,7 @@ const BlendDetailPage = ({ id: propId }: BlendDetailPageProps = {}) => {
         title="Ghi nhận kết quả QC"
         open={showQCModal}
         onCancel={() => setShowQCModal(false)}
+        width={800}
         onOk={handleRecordQC}
         okText="Lưu"
         okButtonProps={{ loading: actionLoading }}

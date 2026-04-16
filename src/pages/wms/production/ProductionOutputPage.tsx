@@ -417,7 +417,7 @@ const ProductionOutputPage = ({ id: propId }: ProductionOutputPageProps = {}) =>
         okText="Ghi nhận QC"
         confirmLoading={qcLoading}
         okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
-        width={600}
+        width={800}
       >
         <Form form={qcForm} layout="vertical">
           <Row gutter={16}>

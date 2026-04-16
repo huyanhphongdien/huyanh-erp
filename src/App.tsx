@@ -130,19 +130,14 @@ const StockOutListPage = lazy(() => import('./pages/wms/stock-out/StockOutListPa
 const StockOutCreatePage = lazy(() => import('./pages/wms/stock-out/StockOutCreatePage'));
 const StockOutDetailPage = lazy(() => import('./pages/wms/stock-out/StockOutDetailPage'));
 const PickingListPage = lazy(() => import('./pages/wms/stock-out/PickingListPage'));
-const InventoryDashboard = lazy(() => import('./pages/wms/InventoryDashboard'));
+// Phase A consolidation: các page rời (InventoryDashboard, NVLDashboardPage,
+// AlertListPage, StockCheckPage, QCDashboardPage, QCRecheckPage, etc.) giờ
+// chỉ render nội bộ trong 3 tabbed wrapper, không còn lazy import trực tiếp.
 const WMSInventoryTabbedPage = lazy(() => import('./pages/wms/WMSInventoryTabbedPage'));
 const WMSQCTabbedPage = lazy(() => import('./pages/wms/qc/WMSQCTabbedPage'));
 const WMSReportsTabbedPage = lazy(() => import('./pages/wms/reports/WMSReportsTabbedPage'));
 const InventoryDetailPage = lazy(() => import('./pages/wms/InventoryDetailPage'));
-const AlertListPage = lazy(() => import('./pages/wms/AlertListPage'));
-const StockCheckPage = lazy(() => import('./pages/wms/StockCheckPage'));
-const NVLDashboardPage = lazy(() => import('./pages/wms/NVLDashboardPage'));
-const QCDashboardPage = lazy(() => import('./pages/wms/qc/QCDashboardPage'));
-const QCRecheckPage = lazy(() => import('./pages/wms/qc/QCRecheckPage'));
-const QCStandardsConfigPage = lazy(() => import('./pages/wms/qc/QCStandardsConfigPage'));
 const BatchQCHistoryPage = lazy(() => import('./pages/wms/qc/BatchQCHistoryPage'));
-const QCQuickScanPage = lazy(() => import('./pages/wms/qc/QCQuickScanPage'));
 const BatchLabelPage = lazy(() => import('./pages/wms/BatchLabelPage'));
 const WeighbridgeListPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeListPage'));
 const WeighbridgeDetailPage = lazy(() => import('./pages/wms/weighbridge/WeighbridgeDetailPage'));
@@ -177,11 +172,7 @@ const BlendListPage = lazy(() => import('./pages/wms/blending/BlendListPage'));
 const BlendCreatePage = lazy(() => import('./pages/wms/blending/BlendCreatePage'));
 const BlendDetailPage = lazy(() => import('./pages/wms/blending/BlendDetailPage'));
 const BlendSuggestPage = lazy(() => import('./pages/wms/blending/BlendSuggestPage'));
-const WMSReportDashboardPage = lazy(() => import('./pages/wms/reports/WMSReportDashboardPage'));
-const StockMovementReportPage = lazy(() => import('./pages/wms/reports/StockMovementReportPage'));
-const SupplierQualityReportPage = lazy(() => import('./pages/wms/reports/SupplierQualityReportPage'));
-const InventoryValueReportPage = lazy(() => import('./pages/wms/reports/InventoryValueReportPage'));
-const SupplierScoringPage = lazy(() => import('./pages/wms/reports/SupplierScoringPage'));
+// Phase A: 5 report page rời giờ chỉ render nội bộ trong WMSReportsTabbedPage
 const WMSSettingsPage = lazy(() => import('./pages/wms/WMSSettingsPage'));
 
 // ===== PROJECT MANAGEMENT (lazy) =====

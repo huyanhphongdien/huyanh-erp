@@ -211,7 +211,7 @@ const QCQuickScanPage = () => {
   // --------------------------------------------------------------------------
 
   return (
-    <div style={{ padding: 16, maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#F7F5F2' }}>
+    <div style={{ padding: 24, maxWidth: 720, margin: '0 auto', background: '#F7F5F2' }}>
       {/* Header */}
       <Space style={{ marginBottom: 16 }}>
         <Button

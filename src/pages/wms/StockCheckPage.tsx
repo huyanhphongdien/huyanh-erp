@@ -223,128 +223,128 @@ const StockCheckPage = () => {
   // ========== STEP 1: CHON KHO ==========
   if (step === 'select_warehouse') {
     return (
-      <div style={{ minHeight: '100vh', background: '#F7F5F2' }}>
-        <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
-          <Space align="center">
-            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ color: '#fff' }} />
-            <div>
-              <Title level={5} style={{ color: '#fff', margin: 0 }}>Kiểm kê tồn kho</Title>
-              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Bước 1: Chọn kho kiểm kê</Text>
-            </div>
-          </Space>
-        </div>
+      <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+        <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+          <Col>
+            <Space>
+              <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
+              <div>
+                <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
+                  <AuditOutlined style={{ marginRight: 8 }} />
+                  Kiểm kê tồn kho
+                </Title>
+                <Text type="secondary">Bước 1: Chọn kho và phạm vi kiểm kê</Text>
+              </div>
+            </Space>
+          </Col>
+          <Col>
+            <Button
+              type="primary"
+              size="large"
+              icon={creating ? <LoadingOutlined /> : <AuditOutlined />}
+              onClick={handleCreateCheck}
+              disabled={!selectedWarehouse || creating}
+              loading={creating}
+              style={{ background: selectedWarehouse ? '#1B4D3E' : undefined, borderColor: selectedWarehouse ? '#1B4D3E' : undefined }}
+            >
+              {creating ? 'Đang tạo...' : 'Bắt đầu kiểm kê'}
+            </Button>
+          </Col>
+        </Row>
 
         {stepsBar}
 
-        <div style={{ padding: 16 }}>
-          {loadingWarehouses ? (
-            <div style={{ textAlign: 'center', padding: 40 }}>
-              <Spin size="large" />
-            </div>
-          ) : (
-            <Space direction="vertical" style={{ width: '100%' }} size={12}>
-              {warehouses.map(wh => (
-                <Card
-                  key={wh.id}
-                  hoverable
-                  onClick={() => { setSelectedWarehouse(wh.id); setSelectedLocationIds([]) }}
-                  style={{
-                    borderColor: selectedWarehouse === wh.id ? '#1B4D3E' : '#d9d9d9',
-                    borderWidth: selectedWarehouse === wh.id ? 2 : 1,
-                    background: selectedWarehouse === wh.id ? 'rgba(27,77,62,0.04)' : '#fff',
-                  }}
-                  size="small"
-                >
-                  <Space align="center">
-                    <div style={{
-                      width: 40, height: 40, borderRadius: 8,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: selectedWarehouse === wh.id ? '#1B4D3E' : '#f0f0f0',
-                      color: selectedWarehouse === wh.id ? '#fff' : '#999',
-                      fontSize: 18,
-                    }}>
-                      <AuditOutlined />
-                    </div>
-                    <div>
-                      <Text strong>{wh.name}</Text>
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {wh.code} &bull; {wh.type === 'finished' ? 'Thành phẩm' : 'NVL'}
-                      </Text>
-                    </div>
-                    {selectedWarehouse === wh.id && (
-                      <CheckCircleOutlined style={{ color: '#1B4D3E', fontSize: 20, marginLeft: 'auto' }} />
-                    )}
-                  </Space>
-                </Card>
-              ))}
-            </Space>
-          )}
-
-          {/* C2: Mode toggle + location picker (chỉ hiện khi đã chọn kho) */}
-          {selectedWarehouse && (
-            <Card
-              size="small"
-              style={{ marginTop: 12, borderRadius: 8 }}
-              bodyStyle={{ padding: 12 }}
-            >
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>Phạm vi kiểm kê</Text>
-              <Radio.Group
-                value={countMode}
-                onChange={e => { setCountMode(e.target.value); setSelectedLocationIds([]) }}
-                buttonStyle="solid"
-                size="middle"
-                style={{ width: '100%' }}
-              >
-                <Radio.Button value="full" style={{ width: '50%', textAlign: 'center' }}>
-                  🏬 Toàn bộ kho
-                </Radio.Button>
-                <Radio.Button value="cycle" style={{ width: '50%', textAlign: 'center' }}>
-                  📍 Theo vị trí (cycle)
-                </Radio.Button>
-              </Radio.Group>
-              {countMode === 'cycle' && (
-                <div style={{ marginTop: 12 }}>
-                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
-                    Chọn vị trí cần đếm. Chỉ batch ở vị trí đã chọn sẽ được đưa vào đợt kiểm kê.
-                  </Text>
-                  <Select
-                    mode="multiple"
-                    placeholder="Chọn vị trí..."
-                    value={selectedLocationIds}
-                    onChange={setSelectedLocationIds}
-                    loading={loadingLocations}
-                    style={{ width: '100%' }}
-                    maxTagCount={3}
-                    options={locations.map(l => ({
-                      value: l.id,
-                      label: l.shelf ? `${l.code} · Kệ ${l.shelf}` : l.code,
-                    }))}
-                  />
-                </div>
+        <Row gutter={24} style={{ marginTop: 24 }}>
+          {/* Left: Warehouse grid */}
+          <Col xs={24} lg={14}>
+            <Card title="Chọn kho" style={{ marginBottom: 16 }}>
+              {loadingWarehouses ? (
+                <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+              ) : (
+                <Row gutter={[12, 12]}>
+                  {warehouses.map(wh => (
+                    <Col xs={24} sm={12} key={wh.id}>
+                      <Card
+                        hoverable
+                        onClick={() => { setSelectedWarehouse(wh.id); setSelectedLocationIds([]) }}
+                        style={{
+                          borderColor: selectedWarehouse === wh.id ? '#1B4D3E' : '#d9d9d9',
+                          borderWidth: selectedWarehouse === wh.id ? 2 : 1,
+                          background: selectedWarehouse === wh.id ? 'rgba(27,77,62,0.04)' : '#fff',
+                        }}
+                        size="small"
+                      >
+                        <Space align="center">
+                          <div style={{
+                            width: 40, height: 40, borderRadius: 8,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: selectedWarehouse === wh.id ? '#1B4D3E' : '#f0f0f0',
+                            color: selectedWarehouse === wh.id ? '#fff' : '#999',
+                            fontSize: 18,
+                          }}>
+                            <AuditOutlined />
+                          </div>
+                          <div>
+                            <Text strong>{wh.name}</Text>
+                            <br />
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {wh.code} &bull; {wh.type === 'finished' ? 'Thành phẩm' : 'NVL'}
+                            </Text>
+                          </div>
+                          {selectedWarehouse === wh.id && (
+                            <CheckCircleOutlined style={{ color: '#1B4D3E', fontSize: 20, marginLeft: 'auto' }} />
+                          )}
+                        </Space>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
               )}
             </Card>
-          )}
-        </div>
+          </Col>
 
-        <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: '#fff', borderTop: '1px solid #f0f0f0',
-          padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-        }}>
-          <Button
-            type="primary"
-            block
-            size="large"
-            icon={creating ? <LoadingOutlined /> : <AuditOutlined />}
-            onClick={handleCreateCheck}
-            disabled={!selectedWarehouse || creating}
-            loading={creating}
-            style={{ background: selectedWarehouse ? '#1B4D3E' : undefined, borderColor: selectedWarehouse ? '#1B4D3E' : undefined }}
-          >
-            {creating ? 'Đang tạo...' : 'Bắt đầu kiểm kê'}
-          </Button>
-        </div>
+          {/* Right: Scope mode + location filter */}
+          <Col xs={24} lg={10}>
+            {selectedWarehouse && (
+              <Card title="Phạm vi kiểm kê" style={{ marginBottom: 16 }}>
+                <Radio.Group
+                  value={countMode}
+                  onChange={e => { setCountMode(e.target.value); setSelectedLocationIds([]) }}
+                  buttonStyle="solid"
+                  size="middle"
+                  style={{ width: '100%', marginBottom: 16 }}
+                >
+                  <Radio.Button value="full" style={{ width: '50%', textAlign: 'center' }}>
+                    🏬 Toàn bộ kho
+                  </Radio.Button>
+                  <Radio.Button value="cycle" style={{ width: '50%', textAlign: 'center' }}>
+                    📍 Theo vị trí (cycle)
+                  </Radio.Button>
+                </Radio.Group>
+                {countMode === 'cycle' && (
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
+                      Chọn vị trí cần đếm. Chỉ batch ở vị trí đã chọn sẽ được đưa vào đợt kiểm kê.
+                    </Text>
+                    <Select
+                      mode="multiple"
+                      placeholder="Chọn vị trí..."
+                      value={selectedLocationIds}
+                      onChange={setSelectedLocationIds}
+                      loading={loadingLocations}
+                      style={{ width: '100%' }}
+                      maxTagCount={5}
+                      options={locations.map(l => ({
+                        value: l.id,
+                        label: l.shelf ? `${l.code} · Kệ ${l.shelf}` : l.code,
+                      }))}
+                    />
+                  </div>
+                )}
+              </Card>
+            )}
+          </Col>
+        </Row>
       </div>
     )
   }
@@ -411,119 +411,119 @@ const StockCheckPage = () => {
     ]
 
     return (
-      <div style={{ minHeight: '100vh', background: '#F7F5F2' }}>
-        <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
-          <Space align="center" style={{ width: '100%' }}>
-            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setStep('select_warehouse')} style={{ color: '#fff' }} />
-            <div style={{ flex: 1 }}>
-              <Title level={5} style={{ color: '#fff', margin: 0 }}>Kiểm kê: {warehouseName}</Title>
-              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-                {stockCheck?.code} &bull; {checkedCount}/{items.length} đã kiểm
-              </Text>
-            </div>
-          </Space>
-          <Progress
-            percent={progressPercent}
-            showInfo={false}
-            strokeColor="#E8A838"
-            trailColor="rgba(255,255,255,0.2)"
-            style={{ marginTop: 8 }}
-            size="small"
-          />
-        </div>
+      <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+        <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+          <Col>
+            <Space>
+              <Button icon={<ArrowLeftOutlined />} onClick={() => setStep('select_warehouse')} />
+              <div>
+                <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
+                  Kiểm kê: {warehouseName}
+                </Title>
+                <Text type="secondary">
+                  {stockCheck?.code} &bull; {checkedCount}/{items.length} đã kiểm
+                </Text>
+              </div>
+            </Space>
+          </Col>
+          <Col>
+            <Space>
+              <Text type="secondary">{checkedCount}/{items.length}</Text>
+              {summary.shortage_count > 0 && <Tag color="error">{summary.shortage_count} thiếu</Tag>}
+              {summary.surplus_count > 0 && <Tag color="blue">{summary.surplus_count} thừa</Tag>}
+              <Button
+                type="primary"
+                icon={<ArrowRightOutlined />}
+                onClick={() => setStep('review')}
+                disabled={checkedCount < items.length}
+                style={checkedCount >= items.length ? { background: '#E8A838', borderColor: '#E8A838' } : {}}
+              >
+                Xem kết quả
+              </Button>
+            </Space>
+          </Col>
+        </Row>
 
         {stepsBar}
 
-        {/* Search + Filter */}
-        <div style={{ padding: '12px 16px', background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
-          <Input
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            placeholder="Tìm lô, sản phẩm..."
-            allowClear
-            style={{ marginBottom: 8 }}
-          />
-          <Space>
-            <Button
-              type={!showOnlyDiscrepancy ? 'primary' : 'default'}
-              size="small"
-              onClick={() => setShowOnlyDiscrepancy(false)}
-              style={!showOnlyDiscrepancy ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
-            >
-              Tất cả ({items.length})
-            </Button>
-            <Button
-              type={showOnlyDiscrepancy ? 'primary' : 'default'}
-              size="small"
-              danger={showOnlyDiscrepancy}
-              onClick={() => setShowOnlyDiscrepancy(true)}
-            >
-              Chênh lệch ({summary.surplus_count + summary.shortage_count})
-            </Button>
-          </Space>
-        </div>
+        <Progress
+          percent={progressPercent}
+          strokeColor="#E8A838"
+          style={{ marginBottom: 16 }}
+          size="small"
+        />
 
-        <div style={{ padding: '12px 16px', paddingBottom: 120 }}>
-          <Table
-            dataSource={filteredItems}
-            columns={checkColumns}
-            rowKey="id"
-            size="small"
-            pagination={false}
-            scroll={{ x: 450 }}
-            rowClassName={(item: StockCheckItem) => {
-              if (item.actual_quantity !== undefined && item.actual_quantity !== null && item.discrepancy !== 0) {
-                return 'ant-table-row-warning'
-              }
-              return ''
-            }}
-          />
-        </div>
+        {/* Search + Filter bar */}
+        <Card size="small" style={{ marginBottom: 16 }} bodyStyle={{ padding: '8px 16px' }}>
+          <Row gutter={16} align="middle">
+            <Col flex="auto">
+              <Input
+                prefix={<SearchOutlined />}
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                placeholder="Tìm lô, sản phẩm..."
+                allowClear
+              />
+            </Col>
+            <Col>
+              <Space>
+                <Button
+                  type={!showOnlyDiscrepancy ? 'primary' : 'default'}
+                  size="small"
+                  onClick={() => setShowOnlyDiscrepancy(false)}
+                  style={!showOnlyDiscrepancy ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
+                >
+                  Tất cả ({items.length})
+                </Button>
+                <Button
+                  type={showOnlyDiscrepancy ? 'primary' : 'default'}
+                  size="small"
+                  danger={showOnlyDiscrepancy}
+                  onClick={() => setShowOnlyDiscrepancy(true)}
+                >
+                  Chênh lệch ({summary.surplus_count + summary.shortage_count})
+                </Button>
+              </Space>
+            </Col>
+          </Row>
+        </Card>
 
-        <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: '#fff', borderTop: '1px solid #f0f0f0',
-          padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-        }}>
-          <Space style={{ marginBottom: 8 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Đã kiểm: {checkedCount}/{items.length}</Text>
-            {summary.shortage_count > 0 && <Text type="danger" style={{ fontSize: 12 }}>&bull; {summary.shortage_count} thiếu</Text>}
-            {summary.surplus_count > 0 && <Text style={{ color: '#1677ff', fontSize: 12 }}>&bull; {summary.surplus_count} thừa</Text>}
-          </Space>
-          <Button
-            block
-            size="large"
-            icon={<ArrowRightOutlined />}
-            onClick={() => setStep('review')}
-            disabled={checkedCount < items.length}
-            style={checkedCount >= items.length ? { background: '#E8A838', borderColor: '#E8A838', color: '#fff' } : {}}
-          >
-            Xem kết quả
-          </Button>
-        </div>
+        <Table
+          dataSource={filteredItems}
+          columns={checkColumns}
+          rowKey="id"
+          size="small"
+          pagination={{ showSizeChanger: true, defaultPageSize: 50, showTotal: (t, r) => `${r[0]}-${r[1]} / ${t}` }}
+          scroll={{ x: 600 }}
+          rowClassName={(item: StockCheckItem) => {
+            if (item.actual_quantity !== undefined && item.actual_quantity !== null && item.discrepancy !== 0) {
+              return 'ant-table-row-warning'
+            }
+            return ''
+          }}
+        />
       </div>
     )
   }
 
   // ========== STEP 3: REVIEW & CONFIRM ==========
   return (
-    <div style={{ minHeight: '100vh', background: '#F7F5F2' }}>
-      <div style={{ background: '#1B4D3E', padding: '16px', color: '#fff' }}>
-        <Space align="center">
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setStep('checking')} style={{ color: '#fff' }} />
-          <div>
-            <Title level={5} style={{ color: '#fff', margin: 0 }}>Kết quả kiểm kê</Title>
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-              {stockCheck?.code} &bull; {warehouseName}
-            </Text>
-          </div>
-        </Space>
-      </div>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Space>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => setStep('checking')} />
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>Kết quả kiểm kê</Title>
+              <Text type="secondary">{stockCheck?.code} &bull; {warehouseName}</Text>
+            </div>
+          </Space>
+        </Col>
+      </Row>
 
       {stepsBar}
 
-      <div style={{ padding: '16px', paddingBottom: 100 }}>
+      <div style={{ marginTop: 24 }}>
         {/* Summary cards */}
         <Row gutter={8} style={{ marginBottom: 16 }}>
           <Col span={8}>
@@ -616,30 +616,24 @@ const StockCheckPage = () => {
         )}
       </div>
 
-      {/* Bottom bar */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: '#fff', borderTop: '1px solid #f0f0f0',
-        padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-        display: 'flex', gap: 8,
-      }}>
-        <Button
-          size="large"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => setStep('checking')}
-        />
-        <Button
-          type="primary"
-          size="large"
-          block
-          icon={saving ? <LoadingOutlined /> : <CheckOutlined />}
-          onClick={handleFinalize}
-          loading={saving}
-          style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
-        >
-          {saving ? 'Đang xử lý...' : 'Xác nhận & Điều chỉnh'}
-        </Button>
-      </div>
+      {/* Action buttons — inline instead of fixed bottom bar */}
+      <Row justify="end" style={{ marginTop: 24 }}>
+        <Space>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => setStep('checking')}>
+            Quay lại kiểm kê
+          </Button>
+          <Button
+            type="primary"
+            size="large"
+            icon={saving ? <LoadingOutlined /> : <CheckOutlined />}
+            onClick={handleFinalize}
+            loading={saving}
+            style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+          >
+            {saving ? 'Đang xử lý...' : 'Xác nhận & Điều chỉnh'}
+          </Button>
+        </Space>
+      </Row>
     </div>
   )
 }

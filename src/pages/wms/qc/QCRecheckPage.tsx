@@ -172,7 +172,7 @@ const QCRecheckPage = () => {
         title={<Space><ExperimentOutlined /> Tái kiểm QC {selectedBatch && `— ${selectedBatch.batch_no}`}</Space>}
         open={modalOpen}
         onCancel={result ? handleDone : () => setModalOpen(false)}
-        width={600}
+        width={800}
         footer={result ? [
           ...(result.result === 'passed' && selectedBatch ? [
             <Button key="print" icon={<PrinterOutlined />} onClick={() => navigate(`/wms/batch/${selectedBatch.id}/label`)}>
@@ -181,7 +181,7 @@ const QCRecheckPage = () => {
           ] : []),
           <Button key="done" type="primary" onClick={handleDone} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>Hoàn tất</Button>,
         ] : [
-          <Button key="cancel" onClick={() => setModalOpen(false)}>Huy</Button>,
+          <Button key="cancel" onClick={() => setModalOpen(false)}>Huỷ</Button>,
           <Button key="submit" type="primary" onClick={handleSubmit} loading={saving} disabled={!qcData}
             style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
             <CheckCircleOutlined /> Xác nhận tai kiem

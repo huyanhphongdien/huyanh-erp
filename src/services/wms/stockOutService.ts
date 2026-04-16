@@ -623,11 +623,12 @@ export const stockOutService = {
       }
     }
 
-    // W6: Update container.gross_weight_kg + status='sealed'
+    // W6: Update container.net_weight_kg + status='sealed'
+    // sales_order_containers KHÔNG có column updated_at — bỏ ra khỏi payload
     if (orderFull && (orderFull as any).container_id) {
       try {
         const containerId = (orderFull as any).container_id
-        await supabase
+        const { error: w6Err } = await supabase
           .from('sales_order_containers')
           .update({
             net_weight_kg: (orderFull as any).total_weight || 0,
@@ -635,11 +636,11 @@ export const stockOutService = {
             status: 'sealed',
             packed_at: now,
             sealed_at: now,
-            updated_at: now,
           })
           .eq('id', containerId)
+        if (w6Err) console.error('[stockOut W6] container update error:', w6Err)
       } catch (e) {
-        console.error('[stockOut] container update failed (non-blocking):', e)
+        console.error('[stockOut W6] container update failed (non-blocking):', e)
       }
     }
 
@@ -654,13 +655,14 @@ export const stockOutService = {
         const allDone = containers && containers.length > 0 &&
           containers.every((c: any) => ['sealed', 'shipped'].includes(c.status))
         if (allDone) {
-          await supabase
+          const { error: w7Err } = await supabase
             .from('sales_orders')
-            .update({ status: 'shipped', updated_at: now })
+            .update({ status: 'shipped', shipped_at: now })
             .eq('id', soId)
+          if (w7Err) console.error('[stockOut W7] SO update error:', w7Err)
         }
       } catch (e) {
-        console.error('[stockOut] SO status update failed (non-blocking):', e)
+        console.error('[stockOut W7] SO status update failed (non-blocking):', e)
       }
     }
 

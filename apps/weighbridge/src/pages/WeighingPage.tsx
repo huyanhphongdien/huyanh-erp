@@ -384,16 +384,24 @@ export default function WeighingPage() {
     setError('')
     try {
       let updated: WeighbridgeTicket
-      // S3: OUT flow — cân 1 lần (gross loaded), tare cố định theo container type.
-      // Net = gross - container_tare.
+      // S3 + F3: OUT flow — cân 1 lần. Tare phụ thuộc context:
+      //   • Có Container (Sales Order export) → tare = container_tare cố định (20ft=2300, 40ft=3800)
+      //   • Có Transfer hoặc xuất lẻ → tare = 0, weight nhập = NET trực tiếp (vì xe tải bình thường,
+      //     không phải container chuẩn — trọng lượng hàng đã biết trước qua planned)
       if (ticket.ticket_type === 'out') {
+        const isContainerShipment = !!selectedContainerId  // chỉ container SO mới có tare cố định
         const containerType = selectedContainer?.container_type || '20ft'
-        const tareKg = CONTAINER_TARE_KG[containerType] || CONTAINER_TARE_KG['20ft']
+        const tareKg = isContainerShipment
+          ? (CONTAINER_TARE_KG[containerType] || CONTAINER_TARE_KG['20ft'])
+          : 0
         updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
         updated = await weighbridgeService.updateTareWeight(ticket.id, tareKg, operator?.id)
         setTicket(updated)
         const c = recalculate(weight, tareKg, deductionKg, expectedDrc, unitPrice, priceUnit)
-        setSuccess(`Cân OUT: gross ${weight.toLocaleString()} kg − tare ${tareKg.toLocaleString()} kg (${containerType}) → NET ${c.net_weight.toLocaleString()} kg`)
+        const ctxLabel = isContainerShipment
+          ? `container ${containerType}, tare ${tareKg.toLocaleString()} kg`
+          : (selectedTransferId ? 'transfer (NET trực tiếp)' : 'xuất lẻ (NET trực tiếp)')
+        setSuccess(`Cân OUT: ${weight.toLocaleString()} kg (${ctxLabel}) → NET ${c.net_weight.toLocaleString()} kg`)
         setManualWeight(null)
         if (cameraCaptureRef.current) {
           cameraCaptureRef.current('OUT').catch(() => {})

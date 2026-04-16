@@ -557,23 +557,25 @@ export const stockOutService = {
     if (updateOrderErr) throw updateOrderErr
 
     // 3. Với MỖI detail đã picked → cập nhật tồn kho
-    //    batch + stock_levels + tx theo KG (đồng bộ sales),
-    //    warehouse_locations theo count (slot-count).
+    //    QUAN TRỌNG: stock_batches.quantity_remaining lưu COUNT (đơn vị, VD bành),
+    //    trong khi stock_levels + inventory_transactions lưu KG.
+    //    → Dùng detail.quantity cho batch/location, detail.weight cho levels/tx.
     for (const detail of pickedDetails) {
+      const deltaCount = Number(detail.quantity || 0)
       const deltaKg = Number(detail.weight || detail.quantity || 0)
 
-      // 3a. Giảm stock_batches.quantity_remaining theo kg
+      // 3a. Giảm stock_batches.quantity_remaining theo COUNT (đơn vị)
       //     Nếu quantity_remaining = 0 → status = 'depleted'
-      await batchService.updateQuantity(detail.batch_id, -deltaKg)
+      await batchService.updateQuantity(detail.batch_id, -deltaCount)
 
-      // 3b. Giảm stock_levels.quantity theo kg
+      // 3b. Giảm stock_levels.quantity theo KG
       await this._upsertStockLevel(
         detail.material_id,
         order.warehouse_id,
         -deltaKg
       )
 
-      // 3c. Insert inventory_transactions (type='out') theo kg
+      // 3c. Insert inventory_transactions (type='out') theo KG
       await supabase
         .from('inventory_transactions')
         .insert({

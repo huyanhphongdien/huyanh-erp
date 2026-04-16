@@ -1491,7 +1491,7 @@ const StockOutCreatePage: React.FC = () => {
                 value={totalWeight > 0 ? totalWeight : 0}
                 suffix="kg"
                 valueStyle={{ ...monoStyle, color: '#fff', fontSize: 20 }}
-                formatter={(val) => val ? (val as number).toLocaleString('vi-VN') : '—'}
+                formatter={(val) => val ? (val as number).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '—'}
               />
               <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
                 {outItems.length} lô · {new Set(outItems.map(i => i.material_id)).size} sản phẩm

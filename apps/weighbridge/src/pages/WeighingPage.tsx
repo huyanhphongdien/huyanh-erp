@@ -65,6 +65,8 @@ export default function WeighingPage() {
   const [driverName, setDriverName] = useState('')
   const [plateHistory, setPlateHistory] = useState<string[]>([])
   const [tareSuggestion, setTareSuggestion] = useState<{ avgTare: number | null; lastTare: number | null; count: number } | null>(null)
+  // S3: Loại phiếu cân — IN (cân 2 lần gross/tare) | OUT (cân 1 lần net trực tiếp)
+  const [ticketDirection, setTicketDirection] = useState<'in' | 'out'>('in')
 
   // Deal/Supplier
   const [deals, setDeals] = useState<ActiveDealForStockIn[]>([])
@@ -217,7 +219,7 @@ export default function WeighingPage() {
     setError('')
     try {
       const t = await weighbridgeService.create(
-        { vehicle_plate: vehiclePlate.trim(), driver_name: driverName || undefined, ticket_type: 'in', notes: notes || undefined },
+        { vehicle_plate: vehiclePlate.trim(), driver_name: driverName || undefined, ticket_type: ticketDirection, notes: notes || undefined },
         operator?.id,
       )
       setTicket(t)
@@ -268,6 +270,22 @@ export default function WeighingPage() {
     setError('')
     try {
       let updated: WeighbridgeTicket
+      // S3: OUT flow — chỉ cần 1 lần cân, weight = net trực tiếp (xe đã có hàng).
+      // Bỏ qua step tare: gross=weight, tare=0, net=weight, complete luôn.
+      if (ticket.ticket_type === 'out') {
+        updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
+        // Set tare=0 → net = gross - 0 = weight (cân đơn giản)
+        updated = await weighbridgeService.updateTareWeight(ticket.id, 0, operator?.id)
+        setTicket(updated)
+        const c = recalculate(weight, 0, deductionKg, expectedDrc, unitPrice, priceUnit)
+        setSuccess(`Cân OUT: ${weight.toLocaleString()} kg — NET: ${c.net_weight.toLocaleString()} kg`)
+        setManualWeight(null)
+        if (cameraCaptureRef.current) {
+          cameraCaptureRef.current('OUT').catch(() => {})
+        }
+        return
+      }
+
       if (ticket.status === 'weighing_gross') {
         updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
         setTicket(updated)
@@ -311,8 +329,9 @@ export default function WeighingPage() {
         await saveCalculatedValues(ticket.id, calc)
       }
 
-      // Update deal if linked
-      if (selectedDealId && updated.net_weight) {
+      // Update deal if linked — chỉ cho IN (deal nhập). OUT không sync ở đây
+      // vì stock-out chưa confirmed (chỉ tạo draft, user pick batch + confirm sau).
+      if (selectedDealId && updated.net_weight && ticket.ticket_type === 'in') {
         try {
           await dealWmsService.updateDealStockInTotals(selectedDealId)
         } catch { /* non-blocking */ }
@@ -472,6 +491,35 @@ export default function WeighingPage() {
           {/* LEFT: Form */}
           <Col xs={24} lg={10}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              {/* S3: Loại phiếu — IN (cân 2 lần) | OUT (cân 1 lần) */}
+              <Card size="small" title="Loại phiếu cân" style={{ borderRadius: 12 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button
+                    type={ticketDirection === 'in' ? 'primary' : 'default'}
+                    onClick={() => setTicketDirection('in')}
+                    style={ticketDirection === 'in' ? { background: PRIMARY, borderColor: PRIMARY, flex: 1 } : { flex: 1 }}
+                    disabled={!!ticket}
+                    size="large"
+                  >
+                    📥 NHẬP (vào kho)
+                  </Button>
+                  <Button
+                    type={ticketDirection === 'out' ? 'primary' : 'default'}
+                    onClick={() => setTicketDirection('out')}
+                    style={ticketDirection === 'out' ? { background: '#E8A838', borderColor: '#E8A838', flex: 1 } : { flex: 1 }}
+                    disabled={!!ticket}
+                    size="large"
+                  >
+                    📤 XUẤT (ra kho)
+                  </Button>
+                </div>
+                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
+                  {ticketDirection === 'in'
+                    ? 'Cân 2 lần: Gross (xe + hàng) → Tare (xe rỗng) → Net'
+                    : 'Cân 1 lần: weight = net trực tiếp (xe đã có hàng)'}
+                </Text>
+              </Card>
+
               {/* Source: Deal or Supplier */}
               <Card size="small" title="Nguồn mủ" style={{ borderRadius: 12 }}>
                 <Space direction="vertical" size={12} style={{ width: '100%' }}>

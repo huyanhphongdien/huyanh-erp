@@ -25,6 +25,10 @@ registerTabComponent('stock-in-detail', StockInDetailPage)
 const StockOutDetailPage = lazy(() => import('../pages/wms/stock-out/StockOutDetailPage'))
 registerTabComponent('stock-out-detail', StockOutDetailPage)
 
+// F3 — Inter-facility Transfer detail
+const TransferDetailPage = lazy(() => import('../pages/wms/transfer/TransferDetailPage'))
+registerTabComponent('transfer-detail', TransferDetailPage)
+
 const PickingListPage = lazy(() => import('../pages/wms/stock-out/PickingListPage'))
 registerTabComponent('picking-list', PickingListPage)
 

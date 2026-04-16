@@ -13,6 +13,7 @@ import { useCurrentFacility } from '@/stores/facilityStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import stockInService from '@erp/services/wms/stockInService'
 import stockOutService from '@erp/services/wms/stockOutService'
+import transferService, { type InterFacilityTransfer } from '@erp/services/wms/transferService'
 import { supabase } from '@erp/lib/supabase'
 import { useKeliScale } from '@erp/hooks/useKeliScale'
 import { dealWmsService } from '@erp/services/b2b/dealWmsService'
@@ -91,6 +92,13 @@ export default function WeighingPage() {
   const [loadingContainers, setLoadingContainers] = useState(false)
   const [sealNoActual, setSealNoActual] = useState('')
 
+  // F3 Transfer: pending transfers cho NM hiện tại (theo direction)
+  // - OUT + facility != PD → transfers đang gửi từ facility này
+  // - IN  + facility = PD  → transfers đến PD chờ cân nhận
+  const [transferOptions, setTransferOptions] = useState<InterFacilityTransfer[]>([])
+  const [selectedTransferId, setSelectedTransferId] = useState<string>('')
+  const [loadingTransfers, setLoadingTransfers] = useState(false)
+
   // Deal/Supplier
   const [deals, setDeals] = useState<ActiveDealForStockIn[]>([])
   const [selectedDealId, setSelectedDealId] = useState<string>('')
@@ -135,6 +143,21 @@ export default function WeighingPage() {
       .catch(err => console.warn('SO load error:', err))
       .finally(() => setLoadingSO(false))
   }, [ticketDirection, ticket])
+
+  // F3: Load pending transfers theo direction + facility
+  // - OUT + facility != PD → transfers gửi từ facility này (chưa cân xuất)
+  // - IN  + bất kỳ facility → transfers đến facility này (chưa cân nhận, in_transit/arrived)
+  useEffect(() => {
+    if (ticket || !currentFacility) return
+    setLoadingTransfers(true)
+    const loader = ticketDirection === 'out'
+      ? transferService.getPendingForWeighOut(currentFacility.id)
+      : transferService.getPendingForWeighIn(currentFacility.id)
+    loader
+      .then(setTransferOptions)
+      .catch((err) => console.warn('Transfer load error:', err))
+      .finally(() => setLoadingTransfers(false))
+  }, [ticketDirection, ticket, currentFacility])
 
   // S3 OUT: Load containers khi user chọn SO
   useEffect(() => {
@@ -302,6 +325,15 @@ export default function WeighingPage() {
           await supabase.from('weighbridge_tickets').update(updates).eq('id', t.id)
         } catch (e) {
           console.warn('Link SO/container failed:', e)
+        }
+      }
+
+      // F3: Link transfer_id nếu user đã chọn phiếu chuyển kho
+      if (selectedTransferId) {
+        try {
+          await supabase.from('weighbridge_tickets').update({ transfer_id: selectedTransferId }).eq('id', t.id)
+        } catch (e) {
+          console.warn('Link transfer failed:', e)
         }
       }
       setTicket(t)
@@ -487,6 +519,39 @@ export default function WeighingPage() {
         }
       }
 
+      // F3: Auto-trigger transfer state machine nếu ticket gắn với phiếu chuyển
+      const linkedTransferId = (ticket as any).transfer_id || selectedTransferId
+      if (linkedTransferId && updated.net_weight && updated.net_weight > 0) {
+        try {
+          if (ticket.ticket_type === 'out') {
+            // Cân xuất tại NM gửi → confirmShipped → in_transit
+            await transferService.confirmShipped({
+              transfer_id: linkedTransferId,
+              weighbridge_ticket_id: ticket.id,
+              weight_out_kg: updated.net_weight,
+              user_id: operator?.id,
+            })
+            message.success(`Phiếu chuyển: hàng đã rời ${currentFacility?.name} → đang vận chuyển`)
+          } else {
+            // Cân nhận tại NM nhận → confirmReceived → received hoặc arrived (chờ duyệt)
+            const result = await transferService.confirmReceived({
+              transfer_id: linkedTransferId,
+              weighbridge_ticket_id: ticket.id,
+              weight_in_kg: updated.net_weight,
+              user_id: operator?.id,
+            })
+            if (result.needs_approval) {
+              message.warning(`Hao hụt ${result.loss_pct}% vượt ngưỡng — cần BGD duyệt`)
+            } else {
+              message.success(`Phiếu chuyển hoàn tất — hao hụt ${result.loss_pct}% (OK)`)
+            }
+          }
+        } catch (transferErr: any) {
+          console.error('Transfer state machine error:', transferErr)
+          message.error('Lỗi cập nhật phiếu chuyển: ' + (transferErr?.message || ''))
+        }
+      }
+
       message.success(`Hoàn tất — NET: ${updated.net_weight?.toLocaleString()} kg`)
 
       // Auto navigate to print page after 1 second
@@ -644,6 +709,61 @@ export default function WeighingPage() {
                     : 'Cân 1 lần: weight = net trực tiếp (xe đã có hàng)'}
                 </Text>
               </Card>
+
+              {/* F3: Transfer picker — hiện cho cả OUT (NM gửi) và IN (NM nhận) khi có pending */}
+              {transferOptions.length > 0 && !ticket && (
+                <Card
+                  size="small"
+                  title={`🔀 Phiếu chuyển kho ${ticketDirection === 'out' ? '(cân xuất tại NM gửi)' : '(cân nhận tại NM đến)'}`}
+                  style={{ borderRadius: 12, borderColor: '#1B4D3E', borderWidth: 2 }}
+                >
+                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Có {transferOptions.length} phiếu chuyển đang chờ cân — chọn nếu xe này thuộc phiếu chuyển kho
+                    </Text>
+                    <Select
+                      value={selectedTransferId || undefined}
+                      onChange={(v) => {
+                        setSelectedTransferId(v || '')
+                        // Auto-fill biển số xe từ phiếu chuyển
+                        const tr = transferOptions.find((x) => x.id === v)
+                        if (tr?.vehicle_plate && !vehiclePlate) setVehiclePlate(tr.vehicle_plate)
+                        if (tr?.driver_name && !driverName) setDriverName(tr.driver_name)
+                      }}
+                      placeholder={loadingTransfers ? 'Đang tải...' : 'Chọn phiếu chuyển (hoặc bỏ trống nếu không phải transfer)'}
+                      style={{ width: '100%' }}
+                      allowClear
+                      loading={loadingTransfers}
+                      showSearch
+                      optionFilterProp="label"
+                      options={transferOptions.map((t) => ({
+                        value: t.id,
+                        label: `${t.code} — ${t.from_facility?.code}→${t.to_facility?.code}${t.vehicle_plate ? ` · ${t.vehicle_plate}` : ''}`,
+                      }))}
+                    />
+                    {selectedTransferId && (() => {
+                      const tr = transferOptions.find((x) => x.id === selectedTransferId)
+                      if (!tr) return null
+                      return (
+                        <div style={{ padding: 8, background: '#F0FDF4', borderRadius: 8, fontSize: 12, border: '1px solid #BBF7D0' }}>
+                          <Space size={4} wrap>
+                            <Tag color="blue">{tr.from_facility?.code}</Tag>→
+                            <Tag color="green">{tr.to_facility?.code}</Tag>
+                            <Text type="secondary">|</Text>
+                            <Text>Mã: <Text strong>{tr.code}</Text></Text>
+                            {ticketDirection === 'in' && tr.weight_out_kg && (
+                              <>
+                                <Text type="secondary">|</Text>
+                                <Text>Cân xuất: <Text strong>{tr.weight_out_kg.toLocaleString('vi-VN')} kg</Text></Text>
+                              </>
+                            )}
+                          </Space>
+                        </div>
+                      )
+                    })()}
+                  </Space>
+                </Card>
+              )}
 
               {/* S3 OUT: Sales Order + Container picker (chỉ cho OUT) */}
               {ticketDirection === 'out' && (

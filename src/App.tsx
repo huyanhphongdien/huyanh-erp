@@ -130,6 +130,10 @@ const StockOutListPage = lazy(() => import('./pages/wms/stock-out/StockOutListPa
 const StockOutCreatePage = lazy(() => import('./pages/wms/stock-out/StockOutCreatePage'));
 const StockOutDetailPage = lazy(() => import('./pages/wms/stock-out/StockOutDetailPage'));
 const PickingListPage = lazy(() => import('./pages/wms/stock-out/PickingListPage'));
+// F3 — Inter-facility Transfer
+const TransferListPage = lazy(() => import('./pages/wms/transfer/TransferListPage'));
+const TransferCreatePage = lazy(() => import('./pages/wms/transfer/TransferCreatePage'));
+const TransferDetailPage = lazy(() => import('./pages/wms/transfer/TransferDetailPage'));
 // Phase A consolidation: các page rời (InventoryDashboard, NVLDashboardPage,
 // AlertListPage, StockCheckPage, QCDashboardPage, QCRecheckPage, etc.) giờ
 // chỉ render nội bộ trong 3 tabbed wrapper, không còn lazy import trực tiếp.
@@ -386,6 +390,10 @@ function App() {
                 <Route path="stock-out/new" element={<StockOutCreatePage />} />
                 <Route path="stock-out/:id" element={<StockOutDetailPage />} />
                 <Route path="stock-out/:id/pick" element={<PickingListPage />} />
+                {/* F3: Inter-facility Transfer */}
+                <Route path="transfer" element={<TransferListPage />} />
+                <Route path="transfer/new" element={<TransferCreatePage />} />
+                <Route path="transfer/:id" element={<TransferDetailPage />} />
                 <Route path="inventory/:materialId" element={<InventoryDetailPage />} />
                 {/* Phase A: redirect to consolidated /wms inventory tabbed */}
                 <Route path="alerts" element={<Navigate to="/wms?tab=alerts" replace />} />

@@ -371,6 +371,7 @@ const getMenuGroups = (
       { path: '/wms', label: 'Tồn kho', icon: <Warehouse size={18} /> }, // tabs: overview | nvl | alerts | stock-check
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
+      { path: '/wms/transfer', label: 'Chuyển kho NM', icon: <PackageMinus size={18} /> },
       { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
       { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> }, // tabs: dashboard | recheck | quick-scan | standards
       { path: '/wms/materials', label: 'Vật liệu', icon: <Package size={18} /> },

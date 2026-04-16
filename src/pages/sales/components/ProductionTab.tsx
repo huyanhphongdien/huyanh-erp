@@ -210,9 +210,11 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
 
   const renderProductionProgress = () => {
     if (!order.production_order_id) {
-      // Khi đơn ở confirmed, hiện link dẫn tới trang detail đầy đủ
-      // để chọn NVL và tạo Lệnh SX thực sự.
-      const canCreate = order.status === 'confirmed' &&
+      // Cho phép tạo Lệnh SX ở 2 status:
+      //  - confirmed: chưa start sản xuất, đang xếp hàng đợi
+      //  - producing: đã chuyển status nhưng chưa có Lệnh SX (vd user revert
+      //    từ packing về producing để cấp lại NVL/làm lại lô mới)
+      const canCreate = ['confirmed', 'producing'].includes(order.status) &&
         (salesRole === 'production' || salesRole === 'admin')
       return (
         <Card size="small" style={{ marginBottom: 16 }}>

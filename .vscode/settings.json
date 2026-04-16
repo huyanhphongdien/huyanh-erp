@@ -20,5 +20,19 @@
   ],
   "[typescript]": {
     "editor.defaultFormatter": "denoland.vscode-deno"
-  }
+  },
+
+  // Tắt Code Spell Checker — project tiếng Việt, mọi từ bị flag là noise.
+  // Nếu muốn check spelling tiếng Anh trong code, mở lại + thêm "vi" vào dictionary.
+  "cSpell.enabled": false,
+  "cSpell.enabledFileTypes": {
+    "markdown": false,
+    "plaintext": false
+  },
+  "cSpell.ignorePaths": [
+    "docs/**",
+    ".claude/**",
+    "memory/**",
+    "**/*.md"
+  ]
 }

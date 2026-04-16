@@ -157,7 +157,9 @@ const AddDetailModal: React.FC<{
 
   const selectedMaterial = materials.find(m => m.id === materialId)
   const qtyNum = quantity || 0
-  const weightCalc = selectedMaterial?.weight_per_unit ? qtyNum * selectedMaterial.weight_per_unit : qtyNum
+  const weightCalc = selectedMaterial?.weight_per_unit
+    ? Math.round(qtyNum * selectedMaterial.weight_per_unit * 100) / 100
+    : qtyNum
   const canSubmit = materialId && qtyNum > 0 && qcData !== null
   // Ưu tiên grade từ material SKU (chính xác cho RSS/Latex/SVR L/CV),
   // chỉ fallback sang phân loại theo DRC nếu SKU không match pattern

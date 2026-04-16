@@ -431,8 +431,9 @@ const StockOutCreatePage: React.FC = () => {
     if (outItems.some(i => i.batch_id === batch.id)) return
 
     const defaultQty = batch.quantity_remaining
+    // Round weight to 2 decimal: tránh 15 × 33.33 = 499.95 thay vì 500
     const weight = batch.weight_per_unit
-      ? defaultQty * batch.weight_per_unit
+      ? Math.round(defaultQty * batch.weight_per_unit * 100) / 100
       : 0
 
     const newItem: OutItem = {
@@ -461,7 +462,9 @@ const StockOutCreatePage: React.FC = () => {
   const handleChangeQty = (tempId: string, qty: number) => {
     setOutItems(prev => prev.map(i => {
       if (i.tempId !== tempId) return i
-      const weight = i.weight_per_unit ? qty * i.weight_per_unit : 0
+      const weight = i.weight_per_unit
+        ? Math.round(qty * i.weight_per_unit * 100) / 100
+        : 0
       return { ...i, quantity: qty, weight }
     }))
   }
@@ -495,7 +498,7 @@ const StockOutCreatePage: React.FC = () => {
     for (const b of candidates) {
       if (remainingKg <= 0) break
       const wpu = b.weight_per_unit || 0
-      const fullBatchKg = b.quantity_remaining * wpu
+      const fullBatchKg = Math.round(b.quantity_remaining * wpu * 100) / 100
 
       if (fullBatchKg <= remainingKg) {
         // Pick full batch
@@ -522,7 +525,7 @@ const StockOutCreatePage: React.FC = () => {
         // Partial: cần floor qty để không vượt remainingKg
         const partialQty = Math.floor(remainingKg / wpu)
         if (partialQty <= 0) continue
-        const partialWeight = partialQty * wpu
+        const partialWeight = Math.round(partialQty * wpu * 100) / 100
         picked.push({
           tempId: `out-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${b.id.slice(0, 4)}`,
           batch_id: b.id,

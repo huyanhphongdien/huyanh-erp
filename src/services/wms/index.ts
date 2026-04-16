@@ -58,6 +58,9 @@ export { traceabilityService } from './traceabilityService'
 export { forecastService, DEFAULT_ALERT_CONFIG } from './forecastService'
 export { yardService } from './yardService'
 
+// ===== Multi-facility F1 (2026-04-16) =====
+export { facilityService, type Facility } from './facilityService'
+
 // ============================================================================
 // Back-compat aliases — cho code cũ đang import `wms*Service` prefix
 // (chỉ giữ cho tới khi refactor toàn bộ consumer sang tên gốc)

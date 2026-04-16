@@ -262,15 +262,30 @@ export default function HomePage() {
           }}
         >
           {/* TRÁI — Logo + tên công ty */}
-          <Space size={10} align="center">
-            <img
-              src="/logo.png"
-              alt="Huy Anh Rubber"
-              style={{ height: 40, width: 40, borderRadius: 6, background: '#fff', padding: 4 }}
-            />
-            <div style={{ lineHeight: 1.2 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>Công ty TNHH MTV</div>
-              <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>Cao su Huy Anh</div>
+          <Space size={12} align="center">
+            <div
+              style={{
+                background: '#fff',
+                padding: '6px 10px',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              }}
+            >
+              <img
+                src="/logo.png"
+                alt="Huy Anh Rubber"
+                style={{ height: 32, width: 'auto', display: 'block' }}
+              />
+            </div>
+            <div style={{ lineHeight: 1.25 }}>
+              <div style={{ color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 0.3 }}>
+                Công ty TNHH MTV
+              </div>
+              <div style={{ color: '#FFD54F', fontSize: 12, fontWeight: 500 }}>
+                Cao su Huy Anh
+              </div>
             </div>
           </Space>
 

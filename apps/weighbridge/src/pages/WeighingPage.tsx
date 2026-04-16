@@ -558,16 +558,27 @@ export default function WeighingPage() {
           }}
         >
           {/* TRÁI — Back button + logo + tên công ty */}
-          <Space size={8} align="center">
+          <Space size={10} align="center">
             <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')} style={{ color: '#fff' }} />
-            <img
-              src="/logo.png"
-              alt="Huy Anh Rubber"
-              style={{ height: 36, width: 36, borderRadius: 6, background: '#fff', padding: 3 }}
-            />
-            <div style={{ lineHeight: 1.2 }}>
-              <div style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>Công ty TNHH MTV</div>
-              <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>Cao su Huy Anh</div>
+            <div
+              style={{
+                background: '#fff',
+                padding: '5px 8px',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+              }}
+            >
+              <img
+                src="/logo.png"
+                alt="Huy Anh Rubber"
+                style={{ height: 28, width: 'auto', display: 'block' }}
+              />
+            </div>
+            <div style={{ lineHeight: 1.25 }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>Công ty TNHH MTV</div>
+              <div style={{ color: '#FFD54F', fontSize: 11, fontWeight: 500 }}>Cao su Huy Anh</div>
             </div>
           </Space>
 

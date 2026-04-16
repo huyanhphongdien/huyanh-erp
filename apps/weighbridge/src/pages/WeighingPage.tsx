@@ -488,13 +488,18 @@ export default function WeighingPage() {
         import.meta.env.VITE_AUTO_WEIGHBRIDGE_SYNC === 'true'
       ) {
         try {
-          const { data: rawWh } = await supabase
+          // F2 multi-facility: chỉ pick kho NVL CÙNG facility với phiếu cân.
+          // Trước fix: order code asc → KHO-LAO-NVL ("L") đứng trước KHO-NVL ("N")
+          // → tất cả phiếu nhập từ trạm cân PD đều bị tạo ở kho Lào (BUG).
+          const ticketFacilityId = (ticket as any).facility_id || currentFacility?.id || null
+          let whQuery = supabase
             .from('warehouses')
-            .select('id, code, name')
+            .select('id, code, name, facility_id')
             .eq('is_active', true)
             .in('type', ['raw', 'mixed'])
             .order('code', { ascending: true })
-            .limit(1)
+          if (ticketFacilityId) whQuery = whQuery.eq('facility_id', ticketFacilityId)
+          const { data: rawWh } = await whQuery.limit(1)
           if (rawWh && rawWh.length > 0) {
             const result = await stockInService.createFromWeighbridgeTicket(
               ticket.id,
@@ -503,10 +508,11 @@ export default function WeighingPage() {
             if (result.reused) {
               message.info(`Phiếu nhập đã tồn tại: ${result.stockIn?.code || ''}`)
             } else {
-              message.success(`Đã tạo phiếu nhập NVL: ${result.stockIn?.code || ''}`)
+              message.success(`Đã tạo phiếu nhập NVL ${rawWh[0].code}: ${result.stockIn?.code || ''}`)
             }
           } else {
-            console.warn('[auto-sync in] không tìm thấy kho NVL active')
+            console.warn(`[auto-sync in] không tìm thấy kho NVL cho facility ${ticketFacilityId || 'unknown'}`)
+            message.warning('Phiếu cân hoàn tất nhưng không tìm thấy kho NVL cho nhà máy này — phải tạo phiếu nhập tay')
           }
         } catch (syncErr: any) {
           console.warn('[auto-sync in] tạo phiếu nhập thất bại:', syncErr?.message || syncErr)
@@ -522,13 +528,16 @@ export default function WeighingPage() {
         import.meta.env.VITE_AUTO_WEIGHBRIDGE_OUT_SYNC === 'true'
       ) {
         try {
-          const { data: tpWh } = await supabase
+          // F2: pick kho TP CÙNG facility (tránh bug giống cân IN — KHO-LAO trước alphabet)
+          const ticketFacilityId = (ticket as any).facility_id || currentFacility?.id || null
+          let tpQuery = supabase
             .from('warehouses')
-            .select('id, code, name')
+            .select('id, code, name, facility_id')
             .eq('is_active', true)
             .in('type', ['finished', 'mixed'])
             .order('code', { ascending: true })
-            .limit(1)
+          if (ticketFacilityId) tpQuery = tpQuery.eq('facility_id', ticketFacilityId)
+          const { data: tpWh } = await tpQuery.limit(1)
           if (tpWh && tpWh.length > 0) {
             const result = await stockOutService.createDraftFromWeighbridgeTicketOut(
               ticket.id,
@@ -537,10 +546,11 @@ export default function WeighingPage() {
             if (result.reused) {
               message.info(`Phiếu xuất draft đã tồn tại: ${result.stockOut?.code || ''}`)
             } else {
-              message.success(`Đã tạo phiếu xuất draft: ${result.stockOut?.code || ''}`)
+              message.success(`Đã tạo phiếu xuất draft ${tpWh[0].code}: ${result.stockOut?.code || ''}`)
             }
           } else {
-            console.warn('[auto-sync out] không tìm thấy kho TP active')
+            console.warn(`[auto-sync out] không tìm thấy kho TP cho facility ${ticketFacilityId || 'unknown'}`)
+            message.warning('Phiếu cân hoàn tất nhưng không tìm thấy kho TP cho nhà máy này — phải tạo phiếu xuất tay')
           }
         } catch (syncErr: any) {
           console.warn('[auto-sync out] tạo phiếu xuất thất bại:', syncErr?.message || syncErr)

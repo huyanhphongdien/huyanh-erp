@@ -644,8 +644,12 @@ async function _createStockInForReceived(
     const itemQtyReceived = item.quantity_planned || 0  // qty không phụ thuộc cân (vì cân là tổng)
 
     // Tạo batch mới ở NM nhận (nguồn từ batch cũ ở NM gửi)
+    // Schema thực: stock_batches dùng parent_batch_id (KHÔNG source_batch_id),
+    // batch_type='production' (chưa có 'transfer'), không có cột notes →
+    // dùng contamination_notes thay
     const newBatchCode = `${transfer.code}-${item.material_id.slice(0, 6)}`
-    const { data: newBatch } = await supabase
+    const sourceBatch = item.source_batch as any
+    const { data: newBatch, error: batchErr } = await supabase
       .from('stock_batches')
       .insert({
         batch_no: newBatchCode,
@@ -655,13 +659,21 @@ async function _createStockInForReceived(
         initial_quantity: itemQtyReceived,
         initial_weight: itemWeightReceived,
         current_weight: itemWeightReceived,
+        unit: 'bành',
         status: 'active',
-        source_type: 'transfer',
-        source_batch_id: item.source_batch_id,
-        notes: `Chuyển từ ${transfer.from_facility?.code || ''} (${transfer.code})`,
+        batch_type: 'production',
+        parent_batch_id: item.source_batch_id || null,
+        rubber_grade: sourceBatch?.rubber_grade || null,
+        rubber_type: sourceBatch?.rubber_grade ? sourceBatch.rubber_grade.toLowerCase() : null,
+        latest_drc: sourceBatch?.latest_drc || null,
+        qc_status: 'passed',
+        received_date: new Date().toISOString().split('T')[0],
+        contamination_status: 'clean',
+        contamination_notes: `Chuyển từ ${transfer.from_facility?.code || ''} (${transfer.code})`,
       })
       .select('id')
       .single()
+    if (batchErr) console.error('[transferService] insert batch failed:', batchErr)
 
     // Stock-in detail (column là stock_in_id không phải stock_in_order_id)
     await supabase.from('stock_in_details').insert({

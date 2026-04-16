@@ -135,14 +135,16 @@ export default function WeighingPage() {
   }, [])
 
   // S3 OUT: Load active sales orders khi user chuyển sang OUT
+  // CHỈ load ở NM xuất khẩu (PD, can_ship_to_customer=true). TL/LAO không cần.
   useEffect(() => {
     if (ticketDirection !== 'out' || ticket) return
+    if (!currentFacility?.can_ship_to_customer) return
     setLoadingSO(true)
     salesOrderService.getActiveForShipping()
       .then(setSalesOrders)
       .catch(err => console.warn('SO load error:', err))
       .finally(() => setLoadingSO(false))
-  }, [ticketDirection, ticket])
+  }, [ticketDirection, ticket, currentFacility])
 
   // F3: Load pending transfers theo direction + facility
   // - OUT + facility != PD → transfers gửi từ facility này (chưa cân xuất)
@@ -773,8 +775,10 @@ export default function WeighingPage() {
                 </Card>
               )}
 
-              {/* S3 OUT: Sales Order + Container picker (chỉ cho OUT, ẨN khi đã chọn transfer) */}
-              {ticketDirection === 'out' && !selectedTransferId && (
+              {/* S3 OUT: Sales Order + Container picker — CHỈ hiện ở NM xuất khẩu (PD).
+                  Ẩn ở TL/LAO (can_ship_to_customer=false) vì các NM này không xuất trực tiếp,
+                  chỉ làm transfer về PD. Cũng ẨN khi đã chọn transfer (tránh confusion). */}
+              {ticketDirection === 'out' && !selectedTransferId && currentFacility?.can_ship_to_customer && (
                 <Card size="small" title="Đơn hàng xuất" style={{ borderRadius: 12, borderColor: '#E8A838' }}>
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     <div>

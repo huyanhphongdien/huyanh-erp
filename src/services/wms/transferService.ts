@@ -80,8 +80,8 @@ export interface InterFacilityTransfer {
   // Joined refs (chỉ trả về khi query SELECT_FULL)
   stock_out_order?: { id: string; code: string } | null
   stock_in_order?: { id: string; code: string } | null
-  weighbridge_out?: { id: string; code: string } | null
-  weighbridge_in?: { id: string; code: string } | null
+  weighbridge_out?: { id: string; code: string; vehicle_plate?: string | null; driver_name?: string | null } | null
+  weighbridge_in?: { id: string; code: string; vehicle_plate?: string | null; driver_name?: string | null } | null
 
   notes?: string | null
   created_by?: string | null
@@ -145,8 +145,8 @@ const SELECT_FULL = `
   to_warehouse:warehouses!to_warehouse_id(id, code, name, facility_id),
   stock_out_order:stock_out_orders!stock_out_order_id(id, code),
   stock_in_order:stock_in_orders!stock_in_order_id(id, code),
-  weighbridge_out:weighbridge_tickets!weighbridge_out_id(id, code),
-  weighbridge_in:weighbridge_tickets!weighbridge_in_id(id, code),
+  weighbridge_out:weighbridge_tickets!weighbridge_out_id(id, code, vehicle_plate, driver_name),
+  weighbridge_in:weighbridge_tickets!weighbridge_in_id(id, code, vehicle_plate, driver_name),
   items:inter_facility_transfer_items(
     *,
     material:materials(id, sku, name, unit, weight_per_unit),

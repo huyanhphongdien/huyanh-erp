@@ -20,6 +20,11 @@ interface FacilityInfo {
   name: string
   country: string
   weighbridge_subdomain?: string | null
+  /** F3: NM này có quyền xuất khẩu cho khách không?
+   *  - true (PD) → app cân hiện Card SO/Container/Seal khi cân OUT
+   *  - false (TL/LAO) → app cân ẨN Card SO (vì chỉ làm transfer về PD)
+   */
+  can_ship_to_customer?: boolean
 }
 
 interface FacilityStoreState {
@@ -62,7 +67,7 @@ export function useCurrentFacility() {
     setError(null)
     supabase
       .from('facilities')
-      .select('id, code, name, country, weighbridge_subdomain')
+      .select('id, code, name, country, weighbridge_subdomain, can_ship_to_customer')
       .eq('code', code)
       .maybeSingle()
       .then(({ data, error }) => {

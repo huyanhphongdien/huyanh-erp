@@ -310,19 +310,26 @@ export default function TransferCreatePage() {
             )}
           </Col>
         </Row>
+        <Alert
+          type="info"
+          showIcon
+          message="Xe dự kiến (không bắt buộc)"
+          description="Có thể bỏ trống nếu chưa biết — xe thực tế sẽ ghi tại trạm cân khi cân xuất/cân nhận. Cũng có thể đổi xe trên đường."
+          style={{ marginBottom: 12, fontSize: 12 }}
+        />
         <Row gutter={12}>
           <Col xs={24} sm={8}>
-            <Text>Biển số xe</Text>
+            <Text>Biển số xe (dự kiến)</Text>
             <Input
               size="large"
-              placeholder="VD: 75H-12345"
+              placeholder="VD: 75H-12345 (có thể trống)"
               value={vehiclePlate}
               onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
               style={{ marginTop: 4 }}
             />
           </Col>
           <Col xs={24} sm={8}>
-            <Text>Tài xế</Text>
+            <Text>Tài xế (dự kiến)</Text>
             <Input
               size="large"
               placeholder="Tên tài xế"

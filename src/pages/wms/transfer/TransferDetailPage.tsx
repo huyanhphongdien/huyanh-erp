@@ -269,10 +269,38 @@ export default function TransferDetailPage({ id: propId }: Props) {
               ? <Text strong>👤 {transfer.requested_by_name}</Text>
               : <Text type="secondary">—</Text>}
           </Descriptions.Item>
-          <Descriptions.Item label="Biển số">{transfer.vehicle_plate || '—'}</Descriptions.Item>
-          <Descriptions.Item label="Tài xế">
-            {transfer.driver_name || '—'}
-            {transfer.driver_phone && <Text type="secondary"> • {transfer.driver_phone}</Text>}
+          <Descriptions.Item label="Xe dự kiến" span={2}>
+            {transfer.vehicle_plate
+              ? <>
+                  <Text code>{transfer.vehicle_plate}</Text>
+                  {transfer.driver_name && <> · {transfer.driver_name}</>}
+                  {transfer.driver_phone && <Text type="secondary"> · {transfer.driver_phone}</Text>}
+                </>
+              : <Text type="secondary">— (chưa biết)</Text>}
+          </Descriptions.Item>
+          <Descriptions.Item label="🚛 Xe cân xuất TL">
+            {transfer.weighbridge_out?.vehicle_plate
+              ? <>
+                  <Text code strong>{transfer.weighbridge_out.vehicle_plate}</Text>
+                  {transfer.weighbridge_out.driver_name && (
+                    <Text type="secondary"> · {transfer.weighbridge_out.driver_name}</Text>
+                  )}
+                </>
+              : <Text type="secondary">—</Text>}
+          </Descriptions.Item>
+          <Descriptions.Item label="🚛 Xe cân nhận PD" span={2}>
+            {transfer.weighbridge_in?.vehicle_plate
+              ? <>
+                  <Text code strong>{transfer.weighbridge_in.vehicle_plate}</Text>
+                  {transfer.weighbridge_in.driver_name && (
+                    <Text type="secondary"> · {transfer.weighbridge_in.driver_name}</Text>
+                  )}
+                  {transfer.weighbridge_out?.vehicle_plate &&
+                   transfer.weighbridge_in.vehicle_plate !== transfer.weighbridge_out.vehicle_plate && (
+                    <Tag color="orange" style={{ marginLeft: 8, fontSize: 11 }}>⚠ Khác xe đi</Tag>
+                  )}
+                </>
+              : <Text type="secondary">—</Text>}
           </Descriptions.Item>
           <Descriptions.Item label="Ngưỡng hao hụt">{transfer.loss_threshold_pct}%</Descriptions.Item>
           <Descriptions.Item label="Phiếu xuất">

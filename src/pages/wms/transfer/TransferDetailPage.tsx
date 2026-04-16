@@ -264,6 +264,11 @@ export default function TransferDetailPage({ id: propId }: Props) {
             <Tag color="green">{transfer.to_facility?.code}</Tag> {transfer.to_facility?.name}
           </Descriptions.Item>
           <Descriptions.Item label="Kho nhận">{transfer.to_warehouse?.name}</Descriptions.Item>
+          <Descriptions.Item label="Người chuyển">
+            {transfer.requested_by_name
+              ? <Text strong>👤 {transfer.requested_by_name}</Text>
+              : <Text type="secondary">—</Text>}
+          </Descriptions.Item>
           <Descriptions.Item label="Biển số">{transfer.vehicle_plate || '—'}</Descriptions.Item>
           <Descriptions.Item label="Tài xế">
             {transfer.driver_name || '—'}

@@ -62,6 +62,9 @@ export default function TransferCreatePage() {
   const [driverName, setDriverName] = useState('')
   const [driverPhone, setDriverPhone] = useState('')
 
+  // Người yêu cầu chuyển — default = user đang đăng nhập
+  const [requestedByName, setRequestedByName] = useState(user?.full_name || '')
+
   // Items
   const [pickedBatches, setPickedBatches] = useState<BatchPick[]>([])
   const [availableBatches, setAvailableBatches] = useState<any[]>([])
@@ -184,6 +187,7 @@ export default function TransferCreatePage() {
         vehicle_plate: vehiclePlate || undefined,
         driver_name: driverName || undefined,
         driver_phone: driverPhone || undefined,
+        requested_by_name: requestedByName || undefined,
         loss_threshold_pct: lossThreshold,
         notes: notes || undefined,
         items: pickedBatches.map((b) => ({
@@ -283,8 +287,24 @@ export default function TransferCreatePage() {
         </Row>
       </Card>
 
-      {/* Vehicle + driver */}
-      <Card title="🚛 Phương tiện" size="small" style={{ marginBottom: 16, borderRadius: 10 }}>
+      {/* Người yêu cầu + Phương tiện */}
+      <Card title="🚛 Phương tiện & Người yêu cầu" size="small" style={{ marginBottom: 16, borderRadius: 10 }}>
+        <Row gutter={12} style={{ marginBottom: 12 }}>
+          <Col xs={24} sm={12}>
+            <Text>Người chuyển <Text type="danger">*</Text></Text>
+            <Input
+              size="large"
+              placeholder="Tên người yêu cầu chuyển"
+              value={requestedByName}
+              onChange={(e) => setRequestedByName(e.target.value)}
+              style={{ marginTop: 4 }}
+              prefix="👤"
+            />
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              Auto-fill từ tài khoản đang đăng nhập — có thể edit nếu tạo hộ
+            </Text>
+          </Col>
+        </Row>
         <Row gutter={12}>
           <Col xs={24} sm={8}>
             <Text>Biển số xe</Text>

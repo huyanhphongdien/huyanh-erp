@@ -58,6 +58,9 @@ export interface InterFacilityTransfer {
   driver_name?: string | null
   driver_phone?: string | null
 
+  /** Tên người yêu cầu chuyển (text, default = user.full_name lúc tạo) */
+  requested_by_name?: string | null
+
   weighbridge_out_id?: string | null
   weighbridge_in_id?: string | null
 
@@ -121,6 +124,8 @@ export interface CreateTransferInput {
   vehicle_plate?: string
   driver_name?: string
   driver_phone?: string
+  /** Tên người yêu cầu chuyển — auto-fill từ user.full_name */
+  requested_by_name?: string
   loss_threshold_pct?: number
   notes?: string
   items: Array<{
@@ -217,6 +222,7 @@ async function create(input: CreateTransferInput, userId?: string): Promise<Inte
       vehicle_plate: input.vehicle_plate?.toUpperCase().trim() || null,
       driver_name: input.driver_name?.trim() || null,
       driver_phone: input.driver_phone?.trim() || null,
+      requested_by_name: input.requested_by_name?.trim() || null,
       loss_threshold_pct: input.loss_threshold_pct ?? 0.5,
       notes: input.notes || null,
       status: 'draft' as TransferStatus,

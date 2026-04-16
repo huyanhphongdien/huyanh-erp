@@ -170,6 +170,7 @@ export default function TransferCreatePage() {
   const totalWeight = pickedBatches.reduce((s, b) => s + b.pick_weight, 0)
 
   const canSubmit =
+    !!requestedByName &&  // bắt buộc có người chuyển
     fromFacilityId && fromWarehouseId && toFacilityId && toWarehouseId &&
     fromFacilityId !== toFacilityId &&
     pickedBatches.length > 0 &&
@@ -294,15 +295,19 @@ export default function TransferCreatePage() {
             <Text>Người chuyển <Text type="danger">*</Text></Text>
             <Input
               size="large"
-              placeholder="Tên người yêu cầu chuyển"
               value={requestedByName}
-              onChange={(e) => setRequestedByName(e.target.value)}
-              style={{ marginTop: 4 }}
+              disabled
+              style={{ marginTop: 4, color: '#1B4D3E', fontWeight: 600, background: '#F0FDF4' }}
               prefix="👤"
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              Auto-fill từ tài khoản đang đăng nhập — có thể edit nếu tạo hộ
+              🔒 Tự động lấy từ tài khoản đăng nhập — không thể sửa
             </Text>
+            {!requestedByName && (
+              <Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+                ⚠ Tài khoản chưa gắn với nhân viên — không tạo phiếu được
+              </Text>
+            )}
           </Col>
         </Row>
         <Row gutter={12}>
@@ -476,7 +481,9 @@ export default function TransferCreatePage() {
         {!canSubmit && (
           <div style={{ marginTop: 4 }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {!fromFacilityId || !toFacilityId
+              {!requestedByName
+                ? '↑ Tài khoản đăng nhập chưa có tên (chưa gắn nhân viên)'
+                : !fromFacilityId || !toFacilityId
                 ? '↑ Chọn cả NM gửi và NM nhận'
                 : !fromWarehouseId || !toWarehouseId
                 ? '↑ Chọn kho gửi và kho nhận'

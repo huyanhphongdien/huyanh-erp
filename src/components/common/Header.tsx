@@ -1,14 +1,14 @@
 // src/components/common/Header.tsx
+// NOTE: Component này hiện không được dùng trong MainLayout (chỉ render
+// Sidebar + Outlet). Giữ lại cho future use hoặc các layout khác.
+// FacilityPicker đã chuyển vào Sidebar (giữa user info và navigation).
 import { useAuthStore } from '../../stores/authStore'
-import { useFacilityFilter } from '../../stores/facilityFilterStore'
-import FacilityPicker from '../wms/FacilityPicker'
 import { Button } from '../ui'
 import { NotificationBell } from './NotificationBell'
 import { TaskNotificationBell } from './TaskNotificationBell'
 
 export function Header() {
   const { user, logout } = useAuthStore()
-  const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter()
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -17,16 +17,6 @@ export function Header() {
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="text-xl sm:text-2xl">🏭</span>
           <span className="font-bold text-base sm:text-xl text-primary">Huy Anh ERP</span>
-        </div>
-
-        {/* Facility selector — global filter */}
-        <div className="hidden md:block" style={{ minWidth: 220 }}>
-          <FacilityPicker
-            value={currentFacilityId}
-            onChange={setCurrentFacilityId}
-            allowAll
-            size="middle"
-          />
         </div>
 
         {/* User info & Actions */}

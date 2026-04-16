@@ -24,6 +24,8 @@ import { purchaseAccessService } from '../../services/purchaseAccessService';
 import { overtimeRequestService } from '../../services/overtimeRequestService';
 import { leaveRequestService } from '../../services/leaveRequestService';
 import logoImg from '../../assets/logo.png';
+import FacilityPicker from '../wms/FacilityPicker';
+import { useFacilityFilter } from '../../stores/facilityFilterStore';
 import {
   Menu, X, ChevronDown, ChevronRight,
   LayoutDashboard, Building2, Briefcase, Users,
@@ -413,6 +415,7 @@ const getMenuGroups = (
 
 export function Sidebar() {
   const { user, logout } = useAuthStore();
+  const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter();
   const location = useLocation();
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -769,6 +772,20 @@ export function Sidebar() {
           </div>
           <Settings size={15} className="text-[#C8D0CC] group-hover:text-[#2D8B6E] transition-colors flex-shrink-0" />
         </NavLink>
+      </div>
+
+      {/* ─── FACILITY SELECTOR ─── */}
+      <div className="px-4 py-2.5 border-b border-black/[0.06]">
+        <p className="text-[10px] font-semibold text-[#B0B8B4] uppercase tracking-[0.08em] mb-1.5">
+          🏭 Nhà máy
+        </p>
+        <FacilityPicker
+          value={currentFacilityId}
+          onChange={setCurrentFacilityId}
+          allowAll
+          size="small"
+          style={{ width: '100%' }}
+        />
       </div>
 
       {/* ─── NAVIGATION ─── */}

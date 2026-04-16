@@ -4,9 +4,11 @@
 // Rewrite: Tailwind -> Ant Design v6, them rubber grade distribution, dry weight
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenTab } from '../../hooks/useOpenTab'
+import { useFacilityFilter } from '../../stores/facilityFilterStore'
+import { useActiveFacilities } from '../../hooks/useActiveFacilities'
 import {
   Card,
   Row,
@@ -62,9 +64,13 @@ interface GradeDistribution {
 // COMPONENT
 // ============================================================================
 
+const COUNTRY_FLAG: Record<string, string> = { VN: '🇻🇳', LA: '🇱🇦' }
+
 const InventoryDashboard = () => {
   const navigate = useNavigate()
   const openTab = useOpenTab()
+  const { currentFacilityId } = useFacilityFilter()
+  const { data: facilities = [] } = useActiveFacilities()
 
   const [overview, setOverview] = useState<InventoryOverview | null>(null)
   const [stockSummary, setStockSummary] = useState<StockSummaryItem[]>([])
@@ -155,7 +161,24 @@ const InventoryDashboard = () => {
   // FILTERED DATA
   // --------------------------------------------------------------------------
 
-  const filteredSummary = stockSummary.filter(item => {
+  // F2: Khi chọn 1 nhà máy, lọc warehouse_breakdown và tính lại tổng theo facility đó.
+  // Khi "Tất cả nhà máy", giữ nguyên dữ liệu gốc (sẽ có thêm cột pivot bên dưới).
+  const scopedSummary = useMemo(() => {
+    if (!currentFacilityId) return stockSummary
+    return stockSummary
+      .map(item => {
+        const breakdown = item.warehouse_breakdown.filter(
+          (w: any) => w.warehouse?.facility_id === currentFacilityId,
+        )
+        if (breakdown.length === 0) return null
+        const total_quantity = breakdown.reduce((s, w) => s + (w.quantity || 0), 0)
+        const total_weight = breakdown.reduce((s, w) => s + (w.weight || 0), 0)
+        return { ...item, warehouse_breakdown: breakdown, total_quantity, total_weight }
+      })
+      .filter((x): x is StockSummaryItem => x !== null)
+  }, [stockSummary, currentFacilityId])
+
+  const filteredSummary = scopedSummary.filter(item => {
     if (searchText) {
       const s = searchText.toLowerCase()
       if (!item.material.name?.toLowerCase().includes(s) &&
@@ -167,12 +190,65 @@ const InventoryDashboard = () => {
     return true
   })
 
+  // F2: Cross-facility pivot — tính tổng TL mỗi nhà máy cho mỗi material (chỉ khi "Tất cả")
+  const facilityPivot = useMemo(() => {
+    if (currentFacilityId || facilities.length === 0) return null
+    const pivot: Record<string, Record<string, number>> = {} // material_id → facility_id → weight
+    for (const item of filteredSummary) {
+      pivot[item.material_id] = {}
+      for (const w of item.warehouse_breakdown as any[]) {
+        const fid = w.warehouse?.facility_id
+        if (!fid) continue
+        pivot[item.material_id][fid] = (pivot[item.material_id][fid] || 0) + (w.weight || 0)
+      }
+    }
+    return pivot
+  }, [filteredSummary, currentFacilityId, facilities])
+
   const topAlerts = alerts.slice(0, 8)
   const highAlertCount = alerts.filter(a => a.severity === 'high').length
+
+  // F2: KPI hiển thị tổng theo facility đang filter (nếu có), hoặc toàn công ty
+  const displayOverview = useMemo(() => {
+    if (!currentFacilityId) return overview
+    const total_materials = scopedSummary.length
+    const total_weight = scopedSummary.reduce((s, i) => s + (i.total_weight || 0), 0)
+    const total_quantity = scopedSummary.reduce((s, i) => s + (i.total_quantity || 0), 0)
+    return {
+      ...(overview || { total_alerts: 0, low_stock_count: 0, expiring_soon_count: 0 } as any),
+      total_materials, total_weight, total_quantity,
+    }
+  }, [overview, scopedSummary, currentFacilityId])
+
+  const currentFacility = facilities.find(f => f.id === currentFacilityId)
 
   // --------------------------------------------------------------------------
   // TABLE COLUMNS
   // --------------------------------------------------------------------------
+
+  // F2: Cột pivot per-facility chỉ khi không filter (tổng quan toàn công ty)
+  const facilityPivotColumns = (!currentFacilityId && facilityPivot)
+    ? facilities.map(f => ({
+        title: (
+          <Space size={4}>
+            <span>{COUNTRY_FLAG[f.country || 'VN'] || '🏭'}</span>
+            <span>{f.code}</span>
+          </Space>
+        ),
+        key: `pivot-${f.id}`,
+        align: 'right' as const,
+        width: 90,
+        render: (_: any, record: StockSummaryItem) => {
+          const w = facilityPivot[record.material_id]?.[f.id] || 0
+          if (w === 0) return <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
+          return (
+            <Text style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#1B4D3E' }}>
+              {(w / 1000).toFixed(2)}
+            </Text>
+          )
+        },
+      }))
+    : []
 
   const columns = [
     {
@@ -199,7 +275,7 @@ const InventoryDashboard = () => {
       ),
     },
     {
-      title: 'Trọng lượng (T)',
+      title: 'Tổng (T)',
       dataIndex: 'total_weight',
       key: 'total_weight',
       align: 'right' as const,
@@ -209,6 +285,7 @@ const InventoryDashboard = () => {
         </Text>
       ),
     },
+    ...facilityPivotColumns,
     {
       title: 'Kho',
       key: 'warehouses',
@@ -281,6 +358,16 @@ const InventoryDashboard = () => {
           <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
             <DashboardOutlined style={{ marginRight: 8 }} />
             Kho Thành Phẩm
+            {currentFacility && (
+              <Tag color="green" style={{ marginLeft: 8, fontSize: 12 }}>
+                {COUNTRY_FLAG[currentFacility.country || 'VN']} {currentFacility.name}
+              </Tag>
+            )}
+            {!currentFacilityId && (
+              <Tag color="blue" style={{ marginLeft: 8, fontSize: 12 }}>
+                🏢 Tất cả nhà máy
+              </Tag>
+            )}
           </Title>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Cập nhật: {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
@@ -315,7 +402,7 @@ const InventoryDashboard = () => {
           <Card bodyStyle={{ padding: 16 }}>
             <Statistic
               title={<Text type="secondary" style={{ fontSize: 12 }}>Tổng lô</Text>}
-              value={overview?.total_materials || 0}
+              value={displayOverview?.total_materials || 0}
               valueStyle={{ color: '#1B4D3E', fontFamily: "'JetBrains Mono', monospace" }}
               prefix={<InboxOutlined />}
             />
@@ -325,7 +412,7 @@ const InventoryDashboard = () => {
           <Card bodyStyle={{ padding: 16 }}>
             <Statistic
               title={<Text type="secondary" style={{ fontSize: 12 }}>Trọng lượng (T)</Text>}
-              value={((overview?.total_weight || 0) / 1000).toFixed(1)}
+              value={((displayOverview?.total_weight || 0) / 1000).toFixed(1)}
               valueStyle={{ color: '#1B4D3E', fontFamily: "'JetBrains Mono', monospace" }}
             />
           </Card>

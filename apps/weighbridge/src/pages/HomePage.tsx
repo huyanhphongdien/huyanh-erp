@@ -11,6 +11,7 @@ import {
   EyeOutlined, PrinterOutlined, SearchOutlined, HistoryOutlined, FilterOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
+import { useCurrentFacility } from '@/stores/facilityStore'
 import { useKeliScale } from '@erp/hooks/useKeliScale'
 import ScaleSettings from '@/components/ScaleSettings'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
@@ -31,6 +32,7 @@ const STATUS_MAP: Record<WeighbridgeStatus, { label: string; color: string }> = 
 export default function HomePage() {
   const navigate = useNavigate()
   const { operator, logout } = useAuthStore()
+  const { facility } = useCurrentFacility()
   const scale = useKeliScale()
 
   const [allTickets, setAllTickets] = useState<WeighbridgeTicket[]>([])
@@ -251,9 +253,12 @@ export default function HomePage() {
           <Space size={12}>
             <span style={{ fontSize: 24 }}>⚖️</span>
             <div>
-              <Title level={5} style={{ color: '#fff', margin: 0, fontSize: 16 }}>TRẠM CÂN HUY ANH</Title>
+              <Title level={5} style={{ color: '#fff', margin: 0, fontSize: 16 }}>
+                TRẠM CÂN {facility ? facility.name.toUpperCase() : 'HUY ANH'}
+              </Title>
               <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
                 {operator?.name} • {operator?.station || 'Trạm 1'}
+                {facility && <> • <span style={{ color: '#FFD54F' }}>🏭 {facility.code}</span></>}
               </Text>
             </div>
           </Space>

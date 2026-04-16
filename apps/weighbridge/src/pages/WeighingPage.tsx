@@ -9,6 +9,7 @@ import {
   CameraOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
+import { useCurrentFacility } from '@/stores/facilityStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import stockInService from '@erp/services/wms/stockInService'
 import stockOutService from '@erp/services/wms/stockOutService'
@@ -60,6 +61,7 @@ export default function WeighingPage() {
   const navigate = useNavigate()
   const { ticketId } = useParams()
   const { operator } = useAuthStore()
+  const { facility: currentFacility, error: facilityError } = useCurrentFacility()
   const scale = useKeliScale()
 
   // Ticket state
@@ -281,7 +283,13 @@ export default function WeighingPage() {
     setError('')
     try {
       const t = await weighbridgeService.create(
-        { vehicle_plate: vehiclePlate.trim(), driver_name: driverName || undefined, ticket_type: ticketDirection, notes: notes || undefined },
+        {
+          vehicle_plate: vehiclePlate.trim(),
+          driver_name: driverName || undefined,
+          ticket_type: ticketDirection,
+          notes: notes || undefined,
+          facility_id: currentFacility?.id || null,
+        },
         operator?.id,
       )
 
@@ -543,6 +551,11 @@ export default function WeighingPage() {
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/')} style={{ color: '#fff' }} />
           <Title level={5} style={{ color: '#fff', margin: 0, flex: 1 }}>
             {isCreate ? 'Tạo phiếu cân mới' : `Phiếu ${ticket?.code}`}
+            {currentFacility && (
+              <Tag color="gold" style={{ marginLeft: 8, fontSize: 12 }}>
+                🏭 {currentFacility.code}
+              </Tag>
+            )}
           </Title>
           {ticket && (
             <Tag color={
@@ -561,6 +574,7 @@ export default function WeighingPage() {
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
         {error && <Alert type="error" message={error} showIcon closable onClose={() => setError('')} style={{ marginBottom: 12 }} />}
         {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess('')} style={{ marginBottom: 12 }} />}
+        {facilityError && <Alert type="warning" message={`Lỗi facility: ${facilityError}`} showIcon style={{ marginBottom: 12 }} />}
 
         <Row gutter={16}>
           {/* LEFT: Form */}

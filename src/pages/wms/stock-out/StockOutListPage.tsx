@@ -4,9 +4,12 @@
 // Rewrite: Tailwind -> Ant Design v6, add rubber fields
 // ============================================================================
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenTab } from '../../../hooks/useOpenTab'
+import { useFacilityFilter } from '../../../stores/facilityFilterStore'
+import { useActiveWarehouses } from '../../../hooks/useActiveWarehouses'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
 import {
   Card,
   Table,
@@ -145,11 +148,25 @@ const StockOutListPage: React.FC = () => {
   const navigate = useNavigate()
   const openTab = useOpenTab()
 
+  // F2: Facility filter (multi-facility) — đọc từ store global
+  const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter()
+  const { data: warehouses = [] } = useActiveWarehouses()
+
   // State
   const [orders, setOrders] = useState<StockOutOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
   const [activeFilter, setActiveFilter] = useState<string>('')
+
+  // F2: Map warehouse_id → facility_id để filter
+  const warehouseIdsForFacility = useMemo(() => {
+    if (!currentFacilityId) return null
+    return new Set(
+      warehouses
+        .filter(w => (w as any).facility_id === currentFacilityId)
+        .map(w => w.id),
+    )
+  }, [warehouses, currentFacilityId])
 
   // Load data from Supabase
   useEffect(() => {
@@ -182,6 +199,11 @@ const StockOutListPage: React.FC = () => {
   const filteredOrders = useCallback(() => {
     let result = [...orders]
 
+    // F2: Facility filter
+    if (warehouseIdsForFacility) {
+      result = result.filter(o => warehouseIdsForFacility.has(o.warehouse_id))
+    }
+
     // Status filter
     if (activeFilter) {
       result = result.filter(o => o.status === activeFilter)
@@ -200,7 +222,7 @@ const StockOutListPage: React.FC = () => {
     }
 
     return result
-  }, [orders, activeFilter, searchText])
+  }, [orders, activeFilter, searchText, warehouseIdsForFacility])
 
   const displayOrders = filteredOrders()
 
@@ -357,7 +379,7 @@ const StockOutListPage: React.FC = () => {
     <div style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Space>
+        <Space size={12}>
           <Button icon={<ArrowLeftOutlined />} onClick={handleGoBack} />
           <div>
             <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
@@ -366,6 +388,14 @@ const StockOutListPage: React.FC = () => {
             </Title>
             <Text type="secondary">NVL & Thành phẩm</Text>
           </div>
+          <Text type="secondary" style={{ fontSize: 13 }}>🏭</Text>
+          <FacilityPicker
+            value={currentFacilityId}
+            onChange={setCurrentFacilityId}
+            allowAll
+            size="middle"
+            style={{ width: 220 }}
+          />
         </Space>
         <Button
           type="primary"

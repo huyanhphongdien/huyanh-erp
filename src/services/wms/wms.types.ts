@@ -127,6 +127,8 @@ export interface Warehouse {
   is_active: boolean
   created_at: string
   updated_at: string
+  // Multi-facility F1+ — kho thuộc nhà máy nào (nullable cho legacy data)
+  facility_id?: string | null
 }
 
 export interface WarehouseLocation {

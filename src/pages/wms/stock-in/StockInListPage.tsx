@@ -3,6 +3,7 @@
 // File: src/pages/wms/stock-in/StockInListPage.tsx
 // ============================================================================
 
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Tag, Typography, Button, Descriptions, Card, Row, Col, Statistic, Space } from 'antd'
@@ -11,6 +12,9 @@ import stockInService from '../../../services/wms/stockInService'
 import type { StockInOrder } from '../../../services/wms/wms.types'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
 import { useOpenTab } from '../../../hooks/useOpenTab'
+import { useFacilityFilter } from '../../../stores/facilityFilterStore'
+import { useActiveWarehouses } from '../../../hooks/useActiveWarehouses'
+import FacilityPicker from '../../../components/wms/FacilityPicker'
 
 const { Text } = Typography
 
@@ -44,6 +48,8 @@ const extractWeighbridgeCode = (notes: string | null | undefined): string | null
 export default function StockInListPage() {
   const navigate = useNavigate()
   const openTab = useOpenTab()
+  const { currentFacilityId, setCurrentFacilityId } = useFacilityFilter()
+  const { data: warehouses = [] } = useActiveWarehouses()
 
   const openDetail = (order: StockInOrder) => {
     openTab({
@@ -63,6 +69,16 @@ export default function StockInListPage() {
     },
     staleTime: 60000,
   })
+
+  // F2: Filter theo facility (nếu user chọn ở /wms global filter).
+  // Map qua warehouses để lấy facility_id rồi compare.
+  const filteredOrders = useMemo(() => {
+    if (!currentFacilityId) return orders
+    const whIds = new Set(
+      warehouses.filter(w => (w as any).facility_id === currentFacilityId).map(w => w.id),
+    )
+    return orders.filter(o => whIds.has(o.warehouse_id))
+  }, [orders, currentFacilityId, warehouses])
 
   const columns: ColumnDef<StockInOrder>[] = [
     { key: 'code', title: 'Mã phiếu', dataIndex: 'code', width: 160, sortable: true,
@@ -137,14 +153,24 @@ export default function StockInListPage() {
   return (
     <div style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Text strong style={{ fontSize: 18, color: '#1B4D3E' }}>Phiếu nhập kho</Text>
+        <Space size={12} align="center">
+          <Text strong style={{ fontSize: 18, color: '#1B4D3E' }}>Phiếu nhập kho</Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>🏭</Text>
+          <FacilityPicker
+            value={currentFacilityId}
+            onChange={setCurrentFacilityId}
+            allowAll
+            size="middle"
+            style={{ width: 220 }}
+          />
+        </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/wms/stock-in/new')} style={{ background: '#1B4D3E' }}>
           Tạo phiếu nhập
         </Button>
       </div>
       <AdvancedDataTable<StockInOrder>
         columns={columns}
-        dataSource={orders}
+        dataSource={filteredOrders}
         rowKey="id"
         loading={isLoading}
         title="Phiếu nhập kho"

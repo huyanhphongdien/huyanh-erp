@@ -79,6 +79,8 @@ export interface CreateTicketData {
   reference_type?: string
   reference_id?: string
   notes?: string
+  /** F2 multi-facility: ID nhà máy phát sinh phiếu (PD/TL/LAO). Sub-app cân tự inject. */
+  facility_id?: string | null
 }
 
 /**
@@ -99,6 +101,7 @@ async function create(data: CreateTicketData, userId?: string): Promise<Weighbri
       notes: data.notes || null,
       status: 'weighing_gross' as WeighbridgeStatus,
       created_by: userId || null,
+      facility_id: data.facility_id || null,
     })
     .select(TICKET_SELECT)
     .single()

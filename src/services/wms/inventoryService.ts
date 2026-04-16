@@ -161,7 +161,7 @@ export const inventoryService = {
         warehouse_id,
         quantity,
         material:materials(id, sku, name, type, unit, weight_per_unit, min_stock, max_stock, category_id, is_active),
-        warehouse:warehouses(id, code, name, type)
+        warehouse:warehouses(id, code, name, type, facility_id)
       `)
 
     if (params?.warehouse_id) {

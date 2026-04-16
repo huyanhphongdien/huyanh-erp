@@ -175,15 +175,14 @@ export default function WeighingPage() {
         if (t.ticket_type === 'in' || t.ticket_type === 'out') {
           setTicketDirection(t.ticket_type)
         }
-        // Sync SO/container nếu OUT
-        const ext = t as any
-        if (ext.sales_order_id) setSelectedSalesOrderId(ext.sales_order_id)
-        if (ext.container_id) setSelectedContainerId(ext.container_id)
         setVehiclePlate(t.vehicle_plate)
         setDriverName(t.driver_name || '')
         setNotes(t.notes || '')
         // Load rubber fields from extended columns
         const ext = t as any
+        // Sync SO/container nếu OUT
+        if (ext.sales_order_id) setSelectedSalesOrderId(ext.sales_order_id)
+        if (ext.container_id) setSelectedContainerId(ext.container_id)
         if (ext.deal_id) { setSelectedDealId(ext.deal_id); setSourceType('deal') }
         if (ext.supplier_id) { setSelectedSupplierId(ext.supplier_id); setSourceType('supplier') }
         if (ext.rubber_type) setRubberType(ext.rubber_type)

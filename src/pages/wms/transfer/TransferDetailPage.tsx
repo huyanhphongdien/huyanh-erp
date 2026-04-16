@@ -92,10 +92,11 @@ export default function TransferDetailPage({ id: propId }: Props) {
 
   const handleApprove = async () => {
     if (!user?.id) { message.error('Chưa đăng nhập'); return }
+    if (!user.employee_id) { message.error('Tài khoản chưa gắn với nhân viên — không thể duyệt'); return }
     try {
       await transferService.approveReceived({
         transfer_id: transfer.id,
-        approved_by: user.id,
+        approved_by: user.employee_id,
         approval_note: approveNote || undefined,
       })
       message.success('Đã duyệt — phiếu chuyển hoàn tất')
@@ -110,11 +111,12 @@ export default function TransferDetailPage({ id: propId }: Props) {
 
   const handleReject = async () => {
     if (!user?.id) { message.error('Chưa đăng nhập'); return }
+    if (!user.employee_id) { message.error('Tài khoản chưa gắn với nhân viên — không thể từ chối'); return }
     if (!rejectReason.trim()) { message.warning('Nhập lý do từ chối'); return }
     try {
       await transferService.rejectReceived({
         transfer_id: transfer.id,
-        rejected_by: user.id,
+        rejected_by: user.employee_id,
         reason: rejectReason,
       })
       message.success('Đã từ chối phiếu chuyển')
@@ -128,7 +130,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
 
   const handleCancel = async () => {
     try {
-      await transferService.cancel(transfer.id, user?.id, cancelReason || undefined)
+      await transferService.cancel(transfer.id, user?.employee_id || undefined, cancelReason || undefined)
       message.success('Đã hủy phiếu')
       setCancelOpen(false)
       queryClient.invalidateQueries({ queryKey: ['transfer', id] })
@@ -139,7 +141,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
 
   const handleMarkArrived = async () => {
     try {
-      await transferService.markArrived(transfer.id, user?.id)
+      await transferService.markArrived(transfer.id, user?.employee_id || undefined)
       message.success('Đã đánh dấu xe đến NM nhận')
       queryClient.invalidateQueries({ queryKey: ['transfer', id] })
     } catch (err: any) {

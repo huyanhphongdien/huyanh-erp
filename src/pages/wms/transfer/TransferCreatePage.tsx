@@ -193,7 +193,8 @@ export default function TransferCreatePage() {
           weight_planned_kg: b.pick_weight,
         })),
       }
-      const transfer = await transferService.create(payload, user?.id)
+      // employee_id (FK tới employees.id), KHÔNG dùng user.id (auth.users.id)
+      const transfer = await transferService.create(payload, user?.employee_id || undefined)
       message.success(`Tạo phiếu chuyển ${transfer.code} thành công`)
       navigate(`/wms/transfer/${transfer.id}`)
     } catch (err: any) {

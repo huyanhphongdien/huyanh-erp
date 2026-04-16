@@ -15,6 +15,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import {
   CheckCircleOutlined, DeleteOutlined, ShoppingCartOutlined,
+  ThunderboltOutlined, ClearOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
@@ -84,6 +85,57 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
   const isSufficient = grandTotal >= targetKg && selectedTotal > 0
   // Ngưỡng 2% — chuẩn hợp đồng xuất khẩu cao su ±2%
   const isOverAllocated = grandTotal > targetKg * 1.02
+
+  /**
+   * Cấp phát nhanh: tự fill các batch theo FIFO (batch nhập trước fill trước),
+   * mỗi batch lấy tối đa quantity_remaining, batch cuối lấy đúng số còn thiếu.
+   * Bỏ qua các batch đã có trong "existing allocations" — chỉ phân bổ phần còn thiếu.
+   */
+  const handleQuickFill = () => {
+    if (available.length === 0) {
+      message.warning('Không có lô khả dụng để cấp phát')
+      return
+    }
+    const stillNeeded = Math.max(0, targetKg - existingTotal)
+    if (stillNeeded <= 0.5) {
+      message.info('Đã cấp đủ rồi — không cần thêm')
+      return
+    }
+
+    // FIFO: sort theo received_date asc (đã sort sẵn từ service)
+    const next: Record<string, number> = {}
+    let remaining = stillNeeded
+    for (const batch of available) {
+      if (remaining <= 0.5) break
+      const batchMax = Number(batch.quantity_remaining || 0)
+      if (batchMax <= 0) continue
+      const take = Math.min(batchMax, remaining)
+      // Round to 2 decimal places (kg)
+      next[batch.id] = Math.round(take * 100) / 100
+      remaining = Math.round((remaining - take) * 100) / 100
+    }
+
+    if (Object.keys(next).length === 0) {
+      message.warning('Tất cả lô đã hết tồn — không thể cấp phát')
+      return
+    }
+    setSelections(next)
+    const total = Object.values(next).reduce((s, v) => s + v, 0)
+    if (remaining > 0.5) {
+      message.warning(
+        `Đã chọn ${total.toLocaleString('vi-VN')} kg từ ${Object.keys(next).length} lô — vẫn còn thiếu ${remaining.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg`,
+      )
+    } else {
+      message.success(
+        `⚡ Tự chọn ${total.toLocaleString('vi-VN')} kg từ ${Object.keys(next).length} lô — đủ cho đơn`,
+      )
+    }
+  }
+
+  /** Clear toàn bộ selections để chọn lại từ đầu */
+  const handleClearSelections = () => {
+    setSelections({})
+  }
 
   const handleAllocate = async () => {
     const requests = Object.entries(selections)
@@ -342,8 +394,32 @@ export default function StockPickerSection({ order, canEdit, onSaved }: Props) {
       )}
 
       {/* Available batches */}
-      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#666' }}>
-        LÔ TRONG KHO CÙNG GRADE {order.grade} ({available.length})
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>
+          LÔ TRONG KHO CÙNG GRADE {order.grade} ({available.length})
+        </div>
+        {canEdit && available.length > 0 && (
+          <Space size={6}>
+            <Button
+              type="primary"
+              size="small"
+              icon={<ThunderboltOutlined />}
+              onClick={handleQuickFill}
+              style={{ background: '#E8A838', borderColor: '#E8A838' }}
+            >
+              Cấp phát nhanh (FIFO)
+            </Button>
+            {selectedTotal > 0 && (
+              <Button
+                size="small"
+                icon={<ClearOutlined />}
+                onClick={handleClearSelections}
+              >
+                Xóa chọn
+              </Button>
+            )}
+          </Space>
+        )}
       </div>
       {available.length === 0 ? (
         <Empty

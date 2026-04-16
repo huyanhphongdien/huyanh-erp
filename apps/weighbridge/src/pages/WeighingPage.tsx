@@ -171,6 +171,14 @@ export default function WeighingPage() {
       const t = await weighbridgeService.getById(id)
       if (t) {
         setTicket(t)
+        // Sync direction toggle với ticket type từ DB
+        if (t.ticket_type === 'in' || t.ticket_type === 'out') {
+          setTicketDirection(t.ticket_type)
+        }
+        // Sync SO/container nếu OUT
+        const ext = t as any
+        if (ext.sales_order_id) setSelectedSalesOrderId(ext.sales_order_id)
+        if (ext.container_id) setSelectedContainerId(ext.container_id)
         setVehiclePlate(t.vehicle_plate)
         setDriverName(t.driver_name || '')
         setNotes(t.notes || '')

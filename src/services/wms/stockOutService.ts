@@ -842,19 +842,29 @@ export const stockOutService = {
         if (ticket.container_id) {
           allocQuery = allocQuery.eq('container_id', ticket.container_id)
         }
-        const { data: allocations } = await allocQuery
+        const { data: allocations, error: allocErr } = await allocQuery
+        if (allocErr) {
+          console.warn('[stockOut OUT] allocation query error:', allocErr)
+        }
+        console.log('[stockOut OUT] allocations found:', allocations?.length || 0, allocations)
 
         if (allocations && allocations.length > 0) {
           // Fetch batch details để có material_id + weight_per_unit
           const batchIds = allocations.map((a: any) => a.stock_batch_id).filter(Boolean)
-          const { data: batches } = await supabase
+          const { data: batches, error: batchErr } = await supabase
             .from('stock_batches')
             .select('id, material_id, location_id, material:materials(weight_per_unit)')
             .in('id', batchIds)
+          if (batchErr) {
+            console.warn('[stockOut OUT] batch query error:', batchErr)
+          }
+          console.log('[stockOut OUT] batches found:', batches?.length || 0)
 
           const items = allocations.map((alloc: any) => {
             const batch: any = batches?.find((b: any) => b.id === alloc.stock_batch_id)
-            const wpu = batch?.material?.weight_per_unit || 1
+            // Material join — Supabase trả object hoặc array tuỳ relationship
+            const matObj: any = Array.isArray(batch?.material) ? batch.material[0] : batch?.material
+            const wpu = matObj?.weight_per_unit || 1
             const weightKg = Number(alloc.quantity_kg) || 0
             const quantity = Math.round((weightKg / wpu) * 100) / 100
             return {
@@ -866,14 +876,18 @@ export const stockOutService = {
             }
           }).filter(it => it.material_id && it.batch_id)
 
+          console.log('[stockOut OUT] picked items computed:', items.length, items)
+
           if (items.length > 0) {
             await this.addPickedDetails(order.id, items, createdBy)
+            console.log('[stockOut OUT] addPickedDetails OK, calling confirmStockOut...')
             const confirmed = await this.confirmStockOut(order.id, createdBy)
+            console.log('[stockOut OUT] auto-confirm SUCCESS:', confirmed)
             return { stockOut: confirmed }
           }
         }
-      } catch (e) {
-        console.warn('[stockOut OUT] auto-confirm failed, leaving draft:', e)
+      } catch (e: any) {
+        console.error('[stockOut OUT] auto-confirm FAILED, leaving draft:', e?.message || e, e)
       }
     }
 

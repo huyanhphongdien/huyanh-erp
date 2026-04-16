@@ -48,6 +48,8 @@ export default function HomePage() {
   const [filterDate, setFilterDate] = useState<dayjs.Dayjs | null>(dayjs())
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [showAllDates, setShowAllDates] = useState(false)
+  // Mặc định ẨN phiếu đã hủy (giảm noise). User có thể bật lên qua filter status.
+  const [showCancelled, setShowCancelled] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -221,6 +223,9 @@ export default function HomePage() {
   const filteredTickets = allTickets.filter(t => {
     // Exclude in-progress (shown separately)
     if (t.status === 'weighing_gross' || t.status === 'weighing_tare') return false
+
+    // Default ẨN cancelled — chỉ hiện khi user bật toggle hoặc chọn filter='cancelled'
+    if (t.status === 'cancelled' && !showCancelled && filterStatus !== 'cancelled') return false
 
     // Date filter
     if (!showAllDates && filterDate) {
@@ -511,6 +516,15 @@ export default function HomePage() {
                   { value: 'cancelled', label: 'Đã hủy' },
                 ]}
               />
+              <Button
+                size="small"
+                type={showCancelled ? 'primary' : 'default'}
+                danger={showCancelled}
+                onClick={() => setShowCancelled(!showCancelled)}
+                style={!showCancelled ? {} : { background: '#ff4d4f', borderColor: '#ff4d4f' }}
+              >
+                {showCancelled ? '✓ Đang hiện phiếu hủy' : 'Hiện phiếu hủy'}
+              </Button>
             </div>
             <Table
               columns={columns}

@@ -24,7 +24,11 @@ import {
   Result,
   Collapse,
   Alert,
+  Modal,
+  message,
 } from 'antd'
+import stockOutService from '../../../services/wms/stockOutService'
+import { useAuthStore } from '../../../stores/authStore'
 import type { ColumnsType } from 'antd/es/table'
 import {
   ArrowLeftOutlined,
@@ -174,9 +178,45 @@ export default function StockOutDetailPage({ id: propId }: StockOutDetailPagePro
   const id = propId || paramId
   const navigate = useNavigate()
   const openTab = useOpenTab()
+  const { user } = useAuthStore()
   const [order, setOrder] = useState<OutOrderData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
+  // Reload order after confirm
+  const reloadOrder = async () => {
+    if (!id) return
+    const { data: raw } = await supabase
+      .from('stock_out_orders')
+      .select('*, warehouse:warehouses(id, code, name), details:stock_out_details(*, material:materials(*), batch:stock_batches(*), location:warehouse_locations(*))')
+      .eq('id', id)
+      .single()
+    if (raw) setOrder(raw as any)
+  }
+
+  const handleConfirm = async () => {
+    if (!order) return
+    Modal.confirm({
+      title: 'Xác nhận xuất kho?',
+      content: `Phiếu ${order.code} sẽ được xác nhận xuất, tồn kho sẽ giảm tương ứng. Hành động này KHÔNG thể hoàn tác.`,
+      okText: 'Xác nhận xuất',
+      cancelText: 'Huỷ',
+      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
+      onOk: async () => {
+        setConfirming(true)
+        try {
+          await stockOutService.confirmStockOut(order.id, user?.employee_id || user?.id)
+          message.success(`Đã xác nhận xuất phiếu ${order.code}`)
+          await reloadOrder()
+        } catch (err: any) {
+          message.error(err?.message || 'Không thể xác nhận xuất kho')
+        } finally {
+          setConfirming(false)
+        }
+      },
+    })
+  }
 
   useEffect(() => {
     if (!id) return
@@ -488,7 +528,7 @@ export default function StockOutDetailPage({ id: propId }: StockOutDetailPagePro
           </Tag>
         </Space>
         <Space>
-          {order.status === 'picking' && (
+          {(order.status === 'draft' || order.status === 'picking') && (
             <Button
               type="primary"
               onClick={() => openTab({
@@ -501,6 +541,17 @@ export default function StockOutDetailPage({ id: propId }: StockOutDetailPagePro
               style={{ backgroundColor: '#E8A838', borderColor: '#E8A838' }}
             >
               Picking List
+            </Button>
+          )}
+          {(order.status === 'picked' || order.status === 'picking') && (
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={handleConfirm}
+              loading={confirming}
+              style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
+            >
+              Xác nhận xuất
             </Button>
           )}
           <Button icon={<PrinterOutlined />}>In phiếu</Button>

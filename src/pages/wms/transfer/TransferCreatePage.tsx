@@ -27,7 +27,7 @@ const PRIMARY = '#1B4D3E'
 
 interface BatchPick {
   batch_id: string
-  batch_code: string
+  batch_no: string
   material_id: string
   material_name: string
   material_unit: string
@@ -107,7 +107,7 @@ export default function TransferCreatePage() {
       const { data, error } = await supabase
         .from('stock_batches')
         .select(`
-          id, batch_code, material_id, quantity_remaining, current_weight,
+          id, batch_no, material_id, quantity_remaining, current_weight,
           rubber_grade, latest_drc, status,
           material:materials(id, sku, name, unit, weight_per_unit)
         `)
@@ -131,7 +131,7 @@ export default function TransferCreatePage() {
     const mat = Array.isArray(batch.material) ? batch.material[0] : batch.material
     setPickedBatches((prev) => [...prev, {
       batch_id: batch.id,
-      batch_code: batch.batch_code,
+      batch_no: batch.batch_no,
       material_id: batch.material_id,
       material_name: mat?.name || '?',
       material_unit: mat?.unit || 'bành',
@@ -347,7 +347,7 @@ export default function TransferCreatePage() {
             rowKey="batch_id"
             dataSource={pickedBatches}
             columns={[
-              { title: 'Batch', dataIndex: 'batch_code', width: 140, render: (v) => <Text strong>{v}</Text> },
+              { title: 'Batch', dataIndex: 'batch_no', width: 140, render: (v) => <Text strong>{v}</Text> },
               { title: 'Vật liệu', dataIndex: 'material_name', ellipsis: true },
               { title: 'Grade', dataIndex: 'rubber_grade', width: 90, render: (g) => <GradeBadge grade={g} size="small" /> },
               {
@@ -484,7 +484,7 @@ export default function TransferCreatePage() {
             dataSource={availableBatches}
             pagination={{ pageSize: 10 }}
             columns={[
-              { title: 'Batch', dataIndex: 'batch_code', width: 140, render: (v) => <Text strong>{v}</Text> },
+              { title: 'Batch', dataIndex: 'batch_no', width: 140, render: (v) => <Text strong>{v}</Text> },
               {
                 title: 'Vật liệu',
                 key: 'material',

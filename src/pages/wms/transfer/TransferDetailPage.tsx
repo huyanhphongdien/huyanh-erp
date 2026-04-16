@@ -300,7 +300,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
               width: 90,
               render: (_, r: any) => <GradeBadge grade={(r.source_batch?.rubber_grade as RubberGrade) || null} size="small" />,
             },
-            { title: 'Batch nguồn', dataIndex: ['source_batch', 'batch_code'], width: 140, render: (_, r: any) => r.source_batch?.batch_code ? <Text code>{r.source_batch.batch_code}</Text> : '—' },
+            { title: 'Batch nguồn', dataIndex: ['source_batch', 'batch_no'], width: 140, render: (_, r: any) => r.source_batch?.batch_no ? <Text code>{r.source_batch.batch_no}</Text> : '—' },
             {
               title: 'Dự kiến',
               dataIndex: 'quantity_planned',

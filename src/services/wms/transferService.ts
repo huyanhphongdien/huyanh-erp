@@ -135,7 +135,7 @@ const SELECT_FULL = `
   items:inter_facility_transfer_items(
     *,
     material:materials(id, sku, name, unit, weight_per_unit),
-    source_batch:stock_batches!source_batch_id(id, batch_code, quantity_remaining, current_weight, latest_drc, rubber_grade)
+    source_batch:stock_batches!source_batch_id(id, batch_no, quantity_remaining, current_weight, latest_drc, rubber_grade)
   )
 `
 
@@ -648,7 +648,7 @@ async function _createStockInForReceived(
     const { data: newBatch } = await supabase
       .from('stock_batches')
       .insert({
-        batch_code: newBatchCode,
+        batch_no: newBatchCode,
         material_id: item.material_id,
         warehouse_id: transfer.to_warehouse_id,
         quantity_remaining: itemQtyReceived,

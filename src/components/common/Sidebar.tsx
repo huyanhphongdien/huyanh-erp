@@ -355,6 +355,8 @@ const getMenuGroups = (
       { path: '/production/safety-signs', label: 'Biển hiệu AT', icon: <AlertTriangle size={18} /> },
       { path: '/wms/production/facilities', label: 'Dây chuyền', icon: <Settings size={18} /> },
       { path: '/wms/production/specs', label: 'Công thức BOM', icon: <FileText size={18} /> },
+      { path: '/wms/blending', label: 'Phối trộn', icon: <Droplets size={18} /> },
+      { path: '/wms/blending/suggest', label: 'Gợi ý trộn', icon: <FlaskConical size={18} /> },
     ],
   },
 
@@ -373,9 +375,6 @@ const getMenuGroups = (
       { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> }, // tabs: dashboard | recheck | quick-scan | standards
       { path: '/wms/materials', label: 'Vật liệu', icon: <Package size={18} /> },
       { path: '/wms/warehouses', label: 'Kho hàng', icon: <Warehouse size={18} /> },
-      { path: '/wms/blending', label: 'Phối trộn', icon: <Droplets size={18} /> },
-      { path: '/wms/blending/suggest', label: 'Gợi ý trộn', icon: <FlaskConical size={18} /> },
-      { path: '/wms/yard-map', label: 'Bản đồ bãi', icon: <LayoutGrid size={18} /> },
       { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> }, // tabs: dashboard | stock-movement | supplier-quality | inventory-value | supplier-scoring
       { path: '/wms/settings', label: 'Cài đặt kho', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
     ],

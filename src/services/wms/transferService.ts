@@ -74,6 +74,11 @@ export interface InterFacilityTransfer {
 
   stock_out_order_id?: string | null
   stock_in_order_id?: string | null
+  // Joined refs (chỉ trả về khi query SELECT_FULL)
+  stock_out_order?: { id: string; code: string } | null
+  stock_in_order?: { id: string; code: string } | null
+  weighbridge_out?: { id: string; code: string } | null
+  weighbridge_in?: { id: string; code: string } | null
 
   notes?: string | null
   created_by?: string | null
@@ -100,6 +105,7 @@ export interface TransferItem {
   weight_planned_kg?: number | null
 
   destination_batch_id?: string | null
+  destination_batch?: { id: string; batch_no: string; quantity_remaining: number; current_weight: number; rubber_grade?: string | null } | null
   quantity_received?: number | null
   weight_received_kg?: number | null
 
@@ -132,10 +138,15 @@ const SELECT_FULL = `
   from_warehouse:warehouses!from_warehouse_id(id, code, name, facility_id),
   to_facility:facilities!to_facility_id(id, code, name, country),
   to_warehouse:warehouses!to_warehouse_id(id, code, name, facility_id),
+  stock_out_order:stock_out_orders!stock_out_order_id(id, code),
+  stock_in_order:stock_in_orders!stock_in_order_id(id, code),
+  weighbridge_out:weighbridge_tickets!weighbridge_out_id(id, code),
+  weighbridge_in:weighbridge_tickets!weighbridge_in_id(id, code),
   items:inter_facility_transfer_items(
     *,
     material:materials(id, sku, name, unit, weight_per_unit),
-    source_batch:stock_batches!source_batch_id(id, batch_no, quantity_remaining, current_weight, latest_drc, rubber_grade)
+    source_batch:stock_batches!source_batch_id(id, batch_no, quantity_remaining, current_weight, latest_drc, rubber_grade),
+    destination_batch:stock_batches!destination_batch_id(id, batch_no, quantity_remaining, current_weight, rubber_grade)
   )
 `
 

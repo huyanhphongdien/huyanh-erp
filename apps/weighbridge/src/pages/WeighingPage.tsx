@@ -765,8 +765,8 @@ export default function WeighingPage() {
                 </Card>
               )}
 
-              {/* S3 OUT: Sales Order + Container picker (chỉ cho OUT) */}
-              {ticketDirection === 'out' && (
+              {/* S3 OUT: Sales Order + Container picker (chỉ cho OUT, ẨN khi đã chọn transfer) */}
+              {ticketDirection === 'out' && !selectedTransferId && (
                 <Card size="small" title="Đơn hàng xuất" style={{ borderRadius: 12, borderColor: '#E8A838' }}>
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     <div>

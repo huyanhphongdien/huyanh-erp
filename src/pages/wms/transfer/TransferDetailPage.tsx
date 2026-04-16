@@ -15,6 +15,7 @@ import {
   WarningOutlined, ReloadOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../../stores/authStore'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import transferService, { type TransferStatus } from '../../../services/wms/transferService'
 import GradeBadge from '../../../components/wms/GradeBadge'
 import type { RubberGrade } from '../../../services/wms/wms.types'
@@ -57,6 +58,7 @@ export default function TransferDetailPage({ id: propId }: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+  const openTab = useOpenTab()
 
   const [approveOpen, setApproveOpen] = useState(false)
   const [approveNote, setApproveNote] = useState('')
@@ -207,53 +209,46 @@ export default function TransferDetailPage({ id: propId }: Props) {
         />
       )}
 
-      {/* Stats trọng lượng */}
+      {/* Stats trọng lượng — hiển thị "—" khi chưa có data thay vì 0 */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic
-              title="Cân xuất"
-              value={transfer.weight_out_kg || 0}
-              precision={1}
-              suffix="kg"
-              valueStyle={{ fontSize: 18, color: PRIMARY }}
-              formatter={(v) => Number(v).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}
-            />
+            <div style={{ color: 'rgba(0,0,0,0.45)', fontSize: 14 }}>Cân xuất</div>
+            <div style={{ fontSize: 22, color: PRIMARY, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              {transfer.weight_out_kg != null
+                ? <>{Number(transfer.weight_out_kg).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} <span style={{ fontSize: 14 }}>kg</span></>
+                : <span style={{ color: '#bfbfbf' }}>—</span>}
+            </div>
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic
-              title="Cân nhận"
-              value={transfer.weight_in_kg || 0}
-              precision={1}
-              suffix="kg"
-              valueStyle={{ fontSize: 18, color: '#1890ff' }}
-              formatter={(v) => Number(v).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}
-            />
+            <div style={{ color: 'rgba(0,0,0,0.45)', fontSize: 14 }}>Cân nhận</div>
+            <div style={{ fontSize: 22, color: '#1890ff', fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              {transfer.weight_in_kg != null
+                ? <>{Number(transfer.weight_in_kg).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} <span style={{ fontSize: 14 }}>kg</span></>
+                : <span style={{ color: '#bfbfbf' }}>—</span>}
+            </div>
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic
-              title="Hao hụt"
-              value={transfer.loss_kg || 0}
-              precision={1}
-              suffix="kg"
-              valueStyle={{ fontSize: 18, color: lossOk ? '#52c41a' : '#ff4d4f' }}
-              formatter={(v) => Number(v).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}
-            />
+            <div style={{ color: 'rgba(0,0,0,0.45)', fontSize: 14 }}>Hao hụt</div>
+            <div style={{ fontSize: 22, color: lossOk ? '#52c41a' : '#ff4d4f', fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              {transfer.loss_kg != null
+                ? <>{Number(transfer.loss_kg).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} <span style={{ fontSize: 14 }}>kg</span></>
+                : <span style={{ color: '#bfbfbf' }}>—</span>}
+            </div>
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic
-              title="Hao hụt %"
-              value={transfer.loss_pct || 0}
-              precision={2}
-              suffix="%"
-              valueStyle={{ fontSize: 18, color: lossOk ? '#52c41a' : '#ff4d4f' }}
-            />
+            <div style={{ color: 'rgba(0,0,0,0.45)', fontSize: 14 }}>Hao hụt %</div>
+            <div style={{ fontSize: 22, color: lossOk ? '#52c41a' : '#ff4d4f', fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              {transfer.loss_pct != null
+                ? <>{Number(transfer.loss_pct).toFixed(2)} <span style={{ fontSize: 14 }}>%</span></>
+                : <span style={{ color: '#bfbfbf' }}>—</span>}
+            </div>
           </Card>
         </Col>
       </Row>
@@ -275,8 +270,48 @@ export default function TransferDetailPage({ id: propId }: Props) {
             {transfer.driver_phone && <Text type="secondary"> • {transfer.driver_phone}</Text>}
           </Descriptions.Item>
           <Descriptions.Item label="Ngưỡng hao hụt">{transfer.loss_threshold_pct}%</Descriptions.Item>
-          <Descriptions.Item label="Phiếu xuất">{transfer.stock_out_order_id ? <Text code>{transfer.stock_out_order_id.slice(0, 8)}</Text> : '—'}</Descriptions.Item>
-          <Descriptions.Item label="Phiếu nhập">{transfer.stock_in_order_id ? <Text code>{transfer.stock_in_order_id.slice(0, 8)}</Text> : '—'}</Descriptions.Item>
+          <Descriptions.Item label="Phiếu xuất">
+            {transfer.stock_out_order ? (
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0, height: 'auto', fontFamily: "'JetBrains Mono'" }}
+                onClick={() => openTab({
+                  key: `stock-out-${transfer.stock_out_order!.id}`,
+                  title: `Phiếu ${transfer.stock_out_order!.code}`,
+                  componentId: 'stock-out-detail',
+                  props: { id: transfer.stock_out_order!.id },
+                  path: `/wms/stock-out/${transfer.stock_out_order!.id}`,
+                })}
+              >
+                {transfer.stock_out_order.code} →
+              </Button>
+            ) : '—'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Phiếu nhập">
+            {transfer.stock_in_order ? (
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0, height: 'auto', fontFamily: "'JetBrains Mono'" }}
+                onClick={() => openTab({
+                  key: `stock-in-${transfer.stock_in_order!.id}`,
+                  title: `Phiếu ${transfer.stock_in_order!.code}`,
+                  componentId: 'stock-in-detail',
+                  props: { id: transfer.stock_in_order!.id },
+                  path: `/wms/stock-in/${transfer.stock_in_order!.id}`,
+                })}
+              >
+                {transfer.stock_in_order.code} →
+              </Button>
+            ) : '—'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Cân xuất">
+            {transfer.weighbridge_out ? <Text code>{transfer.weighbridge_out.code}</Text> : '—'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Cân nhận">
+            {transfer.weighbridge_in ? <Text code>{transfer.weighbridge_in.code}</Text> : '—'}
+          </Descriptions.Item>
           <Descriptions.Item label="Ghi chú" span={3}>{transfer.notes || '—'}</Descriptions.Item>
           {transfer.approved_at && (
             <Descriptions.Item label="Duyệt" span={3}>
@@ -329,9 +364,11 @@ export default function TransferDetailPage({ id: propId }: Props) {
             },
             {
               title: 'Batch nhận',
-              dataIndex: ['destination_batch_id'],
-              width: 110,
-              render: (v) => v ? <Text code>{v.slice(0, 8)}</Text> : '—',
+              key: 'destination_batch',
+              width: 200,
+              render: (_, r: any) => r.destination_batch?.batch_no
+                ? <Text code style={{ fontSize: 11 }}>{r.destination_batch.batch_no}</Text>
+                : '—',
             },
           ]}
         />

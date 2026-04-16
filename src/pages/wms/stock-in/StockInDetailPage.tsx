@@ -437,11 +437,20 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
       )}
 
       {/* Summary cards */}
+      {(() => null)()}
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={6}>
           <Card bodyStyle={{ padding: 12 }}>
-            <Statistic title="Tổng SL" value={order.total_quantity || 0} suffix="kg"
-              valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }} />
+            <Statistic
+              title="Tổng SL"
+              value={order.total_quantity || 0}
+              // F3 polish: dùng unit thật từ details (bành/kiện/kg) thay vì hardcode "kg"
+              suffix={(() => {
+                const units = Array.from(new Set((order.details || []).map(d => d.unit).filter(Boolean)))
+                return units.length === 1 ? units[0] : 'đv'
+              })()}
+              valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono'" }}
+            />
           </Card>
         </Col>
         <Col xs={6}>

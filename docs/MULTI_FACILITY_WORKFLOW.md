@@ -1,7 +1,21 @@
 # Multi-Facility Warehouse Workflow — Huy Anh Rubber
 
 **Ngày:** 2026-04-16
+**Cập nhật:** 2026-04-16 — User trả lời 6/8 questions, scope chốt.
 **Mô hình:** 1 ERP (huyanhrubber.vn) — 3 nhà máy (Phong Điền HQ + Tân Lâm + Lào) — 3 trạm cân riêng — tất cả write vào 1 Supabase central.
+
+## TL;DR — User decisions
+
+| Q | Quyết định |
+|---|---|
+| Hao hụt vận chuyển threshold | ✅ **0.5%** |
+| Reverse transfer (PD → TL/Lào) | ✅ **Có hỗ trợ**, không thường xuyên — UI có flow nhưng không cần optimize/suggest |
+| Network Lào | ✅ **Ổn định** — không cần PWA offline-first |
+| Lệnh sản xuất chéo NM | ⏸ **Defer** — thuộc module Production, làm sau |
+| Material catalog | ✅ **Dùng chung 3 NM** — 1 bảng materials, không tách |
+| NCC (đại lý) | ✅ **Dùng chung 1 bảng** `rubber_suppliers` — đại lý có thể giao bất kỳ NM nào, weighbridge ticket gắn `supplier_id` + `facility_id` để track |
+| Currency Lào | ⏳ Pending (default VND, có thể thêm LAK/USD sau) |
+| Thứ tự rollout | ⏳ Pending (đề xuất F1 → F2 + Tân Lâm trước) |
 
 ---
 
@@ -421,23 +435,195 @@ UPDATE sales_orders SET ship_from_facility_id = (SELECT id FROM facilities WHERE
 
 ---
 
-## 10. Open questions cần xác nhận
+## 10. Còn 2 câu chưa quyết
 
-1. **Hao hụt vận chuyển threshold:** 0.5% là ngưỡng OK hay cần khác? (Cao su có thể hao do bốc hơi nước)
+7. **Currency Lào:** Tạm thời VND. Sau khi vận hành sẽ thêm LAK/USD nếu cần (column `currency` trên rubber_intake_batches/weighbridge_tickets, default 'VND').
 
-2. **Transfer reverse:** Có bao giờ Phong Điền chuyển NGƯỢC về Tân Lâm/Lào không? (VD: NVL dư cần share)
+8. **Thứ tự rollout:** Đề xuất Tân Lâm trước (gần PD, dễ test transfer), Lào sau khi TL ổn 1-2 tuần. → Xác nhận lại nếu khác.
 
-3. **Network Lào:** Có ổn định 24/7 không? Nếu không → cần PWA offline-first cho trạm cân Lào (cache pending tickets, sync khi có mạng)
+---
 
-4. **Lệnh sản xuất chéo:** NM Tân Lâm có thể nhận lệnh sản xuất TỪ Phong Điền (BGD assign), hay tự tạo lệnh riêng?
+## 11. 🚀 EXECUTION PLAN — Ý tưởng thực hiện
 
-5. **Currency Lào:** Giá NVL Lào tính bằng VND hay LAK hay USD?
+### Tổng quan thứ tự
 
-6. **Master data:** Material catalog (RSS3, SVR10, ...) dùng chung 3 NM, hay mỗi NM có thể thêm material riêng?
+```
+F1 Foundation                           ← BẮT BUỘC làm đầu tiên
+  └─ Schema + migration + facilities CRUD
+     └─ TEST: ERP load OK với 3 facilities + 7 kho
+        └─ Decision point: deploy → tiếp tục F2
 
-7. **NCC (đại lý):** Đại lý Tân Lâm/Lào lưu trong cùng table `rubber_suppliers` hay tách bảng theo facility?
+F2 Tân Lâm vào ERP (chưa có trạm cân)
+  └─ Sub-app weighbridge clone cho TL
+     └─ User cài máy cân vật lý + setup
+        └─ TEST: cân ở TL, check hàng vào KHO-TL-NVL
+           └─ Decision point: Lào hoặc Transfer
 
-8. **Bắt đầu:** F1 + F2 (Tân Lâm trước) — 8-12h cho 1 NM thứ 2. Sau khi ổn → F3 transfer. Có OK không?
+F3 Inter-facility Transfer (CORE — quan trọng nhất)
+  └─ TEST flow TL → PD trước (gần, dễ thử)
+     └─ Sau ổn → enable cho Lào
+
+F4 Lào vào ERP
+  └─ Tương tự F2 nhưng cho Lào
+
+F5 Smart suggestions + reports + polish
+```
+
+### Phase F1 — Foundation (4-6h, bắt buộc làm trước)
+
+**Goal:** Đặt nền tảng schema + UI để các phase sau xây lên. KHÔNG ảnh hưởng vận hành hiện tại của Phong Điền.
+
+**Steps:**
+1. Migration SQL: `facilities` table + `facility_id` FK trên 6 bảng + backfill
+   - Tất cả data hiện có gán facility = Phong Điền (transparent, không break gì)
+   - Thêm 4 kho mới (KHO-TL-NVL, KHO-TL-TP, KHO-LAO-NVL, KHO-LAO-TP) status=active nhưng chưa có data
+2. `facilityService.ts` + `useActiveFacilities()` hook (mirror pattern WarehousePicker)
+3. `<FacilityPicker>` shared component
+4. Header sidebar: dropdown chọn facility (với user multi-facility, default "Tất cả")
+5. URL search param `?facility=TL` để filter dashboards
+
+**Deliverable:** ERP vẫn chạy bình thường (như Phong Điền hiện tại), nhưng schema đã sẵn sàng cho multi-facility. User có thể tạo phiếu nhập/xuất cho TL/LÀO bằng tay (dropdown warehouse mới có).
+
+**Risk:** Low — pure additive, có rollback SQL.
+
+---
+
+### Phase F2 — Tân Lâm vào ERP (4-6h)
+
+**Goal:** Tân Lâm hoạt động được trên ERP central như nhà máy thứ 2.
+
+**Steps:**
+1. Sub-app weighbridge clone:
+   ```
+   apps/weighbridge-tanlam/   (copy apps/weighbridge/)
+     .env: VITE_FACILITY_CODE=TL
+   ```
+2. Code update sub-app:
+   - Read `VITE_FACILITY_CODE` → tự gán `facility_id` khi create ticket
+   - Header hiện tên facility "TRẠM CÂN — Tân Lâm"
+   - Auto-sync IN/OUT vào kho của facility đó (KHO-TL-NVL/KHO-TL-TP)
+3. ERP UI:
+   - Stock-in/out create page: warehouse picker filter theo facility user chọn
+   - Production order create page: thêm facility selector
+4. Vercel: deploy sub-app riêng `huyanh-weighbridge-tanlam` → subdomain `can-tl.huyanhrubber.vn`
+5. User cài đặt phần cứng cân vật lý + Keli scale software ở Tân Lâm
+6. **TEST:** Cân thử NVL ở TL → check tồn KHO-TL-NVL tăng đúng
+
+**Deliverable:** Tân Lâm hoạt động full chu trình NVL nhập + sản xuất + TP vào kho local. **CHƯA có transfer** — TP nằm tại TL, BGD thấy trong dashboard.
+
+---
+
+### Phase F3 — Transfer NM ↔ Phong Điền (6-8h, CORE)
+
+**Goal:** Mở khóa flow chuyển TP từ TL/Lào về PD để xuất khẩu.
+
+**Steps:**
+1. Schema bổ sung:
+   ```sql
+   ALTER TABLE stock_out_orders ADD COLUMN destination_facility_id UUID;
+   ALTER TABLE stock_out_orders ADD COLUMN destination_warehouse_id UUID;
+   ALTER TABLE stock_out_orders ADD COLUMN transit_status VARCHAR;
+   ALTER TABLE stock_in_orders ADD COLUMN origin_facility_id UUID;
+   ALTER TABLE stock_in_orders ADD COLUMN origin_stock_out_id UUID;
+   ```
+2. `stockOutService.createTransferOrder` — tạo phiếu xuất reason='transfer' với destination
+3. State machine `transit_status`: departed → in_transit → arrived → received (+ rejected nếu hao hụt cao)
+4. Cân tại NM gửi (TL): trừ KHO-TL-TP, set status='in_transit'
+5. Cân tại NM nhận (PD): tạo stock-in tự động link `origin_stock_out_id`, tính hao hụt
+6. Threshold check: hao hụt < 0.5% → auto-confirm, > 0.5% → cảnh báo BGD duyệt
+7. UI mới:
+   - Trang "🚛 Hàng đang vận chuyển" (tab trong /wms hoặc dashboard riêng)
+   - Form tạo phiếu transfer (giống stock-out nhưng có destination picker)
+   - Reverse direction: PD → TL/Lào — chung component, swap source/dest
+
+**Deliverable:** Hoàn chỉnh chu trình TL produce → transfer to PD → ship to khách. Hao hụt được track + duyệt nếu vượt ngưỡng.
+
+---
+
+### Phase F4 — Lào vào ERP (3-4h)
+
+**Goal:** Lào hoạt động giống TL.
+
+**Steps:** Lặp lại F2 cho Lào:
+- Clone `apps/weighbridge-lao/` với `VITE_FACILITY_CODE=LAO`
+- Subdomain `can-lao.huyanhrubber.vn`
+- Cài đặt cân vật lý ở Lào
+- Test inbound + transfer Lào → PD
+
+**Deliverable:** 3/3 nhà máy hoạt động đầy đủ trên 1 ERP.
+
+---
+
+### Phase F5 — Smart suggestions + Reports + Polish (4-6h, có thể defer)
+
+**Goal:** Tối ưu vận hành — gợi ý transfer, báo cáo cross-facility.
+
+**Steps:**
+1. Cron job (Supabase Edge Function hoặc Vercel cron):
+   - Mỗi đêm tính demand vs supply tại PD
+   - Generate transfer suggestions
+   - Lưu vào `transfer_suggestions` table
+2. Dashboard "Transfer Planning" (tab trong /wms/reports)
+3. Pivot table tồn kho 3 facilities
+4. So sánh KPI per facility (turnover, hao hụt, picking accuracy)
+5. Permission UI: BGD gán user vào facility(s)
+
+**Deliverable:** ERP enterprise-grade với suggestions tự động + báo cáo cấp công ty.
+
+---
+
+## 12. Tổng effort + lịch trình đề xuất
+
+| Phase | Effort | Có thể deploy độc lập? | Phụ thuộc |
+|---|---|---|---|
+| F1 Foundation | 4-6h | ✅ Yes (no breaking) | — |
+| F2 Tân Lâm | 4-6h | ✅ Yes | F1 |
+| F3 Transfer | 6-8h | ✅ Yes | F1 + F2 |
+| F4 Lào | 3-4h | ✅ Yes | F1 (F3 nếu muốn transfer luôn) |
+| F5 Polish | 4-6h | ✅ Yes (additive) | F1+F2+F3 |
+
+**Tổng:** ~21-30h. Gợi ý chia ra 3-5 sessions:
+
+- **Session 1 (F1, ~5h):** Foundation — schema + facility CRUD. Test ERP vẫn chạy ổn với Phong Điền.
+- **Session 2 (F2, ~5h):** Tân Lâm vào ERP. User song song cài đặt phần cứng cân TL.
+- **Session 3 (F3, ~7h):** Transfer flow + state machine. Test với data thật ở TL.
+- **Session 4 (F4, ~3h):** Lào vào ERP. Tương tự TL nhưng nhanh hơn vì code đã có.
+- **Session 5 (F5, ~5h):** Suggestions + reports — sau khi 3 NM ổn 1-2 tuần.
+
+---
+
+## 13. Đề xuất bắt đầu — Session 1: F1 Foundation
+
+**Bắt đầu ngay được — KHÔNG cần đợi gì:**
+
+1. Tạo migration `multi_facility_foundation.sql`:
+   - CREATE TABLE facilities
+   - INSERT 3 facilities (PD, TL, LAO)
+   - ALTER TABLE warehouses ADD facility_id + INSERT 4 kho mới
+   - ALTER TABLE weighbridge_tickets ADD facility_id (backfill = PD)
+   - ALTER TABLE production_orders ADD facility_id (backfill = PD)
+   - ALTER TABLE sales_orders ADD ship_from_facility_id (backfill = PD)
+   - ALTER TABLE rubber_intake_batches ADD facility_id (backfill = PD)
+   - RLS policies cho facilities (admin write, all read)
+
+2. Code:
+   - `src/services/wms/facilityService.ts` (~50 LOC, CRUD đơn giản)
+   - `src/hooks/useActiveFacilities.ts` (~15 LOC, mirror useActiveWarehouses)
+   - `src/components/wms/FacilityPicker.tsx` (~80 LOC, mirror WarehousePicker)
+   - Header dropdown facility selector (+30 LOC vào Sidebar/Header)
+
+3. Test:
+   - ERP load OK (Phong Điền data nguyên vẹn)
+   - Sidebar có dropdown facility
+   - Tạo thử phiếu nhập kho cho KHO-TL-NVL từ ERP UI
+
+**Risk:** Rất thấp — pure additive. Rollback = drop table + remove columns.
+
+**Sau F1 xong + deploy:** User có thể xem ERP có 7 kho thay vì 3, dropdown facility hoạt động. Phong Điền vẫn dùng bình thường, TL/Lào kho rỗng chờ data.
+
+---
+
+## 14. Tham chiếu
 
 ---
 

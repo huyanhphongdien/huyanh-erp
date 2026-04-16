@@ -837,6 +837,51 @@ export const salesOrderService = {
   // ==========================================================================
 
   /**
+   * Lấy danh sách Sales Order đang sẵn sàng để xuất hàng (cân OUT).
+   * Filter: status IN ('confirmed', 'producing', 'ready', 'packing', 'shipped')
+   * — sẵn sàng cân; bỏ draft/cancelled/delivered/invoiced/paid.
+   */
+  async getActiveForShipping(): Promise<Array<{
+    id: string
+    code: string
+    customer_name: string
+    customer_id: string
+    grade: string
+    quantity_kg: number
+    container_count: number
+    container_type: string
+    port_of_destination: string | null
+    vessel_name: string | null
+    status: string
+  }>> {
+    const { data } = await supabase
+      .from('sales_orders')
+      .select(`
+        id, code, customer_id, grade, quantity_kg,
+        container_count, container_type,
+        port_of_destination, vessel_name, status,
+        customer:sales_customers(id, name, short_name)
+      `)
+      .in('status', ['confirmed', 'producing', 'ready', 'packing', 'shipped'])
+      .order('order_date', { ascending: false })
+      .limit(50)
+
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      code: d.code,
+      customer_id: d.customer_id,
+      customer_name: d.customer?.short_name || d.customer?.name || '—',
+      grade: d.grade || '',
+      quantity_kg: Number(d.quantity_kg) || 0,
+      container_count: d.container_count || 0,
+      container_type: d.container_type || '20ft',
+      port_of_destination: d.port_of_destination,
+      vessel_name: d.vessel_name,
+      status: d.status,
+    }))
+  },
+
+  /**
    * Lấy danh sách container của đơn hàng
    */
   async getContainers(orderId: string): Promise<SalesOrderContainer[]> {

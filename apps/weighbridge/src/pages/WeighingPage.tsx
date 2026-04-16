@@ -16,6 +16,8 @@ import { supabase } from '@erp/lib/supabase'
 import { useKeliScale } from '@erp/hooks/useKeliScale'
 import { dealWmsService } from '@erp/services/b2b/dealWmsService'
 import type { ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
+import { salesOrderService } from '@erp/services/sales/salesOrderService'
+import type { SalesOrderContainer } from '@erp/services/sales/salesTypes'
 import type { WeighbridgeTicket } from '@erp/services/wms/wms.types'
 import {
   calculateWeights, saveRubberFields, saveCalculatedValues, getRubberSuppliers,
@@ -42,6 +44,12 @@ const DESTINATIONS = [
   { value: 'bai_mu', label: 'Bãi mủ' },
 ]
 
+// S3: Tare cố định theo loại container (kg) — user decision
+const CONTAINER_TARE_KG: Record<string, number> = {
+  '20ft': 2300,
+  '40ft': 3800,
+}
+
 interface SupplierOption {
   id: string
   code: string
@@ -67,6 +75,19 @@ export default function WeighingPage() {
   const [tareSuggestion, setTareSuggestion] = useState<{ avgTare: number | null; lastTare: number | null; count: number } | null>(null)
   // S3: Loại phiếu cân — IN (cân 2 lần gross/tare) | OUT (cân 1 lần net trực tiếp)
   const [ticketDirection, setTicketDirection] = useState<'in' | 'out'>('in')
+
+  // S3 OUT: Sales Order + Container picker (optional cho OUT — cho phép xuất lẻ không SO)
+  const [salesOrders, setSalesOrders] = useState<Array<{
+    id: string; code: string; customer_name: string; grade: string;
+    quantity_kg: number; container_count: number; container_type: string;
+    port_of_destination: string | null; vessel_name: string | null;
+  }>>([])
+  const [selectedSalesOrderId, setSelectedSalesOrderId] = useState<string>('')
+  const [containers, setContainers] = useState<SalesOrderContainer[]>([])
+  const [selectedContainerId, setSelectedContainerId] = useState<string>('')
+  const [loadingSO, setLoadingSO] = useState(false)
+  const [loadingContainers, setLoadingContainers] = useState(false)
+  const [sealNoActual, setSealNoActual] = useState('')
 
   // Deal/Supplier
   const [deals, setDeals] = useState<ActiveDealForStockIn[]>([])
@@ -102,6 +123,40 @@ export default function WeighingPage() {
     dealWmsService.getActiveDealsForStockIn().then((d) => { console.log('Deals loaded:', d); setDeals(d) }).catch((err) => console.error('Deal load error:', err))
     getRubberSuppliers().then((s) => setSuppliers(s.map((x: any) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {})
   }, [])
+
+  // S3 OUT: Load active sales orders khi user chuyển sang OUT
+  useEffect(() => {
+    if (ticketDirection !== 'out' || ticket) return
+    setLoadingSO(true)
+    salesOrderService.getActiveForShipping()
+      .then(setSalesOrders)
+      .catch(err => console.warn('SO load error:', err))
+      .finally(() => setLoadingSO(false))
+  }, [ticketDirection, ticket])
+
+  // S3 OUT: Load containers khi user chọn SO
+  useEffect(() => {
+    if (!selectedSalesOrderId) {
+      setContainers([])
+      setSelectedContainerId('')
+      return
+    }
+    setLoadingContainers(true)
+    salesOrderService.getContainers(selectedSalesOrderId)
+      .then(c => {
+        // Filter chỉ container chưa shipped
+        setContainers(c.filter(x => x.status !== 'shipped'))
+      })
+      .catch(err => console.warn('Container load error:', err))
+      .finally(() => setLoadingContainers(false))
+  }, [selectedSalesOrderId])
+
+  const selectedSO = salesOrders.find(s => s.id === selectedSalesOrderId)
+  const selectedContainer = containers.find(c => c.id === selectedContainerId)
+  // Auto-fill seal_no từ container khi chọn
+  useEffect(() => {
+    if (selectedContainer?.seal_no) setSealNoActual(selectedContainer.seal_no)
+  }, [selectedContainerId])
 
   // Load existing ticket if editing
   useEffect(() => {
@@ -222,6 +277,18 @@ export default function WeighingPage() {
         { vehicle_plate: vehiclePlate.trim(), driver_name: driverName || undefined, ticket_type: ticketDirection, notes: notes || undefined },
         operator?.id,
       )
+
+      // S3 OUT: link sales_order + container nếu user đã chọn
+      if (ticketDirection === 'out' && (selectedSalesOrderId || selectedContainerId)) {
+        try {
+          const updates: Record<string, any> = {}
+          if (selectedSalesOrderId) updates.sales_order_id = selectedSalesOrderId
+          if (selectedContainerId) updates.container_id = selectedContainerId
+          await supabase.from('weighbridge_tickets').update(updates).eq('id', t.id)
+        } catch (e) {
+          console.warn('Link SO/container failed:', e)
+        }
+      }
       setTicket(t)
 
       // Save rubber fields
@@ -270,15 +337,16 @@ export default function WeighingPage() {
     setError('')
     try {
       let updated: WeighbridgeTicket
-      // S3: OUT flow — chỉ cần 1 lần cân, weight = net trực tiếp (xe đã có hàng).
-      // Bỏ qua step tare: gross=weight, tare=0, net=weight, complete luôn.
+      // S3: OUT flow — cân 1 lần (gross loaded), tare cố định theo container type.
+      // Net = gross - container_tare.
       if (ticket.ticket_type === 'out') {
+        const containerType = selectedContainer?.container_type || '20ft'
+        const tareKg = CONTAINER_TARE_KG[containerType] || CONTAINER_TARE_KG['20ft']
         updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
-        // Set tare=0 → net = gross - 0 = weight (cân đơn giản)
-        updated = await weighbridgeService.updateTareWeight(ticket.id, 0, operator?.id)
+        updated = await weighbridgeService.updateTareWeight(ticket.id, tareKg, operator?.id)
         setTicket(updated)
-        const c = recalculate(weight, 0, deductionKg, expectedDrc, unitPrice, priceUnit)
-        setSuccess(`Cân OUT: ${weight.toLocaleString()} kg — NET: ${c.net_weight.toLocaleString()} kg`)
+        const c = recalculate(weight, tareKg, deductionKg, expectedDrc, unitPrice, priceUnit)
+        setSuccess(`Cân OUT: gross ${weight.toLocaleString()} kg − tare ${tareKg.toLocaleString()} kg (${containerType}) → NET ${c.net_weight.toLocaleString()} kg`)
         setManualWeight(null)
         if (cameraCaptureRef.current) {
           cameraCaptureRef.current('OUT').catch(() => {})
@@ -520,7 +588,82 @@ export default function WeighingPage() {
                 </Text>
               </Card>
 
-              {/* Source: Deal or Supplier */}
+              {/* S3 OUT: Sales Order + Container picker (chỉ cho OUT) */}
+              {ticketDirection === 'out' && (
+                <Card size="small" title="Đơn hàng xuất" style={{ borderRadius: 12, borderColor: '#E8A838' }}>
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Sales Order (tuỳ chọn — bỏ trống nếu xuất lẻ)</Text>
+                      <Select
+                        value={selectedSalesOrderId || undefined}
+                        onChange={v => { setSelectedSalesOrderId(v || ''); setSelectedContainerId('') }}
+                        placeholder="Chọn đơn hàng bán..."
+                        style={{ width: '100%' }}
+                        disabled={!!ticket}
+                        allowClear
+                        loading={loadingSO}
+                        showSearch
+                        optionFilterProp="label"
+                        options={salesOrders.map(s => ({
+                          value: s.id,
+                          label: `${s.code} — ${s.customer_name} — ${s.grade} — ${(s.quantity_kg / 1000).toFixed(1)}T`,
+                        }))}
+                      />
+                      {selectedSO && (
+                        <div style={{ marginTop: 8, padding: 8, background: '#FEF3C7', borderRadius: 8 }}>
+                          <Text strong style={{ color: '#92400E' }}>{selectedSO.customer_name}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {selectedSO.grade} · {selectedSO.container_count}× {selectedSO.container_type}
+                            {selectedSO.port_of_destination && ` · ${selectedSO.port_of_destination}`}
+                          </Text>
+                          {selectedSO.vessel_name && (
+                            <><br /><Text type="secondary" style={{ fontSize: 11 }}>🚢 {selectedSO.vessel_name}</Text></>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedSalesOrderId && (
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Container (1 phiếu cân = 1 container)</Text>
+                        <Select
+                          value={selectedContainerId || undefined}
+                          onChange={v => setSelectedContainerId(v || '')}
+                          placeholder="Chọn container..."
+                          style={{ width: '100%' }}
+                          disabled={!!ticket}
+                          allowClear
+                          loading={loadingContainers}
+                          notFoundContent={containers.length === 0 ? 'SO chưa có container nào sẵn sàng' : undefined}
+                          options={containers.map(c => ({
+                            value: c.id,
+                            label: `${c.container_no || '(chưa số)'} · ${c.container_type} · ${c.bale_count || 0} bành${c.status ? ` · ${c.status}` : ''}`,
+                          }))}
+                        />
+                        {selectedContainer && (
+                          <div style={{ marginTop: 8, padding: 8, background: '#F0F9FF', borderRadius: 8, fontSize: 12 }}>
+                            <Text strong>Tare cố định:</Text> {(CONTAINER_TARE_KG[selectedContainer.container_type || '20ft'] || 2300).toLocaleString()} kg ({selectedContainer.container_type})
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Số seal thực tế (nếu khác kế hoạch)</Text>
+                      <Input
+                        value={sealNoActual}
+                        onChange={e => setSealNoActual(e.target.value)}
+                        placeholder="VD: ABC1234567"
+                        disabled={!!ticket}
+                      />
+                    </div>
+                  </Space>
+                </Card>
+              )}
+
+              {/* IN-only: Source Deal/Supplier */}
+              {ticketDirection === 'in' && (
               <Card size="small" title="Nguồn mủ" style={{ borderRadius: 12 }}>
                 <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -590,6 +733,7 @@ export default function WeighingPage() {
                   )}
                 </Space>
               </Card>
+              )}
 
               {/* Vehicle info */}
               <Card size="small" title="Thông tin xe" style={{ borderRadius: 12 }}>
@@ -627,7 +771,8 @@ export default function WeighingPage() {
                 </Space>
               </Card>
 
-              {/* Rubber fields */}
+              {/* Rubber fields — IN only (TP xuất không cần loại mủ/DRC/đơn giá/vị trí dỡ/tạp chất) */}
+              {ticketDirection === 'in' && (
               <Card size="small" title="Thông tin mủ" style={{ borderRadius: 12 }}>
                 <Row gutter={[12, 12]}>
                   <Col span={12}>
@@ -676,6 +821,15 @@ export default function WeighingPage() {
                   </Col>
                 </Row>
               </Card>
+              )}
+
+              {/* OUT-only: Ghi chú đơn giản */}
+              {ticketDirection === 'out' && (
+                <Card size="small" title="Ghi chú" style={{ borderRadius: 12 }}>
+                  <Input.TextArea value={notes} onChange={(e) => setNotes(e.target.value)}
+                    rows={2} placeholder="Ghi chú thêm (nếu có)..." disabled={isCompleted} />
+                </Card>
+              )}
 
               {/* Camera */}
               {ticket && (

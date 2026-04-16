@@ -140,6 +140,8 @@ interface FormHeader {
   container_type: string
   bale_count: number | null
   deal_id: string | null
+  sales_order_id: string | null
+  container_id: string | null
 }
 
 // ============================================================================
@@ -195,6 +197,8 @@ const StockOutCreatePage: React.FC = () => {
     container_type: '',
     bale_count: null,
     deal_id: null,
+    sales_order_id: null,
+    container_id: null,
   })
 
   // S2: Deal sale options (load khi reason='sale')
@@ -584,6 +588,8 @@ const StockOutCreatePage: React.FC = () => {
     container_type: header.container_type || null,
     bale_count: header.bale_count,
     deal_id: header.deal_id || null,
+    sales_order_id: header.sales_order_id || null,
+    container_id: header.container_id || null,
   })
 
   /** Convert outItems (UI state) → ManualPickedDetail[] cho service */

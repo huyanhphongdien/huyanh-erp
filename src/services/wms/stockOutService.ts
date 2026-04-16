@@ -42,6 +42,9 @@ export interface StockOutFormData {
   bale_count?: number | null
   // S2: Link tới deal sale — khi confirm sẽ update delivered_weight_kg của deal
   deal_id?: string | null
+  // W1: Link tới Sales Order + Container (cho OUT từ phiếu cân hoặc từ page)
+  sales_order_id?: string | null
+  container_id?: string | null
 }
 
 /** Data thêm 1 dòng đã picked vào phiếu (flow chọn batch manual) */
@@ -188,6 +191,9 @@ export const stockOutService = {
       bale_count: data.bale_count ?? null,
       // S2: link tới deal sale (nullable, chỉ khi reason='sale')
       deal_id: data.deal_id || null,
+      // W1: link tới Sales Order + Container
+      sales_order_id: data.sales_order_id || null,
+      container_id: data.container_id || null,
     }
 
     const { data: order, error } = await supabase
@@ -600,18 +606,61 @@ export const stockOutService = {
     await this._recalculateTotals(stockOutId, true)
 
     // 5. S2: Nếu phiếu có deal_id → update delivered_weight_kg của deal
+    //    W6+W7: Nếu phiếu có sales_order_id/container_id → update SO + container.
     //    Non-blocking (log error nhưng không fail confirm).
     const { data: orderFull } = await supabase
       .from('stock_out_orders')
-      .select('deal_id')
+      .select('deal_id, sales_order_id, container_id, total_weight, total_quantity')
       .eq('id', stockOutId)
       .single()
+
     if (orderFull && (orderFull as any).deal_id) {
       try {
         const { dealWmsService } = await import('../b2b/dealWmsService')
         await dealWmsService.updateDealStockOutTotals((orderFull as any).deal_id)
       } catch (e) {
         console.error('[stockOut] deal sync failed (non-blocking):', e)
+      }
+    }
+
+    // W6: Update container.gross_weight_kg + status='sealed'
+    if (orderFull && (orderFull as any).container_id) {
+      try {
+        const containerId = (orderFull as any).container_id
+        await supabase
+          .from('sales_order_containers')
+          .update({
+            net_weight_kg: (orderFull as any).total_weight || 0,
+            bale_count: (orderFull as any).total_quantity || 0,
+            status: 'sealed',
+            packed_at: now,
+            sealed_at: now,
+            updated_at: now,
+          })
+          .eq('id', containerId)
+      } catch (e) {
+        console.error('[stockOut] container update failed (non-blocking):', e)
+      }
+    }
+
+    // W7: SO status auto-transition → 'shipped' khi tất cả container đã sealed/shipped
+    if (orderFull && (orderFull as any).sales_order_id) {
+      try {
+        const soId = (orderFull as any).sales_order_id
+        const { data: containers } = await supabase
+          .from('sales_order_containers')
+          .select('status')
+          .eq('sales_order_id', soId)
+        const allDone = containers && containers.length > 0 &&
+          containers.every((c: any) => ['sealed', 'shipped'].includes(c.status))
+        if (allDone) {
+          await supabase
+            .from('sales_orders')
+            .update({ status: 'shipped', updated_at: now })
+            .eq('id', soId)
+        }
+      } catch (e) {
+        console.error('[stockOut] SO status update failed (non-blocking):', e)
       }
     }
 
@@ -720,8 +769,43 @@ export const stockOutService = {
     // 4. Validate kho TP (outbound mặc định là TP hàng bán)
     await _assertWarehouseTypeMatches(warehouseId, 'finished')
 
-    // 5. Create draft header
+    // 5. Pre-fetch SO + customer + container info nếu ticket đã link
+    let customerName: string | null = null
+    let customerOrderRef: string | null = null
+    let containerType: string | null = null
+    let baleCount: number | null = null
+    if (ticket.sales_order_id) {
+      const { data: so } = await supabase
+        .from('sales_orders')
+        .select(`
+          code, container_type,
+          customer:sales_customers(name, short_name)
+        `)
+        .eq('id', ticket.sales_order_id)
+        .single()
+      if (so) {
+        const customer: any = Array.isArray((so as any).customer) ? (so as any).customer[0] : (so as any).customer
+        customerName = customer?.short_name || customer?.name || null
+        customerOrderRef = (so as any).code || null
+        containerType = (so as any).container_type || null
+      }
+    }
+    if (ticket.container_id) {
+      const { data: container } = await supabase
+        .from('sales_order_containers')
+        .select('container_no, seal_no, container_type, bale_count')
+        .eq('id', ticket.container_id)
+        .single()
+      if (container) {
+        containerType = (container as any).container_type || containerType
+        baleCount = (container as any).bale_count || null
+      }
+    }
+
+    // 6. Create header. User decision: AUTO-CONFIRM (status='confirmed') khi
+    // có SO + allocation. Nếu không có SO → draft (user pick batch manual).
     const code = await generateCode('finished')
+    const containerNote = ticket.container_id ? ' · container linked' : ''
     const { data: order, error: insErr } = await supabase
       .from('stock_out_orders')
       .insert({
@@ -729,20 +813,70 @@ export const stockOutService = {
         type: 'finished',
         warehouse_id: warehouseId,
         reason: 'sale' as StockOutReason,
-        customer_name: null,
-        customer_order_ref: null,
-        notes: `Từ phiếu cân ${ticket.code}${ticket.vehicle_plate ? ` · ${ticket.vehicle_plate}` : ''}`,
-        status: 'draft' as StockOutStatus,
+        customer_name: customerName,
+        customer_order_ref: customerOrderRef,
+        notes: `Từ phiếu cân ${ticket.code}${ticket.vehicle_plate ? ` · ${ticket.vehicle_plate}` : ''}${containerNote}`,
+        status: 'draft' as StockOutStatus, // start as draft, will auto-confirm below if allocation exists
         created_by: createdBy || null,
         total_quantity: 0,
         total_weight: ticket.net_weight || 0,
-        container_type: null,
-        bale_count: null,
+        container_type: containerType,
+        bale_count: baleCount,
+        sales_order_id: ticket.sales_order_id || null,
+        container_id: ticket.container_id || null,
       })
       .select('id, code, status')
       .single()
 
     if (insErr) throw insErr
+
+    // 7. Nếu có sales_order_id + allocation → auto-fill picked details + confirm
+    if (ticket.sales_order_id && order) {
+      try {
+        // Lấy allocations cho SO (filter theo container nếu có)
+        let allocQuery = supabase
+          .from('sales_order_stock_allocations')
+          .select('stock_batch_id, quantity_kg')
+          .eq('sales_order_id', ticket.sales_order_id)
+          .in('status', ['reserved', 'packed'])
+        if (ticket.container_id) {
+          allocQuery = allocQuery.eq('container_id', ticket.container_id)
+        }
+        const { data: allocations } = await allocQuery
+
+        if (allocations && allocations.length > 0) {
+          // Fetch batch details để có material_id + weight_per_unit
+          const batchIds = allocations.map((a: any) => a.stock_batch_id).filter(Boolean)
+          const { data: batches } = await supabase
+            .from('stock_batches')
+            .select('id, material_id, location_id, material:materials(weight_per_unit)')
+            .in('id', batchIds)
+
+          const items = allocations.map((alloc: any) => {
+            const batch: any = batches?.find((b: any) => b.id === alloc.stock_batch_id)
+            const wpu = batch?.material?.weight_per_unit || 1
+            const weightKg = Number(alloc.quantity_kg) || 0
+            const quantity = Math.round((weightKg / wpu) * 100) / 100
+            return {
+              material_id: batch?.material_id,
+              batch_id: alloc.stock_batch_id,
+              location_id: batch?.location_id || null,
+              quantity,
+              weight: weightKg,
+            }
+          }).filter(it => it.material_id && it.batch_id)
+
+          if (items.length > 0) {
+            await this.addPickedDetails(order.id, items, createdBy)
+            const confirmed = await this.confirmStockOut(order.id, createdBy)
+            return { stockOut: confirmed }
+          }
+        }
+      } catch (e) {
+        console.warn('[stockOut OUT] auto-confirm failed, leaving draft:', e)
+      }
+    }
+
     return { stockOut: order }
   },
 

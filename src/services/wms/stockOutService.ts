@@ -1116,17 +1116,18 @@ export const stockOutService = {
 
     // ── 5. Insert details + trừ kho ──
     for (const pick of picks) {
-      // Detail
+      // Detail — picked_by/picked_at để TRỐNG (sẽ fill khi user ERP confirm)
+      // "Người lấy" = người click confirm trên ERP, KHÔNG phải operator cân
       await supabase.from('stock_out_details').insert({
         stock_out_id: stockOutId,
         material_id: pick.material_id,
         batch_id: pick.batch_id,
         quantity: pick.qty,
         weight: pick.weight,
-        picking_status: 'picked',
-        picked_at: new Date().toISOString(),
-        picked_by: params.user_id || null,
-        container_id, // Pattern C: track container nào
+        picking_status: 'pending',
+        picked_at: null,
+        picked_by: null,
+        container_id,
         notes: `Container ${container.container_no || container_id.slice(0, 8)}`,
       })
 
@@ -1174,29 +1175,30 @@ export const stockOutService = {
     }
 
     // ── 6. Recalculate totals phiếu xuất ──
+    // total_quantity = tổng KG / bale_weight → bành (khớp SO contract)
     const { data: allDetails } = await supabase
       .from('stock_out_details')
       .select('quantity, weight')
       .eq('stock_out_id', stockOutId)
-    const totalQty = (allDetails || []).reduce((s, d) => s + Number(d.quantity || 0), 0)
     const totalWeight = (allDetails || []).reduce((s, d) => s + Number(d.weight || 0), 0)
+    // Dùng bale_count từ container (= unit SO) thay sum(detail.qty) vì unit kho có thể khác
+    const totalBalesAllContainers = baleCount || Math.round(totalWeight / 35)
     await supabase.from('stock_out_orders').update({
-      total_quantity: totalQty,
+      total_quantity: totalBalesAllContainers,
       total_weight: Math.round(totalWeight * 100) / 100,
+      // Fix #3: warehouse_id = kho thực tế của batch đầu tiên (không phải param)
+      warehouse_id: picks[0]?.batch_warehouse_id || warehouse_id,
     }).eq('id', stockOutId)
 
     // ── 7. Container → shipped ──
-    const containerUpdate: Record<string, any> = {
-      status: 'shipped',
-      shipped_at: new Date().toISOString(),
-    }
-    if (seal_no_actual) containerUpdate.seal_no_actual = seal_no_actual
     await supabase
       .from('sales_order_containers')
-      .update(containerUpdate)
+      .update({ status: 'shipped' })
       .eq('id', container_id)
 
-    // ── 8. Check: TẤT CẢ containers shipped? ──
+    // ── 8. Check: TẤT CẢ containers shipped? → KHÔNG auto-confirm (manual confirm)
+    // User ERP sẽ review phiếu xuất → click "Xác nhận" → mới confirmed.
+    // "Người lấy" = người click confirm (confirmed_by), không phải operator cân.
     const { count: unshipped } = await supabase
       .from('sales_order_containers')
       .select('id', { count: 'exact', head: true })
@@ -1204,20 +1206,8 @@ export const stockOutService = {
       .neq('status', 'shipped')
     const allContainersShipped = (unshipped || 0) === 0
 
-    if (allContainersShipped) {
-      // Confirm phiếu xuất
-      await supabase.from('stock_out_orders').update({
-        status: 'confirmed' as StockOutStatus,
-        confirmed_by: params.user_id || null,
-        confirmed_at: new Date().toISOString(),
-      }).eq('id', stockOutId)
-
-      // SO → shipped
-      await supabase.from('sales_orders').update({
-        status: 'shipped',
-        shipped_at: new Date().toISOString(),
-      }).eq('id', sales_order_id)
-    }
+    // Phiếu xuất giữ DRAFT — chờ user ERP confirm thủ công.
+    // SO chưa chuyển shipped — chỉ khi phiếu xuất confirmed + containers shipped.
 
     return { stockOutId, stockOutCode, allContainersShipped, reused }
   },

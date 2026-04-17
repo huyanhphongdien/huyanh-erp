@@ -180,7 +180,8 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
     try {
       await containerService.updateContainer(container.id, vals)
       message.success('Đã cập nhật container')
-      setEditingContainerId(null)
+      // KHÔNG setEditingContainerId(null) — giữ edit mode để user sửa tiếp
+      // field khác (vd seal_no sau container_no). User tự thoát bằng click ✏️.
       loadContainers()
     } catch (e: any) {
       message.error(e.message)

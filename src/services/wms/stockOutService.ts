@@ -1118,7 +1118,9 @@ export const stockOutService = {
     // ── 5. Insert details + trừ kho ──
     for (const pick of picks) {
       // Detail — xe lên cân = hàng đã lấy → picked
-      // "Người lấy" = operator đang cân (auto-fill tên)
+      // "Người lấy" = Lê Thành Nhân (HA-0007) — phụ trách xuất kho ra cảng
+      const NGUOI_LAY_ID = 'a320ebc5-34a3-49fd-903e-98a926f6eab0'
+      const NGUOI_LAY_NAME = 'Lê Thành Nhân'
       await supabase.from('stock_out_details').insert({
         stock_out_id: stockOutId,
         material_id: pick.material_id,
@@ -1127,11 +1129,9 @@ export const stockOutService = {
         weight: pick.weight,
         picking_status: 'picked',
         picked_at: new Date().toISOString(),
-        picked_by: params.user_id || null,
+        picked_by: NGUOI_LAY_ID,
         container_id,
-        notes: params.operator_name
-          ? `Container ${container.container_no || ''} — Người lấy: ${params.operator_name}`
-          : `Container ${container.container_no || container_id.slice(0, 8)}`,
+        notes: `Container ${container.container_no || ''} — Người lấy: ${NGUOI_LAY_NAME}`,
       })
 
       // Trừ stock_batches (quantity = COUNT đơn vị)

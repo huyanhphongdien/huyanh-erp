@@ -527,9 +527,23 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
         locale={{ emptyText: 'Chưa có container' }}
       />
 
-      {/* Add container form */}
+      {/* Add container form — Bành + KL auto-fill từ SO */}
       {canEdit && (
-        <Form form={form} layout="inline" size="small" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+        <Form
+          form={form}
+          layout="inline"
+          size="small"
+          style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}
+          initialValues={{
+            bale_count: order.bales_per_container || order.total_bales || undefined,
+            net_weight_kg: (() => {
+              const bales = order.bales_per_container || order.total_bales || 0
+              const wpu = order.bale_weight_kg || (order.quantity_kg && order.total_bales ? order.quantity_kg / order.total_bales : 35)
+              const kg = Math.round(bales * wpu * 100) / 100
+              return kg > 0 ? kg : undefined
+            })(),
+          }}
+        >
           <Form.Item name="container_no">
             <Input placeholder="Container No." style={{ width: 140 }} />
           </Form.Item>

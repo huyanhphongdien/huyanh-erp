@@ -80,7 +80,7 @@ export const containerService = {
     // Lấy thông tin đơn hàng
     const { data: order, error: orderErr } = await supabase
       .from('sales_orders')
-      .select('id, quantity_tons, container_type, container_count, total_bales')
+      .select('id, code, quantity_tons, quantity_kg, container_type, container_count, total_bales, bale_weight_kg, bales_per_container')
       .eq('id', orderId)
       .single()
 
@@ -101,26 +101,33 @@ export const containerService = {
     const containerType: ContainerType = order.container_type || '20ft'
     const capacity = CONTAINER_CAPACITY[containerType]
     const containerCount = order.container_count || Math.ceil(order.quantity_tons / capacity.max_tons)
+    const soCode = order.code || orderId.slice(0, 8)
 
-    // Tính số bành trung bình mỗi container
+    // Tính số bành mỗi container
     const totalBales = order.total_bales || 0
-    const balesPerContainer = totalBales > 0 ? Math.ceil(totalBales / containerCount) : 0
+    const balesPerContainer = order.bales_per_container || (totalBales > 0 ? Math.ceil(totalBales / containerCount) : 0)
+    const baleWeightKg = order.bale_weight_kg || (order.quantity_kg && totalBales ? order.quantity_kg / totalBales : 35)
 
-    // Tạo container records
-    const containersToInsert = Array.from({ length: containerCount }, (_, i) => ({
-      sales_order_id: orderId,
-      container_no: null,
-      seal_no: null,
-      container_type: containerType,
-      gross_weight_kg: null,
-      tare_weight_kg: null,
-      net_weight_kg: null,
-      bale_count: i < containerCount - 1
-        ? balesPerContainer
-        : (totalBales > 0 ? totalBales - balesPerContainer * (containerCount - 1) : 0),
-      status: 'planning' as ContainerStatus,
-      notes: `Container ${i + 1}/${containerCount} — Tạo tự động`,
-    }))
+    // Tạo container records — auto-fill container_no + bale_count + net_weight_kg
+    const containersToInsert = Array.from({ length: containerCount }, (_, i) => {
+      const isLast = i === containerCount - 1
+      const bales = isLast && totalBales > 0
+        ? totalBales - balesPerContainer * (containerCount - 1)
+        : balesPerContainer
+      const netKg = Math.round(bales * baleWeightKg * 100) / 100
+      return {
+        sales_order_id: orderId,
+        container_no: `CONT-${soCode}-${String(i + 1).padStart(2, '0')}`,
+        seal_no: null,
+        container_type: containerType,
+        gross_weight_kg: null,
+        tare_weight_kg: null,
+        net_weight_kg: netKg > 0 ? netKg : null,
+        bale_count: bales > 0 ? bales : null,
+        status: 'planning' as ContainerStatus,
+        notes: `Container ${i + 1}/${containerCount} — Tạo tự động`,
+      }
+    })
 
     const { data, error } = await supabase
       .from('sales_order_containers')

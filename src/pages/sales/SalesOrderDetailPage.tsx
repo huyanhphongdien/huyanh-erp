@@ -62,6 +62,7 @@ import { containerService } from '../../services/sales/containerService'
 import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
+import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
 import { useAuthStore } from '../../stores/authStore'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
@@ -141,11 +142,19 @@ const STATUS_FLOW: SalesOrderStatus[] = [
 function SalesOrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const initialTab = searchParams.get('tab') || 'info'
   const { user } = useAuthStore()
   const salesRole = getSalesRole(user)
   const visibleTabs = getVisibleTabs(salesRole)
+  // Controlled active tab — cho phép Timeline component navigate giữa tabs
+  const [activeTab, setActiveTab] = useState(initialTab)
+  const handleTabChange = (key: string) => {
+    setActiveTab(key)
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', key)
+    setSearchParams(next, { replace: true })
+  }
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1481,9 +1490,13 @@ function SalesOrderDetailPage() {
         </Col>
       </Row>
 
+      {/* F-polish: Status Timeline + Next-step hint */}
+      <SalesOrderStatusTimeline order={order} onTabChange={handleTabChange} />
+
       {/* Tabs */}
       <Tabs
-        defaultActiveKey={initialTab}
+        activeKey={activeTab}
+        onChange={handleTabChange}
         items={[
           {
             key: 'info',

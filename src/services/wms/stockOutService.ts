@@ -1061,12 +1061,24 @@ export const stockOutService = {
     }
 
     // ── 4. Auto-pick FIFO batch cho container này ──
-    // Lấy batches có hàng cùng grade trong warehouse
+    // Tìm batches cùng grade trong TẤT CẢ kho TP của facility (không chỉ 1 warehouse_id).
+    // Lý do: WeighingPage pick warehouse đầu tiên theo alphabet (KHO-A) nhưng batch
+    // có thể nằm ở KHO-B → search across all finished warehouses cùng facility.
     const gradeCol = so.grade || null
+
+    // Lấy tất cả warehouse_ids TP cùng facility
+    const { data: facilityWarehouses } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('is_active', true)
+      .in('type', ['finished', 'mixed'])
+    const whIds = (facilityWarehouses || []).map(w => w.id)
+    if (whIds.length === 0) throw new Error('Không tìm thấy kho TP nào')
+
     let batchQuery = supabase
       .from('stock_batches')
-      .select('id, batch_no, material_id, quantity_remaining, current_weight, rubber_grade')
-      .eq('warehouse_id', warehouse_id)
+      .select('id, batch_no, material_id, quantity_remaining, current_weight, rubber_grade, warehouse_id')
+      .in('warehouse_id', whIds)
       .eq('status', 'active')
       .gt('quantity_remaining', 0)
       .order('received_date', { ascending: true }) // FIFO
@@ -1075,12 +1087,12 @@ export const stockOutService = {
     if (gradeCol) batchQuery = batchQuery.eq('rubber_grade', gradeCol)
 
     const { data: batches } = await batchQuery
-    if (!batches || batches.length === 0) throw new Error(`Không còn batch ${gradeCol || ''} trong kho để pick`)
+    if (!batches || batches.length === 0) throw new Error(`Không còn batch ${gradeCol || ''} trong kho TP để pick`)
 
     // Pick FIFO cho đủ baleCount (hoặc net_weight nếu baleCount=0)
     let remainBales = baleCount
     let remainWeight = net_weight_kg
-    const picks: Array<{ batch_id: string; material_id: string; qty: number; weight: number }> = []
+    const picks: Array<{ batch_id: string; material_id: string; qty: number; weight: number; batch_warehouse_id: string }> = []
 
     for (const batch of batches) {
       if (remainBales <= 0 && remainWeight <= 0.5) break
@@ -1089,19 +1101,17 @@ export const stockOutService = {
       const batchWeight = Number(batch.current_weight || 0)
 
       if (baleCount > 0) {
-        // Pick theo bành
         const takeQty = Math.min(batchQty, remainBales)
         const wpu = batchQty > 0 ? batchWeight / batchQty : 0
         const takeWeight = Math.round(takeQty * wpu * 100) / 100
-        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight })
+        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight, batch_warehouse_id: batch.warehouse_id })
         remainBales -= takeQty
         remainWeight -= takeWeight
       } else {
-        // Pick theo kg (fallback nếu không biết bành)
         const takeWeight = Math.min(batchWeight, remainWeight)
         const wpu = batchWeight > 0 ? batchQty / batchWeight : 0
         const takeQty = Math.round(takeWeight * wpu)
-        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight })
+        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight, batch_warehouse_id: batch.warehouse_id })
         remainWeight -= takeWeight
       }
     }
@@ -1140,23 +1150,23 @@ export const stockOutService = {
         }).eq('id', pick.batch_id)
       }
 
-      // Trừ stock_levels (quantity = KG)
+      // Trừ stock_levels — dùng warehouse_id CỦA BATCH (không phải warehouse_id param)
       const { data: level } = await supabase
         .from('stock_levels')
         .select('quantity')
-        .eq('warehouse_id', warehouse_id)
+        .eq('warehouse_id', pick.batch_warehouse_id)
         .eq('material_id', pick.material_id)
         .maybeSingle()
       if (level) {
         await supabase.from('stock_levels').update({
           quantity: Math.max(0, (level.quantity || 0) - pick.weight),
-        }).eq('warehouse_id', warehouse_id).eq('material_id', pick.material_id)
+        }).eq('warehouse_id', pick.batch_warehouse_id).eq('material_id', pick.material_id)
       }
 
       // Inventory transaction
       await supabase.from('inventory_transactions').insert({
         type: 'out',
-        warehouse_id,
+        warehouse_id: pick.batch_warehouse_id,
         material_id: pick.material_id,
         batch_id: pick.batch_id,
         quantity: -pick.weight,

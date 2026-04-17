@@ -519,16 +519,58 @@ export default function WeighingPage() {
         }
       }
 
-      // S3: Auto-sync OUTBOUND → tạo phiếu xuất kho TP draft từ phiếu cân
-      //     (feature flag VITE_AUTO_WEIGHBRIDGE_OUT_SYNC riêng với C1).
-      //     Draft only — user phải pick batch + confirm manual.
-      //     Chọn kho finished/mixed đầu tiên. Errors non-blocking.
-      if (
+      // ── Pattern C: cân OUT cho SO + Container → processContainerShipment ──
+      // 1 phiếu xuất / SO, mỗi container add detail + trừ kho ngay.
+      // Khi tất cả containers shipped → confirm phiếu xuất + SO → shipped.
+      // Chỉ trigger khi có selectedSalesOrderId + selectedContainerId.
+      // Nếu không có SO → fallback auto-sync cũ (tạo draft).
+      if (ticket.ticket_type === 'out' && selectedSalesOrderId && selectedContainerId) {
+        try {
+          const ticketFacilityId = (ticket as any).facility_id || currentFacility?.id || null
+          let tpQuery = supabase
+            .from('warehouses')
+            .select('id, code')
+            .eq('is_active', true)
+            .in('type', ['finished', 'mixed'])
+            .order('code', { ascending: true })
+          if (ticketFacilityId) tpQuery = tpQuery.eq('facility_id', ticketFacilityId)
+          const { data: tpWh } = await tpQuery.limit(1)
+          const whId = tpWh?.[0]?.id
+          if (!whId) throw new Error('Không tìm thấy kho TP')
+
+          const result = await stockOutService.processContainerShipment({
+            sales_order_id: selectedSalesOrderId,
+            container_id: selectedContainerId,
+            weighbridge_ticket_id: ticket.id,
+            warehouse_id: whId,
+            net_weight_kg: updated.net_weight || 0,
+            seal_no_actual: sealNoActual || undefined,
+            user_id: operator?.id || null,
+          })
+
+          if (result.reused) {
+            message.success(`Thêm container vào phiếu xuất ${result.stockOutCode}`)
+          } else {
+            message.success(`Tạo phiếu xuất ${result.stockOutCode}`)
+          }
+
+          if (result.allContainersShipped) {
+            message.success('✅ Tất cả container đã ship — phiếu xuất confirmed, SO → shipped')
+          } else {
+            message.info('📦 Container shipped — còn container khác chưa cân')
+          }
+        } catch (syncErr: any) {
+          console.error('[Pattern C] processContainerShipment failed:', syncErr)
+          message.error('Lỗi xuất kho: ' + (syncErr?.message || ''))
+        }
+      }
+      // Fallback: cân OUT không có SO (xuất lẻ) → tạo draft cũ
+      else if (
         ticket.ticket_type === 'out' &&
+        !selectedSalesOrderId &&
         import.meta.env.VITE_AUTO_WEIGHBRIDGE_OUT_SYNC === 'true'
       ) {
         try {
-          // F2: pick kho TP CÙNG facility (tránh bug giống cân IN — KHO-LAO trước alphabet)
           const ticketFacilityId = (ticket as any).facility_id || currentFacility?.id || null
           let tpQuery = supabase
             .from('warehouses')
@@ -546,14 +588,11 @@ export default function WeighingPage() {
             if (result.reused) {
               message.info(`Phiếu xuất draft đã tồn tại: ${result.stockOut?.code || ''}`)
             } else {
-              message.success(`Đã tạo phiếu xuất draft ${tpWh[0].code}: ${result.stockOut?.code || ''}`)
+              message.success(`Đã tạo phiếu xuất draft: ${result.stockOut?.code || ''}`)
             }
-          } else {
-            console.warn(`[auto-sync out] không tìm thấy kho TP cho facility ${ticketFacilityId || 'unknown'}`)
-            message.warning('Phiếu cân hoàn tất nhưng không tìm thấy kho TP cho nhà máy này — phải tạo phiếu xuất tay')
           }
         } catch (syncErr: any) {
-          console.warn('[auto-sync out] tạo phiếu xuất thất bại:', syncErr?.message || syncErr)
+          console.warn('[auto-sync out fallback] failed:', syncErr?.message || syncErr)
         }
       }
 

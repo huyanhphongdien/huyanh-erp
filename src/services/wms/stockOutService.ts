@@ -969,6 +969,253 @@ export const stockOutService = {
     }
   },
 
+  // ==========================================================================
+  // PATTERN C: 1 phiếu xuất / SO — cân từng container, trừ kho ngay
+  // ==========================================================================
+
+  /**
+   * Xử lý cân container cho Sales Order.
+   * - Tìm phiếu xuất CŨ cho SO (nếu đã tạo khi cân container trước) → reuse
+   * - Chưa có → tạo MỚI (draft)
+   * - Auto-pick FIFO từ allocations → add details + trừ kho ngay
+   * - Container → shipped
+   * - Khi TẤT CẢ containers shipped → confirm phiếu xuất + SO → shipped
+   */
+  async processContainerShipment(params: {
+    sales_order_id: string
+    container_id: string
+    weighbridge_ticket_id: string
+    warehouse_id: string
+    net_weight_kg: number
+    seal_no_actual?: string
+    user_id?: string | null
+  }): Promise<{
+    stockOutId: string
+    stockOutCode: string
+    allContainersShipped: boolean
+    reused: boolean
+  }> {
+    const { sales_order_id, container_id, weighbridge_ticket_id, warehouse_id, net_weight_kg, seal_no_actual } = params
+
+    // ── 1. Tìm SO info ──
+    const { data: so } = await supabase
+      .from('sales_orders')
+      .select('id, code, grade, quantity_kg')
+      .eq('id', sales_order_id)
+      .single()
+    if (!so) throw new Error('Sales Order không tồn tại')
+
+    // ── 2. Tìm container info ──
+    const { data: container } = await supabase
+      .from('sales_order_containers')
+      .select('id, container_no, container_type, bale_count, net_weight_kg, seal_no, status')
+      .eq('id', container_id)
+      .single()
+    if (!container) throw new Error('Container không tồn tại')
+    if (container.status === 'shipped') throw new Error('Container đã shipped — không cân lại')
+
+    const baleCount = container.bale_count || 0
+
+    // ── 3. Find-or-create phiếu xuất cho SO ──
+    let reused = false
+    const { data: existingXK } = await supabase
+      .from('stock_out_orders')
+      .select('id, code')
+      .eq('sales_order_id', sales_order_id)
+      .eq('reason', 'sale')
+      .neq('status', 'cancelled')
+      .limit(1)
+      .maybeSingle()
+
+    let stockOutId: string
+    let stockOutCode: string
+
+    if (existingXK) {
+      stockOutId = existingXK.id
+      stockOutCode = existingXK.code
+      reused = true
+    } else {
+      // Tạo mới — code format: XK-{SO.code} (VD: XK-SO-2026-004)
+      const code = `XK-${so.code}`
+      const { data: newXK, error: errXK } = await supabase
+        .from('stock_out_orders')
+        .insert({
+          code,
+          type: 'finished',
+          warehouse_id,
+          reason: 'sale' as StockOutReason,
+          customer_order_ref: so.code,
+          sales_order_id,
+          weighbridge_ticket_id,
+          status: 'draft' as StockOutStatus,
+          total_quantity: 0,
+          total_weight: 0,
+          notes: `Phiếu xuất gộp cho đơn ${so.code}`,
+          created_by: params.user_id || null,
+        })
+        .select('id, code')
+        .single()
+      if (errXK) throw errXK
+      stockOutId = newXK.id
+      stockOutCode = newXK.code
+    }
+
+    // ── 4. Auto-pick FIFO batch cho container này ──
+    // Lấy batches có hàng cùng grade trong warehouse
+    const gradeCol = so.grade || null
+    let batchQuery = supabase
+      .from('stock_batches')
+      .select('id, batch_no, material_id, quantity_remaining, current_weight, rubber_grade')
+      .eq('warehouse_id', warehouse_id)
+      .eq('status', 'active')
+      .gt('quantity_remaining', 0)
+      .order('received_date', { ascending: true }) // FIFO
+      .order('created_at', { ascending: true })
+
+    if (gradeCol) batchQuery = batchQuery.eq('rubber_grade', gradeCol)
+
+    const { data: batches } = await batchQuery
+    if (!batches || batches.length === 0) throw new Error(`Không còn batch ${gradeCol || ''} trong kho để pick`)
+
+    // Pick FIFO cho đủ baleCount (hoặc net_weight nếu baleCount=0)
+    let remainBales = baleCount
+    let remainWeight = net_weight_kg
+    const picks: Array<{ batch_id: string; material_id: string; qty: number; weight: number }> = []
+
+    for (const batch of batches) {
+      if (remainBales <= 0 && remainWeight <= 0.5) break
+
+      const batchQty = Number(batch.quantity_remaining || 0)
+      const batchWeight = Number(batch.current_weight || 0)
+
+      if (baleCount > 0) {
+        // Pick theo bành
+        const takeQty = Math.min(batchQty, remainBales)
+        const wpu = batchQty > 0 ? batchWeight / batchQty : 0
+        const takeWeight = Math.round(takeQty * wpu * 100) / 100
+        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight })
+        remainBales -= takeQty
+        remainWeight -= takeWeight
+      } else {
+        // Pick theo kg (fallback nếu không biết bành)
+        const takeWeight = Math.min(batchWeight, remainWeight)
+        const wpu = batchWeight > 0 ? batchQty / batchWeight : 0
+        const takeQty = Math.round(takeWeight * wpu)
+        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight })
+        remainWeight -= takeWeight
+      }
+    }
+
+    if (picks.length === 0) throw new Error('Không pick được batch nào')
+
+    // ── 5. Insert details + trừ kho ──
+    for (const pick of picks) {
+      // Detail
+      await supabase.from('stock_out_details').insert({
+        stock_out_id: stockOutId,
+        material_id: pick.material_id,
+        batch_id: pick.batch_id,
+        quantity: pick.qty,
+        weight: pick.weight,
+        picking_status: 'picked',
+        picked_at: new Date().toISOString(),
+        picked_by: params.user_id || null,
+        container_id, // Pattern C: track container nào
+        notes: `Container ${container.container_no || container_id.slice(0, 8)}`,
+      })
+
+      // Trừ stock_batches (quantity = COUNT đơn vị)
+      const { data: batchData } = await supabase
+        .from('stock_batches')
+        .select('quantity_remaining, current_weight')
+        .eq('id', pick.batch_id)
+        .single()
+      if (batchData) {
+        const newQty = Math.max(0, (batchData.quantity_remaining || 0) - pick.qty)
+        const newWeight = Math.max(0, (batchData.current_weight || 0) - pick.weight)
+        await supabase.from('stock_batches').update({
+          quantity_remaining: newQty,
+          current_weight: newWeight,
+          status: newQty <= 0 ? 'depleted' : 'active',
+        }).eq('id', pick.batch_id)
+      }
+
+      // Trừ stock_levels (quantity = KG)
+      const { data: level } = await supabase
+        .from('stock_levels')
+        .select('quantity')
+        .eq('warehouse_id', warehouse_id)
+        .eq('material_id', pick.material_id)
+        .maybeSingle()
+      if (level) {
+        await supabase.from('stock_levels').update({
+          quantity: Math.max(0, (level.quantity || 0) - pick.weight),
+        }).eq('warehouse_id', warehouse_id).eq('material_id', pick.material_id)
+      }
+
+      // Inventory transaction
+      await supabase.from('inventory_transactions').insert({
+        type: 'out',
+        warehouse_id,
+        material_id: pick.material_id,
+        batch_id: pick.batch_id,
+        quantity: -pick.weight,
+        reference_type: 'stock_out',
+        reference_id: stockOutId,
+        notes: `Xuất cho ${so.code} cont ${container.container_no || ''}`,
+        created_by: null,
+      })
+    }
+
+    // ── 6. Recalculate totals phiếu xuất ──
+    const { data: allDetails } = await supabase
+      .from('stock_out_details')
+      .select('quantity, weight')
+      .eq('stock_out_id', stockOutId)
+    const totalQty = (allDetails || []).reduce((s, d) => s + Number(d.quantity || 0), 0)
+    const totalWeight = (allDetails || []).reduce((s, d) => s + Number(d.weight || 0), 0)
+    await supabase.from('stock_out_orders').update({
+      total_quantity: totalQty,
+      total_weight: Math.round(totalWeight * 100) / 100,
+    }).eq('id', stockOutId)
+
+    // ── 7. Container → shipped ──
+    const containerUpdate: Record<string, any> = {
+      status: 'shipped',
+      shipped_at: new Date().toISOString(),
+    }
+    if (seal_no_actual) containerUpdate.seal_no_actual = seal_no_actual
+    await supabase
+      .from('sales_order_containers')
+      .update(containerUpdate)
+      .eq('id', container_id)
+
+    // ── 8. Check: TẤT CẢ containers shipped? ──
+    const { count: unshipped } = await supabase
+      .from('sales_order_containers')
+      .select('id', { count: 'exact', head: true })
+      .eq('sales_order_id', sales_order_id)
+      .neq('status', 'shipped')
+    const allContainersShipped = (unshipped || 0) === 0
+
+    if (allContainersShipped) {
+      // Confirm phiếu xuất
+      await supabase.from('stock_out_orders').update({
+        status: 'confirmed' as StockOutStatus,
+        confirmed_by: params.user_id || null,
+        confirmed_at: new Date().toISOString(),
+      }).eq('id', stockOutId)
+
+      // SO → shipped
+      await supabase.from('sales_orders').update({
+        status: 'shipped',
+        shipped_at: new Date().toISOString(),
+      }).eq('id', sales_order_id)
+    }
+
+    return { stockOutId, stockOutCode, allContainersShipped, reused }
+  },
+
   // --------------------------------------------------------------------------
   // Giảm current_quantity của warehouse_location
   // --------------------------------------------------------------------------

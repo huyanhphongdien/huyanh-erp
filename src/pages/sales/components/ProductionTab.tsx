@@ -135,6 +135,24 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
     loadContainers()
   }, [loadProgress, loadContainers])
 
+  // Auto-fill Bành + KL inline form = phần CÒN LẠI chưa assign vào container nào
+  // Re-compute khi containers thay đổi (thêm/xóa container)
+  useEffect(() => {
+    const totalBales = order.total_bales || 0
+    const balesAssigned = containers.reduce((s, c) => s + (c.bale_count || 0), 0)
+    const balesRemaining = Math.max(0, totalBales - balesAssigned)
+    const balesPerCont = order.bales_per_container || totalBales || 0
+    const autoFillBales = balesRemaining > 0 ? Math.min(balesPerCont, balesRemaining) : 0
+    const wpu = order.bale_weight_kg || (order.quantity_kg && totalBales ? order.quantity_kg / totalBales : 35)
+    const autoFillKg = Math.round(autoFillBales * wpu * 100) / 100
+    form.setFieldsValue({
+      container_no: undefined,
+      seal_no: undefined,
+      bale_count: autoFillBales > 0 ? autoFillBales : undefined,
+      net_weight_kg: autoFillKg > 0 ? autoFillKg : undefined,
+    })
+  }, [containers, order, form])
+
   // ── Save ready date ──
   const handleSaveReadyDate = async () => {
     setSavingReadyDate(true)
@@ -527,22 +545,13 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
         locale={{ emptyText: 'Chưa có container' }}
       />
 
-      {/* Add container form — Bành + KL auto-fill từ SO */}
+      {/* Add container form — Bành + KL auto-fill = phần CÒN LẠI chưa assign */}
       {canEdit && (
         <Form
           form={form}
           layout="inline"
           size="small"
           style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}
-          initialValues={{
-            bale_count: order.bales_per_container || order.total_bales || undefined,
-            net_weight_kg: (() => {
-              const bales = order.bales_per_container || order.total_bales || 0
-              const wpu = order.bale_weight_kg || (order.quantity_kg && order.total_bales ? order.quantity_kg / order.total_bales : 35)
-              const kg = Math.round(bales * wpu * 100) / 100
-              return kg > 0 ? kg : undefined
-            })(),
-          }}
         >
           <Form.Item name="container_no">
             <Input placeholder="Container No." style={{ width: 140 }} />

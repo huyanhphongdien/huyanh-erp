@@ -1142,7 +1142,18 @@ function SalesOrderDetailPage() {
               <Button
                 icon={<PlusOutlined />}
                 size="small"
-                onClick={() => setContainerModalOpen(true)}
+                onClick={() => {
+                  // Auto-fill bành + KL từ thông tin SO
+                  const containerCount = order.container_count || 1
+                  const bales = order.bales_per_container || Math.ceil((order.total_bales || 0) / containerCount)
+                  const weightPerBale = order.bale_weight_kg || (order.quantity_kg && order.total_bales ? order.quantity_kg / order.total_bales : 35)
+                  const netKg = Math.round(bales * weightPerBale * 100) / 100
+                  containerForm.setFieldsValue({
+                    bale_count: bales || undefined,
+                    net_weight_kg: netKg > 0 ? netKg : undefined,
+                  })
+                  setContainerModalOpen(true)
+                }}
               >
                 Thêm container
               </Button>

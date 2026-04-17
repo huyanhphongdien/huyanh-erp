@@ -259,7 +259,10 @@ export default function PrintPage() {
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
             <Row2 l="BS" r={<strong>{ticket!.vehicle_plate}</strong>} />
             {ticket!.driver_name && <Row2 l="TX" r={ticket!.driver_name} />}
-            <Row2 l="Mủ" r={rubberLabel} />
+            {ticket!.ticket_type === 'out'
+              ? <Row2 l="Loại" r={`Xe ra (Xuất)`} />
+              : <Row2 l="Mủ" r={rubberLabel} />
+            }
             {(dealInfo?.partner_name || ext.supplier_name) && <Row2 l="ĐL" r={dealInfo?.partner_name || ext.supplier_name} />}
             {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>

@@ -1090,30 +1090,26 @@ export const stockOutService = {
     if (!batches || batches.length === 0) throw new Error(`Không còn batch ${gradeCol || ''} trong kho TP để pick`)
 
     // Pick FIFO cho đủ baleCount (hoặc net_weight nếu baleCount=0)
-    let remainBales = baleCount
+    // Pick theo KG (universal) — vì unit kho (kiện 111kg) có thể khác unit SO (bành 35kg).
+    // Balecount chỉ dùng cho tổng detail, weight mới chính xác cho trừ kho.
     let remainWeight = net_weight_kg
     const picks: Array<{ batch_id: string; material_id: string; qty: number; weight: number; batch_warehouse_id: string }> = []
 
     for (const batch of batches) {
-      if (remainBales <= 0 && remainWeight <= 0.5) break
+      if (remainWeight <= 0.5) break
 
       const batchQty = Number(batch.quantity_remaining || 0)
       const batchWeight = Number(batch.current_weight || 0)
+      if (batchWeight <= 0) continue
 
-      if (baleCount > 0) {
-        const takeQty = Math.min(batchQty, remainBales)
-        const wpu = batchQty > 0 ? batchWeight / batchQty : 0
-        const takeWeight = Math.round(takeQty * wpu * 100) / 100
-        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight, batch_warehouse_id: batch.warehouse_id })
-        remainBales -= takeQty
-        remainWeight -= takeWeight
-      } else {
-        const takeWeight = Math.min(batchWeight, remainWeight)
-        const wpu = batchWeight > 0 ? batchQty / batchWeight : 0
-        const takeQty = Math.round(takeWeight * wpu)
-        picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: takeWeight, batch_warehouse_id: batch.warehouse_id })
-        remainWeight -= takeWeight
-      }
+      const takeWeight = Math.min(batchWeight, remainWeight)
+      // Convert weight → unit count của batch (kiện/bành)
+      const wpu = batchWeight / batchQty  // kg per unit
+      const takeQty = Math.round(takeWeight / wpu * 100) / 100
+
+      if (takeWeight <= 0 || takeQty <= 0) continue
+      picks.push({ batch_id: batch.id, material_id: batch.material_id, qty: takeQty, weight: Math.round(takeWeight * 100) / 100, batch_warehouse_id: batch.warehouse_id })
+      remainWeight -= takeWeight
     }
 
     if (picks.length === 0) throw new Error('Không pick được batch nào')

@@ -989,6 +989,7 @@ export const stockOutService = {
     net_weight_kg: number
     seal_no_actual?: string
     user_id?: string | null
+    operator_name?: string | null
   }): Promise<{
     stockOutId: string
     stockOutCode: string
@@ -1116,19 +1117,21 @@ export const stockOutService = {
 
     // ── 5. Insert details + trừ kho ──
     for (const pick of picks) {
-      // Detail — picked_by/picked_at để TRỐNG (sẽ fill khi user ERP confirm)
-      // "Người lấy" = người click confirm trên ERP, KHÔNG phải operator cân
+      // Detail — xe lên cân = hàng đã lấy → picked
+      // "Người lấy" = operator đang cân (auto-fill tên)
       await supabase.from('stock_out_details').insert({
         stock_out_id: stockOutId,
         material_id: pick.material_id,
         batch_id: pick.batch_id,
         quantity: pick.qty,
         weight: pick.weight,
-        picking_status: 'pending',
-        picked_at: null,
-        picked_by: null,
+        picking_status: 'picked',
+        picked_at: new Date().toISOString(),
+        picked_by: params.user_id || null,
         container_id,
-        notes: `Container ${container.container_no || container_id.slice(0, 8)}`,
+        notes: params.operator_name
+          ? `Container ${container.container_no || ''} — Người lấy: ${params.operator_name}`
+          : `Container ${container.container_no || container_id.slice(0, 8)}`,
       })
 
       // Trừ stock_batches (quantity = COUNT đơn vị)

@@ -546,6 +546,7 @@ export default function WeighingPage() {
             net_weight_kg: updated.net_weight || 0,
             seal_no_actual: sealNoActual || undefined,
             user_id: operator?.id || null,
+            operator_name: operator?.name || null,
           })
 
           if (result.reused) {

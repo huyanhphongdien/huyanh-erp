@@ -31,6 +31,7 @@ import {
   Badge,
   Tooltip,
 } from 'antd'
+import { useAuthStore } from '../../../stores/authStore'
 import {
   ArrowLeftOutlined,
   EditOutlined,
@@ -127,6 +128,11 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
   const [acceptModal, setAcceptModal] = useState(false)
   const [cancelModal, setCancelModal] = useState(false)
   const [form] = Form.useForm()
+  const { user } = useAuthStore()
+
+  // Role check: Duyệt Deal + Quyết toán chỉ cho manager/admin
+  // (Thu mua thường chỉ xem, không duyệt giá trị tiền)
+  const canApprove = user?.role === 'admin' || user?.role === 'manager'
 
   const handleAccept = async () => {
     try {
@@ -195,28 +201,32 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
           </Popconfirm>
         )}
 
-        {/* Processing -> Accepted (có validate điều kiện) */}
+        {/* Processing -> Accepted (validate điều kiện + role) */}
         {deal.status === 'processing' && (() => {
           const { canAccept, missing } = dealService.checkAcceptConditions(deal)
+          const missingList = [...missing]
+          if (!canApprove) missingList.unshift('Chỉ Quản lý/Admin mới được duyệt Deal')
+          const allOk = canAccept && canApprove
+
           const btn = (
             <Button
               type="primary"
               icon={<CheckCircleOutlined />}
               onClick={() => setAcceptModal(true)}
               loading={loading}
-              disabled={!canAccept}
-              style={canAccept ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
+              disabled={!allOk}
+              style={allOk ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
             >
               Duyệt Deal
             </Button>
           )
-          if (canAccept) return btn
+          if (allOk) return btn
           return (
             <Tooltip
               title={
                 <div>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>Chưa đủ điều kiện duyệt:</div>
-                  {missing.map((m, i) => (
+                  {missingList.map((m, i) => (
                     <div key={i}>• {m}</div>
                   ))}
                 </div>
@@ -227,17 +237,31 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
           )
         })()}
 
-        {/* Accepted -> Auto Settlement */}
+        {/* Accepted -> Auto Settlement (chỉ manager/admin) */}
         {deal.status === 'accepted' && deal.actual_drc != null && deal.actual_drc > 0 && deal.actual_weight_kg != null && deal.actual_weight_kg > 0 && (
-          <Button
-            type="primary"
-            icon={<DollarOutlined />}
-            onClick={handleSettle}
-            loading={settleLoading}
-            style={{ backgroundColor: '#722ed1', borderColor: '#722ed1' }}
-          >
-            Quyết toán
-          </Button>
+          canApprove ? (
+            <Button
+              type="primary"
+              icon={<DollarOutlined />}
+              onClick={handleSettle}
+              loading={settleLoading}
+              style={{ backgroundColor: '#722ed1', borderColor: '#722ed1' }}
+            >
+              Quyết toán
+            </Button>
+          ) : (
+            <Tooltip title="Chỉ Quản lý/Admin mới được tạo quyết toán">
+              <span style={{ cursor: 'not-allowed' }}>
+                <Button
+                  type="primary"
+                  icon={<DollarOutlined />}
+                  disabled
+                >
+                  Quyết toán
+                </Button>
+              </span>
+            </Tooltip>
+          )
         )}
 
         {/* Cancel button */}

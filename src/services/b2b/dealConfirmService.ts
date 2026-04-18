@@ -4,11 +4,11 @@
 //
 // Luồng: BookingCard → ConfirmDealModal → confirmDealFromChat()
 //   Step 1: Tạo Deal (b2b_deals)
-//   Step 2: Tạo Advance nếu có (b2b_advances)
-//   Step 3: Ghi Ledger nếu có advance (b2b_partner_ledger)
-//   Step 4: Update booking message metadata → confirmed
-//   Step 5: Gửi DealCard message trong chat
-//   Step 6: Update deal totals
+//   Step 2: Tạo Advance nếu có (status='approved')
+//           → gọi advanceService.markPaid() — nơi DUY NHẤT ghi ledger (tránh double entry)
+//   Step 3: Update booking message metadata → confirmed
+//   Step 4: Gửi DealCard message trong chat
+//   Step 5: Update deal totals
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
@@ -180,6 +180,7 @@ export const dealConfirmService = {
           formData.advance_notes || '',
         ].filter(Boolean).join('. ')
 
+        // Step 2a: Tạo advance ở trạng thái 'approved' (chưa chi)
         const { data: advance, error: advError } = await supabase
           .from('b2b_advances')
           .insert({
@@ -192,10 +193,10 @@ export const dealConfirmService = {
             payment_date: new Date().toISOString().split('T')[0],
             payment_method: formData.advance_payment_method || 'cash',
             purpose,
-            status: 'paid',
+            status: 'approved',
             requested_by: context.confirmedBy,
-            paid_by: context.confirmedBy,
-            paid_at: new Date().toISOString(),
+            approved_by: context.confirmedBy,
+            approved_at: new Date().toISOString(),
           })
           .select('*')
           .single()
@@ -203,44 +204,19 @@ export const dealConfirmService = {
         if (advError) {
           console.error('Advance creation failed (deal still created):', advError)
         } else {
-          totalAdvanced = formData.advance_amount
-          result.advance = {
-            id: advance.id,
-            advance_number: advance.advance_number,
-            amount: advance.amount,
-          }
-
-          // === Step 3: Ghi Ledger ===
+          // Step 2b: Gọi markPaid — đây là nơi DUY NHẤT ghi ledger cho advance
+          // (tránh double entry nếu ghi ledger trực tiếp ở đây + markPaid)
           try {
-            const now = new Date()
-            const { data: ledgerEntry, error: ledgerError } = await supabase
-              .from('b2b_partner_ledger')
-              .insert({
-                partner_id: context.partnerId,
-                entry_type: 'advance',
-                debit: 0,
-                credit: formData.advance_amount,
-                advance_id: advance.id,
-                reference_code: advanceNumber,
-                description: `Tạm ứng khi xác nhận deal ${dealNumber}`,
-                entry_date: now.toISOString().split('T')[0],
-                period_month: now.getMonth() + 1,
-                period_year: now.getFullYear(),
-                created_by: context.confirmedBy,
-              })
-              .select('id, credit')
-              .single()
-
-            if (ledgerError) {
-              console.error('Ledger entry failed:', ledgerError)
-            } else {
-              result.ledgerEntry = {
-                id: ledgerEntry.id,
-                credit: ledgerEntry.credit,
-              }
+            const { advanceService } = await import('./advanceService')
+            const paidAdvance = await advanceService.markPaid(advance.id, context.confirmedBy)
+            totalAdvanced = paidAdvance.amount_vnd || paidAdvance.amount || 0
+            result.advance = {
+              id: paidAdvance.id,
+              advance_number: paidAdvance.advance_number,
+              amount: paidAdvance.amount,
             }
           } catch (err) {
-            console.error('Ledger entry error:', err)
+            console.error('markPaid failed (advance created but ledger not written):', err)
           }
         }
       } catch (err) {

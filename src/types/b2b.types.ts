@@ -18,7 +18,13 @@ export type SenderType = 'factory' | 'partner' | 'system'
 export type ParticipantRole = 'owner' | 'admin' | 'member'
 
 export type BookingStatus = 'pending' | 'confirmed' | 'negotiating' | 'rejected' | 'cancelled'
-export type DealStatus = 'draft' | 'active' | 'completed' | 'cancelled'
+// DealStatus — thống nhất với dealService.ts (đã cập nhật 18/04/2026)
+//   pending    — Chờ xử lý (manual create, chưa bắt đầu)
+//   processing — Đang xử lý (nhập kho, QC, tạm ứng)
+//   accepted   — Đã duyệt (đủ điều kiện: weight + DRC + QC passed)
+//   settled    — Đã quyết toán
+//   cancelled  — Đã hủy
+export type DealStatus = 'pending' | 'processing' | 'accepted' | 'settled' | 'cancelled'
 
 // ============================================================================
 // PARTNER INTERFACES

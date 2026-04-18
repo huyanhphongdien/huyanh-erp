@@ -87,7 +87,8 @@ export function useB2BChatRoom(roomId: string | null) {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
   // Fetch room info
   const fetchRoom = useCallback(async () => {
@@ -150,7 +151,7 @@ export function useB2BChatRoom(roomId: string | null) {
     [roomId, user]
   );
 
-  // Subscribe realtime messages
+  // Subscribe realtime messages + auto-reconnect
   useEffect(() => {
     if (!roomId) {
       setRoom(null);
@@ -161,27 +162,45 @@ export function useB2BChatRoom(roomId: string | null) {
     fetchRoom();
     fetchMessages();
 
-    // Subscribe to new messages
-    channelRef.current = chatMessageService.subscribeToRoom(roomId, {
+    let wasDisconnected = false;
+
+    subscriptionRef.current = chatMessageService.subscribeToRoom(roomId, {
       onInsert: (newMessage: ChatMessage) => {
         setMessages((prev) => {
-          // Tránh duplicate
           if (prev.some((m) => m.id === newMessage.id)) {
             return prev;
           }
           return [...prev, newMessage];
         });
 
-        // Mark as read nếu là tin từ partner
         if (newMessage.sender_type === 'partner') {
           chatMessageService.markAsRead(roomId);
         }
       },
-    }) as unknown as RealtimeChannel;
+      onUpdate: (updatedMessage: ChatMessage) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === updatedMessage.id ? { ...m, ...updatedMessage } : m))
+        );
+      },
+      onDelete: (deletedMessage: ChatMessage) => {
+        setMessages((prev) => prev.filter((m) => m.id !== deletedMessage.id));
+      },
+      onStatusChange: (status) => {
+        setConnectionStatus(status);
+        if (status === 'disconnected' || status === 'reconnecting') {
+          wasDisconnected = true;
+        } else if (status === 'connected' && wasDisconnected) {
+          // Vừa kết nối lại → refetch để lấy tin nhắn bị miss trong lúc disconnect
+          wasDisconnected = false;
+          fetchMessages();
+        }
+      },
+    });
 
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
       }
     };
   }, [roomId, fetchRoom, fetchMessages]);
@@ -193,6 +212,7 @@ export function useB2BChatRoom(roomId: string | null) {
     isLoadingMessages,
     isSending,
     error,
+    connectionStatus,
     sendMessage,
     refetchMessages: fetchMessages,
   };

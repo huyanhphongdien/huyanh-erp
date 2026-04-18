@@ -528,13 +528,16 @@ export const chatMessageService = {
   // ============================================
 
   /**
-   * Subscribe to messages of a specific room.
+   * Subscribe to messages of a specific room với AUTO-RECONNECT.
    *
    * Base table là b2b.chat_messages (public.b2b_chat_messages chỉ là VIEW
    * không publish realtime được). Subscription phải trỏ vào base table
    * với schema:'b2b'. Migration đi kèm add b2b.chat_messages vào
    * supabase_realtime publication:
    *   docs/migrations/b2b_chat_realtime_publication.sql
+   *
+   * Trả về subscription object với .unsubscribe() thay vì channel trực tiếp.
+   * Tự động reconnect khi mất kết nối (exponential backoff, max 30s).
    */
   subscribeToRoom(
     roomId: string,
@@ -542,60 +545,128 @@ export const chatMessageService = {
       onInsert?: (message: ChatMessage) => void
       onUpdate?: (message: ChatMessage) => void
       onDelete?: (message: ChatMessage) => void
+      onStatusChange?: (status: 'connected' | 'disconnected' | 'reconnecting') => void
     }
   ) {
-    // Unique channel per (room, mount instance) để 2 tab mở cùng 1 room
-    // hoặc 2 mount không dùng chung channel gây duplicate/miss event
-    const channelName = `chat-room-${roomId}-${Math.random().toString(36).slice(2, 8)}`
-    return supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'b2b',
-          table: 'chat_messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          callbacks.onInsert?.(payload.new as ChatMessage)
+    let currentChannel: ReturnType<typeof supabase.channel> | null = null
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let retryCount = 0
+    let unsubscribed = false
+    const MAX_BACKOFF_MS = 30000
+
+    const connect = () => {
+      if (unsubscribed) return
+
+      // Unique channel name mỗi lần connect để tránh reuse stale channel
+      const channelName = `chat-room-${roomId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+
+      currentChannel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'b2b',
+            table: 'chat_messages',
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => callbacks.onInsert?.(payload.new as ChatMessage)
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'b2b',
+            table: 'chat_messages',
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => callbacks.onUpdate?.(payload.new as ChatMessage)
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'b2b',
+            table: 'chat_messages',
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => callbacks.onDelete?.(payload.old as ChatMessage)
+        )
+        .subscribe((status) => {
+          if (unsubscribed) return
+
+          if (status === 'SUBSCRIBED') {
+            if (retryCount > 0) {
+              console.log(`[chat-realtime] reconnected after ${retryCount} attempts`)
+            }
+            retryCount = 0
+            callbacks.onStatusChange?.('connected')
+            return
+          }
+
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            callbacks.onStatusChange?.(retryCount === 0 ? 'disconnected' : 'reconnecting')
+
+            // Tháo channel cũ trước khi reconnect
+            if (currentChannel) {
+              supabase.removeChannel(currentChannel)
+              currentChannel = null
+            }
+
+            // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (cap)
+            const delay = Math.min(1000 * Math.pow(2, retryCount), MAX_BACKOFF_MS)
+            retryCount++
+
+            console.warn(
+              `[chat-realtime] lost — status: ${status}. Reconnect in ${delay}ms (attempt ${retryCount})`
+            )
+
+            reconnectTimer = setTimeout(() => {
+              reconnectTimer = null
+              connect()
+            }, delay)
+          }
+        })
+    }
+
+    connect()
+
+    // Auto reconnect khi tab active trở lại (user quay lại từ tab khác)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !unsubscribed) {
+        // Force reconnect nếu channel không healthy
+        const state = (currentChannel as any)?.state
+        if (state !== 'joined' && state !== 'joining') {
+          console.log('[chat-realtime] tab visible — force reconnect')
+          retryCount = 0 // Reset backoff
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer)
+            reconnectTimer = null
+          }
+          if (currentChannel) {
+            supabase.removeChannel(currentChannel)
+            currentChannel = null
+          }
+          connect()
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'b2b',
-          table: 'chat_messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          callbacks.onUpdate?.(payload.new as ChatMessage)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return {
+      unsubscribe: () => {
+        unsubscribed = true
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer)
+          reconnectTimer = null
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'b2b',
-          table: 'chat_messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          callbacks.onDelete?.(payload.old as ChatMessage)
+        if (currentChannel) {
+          supabase.removeChannel(currentChannel)
+          currentChannel = null
         }
-      )
-      .subscribe((status) => {
-        // Giữ lại warning cho trường hợp subscription fail để catch regression
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error(
-            '[chat-realtime] subscription lost — status:', status,
-            '\nVerify: (1) b2b.chat_messages ở trong supabase_realtime publication,',
-            '(2) REPLICA IDENTITY FULL, (3) RLS SELECT policy cho authenticated.',
-            '\nMigration: docs/migrations/b2b_chat_realtime_publication.sql'
-          )
-        }
-      })
+      },
+    }
   },
 
   // ============================================

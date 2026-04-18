@@ -634,6 +634,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   const [room, setRoom] = useState<ChatRoom | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected')
   const [sending, setSending] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null)
@@ -851,10 +852,19 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       onDelete: (deletedMessage) => {
         setMessages((prev) => prev.filter((m) => m.id !== deletedMessage.id))
       },
+      onStatusChange: (status) => {
+        setConnectionStatus((prev) => {
+          // Khi vừa reconnect thành công → refetch để lấy tin nhắn bị miss
+          if (prev !== 'connected' && status === 'connected') {
+            fetchMessages()
+          }
+          return status
+        })
+      },
     })
 
     return () => { channel.unsubscribe() }
-  }, [roomId])
+  }, [roomId, fetchMessages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1289,18 +1299,26 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
               </Space>
             </div>
           </Space>
-          <Dropdown
-            menu={{
-              items: [
-                { key: 'search', icon: <SearchOutlined />, label: 'Tìm kiếm' },
-                { key: 'pinned', icon: <PushpinOutlined />, label: 'Tin đã ghim' },
-                { key: 'files', icon: <FileOutlined />, label: 'File đã gửi' },
-              ],
-            }}
-            trigger={['click']}
-          >
-            <Button type="text" icon={<MoreOutlined />} />
-          </Dropdown>
+          <Space size={8}>
+            {connectionStatus === 'disconnected' && (
+              <Tag color="red" style={{ fontSize: 11, margin: 0 }}>● Mất kết nối</Tag>
+            )}
+            {connectionStatus === 'reconnecting' && (
+              <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>● Đang kết nối lại...</Tag>
+            )}
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'search', icon: <SearchOutlined />, label: 'Tìm kiếm' },
+                  { key: 'pinned', icon: <PushpinOutlined />, label: 'Tin đã ghim' },
+                  { key: 'files', icon: <FileOutlined />, label: 'File đã gửi' },
+                ],
+              }}
+              trigger={['click']}
+            >
+              <Button type="text" icon={<MoreOutlined />} />
+            </Dropdown>
+          </Space>
         </Space>
       </Card>
 

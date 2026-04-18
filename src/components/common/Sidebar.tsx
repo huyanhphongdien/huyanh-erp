@@ -139,6 +139,7 @@ const getMenuGroups = (
 ): MenuGroup[] => [
   {
     title: 'TỔNG QUAN',
+    collapsible: true,
     icon: <LayoutDashboard size={18} />,
     items: [
       { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -172,6 +173,7 @@ const getMenuGroups = (
   },
   {
     title: 'QUẢN LÝ CÔNG VIỆC',
+    collapsible: true,
     icon: <ClipboardList size={18} />,
     items: [
       { path: '/tasks', label: 'Danh sách công việc', icon: <ClipboardList size={18} /> },
@@ -222,6 +224,7 @@ const getMenuGroups = (
       { path: '/purchasing/debt', label: 'Công nợ NCC', icon: <DollarSign size={18} />, requirePurchaseAccess: true },
       { path: '/purchasing/payments', label: 'Lịch sử thanh toán', icon: <CreditCard size={18} />, requirePurchaseAccess: true },
       { path: '/purchasing/reports', label: 'Báo cáo mua hàng', icon: <TrendingUp size={18} />, requirePurchaseAccess: true },
+      { path: '/purchasing/access', label: 'Phân quyền', icon: <Shield size={18} />, bgdOnly: true },
     ],
   },
 
@@ -346,13 +349,6 @@ const getMenuGroups = (
     items: [
       { path: '/wms/production', label: 'Lệnh sản xuất', icon: <ClipboardList size={18} /> },
       { path: '/wms/production/dashboard', label: 'Dashboard SX', icon: <TrendingUp size={18} /> },
-      { path: '/production/live', label: 'Live Board', icon: <Monitor size={18} /> },
-      { path: '/production/shift-reports', label: 'Báo cáo ca', icon: <Timer size={18} /> },
-      { path: '/production/downtimes', label: 'Downtime / Sự cố', icon: <AlertTriangle size={18} /> },
-      { path: '/production/oee', label: 'OEE', icon: <TrendingUp size={18} /> },
-      { path: '/production/sop', label: 'SOP', icon: <FileText size={18} /> },
-      { path: '/production/training', label: 'Huấn luyện', icon: <UserCheck size={18} /> },
-      { path: '/production/safety-signs', label: 'Biển hiệu AT', icon: <AlertTriangle size={18} /> },
       { path: '/wms/production/facilities', label: 'Dây chuyền', icon: <Settings size={18} /> },
       { path: '/wms/production/specs', label: 'Công thức BOM', icon: <FileText size={18} /> },
       { path: '/wms/blending', label: 'Phối trộn', icon: <Droplets size={18} /> },
@@ -381,14 +377,7 @@ const getMenuGroups = (
     ],
   },
 
-  {
-    title: 'QUẢN TRỊ',
-    icon: <Shield size={18} />,
-    executiveOnly: true,
-    items: [
-      { path: '/purchasing/access', label: 'Phân quyền mua hàng', icon: <Shield size={18} />, bgdOnly: true },
-    ],
-  },
+  // QUẢN TRỊ: đã gộp vào MUA HÀNG (Phân quyền)
   {
     title: 'BÁO CÁO',
     icon: <BarChart3 size={18} />,
@@ -418,15 +407,19 @@ export function Sidebar() {
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
-    'KHO THÀNH PHẨM': true,
-    'LÝ LỊCH MỦ': true,
-    'THU MUA MỦ': true,
-    'MUA HÀNG': true,
-    'QUẢN LÝ NHÂN SỰ': true,
+    // Mặc định MỞ: module đang dùng nhiều
     'CHẤM CÔNG': false,
-    'QUẢN LÝ ĐƠN HÀNG': true,
-    'QUẢN LÝ DỰ ÁN': false,
-    'B2B THU MUA': false,
+    'ĐƠN HÀNG BÁN': false,
+    'KHO (WMS)': false,
+    // Mặc định ĐÓNG: module ít dùng hàng ngày
+    'QUẢN LÝ SẢN XUẤT': true,
+    'QUẢN LÝ CÔNG VIỆC': true,
+    'QUẢN LÝ DỰ ÁN': true,
+    'MUA HÀNG': true,
+    'B2B THU MUA': true,
+    'BÁO CÁO': true,
+    'QUẢN TRỊ': true,
+    'CÀI ĐẶT': true,
   });
 
   // ★ Purchase access state

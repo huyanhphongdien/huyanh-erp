@@ -5,6 +5,7 @@ import viVN from 'antd/locale/vi_VN'
 import 'antd/dist/reset.css'
 import { antdTheme } from './config/antdTheme'
 import './index.css'
+import './styles/airtable-theme.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

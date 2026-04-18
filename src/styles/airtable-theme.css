@@ -1,0 +1,341 @@
+/* ============================================================================
+ * AIRTABLE-INSPIRED THEME — Huy Anh ERP
+ * Inspired by getdesign.md/airtable — adapted with brand color #1B4D3E
+ *
+ * Key principles:
+ * - Clean white canvas + deep text
+ * - Positive letter-spacing on body text
+ * - Blue-tinted shadows (adapted to green brand)
+ * - 12px radius buttons, 16px cards
+ * - Consistent spacing (8px base grid)
+ * ============================================================================ */
+
+:root {
+  /* ── Brand Colors (Huy Anh — keep, NOT Airtable Blue) ── */
+  --ha-primary: #1B4D3E;
+  --ha-primary-hover: #164033;
+  --ha-primary-light: #E8F5E9;
+  --ha-accent: #E8A838;
+
+  /* ── Airtable-inspired Neutrals ── */
+  --at-text-primary: #181d26;
+  --at-text-secondary: #333333;
+  --at-text-weak: rgba(4, 14, 32, 0.69);
+  --at-text-muted: rgba(4, 14, 32, 0.45);
+  --at-surface: #ffffff;
+  --at-surface-subtle: #f8fafc;
+  --at-border: #e0e2e6;
+  --at-border-strong: #d0d5dd;
+
+  /* ── Semantic ── */
+  --at-success: #006400;
+  --at-error: #dc2626;
+  --at-warning: #f59e0b;
+  --at-info: #1b61c9;
+
+  /* ── Shadows (green-tinted for brand) ── */
+  --at-shadow-sm: rgba(0,0,0,0.06) 0px 1px 2px;
+  --at-shadow-md: rgba(0,0,0,0.08) 0px 2px 4px, rgba(27,77,62,0.12) 0px 1px 3px;
+  --at-shadow-lg: rgba(0,0,0,0.1) 0px 4px 12px, rgba(27,77,62,0.08) 0px 2px 6px;
+  --at-shadow-card: 0px 0px 1px rgba(0,0,0,0.2), 0px 1px 3px rgba(27,77,62,0.1);
+  --at-shadow-button: 0px 1px 2px rgba(27,77,62,0.15);
+
+  /* ── Radius ── */
+  --at-radius-sm: 6px;
+  --at-radius-md: 10px;
+  --at-radius-lg: 16px;
+  --at-radius-button: 10px;
+  --at-radius-card: 12px;
+  --at-radius-input: 8px;
+
+  /* ── Spacing (8px base) ── */
+  --at-space-1: 4px;
+  --at-space-2: 8px;
+  --at-space-3: 12px;
+  --at-space-4: 16px;
+  --at-space-5: 20px;
+  --at-space-6: 24px;
+  --at-space-8: 32px;
+  --at-space-10: 40px;
+  --at-space-12: 48px;
+}
+
+/* ============================================================================
+ * GLOBAL TYPOGRAPHY — Airtable-style letter-spacing + weights
+ * ============================================================================ */
+
+body {
+  color: var(--at-text-primary);
+  letter-spacing: 0.1px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4 {
+  color: var(--at-text-primary) !important;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+p, span, div {
+  letter-spacing: 0.08px;
+}
+
+/* ============================================================================
+ * ANT DESIGN OVERRIDES — Airtable aesthetic
+ * ============================================================================ */
+
+/* ── Buttons ── */
+.ant-btn {
+  border-radius: var(--at-radius-button) !important;
+  letter-spacing: 0.08px;
+  font-weight: 500;
+  box-shadow: var(--at-shadow-button);
+  transition: all 0.2s ease;
+}
+
+.ant-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--at-shadow-md);
+}
+
+.ant-btn-primary {
+  background: var(--ha-primary) !important;
+  border-color: var(--ha-primary) !important;
+}
+
+.ant-btn-primary:hover {
+  background: var(--ha-primary-hover) !important;
+  border-color: var(--ha-primary-hover) !important;
+}
+
+/* ── Cards ── */
+.ant-card {
+  border-radius: var(--at-radius-card) !important;
+  border: 1px solid var(--at-border) !important;
+  box-shadow: var(--at-shadow-card) !important;
+  transition: box-shadow 0.2s ease;
+}
+
+.ant-card:hover {
+  box-shadow: var(--at-shadow-md) !important;
+}
+
+.ant-card-head {
+  border-bottom: 1px solid var(--at-border) !important;
+  padding: var(--at-space-3) var(--at-space-4) !important;
+  min-height: unset !important;
+}
+
+.ant-card-head-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05px;
+  color: var(--at-text-primary);
+}
+
+.ant-card-body {
+  padding: var(--at-space-4) !important;
+}
+
+/* ── Tables ── */
+.ant-table {
+  border-radius: var(--at-radius-card) !important;
+  overflow: hidden;
+}
+
+.ant-table-thead > tr > th {
+  background: var(--at-surface-subtle) !important;
+  color: var(--at-text-weak) !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--at-border) !important;
+  padding: 10px 12px !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0 !important;
+  padding: 10px 12px !important;
+  font-size: 13px;
+  color: var(--at-text-primary);
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(27, 77, 62, 0.03) !important;
+}
+
+.ant-table-tbody > tr:last-child > td {
+  border-bottom: none !important;
+}
+
+/* ── Inputs ── */
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker {
+  border-radius: var(--at-radius-input) !important;
+  border-color: var(--at-border) !important;
+  transition: all 0.2s ease;
+}
+
+.ant-input:focus,
+.ant-input-focused,
+.ant-input-number:focus,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused {
+  border-color: var(--ha-primary) !important;
+  box-shadow: 0 0 0 2px rgba(27, 77, 62, 0.1) !important;
+}
+
+/* ── Tags ── */
+.ant-tag {
+  border-radius: var(--at-radius-sm) !important;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05px;
+  padding: 2px 8px;
+  border: none !important;
+}
+
+/* ── Tabs ── */
+.ant-tabs-tab {
+  letter-spacing: 0.05px !important;
+  font-weight: 500 !important;
+  color: var(--at-text-weak) !important;
+  transition: all 0.2s ease;
+}
+
+.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--ha-primary) !important;
+  font-weight: 600 !important;
+}
+
+.ant-tabs-ink-bar {
+  background: var(--ha-primary) !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+}
+
+/* ── Steps ── */
+.ant-steps-item-process .ant-steps-item-icon {
+  background: var(--ha-primary) !important;
+  border-color: var(--ha-primary) !important;
+}
+
+.ant-steps-item-finish .ant-steps-item-icon {
+  border-color: var(--ha-primary) !important;
+}
+
+.ant-steps-item-finish .ant-steps-item-icon > .ant-steps-icon {
+  color: var(--ha-primary) !important;
+}
+
+/* ── Modal ── */
+.ant-modal-content {
+  border-radius: var(--at-radius-lg) !important;
+  box-shadow: var(--at-shadow-lg) !important;
+  overflow: hidden;
+}
+
+.ant-modal-header {
+  border-bottom: 1px solid var(--at-border) !important;
+  padding: var(--at-space-4) var(--at-space-6) !important;
+}
+
+/* ── Alert ── */
+.ant-alert {
+  border-radius: var(--at-radius-md) !important;
+}
+
+/* ── Statistic ── */
+.ant-statistic-title {
+  color: var(--at-text-weak) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.ant-statistic-content-value {
+  color: var(--at-text-primary) !important;
+  letter-spacing: -0.02em;
+}
+
+/* ── Descriptions ── */
+.ant-descriptions-item-label {
+  color: var(--at-text-weak) !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.05px;
+}
+
+/* ── Popconfirm / Tooltip ── */
+.ant-popover-inner,
+.ant-tooltip-inner {
+  border-radius: var(--at-radius-md) !important;
+}
+
+/* ── Select dropdown ── */
+.ant-select-dropdown {
+  border-radius: var(--at-radius-md) !important;
+  box-shadow: var(--at-shadow-lg) !important;
+}
+
+/* ── Scrollbar (Airtable-like thin) ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ============================================================================
+ * SIDEBAR POLISH
+ * ============================================================================ */
+
+/* Sidebar smoother transitions */
+nav a {
+  transition: all 0.15s ease !important;
+}
+
+/* ============================================================================
+ * AIRTABLE "DATA-DENSE" TABLE FEEL
+ * ============================================================================ */
+
+/* Compact table for list pages */
+.ant-table-small .ant-table-tbody > tr > td {
+  padding: 8px 10px !important;
+}
+
+/* Alternating row (very subtle) */
+.ant-table-tbody > tr:nth-child(even) > td {
+  background: rgba(248, 250, 252, 0.5);
+}
+
+/* ============================================================================
+ * ANIMATION — subtle, not flashy
+ * ============================================================================ */
+
+.ant-card,
+.ant-btn,
+.ant-input,
+.ant-select-selector {
+  transition: all 0.2s ease !important;
+}

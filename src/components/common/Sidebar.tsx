@@ -293,6 +293,12 @@ const getMenuGroups = (
         requireB2BPurchaser: true,
       },
       {
+        path: '/b2b/disputes',
+        label: 'Khiếu nại DRC',
+        icon: <AlertTriangle size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
         path: '/b2b/analytics',
         label: 'Phân tích B2B',
         icon: <TrendingUp size={18} />,

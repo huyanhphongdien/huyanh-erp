@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { patchDealCardMetadata } from './dealChatActionsService'
 
 // ============================================
 // TYPES
@@ -503,6 +504,19 @@ export const dealWmsService = {
       .from('b2b_chat_rooms')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
+
+    // Sync DealCard live — progress bar chuyển sang "Đã nhập kho"
+    const { data: freshDeal } = await supabase
+      .from('b2b_deals')
+      .select('stock_in_count, actual_weight_kg')
+      .eq('id', dealId)
+      .single()
+    if (freshDeal) {
+      await patchDealCardMetadata(dealId, {
+        stock_in_count: freshDeal.stock_in_count ?? undefined,
+        actual_weight_kg: freshDeal.actual_weight_kg ?? undefined,
+      })
+    }
     } catch (e) { console.error('[dealWms] notifyStockIn error:', e) }
   },
 
@@ -558,6 +572,20 @@ export const dealWmsService = {
       .from('b2b_chat_rooms')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
+
+    // Sync DealCard live — DRC thực + qc_status để progress bar + variance warning hiển thị
+    const { data: freshDeal } = await supabase
+      .from('b2b_deals')
+      .select('actual_drc, qc_status, final_value')
+      .eq('id', dealId)
+      .single()
+    if (freshDeal) {
+      await patchDealCardMetadata(dealId, {
+        actual_drc: freshDeal.actual_drc ?? undefined,
+        qc_status: (freshDeal.qc_status as any) ?? undefined,
+        final_value: freshDeal.final_value ?? undefined,
+      })
+    }
     } catch (e) { console.error('[dealWms] notifyQc error:', e) }
   },
 
@@ -620,6 +648,18 @@ export const dealWmsService = {
       .from('b2b_chat_rooms')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', room.id)
+
+    // Sync DealCard live — settlement code + có thể status deal đã đổi (accepted → settled)
+    const { data: freshDeal } = await supabase
+      .from('b2b_deals')
+      .select('status, final_value')
+      .eq('id', dealId)
+      .single()
+    await patchDealCardMetadata(dealId, {
+      settlement_code: settlementCode,
+      status: freshDeal?.status ?? undefined,
+      final_value: freshDeal?.final_value ?? undefined,
+    })
     } catch (e) { console.error('[dealWms] notifySettlement error:', e) }
   },
 

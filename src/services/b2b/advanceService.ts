@@ -32,6 +32,8 @@ export interface Advance {
   approved_at: string | null
   paid_by: string | null
   paid_at: string | null
+  partner_ack_at: string | null
+  partner_ack_by: string | null
   created_at: string
   updated_at: string
   // Joined
@@ -393,6 +395,19 @@ export const advanceService = {
       }
     } catch (err) { console.error('Ledger entry for advance failed:', err) }
 
+    // Patch DealCard — đánh dấu pending ack (partner chưa xác nhận đã nhận)
+    try {
+      const advance = data as Advance
+      if (advance?.deal_id) {
+        const { patchDealCardMetadata } = await import('./dealChatActionsService')
+        await patchDealCardMetadata(advance.deal_id, {
+          pending_ack_advance_id: advance.id,
+          pending_ack_advance_number: advance.advance_number,
+          pending_ack_advance_amount: advance.amount_vnd || advance.amount || 0,
+        })
+      }
+    } catch (err) { console.error('Patch DealCard pending_ack failed:', err) }
+
     return data as Advance
   },
 
@@ -409,6 +424,50 @@ export const advanceService = {
 
     if (error) throw error
     return data as Advance
+  },
+
+  /**
+   * PARTNER ONLY — gọi từ Portal đại lý
+   * Xác nhận đã nhận tạm ứng. Chỉ chạy 1 lần, sau đó partner_ack_at != null.
+   * Dùng RPC partner_acknowledge_advance (SECURITY DEFINER) để verify JWT.
+   */
+  async acknowledgeByPartner(advanceId: string): Promise<void> {
+    const { error } = await supabase.rpc('partner_acknowledge_advance', {
+      p_advance_id: advanceId,
+    })
+    if (error) throw new Error(error.message || 'Không thể xác nhận tạm ứng')
+
+    // Clear pending_ack flags trên DealCard
+    try {
+      const advance = await this.getAdvanceById(advanceId)
+      if (advance?.deal_id) {
+        const { patchDealCardMetadata } = await import('./dealChatActionsService')
+        await patchDealCardMetadata(advance.deal_id, {
+          pending_ack_advance_id: undefined,
+          pending_ack_advance_number: undefined,
+          pending_ack_advance_amount: undefined,
+        })
+      }
+    } catch (err) { console.error('Patch DealCard clear pending_ack failed:', err) }
+  },
+
+  /**
+   * Lấy các advance CHƯA được partner ack — dùng cho bell notification
+   * phía nhà máy ("Đại lý XYZ chưa ack tạm ứng ABC").
+   */
+  async getUnacknowledgedAdvances(partnerId?: string): Promise<Advance[]> {
+    let query = supabase
+      .from('b2b_advances')
+      .select('*')
+      .eq('status', 'paid')
+      .is('partner_ack_at', null)
+      .order('paid_at', { ascending: false })
+
+    if (partnerId) query = query.eq('partner_id', partnerId)
+
+    const { data, error } = await query
+    if (error) throw error
+    return (data || []) as Advance[]
   },
 
   // ============================================

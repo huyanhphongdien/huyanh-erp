@@ -80,6 +80,8 @@ import ConfirmDealModal from '../../components/b2b/ConfirmDealModal'
 import AddAdvanceModal from '../../components/b2b/AddAdvanceModal'
 import RecordDeliveryModal from '../../components/b2b/RecordDeliveryModal'
 import DealCard from '../../components/b2b/DealCard'
+import RaiseDisputeModal from '../../components/b2b/RaiseDisputeModal'
+import DisputeDetailDrawer from '../../components/b2b/DisputeDetailDrawer'
 import EmojiPickerPopover from '../../components/b2b/EmojiPickerPopover'
 import { chatAttachmentService } from '../../services/b2b/chatAttachmentService'
 import { dealChatActionsService } from '../../services/b2b/dealChatActionsService'
@@ -145,6 +147,8 @@ const BookingCard = ({
   onReject,
   onNegotiate
 }: BookingCardProps) => {
+  const [collapsedExpanded, setCollapsedExpanded] = useState(false)
+
   if (!booking) {
     return (
       <Card size="small" style={{ width: 320, borderRadius: 12 }}>
@@ -155,6 +159,43 @@ const BookingCard = ({
 
   const isPending = booking.status === 'pending'
   const isNegotiating = booking.status === 'negotiating'
+  const isConfirmed = booking.status === 'confirmed'
+  const isRejected = booking.status === 'rejected'
+
+  // Khi booking đã chuyển thành Deal (confirmed) hoặc bị reject → collapse mini view
+  // Giảm trùng lặp với DealCard hiển thị ngay dưới.
+  if ((isConfirmed || isRejected) && !collapsedExpanded) {
+    const miniBg = isConfirmed ? 'rgba(82,196,26,0.08)' : 'rgba(156,163,175,0.1)'
+    const miniBorder = isConfirmed ? 'rgba(82,196,26,0.3)' : 'rgba(156,163,175,0.3)'
+    const iconColor = isConfirmed ? '#52c41a' : '#9ca3af'
+    const mainText = isConfirmed
+      ? `${booking.code || 'Phiếu chốt'} đã được xác nhận thành Deal`
+      : `${booking.code || 'Phiếu chốt'} đã bị từ chối`
+    const IconCmp = isConfirmed ? CheckCircleOutlined : CloseCircleOutlined
+
+    return (
+      <Card
+        size="small"
+        style={{
+          width: 320,
+          borderRadius: 10,
+          background: miniBg,
+          border: `1px solid ${miniBorder}`,
+          cursor: 'pointer',
+        }}
+        styles={{ body: { padding: '8px 12px' } }}
+        onClick={() => setCollapsedExpanded(true)}
+      >
+        <Space size={8} style={{ width: '100%' }}>
+          <IconCmp style={{ color: iconColor, fontSize: 16 }} />
+          <Text style={{ flex: 1, fontSize: 12, color: '#374151' }} ellipsis>
+            {mainText}
+          </Text>
+          <Text style={{ fontSize: 11, color: '#9ca3af' }}>Mở rộng ▾</Text>
+        </Space>
+      </Card>
+    )
+  }
 
   return (
     <Card
@@ -180,6 +221,14 @@ const BookingCard = ({
         <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
           {booking.code}
         </Text>
+        {(isConfirmed || isRejected) && (
+          <Text
+            style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, cursor: 'pointer', marginLeft: 8 }}
+            onClick={() => setCollapsedExpanded(false)}
+          >
+            Thu gọn ▴
+          </Text>
+        )}
       </div>
 
       {/* Content */}
@@ -348,7 +397,7 @@ interface MessageBubbleProps {
   showAvatar: boolean
   onContextMenu: (message: ChatMessage, action: string) => void
   onBookingAction: (messageId: string, action: 'confirm' | 'reject' | 'negotiate') => void
-  onDealAction: (dealId: string, action: 'add_advance' | 'delivery' | 'view_details') => void
+  onDealAction: (dealId: string, action: 'add_advance' | 'delivery' | 'view_details' | 'accept_deal' | 'create_settlement' | 'view_settlement' | 'raise_dispute' | 'view_dispute') => void
 }
 
 const MessageBubble = ({
@@ -404,6 +453,11 @@ const MessageBubble = ({
             onAddAdvance={() => onDealAction(dealMeta?.deal_id, 'add_advance')}
             onRecordDelivery={() => onDealAction(dealMeta?.deal_id, 'delivery')}
             onViewDetails={() => onDealAction(dealMeta?.deal_id, 'view_details')}
+            onAcceptDeal={() => onDealAction(dealMeta?.deal_id, 'accept_deal')}
+            onCreateSettlement={() => onDealAction(dealMeta?.deal_id, 'create_settlement')}
+            onViewSettlement={() => onDealAction(dealMeta?.deal_id, 'view_settlement')}
+            onRaiseDispute={() => onDealAction(dealMeta?.deal_id, 'raise_dispute')}
+            onViewDispute={() => onDealAction(dealMeta?.deal_id, 'view_dispute')}
           />
         )
 
@@ -668,6 +722,18 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
     deal: DealCardMetadata | null
   }>({ visible: false, deal: null })
   const [deliveryLoading, setDeliveryLoading] = useState(false)
+
+  // Raise Dispute Modal state
+  const [raiseDisputeModal, setRaiseDisputeModal] = useState<{
+    visible: boolean
+    deal: DealCardMetadata | null
+  }>({ visible: false, deal: null })
+
+  // View Dispute Drawer state
+  const [disputeDrawer, setDisputeDrawer] = useState<{
+    open: boolean
+    disputeId: string | null
+  }>({ open: false, disputeId: null })
 
   // Negotiate modal
   const [negotiateModal, setNegotiateModal] = useState<{ visible: boolean; messageId: string | null }>({
@@ -1074,9 +1140,45 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   }
 
   // Xử lý actions trên DealCard
-  const handleDealAction = (dealId: string, action: 'add_advance' | 'delivery' | 'view_details') => {
+  const handleDealAction = async (
+    dealId: string,
+    action: 'add_advance' | 'delivery' | 'view_details' | 'accept_deal' | 'create_settlement' | 'view_settlement' | 'raise_dispute' | 'view_dispute',
+  ) => {
     if (action === 'view_details') {
       navigate(`/b2b/deals/${dealId}`)
+      return
+    }
+
+    if (action === 'create_settlement') {
+      navigate(`/b2b/settlements/new?deal_id=${dealId}`)
+      return
+    }
+
+    if (action === 'view_settlement') {
+      // Nav sang deal detail — từ đó user thấy phiếu QT gắn với deal này
+      navigate(`/b2b/deals/${dealId}`)
+      return
+    }
+
+    if (action === 'accept_deal') {
+      // Duyệt deal ngay từ chat — backend đã validate điều kiện + role
+      try {
+        const fullDeal = await dealService.getDealById(dealId)
+        if (!fullDeal) throw new Error('Không tìm thấy deal')
+        const { canAccept, missing } = dealService.checkAcceptConditions(fullDeal)
+        if (!canAccept) {
+          message.error({
+            content: `Chưa đủ điều kiện duyệt:\n- ${missing.join('\n- ')}`,
+            duration: 6,
+          })
+          return
+        }
+        await dealService.acceptDeal(dealId)
+        message.success('Đã duyệt Deal thành công')
+        fetchMessages()
+      } catch (err: any) {
+        message.error(err?.message || 'Không thể duyệt Deal')
+      }
       return
     }
 
@@ -1095,6 +1197,25 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       setAddAdvanceModal({ visible: true, deal: dealMeta })
     } else if (action === 'delivery') {
       setDeliveryModal({ visible: true, deal: dealMeta })
+    } else if (action === 'raise_dispute') {
+      setRaiseDisputeModal({ visible: true, deal: dealMeta })
+    } else if (action === 'view_dispute') {
+      if (dealMeta.active_dispute_id) {
+        setDisputeDrawer({ open: true, disputeId: dealMeta.active_dispute_id })
+      } else {
+        // Fallback: tìm dispute active mới nhất cho deal
+        try {
+          const { drcDisputeService } = await import('../../services/b2b/drcDisputeService')
+          const found = await drcDisputeService.getActiveDisputeByDeal(dealId)
+          if (found) {
+            setDisputeDrawer({ open: true, disputeId: found.id })
+          } else {
+            message.info('Không có khiếu nại đang mở cho deal này')
+          }
+        } catch (err: any) {
+          message.error(err?.message || 'Không thể tải khiếu nại')
+        }
+      }
     }
   }
 
@@ -1474,6 +1595,30 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
         loading={deliveryLoading}
         deal={deliveryModal.deal}
         partnerName={room?.partner?.name}
+      />
+
+      {/* Raise Dispute Modal — ở ERP thường Factory KHÔNG raise nhưng để đây
+          support future portal copy. Khi factory view = ẩn tự động ở DealCard. */}
+      {raiseDisputeModal.deal && (
+        <RaiseDisputeModal
+          open={raiseDisputeModal.visible}
+          onClose={() => setRaiseDisputeModal({ visible: false, deal: null })}
+          dealId={raiseDisputeModal.deal.deal_id}
+          dealNumber={raiseDisputeModal.deal.deal_number}
+          expectedDrc={raiseDisputeModal.deal.expected_drc}
+          actualDrc={raiseDisputeModal.deal.actual_drc || 0}
+          onSuccess={() => fetchMessages()}
+        />
+      )}
+
+      {/* Dispute Detail Drawer — factory resolve / partner xem */}
+      <DisputeDetailDrawer
+        open={disputeDrawer.open}
+        onClose={() => setDisputeDrawer({ open: false, disputeId: null })}
+        disputeId={disputeDrawer.disputeId}
+        viewerType="factory"
+        actionBy={user?.employee_id ?? undefined}
+        onChanged={() => fetchMessages()}
       />
 
       {/* Negotiate Modal */}

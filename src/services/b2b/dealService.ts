@@ -5,13 +5,21 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import {
+  DEAL_STATUS_LABELS as _DEAL_STATUS_LABELS,
+  DEAL_STATUS_COLORS as _DEAL_STATUS_COLORS,
+  DEAL_TYPE_LABELS as _DEAL_TYPE_LABELS,
+  DEAL_TYPE_COLORS as _DEAL_TYPE_COLORS,
+  type DealStatus as _DealStatus,
+  type DealType as _DealType,
+} from '../../types/b2b.constants'
 
 // ============================================
-// TYPES
+// TYPES — re-export để call-sites cũ không phải đổi import
 // ============================================
 
-export type DealStatus = 'pending' | 'processing' | 'accepted' | 'settled' | 'cancelled'
-export type DealType = 'purchase' | 'sale' | 'processing' | 'consignment'
+export type DealStatus = _DealStatus
+export type DealType = _DealType
 
 export interface Deal {
   id: string
@@ -122,35 +130,10 @@ export interface DealUpdateData {
 // CONSTANTS
 // ============================================
 
-export const DEAL_STATUS_LABELS: Record<DealStatus, string> = {
-  pending: 'Chờ xử lý',
-  processing: 'Đang xử lý',
-  accepted: 'Đã duyệt',
-  settled: 'Đã quyết toán',
-  cancelled: 'Đã hủy',
-}
-
-export const DEAL_STATUS_COLORS: Record<DealStatus, string> = {
-  pending: 'orange',
-  processing: 'blue',
-  accepted: 'green',
-  settled: 'purple',
-  cancelled: 'default',
-}
-
-export const DEAL_TYPE_LABELS: Record<DealType, string> = {
-  purchase: 'Mua hàng',
-  sale: 'Bán hàng',
-  processing: 'Gia công',
-  consignment: 'Ký gửi',
-}
-
-export const DEAL_TYPE_COLORS: Record<DealType, string> = {
-  purchase: 'cyan',
-  sale: 'green',
-  processing: 'orange',
-  consignment: 'purple',
-}
+export const DEAL_STATUS_LABELS = _DEAL_STATUS_LABELS
+export const DEAL_STATUS_COLORS = _DEAL_STATUS_COLORS
+export const DEAL_TYPE_LABELS = _DEAL_TYPE_LABELS
+export const DEAL_TYPE_COLORS = _DEAL_TYPE_COLORS
 
 // ============================================
 // HELPER FUNCTIONS
@@ -484,6 +467,20 @@ export const dealService = {
       .single()
 
     if (error) throw error
+
+    // Nếu status đổi → sync DealCard trong chat (progress bar + buttons)
+    if (updateData.status) {
+      try {
+        const { patchDealCardMetadata } = await import('./dealChatActionsService')
+        await patchDealCardMetadata(id, {
+          status: updateData.status,
+          final_value: data.final_value ?? undefined,
+          cancel_reason: updateData.status === 'cancelled' ? (updateData.notes || undefined) : undefined,
+        })
+      } catch (err) {
+        console.error('[dealService.updateDeal] patch DealCard failed:', err)
+      }
+    }
 
     return {
       ...data,

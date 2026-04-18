@@ -58,6 +58,46 @@ const formatCurrency = (value: number): string => {
 }
 
 // ============================================
+// SHARED HELPER — Patch tất cả DealCard message metadata của 1 deal
+// Dùng bởi: addAdvance, notifyStockIn, notifyQc, notifySettlement, cancelDeal...
+//
+// Thay đổi UPDATE này được Supabase realtime broadcast cho mọi client đang
+// subscribe room → DealCard UI auto-update mà không cần F5.
+// Yêu cầu: b2b.chat_messages có REPLICA IDENTITY FULL (migration đã chạy).
+// ============================================
+
+export async function patchDealCardMetadata(
+  dealId: string,
+  patch: Partial<DealCardMetadata>,
+): Promise<void> {
+  try {
+    // JSONB contains filter — chỉ lấy đúng các DealCard message của deal này
+    // thay vì quét toàn bộ message_type='deal'.
+    const { data: dealMessages } = await supabase
+      .from('b2b_chat_messages')
+      .select('id, metadata')
+      .eq('message_type', 'deal')
+      .contains('metadata', { deal: { deal_id: dealId } })
+
+    for (const msg of (dealMessages || [])) {
+      const meta = msg.metadata as any
+      if (meta?.deal?.deal_id !== dealId) continue  // extra guard
+      await supabase
+        .from('b2b_chat_messages')
+        .update({
+          metadata: {
+            ...msg.metadata,
+            deal: { ...meta.deal, ...patch },
+          },
+        })
+        .eq('id', msg.id)
+    }
+  } catch (err) {
+    console.error('[patchDealCardMetadata] failed:', err)
+  }
+}
+
+// ============================================
 // SERVICE
 // ============================================
 

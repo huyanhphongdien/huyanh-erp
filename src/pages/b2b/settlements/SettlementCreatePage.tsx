@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card,
   Steps,
@@ -82,6 +82,8 @@ const formatCurrency = (value: number | undefined | null): string => {
 
 const SettlementCreatePage: React.FC = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const prefilledDealId = searchParams.get('deal_id')
   const [currentStep, setCurrentStep] = useState(0)
   const [partners, setPartners] = useState<Partner[]>([])
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null)
@@ -105,6 +107,30 @@ const SettlementCreatePage: React.FC = () => {
     }
     fetchPartners()
   }, [])
+
+  // Prefill từ query param deal_id (nav từ DealCard trong chat)
+  useEffect(() => {
+    if (!prefilledDealId || partners.length === 0 || selectedPartner) return
+    const prefill = async () => {
+      const { data: deal } = await supabase
+        .from('b2b_deals')
+        .select('id, partner_id, product_code, deal_type')
+        .eq('id', prefilledDealId)
+        .single()
+      if (!deal) return
+      const partner = partners.find((p) => p.id === deal.partner_id)
+      if (partner) {
+        setSelectedPartner(partner)
+        form.setFieldsValue({
+          partner_id: partner.id,
+          deal_id: deal.id,
+          product_type: deal.product_code || undefined,
+          settlement_type: deal.deal_type === 'processing' ? 'processing' : 'purchase',
+        })
+      }
+    }
+    prefill()
+  }, [prefilledDealId, partners, selectedPartner, form])
 
   // Fetch deals when partner changes
   useEffect(() => {

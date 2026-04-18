@@ -423,6 +423,25 @@ export interface DealCardMetadata {
   // Tài chính
   total_advanced: number
   balance_due: number
+
+  // Live progress — cập nhật từ dealWmsService / qcService khi có event
+  stock_in_count?: number
+  actual_weight_kg?: number
+  actual_drc?: number
+  qc_status?: 'pending' | 'passed' | 'warning' | 'failed'
+  final_value?: number
+  settlement_id?: string
+  settlement_code?: string
+  cancel_reason?: string
+
+  // Partner-side state
+  // ID của advance mới nhất chưa được partner ack (để hiện nút "Đã nhận")
+  pending_ack_advance_id?: string
+  pending_ack_advance_number?: string
+  pending_ack_advance_amount?: number
+  // Active dispute info (nếu có, partner/factory đều thấy)
+  active_dispute_id?: string
+  active_dispute_status?: 'open' | 'investigating'
 }
 
 export interface ConfirmDealResult {

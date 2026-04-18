@@ -173,8 +173,7 @@ CREATE OR REPLACE FUNCTION public.partner_raise_drc_dispute(
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, b2b
-AS $$
+AS $body$
 DECLARE
   v_partner_id UUID;
   v_owner UUID;
@@ -184,56 +183,60 @@ DECLARE
   v_dispute_id UUID;
   v_dispute_number TEXT;
   v_existing_open UUID;
-  v_found BOOLEAN;
 BEGIN
   v_partner_id := public.current_partner_id();
   IF v_partner_id IS NULL THEN
     RAISE EXCEPTION 'Chỉ partner mới có thể raise dispute';
   END IF;
 
-  SELECT TRUE INTO v_found FROM b2b.deals WHERE id = p_deal_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Deal không tồn tại'; END IF;
-
-  SELECT partner_id INTO v_owner FROM b2b.deals WHERE id = p_deal_id;
+  -- Dùng assignment syntax `var := (SELECT ...)` thay vì `SELECT ... INTO var`
+  -- Lý do: Supabase Studio SQL editor hiện không xử lý đúng SELECT INTO trong
+  -- plpgsql function body (treat tên biến là relation → ERROR 42P01).
+  v_owner := (SELECT partner_id FROM b2b.deals WHERE id = p_deal_id);
+  IF v_owner IS NULL THEN RAISE EXCEPTION 'Deal không tồn tại'; END IF;
   IF v_owner <> v_partner_id THEN RAISE EXCEPTION 'Deal không thuộc partner này'; END IF;
 
-  SELECT actual_drc INTO v_act_drc FROM b2b.deals WHERE id = p_deal_id;
+  v_act_drc := (SELECT actual_drc FROM b2b.deals WHERE id = p_deal_id);
   IF v_act_drc IS NULL THEN RAISE EXCEPTION 'Deal chưa có DRC thực tế'; END IF;
 
-  SELECT expected_drc INTO v_exp_drc FROM b2b.deals WHERE id = p_deal_id;
+  v_exp_drc := (SELECT expected_drc FROM b2b.deals WHERE id = p_deal_id);
 
-  SELECT status INTO v_deal_st FROM b2b.deals WHERE id = p_deal_id;
+  v_deal_st := (SELECT status FROM b2b.deals WHERE id = p_deal_id);
   IF v_deal_st IN ('settled', 'cancelled') THEN RAISE EXCEPTION 'Deal đã quyết toán/hủy'; END IF;
 
   IF p_reason IS NULL OR LENGTH(TRIM(p_reason)) < 10 THEN
     RAISE EXCEPTION 'Lý do khiếu nại phải có ít nhất 10 ký tự';
   END IF;
 
-  SELECT id INTO v_existing_open
-  FROM b2b.drc_disputes
-  WHERE deal_id = p_deal_id AND status IN ('open', 'investigating');
-
+  v_existing_open := (
+    SELECT id FROM b2b.drc_disputes
+    WHERE deal_id = p_deal_id AND status IN ('open', 'investigating')
+    LIMIT 1
+  );
   IF v_existing_open IS NOT NULL THEN
     RAISE EXCEPTION 'Deal này đã có khiếu nại đang mở';
   END IF;
 
   v_dispute_number := b2b.generate_dispute_number();
+  v_dispute_id := gen_random_uuid();
 
   INSERT INTO b2b.drc_disputes (
+    id,
     dispute_number, deal_id, partner_id,
     expected_drc, actual_drc,
     reason, partner_evidence,
     status, raised_by
   ) VALUES (
+    v_dispute_id,
     v_dispute_number, p_deal_id, v_partner_id,
     v_exp_drc, v_act_drc,
     p_reason, p_evidence,
     'open', v_partner_id
-  ) RETURNING id INTO v_dispute_id;
+  );
 
   RETURN v_dispute_id;
 END;
-$$;
+$body$;
 
 GRANT EXECUTE ON FUNCTION public.partner_raise_drc_dispute(UUID, TEXT, JSONB) TO authenticated;
 
@@ -241,8 +244,7 @@ CREATE OR REPLACE FUNCTION public.partner_withdraw_drc_dispute(p_dispute_id UUID
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, b2b
-AS $$
+AS $body$
 DECLARE
   v_partner_id UUID;
   v_dispute_partner UUID;
@@ -251,18 +253,16 @@ BEGIN
   v_partner_id := public.current_partner_id();
   IF v_partner_id IS NULL THEN RAISE EXCEPTION 'Chỉ partner mới gọi được'; END IF;
 
-  SELECT partner_id INTO v_dispute_partner
-    FROM b2b.drc_disputes WHERE id = p_dispute_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Dispute không tồn tại'; END IF;
+  v_dispute_partner := (SELECT partner_id FROM b2b.drc_disputes WHERE id = p_dispute_id);
+  IF v_dispute_partner IS NULL THEN RAISE EXCEPTION 'Dispute không tồn tại'; END IF;
   IF v_dispute_partner <> v_partner_id THEN RAISE EXCEPTION 'Dispute không thuộc partner này'; END IF;
 
-  SELECT status INTO v_status
-    FROM b2b.drc_disputes WHERE id = p_dispute_id;
+  v_status := (SELECT status FROM b2b.drc_disputes WHERE id = p_dispute_id);
   IF v_status NOT IN ('open', 'investigating') THEN RAISE EXCEPTION 'Chỉ rút được dispute đang mở'; END IF;
 
   UPDATE b2b.drc_disputes SET status = 'withdrawn', updated_at = NOW() WHERE id = p_dispute_id;
 END;
-$$;
+$body$;
 
 GRANT EXECUTE ON FUNCTION public.partner_withdraw_drc_dispute(UUID) TO authenticated;
 
@@ -271,8 +271,7 @@ CREATE OR REPLACE FUNCTION public.partner_acknowledge_advance(p_advance_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, b2b
-AS $$
+AS $body$
 DECLARE
   v_partner_id UUID;
   v_advance_partner UUID;
@@ -280,10 +279,9 @@ BEGIN
   v_partner_id := public.current_partner_id();
   IF v_partner_id IS NULL THEN RAISE EXCEPTION 'Chỉ partner mới gọi được'; END IF;
 
-  SELECT partner_id INTO v_advance_partner FROM b2b.advances WHERE id = p_advance_id;
-
+  v_advance_partner := (SELECT partner_id FROM b2b.advances WHERE id = p_advance_id);
   IF v_advance_partner IS NULL THEN RAISE EXCEPTION 'Advance không tồn tại'; END IF;
-  IF v_advance_partner != v_partner_id THEN RAISE EXCEPTION 'Advance không thuộc partner này'; END IF;
+  IF v_advance_partner <> v_partner_id THEN RAISE EXCEPTION 'Advance không thuộc partner này'; END IF;
 
   UPDATE b2b.advances
   SET partner_ack_at = NOW(),
@@ -291,7 +289,7 @@ BEGIN
       updated_at = NOW()
   WHERE id = p_advance_id AND partner_ack_at IS NULL;
 END;
-$$;
+$body$;
 
 GRANT EXECUTE ON FUNCTION public.partner_acknowledge_advance(UUID) TO authenticated;
 

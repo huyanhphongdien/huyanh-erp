@@ -234,7 +234,7 @@ const getMenuGroups = (
   {
     title: 'B2B THU MUA',
     icon: <MessageSquare size={18} />,
-    collapsible: false,
+    collapsible: true,
     requireB2BPurchaser: true,
     items: [
       {
@@ -381,6 +381,7 @@ const getMenuGroups = (
   {
     title: 'BÁO CÁO',
     icon: <BarChart3 size={18} />,
+    collapsible: true,
     hiddenByDefault: true,
     items: [
       { path: '/reports/tasks', label: 'Báo cáo công việc', icon: <FileBarChart size={18} />, managerOnly: true },
@@ -391,6 +392,7 @@ const getMenuGroups = (
   {
     title: 'CÀI ĐẶT',
     icon: <Settings size={18} />,
+    collapsible: true,
     items: [
       { path: '/settings', label: 'Cài đặt tài khoản', icon: <User size={18} /> },
     ],

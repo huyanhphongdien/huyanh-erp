@@ -112,6 +112,7 @@ export interface SalesOrder {
   shrink_wrap: boolean
   pallet_required: boolean
   marking_instructions?: string
+  packing_note?: string
 
   // Vận chuyển
   container_type?: ContainerType
@@ -129,9 +130,11 @@ export interface SalesOrder {
 
   // Thanh toán
   payment_terms?: PaymentTerms
+  payment_terms_note?: string
   lc_number?: string
   lc_bank?: string
   lc_expiry_date?: string
+  shipment_time?: string
 
   // Trạng thái
   status: SalesOrderStatus
@@ -226,6 +229,7 @@ export interface SalesOrderItem {
   bales_per_container?: number
   container_count?: number
   packing_type?: string
+  packing_note?: string
   drc_min?: number
   drc_max?: number
   moisture_max?: number

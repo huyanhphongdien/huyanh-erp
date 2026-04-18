@@ -345,12 +345,25 @@ function SalesOrderDetailPage() {
               {PACKING_TYPE_LABELS[order.packing_type as PackingType] || order.packing_type}
               {order.shrink_wrap ? ' + Shrink wrap' : ''}
               {order.pallet_required ? ' + Pallet' : ''}
+              {order.packing_note ? (
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+                  Ghi chú: {order.packing_note}
+                </div>
+              ) : null}
             </Descriptions.Item>
             <Descriptions.Item label="KL bành">{order.bale_weight_kg} kg</Descriptions.Item>
             <Descriptions.Item label="Thanh toán">
               {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] ||
                 order.payment_terms ||
                 '-'}
+              {order.payment_terms_note ? (
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+                  Ghi chú: {order.payment_terms_note}
+                </div>
+              ) : null}
+            </Descriptions.Item>
+            <Descriptions.Item label="Shipment Time" span={2}>
+              {order.shipment_time || '-'}
             </Descriptions.Item>
             <Descriptions.Item label="Số L/C">{order.lc_number || '-'}</Descriptions.Item>
             <Descriptions.Item label="NH L/C">{order.lc_bank || '-'}</Descriptions.Item>

@@ -100,14 +100,15 @@ function SalesOrderCreatePage() {
     bale_weight_kg: number
     bales_per_container: number
     packing_type: string
+    packing_note: string
     payment_terms: string
   }
   const [orderItems, setOrderItems] = useState<OrderItem[]>([
-    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', payment_terms: '' },
+    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' },
   ])
 
   const addItem = () => {
-    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', payment_terms: '' }])
+    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' }])
   }
 
   const removeItem = (key: string) => {
@@ -218,6 +219,19 @@ function SalesOrderCreatePage() {
         return
       }
 
+      // Gộp packing_note từ items → header (để detail page hiển thị)
+      const itemPackingNotes = validItems
+        .map(i => (i.packing_note || '').trim())
+        .filter(Boolean)
+      const aggregatedPackingNote = validItems.length === 1
+        ? (itemPackingNotes[0] || undefined)
+        : (itemPackingNotes.length
+            ? validItems
+                .filter(i => (i.packing_note || '').trim())
+                .map(i => `${i.grade}: ${i.packing_note}`)
+                .join('\n')
+            : undefined)
+
       // Convert dayjs to string + calc from items
       const payload: CreateSalesOrderData = {
         ...values,
@@ -228,6 +242,7 @@ function SalesOrderCreatePage() {
         bale_weight_kg: validItems[0].bale_weight_kg,
         bales_per_container: validItems[0].bales_per_container,
         packing_type: validItems[0].packing_type as any,
+        packing_note: values.packing_note || aggregatedPackingNote,
         delivery_date: values.delivery_date ? values.delivery_date.format('YYYY-MM-DD') : undefined,
         contract_date: values.contract_date ? values.contract_date.format('YYYY-MM-DD') : undefined,
         etd: values.etd ? values.etd.format('YYYY-MM-DD') : undefined,
@@ -347,6 +362,14 @@ function SalesOrderCreatePage() {
                     onChange={(v) => updateItem(item.key, 'packing_type', v)} />
                 </Col>
                 <Col xs={24}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2, marginTop: 4 }}>Ghi chú bao bì (tuỳ chọn)</div>
+                  <Input
+                    value={item.packing_note || ''}
+                    placeholder="VD: Pallet gỗ fumigation, bao PE lót đáy cont, in logo khách..."
+                    onChange={(e) => updateItem(item.key, 'packing_note', e.target.value)}
+                  />
+                </Col>
+                <Col xs={24}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 4, marginTop: 4 }}>Thanh toán</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {Object.entries(PAYMENT_TERMS_LABELS).map(([val, label]) => {
@@ -407,6 +430,31 @@ function SalesOrderCreatePage() {
               <Form.Item label="Cảng xếp hàng (POL)" name="port_of_loading">
                 <Select size="large" allowClear placeholder="Chọn cảng..."
                   options={PORT_OF_LOADING_OPTIONS.map((p) => ({ value: p.value, label: p.label }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24}>
+              <Form.Item
+                label="Shipment Time"
+                name="shipment_time"
+                tooltip="Điều khoản thời gian giao hàng trên hợp đồng/L/C (text tự do). VD: Within 30 days from L/C date, End of May 2026, June/July 2026..."
+              >
+                <Input size="large" placeholder="VD: Within 30 days from L/C date / End of May 2026 / June–July shipment" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24}>
+              <Form.Item
+                label="Ghi chú thanh toán"
+                name="payment_terms_note"
+                tooltip="Dùng cho case thanh toán không khớp tag cố định phía trên. VD: L/C at sight, L/C usance, L/C UPAS, 10% cọc + 90% D/P, 30% TT trước + 70% khi giao..."
+              >
+                <TextArea
+                  rows={2}
+                  placeholder="VD: L/C at sight / L/C UPAS 90 days / 10% cọc + 90% D/P / 30% TT trước ETD + 70% sau B/L"
+                />
               </Form.Item>
             </Col>
           </Row>

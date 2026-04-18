@@ -50,6 +50,7 @@ export interface CreateSalesOrderData {
   shrink_wrap?: boolean
   pallet_required?: boolean
   marking_instructions?: string
+  packing_note?: string
 
   // Vận chuyển
   container_type?: ContainerType
@@ -65,9 +66,11 @@ export interface CreateSalesOrderData {
 
   // Thanh toán
   payment_terms?: PaymentTerms
+  payment_terms_note?: string
   lc_number?: string
   lc_bank?: string
   lc_expiry_date?: string
+  shipment_time?: string
 
   // Hợp đồng (v4)
   contract_no?: string
@@ -94,6 +97,7 @@ export interface CreateSalesOrderData {
     bale_weight_kg?: number
     bales_per_container?: number
     packing_type?: string
+    packing_note?: string
     drc_min?: number
     drc_max?: number
     moisture_max?: number
@@ -386,6 +390,7 @@ export const salesOrderService = {
         shrink_wrap: input.shrink_wrap ?? false,
         pallet_required: input.pallet_required ?? false,
         marking_instructions: input.marking_instructions || null,
+        packing_note: input.packing_note || null,
 
         // Vận chuyển
         container_type: containerType,
@@ -402,9 +407,11 @@ export const salesOrderService = {
 
         // Thanh toán
         payment_terms: input.payment_terms || null,
+        payment_terms_note: input.payment_terms_note || null,
         lc_number: input.lc_number || null,
         lc_bank: input.lc_bank || null,
         lc_expiry_date: input.lc_expiry_date || null,
+        shipment_time: input.shipment_time || null,
 
         // Trạng thái mặc định
         status: 'draft' as SalesOrderStatus,
@@ -458,6 +465,7 @@ export const salesOrderService = {
           bales_per_container: bpc,
           container_count: Math.ceil(totalBales / bpc),
           packing_type: item.packing_type || 'loose_bale',
+          packing_note: item.packing_note || null,
           drc_min: item.drc_min ?? null,
           drc_max: item.drc_max ?? null,
           moisture_max: item.moisture_max ?? null,

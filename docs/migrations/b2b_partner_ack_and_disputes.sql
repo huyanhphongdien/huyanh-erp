@@ -177,29 +177,33 @@ SET search_path = public, b2b
 AS $$
 DECLARE
   v_partner_id UUID;
-  v_deal_id UUID;
-  v_deal_partner_id UUID;
-  v_deal_expected_drc NUMERIC(5,2);
-  v_deal_actual_drc NUMERIC(5,2);
-  v_deal_status TEXT;
+  v_owner UUID;
+  v_exp_drc NUMERIC(5,2);
+  v_act_drc NUMERIC(5,2);
+  v_deal_st TEXT;
   v_dispute_id UUID;
   v_dispute_number TEXT;
   v_existing_open UUID;
+  v_found BOOLEAN;
 BEGIN
   v_partner_id := public.current_partner_id();
   IF v_partner_id IS NULL THEN
     RAISE EXCEPTION 'Chỉ partner mới có thể raise dispute';
   END IF;
 
-  SELECT id, partner_id, expected_drc, actual_drc, status
-  INTO v_deal_id, v_deal_partner_id, v_deal_expected_drc, v_deal_actual_drc, v_deal_status
-  FROM b2b.deals
-  WHERE id = p_deal_id;
+  SELECT TRUE INTO v_found FROM b2b.deals WHERE id = p_deal_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Deal không tồn tại'; END IF;
 
-  IF v_deal_id IS NULL THEN RAISE EXCEPTION 'Deal không tồn tại'; END IF;
-  IF v_deal_partner_id <> v_partner_id THEN RAISE EXCEPTION 'Deal không thuộc partner này'; END IF;
-  IF v_deal_actual_drc IS NULL THEN RAISE EXCEPTION 'Deal chưa có DRC thực tế'; END IF;
-  IF v_deal_status IN ('settled', 'cancelled') THEN RAISE EXCEPTION 'Deal đã quyết toán/hủy'; END IF;
+  SELECT partner_id INTO v_owner FROM b2b.deals WHERE id = p_deal_id;
+  IF v_owner <> v_partner_id THEN RAISE EXCEPTION 'Deal không thuộc partner này'; END IF;
+
+  SELECT actual_drc INTO v_act_drc FROM b2b.deals WHERE id = p_deal_id;
+  IF v_act_drc IS NULL THEN RAISE EXCEPTION 'Deal chưa có DRC thực tế'; END IF;
+
+  SELECT expected_drc INTO v_exp_drc FROM b2b.deals WHERE id = p_deal_id;
+
+  SELECT status INTO v_deal_st FROM b2b.deals WHERE id = p_deal_id;
+  IF v_deal_st IN ('settled', 'cancelled') THEN RAISE EXCEPTION 'Deal đã quyết toán/hủy'; END IF;
 
   IF p_reason IS NULL OR LENGTH(TRIM(p_reason)) < 10 THEN
     RAISE EXCEPTION 'Lý do khiếu nại phải có ít nhất 10 ký tự';
@@ -222,7 +226,7 @@ BEGIN
     status, raised_by
   ) VALUES (
     v_dispute_number, p_deal_id, v_partner_id,
-    v_deal_expected_drc, v_deal_actual_drc,
+    v_exp_drc, v_act_drc,
     p_reason, p_evidence,
     'open', v_partner_id
   ) RETURNING id INTO v_dispute_id;
@@ -247,11 +251,13 @@ BEGIN
   v_partner_id := public.current_partner_id();
   IF v_partner_id IS NULL THEN RAISE EXCEPTION 'Chỉ partner mới gọi được'; END IF;
 
-  SELECT partner_id, status INTO v_dispute_partner, v_status
-  FROM b2b.drc_disputes WHERE id = p_dispute_id;
+  SELECT partner_id INTO v_dispute_partner
+    FROM b2b.drc_disputes WHERE id = p_dispute_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Dispute không tồn tại'; END IF;
+  IF v_dispute_partner <> v_partner_id THEN RAISE EXCEPTION 'Dispute không thuộc partner này'; END IF;
 
-  IF v_dispute_partner IS NULL THEN RAISE EXCEPTION 'Dispute không tồn tại'; END IF;
-  IF v_dispute_partner != v_partner_id THEN RAISE EXCEPTION 'Dispute không thuộc partner này'; END IF;
+  SELECT status INTO v_status
+    FROM b2b.drc_disputes WHERE id = p_dispute_id;
   IF v_status NOT IN ('open', 'investigating') THEN RAISE EXCEPTION 'Chỉ rút được dispute đang mở'; END IF;
 
   UPDATE b2b.drc_disputes SET status = 'withdrawn', updated_at = NOW() WHERE id = p_dispute_id;

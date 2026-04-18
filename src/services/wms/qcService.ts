@@ -336,10 +336,53 @@ export const qcService = {
       } catch { /* non-blocking */ }
     }
 
+    // Auto-update Deal.actual_drc nếu batch thuộc 1 B2B Deal
+    await this.syncDealDrcFromBatch(batch_id)
+
     return {
       qcResult: qcResult as unknown as BatchQCResult,
       evaluation,
       supplierImpact,
+    }
+  },
+
+  /**
+   * Tìm Deal mà batch thuộc về và cập nhật actual_drc / final_value.
+   * Non-blocking: nếu batch không thuộc deal nào, silent.
+   */
+  async syncDealDrcFromBatch(batchId: string): Promise<void> {
+    try {
+      // batch → stock_in_details → stock_in_orders → deal_id
+      const { data: detail } = await supabase
+        .from('stock_in_details')
+        .select('stock_in_id')
+        .eq('batch_id', batchId)
+        .maybeSingle()
+
+      if (!detail?.stock_in_id) return
+
+      const { data: stockIn } = await supabase
+        .from('stock_in_orders')
+        .select('deal_id')
+        .eq('id', detail.stock_in_id)
+        .maybeSingle()
+
+      if (!stockIn?.deal_id) return
+
+      const { dealWmsService } = await import('../b2b/dealWmsService')
+      const result = await dealWmsService.updateDealActualDrc(stockIn.deal_id)
+      // Gửi notification vào chat để thu mua/kế toán biết
+      if (result && result.actual_drc != null) {
+        try {
+          await dealWmsService.notifyDealChatQcUpdate(
+            stockIn.deal_id,
+            result.actual_drc,
+            result.qc_status
+          )
+        } catch { /* non-blocking */ }
+      }
+    } catch (err) {
+      console.warn('[qcService.syncDealDrcFromBatch] failed:', err)
     }
   },
 
@@ -584,6 +627,9 @@ export const qcService = {
         }
       } catch { /* non-blocking */ }
     }
+
+    // Auto-update Deal.actual_drc nếu batch thuộc 1 B2B Deal
+    await this.syncDealDrcFromBatch(batch_id)
 
     return {
       qcResult: qcResult as unknown as BatchQCResult,

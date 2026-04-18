@@ -29,6 +29,7 @@ import {
   Statistic,
   Tabs,
   Badge,
+  Tooltip,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -194,18 +195,37 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
           </Popconfirm>
         )}
 
-        {/* Processing -> Accepted */}
-        {deal.status === 'processing' && (
-          <Button
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            onClick={() => setAcceptModal(true)}
-            loading={loading}
-            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
-          >
-            Duyệt Deal
-          </Button>
-        )}
+        {/* Processing -> Accepted (có validate điều kiện) */}
+        {deal.status === 'processing' && (() => {
+          const { canAccept, missing } = dealService.checkAcceptConditions(deal)
+          const btn = (
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={() => setAcceptModal(true)}
+              loading={loading}
+              disabled={!canAccept}
+              style={canAccept ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
+            >
+              Duyệt Deal
+            </Button>
+          )
+          if (canAccept) return btn
+          return (
+            <Tooltip
+              title={
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>Chưa đủ điều kiện duyệt:</div>
+                  {missing.map((m, i) => (
+                    <div key={i}>• {m}</div>
+                  ))}
+                </div>
+              }
+            >
+              <span style={{ cursor: 'not-allowed' }}>{btn}</span>
+            </Tooltip>
+          )
+        })()}
 
         {/* Accepted -> Auto Settlement */}
         {deal.status === 'accepted' && deal.actual_drc != null && deal.actual_drc > 0 && deal.actual_weight_kg != null && deal.actual_weight_kg > 0 && (
@@ -344,8 +364,12 @@ const DealDetailPage = () => {
 
       message.success(`Đã chuyển trạng thái sang "${DEAL_STATUS_LABELS[status]}"`)
       fetchDeal()
-    } catch (error) {
-      message.error('Không thể cập nhật trạng thái')
+    } catch (error: any) {
+      // Hiển thị lý do cụ thể từ service (ví dụ: thiếu weight/drc/QC)
+      message.error({
+        content: error?.message || 'Không thể cập nhật trạng thái',
+        duration: 5,
+      })
     } finally {
       setUpdating(false)
     }

@@ -500,16 +500,63 @@ export const dealService = {
   },
 
   /**
-   * Chuyển deal sang trạng thái processing
+   * Chuyển deal sang trạng thái processing (chỉ từ pending)
    */
   async startProcessing(id: string): Promise<Deal> {
+    const deal = await this.getDealById(id)
+    if (!deal) throw new Error('Không tìm thấy deal')
+    if (deal.status !== 'pending') {
+      throw new Error(`Không thể bắt đầu xử lý deal đang ở trạng thái "${deal.status}". Chỉ deal ở "pending" mới bắt đầu được.`)
+    }
     return this.updateStatus(id, 'processing')
   },
 
   /**
-   * Duyệt deal
+   * Kiểm tra deal đã đủ điều kiện duyệt chưa.
+   * Dùng cho UI để disable nút + hiển thị lý do thiếu.
+   */
+  checkAcceptConditions(deal: Deal): { canAccept: boolean; missing: string[] } {
+    const missing: string[] = []
+
+    if (deal.status !== 'processing') {
+      missing.push(`Deal phải ở trạng thái "Đang xử lý" (hiện: ${deal.status})`)
+    }
+    if (!deal.stock_in_count || deal.stock_in_count === 0) {
+      missing.push('Chưa có phiếu nhập kho nào')
+    }
+    if (!deal.actual_weight_kg || deal.actual_weight_kg <= 0) {
+      missing.push('Chưa có trọng lượng thực tế (actual_weight_kg)')
+    }
+    if (!deal.actual_drc || deal.actual_drc <= 0) {
+      missing.push('Chưa có DRC thực tế (actual_drc)')
+    }
+    if (deal.qc_status === 'failed') {
+      missing.push('QC đã FAIL — không thể duyệt')
+    }
+    if (deal.qc_status === 'pending' || !deal.qc_status) {
+      missing.push('QC chưa hoàn thành')
+    }
+
+    return { canAccept: missing.length === 0, missing }
+  },
+
+  /**
+   * Duyệt deal — CẦN đầy đủ điều kiện:
+   *  - status = 'processing'
+   *  - stock_in_count > 0 (đã có phiếu nhập kho)
+   *  - actual_weight_kg > 0 (có trọng lượng thực)
+   *  - actual_drc > 0 (có DRC thực)
+   *  - qc_status != 'failed' và != 'pending' (QC đã xong, không fail)
    */
   async acceptDeal(id: string, finalPrice?: number): Promise<Deal> {
+    const deal = await this.getDealById(id)
+    if (!deal) throw new Error('Không tìm thấy deal')
+
+    const { canAccept, missing } = this.checkAcceptConditions(deal)
+    if (!canAccept) {
+      throw new Error(`Chưa đủ điều kiện duyệt deal:\n- ${missing.join('\n- ')}`)
+    }
+
     return this.updateDeal(id, {
       status: 'accepted',
       final_price: finalPrice,
@@ -517,16 +564,29 @@ export const dealService = {
   },
 
   /**
-   * Quyết toán deal
+   * Quyết toán deal — chỉ khi status='accepted'
    */
   async settleDeal(id: string): Promise<Deal> {
+    const deal = await this.getDealById(id)
+    if (!deal) throw new Error('Không tìm thấy deal')
+    if (deal.status !== 'accepted') {
+      throw new Error(`Chỉ deal đã được DUYỆT mới quyết toán được (hiện: ${deal.status}).`)
+    }
     return this.updateStatus(id, 'settled')
   },
 
   /**
-   * Hủy deal
+   * Hủy deal — không cho hủy khi đã 'settled'
    */
   async cancelDeal(id: string, reason?: string): Promise<Deal> {
+    const deal = await this.getDealById(id)
+    if (!deal) throw new Error('Không tìm thấy deal')
+    if (deal.status === 'settled') {
+      throw new Error('Deal đã QUYẾT TOÁN không thể hủy. Cần hủy quyết toán trước.')
+    }
+    if (deal.status === 'cancelled') {
+      throw new Error('Deal đã ở trạng thái hủy.')
+    }
     return this.updateDeal(id, {
       status: 'cancelled',
       notes: reason,

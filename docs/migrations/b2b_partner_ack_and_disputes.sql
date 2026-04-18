@@ -177,7 +177,11 @@ SET search_path = public, b2b
 AS $$
 DECLARE
   v_partner_id UUID;
-  v_deal RECORD;
+  v_deal_id UUID;
+  v_deal_partner_id UUID;
+  v_deal_expected_drc NUMERIC(5,2);
+  v_deal_actual_drc NUMERIC(5,2);
+  v_deal_status TEXT;
   v_dispute_id UUID;
   v_dispute_number TEXT;
   v_existing_open UUID;
@@ -188,14 +192,14 @@ BEGIN
   END IF;
 
   SELECT id, partner_id, expected_drc, actual_drc, status
-  INTO v_deal
+  INTO v_deal_id, v_deal_partner_id, v_deal_expected_drc, v_deal_actual_drc, v_deal_status
   FROM b2b.deals
   WHERE id = p_deal_id;
 
-  IF v_deal.id IS NULL THEN RAISE EXCEPTION 'Deal không tồn tại'; END IF;
-  IF v_deal.partner_id != v_partner_id THEN RAISE EXCEPTION 'Deal không thuộc partner này'; END IF;
-  IF v_deal.actual_drc IS NULL THEN RAISE EXCEPTION 'Deal chưa có DRC thực tế'; END IF;
-  IF v_deal.status IN ('settled', 'cancelled') THEN RAISE EXCEPTION 'Deal đã quyết toán/hủy'; END IF;
+  IF v_deal_id IS NULL THEN RAISE EXCEPTION 'Deal không tồn tại'; END IF;
+  IF v_deal_partner_id <> v_partner_id THEN RAISE EXCEPTION 'Deal không thuộc partner này'; END IF;
+  IF v_deal_actual_drc IS NULL THEN RAISE EXCEPTION 'Deal chưa có DRC thực tế'; END IF;
+  IF v_deal_status IN ('settled', 'cancelled') THEN RAISE EXCEPTION 'Deal đã quyết toán/hủy'; END IF;
 
   IF p_reason IS NULL OR LENGTH(TRIM(p_reason)) < 10 THEN
     RAISE EXCEPTION 'Lý do khiếu nại phải có ít nhất 10 ký tự';
@@ -218,7 +222,7 @@ BEGIN
     status, raised_by
   ) VALUES (
     v_dispute_number, p_deal_id, v_partner_id,
-    v_deal.expected_drc, v_deal.actual_drc,
+    v_deal_expected_drc, v_deal_actual_drc,
     p_reason, p_evidence,
     'open', v_partner_id
   ) RETURNING id INTO v_dispute_id;

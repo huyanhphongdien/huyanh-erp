@@ -251,6 +251,10 @@ export const rubberIntakeB2BService = {
     unit_price: number
     source_region?: string
     intake_date?: string
+    // EUDR traceability — copy từ Deal (đã có GPS từ booking)
+    rubber_region?: string
+    rubber_region_lat?: number
+    rubber_region_lng?: number
   }): Promise<string | null> {
     try {
       if (!params.quantity_kg || params.quantity_kg <= 0 || !params.unit_price || params.unit_price <= 0) {
@@ -279,6 +283,12 @@ export const rubberIntakeB2BService = {
           location_name: params.source_region || null,
           notes: params.lot_description || null,
           status: 'draft',
+          // EUDR fields
+          rubber_region: params.rubber_region || null,
+          rubber_region_lat: params.rubber_region_lat || null,
+          rubber_region_lng: params.rubber_region_lng || null,
+          deforestation_risk_assessment: 'medium', // default — admin update sau khi verify
+          // eudr_statement_ref để NULL đến khi submit TRACES
         })
         .select('id')
         .single()

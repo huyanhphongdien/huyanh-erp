@@ -67,6 +67,8 @@ export interface Deal {
   rubber_region: string | null
   rubber_region_lat: number | null
   rubber_region_lng: number | null
+  // Nhà máy đích nhận hàng (FK public.facilities.id)
+  target_facility_id: string | null
   // Joined fields
   partner?: {
     id: string

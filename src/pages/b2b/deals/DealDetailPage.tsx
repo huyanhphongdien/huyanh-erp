@@ -515,7 +515,12 @@ const DealDetailPage = () => {
               <Button icon={<MessageOutlined />} onClick={handleOpenChat}>
                 Mở Chat
               </Button>
-              <Button icon={<PrinterOutlined />}>In</Button>
+              <Button
+                icon={<PrinterOutlined />}
+                onClick={() => window.open(`/b2b/deals/${deal.id}/print`, '_blank')}
+              >
+                In phiếu
+              </Button>
               <StatusActions
                 deal={deal}
                 onUpdateStatus={handleUpdateStatus}

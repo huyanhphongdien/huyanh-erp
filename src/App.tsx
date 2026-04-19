@@ -204,6 +204,7 @@ const B2BChatPage = lazy(() => import('./pages/b2b/B2BChatPage'));
 const DealListPage = lazy(() => import('./pages/b2b/deals/DealListPage'));
 const DealCreatePage = lazy(() => import('./pages/b2b/deals/DealCreatePage'));
 const DealDetailPage = lazy(() => import('./pages/b2b/deals/DealDetailPage'));
+const DealPrintPage = lazy(() => import('./pages/b2b/deals/DealPrintPage'));
 // Partners
 const PartnerListPage = lazy(() => import('./pages/b2b/partners/PartnerListPage'));
 const PartnerRequestsPage = lazy(() => import('./pages/b2b/partners/PartnerRequestsPage'));
@@ -337,6 +338,7 @@ function App() {
                 <Route path="deals" element={<Suspense fallback={<LoadingSpinner />}><DealListPage /></Suspense>} />
                 <Route path="deals/new" element={<Suspense fallback={<LoadingSpinner />}><DealCreatePage /></Suspense>} />
                 <Route path="deals/:id" element={<Suspense fallback={<LoadingSpinner />}><DealDetailPage /></Suspense>} />
+                <Route path="deals/:id/print" element={<Suspense fallback={<LoadingSpinner />}><DealPrintPage /></Suspense>} />
                 {/* B2B Ledger (Phase E5) */}
                 <Route path="ledger" element={<Suspense fallback={<LoadingSpinner />}><LedgerOverviewPage /></Suspense>} />
                 <Route path="ledger/:partnerId" element={<Suspense fallback={<LoadingSpinner />}><PartnerLedgerPage /></Suspense>} />

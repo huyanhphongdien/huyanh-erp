@@ -63,6 +63,20 @@ export interface RubberIntake {
   payment_status: 'unpaid' | 'partial' | 'paid'
   paid_amount?: number
 
+  // B2B linking (đã có DB, expose cho UI)
+  deal_id?: string | null
+  b2b_partner_id?: string | null
+  lot_code?: string | null
+  stock_in_id?: string | null
+  facility_id?: string | null
+
+  // EUDR Traceability — truy xuất nguồn gốc
+  rubber_region?: string | null
+  rubber_region_lat?: number | null
+  rubber_region_lng?: number | null
+  eudr_statement_ref?: string | null
+  deforestation_risk_assessment?: 'low' | 'medium' | 'high' | 'verified' | null
+
   created_by?: string
   created_at: string
   updated_at: string
@@ -112,6 +126,9 @@ const INTAKE_LIST_SELECT = `
   location_name, buyer_name,
   exchange_rate, total_amount_vnd,
   status, payment_status, paid_amount,
+  deal_id, b2b_partner_id, lot_code, facility_id,
+  rubber_region, rubber_region_lat, rubber_region_lng,
+  eudr_statement_ref, deforestation_risk_assessment,
   notes, created_by, created_at, updated_at,
   supplier:rubber_suppliers(id, code, name, phone, country, supplier_type)
 `
@@ -205,6 +222,32 @@ export const rubberIntakeService = {
       })
       .eq('id', id)
       .eq('status', 'draft')
+      .select(INTAKE_SELECT)
+      .single()
+
+    if (error) throw error
+    return data as unknown as RubberIntake
+  },
+
+  /**
+   * Cập nhật thông tin EUDR (truy xuất nguồn gốc)
+   * Admin điền eudr_statement_ref sau khi submit TRACES + risk assessment
+   */
+  async updateEudr(
+    id: string,
+    payload: {
+      eudr_statement_ref?: string | null
+      deforestation_risk_assessment?: 'low' | 'medium' | 'high' | 'verified' | null
+    },
+  ): Promise<RubberIntake> {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update({
+        eudr_statement_ref: payload.eudr_statement_ref ?? null,
+        deforestation_risk_assessment: payload.deforestation_risk_assessment ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
       .select(INTAKE_SELECT)
       .single()
 

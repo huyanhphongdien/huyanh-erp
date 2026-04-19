@@ -115,6 +115,134 @@ const InfoRow: React.FC<{
 )
 
 // ============================================================================
+// EUDR SECTION — Truy xuất nguồn gốc (EU Deforestation Regulation)
+// ============================================================================
+
+const RISK_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  low:      { label: '✅ Thấp (an toàn)',       bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  medium:   { label: '⚠️ Trung bình (mặc định)', bg: 'bg-amber-50',   text: 'text-amber-700' },
+  high:     { label: '🚨 Cao (cần xác minh)',   bg: 'bg-red-50',     text: 'text-red-700' },
+  verified: { label: '🏅 Đã chứng nhận (3rd-party)', bg: 'bg-blue-50',    text: 'text-blue-700' },
+}
+
+const EudrSection: React.FC<{
+  intake: RubberIntake
+  onUpdate: (updated: RubberIntake) => void
+}> = ({ intake, onUpdate }) => {
+  const [ref, setRef] = useState(intake.eudr_statement_ref || '')
+  const [risk, setRisk] = useState<string>(intake.deforestation_risk_assessment || 'medium')
+  const [saving, setSaving] = useState(false)
+
+  const hasGps = intake.rubber_region_lat != null && intake.rubber_region_lng != null
+  const dirty = ref !== (intake.eudr_statement_ref || '') ||
+    risk !== (intake.deforestation_risk_assessment || 'medium')
+  const riskCfg = RISK_CONFIG[intake.deforestation_risk_assessment || 'medium']
+
+  const save = async () => {
+    try {
+      setSaving(true)
+      const updated = await rubberIntakeService.updateEudr(intake.id, {
+        eudr_statement_ref: ref.trim() || null,
+        deforestation_risk_assessment: risk as any,
+      })
+      onUpdate(updated)
+    } catch (e: any) {
+      alert(`Lỗi: ${e?.message || 'Không cập nhật được'}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-50 flex items-center gap-2">
+        <Globe size={16} className="text-[#1B4D3E]" />
+        <span className="text-[14px] font-bold text-gray-900">Truy xuất nguồn gốc (EUDR)</span>
+        <span className={`ml-auto text-[11px] px-2 py-0.5 rounded-full font-semibold ${riskCfg.bg} ${riskCfg.text}`}>
+          {riskCfg.label}
+        </span>
+      </div>
+
+      <div className="px-4 py-3 space-y-3">
+        {/* Vùng thu mua (readonly, từ Deal) */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-gray-500">
+            <MapPin size={14} /><span className="text-[13px]">Vùng thu mua</span>
+          </div>
+          {intake.rubber_region ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[14px] font-semibold text-gray-800">{intake.rubber_region}</span>
+              {hasGps && (
+                <span className="text-[11px] font-mono text-gray-500">
+                  ({intake.rubber_region_lat!.toFixed(6)}, {intake.rubber_region_lng!.toFixed(6)})
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[13px] text-gray-400 italic">
+              — Chưa có (sync từ Deal). Deal cũ trước khi migrate sẽ NULL.
+            </span>
+          )}
+          {hasGps && (
+            <a
+              href={`https://www.google.com/maps?q=${intake.rubber_region_lat},${intake.rubber_region_lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[12px] text-blue-600 hover:underline inline-flex items-center gap-1"
+            >
+              <Globe size={12} /> Xem Google Maps
+            </a>
+          )}
+        </div>
+
+        {/* EUDR Statement Ref */}
+        <div className="space-y-1">
+          <label className="text-[13px] text-gray-500 flex items-center gap-2">
+            <Hash size={14} /> EUDR Statement Ref
+            <span className="text-[11px] text-gray-400">(điền sau khi submit TRACES NT)</span>
+          </label>
+          <input
+            type="text"
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+            placeholder="VD: DDS-VN-2026-123456"
+            className="w-full px-3 py-2 text-[14px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]/20 font-mono"
+          />
+        </div>
+
+        {/* Risk Assessment */}
+        <div className="space-y-1">
+          <label className="text-[13px] text-gray-500 flex items-center gap-2">
+            <AlertTriangle size={14} /> Đánh giá rủi ro phá rừng
+          </label>
+          <select
+            value={risk}
+            onChange={(e) => setRisk(e.target.value)}
+            className="w-full px-3 py-2 text-[14px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]/20"
+          >
+            <option value="low">Thấp (an toàn)</option>
+            <option value="medium">Trung bình (mặc định)</option>
+            <option value="high">Cao (cần xác minh)</option>
+            <option value="verified">Đã chứng nhận (bên thứ 3)</option>
+          </select>
+        </div>
+
+        {/* Save */}
+        {dirty && (
+          <button
+            onClick={save}
+            disabled={saving}
+            className="w-full py-2 bg-[#1B4D3E] text-white text-[14px] font-semibold rounded-lg disabled:opacity-50 hover:bg-[#0F3D2E] transition-colors"
+          >
+            {saving ? 'Đang lưu...' : 'Lưu thay đổi EUDR'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -362,6 +490,12 @@ const RubberIntakeDetailPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* EUDR — TRUY XUẤT NGUỒN GỐC */}
+        <EudrSection
+          intake={intake}
+          onUpdate={(updated) => setIntake(updated)}
+        />
 
         {/* TIMELINE */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

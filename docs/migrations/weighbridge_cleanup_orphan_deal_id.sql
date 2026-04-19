@@ -54,8 +54,9 @@ SELECT
   t.deal_id,
   d.deal_number,
   d.status,
+  d.created_at,
   COUNT(t.id) AS ticket_count
 FROM weighbridge_tickets t
 JOIN b2b.deals d ON d.id = t.deal_id
-GROUP BY t.deal_id, d.deal_number, d.status
+GROUP BY t.deal_id, d.deal_number, d.status, d.created_at
 ORDER BY d.created_at DESC;

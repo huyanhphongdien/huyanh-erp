@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card, Button, Input, Select, Typography, Space, Row, Col, Alert, Divider,
-  Tag, InputNumber, Switch, message, Modal, AutoComplete,
+  Tag, InputNumber, message, Modal, AutoComplete,
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, PrinterOutlined, CheckOutlined,
@@ -114,7 +114,7 @@ export default function WeighingPage() {
   const [expectedDrc, setExpectedDrc] = useState<number | null>(null)
   const [unitPrice, setUnitPrice] = useState<number | null>(null)
   const [priceUnit, setPriceUnit] = useState<'wet' | 'dry'>('wet')
-  const [destination, setDestination] = useState<string>('')
+  const [destination, setDestination] = useState<string>('bai_mu')
   const [deductionKg, setDeductionKg] = useState<number>(0)
   const [notes, setNotes] = useState('')
 
@@ -1084,27 +1084,10 @@ export default function WeighingPage() {
                       formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
                   </Col>
                   <Col span={12}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Loại giá</Text>
-                    <div style={{ marginTop: 4 }}>
-                      <Switch
-                        checked={priceUnit === 'dry'}
-                        onChange={(checked) => setPriceUnit(checked ? 'dry' : 'wet')}
-                        checkedChildren="Khô"
-                        unCheckedChildren="Ướt"
-                        disabled={isCompleted}
-                      />
-                    </div>
-                  </Col>
-                  <Col span={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Vị trí dỡ</Text>
                     <Select value={destination || undefined} onChange={setDestination}
                       style={{ width: '100%' }} options={DESTINATIONS} allowClear
                       placeholder="Chọn..." disabled={isCompleted} />
-                  </Col>
-                  <Col span={12}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Tạp chất (kg)</Text>
-                    <InputNumber value={deductionKg} onChange={(v) => setDeductionKg(v || 0)}
-                      style={{ width: '100%' }} min={0} disabled={isCompleted} />
                   </Col>
                   <Col span={24}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Ghi chú</Text>
@@ -1260,13 +1243,6 @@ export default function WeighingPage() {
                       <Text type="secondary">NET:</Text>
                       <Text strong style={{ ...MONO, float: 'right' }}>{calc.net_weight.toLocaleString()} kg</Text>
                     </Col>
-                    <Col span={12}>
-                      <Text type="secondary">Tạp chất:</Text>
-                      <Text style={{ ...MONO, float: 'right', color: calc.deduction_kg > 0 ? '#DC2626' : undefined }}>
-                        - {calc.deduction_kg.toLocaleString()} kg
-                      </Text>
-                    </Col>
-                    <Col span={24}><Divider style={{ margin: '4px 0' }} /></Col>
                     <Col span={12}>
                       <Text strong>KL Thực:</Text>
                       <Text strong style={{ ...MONO, float: 'right', color: '#15803D' }}>

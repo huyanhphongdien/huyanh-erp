@@ -275,42 +275,30 @@ const ConfirmDealModal = ({
           style={{ marginBottom: 16 }}
         />
 
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="agreed_price"
-              label="Đơn giá thỏa thuận (đ/kg)"
-              rules={[
-                { required: true, message: 'Nhập đơn giá' },
-                { type: 'number', min: 100, message: 'Giá không hợp lệ' },
-              ]}
-            >
-              <InputNumber<number>
-                style={{ width: '100%' }}
-                min={100}
-                step={100}
-                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(v) => Number(v!.replace(/,/g, '')) || 0}
-                size="large"
-              />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="price_unit"
-              label="Loại giá"
-              rules={[{ required: true }]}
-            >
-              <Select
-                size="large"
-                options={[
-                  { value: 'wet', label: 'Giá ướt' },
-                  { value: 'dry', label: 'Giá khô (theo DRC)' },
-                ]}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
+        {/* Loại giá đã bỏ — implicit trong loại mủ + kế thừa từ booking.
+            Field price_unit vẫn giữ trong form data (hidden) để submit.
+            Default = booking.price_unit (đại lý đã set khi tạo phiếu). */}
+        <Form.Item name="price_unit" hidden>
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="agreed_price"
+          label="Đơn giá thỏa thuận (đ/kg)"
+          rules={[
+            { required: true, message: 'Nhập đơn giá' },
+            { type: 'number', min: 100, message: 'Giá không hợp lệ' },
+          ]}
+        >
+          <InputNumber<number>
+            style={{ width: '100%' }}
+            min={100}
+            step={100}
+            formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+            parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+            size="large"
+          />
+        </Form.Item>
 
         {/* Vùng thu mua / Địa điểm bốc hàng */}
         <Form.Item

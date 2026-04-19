@@ -44,6 +44,10 @@ export interface BookingMetadata {
   status: 'pending' | 'confirmed' | 'negotiating' | 'rejected'
   counter_price?: number
   negotiation_notes?: string
+  // Nhà máy đích nhận hàng (đồng bộ với portal)
+  target_facility_id?: string
+  target_facility_code?: string
+  target_facility_name?: string
 }
 
 export interface MessageMetadata {

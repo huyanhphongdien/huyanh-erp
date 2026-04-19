@@ -113,6 +113,14 @@ const BookingFormModal = ({
         }
       }
 
+      // Map target_facility_id → code/name (đồng bộ với portal FACILITIES)
+      const FACILITY_MAP: Record<string, { code: string; name: string }> = {
+        '755ae776-3be6-47b8-b1d0-d15b61789f24': { code: 'PD',  name: 'Phong Điền (HQ)' },
+        '9bc1467c-0cbe-4982-abc1-192c61ef7dca': { code: 'TL',  name: 'Tân Lâm' },
+        '67b45068-6e7c-4888-b8b3-49721bb9cb96': { code: 'LAO', name: 'Lào' },
+      }
+      const facility = FACILITY_MAP[values.target_facility_id]
+
       const booking: BookingMetadata = {
         code: generateBookingCode(),
         product_type: values.product_type,
@@ -129,6 +137,9 @@ const BookingFormModal = ({
         rubber_region: rubberRegionValue?.name || undefined,
         rubber_region_lat: rubberRegionValue?.lat || undefined,
         rubber_region_lng: rubberRegionValue?.lng || undefined,
+        target_facility_id: values.target_facility_id,
+        target_facility_code: facility?.code,
+        target_facility_name: facility?.name,
         notes: values.notes || undefined,
         status: 'pending',
       }
@@ -308,6 +319,24 @@ const BookingFormModal = ({
             <Input placeholder="VD: Huyện XYZ, Tỉnh ABC" size="large" />
           </Form.Item>
         )}
+
+        {/* Giao tại nhà máy (target_facility) — required, đồng bộ với Portal */}
+        <Form.Item
+          name="target_facility_id"
+          label={<><span style={{ marginRight: 4 }}>🏭</span> Giao tại nhà máy</>}
+          rules={[{ required: true, message: 'Vui lòng chọn nhà máy nhận hàng' }]}
+          tooltip="Trạm cân của nhà máy này sẽ tiếp nhận lô hàng"
+        >
+          <Select
+            placeholder="Chọn nhà máy xe đến giao hàng"
+            size="large"
+            options={[
+              { value: '755ae776-3be6-47b8-b1d0-d15b61789f24', label: '🏭 PD — Phong Điền (HQ)' },
+              { value: '9bc1467c-0cbe-4982-abc1-192c61ef7dca', label: '🏭 TL — Tân Lâm' },
+              { value: '67b45068-6e7c-4888-b8b3-49721bb9cb96', label: '🏭 LAO — Lào' },
+            ]}
+          />
+        </Form.Item>
 
         {/* Ngày giao hàng */}
         <Form.Item

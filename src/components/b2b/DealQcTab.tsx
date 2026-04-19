@@ -160,7 +160,7 @@ const DealQcTab = ({ dealId, deal }: DealQcTabProps) => {
                   <Button
                     size="small"
                     type="link"
-                    onClick={() => navigate(`/wms/qc/history/${record.batch_id}`)}
+                    onClick={() => navigate(`/wms/qc/batch/${record.batch_id}`)}
                   >
                     Lịch sử QC
                   </Button>

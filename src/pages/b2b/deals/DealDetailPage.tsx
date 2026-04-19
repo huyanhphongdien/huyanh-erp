@@ -49,9 +49,7 @@ import {
   InboxOutlined,
   ExperimentOutlined,
   WalletOutlined,
-  ToolOutlined,
-  AuditOutlined,
-  SafetyCertificateOutlined,
+  CarOutlined,
   FileProtectOutlined,
 } from '@ant-design/icons'
 import {
@@ -69,9 +67,7 @@ import { PRODUCT_TYPE_LABELS } from '../../../constants/rubberProducts'
 import DealWmsTab from '../../../components/b2b/DealWmsTab'
 import DealQcTab from '../../../components/b2b/DealQcTab'
 import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
-import DealProductionTab from '../../../components/b2b/DealProductionTab'
-import DealProcessingTab from '../../../components/b2b/DealProcessingTab'
-import DealAcceptanceTab from '../../../components/b2b/DealAcceptanceTab'
+import DealDeliveryTab from '../../../components/b2b/DealDeliveryTab'
 import DealContractTab from '../../../components/b2b/DealContractTab'
 
 const { Title, Text, Paragraph } = Typography
@@ -903,11 +899,11 @@ const DealDetailPage = () => {
             children: <DealQcTab dealId={deal.id} deal={deal} />,
           },
           {
-            key: 'production',
+            key: 'delivery',
             label: (
-              <span><ToolOutlined /> Sản xuất</span>
+              <span><CarOutlined /> Thông tin giao hàng</span>
             ),
-            children: <DealProductionTab dealId={deal.id} />,
+            children: <DealDeliveryTab dealId={deal.id} />,
           },
           {
             key: 'advances',
@@ -915,20 +911,6 @@ const DealDetailPage = () => {
               <span><WalletOutlined /> Tạm ứng</span>
             ),
             children: <DealAdvancesTab dealId={deal.id} deal={deal} />,
-          },
-          {
-            key: 'processing',
-            label: (
-              <span><AuditOutlined /> Xử lý mủ</span>
-            ),
-            children: <DealProcessingTab dealId={deal.id} />,
-          },
-          {
-            key: 'acceptance',
-            label: (
-              <span><SafetyCertificateOutlined /> Biên bản</span>
-            ),
-            children: <DealAcceptanceTab dealId={deal.id} />,
           },
           {
             key: 'contract',

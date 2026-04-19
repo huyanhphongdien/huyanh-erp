@@ -490,6 +490,22 @@ export default function WeighingPage() {
         try {
           await dealWmsService.updateDealStockInTotals(selectedDealId)
         } catch { /* non-blocking */ }
+
+        // Match delivery plan theo vehicle_plate → auto-fill actual_kg +
+        // variance. Admin đã declare plan trước → cân xong auto match.
+        // Non-blocking: nếu không có plan match thì bỏ qua (xe không được
+        // khai báo trước, vẫn cân bình thường).
+        try {
+          const { dealDeliveryPlanService } = await import('@erp/services/b2b/dealDeliveryPlanService')
+          await dealDeliveryPlanService.matchFromWeighbridge({
+            deal_id: selectedDealId,
+            vehicle_plate: vehiclePlate.trim(),
+            weigh_ticket_id: ticket.id,
+            actual_kg: updated.net_weight,
+          })
+        } catch (err) {
+          console.warn('[delivery-plan] match failed (non-blocking):', err)
+        }
       }
 
       // C1: Auto-sync INBOUND → tạo phiếu nhập kho NVL từ phiếu cân

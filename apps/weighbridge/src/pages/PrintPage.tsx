@@ -362,43 +362,24 @@ export default function PrintPage() {
           </table>
         )}
 
-        {/* ===== DRC + PRICE ===== */}
-        {(ext.expected_drc || ext.unit_price) && (
+        {/* ===== DRC (ẩn KL Khô ước / Đơn giá / Thành tiền trên phiếu cân) ===== */}
+        {ext.expected_drc && (
           isThermal ? (
             <div style={{ marginBottom: 4 }}>
               <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
-              {ext.expected_drc && <Row2 l={`DRC ${ext.expected_drc}%`} r={<span style={{ fontFamily: "'JetBrains Mono', monospace" }}>KL Khô: {dryWeight ? `${fmt(dryWeight)} kg` : '—'}</span>} />}
-              {ext.unit_price && <Row2 l={`Giá: ${fmt(ext.unit_price)}đ/${ext.price_unit === 'dry' ? 'khô' : 'ướt'}`} r="" />}
-              {estimatedValue && (
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 4 }}><tbody><tr>
-                  <td style={{ fontWeight: 700, fontSize: fs + 2, padding: '2px 0' }}>Thành tiền</td>
-                  <td style={{ fontWeight: 700, fontSize: fs + 2, padding: '2px 0', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>{fmt(estimatedValue)} đ</td>
-                </tr></tbody></table>
-              )}
+              <Row2 l={`DRC kỳ vọng: ${ext.expected_drc}%`} r="" />
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16, border: '1px solid #ddd' }}>
-              <tbody>
-                {ext.expected_drc && (
+            ext.expected_drc && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16, border: '1px solid #ddd' }}>
+                <tbody>
                   <tr>
                     <td style={tdLabel}>DRC kỳ vọng</td>
-                    <td style={tdValue}>{ext.expected_drc}%</td>
-                    <td style={tdLabel}>KL Khô ước</td>
-                    <td style={{ ...tdValue, fontWeight: 700, color: '#B45309' }}>{dryWeight ? `${fmt(dryWeight)} kg` : '—'}</td>
+                    <td style={tdValue} colSpan={3}>{ext.expected_drc}%</td>
                   </tr>
-                )}
-                {ext.unit_price && (
-                  <tr>
-                    <td style={tdLabel}>Đơn giá</td>
-                    <td style={tdValue}>{fmt(ext.unit_price)} đ/kg ({ext.price_unit === 'dry' ? 'khô' : 'ướt'})</td>
-                    <td style={tdLabel}>Thành tiền</td>
-                    <td style={{ ...tdValue, fontSize: 15, fontWeight: 700, color: '#1B4D3E' }}>
-                      {estimatedValue ? `${fmt(estimatedValue)} đ` : '—'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            )
           )
         )}
 

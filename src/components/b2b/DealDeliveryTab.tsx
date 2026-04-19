@@ -80,7 +80,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       vehicle_plate: p.vehicle_plate,
       driver_name: p.driver_name,
       driver_phone: p.driver_phone,
-      declared_kg: p.declared_kg,
+      declared_tons: p.declared_kg ? p.declared_kg / 1000 : undefined,
       notes: p.notes,
     })
     setModalOpen(true)
@@ -89,14 +89,22 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
   const submit = async () => {
     try {
       const v = await form.validateFields()
+      // UI input tấn → DB lưu kg
+      const payload = {
+        vehicle_plate: v.vehicle_plate,
+        driver_name: v.driver_name,
+        driver_phone: v.driver_phone,
+        declared_kg: Number(v.declared_tons) * 1000,
+        notes: v.notes,
+      }
       if (editing) {
-        await dealDeliveryPlanService.update(editing.id, v)
+        await dealDeliveryPlanService.update(editing.id, payload)
         message.success('Đã cập nhật kế hoạch')
       } else {
         await dealDeliveryPlanService.create({
           deal_id: dealId,
-          declared_by: user?.employee_id,
-          ...v,
+          declared_by: user?.employee_id || undefined,
+          ...payload,
         })
         message.success('Đã thêm xe dự kiến')
       }
@@ -150,7 +158,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       title: 'KL khai báo',
       dataIndex: 'declared_kg',
       align: 'right' as const,
-      render: (v: number) => <Text strong>{v.toLocaleString('vi-VN')} kg</Text>,
+      render: (v: number) => <Text strong>{(v / 1000).toFixed(2)} tấn</Text>,
     },
     {
       title: 'KL cân thực',
@@ -158,7 +166,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
       align: 'right' as const,
       render: (v: number | null) => (
         v != null ? (
-          <Text strong style={{ color: '#1B4D3E' }}>{v.toLocaleString('vi-VN')} kg</Text>
+          <Text strong style={{ color: '#1B4D3E' }}>{(v / 1000).toFixed(2)} tấn</Text>
         ) : (
           <Text type="secondary" italic>Chưa cân</Text>
         )
@@ -177,7 +185,7 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
         return (
           <Tooltip title={abs > VARIANCE_WARN_PCT ? 'Chênh lệch vượt ngưỡng 5% — kiểm tra' : ''}>
             <span style={{ color, fontWeight: 600 }}>
-              {sign}{v.toLocaleString('vi-VN')} kg
+              {sign}{(v / 1000).toFixed(2)} tấn
               <Text style={{ color, fontSize: 11, marginLeft: 4 }}>
                 ({sign}{pct.toFixed(1)}%)
               </Text>
@@ -252,8 +260,8 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
           <Card size="small">
             <Statistic
               title="Chênh lệch (đã cân)"
-              value={summary.total_variance_kg.toLocaleString('vi-VN')}
-              suffix="kg"
+              value={(summary.total_variance_kg / 1000).toFixed(2)}
+              suffix="tấn"
               valueStyle={{
                 color: Math.abs(summary.avg_variance_pct || 0) > VARIANCE_WARN_PCT
                   ? '#ef4444'
@@ -331,16 +339,17 @@ const DealDeliveryTab = ({ dealId, onTotalsChange }: DealDeliveryTabProps) => {
             </Col>
           </Row>
           <Form.Item
-            name="declared_kg"
-            label="Khối lượng khai báo (kg)"
-            rules={[{ required: true, message: 'Nhập KL' }, { type: 'number', min: 1 }]}
+            name="declared_tons"
+            label="Khối lượng khai báo (tấn)"
+            rules={[{ required: true, message: 'Nhập KL' }, { type: 'number', min: 0.01, message: 'Tối thiểu 0.01 tấn' }]}
           >
             <InputNumber<number>
               style={{ width: '100%' }}
-              min={1}
-              step={100}
-              formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(v) => Number((v || '').replace(/,/g, '')) || 0}
+              min={0.01}
+              step={0.1}
+              precision={3}
+              placeholder="VD: 60"
+              addonAfter="tấn"
             />
           </Form.Item>
           <Form.Item name="notes" label="Ghi chú">

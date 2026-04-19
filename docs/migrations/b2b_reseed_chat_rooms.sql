@@ -33,8 +33,7 @@ INSERT INTO b2b.chat_rooms (
   room_type,
   status,
   last_message_at,
-  created_at,
-  updated_at
+  created_at
 )
 SELECT
   p.id AS partner_id,
@@ -42,8 +41,7 @@ SELECT
   'deal' AS room_type,
   'active' AS status,
   now() AS last_message_at,
-  now() AS created_at,
-  now() AS updated_at
+  now() AS created_at
 FROM b2b.partners p
 WHERE p.status = 'verified'
   AND NOT EXISTS (

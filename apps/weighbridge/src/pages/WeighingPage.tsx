@@ -264,27 +264,45 @@ export default function WeighingPage() {
   // DEAL AUTO-FILL
   // ============================================================================
 
-  function handleDealSelect(dealId: string) {
+  async function handleDealSelect(dealId: string) {
     setSelectedDealId(dealId)
     setSelectedSupplierId('')
     const deal = deals.find((d) => d.id === dealId)
-    if (deal) {
-      // Auto-fill from deal (đã select expected_drc, unit_price, price_unit,
-      // rubber_type trong getActiveDealsForStockIn)
-      const ext = deal as any
-      // Ưu tiên rubber_type (mã code 'mu_tap' vv), fallback parse product_name
-      if (ext.rubber_type) {
-        setRubberType(ext.rubber_type)
-      } else if (ext.product_name) {
-        const lower = ext.product_name.toLowerCase()
-        if (lower.includes('đông') || lower.includes('dong')) setRubberType('mu_dong')
-        else if (lower.includes('nước') || lower.includes('nuoc')) setRubberType('mu_nuoc')
-        else if (lower.includes('tạp') || lower.includes('tap')) setRubberType('mu_tap')
-        else if (lower.includes('svr')) setRubberType('svr')
+    if (!deal) return
+
+    // Auto-fill from deal (đã select expected_drc, unit_price, price_unit,
+    // rubber_type trong getActiveDealsForStockIn)
+    const ext = deal as any
+    if (ext.rubber_type) {
+      setRubberType(ext.rubber_type)
+    } else if (ext.product_name) {
+      const lower = ext.product_name.toLowerCase()
+      if (lower.includes('đông') || lower.includes('dong')) setRubberType('mu_dong')
+      else if (lower.includes('nước') || lower.includes('nuoc')) setRubberType('mu_nuoc')
+      else if (lower.includes('tạp') || lower.includes('tap')) setRubberType('mu_tap')
+      else if (lower.includes('svr')) setRubberType('svr')
+    }
+    if (ext.expected_drc) setExpectedDrc(ext.expected_drc)
+    if (ext.unit_price) setUnitPrice(ext.unit_price)
+    if (ext.price_unit === 'wet' || ext.price_unit === 'dry') setPriceUnit(ext.price_unit)
+
+    // Prefill thông tin xe/tài xế từ "Báo đã giao" của đại lý (nếu có)
+    // → operator không phải nhập lại. Chỉ prefill nếu operator chưa gõ.
+    try {
+      const delivery = await dealWmsService.getLatestDeliveryForDeal(dealId)
+      if (delivery) {
+        if (delivery.vehicle_plate && !vehiclePlate) {
+          setVehiclePlate(delivery.vehicle_plate.toUpperCase())
+        }
+        if (delivery.driver_name && !driverName) {
+          setDriverName(delivery.driver_name)
+        }
+        if (delivery.notes && !notes) {
+          setNotes(`[Từ báo đã giao] ${delivery.notes}`)
+        }
       }
-      if (ext.expected_drc) setExpectedDrc(ext.expected_drc)
-      if (ext.unit_price) setUnitPrice(ext.unit_price)
-      if (ext.price_unit === 'wet' || ext.price_unit === 'dry') setPriceUnit(ext.price_unit)
+    } catch (e) {
+      console.warn('[handleDealSelect] fetch delivery failed:', e)
     }
   }
 

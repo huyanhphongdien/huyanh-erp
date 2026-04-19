@@ -306,6 +306,49 @@ export const dealWmsService = {
   },
 
   /**
+   * Lấy thông tin delivery gần nhất của 1 Deal (từ chat message metadata)
+   * Dùng bởi weighbridge để auto-fill biển số + tài xế khi operator chọn Deal
+   * → tránh nhập trùng lặp thông tin đại lý đã cung cấp lúc báo đã giao.
+   */
+  async getLatestDeliveryForDeal(dealId: string): Promise<{
+    quantity_kg?: number | null
+    drc_at_delivery?: number | null
+    delivery_date?: string | null
+    vehicle_plate?: string | null
+    driver_name?: string | null
+    driver_phone?: string | null
+    notes?: string | null
+  } | null> {
+    try {
+      // Query message_type='system' với metadata.delivery.deal_id = dealId
+      const { data, error } = await supabase
+        .from('b2b_chat_messages')
+        .select('metadata, sent_at')
+        .eq('message_type', 'system')
+        .contains('metadata', { delivery: { deal_id: dealId } })
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error || !data) return null
+      const d = (data as any).metadata?.delivery
+      if (!d) return null
+      return {
+        quantity_kg: d.quantity_kg ?? null,
+        drc_at_delivery: d.drc_at_delivery ?? null,
+        delivery_date: d.delivery_date ?? null,
+        vehicle_plate: d.vehicle_plate ?? null,
+        driver_name: d.driver_name ?? null,
+        driver_phone: d.driver_phone ?? null,
+        notes: d.notes ?? null,
+      }
+    } catch (e) {
+      console.error('[getLatestDeliveryForDeal] error:', e)
+      return null
+    }
+  },
+
+  /**
    * Cập nhật actual_drc từ QC kết quả về Deal
    * Tính weighted average DRC từ tất cả batches thuộc Deal
    */

@@ -186,4 +186,27 @@ function handleDealChange(
       onClick: goToDeal,
     })
   }
+
+  // 4. Đủ điều kiện duyệt — processing + stock_in > 0 + actual_drc + QC passed
+  // Chỉ trigger khi điều kiện MỚI được đáp ứng (trước đó chưa đủ).
+  if (oldRow && newRow.status === 'processing') {
+    const readyNow =
+      (newRow.stock_in_count || 0) > 0 &&
+      newRow.actual_drc != null &&
+      newRow.qc_status === 'passed'
+    const readyBefore =
+      (oldRow.stock_in_count || 0) > 0 &&
+      oldRow.actual_drc != null &&
+      oldRow.qc_status === 'passed'
+    if (readyNow && !readyBefore) {
+      notification.success({
+        key: `ready-${newRow.id}`,
+        message: `✅ Deal ${newRow.deal_number} đủ điều kiện duyệt`,
+        description: `DRC ${newRow.actual_drc}% · QC passed · đã nhập ${newRow.stock_in_count} phiếu. Mở Deal và bấm "Duyệt Deal".`,
+        placement: 'bottomRight',
+        duration: 8,
+        onClick: goToDeal,
+      })
+    }
+  }
 }

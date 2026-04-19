@@ -249,6 +249,27 @@ const DealCard = ({
         />
       )}
 
+      {/* Badge "Đủ điều kiện duyệt" — chỉ hiện phía factory khi đủ điều kiện */}
+      {readyToAccept && viewerType === 'factory' && !isAccepted && !isSettled && (
+        <div
+          style={{
+            background: 'rgba(16, 185, 129, 0.25)',
+            border: '1px solid rgba(16, 185, 129, 0.6)',
+            borderRadius: 6,
+            padding: '4px 10px',
+            marginBottom: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <CheckCircleOutlined style={{ color: '#86efac', fontSize: 13 }} />
+          <Text style={{ color: '#ecfccb', fontSize: 11, fontWeight: 600 }}>
+            ✅ Đủ điều kiện duyệt — bấm "Duyệt Deal" bên dưới
+          </Text>
+        </div>
+      )}
+
       {/* Content */}
       <div
         style={{

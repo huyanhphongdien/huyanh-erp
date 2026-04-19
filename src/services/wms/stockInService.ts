@@ -639,6 +639,46 @@ export const stockInService = {
     if (!ticket) throw new Error('Không tìm thấy phiếu cân')
     if (ticket.status !== 'completed') throw new Error('Phiếu cân chưa hoàn tất')
 
+    // 1b. Nếu link với Deal → fetch deal info (lot_code + partner) để
+    // enrich stock_in_order.notes + batch.source_lot_code.
+    let dealLotCode: string | null = null
+    let dealPartnerName: string | null = null
+    let dealRubberType: string | null = null
+    if (ticket.deal_id) {
+      try {
+        const { data: deal } = await supabase
+          .from('b2b_deals')
+          .select('lot_code, rubber_type, partner:b2b_partners!partner_id(code, name)')
+          .eq('id', ticket.deal_id)
+          .maybeSingle()
+        if (deal) {
+          dealLotCode = (deal as any).lot_code
+          dealRubberType = (deal as any).rubber_type
+          const p = (deal as any).partner
+          dealPartnerName = Array.isArray(p) ? p[0]?.name : p?.name
+        }
+      } catch (e) { console.warn('[stockIn.fromTicket] fetch deal failed:', e) }
+    }
+
+    // Build notes với đầy đủ thông tin vận chuyển + lô
+    const rubberTypeLabel: Record<string, string> = {
+      mu_nuoc: 'Mủ nước', mu_tap: 'Mủ tạp', mu_dong: 'Mủ đông',
+      mu_chen: 'Mủ chén', mu_to: 'Mủ tờ',
+    }
+    const rubberLabel = dealRubberType
+      ? (rubberTypeLabel[dealRubberType] || ticket.rubber_type || dealRubberType)
+      : (ticket.rubber_type ? (rubberTypeLabel[ticket.rubber_type] || ticket.rubber_type) : null)
+    const notesLines = [
+      `Nhập từ phiếu cân ${ticket.code}`,
+      ticket.vehicle_plate
+        ? `Xe: ${ticket.vehicle_plate}${ticket.driver_name ? ` · ${ticket.driver_name}` : ''}${ticket.driver_phone ? ` · ${ticket.driver_phone}` : ''}`
+        : null,
+      dealLotCode ? `Lô: ${dealLotCode}` : null,
+      rubberLabel ? `Loại: ${rubberLabel}` : null,
+      dealPartnerName ? `Đại lý: ${dealPartnerName}` : (ticket.supplier_name ? `NCC: ${ticket.supplier_name}` : null),
+    ].filter(Boolean)
+    const enrichedNotes = notesLines.join(' · ')
+
     // Idempotency: nếu phiếu nhập đã tồn tại cho ticket này (matched via notes),
     // trả về record cũ thay vì tạo trùng. Tránh double inventory khi re-trigger.
     if (ticket.code) {
@@ -676,7 +716,7 @@ export const stockInService = {
         total_quantity: 1,
         total_weight: ticket.net_weight || 0,
         confirmed_at: new Date().toISOString(),
-        notes: `Nhập nhanh từ phiếu cân ${ticket.code}`,
+        notes: enrichedNotes,
       })
       .select('id, code')
       .single()
@@ -691,7 +731,7 @@ export const stockInService = {
       .limit(1)
       .single()
 
-    // 5. Create batch
+    // 5. Create batch — gắn source_lot_code của Deal để trace ngược về lô gốc
     const batchNo = `NVL-${(ticket.code || '').replace('CX-', '')}`
     const { data: batch, error: batchErr } = await supabase
       .from('stock_batches')
@@ -707,9 +747,10 @@ export const stockInService = {
         latest_drc: ticket.expected_drc || null,
         qc_status: 'pending' as QCStatus,
         status: 'active' as const,
-        rubber_type: ticket.rubber_type || null,
-        supplier_name: ticket.supplier_name || null,
+        rubber_type: dealRubberType || ticket.rubber_type || null,
+        supplier_name: dealPartnerName || ticket.supplier_name || null,
         supplier_reported_drc: ticket.expected_drc || null,
+        source_lot_code: dealLotCode,  // ⭐ kế thừa lot_code từ Deal
         yard_zone: yardPosition?.zone || null,
         yard_row: yardPosition?.row || null,
         yard_col: yardPosition?.col || null,

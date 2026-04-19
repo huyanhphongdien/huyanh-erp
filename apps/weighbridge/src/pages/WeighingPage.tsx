@@ -74,6 +74,7 @@ export default function WeighingPage() {
   // Form state
   const [vehiclePlate, setVehiclePlate] = useState('')
   const [driverName, setDriverName] = useState('')
+  const [driverPhone, setDriverPhone] = useState('')
   const [plateHistory, setPlateHistory] = useState<string[]>([])
   const [tareSuggestion, setTareSuggestion] = useState<{ avgTare: number | null; lastTare: number | null; count: number } | null>(null)
   // S3: Loại phiếu cân — IN (cân 2 lần gross/tare) | OUT (cân 1 lần net trực tiếp)
@@ -286,24 +287,8 @@ export default function WeighingPage() {
     if (ext.unit_price) setUnitPrice(ext.unit_price)
     if (ext.price_unit === 'wet' || ext.price_unit === 'dry') setPriceUnit(ext.price_unit)
 
-    // Prefill thông tin xe/tài xế từ "Báo đã giao" của đại lý (nếu có)
-    // → operator không phải nhập lại. Chỉ prefill nếu operator chưa gõ.
-    try {
-      const delivery = await dealWmsService.getLatestDeliveryForDeal(dealId)
-      if (delivery) {
-        if (delivery.vehicle_plate && !vehiclePlate) {
-          setVehiclePlate(delivery.vehicle_plate.toUpperCase())
-        }
-        if (delivery.driver_name && !driverName) {
-          setDriverName(delivery.driver_name)
-        }
-        if (delivery.notes && !notes) {
-          setNotes(`[Từ báo đã giao] ${delivery.notes}`)
-        }
-      }
-    } catch (e) {
-      console.warn('[handleDealSelect] fetch delivery failed:', e)
-    }
+    // Biển số + tài xế: operator tự nhập (1 Deal có thể có nhiều xe giao
+    // khác nhau, prefill từ báo đã giao sẽ gây nhầm lẫn)
   }
 
   // ============================================================================
@@ -340,6 +325,7 @@ export default function WeighingPage() {
         {
           vehicle_plate: vehiclePlate.trim(),
           driver_name: driverName || undefined,
+          driver_phone: driverPhone || undefined,
           ticket_type: ticketDirection,
           notes: notes || undefined,
           facility_id: currentFacility?.id || null,
@@ -1046,9 +1032,9 @@ export default function WeighingPage() {
               )}
 
               {/* Vehicle info */}
-              <Card size="small" title="Thông tin xe" style={{ borderRadius: 12 }}>
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  <div>
+              <Card size="small" title="Thông tin vận chuyển" style={{ borderRadius: 12 }}>
+                <Row gutter={[12, 12]}>
+                  <Col span={24}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Biển số xe *</Text>
                     <AutoComplete
                       value={vehiclePlate}
@@ -1058,7 +1044,7 @@ export default function WeighingPage() {
                         if (upper.length >= 2) handlePlateSearch(upper)
                       }}
                       onSelect={(v) => handlePlateSelect(v)}
-                      placeholder="Nhập biển số..."
+                      placeholder="VD: 43C-123.45"
                       style={{ width: '100%' }}
                       disabled={isCompleted}
                       options={plateHistory.map((p) => ({ value: p, label: p }))}
@@ -1068,8 +1054,8 @@ export default function WeighingPage() {
                         💡 Tare TB {tareSuggestion.count} lần: {tareSuggestion.avgTare?.toLocaleString()} kg
                       </Text>
                     )}
-                  </div>
-                  <div>
+                  </Col>
+                  <Col span={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Tài xế</Text>
                     <Input
                       value={driverName}
@@ -1077,8 +1063,17 @@ export default function WeighingPage() {
                       placeholder="Tên tài xế..."
                       disabled={isCompleted}
                     />
-                  </div>
-                </Space>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>SĐT tài xế</Text>
+                    <Input
+                      value={driverPhone}
+                      onChange={(e) => setDriverPhone(e.target.value)}
+                      placeholder="0905..."
+                      disabled={isCompleted}
+                    />
+                  </Col>
+                </Row>
               </Card>
 
               {/* Rubber fields — IN only (TP xuất không cần loại mủ/DRC/đơn giá/vị trí dỡ/tạp chất) */}

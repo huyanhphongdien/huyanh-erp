@@ -75,6 +75,7 @@ async function generateCode(): Promise<string> {
 export interface CreateTicketData {
   vehicle_plate: string
   driver_name?: string
+  driver_phone?: string
   ticket_type: TicketType
   reference_type?: string
   reference_id?: string
@@ -95,6 +96,7 @@ async function create(data: CreateTicketData, userId?: string): Promise<Weighbri
       code,
       vehicle_plate: data.vehicle_plate.toUpperCase().trim(),
       driver_name: data.driver_name?.trim() || null,
+      driver_phone: data.driver_phone?.trim() || null,
       ticket_type: data.ticket_type,
       reference_type: data.reference_type || null,
       reference_id: data.reference_id || null,

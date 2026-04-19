@@ -723,13 +723,33 @@ export const stockInService = {
 
     if (siErr) throw siErr
 
-    // 4. Get material (first raw material)
-    const { data: mat } = await supabase
+    // 4. Get material (first raw material) — dùng maybeSingle để không throw
+    // khi chưa có material raw. Nếu chưa có → auto-tạo 1 material mặc định
+    // "Mủ cao su thô" để batch có material_id hợp lệ.
+    let { data: mat } = await supabase
       .from('materials')
       .select('id')
       .eq('type', 'raw')
       .limit(1)
-      .single()
+      .maybeSingle()
+
+    if (!mat) {
+      const { data: newMat, error: matCreateErr } = await supabase
+        .from('materials')
+        .insert({
+          code: 'MU-CSRAW',
+          name: 'Mủ cao su thô (tự tạo)',
+          type: 'raw',
+          unit: 'kg',
+        })
+        .select('id')
+        .maybeSingle()
+      if (matCreateErr) {
+        console.warn('[stockIn.fromTicket] tạo material raw mặc định thất bại:', matCreateErr)
+      } else {
+        mat = newMat
+      }
+    }
 
     // 5. Create batch — gắn source_lot_code của Deal để trace ngược về lô gốc
     const batchNo = `NVL-${(ticket.code || '').replace('CX-', '')}`

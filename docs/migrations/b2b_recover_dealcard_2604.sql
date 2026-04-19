@@ -82,7 +82,15 @@ WHERE message_type = 'deal'
 -- Chạy block này TRƯỚC bước 4 để verify room_id sẽ được dùng
 -- ============================================
 
--- 3b.1 Qua deal.booking_id (cách chính xác nhất)
+-- 3b.0 Debug: xem booking_id kiểu gì, nội dung gì
+SELECT
+  deal_number,
+  booking_id,
+  pg_typeof(booking_id) AS booking_id_type
+FROM b2b.deals
+WHERE deal_number = 'DL2604-CVO4';
+
+-- 3b.1 Qua deal.booking_id (cast ::text ↔ ::text để tránh mismatch UUID/TEXT)
 SELECT
   'via_booking_id' AS method,
   m.id AS booking_msg_id,
@@ -91,7 +99,7 @@ SELECT
   m.message_type,
   m.content
 FROM b2b.chat_messages m
-WHERE m.id = (SELECT booking_id FROM b2b.deals WHERE deal_number = 'DL2604-CVO4');
+WHERE m.id::text = (SELECT booking_id::text FROM b2b.deals WHERE deal_number = 'DL2604-CVO4');
 
 -- 3b.2 Thử các path metadata khác nhau
 SELECT
@@ -148,7 +156,7 @@ room_target AS (
   -- Fallback: tìm booking_code trong metadata JSON (nhiều path khả dĩ)
   SELECT m.room_id
   FROM b2b.chat_messages m
-  WHERE m.id = (SELECT booking_id FROM b2b.deals WHERE deal_number = 'DL2604-CVO4')
+  WHERE m.id::text = (SELECT booking_id::text FROM b2b.deals WHERE deal_number = 'DL2604-CVO4')
   UNION ALL
   SELECT m.room_id
   FROM b2b.chat_messages m

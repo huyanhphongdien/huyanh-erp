@@ -179,7 +179,7 @@ const BookingFormModal = ({
         onValuesChange={handleValuesChange}
         initialValues={{
           price_unit: 'wet',
-          drc_percent: 60,
+          // Không default DRC — user nhập hoặc auto-fill khi chọn pickup_location
         }}
         style={{ marginTop: 16 }}
       >

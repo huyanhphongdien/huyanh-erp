@@ -6,7 +6,7 @@ import {
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, PrinterOutlined, CheckOutlined,
-  CameraOutlined, ThunderboltOutlined, ExperimentOutlined,
+  CameraOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrentFacility } from '@/stores/facilityStore'
@@ -125,13 +125,6 @@ export default function WeighingPage() {
 
   // Manual weight input
   const [manualWeight, setManualWeight] = useState<number | null>(null)
-
-  // QC inline — operator nhập sau khi test mẫu, trước khi cân Tare
-  const [qcActualDrc, setQcActualDrc] = useState<number | null>(null)
-  const [qcStatus, setQcStatus] = useState<'passed' | 'warning' | 'failed' | null>(null)
-  const [qcNotes, setQcNotes] = useState<string>('')
-  const [qcSaving, setQcSaving] = useState(false)
-  const [qcSkipped, setQcSkipped] = useState(false)
 
   // Calculation
   const [calc, setCalc] = useState<WeightCalculation | null>(null)
@@ -748,45 +741,8 @@ export default function WeighingPage() {
   const isWeighingGross = ticket?.status === 'weighing_gross'
   const isWeighingTare = ticket?.status === 'weighing_tare'
   const isCompleted = ticket?.status === 'completed'
-
-  // QC gate: đã có kết quả QC trên ticket HAY đã skip — mới cho cân Tare
-  const qcDone = !!(ticket as any)?.qc_status || qcStatus !== null || qcSkipped || ((ticket as any)?.qc_status === null && (ticket as any)?.qc_notes?.includes('[skipped]'))
-  // Chỉ áp dụng gate cho ticket_type='in' + nguồn có deal (B2B). NCC thường
-  // đã có test tại nguồn → skip gate.
-  const requireQcGate = ticketDirection === 'in' && !!selectedDealId
-  const canRecordTare = isWeighingTare && ticket?.tare_weight == null && (!requireQcGate || qcDone)
-  const canRecord = isWeighingGross || canRecordTare
+  const canRecord = isWeighingGross || (isWeighingTare && ticket?.tare_weight == null)
   const canComplete = isWeighingTare && ticket?.tare_weight != null
-
-  async function handleSaveQC(status: 'passed' | 'warning' | 'failed' | null, skipped: boolean = false) {
-    if (!ticket) return
-    try {
-      setQcSaving(true)
-      await weighbridgeService.updateQC(ticket.id, {
-        qc_actual_drc: qcActualDrc,
-        qc_status: status,
-        qc_notes: skipped ? `[skipped] ${qcNotes}`.trim() : qcNotes.trim() || null,
-        qc_checked_by: operator?.id,
-      })
-      setQcStatus(status)
-      if (skipped) setQcSkipped(true)
-      // Reload ticket
-      const refreshed = await weighbridgeService.getById(ticket.id)
-      if (refreshed) setTicket(refreshed)
-    } catch (err: any) {
-      setError(err?.message || 'Không lưu được QC')
-    } finally {
-      setQcSaving(false)
-    }
-  }
-
-  function evaluateQC(drc: number | null): 'passed' | 'warning' | 'failed' {
-    if (drc == null || expectedDrc == null) return 'passed'
-    const diff = Math.abs(drc - expectedDrc)
-    if (diff <= 2) return 'passed'
-    if (diff <= 5) return 'warning'
-    return 'failed'
-  }
 
   const selectedDeal = deals.find((d) => d.id === selectedDealId)
 
@@ -1383,88 +1339,9 @@ export default function WeighingPage() {
               {/* Card 'Tính toán' đã bỏ — trạm cân chỉ quan tâm KL, tiền
                   tính sau ở Deal/Quyết toán */}
 
-              {/* QC inline — hiện sau khi cân Gross xong, trước khi cân Tare.
-                  Bắt buộc cho ticket_type='in' + có Deal (B2B). Operator có
-                  thể Skip nếu lab chưa có kết quả → QC nhập sau. */}
-              {requireQcGate && isWeighingTare && !isCompleted && (
-                <Card
-                  size="small"
-                  title={
-                    <Space>
-                      <ExperimentOutlined style={{ color: '#B45309' }} />
-                      <Text strong>QC lô hàng (bắt buộc hoặc skip)</Text>
-                      {qcStatus && (
-                        <Tag color={qcStatus === 'passed' ? 'green' : qcStatus === 'warning' ? 'orange' : 'red'}>
-                          {qcStatus === 'passed' ? 'Đạt' : qcStatus === 'warning' ? 'Cảnh báo' : 'Không đạt'}
-                        </Tag>
-                      )}
-                      {qcSkipped && <Tag>Đã skip — chờ lab</Tag>}
-                    </Space>
-                  }
-                  style={{ borderRadius: 12, borderColor: qcDone ? '#86efac' : '#fca5a5' }}
-                >
-                  <Space direction="vertical" size={10} style={{ width: '100%' }}>
-                    <div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        DRC kỳ vọng: <b>{expectedDrc != null ? `${expectedDrc}%` : '—'}</b> · DRC đo thực (%)
-                      </Text>
-                      <InputNumber<number>
-                        value={qcActualDrc}
-                        onChange={(v) => {
-                          setQcActualDrc(v)
-                          if (v != null && expectedDrc != null) {
-                            setQcStatus(evaluateQC(v))
-                          }
-                        }}
-                        min={0} max={100} step={0.1}
-                        placeholder="VD: 48.5"
-                        style={{ width: '100%' }}
-                        disabled={qcDone}
-                      />
-                    </div>
-                    <Input.TextArea
-                      value={qcNotes}
-                      onChange={(e) => setQcNotes(e.target.value)}
-                      rows={2}
-                      placeholder="Ghi chú QC (phương pháp test, mẫu số, điểm lấy...)"
-                      disabled={qcDone}
-                    />
-                    {!qcDone && (
-                      <Row gutter={8}>
-                        <Col span={12}>
-                          <Button
-                            type="primary" block size="large"
-                            icon={<CheckOutlined />}
-                            disabled={qcActualDrc == null || qcSaving}
-                            loading={qcSaving}
-                            onClick={() => handleSaveQC(evaluateQC(qcActualDrc))}
-                            style={{ background: '#16A34A', borderColor: '#16A34A' }}
-                          >
-                            Lưu QC
-                          </Button>
-                        </Col>
-                        <Col span={12}>
-                          <Button
-                            block size="large"
-                            disabled={qcSaving}
-                            onClick={() => handleSaveQC(null, true)}
-                          >
-                            Skip — test sau
-                          </Button>
-                        </Col>
-                      </Row>
-                    )}
-                    {qcStatus === 'failed' && (
-                      <Alert
-                        type="error"
-                        showIcon
-                        message="QC KHÔNG ĐẠT"
-                        description="Liên hệ quản lý để quyết định: từ chối xe / nhập vào kho tranh chấp / admin override."
-                      />
-                    )}
-                  </Space>
-                </Card>
-              )}
+              {/* QC gate đã bỏ — DRC là thông số quan trọng, để QC lab
+                  chuyên trách test sau (tab QC của Deal / Quick Scan).
+                  Trạm cân chỉ chịu trách nhiệm Gross/Tare/Net. */}
 
               {/* Action buttons */}
               {ticket && (

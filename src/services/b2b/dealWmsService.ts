@@ -63,10 +63,18 @@ export interface ActiveDealForStockIn {
   id: string
   deal_number: string
   partner_name: string
+  partner_id?: string
   product_name: string
   quantity_kg: number
   received_kg: number
   remaining_kg: number
+  // Auto-fill weighbridge khi chọn deal
+  expected_drc?: number | null
+  unit_price?: number | null
+  price_unit?: 'wet' | 'dry' | null
+  rubber_type?: string | null
+  target_facility_id?: string | null
+  lot_code?: string | null
 }
 
 // ============================================
@@ -238,6 +246,7 @@ export const dealWmsService = {
       .from('b2b_deals')
       .select(`
         id, deal_number, product_name, quantity_kg, target_facility_id,
+        expected_drc, unit_price, price_unit, rubber_type, lot_code, partner_id,
         partner:b2b_partners!partner_id ( id, name )
       `)
       .in('status', ['processing', 'accepted'])
@@ -274,14 +283,22 @@ export const dealWmsService = {
 
       const quantityKg = (deal as any).quantity_kg || 0
 
+      const d = deal as any
       result.push({
-        id: (deal as any).id,
-        deal_number: (deal as any).deal_number,
-        partner_name: (deal as any).partner?.name || '',
-        product_name: (deal as any).product_name || '',
+        id: d.id,
+        deal_number: d.deal_number,
+        partner_name: d.partner?.name || '',
+        partner_id: d.partner_id,
+        product_name: d.product_name || '',
         quantity_kg: quantityKg,
         received_kg: receivedKg,
         remaining_kg: Math.max(0, quantityKg - receivedKg),
+        expected_drc: d.expected_drc ?? null,
+        unit_price: d.unit_price ?? null,
+        price_unit: d.price_unit ?? null,
+        rubber_type: d.rubber_type ?? null,
+        target_facility_id: d.target_facility_id ?? null,
+        lot_code: d.lot_code ?? null,
       })
     }
 

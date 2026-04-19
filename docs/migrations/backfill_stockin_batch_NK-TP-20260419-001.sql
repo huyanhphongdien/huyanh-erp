@@ -66,9 +66,9 @@ batch_insert AS (
     supplier_name = EXCLUDED.supplier_name
   RETURNING id, batch_no
 )
--- BƯỚC 3 — Tạo stock_in_detail link stock_in ↔ batch
-INSERT INTO stock_in_details (stock_in_id, material_id, batch_id, quantity, weight, drc_value)
-SELECT si.stock_in_id, mat.id, b.id, 1, si.total_weight, 50
+-- BƯỚC 3 — Tạo stock_in_detail link stock_in ↔ batch (không có drc_value)
+INSERT INTO stock_in_details (stock_in_id, material_id, batch_id, quantity, weight, unit)
+SELECT si.stock_in_id, mat.id, b.id, 1, si.total_weight, 'kg'
 FROM si, mat, batch_insert b
 WHERE NOT EXISTS (
   SELECT 1 FROM stock_in_details

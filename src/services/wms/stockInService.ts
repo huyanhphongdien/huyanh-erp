@@ -781,14 +781,14 @@ export const stockInService = {
 
     if (batchErr) throw batchErr
 
-    // 6. Create stock_in_detail
+    // 6. Create stock_in_detail (không có drc_value column trên table)
     await supabase.from('stock_in_details').insert({
       stock_in_id: si!.id,
       material_id: mat?.id,
       batch_id: batch!.id,
       quantity: 1,
       weight: ticket.net_weight || 0,
-      drc_value: ticket.expected_drc || null,
+      unit: 'kg',
     })
 
     // 6b. Đồng bộ stock_levels + inventory_transactions cho phiếu cân

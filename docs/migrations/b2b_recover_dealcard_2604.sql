@@ -78,11 +78,41 @@ WHERE message_type = 'deal'
   );
 
 -- ============================================
+-- BƯỚC 3b — Tìm room_id thực tế (debug)
+-- Chạy block này TRƯỚC bước 4 để verify room_id sẽ được dùng
+-- ============================================
+
+-- 3b.1 Qua deal.booking_id (cách chính xác nhất)
+SELECT
+  'via_booking_id' AS method,
+  m.id AS booking_msg_id,
+  m.room_id,
+  m.sender_type,
+  m.message_type,
+  m.content
+FROM b2b.chat_messages m
+WHERE m.id = (SELECT booking_id FROM b2b.deals WHERE deal_number = 'DL2604-CVO4');
+
+-- 3b.2 Thử các path metadata khác nhau
+SELECT
+  'metadata_path' AS method,
+  id AS booking_msg_id,
+  room_id,
+  sender_type,
+  message_type,
+  metadata
+FROM b2b.chat_messages
+WHERE metadata->'booking'->>'booking_code' = 'BK260419-9JES'
+   OR metadata->>'booking_code' = 'BK260419-9JES'
+   OR metadata->'booking'->>'code' = 'BK260419-9JES'
+   OR content ILIKE '%BK260419-9JES%'
+LIMIT 5;
+
+-- ============================================
 -- BƯỚC 4 — INSERT DealCard message
--- ⚠️ Chỉ chạy khi BƯỚC 3 trả về 0 rows
+-- ⚠️ Chỉ chạy khi BƯỚC 3 trả về 0 rows VÀ BƯỚC 3b trả room_id hợp lệ
 --
 -- Dùng CTE để compute total_advanced từ advances thay vì assume column.
--- price_unit: default 'wet' nếu column không tồn tại trên base table.
 -- ============================================
 WITH deal_snapshot AS (
   SELECT
@@ -114,10 +144,21 @@ WITH deal_snapshot AS (
   WHERE d.deal_number = 'DL2604-CVO4'
 ),
 room_target AS (
-  SELECT room_id
-  FROM b2b.chat_messages
-  WHERE metadata->'booking'->>'booking_code' = 'BK260419-9JES'
-  ORDER BY sent_at DESC
+  -- Ưu tiên lookup qua deal.booking_id (= chat_messages.id của booking message gốc)
+  -- Fallback: tìm booking_code trong metadata JSON (nhiều path khả dĩ)
+  SELECT m.room_id
+  FROM b2b.chat_messages m
+  WHERE m.id = (SELECT booking_id FROM b2b.deals WHERE deal_number = 'DL2604-CVO4')
+  UNION ALL
+  SELECT m.room_id
+  FROM b2b.chat_messages m
+  WHERE (
+    m.metadata->'booking'->>'booking_code' = 'BK260419-9JES'
+    OR m.metadata->>'booking_code' = 'BK260419-9JES'
+    OR m.metadata->'booking'->>'code' = 'BK260419-9JES'
+    OR m.content ILIKE '%BK260419-9JES%'
+  )
+  ORDER BY 1
   LIMIT 1
 )
 INSERT INTO b2b.chat_messages (

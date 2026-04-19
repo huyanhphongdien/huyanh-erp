@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card, Input, Button, Space, Typography, Spin, Result, Tag,
   Radio, InputNumber, Collapse, Descriptions, List, message,
@@ -46,7 +46,9 @@ interface RecentQC {
 
 const QCQuickScanPage = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const searchRef = useRef<any>(null)
+  const initialBatch = searchParams.get('batch') || ''
 
   // Search state
   const [searching, setSearching] = useState(false)
@@ -193,6 +195,14 @@ const QCQuickScanPage = () => {
   // RESET / SCAN NEXT
   // --------------------------------------------------------------------------
 
+  // Auto-search khi URL có ?batch=NVL-... (từ link trong tab QC của Deal)
+  useEffect(() => {
+    if (initialBatch) {
+      handleSearch(initialBatch)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialBatch])
+
   const handleScanNext = () => {
     setBatch(null)
     setEvaluation(null)
@@ -235,6 +245,7 @@ const QCQuickScanPage = () => {
           onSearch={handleSearch}
           loading={searching}
           autoFocus
+          defaultValue={initialBatch}
           style={{ fontSize: 16 }}
         />
       </Card>

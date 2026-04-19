@@ -155,15 +155,25 @@ const DealQcTab = ({ dealId, deal }: DealQcTabProps) => {
               },
               {
                 title: '',
-                width: 100,
+                width: 200,
                 render: (_: any, record: DealBatchSummary) => (
-                  <Button
-                    size="small"
-                    type="link"
-                    onClick={() => navigate(`/wms/qc/batch/${record.batch_id}`)}
-                  >
-                    Lịch sử QC
-                  </Button>
+                  <Button.Group>
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<ExperimentOutlined />}
+                      onClick={() => navigate(`/wms/qc?tab=quick-scan&batch=${encodeURIComponent(record.batch_no)}`)}
+                      style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+                    >
+                      Nhập QC
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => navigate(`/wms/qc/batch/${record.batch_id}`)}
+                    >
+                      Lịch sử
+                    </Button>
+                  </Button.Group>
                 ),
               },
             ]}

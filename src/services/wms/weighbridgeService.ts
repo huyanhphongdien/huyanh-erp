@@ -29,6 +29,7 @@ const TICKET_LIST_SELECT = `
   id, code, vehicle_plate, driver_name, ticket_type,
   gross_weight, tare_weight, net_weight,
   reference_type, reference_id,
+  deal_id, partner_id, supplier_name, rubber_type,
   status, notes, created_by,
   gross_weighed_at, tare_weighed_at,
   completed_at, created_at, updated_at

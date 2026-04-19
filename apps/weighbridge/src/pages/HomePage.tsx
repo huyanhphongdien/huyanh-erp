@@ -50,6 +50,9 @@ export default function HomePage() {
   const [showAllDates, setShowAllDates] = useState(false)
   // Mặc định ẨN phiếu đã hủy (giảm noise). User có thể bật lên qua filter status.
   const [showCancelled, setShowCancelled] = useState(false)
+  // Filter theo đại lý (partner_id) + Deal (deal_id)
+  const [filterPartnerId, setFilterPartnerId] = useState<string>('all')
+  const [filterDealId, setFilterDealId] = useState<string>('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -237,10 +240,16 @@ export default function HomePage() {
     // Status filter
     if (filterStatus !== 'all' && t.status !== filterStatus) return false
 
+    // Partner filter
+    if (filterPartnerId !== 'all' && (t as any).partner_id !== filterPartnerId) return false
+
+    // Deal filter
+    if (filterDealId !== 'all' && (t as any).deal_id !== filterDealId) return false
+
     // Search
     if (searchText) {
       const s = searchText.toLowerCase()
-      const match = [t.code, t.vehicle_plate, t.driver_name]
+      const match = [t.code, t.vehicle_plate, t.driver_name, (t as any).supplier_name]
         .filter(Boolean)
         .some(v => v!.toLowerCase().includes(s))
       if (!match) return false
@@ -248,6 +257,38 @@ export default function HomePage() {
 
     return true
   })
+
+  // Build dropdown options từ tickets hiện có (distinct)
+  const partnerOptions = (() => {
+    const map = new Map<string, string>()
+    for (const t of allTickets) {
+      const pid = (t as any).partner_id
+      const name = (t as any).supplier_name
+      if (pid && name && !map.has(pid)) map.set(pid, name)
+    }
+    return [{ value: 'all', label: 'Tất cả đại lý' }, ...Array.from(map.entries()).map(([value, label]) => ({ value, label }))]
+  })()
+
+  const dealOptions = (() => {
+    const map = new Map<string, string>()
+    for (const t of allTickets) {
+      const did = (t as any).deal_id
+      const refCode = t.reference_type === 'b2b_deal' ? t.reference_id : null
+      if (did) {
+        // Try to use reference code as label, fallback to short id
+        const label = (refCode as string) || did.slice(0, 8)
+        if (!map.has(did)) map.set(did, label)
+      }
+    }
+    // Filter deals theo partner nếu chọn
+    const entries = filterPartnerId !== 'all'
+      ? Array.from(map.entries()).filter(([id]) => {
+          const tk = allTickets.find(t => (t as any).deal_id === id)
+          return tk && (tk as any).partner_id === filterPartnerId
+        })
+      : Array.from(map.entries())
+    return [{ value: 'all', label: 'Tất cả Deal' }, ...entries.map(([value, label]) => ({ value, label }))]
+  })()
 
   const now = new Date()
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -515,6 +556,24 @@ export default function HomePage() {
                   { value: 'completed', label: 'Hoàn tất' },
                   { value: 'cancelled', label: 'Đã hủy' },
                 ]}
+              />
+              <Select
+                value={filterPartnerId}
+                onChange={(v) => { setFilterPartnerId(v); setFilterDealId('all') }}
+                style={{ width: 200 }}
+                showSearch
+                optionFilterProp="label"
+                placeholder="Đại lý"
+                options={partnerOptions}
+              />
+              <Select
+                value={filterDealId}
+                onChange={setFilterDealId}
+                style={{ width: 180 }}
+                showSearch
+                optionFilterProp="label"
+                placeholder="Deal"
+                options={dealOptions}
               />
               <Button
                 size="small"

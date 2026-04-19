@@ -52,6 +52,27 @@ const generateAdvanceNumber = (): string => {
   return `TU${year}${month}-${random}`
 }
 
+// ============================================
+// Facility lookup — chỉ khi admin override ở ConfirmDealModal (formData có
+// target_facility_id nhưng không có code/name)
+// ============================================
+async function resolveFacilityInfo(
+  facilityId: string | undefined,
+): Promise<{ code?: string; name?: string }> {
+  if (!facilityId) return {}
+  try {
+    const { data } = await supabase
+      .from('facilities')
+      .select('code, name')
+      .eq('id', facilityId)
+      .maybeSingle()
+    return data ? { code: data.code, name: data.name } : {}
+  } catch (e) {
+    console.error('[resolveFacilityInfo] lookup failed:', e)
+    return {}
+  }
+}
+
 export function calculateEstimatedValue(data: {
   quantity_tons: number
   price_per_kg: number
@@ -146,6 +167,8 @@ export const dealConfirmService = {
         rubber_region: context.rubberRegion || null,
         rubber_region_lat: context.rubberRegionLat || null,
         rubber_region_lng: context.rubberRegionLng || null,
+        // Nhà máy đích (kế thừa từ booking, có thể override ở ConfirmDealModal)
+        target_facility_id: formData.target_facility_id || null,
         // Notes chỉ chứa ghi chú thực sự
         notes: formData.deal_notes || null,
         booking_id: context.bookingMessageId,
@@ -253,6 +276,16 @@ export const dealConfirmService = {
     }
 
     // === Step 5: Gửi DealCard message trong chat ===
+    // Nếu admin override facility khác với booking → formData có id nhưng
+    // code/name có thể là của booking cũ → lookup lại từ DB để đúng.
+    let facilityCode = formData.target_facility_code
+    let facilityName = formData.target_facility_name
+    if (formData.target_facility_id && (!facilityCode || !facilityName)) {
+      const info = await resolveFacilityInfo(formData.target_facility_id)
+      facilityCode = info.code
+      facilityName = info.name
+    }
+
     const dealMetadata: DealCardMetadata = {
       deal_id: deal.id,
       deal_number: dealNumber,
@@ -265,6 +298,9 @@ export const dealConfirmService = {
       price_unit: formData.price_unit,
       estimated_value: estimatedValue,
       pickup_location: formData.pickup_location,
+      target_facility_id: formData.target_facility_id,
+      target_facility_code: facilityCode,
+      target_facility_name: facilityName,
       total_advanced: totalAdvanced,
       balance_due: estimatedValue - totalAdvanced,
     }

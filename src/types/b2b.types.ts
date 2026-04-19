@@ -396,6 +396,11 @@ export interface ConfirmDealFormData {
   delivery_date?: string
   deal_notes?: string
 
+  // === Nhà máy đích (kế thừa từ booking, admin có thể override khi confirm) ===
+  target_facility_id?: string
+  target_facility_code?: string
+  target_facility_name?: string
+
   // === Phần 2: Tạm ứng (optional, chỉ khi factory confirm) ===
   has_advance: boolean
   advance_amount?: number
@@ -419,6 +424,11 @@ export interface DealCardMetadata {
   price_unit: 'wet' | 'dry'
   estimated_value: number
   pickup_location?: string
+
+  // Nhà máy đích (kế thừa từ booking lúc chốt Deal)
+  target_facility_id?: string
+  target_facility_code?: string
+  target_facility_name?: string
 
   // Tài chính
   total_advanced: number

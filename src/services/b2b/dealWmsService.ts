@@ -228,18 +228,29 @@ export const dealWmsService = {
   /**
    * Lấy danh sách Deals chưa hoàn tất nhập kho (cho dropdown chọn Deal)
    */
-  async getActiveDealsForStockIn(partnerId?: string): Promise<ActiveDealForStockIn[]> {
+  async getActiveDealsForStockIn(
+    partnerId?: string,
+    /** Filter deals đi vào facility này. NULL deals (chưa assign) vẫn hiện để legacy. */
+    currentFacilityId?: string,
+  ): Promise<ActiveDealForStockIn[]> {
     // 1. Lấy deals status = 'processing' hoặc 'accepted'
     let query = supabase
       .from('b2b_deals')
       .select(`
-        id, deal_number, product_name, quantity_kg,
+        id, deal_number, product_name, quantity_kg, target_facility_id,
         partner:b2b_partners!partner_id ( id, name )
       `)
       .in('status', ['processing', 'accepted'])
 
     if (partnerId) {
       query = query.eq('partner_id', partnerId)
+    }
+
+    // Filter theo facility: trạm cân ở PD chỉ thấy deal đi PD, không nhầm
+    // TL/LAO. Legacy deals có target_facility_id = NULL vẫn hiện để backward
+    // compatible (có thể cân ở bất kỳ trạm nào).
+    if (currentFacilityId) {
+      query = query.or(`target_facility_id.is.null,target_facility_id.eq.${currentFacilityId}`)
     }
 
     const { data: deals, error } = await query

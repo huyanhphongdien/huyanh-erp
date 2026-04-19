@@ -315,6 +315,28 @@ const DealCard = ({
           </div>
         )}
 
+        {/* Giao tại nhà máy */}
+        {metadata.target_facility_code && (
+          <div
+            style={{
+              marginTop: 8,
+              padding: '6px 10px',
+              background: 'rgba(255,255,255,0.18)',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              border: '1px solid rgba(255,255,255,0.3)',
+            }}
+          >
+            <span style={{ fontSize: 14 }}>🏭</span>
+            <Text style={{ color: '#fff', fontSize: 12 }}>
+              Giao tại: <b>{metadata.target_facility_code}</b>
+              {metadata.target_facility_name ? ` — ${metadata.target_facility_name}` : ''}
+            </Text>
+          </div>
+        )}
+
         <Divider style={{ margin: '12px 0', borderColor: 'rgba(255,255,255,0.2)' }} />
 
         {/* Giá trị */}

@@ -87,6 +87,7 @@ const ConfirmDealModal = ({
         agreed_price: booking.price_per_kg,
         price_unit: booking.price_unit || 'wet',
         pickup_location: booking.pickup_location,
+        target_facility_id: (booking as any).target_facility_id,
         delivery_date: booking.delivery_date,
         deal_notes: '',
         has_advance: false,
@@ -135,6 +136,8 @@ const ConfirmDealModal = ({
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      const bookingMeta = booking as any
+      const finalFacilityId = values.target_facility_id || bookingMeta?.target_facility_id
       const data: ConfirmDealFormData = {
         product_type: values.product_type,
         agreed_quantity_tons: values.agreed_quantity_tons,
@@ -142,6 +145,9 @@ const ConfirmDealModal = ({
         agreed_price: values.agreed_price,
         price_unit: values.price_unit,
         pickup_location: Array.isArray(values.pickup_location) ? values.pickup_location[0] : (values.pickup_location || booking?.pickup_location),
+        target_facility_id: finalFacilityId,
+        target_facility_code: bookingMeta?.target_facility_code,
+        target_facility_name: bookingMeta?.target_facility_name,
         delivery_date: values.delivery_date || booking?.delivery_date,
         deal_notes: values.deal_notes,
         deal_type: dealType as 'purchase' | 'sale' | 'processing' | 'consignment',
@@ -330,6 +336,28 @@ const ConfirmDealModal = ({
               { value: 'Lào - Attapeu', label: 'Lào - Attapeu' },
               { value: 'Campuchia - Ratanakiri', label: 'Campuchia - Ratanakiri' },
               { value: 'Thái Lan', label: 'Thái Lan' },
+            ]}
+          />
+        </Form.Item>
+
+        {/* Giao tại nhà máy — kế thừa từ booking, admin có thể override */}
+        <Form.Item
+          name="target_facility_id"
+          label={<><span style={{ marginRight: 4 }}>🏭</span> Giao tại nhà máy</>}
+          initialValue={(booking as any).target_facility_id}
+          rules={[{ required: true, message: 'Vui lòng chọn nhà máy nhận hàng' }]}
+          extra={
+            (booking as any).target_facility_code
+              ? `Kế thừa từ phiếu chốt (${(booking as any).target_facility_code} — ${(booking as any).target_facility_name || ''}). Có thể đổi nếu logistics thay đổi.`
+              : 'Đại lý chưa chọn nhà máy trên phiếu chốt — bắt buộc chọn ở đây.'
+          }
+        >
+          <Select
+            placeholder="Chọn nhà máy nhận hàng"
+            options={[
+              { value: '755ae776-3be6-47b8-b1d0-d15b61789f24', label: '🏭 PD — Phong Điền (HQ)' },
+              { value: '9bc1467c-0cbe-4982-abc1-192c61ef7dca', label: '🏭 TL — Tân Lâm' },
+              { value: '67b45068-6e7c-4888-b8b3-49721bb9cb96', label: '🏭 LAO — Lào' },
             ]}
           />
         </Form.Item>

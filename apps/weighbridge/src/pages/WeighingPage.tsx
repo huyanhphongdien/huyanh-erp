@@ -132,10 +132,13 @@ export default function WeighingPage() {
   // ============================================================================
 
   useEffect(() => {
-    // Load deals and suppliers
-    dealWmsService.getActiveDealsForStockIn().then((d) => { console.log('Deals loaded:', d); setDeals(d) }).catch((err) => console.error('Deal load error:', err))
+    // Load deals — filter theo facility hiện tại: trạm cân PD chỉ thấy deal đi PD.
+    // Legacy deals (target_facility_id = NULL) vẫn hiện để backward compatible.
+    dealWmsService.getActiveDealsForStockIn(undefined, currentFacility?.id)
+      .then((d) => { console.log('Deals loaded (facility=', currentFacility?.code, '):', d); setDeals(d) })
+      .catch((err) => console.error('Deal load error:', err))
     getRubberSuppliers().then((s) => setSuppliers(s.map((x: any) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {})
-  }, [])
+  }, [currentFacility?.id, currentFacility?.code])
 
   // S3 OUT: Load active sales orders khi user chuyển sang OUT
   // CHỈ load ở NM xuất khẩu (PD, can_ship_to_customer=true). TL/LAO không cần.

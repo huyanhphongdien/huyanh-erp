@@ -55,6 +55,10 @@ export interface BookingMetadata {
   status?: 'pending' | 'confirmed' | 'negotiating' | 'rejected';
   counter_price?: number;
   negotiation_notes?: string;
+  // Nhà máy đích nhận hàng
+  target_facility_id?: string;
+  target_facility_code?: string;
+  target_facility_name?: string;
 }
 
 export interface BookingCardProps {
@@ -198,6 +202,8 @@ const BookingCard: React.FC<BookingCardProps> = ({
     price_unit,
     estimated_value,
     pickup_location,
+    target_facility_code,
+    target_facility_name,
     delivery_date,
     notes,
     status = 'pending',
@@ -276,6 +282,17 @@ const BookingCard: React.FC<BookingCardProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
             <EnvironmentOutlined style={{ color: '#1890ff' }} />
             <Tag color="blue">{pickup_location}</Tag>
+          </div>
+        )}
+
+        {/* Giao tại nhà máy */}
+        {target_facility_code && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+            <span style={{ fontSize: 14 }}>🏭</span>
+            <Tag color="green">
+              Giao tại: {target_facility_code}
+              {target_facility_name ? ` — ${target_facility_name}` : ''}
+            </Tag>
           </div>
         )}
 

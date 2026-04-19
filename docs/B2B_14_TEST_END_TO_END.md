@@ -1,11 +1,76 @@
 # B2B — Hướng dẫn test end-to-end (Phiếu chốt mủ → Quyết toán)
 
-> **Ngày:** 2026-04-19
+> **Ngày cập nhật:** 2026-04-19 (sau khi debug bug DealCard silent insert)
 > **Phạm vi:** Test từ lúc đại lý tạo Phiếu chốt mủ đến lúc Deal được quyết toán xong, gồm cả nhánh Khiếu nại DRC.
-> **Yêu cầu trước khi test:**
-> - Đã chạy các migration của commit `c6376926` trở về sau (xem mục 0 của [B2B_13_HUONG_DAN_TINH_NANG_MOI.md](B2B_13_HUONG_DAN_TINH_NANG_MOI.md)).
-> - Portal `b2b.huyanhrubber.vn` đã deploy commit `3bd342c` trở về sau.
-> - Nếu muốn test sạch → chạy `docs/migrations/b2b_reset_chat_history.sql` (reset toàn bộ chat/deal/advance/dispute).
+
+---
+
+## 🗺️ Luồng tổng quan
+
+```
+┌────────────────── ĐẠI LÝ (Portal) ──────────────────┐     ┌──────────────── NHÀ MÁY (ERP) ────────────────┐
+│                                                      │     │                                                 │
+│  1. Tạo Phiếu chốt mủ (Booking)  ──── gửi qua chat ───────▶│  2. Xác nhận & Chốt Deal                        │
+│     (loại mủ, KL, DRC, đơn giá)                      │     │     (tạo Deal + Advance nếu có)                 │
+│                                                      │     │                                                 │
+│  3. Bấm "Đã nhận" (ack advance)  ◀──── realtime ─────┼─────│     DealCard xuất hiện 2 phía                   │
+│     flag clear 2 phía                                │     │                                                 │
+│                                                      │     │  4. Cân nhập kho (IN, nhiều batch)              │
+│                                DealCard self-update ◀┼─────│     actual_weight_kg tăng, mốc 2 sáng           │
+│                                                      │     │                                                 │
+│                                DealCard self-update ◀┼─────│  5. QC từng batch                                │
+│                                                      │     │     actual_drc = weighted avg, mốc 3 sáng       │
+│                                                      │     │                                                 │
+│                                                      │     │  6. Duyệt Deal (admin/manager)                  │
+│  Toast "Đã được duyệt" ◀────── b2b.deals UPDATE ─────┼─────│     status = accepted, mốc 4 sáng               │
+│                                                      │     │                                                 │
+│                                                      │     │  7. Tạo phiếu Quyết toán                        │
+│  Toast "Đã quyết toán" ◀────── b2b.deals UPDATE ─────┼─────│     status = settled, mốc 5 sáng                │
+│                                                      │     │                                                 │
+│  8. Xem phiếu quyết toán                             │     │                                                 │
+│     /partner/settlements/:id                         │     │                                                 │
+│                                                      │     │                                                 │
+│─────────────────────── NHÁNH KHIẾU NẠI DRC (khi |actual - expected| > 3%) ────────────────────────────────────│
+│                                                      │     │                                                 │
+│  N1. Bấm "Khiếu nại DRC"                             │     │                                                 │
+│      → RaiseDisputeModal (lý do + ảnh)               │     │                                                 │
+│      → RPC partner_raise_drc_dispute ────────────────┼─────▶│  Toast "Khiếu nại mới từ {partner}"            │
+│                                                      │     │                                                 │
+│                                                      │     │  N2. Mở /b2b/disputes → Resolve                 │
+│                                                      │     │      (accept/reject + adjustment)               │
+│  Toast kết quả + ledger adjustment ◀─── UPDATE ──────┼─────│                                                 │
+│                                                      │     │                                                 │
+└──────────────────────────────────────────────────────┘     └─────────────────────────────────────────────────┘
+```
+
+---
+
+## ⚙️ PRE-REQUISITE — các migration phải chạy TRƯỚC khi test (rất quan trọng)
+
+Thiếu 1 trong các migration này → Deal sẽ tạo **nhưng không có DealCard trong chat** (silent fail). Chạy lần lượt trên Supabase SQL editor:
+
+| # | File | Tác dụng |
+|---|---|---|
+| 1 | `b2b_chat_realtime_publication.sql` | REPLICA IDENTITY FULL + ADD PUBLICATION cho chat_messages |
+| 2 | `b2b_deals_realtime.sql` | Realtime broadcast cho `b2b.deals` UPDATE |
+| 3 | `b2b_partner_ack_and_disputes.sql` | Cột partner_ack_at + table drc_disputes + RPC partner_* |
+| 4 | `b2b_ledger_running_balance_trigger.sql` | Trigger auto compute running_balance |
+| 5 | `b2b_rls_partner_scope.sql` | RLS partner chỉ thấy deal/advance/dispute của mình |
+| 6 | `b2b_drop_permissive_legacy_policies.sql` | Cleanup policy cũ |
+| 7 | `b2b_fix_partner_users_recursion.sql` | Fix infinite recursion trên partner_users |
+| 8 | `b2b_views_security_invoker.sql` | SECURITY INVOKER cho views |
+| 9 | **`b2b_fix_message_type_check.sql`** ⚠️ | **Thêm `'deal'` vào CHECK constraint message_type** — nếu thiếu thì DealCard không insert được (bug đã debug 2026-04-19) |
+
+Sau khi chạy xong, verify bằng query:
+```sql
+SELECT pg_get_constraintdef(oid) FROM pg_constraint
+WHERE conname = 'chat_messages_message_type_check';
+-- Phải thấy 'deal' trong CHECK (message_type IN (...))
+```
+
+## 🔁 Reset data nếu muốn test lại từ đầu
+
+Chạy `docs/migrations/b2b_reset_chat_history.sql` — xóa sạch chat/deal/advance/dispute/booking, có backup schema + rollback query.
 
 ---
 
@@ -17,6 +82,14 @@
 | **Portal (đại lý)** | `https://b2b.huyanhrubber.vn` | account partner (đại lý đang test) |
 
 Mở 2 tab song song, pin chúng lại để xem realtime cross-side.
+
+### ✅ Smoke test nhanh (2 phút) — verify env đã ready
+
+Trước khi bắt đầu luồng đầy đủ:
+1. Login portal → chat room với nhà máy → gõ `test` → enter
+2. ERP phải thấy tin nhắn `test` **realtime** (< 2s, không F5) → ✅ realtime OK
+3. ERP reply `ok` → portal nhận ngay → ✅ 2 chiều OK
+4. Nếu sai → check migration #1 (chat realtime publication) chưa chạy
 
 ---
 
@@ -256,20 +329,86 @@ Mở 2 tab song song, pin chúng lại để xem realtime cross-side.
 
 ---
 
-## Troubleshooting
+## 🗺️ State diagram của DealCard
 
-| Triệu chứng | Nguyên nhân thường gặp |
-|---|---|
-| DealCard không update realtime | `b2b.chat_messages` thiếu REPLICA IDENTITY FULL hoặc chưa ADD PUBLICATION → chạy lại `b2b_chat_realtime_publication.sql` |
-| Portal không nhận toast | `partnerAuthStore.partner?.id` undefined → check login; hoặc `b2b.deals` chưa trong publication realtime → chạy `b2b_deals_realtime.sql` |
-| QC xong DRC deal không update | Chain `batch → stock_in → deal_id` đứt — check `stock_ins.deal_id` có set lúc nhập kho không |
-| Khiếu nại "RPC does not exist" | Migration `b2b_partner_ack_and_disputes.sql` chưa chạy hoặc chạy thiếu function |
-| Nút "Duyệt Deal" luôn disabled dù đã cân + QC | Check `qc_status` của deal: phải khác `pending` và `failed` |
-| Đại lý ack tạm ứng → nút không biến mất | `patchDealCardMetadata` fail (log console); hoặc portal DealCard bản cũ → check commit `7deb8e6` đã deploy |
+```
+                     ┌───────────────────────────────────────────────────────────────────┐
+                     │                  DEAL STATUS LIFECYCLE                             │
+                     │                                                                    │
+   [Tạo Deal]───────▶│  processing (🟦 xanh dương)                                       │
+                     │    │   Mốc: ●─○─○─○─○    Chốt | Nhập kho | QC | Duyệt | Quyết toán │
+                     │    │                                                               │
+   [Cân nhập kho]────┼────┤  processing, stock_in_count++                                 │
+                     │    │   Mốc: ●─●─○─○─○    (mốc 2 sáng)                              │
+                     │    │                                                               │
+   [QC từng batch]───┼────┤  processing, actual_drc = weighted avg                        │
+                     │    │   Mốc: ●─●─●─○─○    (mốc 3 sáng)                              │
+                     │    │                                                               │
+   [Duyệt] ─────────┬┼────▶  accepted (🟩 xanh lá)                                        │
+                     │     │   Mốc: ●─●─●─●─○    (mốc 4 sáng)                             │
+                     │     │                                                              │
+   [Tạo settlement]─┬┼─────▶  settled (🟪 tím)                                            │
+                     │     │   Mốc: ●─●─●─●─●    (mốc 5 sáng — full)                      │
+                     │     │                                                              │
+   [Hủy ở bất kỳ]───┴┴─────▶  cancelled (⬛ xám, gạch ngang)                              │
+                     │         (không cho hủy khi đã settled)                             │
+                     └───────────────────────────────────────────────────────────────────┘
+
+   VARIANCE OVERLAY (song song lifecycle, chỉ khi |actual_drc - expected_drc| > 3%):
+   ┌─────────────┐   raise     ┌──────────────┐   resolve_accepted   ┌────────────────┐
+   │ variance 🟧 │────────────▶│ dispute: open │─────────────────────▶│ resolved 🟩    │
+   │  (cam nhạt) │  partner    │ 🟥 (đỏ đậm)  │   factory            │ + ledger adjust│
+   └─────────────┘             └──────────────┘                      └────────────────┘
+```
+
+---
+
+## 🧰 Troubleshooting
+
+| Triệu chứng | Nguyên nhân thường gặp | Fix |
+|---|---|---|
+| **Deal tạo OK nhưng DealCard KHÔNG xuất hiện trong chat** (Deal có trong DB, chat không có card) | `chat_messages_message_type_check` constraint cũ không accept `'deal'` → INSERT fail ERROR 23514, code cũ nuốt silent | Chạy `b2b_fix_message_type_check.sql`. Nếu đã có Deal orphan → chạy `b2b_recover_dealcard_2604.sql` (điều chỉnh deal_number + booking_code trong script cho trùng case của bạn) |
+| DealCard không update realtime | `b2b.chat_messages` thiếu REPLICA IDENTITY FULL hoặc chưa ADD PUBLICATION | Chạy lại `b2b_chat_realtime_publication.sql` |
+| Portal không nhận toast khi Deal đổi status | `partnerAuthStore.partner?.id` undefined; hoặc `b2b.deals` chưa trong publication realtime | Check login; chạy `b2b_deals_realtime.sql` |
+| QC xong DRC deal không update | Chain `batch → stock_in → deal_id` đứt | Check `stock_ins.deal_id` có set lúc nhập kho |
+| Khiếu nại báo "RPC does not exist" | Migration `b2b_partner_ack_and_disputes.sql` chưa chạy | Chạy migration + verify 3 RPC: `partner_raise_drc_dispute`, `partner_acknowledge_advance`, `partner_withdraw_drc_dispute` |
+| Nút "Duyệt Deal" luôn disabled dù đã cân + QC | `qc_status` deal đang `pending`/`failed` | Mở DealDetailPage → hover nút → tooltip liệt kê điều kiện còn thiếu |
+| Đại lý ack tạm ứng → nút "Đã nhận" không biến mất | Portal DealCard bản cũ; hoặc `patchDealCardMetadata` fail | Verify portal commit `7deb8e6` đã deploy trên Vercel |
+| Đại lý không thấy nút "Khiếu nại DRC" dù variance cao | Threshold variance phải `> 3%` tuyệt đối (KHÔNG phải tương đối) | `|actual_drc - expected_drc| > 3` — vd 28.5 vs 25 = diff 3.5 → show; 28.5 vs 26 = diff 2.5 → không show |
+| Partner portal render DealCard version cũ (badge không đúng) | Portal chưa deploy commit `7deb8e6` | Check `https://vercel.com/...` build logs |
+
+### 🔎 Debug nhanh 1 Deal cụ thể
+
+Chạy trên Supabase SQL editor, thay `<DEAL_NUM>`:
+```sql
+SELECT
+  d.deal_number, d.status, d.stock_in_count, d.actual_weight_kg, d.actual_drc, d.qc_status,
+  (SELECT COUNT(*) FROM b2b.chat_messages
+   WHERE message_type='deal' AND metadata->'deal'->>'deal_id' = d.id::text) AS dealcards,
+  (SELECT COUNT(*) FROM b2b.advances WHERE deal_id = d.id) AS advances,
+  (SELECT COUNT(*) FROM b2b.drc_disputes WHERE deal_id = d.id) AS disputes
+FROM b2b.deals d
+WHERE d.deal_number = '<DEAL_NUM>';
+```
+
+`dealcards = 0` → DealCard chưa insert (kiểm tra constraint + chạy recovery).
+`dealcards > 1` → có duplicate, cần xóa bớt row cũ.
+
+---
+
+## 📜 Bài học từ debug hôm nay (2026-04-19)
+
+**Bug silent insert:** Code dùng `supabase.from(...).insert(...)` wrap trong `try/catch` thuần, nhưng **supabase-js KHÔNG throw khi RLS/constraint reject** — trả `{data, error}`. Try/catch không bắt được → INSERT fail mà app không biết → user stuck.
+
+**Nguyên tắc:** Mọi supabase call PHẢI destructure `{ error }` + check `if (error) throw` — đừng dựa vào try/catch.
+
+**Commit fix:** `2fb6775a` (surface error) — từ giờ nếu INSERT fail sẽ hiện alert thay vì silent stuck.
 
 ---
 
 ## Rollback nếu hỏng
 
 - Data: chạy khối KHÔI PHỤC ở cuối file `b2b_reset_chat_history.sql`.
-- Code: `git revert 3bd342c 7deb8e6` (portal) và `git revert c6376926 a5e20a40 a530fee9` (ERP).
+- Code ERP: `git revert 2fb6775a c6376926 a5e20a40 a530fee9`.
+- Code Portal: `git revert 3bd342c 7deb8e6`.
+- Constraint: nếu cần rollback constraint → `ALTER TABLE b2b.chat_messages DROP CONSTRAINT chat_messages_message_type_check;` (không khuyến nghị vì app sẽ ghi ẩu).

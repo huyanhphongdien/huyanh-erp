@@ -463,7 +463,7 @@ const DealCard = ({
           ACTION BUTTONS — dynamic theo status & role
           ================================================================= */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {/* 1. PROCESSING — Ứng thêm + Giao hàng */}
+        {/* 1. PROCESSING — Ứng thêm (factory only) */}
         {isProcessing && viewerType === 'factory' && onAddAdvance && (
           <Button
             size="small"
@@ -474,16 +474,8 @@ const DealCard = ({
             Ứng thêm
           </Button>
         )}
-        {isProcessing && onRecordDelivery && (
-          <Button
-            size="small"
-            icon={<SendOutlined />}
-            style={btnStyle}
-            onClick={onRecordDelivery}
-          >
-            Giao hàng
-          </Button>
-        )}
+        {/* Nút 'Giao hàng' đã bỏ — thông tin xe/tài xế chỉ nhập 1 nơi
+            ở trạm cân (weighbridge). Đại lý không phải 'báo' trước. */}
 
         {/* 2. PROCESSING đủ điều kiện → nút Duyệt (chỉ factory) */}
         {readyToAccept && viewerType === 'factory' && onAcceptDeal && (

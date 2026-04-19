@@ -20,9 +20,20 @@ WHERE ns.nspname = 'b2b'
   AND con.contype = 'c';  -- check constraints only
 
 -- ============================================
--- BƯỚC 2 — DROP constraint cũ + CREATE lại với allowed values mới
--- Các message_type cần support:
---   text, image, file, voice, system, quotation, booking, deal
+-- BƯỚC 1b — Liệt kê MỌI giá trị message_type đang tồn tại trong DB
+-- (để biết cần thêm gì vào allowed list)
+-- ============================================
+SELECT message_type, COUNT(*) AS row_count
+FROM b2b.chat_messages
+GROUP BY message_type
+ORDER BY row_count DESC;
+
+-- ============================================
+-- BƯỚC 2 — DROP constraint cũ + CREATE lại với NOT VALID
+--
+-- NOT VALID: bỏ qua validate với rows cũ (giữ nguyên data hiện tại) nhưng
+-- enforce cho INSERT/UPDATE mới. An toàn hơn — không mất data, không crash
+-- nếu có row legacy có message_type "lạ".
 -- ============================================
 ALTER TABLE b2b.chat_messages
   DROP CONSTRAINT IF EXISTS chat_messages_message_type_check;
@@ -37,8 +48,20 @@ ALTER TABLE b2b.chat_messages
     'system',
     'quotation',
     'booking',
-    'deal'
-  ));
+    'deal',
+    'audio',         -- legacy?
+    'video',
+    'location',
+    'contact',
+    'sticker'
+  ))
+  NOT VALID;
+
+-- ============================================
+-- BƯỚC 2b — (OPTIONAL) Validate rows cũ sau khi đã chắc chắn list đủ
+-- Chỉ chạy khi BƯỚC 1b không còn giá trị nào ngoài list ở bước 2
+-- ============================================
+-- ALTER TABLE b2b.chat_messages VALIDATE CONSTRAINT chat_messages_message_type_check;
 
 -- ============================================
 -- BƯỚC 3 — Verify constraint mới

@@ -269,27 +269,32 @@ export const dealConfirmService = {
       balance_due: estimatedValue - totalAdvanced,
     }
 
-    try {
-      await supabase
-        .from('b2b_chat_messages')
-        .insert({
-          room_id: context.roomId,
-          sender_type: context.confirmerType,
-          sender_id: context.confirmedBy,
-          message_type: 'deal',
-          content: `🤝 Deal ${dealNumber} đã được tạo`,
-          metadata: { deal: dealMetadata },
-          attachments: [],
-        })
+    // ⚠️ supabase-js KHÔNG throw khi RLS/constraint reject — mà trả { data, error }.
+    // Phải destructure + check error, không được wrap thuần try/catch (sẽ bị nuốt lỗi).
+    const { error: dealMsgError } = await supabase
+      .from('b2b_chat_messages')
+      .insert({
+        room_id: context.roomId,
+        sender_type: context.confirmerType,
+        sender_id: context.confirmedBy,
+        message_type: 'deal',
+        content: `🤝 Deal ${dealNumber} đã được tạo`,
+        metadata: { deal: dealMetadata },
+        attachments: [],
+      })
 
-      // Update room last_message_at
-      await supabase
-        .from('b2b_chat_rooms')
-        .update({ last_message_at: new Date().toISOString() })
-        .eq('id', context.roomId)
-    } catch (err) {
-      console.error('Send deal message error:', err)
+    if (dealMsgError) {
+      console.error('[dealConfirm] INSERT DealCard message failed:', dealMsgError)
+      throw new Error(
+        `Deal ${dealNumber} đã tạo nhưng KHÔNG gửi được DealCard vào chat: ${dealMsgError.message}`,
+      )
     }
+
+    // Update room last_message_at
+    await supabase
+      .from('b2b_chat_rooms')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', context.roomId)
 
     // === Step 6: Update deal totals ===
     if (totalAdvanced > 0) {

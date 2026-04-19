@@ -110,6 +110,10 @@ export default function WeighingPage() {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
   const [sourceType, setSourceType] = useState<'deal' | 'supplier'>('deal')
 
+  // Delivery plans (xe đã khai báo trước ở tab "Thông tin giao hàng")
+  const [deliveryPlans, setDeliveryPlans] = useState<any[]>([])
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('')
+
   // Rubber fields
   const [rubberType, setRubberType] = useState<string>('mu_dong')
   const [expectedDrc, setExpectedDrc] = useState<number | null>(null)
@@ -265,11 +269,26 @@ export default function WeighingPage() {
   // DEAL AUTO-FILL
   // ============================================================================
 
+  async function loadDeliveryPlans(dealId: string) {
+    try {
+      const { dealDeliveryPlanService } = await import('@erp/services/b2b/dealDeliveryPlanService')
+      const plans = await dealDeliveryPlanService.getByDeal(dealId)
+      setDeliveryPlans(plans)
+    } catch (e) {
+      console.warn('[loadDeliveryPlans] failed:', e)
+      setDeliveryPlans([])
+    }
+  }
+
   async function handleDealSelect(dealId: string) {
     setSelectedDealId(dealId)
     setSelectedSupplierId('')
+    setSelectedPlanId('')
     const deal = deals.find((d) => d.id === dealId)
     if (!deal) return
+
+    // Load xe đã khai báo cho Deal này
+    loadDeliveryPlans(dealId)
 
     // Auto-fill from deal (đã select expected_drc, unit_price, price_unit,
     // rubber_type trong getActiveDealsForStockIn)
@@ -287,8 +306,19 @@ export default function WeighingPage() {
     if (ext.unit_price) setUnitPrice(ext.unit_price)
     if (ext.price_unit === 'wet' || ext.price_unit === 'dry') setPriceUnit(ext.price_unit)
 
-    // Biển số + tài xế: operator tự nhập (1 Deal có thể có nhiều xe giao
-    // khác nhau, prefill từ báo đã giao sẽ gây nhầm lẫn)
+    // Biển số + tài xế: operator chọn từ dropdown "Xe đã khai báo" (các
+    // plan status='pending') hoặc tự nhập nếu xe chưa khai báo.
+  }
+
+  function handlePlanSelect(planId: string) {
+    setSelectedPlanId(planId)
+    const plan = deliveryPlans.find((p) => p.id === planId)
+    if (!plan) return
+    // Prefill xe + tài xế từ kế hoạch
+    setVehiclePlate((plan.vehicle_plate || '').toUpperCase())
+    setDriverName(plan.driver_name || '')
+    setDriverPhone(plan.driver_phone || '')
+    if (plan.notes) setNotes(prev => prev || plan.notes)
   }
 
   // ============================================================================
@@ -503,6 +533,8 @@ export default function WeighingPage() {
             weigh_ticket_id: ticket.id,
             actual_kg: updated.net_weight,
           })
+          // Reload plans để dropdown gạch xe vừa cân
+          loadDeliveryPlans(selectedDealId)
         } catch (err) {
           console.warn('[delivery-plan] match failed (non-blocking):', err)
         }
@@ -1021,6 +1053,46 @@ export default function WeighingPage() {
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {selectedDeal.product_name} • Còn {(selectedDeal.remaining_kg / 1000).toFixed(1)} T
                           </Text>
+                        </div>
+                      )}
+
+                      {/* Dropdown chọn xe đã khai báo — chỉ hiện nếu deal có plan */}
+                      {selectedDealId && deliveryPlans.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>Xe đã khai báo ({deliveryPlans.filter(p => p.status === 'pending').length} chờ / {deliveryPlans.length} tổng)</Text>
+                          <Select
+                            value={selectedPlanId || undefined}
+                            onChange={handlePlanSelect}
+                            placeholder="Chọn xe đã khai báo (hoặc bỏ qua nếu xe mới)"
+                            style={{ width: '100%' }}
+                            disabled={isCompleted}
+                            allowClear
+                            options={deliveryPlans.map((p) => {
+                              const weighed = p.status === 'weighed'
+                              const declared = `${(p.declared_kg / 1000).toFixed(2)}T`
+                              const driver = p.driver_name ? ` · ${p.driver_name}` : ''
+                              return {
+                                value: p.id,
+                                disabled: weighed || p.status === 'cancelled',
+                                label: (
+                                  <span style={{
+                                    textDecoration: weighed ? 'line-through' : 'none',
+                                    color: weighed ? '#9ca3af' : undefined,
+                                  }}>
+                                    {p.vehicle_plate} — {declared}{driver}
+                                    {weighed && <Tag color="green" style={{ marginLeft: 6 }}>Đã cân</Tag>}
+                                    {p.status === 'cancelled' && <Tag color="default" style={{ marginLeft: 6 }}>Hủy</Tag>}
+                                    {p.status === 'no_show' && <Tag color="red" style={{ marginLeft: 6 }}>Không đến</Tag>}
+                                  </span>
+                                ) as any,
+                              }
+                            })}
+                          />
+                          {selectedPlanId && (
+                            <div style={{ marginTop: 6, padding: 6, background: '#EFF6FF', borderRadius: 6, fontSize: 12 }}>
+                              <Text type="secondary">Đã điền biển số + tài xế từ kế hoạch. Cân xong sẽ tự match.</Text>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

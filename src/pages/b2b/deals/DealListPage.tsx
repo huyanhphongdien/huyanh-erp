@@ -17,7 +17,7 @@ import {
   DEAL_TYPE_LABELS,
 } from '../../../services/b2b/dealService'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
-import DealInlineDetail from '../../../components/b2b/DealInlineDetail'
+// DealInlineDetail bỏ — click row thay vì expand inline
 
 const { Text } = Typography
 
@@ -202,7 +202,8 @@ const DealListPage = () => {
         }
       />
 
-      {/* Table */}
+      {/* Table — click row → điều hướng DealDetailPage. Không còn expand
+          inline (tránh trùng UX với trang detail). */}
       <AdvancedDataTable<Deal>
         columns={columns}
         dataSource={tabDeals}
@@ -211,7 +212,7 @@ const DealListPage = () => {
         title={`Deals B2B`}
         dateRangeField="created_at"
         onRefresh={() => refetch()}
-        expandedRowRender={(deal) => <DealInlineDetail deal={deal} />}
+        onRowClick={(deal) => navigate(`/b2b/deals/${deal.id}`)}
         exportFileName="B2B_Deals"
         pageSize={50}
       />

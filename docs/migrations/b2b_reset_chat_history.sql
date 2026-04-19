@@ -67,9 +67,10 @@ DELETE FROM b2b.chat_messages;
 -- 2.2. Xóa disputes (FK tới deals)
 DELETE FROM b2b.drc_disputes;
 
--- 2.3. Xóa ledger entries liên quan Deal/Advance/Dispute
-DELETE FROM b2b.partner_ledger
- WHERE reference_type IN ('advance','dispute','settlement','deal');
+-- 2.3. Xóa ledger entries B2B (toàn bộ — partner_ledger chỉ chứa entries B2B)
+-- Nếu muốn chọn lọc, filter bằng entry_type thay vì reference_type
+-- (cột reference_type có thể không tồn tại trong mọi phiên bản schema).
+DELETE FROM b2b.partner_ledger;
 
 -- 2.4. Xóa settlement detail + settlement header
 DELETE FROM b2b.settlement_advances;

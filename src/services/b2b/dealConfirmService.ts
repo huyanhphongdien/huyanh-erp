@@ -53,24 +53,20 @@ const generateAdvanceNumber = (): string => {
 }
 
 // ============================================
-// Facility lookup — chỉ khi admin override ở ConfirmDealModal (formData có
-// target_facility_id nhưng không có code/name)
+// Facility map — 3 nhà máy Huy Anh (hardcode để tránh RLS lookup fail silent).
+// ID khớp với public.facilities prod. Sync với portal src/constants/facilities.ts.
 // ============================================
-async function resolveFacilityInfo(
+const FACILITY_MAP: Record<string, { code: string; name: string }> = {
+  '755ae776-3be6-47b8-b1d0-d15b61789f24': { code: 'PD',  name: 'Phong Điền (HQ)' },
+  '9bc1467c-0cbe-4982-abc1-192c61ef7dca': { code: 'TL',  name: 'Tân Lâm' },
+  '67b45068-6e7c-4888-b8b3-49721bb9cb96': { code: 'LAO', name: 'Lào' },
+}
+
+function resolveFacilityInfoSync(
   facilityId: string | undefined,
-): Promise<{ code?: string; name?: string }> {
+): { code?: string; name?: string } {
   if (!facilityId) return {}
-  try {
-    const { data } = await supabase
-      .from('facilities')
-      .select('code, name')
-      .eq('id', facilityId)
-      .maybeSingle()
-    return data ? { code: data.code, name: data.name } : {}
-  } catch (e) {
-    console.error('[resolveFacilityInfo] lookup failed:', e)
-    return {}
-  }
+  return FACILITY_MAP[facilityId] || {}
 }
 
 export function calculateEstimatedValue(data: {
@@ -276,14 +272,14 @@ export const dealConfirmService = {
     }
 
     // === Step 5: Gửi DealCard message trong chat ===
-    // Nếu admin override facility khác với booking → formData có id nhưng
-    // code/name có thể là của booking cũ → lookup lại từ DB để đúng.
+    // Nếu admin override facility khác booking → formData có id nhưng
+    // code/name có thể rỗng → lookup từ FACILITY_MAP (sync, không RLS).
     let facilityCode = formData.target_facility_code
     let facilityName = formData.target_facility_name
     if (formData.target_facility_id && (!facilityCode || !facilityName)) {
-      const info = await resolveFacilityInfo(formData.target_facility_id)
-      facilityCode = info.code
-      facilityName = info.name
+      const info = resolveFacilityInfoSync(formData.target_facility_id)
+      facilityCode = facilityCode || info.code
+      facilityName = facilityName || info.name
     }
 
     const dealMetadata: DealCardMetadata = {

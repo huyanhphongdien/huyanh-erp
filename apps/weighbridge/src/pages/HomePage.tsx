@@ -16,6 +16,7 @@ import { useKeliScale } from '@erp/hooks/useKeliScale'
 import ScaleSettings from '@/components/ScaleSettings'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
+import dealWmsService, { type ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
 import type { WeighbridgeTicket, WeighbridgeStatus, WeighbridgeImage } from '@erp/services/wms/wms.types'
 
 const { Title, Text } = Typography
@@ -53,6 +54,14 @@ export default function HomePage() {
   // Filter theo đại lý (partner_id) + Deal (deal_id)
   const [filterPartnerId, setFilterPartnerId] = useState<string>('all')
   const [filterDealId, setFilterDealId] = useState<string>('all')
+  // Danh sách deals active (để dropdown hiện deal_number + partner thay vì UUID)
+  const [activeDeals, setActiveDeals] = useState<ActiveDealForStockIn[]>([])
+
+  useEffect(() => {
+    dealWmsService.getActiveDealsForStockIn()
+      .then(setActiveDeals)
+      .catch(() => setActiveDeals([]))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -258,36 +267,40 @@ export default function HomePage() {
     return true
   })
 
-  // Build dropdown options từ tickets hiện có (distinct)
+  // Build dropdown options từ activeDeals (ưu tiên) — có deal_number + partner_name
+  // Partner options: distinct partner_id từ activeDeals, fallback supplier_name từ tickets cho NCC (không qua B2B)
   const partnerOptions = (() => {
     const map = new Map<string, string>()
+    // 1) Từ active deals (B2B partner)
+    for (const d of activeDeals) {
+      const pid = (d as any).partner_id
+      if (pid && d.partner_name && !map.has(pid)) map.set(pid, d.partner_name)
+    }
+    // 2) Fallback từ tickets (NCC không deal, hoặc partner cũ)
     for (const t of allTickets) {
       const pid = (t as any).partner_id
       const name = (t as any).supplier_name
       if (pid && name && !map.has(pid)) map.set(pid, name)
     }
-    return [{ value: 'all', label: 'Tất cả đại lý' }, ...Array.from(map.entries()).map(([value, label]) => ({ value, label }))]
+    return [
+      { value: 'all', label: 'Tất cả đại lý' },
+      ...Array.from(map.entries()).map(([value, label]) => ({ value, label })),
+    ]
   })()
 
+  // Deal options: format 'DL2604-XXXX — Partner Name — Còn X.XT'
+  // Chỉ từ activeDeals (Deal đã xoá khỏi b2b.deals thì ẩn khỏi dropdown)
   const dealOptions = (() => {
-    const map = new Map<string, string>()
-    for (const t of allTickets) {
-      const did = (t as any).deal_id
-      const refCode = t.reference_type === 'b2b_deal' ? t.reference_id : null
-      if (did) {
-        // Try to use reference code as label, fallback to short id
-        const label = (refCode as string) || did.slice(0, 8)
-        if (!map.has(did)) map.set(did, label)
-      }
-    }
-    // Filter deals theo partner nếu chọn
-    const entries = filterPartnerId !== 'all'
-      ? Array.from(map.entries()).filter(([id]) => {
-          const tk = allTickets.find(t => (t as any).deal_id === id)
-          return tk && (tk as any).partner_id === filterPartnerId
-        })
-      : Array.from(map.entries())
-    return [{ value: 'all', label: 'Tất cả Deal' }, ...entries.map(([value, label]) => ({ value, label }))]
+    const deals = filterPartnerId !== 'all'
+      ? activeDeals.filter(d => (d as any).partner_id === filterPartnerId)
+      : activeDeals
+    return [
+      { value: 'all', label: 'Tất cả Deal' },
+      ...deals.map(d => ({
+        value: d.id,
+        label: `${d.deal_number} — ${d.partner_name} — Còn ${(d.remaining_kg / 1000).toFixed(1)}T`,
+      })),
+    ]
   })()
 
   const now = new Date()

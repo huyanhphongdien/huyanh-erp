@@ -310,12 +310,6 @@ const getMenuGroups = (
         icon: <BarChart3 size={18} />,
         requireB2BPurchaser: true,
       },
-      {
-        path: '/b2b/pickup-locations',
-        label: 'Địa điểm bốc hàng',
-        icon: <MapPin size={18} />,
-        requireB2BPurchaser: true,
-      },
     ],
   },
 

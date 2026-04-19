@@ -79,9 +79,9 @@ DELETE FROM b2b.settlements;
 -- 2.5. Xóa advances
 DELETE FROM b2b.advances;
 
--- 2.6. Xóa stock_ins liên quan Deal (nếu có)
--- Chỉ xóa stock_ins có deal_id, KHÔNG xóa hết stock_ins toàn kho
-DELETE FROM public.stock_ins WHERE deal_id IS NOT NULL;
+-- 2.6. Xóa stock_in_orders liên quan Deal B2B (chỉ row có deal_id)
+-- Giữ nguyên các phiếu nhập NCC / không liên quan Deal.
+DELETE FROM public.stock_in_orders WHERE deal_id IS NOT NULL;
 
 -- 2.7. Xóa deals
 DELETE FROM b2b.deals;

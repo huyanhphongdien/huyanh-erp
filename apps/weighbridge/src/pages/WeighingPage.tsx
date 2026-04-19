@@ -1336,41 +1336,8 @@ export default function WeighingPage() {
                 </Row>
               </Card>
 
-              {/* Rubber calculation summary */}
-              {calc && (
-                <Card size="small" title="Tính toán" style={{ borderRadius: 12 }}>
-                  <Row gutter={[16, 8]}>
-                    <Col span={12}>
-                      <Text type="secondary">NET:</Text>
-                      <Text strong style={{ ...MONO, float: 'right' }}>{calc.net_weight.toLocaleString()} kg</Text>
-                    </Col>
-                    <Col span={12}>
-                      <Text strong>KL Thực:</Text>
-                      <Text strong style={{ ...MONO, float: 'right', color: '#15803D' }}>
-                        {calc.actual_net_weight.toLocaleString()} kg
-                      </Text>
-                    </Col>
-                    {calc.dry_weight_estimate != null && (
-                      <Col span={12}>
-                        <Text type="secondary">KL Khô ({expectedDrc}%):</Text>
-                        <Text style={{ ...MONO, float: 'right', color: '#B45309' }}>
-                          {calc.dry_weight_estimate.toLocaleString()} kg
-                        </Text>
-                      </Col>
-                    )}
-                    {calc.estimated_value != null && (
-                      <>
-                        <Col span={24}><Divider style={{ margin: '4px 0' }} /></Col>
-                        <Col span={24} style={{ textAlign: 'right' }}>
-                          <Text strong style={{ fontSize: 18, color: PRIMARY }}>
-                            Thành tiền: {calc.estimated_value.toLocaleString()} đ
-                          </Text>
-                        </Col>
-                      </>
-                    )}
-                  </Row>
-                </Card>
-              )}
+              {/* Card 'Tính toán' đã bỏ — trạm cân chỉ quan tâm KL, tiền
+                  tính sau ở Deal/Quyết toán */}
 
               {/* Action buttons */}
               {ticket && (

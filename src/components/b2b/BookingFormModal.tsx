@@ -24,13 +24,6 @@ import {
   PRODUCT_TYPE_LABELS,
   type BookingMetadata,
 } from '../../services/b2b/chatMessageService'
-import {
-  PICKUP_LOCATIONS,
-  COUNTRY_LABELS,
-  COUNTRY_FLAGS,
-  getLocationsByCountry,
-  getCountries,
-} from '../../constants/pickupLocations'
 import dayjs from 'dayjs'
 import RubberRegionPicker from './RubberRegionPicker'
 
@@ -75,7 +68,6 @@ const BookingFormModal = ({
 }: BookingFormModalProps) => {
   const [form] = Form.useForm()
   const [estimatedValue, setEstimatedValue] = useState(0)
-  const [showCustomLocation, setShowCustomLocation] = useState(false)
   const [rubberRegionValue, setRubberRegionValue] = useState<{ name: string; lat?: number; lng?: number } | null>(null)
 
   // Reset form when modal opens
@@ -83,7 +75,6 @@ const BookingFormModal = ({
     if (open) {
       form.resetFields()
       setEstimatedValue(0)
-      setShowCustomLocation(false)
       setRubberRegionValue(null)
     }
   }, [open, form])
@@ -102,17 +93,6 @@ const BookingFormModal = ({
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      // Resolve pickup location label
-      let pickupLocationLabel: string | undefined
-      if (values.pickup_location) {
-        if (values.pickup_location === 'other') {
-          pickupLocationLabel = values.custom_location?.trim() || undefined
-        } else {
-          const found = PICKUP_LOCATIONS.find(l => l.value === values.pickup_location)
-          pickupLocationLabel = found?.label || values.pickup_location
-        }
-      }
-
       // Map target_facility_id → code/name (đồng bộ với portal FACILITIES)
       const FACILITY_MAP: Record<string, { code: string; name: string }> = {
         '755ae776-3be6-47b8-b1d0-d15b61789f24': { code: 'PD',  name: 'Phong Điền (HQ)' },
@@ -129,7 +109,7 @@ const BookingFormModal = ({
         price_per_kg: values.price_per_kg,
         price_unit: 'wet', // Luôn giá ướt (đồng bộ Portal)
         estimated_value: estimatedValue,
-        pickup_location: pickupLocationLabel,
+        pickup_location: undefined, // Đã bỏ khỏi form — nhà máy không cần địa điểm bốc hàng
         delivery_date: values.delivery_date
           ? dayjs(values.delivery_date).format('YYYY-MM-DD')
           : dayjs().add(1, 'day').format('YYYY-MM-DD'),
@@ -270,55 +250,6 @@ const BookingFormModal = ({
 
           {/* Loại giá: luôn wet — bỏ dropdown theo Portal */}
         </Row>
-
-        {/* Địa điểm bốc hàng */}
-        <Form.Item
-          name="pickup_location"
-          label="Địa điểm bốc hàng"
-          rules={[{ required: true, message: 'Vui lòng chọn địa điểm' }]}
-          tooltip="Chọn địa điểm sẽ tự động điền DRC dự kiến"
-        >
-          <Select
-            placeholder="Chọn địa điểm"
-            showSearch
-            optionFilterProp="label"
-            onChange={(value) => {
-              setShowCustomLocation(value === 'other')
-              // Auto-fill DRC khi chọn địa điểm
-              if (value !== 'other') {
-                const found = PICKUP_LOCATIONS.find(l => l.value === value)
-                if (found) {
-                  form.setFieldsValue({ drc_percent: found.default_drc })
-                  handleValuesChange()
-                }
-              }
-            }}
-            size="large"
-          >
-            {getCountries().map(country => (
-              <Select.OptGroup key={country} label={`${COUNTRY_FLAGS[country] || ''} ${COUNTRY_LABELS[country] || country}`}>
-                {getLocationsByCountry(country).map(loc => (
-                  <Select.Option key={loc.value} value={loc.value} label={loc.label}>
-                    {loc.label} (DRC ~{loc.default_drc}%)
-                  </Select.Option>
-                ))}
-              </Select.OptGroup>
-            ))}
-            <Select.OptGroup label="Khác">
-              <Select.Option value="other" label="Khác (nhập tay)">Khác (nhập tay)</Select.Option>
-            </Select.OptGroup>
-          </Select>
-        </Form.Item>
-
-        {showCustomLocation && (
-          <Form.Item
-            name="custom_location"
-            label="Nhập địa điểm"
-            rules={[{ required: true, message: 'Vui lòng nhập địa điểm' }]}
-          >
-            <Input placeholder="VD: Huyện XYZ, Tỉnh ABC" size="large" />
-          </Form.Item>
-        )}
 
         {/* Giao tại nhà máy (target_facility) — required, đồng bộ với Portal */}
         <Form.Item

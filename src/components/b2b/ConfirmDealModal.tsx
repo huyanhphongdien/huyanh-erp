@@ -86,7 +86,6 @@ const ConfirmDealModal = ({
         expected_drc: booking.drc_percent,
         agreed_price: booking.price_per_kg,
         price_unit: booking.price_unit || 'wet',
-        pickup_location: booking.pickup_location,
         target_facility_id: (booking as any).target_facility_id,
         delivery_date: booking.delivery_date,
         deal_notes: '',
@@ -144,7 +143,7 @@ const ConfirmDealModal = ({
         expected_drc: values.expected_drc,
         agreed_price: values.agreed_price,
         price_unit: values.price_unit,
-        pickup_location: Array.isArray(values.pickup_location) ? values.pickup_location[0] : (values.pickup_location || booking?.pickup_location),
+        // pickup_location đã bỏ khỏi form
         target_facility_id: finalFacilityId,
         target_facility_code: bookingMeta?.target_facility_code,
         target_facility_name: bookingMeta?.target_facility_name,
@@ -297,34 +296,6 @@ const ConfirmDealModal = ({
             formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
             parser={(v) => Number(v!.replace(/,/g, '')) || 0}
             size="large"
-          />
-        </Form.Item>
-
-        {/* Vùng thu mua / Địa điểm bốc hàng */}
-        <Form.Item
-          name="pickup_location"
-          label={<><EnvironmentOutlined style={{ color: '#1890ff', marginRight: 4 }} /> Vùng thu mua / Địa điểm bốc hàng</>}
-          initialValue={booking.pickup_location ? [booking.pickup_location] : []}
-        >
-          <Select
-            allowClear
-            showSearch
-            placeholder="Chọn hoặc nhập vùng thu mua"
-            mode="tags"
-            maxCount={1}
-            options={[
-              { value: 'Bình Phước', label: 'Bình Phước' },
-              { value: 'Tây Ninh', label: 'Tây Ninh' },
-              { value: 'Đồng Nai', label: 'Đồng Nai' },
-              { value: 'Gia Lai', label: 'Gia Lai' },
-              { value: 'Kon Tum', label: 'Kon Tum' },
-              { value: 'Đắk Lắk', label: 'Đắk Lắk' },
-              { value: 'Bình Dương', label: 'Bình Dương' },
-              { value: 'Lào - Champasak', label: 'Lào - Champasak' },
-              { value: 'Lào - Attapeu', label: 'Lào - Attapeu' },
-              { value: 'Campuchia - Ratanakiri', label: 'Campuchia - Ratanakiri' },
-              { value: 'Thái Lan', label: 'Thái Lan' },
-            ]}
           />
         </Form.Item>
 

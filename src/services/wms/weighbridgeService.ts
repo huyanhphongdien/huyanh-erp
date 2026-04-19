@@ -85,6 +85,13 @@ export interface CreateTicketData {
   facility_id?: string | null
 }
 
+export interface UpdateTicketQCData {
+  qc_actual_drc?: number | null
+  qc_status?: 'passed' | 'warning' | 'failed' | null
+  qc_notes?: string | null
+  qc_checked_by?: string | null
+}
+
 /**
  * Tạo phiếu cân mới — status = 'weighing_gross'
  */
@@ -207,6 +214,29 @@ async function complete(id: string): Promise<WeighbridgeTicket> {
 /**
  * Hủy phiếu cân → status = 'cancelled'
  */
+/**
+ * Cập nhật thông tin QC trên phiếu cân — operator nhập sau khi test mẫu.
+ * Gọi giữa Gross và Tare. Sau đó stock-in tạo với batch.qc_status từ ticket.
+ */
+async function updateQC(id: string, data: UpdateTicketQCData): Promise<WeighbridgeTicket> {
+  const { data: ticket, error } = await supabase
+    .from('weighbridge_tickets')
+    .update({
+      qc_actual_drc: data.qc_actual_drc ?? null,
+      qc_status: data.qc_status ?? null,
+      qc_notes: data.qc_notes ?? null,
+      qc_checked_by: data.qc_checked_by ?? null,
+      qc_checked_at: data.qc_status ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select(TICKET_SELECT)
+    .single()
+
+  if (error) throw error
+  return ticket
+}
+
 async function cancel(id: string, reason?: string): Promise<WeighbridgeTicket> {
   const updates: Record<string, unknown> = {
     status: 'cancelled' as WeighbridgeStatus,
@@ -504,6 +534,7 @@ export const weighbridgeService = {
   create,
   updateGrossWeight,
   updateTareWeight,
+  updateQC,
   complete,
   cancel,
   getAll,

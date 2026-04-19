@@ -764,8 +764,11 @@ export const stockInService = {
         initial_weight: ticket.net_weight || 0,
         current_weight: ticket.net_weight || 0,
         initial_drc: ticket.expected_drc || null,
-        latest_drc: ticket.expected_drc || null,
-        qc_status: 'pending' as QCStatus,
+        // Ưu tiên DRC thực đo tại QC (nếu operator đã test), fallback kỳ vọng
+        latest_drc: (ticket as any).qc_actual_drc ?? ticket.expected_drc ?? null,
+        // Propagate qc_status từ ticket: nếu đã test tại trạm → passed/warn/fail;
+        // nếu chưa (skipped hoặc chưa nhập) → 'pending' chờ lab nhập sau.
+        qc_status: ((ticket as any).qc_status as QCStatus) || ('pending' as QCStatus),
         status: 'active' as const,
         rubber_type: dealRubberType || ticket.rubber_type || null,
         supplier_name: dealPartnerName || ticket.supplier_name || null,

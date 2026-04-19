@@ -155,26 +155,29 @@ const DealQcTab = ({ dealId, deal }: DealQcTabProps) => {
               },
               {
                 title: '',
-                width: 200,
-                render: (_: any, record: DealBatchSummary) => (
-                  <Button.Group>
-                    <Button
-                      size="small"
-                      type="primary"
-                      icon={<ExperimentOutlined />}
-                      onClick={() => navigate(`/wms/qc?tab=quick-scan&batch=${encodeURIComponent(record.batch_no)}`)}
-                      style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
-                    >
-                      Nhập QC
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => navigate(`/wms/qc/batch/${record.batch_id}`)}
-                    >
-                      Lịch sử
-                    </Button>
-                  </Button.Group>
-                ),
+                width: 220,
+                render: (_: any, record: DealBatchSummary) => {
+                  const isPending = !record.qc_status || record.qc_status === 'pending'
+                  return (
+                    <Button.Group>
+                      <Button
+                        size="small"
+                        type={isPending ? 'primary' : 'default'}
+                        icon={<ExperimentOutlined />}
+                        onClick={() => navigate(`/wms/qc?tab=quick-scan&batch=${encodeURIComponent(record.batch_no)}`)}
+                        style={isPending ? { background: '#B45309', borderColor: '#B45309' } : undefined}
+                      >
+                        {isPending ? 'Nhập QC' : 'Sửa QC'}
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => navigate(`/wms/qc/batch/${record.batch_id}`)}
+                      >
+                        Lịch sử
+                      </Button>
+                    </Button.Group>
+                  )
+                },
               },
             ]}
             size="small"

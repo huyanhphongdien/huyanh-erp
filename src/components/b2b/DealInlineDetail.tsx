@@ -7,8 +7,8 @@
 import { Suspense, lazy } from 'react'
 import { Tabs, Descriptions, Tag, Typography, Spin, Row, Col, Statistic, Card, Button } from 'antd'
 import {
-  InfoCircleOutlined, InboxOutlined, ExperimentOutlined, ToolOutlined,
-  WalletOutlined, AuditOutlined, SafetyCertificateOutlined, FileProtectOutlined,
+  InfoCircleOutlined, InboxOutlined, ExperimentOutlined, CarOutlined,
+  WalletOutlined, FileProtectOutlined,
   MessageOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -18,9 +18,7 @@ import { DEAL_STATUS_LABELS, DEAL_STATUS_COLORS } from '../../services/b2b/dealS
 const DealWmsTab = lazy(() => import('./DealWmsTab'))
 const DealQcTab = lazy(() => import('./DealQcTab'))
 const DealAdvancesTab = lazy(() => import('./DealAdvancesTab'))
-const DealProductionTab = lazy(() => import('./DealProductionTab'))
-const DealProcessingTab = lazy(() => import('./DealProcessingTab'))
-const DealAcceptanceTab = lazy(() => import('./DealAcceptanceTab'))
+const DealDeliveryTab = lazy(() => import('./DealDeliveryTab'))
 const DealContractTab = lazy(() => import('./DealContractTab'))
 
 const { Text } = Typography
@@ -112,24 +110,14 @@ export default function DealInlineDetail({ deal }: Props) {
       children: <Suspense fallback={<Spin />}><DealQcTab dealId={deal.id} deal={deal} /></Suspense>,
     },
     {
-      key: 'production',
-      label: <span><ToolOutlined /> Sản xuất</span>,
-      children: <Suspense fallback={<Spin />}><DealProductionTab dealId={deal.id} /></Suspense>,
+      key: 'delivery',
+      label: <span><CarOutlined /> Thông tin giao hàng</span>,
+      children: <Suspense fallback={<Spin />}><DealDeliveryTab dealId={deal.id} /></Suspense>,
     },
     {
       key: 'advances',
       label: <span><WalletOutlined /> Tạm ứng</span>,
       children: <Suspense fallback={<Spin />}><DealAdvancesTab dealId={deal.id} deal={deal} /></Suspense>,
-    },
-    {
-      key: 'processing',
-      label: <span><AuditOutlined /> Xử lý mủ</span>,
-      children: <Suspense fallback={<Spin />}><DealProcessingTab dealId={deal.id} /></Suspense>,
-    },
-    {
-      key: 'acceptance',
-      label: <span><SafetyCertificateOutlined /> Biên bản</span>,
-      children: <Suspense fallback={<Spin />}><DealAcceptanceTab dealId={deal.id} /></Suspense>,
     },
     {
       key: 'contract',

@@ -62,6 +62,7 @@ import {
 } from '../../../services/b2b/dealService'
 import { autoSettlementService } from '../../../services/b2b/autoSettlementService'
 import { useOpenTab } from '../../../hooks/useOpenTab'
+import { useOpenChatTab } from '../../../hooks/useB2BTabs'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import { PRODUCT_TYPE_LABELS } from '../../../constants/rubberProducts'
@@ -338,6 +339,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
   const dealId = propId || paramId
   const navigate = useNavigate()
   const openTab = useOpenTab()
+  const openChatTab = useOpenChatTab()
 
   // State
   const [deal, setDeal] = useState<Deal | null>(null)
@@ -408,13 +410,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
     try {
       const room = await dealService.getChatRoomByPartner(deal.partner_id)
       if (room) {
-        openTab({
-          key: `b2b-chat-${room.id}`,
-          title: deal.partner?.name ? `Chat: ${deal.partner.name}` : 'Chat',
-          componentId: 'b2b-chat-room',
-          props: { roomIdProp: room.id },
-          path: `/b2b/chat/${room.id}`,
-        })
+        openChatTab({ id: room.id, partner_name: deal.partner?.name })
       } else {
         message.info('Chưa có phòng chat với đại lý này')
       }

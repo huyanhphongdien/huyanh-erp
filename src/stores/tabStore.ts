@@ -57,6 +57,12 @@ export interface OpenTab {
   openedAt: number
   /** Có unsaved changes không — cảnh báo khi close */
   dirty?: boolean
+  /**
+   * Key của tab parent (top-level) — nếu set thì tab này hiện ở row 2
+   * (sub-tab bar) chỉ khi parent đang active. Dùng cho chat rooms
+   * trực thuộc 'Chat Đại lý', sub-pages drill-down, v.v.
+   */
+  parentKey?: string
 }
 
 interface TabStoreState {
@@ -142,11 +148,15 @@ export const useTabStore = create<TabStore>()(
 
       closeTab: (key) => {
         set((state) => {
-          const tabs = state.tabs.filter((t) => t.key !== key)
+          // Nếu đóng tab parent → đóng luôn tất cả sub-tabs thuộc nó
+          const tabs = state.tabs.filter((t) => t.key !== key && t.parentKey !== key)
           let activeKey = state.activeKey
 
-          // Nếu đóng tab đang active → focus tab kế bên (ưu tiên bên phải)
-          if (activeKey === key) {
+          // Nếu đóng tab đang active (hoặc parent của active) → focus tab kế bên
+          const closedKeys = state.tabs
+            .filter((t) => t.key === key || t.parentKey === key)
+            .map((t) => t.key)
+          if (activeKey && closedKeys.includes(activeKey)) {
             const idx = state.tabs.findIndex((t) => t.key === key)
             if (tabs.length === 0) {
               activeKey = null

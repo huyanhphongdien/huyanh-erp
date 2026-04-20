@@ -32,10 +32,11 @@ export function useOpenChatTab() {
       const name = room.partner?.name || room.partner_name || room.room_name || 'Chat'
       openTab({
         key: `b2b-chat-${room.id}`,
-        title: `Chat: ${name}`,
+        title: name,
         componentId: 'b2b-chat-room',
         props: { roomIdProp: room.id },
         path: `/b2b/chat/${room.id}`,
+        parentKey: 'b2b-chat-list', // hiện ở sub-tab row dưới tab 'Chat Đại lý'
       })
     },
     [openTab],

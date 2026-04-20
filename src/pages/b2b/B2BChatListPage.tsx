@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useOpenTab } from '../../hooks/useOpenTab'
+import { useOpenChatTab } from '../../hooks/useB2BTabs'
 import {
   Card,
   Input,
@@ -228,7 +228,7 @@ const ChatRoomSkeleton = () => (
 // ============================================
 
 const B2BChatListPage = () => {
-  const openTab = useOpenTab()
+  const openChatTab = useOpenChatTab()
   
   // State
   const [rooms, setRooms] = useState<ChatRoom[]>([])
@@ -318,16 +318,7 @@ const B2BChatListPage = () => {
   // ============================================
 
   const handleRoomClick = (room: ChatRoom) => {
-    const title = room.partner?.name
-      ? `Chat: ${room.partner.name}`
-      : room.room_name || 'Chat'
-    openTab({
-      key: `b2b-chat-${room.id}`,
-      title,
-      componentId: 'b2b-chat-room',
-      props: { roomIdProp: room.id },
-      path: `/b2b/chat/${room.id}`,
-    })
+    openChatTab(room)
   }
 
   const handleRefresh = () => {

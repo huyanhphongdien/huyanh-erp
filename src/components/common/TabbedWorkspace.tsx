@@ -69,13 +69,44 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
     return () => window.removeEventListener('keydown', onKeydown)
   }, [effectiveActiveKey, tabs, closeTab, setActive, navigate])
 
-  // Build tab items cho Ant Design Tabs — content để null, tự render bên dưới
-  const tabItems: TabsProps['items'] = tabs.map((tab) => ({
+  // Split tabs: top-level (no parentKey) vs child tabs (has parentKey)
+  const topTabs = tabs.filter((t) => !t.parentKey)
+  const childTabsByParent = tabs.reduce<Record<string, OpenTab[]>>((acc, t) => {
+    if (t.parentKey) {
+      if (!acc[t.parentKey]) acc[t.parentKey] = []
+      acc[t.parentKey].push(t)
+    }
+    return acc
+  }, {})
+
+  // Xác định parent đang effective (hiển thị sub-tab row khi parent active
+  // HOẶC khi active tab là sub của parent đó)
+  let effectiveParentKey: string | null = null
+  if (matchingTab) {
+    effectiveParentKey = matchingTab.parentKey || matchingTab.key
+  }
+  const childTabs = effectiveParentKey ? childTabsByParent[effectiveParentKey] || [] : []
+
+  const topTabItems: TabsProps['items'] = topTabs.map((tab) => ({
     key: tab.key,
     label: <TabLabel tab={tab} onCloseOthers={closeOthers} onCloseAll={closeAll} />,
     children: null,
     closable: true,
   }))
+
+  const childTabItems: TabsProps['items'] = childTabs.map((tab) => ({
+    key: tab.key,
+    label: <TabLabel tab={tab} onCloseOthers={closeOthers} onCloseAll={closeAll} />,
+    children: null,
+    closable: true,
+  }))
+
+  // Tab active trong row trên cùng = active tab chính nó (nếu top-level)
+  // HOẶC parent của active tab (nếu active là sub-tab)
+  const topActiveKey = matchingTab
+    ? (matchingTab.parentKey || matchingTab.key)
+    : undefined
+  const childActiveKey = matchingTab?.parentKey ? matchingTab.key : undefined
 
   // Khi user click vào tab bar → cần navigate đến path của tab đó
   // (không chỉ setActive trong store — vì render logic dựa vào URL match)
@@ -93,7 +124,7 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
       // Sau khi đóng, nếu tab bị đóng là tab đang xem → navigate sang
       // tab kế bên (nếu còn) hoặc về /wms (fallback)
       if (wasActive) {
-        const remaining = tabs.filter((t) => t.key !== key)
+        const remaining = tabs.filter((t) => t.key !== key && t.parentKey !== key)
         if (remaining.length > 0) {
           const idx = tabs.findIndex((t) => t.key === key)
           const next = remaining[Math.min(idx, remaining.length - 1)]
@@ -116,22 +147,46 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
         style={{
           background: 'linear-gradient(to bottom, #F0EDE8 0%, #E5E1D8 100%)',
           padding: '8px 12px 0 12px',
-          borderBottom: '3px solid #1B4D3E',
-          boxShadow: '0 2px 6px rgba(27, 77, 62, 0.15)',
+          borderBottom: childTabs.length > 0 ? '1px solid #d0cec9' : '3px solid #1B4D3E',
+          boxShadow: childTabs.length > 0 ? 'none' : '0 2px 6px rgba(27, 77, 62, 0.15)',
           flexShrink: 0,
         }}
       >
         <Tabs
           type="editable-card"
           hideAdd
-          activeKey={effectiveActiveKey || undefined}
+          activeKey={topActiveKey}
           onChange={handleChange}
           onEdit={handleEdit}
-          items={tabItems}
+          items={topTabItems}
           size="middle"
           tabBarStyle={{ margin: 0, borderBottom: 'none' }}
         />
       </div>
+      {/* Sub-tab row — hiện khi active tab có children hoặc chính là child */}
+      {childTabs.length > 0 && (
+        <div
+          className="tabbed-workspace-bar tabbed-workspace-subbar"
+          style={{
+            background: 'linear-gradient(to bottom, #E5E1D8 0%, #D8D3C8 100%)',
+            padding: '6px 12px 0 24px',
+            borderBottom: '3px solid #1B4D3E',
+            boxShadow: '0 2px 6px rgba(27, 77, 62, 0.15)',
+            flexShrink: 0,
+          }}
+        >
+          <Tabs
+            type="editable-card"
+            hideAdd
+            activeKey={childActiveKey}
+            onChange={handleChange}
+            onEdit={handleEdit}
+            items={childTabItems}
+            size="small"
+            tabBarStyle={{ margin: 0, borderBottom: 'none' }}
+          />
+        </div>
+      )}
       <style>{`
         .tabbed-workspace-bar .ant-tabs-tab {
           background: #ffffff !important;

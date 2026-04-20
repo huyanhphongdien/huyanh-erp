@@ -12,6 +12,7 @@ import {
   MessageOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useOpenChatTab } from '../../hooks/useB2BTabs'
 import { DEAL_STATUS_LABELS, DEAL_STATUS_COLORS } from '../../services/b2b/dealService'
 
 // Lazy load tab components (same as DealDetailPage)
@@ -38,6 +39,7 @@ interface Props {
 
 export default function DealInlineDetail({ deal }: Props) {
   const navigate = useNavigate()
+  const openChatTab = useOpenChatTab()
 
   const tabItems = [
     {
@@ -91,7 +93,7 @@ export default function DealInlineDetail({ deal }: Props) {
                   .eq('partner_id', deal.partner_id)
                   .limit(1)
                   .maybeSingle()
-                if (room) navigate(`/b2b/chat/${room.id}`)
+                if (room) openChatTab({ id: room.id, partner_name: deal.partner?.name })
                 else navigate('/b2b/chat')
               } catch { navigate('/b2b/chat') }
             }}>Mở chat đại lý</Button>

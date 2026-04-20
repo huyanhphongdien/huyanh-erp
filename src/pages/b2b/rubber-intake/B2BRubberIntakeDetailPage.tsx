@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useOpenDealTab } from '../../../hooks/useB2BTabs'
 import {
   ArrowLeft, FileCheck, Link2, Package, Scale, Droplets, DollarSign,
   Truck, MapPin, Calendar, CheckCircle, XCircle, Clock, AlertTriangle,
@@ -74,6 +75,7 @@ function DRCGauge({ value }: { value: number | null }) {
 export default function B2BRubberIntakeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const openDealTab = useOpenDealTab()
   const [item, setItem] = useState<B2BRubberIntake | null>(null)
   const [loading, setLoading] = useState(true)
   const [stockIns, setStockIns] = useState<StockInInfo[]>([])
@@ -203,7 +205,7 @@ export default function B2BRubberIntakeDetailPage() {
             <h3 className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-2 flex items-center gap-1">
               <Link2 size={12} /> Liên kết Deal
             </h3>
-            <button onClick={() => navigate(`/b2b/deals/${item.deal!.id}`)} className="w-full flex items-center gap-3 p-2 bg-white rounded-lg hover:shadow-sm transition-shadow">
+            <button onClick={() => openDealTab({ id: item.deal!.id, deal_number: item.deal!.deal_number })} className="w-full flex items-center gap-3 p-2 bg-white rounded-lg hover:shadow-sm transition-shadow">
               <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
                 DL
               </div>

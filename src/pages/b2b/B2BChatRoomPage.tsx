@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useOpenDealTab } from '../../hooks/useB2BTabs'
 import {
   Card,
   Input,
@@ -680,6 +681,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   const { roomId: paramRoomId } = useParams<{ roomId: string }>()
   const roomId = roomIdProp || paramRoomId
   const navigate = useNavigate()
+  const openDealTab = useOpenDealTab()
   const { user } = useAuthStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -1145,7 +1147,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
     action: 'add_advance' | 'delivery' | 'view_details' | 'accept_deal' | 'create_settlement' | 'view_settlement' | 'raise_dispute' | 'view_dispute',
   ) => {
     if (action === 'view_details') {
-      navigate(`/b2b/deals/${dealId}`)
+      openDealTab({ id: dealId })
       return
     }
 
@@ -1156,7 +1158,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
 
     if (action === 'view_settlement') {
       // Nav sang deal detail — từ đó user thấy phiếu QT gắn với deal này
-      navigate(`/b2b/deals/${dealId}`)
+      openDealTab({ id: dealId })
       return
     }
 

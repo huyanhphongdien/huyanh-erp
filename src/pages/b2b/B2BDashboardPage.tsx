@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenChatTab } from '../../hooks/useB2BTabs'
 import {
   Card,
   Row,
@@ -175,6 +176,7 @@ const KPICard = ({
 
 const B2BDashboardPage = () => {
   const navigate = useNavigate()
+  const openChatTab = useOpenChatTab()
 
   // State
   const [loading, setLoading] = useState(true)
@@ -605,7 +607,7 @@ const B2BDashboardPage = () => {
                           <Button
                             size="small"
                             icon={<EyeOutlined />}
-                            onClick={() => navigate(`/b2b/chat/${item.roomId}`)}
+                            onClick={() => openChatTab({ id: item.roomId, partner_name: item.partnerName })}
                           />
                         </Tooltip>,
                       ]}
@@ -661,7 +663,7 @@ const B2BDashboardPage = () => {
                   renderItem={(item) => (
                     <List.Item
                       style={{ padding: '12px 16px', cursor: 'pointer' }}
-                      onClick={() => navigate(`/b2b/chat/${item.roomId}`)}
+                      onClick={() => openChatTab({ id: item.roomId, partner_name: item.partnerName })}
                     >
                       <List.Item.Meta
                         avatar={

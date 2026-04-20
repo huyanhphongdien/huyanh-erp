@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useOpenDealTab } from '../../../hooks/useB2BTabs'
 import {
   Card,
   Descriptions,
@@ -142,6 +143,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
   const { id: paramId } = useParams<{ id: string }>()
   const id = propId || paramId
   const navigate = useNavigate()
+  const openDealTab = useOpenDealTab()
 
   const [order, setOrder] = useState<OrderData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -428,7 +430,7 @@ const StockInDetailPage = ({ id: propId }: StockInDetailPageProps = {}) => {
               )}
             </Col>
             <Col>
-              <Button type="link" onClick={() => navigate(`/b2b/deals/${order.deal!.id}`)}>
+              <Button type="link" onClick={() => openDealTab({ id: order.deal!.id, deal_number: order.deal!.deal_number })}>
                 Xem Deal →
               </Button>
             </Col>

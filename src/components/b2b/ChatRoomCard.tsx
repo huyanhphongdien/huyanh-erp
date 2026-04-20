@@ -5,8 +5,8 @@
 // ============================================================================
 
 import { memo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Package, Clock, MessageSquare } from 'lucide-react';
+import { useOpenChatTab } from '../../hooks/useB2BTabs';
 import type { ChatRoom } from '../../services/b2b/chatRoomService';
 
 // ============================================================================
@@ -110,13 +110,13 @@ function truncateMessage(message: string | null, maxLength = 50): string {
 // ============================================================================
 
 function ChatRoomCard({ room }: ChatRoomCardProps) {
-  const navigate = useNavigate();
+  const openChatTab = useOpenChatTab();
   const partner = room.partner;
   const tierConfig = getTierConfig(partner?.tier || 'new');
   const hasUnread = (room.unread_count || 0) > 0;
 
   const handleClick = () => {
-    navigate(`/b2b/chat/${room.id}`);
+    openChatTab(room);
   };
 
   return (

@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useOpenDealTab } from '../../../hooks/useB2BTabs'
 import {
   Card,
   Descriptions,
@@ -100,6 +101,7 @@ const formatDateTime = (dateStr: string | null): string => {
 const DemandDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const openDealTab = useOpenDealTab()
 
   // State
   const [demand, setDemand] = useState<Demand | null>(null)
@@ -385,7 +387,7 @@ const DemandDetailPage = () => {
                 type="link"
                 size="small"
                 icon={<EyeOutlined />}
-                onClick={() => navigate(`/b2b/deals/${record.deal_id}`)}
+                onClick={() => openDealTab({ id: record.deal_id })}
               >
                 Xem Deal
               </Button>
@@ -430,7 +432,7 @@ const DemandDetailPage = () => {
       key: 'deal_number',
       width: 140,
       render: (text: string, record: any) => (
-        <Button type="link" onClick={() => navigate(`/b2b/deals/${record.id}`)} style={{ padding: 0 }}>
+        <Button type="link" onClick={() => openDealTab(record)} style={{ padding: 0 }}>
           <Text strong>{text}</Text>
         </Button>
       ),

@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import { notification } from 'antd'
 import { supabase } from '../lib/supabase'
 import { DEAL_STATUS_LABELS } from '../types/b2b.constants'
+import { useOpenDealTab } from './useB2BTabs'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface DealRow {
@@ -33,6 +34,7 @@ interface DealRow {
  */
 export function useB2BDealToasts(enabled: boolean = true) {
   const navigate = useNavigate()
+  const openDealTab = useOpenDealTab()
   const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export function useB2BDealToasts(enabled: boolean = true) {
         (payload: any) => {
           const oldRow = payload.old as DealRow
           const newRow = payload.new as DealRow
-          handleDealChange(oldRow, newRow, navigate)
+          handleDealChange(oldRow, newRow, openDealTab)
         },
       )
       .on(
@@ -84,17 +86,17 @@ export function useB2BDealToasts(enabled: boolean = true) {
         channelRef.current = null
       }
     }
-  }, [enabled, navigate])
+  }, [enabled, navigate, openDealTab])
 }
 
 function handleDealChange(
   oldRow: DealRow | null,
   newRow: DealRow,
-  navigate: ReturnType<typeof useNavigate>,
+  openDealTab: (deal: { id: string; deal_number?: string | null }) => void,
 ) {
   if (!newRow?.deal_number) return
 
-  const goToDeal = () => navigate(`/b2b/deals/${newRow.id}`)
+  const goToDeal = () => openDealTab({ id: newRow.id, deal_number: newRow.deal_number })
   const key = `deal-${newRow.id}`
 
   // 1. Status đổi

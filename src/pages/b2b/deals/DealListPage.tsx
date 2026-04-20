@@ -4,7 +4,6 @@
 // ============================================================================
 
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Tag, Typography, Button, Tabs } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
@@ -17,6 +16,7 @@ import {
   DEAL_TYPE_LABELS,
 } from '../../../services/b2b/dealService'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 // DealInlineDetail bỏ — click row thay vì expand inline
 
 const { Text } = Typography
@@ -44,7 +44,7 @@ const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-
 // ============================================================================
 
 const DealListPage = () => {
-  const navigate = useNavigate()
+  const openTab = useOpenTab()
   const [activeTab, setActiveTab] = useState('all')
 
   const { data: allDeals = [], isLoading, refetch } = useQuery({
@@ -196,7 +196,13 @@ const DealListPage = () => {
           ),
         }))}
         tabBarExtraContent={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/b2b/deals/new')} style={{ background: '#1B4D3E' }}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openTab({
+            key: 'b2b-deal-create',
+            title: 'Tạo Deal mới',
+            componentId: 'b2b-deal-create',
+            props: {},
+            path: '/b2b/deals/new',
+          })} style={{ background: '#1B4D3E' }}>
             Tạo Deal
           </Button>
         }
@@ -212,7 +218,13 @@ const DealListPage = () => {
         title={`Deals B2B`}
         dateRangeField="created_at"
         onRefresh={() => refetch()}
-        onRowClick={(deal) => navigate(`/b2b/deals/${deal.id}`)}
+        onRowClick={(deal) => openTab({
+          key: `b2b-deal-${deal.id}`,
+          title: `Deal ${deal.deal_number || deal.id.slice(0, 8)}`,
+          componentId: 'b2b-deal-detail',
+          props: { id: deal.id },
+          path: `/b2b/deals/${deal.id}`,
+        })}
         exportFileName="B2B_Deals"
         pageSize={50}
       />

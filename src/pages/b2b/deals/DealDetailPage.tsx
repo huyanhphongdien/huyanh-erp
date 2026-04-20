@@ -61,6 +61,7 @@ import {
   DEAL_TYPE_LABELS,
 } from '../../../services/b2b/dealService'
 import { autoSettlementService } from '../../../services/b2b/autoSettlementService'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import { PRODUCT_TYPE_LABELS } from '../../../constants/rubberProducts'
@@ -327,10 +328,16 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
 // MAIN COMPONENT
 // ============================================
 
-const DealDetailPage = () => {
-  // Route declared as 'deals/:id' in App.tsx → param key is 'id', not 'dealId'
-  const { id: dealId } = useParams<{ id: string }>()
+interface DealDetailPageProps {
+  id?: string
+}
+
+const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
+  // Accept optional prop (tab mode) with useParams fallback (deep link mode)
+  const { id: paramId } = useParams<{ id: string }>()
+  const dealId = propId || paramId
   const navigate = useNavigate()
+  const openTab = useOpenTab()
 
   // State
   const [deal, setDeal] = useState<Deal | null>(null)
@@ -401,7 +408,13 @@ const DealDetailPage = () => {
     try {
       const room = await dealService.getChatRoomByPartner(deal.partner_id)
       if (room) {
-        navigate(`/b2b/chat/${room.id}`)
+        openTab({
+          key: `b2b-chat-${room.id}`,
+          title: deal.partner?.name ? `Chat: ${deal.partner.name}` : 'Chat',
+          componentId: 'b2b-chat-room',
+          props: { roomIdProp: room.id },
+          path: `/b2b/chat/${room.id}`,
+        })
       } else {
         message.info('Chưa có phòng chat với đại lý này')
       }
@@ -513,7 +526,13 @@ const DealDetailPage = () => {
               </Button>
               <Button
                 icon={<PrinterOutlined />}
-                onClick={() => window.open(`/b2b/deals/${deal.id}/print`, '_blank')}
+                onClick={() => openTab({
+                  key: `b2b-deal-print-${deal.id}`,
+                  title: `In ${deal.deal_number || deal.id.slice(0, 8)}`,
+                  componentId: 'b2b-deal-print',
+                  props: { id: deal.id },
+                  path: `/b2b/deals/${deal.id}/print`,
+                })}
               >
                 In phiếu
               </Button>

@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenChatTab } from '../../../hooks/useB2BTabs'
 import {
   Card,
   Row,
@@ -187,6 +188,7 @@ const PartnerCard = ({ partner, onView, onChat, onDeals }: PartnerCardProps) => 
 
 const PartnerListPage = () => {
   const navigate = useNavigate()
+  const openChatTab = useOpenChatTab()
 
   // State
   const [partners, setPartners] = useState<Partner[]>([])
@@ -273,7 +275,7 @@ const PartnerListPage = () => {
     try {
       const room = await partnerService.getChatRoom(partner.id)
       if (room) {
-        navigate(`/b2b/chat/${room.id}`)
+        openChatTab({ id: room.id, partner_name: partner.name })
       } else {
         message.info('Chưa có phòng chat với đại lý này')
       }

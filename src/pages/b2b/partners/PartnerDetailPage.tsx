@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useOpenDealTab, useOpenDealCreateTab, useOpenChatTab } from '../../../hooks/useB2BTabs'
 import {
   Card,
   Tabs,
@@ -282,7 +283,8 @@ interface DealsTabProps {
 }
 
 const DealsTab = ({ partnerId }: DealsTabProps) => {
-  const navigate = useNavigate()
+  const openDealTab = useOpenDealTab()
+  const openDealCreateTab = useOpenDealCreateTab()
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -310,7 +312,7 @@ const DealsTab = ({ partnerId }: DealsTabProps) => {
       dataIndex: 'deal_number',
       key: 'deal_number',
       render: (text, record) => (
-        <Button type="link" onClick={() => navigate(`/b2b/deals/${record.id}`)}>
+        <Button type="link" onClick={() => openDealTab(record)}>
           {text}
         </Button>
       ),
@@ -359,7 +361,7 @@ const DealsTab = ({ partnerId }: DealsTabProps) => {
             type="text"
             size="small"
             icon={<EyeOutlined />}
-            onClick={() => navigate(`/b2b/deals/${record.id}`)}
+            onClick={() => openDealTab(record)}
           />
         </Tooltip>
       ),
@@ -373,7 +375,7 @@ const DealsTab = ({ partnerId }: DealsTabProps) => {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => navigate(`/b2b/deals/create?partner_id=${partnerId}`)}
+          onClick={() => openDealCreateTab(`partner_id=${partnerId}`)}
         >
           Tạo Deal
         </Button>
@@ -470,6 +472,8 @@ const DebtTab = ({ partner }: DebtTabProps) => {
 const PartnerDetailPage = () => {
   const { partnerId } = useParams<{ partnerId: string }>()
   const navigate = useNavigate()
+  const openChatTab = useOpenChatTab()
+  const openDealCreateTab = useOpenDealCreateTab()
 
   // State
   const [partner, setPartner] = useState<Partner | null>(null)
@@ -514,7 +518,7 @@ const PartnerDetailPage = () => {
     try {
       const room = await partnerService.getChatRoom(partner.id)
       if (room) {
-        navigate(`/b2b/chat/${room.id}`)
+        openChatTab({ id: room.id, partner_name: partner.name })
       } else {
         message.info('Chưa có phòng chat với đại lý này')
       }
@@ -525,7 +529,7 @@ const PartnerDetailPage = () => {
 
   const handleCreateDeal = () => {
     if (!partner) return
-    navigate(`/b2b/deals/create?partner_id=${partner.id}`)
+    openDealCreateTab(`partner_id=${partner.id}`)
   }
 
   // ============================================

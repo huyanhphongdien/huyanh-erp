@@ -69,6 +69,22 @@ registerTabComponent('weighbridge-detail', WeighbridgeDetailPage)
 const WarehouseLocationPage = lazy(() => import('../pages/wms/warehouses/WarehouseLocationPage'))
 registerTabComponent('warehouse-location', WarehouseLocationPage)
 
+// ===== B2B — Deals =====
+
+const DealDetailPage = lazy(() => import('../pages/b2b/deals/DealDetailPage'))
+registerTabComponent('b2b-deal-detail', DealDetailPage)
+
+const DealCreatePage = lazy(() => import('../pages/b2b/deals/DealCreatePage'))
+registerTabComponent('b2b-deal-create', DealCreatePage)
+
+const DealPrintPage = lazy(() => import('../pages/b2b/deals/DealPrintPage'))
+registerTabComponent('b2b-deal-print', DealPrintPage)
+
+// ===== B2B — Chat =====
+
+const B2BChatRoomPage = lazy(() => import('../pages/b2b/B2BChatRoomPage'))
+registerTabComponent('b2b-chat-room', B2BChatRoomPage)
+
 // Thêm vào đây khi rollout các module khác:
 // const SalesOrderDetailPage = lazy(() => import('../pages/sales/SalesOrderDetailPage'))
 // registerTabComponent('sales-order-detail', SalesOrderDetailPage)

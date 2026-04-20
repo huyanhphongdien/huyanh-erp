@@ -47,8 +47,13 @@ const fmtDate = (s?: string | null): string => {
 const fmtNumber = (n?: number | null): string =>
   n != null ? n.toLocaleString('vi-VN') : '—'
 
-const DealPrintPage = () => {
-  const { id } = useParams<{ id: string }>()
+interface DealPrintPageProps {
+  id?: string
+}
+
+const DealPrintPage = ({ id: propId }: DealPrintPageProps = {}) => {
+  const { id: paramId } = useParams<{ id: string }>()
+  const id = propId || paramId
   const [deal, setDeal] = useState<Deal | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

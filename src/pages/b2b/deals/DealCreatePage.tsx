@@ -6,6 +6,8 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useOpenDealTab } from '../../../hooks/useB2BTabs'
+import { useCloseCurrentTab } from '../../../hooks/useOpenTab'
 import {
   Card,
   Steps,
@@ -500,6 +502,8 @@ const ConfirmStep = ({ form, selectedPartner, onBack, onSubmit, loading }: Confi
 
 const DealCreatePage = () => {
   const navigate = useNavigate()
+  const openDealTab = useOpenDealTab()
+  const closeCurrentTab = useCloseCurrentTab()
   const [searchParams] = useSearchParams()
   const [form] = Form.useForm()
 
@@ -669,7 +673,10 @@ const DealCreatePage = () => {
               <Button
                 type="primary"
                 key="view"
-                onClick={() => navigate(`/b2b/deals/${createdDeal.id}`)}
+                onClick={() => {
+                  openDealTab(createdDeal)
+                  closeCurrentTab()
+                }}
               >
                 Xem chi tiết
               </Button>,

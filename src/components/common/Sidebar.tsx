@@ -18,6 +18,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useOpenTab } from '../../hooks/useOpenTab';
 import { getSalesRole, hasSalesAccess } from '../../services/sales/salesPermissionService';
 import { supabase } from '../../lib/supabase';
 import { purchaseAccessService } from '../../services/purchaseAccessService';
@@ -111,6 +112,12 @@ interface MenuItem {
   badge?: number;
   allowedEmails?: string[];
   requireSalesRoles?: string[]; // ['sale','logistics','accounting','admin']
+  // Nếu item này nên mở thành tab (thay vì navigate), cung cấp tab config.
+  // Key trùng → focus tab đã mở, không tạo mới.
+  tab?: {
+    key: string;
+    componentId: string;
+  };
 }
 
 interface MenuGroup {
@@ -242,6 +249,7 @@ const getMenuGroups = (
         label: 'Dashboard',
         icon: <LayoutDashboard size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-dashboard', componentId: 'b2b-dashboard' },
       },
       {
         path: '/b2b/chat',
@@ -249,66 +257,77 @@ const getMenuGroups = (
         icon: <MessageSquare size={18} />,
         requireB2BPurchaser: true,
         badge: unreadB2BCount > 0 ? unreadB2BCount : undefined,
+        tab: { key: 'b2b-chat-list', componentId: 'b2b-chat-list' },
       },
       {
         path: '/b2b/demands',
         label: 'Nhu cầu mua',
         icon: <ShoppingCart size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-demand-list', componentId: 'b2b-demand-list' },
       },
       {
         path: '/b2b/partners',
         label: 'Đại lý',
         icon: <Users size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-partner-list', componentId: 'b2b-partner-list' },
       },
       {
         path: '/b2b/deals',
         label: 'Deals',
         icon: <Handshake size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-deal-list', componentId: 'b2b-deal-list' },
       },
       {
         path: '/b2b/auctions',
         label: 'Đấu giá',
         icon: <Timer size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-auction-list', componentId: 'b2b-auction-list' },
       },
       {
         path: '/b2b/rubber-intake',
         label: 'Lý lịch mủ',
         icon: <FileCheck size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-rubber-intake-list', componentId: 'b2b-rubber-intake-list' },
       },
       {
         path: '/b2b/ledger',
         label: 'Công nợ',
         icon: <BookOpen size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-ledger-overview', componentId: 'b2b-ledger-overview' },
       },
       {
         path: '/b2b/settlements',
         label: 'Quyết toán',
         icon: <ArrowLeftRight size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-settlement-list', componentId: 'b2b-settlement-list' },
       },
       {
         path: '/b2b/disputes',
         label: 'Khiếu nại DRC',
         icon: <AlertTriangle size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-dispute-list', componentId: 'b2b-dispute-list' },
       },
       {
         path: '/b2b/analytics',
         label: 'Phân tích B2B',
         icon: <TrendingUp size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-analytics', componentId: 'b2b-analytics' },
       },
       {
         path: '/b2b/reports',
         label: 'Báo cáo công nợ',
         icon: <BarChart3 size={18} />,
         requireB2BPurchaser: true,
+        tab: { key: 'b2b-ledger-report', componentId: 'b2b-ledger-report' },
       },
     ],
   },
@@ -406,6 +425,7 @@ const getMenuGroups = (
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const location = useLocation();
+  const openTab = useOpenTab();
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
@@ -659,12 +679,27 @@ export function Sidebar() {
   const renderMenuItem = (item: MenuItem) => {
     if (!isItemVisible(item)) return null;
 
+    const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      setIsMobileOpen(false);
+      // Nếu item có tab config → mở thành tab thay vì navigate thường
+      if (item.tab) {
+        e.preventDefault();
+        openTab({
+          key: item.tab.key,
+          title: item.label,
+          componentId: item.tab.componentId,
+          props: {},
+          path: item.path,
+        });
+      }
+    };
+
     return (
       <li key={item.path}>
         <NavLink
           to={item.path}
           end
-          onClick={() => setIsMobileOpen(false)}
+          onClick={handleClick}
           className={({ isActive: navIsActive }) =>
             `relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
               navIsActive

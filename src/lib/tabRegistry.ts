@@ -69,7 +69,45 @@ registerTabComponent('weighbridge-detail', WeighbridgeDetailPage)
 const WarehouseLocationPage = lazy(() => import('../pages/wms/warehouses/WarehouseLocationPage'))
 registerTabComponent('warehouse-location', WarehouseLocationPage)
 
-// ===== B2B — Deals =====
+// ===== B2B — Dashboards & List pages (mở từ sidebar menu) =====
+
+const B2BDashboardPage = lazy(() => import('../pages/b2b/B2BDashboardPage'))
+registerTabComponent('b2b-dashboard', B2BDashboardPage)
+
+const B2BChatListPage = lazy(() => import('../pages/b2b/B2BChatListPage'))
+registerTabComponent('b2b-chat-list', B2BChatListPage)
+
+const DemandListPage = lazy(() => import('../pages/b2b/demands/DemandListPage'))
+registerTabComponent('b2b-demand-list', DemandListPage)
+
+const PartnerListPage = lazy(() => import('../pages/b2b/partners/PartnerListPage'))
+registerTabComponent('b2b-partner-list', PartnerListPage)
+
+const DealListPage = lazy(() => import('../pages/b2b/deals/DealListPage'))
+registerTabComponent('b2b-deal-list', DealListPage)
+
+const AuctionListPage = lazy(() => import('../pages/b2b/auctions/AuctionListPage'))
+registerTabComponent('b2b-auction-list', AuctionListPage)
+
+const B2BRubberIntakePage = lazy(() => import('../pages/b2b/rubber-intake/B2BRubberIntakePage'))
+registerTabComponent('b2b-rubber-intake-list', B2BRubberIntakePage)
+
+const LedgerOverviewPage = lazy(() => import('../pages/b2b/ledger/LedgerOverviewPage'))
+registerTabComponent('b2b-ledger-overview', LedgerOverviewPage)
+
+const SettlementListPage = lazy(() => import('../pages/b2b/settlements/SettlementListPage'))
+registerTabComponent('b2b-settlement-list', SettlementListPage)
+
+const DisputeListPage = lazy(() => import('../pages/b2b/disputes/DisputeListPage'))
+registerTabComponent('b2b-dispute-list', DisputeListPage)
+
+const B2BAnalyticsDashboard = lazy(() => import('../pages/b2b/reports/B2BAnalyticsDashboard'))
+registerTabComponent('b2b-analytics', B2BAnalyticsDashboard)
+
+const LedgerReportPage = lazy(() => import('../pages/b2b/reports/LedgerReportPage'))
+registerTabComponent('b2b-ledger-report', LedgerReportPage)
+
+// ===== B2B — Deal detail flow =====
 
 const DealDetailPage = lazy(() => import('../pages/b2b/deals/DealDetailPage'))
 registerTabComponent('b2b-deal-detail', DealDetailPage)
@@ -80,7 +118,7 @@ registerTabComponent('b2b-deal-create', DealCreatePage)
 const DealPrintPage = lazy(() => import('../pages/b2b/deals/DealPrintPage'))
 registerTabComponent('b2b-deal-print', DealPrintPage)
 
-// ===== B2B — Chat =====
+// ===== B2B — Chat room =====
 
 const B2BChatRoomPage = lazy(() => import('../pages/b2b/B2BChatRoomPage'))
 registerTabComponent('b2b-chat-room', B2BChatRoomPage)

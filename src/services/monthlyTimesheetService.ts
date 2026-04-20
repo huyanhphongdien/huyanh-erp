@@ -333,8 +333,12 @@ export const monthlyTimesheetService = {
       for (const day of days) {
         const sym = day.symbol
         let dayCong = 0
-        if (sym === 'HC' || sym === 'S' || sym === 'C2') {
+        if (sym === 'HC' || sym === 'C2') {
           dayCong = 1.0
+          recalcWorkDays++
+        } else if (sym === 'S') {
+          // Ca sáng ngắn (SHORT_1) = 1.0, ca ngày dài (LONG_DAY) = 1.5
+          dayCong = day.shiftCode === 'LONG_DAY' ? 1.5 : 1.0
           recalcWorkDays++
         } else if (sym === 'Đ') {
           // Ca đêm ngắn (SHORT_3) = 1.0, ca đêm dài (LONG_NIGHT) = 1.5

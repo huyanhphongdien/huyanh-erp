@@ -494,6 +494,23 @@ export const settlementService = {
       throw new Error('Chỉ có thể gửi duyệt phiếu ở trạng thái "Nháp" hoặc "Từ chối"')
     }
 
+    // ─── Gap #3: Chặn submit khi deal có active dispute ───
+    if (current.deal_id) {
+      const { data: activeDisputes } = await supabase
+        .from('b2b_drc_disputes')
+        .select('id, dispute_number, status')
+        .eq('deal_id', current.deal_id)
+        .in('status', ['open', 'investigating'])
+        .limit(1)
+      if (activeDisputes && activeDisputes.length > 0) {
+        const d = activeDisputes[0]
+        throw new Error(
+          `Deal đang có khiếu nại ${d.dispute_number} chưa giải quyết (${d.status}). ` +
+          `Phải xử lý khiếu nại trước khi gửi duyệt phiếu quyết toán.`,
+        )
+      }
+    }
+
     const { data, error } = await supabase
       .from('b2b_settlements')
       .update({
@@ -518,6 +535,32 @@ export const settlementService = {
     if (!current) throw new Error('Phiếu quyết toán không tồn tại')
     if (current.status !== 'pending') {
       throw new Error('Chỉ có thể duyệt phiếu ở trạng thái "Chờ duyệt"')
+    }
+
+    // ─── Gap #3: Double-check dispute tại thời điểm duyệt ───
+    if (current.deal_id) {
+      const { data: activeDisputes } = await supabase
+        .from('b2b_drc_disputes')
+        .select('id, dispute_number, status')
+        .eq('deal_id', current.deal_id)
+        .in('status', ['open', 'investigating'])
+        .limit(1)
+      if (activeDisputes && activeDisputes.length > 0) {
+        const d = activeDisputes[0]
+        throw new Error(
+          `Deal đang có khiếu nại ${d.dispute_number} chưa giải quyết. Không thể duyệt phiếu quyết toán.`,
+        )
+      }
+    }
+
+    // ─── Gap #5: Chặn duyệt khi advance > gross_amount (balance âm) ───
+    const grossAmount = current.gross_amount || 0
+    const totalAdvance = current.total_advance || 0
+    if (totalAdvance > grossAmount && grossAmount > 0 && current.settlement_type !== 'processing') {
+      throw new Error(
+        `Tổng tạm ứng (${totalAdvance.toLocaleString('vi-VN')} đ) lớn hơn giá trị quyết toán ` +
+        `(${grossAmount.toLocaleString('vi-VN')} đ). Không thể duyệt — vui lòng điều chỉnh advance hoặc amount.`,
+      )
     }
 
     const { data, error } = await supabase

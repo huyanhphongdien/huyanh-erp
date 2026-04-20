@@ -328,8 +328,43 @@ export const dealService = {
 
   /**
    * Tạo deal mới
+   *
+   * Sprint 1 enforcement:
+   *  - Gap #2: Partner phải ở status 'verified' (không accept suspended/rejected)
+   *  - Gap #6: quantity_kg > 0, unit_price >= 0 (0 = gia công, không cho âm)
    */
   async createDeal(dealData: DealCreateData): Promise<Deal> {
+    // ─── Gap #6: Validation amount fields ───
+    if (dealData.quantity_kg !== undefined && dealData.quantity_kg !== null && dealData.quantity_kg <= 0) {
+      throw new Error('Số lượng phải lớn hơn 0')
+    }
+    if (dealData.unit_price !== undefined && dealData.unit_price !== null && dealData.unit_price < 0) {
+      throw new Error('Đơn giá không được âm')
+    }
+    if (dealData.total_value_vnd !== undefined && dealData.total_value_vnd !== null && dealData.total_value_vnd < 0) {
+      throw new Error('Tổng giá trị deal không được âm')
+    }
+
+    // ─── Gap #2: Kiểm tra partner status ───
+    const { data: partner, error: partnerError } = await supabase
+      .from('b2b_partners')
+      .select('id, status, name')
+      .eq('id', dealData.partner_id)
+      .single()
+    if (partnerError || !partner) {
+      throw new Error('Không tìm thấy đại lý')
+    }
+    if (partner.status !== 'verified') {
+      const statusLabel: Record<string, string> = {
+        pending: 'Chờ duyệt',
+        suspended: 'Đang bị tạm ngưng',
+        rejected: 'Đã bị từ chối',
+      }
+      throw new Error(
+        `Đại lý "${partner.name}" đang ở trạng thái ${statusLabel[partner.status] || partner.status} — không thể tạo deal`,
+      )
+    }
+
     const dealNumber = generateDealNumber()
 
     // Calculate total if not provided

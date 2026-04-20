@@ -52,6 +52,21 @@ export const autoSettlementService = {
    * - Tạo settlement draft + settlement items
    */
   async createAutoSettlement(dealId: string): Promise<AutoSettlementResult> {
+    // ─── Gap #3: Chặn tạo settlement khi có active dispute ───
+    const { data: activeDisputes, error: disputeErr } = await supabase
+      .from('b2b_drc_disputes')
+      .select('id, dispute_number, status')
+      .eq('deal_id', dealId)
+      .in('status', ['open', 'investigating'])
+      .limit(1)
+    if (disputeErr) throw new Error(`Không thể kiểm tra khiếu nại: ${disputeErr.message}`)
+    if (activeDisputes && activeDisputes.length > 0) {
+      const d = activeDisputes[0]
+      throw new Error(
+        `Deal đang có khiếu nại ${d.dispute_number} chưa giải quyết (${d.status}). Phải xử lý khiếu nại trước khi quyết toán.`,
+      )
+    }
+
     // ─── 1. Lấy thông tin Deal ───
     const { data: deal, error: dealError } = await supabase
       .from('b2b_deals')
@@ -135,6 +150,17 @@ export const autoSettlementService = {
 
     const paidAdvances = advances || []
     const totalAdvanced = paidAdvances.reduce((sum, a) => sum + (a.amount || 0), 0)
+
+    // ─── Gap #5: Chặn advance > final_value (dẫn đến balance âm) ───
+    // Chỉ cảnh báo, không chặn cứng vì có trường hợp hợp lệ (VD: gia công lỗ)
+    // nhưng log để audit. Trong trường hợp purchase thường không nên vượt.
+    if (totalAdvanced > finalValue && finalValue > 0 && dealType !== 'processing') {
+      throw new Error(
+        `Tổng tạm ứng (${totalAdvanced.toLocaleString('vi-VN')} đ) lớn hơn giá trị deal thực tế ` +
+        `(${finalValue.toLocaleString('vi-VN')} đ). Vui lòng kiểm tra lại advances hoặc điều chỉnh ` +
+        `trước khi quyết toán.`,
+      )
+    }
 
     // ─── 5. Tính số dư phải trả ───
     const balanceDue = finalValue - totalAdvanced

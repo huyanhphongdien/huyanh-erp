@@ -285,6 +285,17 @@ export const advanceService = {
   // ============================================
 
   async createAdvance(advanceData: AdvanceCreateData): Promise<Advance> {
+    // ─── Gap #6: Validation amount ───
+    if (!advanceData.amount || advanceData.amount <= 0) {
+      throw new Error('Số tiền tạm ứng phải lớn hơn 0')
+    }
+    if (advanceData.amount_vnd !== undefined && advanceData.amount_vnd !== null && advanceData.amount_vnd <= 0) {
+      throw new Error('Số tiền tạm ứng (VNĐ) phải lớn hơn 0')
+    }
+    if (advanceData.exchange_rate !== undefined && advanceData.exchange_rate !== null && advanceData.exchange_rate <= 0) {
+      throw new Error('Tỷ giá phải lớn hơn 0')
+    }
+
     const advanceNumber = generateAdvanceNumber()
 
     const { data, error } = await supabase

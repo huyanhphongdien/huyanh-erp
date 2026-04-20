@@ -97,7 +97,46 @@ export const dealConfirmService = {
     context: ConfirmDealContext,
   ): Promise<ConfirmDealResult> {
 
+    // ─── Gap #6: Validation amount fields ───
+    if (!formData.agreed_quantity_tons || formData.agreed_quantity_tons <= 0) {
+      throw new Error('Số lượng phải lớn hơn 0')
+    }
+    if (formData.agreed_price === undefined || formData.agreed_price === null || formData.agreed_price < 0) {
+      throw new Error('Đơn giá không được âm')
+    }
+    if (formData.expected_drc !== undefined && formData.expected_drc !== null) {
+      if (formData.expected_drc <= 0 || formData.expected_drc > 100) {
+        throw new Error('DRC dự kiến phải trong khoảng (0, 100]')
+      }
+    }
+    if (formData.has_advance && formData.advance_amount !== undefined && formData.advance_amount !== null && formData.advance_amount < 0) {
+      throw new Error('Số tiền tạm ứng không được âm')
+    }
+
+    // ─── Gap #2: Kiểm tra partner status ───
+    const { data: partner, error: partnerErr } = await supabase
+      .from('b2b_partners')
+      .select('id, status, name')
+      .eq('id', context.partnerId)
+      .single()
+    if (partnerErr || !partner) {
+      throw new Error('Không tìm thấy đại lý')
+    }
+    if (partner.status !== 'verified') {
+      const statusLabel: Record<string, string> = {
+        pending: 'Chờ duyệt',
+        suspended: 'Đang bị tạm ngưng',
+        rejected: 'Đã bị từ chối',
+      }
+      throw new Error(
+        `Đại lý "${partner.name}" đang ở trạng thái ${statusLabel[partner.status] || partner.status} — không thể xác nhận deal`,
+      )
+    }
+
     // === Pre-check: Booking chưa được confirm? ===
+    // Note: Gap #1 được enforce cứng ở DB bằng UNIQUE index idx_deals_booking_id_unique.
+    // Pre-check ở đây chỉ để hiển thị error message thân thiện. Nếu race, DB insert
+    // sẽ fail với code 23505 (unique violation) → catch ở block insert bên dưới.
     const { data: existingMsg } = await supabase
       .from('b2b_chat_messages')
       .select('metadata')
@@ -108,7 +147,6 @@ export const dealConfirmService = {
       throw new Error('Phiếu chốt này đã được xác nhận trước đó')
     }
 
-    // Pre-check: Chưa có deal cho booking này?
     const { data: existingDeal } = await supabase
       .from('b2b_deals')
       .select('id, deal_number')
@@ -172,7 +210,14 @@ export const dealConfirmService = {
       .select('*')
       .single()
 
-    if (dealError) throw new Error(`Không thể tạo Deal: ${dealError.message}`)
+    if (dealError) {
+      // Gap #1 — race condition: 2 nhân viên cùng confirm → UNIQUE index chặn
+      // PostgreSQL error code 23505 = unique_violation
+      if ((dealError as any).code === '23505' || /duplicate|unique/i.test(dealError.message)) {
+        throw new Error('Phiếu chốt này vừa được xác nhận bởi người khác. Vui lòng refresh để xem Deal đã tạo.')
+      }
+      throw new Error(`Không thể tạo Deal: ${dealError.message}`)
+    }
 
     const result: ConfirmDealResult = {
       deal: {

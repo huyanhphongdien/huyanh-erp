@@ -78,15 +78,21 @@ interface DealProgressProps {
   status: DealStatus
   stockInCount?: number
   qcStatus?: string
+  actualDrc?: number | null
 }
 
-const DealProgress = ({ status, stockInCount, qcStatus }: DealProgressProps) => {
+const DealProgress = ({ status, stockInCount, qcStatus, actualDrc }: DealProgressProps) => {
+  // Thứ tự chuẩn (Sprint J business rule):
+  //   Chốt → QC (đo DRC mẫu) → Duyệt (BGĐ) → Nhập kho (sau duyệt) → Quyết toán
+  // Lý do: QC lấy mẫu đo DRC trước, BGĐ dựa DRC quyết định duyệt, sau đó
+  // mới cho cân xe + nhập kho (trigger enforce_*_requires_accepted chặn DB).
+  const hasQc = (actualDrc ?? 0) > 0 || (!!qcStatus && qcStatus !== 'pending')
   const steps = [
-    { key: 'confirmed', label: 'Chốt', done: true },
-    { key: 'stock_in', label: 'Nhập kho', done: (stockInCount || 0) > 0 },
-    { key: 'qc',       label: 'QC',      done: !!qcStatus && qcStatus !== 'pending' },
-    { key: 'accepted', label: 'Duyệt',   done: status === 'accepted' || status === 'settled' },
-    { key: 'settled',  label: 'Quyết toán', done: status === 'settled' },
+    { key: 'confirmed', label: 'Chốt',       done: true },
+    { key: 'qc',        label: 'QC',         done: hasQc },
+    { key: 'accepted',  label: 'Duyệt',      done: status === 'accepted' || status === 'settled' },
+    { key: 'stock_in',  label: 'Nhập kho',   done: (stockInCount || 0) > 0 },
+    { key: 'settled',   label: 'Quyết toán', done: status === 'settled' },
   ]
 
   return (
@@ -246,6 +252,7 @@ const DealCard = ({
           status={status}
           stockInCount={metadata.stock_in_count}
           qcStatus={metadata.qc_status}
+          actualDrc={metadata.actual_drc}
         />
       )}
 

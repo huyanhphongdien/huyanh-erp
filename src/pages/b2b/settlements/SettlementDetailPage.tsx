@@ -6,6 +6,8 @@ import { settlementService, Settlement, SettlementStatus, SETTLEMENT_STATUS_LABE
 import PaymentForm from '../../../components/b2b/PaymentForm'
 import ApprovalTimeline from '../../../components/b2b/ApprovalTimeline'
 import { SettlementStatusTag } from '../../../components/ui/StatusTag'
+import { useAuthStore } from '../../../stores/authStore'
+import { supabase } from '../../../lib/supabase'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -43,6 +45,21 @@ const SettlementDetailPage = () => {
   const [actionLoading, setActionLoading] = useState(false)
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const [addItemForm] = Form.useForm()
+  const { user } = useAuthStore()
+
+  // Lookup employee_id of current auth user (FK target cho approved_by / rejected_by / paid_by).
+  // Cache lại local để không phải query mỗi lần click.
+  const getCurrentEmployeeId = useCallback(async (): Promise<string> => {
+    if (user?.employee_id) return user.employee_id
+    if (!user?.id) throw new Error('Chưa đăng nhập')
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!emp?.id) throw new Error('Tài khoản chưa liên kết với employee')
+    return emp.id
+  }, [user?.id, user?.employee_id])
 
   const fetchSettlement = useCallback(async () => {
     if (!id) return
@@ -76,7 +93,8 @@ const SettlementDetailPage = () => {
     if (!id) return
     try {
       const values = await approvalForm.validateFields()
-      await settlementService.approveSettlement(id, 'current-user-id', values.approval_notes)
+      const employeeId = await getCurrentEmployeeId()
+      await settlementService.approveSettlement(id, employeeId, values.approval_notes)
       message.success('Đã duyệt phiếu quyết toán')
       setApprovalModalOpen(false)
       approvalForm.resetFields()
@@ -91,7 +109,8 @@ const SettlementDetailPage = () => {
     try {
       setActionLoading(true)
       const values = await rejectForm.validateFields()
-      await settlementService.rejectSettlement(id, 'current-user-id', values.rejected_reason)
+      const employeeId = await getCurrentEmployeeId()
+      await settlementService.rejectSettlement(id, employeeId, values.rejected_reason)
       message.success('Đã từ chối phiếu quyết toán')
       setRejectModalOpen(false)
       rejectForm.resetFields()
@@ -564,7 +583,7 @@ const SettlementDetailPage = () => {
         <PaymentForm
           settlementId={id!}
           maxAmount={settlement.remaining_amount || 0}
-          createdBy="current-user-id"
+          createdBy={user?.employee_id || ''}
           onSuccess={handlePaymentSuccess}
           onCancel={() => setPaymentModalOpen(false)}
         />

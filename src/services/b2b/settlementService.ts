@@ -638,23 +638,11 @@ export const settlementService = {
     // Sprint 3 Gap #8 — dùng ledgerService.createManualEntry để có idempotency
     // (tránh double ledger entry khi retry). reference_code = settlement.code.
     // Gap #9 — period derived từ entry_date (hôm nay = ngày approve).
-    if (current.partner_id) {
-      try {
-        const grossAmount = current.gross_amount || 0
-        const { ledgerService } = await import('./ledgerService')
-        await ledgerService.createManualEntry({
-          partner_id: current.partner_id,
-          entry_type: 'settlement',
-          description: `Quyết toán ${current.code} — Giá trị deal`,
-          debit: grossAmount,
-          credit: 0,
-          reference_code: current.code,
-          created_by: approvedBy,
-        })
-      } catch (err) {
-        console.error('Ghi ledger debit khi approve settlement thất bại:', err)
-      }
-    }
+    // Note: DB trigger on_settlement_approved (Sprint G idempotent) đã tự INSERT
+    // ledger entry 'settlement_receivable' khi status transition → approved.
+    // Không cần service manual insert. CHECK constraint partner_ledger_entry_type
+    // không cho phép value 'settlement' (đã từng gây lỗi 23514 lúc trigger chưa
+    // fire đúng). Trigger đảm bảo idempotency via unique_violation EXCEPTION.
 
     // Gửi thông báo chat
     if (current.deal_id) {
@@ -750,7 +738,7 @@ export const settlementService = {
           const { ledgerService } = await import('./ledgerService')
           await ledgerService.createManualEntry({
             partner_id: current.partner_id,
-            entry_type: 'payment',
+            entry_type: 'payment_paid',
             description: `Thanh toán quyết toán ${current.code} (${paymentData.payment_method === 'bank_transfer' ? 'CK' : paymentData.payment_method === 'cash' ? 'TM' : paymentData.payment_method})`,
             debit: 0,
             credit: paymentAmount,

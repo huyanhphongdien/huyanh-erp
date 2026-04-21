@@ -559,7 +559,7 @@ export const dealWmsService = {
       .insert({
         room_id: room.id,
         sender_type: 'system',
-        sender_id: 'system',
+        sender_id: null,
         message_type: 'system',
         content: `Đã nhập kho ${(totalWeight / 1000).toFixed(1)} tấn cho Deal ${deal.deal_number} (${stockInCode})`,
         metadata: {
@@ -627,7 +627,7 @@ export const dealWmsService = {
       .insert({
         room_id: room.id,
         sender_type: 'system',
-        sender_id: 'system',
+        sender_id: null,
         message_type: 'system',
         content: `QC hoàn thành — Deal ${deal.deal_number}: DRC thực tế = ${actualDrc}%, Trạng thái: ${statusLabels[qcStatus] || qcStatus}`,
         metadata: {
@@ -702,7 +702,7 @@ export const dealWmsService = {
       .insert({
         room_id: room.id,
         sender_type: 'system',
-        sender_id: 'system',
+        sender_id: null,
         message_type: 'system',
         content,
         metadata: {
@@ -765,7 +765,7 @@ export const dealWmsService = {
       .insert({
         room_id: room.id,
         sender_type: 'system',
-        sender_id: 'system',
+        sender_id: null,
         message_type: 'system',
         content: `Đã chi tạm ứng ${advanceNumber} số tiền ${formattedAmount} VNĐ cho Deal ${deal.deal_number}`,
         metadata: {

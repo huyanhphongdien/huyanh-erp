@@ -387,21 +387,8 @@ export const advanceService = {
     if (error) throw error
 
     // Create ledger entry (Gap #8 idempotent: reference_code = advance_number)
-    try {
-      const advance = data as Advance
-      if (advance?.deal_id && advance?.partner_id) {
-        const amount = advance.amount_vnd || advance.amount || 0
-        const { ledgerService } = await import('./ledgerService')
-        await ledgerService.createManualEntry({
-          partner_id: advance.partner_id,
-          entry_type: 'advance',
-          reference_code: advance.advance_number,
-          description: `Tạm ứng ${advance.advance_number} cho Deal`,
-          debit: 0,
-          credit: amount,
-        })
-      }
-    } catch (err) { console.error('Ledger entry for advance failed:', err) }
+    // DB trigger on_advance_paid (Sprint I) tự INSERT ledger entry 'advance_paid'
+    // khi status='paid'. Không cần service manual insert.
 
     // Patch DealCard — đánh dấu pending ack (partner chưa xác nhận đã nhận)
     try {

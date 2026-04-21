@@ -180,21 +180,10 @@ export const dealChatActionsService = {
 
     if (advError) throw new Error(`Không thể tạo phiếu tạm ứng: ${advError.message}`)
 
-    // Step 3: Ghi ledger — Gap #8 idempotent qua ledgerService
-    try {
-      const { ledgerService } = await import('./ledgerService')
-      await ledgerService.createManualEntry({
-        partner_id: context.partnerId,
-        entry_type: 'advance',
-        debit: 0,
-        credit: formData.amount,
-        reference_code: advanceNumber,
-        description: `Ứng thêm cho deal ${context.dealNumber}`,
-        created_by: context.actionBy,
-      })
-    } catch (err) {
-      console.error('Ledger entry for advance failed:', err)
-    }
+    // Step 3: Ghi ledger — DB trigger on_advance_paid (Sprint I) tự INSERT
+    // ledger entry 'advance_paid' khi advance status='paid'. Service không cần
+    // manual insert. Idempotent qua EXCEPTION unique_violation.
+    // CHECK partner_ledger_entry_type chỉ cho 'advance_paid' (không 'advance').
 
     // Step 4: Compute new totals (không UPDATE b2b.deals vì 2 cột total_advanced/
     // balance_due không tồn tại — UI compute lại from SUM mỗi khi cần).

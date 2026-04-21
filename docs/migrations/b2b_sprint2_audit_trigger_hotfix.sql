@@ -151,3 +151,45 @@ SELECT proname, pronamespace::regnamespace AS schema
 FROM pg_proc
 WHERE proname IN ('log_deal_changes', 'log_settlement_changes', 'log_dispute_changes')
 ORDER BY proname;
+
+-- ─── 4. log_dispute_changes (append sau audit) ──────────────────────
+-- Fix bổ sung 2026-04-21: function này cũng dùng || 'text' buggy
+CREATE OR REPLACE FUNCTION b2b.log_dispute_changes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  changed TEXT[] := ARRAY[]::TEXT[];
+  actor UUID;
+BEGIN
+  BEGIN
+    actor := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    actor := NULL;
+  END;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO b2b.dispute_audit_log (dispute_id, changed_by, op, new_data)
+    VALUES (NEW.id, actor, 'INSERT', to_jsonb(NEW));
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO b2b.dispute_audit_log (dispute_id, changed_by, op, old_data)
+    VALUES (OLD.id, actor, 'DELETE', to_jsonb(OLD));
+    RETURN OLD;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF NEW.status IS DISTINCT FROM OLD.status THEN changed := array_append(changed, 'status'); END IF;
+    IF NEW.resolution IS DISTINCT FROM OLD.resolution THEN changed := array_append(changed, 'resolution'); END IF;
+    IF NEW.adjustment_amount IS DISTINCT FROM OLD.adjustment_amount THEN changed := array_append(changed, 'adjustment_amount'); END IF;
+    IF NEW.adjustment_drc IS DISTINCT FROM OLD.adjustment_drc THEN changed := array_append(changed, 'adjustment_drc'); END IF;
+    IF NEW.resolved_at IS DISTINCT FROM OLD.resolved_at THEN changed := array_append(changed, 'resolved_at'); END IF;
+
+    IF array_length(changed, 1) > 0 THEN
+      INSERT INTO b2b.dispute_audit_log (dispute_id, changed_by, op, old_data, new_data, changed_fields)
+      VALUES (NEW.id, actor, 'UPDATE', to_jsonb(OLD), to_jsonb(NEW), changed);
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  RETURN NULL;
+END;
+$$;

@@ -141,7 +141,7 @@ export const autoSettlementService = {
     // ─── 4. Lấy tạm ứng đã chi (paid) cho Deal ───
     const { data: advances, error: advError } = await supabase
       .from('b2b_advances')
-      .select('id, amount, payment_date, advance_number, notes')
+      .select('id, amount, payment_date, advance_number, purpose')
       .eq('deal_id', dealId)
       .eq('status', 'paid')
       .order('payment_date', { ascending: true })
@@ -252,7 +252,7 @@ export const autoSettlementService = {
         advance_id: adv.id,
         advance_date: adv.payment_date,
         amount: adv.amount,
-        notes: adv.notes || `Tạm ứng ${adv.advance_number}`,
+        notes: adv.purpose || `Tạm ứng ${adv.advance_number}`,
         sort_order: idx,
       }))
 

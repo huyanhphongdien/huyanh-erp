@@ -190,7 +190,7 @@ const ApprovalTimeline = ({ settlement }: ApprovalTimelineProps) => {
   }
 
   // Pending indicator (if currently pending)
-  if (settlement.status === 'pending') {
+  if (settlement.status === 'pending_approval') {
     items.push({
       color: 'orange',
       dot: <ClockCircleOutlined />,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Alert, Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Select, Statistic, message, Breadcrumb, Popconfirm } from 'antd'
-import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, PrinterOutlined, EditOutlined, SendOutlined } from '@ant-design/icons'
+import { Alert, Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Select, Statistic, message, Breadcrumb, Popconfirm, InputNumber } from 'antd'
+import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, PrinterOutlined, EditOutlined, SendOutlined, PlusOutlined } from '@ant-design/icons'
 import { settlementService, Settlement, SettlementStatus, SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUS_COLORS, SETTLEMENT_TYPE_LABELS } from '../../../services/b2b/settlementService'
 import PaymentForm from '../../../components/b2b/PaymentForm'
 import ApprovalTimeline from '../../../components/b2b/ApprovalTimeline'
@@ -41,6 +41,8 @@ const SettlementDetailPage = () => {
   const [rejectForm] = Form.useForm()
   const [markPaidForm] = Form.useForm()
   const [actionLoading, setActionLoading] = useState(false)
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false)
+  const [addItemForm] = Form.useForm()
 
   const fetchSettlement = useCallback(async () => {
     if (!id) return
@@ -149,6 +151,38 @@ const SettlementDetailPage = () => {
     fetchSettlement()
   }
 
+  const handleAddItem = async () => {
+    if (!id) return
+    try {
+      const values = await addItemForm.validateFields()
+      const qty = Number(values.quantity) || 0
+      const price = Number(values.unit_price) || 0
+      const amount = Number(values.amount) || (qty * price) || 0
+      setActionLoading(true)
+      await settlementService.addItem(id, {
+        item_type: values.item_type,
+        reference_id: null,
+        reference_number: null,
+        reference_date: null,
+        description: values.description,
+        quantity: qty || null,
+        unit_price: price || null,
+        amount,
+        is_credit: values.is_credit === 'credit',
+        notes: values.notes || null,
+      } as any)
+      message.success('Đã thêm hạng mục')
+      setAddItemModalOpen(false)
+      addItemForm.resetFields()
+      fetchSettlement()
+    } catch (err: any) {
+      if (err?.errorFields) return
+      message.error(err?.message || 'Không thể thêm hạng mục')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -221,7 +255,7 @@ const SettlementDetailPage = () => {
       )
     }
 
-    if (settlement.status === 'pending') {
+    if (settlement.status === 'pending_approval') {
       buttons.push(
         <Button
           key="approve"
@@ -319,13 +353,29 @@ const SettlementDetailPage = () => {
             </Descriptions>
           </Card>
 
-          <Card title="Hạng mục" style={{ borderRadius: 8, marginBottom: 16 }}>
+          <Card
+            title="Hạng mục"
+            style={{ borderRadius: 8, marginBottom: 16 }}
+            extra={
+              (settlement.status === 'draft' || settlement.status === 'rejected') && (
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => setAddItemModalOpen(true)}
+                >
+                  Thêm hạng mục
+                </Button>
+              )
+            }
+          >
             <Table
               dataSource={settlement.items || []}
               columns={itemColumns}
               rowKey="id"
               pagination={false}
               size="small"
+              locale={{ emptyText: 'Chưa có hạng mục nào' }}
             />
           </Card>
 
@@ -518,6 +568,89 @@ const SettlementDetailPage = () => {
           onSuccess={handlePaymentSuccess}
           onCancel={() => setPaymentModalOpen(false)}
         />
+      </Modal>
+
+      {/* Add Item Modal — chỉ hiện khi draft/rejected */}
+      <Modal
+        title="Thêm hạng mục chi phí"
+        open={addItemModalOpen}
+        onCancel={() => {
+          setAddItemModalOpen(false)
+          addItemForm.resetFields()
+        }}
+        onOk={handleAddItem}
+        okText="Thêm"
+        cancelText="Hủy"
+        confirmLoading={actionLoading}
+      >
+        <Form form={addItemForm} layout="vertical" preserve={false}>
+          <Form.Item
+            name="item_type"
+            label="Loại hạng mục"
+            rules={[{ required: true, message: 'Chọn loại' }]}
+          >
+            <Select
+              placeholder="Chọn loại hạng mục"
+              options={[
+                { value: 'transport_fee', label: 'Phí vận chuyển' },
+                { value: 'processing_fee', label: 'Phí gia công' },
+                { value: 'quality_bonus', label: 'Thưởng chất lượng' },
+                { value: 'quality_penalty', label: 'Phạt chất lượng' },
+                { value: 'late_penalty', label: 'Phạt chậm giao' },
+                { value: 'loyalty_bonus', label: 'Thưởng khách hàng thân thiết' },
+                { value: 'adjustment', label: 'Điều chỉnh khác' },
+                { value: 'other', label: 'Khác' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả" rules={[{ required: true, message: 'Nhập mô tả' }]}>
+            <Input placeholder="VD: Phí vận chuyển Tây Ninh → Phong Điền" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="quantity" label="Số lượng">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="(nếu có)" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="unit_price" label="Đơn giá">
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={0}
+                  placeholder="(nếu có)"
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="amount"
+                label="Thành tiền"
+                rules={[{ required: true, message: 'Nhập thành tiền' }]}
+                tooltip="Hoặc để trống nếu đã nhập SL × Đơn giá"
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={0}
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v) => Number(v!.replace(/,/g, '')) || 0}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="is_credit" label="Loại tác động" initialValue="debit" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: 'debit', label: 'Nợ (trừ tiền đại lý — phí, phạt)' },
+                { value: 'credit', label: 'Có (cộng tiền đại lý — thưởng, discount)' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="notes" label="Ghi chú">
+            <Input.TextArea rows={2} placeholder="Ghi chú thêm (tuỳ chọn)" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   )

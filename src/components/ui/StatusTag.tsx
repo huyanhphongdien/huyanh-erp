@@ -30,8 +30,8 @@ export type BookingStatus = 'pending' | 'confirmed' | 'negotiating' | 'rejected'
 // Partner Status
 export type PartnerStatus = 'pending' | 'verified' | 'suspended' | 'rejected';
 
-// Settlement Status
-export type SettlementStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'cancelled' | 'rejected';
+// Settlement Status — sync với DB CHECK settlements_status_check
+export type SettlementStatus = 'draft' | 'pending_approval' | 'approved' | 'partial_paid' | 'paid' | 'cancelled' | 'rejected';
 
 // Advance Status
 export type AdvanceStatus = 'pending' | 'approved' | 'paid' | 'rejected';
@@ -147,7 +147,7 @@ export const settlementStatusConfig: Record<SettlementStatus, StatusConfig> = {
     bgColor: '#fafafa',
     icon: <ClockCircleOutlined />,
   },
-  pending: {
+  pending_approval: {
     label: 'Chờ duyệt',
     color: '#faad14',
     bgColor: '#fffbe6',
@@ -157,6 +157,12 @@ export const settlementStatusConfig: Record<SettlementStatus, StatusConfig> = {
     label: 'Đã duyệt',
     color: '#52c41a',
     bgColor: '#f6ffed',
+    icon: <CheckCircleOutlined />,
+  },
+  partial_paid: {
+    label: 'Thanh toán 1 phần',
+    color: '#d48806',
+    bgColor: '#fff7e6',
     icon: <CheckCircleOutlined />,
   },
   paid: {

@@ -168,13 +168,47 @@ export const autoSettlementService = {
     // ─── 6. Tạo settlement code ───
     const code = generateSettlementCode()
 
-    // ─── 7. Xác định khoảng ngày cân ───
+    // ─── 7. Xác định khoảng ngày cân + aggregate xe/tài xế từ weighbridge_tickets ───
     let weighDateStart: string | null = null
     let weighDateEnd: string | null = null
+    let aggregatedVehiclePlates: string[] = []
+    let aggregatedDriverNames: string[] = []
+    let aggregatedDriverPhones: string[] = []
+
     if (confirmedStockIns.length > 0) {
       weighDateStart = confirmedStockIns[0].confirmed_at || confirmedStockIns[0].created_at
       const last = confirmedStockIns[confirmedStockIns.length - 1]
       weighDateEnd = last.confirmed_at || last.created_at
+    }
+
+    // Query weighbridge_tickets của deal để lấy xe + tài xế (1 deal nhiều xe)
+    const { data: tickets } = await supabase
+      .from('weighbridge_tickets')
+      .select('vehicle_plate, driver_name, driver_phone, gross_weighed_at, completed_at')
+      .eq('deal_id', dealId)
+      .eq('ticket_type', 'IN')
+      .order('gross_weighed_at', { ascending: true, nullsFirst: false })
+
+    if (tickets && tickets.length > 0) {
+      // Distinct vehicle plates
+      const plateSet = new Set<string>()
+      const driverSet = new Set<string>()
+      const phoneSet = new Set<string>()
+      for (const t of tickets) {
+        if (t.vehicle_plate) plateSet.add(t.vehicle_plate)
+        if (t.driver_name) driverSet.add(t.driver_name)
+        if (t.driver_phone) phoneSet.add(t.driver_phone)
+      }
+      aggregatedVehiclePlates = Array.from(plateSet)
+      aggregatedDriverNames = Array.from(driverSet)
+      aggregatedDriverPhones = Array.from(phoneSet)
+
+      // Narrow weigh_date range từ ticket (chính xác hơn stock_in_orders)
+      const firstTicketDate = tickets[0].gross_weighed_at || tickets[0].completed_at
+      const lastTicket = tickets[tickets.length - 1]
+      const lastTicketDate = lastTicket.gross_weighed_at || lastTicket.completed_at
+      if (firstTicketDate) weighDateStart = firstTicketDate
+      if (lastTicketDate) weighDateEnd = lastTicketDate
     }
 
     // ─── 8. Lấy employee_id của user hiện tại (FK settlements.created_by → employees.id) ───
@@ -211,7 +245,9 @@ export const autoSettlementService = {
         // (PG reject: "cannot insert a non-DEFAULT value into column gross_amount").
         total_advance: totalAdvanced,
         total_paid_post: 0,
-        vehicle_plates: [],
+        vehicle_plates: aggregatedVehiclePlates,
+        driver_name: aggregatedDriverNames.join(', ') || null,
+        driver_phone: aggregatedDriverPhones.join(', ') || null,
         weigh_date_start: weighDateStart,
         weigh_date_end: weighDateEnd,
         stock_in_date: weighDateStart,

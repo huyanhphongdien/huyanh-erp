@@ -19,7 +19,7 @@ const { Text } = Typography
 const STATUS_TABS = [
   { key: 'all', label: 'Tất cả' },
   { key: 'draft', label: 'Nháp' },
-  { key: 'pending', label: 'Chờ duyệt' },
+  { key: 'pending_approval', label: 'Chờ duyệt' },
   { key: 'approved', label: 'Đã duyệt' },
   { key: 'paid', label: 'Đã thanh toán' },
 ]

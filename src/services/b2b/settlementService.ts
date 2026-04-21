@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabase'
 // TYPES
 // ============================================
 
-export type SettlementStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'cancelled' | 'rejected'
+export type SettlementStatus = 'draft' | 'pending_approval' | 'approved' | 'partial_paid' | 'paid' | 'cancelled' | 'rejected'
 export type SettlementType = 'purchase' | 'sale' | 'processing'
 
 export interface Settlement {
@@ -81,6 +81,9 @@ export interface SettlementItem {
   id: string
   settlement_id: string
   item_type: string
+  reference_id: string | null
+  reference_number: string | null
+  reference_date: string | null
   description: string
   quantity: number | null
   unit_price: number | null
@@ -188,8 +191,9 @@ export interface SettlementUpdateData {
 
 export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   draft: 'Nháp',
-  pending: 'Chờ duyệt',
+  pending_approval: 'Chờ duyệt',
   approved: 'Đã duyệt',
+  partial_paid: 'Thanh toán 1 phần',
   paid: 'Đã thanh toán',
   cancelled: 'Đã hủy',
   rejected: 'Từ chối',
@@ -197,8 +201,9 @@ export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
 
 export const SETTLEMENT_STATUS_COLORS: Record<SettlementStatus, string> = {
   draft: 'default',
-  pending: 'orange',
+  pending_approval: 'orange',
   approved: 'green',
+  partial_paid: 'gold',
   paid: 'blue',
   cancelled: 'red',
   rejected: 'red',
@@ -558,7 +563,7 @@ export const settlementService = {
     const { data, error } = await supabase
       .from('b2b_settlements')
       .update({
-        status: 'pending' as SettlementStatus,
+        status: 'pending_approval' as SettlementStatus,
         submitted_at: new Date().toISOString(),
         // Clear rejection fields when resubmitting
         rejected_by: null,
@@ -577,7 +582,7 @@ export const settlementService = {
   async approveSettlement(id: string, approvedBy: string, notes?: string): Promise<Settlement> {
     const current = await this.getSettlementById(id)
     if (!current) throw new Error('Phiếu quyết toán không tồn tại')
-    if (current.status !== 'pending') {
+    if (current.status !== 'pending_approval') {
       throw new Error('Chỉ có thể duyệt phiếu ở trạng thái "Chờ duyệt"')
     }
 
@@ -687,7 +692,7 @@ export const settlementService = {
   async rejectSettlement(id: string, rejectedBy: string, reason: string): Promise<Settlement> {
     const current = await this.getSettlementById(id)
     if (!current) throw new Error('Phiếu quyết toán không tồn tại')
-    if (current.status !== 'pending') {
+    if (current.status !== 'pending_approval') {
       throw new Error('Chỉ có thể từ chối phiếu ở trạng thái "Chờ duyệt"')
     }
 

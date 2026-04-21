@@ -234,3 +234,50 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- ─── 6. Fix log_settlement_changes — bỏ column không tồn tại paid_amount ──
+-- Schema thực có total_paid_post, không có paid_amount
+CREATE OR REPLACE FUNCTION b2b.log_settlement_changes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  changed TEXT[] := ARRAY[]::TEXT[];
+  actor UUID;
+BEGIN
+  BEGIN
+    actor := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    actor := NULL;
+  END;
+
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO b2b.settlement_audit_log (settlement_id, changed_by, op, new_data)
+    VALUES (NEW.id, actor, 'INSERT', to_jsonb(NEW));
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO b2b.settlement_audit_log (settlement_id, changed_by, op, old_data)
+    VALUES (OLD.id, actor, 'DELETE', to_jsonb(OLD));
+    RETURN OLD;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF NEW.status IS DISTINCT FROM OLD.status THEN changed := array_append(changed, 'status'); END IF;
+    IF NEW.weighed_kg IS DISTINCT FROM OLD.weighed_kg THEN changed := array_append(changed, 'weighed_kg'); END IF;
+    IF NEW.finished_kg IS DISTINCT FROM OLD.finished_kg THEN changed := array_append(changed, 'finished_kg'); END IF;
+    IF NEW.drc_percent IS DISTINCT FROM OLD.drc_percent THEN changed := array_append(changed, 'drc_percent'); END IF;
+    IF NEW.approved_price IS DISTINCT FROM OLD.approved_price THEN changed := array_append(changed, 'approved_price'); END IF;
+    IF NEW.total_advance IS DISTINCT FROM OLD.total_advance THEN changed := array_append(changed, 'total_advance'); END IF;
+    IF NEW.total_paid_post IS DISTINCT FROM OLD.total_paid_post THEN changed := array_append(changed, 'total_paid_post'); END IF;
+    IF NEW.notes IS DISTINCT FROM OLD.notes THEN changed := array_append(changed, 'notes'); END IF;
+    IF NEW.internal_notes IS DISTINCT FROM OLD.internal_notes THEN changed := array_append(changed, 'internal_notes'); END IF;
+    IF NEW.locked_by_dispute IS DISTINCT FROM OLD.locked_by_dispute THEN changed := array_append(changed, 'locked_by_dispute'); END IF;
+
+    IF array_length(changed, 1) > 0 THEN
+      INSERT INTO b2b.settlement_audit_log (settlement_id, changed_by, op, old_data, new_data, changed_fields)
+      VALUES (NEW.id, actor, 'UPDATE', to_jsonb(OLD), to_jsonb(NEW), changed);
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  RETURN NULL;
+END;
+$$;

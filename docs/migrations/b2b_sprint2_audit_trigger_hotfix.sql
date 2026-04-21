@@ -193,3 +193,44 @@ BEGIN
   RETURN NULL;
 END;
 $$;
+
+-- ─── 5. Fix enforce_settlement_lock — bỏ check gross_amount (generated column) ──
+-- Bug: NEW.gross_amount = NULL trong BEFORE UPDATE (chưa compute lại), khiến
+-- IS DISTINCT FROM luôn true → chặn mọi UPDATE kể cả sửa notes.
+-- Fix: check input fields (finished_kg, approved_price) thay cho derived gross_amount.
+CREATE OR REPLACE FUNCTION b2b.enforce_settlement_lock()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  locked_statuses TEXT[] := ARRAY['approved', 'paid'];
+BEGIN
+  IF OLD.locked_by_dispute = TRUE AND NEW.locked_by_dispute = TRUE THEN
+    IF NEW.finished_kg IS DISTINCT FROM OLD.finished_kg
+      OR NEW.approved_price IS DISTINCT FROM OLD.approved_price
+      OR NEW.status IS DISTINCT FROM OLD.status THEN
+      RAISE EXCEPTION 'Phiếu quyết toán % đang bị lock bởi khiếu nại DRC — chỉ sửa ghi chú', OLD.code;
+    END IF;
+  END IF;
+
+  IF OLD.status = ANY(locked_statuses) THEN
+    IF NEW.finished_kg IS DISTINCT FROM OLD.finished_kg THEN
+      RAISE EXCEPTION 'Phiếu % đã %, không thể sửa finished_kg', OLD.code, OLD.status;
+    END IF;
+    IF NEW.approved_price IS DISTINCT FROM OLD.approved_price THEN
+      RAISE EXCEPTION 'Phiếu % đã %, không thể sửa approved_price', OLD.code, OLD.status;
+    END IF;
+    IF NEW.weighed_kg IS DISTINCT FROM OLD.weighed_kg THEN
+      RAISE EXCEPTION 'Phiếu % đã %, không thể sửa weighed_kg', OLD.code, OLD.status;
+    END IF;
+    IF NEW.drc_percent IS DISTINCT FROM OLD.drc_percent THEN
+      RAISE EXCEPTION 'Phiếu % đã %, không thể sửa drc_percent', OLD.code, OLD.status;
+    END IF;
+    IF NEW.total_advance IS DISTINCT FROM OLD.total_advance THEN
+      RAISE EXCEPTION 'Phiếu % đã %, không thể sửa total_advance', OLD.code, OLD.status;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;

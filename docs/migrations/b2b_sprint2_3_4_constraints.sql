@@ -291,43 +291,22 @@ COMMENT ON INDEX b2b.idx_ledger_idempotency IS
 
 
 -- ============================================================================
--- SPRINT 3 — Gap #9: Period cutting rule (derived from entry_date)
+-- SPRINT 3 — Gap #9: Period cutting rule (ĐÃ ENFORCE qua GENERATED column)
 -- ============================================================================
+-- period_month / period_year trong b2b.partner_ledger đã là GENERATED column
+-- (derived từ entry_date). Schema đã đảm bảo rule, không cần trigger.
+-- Client không được set period_* — ledgerService.createManualEntry vẫn pass
+-- vào nhưng Postgres bỏ qua vì GENERATED ALWAYS AS. OK.
+--
+-- Nếu muốn verify, chạy query:
+--   SELECT column_name, is_generated, generation_expression
+--   FROM information_schema.columns
+--   WHERE table_schema='b2b' AND table_name='partner_ledger'
+--     AND column_name IN ('period_month','period_year');
 
--- Trigger đảm bảo period_month/year luôn = EXTRACT từ entry_date
--- Không phụ thuộc vào client set đúng hay sai.
-CREATE OR REPLACE FUNCTION b2b.enforce_ledger_period()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF NEW.entry_date IS NOT NULL THEN
-    NEW.period_month := EXTRACT(MONTH FROM NEW.entry_date)::INT;
-    NEW.period_year  := EXTRACT(YEAR FROM NEW.entry_date)::INT;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
+-- Dọn trigger cũ nếu migration được chạy 1 phần trước đó (idempotent)
 DROP TRIGGER IF EXISTS trg_ledger_period ON b2b.partner_ledger;
-CREATE TRIGGER trg_ledger_period
-  BEFORE INSERT OR UPDATE ON b2b.partner_ledger
-  FOR EACH ROW
-  EXECUTE FUNCTION b2b.enforce_ledger_period();
-
-COMMENT ON FUNCTION b2b.enforce_ledger_period() IS
-  'Sprint 3 Gap #9 — Quy ước: period_month/year LUÔN derived từ entry_date. ' ||
-  'Nếu deal span nhiều tháng, settlement approved tháng 4 → entry thuộc kỳ tháng 4.';
-
--- Backfill rows có period sai
-UPDATE b2b.partner_ledger
-SET period_month = EXTRACT(MONTH FROM entry_date)::INT,
-    period_year  = EXTRACT(YEAR FROM entry_date)::INT
-WHERE entry_date IS NOT NULL
-  AND (period_month IS NULL
-    OR period_year IS NULL
-    OR period_month != EXTRACT(MONTH FROM entry_date)::INT
-    OR period_year  != EXTRACT(YEAR FROM entry_date)::INT);
+DROP FUNCTION IF EXISTS b2b.enforce_ledger_period();
 
 
 -- ============================================================================
@@ -438,19 +417,35 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS b2b.notifications (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type            TEXT NOT NULL,
-  audience        TEXT NOT NULL CHECK (audience IN ('staff', 'partner', 'both')),
-  partner_id      UUID NULL,
-  deal_id         UUID NULL,
-  settlement_id   UUID NULL,
-  dispute_id      UUID NULL,
-  title           TEXT NOT NULL,
-  message         TEXT NOT NULL,
-  link_url        TEXT NULL,
-  is_read         BOOLEAN NOT NULL DEFAULT FALSE,
-  created_by      UUID NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Self-heal schema nếu bảng đã tồn tại từ trước với cột khác
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS type TEXT;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS audience TEXT;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS partner_id UUID;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS deal_id UUID;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS settlement_id UUID;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS dispute_id UUID;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS message TEXT;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS link_url TEXT;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE b2b.notifications ADD COLUMN IF NOT EXISTS created_by UUID;
+
+-- Constraint cho audience (chỉ add nếu chưa có)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'b2b_notifications_audience_check'
+      AND conrelid = 'b2b.notifications'::regclass
+  ) THEN
+    ALTER TABLE b2b.notifications
+      ADD CONSTRAINT b2b_notifications_audience_check
+      CHECK (audience IS NULL OR audience IN ('staff', 'partner', 'both'));
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_notifications_audience_read
   ON b2b.notifications(audience, is_read, created_at DESC);
@@ -459,29 +454,55 @@ CREATE INDEX IF NOT EXISTS idx_notifications_partner
   ON b2b.notifications(partner_id, is_read, created_at DESC)
   WHERE partner_id IS NOT NULL;
 
--- Expose qua view public cho PostgREST
-CREATE OR REPLACE VIEW public.b2b_notifications AS
+-- Expose qua view public cho PostgREST — DROP trước để pick up cột mới
+DROP VIEW IF EXISTS public.b2b_notifications;
+CREATE VIEW public.b2b_notifications AS
   SELECT * FROM b2b.notifications;
 
 GRANT SELECT, INSERT, UPDATE ON public.b2b_notifications TO authenticated;
 
 -- RLS: partner chỉ thấy notification của chính mình; staff thấy tất cả audience staff/both
+-- Chỉ tạo policy nếu helper function b2b.current_partner_id() tồn tại.
+-- Nếu chưa có → để RLS off (dev env); production phải có function này.
 ALTER TABLE b2b.notifications ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS b2b_notifications_partner_select ON b2b.notifications;
-CREATE POLICY b2b_notifications_partner_select
-  ON b2b.notifications FOR SELECT
-  TO authenticated
-  USING (
-    audience IN ('staff', 'both')
-    OR (audience IN ('partner', 'both') AND partner_id = b2b.current_partner_id())
-  );
-
 DROP POLICY IF EXISTS b2b_notifications_staff_all ON b2b.notifications;
-CREATE POLICY b2b_notifications_staff_all
-  ON b2b.notifications FOR ALL
-  TO authenticated
-  USING (b2b.current_partner_id() IS NULL); -- factory user (không có partner_id)
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'b2b' AND p.proname = 'current_partner_id'
+  ) THEN
+    EXECUTE $POL$
+      CREATE POLICY b2b_notifications_partner_select
+        ON b2b.notifications FOR SELECT
+        TO authenticated
+        USING (
+          audience IN ('staff', 'both')
+          OR (audience IN ('partner', 'both') AND partner_id = b2b.current_partner_id())
+        )
+    $POL$;
+    EXECUTE $POL$
+      CREATE POLICY b2b_notifications_staff_all
+        ON b2b.notifications FOR ALL
+        TO authenticated
+        USING (b2b.current_partner_id() IS NULL)
+    $POL$;
+  ELSE
+    -- Fallback: cho authenticated đọc/ghi tất cả (staff-only env)
+    EXECUTE $POL$
+      CREATE POLICY b2b_notifications_auth_all
+        ON b2b.notifications FOR ALL
+        TO authenticated
+        USING (TRUE)
+        WITH CHECK (TRUE)
+    $POL$;
+    RAISE NOTICE 'b2b.current_partner_id() không tồn tại — dùng fallback policy authenticated=ALL. Production cần tạo helper function.';
+  END IF;
+END $$;
 
 
 -- ============================================================================

@@ -333,6 +333,9 @@ export const ledgerService = {
       }
     }
 
+    // Gap #9: period_month/period_year là GENERATED column trong DB,
+    // derived từ entry_date — KHÔNG gửi trong INSERT (sẽ lỗi 428C9).
+    void entryDate
     const { data, error } = await supabase
       .from('b2b_partner_ledger')
       .insert({
@@ -343,9 +346,6 @@ export const ledgerService = {
         reference_code: entryData.reference_code,
         description: entryData.description,
         entry_date: entryDateStr,
-        // Period LUÔN derived từ entry_date (Gap #9)
-        period_month: entryDate.getMonth() + 1,
-        period_year: entryDate.getFullYear(),
         created_by: entryData.created_by,
       })
       .select(`

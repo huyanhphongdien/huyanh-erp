@@ -383,15 +383,22 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
     try {
       setUpdating(true)
 
+      let updated: Deal | null = null
       if (status === 'accepted' && data?.final_price) {
-        await dealService.acceptDeal(deal.id, data.final_price)
+        updated = await dealService.acceptDeal(deal.id, data.final_price)
       } else if (status === 'cancelled' && data?.notes) {
-        await dealService.cancelDeal(deal.id, data.notes)
+        updated = await dealService.cancelDeal(deal.id, data.notes)
       } else {
-        await dealService.updateStatus(deal.id, status)
+        updated = await dealService.updateStatus(deal.id, status)
       }
 
       message.success(`Đã chuyển trạng thái sang "${DEAL_STATUS_LABELS[status]}"`)
+      // Auto-refresh UI ngay lập tức từ return value (không cần F5).
+      // Fallback fetchDeal để pick up các field joined (partner) nếu updateDeal
+      // service trả về bare row.
+      if (updated) {
+        setDeal(updated)
+      }
       fetchDeal()
     } catch (error: any) {
       // Hiển thị lý do cụ thể từ service (ví dụ: thiếu weight/drc/QC)

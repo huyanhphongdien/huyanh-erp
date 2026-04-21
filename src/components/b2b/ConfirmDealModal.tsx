@@ -204,13 +204,26 @@ const ConfirmDealModal = ({
           Thông tin Deal
         </Divider>
 
-        {/* Loại mủ */}
+        {/* NEW-BUG-F fix: các trường đã chốt từ phiếu booking → LOCK, không cho
+            factory sửa để giữ nguyên thỏa thuận với đại lý. Chỉ Ghi chú Deal
+            và section Tạm ứng mới editable. Muốn đổi số lượng/giá/DRC phải
+            thương lượng lại qua chat hoặc reject booking. */}
+        <Alert
+          message="Các trường dưới đây khóa theo phiếu chốt mủ"
+          description="Loại mủ, số lượng, DRC, đơn giá, nhà máy đã thỏa thuận trên phiếu chốt không thể sửa khi tạo deal. Nếu cần thay đổi, phản hồi qua chat rồi đại lý chốt lại phiếu mới."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
+        {/* Loại mủ — lock */}
         <Form.Item
           name="product_type"
           label="Loại mủ"
           rules={[{ required: true, message: 'Chọn loại mủ' }]}
         >
           <Select
+            disabled
             options={Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => ({
               value,
               label,
@@ -230,6 +243,7 @@ const ConfirmDealModal = ({
               ]}
             >
               <InputNumber<number>
+                disabled
                 style={{ width: '100%' }}
                 min={0.1}
                 step={0.5}
@@ -256,6 +270,7 @@ const ConfirmDealModal = ({
               ]}
             >
               <InputNumber<number>
+                disabled
                 style={{ width: '100%' }}
                 min={1}
                 max={100}
@@ -267,16 +282,7 @@ const ConfirmDealModal = ({
           </Col>
         </Row>
 
-        <Alert
-          message="DRC dự kiến — không phải DRC chuẩn. DRC thực tế chỉ có sau khi ra thành phẩm (QC)."
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
-
-        {/* Loại giá đã bỏ — implicit trong loại mủ + kế thừa từ booking.
-            Field price_unit vẫn giữ trong form data (hidden) để submit.
-            Default = booking.price_unit (đại lý đã set khi tạo phiếu). */}
+        {/* Loại giá — hidden, kế thừa từ booking */}
         <Form.Item name="price_unit" hidden>
           <Input />
         </Form.Item>
@@ -290,6 +296,7 @@ const ConfirmDealModal = ({
           ]}
         >
           <InputNumber<number>
+            disabled
             style={{ width: '100%' }}
             min={100}
             step={100}
@@ -299,7 +306,7 @@ const ConfirmDealModal = ({
           />
         </Form.Item>
 
-        {/* Giao tại nhà máy — kế thừa từ booking, admin có thể override */}
+        {/* Giao tại nhà máy — kế thừa + lock */}
         <Form.Item
           name="target_facility_id"
           label={<><span style={{ marginRight: 4 }}>🏭</span> Giao tại nhà máy</>}
@@ -307,11 +314,12 @@ const ConfirmDealModal = ({
           rules={[{ required: true, message: 'Vui lòng chọn nhà máy nhận hàng' }]}
           extra={
             (booking as any).target_facility_code
-              ? `Kế thừa từ phiếu chốt (${(booking as any).target_facility_code} — ${(booking as any).target_facility_name || ''}). Có thể đổi nếu logistics thay đổi.`
-              : 'Đại lý chưa chọn nhà máy trên phiếu chốt — bắt buộc chọn ở đây.'
+              ? `Kế thừa từ phiếu chốt (${(booking as any).target_facility_code} — ${(booking as any).target_facility_name || ''})`
+              : 'Đại lý chưa chọn nhà máy trên phiếu chốt.'
           }
         >
           <Select
+            disabled
             placeholder="Chọn nhà máy nhận hàng"
             options={[
               { value: '755ae776-3be6-47b8-b1d0-d15b61789f24', label: '🏭 PD — Phong Điền (HQ)' },

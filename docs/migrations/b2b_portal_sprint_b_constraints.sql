@@ -128,13 +128,15 @@ ALTER TABLE public.b2b_demand_offers
 -- GAP-10: deadline > published_at
 -- ═══════════════════════════════════════════════════════════════
 
+-- NOT VALID: skip existing rows vi phạm (legacy WFV), chỉ enforce data mới
+-- Nếu muốn hard enforce sau khi clean data: ALTER ... VALIDATE CONSTRAINT chk_...
 ALTER TABLE public.b2b_demands
   DROP CONSTRAINT IF EXISTS chk_demand_deadline_after_publish;
 ALTER TABLE public.b2b_demands
   ADD CONSTRAINT chk_demand_deadline_after_publish
   CHECK (
     deadline IS NULL OR published_at IS NULL OR deadline > published_at
-  );
+  ) NOT VALID;
 
 -- ═══════════════════════════════════════════════════════════════
 -- Reload PostgREST schema

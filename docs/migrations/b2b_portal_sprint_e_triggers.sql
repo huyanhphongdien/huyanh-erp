@@ -230,10 +230,12 @@ END $$;
 -- ═══════════════════════════════════════════════════════════════
 -- BUG-16: Patch DealCard metadata trong b2b.chat_messages
 --         khi b2b.deals UPDATE (status, actual_drc, actual_weight_kg,
---         final_value, stock_in_count, qc_status, cancel_reason)
+--         final_value, stock_in_count, qc_status)
 -- ═══════════════════════════════════════════════════════════════
 -- Card metadata được freeze tại thời điểm gửi → stale khi deal tiến triển.
 -- Trigger sync các fields quan trọng để UI (chat) hiển thị đúng trạng thái.
+-- Note: cancel_reason không phải column của b2b.deals, được patch riêng
+-- qua ERP-side patchDealCardMetadata khi status='cancelled'.
 
 CREATE OR REPLACE FUNCTION b2b.sync_deal_card_metadata()
 RETURNS TRIGGER
@@ -249,7 +251,6 @@ BEGIN
      AND OLD.final_value IS NOT DISTINCT FROM NEW.final_value
      AND OLD.stock_in_count IS NOT DISTINCT FROM NEW.stock_in_count
      AND OLD.qc_status IS NOT DISTINCT FROM NEW.qc_status
-     AND OLD.cancel_reason IS NOT DISTINCT FROM NEW.cancel_reason
   THEN
     RETURN NEW;
   END IF;
@@ -260,8 +261,7 @@ BEGIN
     'actual_weight_kg', NEW.actual_weight_kg,
     'final_value', NEW.final_value,
     'stock_in_count', COALESCE(NEW.stock_in_count, 0),
-    'qc_status', NEW.qc_status,
-    'cancel_reason', NEW.cancel_reason
+    'qc_status', NEW.qc_status
   );
 
   -- Patch card có metadata->>'deal_id' = NEW.id
@@ -292,7 +292,7 @@ $$;
 DROP TRIGGER IF EXISTS trg_sync_deal_card_metadata ON b2b.deals;
 CREATE TRIGGER trg_sync_deal_card_metadata
   AFTER UPDATE OF status, actual_drc, actual_weight_kg, final_value,
-                 stock_in_count, qc_status, cancel_reason
+                 stock_in_count, qc_status
   ON b2b.deals
   FOR EACH ROW
   EXECUTE FUNCTION b2b.sync_deal_card_metadata();

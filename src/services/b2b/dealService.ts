@@ -581,6 +581,13 @@ export const dealService = {
   /**
    * Kiểm tra deal đã đủ điều kiện duyệt chưa.
    * Dùng cho UI để disable nút + hiển thị lý do thiếu.
+   *
+   * Business rule (theo BGĐ Huy Anh):
+   *   Chỉ cần QC đã đo DRC thực tế (actual_drc > 0) → báo Ban giám đốc.
+   *   BGĐ tự quyết định duyệt hay hủy deal dựa trên DRC + tình huống thực tế.
+   *   Không bắt buộc stock-in / actual_weight / qc_status='passed' vì:
+   *     - Deal có thể duyệt từ mẫu QC sớm trước khi toàn bộ hàng nhập kho
+   *     - BGĐ có context ngoài hệ thống (đàm phán giá, quan hệ đại lý, etc.)
    */
   checkAcceptConditions(deal: Deal): { canAccept: boolean; missing: string[] } {
     const missing: string[] = []
@@ -588,32 +595,17 @@ export const dealService = {
     if (deal.status !== 'processing') {
       missing.push(`Deal phải ở trạng thái "Đang xử lý" (hiện: ${deal.status})`)
     }
-    if (!deal.stock_in_count || deal.stock_in_count === 0) {
-      missing.push('Chưa có phiếu nhập kho nào')
-    }
-    if (!deal.actual_weight_kg || deal.actual_weight_kg <= 0) {
-      missing.push('Chưa có trọng lượng thực tế (actual_weight_kg)')
-    }
     if (!deal.actual_drc || deal.actual_drc <= 0) {
-      missing.push('Chưa có DRC thực tế (actual_drc)')
-    }
-    if (deal.qc_status === 'failed') {
-      missing.push('QC đã FAIL — không thể duyệt')
-    }
-    if (deal.qc_status === 'pending' || !deal.qc_status) {
-      missing.push('QC chưa hoàn thành')
+      missing.push('QC chưa đo DRC thực tế — chưa đủ cơ sở để Ban giám đốc quyết định')
     }
 
     return { canAccept: missing.length === 0, missing }
   },
 
   /**
-   * Duyệt deal — CẦN đầy đủ điều kiện:
+   * Duyệt deal — CẦN điều kiện tối thiểu (BGĐ quyết định):
    *  - status = 'processing'
-   *  - stock_in_count > 0 (đã có phiếu nhập kho)
-   *  - actual_weight_kg > 0 (có trọng lượng thực)
-   *  - actual_drc > 0 (có DRC thực)
-   *  - qc_status != 'failed' và != 'pending' (QC đã xong, không fail)
+   *  - actual_drc > 0 (QC đã báo DRC thực tế cho BGĐ)
    */
   async acceptDeal(id: string, finalPrice?: number): Promise<Deal> {
     const deal = await this.getDealById(id)

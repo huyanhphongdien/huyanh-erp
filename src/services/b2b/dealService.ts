@@ -126,6 +126,10 @@ export interface DealUpdateData {
   delivery_terms?: string
   notes?: string
   warehouse_id?: string
+  // QC fields — nhập từ DealQcTab (trưởng/phó phòng QC)
+  actual_drc?: number | null
+  actual_weight_kg?: number | null
+  qc_status?: string | null
 }
 
 // ============================================

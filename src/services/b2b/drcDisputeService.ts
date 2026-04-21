@@ -157,6 +157,36 @@ export const drcDisputeService = {
       })
     } catch (err) { console.error('Patch DealCard dispute failed:', err) }
 
+    // Sprint 4 — notification (nhân viên nhận alert)
+    try {
+      const { b2bNotificationService } = await import('./b2bNotificationService')
+      await b2bNotificationService.notify({
+        type: 'dispute_raised',
+        audience: 'staff',
+        deal_id: dealId,
+        dispute_id: disputeId,
+        title: 'Khiếu nại DRC mới',
+        message: reason.slice(0, 200),
+      })
+    } catch (err) { console.error('B2B notification dispute raised:', err) }
+
+    // ─── Sprint 2 Cross #2: Auto-pause settlements của deal này ───
+    // Khoá các phiếu settlement chưa paid → chặn approve/update cho đến khi
+    // dispute được giải quyết. Không block payment đã paid (không rollback).
+    try {
+      await supabase
+        .from('b2b_settlements')
+        .update({
+          locked_by_dispute: true,
+          locked_dispute_id: disputeId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('deal_id', dealId)
+        .in('status', ['draft', 'pending', 'approved'])
+    } catch (err) {
+      console.error('[drcDispute.raise] Auto-pause settlement failed:', err)
+    }
+
     return disputeId
   },
 
@@ -176,6 +206,21 @@ export const drcDisputeService = {
           active_dispute_status: undefined,
         })
       } catch (err) { console.error('Patch DealCard clear dispute failed:', err) }
+
+      // ─── Sprint 2 Cross #2: Unlock settlements ───
+      try {
+        await supabase
+          .from('b2b_settlements')
+          .update({
+            locked_by_dispute: false,
+            locked_dispute_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('deal_id', dispute.deal_id)
+          .eq('locked_dispute_id', disputeId)
+      } catch (err) {
+        console.error('[drcDispute.withdraw] Unlock settlement failed:', err)
+      }
     }
   },
 
@@ -285,6 +330,21 @@ export const drcDisputeService = {
         active_dispute_status: undefined,
       })
     } catch (err) { console.error('Patch DealCard clear dispute failed:', err) }
+
+    // ─── Sprint 2 Cross #2: Unlock settlements đã bị lock bởi dispute này ───
+    try {
+      await supabase
+        .from('b2b_settlements')
+        .update({
+          locked_by_dispute: false,
+          locked_dispute_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('deal_id', resolved.deal_id)
+        .eq('locked_dispute_id', disputeId)
+    } catch (err) {
+      console.error('[drcDispute.resolve] Unlock settlement failed:', err)
+    }
 
     return resolved
   },

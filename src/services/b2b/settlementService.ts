@@ -50,6 +50,9 @@ export interface Settlement {
   submitted_at: string | null
   notes: string | null
   internal_notes: string | null
+  // Sprint 2 Cross #2 — tạm khoá khi có dispute
+  locked_by_dispute: boolean | null
+  locked_dispute_id: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -447,6 +450,38 @@ export const settlementService = {
   // ============================================
 
   async updateSettlement(id: string, updateData: SettlementUpdateData): Promise<Settlement> {
+    const current = await this.getSettlementById(id)
+    if (!current) throw new Error('Phiếu quyết toán không tồn tại')
+
+    // ─── Sprint 2 Gap #7: Khoá field sau khi approved/paid ───
+    // Chỉ cho sửa notes/internal_notes. Sửa amount/kg/price sau approve →
+    // ledger entry không update theo → công nợ lệch.
+    const LOCKED_STATUSES: SettlementStatus[] = ['approved', 'paid']
+    if (LOCKED_STATUSES.includes(current.status)) {
+      const ALLOWED_EDIT: (keyof SettlementUpdateData)[] = ['notes', 'internal_notes']
+      const attempted = Object.keys(updateData).filter(
+        (k) => (updateData as any)[k] !== undefined,
+      )
+      const blocked = attempted.filter(
+        (k) => !ALLOWED_EDIT.includes(k as keyof SettlementUpdateData),
+      )
+      if (blocked.length > 0) {
+        throw new Error(
+          `Phiếu quyết toán ${current.code} đã ${current.status === 'paid' ? 'thanh toán' : 'duyệt'} ` +
+          `— chỉ được sửa ghi chú. Trường bị khoá: ${blocked.join(', ')}. ` +
+          `Nếu cần điều chỉnh, hãy từ chối phiếu hoặc ghi bút toán điều chỉnh.`,
+        )
+      }
+    }
+
+    // ─── Sprint 2 Cross #2: Không cho sửa khi bị lock bởi dispute ───
+    if ((current as any).locked_by_dispute) {
+      throw new Error(
+        `Phiếu quyết toán ${current.code} đang bị tạm khoá do có khiếu nại DRC chưa giải quyết. ` +
+        `Vui lòng xử lý khiếu nại trước.`,
+      )
+    }
+
     const updates: any = {
       ...updateData,
       updated_at: new Date().toISOString(),
@@ -454,13 +489,10 @@ export const settlementService = {
 
     // Recalculate gross if price/kg changed
     if (updateData.finished_kg !== undefined || updateData.approved_price !== undefined) {
-      const current = await this.getSettlementById(id)
-      if (current) {
-        const finishedKg = updateData.finished_kg ?? current.finished_kg
-        const approvedPrice = updateData.approved_price ?? current.approved_price
-        updates.gross_amount = finishedKg * approvedPrice
-        updates.remaining_amount = updates.gross_amount - current.total_advance - current.total_paid_post
-      }
+      const finishedKg = updateData.finished_kg ?? current.finished_kg
+      const approvedPrice = updateData.approved_price ?? current.approved_price
+      updates.gross_amount = finishedKg * approvedPrice
+      updates.remaining_amount = updates.gross_amount - current.total_advance - current.total_paid_post
     }
 
     const { data, error } = await supabase
@@ -492,6 +524,14 @@ export const settlementService = {
     if (!current) throw new Error('Phiếu quyết toán không tồn tại')
     if (current.status !== 'draft' && current.status !== 'rejected') {
       throw new Error('Chỉ có thể gửi duyệt phiếu ở trạng thái "Nháp" hoặc "Từ chối"')
+    }
+
+    // ─── Sprint 2 Cross #2: Phiếu đang bị khoá bởi dispute ───
+    if ((current as any).locked_by_dispute) {
+      throw new Error(
+        `Phiếu ${current.code} đang tạm khoá do có khiếu nại DRC chưa giải quyết. ` +
+        `Vui lòng xử lý khiếu nại trước khi gửi duyệt.`,
+      )
     }
 
     // ─── Gap #3: Chặn submit khi deal có active dispute ───
@@ -537,6 +577,13 @@ export const settlementService = {
       throw new Error('Chỉ có thể duyệt phiếu ở trạng thái "Chờ duyệt"')
     }
 
+    // ─── Sprint 2 Cross #2: Lock flag do dispute ───
+    if ((current as any).locked_by_dispute) {
+      throw new Error(
+        `Phiếu ${current.code} đang bị khoá do có khiếu nại DRC chưa giải quyết. Không thể duyệt.`,
+      )
+    }
+
     // ─── Gap #3: Double-check dispute tại thời điểm duyệt ───
     if (current.deal_id) {
       const { data: activeDisputes } = await supabase
@@ -579,23 +626,22 @@ export const settlementService = {
     if (error) throw error
 
     // Ghi bút toán công nợ: DEBIT (nhà máy nợ đại lý giá trị deal)
+    // Sprint 3 Gap #8 — dùng ledgerService.createManualEntry để có idempotency
+    // (tránh double ledger entry khi retry). reference_code = settlement.code.
+    // Gap #9 — period derived từ entry_date (hôm nay = ngày approve).
     if (current.partner_id) {
       try {
         const grossAmount = current.gross_amount || 0
-        await supabase
-          .from('b2b_partner_ledger')
-          .insert({
-            partner_id: current.partner_id,
-            entry_type: 'settlement',
-            description: `Quyết toán ${current.code} — Giá trị deal`,
-            debit: grossAmount,
-            credit: 0,
-            reference_type: 'settlement',
-            reference_id: id,
-            entry_date: new Date().toISOString().split('T')[0],
-            period_month: new Date().getMonth() + 1,
-            period_year: new Date().getFullYear(),
-          })
+        const { ledgerService } = await import('./ledgerService')
+        await ledgerService.createManualEntry({
+          partner_id: current.partner_id,
+          entry_type: 'settlement',
+          description: `Quyết toán ${current.code} — Giá trị deal`,
+          debit: grossAmount,
+          credit: 0,
+          reference_code: current.code,
+          created_by: approvedBy,
+        })
       } catch (err) {
         console.error('Ghi ledger debit khi approve settlement thất bại:', err)
       }
@@ -615,6 +661,21 @@ export const settlementService = {
         console.error('Notify chat settlement approved thất bại:', err)
       }
     }
+
+    // Sprint 4 — notification engine (both audiences)
+    try {
+      const { b2bNotificationService } = await import('./b2bNotificationService')
+      await b2bNotificationService.notify({
+        type: 'settlement_approved',
+        audience: 'both',
+        partner_id: current.partner_id,
+        deal_id: current.deal_id,
+        settlement_id: id,
+        title: `Phiếu quyết toán ${current.code} đã duyệt`,
+        message: `Giá trị: ${(current.gross_amount || 0).toLocaleString('vi-VN')} đ`,
+        created_by: approvedBy,
+      })
+    } catch (err) { console.error('B2B notification settlement approved:', err) }
 
     return { ...data, partner: Array.isArray(data.partner) ? data.partner[0] : data.partner } as Settlement
   },
@@ -676,20 +737,17 @@ export const settlementService = {
         const creditAmount = current.remaining_amount || Math.max(0, grossAmount - totalAdvance - alreadyPaid)
         const paymentAmount = creditAmount > 0 ? creditAmount : 0
         if (paymentAmount > 0) {
-          await supabase
-            .from('b2b_partner_ledger')
-            .insert({
-              partner_id: current.partner_id,
-              entry_type: 'payment',
-              description: `Thanh toán quyết toán ${current.code} (${paymentData.payment_method === 'bank_transfer' ? 'CK' : paymentData.payment_method === 'cash' ? 'TM' : paymentData.payment_method})`,
-              debit: 0,
-              credit: paymentAmount,
-              reference_type: 'settlement',
-              reference_id: id,
-              entry_date: new Date().toISOString().split('T')[0],
-              period_month: new Date().getMonth() + 1,
-              period_year: new Date().getFullYear(),
-            })
+          // Gap #8 idempotency: reference_code = settlement.code + '-PAY'
+          const { ledgerService } = await import('./ledgerService')
+          await ledgerService.createManualEntry({
+            partner_id: current.partner_id,
+            entry_type: 'payment',
+            description: `Thanh toán quyết toán ${current.code} (${paymentData.payment_method === 'bank_transfer' ? 'CK' : paymentData.payment_method === 'cash' ? 'TM' : paymentData.payment_method})`,
+            debit: 0,
+            credit: paymentAmount,
+            reference_code: `${current.code}-PAY`,
+            created_by: paymentData.paid_by,
+          })
         }
       } catch (err) {
         console.error('Ghi ledger credit khi thanh toán settlement thất bại:', err)

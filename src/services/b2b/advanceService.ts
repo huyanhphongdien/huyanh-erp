@@ -386,22 +386,19 @@ export const advanceService = {
 
     if (error) throw error
 
-    // Create ledger entry
+    // Create ledger entry (Gap #8 idempotent: reference_code = advance_number)
     try {
       const advance = data as Advance
       if (advance?.deal_id && advance?.partner_id) {
         const amount = advance.amount_vnd || advance.amount || 0
-        await supabase.from('b2b_partner_ledger').insert({
+        const { ledgerService } = await import('./ledgerService')
+        await ledgerService.createManualEntry({
           partner_id: advance.partner_id,
           entry_type: 'advance',
-          reference_type: 'advance',
-          reference_id: id,
+          reference_code: advance.advance_number,
           description: `Tạm ứng ${advance.advance_number} cho Deal`,
           debit: 0,
           credit: amount,
-          entry_date: new Date().toISOString().split('T')[0],
-          period_month: new Date().getMonth() + 1,
-          period_year: new Date().getFullYear(),
         })
       }
     } catch (err) { console.error('Ledger entry for advance failed:', err) }

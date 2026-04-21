@@ -486,8 +486,41 @@ export const dealService = {
 
   /**
    * Cập nhật deal
+   *
+   * Sprint 2 Gap #4: Deal đã ở trạng thái cuối (accepted/settled/cancelled)
+   * chỉ cho phép sửa notes, delivery_terms, warehouse_id hoặc chuyển status sang
+   * 'settled'/'cancelled'. Các trường amount (final_price) bị khoá để tránh
+   * sửa data sau khi đã duyệt → sai công nợ / sai báo cáo.
    */
   async updateDeal(id: string, updateData: DealUpdateData): Promise<Deal> {
+    const current = await this.getDealById(id)
+    if (!current) throw new Error('Deal không tồn tại')
+
+    const LOCKED_STATUSES: DealStatus[] = ['accepted', 'settled', 'cancelled']
+    if (LOCKED_STATUSES.includes(current.status)) {
+      const wantsFinalPrice = updateData.final_price !== undefined
+        && updateData.final_price !== current.final_price
+      if (wantsFinalPrice) {
+        throw new Error(
+          `Deal ${current.deal_number} đã ở trạng thái "${current.status}" — không thể sửa ` +
+          `đơn giá cuối (final_price). Nếu cần điều chỉnh, hãy hủy deal hoặc tạo khiếu nại DRC.`,
+        )
+      }
+      if (updateData.status) {
+        const allowedNext: Record<string, DealStatus[]> = {
+          accepted: ['settled', 'cancelled'],
+          settled: [],
+          cancelled: [],
+        }
+        const next = allowedNext[current.status] || []
+        if (!next.includes(updateData.status)) {
+          throw new Error(
+            `Không thể chuyển deal từ "${current.status}" sang "${updateData.status}".`,
+          )
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('b2b_deals')
       .update({

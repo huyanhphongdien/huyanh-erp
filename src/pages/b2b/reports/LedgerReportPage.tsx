@@ -11,6 +11,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { ledgerService, AgingItem, BalanceSummary } from '../../../services/b2b/ledgerService'
+import { exportLedgerReport } from '../../../utils/b2bLedgerExportExcel'
 
 const { Title, Text } = Typography
 
@@ -47,6 +48,19 @@ const LedgerReportPage = () => {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  const handleExport = async () => {
+    try {
+      const periodLabel = selectedMonth
+        ? `Tháng ${selectedMonth}/${selectedYear}`
+        : `Năm ${selectedYear}`
+      await exportLedgerReport({ summary, aging: agingData, periodLabel })
+      message.success('Đã xuất file Excel báo cáo công nợ')
+    } catch (err) {
+      console.error(err)
+      message.error('Xuất Excel thất bại')
+    }
+  }
 
   const agingColumns: ColumnsType<AgingItem> = [
     {
@@ -137,7 +151,7 @@ const LedgerReportPage = () => {
             <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
               Làm mới
             </Button>
-            <Button icon={<ExportOutlined />} type="primary">
+            <Button icon={<ExportOutlined />} type="primary" onClick={handleExport} disabled={loading}>
               Xuất Excel
             </Button>
           </Space>

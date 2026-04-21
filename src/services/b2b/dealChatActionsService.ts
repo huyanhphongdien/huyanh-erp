@@ -162,24 +162,18 @@ export const dealChatActionsService = {
 
     if (advError) throw new Error(`Không thể tạo phiếu tạm ứng: ${advError.message}`)
 
-    // Step 3: Ghi ledger
-    const now = new Date()
+    // Step 3: Ghi ledger — Gap #8 idempotent qua ledgerService
     try {
-      await supabase
-        .from('b2b_partner_ledger')
-        .insert({
-          partner_id: context.partnerId,
-          entry_type: 'advance',
-          debit: 0,
-          credit: formData.amount,
-          advance_id: advance.id,
-          reference_code: advanceNumber,
-          description: `Ứng thêm cho deal ${context.dealNumber}`,
-          entry_date: now.toISOString().split('T')[0],
-          period_month: now.getMonth() + 1,
-          period_year: now.getFullYear(),
-          created_by: context.actionBy,
-        })
+      const { ledgerService } = await import('./ledgerService')
+      await ledgerService.createManualEntry({
+        partner_id: context.partnerId,
+        entry_type: 'advance',
+        debit: 0,
+        credit: formData.amount,
+        reference_code: advanceNumber,
+        description: `Ứng thêm cho deal ${context.dealNumber}`,
+        created_by: context.actionBy,
+      })
     } catch (err) {
       console.error('Ledger entry for advance failed:', err)
     }

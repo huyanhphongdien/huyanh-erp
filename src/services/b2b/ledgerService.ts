@@ -290,23 +290,60 @@ export const ledgerService = {
   // ============================================
 
   /**
-   * Tạo bút toán điều chỉnh thủ công
+   * Tạo bút toán điều chỉnh thủ công.
+   *
+   * Sprint 3 Gap #8 — Idempotency: Nếu truyền `reference_code`, việc gọi lại
+   * (retry / double-click) sẽ KHÔNG tạo entry trùng. Trả lại entry gốc nếu
+   * đã tồn tại `(partner_id, entry_type, reference_code)`.
+   *
+   * Sprint 3 Gap #9 — Period cutting rule: `period_month/year` LUÔN derived
+   * từ `entry_date` (không dùng thời điểm insert, không dùng deal date).
+   * Quy ước: settlement approved ngày 5/4 → period = tháng 4, kể cả khi deal
+   * được tạo tháng 3. Manual entry dùng `entry_date` client truyền vào.
    */
   async createManualEntry(entryData: LedgerCreateData): Promise<LedgerEntry> {
     const now = new Date()
     const entryDateStr = entryData.entry_date || now.toISOString().split('T')[0]
     const entryDate = new Date(entryDateStr)
+    const entryType = entryData.entry_type || 'adjustment'
+
+    // ─── Idempotency check trước khi insert ───
+    if (entryData.reference_code) {
+      const { data: existing } = await supabase
+        .from('b2b_partner_ledger')
+        .select(`
+          *,
+          partner:b2b_partners!partner_id (
+            id, code, name, tier, phone
+          )
+        `)
+        .eq('partner_id', entryData.partner_id)
+        .eq('entry_type', entryType)
+        .eq('reference_code', entryData.reference_code)
+        .limit(1)
+        .maybeSingle()
+
+      if (existing) {
+        return {
+          ...existing,
+          partner: Array.isArray((existing as any).partner)
+            ? (existing as any).partner[0]
+            : (existing as any).partner,
+        } as LedgerEntry
+      }
+    }
 
     const { data, error } = await supabase
       .from('b2b_partner_ledger')
       .insert({
         partner_id: entryData.partner_id,
-        entry_type: entryData.entry_type || 'adjustment',
+        entry_type: entryType,
         debit: entryData.debit || 0,
         credit: entryData.credit || 0,
         reference_code: entryData.reference_code,
         description: entryData.description,
         entry_date: entryDateStr,
+        // Period LUÔN derived từ entry_date (Gap #9)
         period_month: entryDate.getMonth() + 1,
         period_year: entryDate.getFullYear(),
         created_by: entryData.created_by,
@@ -319,7 +356,34 @@ export const ledgerService = {
       `)
       .single()
 
-    if (error) throw error
+    if (error) {
+      // UNIQUE constraint từ DB (race condition): fetch existing
+      if ((error as any).code === '23505' && entryData.reference_code) {
+        const { data: existing } = await supabase
+          .from('b2b_partner_ledger')
+          .select(`
+            *,
+            partner:b2b_partners!partner_id (
+              id, code, name, tier, phone
+            )
+          `)
+          .eq('partner_id', entryData.partner_id)
+          .eq('entry_type', entryType)
+          .eq('reference_code', entryData.reference_code)
+          .limit(1)
+          .single()
+
+        if (existing) {
+          return {
+            ...existing,
+            partner: Array.isArray((existing as any).partner)
+              ? (existing as any).partner[0]
+              : (existing as any).partner,
+          } as LedgerEntry
+        }
+      }
+      throw error
+    }
 
     return {
       ...data,

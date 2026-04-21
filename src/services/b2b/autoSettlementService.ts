@@ -177,9 +177,18 @@ export const autoSettlementService = {
       weighDateEnd = last.confirmed_at || last.created_at
     }
 
-    // ─── 8. Lấy user hiện tại ───
+    // ─── 8. Lấy employee_id của user hiện tại (FK settlements.created_by → employees.id) ───
     const { data: { user } } = await supabase.auth.getUser()
-    const createdBy = user?.id || 'system'
+    if (!user?.id) throw new Error('Chưa đăng nhập')
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!employee?.id) {
+      throw new Error('Tài khoản chưa liên kết với employee — không thể tạo phiếu quyết toán')
+    }
+    const createdBy = employee.id
 
     // ─── 9. Tạo settlement record ───
     const { data: settlement, error: createError } = await supabase

@@ -35,9 +35,10 @@ BEGIN
       NOW()::DATE,
       NEW.approved_by
     )
-    ON CONFLICT ON CONSTRAINT idx_ledger_idempotency DO NOTHING;
-    -- Idempotent: nếu ledger entry đã tồn tại (case: settlement đã approved từ
-    -- trước rồi paid rồi rollback lại approved) → skip INSERT, không duplicate.
+    ON CONFLICT (partner_id, entry_type, reference_code) DO NOTHING;
+    -- Idempotent: match unique index idx_ledger_idempotency trên 3 cột này.
+    -- Dùng ON CONFLICT (cols) thay ON CONSTRAINT vì Postgres không cho reference
+    -- partial/expression unique index qua tên constraint (index, không constraint).
   END IF;
   RETURN NEW;
 END;

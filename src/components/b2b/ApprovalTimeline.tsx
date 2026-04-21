@@ -55,7 +55,9 @@ const ApprovalTimeline = ({ settlement }: ApprovalTimelineProps) => {
           <>
             <br />
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Người tạo: {settlement.created_by}
+              Người tạo: {settlement.creator?.full_name
+                ? `${settlement.creator.full_name}${settlement.creator.code ? ` · ${settlement.creator.code}` : ''}`
+                : settlement.created_by}
             </Text>
           </>
         )}

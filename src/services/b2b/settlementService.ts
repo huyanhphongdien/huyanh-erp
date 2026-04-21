@@ -69,6 +69,12 @@ export interface Settlement {
   items?: SettlementItem[]
   advances?: SettlementAdvanceLink[]
   payments?: SettlementPayment[]
+  // Creator employee (join từ employees.id=created_by)
+  creator?: {
+    id: string
+    full_name: string
+    code: string
+  } | null
 }
 
 export interface SettlementItem {
@@ -315,11 +321,14 @@ export const settlementService = {
     if (error) throw error
     if (!data) return null
 
-    // Fetch related data in parallel
-    const [itemsRes, advancesRes, paymentsRes] = await Promise.all([
+    // Fetch related data + creator employee in parallel
+    const [itemsRes, advancesRes, paymentsRes, creatorRes] = await Promise.all([
       supabase.from('b2b_settlement_items').select('*').eq('settlement_id', id).order('created_at'),
       supabase.from('b2b_settlement_advances').select('*').eq('settlement_id', id).order('sort_order'),
       supabase.from('b2b_settlement_payments').select('*').eq('settlement_id', id).order('payment_date', { ascending: false }),
+      data.created_by
+        ? supabase.from('employees').select('id, full_name, code').eq('id', data.created_by).maybeSingle()
+        : Promise.resolve({ data: null }),
     ])
 
     return {
@@ -328,6 +337,7 @@ export const settlementService = {
       items: (itemsRes.data || []) as SettlementItem[],
       advances: (advancesRes.data || []) as SettlementAdvanceLink[],
       payments: (paymentsRes.data || []) as SettlementPayment[],
+      creator: creatorRes?.data as { id: string; full_name: string; code: string } | null,
     } as Settlement
   },
 
@@ -485,14 +495,9 @@ export const settlementService = {
       ...updateData,
       updated_at: new Date().toISOString(),
     }
-
-    // Recalculate gross if price/kg changed
-    if (updateData.finished_kg !== undefined || updateData.approved_price !== undefined) {
-      const finishedKg = updateData.finished_kg ?? current.finished_kg
-      const approvedPrice = updateData.approved_price ?? current.approved_price
-      updates.gross_amount = finishedKg * approvedPrice
-      updates.remaining_amount = updates.gross_amount - current.total_advance - current.total_paid_post
-    }
+    // gross_amount + remaining_amount là GENERATED columns — DB tự compute khi
+    // finished_kg/approved_price/total_advance/total_paid_post thay đổi,
+    // không UPDATE trực tiếp (PG reject).
 
     const { data, error } = await supabase
       .from('b2b_settlements')

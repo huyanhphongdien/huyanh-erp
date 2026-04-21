@@ -173,9 +173,9 @@ const SettlementDetailPage = () => {
   ]
 
   const advanceColumns = [
-    { title: 'Ngày', dataIndex: 'date', key: 'date', render: (v: string) => formatDate(v) },
+    { title: 'Ngày', dataIndex: 'advance_date', key: 'advance_date', render: (v: string) => formatDate(v) },
     { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: (v: number) => formatCurrency(v) },
-    { title: 'Ghi chú', dataIndex: 'note', key: 'note' },
+    { title: 'Ghi chú', dataIndex: 'notes', key: 'notes' },
   ]
 
   const paymentColumns = [

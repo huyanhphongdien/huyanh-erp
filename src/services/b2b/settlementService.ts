@@ -372,10 +372,10 @@ export const settlementService = {
         finished_kg: createData.finished_kg || 0,
         drc_percent: createData.drc_percent,
         approved_price: createData.approved_price || 0,
-        gross_amount: grossAmount,
+        // gross_amount + remaining_amount là GENERATED columns — DB compute,
+        // không INSERT trực tiếp (PG error 428C9 cannot insert non-DEFAULT).
         total_advance: 0,
         total_paid_post: 0,
-        remaining_amount: grossAmount,
         vehicle_plates: createData.vehicle_plates || [],
         driver_name: createData.driver_name,
         driver_phone: createData.driver_phone,
@@ -431,13 +431,12 @@ export const settlementService = {
 
       await supabase.from('b2b_settlement_advances').insert(advancesToInsert)
 
-      // Update total_advance
+      // Update total_advance — remaining_amount là GENERATED, không cần UPDATE
       const totalAdvance = advancesToInsert.reduce((sum, a) => sum + a.amount, 0)
       await supabase
         .from('b2b_settlements')
         .update({
           total_advance: totalAdvance,
-          remaining_amount: grossAmount - totalAdvance,
         })
         .eq('id', settlement.id)
     }
@@ -939,15 +938,11 @@ export const settlementService = {
 
     const totalAdvance = (data || []).reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
 
-    const settlement = await this.getSettlementById(settlementId)
-    const grossAmount = settlement?.gross_amount || 0
-    const totalPaid = settlement?.total_paid_post || 0
-
+    // remaining_amount là GENERATED column — bỏ UPDATE
     await supabase
       .from('b2b_settlements')
       .update({
         total_advance: totalAdvance,
-        remaining_amount: grossAmount - totalAdvance - totalPaid,
       })
       .eq('id', settlementId)
   },

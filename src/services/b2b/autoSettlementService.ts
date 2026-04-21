@@ -197,10 +197,11 @@ export const autoSettlementService = {
           : actualWeightKg,
         drc_percent: actualDrc,
         approved_price: pricePerKg,
-        gross_amount: finalValue,
+        // gross_amount + remaining_amount là GENERATED columns (finished_kg *
+        // approved_price), DB tự compute — KHÔNG được INSERT giá trị trực tiếp
+        // (PG reject: "cannot insert a non-DEFAULT value into column gross_amount").
         total_advance: totalAdvanced,
         total_paid_post: 0,
-        remaining_amount: balanceDue,
         vehicle_plates: [],
         weigh_date_start: weighDateStart,
         weigh_date_end: weighDateEnd,

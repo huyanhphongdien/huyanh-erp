@@ -246,14 +246,11 @@ export const paymentService = {
       .eq('id', settlementId)
       .single()
 
-    const grossAmount = settlement?.gross_amount || 0
-    const totalAdvance = settlement?.total_advance || 0
-
+    // remaining_amount là GENERATED column — DB tự compute, bỏ UPDATE
     await supabase
       .from('b2b_settlements')
       .update({
         total_paid_post: totalPaid,
-        remaining_amount: grossAmount - totalAdvance - totalPaid,
         updated_at: new Date().toISOString(),
       })
       .eq('id', settlementId)

@@ -19,26 +19,30 @@ AS $$
 BEGIN
   -- Chỉ ghi khi chuyển sang 'approved' lần đầu
   IF NEW.status = 'approved' AND OLD.status != 'approved' THEN
-    INSERT INTO b2b.partner_ledger (
-      partner_id, entry_type, debit, credit,
-      settlement_id, reference_code, description,
-      entry_date, created_by
-    ) VALUES (
-      NEW.partner_id,
-      'settlement_receivable',
-      NEW.gross_amount,
-      0,
-      NEW.id,
-      NEW.code,
-      'Quyết toán ' || NEW.code || ' - ' || COALESCE(NEW.product_type, '') ||
-        ' - KL: ' || NEW.finished_kg || 'kg × ' || NEW.approved_price || 'đ/kg',
-      NOW()::DATE,
-      NEW.approved_by
-    )
-    ON CONFLICT (partner_id, entry_type, reference_code) DO NOTHING;
-    -- Idempotent: match unique index idx_ledger_idempotency trên 3 cột này.
-    -- Dùng ON CONFLICT (cols) thay ON CONSTRAINT vì Postgres không cho reference
-    -- partial/expression unique index qua tên constraint (index, không constraint).
+    BEGIN
+      INSERT INTO b2b.partner_ledger (
+        partner_id, entry_type, debit, credit,
+        settlement_id, reference_code, description,
+        entry_date, created_by
+      ) VALUES (
+        NEW.partner_id,
+        'settlement_receivable',
+        NEW.gross_amount,
+        0,
+        NEW.id,
+        NEW.code,
+        'Quyết toán ' || NEW.code || ' - ' || COALESCE(NEW.product_type, '') ||
+          ' - KL: ' || NEW.finished_kg || 'kg × ' || NEW.approved_price || 'đ/kg',
+        NOW()::DATE,
+        NEW.approved_by
+      );
+    EXCEPTION WHEN unique_violation THEN
+      -- Idempotent via PL/pgSQL exception handler:
+      -- rollback paid → approved re-fire trigger → INSERT dup → silent skip.
+      -- Dùng exception thay vì ON CONFLICT vì idx_ledger_idempotency là
+      -- partial/expression unique index, ON CONFLICT (cols) không match shape.
+      NULL;
+    END;
   END IF;
   RETURN NEW;
 END;

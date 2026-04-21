@@ -52,6 +52,24 @@ ALTER TABLE b2b.settlements ADD CONSTRAINT settlements_status_check
 
 
 -- ═══════════════════════════════════════════════════════════════
+-- 2b. RECREATE public.b2b_settlements VIEW
+-- ═══════════════════════════════════════════════════════════════
+-- QUAN TRỌNG: PostgreSQL view resolve column list tại CREATE time.
+-- ALTER TABLE ADD COLUMN trên base → view KHÔNG tự pick up column mới
+-- → PGRST cache báo 400 "column not found". Phải DROP + CREATE lại.
+-- (Memory: postgres_view_alter_table_gotcha.md)
+
+DROP VIEW IF EXISTS public.b2b_settlements CASCADE;
+
+CREATE VIEW public.b2b_settlements
+WITH (security_invoker = true)
+AS SELECT * FROM b2b.settlements;
+
+GRANT SELECT ON public.b2b_settlements TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.b2b_settlements TO authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════
 -- 3. CREATE VIEW public.b2b_settlement_items
 -- ═══════════════════════════════════════════════════════════════
 -- Pattern giống các b2b_* view khác: security_invoker=true để reader dùng

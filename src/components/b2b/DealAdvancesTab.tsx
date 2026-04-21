@@ -15,10 +15,14 @@ import {
   Empty,
   Divider,
   Typography,
+  Button,
+  Tooltip,
+  message,
 } from 'antd'
 import {
   DollarOutlined,
   WalletOutlined,
+  PlusOutlined,
 } from '@ant-design/icons'
 import {
   advanceService,
@@ -27,6 +31,11 @@ import {
   ADVANCE_STATUS_COLORS,
 } from '../../services/b2b/advanceService'
 import { Deal } from '../../services/b2b/dealService'
+import { dealChatActionsService } from '../../services/b2b/dealChatActionsService'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../stores/authStore'
+import AddAdvanceModal, { AddAdvanceFormData } from './AddAdvanceModal'
+import type { DealCardMetadata } from '../../types/b2b.types'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -66,21 +75,77 @@ interface DealAdvancesTabProps {
 const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
   const [loading, setLoading] = useState(true)
   const [advances, setAdvances] = useState<Advance[]>([])
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const { user } = useAuthStore()
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const data = await advanceService.getAdvancesByDeal(dealId)
+      setAdvances(data)
+    } catch (error) {
+      console.error('Load DealAdvancesTab error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const data = await advanceService.getAdvancesByDeal(dealId)
-        setAdvances(data)
-      } catch (error) {
-        console.error('Load DealAdvancesTab error:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
     loadData()
   }, [dealId])
+
+  // Business rule: chỉ được tạo advance khi deal đã Duyệt (accepted)
+  const canAddAdvance = deal.status === 'accepted'
+
+  // Submit handler — call dealChatActionsService (reuse full 6-step pipeline)
+  const handleAddAdvance = async (formData: AddAdvanceFormData) => {
+    if (!user?.employee_id) {
+      message.error('Không xác định được nhân viên đang đăng nhập')
+      return
+    }
+    if (!deal.partner_id) {
+      message.error('Deal thiếu partner_id, không thể tạo tạm ứng')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // Lookup chat room để service gửi notification message vào chat
+      const { data: room } = await supabase
+        .from('b2b_chat_rooms')
+        .select('id')
+        .eq('partner_id', deal.partner_id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!room?.id) {
+        message.error('Không tìm thấy phòng chat cho đại lý — không thể ứng tiền từ đây')
+        return
+      }
+
+      const result = await dealChatActionsService.addAdvanceFromChat(formData, {
+        dealId,
+        dealNumber: deal.deal_number,
+        partnerId: deal.partner_id,
+        roomId: room.id,
+        actionBy: user.employee_id,
+        actionByType: 'factory',
+      })
+
+      message.success(
+        `Đã ứng thêm ${result.amount.toLocaleString('vi-VN')} VNĐ (${result.advance_number})`
+      )
+      setAddModalOpen(false)
+      await loadData()
+    } catch (err: any) {
+      message.error(err?.message || 'Không thể tạo tạm ứng')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
@@ -93,6 +158,20 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
 
   const dealValue = deal.final_value || deal.total_value_vnd || 0
   const balanceDue = dealValue - totalAdvanced
+
+  // Build deal metadata tối thiểu để AddAdvanceModal render
+  const dealMeta: DealCardMetadata = {
+    deal_id: dealId,
+    deal_number: deal.deal_number,
+    status: deal.status,
+    product_type: deal.product_code || '',
+    quantity_kg: deal.quantity_kg || 0,
+    expected_drc: deal.expected_drc || 0,
+    agreed_price: deal.unit_price || 0,
+    estimated_value: dealValue,
+    total_advanced: totalAdvanced,
+    balance_due: balanceDue,
+  } as DealCardMetadata
 
   return (
     <div>
@@ -128,15 +207,36 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
 
       <Divider />
 
+      {/* Header row: Title + Nút Ứng thêm tiền */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Text strong style={{ fontSize: 15 }}>
+          <WalletOutlined style={{ marginRight: 8 }} />
+          Danh sách tạm ứng ({advances.length})
+        </Text>
+        <Tooltip
+          title={
+            !canAddAdvance
+              ? `Chỉ được tạm ứng khi deal đã DUYỆT. Hiện: "${deal.status}"`
+              : 'Tạo phiếu tạm ứng mới cho đại lý'
+          }
+        >
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            disabled={!canAddAdvance}
+            onClick={() => setAddModalOpen(true)}
+            style={{ background: canAddAdvance ? '#1B4D3E' : undefined, borderColor: canAddAdvance ? '#1B4D3E' : undefined }}
+          >
+            Ứng thêm tiền
+          </Button>
+        </Tooltip>
+      </div>
+
       {/* Advances Table */}
       {advances.length === 0 ? (
         <Empty description="Chưa có phiếu tạm ứng nào" />
       ) : (
         <>
-          <Text strong style={{ fontSize: 15, marginBottom: 12, display: 'block' }}>
-            <WalletOutlined style={{ marginRight: 8 }} />
-            Danh sách tạm ứng ({advances.length})
-          </Text>
           <Table
             dataSource={advances}
             rowKey="id"
@@ -186,6 +286,15 @@ const DealAdvancesTab = ({ dealId, deal }: DealAdvancesTabProps) => {
           />
         </>
       )}
+
+      <AddAdvanceModal
+        open={addModalOpen}
+        onCancel={() => setAddModalOpen(false)}
+        onConfirm={handleAddAdvance}
+        loading={submitting}
+        deal={dealMeta}
+        partnerName={(deal as any).partner_name || undefined}
+      />
     </div>
   )
 }

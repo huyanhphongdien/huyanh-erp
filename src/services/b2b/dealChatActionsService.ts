@@ -119,17 +119,35 @@ export const dealChatActionsService = {
     context: DealChatActionContext,
   ): Promise<AddAdvanceResult> {
 
-    // Step 1: Lấy deal hiện tại
+    // Step 1: Lấy deal hiện tại — bỏ total_advanced/balance_due khỏi SELECT
+    // vì 2 cột này không tồn tại trong b2b.deals (compute on-the-fly từ SUM advances).
     const { data: deal, error: dealError } = await supabase
       .from('b2b_deals')
-      .select('id, deal_number, status, total_value_vnd, total_advanced, balance_due')
+      .select('id, deal_number, status, total_value_vnd')
       .eq('id', context.dealId)
       .single()
 
     if (dealError || !deal) throw new Error('Không tìm thấy Deal')
-    if (deal.status === 'settled' || deal.status === 'cancelled') {
-      throw new Error('Deal đã quyết toán hoặc đã hủy, không thể ứng thêm')
+
+    // Business rule (BGĐ Huy Anh): advance chỉ được tạo khi deal đã DUYỆT.
+    // Deal ở 'processing' chưa đủ cơ sở để BGĐ commit tạm ứng — phải duyệt xong
+    // (actual_drc + BGĐ approve) rồi mới được ứng.
+    if (deal.status !== 'accepted') {
+      throw new Error(
+        `Chỉ được tạm ứng khi deal đã DUYỆT. Hiện: "${deal.status}". ` +
+        `Hãy duyệt deal trước khi ứng tiền.`
+      )
     }
+
+    // Compute current advanced total (replaces stale deal.total_advanced column)
+    const { data: existingAdvances } = await supabase
+      .from('b2b_advances')
+      .select('amount_vnd, amount')
+      .eq('deal_id', context.dealId)
+      .eq('status', 'paid')
+
+    const currentTotalAdvanced = (existingAdvances || [])
+      .reduce((sum, a) => sum + (a.amount_vnd || a.amount || 0), 0)
 
     // Step 2: Tạo advance
     const advanceNumber = generateAdvanceNumber()
@@ -178,19 +196,11 @@ export const dealChatActionsService = {
       console.error('Ledger entry for advance failed:', err)
     }
 
-    // Step 4: Update deal totals
-    const newTotalAdvanced = (deal.total_advanced || 0) + formData.amount
+    // Step 4: Compute new totals (không UPDATE b2b.deals vì 2 cột total_advanced/
+    // balance_due không tồn tại — UI compute lại from SUM mỗi khi cần).
+    const newTotalAdvanced = currentTotalAdvanced + formData.amount
     const estimatedValue = deal.total_value_vnd || 0
     const newBalanceDue = estimatedValue - newTotalAdvanced
-
-    await supabase
-      .from('b2b_deals')
-      .update({
-        total_advanced: newTotalAdvanced,
-        balance_due: newBalanceDue,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', context.dealId)
 
     // Step 5: Update DealCard message metadata (tìm message deal gần nhất)
     try {

@@ -383,7 +383,6 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
                               width: 32,
                               height: 32,
                               borderRadius: '50%',
-                              background: '#1B4D3E',
                               color: '#fff',
                               display: 'flex',
                               alignItems: 'center',

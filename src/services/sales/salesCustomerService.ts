@@ -330,24 +330,24 @@ export const salesCustomerService = {
 
 /**
  * Sinh mã khách hàng tự động: KH-001, KH-002, ...
+ * Chỉ xét code dạng KH-<số> — bỏ qua KH-ZHEJIANG, KH-TEST-xxx v.v.
  */
 async function generateCustomerCode(): Promise<string> {
   const { data } = await supabase
     .from('sales_customers')
     .select('code')
     .like('code', 'KH-%')
-    .order('code', { ascending: false })
-    .limit(1)
 
-  if (data && data.length > 0) {
-    const lastCode = data[0].code // e.g. "KH-042"
-    const lastNum = parseInt(lastCode.replace('KH-', ''), 10)
-    if (!isNaN(lastNum)) {
-      return `KH-${String(lastNum + 1).padStart(3, '0')}`
+  let maxNum = 0
+  for (const row of data || []) {
+    const match = (row.code as string).match(/^KH-(\d+)$/)
+    if (match) {
+      const n = parseInt(match[1], 10)
+      if (!isNaN(n) && n > maxNum) maxNum = n
     }
   }
 
-  return 'KH-001'
+  return `KH-${String(maxNum + 1).padStart(3, '0')}`
 }
 
 export default salesCustomerService

@@ -499,11 +499,14 @@ const DemandCreatePage = () => {
   useEffect(() => {
     const fetchWarehouses = async () => {
       try {
+        // Nhu cầu mua = nhập NVL cao su → chỉ cho phép 3 kho NVL (type='raw')
+        // KHO-NVL · KHO-LAO-NVL · KHO-TL-NVL
         const { data, error } = await supabase
           .from('warehouses')
           .select('id, name, code')
           .eq('is_active', true)
-          .order('name')
+          .eq('type', 'raw')
+          .order('code')
 
         if (error) throw error
         setWarehouses(data || [])

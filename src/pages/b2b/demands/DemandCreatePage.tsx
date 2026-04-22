@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import PartnerMatchSuggestions from '../../../components/b2b/PartnerMatchSuggestions'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card,
   Steps,
@@ -308,6 +308,8 @@ interface Step2Props {
   onBack: () => void
   onSaveDraft: () => void
   onPublish: () => void
+  onUpdate?: () => void
+  isEditMode?: boolean
   submitting: boolean
 }
 
@@ -317,6 +319,8 @@ const Step2DetailsConfirm = ({
   onBack,
   onSaveDraft,
   onPublish,
+  onUpdate,
+  isEditMode,
   submitting,
 }: Step2Props) => {
   const values = form.getFieldsValue(true)
@@ -460,18 +464,32 @@ const Step2DetailsConfirm = ({
           Quay lại
         </Button>
         <Space>
-          <Button onClick={onSaveDraft} size="large" loading={submitting}>
-            Lưu nháp
-          </Button>
-          <Button
-            type="primary"
-            onClick={onPublish}
-            size="large"
-            loading={submitting}
-            style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
-          >
-            Đăng ngay
-          </Button>
+          {isEditMode ? (
+            <Button
+              type="primary"
+              onClick={onUpdate}
+              size="large"
+              loading={submitting}
+              style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
+            >
+              Lưu thay đổi
+            </Button>
+          ) : (
+            <>
+              <Button onClick={onSaveDraft} size="large" loading={submitting}>
+                Lưu nháp
+              </Button>
+              <Button
+                type="primary"
+                onClick={onPublish}
+                size="large"
+                loading={submitting}
+                style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
+              >
+                Đăng ngay
+              </Button>
+            </>
+          )}
         </Space>
       </div>
     </div>
@@ -484,12 +502,15 @@ const Step2DetailsConfirm = ({
 
 const DemandCreatePage = () => {
   const navigate = useNavigate()
+  const { id: editId } = useParams<{ id: string }>()
+  const isEditMode = !!editId
   const [form] = Form.useForm()
 
   // State
   const [currentStep, setCurrentStep] = useState(0)
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [loadingDemand, setLoadingDemand] = useState(isEditMode)
   const [createdDemand, setCreatedDemand] = useState<{ id: string; code: string } | null>(null)
 
   // ============================================
@@ -517,6 +538,48 @@ const DemandCreatePage = () => {
 
     fetchWarehouses()
   }, [])
+
+  // Load existing demand khi ở edit mode
+  useEffect(() => {
+    if (!isEditMode || !editId) return
+    const fetchDemand = async () => {
+      try {
+        const demand = await demandService.getById(editId)
+        if (!demand) {
+          message.error('Không tìm thấy nhu cầu')
+          navigate('/b2b/demands')
+          return
+        }
+        form.setFieldsValue({
+          demand_type: demand.demand_type,
+          product_type: demand.product_type,
+          quantity_tons: (demand.quantity_kg || 0) / 1000,
+          drc_min: demand.drc_min,
+          drc_max: demand.drc_max,
+          price_min: demand.price_min,
+          price_max: demand.price_max,
+          preferred_regions: demand.preferred_regions,
+          deadline: demand.deadline ? dayjs(demand.deadline) : null,
+          delivery_range: (demand.delivery_from && demand.delivery_to)
+            ? [dayjs(demand.delivery_from), dayjs(demand.delivery_to)]
+            : null,
+          warehouse_id: demand.warehouse_id,
+          processing_fee_per_ton: demand.processing_fee_per_ton,
+          expected_output_rate: demand.expected_output_rate,
+          target_grade: demand.target_grade,
+          notes: demand.notes,
+          internal_notes: demand.internal_notes,
+          priority: demand.priority,
+        })
+      } catch (error) {
+        console.error('Error loading demand:', error)
+        message.error('Không thể tải nhu cầu')
+      } finally {
+        setLoadingDemand(false)
+      }
+    }
+    fetchDemand()
+  }, [isEditMode, editId, form, navigate])
 
   // ============================================
   // HANDLERS
@@ -587,6 +650,22 @@ const DemandCreatePage = () => {
     }
   }
 
+  const handleUpdate = async () => {
+    if (!editId) return
+    try {
+      setSubmitting(true)
+      const data = buildCreateData()
+      await demandService.update(editId, data)
+      message.success('Đã cập nhật nhu cầu!')
+      navigate(`/b2b/demands/${editId}`)
+    } catch (error) {
+      console.error('Error updating demand:', error)
+      message.error('Không thể cập nhật nhu cầu')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   // ============================================
   // RENDER
   // ============================================
@@ -604,7 +683,7 @@ const DemandCreatePage = () => {
         items={[
           { title: <a onClick={() => navigate('/b2b')}>B2B</a> },
           { title: <a onClick={() => navigate('/b2b/demands')}>Nhu cầu mua</a> },
-          { title: 'Tạo mới' },
+          { title: isEditMode ? 'Sửa' : 'Tạo mới' },
         ]}
       />
 
@@ -614,10 +693,10 @@ const DemandCreatePage = () => {
           <Button
             type="text"
             icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/b2b/demands')}
+            onClick={() => navigate(isEditMode ? `/b2b/demands/${editId}` : '/b2b/demands')}
           />
           <Title level={3} style={{ margin: 0 }}>
-            Tạo nhu cầu mua mới
+            {isEditMode ? 'Sửa nhu cầu mua' : 'Tạo nhu cầu mua mới'}
           </Title>
         </Space>
       </div>
@@ -647,6 +726,8 @@ const DemandCreatePage = () => {
             onBack={() => setCurrentStep(0)}
             onSaveDraft={handleSaveDraft}
             onPublish={handlePublish}
+            onUpdate={handleUpdate}
+            isEditMode={isEditMode}
             submitting={submitting}
           />
         )}

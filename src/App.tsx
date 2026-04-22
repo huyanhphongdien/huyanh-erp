@@ -356,6 +356,7 @@ function App() {
                 {/* B2B Demands */}
                 <Route path="demands" element={<Suspense fallback={<LoadingSpinner />}><DemandListPage /></Suspense>} />
                 <Route path="demands/new" element={<Suspense fallback={<LoadingSpinner />}><DemandCreatePage /></Suspense>} />
+                <Route path="demands/:id/edit" element={<Suspense fallback={<LoadingSpinner />}><DemandCreatePage /></Suspense>} />
                 <Route path="demands/:id" element={<Suspense fallback={<LoadingSpinner />}><DemandDetailPage /></Suspense>} />
                 {/* B2B Rubber Intake (Lý lịch mủ) */}
                 <Route path="rubber-intake" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakePage /></Suspense>} />

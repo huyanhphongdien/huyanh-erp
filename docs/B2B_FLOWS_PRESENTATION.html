@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luồng nghiệp vụ B2B — Huy Anh Rubber</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #1B4D3E;
+    --primary-light: #2E7D5B;
+    --primary-dark: #0F3D30;
+    --accent: #D4AF37;
+    --bg: #F7F9F8;
+    --bg-card: #FFFFFF;
+    --border: #E3E8E5;
+    --text: #1A2B25;
+    --text-muted: #5C7369;
+    --success: #2E7D32;
+    --warning: #F59E0B;
+    --danger: #DC2626;
+    --info: #2563EB;
+    --partner: #7C3AED;
+    --factory: #059669;
+    --shadow: 0 1px 3px rgba(27,77,62,0.08), 0 4px 12px rgba(27,77,62,0.04);
+    --shadow-lg: 0 4px 12px rgba(27,77,62,0.08), 0 12px 32px rgba(27,77,62,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 50%, #3A9B7A 100%);
+    color: white;
+    padding: 80px 32px 100px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(212,175,55,0.1) 0%, transparent 40%);
+  }
+  .hero > * { position: relative; z-index: 1; }
+  .hero h1 {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+  .hero .subtitle {
+    font-size: 18px;
+    opacity: 0.92;
+    max-width: 720px;
+    margin: 0 auto 24px;
+  }
+  .hero .badges {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .badge-hero {
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* NAV */
+  nav.toc {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  nav.toc ul {
+    list-style: none;
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  nav.toc a {
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  nav.toc a:hover {
+    background: var(--bg);
+    color: var(--primary);
+  }
+
+  /* CONTAINER */
+  .container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+  section { margin-bottom: 56px; scroll-margin-top: 70px; }
+  section h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section h2 .num {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    border-radius: 10px;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  section h3 {
+    font-size: 18px;
+    color: var(--primary-dark);
+    margin: 24px 0 12px;
+    font-weight: 600;
+  }
+  section .lead {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    padding-left: 52px;
+  }
+
+  /* CARD */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .card-accent { border-left: 4px solid var(--primary); }
+  .card-warning { border-left: 4px solid var(--warning); background: #FFFBEB; }
+  .card-danger { border-left: 4px solid var(--danger); background: #FEF2F2; }
+  .card-info { border-left: 4px solid var(--info); background: #EFF6FF; }
+  .card-success { border-left: 4px solid var(--success); background: #F0FDF4; }
+
+  /* MERMAID */
+  .mermaid {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    text-align: center;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+    margin: 16px 0;
+  }
+
+  /* TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    text-align: left;
+    padding: 12px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  td {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:hover { background: var(--bg); }
+
+  /* BADGES */
+  .b {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .b-primary { background: #E6F4EF; color: var(--primary); }
+  .b-partner { background: #F3E8FF; color: var(--partner); }
+  .b-factory { background: #D1FAE5; color: var(--factory); }
+  .b-sale { background: #FEF3C7; color: #92400E; }
+  .b-prod { background: #FED7AA; color: #7C2D12; }
+  .b-logis { background: #DBEAFE; color: #1E40AF; }
+  .b-acct { background: #E9D5FF; color: #6B21A8; }
+  .b-bgd { background: #1F2937; color: white; }
+  .b-qc { background: #FECACA; color: #991B1B; }
+  .b-success { background: #D1FAE5; color: var(--success); }
+  .b-warning { background: #FEF3C7; color: #92400E; }
+  .b-danger { background: #FEE2E2; color: var(--danger); }
+  .b-info { background: #DBEAFE; color: var(--info); }
+  .b-muted { background: #F3F4F6; color: #6B7280; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 820px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* KPI CARDS */
+  .kpi {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .kpi .label { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
+  .kpi .value { font-size: 28px; font-weight: 700; color: var(--primary); line-height: 1.1; }
+  .kpi .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  /* STEP LIST */
+  ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 12px 0; }
+  ol.steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 12px 12px 12px 52px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s;
+  }
+  ol.steps li:hover { transform: translateX(4px); }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  ol.steps li strong { color: var(--primary-dark); }
+
+  /* CODE INLINE */
+  code.inline {
+    background: #F1F5F4;
+    color: var(--primary-dark);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
+  /* ICON */
+  .icon-lg { font-size: 24px; }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+    margin: 32px 0;
+  }
+
+  /* FOOTER */
+  footer {
+    background: var(--primary-dark);
+    color: rgba(255,255,255,0.8);
+    padding: 32px 24px;
+    text-align: center;
+    font-size: 14px;
+  }
+  footer strong { color: white; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 30px; }
+    .hero .subtitle { font-size: 15px; }
+    .container { padding: 32px 16px; }
+    section h2 { font-size: 22px; }
+    table { font-size: 12.5px; }
+    th, td { padding: 8px 10px; }
+  }
+
+  /* PRINT */
+  @media print {
+    nav.toc { display: none; }
+    .hero { padding: 32px 20px; }
+    section { page-break-inside: avoid; }
+    .mermaid { page-break-inside: avoid; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🌿 Luồng Nghiệp Vụ B2B</h1>
+  <div class="subtitle">
+    Hệ sinh thái mua mủ cao su tự động — Huy Anh Rubber<br>
+    2 kênh mua • Deal lifecycle 5 stages • Cân tự động hai chiều • Realtime cross-portal
+  </div>
+  <div class="badges">
+    <span class="badge-hero">⛓️ Chat + Demand-driven</span>
+    <span class="badge-hero">🏭 5 bộ phận cộng tác</span>
+    <span class="badge-hero">⚖️ Weighbridge → Stock auto</span>
+    <span class="badge-hero">🔒 Sprint J guards</span>
+    <span class="badge-hero">📊 Realtime dashboard</span>
+  </div>
+</div>
+
+<nav class="toc">
+  <ul>
+    <li><a href="#overview">Tổng quan</a></li>
+    <li><a href="#flow-chat">🅰️ Chat</a></li>
+    <li><a href="#flow-demand">🅱️ Nhu cầu</a></li>
+    <li><a href="#deal-lifecycle">Deal Lifecycle</a></li>
+    <li><a href="#auto-in">⚖️ Cân IN</a></li>
+    <li><a href="#auto-out">⚖️ Cân OUT</a></li>
+    <li><a href="#side-flows">Luồng phụ</a></li>
+    <li><a href="#integration">Tích hợp</a></li>
+    <li><a href="#guards">Guards</a></li>
+  </ul>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════════════════ OVERVIEW ═══════════════════════════ -->
+<section id="overview">
+  <h2><span class="num">0</span>Tổng quan hệ thống</h2>
+  <p class="lead">Map 2 luồng chính + 6 luồng phụ + 2 automation cân/kho.</p>
+
+  <div class="mermaid">
+flowchart TD
+    Partner["🤝 PARTNER PORTAL<br/>b2b.huyanhrubber.vn"]
+
+    Partner --> ChatFlow["🅰️ LUỒNG CHAT<br/>Ad-hoc booking"]
+    Partner --> DemandFlow["🅱️ LUỒNG NHU CẦU<br/>Factory publish → Offer"]
+
+    ChatFlow --> Deal
+    DemandFlow --> Deal
+
+    Deal["📋 DEAL<br/>5 stages: QC → Duyệt → Nhập kho → Quyết toán → Thanh toán"]
+
+    Deal --> WeighIN["⚖️ Cân IN<br/>+ Nhập kho"]
+    Deal --> Advance["💸 Tạm ứng"]
+    Deal --> QC["🔬 QC/DRC"]
+    Deal --> Settlement["📋 Quyết toán<br/>+ Thanh toán"]
+    Settlement --> Settled["✅ Settled<br/>+ Tier upgrade"]
+    Settled --> WeighOUT["⚖️ Cân OUT<br/>Xuất kho TP"]
+
+    style Partner fill:#7C3AED,color:#fff
+    style ChatFlow fill:#DBEAFE,stroke:#2563EB,stroke-width:2px
+    style DemandFlow fill:#FEF3C7,stroke:#F59E0B,stroke-width:2px
+    style Deal fill:#1B4D3E,color:#fff,stroke-width:3px
+    style WeighIN fill:#D1FAE5,stroke:#059669
+    style WeighOUT fill:#D1FAE5,stroke:#059669
+    style Settled fill:#FDE68A,stroke:#92400E
+  </div>
+
+  <div class="grid-4">
+    <div class="kpi">
+      <div class="label">2 kênh mua</div>
+      <div class="value">Chat + Nhu cầu</div>
+      <div class="sub">Push (partner) + Pull (factory)</div>
+    </div>
+    <div class="kpi">
+      <div class="label">5 bộ phận tham gia</div>
+      <div class="value">Factory</div>
+      <div class="sub">KD · QC · SX · Hậu cần · KT · BGĐ</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Cân tự động</div>
+      <div class="value">2 chiều</div>
+      <div class="sub">IN → Nhập · OUT → Xuất</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Deal lifecycle</div>
+      <div class="value">9 stages</div>
+      <div class="sub">Draft → Settled/Cancelled</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ FLOW A — CHAT ═══════════════════════════ -->
+<section id="flow-chat">
+  <h2><span class="num">A</span>Luồng mua mủ bằng Chat</h2>
+  <p class="lead">Partner có mủ sẵn → chat trực tiếp nhà máy → gửi phiếu chốt → factory xác nhận → Deal.</p>
+
+  <div class="card card-info">
+    <strong>Use case:</strong> Partner đã có lô mủ (mu tạp / mủ nước / mủ cao su) cần bán ngay, không chờ nhà máy đăng nhu cầu.
+  </div>
+
+  <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant P as 👤 Partner
+    participant C as 💬 Chat Room
+    participant F as 🏭 Factory (KD)
+    participant DB as 🗄️ DB
+
+    P->>C: Mở chat với nhà máy
+    Note over P: Click 📎 → "Tạo phiếu chốt"
+    P->>P: Điền: loại mủ, qty, DRC, giá, ngày giao, vùng, facility
+    P->>C: Send BookingCard<br/>(message_type='booking')
+    C->>DB: INSERT b2b_chat_messages<br/>metadata.booking = {...}
+    DB-->>F: Realtime notification
+    F->>C: Xem BookingCard
+    F->>F: Click "Xác nhận" → Modal Tạo Deal
+    Note over F: Form prefill từ booking<br/>(số lượng, DRC, giá, facility)
+    F->>F: Optional: điền Tạm ứng
+    F->>DB: dealConfirmService.createDealFromBooking()
+    DB->>DB: INSERT b2b.deals<br/>status='processing'
+    DB->>DB: UPDATE message.booking.status='accepted'
+    DB-->>P: Realtime: "Deal đã tạo: DLxxxx"
+    DB-->>F: Advance entry (nếu có)
+  </div>
+
+  <h3>📋 Bước chi tiết</h3>
+  <ol class="steps">
+    <li><strong>Mở chat room</strong> — Partner hoặc Factory khởi tạo. <code class="inline">b2b.chat_rooms</code> INSERT/SELECT.</li>
+    <li><strong>Tạo phiếu chốt</strong> — Partner click icon 📎 trong chat → form BookingCard.</li>
+    <li><strong>Điền phiếu</strong> — Loại mủ, số lượng (tấn), DRC (%), giá (VNĐ/kg), đơn vị (wet/dry), ngày giao, vùng nguyên liệu, <span class="b b-success">🆕 Giao tại nhà máy</span>.</li>
+    <li><strong>Gửi phiếu</strong> — Message <code class="inline">message_type='booking'</code> với metadata đầy đủ.</li>
+    <li><strong>Factory nhận</strong> — Realtime &lt; 2s. BookingCard hiện trong chat + notification bell +1.</li>
+    <li><strong>Xác nhận</strong> — Factory click nút Xác nhận → Modal "Tạo Deal" mở, form prefill từ booking.</li>
+    <li><strong>Optional tạm ứng</strong> — Bật toggle "Tạm ứng ngay", điền số tiền + phương thức (cash/bank).</li>
+    <li><strong>Tạo Deal</strong> — Click <strong>Tạo Deal</strong> → INSERT <code class="inline">b2b.deals</code> status=processing.</li>
+    <li><strong>Auto cascade</strong> — Booking status='accepted', chat card "Deal đã tạo", partner notification.</li>
+  </ol>
+</section>
+
+<!-- ═══════════════════════════ FLOW B — DEMAND ═══════════════════════════ -->
+<section id="flow-demand">
+  <h2><span class="num">B</span>Luồng mua theo Nhu cầu</h2>
+  <p class="lead">Factory dự báo cần mua → đăng nhu cầu lên portal → partner gửi báo giá → chốt offer → Deal.</p>
+
+  <div class="card card-info">
+    <strong>Use case:</strong> Factory đã lên kế hoạch sản xuất và biết cần mua N tấn mủ loại X trong khoảng giá Y trước deadline Z. Đăng nhu cầu để partner biết + chủ động gửi báo giá cạnh tranh.
+  </div>
+
+  <div class="mermaid">
+flowchart TB
+    F1["🛒 Factory KD<br/>Tạo nhu cầu mua"] -->|draft| F2["Điền: loại mủ, qty, khoảng giá, DRC, vùng ưu tiên, deadline, Kho nhận (NVL)"]
+    F2 -->|Đăng ngay| PUB["📢 demand.status = published"]
+    PUB -->|Trigger| NOTIF["🔔 Notify partners có region match"]
+
+    NOTIF --> P1["👤 Partner vào tab 'Cơ hội'"]
+    P1 --> P2["Xem chi tiết demand"]
+    P2 --> P3["Điền báo giá<br/>(multi-lot: giá, qty, DRC, ngày giao, vùng)"]
+    P3 -->|Gửi báo giá| OFFER["📤 offer.status = pending"]
+    OFFER --> CHAT["💬 Booking card auto → chat room"]
+
+    CHAT --> F3["🛒 Factory xem offers<br/>tab 'Chào giá'"]
+    F3 --> F4["Compare offers<br/>(giá, DRC, deadline)"]
+    F4 -->|Chốt offer| ACCEPT["✅ offer.status = accepted"]
+    ACCEPT --> DEAL["📋 Deal auto-create<br/>status = processing"]
+    ACCEPT --> FILL["📈 demand.filled_quantity += qty"]
+    FILL -->|sum ≥ quantity_kg| CLOSE["🔒 demand.status = filled"]
+
+    style F1 fill:#FEF3C7
+    style PUB fill:#DBEAFE
+    style OFFER fill:#E9D5FF
+    style ACCEPT fill:#D1FAE5
+    style DEAL fill:#1B4D3E,color:#fff
+    style CLOSE fill:#9CA3AF,color:#fff
+  </div>
+
+  <h3>🚧 Guards đặc biệt (Sprint L)</h3>
+  <div class="grid-2">
+    <div class="card card-danger">
+      <strong>❌ Không cho chốt offer khi demand đã đóng</strong>
+      <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">
+        demand.status ∈ {closed, filled, cancelled} → block accept offer
+      </div>
+    </div>
+    <div class="card card-danger">
+      <strong>❌ Không cho over-fill</strong>
+      <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">
+        Trigger chặn nếu sum(accepted offers) &gt; demand.quantity_kg
+      </div>
+    </div>
+    <div class="card card-danger">
+      <strong>❌ Deadline phải sau ngày đăng</strong>
+      <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">
+        CHECK <code class="inline">deadline ≥ published_at</code>
+      </div>
+    </div>
+    <div class="card card-danger">
+      <strong>❌ Kho nhận chỉ kho NVL</strong>
+      <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">
+        Dropdown chỉ hiện 3 kho type='raw' (KHO-NVL · LAO-NVL · TL-NVL)
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ DEAL LIFECYCLE ═══════════════════════════ -->
+<section id="deal-lifecycle">
+  <h2><span class="num">C</span>Deal Lifecycle — 5 Stages Chính</h2>
+  <p class="lead">Sau khi Deal tạo (từ A hoặc B), đi qua 5 giai đoạn cộng tác xuyên bộ phận.</p>
+
+  <div class="mermaid">
+stateDiagram-v2
+    [*] --> processing : Deal created
+    processing --> processing : QC đo DRC mẫu
+    processing --> accepted : BGĐ Duyệt
+    accepted --> accepted : Cân IN + Stock-in
+    accepted --> accepted : Advance + Acknowledge
+    accepted --> accepted : Settlement confirmed
+    accepted --> settled : Settlement PAID
+    settled --> [*] : Complete
+    processing --> cancelled : Hủy
+    accepted --> cancelled : Hủy (nếu chưa nhập kho)
+
+    note right of processing
+      🔬 QC phụ trách
+      Chưa unlock cân
+    end note
+    note right of accepted
+      👔 BGĐ đã duyệt
+      Unlock: cân + stock-in + advance
+    end note
+    note left of settled
+      💰 Tier auto upgrade
+      ledger running_balance = 0
+    end note
+  </div>
+
+  <h3>📍 Stage × Bộ phận</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Stage UI</th>
+        <th>DB status</th>
+        <th>Bộ phận</th>
+        <th>Hành động</th>
+        <th>Output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>🔹 Chốt</td>
+        <td><code class="inline">processing</code></td>
+        <td><span class="b b-muted">Auto</span></td>
+        <td>Deal mới tạo, chờ QC</td>
+        <td>chat card "Deal created"</td>
+      </tr>
+      <tr>
+        <td>🔹 QC</td>
+        <td><code class="inline">processing</code></td>
+        <td><span class="b b-qc">🔬 QC</span></td>
+        <td>Đo DRC mẫu, update <code class="inline">actual_drc</code></td>
+        <td>DRC actual &gt; 0</td>
+      </tr>
+      <tr>
+        <td>🔹 Duyệt</td>
+        <td><code class="inline">accepted</code></td>
+        <td><span class="b b-bgd">👔 BGĐ</span></td>
+        <td>Review + click "Duyệt Deal"</td>
+        <td>Unlock cân + stock-in + advance</td>
+      </tr>
+      <tr>
+        <td>🔹 Nhập kho</td>
+        <td><code class="inline">accepted</code></td>
+        <td><span class="b b-logis">🚚 Cân + Kho</span></td>
+        <td>Xe cân IN → stock-in KHO-NVL</td>
+        <td>stock_batches + stock_in_count++</td>
+      </tr>
+      <tr>
+        <td>🔹 Tạm ứng</td>
+        <td><code class="inline">accepted</code></td>
+        <td><span class="b b-acct">💰 Kế toán</span></td>
+        <td>Tạo advance + partner acknowledge</td>
+        <td>partner_ledger entry (advance_paid)</td>
+      </tr>
+      <tr>
+        <td>🔹 Quyết toán</td>
+        <td><code class="inline">accepted</code></td>
+        <td><span class="b b-acct">💰 Kế toán</span></td>
+        <td>Settlement items (gross - advance)</td>
+        <td>settlement_receivable ledger</td>
+      </tr>
+      <tr>
+        <td>🔹 Thanh toán</td>
+        <td><code class="inline">settled</code></td>
+        <td><span class="b b-acct">💰 Kế toán</span></td>
+        <td>Payment paid → cascade settled</td>
+        <td>ledger = 0 · tier auto upgrade</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>🔒 Sprint J Guards (CRITICAL)</h3>
+  <div class="grid-3">
+    <div class="card card-warning">
+      <div class="icon-lg">⚖️</div>
+      <strong>Cân xe IN</strong>
+      <div style="font-size: 13px; margin-top: 6px;">
+        Trigger <code class="inline">trg_enforce_weighbridge_accepted</code> reject nếu deal ≠ accepted/settled.
+      </div>
+    </div>
+    <div class="card card-warning">
+      <div class="icon-lg">📦</div>
+      <strong>Stock-in B2B</strong>
+      <div style="font-size: 13px; margin-top: 6px;">
+        Trigger <code class="inline">trg_enforce_b2b_stock_in_accepted</code> reject nếu source_type='b2b' và deal chưa accepted.
+      </div>
+    </div>
+    <div class="card card-warning">
+      <div class="icon-lg">💸</div>
+      <strong>Tạm ứng</strong>
+      <div style="font-size: 13px; margin-top: 6px;">
+        App-layer + DB check: advance chỉ tạo được khi deal.status = accepted.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ AUTO 1: WEIGHBRIDGE IN ═══════════════════════════ -->
+<section id="auto-in">
+  <h2><span class="num">D</span>Automation — Cân IN → Nhập kho</h2>
+  <p class="lead">Flag C1 đã active production. Xe partner vào cổng → cân 2 lần → auto-create stock-in order.</p>
+
+  <div class="mermaid">
+flowchart TD
+    A[🚛 Xe partner vào cổng] --> B[Bảo vệ scan QR deal + biển số]
+    B --> C{Deal status?}
+    C -->|≠ accepted/settled| REJ[❌ REJECT 400<br/>Trigger Sprint J]
+    C -->|accepted/settled ✅| D[⚖️ Cân lần 1: GROSS]
+    D --> E[Xe xuống bãi → trút mủ]
+    E --> F[⚖️ Cân lần 2: TARE]
+    F --> G[Auto compute<br/>NET = GROSS - TARE]
+    G --> H[weighbridge_tickets.status = 'completed']
+    H --> I{Flag<br/>weighbridge_auto_sync IN?}
+    I -->|ON 🟢| J[Auto-create stock_in_order<br/>source_type='b2b'<br/>warehouse=KHO-NVL<br/>actual_quantity_kg=NET]
+    I -->|OFF| K[Manual stock-in]
+    J --> L[stock_in_order.status='draft']
+    L --> M[Factory confirm]
+    M --> N[Trigger: stock_batches created<br/>+ stock_levels ++<br/>+ deal.stock_in_count ++]
+    N --> O[✅ Notification<br/>'Đã nhập kho N kg']
+
+    style REJ fill:#FEE2E2,stroke:#DC2626
+    style J fill:#D1FAE5,stroke:#059669
+    style N fill:#FEF3C7
+    style O fill:#1B4D3E,color:#fff
+  </div>
+
+  <h3>⚙️ Cơ chế tự động</h3>
+  <table>
+    <thead>
+      <tr><th>Bước</th><th>Trigger/Function</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Guard Sprint J</td>
+        <td><code class="inline">trg_enforce_weighbridge_accepted</code> (DB trigger BEFORE INSERT)</td>
+        <td>Reject 400 + message "Deal đang processing — chỉ cân được khi deal đã DUYỆT"</td>
+      </tr>
+      <tr>
+        <td>Auto stock-in</td>
+        <td>App-layer <code class="inline">weighbridgeService.autoCreateStockIn()</code></td>
+        <td>INSERT stock_in_order + items</td>
+      </tr>
+      <tr>
+        <td>Auto batch</td>
+        <td>Trigger <code class="inline">trg_stock_in_confirm</code></td>
+        <td>INSERT stock_batches(batch_no='PCB-...', quantity_remaining=net)</td>
+      </tr>
+      <tr>
+        <td>Stock level sync</td>
+        <td>Trigger <code class="inline">trg_update_stock_levels</code></td>
+        <td>stock_levels.current_kg += net</td>
+      </tr>
+      <tr>
+        <td>Deal count</td>
+        <td>Sprint E BUG-9 trigger</td>
+        <td>deal.stock_in_count += 1</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card card-success">
+    <strong>📝 Memory quan trọng:</strong>
+    <ul style="margin-top: 8px; padding-left: 20px;">
+      <li><strong>Nhà máy PD (Phong Điền):</strong> Cân 2 lần (Gross − Tare) chuẩn</li>
+      <li><strong>Nhà máy TL (Trảng Lớn):</strong> Cân 1 lần (tare=0, weight=NET trực tiếp)</li>
+      <li><strong>Nhà máy LAO:</strong> Cân 2 lần, sau đó transfer về TL</li>
+      <li><code class="inline">auto_created_stock_in_id</code> column → idempotent, không duplicate</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ AUTO 2: WEIGHBRIDGE OUT ═══════════════════════════ -->
+<section id="auto-out">
+  <h2><span class="num">E</span>Automation — Cân OUT → Xuất kho</h2>
+  <p class="lead">Flag W1-W7 verified 2026-04-16. Xe tải đến lấy container → cân OUT → auto-confirm phiếu xuất.</p>
+
+  <div class="mermaid">
+flowchart TD
+    A[📋 Sales Order<br/>status=ready] --> B[📦 Container Packing xong]
+    B --> C[🔐 Seal container<br/>status=sealed]
+    C --> D[🚛 Xe tải vào lấy hàng]
+    D --> E[Factory xác nhận phiếu xuất<br/>status=picking]
+    E --> F[⚖️ Weighbridge OUT<br/>ticket_type='out']
+    F --> G{W1-W3 Guards}
+    G -->|fail| REJ[❌ Reject]
+    G -->|pass ✅| H[Cân 1 lần<br/>tare từ đăng ký xe]
+    H --> I[NET = GROSS - TARE]
+    I --> J[weighbridge_tickets.status='completed']
+    J --> K{Flag OUT?}
+    K -->|ON| L[Auto-confirm sales_out_order<br/>status → picked]
+    L --> M[Trigger W4: Hard commit<br/>stock_batches.quantity_remaining -=<br/>stock_levels -=]
+    M --> N[Trigger W5: inventory_transactions OUT]
+    N --> O[Trigger W6: notification<br/>logistics + sale]
+    O --> P[Factory chốt phiếu<br/>status=shipped]
+    P --> Q[container.shipped_at = NOW<br/>sales_order.status = shipped]
+
+    style REJ fill:#FEE2E2
+    style L fill:#D1FAE5
+    style M fill:#FEF3C7
+    style Q fill:#1B4D3E,color:#fff
+  </div>
+
+  <h3>🛡️ Guards W1-W7</h3>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Guard</th><th>Logic</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>W1</td><td>Order status</td><td>Chỉ cho OUT khi sales_order.status ∈ {ready, packing}</td></tr>
+      <tr><td>W2</td><td>Weight validate</td><td>NET ≥ container.expected_weight × 0.95 (cho dung sai 5%)</td></tr>
+      <tr><td>W3</td><td>Batch allocation</td><td>Batch phải có allocation trước khi cân</td></tr>
+      <tr><td>W4</td><td>Hard commit</td><td>Trừ stock_batches + stock_levels NGAY sau cân (không deferred)</td></tr>
+      <tr><td>W5</td><td>Audit trail</td><td>Auto insert inventory_transactions type='out'</td></tr>
+      <tr><td>W6</td><td>Notification</td><td>Realtime toast cho logistics + sale role</td></tr>
+      <tr><td>W7</td><td>Idempotent</td><td>UNIQUE constraint trên ticket_id → không duplicate</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════ SIDE FLOWS ═══════════════════════════ -->
+<section id="side-flows">
+  <h2><span class="num">F</span>Các luồng phụ</h2>
+  <p class="lead">6 flow phụ bổ sung cho ecosystem B2B.</p>
+
+  <div class="grid-2">
+    <div class="card card-accent">
+      <h3 style="margin-top:0">🎟️ Đấu giá (Auction)</h3>
+      <div class="mermaid" style="padding:12px;margin:8px 0">
+flowchart LR
+    A[Factory tạo Auction] --> B[Publish<br/>live]
+    B --> C[Partners bid]
+    C --> D[End time]
+    D --> E[Factory chọn winner]
+    E --> F[Auto-create Deal]
+      </div>
+      <div style="font-size: 13px; color: var(--text-muted);">
+        <strong>CHECK Sprint O-2:</strong> auction.status ∈ (draft/scheduled/live/ending/ended/cancelled/closed)
+      </div>
+    </div>
+
+    <div class="card card-accent">
+      <h3 style="margin-top:0">💸 Tạm ứng (Advance)</h3>
+      <div class="mermaid" style="padding:12px;margin:8px 0">
+flowchart LR
+    A[Deal accepted] --> B[Factory tạo advance]
+    B --> C[Ledger: advance_paid<br/>debit]
+    C --> D[Partner acknowledge]
+    D --> E[Deal unlock nhập kho]
+      </div>
+      <div style="font-size: 13px; color: var(--text-muted);">
+        Partner xác nhận đã nhận tiền trước khi giao mủ. Ledger running balance cumulative.
+      </div>
+    </div>
+
+    <div class="card card-accent">
+      <h3 style="margin-top:0">📋 Quyết toán + Thanh toán</h3>
+      <div class="mermaid" style="padding:12px;margin:8px 0">
+flowchart TD
+    A[Deal có stock-in + actual_drc] --> B[Tạo Settlement]
+    B --> C[Items: qty × price<br/>dry weight basis]
+    C --> D[Gross = sum items<br/>Remaining = gross - advance]
+    D --> E[Confirm → ledger<br/>settlement_receivable]
+    E --> F[Mark paid]
+    F --> G[Trigger Sprint O-4<br/>deal.status=settled]
+    F --> H[Ledger payment_paid<br/>Sprint M trigger]
+    G --> I[Tier upgrade<br/>running_balance=0]
+      </div>
+    </div>
+
+    <div class="card card-accent">
+      <h3 style="margin-top:0">🔔 Khiếu nại DRC (Dispute)</h3>
+      <div class="mermaid" style="padding:12px;margin:8px 0">
+flowchart LR
+    A[Deal settled<br/>variance ≥ 2%] --> B[Partner raise]
+    B --> C[status=open]
+    C --> D[Factory investigate]
+    D --> E[Resolve:<br/>accepted/rejected]
+    E --> F[Audit log<br/>Sprint I]
+      </div>
+      <div style="font-size: 13px; color: var(--text-muted);">
+        Variance = |actual - expected| / expected × 100. Dispute tranh chấp DRC không chính xác.
+      </div>
+    </div>
+
+    <div class="card card-accent">
+      <h3 style="margin-top:0">🏆 Partner Tier Auto-upgrade</h3>
+      <div class="mermaid" style="padding:12px;margin:8px 0">
+flowchart TD
+    A[Deal status=settled] --> B[Trigger Sprint O-1<br/>update_partner_volume]
+    B --> C[partner_ratings<br/>total_volume_kg +=]
+    C --> D[Trigger update_partner_tier]
+    D --> E[Check thresholds]
+    E --> F[Sprint O-7 sync<br/>b2b.partners.tier]
+    F --> G[Portal badge updated<br/>realtime]
+      </div>
+      <table style="font-size:12px;margin-top:8px">
+        <tr><td>🥉 Bronze</td><td>&lt; 100.000 kg</td></tr>
+        <tr><td>🥈 Silver</td><td>100.000 — 500.000 kg</td></tr>
+        <tr><td>🥇 Gold</td><td>500.000 — 2.000.000 kg</td></tr>
+        <tr><td>💎 Platinum</td><td>2.000.000 — 5.000.000 kg</td></tr>
+        <tr><td>💠 Diamond</td><td>≥ 5.000.000 kg</td></tr>
+      </table>
+    </div>
+
+    <div class="card card-accent">
+      <h3 style="margin-top:0">💬 Chat Realtime Cross-portal</h3>
+      <div class="mermaid" style="padding:12px;margin:8px 0">
+flowchart LR
+    A[ERP event<br/>deal/advance/settlement/dispute] --> B[Trigger sinh chat message]
+    B --> C[Supabase Realtime broadcast<br/>REPLICA IDENTITY FULL]
+    C --> D[Portal subscriber<br/>&lt; 2 giây]
+    D --> E[Card refresh +<br/>notification bell]
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ INTEGRATION ═══════════════════════════ -->
+<section id="integration">
+  <h2><span class="num">G</span>Sơ đồ tích hợp hệ thống</h2>
+  <p class="lead">3 client (Partner Portal · ERP · Weighbridge) + 1 backend Supabase duy nhất.</p>
+
+  <div class="mermaid">
+flowchart TB
+    subgraph clients["🖥️ CLIENT APPS"]
+        P1["🤝 Partner Portal<br/>b2b.huyanhrubber.vn"]
+        E1["🏭 ERP<br/>huyanhrubber.vn"]
+        W1["⚖️ Weighbridge<br/>sub-app (Keli)"]
+    end
+
+    subgraph backend["☁️ SUPABASE BACKEND"]
+        AUTH["🔐 Auth"]
+        DB["🗄️ PostgreSQL<br/>(RLS enforced)"]
+        RT["📡 Realtime<br/>publication"]
+        STORAGE["📦 Storage<br/>(photos, docs)"]
+    end
+
+    subgraph external["🔗 EXTERNAL"]
+        VERCEL["▲ Vercel Auto-Deploy"]
+        GITHUB["🐙 GitHub"]
+    end
+
+    P1 <-->|HTTPS + JWT| AUTH
+    P1 <-->|REST + Realtime| DB
+    P1 <--> RT
+    E1 <-->|HTTPS + JWT| AUTH
+    E1 <-->|REST + Realtime| DB
+    E1 <--> RT
+    W1 <--> DB
+
+    GITHUB -->|push main| VERCEL
+    VERCEL -->|deploy| P1
+    VERCEL -->|deploy| E1
+
+    style backend fill:#F0FDF4,stroke:#059669,stroke-width:2px
+    style clients fill:#EFF6FF,stroke:#2563EB,stroke-width:2px
+    style external fill:#FEF3C7,stroke:#F59E0B,stroke-width:2px
+  </div>
+
+  <h3>👥 Actor × Role × Quyền</h3>
+  <table>
+    <thead>
+      <tr><th>Actor</th><th>Login</th><th>Đặc quyền</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="b b-partner">Partner</span></td>
+        <td>b2b.huyanhrubber.vn</td>
+        <td>SELECT/INSERT on own data (RLS <code class="inline">partner_id = current_partner_id()</code>)</td>
+      </tr>
+      <tr>
+        <td><span class="b b-bgd">Factory BGĐ</span></td>
+        <td>ERP + role=admin</td>
+        <td>Full deal lifecycle + Executive Dashboard</td>
+      </tr>
+      <tr>
+        <td><span class="b b-sale">Kinh doanh</span></td>
+        <td>ERP + role=sale</td>
+        <td>Tạo demand, chốt offer, xem deal</td>
+      </tr>
+      <tr>
+        <td><span class="b b-qc">QC</span></td>
+        <td>ERP + role=qc</td>
+        <td>Cập nhật DRC mẫu, qc_status</td>
+      </tr>
+      <tr>
+        <td><span class="b b-acct">Kế toán</span></td>
+        <td>ERP + role=accounting</td>
+        <td>Advance + Settlement + Payment</td>
+      </tr>
+      <tr>
+        <td><span class="b b-logis">Logistics</span></td>
+        <td>ERP + role=logistics</td>
+        <td>Weighbridge + stock-in/out + shipping</td>
+      </tr>
+      <tr>
+        <td><span class="b b-muted">Scale operator</span></td>
+        <td>Sub-app weighbridge</td>
+        <td>Chỉ weighbridge_tickets (cân xe)</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════ GUARDS ═══════════════════════════ -->
+<section id="guards">
+  <h2><span class="num">H</span>Guards + Cảnh báo cốt lõi</h2>
+  <p class="lead">Tất cả cảnh báo hiện ở đâu + bảo vệ những gì.</p>
+
+  <table>
+    <thead>
+      <tr><th>Cảnh báo / Guard</th><th>Vị trí UI</th><th>Source</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Deal chưa accepted — không cho cân</td><td>Weighbridge UI + DB</td><td>Sprint J P-0 trigger</td></tr>
+      <tr><td>Stock-in B2B chưa accepted</td><td>Stock-in form</td><td>Sprint J trg_enforce_b2b_stock_in</td></tr>
+      <tr><td>Advance vs deal chưa accepted</td><td>Advance form</td><td>Sprint J</td></tr>
+      <tr><td>Demand over-filled (sum &gt; qty)</td><td>Demand detail</td><td>Sprint L trigger</td></tr>
+      <tr><td>Demand deadline ≤ published_at</td><td>Demand create</td><td>CHECK chk_demand_deadline</td></tr>
+      <tr><td>Offer price ngoài khoảng giá</td><td>Portal offer form</td><td>Client validate</td></tr>
+      <tr><td>Settlement gross &gt; final_value</td><td>Settlement form</td><td>App-layer validate</td></tr>
+      <tr><td>running_balance cumulative sai</td><td>Partner Ledger</td><td>Sprint N cumulative SUM</td></tr>
+      <tr><td>Tier volume out of sync</td><td>Partner detail</td><td>Sprint O-1 + O-7</td></tr>
+      <tr><td>L/C expiry ≤ 7 ngày</td><td>Cash Flow LC tab</td><td>lcExpiryTag()</td></tr>
+      <tr><td>Mã KH duplicate</td><td>Customer modal toast đỏ</td><td>generateCustomerCode (fixed)</td></tr>
+      <tr><td>Container bale orphan</td><td>Container table</td><td>Sprint Q soft sync trigger</td></tr>
+      <tr><td>Stock thiếu allocate</td><td>StockPicker</td><td>2% tolerance rule</td></tr>
+      <tr><td>A/R Aging 90+ ngày</td><td>AR Aging bucket đỏ</td><td>Auto compute</td></tr>
+      <tr><td>Kho nhận hàng sai type</td><td>Demand create dropdown</td><td>Filter type='raw'</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════ CLOSING ═══════════════════════════ -->
+<section id="summary">
+  <h2><span class="num">✓</span>Tóm gọn cho slide</h2>
+  <div class="card card-accent" style="background: linear-gradient(135deg, #1B4D3E 0%, #2E7D5B 100%); color: white; padding: 32px;">
+    <div style="font-size: 20px; font-weight: 600; line-height: 1.5;">
+      "Hệ B2B Huy Anh tự động kết nối <strong style="color:#FDE68A">2 kênh mua</strong>
+      (chat trực tiếp + nhu cầu mua), chuyển Deal qua <strong style="color:#FDE68A">5 giai đoạn</strong>
+      (QC → Duyệt → Nhập kho → Tạm ứng → Quyết toán → Thanh toán) với <strong style="color:#FDE68A">kiểm soát chặt chẽ</strong>
+      (Sprint J guards), tích hợp <strong style="color:#FDE68A">cân xe tự động hai chiều</strong>
+      (IN → nhập kho, OUT → xuất kho) và <strong style="color:#FDE68A">đồng bộ realtime cross-portal</strong>
+      để factory — partner cộng tác không qua email/điện thoại."
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-top: 24px;">
+    <div class="kpi">
+      <div class="label">Thời gian tạo deal</div>
+      <div class="value" style="color: var(--success)">-78%</div>
+      <div class="sub">45' → 10'</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Báo cáo AR Aging</div>
+      <div class="value" style="color: var(--success)">Instant</div>
+      <div class="sub">Từ 2-3 giờ/tháng</div>
+    </div>
+    <div class="kpi">
+      <div class="label">L/C miss deadline</div>
+      <div class="value" style="color: var(--success)">0</div>
+      <div class="sub">Alert tự động ≤ 7 ngày</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Latency báo cáo BGĐ</div>
+      <div class="value" style="color: var(--success)">Realtime</div>
+      <div class="sub">Từ 2-3 ngày</div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  <strong>🌿 Huy Anh Rubber — B2B Flow Documentation</strong><br>
+  Phiên bản 1.0 · 2026-04-22 · ERP <code style="color:white">github.com/huyanhphongdien/huyanh-erp</code> · Portal <code style="color:white">github.com/huyanhphongdien/huyanh-b2b-portal</code><br>
+  <span style="opacity:0.7;font-size:12px">Supabase: dygveetaatqllhjusyzz · Contact: huyanhphongdien@gmail.com</span>
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#E6F4EF',
+      primaryTextColor: '#1A2B25',
+      primaryBorderColor: '#1B4D3E',
+      lineColor: '#5C7369',
+      secondaryColor: '#FEF3C7',
+      tertiaryColor: '#DBEAFE',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: '14px',
+    },
+    flowchart: { curve: 'basis', padding: 20, htmlLabels: true },
+    sequence: { actorMargin: 80, boxMargin: 10 },
+    stateDiagram: { curve: 'basis' },
+  });
+</script>
+
+</body>
+</html>

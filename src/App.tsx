@@ -178,6 +178,7 @@ const BlendDetailPage = lazy(() => import('./pages/wms/blending/BlendDetailPage'
 const BlendSuggestPage = lazy(() => import('./pages/wms/blending/BlendSuggestPage'));
 // Phase A: 5 report page rời giờ chỉ render nội bộ trong WMSReportsTabbedPage
 const WMSSettingsPage = lazy(() => import('./pages/wms/WMSSettingsPage'));
+const WMSConfigTabbedPage = lazy(() => import('./pages/wms/WMSConfigTabbedPage'));
 
 // ===== PROJECT MANAGEMENT (lazy) =====
 const ProjectCategoryPage = lazy(() => import('./pages/projects/ProjectCategoryPage'));
@@ -435,8 +436,10 @@ function App() {
                 <Route path="reports/supplier-quality" element={<Navigate to="/wms/reports?tab=supplier-quality" replace />} />
                 <Route path="reports/inventory-value" element={<Navigate to="/wms/reports?tab=inventory-value" replace />} />
                 <Route path="reports/supplier-scoring" element={<Navigate to="/wms/reports?tab=supplier-scoring" replace />} />
-                {/* P11: Settings */}
-                <Route path="settings" element={<WMSSettingsPage />} />
+                {/* P11: Settings (legacy — redirect to consolidated config) */}
+                <Route path="settings" element={<Navigate to="/wms/config?tab=settings" replace />} />
+                {/* Phase B consolidation: Vật liệu + Kho hàng + Cài đặt → 1 page tabs */}
+                <Route path="config" element={<WMSConfigTabbedPage />} />
                 {/* Yard Map */}
                 <Route path="yard-map" element={<YardMapPage />} />
               </Route>

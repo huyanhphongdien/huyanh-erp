@@ -375,7 +375,7 @@ const getMenuGroups = (
     ],
   },
 
-  // ★ KHO (WMS) — Phase A consolidation: 15 → 12 items, inline tabs trong /wms, /wms/qc, /wms/reports
+  // ★ KHO (WMS) — Phase B consolidation: 10 → 8 items, inline tabs trong /wms, /wms/qc, /wms/reports, /wms/config
   // ============================================================
   {
     title: 'KHO (WMS)',
@@ -389,10 +389,8 @@ const getMenuGroups = (
       { path: '/wms/transfer', label: 'Chuyển kho NM', icon: <PackageMinus size={18} /> },
       { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
       { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> }, // tabs: dashboard | recheck | quick-scan | standards
-      { path: '/wms/materials', label: 'Vật liệu', icon: <Package size={18} /> },
-      { path: '/wms/warehouses', label: 'Kho hàng', icon: <Warehouse size={18} /> },
       { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> }, // tabs: dashboard | stock-movement | supplier-quality | inventory-value | supplier-scoring
-      { path: '/wms/settings', label: 'Cài đặt kho', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
+      { path: '/wms/config', label: 'Cấu hình', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] }, // tabs: materials | warehouses | settings
     ],
   },
 

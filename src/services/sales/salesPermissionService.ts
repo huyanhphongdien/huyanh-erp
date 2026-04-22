@@ -7,9 +7,9 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Production
   'trunglxh@huyanhrubber.com': 'production',
   'nhanlt@huyanhrubber.com': 'production',
-  // Logistics → Admin (full access)
-  'logistics@huyanhrubber.com': 'admin',
-  'anhlp@huyanhrubber.com': 'admin',
+  // Logistics (Xuất nhập khẩu) — quyền edit Booking / Container / Shipping only
+  'logistics@huyanhrubber.com': 'logistics',
+  'anhlp@huyanhrubber.com': 'logistics',
   // Accounting
   'yendt@huyanhrubber.com': 'accounting',
   'phulv@huyanhrubber.com': 'accounting',

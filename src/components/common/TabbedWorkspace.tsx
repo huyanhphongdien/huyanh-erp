@@ -198,18 +198,20 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
           color: #595959 !important;
           font-weight: 500 !important;
         }
-        .tabbed-workspace-bar .ant-tabs-tab:hover {
+        .tabbed-workspace-bar .ant-tabs-tab:not(.ant-tabs-tab-active):hover {
           background: #f6ffed !important;
           border-color: #2D8B6E !important;
           color: #1B4D3E !important;
         }
-        .tabbed-workspace-bar .ant-tabs-tab-active {
+        .tabbed-workspace-bar .ant-tabs-tab-active,
+        .tabbed-workspace-bar .ant-tabs-tab-active:hover {
           background: #1B4D3E !important;
           border-color: #1B4D3E !important;
           border-bottom: 1px solid #1B4D3E !important;
           box-shadow: 0 -2px 4px rgba(27, 77, 62, 0.2) !important;
         }
-        .tabbed-workspace-bar .ant-tabs-tab-active .ant-tabs-tab-btn {
+        .tabbed-workspace-bar .ant-tabs-tab-active .ant-tabs-tab-btn,
+        .tabbed-workspace-bar .ant-tabs-tab-active:hover .ant-tabs-tab-btn {
           color: #ffffff !important;
           font-weight: 700 !important;
         }

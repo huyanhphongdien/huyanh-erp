@@ -934,9 +934,64 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
     return () => { channel.unsubscribe() }
   }, [roomId, fetchMessages])
 
+  const prevMsgCountRef = useRef(0)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) return
+    const prev = prevMsgCountRef.current
+    const curr = messages.length
+    prevMsgCountRef.current = curr
+    if (curr === 0) return
+
+    // Initial/re-open load → instant scroll. New message (n → n+1) → smooth.
+    const smooth = prev > 0 && curr > prev
+
+    // Rich content (Deal card, ảnh, file) render async → scrollHeight tăng sau
+    // khi scroll lần đầu. Giải pháp: scroll liên tục khi scrollHeight thay đổi
+    // trong 1.5s đầu (initial load), stop sau đó hoặc khi user tự scroll lên.
+    const scrollToBottom = (useSmooth: boolean) => {
+      if (useSmooth) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+      } else {
+        container.scrollTop = container.scrollHeight
+      }
+    }
+    scrollToBottom(smooth)
+
+    // Chỉ cần pin xuống đáy cho initial load (không phải tin mới)
+    if (smooth) return
+
+    let userScrolledUp = false
+    const onUserScroll = () => {
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+      if (distanceFromBottom > 100) userScrolledUp = true
+    }
+    container.addEventListener('scroll', onUserScroll, { passive: true })
+
+    const ro = new ResizeObserver(() => {
+      if (userScrolledUp) return
+      container.scrollTop = container.scrollHeight
+    })
+    ro.observe(container)
+    // Quan sát mọi con để phát hiện Deal card / ảnh load xong
+    Array.from(container.children).forEach((el) => ro.observe(el))
+
+    const timer = setTimeout(() => {
+      ro.disconnect()
+      container.removeEventListener('scroll', onUserScroll)
+    }, 2000)
+
+    return () => {
+      ro.disconnect()
+      container.removeEventListener('scroll', onUserScroll)
+      clearTimeout(timer)
+    }
   }, [messages])
+
+  // Reset prev count khi đổi phòng chat → messages effect next run = initial scroll
+  useEffect(() => {
+    prevMsgCountRef.current = 0
+  }, [roomId])
 
   // ============================================
   // HANDLERS

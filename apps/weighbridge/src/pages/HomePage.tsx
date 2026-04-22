@@ -16,7 +16,7 @@ import { useKeliScale } from '@erp/hooks/useKeliScale'
 import ScaleSettings from '@/components/ScaleSettings'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
-import dealWmsService, { type ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
+import { dealWmsService, type ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
 import type { WeighbridgeTicket, WeighbridgeStatus, WeighbridgeImage } from '@erp/services/wms/wms.types'
 
 const { Title, Text } = Typography

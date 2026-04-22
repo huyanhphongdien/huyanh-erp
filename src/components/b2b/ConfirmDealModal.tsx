@@ -33,6 +33,7 @@ import type { BookingMetadata } from '../../services/b2b/chatMessageService'
 import { PRODUCT_TYPE_LABELS } from '../../services/b2b/chatMessageService'
 import type { ConfirmDealFormData } from '../../types/b2b.types'
 import { calculateEstimatedValue } from '../../services/b2b/dealConfirmService'
+import { supabase } from '../../lib/supabase'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -76,6 +77,9 @@ const ConfirmDealModal = ({
   const [form] = Form.useForm()
   const [hasAdvance, setHasAdvance] = useState(false)
   const [dealType, setDealType] = useState<string>('purchase')
+  const [resolvedFacility, setResolvedFacility] = useState<{
+    id: string | null; code: string | null; name: string | null
+  }>({ id: null, code: null, name: null })
 
   // Reset khi mở modal
   useEffect(() => {
@@ -99,7 +103,47 @@ const ConfirmDealModal = ({
       setHasAdvance(false)
       const demandType = (booking as any).demand_type || (booking as any).deal_type || 'purchase'
       setDealType(demandType as string)
+      // Reset resolved state
+      setResolvedFacility({
+        id: (booking as any).target_facility_id || null,
+        code: (booking as any).target_facility_code || null,
+        name: (booking as any).target_facility_name || null,
+      })
     }
+  }, [open, booking, form])
+
+  // Fallback: nếu booking không có target_facility_id nhưng có demand_id → lookup
+  // từ demand.warehouse_id → warehouse.facility_id. Fix case booking cũ portal
+  // chưa gửi facility info.
+  useEffect(() => {
+    if (!open || !booking) return
+    const bookingAny = booking as any
+    if (bookingAny.target_facility_id) return  // đã có, skip
+    const demandId = bookingAny.demand_id
+    if (!demandId) return
+    const resolve = async () => {
+      const { data: dem } = await supabase
+        .from('b2b_demands')
+        .select('warehouse_id')
+        .eq('id', demandId)
+        .maybeSingle()
+      if (!dem?.warehouse_id) return
+      const { data: wh } = await supabase
+        .from('warehouses')
+        .select('facility_id, facilities:facility_id(id, code, name)')
+        .eq('id', dem.warehouse_id)
+        .maybeSingle()
+      const fac = (wh as any)?.facilities
+      const facId = fac?.id || (wh as any)?.facility_id || null
+      if (!facId) return
+      setResolvedFacility({
+        id: facId,
+        code: fac?.code || null,
+        name: fac?.name || null,
+      })
+      form.setFieldValue('target_facility_id', facId)
+    }
+    resolve()
   }, [open, booking, form])
 
   // Tính giá trị ước tính (reactive)
@@ -136,7 +180,9 @@ const ConfirmDealModal = ({
     try {
       const values = await form.validateFields()
       const bookingMeta = booking as any
-      const finalFacilityId = values.target_facility_id || bookingMeta?.target_facility_id
+      const finalFacilityId = values.target_facility_id
+        || bookingMeta?.target_facility_id
+        || resolvedFacility.id
       const data: ConfirmDealFormData = {
         product_type: values.product_type,
         agreed_quantity_tons: values.agreed_quantity_tons,
@@ -145,8 +191,8 @@ const ConfirmDealModal = ({
         price_unit: values.price_unit,
         // pickup_location đã bỏ khỏi form
         target_facility_id: finalFacilityId,
-        target_facility_code: bookingMeta?.target_facility_code,
-        target_facility_name: bookingMeta?.target_facility_name,
+        target_facility_code: bookingMeta?.target_facility_code || resolvedFacility.code,
+        target_facility_name: bookingMeta?.target_facility_name || resolvedFacility.name,
         delivery_date: values.delivery_date || booking?.delivery_date,
         deal_notes: values.deal_notes,
         deal_type: dealType as 'purchase' | 'sale' | 'processing' | 'consignment',
@@ -306,20 +352,25 @@ const ConfirmDealModal = ({
           />
         </Form.Item>
 
-        {/* Giao tại nhà máy — kế thừa + lock */}
+        {/* Giao tại nhà máy — kế thừa + lock.
+            Thứ tự fallback: booking.target_facility_id (portal đã gửi)
+                           → resolvedFacility (lookup demand.warehouse.facility)
+                           → rỗng (factory phải chọn tay) */}
         <Form.Item
           name="target_facility_id"
           label={<><span style={{ marginRight: 4 }}>🏭</span> Giao tại nhà máy</>}
-          initialValue={(booking as any).target_facility_id}
+          initialValue={(booking as any).target_facility_id || resolvedFacility.id}
           rules={[{ required: true, message: 'Vui lòng chọn nhà máy nhận hàng' }]}
           extra={
             (booking as any).target_facility_code
               ? `Kế thừa từ phiếu chốt (${(booking as any).target_facility_code} — ${(booking as any).target_facility_name || ''})`
-              : 'Đại lý chưa chọn nhà máy trên phiếu chốt.'
+              : resolvedFacility.code
+                ? `Kế thừa từ nhu cầu mua (${resolvedFacility.code} — ${resolvedFacility.name || ''})`
+                : 'Phiếu chốt + nhu cầu mua đều chưa chọn nhà máy. Factory tự chọn.'
           }
         >
           <Select
-            disabled
+            disabled={!!((booking as any).target_facility_id) || !!resolvedFacility.id}
             placeholder="Chọn nhà máy nhận hàng"
             options={[
               { value: '755ae776-3be6-47b8-b1d0-d15b61789f24', label: '🏭 PD — Phong Điền (HQ)' },

@@ -7,6 +7,79 @@
 import { supabase } from '../../lib/supabase'
 
 // ============================================
+// P26: ADVANCE MAX % BY TIER
+// ============================================
+// Theo roadmap v4 default 5: diamond 85 / gold 70 / silver 55 / bronze 40 / new 25
+export const ADVANCE_MAX_PERCENT_BY_TIER: Record<string, number> = {
+  diamond: 0.85,
+  gold: 0.70,
+  silver: 0.55,
+  bronze: 0.40,
+  new: 0.25,
+}
+
+/**
+ * P26 guard: tổng advance đã ứng + advance mới ≤ deal.final_value × tier%
+ * Lookup partner tier + deal.final_value, existing advances, compute.
+ * Throw error rõ ràng nếu vượt.
+ */
+async function validateAdvanceTierLimit(input: {
+  deal_id: string
+  partner_id: string
+  amount_vnd?: number | null
+  amount?: number
+}): Promise<void> {
+  // Lookup partner tier
+  const { data: partner } = await supabase
+    .from('b2b_partners')
+    .select('tier, name, code')
+    .eq('id', input.partner_id)
+    .maybeSingle()
+
+  const tier = (partner as any)?.tier || 'new'
+  const maxPct = ADVANCE_MAX_PERCENT_BY_TIER[tier] ?? ADVANCE_MAX_PERCENT_BY_TIER.new
+
+  // Lookup deal.final_value
+  const { data: deal } = await supabase
+    .from('b2b_deals')
+    .select('final_value, deal_number, total_value_vnd')
+    .eq('id', input.deal_id)
+    .maybeSingle()
+
+  const finalValue = Number((deal as any)?.final_value || (deal as any)?.total_value_vnd || 0)
+  if (finalValue <= 0) {
+    // Không có final_value → bypass (deal mới tạo chưa tính)
+    return
+  }
+
+  const maxAllowed = finalValue * maxPct
+
+  // Lookup tổng advance đã acknowledged/paid cho deal
+  const { data: existing } = await supabase
+    .from('b2b_advances')
+    .select('amount_vnd, amount')
+    .eq('deal_id', input.deal_id)
+    .in('status', ['approved', 'paid'])
+
+  const existingTotal = (existing || []).reduce(
+    (sum, a: any) => sum + Number(a.amount_vnd || a.amount || 0), 0
+  )
+
+  const newAmount = Number(input.amount_vnd || input.amount || 0)
+  const combinedTotal = existingTotal + newAmount
+
+  if (combinedTotal > maxAllowed) {
+    const fmt = (n: number) => n.toLocaleString('vi-VN')
+    throw new Error(
+      `Vượt hạn mức tạm ứng tier ${tier.toUpperCase()} (${Math.round(maxPct * 100)}%): ` +
+      `Deal ${(deal as any)?.deal_number} final_value=${fmt(finalValue)} → ` +
+      `max=${fmt(maxAllowed)} VND. Đã ứng ${fmt(existingTotal)}, ` +
+      `muốn thêm ${fmt(newAmount)} → tổng ${fmt(combinedTotal)} vượt hạn.`
+    )
+  }
+}
+
+// ============================================
 // TYPES
 // ============================================
 
@@ -295,6 +368,11 @@ export const advanceService = {
     if (advanceData.exchange_rate !== undefined && advanceData.exchange_rate !== null && advanceData.exchange_rate <= 0) {
       throw new Error('Tỷ giá phải lớn hơn 0')
     }
+
+    // ─── P26 B2B Intake v4: Tier-based advance max ───
+    // Tier% × deal.final_value (VNĐ) = hạn mức tối đa
+    // diamond 85 / gold 70 / silver 55 / bronze 40 / new 25
+    await validateAdvanceTierLimit(advanceData)
 
     const advanceNumber = generateAdvanceNumber()
 

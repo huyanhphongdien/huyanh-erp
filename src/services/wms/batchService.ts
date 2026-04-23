@@ -92,8 +92,27 @@ const BATCH_LIST_SELECT = `
 /**
  * Map batch_type → prefix mã lô
  * TP = Thành phẩm, PT = Phối trộn, NVL = Nguyên vật liệu
+ *
+ * B2B Intake v4 P24 extension — thêm options cho 3 flow mới:
+ * - purchaseType='outright' + nationality='LAO' → LAO (hộ Lào qua đại lý)
+ * - purchaseType='drc_after_production' → PCB (PostCâng-Batch, đợi SX)
+ * - purchaseType='farmer_walkin' → FW (Farmer Walk-in)
+ * - Default fallback giữ logic cũ (NVL/PT/TP)
  */
-function getBatchPrefix(batchType: string, materialType?: string): string {
+function getBatchPrefix(
+  batchType: string,
+  materialType?: string,
+  options?: { purchase_type?: string; nationality?: string }
+): string {
+  // P24: ưu tiên purchase_type prefix
+  if (options?.purchase_type) {
+    if (options.purchase_type === 'outright' && options.nationality === 'LAO') return 'LAO'
+    if (options.purchase_type === 'drc_after_production') return 'PCB'
+    if (options.purchase_type === 'farmer_walkin') return 'FW'
+    // outright VN / standard → fallback prefix cũ
+  }
+
+  // Legacy logic
   if (batchType === 'blend') return 'PT'
   if (materialType === 'raw') return 'NVL'
   return 'TP'
@@ -120,12 +139,18 @@ function getShortSKU(sku: string): string {
  * Tự sinh mã lô theo format mới: {Loại}-{MãSP}-{YYMMDD}-{Seq}
  * VD: TP-SVR10-260211-001, PT-SVR10-260215-001, NVL-MU-260211-001
  *
+ * B2B Intake v4 P24: options.purchase_type + nationality → prefix khác
+ * VD: LAO-SVR10-260423-001 (outright Lào), PCB-MU-260423-001 (drc_after),
+ *     FW-MU-260423-001 (farmer walk-in)
+ *
  * @param materialId - UUID của sản phẩm (để lấy SKU)
  * @param batchType  - 'production' | 'blend' | 'purchase'
+ * @param options    - { purchase_type, nationality } cho 3 flow B2B mới
  */
 async function generateBatchNo(
   materialId: string,
-  batchType: string = 'production'
+  batchType: string = 'production',
+  options?: { purchase_type?: string; nationality?: string }
 ): Promise<string> {
   // 1. Lấy SKU + type của material
   const { data: mat, error: matErr } = await supabase
@@ -137,7 +162,7 @@ async function generateBatchNo(
   if (matErr) throw matErr
   if (!mat) throw new Error(`Không tìm thấy sản phẩm: ${materialId}`)
 
-  const prefix = getBatchPrefix(batchType, mat.type)
+  const prefix = getBatchPrefix(batchType, mat.type, options)
   const shortSKU = getShortSKU(mat.sku)
 
   // 2. Tạo date part

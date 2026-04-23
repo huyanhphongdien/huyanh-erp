@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototype — 3 Luồng Mua Mủ B2B · Huy Anh Rubber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #1B4D3E;
+    --primary-light: #2E7D5B;
+    --primary-dark: #0F3D30;
+    --accent: #D4AF37;
+    --bg: #F7F9F8;
+    --bg-card: #FFFFFF;
+    --border: #E3E8E5;
+    --text: #1A2B25;
+    --text-muted: #5C7369;
+    --success: #2E7D32;
+    --warning: #F59E0B;
+    --danger: #DC2626;
+    --info: #2563EB;
+    --partner: #7C3AED;
+    --shadow: 0 1px 3px rgba(27,77,62,0.08), 0 4px 12px rgba(27,77,62,0.04);
+    --shadow-lg: 0 4px 12px rgba(27,77,62,0.08), 0 12px 32px rgba(27,77,62,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    font-size: 14px;
+  }
+  code, pre, .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 55%, #3A9B7A 100%);
+    color: white;
+    padding: 48px 32px 40px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .hero p { opacity: 0.92; font-size: 15px; max-width: 800px; margin: 0 auto; }
+  .hero .tag {
+    display: inline-block;
+    margin-top: 12px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    padding: 6px 14px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* TABS */
+  .tabs {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .tabs-inner {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: flex;
+    gap: 0;
+    padding: 0 16px;
+  }
+  .tab {
+    flex: 1;
+    padding: 16px 20px;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 3px solid transparent;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .tab:hover { background: var(--bg); color: var(--primary); }
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--accent);
+    background: #FEFCF5;
+  }
+  .tab .tab-num {
+    width: 26px;
+    height: 26px;
+    background: var(--bg);
+    color: var(--text-muted);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .tab.active .tab-num { background: var(--primary); color: white; }
+  .tab-sub { font-size: 11px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
+
+  /* CONTAINER */
+  .container { max-width: 1240px; margin: 0 auto; padding: 32px 16px; }
+  .flow { display: none; }
+  .flow.active { display: block; }
+
+  /* STEPPER */
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 20px 24px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .step-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    border: 2px solid var(--border);
+    transition: all 0.2s;
+  }
+  .step-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .step-item.current .step-dot {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    transform: scale(1.08);
+    box-shadow: 0 0 0 4px rgba(27,77,62,0.12);
+  }
+  .step-item.current .step-label { color: var(--primary); font-weight: 700; }
+  .step-item.done .step-dot {
+    background: var(--success);
+    color: white;
+    border-color: var(--success);
+  }
+  .step-item.done .step-label { color: var(--success); }
+  .step-line {
+    flex: 1;
+    min-width: 16px;
+    height: 2px;
+    background: var(--border);
+  }
+  .step-line.done { background: var(--success); }
+
+  /* CARD */
+  .card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .card h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-bottom: 4px;
+  }
+  .card .sub {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .card-warn { background: #FFFBEB; border-left: 4px solid var(--warning); }
+  .card-info { background: #EFF6FF; border-left: 4px solid var(--info); }
+  .card-ok { background: #F0FDF4; border-left: 4px solid var(--success); }
+  .card-danger { background: #FEF2F2; border-left: 4px solid var(--danger); }
+  .card-partner { background: #F5F3FF; border-left: 4px solid var(--partner); }
+
+  /* FORM */
+  .row { display: grid; gap: 14px; margin-bottom: 14px; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .row-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  @media (max-width: 720px) {
+    .row-2, .row-3, .row-4 { grid-template-columns: 1fr; }
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 5px;
+  }
+  label .req { color: var(--danger); margin-left: 2px; }
+  label .q {
+    display: inline-block;
+    background: var(--warning);
+    color: white;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    font-size: 10px;
+    text-align: center;
+    line-height: 14px;
+    font-weight: 800;
+    margin-left: 4px;
+    cursor: help;
+  }
+  input[type=text], input[type=number], input[type=tel], input[type=date], select, textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    background: white;
+    transition: all 0.15s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(27,77,62,0.1);
+  }
+  input[readonly], input[disabled] {
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+  .radio-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .radio-option {
+    flex: 1;
+    min-width: 160px;
+    padding: 12px 14px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: white;
+  }
+  .radio-option:hover { border-color: var(--primary-light); }
+  .radio-option.selected {
+    border-color: var(--primary);
+    background: #F0FDF4;
+    box-shadow: 0 2px 8px rgba(27,77,62,0.08);
+  }
+  .radio-option .ro-title { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+  .radio-option .ro-desc { font-size: 12px; color: var(--text-muted); }
+
+  /* BUTTON */
+  .btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(27,77,62,0.25); }
+  .btn-ghost { background: white; color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg); color: var(--text); }
+  .btn-accent { background: var(--accent); color: var(--primary-dark); }
+  .btn-success { background: var(--success); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    gap: 10px;
+  }
+
+  /* BADGE */
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .b-primary { background: #E6F0EB; color: var(--primary); }
+  .b-warn { background: #FEF3C7; color: #92400E; }
+  .b-info { background: #DBEAFE; color: #1E40AF; }
+  .b-success { background: #DCFCE7; color: #166534; }
+  .b-danger { background: #FEE2E2; color: #991B1B; }
+  .b-partner { background: #F5F3FF; color: var(--partner); }
+  .b-muted { background: var(--bg); color: var(--text-muted); }
+
+  /* TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: var(--bg);
+    font-weight: 700;
+    color: var(--text);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  tr:last-child td { border-bottom: none; }
+  .num-cell { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+  /* KPI */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 12px 0; }
+  .kpi {
+    background: linear-gradient(135deg, var(--bg) 0%, white 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .kpi .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi .kpi-value { font-size: 22px; font-weight: 800; color: var(--primary); margin: 4px 0; font-family: 'JetBrains Mono', monospace; }
+  .kpi .kpi-sub { font-size: 11px; color: var(--text-muted); }
+
+  /* TIMELINE */
+  .timeline {
+    position: relative;
+    padding-left: 28px;
+    border-left: 2px dashed var(--border);
+    margin: 12px 0;
+  }
+  .timeline-item { margin-bottom: 18px; position: relative; }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -35px;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--border);
+  }
+  .timeline-item.done::before { background: var(--success); border-color: var(--success); }
+  .timeline-item.current::before {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(27,77,62,0.2);
+  }
+  .timeline-item.waiting::before { background: var(--warning); border-color: var(--warning); }
+  .timeline-item h4 { font-size: 14px; font-weight: 700; }
+  .timeline-item .ts { font-size: 11px; color: var(--text-muted); }
+  .timeline-item .note { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+
+  /* RECEIPT */
+  .receipt {
+    background: linear-gradient(180deg, #FEFCF5 0%, white 100%);
+    border: 2px dashed var(--accent);
+    border-radius: 14px;
+    padding: 28px;
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+  }
+  .receipt::before {
+    content: '✓ HOÀN THÀNH';
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: var(--success);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.5px;
+  }
+  .receipt h3 {
+    color: var(--primary-dark);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    font-family: 'Inter', sans-serif;
+  }
+  .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  .receipt-row.total {
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 2px dashed var(--accent);
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--primary-dark);
+  }
+
+  /* STEP CONTENT */
+  .step-content { display: none; }
+  .step-content.active { display: block; }
+
+  /* DB TABLE REFERENCES */
+  .db-ref {
+    background: #F0FDF4;
+    border: 1px dashed var(--success);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #166534;
+  }
+  .db-ref .ref-title { font-weight: 700; margin-bottom: 4px; }
+  .db-ref code { background: white; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+  /* FAB QUESTION */
+  .q-mark {
+    display: inline-block;
+    background: var(--warning);
+    color: white;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 6px;
+    cursor: help;
+  }
+
+  /* FLOW HEADER */
+  .flow-hero {
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 6px solid var(--primary);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .flow-hero.flow-2 { border-left-color: var(--info); }
+  .flow-hero.flow-3 { border-left-color: var(--partner); }
+  .flow-hero h2 { font-size: 22px; font-weight: 800; color: var(--primary-dark); margin-bottom: 4px; }
+  .flow-hero p { color: var(--text-muted); font-size: 14px; }
+  .flow-hero .flow-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* HELP TIP */
+  .tip {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  /* PRODUCTION GATE */
+  .waiting-gate {
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    border: 2px dashed var(--warning);
+    border-radius: 14px;
+    padding: 32px;
+    text-align: center;
+  }
+  .waiting-gate .icon { font-size: 42px; margin-bottom: 8px; }
+  .waiting-gate h4 { font-size: 18px; color: #92400E; margin-bottom: 6px; }
+  .waiting-gate p { color: #78350F; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🧪 Prototype — 3 Luồng Mua Mủ B2B</h1>
+  <p>Mô phỏng UI/UX cho nhập mủ cao su. Dựa trên schema hiện tại (<code style="background:rgba(255,255,255,0.15);padding:1px 6px;border-radius:4px;">b2b.deals</code>, <code style="background:rgba(255,255,255,0.15);padding:1px 6px;border-radius:4px;">weighbridge_tickets</code>, <code style="background:rgba(255,255,255,0.15);padding:1px 6px;border-radius:4px;">stock_in_orders</code>, <code style="background:rgba(255,255,255,0.15);padding:1px 6px;border-radius:4px;">b2b.settlements</code>) + các bảng mới cần thêm.</p>
+  <span class="tag">📌 <span style="margin-left:4px">Các ô gắn nhãn <b>?</b> là chỗ cần anh confirm thêm</span></span>
+</div>
+
+<div class="tabs">
+  <div class="tabs-inner">
+    <button class="tab active" onclick="switchFlow(1)">
+      <span class="tab-num">1</span>
+      <div>
+        <div>Mua đứt</div>
+        <div class="tab-sub">Đại lý VN · Hộ Lào · DRC cáp</div>
+      </div>
+    </button>
+    <button class="tab" onclick="switchFlow(2)">
+      <span class="tab-num">2</span>
+      <div>
+        <div>Chạy đầu ra</div>
+        <div class="tab-sub">Đại lý · DRC sau sản xuất</div>
+      </div>
+    </button>
+    <button class="tab" onclick="switchFlow(3)">
+      <span class="tab-num">3</span>
+      <div>
+        <div>Walk-in</div>
+        <div class="tab-sub">Hộ nông dân VN · Bất ngờ</div>
+      </div>
+    </button>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════════ FLOW 1 — MUA ĐỨT ═══════════════════════════════ -->
+<div class="flow active" id="flow-1">
+
+  <div class="flow-hero">
+    <h2>🥇 Luồng 1 — Mua Đứt</h2>
+    <p>Người thu mua <b>cáp DRC bằng kinh nghiệm</b> trước → mua dứt điểm → mủ về nhà máy → sản xuất. Không QC chính thức, không BGĐ duyệt. Áp dụng cho: Đại lý VN mua đứt + hộ nông dân Lào.</p>
+    <div class="flow-meta">
+      <span class="badge b-primary">Nhanh gọn · 4 bước</span>
+      <span class="badge b-warn">Bypass QC + Duyệt</span>
+      <span class="badge b-info">Giá chốt cứng</span>
+      <span class="badge b-success">Thanh toán ngay tại cân</span>
+    </div>
+  </div>
+
+  <div class="stepper" id="stepper-1">
+    <div class="step-item current" data-step="1"><div class="step-dot">1</div><div class="step-label">Nguồn mua</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="2"><div class="step-dot">2</div><div class="step-label">Cáp DRC + Giá</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="3"><div class="step-dot">3</div><div class="step-label">Cân xe</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="4"><div class="step-dot">4</div><div class="step-label">Nhập kho + Thanh toán</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="5"><div class="step-dot">✓</div><div class="step-label">Hoàn thành</div></div>
+  </div>
+
+  <!-- Step 1.1 — Nguồn mua -->
+  <div class="step-content active" data-flow="1" data-step="1">
+    <div class="card">
+      <h3>1. Chọn nguồn mua</h3>
+      <p class="sub">Phân loại để hệ thống chọn đúng kho nhập và tạo record trong bảng phù hợp.</p>
+
+      <label>Loại nguồn <span class="req">*</span></label>
+      <div class="radio-group">
+        <div class="radio-option selected" onclick="selectRadio(this,'f1-source')" data-value="dealer_vn">
+          <div class="ro-title">🇻🇳 Đại lý VN mua đứt</div>
+          <div class="ro-desc">Chọn từ danh sách đại lý đã có (b2b.partners). Nhập vào KHO-NVL (PD) hoặc TL-NVL.</div>
+        </div>
+        <div class="radio-option" onclick="selectRadio(this,'f1-source')" data-value="household_lao">
+          <div class="ro-title">🇱🇦 Hộ nông dân Lào</div>
+          <div class="ro-desc">Quick-create hoặc chọn hộ đã lưu. Nhập vào LAO-NVL. Hóa đơn song ngữ.</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row row-2">
+        <div>
+          <label>Chọn đối tác / hộ</label>
+          <select>
+            <option>— Tìm đại lý / hộ —</option>
+            <option>Đại lý Mương Văn A (HSC-0042) · 🥇 Gold</option>
+            <option>Đại lý Trần Văn B (HSC-0057) · 🥈 Silver</option>
+            <option>Hộ Savannakhet · Bounmy X. (LAO-0011)</option>
+            <option>+ Tạo mới hộ Lào…</option>
+          </select>
+          <div class="tip">Nếu chọn "Tạo mới hộ Lào" → popup quick form (tên, SĐT, CMND/Passport, ngân hàng)</div>
+        </div>
+        <div>
+          <label>Người thu mua / cáp DRC <span class="req">*</span></label>
+          <select>
+            <option>Nguyễn Văn Thu (Thu mua · PD)</option>
+            <option>Trần Thị Cáp (Thu mua · TL)</option>
+            <option>Bounmy K. (Thu mua · Lào)</option>
+          </select>
+          <div class="tip">Người này chịu trách nhiệm cáp DRC — lưu audit để thống kê độ chính xác.</div>
+        </div>
+      </div>
+
+      <div class="db-ref">
+        <div class="ref-title">📦 Sẽ INSERT:</div>
+        <code>b2b.deals</code> (purchase_type='outright', buyer_user_id, partner_id) — <b>mới cần thêm field</b> <code>purchase_type</code>, <code>buyer_user_id</code>, <code>estimated_drc</code>.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" disabled>← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(1)">Tiếp tục →</button>
+    </div>
+  </div>
+
+  <!-- Step 1.2 — Cáp DRC + Giá -->
+  <div class="step-content" data-flow="1" data-step="2">
+    <div class="card">
+      <h3>2. Cáp DRC & Chốt giá</h3>
+      <p class="sub">Giá được cố định tại thời điểm này. Không điều chỉnh sau, kể cả QC thấy khác.</p>
+
+      <div class="row row-3">
+        <div>
+          <label>Loại mủ <span class="req">*</span></label>
+          <select>
+            <option>Mủ nước (mu_nuoc)</option>
+            <option>Mủ tạp (mu_tap)</option>
+            <option>Mủ đông (mu_dong)</option>
+            <option>Mủ chén (mu_chen)</option>
+            <option>Mủ tờ (mu_to)</option>
+          </select>
+        </div>
+        <div>
+          <label>DRC cáp (kinh nghiệm) <span class="req">*</span> <span class="q" title="Có cần giới hạn range 25-70% không? Có cảnh báo nếu cách xa DRC trung bình gần đây không?">?</span></label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" value="35" min="0" max="100" step="0.1" style="width:80px">
+            <span style="font-weight:700">%</span>
+          </div>
+          <div class="tip">Dự đoán DRC trước khi đo máy. Lưu vào <code>deal.estimated_drc</code>.</div>
+        </div>
+        <div>
+          <label>Đơn giá <span class="req">*</span></label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" value="12500" style="flex:1">
+            <span style="font-size:12px;color:var(--text-muted)">đ/kg</span>
+          </div>
+          <div class="tip">Đơn giá / kg mủ ướt, đã tính DRC.</div>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div>
+          <label>SL dự kiến (kg)</label>
+          <input type="number" value="3000" readonly>
+          <div class="tip">Ước lượng bởi thu mua — sẽ thay bằng SL cân thực tế.</div>
+        </div>
+        <div>
+          <label>Công thức tính tiền <span class="q" title="Chọn 1 trong 2: (A) giá đã nhân DRC sẵn — tiền = qty × đơn_giá. (B) tiền = qty × DRC × đơn_giá_nền. Cần confirm công thức chuẩn.">?</span></label>
+          <select>
+            <option>A) tiền = qty_cân × đơn_giá (giá đã nhân DRC)</option>
+            <option>B) tiền = qty_cân × DRC_cáp × đơn_giá_nền</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card card-warn" style="margin-top:14px">
+        <b>⚠️ Lưu ý:</b> Sau bước này, giá sẽ <b>bị khóa</b> (lock). QC chỉ đo tham khảo, không ảnh hưởng settlement.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(1)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(1)">Tiếp tục →</button>
+    </div>
+  </div>
+
+  <!-- Step 1.3 — Cân xe -->
+  <div class="step-content" data-flow="1" data-step="3">
+    <div class="card">
+      <h3>3. Cân xe tại cổng</h3>
+      <p class="sub">Tích hợp weighbridge Keli. <b>Không bị Sprint J trigger chặn</b> vì flag <code>purchase_type='outright'</code> bypass guard.</p>
+
+      <div class="row row-3">
+        <div>
+          <label>Biển số xe <span class="req">*</span></label>
+          <input type="text" value="43C-12345">
+        </div>
+        <div>
+          <label>Kho nhập</label>
+          <select>
+            <option>KHO-NVL (Phong Điền)</option>
+            <option>TL-NVL (Trảng Lớn)</option>
+            <option selected>LAO-NVL (Lào — cho hộ Lào)</option>
+          </select>
+        </div>
+        <div>
+          <label>Số cân</label>
+          <select>
+            <option>PD-SCALE-01 (Keli · 60T)</option>
+            <option>LAO-SCALE-01</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div>
+          <label>Cân lần 1 — GROSS (kg)</label>
+          <input type="number" value="11450">
+        </div>
+        <div>
+          <label>Cân lần 2 — TARE (kg)</label>
+          <input type="number" value="8420">
+          <div class="tip">PD cân 2 lần · TL cân 1 lần (tare=0)</div>
+        </div>
+        <div>
+          <label>NET (kg) · tự tính</label>
+          <input type="number" value="3030" readonly style="font-weight:800;color:var(--primary)">
+        </div>
+      </div>
+
+      <div class="db-ref">
+        <div class="ref-title">📦 Sẽ INSERT:</div>
+        <code>weighbridge_tickets</code> (deal_id, ticket_type='in', gross, tare, net) — bypass trigger Sprint J vì <code>deal.purchase_type='outright'</code>.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(1)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(1)">Cân xong → Nhập kho</button>
+    </div>
+  </div>
+
+  <!-- Step 1.4 — Nhập kho + Thanh toán -->
+  <div class="step-content" data-flow="1" data-step="4">
+    <div class="card">
+      <h3>4. Nhập kho & Thanh toán ngay</h3>
+      <p class="sub">Auto-create stock-in từ ticket cân. Sinh phiếu chi luôn.</p>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">SL cân thực</div>
+          <div class="kpi-value">3.030<span style="font-size:14px"> kg</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">DRC cáp</div>
+          <div class="kpi-value">35<span style="font-size:14px">%</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Đơn giá</div>
+          <div class="kpi-value" style="font-size:17px">12.500<span style="font-size:12px"> đ/kg</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Tổng tiền</div>
+          <div class="kpi-value" style="color:var(--accent)">37.875.000 đ</div>
+          <div class="kpi-sub">3.030 × 12.500</div>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div>
+          <label>Phương thức thanh toán <span class="req">*</span></label>
+          <div class="radio-group" style="flex-direction:column">
+            <div class="radio-option selected" onclick="selectRadio(this,'f1-pay')" data-value="cash">
+              <div class="ro-title">💵 Tiền mặt tại chỗ</div>
+              <div class="ro-desc">Xuất phiếu chi ngay, ký tay</div>
+            </div>
+            <div class="radio-option" onclick="selectRadio(this,'f1-pay')" data-value="transfer">
+              <div class="ro-title">🏦 Chuyển khoản</div>
+              <div class="ro-desc">Trong 24-48h, có thể tạm giữ 10%</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label>Ghi chú</label>
+          <textarea rows="3" placeholder="VD: Mủ đẹp, xe sạch, ngày mưa...">Mủ nước Lào, DRC cáp 35% dựa 3 lần giao trước.</textarea>
+
+          <label style="margin-top:10px">Ảnh đính kèm <span class="q" title="Có cần bắt buộc chụp ảnh xe/mủ cho audit không?">?</span></label>
+          <button class="btn btn-ghost" style="width:100%">📷 Chụp / upload ảnh</button>
+        </div>
+      </div>
+
+      <div class="db-ref">
+        <div class="ref-title">📦 Sẽ INSERT song song:</div>
+        • <code>stock_in_orders</code> (source_type='b2b_outright', warehouse=LAO-NVL, confirmed=true)<br>
+        • <code>stock_batches</code> (batch_no='LAO-...', qty_remaining=3030)<br>
+        • <code>b2b.settlements</code> (amount=37.875.000, status='paid', method='cash')<br>
+        • <code>b2b.partner_ledger</code> (settlement_receivable + payment_paid → running=0)<br>
+        • <code>b2b.deals.status='settled'</code> (cascade từ payment)
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(1)">← Quay lại</button>
+      <button class="btn btn-success" onclick="nextStep(1)">✓ Hoàn thành + In phiếu</button>
+    </div>
+  </div>
+
+  <!-- Step 1.5 — Receipt -->
+  <div class="step-content" data-flow="1" data-step="5">
+    <div class="receipt">
+      <h3>PHIẾU MUA MỦ ĐỨT · DL-2604-0127</h3>
+      <div class="receipt-row"><span>Ngày giờ:</span><span>23/04/2026 14:32</span></div>
+      <div class="receipt-row"><span>Người bán:</span><span>Hộ Savannakhet · Bounmy X. (LAO-0011)</span></div>
+      <div class="receipt-row"><span>Người thu mua:</span><span>Bounmy K. (Thu mua · Lào)</span></div>
+      <div class="receipt-row"><span>Loại mủ:</span><span>Mủ nước (mu_nuoc)</span></div>
+      <div class="receipt-row"><span>Xe:</span><span>43C-12345</span></div>
+      <div class="receipt-row"><span>GROSS / TARE / NET:</span><span>11.450 / 8.420 / <b>3.030 kg</b></span></div>
+      <div class="receipt-row"><span>DRC cáp:</span><span>35%</span></div>
+      <div class="receipt-row"><span>Đơn giá:</span><span>12.500 đ/kg</span></div>
+      <div class="receipt-row"><span>Kho:</span><span>LAO-NVL · Batch LAO-2604-0127</span></div>
+      <div class="receipt-row"><span>Phương thức:</span><span>💵 Tiền mặt</span></div>
+      <div class="receipt-row total"><span>TỔNG THANH TOÁN:</span><span>37.875.000 đ</span></div>
+    </div>
+
+    <div class="card card-ok">
+      <h3>✅ Đã hoàn tất 6 tác vụ tự động:</h3>
+      <ul style="padding-left:20px;margin-top:8px;font-size:13px">
+        <li>Tạo deal DL-2604-0127 với <code>purchase_type='outright'</code>, status=<code>settled</code></li>
+        <li>Cân xe ticket <code>WB-IN-5893</code> (bypass Sprint J guard)</li>
+        <li>Stock-in order <code>SI-2604-0342</code> confirmed → stock_batches <code>LAO-2604-0127</code></li>
+        <li>Stock level <code>LAO-NVL/mu_nuoc</code> tăng 3.030 kg</li>
+        <li>Settlement <code>QT-2604-0127</code> status=paid, method=cash</li>
+        <li>Partner ledger: running_balance = 0 đ</li>
+      </ul>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="resetFlow(1)">⟲ Tạo phiếu mới</button>
+      <button class="btn btn-primary">📄 In phiếu chi + Xuất PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════ FLOW 2 — CHẠY ĐẦU RA ═══════════════════════════════ -->
+<div class="flow" id="flow-2">
+
+  <div class="flow-hero flow-2">
+    <h2>🥈 Luồng 2 — Chạy Đầu Ra (DRC-after-production)</h2>
+    <p>Đại lý mang mủ đến, giá chưa chốt. Mủ được <b>chạy thành sản phẩm</b> (crepe / SVR / sheet) — DRC thực tế được xác định từ khối lượng thành phẩm. Sau sản xuất mới quyết toán.</p>
+    <div class="flow-meta">
+      <span class="badge b-info">Lifecycle dài · 7-8 bước</span>
+      <span class="badge b-warn">Có chờ sản xuất</span>
+      <span class="badge b-partner">Có tạm ứng</span>
+      <span class="badge b-success">DRC tính sau</span>
+    </div>
+  </div>
+
+  <div class="stepper" id="stepper-2">
+    <div class="step-item current" data-step="1"><div class="step-dot">1</div><div class="step-label">Tiếp nhận</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="2"><div class="step-dot">2</div><div class="step-label">QC mẫu</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="3"><div class="step-dot">3</div><div class="step-label">BGĐ duyệt</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="4"><div class="step-dot">4</div><div class="step-label">Cân + Nhập kho</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="5"><div class="step-dot">5</div><div class="step-label">Tạm ứng (opt.)</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="6"><div class="step-dot">6</div><div class="step-label">Chờ sản xuất</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="7"><div class="step-dot">7</div><div class="step-label">DRC cao phẩm</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="8"><div class="step-dot">8</div><div class="step-label">Quyết toán</div></div>
+  </div>
+
+  <!-- Step 2.1 — Tiếp nhận -->
+  <div class="step-content active" data-flow="2" data-step="1">
+    <div class="card">
+      <h3>1. Tiếp nhận xe đại lý</h3>
+      <p class="sub">Đại lý chạy đến (walk-in có hẹn hoặc không). Ghi nhận thông tin ban đầu — chưa chốt giá.</p>
+
+      <div class="row row-2">
+        <div>
+          <label>Đại lý <span class="req">*</span></label>
+          <select>
+            <option>Đại lý Mương Văn A (HSC-0042) · 🥇 Gold · Nợ: 12M</option>
+            <option>Đại lý Trần Văn B (HSC-0057) · 🥈 Silver</option>
+            <option>Đại lý Lê Văn C (HSC-0089) · 🥉 Bronze</option>
+          </select>
+        </div>
+        <div>
+          <label>Hình thức</label>
+          <div class="radio-group">
+            <div class="radio-option selected" onclick="selectRadio(this,'f2-type')" data-value="ad-hoc">
+              <div class="ro-title">🚚 Walk-in (chưa hẹn)</div>
+            </div>
+            <div class="radio-option" onclick="selectRadio(this,'f2-type')" data-value="scheduled">
+              <div class="ro-title">📅 Có Deal đã tạo</div>
+              <div class="ro-desc">Từ Flow A (Chat) hoặc Flow B (Demand/Offer)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div>
+          <label>Biển số xe</label>
+          <input type="text" value="43C-55123">
+        </div>
+        <div>
+          <label>Loại mủ dự kiến</label>
+          <select>
+            <option>Mủ tạp (mu_tap)</option>
+            <option>Mủ đông (mu_dong)</option>
+            <option>Mủ chén (mu_chen)</option>
+          </select>
+        </div>
+        <div>
+          <label>SL ước tính (kg)</label>
+          <input type="number" value="5000">
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div>
+          <label>DRC ước lượng <span class="q" title="Đây là số để tính tạm ứng, không dùng quyết toán. Chỉ là reference.">?</span></label>
+          <input type="number" value="38" step="0.1"> %
+        </div>
+        <div>
+          <label>Đơn giá nền (tham khảo theo bảng giá hôm nay) <span class="q" title="Có bảng giá theo ngày không? Hay đại lý/BGĐ tự thương lượng?">?</span></label>
+          <input type="number" value="13000"> đ/kg DRC chuẩn
+        </div>
+      </div>
+
+      <div class="card card-info" style="margin-top:12px">
+        <b>ℹ️ Khác Flow 1:</b> Giá <b>không chốt ở đây</b>. Sẽ tính sau khi chạy đầu ra xong.
+      </div>
+
+      <div class="db-ref">
+        <div class="ref-title">📦 Sẽ INSERT:</div>
+        <code>b2b.deals</code> (purchase_type='drc_after_production', status='processing') + bỏ trống <code>unit_price</code>, <code>actual_drc</code>.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" disabled>← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(2)">Tiếp tục →</button>
+    </div>
+  </div>
+
+  <!-- Step 2.2 — QC mẫu -->
+  <div class="step-content" data-flow="2" data-step="2">
+    <div class="card">
+      <h3>2. QC lấy mẫu đo DRC đầu vào</h3>
+      <p class="sub">QC kiểm tra mẫu trước khi đổ vào bể — giá trị tham khảo, <b>không phải DRC quyết toán</b>.</p>
+
+      <div class="row row-3">
+        <div>
+          <label>QC thực hiện</label>
+          <select>
+            <option>Nguyễn Thị Q. (QC · PD)</option>
+            <option>Phạm Văn K. (QC · TL)</option>
+          </select>
+        </div>
+        <div>
+          <label>DRC mẫu đo được <span class="req">*</span></label>
+          <input type="number" value="37.8" step="0.1"> %
+        </div>
+        <div>
+          <label>Độ ẩm (%)</label>
+          <input type="number" value="2.5" step="0.1">
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div>
+          <label>Đánh giá cảm quan</label>
+          <select>
+            <option>✅ Bình thường, đạt yêu cầu</option>
+            <option>⚠️ Lẫn tạp (cát/lá) nhưng chấp nhận</option>
+            <option>❌ Từ chối (không đạt)</option>
+          </select>
+        </div>
+        <div>
+          <label>Ghi chú QC</label>
+          <textarea rows="2" placeholder="VD: Màu hơi đục, có bọt khí nhiều">Mủ tạp đạt tiêu chuẩn, nên đi chế biến crepe.</textarea>
+        </div>
+      </div>
+
+      <div class="db-ref">
+        <code>b2b.deals.sample_drc</code> = 37.8, <code>qc_user_id</code>, <code>qc_status='passed'</code>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(2)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(2)">QC passed → Trình BGĐ</button>
+    </div>
+  </div>
+
+  <!-- Step 2.3 — BGĐ duyệt -->
+  <div class="step-content" data-flow="2" data-step="3">
+    <div class="card">
+      <h3>3. BGĐ duyệt deal</h3>
+      <p class="sub">Review thông tin QC + quyết định nhận lô này. <b>Duyệt xong mới unlock cân IN</b> (Sprint J guard).</p>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">Đại lý</div>
+          <div class="kpi-value" style="font-size:14px">Mương Văn A · Gold</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">DRC QC</div>
+          <div class="kpi-value">37.8<span style="font-size:14px">%</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Loại mủ</div>
+          <div class="kpi-value" style="font-size:14px">Mủ tạp</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Đơn giá nền</div>
+          <div class="kpi-value" style="font-size:17px">13.000 đ</div>
+        </div>
+      </div>
+
+      <div class="card card-partner" style="margin-top:12px">
+        <b>📋 Lịch sử hợp tác:</b> Đã giao 14 lô gần đây · Giá TB 12.800 đ/kg · Variance DRC &lt; 1% · Không có dispute.
+      </div>
+
+      <div class="row row-2" style="margin-top:14px">
+        <div>
+          <label>Người duyệt</label>
+          <input type="text" value="Ông Huy Anh (Giám đốc)" readonly>
+        </div>
+        <div>
+          <label>Ghi chú BGĐ (optional)</label>
+          <input type="text" placeholder="VD: Ưu tiên chạy trước để trả đơn Trung Quốc">
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-danger">❌ Từ chối lô</button>
+        <button class="btn btn-primary" onclick="nextStep(2)">✅ Duyệt → status='accepted'</button>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-ghost" onclick="prevStep(2)">← Quay lại</button>
+      <span></span>
+    </div>
+  </div>
+
+  <!-- Step 2.4 — Cân + Nhập kho -->
+  <div class="step-content" data-flow="2" data-step="4">
+    <div class="card">
+      <h3>4. Cân xe + Auto nhập kho</h3>
+      <p class="sub">Deal đã ở status <code>accepted</code> → trigger Sprint J cho phép cân + stock-in B2B.</p>
+
+      <div class="row row-3">
+        <div>
+          <label>Cân lần 1 — GROSS</label>
+          <input type="number" value="13250"> kg
+        </div>
+        <div>
+          <label>Cân lần 2 — TARE</label>
+          <input type="number" value="8270"> kg
+        </div>
+        <div>
+          <label>NET</label>
+          <input type="number" value="4980" readonly style="font-weight:800;color:var(--primary)"> kg
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div>
+          <label>Kho nhập</label>
+          <select>
+            <option>KHO-NVL (Phong Điền)</option>
+            <option>TL-NVL (Trảng Lớn)</option>
+          </select>
+        </div>
+        <div>
+          <label>Batch number · tự tạo</label>
+          <input type="text" value="PCB-2604-0542" readonly>
+          <div class="tip">Prefix PCB (production-capable batch) để phân biệt với mua đứt.</div>
+        </div>
+      </div>
+
+      <div class="card card-ok" style="margin-top:12px">
+        <b>✅ Auto cascade:</b> weighbridge_tickets → auto-create stock_in_order → confirm → stock_batches → stock_levels += 4.980 kg → deal.stock_in_count += 1.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(2)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(2)">Nhập kho xong →</button>
+    </div>
+  </div>
+
+  <!-- Step 2.5 — Tạm ứng -->
+  <div class="step-content" data-flow="2" data-step="5">
+    <div class="card">
+      <h3>5. Tạm ứng (tùy chọn)</h3>
+      <p class="sub">Đại lý có thể nhận 1 phần tiền trước trong lúc chờ sản xuất. Tính dựa trên DRC ước lượng.</p>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">Giá trị ước tính</div>
+          <div class="kpi-value" style="font-size:17px">24.537.000 đ</div>
+          <div class="kpi-sub">4.980 × 37.8% × 13.000</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Tối đa tạm ứng <span class="q" title="% tạm ứng tối đa cho phép theo tier đại lý?">?</span></div>
+          <div class="kpi-value" style="font-size:17px">70%</div>
+          <div class="kpi-sub">~17.175.000 đ (Gold tier)</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Công nợ hiện tại</div>
+          <div class="kpi-value" style="font-size:17px;color:var(--danger)">-12M</div>
+          <div class="kpi-sub">Phải trừ vào tạm ứng</div>
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div>
+          <label>Số tiền tạm ứng</label>
+          <input type="number" value="10000000"> đ
+        </div>
+        <div>
+          <label>Phương thức</label>
+          <select>
+            <option>💵 Tiền mặt</option>
+            <option>🏦 Chuyển khoản</option>
+          </select>
+        </div>
+        <div>
+          <label>Đại lý đã xác nhận nhận tiền?</label>
+          <select>
+            <option>Chưa</option>
+            <option>Đã xác nhận (acknowledge)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="db-ref">
+        <code>b2b.advances</code> (amount, status='paid') + <code>partner_ledger</code> entry type='advance_paid'
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(2)">← Quay lại</button>
+      <div>
+        <button class="btn btn-ghost" onclick="nextStep(2)">Bỏ qua</button>
+        <button class="btn btn-primary" onclick="nextStep(2)">Tạm ứng + Tiếp tục</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2.6 — Chờ sản xuất -->
+  <div class="step-content" data-flow="2" data-step="6">
+    <div class="waiting-gate">
+      <div class="icon">⏳</div>
+      <h4>Đang chờ sản xuất xong…</h4>
+      <p>Batch <code>PCB-2604-0542</code> đã vào dây chuyền. Khi xưởng báo output → bước tiếp tự unlock.</p>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h3>📊 Timeline batch PCB-2604-0542</h3>
+      <div class="timeline">
+        <div class="timeline-item done">
+          <h4>Nhập kho NVL</h4>
+          <div class="ts">23/04/2026 09:15 · Kho KHO-NVL · 4.980 kg mủ tạp</div>
+        </div>
+        <div class="timeline-item done">
+          <h4>Gán vào lệnh sản xuất PO-2604-0078</h4>
+          <div class="ts">23/04/2026 14:00 · Sản phẩm: Crepe vàng · Trưởng xưởng: Anh Hải</div>
+        </div>
+        <div class="timeline-item current">
+          <h4>Đang chạy cán crepe</h4>
+          <div class="ts">23/04/2026 16:20 → ETA: 24/04 12:00</div>
+          <div class="note">Line 1 · Temp 85°C · Output hiện: ~1.240 kg (còn chạy)</div>
+        </div>
+        <div class="timeline-item waiting">
+          <h4>Cân + đóng gói thành phẩm</h4>
+          <div class="ts">ETA 24/04/2026 14:00</div>
+        </div>
+        <div class="timeline-item">
+          <h4>Nhập kho TP + đo DRC cao phẩm</h4>
+          <div class="ts">ETA 24/04/2026 16:00</div>
+        </div>
+      </div>
+
+      <div class="card card-info" style="margin-top:10px">
+        <b>🔔 Realtime:</b> Khi xưởng trigger <code>production_orders.finished_at</code> → notification bell cho kế toán + BGĐ, nút "Đo DRC cao phẩm" unlock.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(2)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(2)">⏩ Giả lập: Xưởng đã xong → Đo DRC</button>
+    </div>
+  </div>
+
+  <!-- Step 2.7 — DRC cao phẩm -->
+  <div class="step-content" data-flow="2" data-step="7">
+    <div class="card">
+      <h3>7. Đo DRC cao phẩm (sau sản xuất)</h3>
+      <p class="sub">DRC thực tế = KL thành phẩm / KL mủ đầu vào × 100. Đây là con số <b>quyết toán chính thức</b>.</p>
+
+      <div class="row row-3">
+        <div>
+          <label>KL đầu vào (NET nhập kho)</label>
+          <input type="number" value="4980" readonly> kg
+        </div>
+        <div>
+          <label>KL thành phẩm (crepe) <span class="req">*</span></label>
+          <input type="number" value="1842"> kg
+          <div class="tip">QC đóng gói cân ra</div>
+        </div>
+        <div>
+          <label>DRC cao phẩm · tự tính</label>
+          <input type="number" value="36.99" readonly style="font-weight:800;color:var(--accent)"> %
+          <div class="tip">1842 / 4980 × 100</div>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div>
+          <label>So với DRC cáp ban đầu (37.8%)</label>
+          <input type="text" value="Sai lệch -0.81% (acceptable)" readonly style="color:var(--success);font-weight:600">
+        </div>
+        <div>
+          <label>Sản phẩm</label>
+          <select>
+            <option>Crepe vàng (CV)</option>
+            <option>SVR 3L</option>
+            <option>Sheet RSS1</option>
+            <option>TSR 20</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card card-warn" style="margin-top:12px">
+        <b>⚠️ Nếu variance &gt; 2%:</b> Đại lý có quyền raise DRC dispute (bảng <code>b2b.drc_disputes</code>).
+      </div>
+
+      <div class="db-ref">
+        <code>b2b.deals.actual_drc = 36.99</code>, <code>finished_product_kg = 1842</code>, <code>finished_product_code = 'CV'</code>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(2)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(2)">Chốt DRC → Quyết toán</button>
+    </div>
+  </div>
+
+  <!-- Step 2.8 — Quyết toán + Thanh toán -->
+  <div class="step-content" data-flow="2" data-step="8">
+    <div class="card">
+      <h3>8. Quyết toán + Thanh toán</h3>
+      <p class="sub">Tính tiền chính thức dựa trên DRC cao phẩm. Trừ tạm ứng. Thanh toán → deal=settled.</p>
+
+      <table style="margin-bottom:14px">
+        <thead>
+          <tr><th>Khoản</th><th class="num-cell">Giá trị</th><th>Ghi chú</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>SL mủ đầu vào</td><td class="num-cell">4.980 kg</td><td>Từ weighbridge</td></tr>
+          <tr><td>DRC cao phẩm</td><td class="num-cell">36.99%</td><td>Từ sản xuất</td></tr>
+          <tr><td>Đơn giá nền (DRC 100%)</td><td class="num-cell">13.000 đ/kg</td><td>Thỏa thuận ban đầu</td></tr>
+          <tr><td><b>Gross</b> (4.980 × 36.99% × 13.000)</td><td class="num-cell"><b>23.944.626 đ</b></td><td>Công thức quyết toán <span class="q" title="Có phí sản xuất / chi phí chạy đầu ra trừ vào đây không?">?</span></td></tr>
+          <tr><td>Trừ tạm ứng</td><td class="num-cell" style="color:var(--danger)">-10.000.000 đ</td><td>Step 5</td></tr>
+          <tr><td>Trừ công nợ cũ</td><td class="num-cell" style="color:var(--danger)">-12.000.000 đ</td><td>Partner ledger</td></tr>
+          <tr style="background:var(--bg)">
+            <td><b>Còn phải trả</b></td>
+            <td class="num-cell" style="color:var(--primary);font-size:16px"><b>1.944.626 đ</b></td>
+            <td><b>Remaining</b></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="row row-2">
+        <div>
+          <label>Phương thức thanh toán</label>
+          <select>
+            <option>🏦 Chuyển khoản Vietcombank</option>
+            <option>💵 Tiền mặt</option>
+          </select>
+        </div>
+        <div>
+          <label>Ngày hẹn chi</label>
+          <input type="date" value="2026-04-26">
+        </div>
+      </div>
+
+      <div class="db-ref">
+        • <code>b2b.settlements</code> (gross=23.94M, advance=-10M, prior_debt=-12M, remaining=1.94M, status='approved')<br>
+        • <code>b2b.settlement_payments</code> khi chi<br>
+        • Trigger Sprint O-4 → <code>b2b.deals.status='settled'</code> + tier update
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(2)">← Quay lại</button>
+      <button class="btn btn-success" onclick="resetFlow(2)">✓ Chốt quyết toán</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════ FLOW 3 — WALK-IN HỘ NÔNG DÂN ═══════════════════════════════ -->
+<div class="flow" id="flow-3">
+
+  <div class="flow-hero flow-3">
+    <h2>🥉 Luồng 3 — Walk-in Hộ Nông Dân VN</h2>
+    <p>Hộ nông dân đột xuất mang mủ đến, <b>không có thỏa thuận trước</b>. Xử lý nhanh gọn ngay tại bàn cân: QC đo DRC tại chỗ → cân → thanh toán tiền mặt.</p>
+    <div class="flow-meta">
+      <span class="badge b-partner">Hộ cá thể · VN</span>
+      <span class="badge b-primary">Siêu nhanh · 4 bước</span>
+      <span class="badge b-info">DRC đo thực tế</span>
+      <span class="badge b-warn">Tiền mặt ngay</span>
+    </div>
+  </div>
+
+  <div class="stepper" id="stepper-3">
+    <div class="step-item current" data-step="1"><div class="step-dot">1</div><div class="step-label">Hộ nông dân</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="2"><div class="step-dot">2</div><div class="step-label">QC đo DRC + Cân</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="3"><div class="step-dot">3</div><div class="step-label">Chốt giá</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="4"><div class="step-dot">4</div><div class="step-label">Nhập kho + Chi tiền</div></div>
+    <div class="step-line"></div>
+    <div class="step-item" data-step="5"><div class="step-dot">✓</div><div class="step-label">Xong</div></div>
+  </div>
+
+  <!-- Step 3.1 — Hộ nông dân -->
+  <div class="step-content active" data-flow="3" data-step="1">
+    <div class="card">
+      <h3>1. Thông tin hộ nông dân</h3>
+      <p class="sub">Quick-create 30 giây. Có thể lưu hồ sơ để thống kê về sau, hoặc giao dịch 1 lần.</p>
+
+      <label>Hộ mới hay đã có?</label>
+      <div class="radio-group">
+        <div class="radio-option selected" onclick="selectRadio(this,'f3-existing')" data-value="new">
+          <div class="ro-title">🆕 Hộ mới</div>
+          <div class="ro-desc">Nhập nhanh thông tin cơ bản</div>
+        </div>
+        <div class="radio-option" onclick="selectRadio(this,'f3-existing')" data-value="existing">
+          <div class="ro-title">🔍 Hộ đã từng giao</div>
+          <div class="ro-desc">Tìm theo SĐT / CMND</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row row-3">
+        <div>
+          <label>Họ tên <span class="req">*</span></label>
+          <input type="text" value="Nguyễn Văn Tí">
+        </div>
+        <div>
+          <label>SĐT</label>
+          <input type="tel" value="0987-654-321">
+        </div>
+        <div>
+          <label>CMND/CCCD <span class="q" title="Bắt buộc để xuất phiếu chi thuế GTGT? Hay optional?">?</span></label>
+          <input type="text" value="046095012345">
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div>
+          <label>Địa chỉ (xã/huyện/tỉnh)</label>
+          <input type="text" value="Phong Mỹ, Phong Điền, TT Huế">
+        </div>
+        <div>
+          <label>Lưu hồ sơ?</label>
+          <div class="radio-group">
+            <div class="radio-option selected" onclick="selectRadio(this,'f3-save')" data-value="save">
+              <div class="ro-title">💾 Lưu</div>
+            </div>
+            <div class="radio-option" onclick="selectRadio(this,'f3-save')" data-value="oneoff">
+              <div class="ro-title">1️⃣ Một lần</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label>Quốc tịch</label>
+          <select>
+            <option>🇻🇳 Việt Nam</option>
+            <option disabled>🇱🇦 Lào (→ luồng 1 mua đứt)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="db-ref">
+        <code>b2b.farmer_households</code> (new table) hoặc <code>b2b.partners</code> với <code>partner_type='household'</code> <span class="q" title="Nên tách bảng riêng hay mở rộng partners?">?</span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" disabled>← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(3)">Tiếp tục →</button>
+    </div>
+  </div>
+
+  <!-- Step 3.2 — QC đo DRC + Cân -->
+  <div class="step-content" data-flow="3" data-step="2">
+    <div class="card">
+      <h3>2. QC đo DRC tại chỗ + Cân xe</h3>
+      <p class="sub">Gộp 2 bước làm 1 để tiết kiệm thời gian. QC dùng máy đo mủ di động → cân ngay.</p>
+
+      <div class="row row-3">
+        <div>
+          <label>Loại mủ</label>
+          <select>
+            <option>Mủ chén (mu_chen)</option>
+            <option>Mủ tạp (mu_tap)</option>
+            <option>Mủ đông (mu_dong)</option>
+          </select>
+        </div>
+        <div>
+          <label>QC thực hiện</label>
+          <select>
+            <option>Nguyễn Thị Q. (QC · PD)</option>
+          </select>
+        </div>
+        <div>
+          <label>DRC máy đo <span class="req">*</span></label>
+          <input type="number" value="42.3" step="0.1"> %
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div>
+          <label>GROSS</label>
+          <input type="number" value="1850"> kg
+        </div>
+        <div>
+          <label>TARE (xe máy/thùng)</label>
+          <input type="number" value="220"> kg
+          <div class="tip">Hộ thường đi xe máy/xe tải nhỏ</div>
+        </div>
+        <div>
+          <label>NET</label>
+          <input type="number" value="1630" readonly style="font-weight:800;color:var(--primary)"> kg
+        </div>
+      </div>
+
+      <div class="card card-info" style="margin-top:10px">
+        <b>ℹ️ Khác Flow 2:</b> Không cần BGĐ duyệt, không cần chờ sản xuất. DRC đo máy = DRC quyết toán luôn.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(3)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(3)">Tiếp tục →</button>
+    </div>
+  </div>
+
+  <!-- Step 3.3 — Chốt giá -->
+  <div class="step-content" data-flow="3" data-step="3">
+    <div class="card">
+      <h3>3. Chốt giá theo bảng giá hôm nay</h3>
+      <p class="sub">Hệ thống gợi ý đơn giá từ <code>b2b.daily_price_list</code> theo loại mủ + DRC thực tế.</p>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">Loại mủ</div>
+          <div class="kpi-value" style="font-size:14px">Mủ chén</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">NET</div>
+          <div class="kpi-value">1.630 kg</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">DRC</div>
+          <div class="kpi-value">42.3%</div>
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div>
+          <label>Bảng giá hôm nay</label>
+          <select>
+            <option>Bảng giá 23/04/2026 (chốt 07:00)</option>
+          </select>
+        </div>
+        <div>
+          <label>Đơn giá chuẩn (DRC 100%)</label>
+          <input type="number" value="13000" readonly> đ/kg
+          <div class="tip">Gợi ý từ bảng giá</div>
+        </div>
+        <div>
+          <label>Thương lượng? (hộ mặc cả)</label>
+          <input type="number" value="12800" style="font-weight:700"> đ/kg
+          <div class="tip">Có thể điều chỉnh nhẹ</div>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi" style="background:linear-gradient(135deg,#FEFCF5 0%,#FEF3C7 100%);border-color:var(--accent)">
+          <div class="kpi-label">Tổng tiền dự kiến</div>
+          <div class="kpi-value" style="color:var(--accent);font-size:22px">8.826.952 đ</div>
+          <div class="kpi-sub">1.630 × 42.3% × 12.800</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(3)">← Quay lại</button>
+      <button class="btn btn-primary" onclick="nextStep(3)">Chốt → Thanh toán</button>
+    </div>
+  </div>
+
+  <!-- Step 3.4 — Nhập kho + Chi tiền -->
+  <div class="step-content" data-flow="3" data-step="4">
+    <div class="card">
+      <h3>4. Nhập kho + Chi tiền mặt ngay</h3>
+      <p class="sub">Một thao tác duy nhất: cascade stock-in + settlement + payment + ledger.</p>
+
+      <div class="row row-2">
+        <div>
+          <label>Kho nhập</label>
+          <select>
+            <option>KHO-NVL (Phong Điền)</option>
+          </select>
+          <label style="margin-top:10px">Batch number</label>
+          <input type="text" value="FW-2604-0089" readonly>
+          <div class="tip">Prefix FW (farmer walk-in)</div>
+        </div>
+        <div>
+          <label>Phương thức chi</label>
+          <div class="radio-group" style="flex-direction:column">
+            <div class="radio-option selected" onclick="selectRadio(this,'f3-pay')" data-value="cash">
+              <div class="ro-title">💵 Tiền mặt</div>
+              <div class="ro-desc">Xuất phiếu chi, hộ ký nhận</div>
+            </div>
+            <div class="radio-option" onclick="selectRadio(this,'f3-pay')" data-value="transfer">
+              <div class="ro-title">🏦 Chuyển khoản</div>
+              <div class="ro-desc">Nếu hộ cung cấp STK</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-ok" style="margin-top:12px">
+        <b>✅ Tác vụ tự động khi click "Chi tiền":</b>
+        <ul style="padding-left:20px;margin-top:6px">
+          <li>INSERT <code>b2b.deals</code> purchase_type='farmer_walkin' status='settled'</li>
+          <li>INSERT <code>weighbridge_tickets</code> (bypass Sprint J vì farmer_walkin)</li>
+          <li>INSERT <code>stock_in_orders</code> confirmed + <code>stock_batches FW-2604-0089</code></li>
+          <li>INSERT <code>b2b.settlements</code> status='paid' amount=8.826.952 method='cash'</li>
+          <li>Phiếu chi tiền mặt tự động in</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="prevStep(3)">← Quay lại</button>
+      <button class="btn btn-success" onclick="nextStep(3)">💵 Chi tiền + In phiếu</button>
+    </div>
+  </div>
+
+  <!-- Step 3.5 — Receipt -->
+  <div class="step-content" data-flow="3" data-step="5">
+    <div class="receipt">
+      <h3>PHIẾU CHI HỘ NÔNG DÂN · FW-2604-0089</h3>
+      <div class="receipt-row"><span>Ngày giờ:</span><span>23/04/2026 10:18</span></div>
+      <div class="receipt-row"><span>Người bán (hộ):</span><span>Nguyễn Văn Tí</span></div>
+      <div class="receipt-row"><span>CMND:</span><span>046095012345</span></div>
+      <div class="receipt-row"><span>SĐT:</span><span>0987-654-321</span></div>
+      <div class="receipt-row"><span>Địa chỉ:</span><span>Phong Mỹ, Phong Điền, TT Huế</span></div>
+      <div class="receipt-row"><span>Loại mủ:</span><span>Mủ chén</span></div>
+      <div class="receipt-row"><span>SL cân:</span><span>1.630 kg</span></div>
+      <div class="receipt-row"><span>DRC (máy đo):</span><span>42.3%</span></div>
+      <div class="receipt-row"><span>Đơn giá:</span><span>12.800 đ/kg DRC chuẩn</span></div>
+      <div class="receipt-row"><span>Kho:</span><span>KHO-NVL · Batch FW-2604-0089</span></div>
+      <div class="receipt-row"><span>Phương thức:</span><span>💵 Tiền mặt</span></div>
+      <div class="receipt-row total"><span>ĐÃ CHI:</span><span>8.826.952 đ</span></div>
+    </div>
+
+    <div class="card card-ok">
+      <b>🎉 Hoàn tất 45 giây.</b> Hộ đã rời cổng. Dữ liệu đã sync ERP realtime.
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="resetFlow(3)">⟲ Tiếp hộ tiếp theo</button>
+      <button class="btn btn-primary">📄 In lại phiếu</button>
+    </div>
+  </div>
+
+</div>
+
+</div> <!-- /container -->
+
+<!-- FOOTER -->
+<div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:12px;border-top:1px solid var(--border);background:white;margin-top:40px">
+  🌿 <b>Huy Anh Rubber</b> — Prototype 3 luồng mua mủ · Chưa chốt · Các (<span class="q-mark" style="margin:0">?</span>) là điểm cần confirm<br>
+  Cập nhật: 23/04/2026
+</div>
+
+<script>
+  // Switch flow tab
+  function switchFlow(n) {
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === n - 1));
+    document.querySelectorAll('.flow').forEach((f, i) => f.classList.toggle('active', i === n - 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Radio selection
+  function selectRadio(el, group) {
+    const parent = el.parentElement;
+    parent.querySelectorAll('.radio-option').forEach(r => r.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  // Track current step per flow
+  const currentStep = { 1: 1, 2: 1, 3: 1 };
+  const maxSteps = { 1: 5, 2: 8, 3: 5 };
+
+  function renderStepper(flow) {
+    const stepper = document.getElementById('stepper-' + flow);
+    if (!stepper) return;
+    const items = stepper.querySelectorAll('.step-item');
+    const lines = stepper.querySelectorAll('.step-line');
+    const cur = currentStep[flow];
+    items.forEach((it) => {
+      const s = parseInt(it.dataset.step, 10);
+      it.classList.remove('current', 'done');
+      if (s < cur) it.classList.add('done');
+      else if (s === cur) it.classList.add('current');
+    });
+    lines.forEach((ln, idx) => {
+      ln.classList.toggle('done', idx + 1 < cur);
+    });
+  }
+
+  function renderContent(flow) {
+    document.querySelectorAll(`.step-content[data-flow="${flow}"]`).forEach(c => {
+      c.classList.toggle('active', parseInt(c.dataset.step, 10) === currentStep[flow]);
+    });
+  }
+
+  function nextStep(flow) {
+    if (currentStep[flow] < maxSteps[flow]) {
+      currentStep[flow]++;
+      renderStepper(flow);
+      renderContent(flow);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function prevStep(flow) {
+    if (currentStep[flow] > 1) {
+      currentStep[flow]--;
+      renderStepper(flow);
+      renderContent(flow);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function resetFlow(flow) {
+    currentStep[flow] = 1;
+    renderStepper(flow);
+    renderContent(flow);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+
+</body>
+</html>

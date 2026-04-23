@@ -225,6 +225,11 @@ const B2BRubberIntakePage = lazy(() => import('./pages/b2b/rubber-intake/B2BRubb
 const B2BRubberIntakeDetailPage = lazy(() => import('./pages/b2b/rubber-intake/B2BRubberIntakeDetailPage'));
 // B2B Demands
 const DemandListPage = lazy(() => import('./pages/b2b/demands/DemandListPage'));
+// B2B Intake v4 — 3 flow wizards + daily price admin
+const OutrightWizardPage = lazy(() => import('./pages/b2b/intake/OutrightWizardPage'));
+const WalkinWizardPage = lazy(() => import('./pages/b2b/intake/WalkinWizardPage'));
+const ProductionWizardPage = lazy(() => import('./pages/b2b/intake/ProductionWizardPage'));
+const DailyPriceListPage = lazy(() => import('./pages/b2b/settings/DailyPriceListPage'));
 const DemandCreatePage = lazy(() => import('./pages/b2b/demands/DemandCreatePage'));
 const DemandDetailPage = lazy(() => import('./pages/b2b/demands/DemandDetailPage'))
 
@@ -358,6 +363,11 @@ function App() {
                 <Route path="demands/new" element={<Suspense fallback={<LoadingSpinner />}><DemandCreatePage /></Suspense>} />
                 <Route path="demands/:id/edit" element={<Suspense fallback={<LoadingSpinner />}><DemandCreatePage /></Suspense>} />
                 <Route path="demands/:id" element={<Suspense fallback={<LoadingSpinner />}><DemandDetailPage /></Suspense>} />
+                {/* B2B Intake v4 wizards */}
+                <Route path="intake/outright" element={<Suspense fallback={<LoadingSpinner />}><OutrightWizardPage /></Suspense>} />
+                <Route path="intake/walkin" element={<Suspense fallback={<LoadingSpinner />}><WalkinWizardPage /></Suspense>} />
+                <Route path="intake/production" element={<Suspense fallback={<LoadingSpinner />}><ProductionWizardPage /></Suspense>} />
+                <Route path="settings/daily-prices" element={<Suspense fallback={<LoadingSpinner />}><DailyPriceListPage /></Suspense>} />
                 {/* B2B Rubber Intake (Lý lịch mủ) */}
                 <Route path="rubber-intake" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakePage /></Suspense>} />
                 <Route path="rubber-intake/:id" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakeDetailPage /></Suspense>} />

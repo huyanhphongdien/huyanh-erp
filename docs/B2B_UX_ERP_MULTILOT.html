@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>ERP · huyanhrubber.vn — Multi-Lot Editor + 3 Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--primary:#1B4D3E;--primary-light:#2E7D5B;--primary-dark:#0F3D30;--accent:#D4AF37;--bg:#F7F9F8;--border:#E3E8E5;--text:#1A2B25;--muted:#5C7369;--success:#2E7D32;--warning:#F59E0B;--danger:#DC2626;--info:#2563EB;--partner:#7C3AED;--shadow:0 1px 3px rgba(27,77,62,.08),0 4px 12px rgba(27,77,62,.04)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:14px}
+  code,.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+  .hero{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);color:#fff;padding:40px 24px;text-align:center}
+  .hero h1{font-size:28px;font-weight:800;margin-bottom:6px}
+  .hero p{opacity:.9;font-size:14px;max-width:800px;margin:0 auto}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.15);padding:5px 12px;border-radius:12px;font-size:12px;margin-top:10px}
+  .tabs{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .tabs-inner{max-width:1200px;margin:0 auto;display:flex;padding:0 16px}
+  .tab{flex:1;padding:16px;text-align:center;cursor:pointer;border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+  .tab:hover{background:var(--bg)}
+  .tab.active{color:var(--primary);border-bottom-color:var(--accent);background:#FEFCF5}
+  .container{max-width:1200px;margin:0 auto;padding:24px 16px}
+  .view{display:none}.view.active{display:block}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card h3{font-size:16px;font-weight:700;color:var(--primary-dark);margin-bottom:4px}
+  .card .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .card-warn{background:#FFFBEB;border-left:4px solid var(--warning)}
+  .card-info{background:#EFF6FF;border-left:4px solid var(--info)}
+  .card-ok{background:#F0FDF4;border-left:4px solid var(--success)}
+  .row{display:grid;gap:10px;margin-bottom:10px}
+  .row-2{grid-template-columns:1fr 1fr}.row-3{grid-template-columns:1fr 1fr 1fr}.row-4{grid-template-columns:1fr 1fr 1fr 1fr}
+  label{display:block;font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+  input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;background:#fff}
+  input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(27,77,62,.1)}
+  input[readonly]{background:var(--bg);color:var(--muted)}
+  .btn{padding:8px 16px;border-radius:8px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-ghost{background:#fff;color:var(--muted);border:1px solid var(--border)}
+  .btn-accent{background:var(--accent);color:var(--primary-dark)}
+  .btn-success{background:var(--success);color:#fff}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}
+  .b-primary{background:#E6F0EB;color:var(--primary)}.b-warn{background:#FEF3C7;color:#92400E}.b-info{background:#DBEAFE;color:#1E40AF}
+  .b-success{background:#DCFCE7;color:#166534}.b-danger{background:#FEE2E2;color:#991B1B}.b-partner{background:#F5F3FF;color:var(--partner)}
+  .b-outright{background:#FEF3C7;color:#92400E}.b-drc{background:#DBEAFE;color:#1E40AF}.b-walkin{background:#F5F3FF;color:var(--partner)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border)}
+  th{background:var(--bg);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .num{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:10px 0}
+  .kpi{background:linear-gradient(135deg,var(--bg) 0%,#fff 100%);border:1px solid var(--border);border-radius:8px;padding:12px}
+  .kpi .kpi-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .kpi-value{font-size:20px;font-weight:800;color:var(--primary);margin:4px 0;font-family:'JetBrains Mono',monospace}
+  .kpi .kpi-sub{font-size:10px;color:var(--muted)}
+  .divider{height:1px;background:var(--border);margin:12px 0}
+  .mle-container{border:2px solid var(--primary);border-radius:12px;padding:14px;background:#F0FDF4;margin:10px 0}
+  .mle-container h4{font-size:13px;color:var(--primary-dark);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .mle-row{display:grid;grid-template-columns:30px 2fr 1fr 80px 80px 100px 100px 40px;gap:6px;padding:8px;background:#fff;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;align-items:center}
+  .mle-row.header{background:var(--bg);font-size:10px;text-transform:uppercase;font-weight:700;color:var(--muted);padding:5px 8px}
+  .mle-row input,.mle-row select{padding:5px 7px;font-size:12px;border-radius:4px}
+  .mle-row .del{color:var(--danger);cursor:pointer;text-align:center;font-weight:700}
+  .mle-sum{display:flex;justify-content:space-between;padding:8px 10px;background:var(--primary);color:#fff;border-radius:6px;margin-top:6px;font-size:12px}
+  .mle-sum b{font-size:14px}
+  .mle-warn{background:#FFFBEB;color:#92400E;padding:8px 10px;border-radius:6px;margin-top:6px;font-size:12px;border-left:3px solid var(--warning)}
+  .mle-btn{margin-top:6px;display:flex;justify-content:space-between;align-items:center}
+  .flow-badge{display:inline-flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+  .fan-out{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;margin:10px 0}
+  .fan-arrow{text-align:center;color:var(--accent);font-size:24px;margin:4px 0}
+  .timeline{position:relative;padding-left:24px;border-left:2px dashed var(--border);margin:12px 0}
+  .timeline-item{margin-bottom:14px;position:relative}
+  .timeline-item::before{content:'';position:absolute;left:-30px;top:6px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--border)}
+  .timeline-item.done::before{background:var(--success);border-color:var(--success)}
+  .timeline-item.current::before{background:var(--primary);border-color:var(--primary);box-shadow:0 0 0 3px rgba(27,77,62,.2)}
+  .timeline-item h5{font-size:13px;font-weight:700}
+  .timeline-item .ts{font-size:11px;color:var(--muted)}
+  .timeline-item .note{font-size:12px;color:var(--muted);margin-top:2px}
+  .audit-table td.mono{font-family:'JetBrains Mono',monospace;font-size:11px}
+  .audit-table .diff-old{color:var(--danger);text-decoration:line-through}
+  .audit-table .diff-new{color:var(--success);font-weight:700}
+  .mode-tabs{display:flex;gap:6px;margin-bottom:12px}
+  .mode-tab{flex:1;padding:10px;border:2px solid var(--border);border-radius:8px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;background:#fff;transition:all .15s}
+  .mode-tab.active{border-color:var(--primary);background:#F0FDF4;color:var(--primary)}
+  .mode-tab .mt-sub{font-size:10px;color:var(--muted);margin-top:2px;font-weight:400}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🖥️ ERP · huyanhrubber.vn</h1>
+  <p>UX mới cho 3 flow mua mủ + Multi-Lot Editor (1 xe nhiều lô) + Settlement fan-out</p>
+  <span class="tag">💼 Desktop · Dành cho kế toán, thu mua, BGĐ, admin</span>
+</div>
+
+<div class="tabs">
+  <div class="tabs-inner">
+    <button class="tab active" onclick="sw('v1')">1. MultiLotEditor component</button>
+    <button class="tab" onclick="sw('v2')">2. Wizard 3 flow (integrated)</button>
+    <button class="tab" onclick="sw('v3')">3. Settlement fan-out admin</button>
+    <button class="tab" onclick="sw('v4')">4. Audit log & dispute</button>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════ VIEW 1: MULTILOT EDITOR STANDALONE ═══════════════════════ -->
+<div class="view active" id="v1">
+
+<div class="card">
+  <h3>🧩 Component <code>&lt;MultiLotEditor /&gt;</code></h3>
+  <p class="sub">Component core cho tất cả 3 app (ERP · Weighbridge · Partner Portal). Luôn hiển thị dạng bảng, mặc định 1 dòng (1:1 legacy), có button "+ Thêm lô" khi cần multi-lot.</p>
+
+  <div class="row row-2">
+    <div>
+      <label>Chế độ phân bổ (allocation_mode)</label>
+      <div class="mode-tabs">
+        <div class="mode-tab active" onclick="setMode('by_share')">
+          <div>📊 By share</div>
+          <div class="mt-sub">actual = net × (declared / sum)</div>
+        </div>
+        <div class="mode-tab" onclick="setMode('direct')">
+          <div>🎯 Direct</div>
+          <div class="mt-sub">actual = declared (sum phải = net)</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <label>NET từ cân (kg)</label>
+      <input type="number" value="985" id="mle-net" onchange="realloc()">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Sẽ phân bổ cho các dòng dưới theo mode</div>
+    </div>
+  </div>
+
+  <div class="mle-container">
+    <h4>
+      <span>📋 Dòng hàng (line items)</span>
+      <span class="badge b-primary" id="mle-count">3 dòng</span>
+    </h4>
+
+    <div class="mle-row header">
+      <div>#</div>
+      <div>Nguồn (deal/partner/supplier)</div>
+      <div>Loại mủ</div>
+      <div>Declared</div>
+      <div>DRC %</div>
+      <div>Đơn giá</div>
+      <div>Actual</div>
+      <div></div>
+    </div>
+
+    <div class="mle-row" id="row-1">
+      <div>1</div>
+      <div>
+        <select>
+          <option>🏢 Đại lý MƯƠNG A (HSC-0042)</option>
+          <option>🏢 Đại lý Trần B (HSC-0057)</option>
+          <option>👤 Hộ Bounmy X. (LAO-0011)</option>
+        </select>
+      </div>
+      <div><select><option>Mủ nước</option><option>Mủ tạp</option></select></div>
+      <div><input type="number" value="500" onchange="realloc()"></div>
+      <div><input type="number" value="35" step="0.1"></div>
+      <div><input type="number" value="13000"></div>
+      <div class="num" id="actual-1">492.5</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-row" id="row-2">
+      <div>2</div>
+      <div>
+        <select>
+          <option>👤 Hộ Bounmy Y. (LAO-0015)</option>
+          <option>🏢 Đại lý MƯƠNG A</option>
+        </select>
+      </div>
+      <div><select><option>Mủ nước</option></select></div>
+      <div><input type="number" value="300" onchange="realloc()"></div>
+      <div><input type="number" value="37" step="0.1"></div>
+      <div><input type="number" value="13000"></div>
+      <div class="num" id="actual-2">295.5</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-row" id="row-3">
+      <div>3</div>
+      <div>
+        <select>
+          <option>👤 Hộ Khamphone (LAO-0021)</option>
+        </select>
+      </div>
+      <div><select><option>Mủ tạp</option></select></div>
+      <div><input type="number" value="200" onchange="realloc()"></div>
+      <div><input type="number" value="28" step="0.1"></div>
+      <div><input type="number" value="8000"></div>
+      <div class="num" id="actual-3">197</div>
+      <div class="del">×</div>
+    </div>
+
+    <div class="mle-sum">
+      <div>Tổng declared: <b id="sum-declared">1,000 kg</b></div>
+      <div>NET thực tế: <b>985 kg</b></div>
+      <div>Sai lệch: <b id="sum-diff">-15 kg (-1.5%)</b></div>
+    </div>
+
+    <div class="mle-warn" style="display:none" id="mle-warn">
+      ⚠️ Mode direct: tổng declared phải bằng NET ±1kg
+    </div>
+
+    <div class="mle-btn">
+      <button class="btn btn-primary btn-sm">+ Thêm lô</button>
+      <button class="btn btn-ghost btn-sm">🚚 Quick-add từ lịch sử xe này</button>
+    </div>
+  </div>
+
+  <div class="card card-info" style="margin-top:12px">
+    <b>💡 Behavior khi save:</b>
+    <ul style="padding-left:20px;margin-top:6px;font-size:12px">
+      <li><b>1 dòng</b> → <code>ticket.has_items=false</code>, ghi scalar fields (legacy fast path)</li>
+      <li><b>≥2 dòng</b> → <code>ticket.has_items=true</code>, ghi <code>weighbridge_ticket_items</code> N rows, scalar fields NULL</li>
+      <li>Trigger DB tự động recompute <code>actual_qty_kg</code> khi NET hoặc declared thay đổi</li>
+    </ul>
+  </div>
+</div>
+
+</div>
+
+<!-- ═══════════════════════ VIEW 2: 3 FLOW WIZARD ═══════════════════════ -->
+<div class="view" id="v2">
+
+<div class="card">
+  <h3>🎯 Wizard 3 flow với MultiLotEditor integrated</h3>
+  <p class="sub">Mỗi flow nhúng MultiLotEditor ở step tạo deal/ticket. Default 1 dòng (UX cũ không đổi), user có thể thêm lô khi cần.</p>
+</div>
+
+<div class="card">
+  <div class="flow-badge">
+    <span class="badge b-outright">Flow 1 — OUTRIGHT</span>
+    <span class="badge b-warn">Bypass QC + Duyệt</span>
+    <span class="badge b-info">Giá chốt cứng · DRC cáp</span>
+  </div>
+  <h3>🔥 Flow 1 — Mua đứt · Multi-hộ Lào chung xe</h3>
+  <p class="sub">Scenario: tài xế gom 3 hộ Lào từ 3 bản, 1 xe, cân 1 lần, chi 3 phiếu tiền mặt.</p>
+
+  <div class="row row-3">
+    <div>
+      <label>Loại nguồn</label>
+      <select><option>🇱🇦 Nhiều hộ nông dân Lào</option></select>
+    </div>
+    <div>
+      <label>Người thu mua</label>
+      <select><option>Bounmy K. (Thu mua · Lào)</option></select>
+    </div>
+    <div>
+      <label>Kho nhập</label>
+      <select><option>KHO-LAO-NVL (Lào)</option></select>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <label>📋 Các hộ trong xe này</label>
+
+  <div class="mle-container">
+    <div class="mle-row header">
+      <div>#</div><div>Hộ nông dân</div><div>Loại mủ</div><div>Declared</div><div>DRC</div><div>Đơn giá</div><div>Actual</div><div></div>
+    </div>
+    <div class="mle-row">
+      <div>1</div>
+      <div><select><option>Hộ Bounmy X. (LAO-0011)</option><option>+ Quick-create hộ mới</option></select></div>
+      <div><select><option>Mủ nước</option></select></div>
+      <div><input type="number" value="1200"></div>
+      <div><input type="number" value="35"></div>
+      <div><input type="number" value="12500"></div>
+      <div class="num">1,182</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-row">
+      <div>2</div>
+      <div><select><option>Hộ Savath (LAO-0018)</option></select></div>
+      <div><select><option>Mủ nước</option></select></div>
+      <div><input type="number" value="800"></div>
+      <div><input type="number" value="33"></div>
+      <div><input type="number" value="12000"></div>
+      <div class="num">788</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-row">
+      <div>3</div>
+      <div><select><option>Hộ Khamla (LAO-0022)</option></select></div>
+      <div><select><option>Mủ tạp</option></select></div>
+      <div><input type="number" value="1000"></div>
+      <div><input type="number" value="28"></div>
+      <div><input type="number" value="8500"></div>
+      <div class="num">985</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-sum">
+      <div>Declared: <b>3,000 kg</b></div>
+      <div>NET: <b>2,955 kg</b></div>
+      <div>Lệch: <b>-45 kg (-1.5%)</b></div>
+    </div>
+    <div class="mle-btn">
+      <button class="btn btn-primary btn-sm">+ Thêm hộ</button>
+      <span style="font-size:11px;color:var(--muted)">3 hộ → sẽ tạo 3 deal, 3 settlement, 3 phiếu chi</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="flow-badge">
+    <span class="badge b-drc">Flow 2 — DRC AFTER PRODUCTION</span>
+    <span class="badge b-info">QC mẫu · BGĐ duyệt</span>
+    <span class="badge b-success">DRC tính sau</span>
+  </div>
+  <h3>🏭 Flow 2 — Chạy đầu ra · Đại lý multi-lot (2 vườn)</h3>
+  <p class="sub">Scenario: Đại lý MƯƠNG A gửi 2 lot từ 2 vườn khác DRC, cùng 1 xe. Chạy sản xuất xong mới tính DRC thực.</p>
+
+  <div class="mle-container">
+    <div class="mle-row header">
+      <div>#</div><div>Deal</div><div>Lot code</div><div>Declared</div><div>Expected DRC</div><div>Đơn giá nền</div><div>Actual</div><div></div>
+    </div>
+    <div class="mle-row">
+      <div>1</div>
+      <div><select><option>DL2604-0142 · Lot A · Vườn Quảng Lâm</option></select></div>
+      <div><input type="text" value="LOT-A-2604"></div>
+      <div><input type="number" value="3000"></div>
+      <div><input type="number" value="35"></div>
+      <div><input type="number" value="13000"></div>
+      <div class="num">2,988</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-row">
+      <div>2</div>
+      <div><select><option>DL2604-0143 · Lot B · Vườn Phong Điền</option></select></div>
+      <div><input type="text" value="LOT-B-2604"></div>
+      <div><input type="number" value="2000"></div>
+      <div><input type="number" value="38"></div>
+      <div><input type="number" value="13000"></div>
+      <div class="num">1,992</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-sum">
+      <div>Declared: <b>5,000 kg</b></div>
+      <div>NET: <b>4,980 kg</b></div>
+      <div>Lệch: <b>-20 kg (-0.4%)</b></div>
+    </div>
+  </div>
+
+  <div class="card card-info" style="margin-top:10px;margin-bottom:0">
+    <b>⚙️ DRC actual sẽ set sau:</b> Khi production_orders xong, hook tự tính <code>actual_drc = finished_product_kg / actual_qty_kg × 100</code> cho <b>mỗi lot riêng</b>, không gộp chung.
+  </div>
+</div>
+
+<div class="card">
+  <div class="flow-badge">
+    <span class="badge b-walkin">Flow 3 — FARMER WALK-IN</span>
+    <span class="badge b-info">QC tại chỗ</span>
+    <span class="badge b-success">Cash ngay</span>
+  </div>
+  <h3>🚜 Flow 3 — Walk-in hộ nông dân VN</h3>
+  <p class="sub">Scenario: 2 hộ hàng xóm chung xe tiết kiệm xăng. Mỗi hộ có DRC riêng (mẫu QC đo tại cân).</p>
+
+  <div class="mle-container">
+    <div class="mle-row header">
+      <div>#</div><div>Hộ · CMND</div><div>Mủ</div><div>Declared</div><div>DRC QC</div><div>Giá hôm nay</div><div>Actual</div><div></div>
+    </div>
+    <div class="mle-row">
+      <div>1</div>
+      <div><select><option>Nguyễn Văn A · 046095...</option><option>+ Quick-create hộ mới</option></select></div>
+      <div><select><option>Mủ chén</option></select></div>
+      <div><input type="number" value="1200"></div>
+      <div><input type="number" value="42.3"></div>
+      <div><input type="number" value="12800" readonly></div>
+      <div class="num">1,198</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-row">
+      <div>2</div>
+      <div><select><option>Trần Thị B · 046095...</option></select></div>
+      <div><select><option>Mủ chén</option></select></div>
+      <div><input type="number" value="430"></div>
+      <div><input type="number" value="40.5"></div>
+      <div><input type="number" value="12800" readonly></div>
+      <div class="num">432</div>
+      <div class="del">×</div>
+    </div>
+    <div class="mle-sum">
+      <div>Declared: <b>1,630 kg</b></div>
+      <div>NET: <b>1,630 kg</b></div>
+      <div>Lệch: <b>0 kg (0%)</b> ✓</div>
+    </div>
+  </div>
+
+  <div class="card card-ok" style="margin-top:10px;margin-bottom:0">
+    <b>💰 Chi tiền ngay:</b> Hộ A nhận <code>1,198 × 42.3% × 12,800 = 6,488,563đ</code> · Hộ B nhận <code>432 × 40.5% × 12,800 = 2,239,488đ</code>
+  </div>
+</div>
+
+</div>
+
+<!-- ═══════════════════════ VIEW 3: SETTLEMENT FAN-OUT ═══════════════════════ -->
+<div class="view" id="v3">
+
+<div class="card">
+  <h3>🎯 Settlement Fan-out — 1 ticket → N settlement</h3>
+  <p class="sub">Khi <code>autoSettlementService.createFromTicket(ticketId)</code> chạy, group items by <code>deal_id</code> → tạo N settlement. Lines không có deal_id (farmer walk-in partner-only) đi path riêng.</p>
+</div>
+
+<div class="fan-out">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <div style="flex:1;background:var(--primary);color:#fff;padding:10px 14px;border-radius:8px">
+      <div style="font-size:11px;opacity:.8">Weighbridge Ticket</div>
+      <div style="font-size:16px;font-weight:700">WB-IN-5893</div>
+      <div style="font-size:12px;opacity:.9">NET 5,600 kg · has_items=true · 5 lines</div>
+    </div>
+  </div>
+
+  <div class="fan-arrow">↓</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+    <div class="card" style="margin:0;border-left:4px solid var(--primary)">
+      <div style="font-size:11px;color:var(--muted)">Settlement #1 (deal A)</div>
+      <div style="font-weight:700;margin:3px 0">QT-2604-0142</div>
+      <div style="font-size:11px;color:var(--muted)">2 items · 3,200 kg</div>
+      <table style="margin-top:6px">
+        <tr><td style="padding:4px">Line #1 · 2,988kg</td><td class="num" style="padding:4px">38,844k</td></tr>
+        <tr><td style="padding:4px">Line #3 · 212kg</td><td class="num" style="padding:4px">2,756k</td></tr>
+        <tr style="background:var(--bg)"><td style="padding:4px"><b>Gross</b></td><td class="num" style="padding:4px"><b>41,600k</b></td></tr>
+      </table>
+    </div>
+    <div class="card" style="margin:0;border-left:4px solid var(--info)">
+      <div style="font-size:11px;color:var(--muted)">Settlement #2 (deal B)</div>
+      <div style="font-weight:700;margin:3px 0">QT-2604-0143</div>
+      <div style="font-size:11px;color:var(--muted)">1 item · 1,992 kg</div>
+      <table style="margin-top:6px">
+        <tr><td style="padding:4px">Line #2 · 1,992kg</td><td class="num" style="padding:4px">25,896k</td></tr>
+        <tr style="background:var(--bg)"><td style="padding:4px"><b>Gross</b></td><td class="num" style="padding:4px"><b>25,896k</b></td></tr>
+      </table>
+    </div>
+    <div class="card" style="margin:0;border-left:4px solid var(--partner)">
+      <div style="font-size:11px;color:var(--muted)">Partner-only (no deal)</div>
+      <div style="font-weight:700;margin:3px 0">WALK-2604-089</div>
+      <div style="font-size:11px;color:var(--muted)">2 items · 408 kg</div>
+      <table style="margin-top:6px">
+        <tr><td style="padding:4px">Line #4 · 200kg</td><td class="num" style="padding:4px">1,792k</td></tr>
+        <tr><td style="padding:4px">Line #5 · 208kg</td><td class="num" style="padding:4px">1,862k</td></tr>
+        <tr style="background:var(--bg)"><td style="padding:4px"><b>Cash</b></td><td class="num" style="padding:4px"><b>3,654k</b></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📊 Admin view — Multi-ticket settlements this week</h3>
+  <table>
+    <thead>
+      <tr><th>Ticket</th><th>Mode</th><th>Lines</th><th>Settlements</th><th>Partners</th><th>NET</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>WB-IN-5893</code></td>
+        <td><span class="badge b-primary">by_share</span></td>
+        <td>5</td>
+        <td>2 QT + 1 WALK</td>
+        <td>2 đại lý + 2 hộ</td>
+        <td class="num">5,600 kg</td>
+        <td><span class="badge b-success">✓ All paid</span></td>
+      </tr>
+      <tr>
+        <td><code>WB-IN-5894</code></td>
+        <td><span class="badge b-warn">direct</span></td>
+        <td>2</td>
+        <td>1 QT</td>
+        <td>1 đại lý (2 lot)</td>
+        <td class="num">4,980 kg</td>
+        <td><span class="badge b-info">Đang sản xuất</span></td>
+      </tr>
+      <tr>
+        <td><code>WB-IN-5895</code></td>
+        <td><span class="badge b-muted">-</span></td>
+        <td>1 (legacy)</td>
+        <td>1 QT</td>
+        <td>1 đại lý</td>
+        <td class="num">3,030 kg</td>
+        <td><span class="badge b-success">✓ Paid</span></td>
+      </tr>
+      <tr>
+        <td><code>WB-IN-5896</code></td>
+        <td><span class="badge b-primary">by_share</span></td>
+        <td>3</td>
+        <td>0 QT + 3 WALK</td>
+        <td>3 hộ VN</td>
+        <td class="num">1,850 kg</td>
+        <td><span class="badge b-success">✓ Cash paid</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</div>
+
+<!-- ═══════════════════════ VIEW 4: AUDIT LOG ═══════════════════════ -->
+<div class="view" id="v4">
+
+<div class="card">
+  <h3>📜 Audit log — Timeline thay đổi deal / settlement</h3>
+  <p class="sub">Bảng <code>b2b.deal_audit_log</code>, <code>b2b.settlement_audit_log</code>, <code>b2b.dispute_audit_log</code> đã setup từ Sprint 2-4. Xem timeline theo deal.</p>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Deal</div><div class="kpi-value" style="font-size:15px">DL2604-0142</div></div>
+    <div class="kpi"><div class="kpi-label">Status</div><div class="kpi-value" style="font-size:15px"><span class="badge b-success">settled</span></div></div>
+    <div class="kpi"><div class="kpi-label">Lot code</div><div class="kpi-value" style="font-size:15px">LOT-A-2604</div></div>
+    <div class="kpi"><div class="kpi-label">Partner</div><div class="kpi-value" style="font-size:15px">MƯƠNG A</div></div>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item done">
+      <h5>INSERT deal (status=pending)</h5>
+      <div class="ts">23/04/2026 08:12 · bởi Trần Thu Mua</div>
+      <div class="note">purchase_type=drc_after_production · quantity_kg=3,000 · unit_price=13,000</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>UPDATE status: pending → processing</h5>
+      <div class="ts">23/04/2026 08:45</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>UPDATE sample_drc, qc_user_id (changed_fields)</h5>
+      <div class="ts">23/04/2026 09:30 · bởi Nguyễn QC</div>
+      <div class="note">sample_drc: <span class="diff-old">null</span> → <span class="diff-new">37.8</span></div>
+    </div>
+    <div class="timeline-item done">
+      <h5>UPDATE status: processing → accepted</h5>
+      <div class="ts">23/04/2026 10:15 · bởi Huy Anh BGĐ</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>UPDATE actual_weight_kg, stock_in_count (từ weighbridge)</h5>
+      <div class="ts">23/04/2026 11:00 · auto (ticket WB-IN-5893)</div>
+      <div class="note">actual_weight_kg: <span class="diff-old">null</span> → <span class="diff-new">2,988 kg</span> (line #1 của ticket multi-lot)</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>UPDATE finished_product_kg, actual_drc (production hook)</h5>
+      <div class="ts">24/04/2026 14:22 · auto (PO-2604-0078)</div>
+      <div class="note">finished_product_kg: <span class="diff-old">null</span> → <span class="diff-new">1,105 kg</span> · actual_drc: <span class="diff-old">null</span> → <span class="diff-new">36.99%</span></div>
+    </div>
+    <div class="timeline-item done">
+      <h5>🔒 LOCK triggered — trg_deal_lock enforced</h5>
+      <div class="ts">24/04/2026 14:22</div>
+      <div class="note">Sau điểm này: unit_price, final_price, actual_drc, partner_id không sửa được (trừ dispute)</div>
+    </div>
+    <div class="timeline-item current">
+      <h5>UPDATE status: accepted → settled (QT-2604-0142 paid)</h5>
+      <div class="ts">25/04/2026 09:15 · bởi Kế toán</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>🚨 Lot-level dispute (bonus — prototype tương lai)</h3>
+  <p class="sub">Partner portal raise dispute trên <b>1 lot cụ thể</b> (không phải toàn deal). Vì multi-lot có thể 1 lot OK, 1 lot DRC lệch.</p>
+
+  <div class="card card-warn" style="margin:0">
+    <b>⚠️ Dispute DIS-2604-003 — Partner MƯƠNG A</b><br>
+    <div style="font-size:12px;margin-top:4px">
+      Raise vào LOT-A-2604 (line #1 của ticket WB-IN-5893) · Expected 35% · Actual measured 36.99%<br>
+      Không ảnh hưởng LOT-B-2604 (đã settle bình thường)
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn btn-success btn-sm">Accept (adj 0.5%)</button>
+      <button class="btn btn-danger btn-sm">Reject</button>
+      <button class="btn btn-ghost btn-sm">Investigate</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+</div>
+
+<script>
+  function sw(id){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.tab').forEach((t,i)=>{
+      const ids=['v1','v2','v3','v4'];
+      t.classList.toggle('active',ids[i]===id);
+    });
+    window.scrollTo(0,0);
+  }
+  let mode='by_share';
+  function setMode(m){
+    mode=m;
+    document.querySelectorAll('.mode-tab').forEach((t,i)=>{
+      t.classList.toggle('active', (i===0&&m==='by_share')||(i===1&&m==='direct'));
+    });
+    realloc();
+  }
+  function realloc(){
+    const net=parseFloat(document.getElementById('mle-net').value)||0;
+    const rows=[1,2,3];
+    const declareds=rows.map(i=>parseFloat(document.querySelector('#row-'+i+' input[type=number]').value)||0);
+    const sum=declareds.reduce((a,b)=>a+b,0);
+    rows.forEach((i,idx)=>{
+      const actual=mode==='by_share'?(sum>0?Math.round(net*declareds[idx]/sum*100)/100:0):declareds[idx];
+      document.getElementById('actual-'+i).textContent=actual.toLocaleString('vi-VN');
+    });
+    document.getElementById('sum-declared').textContent=sum.toLocaleString('vi-VN')+' kg';
+    const diff=net-sum;
+    document.getElementById('sum-diff').textContent=(diff>=0?'+':'')+diff.toLocaleString('vi-VN')+' kg ('+(sum?(diff/sum*100).toFixed(1):0)+'%)';
+    document.getElementById('mle-warn').style.display=(mode==='direct'&&Math.abs(diff)>1)?'block':'none';
+  }
+  realloc();
+</script>
+</body>
+</html>

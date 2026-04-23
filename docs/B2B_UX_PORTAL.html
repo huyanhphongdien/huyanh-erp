@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Portal · b2b.huyanhrubber.vn — Partner view Multi-lot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--primary:#1B4D3E;--primary-light:#2E7D5B;--accent:#D4AF37;--bg:#F7F9F8;--border:#E3E8E5;--text:#1A2B25;--muted:#5C7369;--success:#2E7D32;--warning:#F59E0B;--danger:#DC2626;--info:#2563EB;--partner:#7C3AED}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:14px}
+  .topbar{background:#fff;border-bottom:1px solid var(--border);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.04);position:sticky;top:0;z-index:50}
+  .topbar .logo{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--primary);font-size:16px}
+  .topbar .partner-chip{display:flex;align-items:center;gap:8px;background:#F5F3FF;color:var(--partner);padding:6px 12px;border-radius:14px;font-size:12px;font-weight:600}
+  .hero{background:linear-gradient(135deg,#7C3AED 0%,#A855F7 100%);color:#fff;padding:30px 24px;text-align:center}
+  .hero h1{font-size:24px;font-weight:800;margin-bottom:4px}
+  .hero p{opacity:.9;font-size:13px}
+  .tabs{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:56px;z-index:49}
+  .tabs-inner{max-width:1100px;margin:0 auto;display:flex;padding:0 16px}
+  .tab{flex:1;padding:14px;text-align:center;cursor:pointer;border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+  .tab:hover{background:var(--bg)}
+  .tab.active{color:var(--partner);border-bottom-color:var(--accent);background:#FEFCF5}
+  .container{max-width:1100px;margin:0 auto;padding:24px 16px}
+  .view{display:none}.view.active{display:block}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:0 1px 3px rgba(27,77,62,.08);margin-bottom:14px}
+  .card h3{font-size:15px;font-weight:700;color:var(--primary);margin-bottom:4px}
+  .card .sub{color:var(--muted);font-size:12px;margin-bottom:12px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+  .b-primary{background:#E6F0EB;color:var(--primary)}.b-warn{background:#FEF3C7;color:#92400E}.b-info{background:#DBEAFE;color:#1E40AF}
+  .b-success{background:#DCFCE7;color:#166534}.b-danger{background:#FEE2E2;color:#991B1B}.b-partner{background:#F5F3FF;color:var(--partner)}
+  .b-outright{background:#FEF3C7;color:#92400E}.b-drc{background:#DBEAFE;color:#1E40AF}.b-walkin{background:#F5F3FF;color:var(--partner)}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+  .kpi{background:linear-gradient(135deg,var(--bg) 0%,#fff 100%);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .kpi .kpi-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .kpi-value{font-size:22px;font-weight:800;color:var(--primary);margin:4px 0;font-family:'JetBrains Mono',monospace}
+  .kpi .kpi-sub{font-size:10px;color:var(--muted)}
+  .deal-list{display:grid;gap:10px}
+  .deal-item{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;transition:all .15s;cursor:pointer}
+  .deal-item:hover{border-color:var(--partner);box-shadow:0 4px 12px rgba(124,58,237,.1)}
+  .deal-item .row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .deal-item .code{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--partner);font-size:14px}
+  .deal-item .meta{font-size:12px;color:var(--muted)}
+  .deal-item .lot-count{display:inline-block;background:var(--accent);color:var(--primary);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px}
+  .deal-item .amount{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--primary);font-size:16px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}
+  th{background:var(--bg);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .num{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600}
+  .lot-row{background:#FEFCF5;border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:8px}
+  .lot-row .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .lot-row .lot-code{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--primary);font-size:14px}
+  .lot-row .lot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px}
+  .lot-row .lot-grid div{background:#fff;padding:6px 8px;border-radius:6px}
+  .lot-row .lot-grid .l{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600}
+  .lot-row .lot-grid .v{font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace;font-size:14px}
+  .btn{padding:8px 16px;border-radius:8px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn-primary{background:var(--partner);color:#fff}
+  .btn-ghost{background:#fff;color:var(--muted);border:1px solid var(--border)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-sm{padding:5px 10px;font-size:11px}
+  .modal-bg{background:rgba(0,0,0,.5);position:relative;padding:20px;border-radius:12px}
+  .modal{background:#fff;border-radius:12px;padding:20px;max-width:500px;margin:0 auto;border:2px solid var(--danger)}
+  .modal h3{color:var(--danger);margin-bottom:8px}
+  .alert{background:#FEF3C7;border-left:4px solid var(--warning);padding:10px 14px;border-radius:6px;font-size:12px;color:#92400E;margin-bottom:12px}
+  .alert-info{background:#DBEAFE;border-left-color:var(--info);color:#1E40AF}
+  .alert-ok{background:#DCFCE7;border-left-color:var(--success);color:#166534}
+  .timeline{position:relative;padding-left:24px;border-left:2px dashed var(--border);margin:10px 0}
+  .timeline-item{margin-bottom:12px;position:relative}
+  .timeline-item::before{content:'';position:absolute;left:-30px;top:6px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--border)}
+  .timeline-item.done::before{background:var(--success);border-color:var(--success)}
+  .timeline-item.active::before{background:var(--partner);border-color:var(--partner);box-shadow:0 0 0 3px rgba(124,58,237,.2)}
+  .timeline-item h5{font-size:13px;font-weight:700}
+  .timeline-item .ts{font-size:11px;color:var(--muted)}
+  .chat-bubble{display:inline-block;padding:8px 12px;border-radius:12px;font-size:12px;max-width:80%;margin-bottom:6px}
+  .chat-me{background:var(--partner);color:#fff;float:right;clear:both;border-bottom-right-radius:2px}
+  .chat-them{background:#fff;border:1px solid var(--border);float:left;clear:both;border-bottom-left-radius:2px}
+  .chat-ts{font-size:10px;color:var(--muted);clear:both;display:block;margin-bottom:8px}
+  .rating{color:var(--accent);font-size:14px}
+  .tier-ribbon{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FFD700 0%,#FFA000 100%);color:#000;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700}
+  .notif-item{padding:10px 12px;border-left:3px solid var(--info);background:#F0F9FF;border-radius:6px;margin-bottom:8px;font-size:12px}
+  .notif-item.urgent{border-left-color:var(--danger);background:#FEF2F2}
+  .progress-bar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:4px}
+  .progress-bar .fill{height:100%;background:linear-gradient(90deg,var(--partner) 0%,#A855F7 100%);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🤝 Huy Anh B2B Portal</div>
+  <div class="partner-chip">
+    <span class="tier-ribbon">🥇 Gold</span>
+    <span>Đại lý MƯƠNG A (HSC-0042)</span>
+    <span style="color:var(--partner)">▼</span>
+  </div>
+</div>
+
+<div class="hero">
+  <h1>🤝 Portal · b2b.huyanhrubber.vn</h1>
+  <p>Góc nhìn đại lý / hộ · Multi-lot deals · Lot-level dispute · Settlement breakdown</p>
+</div>
+
+<div class="tabs">
+  <div class="tabs-inner">
+    <button class="tab active" onclick="sw('v1')">1. Dashboard (notif + deals)</button>
+    <button class="tab" onclick="sw('v2')">2. Deal detail multi-lot</button>
+    <button class="tab" onclick="sw('v3')">3. Settlement breakdown</button>
+    <button class="tab" onclick="sw('v4')">4. Lot-level dispute</button>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════ VIEW 1: DASHBOARD ═══════════════════════ -->
+<div class="view active" id="v1">
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-label">Deal tháng này</div>
+    <div class="kpi-value">14</div>
+    <div class="kpi-sub">+ 2 multi-lot</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Công nợ</div>
+    <div class="kpi-value" style="color:var(--danger)">-12M</div>
+    <div class="kpi-sub">Nhà máy nợ anh</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Chờ duyệt</div>
+    <div class="kpi-value" style="color:var(--warning)">2</div>
+    <div class="kpi-sub">BGĐ review</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">DRC trung bình</div>
+    <div class="kpi-value">36.8<span style="font-size:14px">%</span></div>
+    <div class="kpi-sub">12 tháng qua</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Rating</div>
+    <div class="kpi-value" style="font-size:18px"><span class="rating">★★★★☆</span></div>
+    <div class="kpi-sub">Từ Huy Anh Rubber</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>🔔 Thông báo (3 mới)</h3>
+  <div class="notif-item urgent">
+    <b>⚠️ Dispute DIS-2604-003 của anh đã resolved</b><br>
+    LOT-A-2604 (deal DL2604-0142): Nhà máy accept DRC +0.5% → điều chỉnh +285k vào công nợ. <a href="#" style="color:var(--info)">Xem chi tiết</a>
+    <div style="color:var(--muted);font-size:10px;margin-top:3px">2 giờ trước</div>
+  </div>
+  <div class="notif-item">
+    <b>💰 Phiếu quyết toán QT-2604-0143 đã duyệt</b><br>
+    LOT-B-2604: 1,992kg × 36.99% × 13,000 = 25,896,500đ · Chờ thanh toán trong 3 ngày
+    <div style="color:var(--muted);font-size:10px;margin-top:3px">5 giờ trước</div>
+  </div>
+  <div class="notif-item">
+    <b>🎉 Tier up!</b> Anh đạt tier <b>Gold</b> — % tạm ứng tối đa lên 70% giá trị deal
+    <div style="color:var(--muted);font-size:10px;margin-top:3px">Hôm qua</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📦 Deal gần đây</h3>
+  <div class="deal-list">
+    <div class="deal-item">
+      <div class="row1">
+        <div>
+          <span class="code">DL2604-0142</span>
+          <span class="lot-count">2 LOT</span>
+          <span class="badge b-drc" style="margin-left:6px">DRC-after</span>
+          <span class="badge b-success" style="margin-left:3px">Settled</span>
+        </div>
+        <div class="amount">67,496,500đ</div>
+      </div>
+      <div class="meta">
+        Mủ tạp · NET 4,980 kg · 2 lot (LOT-A vườn Quảng Lâm + LOT-B vườn Phong Điền)
+      </div>
+      <div class="progress-bar"><div class="fill" style="width:100%"></div></div>
+    </div>
+
+    <div class="deal-item">
+      <div class="row1">
+        <div>
+          <span class="code">DL2604-0145</span>
+          <span class="badge b-drc" style="margin-left:6px">DRC-after</span>
+          <span class="badge b-info" style="margin-left:3px">Đang sản xuất</span>
+        </div>
+        <div class="amount">~48M (est)</div>
+      </div>
+      <div class="meta">
+        Mủ nước · NET 3,560 kg · 1 lot · ETA quyết toán 26/04
+      </div>
+      <div class="progress-bar"><div class="fill" style="width:60%"></div></div>
+    </div>
+
+    <div class="deal-item">
+      <div class="row1">
+        <div>
+          <span class="code">DL2604-0148</span>
+          <span class="lot-count">3 LOT</span>
+          <span class="badge b-drc" style="margin-left:6px">DRC-after</span>
+          <span class="badge b-warn" style="margin-left:3px">Chờ BGĐ</span>
+        </div>
+        <div class="amount">~72M (est)</div>
+      </div>
+      <div class="meta">
+        Multi-lot: 3 vườn khác DRC · QC mẫu xong · Chờ duyệt
+      </div>
+      <div class="progress-bar"><div class="fill" style="width:30%"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>💬 Chat với nhân viên thu mua</h3>
+  <div style="max-height:200px;overflow-y:auto">
+    <div>
+      <div class="chat-bubble chat-them">Chào anh, mai em cho 3 xe xuống ạ, đủ 2 deal anh đặt</div>
+      <span class="chat-ts">08:15 · Em Trần Thu Mua</span>
+    </div>
+    <div>
+      <div class="chat-bubble chat-me">OK em. DL2604-0148 anh có 3 vườn DRC khác nhau, em cân tách từng lô nhé</div>
+      <span class="chat-ts">08:20 · Anh MƯƠNG A</span>
+    </div>
+    <div>
+      <div class="chat-bubble chat-them">Dạ, em tạo ticket multi-lot. Anh check helm app có thấy 3 LOT không</div>
+      <span class="chat-ts">08:22</span>
+    </div>
+  </div>
+  <input type="text" placeholder="Nhập tin nhắn..." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;margin-top:10px">
+</div>
+
+</div>
+
+<!-- ═══════════════════════ VIEW 2: DEAL DETAIL MULTI-LOT ═══════════════════════ -->
+<div class="view" id="v2">
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+    <div>
+      <h3 style="font-size:22px">DL2604-0142 <span class="lot-count" style="font-size:12px">2 LOT</span></h3>
+      <div style="font-size:12px;color:var(--muted)">
+        <span class="badge b-drc">DRC-after-production</span>
+        <span class="badge b-success" style="margin-left:4px">Settled</span>
+        · Tạo 23/04 08:12 · Settled 25/04 09:15
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:var(--muted)">Tổng giá trị</div>
+      <div style="font-size:22px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace">67,496,500đ</div>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">NET ticket</div><div class="kpi-value">4,980 kg</div></div>
+    <div class="kpi"><div class="kpi-label">DRC TB</div><div class="kpi-value">37.0<span style="font-size:14px">%</span></div></div>
+    <div class="kpi"><div class="kpi-label">Đơn giá nền</div><div class="kpi-value" style="font-size:16px">13,000đ</div></div>
+    <div class="kpi"><div class="kpi-label">Tạm ứng</div><div class="kpi-value" style="font-size:16px;color:var(--warning)">-10M</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📋 Breakdown 2 lot</h3>
+  <p class="sub">Hiển thị riêng từng lô — có thể <b>raise dispute</b> trên lô cụ thể (không phải cả deal).</p>
+
+  <div class="lot-row">
+    <div class="head">
+      <div>
+        <span class="lot-code">LOT-A-2604</span>
+        <span class="badge b-warn" style="margin-left:6px">Dispute resolved +0.5%</span>
+      </div>
+      <button class="btn btn-ghost btn-sm">📜 Xem timeline lot</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+      Vườn Quảng Lâm · Mủ tạp · WB-IN-5893 line #1
+    </div>
+    <div class="lot-grid">
+      <div><div class="l">Declared</div><div class="v">3,000 kg</div></div>
+      <div><div class="l">Actual (allocate)</div><div class="v">2,988 kg</div></div>
+      <div><div class="l">DRC expected</div><div class="v">35%</div></div>
+      <div><div class="l">DRC actual</div><div class="v" style="color:var(--warning)">36.99% <span style="font-size:10px">(+0.5 adj)</span></div></div>
+      <div><div class="l">Finished kg</div><div class="v">1,105 kg</div></div>
+      <div><div class="l">Đơn giá</div><div class="v">13,000đ</div></div>
+      <div><div class="l">Line amount</div><div class="v">41,885,500đ</div></div>
+      <div><div class="l">Batch code</div><div class="v" style="font-size:11px">PCB-2604-0542</div></div>
+    </div>
+  </div>
+
+  <div class="lot-row">
+    <div class="head">
+      <div>
+        <span class="lot-code">LOT-B-2604</span>
+        <span class="badge b-success" style="margin-left:6px">OK ✓</span>
+      </div>
+      <button class="btn btn-danger btn-sm">🚩 Raise dispute lot này</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+      Vườn Phong Điền · Mủ tạp · WB-IN-5893 line #2
+    </div>
+    <div class="lot-grid">
+      <div><div class="l">Declared</div><div class="v">2,000 kg</div></div>
+      <div><div class="l">Actual</div><div class="v">1,992 kg</div></div>
+      <div><div class="l">DRC expected</div><div class="v">38%</div></div>
+      <div><div class="l">DRC actual</div><div class="v" style="color:var(--success)">37.95%</div></div>
+      <div><div class="l">Finished kg</div><div class="v">756 kg</div></div>
+      <div><div class="l">Đơn giá</div><div class="v">13,000đ</div></div>
+      <div><div class="l">Line amount</div><div class="v">25,611,000đ</div></div>
+      <div><div class="l">Batch code</div><div class="v" style="font-size:11px">PCB-2604-0543</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📅 Timeline deal</h3>
+  <div class="timeline">
+    <div class="timeline-item done">
+      <h5>Deal tạo từ Demand-Offer</h5>
+      <div class="ts">23/04 08:12 · Chat booking được xác nhận</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>QC mẫu tại nhà máy</h5>
+      <div class="ts">23/04 09:30 · LOT-A sample 37.5% · LOT-B sample 38.2%</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>BGĐ duyệt</h5>
+      <div class="ts">23/04 10:15 · Ông Huy Anh · status=accepted</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>Cân xe + stock-in (multi-lot)</h5>
+      <div class="ts">23/04 11:00 · WB-IN-5893 · 2 line · NET 4,980kg</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>Sản xuất cháy crepe</h5>
+      <div class="ts">24/04 08:00 - 24/04 14:22 · PO-2604-0078</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>DRC cao phẩm tính xong</h5>
+      <div class="ts">24/04 14:22 · LOT-A 36.99% · LOT-B 37.95%</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>⚠️ Dispute raise LOT-A (anh)</h5>
+      <div class="ts">24/04 15:00 · Expected 35% nhưng đo ra 36.99% → nghi ngờ cân sai</div>
+    </div>
+    <div class="timeline-item done">
+      <h5>✓ Dispute resolved accepted</h5>
+      <div class="ts">24/04 17:30 · Nhà máy điều chỉnh +0.5% giá → +285k</div>
+    </div>
+    <div class="timeline-item active">
+      <h5>💰 Settlement QT-2604-0142 paid</h5>
+      <div class="ts">25/04 09:15 · Chuyển khoản Vietcombank · remaining: 1,944,626đ</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ═══════════════════════ VIEW 3: SETTLEMENT BREAKDOWN ═══════════════════════ -->
+<div class="view" id="v3">
+
+<div class="card">
+  <h3>💰 Quyết toán QT-2604-0142 · 2 lot</h3>
+  <div style="font-size:12px;color:var(--muted)">Deal DL2604-0142 · Approved 25/04 09:10 · Paid 25/04 09:15</div>
+
+  <table style="margin-top:14px">
+    <thead>
+      <tr>
+        <th>Lot</th>
+        <th class="num">Actual kg</th>
+        <th class="num">DRC%</th>
+        <th class="num">Dry kg</th>
+        <th class="num">Unit price</th>
+        <th class="num">Line amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>LOT-A-2604</code></td>
+        <td class="num">2,988</td>
+        <td class="num">36.99% <span style="color:var(--warning);font-size:10px">(+0.5 adj)</span></td>
+        <td class="num">1,105.26</td>
+        <td class="num">13,000</td>
+        <td class="num">14,368,380</td>
+      </tr>
+      <tr>
+        <td><code>LOT-B-2604</code></td>
+        <td class="num">1,992</td>
+        <td class="num">37.95%</td>
+        <td class="num">755.96</td>
+        <td class="num">13,000</td>
+        <td class="num">9,827,420</td>
+      </tr>
+      <tr style="background:var(--bg)">
+        <td><b>Gross</b></td>
+        <td class="num"><b>4,980</b></td>
+        <td class="num"></td>
+        <td class="num"><b>1,861.22</b></td>
+        <td class="num"></td>
+        <td class="num"><b>24,195,800</b></td>
+      </tr>
+      <tr>
+        <td>+ Adjustment DIS-2604-003 (LOT-A)</td>
+        <td colspan="4"></td>
+        <td class="num" style="color:var(--success)">+285,000</td>
+      </tr>
+      <tr>
+        <td>− Tạm ứng ADV-2604-015</td>
+        <td colspan="4"></td>
+        <td class="num" style="color:var(--danger)">-10,000,000</td>
+      </tr>
+      <tr>
+        <td>− Công nợ cũ (kỳ trước)</td>
+        <td colspan="4"></td>
+        <td class="num" style="color:var(--danger)">-12,000,000</td>
+      </tr>
+      <tr style="background:#F0FDF4">
+        <td><b>Anh còn nhận</b></td>
+        <td colspan="4"></td>
+        <td class="num" style="font-size:16px;color:var(--primary)"><b>2,480,800đ</b></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="alert alert-ok" style="margin-top:12px">
+    ✓ Đã chuyển khoản Vietcombank · UTR: VCB.TX.20260425.094201 · Số dư công nợ sau: +0đ
+  </div>
+</div>
+
+<div class="card">
+  <h3>📊 Công nợ (running balance)</h3>
+  <table>
+    <thead>
+      <tr><th>Ngày</th><th>Chứng từ</th><th>Loại</th><th class="num">Nợ</th><th class="num">Có</th><th class="num">Dư</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>01/04</td><td><code>OPENING</code></td><td>Dư đầu kỳ</td><td class="num">12,000,000</td><td class="num">-</td><td class="num">-12,000,000</td></tr>
+      <tr><td>23/04</td><td><code>ADV-2604-015</code></td><td>Tạm ứng</td><td class="num">10,000,000</td><td class="num">-</td><td class="num">-22,000,000</td></tr>
+      <tr><td>25/04 09:10</td><td><code>QT-2604-0142</code></td><td>Quyết toán</td><td class="num">-</td><td class="num">24,195,800</td><td class="num" style="color:var(--success)">+2,195,800</td></tr>
+      <tr><td>25/04 09:12</td><td><code>DIS-2604-003</code></td><td>Adjustment</td><td class="num">-</td><td class="num">285,000</td><td class="num" style="color:var(--success)">+2,480,800</td></tr>
+      <tr style="background:var(--bg)"><td>25/04 09:15</td><td><code>QT-2604-0142-PAY</code></td><td>Thanh toán CK</td><td class="num">2,480,800</td><td class="num">-</td><td class="num"><b>0đ</b></td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div>
+
+<!-- ═══════════════════════ VIEW 4: LOT-LEVEL DISPUTE ═══════════════════════ -->
+<div class="view" id="v4">
+
+<div class="card card-warn" style="background:#FFFBEB;border-left:4px solid var(--warning)">
+  <h3 style="color:#92400E">🚩 Raise dispute lot-level</h3>
+  <p class="sub">Khác với dispute cả deal — anh có thể raise riêng trên <b>1 lot</b> (line #) cụ thể. Nếu deal có 3 lot, chỉ lot có vấn đề bị pause, 2 lot kia tiếp tục flow bình thường.</p>
+</div>
+
+<div class="modal-bg">
+  <div class="modal">
+    <h3>⚠️ Khiếu nại DRC trên lot cụ thể</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      Deal DL2604-0148 · Line #2 · <code>LOT-MID-2604</code>
+    </div>
+
+    <div class="alert">
+      <b>Cảnh báo:</b> Khi raise dispute, phiếu quyết toán (nếu có) sẽ <b>tạm khóa</b> (locked_by_dispute). Giải quyết xong mới unlock.
+    </div>
+
+    <div class="lot-row" style="margin:10px 0">
+      <div class="head"><span class="lot-code">LOT-MID-2604</span><span class="badge b-warn">Pending dispute</span></div>
+      <div class="lot-grid">
+        <div><div class="l">Expected DRC</div><div class="v">36%</div></div>
+        <div><div class="l">Actual DRC</div><div class="v" style="color:var(--danger)">32.1%</div></div>
+        <div><div class="l">Variance</div><div class="v" style="color:var(--danger)">-3.9%</div></div>
+        <div><div class="l">Loss ước</div><div class="v" style="color:var(--danger)">~2.1M</div></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Lý do</label>
+      <select style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
+        <option>DRC thực tế khác xa kỳ vọng</option>
+        <option>Nghi ngờ cân sai</option>
+        <option>Lô bị lẫn tạp chất</option>
+        <option>Khác...</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Mô tả chi tiết</label>
+      <textarea rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px">LOT này anh mới cắt vườn trẻ 5 năm, DRC lô trước cùng vườn là 36.5%. Không thể tụt xuống 32.1% được. Xin nhà máy kiểm tra lại.</textarea>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Bằng chứng (optional)</label>
+      <button class="btn btn-ghost" style="width:100%">📎 Upload file (ảnh vườn, kết quả test...)</button>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" style="flex:1">Hủy</button>
+      <button class="btn btn-danger" style="flex:1">🚩 Raise dispute</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📋 Dispute của anh (lịch sử)</h3>
+  <table>
+    <thead>
+      <tr><th>Dispute</th><th>Lot</th><th>Deal</th><th>Variance</th><th>Status</th><th>Kết quả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>DIS-2604-003</code></td>
+        <td><code>LOT-A-2604</code></td>
+        <td>DL2604-0142</td>
+        <td style="color:var(--warning)">+1.99%</td>
+        <td><span class="badge b-success">Accepted</span></td>
+        <td>+285k adjust</td>
+      </tr>
+      <tr>
+        <td><code>DIS-2603-021</code></td>
+        <td><code>LOT-B-2603</code></td>
+        <td>DL2603-0098</td>
+        <td style="color:var(--danger)">-2.5%</td>
+        <td><span class="badge b-danger">Rejected</span></td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td><code>DIS-2602-012</code></td>
+        <td>Cả deal (1 lot)</td>
+        <td>DL2602-0055</td>
+        <td style="color:var(--warning)">+1.2%</td>
+        <td><span class="badge b-success">Accepted</span></td>
+        <td>+1.2M adjust</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card card-info" style="background:#EFF6FF;border-left:4px solid var(--info)">
+  <h3 style="color:var(--info)">💡 Khác với dispute cũ (whole deal)</h3>
+  <table>
+    <tr style="background:var(--bg)"><th>Loại</th><th>Trước (1 dispute = cả deal)</th><th>Bây giờ (dispute per-lot)</th></tr>
+    <tr>
+      <td><b>Scope</b></td>
+      <td>1 dispute block cả settlement</td>
+      <td>Chỉ block settlement của lot đó</td>
+    </tr>
+    <tr>
+      <td><b>Deal 3 lot, 1 lot có vấn đề</b></td>
+      <td>Tất cả pause, không ai happy</td>
+      <td>2 lot OK settle bình thường, 1 lot pause</td>
+    </tr>
+    <tr>
+      <td><b>Audit</b></td>
+      <td>deal.audit_log</td>
+      <td>dispute ref <code>ticket_item_id</code> cụ thể</td>
+    </tr>
+  </table>
+</div>
+
+</div>
+
+</div>
+
+<script>
+  function sw(id){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.tab').forEach((t,i)=>{
+      const ids=['v1','v2','v3','v4'];
+      t.classList.toggle('active',ids[i]===id);
+    });
+    window.scrollTo(0,0);
+  }
+</script>
+</body>
+</html>

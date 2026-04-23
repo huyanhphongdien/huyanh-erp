@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Cân · can.huyanhrubber.vn — Multi-Lot + Cash Settle</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--primary:#1B4D3E;--primary-light:#2E7D5B;--accent:#D4AF37;--bg:#F7F9F8;--border:#E3E8E5;--text:#1A2B25;--muted:#5C7369;--success:#2E7D32;--warning:#F59E0B;--danger:#DC2626;--info:#2563EB;--partner:#7C3AED}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,sans-serif;background:#0F3D30;color:var(--text);font-size:14px;padding:20px 10px;min-height:100vh}
+  .hero{text-align:center;color:#fff;padding:16px 12px 24px}
+  .hero h1{font-size:24px;font-weight:800;margin-bottom:4px}
+  .hero p{opacity:.8;font-size:13px}
+  .device-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;max-width:1400px;margin:0 auto}
+  .device{background:#1a1a1a;border-radius:24px;padding:14px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+  .device-label{color:#aaa;font-size:11px;text-align:center;margin-bottom:8px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+  .screen{background:var(--bg);border-radius:14px;min-height:640px;overflow:hidden;position:relative}
+  .statusbar{background:var(--primary-light);color:#fff;padding:8px 12px;font-size:11px;display:flex;justify-content:space-between;align-items:center}
+  .app-header{background:var(--primary);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+  .app-header h2{font-size:16px;font-weight:700}
+  .app-header .sub{font-size:11px;opacity:.8}
+  .back-btn{background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer}
+  .content{padding:14px;max-height:620px;overflow-y:auto}
+  .card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+  .card h3{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px}
+  .card .sub{font-size:11px;color:var(--muted);margin-bottom:8px}
+  label{display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  input,select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;background:#fff}
+  input:focus{outline:none;border-color:var(--primary)}
+  .row{display:grid;gap:8px;margin-bottom:10px}
+  .row-2{grid-template-columns:1fr 1fr}.row-3{grid-template-columns:1fr 1fr 1fr}
+  .btn{padding:12px 16px;border-radius:10px;border:none;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:6px}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-accent{background:var(--accent);color:var(--primary)}
+  .btn-success{background:var(--success);color:#fff;font-size:16px;padding:14px}
+  .btn-ghost{background:#fff;color:var(--muted);border:1px solid var(--border)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-sm{padding:6px 10px;font-size:12px;width:auto}
+  .pin-display{text-align:center;margin:20px 0;letter-spacing:16px;font-size:36px;font-family:'JetBrains Mono',monospace;color:var(--primary);font-weight:700}
+  .pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px auto;max-width:240px}
+  .pin-btn{aspect-ratio:1;background:#fff;border:1px solid var(--border);border-radius:12px;font-size:24px;font-weight:700;color:var(--primary);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .pin-btn:active{background:var(--bg)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+  .b-primary{background:#E6F0EB;color:var(--primary)}
+  .b-warn{background:#FEF3C7;color:#92400E}
+  .b-info{background:#DBEAFE;color:#1E40AF}
+  .b-success{background:#DCFCE7;color:#166534}
+  .b-outright{background:#FEF3C7;color:#92400E}
+  .b-drc{background:#DBEAFE;color:#1E40AF}
+  .b-walkin{background:#F5F3FF;color:var(--partner)}
+  .deal-card{background:linear-gradient(135deg,#fff 0%,#F0FDF4 100%);border:1px solid var(--primary-light);border-radius:10px;padding:12px;margin-bottom:8px}
+  .deal-code{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--primary);font-size:14px}
+  .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .mode-card{padding:12px;border:2px solid var(--border);border-radius:10px;cursor:pointer;background:#fff;text-align:center}
+  .mode-card.active{border-color:var(--primary);background:#F0FDF4}
+  .mode-card .ic{font-size:24px}
+  .mode-card .mt{font-size:12px;font-weight:700;margin-top:4px}
+  .mode-card .ms{font-size:10px;color:var(--muted);margin-top:2px}
+  .weight-display{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);color:#fff;border-radius:12px;padding:16px;text-align:center;margin:12px 0}
+  .weight-display .label{font-size:11px;opacity:.8;text-transform:uppercase;letter-spacing:1px}
+  .weight-display .value{font-size:40px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-1px;margin:4px 0}
+  .weight-display .unit{font-size:16px;opacity:.9}
+  .mle-row{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
+  .mle-row-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .mle-row-header .code{font-weight:700;color:var(--primary);font-size:13px}
+  .mle-row-header .x{color:var(--danger);cursor:pointer;font-size:18px;line-height:1}
+  .mle-row .fields{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .mle-row .fields input,.mle-row .fields select{padding:6px 8px;font-size:12px}
+  .mle-sum{background:var(--primary);color:#fff;padding:8px 12px;border-radius:8px;margin-top:8px;font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
+  .mle-sum b{font-size:14px}
+  .quick-form{background:#FEFCF5;border:2px dashed var(--accent);border-radius:10px;padding:12px;margin-bottom:10px}
+  .quick-form h4{font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px}
+  .kpi-mini{background:var(--bg);padding:8px 10px;border-radius:6px;text-align:center}
+  .kpi-mini .l{font-size:9px;color:var(--muted);text-transform:uppercase}
+  .kpi-mini .v{font-size:15px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace}
+  .receipt{background:#FEFCF5;border:2px dashed var(--accent);border-radius:10px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px}
+  .receipt h4{font-family:Inter,sans-serif;color:var(--primary);border-bottom:1px dashed var(--accent);padding-bottom:6px;margin-bottom:8px;text-align:center;font-size:13px}
+  .receipt-line{display:flex;justify-content:space-between;padding:3px 0}
+  .receipt-line.tot{border-top:1px dashed var(--accent);padding-top:6px;margin-top:4px;font-weight:700;font-size:13px}
+  .payment-item{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px}
+  .payment-item .row1{display:flex;justify-content:space-between;align-items:center}
+  .payment-item .name{font-weight:700;font-size:13px}
+  .payment-item .amount{font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--accent);font-size:15px}
+  .payment-item .r2{font-size:11px;color:var(--muted);margin-top:4px}
+  .operator-chip{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);padding:4px 8px;border-radius:10px;font-size:11px}
+  .tab-hints{text-align:center;color:#aaa;font-size:10px;margin-top:4px}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>⚖️ Cân · can.huyanhrubber.vn</h1>
+  <p>Tablet UI tại cổng cân · PIN login operator · Multi-lot editor · Cash settle ngay</p>
+</div>
+
+<div class="device-row">
+
+  <!-- SCREEN 1: PIN LOGIN -->
+  <div class="device">
+    <div class="device-label">📱 Screen 1 — PIN Login</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>14:32</span>
+        <span>KHO-LAO-NVL · Ca sáng</span>
+      </div>
+      <div style="padding:40px 20px;text-align:center">
+        <div style="font-size:48px;margin-bottom:10px">⚖️</div>
+        <h2 style="color:var(--primary);font-size:20px">Cân Huy Anh</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">Nhập PIN 4 số</p>
+        <div class="pin-display">• • • •</div>
+        <div class="pin-grid">
+          <div class="pin-btn">1</div><div class="pin-btn">2</div><div class="pin-btn">3</div>
+          <div class="pin-btn">4</div><div class="pin-btn">5</div><div class="pin-btn">6</div>
+          <div class="pin-btn">7</div><div class="pin-btn">8</div><div class="pin-btn">9</div>
+          <div class="pin-btn" style="background:var(--bg)">⌫</div>
+          <div class="pin-btn">0</div>
+          <div class="pin-btn" style="background:var(--primary);color:#fff">✓</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:14px">
+          Facility: <b>LAO</b> · Scale: <b>LAO-SCALE-01</b>
+        </div>
+      </div>
+    </div>
+    <div class="tab-hints">PIN → Bounmy K. đăng nhập → Home</div>
+  </div>
+
+  <!-- SCREEN 2: HOME DASHBOARD -->
+  <div class="device">
+    <div class="device-label">📱 Screen 2 — Home Dashboard</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>14:35</span>
+        <span>KHO-LAO-NVL · LAO-SCALE-01</span>
+      </div>
+      <div class="app-header">
+        <div>
+          <h2>Chào Bounmy K.</h2>
+          <div class="sub">Thu mua · 12 ticket hôm nay</div>
+        </div>
+        <div class="operator-chip">🟢 Online</div>
+      </div>
+      <div class="content">
+        <div class="row row-3" style="margin-bottom:12px">
+          <div class="kpi-mini"><div class="l">Hôm nay</div><div class="v">12</div></div>
+          <div class="kpi-mini"><div class="l">Đang xử lý</div><div class="v" style="color:var(--warning)">3</div></div>
+          <div class="kpi-mini"><div class="l">Tấn IN</div><div class="v">48.5</div></div>
+        </div>
+
+        <button class="btn btn-primary" style="margin-bottom:12px">➕ Tạo phiếu cân mới</button>
+
+        <h3 style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Deal chờ cân (3)</h3>
+
+        <div class="deal-card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="deal-code">DL2604-0142</div>
+            <span class="badge b-drc">DRC-after</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            MƯƠNG A · Mủ tạp · 3,000 kg dự kiến · 2 lot (LOT-A, LOT-B)
+          </div>
+          <button class="btn btn-sm btn-primary" style="margin-top:8px;font-size:11px">Chọn cân</button>
+        </div>
+
+        <div class="deal-card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="deal-code">DL2604-0145</div>
+            <span class="badge b-outright">Outright</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">
+            Hộ Bounmy X. · Mủ nước · ~2,500 kg
+          </div>
+          <button class="btn btn-sm btn-primary" style="margin-top:8px;font-size:11px">Chọn cân</button>
+        </div>
+
+        <div style="margin-top:12px;padding:10px;background:#FEFCF5;border-left:4px solid var(--accent);border-radius:6px">
+          <div style="font-weight:700;font-size:12px;color:var(--primary)">🆕 Walk-in khẩn cấp?</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Hộ nông dân đột xuất → quick-create không cần deal</div>
+          <button class="btn btn-accent btn-sm" style="margin-top:6px;font-size:11px">Walk-in nhanh →</button>
+        </div>
+      </div>
+    </div>
+    <div class="tab-hints">Dashboard list deal active + walk-in quick path</div>
+  </div>
+
+  <!-- SCREEN 3: NEW TICKET - FLOW SELECTOR + MULTILOT -->
+  <div class="device">
+    <div class="device-label">📱 Screen 3 — Tạo phiếu Multi-lot</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>14:38</span>
+        <span>New ticket</span>
+      </div>
+      <div class="app-header">
+        <button class="back-btn">←</button>
+        <h2>Phiếu cân #WB-IN-5896</h2>
+        <span style="font-size:11px;opacity:.7">Step 1/3</span>
+      </div>
+      <div class="content">
+        <label>Loại phiếu</label>
+        <div class="mode-grid">
+          <div class="mode-card active">
+            <div class="ic">🔥</div>
+            <div class="mt">Outright</div>
+            <div class="ms">Mua đứt · cash</div>
+          </div>
+          <div class="mode-card">
+            <div class="ic">🏭</div>
+            <div class="mt">DRC-after</div>
+            <div class="ms">Đại lý cháy đầu ra</div>
+          </div>
+          <div class="mode-card">
+            <div class="ic">🚜</div>
+            <div class="mt">Walk-in</div>
+            <div class="ms">Hộ nông dân</div>
+          </div>
+          <div class="mode-card">
+            <div class="ic">📦</div>
+            <div class="mt">Standard</div>
+            <div class="ms">Deal có sẵn (ERP)</div>
+          </div>
+        </div>
+
+        <div class="row row-2">
+          <div><label>Biển số xe</label><input type="text" value="43C-12345"></div>
+          <div><label>Kho nhập</label><select><option>KHO-LAO-NVL</option></select></div>
+        </div>
+
+        <h3 style="margin-top:14px">📋 Các hộ trên xe này</h3>
+
+        <div class="mle-row">
+          <div class="mle-row-header">
+            <div class="code">#1 · Hộ Bounmy X.</div>
+            <div class="x">×</div>
+          </div>
+          <div class="fields">
+            <select><option>Bounmy X. (LAO-0011)</option></select>
+            <select><option>Mủ nước</option></select>
+            <input type="number" placeholder="Declared" value="1200">
+            <input type="number" placeholder="DRC %" value="35">
+            <input type="number" placeholder="Đơn giá" value="12500">
+            <div style="display:flex;align-items:center;color:var(--muted);font-size:11px">→ allocate sau cân</div>
+          </div>
+        </div>
+
+        <div class="mle-row">
+          <div class="mle-row-header">
+            <div class="code">#2 · Hộ Savath</div>
+            <div class="x">×</div>
+          </div>
+          <div class="fields">
+            <select><option>Savath (LAO-0018)</option></select>
+            <select><option>Mủ nước</option></select>
+            <input type="number" value="800">
+            <input type="number" value="33">
+            <input type="number" value="12000">
+            <div style="display:flex;align-items:center;color:var(--muted);font-size:11px">→ allocate sau cân</div>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px">+ Thêm hộ</button>
+
+        <div class="mle-sum">
+          <span>Declared tổng:</span><b>2,000 kg</b>
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:12px">Tiếp tục → Cân xe</button>
+      </div>
+    </div>
+    <div class="tab-hints">Mode selector + MultiLotEditor inline</div>
+  </div>
+
+  <!-- SCREEN 4: QUICK CREATE HOUSEHOLD -->
+  <div class="device">
+    <div class="device-label">📱 Screen 4 — Quick-create hộ (modal)</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>14:40</span>
+        <span>Modal overlay</span>
+      </div>
+      <div class="app-header">
+        <button class="back-btn">✕</button>
+        <h2>Thêm hộ nông dân</h2>
+        <span style="font-size:11px">Lưu 30s</span>
+      </div>
+      <div class="content">
+        <div class="quick-form">
+          <h4>👤 Hộ mới</h4>
+          <div class="row">
+            <div><label>Họ tên *</label><input type="text" value="Nguyễn Văn Tí"></div>
+          </div>
+          <div class="row row-2">
+            <div><label>SĐT</label><input type="tel" value="0987-654-321"></div>
+            <div><label>CMND/CCCD</label><input type="text" value="046095..."></div>
+          </div>
+          <div class="row">
+            <div><label>Địa chỉ</label><input type="text" value="Phong Mỹ, Phong Điền"></div>
+          </div>
+          <div class="row row-2">
+            <div><label>Quốc tịch</label><select><option>🇻🇳 VN</option><option>🇱🇦 Lào</option></select></div>
+            <div><label>Lưu hồ sơ</label><select><option>💾 Lưu (dùng lại)</option><option>1 lần</option></select></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="color:var(--muted);margin-bottom:6px;font-size:11px;text-transform:uppercase">📋 Sau khi tạo:</h3>
+          <ul style="padding-left:16px;font-size:12px;color:var(--muted);line-height:1.8">
+            <li>INSERT <code>b2b.partners</code> partner_type='household'</li>
+            <li>Auto status='verified' (walk-in hộ không cần duyệt)</li>
+            <li>Tier='new' — sẽ auto-upgrade theo doanh số</li>
+            <li>Partner_id trả về cho MultiLot form</li>
+          </ul>
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:12px">✓ Tạo + Quay lại</button>
+        <button class="btn btn-ghost" style="margin-top:8px">Hủy</button>
+      </div>
+    </div>
+    <div class="tab-hints">Form mini · 30 giây · trả partner_id</div>
+  </div>
+
+  <!-- SCREEN 5: CÂN -->
+  <div class="device">
+    <div class="device-label">📱 Screen 5 — Cân GROSS/TARE/NET</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>14:45</span>
+        <span>Connected LAO-SCALE-01 · Keli</span>
+      </div>
+      <div class="app-header">
+        <button class="back-btn">←</button>
+        <h2>Cân xe 43C-12345</h2>
+        <span style="font-size:11px">Step 2/3</span>
+      </div>
+      <div class="content">
+        <div class="weight-display">
+          <div class="label">Đang cân · Lần 1 (GROSS)</div>
+          <div class="value">11,450</div>
+          <div class="unit">kg · stable ✓</div>
+        </div>
+
+        <div class="row row-2">
+          <div class="kpi-mini">
+            <div class="l">GROSS</div>
+            <div class="v" style="color:var(--success)">11,450</div>
+          </div>
+          <div class="kpi-mini">
+            <div class="l">TARE</div>
+            <div class="v" style="color:var(--muted)">chờ...</div>
+          </div>
+        </div>
+
+        <div style="background:#FEF3C7;padding:10px;border-radius:8px;margin:10px 0;font-size:11px;color:#92400E">
+          ℹ️ Sau khi xe đổ mủ xuống kho, cân lần 2 để lấy TARE. NET = GROSS - TARE tự tính.
+        </div>
+
+        <button class="btn btn-primary" style="margin-bottom:8px">📷 Chụp ảnh xe lần 1</button>
+        <button class="btn btn-accent">✓ Chấp nhận 11,450kg → chờ TARE</button>
+
+        <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border)">
+          <h3 style="font-size:12px;color:var(--primary)">📊 Preview phân bổ NET dự kiến</h3>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+            NET dự kiến 2,955kg (GROSS 11,450 - TARE ước 8,495)
+          </div>
+          <table style="font-size:11px">
+            <tr><td style="padding:3px">Hộ Bounmy (1200 decl)</td><td class="num" style="padding:3px;text-align:right">1,773kg</td></tr>
+            <tr><td style="padding:3px">Hộ Savath (800 decl)</td><td class="num" style="padding:3px;text-align:right">1,182kg</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="tab-hints">Weighbridge real-time · preview allocation</div>
+  </div>
+
+  <!-- SCREEN 6: CASH SETTLE -->
+  <div class="device">
+    <div class="device-label">📱 Screen 6 — Cash settle N phiếu</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>14:58</span>
+        <span>Settlement</span>
+      </div>
+      <div class="app-header">
+        <button class="back-btn">←</button>
+        <h2>Chi tiền mặt</h2>
+        <span style="font-size:11px">Step 3/3</span>
+      </div>
+      <div class="content">
+        <div class="card card" style="background:#F0FDF4;border-color:var(--success);margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:11px;color:var(--muted)">NET đã cân</div>
+              <div style="font-size:22px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace">2,955 kg</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:11px;color:var(--muted)">Tổng chi</div>
+              <div style="font-size:18px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace">34,516,800đ</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase">2 phiếu chi riêng</h3>
+
+        <div class="payment-item">
+          <div class="row1">
+            <span class="name">Bounmy X. (LAO-0011)</span>
+            <span class="amount">21,840,000đ</span>
+          </div>
+          <div class="r2">
+            1,773kg × 35% × 12,500 · Mủ nước · LAO-2604-001
+          </div>
+          <button class="btn btn-success btn-sm" style="margin-top:8px;width:100%;font-size:12px">✓ Đã chi tiền + In phiếu</button>
+        </div>
+
+        <div class="payment-item">
+          <div class="row1">
+            <span class="name">Savath (LAO-0018)</span>
+            <span class="amount">12,676,800đ</span>
+          </div>
+          <div class="r2">
+            1,182kg × 33% × 12,000 · Mủ nước · LAO-2604-002
+          </div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;font-size:12px">⏳ Chờ chi</button>
+        </div>
+
+        <div style="background:#FFFBEB;padding:10px;border-radius:8px;margin-top:10px;font-size:11px;color:#92400E;border-left:3px solid var(--warning)">
+          ⚠️ Hộ nào cần chuyển khoản (không cash) → chuyển sang phiếu CK, kế toán xử lý sau
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:12px">Hoàn tất 2/2 phiếu → Home</button>
+      </div>
+    </div>
+    <div class="tab-hints">N item → N payment · cash tại chỗ · in phiếu riêng</div>
+  </div>
+
+  <!-- SCREEN 7: RECEIPT -->
+  <div class="device">
+    <div class="device-label">📱 Screen 7 — Receipt in (thermal 80mm)</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>14:59</span>
+        <span>Print preview</span>
+      </div>
+      <div class="app-header">
+        <button class="back-btn">✕</button>
+        <h2>Phiếu chi LAO-2604-001</h2>
+        <span style="font-size:11px">📄 PDF</span>
+      </div>
+      <div class="content">
+        <div class="receipt">
+          <h4>PHIẾU CHI · LAO-2604-001</h4>
+          <div class="receipt-line"><span>Ngày:</span><span>23/04/2026 14:58</span></div>
+          <div class="receipt-line"><span>Kho:</span><span>LAO-NVL</span></div>
+          <div class="receipt-line"><span>Ticket cân:</span><span>WB-IN-5896</span></div>
+          <div style="border-top:1px dashed var(--accent);margin:6px 0"></div>
+          <div class="receipt-line"><span>Người bán:</span><span>Bounmy X.</span></div>
+          <div class="receipt-line"><span>Mã hộ:</span><span>LAO-0011</span></div>
+          <div class="receipt-line"><span>Passport:</span><span>L12345...</span></div>
+          <div style="border-top:1px dashed var(--accent);margin:6px 0"></div>
+          <div class="receipt-line"><span>Loại mủ:</span><span>Mủ nước</span></div>
+          <div class="receipt-line"><span>NET (allocate):</span><span>1,773 kg</span></div>
+          <div class="receipt-line"><span>DRC cáp:</span><span>35%</span></div>
+          <div class="receipt-line"><span>DRC tính:</span><span>620.55 kg khô</span></div>
+          <div class="receipt-line"><span>Đơn giá:</span><span>12,500 đ/kg</span></div>
+          <div class="receipt-line tot"><span>CHI:</span><span>21,840,000đ</span></div>
+          <div style="border-top:1px dashed var(--accent);margin:6px 0"></div>
+          <div style="font-family:Inter,sans-serif;font-size:11px;color:var(--muted);text-align:center;margin-top:8px">
+            Người chi: Bounmy K. (Thu mua)<br>
+            Người nhận ký: _____________
+          </div>
+        </div>
+
+        <div class="row row-2" style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm">📄 In A4</button>
+          <button class="btn btn-primary btn-sm">🖨️ Thermal 80mm</button>
+        </div>
+        <button class="btn btn-accent" style="margin-top:8px">Phiếu tiếp theo (#2) →</button>
+      </div>
+    </div>
+    <div class="tab-hints">2 format: A4 kế toán + Thermal 80mm tại cổng</div>
+  </div>
+
+  <!-- SCREEN 8: DEAL-BASED WEIGH (DRC-after) -->
+  <div class="device">
+    <div class="device-label">📱 Screen 8 — DRC-after (chọn deal có sẵn)</div>
+    <div class="screen">
+      <div class="statusbar">
+        <span>09:20</span>
+        <span>Deal-based flow</span>
+      </div>
+      <div class="app-header">
+        <button class="back-btn">←</button>
+        <h2>DL2604-0142 · 2 lot</h2>
+        <span class="badge b-drc" style="background:rgba(255,255,255,.2);color:#fff">DRC-after</span>
+      </div>
+      <div class="content">
+        <div class="card" style="background:#EFF6FF">
+          <h3>🏢 MƯƠNG A (HSC-0042)</h3>
+          <div style="font-size:11px;color:var(--muted)">Gold tier · Nợ: 12M · Lot: 2</div>
+          <div style="margin-top:6px">
+            <span class="badge b-warn">Expected DRC 35-38%</span>
+            <span class="badge b-info" style="margin-left:4px">BGĐ ÁN duyệt ✓</span>
+          </div>
+        </div>
+
+        <h3 style="margin-top:10px">📋 Lô dự kiến trong xe</h3>
+
+        <div class="mle-row">
+          <div class="mle-row-header">
+            <div class="code">#1 · LOT-A (Vườn Quảng Lâm)</div>
+            <div class="x">×</div>
+          </div>
+          <div class="fields">
+            <input type="text" value="LOT-A-2604" placeholder="Lot code">
+            <select><option>Mủ tạp</option></select>
+            <input type="number" placeholder="Declared" value="3000">
+            <input type="number" placeholder="DRC expected" value="35" readonly>
+          </div>
+        </div>
+
+        <div class="mle-row">
+          <div class="mle-row-header">
+            <div class="code">#2 · LOT-B (Vườn Phong Điền)</div>
+            <div class="x">×</div>
+          </div>
+          <div class="fields">
+            <input type="text" value="LOT-B-2604">
+            <select><option>Mủ tạp</option></select>
+            <input type="number" value="2000">
+            <input type="number" value="38" readonly>
+          </div>
+        </div>
+
+        <div class="mle-sum">
+          <span>Declared:</span><b>5,000 kg</b>
+          <span>Giá nền:</span><b>13,000đ</b>
+        </div>
+
+        <div style="background:#DBEAFE;padding:10px;border-radius:8px;margin-top:10px;font-size:11px;color:#1E40AF">
+          ℹ️ Flow DRC-after: <b>CHỈ CÂN</b>. Không chi tiền ở đây. Quyết toán sau khi sản xuất xong.
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:10px">→ Sang bước cân xe</button>
+      </div>
+    </div>
+    <div class="tab-hints">DRC-after · không có cash settle · stop at stock-in</div>
+  </div>
+
+</div>
+
+<div style="text-align:center;padding:20px;color:#aaa;font-size:11px">
+  🌿 <b>Huy Anh Rubber</b> · Weighbridge app prototype · 3 flow integrated · Multi-lot · Cash settle
+</div>
+
+</body>
+</html>

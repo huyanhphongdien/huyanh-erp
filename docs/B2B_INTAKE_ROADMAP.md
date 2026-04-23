@@ -1,914 +1,637 @@
-# 🌿 B2B Intake — Kế hoạch triển khai tổng hợp
+# 🌿 B2B Intake — Kế hoạch triển khai micro-phase
 
 **Ngày:** 2026-04-23
-**Phiên bản:** 3.0 (consolidated — thay thế v1, v2)
-**Scope:** 🎯 **CHỈ B2B** (không động Sales module)
-**Sơ đồ tham chiếu:** [B2B_FLOWS_PRESENTATION.html](B2B_FLOWS_PRESENTATION.html) · [B2B_INTAKE_PROTOTYPE.html](B2B_INTAKE_PROTOTYPE.html)
+**Phiên bản:** 4.0 (micro-phase execution, ~40 bước nhỏ)
+**Scope:** 🎯 **CHỈ B2B** (không động Sales)
+**Triết lý:** code kỹ từng bước, test sau mỗi phase, tìm bug ngay không dồn đuôi
+
+**Sơ đồ tham chiếu:**
+- [B2B_FLOWS_PRESENTATION.html](B2B_FLOWS_PRESENTATION.html) — 10 mermaid diagrams
+- [B2B_INTAKE_PROTOTYPE.html](B2B_INTAKE_PROTOTYPE.html) — UX 3 luồng
 
 ---
 
-## 0. Executive summary
+## 0. Nguyên tắc
 
-### Hiện tại
-- B2B chạy **1 flow duy nhất** (standard): chat/demand → deal processing → QC → BGĐ duyệt → nhập kho → tạm ứng → quyết toán → thanh toán
-- Weighbridge cân 1 ticket = **1 deal** (không hỗ trợ xe nhiều lô)
-- Không có flow cho hộ nông dân walk-in, không có flow mua đứt nhanh, không có flow "chạy đầu ra" rõ ràng cho đại lý
+### Workflow mỗi micro-phase
+```
+1. Đọc context (schema cũ + memory + gap) — 5 phút
+2. Code/SQL phase đó — 15-90 phút
+3. Build/migrate + verify — 5-10 phút
+4. Test cụ thể (SQL query / manual UI / unit) — 5-15 phút
+5. Tìm edge case + bug → fix tại chỗ
+6. Commit (1 phase = 1 commit) + push
+7. Update memory nếu gặp gotcha
+```
 
-### Đề xuất v3
-- ➕ **3 flow mới** song song standard: `outright` · `drc_after_production` · `farmer_walkin`
-- ➕ **Multi-lot per ticket** (1 xe gom N hộ / N grade / N vườn)
-- ➕ **Bảng giá ngày** + **household partner** + **tier-based advance**
-- ➕ **Flow "chạy đầu ra" đại lý** có đặc thù riêng (pool/isolated, DRC variance, SLA, production cost)
-- ➕ **Settlement tại cân** cho outright + walk-in (chi tiền ngay, không qua ERP)
+### Size rule
+- **Phase size:** 15 phút - 3 giờ (không hơn)
+- **Commit size:** 1 concern per commit
+- **Test criteria:** mỗi phase có PASS/FAIL check rõ ràng
+- **Rollback:** mỗi SQL migration có DROP counterpart
+- **Order:** schema trước, trigger sau, service sau nữa, UI cuối
 
-### Effort
-| Ước tính | Value |
-|---|---|
-| ERP (Sprint A-F) | **17-22 ngày** |
-| Weighbridge app (song song) | **4 ngày** |
-| Portal (badge purchase_type) | **0.5 ngày** |
-| **Tổng** | **~4-5 tuần** |
-
-### Rủi ro chính
-1. Trigger Sprint J nới lỏng sai → cân lậu (mitigation: require `buyer_user_id`)
-2. Flow đại lý DRC pool bất công → tranh chấp (mitigation: variance tolerance + dispute auto)
-3. Schema migration point-of-no-return Sprint A (mitigation: rollback SQL sẵn + staging 48h)
+### Bugs budget
+- Dự kiến **3-5 bugs/phase** → không panic, fix ngay
+- Khám phá được **edge case thật** (không phải lý thuyết) → update test plan
+- Không skip test để chạy nhanh → vỡ sau đắt hơn
 
 ---
 
-## 1. Hiện trạng B2B — baseline
+## 1. Context — hiện trạng B2B baseline
 
-### 1.1 Schema hiện có (Sprint E-Q đã xong)
-
+### Đã có (Sprint E-Q)
 ```
 b2b.deals
-├── id, deal_number, partner_id, deal_type, status
-├── quantity_kg, expected_drc, actual_drc, final_value
-├── product_type (mu_tap/mu_nuoc/mu_cao_su)
-├── target_facility_id (commit ce6b30a — booking metadata kế thừa)
-├── warehouse_id (demand-based)
-└── Sprint J guards: weighbridge + stock-in + advance chỉ khi accepted
+├── purchase_type ❌ CHƯA CÓ
+├── status (draft/processing/accepted/settled/cancelled)
+├── Sprint J guards: cân + stock-in + advance chỉ khi accepted
+├── trg_deal_lock: block actual_drc update khi đã accepted
+└── Trigger tier auto-upgrade khi settled
 
-b2b_demands (public)
-├── RLS: authenticated (Sprint L fix 403)
-├── CHECK deadline ≥ published_at
-└── Trigger sync_demand_filled
+b2b.partners
+├── national_id ❌ CHƯA CÓ
+├── nationality ❌ CHƯA CÓ
+└── partner_type (đang dùng cho đại lý, chưa có household)
 
-b2b.partner_ledger
-├── Sprint N cumulative SUM running_balance
-└── entry_type: advance_paid/settlement_receivable/payment_paid
+b2b.daily_price_list ❌ CHƯA CÓ
 
-b2b.partner_ratings
-├── total_volume_kg
-└── Trigger Sprint O: settled deal → auto tier upgrade
+weighbridge_tickets
+├── deal_id scalar (1 ticket = 1 deal)
+├── has_items ❌ CHƯA CÓ
+└── allocation_mode ❌ CHƯA CÓ
+
+weighbridge_ticket_items ❌ CHƯA CÓ
+
+stock_in_details
+├── ticket_item_id ❌ CHƯA CÓ
+└── deal_id ❌ CHƯA CÓ (hiện chỉ cha stock_in_orders.deal_id)
 ```
 
-### 1.2 Luồng standard hiện tại (không thay đổi)
+### 4 luồng mục tiêu
 
-```
-Portal/Chat    Kinh doanh        QC        BGĐ        Weighbridge    Kho        Kế toán
-    │              │              │         │              │            │           │
-    ├──booking────→│              │         │              │            │           │
-    │              ├──create Deal │         │              │            │           │
-    │              │  (processing)│         │              │            │           │
-    │              │              ├──sample │              │            │           │
-    │              │              │         ├──duyệt      │            │           │
-    │              │              │         │ (accepted)   │            │           │
-    │              │              │         │              ├──cân IN──→ │           │
-    │              │              │         │              │            ├──stock_in │
-    │              │              │         │              │            │           ├──advance
-    │              │              │         │              │            │           ├──settlement
-    │              │              │         │              │            │           └──paid (settled)
-```
-
-### 1.3 Gap với 3 flow mới
-
-| # | Gap | Flow ảnh hưởng |
-|---|---|---|
-| G1 | `deal.purchase_type` chưa có | All 3 |
-| G2 | Sprint J block cân khi deal chưa accepted | 🅰️ outright · 🅲 walk-in (bypass BGĐ) |
-| G3 | `trg_deal_lock` block update `actual_drc` sau accepted | 🅱️ drc_after (cần update sau khi SX xong) |
-| G4 | Ticket 1:1 với deal — không hỗ trợ N lô | All (S1-S4 scenarios) |
-| G5 | Không có partner type='household' + CCCD | 🅲 walk-in |
-| G6 | Không có daily price list | 🅲 walk-in |
-| G7 | Không có tier-based advance max | All (đặc thù đại lý) |
-| G8 | Không có pool/isolated production mode | 🅱️ đặc thù đại lý |
-| G9 | Không có DRC variance tolerance + dispute auto | 🅱️ đặc thù đại lý |
-| G10 | Không có settlement tại cân (chi tiền ngay) | 🅰️ + 🅲 |
-
----
-
-## 2. 3 luồng mua mủ mới + standard (4 luồng tổng)
-
-### 2.1 Bảng tóm tắt
-
-| # | Flow | `purchase_type` | Đối tượng | Đặc thù | Thời gian từ cân → trả tiền |
-|---|---|---|---|---|---|
-| 📦 | **Standard** (giữ nguyên) | `standard` | Đại lý chat/demand | QC → BGĐ → SX/giao → QT | 7-30 ngày |
-| 🅰️ | **Outright** (mua đứt) | `outright` | Đại lý VN · hộ Lào | Bypass QC/BGĐ · DRC cáp | **Ngay tại cân** |
-| 🅱️ | **DRC-after-production** ⭐ | `drc_after_production` | Đại lý (tier ≥ silver) | QC mẫu → BGĐ → SX → DRC actual | 3-7 ngày (sau SX xong) |
-| 🅲 | **Farmer walk-in** | `farmer_walkin` | Hộ nông dân VN | QC tại cân · giá ngày | **Ngay tại cân** |
-
-### 2.2 State diagram 4 luồng
-
-```mermaid
-stateDiagram-v2
-    [*] --> draft : Create deal
-
-    state standard_flow <<choice>>
-    draft --> standard_flow : purchase_type?
-
-    standard_flow --> processing_standard : standard
-    processing_standard --> accepted_standard : QC + BGĐ duyệt
-    accepted_standard --> settled_standard : Settlement paid
-    settled_standard --> [*]
-
-    standard_flow --> processing_outright : outright
-    processing_outright --> settled_outright : Cân + chi tiền 1-shot
-    settled_outright --> [*]
-
-    standard_flow --> processing_drc_after : drc_after_production
-    processing_drc_after --> accepted_drc_after : sample_drc + BGĐ
-    accepted_drc_after --> produced : Production finish → actual_drc
-    produced --> settled_drc_after : Settlement auto
-    settled_drc_after --> [*]
-
-    standard_flow --> processing_walkin : farmer_walkin
-    processing_walkin --> settled_walkin : QC tại cân + chi tiền
-    settled_walkin --> [*]
-
-    processing_standard --> cancelled : Hủy
-    processing_outright --> cancelled
-    processing_drc_after --> cancelled
-    processing_walkin --> cancelled
-```
-
----
-
-## 3. Flow 🅱️ "Chạy đầu ra" đại lý — deep dive
-
-Đây là flow **phức tạp nhất** và là **rủi ro cao nhất** cho quan hệ với đại lý. Cần note kỹ 6 đặc thù.
-
-### 3.1 Nghiệp vụ cơ bản
-
-```
-Đại lý giao mủ tạp ─→ Nhà máy cân + nhập kho
-                             ↓
-                     QC đo sample_drc (mẫu ~5kg)
-                             ↓
-                     BGĐ duyệt → deal.accepted
-                             ↓
-                     Ứng tạm tier-based (gold 70% × final_estimated)
-                             ↓
-                     Chạy sản xuất (3-7 ngày)
-                             ↓
-                     TP ra lò → finished_product_kg
-                             ↓
-                     actual_drc = finished_product_kg / nvl_kg × 100
-                             ↓
-                     Settlement: gross = nvl_kg × actual_drc/100 × price
-                                 remaining = gross - advance
-                             ↓
-                     Thanh toán → deal.settled
-```
-
-### 3.2 6 đặc thù đại lý — CẦN IMPLEMENT
-
-#### 🔸 Đặc thù 1: Pool vs Isolated production
-
-**Vấn đề:** Đại lý A giao 10 tấn, nhà máy pool với 50 tấn của đại lý B,C → ra TP 18 tấn pooled → DRC thật của A bao nhiêu?
-
-**Giải pháp:**
-```sql
-ALTER TABLE b2b.deals ADD COLUMN production_mode TEXT DEFAULT 'pooled'
-  CHECK (production_mode IN ('pooled', 'isolated'));
-ALTER TABLE b2b.deals ADD COLUMN production_pool_id UUID;  -- nhóm deal cùng pool
-```
-
-- **Pooled** (default): actual_drc = DRC trung bình weighted của toàn pool → đại lý chấp nhận rủi ro chung
-- **Isolated** (premium, tier ≥ gold): chạy dây chuyền riêng, DRC chính xác 100% của lô đại lý → phí cao hơn 5-10%
-
-**UI portal partner:** chọn khi gửi booking — checkbox "Yêu cầu chạy riêng (+5% phí)". Default pooled.
-
-#### 🔸 Đặc thù 2: DRC variance tolerance
-
-**Vấn đề:** Đại lý đưa sample QC 35%, actual pool ra 30% → mất 14% tiền so với dự kiến. Có tranh chấp?
-
-**Giải pháp:**
-```sql
--- Constant trong app
-const MAX_DRC_VARIANCE_PCT = 3;  -- 3% tolerance
-
--- Trigger auto-dispute khi actual_drc được set
-IF ABS(NEW.actual_drc - NEW.sample_drc) > 3 THEN
-  INSERT INTO b2b.drc_disputes (
-    deal_id, partner_id, expected_drc, actual_drc, reason, status
-  ) VALUES (
-    NEW.id, NEW.partner_id, NEW.sample_drc, NEW.actual_drc,
-    'Auto-raised: variance > 3%', 'open'
-  );
-  -- Hold settlement cho đến khi dispute resolved
-END IF;
-```
-
-**Partner portal notification:** "Deal DL-xxx có chênh lệch DRC 5% — đã tự raise khiếu nại, BGĐ sẽ review trong 24h"
-
-#### 🔸 Đặc thù 3: Production progress visibility
-
-**Vấn đề:** Đại lý không biết lô mình đang ở stage nào → lo lắng, gọi hỏi nhiều.
-
-**Giải pháp:** Portal partner trang mới `/portal/deals/:id/production`:
-
-```
-┌─────────────────────────────────────────────────┐
-│  Deal DL2604-AGX · 10 tấn mủ tạp · 25/04/2026    │
-├─────────────────────────────────────────────────┤
-│  ✅ Đã cân xong          25/04 08:30            │
-│  ✅ Đã nhập kho          25/04 09:15            │
-│  ✅ QC sample DRC=35%    25/04 10:00            │
-│  ✅ BGĐ duyệt           25/04 14:00            │
-│  ✅ Tạm ứng 50M          25/04 16:00            │
-│  🔄 Đang sản xuất        Est. 28/04 (2 ngày)    │
-│  ⏳ Chờ ra TP                                   │
-│  ⏳ Quyết toán                                  │
-│  ⏳ Thanh toán                                  │
-└─────────────────────────────────────────────────┘
-```
-
-Realtime update khi `production_orders.status` thay đổi.
-
-#### 🔸 Đặc thù 4: SLA sản xuất (deadline trả tiền)
-
-**Vấn đề:** Đại lý không biết bao giờ được thanh toán → trôi vốn, giảm lòng tin.
-
-**Giải pháp:**
-```sql
-ALTER TABLE b2b.deals ADD COLUMN production_sla_days INT DEFAULT 7;
-ALTER TABLE b2b.deals ADD COLUMN production_started_at TIMESTAMPTZ;
-ALTER TABLE b2b.deals ADD COLUMN production_sla_deadline TIMESTAMPTZ
-  GENERATED ALWAYS AS (production_started_at + (production_sla_days || ' days')::interval) STORED;
-```
-
-Cron daily: nếu `NOW() > production_sla_deadline AND actual_drc IS NULL`:
-- Notification BGĐ + partner: "Deal DL-xxx quá SLA, chưa có DRC actual"
-- Auto-trigger advance bổ sung 10% (nếu đại lý tier ≥ gold)
-
-#### 🔸 Đặc thù 5: Settlement preview
-
-**Vấn đề:** Đại lý chỉ thấy số tiền cuối khi settlement đã confirmed → không có cơ hội đàm phán.
-
-**Giải pháp:** Compute realtime dựa trên `sample_drc`, hiển thị với disclaimer:
-
-```typescript
-// src/services/b2b/dealService.ts
-function previewSettlement(deal: Deal): Preview {
-  const preview_gross = deal.quantity_kg * deal.sample_drc / 100 * deal.price_per_kg;
-  const preview_remaining = preview_gross - deal.advance_paid;
-  return {
-    estimated_gross: preview_gross,
-    estimated_remaining: preview_remaining,
-    range: {
-      low: preview_remaining * 0.95,   // DRC xuống 3%
-      high: preview_remaining * 1.05,  // DRC lên 3%
-    },
-    disclaimer: 'Ước tính dựa trên DRC mẫu. Actual có thể ±5% tùy kết quả sản xuất.',
-  };
-}
-```
-
-UI hiển thị ngay sau khi cân xong + BGĐ duyệt.
-
-#### 🔸 Đặc thù 6: Reject production output (TP không đạt chuẩn)
-
-**Vấn đề:** TP ra màu xấu, nhiễm bẩn → ai chịu phí? Đại lý (mủ nguyên liệu kém) hay nhà máy (SX lỗi)?
-
-**Giải pháp:**
-```sql
-ALTER TABLE b2b.deals ADD COLUMN production_reject_reason TEXT
-  CHECK (production_reject_reason IN (
-    'raw_material_quality',      -- mủ đại lý xấu → đại lý chịu 100%
-    'production_error',           -- nhà máy SX lỗi → nhà máy chịu 100%
-    'force_majeure',              -- thiên tai, điện cắt → 50/50
-    NULL
-  ));
-ALTER TABLE b2b.deals ADD COLUMN reject_loss_amount NUMERIC(14,2);
-```
-
-Workflow:
-1. QC TP final → nếu không đạt, BGĐ chọn reason
-2. Auto-compute loss (`expected_gross - actual_gross`)
-3. Phân bổ theo rule:
-   - `raw_material_quality`: trừ loss từ settlement đại lý
-   - `production_error`: nhà máy chịu, settlement đại lý full
-   - `force_majeure`: 50/50
-4. Có dispute flow nếu đại lý không đồng ý
-
-### 3.3 Edge cases Flow 🅱️ khác
-
-| # | Case | Xử lý |
-|---|---|---|
-| E1 | Đại lý gộp 2 lô khác sample_drc | Multi-lot: mỗi lô 1 item, actual_drc tính riêng |
-| E2 | Đại lý rút mủ giữa chừng (nhà máy chưa SX) | Cancel deal → hoàn stock-in → refund advance (via ledger reverse entry) |
-| E3 | Production yield < 80% expected | Auto-pause settlement, trigger review BGĐ |
-| E4 | Nhiều deal cùng đại lý ghép 1 lô SX | `production_pool_id` share, allocate TP theo tỷ lệ `nvl_kg` |
-| E5 | Tỷ giá thay đổi giữa advance và settlement | Lưu `advance_exchange_rate` + `settlement_exchange_rate` riêng |
-| E6 | Partner tier downgrade giữa chừng | Lock advance max theo tier **tại thời điểm cân** (không apply tier mới) |
-
----
-
-## 4. Multi-lot architecture (CORE — Sprint A)
-
-### 4.1 Vì sao là CORE (không phải add-on)
-
-4 scenarios thực tế **không thể tránh**:
-- **S1:** Tài xế gom 3 hộ nông dân 3 xã khác nhau → 1 xe
-- **S2:** 1 xe chở 2 loại mủ (nước + tạp) — giá khác nhau
-- **S3:** Đại lý có 2 vườn DRC khác nhau → 1 chuyến
-- **S4:** Demand multi-lot accept → nhiều deal cùng 1 ticket
-
-Nếu không có multi-lot ở Sprint A → phải rework toàn bộ Sprint D UI khi gặp case đầu tiên.
-
-### 4.2 Schema `weighbridge_ticket_items`
-
-```sql
-CREATE TABLE weighbridge_ticket_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ticket_id UUID NOT NULL REFERENCES weighbridge_tickets(id) ON DELETE CASCADE,
-  line_no INT NOT NULL,
-
-  -- EXACTLY 1 of 3 source (CHECK)
-  deal_id      UUID REFERENCES b2b_deals(id),
-  partner_id   UUID REFERENCES b2b_partners(id),
-  supplier_id  UUID REFERENCES rubber_suppliers(id),
-
-  rubber_type TEXT NOT NULL,
-  lot_code TEXT,
-  declared_qty_kg NUMERIC(12,2) NOT NULL CHECK (declared_qty_kg > 0),
-  actual_qty_kg NUMERIC(12,2),      -- auto-compute by trigger
-  drc_percent NUMERIC(5,2),
-  unit_price NUMERIC(12,2),
-  line_amount_vnd NUMERIC(14,2),    -- auto-compute
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-
-  UNIQUE (ticket_id, line_no),
-  CONSTRAINT chk_exactly_one_source CHECK (
-    (deal_id IS NOT NULL)::INT +
-    (partner_id IS NOT NULL)::INT +
-    (supplier_id IS NOT NULL)::INT = 1
-  )
-);
-
-ALTER TABLE weighbridge_tickets
-  ADD COLUMN has_items BOOLEAN NOT NULL DEFAULT FALSE,
-  ADD COLUMN allocation_mode TEXT NOT NULL DEFAULT 'by_share'
-    CHECK (allocation_mode IN ('by_share', 'direct'));
--- by_share: actual = net × (declared / sum(declared))
--- direct: actual = declared, sum phải = net (enforce trigger)
-
-ALTER TABLE stock_in_details
-  ADD COLUMN ticket_item_id UUID REFERENCES weighbridge_ticket_items(id),
-  ADD COLUMN deal_id UUID REFERENCES b2b_deals(id),
-  ADD COLUMN lot_code TEXT;
-```
-
-### 4.3 Trigger allocate
-
-```sql
-CREATE OR REPLACE FUNCTION allocate_ticket_item_weights()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-DECLARE
-  t weighbridge_tickets%ROWTYPE;
-  total_declared NUMERIC;
-BEGIN
-  SELECT * INTO t FROM weighbridge_tickets WHERE id = NEW.ticket_id;
-  IF t.net_weight IS NULL OR NOT t.has_items THEN RETURN NEW; END IF;
-
-  SELECT SUM(declared_qty_kg) INTO total_declared
-  FROM weighbridge_ticket_items WHERE ticket_id = t.id;
-
-  IF t.allocation_mode = 'by_share' AND total_declared > 0 THEN
-    UPDATE weighbridge_ticket_items
-    SET actual_qty_kg = ROUND(t.net_weight * declared_qty_kg / total_declared, 2),
-        line_amount_vnd = ROUND(
-          t.net_weight * declared_qty_kg / total_declared
-          * COALESCE(drc_percent, 100) / 100
-          * COALESCE(unit_price, 0), 0)
-    WHERE ticket_id = t.id;
-  ELSIF t.allocation_mode = 'direct' THEN
-    IF ABS(COALESCE(total_declared, 0) - t.net_weight) > 1 THEN
-      RAISE EXCEPTION 'Mode direct: tổng declared (%) phải = NET (%)',
-        total_declared, t.net_weight;
-    END IF;
-    UPDATE weighbridge_ticket_items
-    SET actual_qty_kg = declared_qty_kg,
-        line_amount_vnd = ROUND(declared_qty_kg * COALESCE(drc_percent,100)/100
-                                * COALESCE(unit_price,0), 0)
-    WHERE ticket_id = t.id;
-  END IF;
-  RETURN NEW;
-END $$;
-```
-
-### 4.4 Helper `getTicketLines()` unify API
-
-```typescript
-// src/services/weighbridge/ticketLinesService.ts
-export async function getTicketLines(ticketId: string): Promise<TicketLine[]> {
-  const ticket = await weighbridgeService.getById(ticketId);
-  if (ticket.has_items) {
-    const { data } = await supabase
-      .from('weighbridge_ticket_items')
-      .select('*').eq('ticket_id', ticketId).order('line_no');
-    return (data || []).map(i => ({ ...i, _source: 'item' }));
-  }
-  // Synthesize 1 line từ scalar (backward-compat)
-  return [{
-    line_no: 1,
-    deal_id: ticket.deal_id,
-    partner_id: ticket.partner_id,
-    supplier_id: ticket.supplier_id,
-    rubber_type: ticket.rubber_type,
-    lot_code: ticket.lot_code,
-    actual_qty_kg: ticket.net_weight,
-    drc_percent: ticket.expected_drc,
-    unit_price: ticket.unit_price,
-    line_amount_vnd: ticket.net_weight * (ticket.expected_drc || 100) / 100 * (ticket.unit_price || 0),
-    _source: 'scalar',
-  }];
-}
-```
-
-**Mọi downstream code chỉ gọi `getTicketLines()`** — không branch `if has_items else`.
-
-### 4.5 UI `<MultiLotEditor/>`
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Nguồn hàng trên xe                          [+ Thêm lô]   │
-├────┬──────────────┬──────────┬──────┬──────┬──────┬─────┤
-│ #1 │ ĐL ABC       │ Mủ nước  │ 600  │ 35%  │ 13k  │ [x] │
-│ #2 │ Hộ Nguyễn V. │ Mủ tạp   │ 400  │ 28%  │  8k  │ [x] │
-├────┴──────────────┴──────────┴──────┴──────┴──────┴─────┤
-│ Tổng declared: 1.000 kg  │  NET cân: 985 kg               │
-│ Allocation: by_share (phân bổ theo tỷ lệ)                  │
-└──────────────────────────────────────────────────────────┘
-```
-
-- Mặc định 1 dòng (UX giống cũ)
-- Click **+ Thêm lô** → thêm dòng
-- Mỗi dòng: chọn deal có sẵn / partner quick-create / supplier
-- Save: nếu 1 dòng → ticket `has_items=false` scalar; nếu N dòng → `has_items=true` items
-
----
-
-## 5. Schema changes — consolidated
-
-### 5.1 Tổng hợp 5 migration
-
-```sql
--- ═══ MIGRATION 1: b2b.deals — 5 cột mới ═══
-ALTER TABLE b2b.deals
-  ADD COLUMN purchase_type TEXT NOT NULL DEFAULT 'standard'
-    CHECK (purchase_type IN ('standard','outright','drc_after_production','farmer_walkin')),
-  ADD COLUMN buyer_user_id UUID,
-  ADD COLUMN qc_user_id UUID,
-  ADD COLUMN sample_drc NUMERIC(5,2),
-  ADD COLUMN finished_product_kg NUMERIC(12,2),
-  ADD COLUMN production_mode TEXT DEFAULT 'pooled'
-    CHECK (production_mode IN ('pooled', 'isolated')),
-  ADD COLUMN production_pool_id UUID,
-  ADD COLUMN production_sla_days INT DEFAULT 7,
-  ADD COLUMN production_started_at TIMESTAMPTZ,
-  ADD COLUMN production_reject_reason TEXT
-    CHECK (production_reject_reason IN ('raw_material_quality','production_error','force_majeure')),
-  ADD COLUMN reject_loss_amount NUMERIC(14,2);
-
--- Backfill (trước khi NOT NULL)
-UPDATE b2b.deals SET purchase_type = 'standard' WHERE purchase_type IS NULL;
-
--- ═══ MIGRATION 2: b2b.partners — household + CCCD ═══
-ALTER TABLE b2b.partners
-  ADD COLUMN national_id TEXT,
-  ADD COLUMN nationality TEXT DEFAULT 'VN' CHECK (nationality IN ('VN','LAO'));
-CREATE UNIQUE INDEX IF NOT EXISTS ux_partners_national_id
-  ON b2b.partners(national_id) WHERE national_id IS NOT NULL;
--- partner_type thêm 'household' vào CHECK hiện tại
-
--- ═══ MIGRATION 3: b2b.daily_price_list (MỚI) ═══
-CREATE TABLE b2b.daily_price_list (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  effective_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  effective_to TIMESTAMPTZ,
-  product_code TEXT NOT NULL,
-  base_price_per_kg NUMERIC(12,2) NOT NULL,
-  notes TEXT,
-  created_by UUID,
-  EXCLUDE USING gist (
-    product_code WITH =,
-    tstzrange(effective_from, effective_to) WITH &&
-  )
-);
-CREATE INDEX idx_daily_price_product_time ON b2b.daily_price_list(product_code, effective_from DESC);
-
--- ═══ MIGRATION 4: weighbridge multi-lot ═══
-CREATE TABLE weighbridge_ticket_items ( ... -- xem §4.2 );
-ALTER TABLE weighbridge_tickets
-  ADD COLUMN has_items BOOLEAN NOT NULL DEFAULT FALSE,
-  ADD COLUMN allocation_mode TEXT NOT NULL DEFAULT 'by_share'
-    CHECK (allocation_mode IN ('by_share', 'direct'));
-ALTER TABLE stock_in_details
-  ADD COLUMN ticket_item_id UUID REFERENCES weighbridge_ticket_items(id),
-  ADD COLUMN deal_id UUID REFERENCES b2b_deals(id),
-  ADD COLUMN lot_code TEXT;
-CREATE TRIGGER trg_items_allocate_on_insert ...  -- xem §4.3
-
--- ═══ MIGRATION 5: Triggers bypass Sprint J cho outright + walk-in ═══
--- Rewrite trg_enforce_weighbridge_accepted + trg_enforce_b2b_stock_in_accepted
--- + trg_deal_lock (exception actual_drc cho drc_after)
--- Chi tiết ở Sprint B
-
--- ═══ MIGRATION 6: Trigger auto-dispute DRC variance (Flow 🅱️) ═══
-CREATE OR REPLACE FUNCTION auto_raise_drc_dispute()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-DECLARE variance_pct NUMERIC;
-BEGIN
-  IF NEW.actual_drc IS NOT NULL AND OLD.actual_drc IS NULL
-     AND NEW.sample_drc IS NOT NULL
-     AND NEW.purchase_type = 'drc_after_production' THEN
-    variance_pct := ABS(NEW.actual_drc - NEW.sample_drc);
-    IF variance_pct > 3 THEN
-      INSERT INTO b2b.drc_disputes (
-        deal_id, partner_id, expected_drc, actual_drc, reason, status
-      ) VALUES (
-        NEW.id, NEW.partner_id, NEW.sample_drc, NEW.actual_drc,
-        format('Auto-raised: variance %.2f%% > 3%%', variance_pct), 'open'
-      );
-    END IF;
-  END IF;
-  RETURN NEW;
-END $$;
-CREATE TRIGGER trg_drc_variance_dispute
-  AFTER UPDATE OF actual_drc ON b2b.deals
-  FOR EACH ROW WHEN (NEW.purchase_type = 'drc_after_production')
-  EXECUTE FUNCTION auto_raise_drc_dispute();
-```
-
-### 5.2 Summary table
-
-| Object | Type | Purpose |
-|---|---|---|
-| `b2b.deals.purchase_type` + 10 cột | ALTER | Phân luồng 3 flow + đặc thù đại lý |
-| `b2b.partners.national_id` + nationality | ALTER | Household VN/LAO |
-| `b2b.daily_price_list` | CREATE TABLE | Giá ngày cho walk-in |
-| `weighbridge_ticket_items` | CREATE TABLE | Multi-lot core |
-| `weighbridge_tickets.has_items` | ALTER | Flag multi-lot |
-| `stock_in_details.ticket_item_id` | ALTER | Link N batches về N items |
-| `trg_enforce_weighbridge_accepted` | REPLACE | Bypass outright/walk-in + support multi-lot |
-| `trg_deal_lock` | REPLACE | Exception drc_after update actual_drc |
-| `trg_drc_variance_dispute` | CREATE | Auto-raise dispute (Flow 🅱️) |
-| `allocate_ticket_item_weights` | CREATE | Multi-lot weight distribution |
-
----
-
-## 6. 9 default BGĐ approve (lặp từ v2)
-
-| # | Câu hỏi | Default approve-ready | Nếu BGĐ muốn khác |
-|---|---|---|---|
-| 1 | Range DRC cáp? | **25-70%**, warning nếu lệch ±10% trung bình 30 ngày | Hardcode từng grade |
-| 2 | Công thức flow 🅰️? | **qty × price** (DRC bake vào price) | qty × drc × price_base |
-| 3 | Chụp ảnh xe/mủ? | **Bắt buộc 2 ảnh** (xe + mẫu mủ) | Optional |
-| 4 | Bảng giá từ đâu? | **Table `daily_price_list`**, admin nhập 7h sáng | API giá quốc tế |
-| 5 | Tier advance max %? | **diamond 85 · gold 70 · silver 55 · bronze 40 · new 25** | Negotiate per deal |
-| 6 | Trừ phí SX vào settlement? | **KHÔNG** (ghi riêng `production_cost`) | Trừ 3-5% cháy đầu ra |
-| 7 | CMND flow 🅲? | **Bắt buộc** (GTGT + audit) | Optional nếu &lt; 500kg |
-| 8 | Farmer table? | **Mở rộng `b2b.partners` + `type='household'`** | Tách table riêng |
-| 9 | Hộ LAO đi flow 🅲? | **KHÔNG** — hộ LAO đi flow 🅰️ qua đại lý | Cho phép nếu có hộ chiếu |
-
-**Default 10 bổ sung cho Flow 🅱️ đại lý:**
-- **Production mode default:** `pooled` (isolated chỉ cho tier gold+ với phí +5-10%)
-- **DRC variance threshold:** `3%` (auto dispute nếu vượt)
-- **Production SLA:** `7 ngày` (nếu vượt → advance bổ sung tier gold+)
-- **Production reject split:** `raw_quality → đại lý 100%` · `production_error → nhà máy 100%` · `force_majeure → 50/50`
-
----
-
-## 7. Sprint plan — 7 sprints
-
-| Sprint | Effort | Deliverable |
-|---|---|---|
-| 🅰️ **A** Foundation | 4 ngày | Schema 5 migration + multi-lot + Deal TS interface |
-| 🅱️ **B** Triggers exception | 1.5 ngày | Sprint J bypass + deal_lock exception |
-| 🅲 **B1** Flow 🅱️ đại lý hardening | 2 ngày | Pool/isolated + variance dispute + SLA + reject |
-| 🅳 **C** Service layer | 3 ngày | Household + daily price + 3 orchestrator |
-| 🅴 **D** UI 3 flow + MultiLotEditor | 4 ngày | 3 wizard + settings page |
-| 🅵 **E** Tier advance + polish | 1.5 ngày | 5 tier × 5% max + UI preview |
-| 🅶 **F** QA + deploy 3 wave | 2 ngày | Test plan + production deploy |
-| **Tổng** | **18 ngày** | ~3.5 tuần (ERP only) |
-| Weighbridge song song | +4 ngày | Settlement modal + QC input + multi-lot |
-| **Grand total** | **~4-5 tuần** | Calendar time |
-
-### Sprint A — Foundation (4 ngày) | CRITICAL
-
-**Gate out:** build xanh, migration rollback SQL sẵn, test schema verify PASS.
-
-| Task | Effort |
-|---|---|
-| A.1 Migration 1 (b2b.deals +10 cột) | 0.5 |
-| A.2 Migration 2 (b2b.partners household) | 0.3 |
-| A.3 Migration 3 (daily_price_list tstzrange) | 0.4 |
-| A.4 Migration 4 (weighbridge multi-lot) + trigger allocate | 1 |
-| A.5 Backfill deals.purchase_type='standard' | 0.2 |
-| A.6 Regenerate Supabase types + update Deal TS interface | 0.5 |
-| A.7 Helper `getTicketLines()` + unit test | 0.5 |
-| A.8 Rollback SQL sẵn sàng + run rollback test trên staging | 0.3 |
-| A.9 Final build + tsc + regression test standard flow | 0.3 |
-
-### Sprint B — Triggers exception (1.5 ngày) | HIGH
-
-| Task | Effort |
-|---|---|
-| B.1 Rewrite `trg_enforce_weighbridge_accepted` — bypass `outright`/`walk-in` + support `has_items` | 0.5 |
-| B.2 Rewrite `trg_enforce_b2b_stock_in_accepted` — tương tự | 0.3 |
-| B.3 Exception `trg_deal_lock` — flow 🅱️ actual_drc NULL→value (1 lần) | 0.3 |
-| B.4 5 test cases (3 flow happy + 2 regression standard) | 0.4 |
-
-### Sprint B1 — Flow 🅱️ đại lý hardening (2 ngày) | HIGH
-
-**Đặc biệt:** sprint này **mới so với v1/v2** — cover 6 đặc thù đại lý.
-
-| Task | Effort |
-|---|---|
-| B1.1 Migration columns production_mode / pool_id / sla_days / reject_reason | 0.3 |
-| B1.2 Trigger `auto_raise_drc_dispute` (variance > 3%) | 0.3 |
-| B1.3 Cron daily SLA check + notification | 0.4 |
-| B1.4 Service `previewSettlement(deal)` với range low/high | 0.3 |
-| B1.5 Service `productionProgressService` — timeline stages cho portal | 0.4 |
-| B1.6 Reject logic (3 reason × 3 loss split) + dispute cascade | 0.3 |
-
-### Sprint C — Service layer (3 ngày) | HIGH
-
-| Task | Effort |
-|---|---|
-| C.1 `partnerService.quickCreateHousehold()` + CCCD validate | 0.5 |
-| C.2 `dailyPriceListService` — CRUD + `getCurrent(product, at=NOW)` | 0.5 |
-| C.3 `intakeOutrightService.execute()` — 1-transaction RPC orchestrator | 0.5 |
-| C.4 `intakeWalkinService.execute()` — dùng daily price | 0.5 |
-| C.5 `intakeProductionService` + hook `productionOutputHookService.onFinish()` | 0.5 |
-| C.6 `batchService.generateBatchCode(purchase_type, nationality)` — LAO-/PCB-/FW- | 0.2 |
-| C.7 `autoSettlementService.createFromTicket()` multi-lot fan-out | 0.3 |
-
-### Sprint D — UI 3 flow + MultiLotEditor (4 ngày) | HIGH
-
-| Task | Effort |
-|---|---|
-| D.1 Component `<MultiLotEditor/>` — default 1 dòng | 1 |
-| D.2 Page `/b2b/intake/outright` (4-step wizard) | 0.7 |
-| D.3 Page `/b2b/intake/production` (8-step wizard) + Production Progress component | 1 |
-| D.4 Page `/b2b/intake/walkin` (4-step) + CCCD input + camera upload | 0.7 |
-| D.5 Page `/b2b/settings/daily-prices` (admin nhập giá) | 0.3 |
-| D.6 Portal partner trang `/deals/:id/production` (timeline visibility) | 0.3 |
-
-### Sprint E — Tier advance + polish (1.5 ngày) | MED
-
-| Task | Effort |
-|---|---|
-| E.1 Constants `ADVANCE_MAX_PERCENT_BY_TIER` | 0.2 |
-| E.2 Guard `advanceService.createAdvance` — reject nếu vượt tier max | 0.3 |
-| E.3 UI form advance: input max warning + preview | 0.3 |
-| E.4 Settlement preview UI trên detail page (low/high range) | 0.4 |
-| E.5 Polish: loading, error toast, mobile responsive | 0.3 |
-
-### Sprint F — QA + deploy (2 ngày) | HIGH
-
-| Task | Effort |
-|---|---|
-| F.1 Test plan 4 flow × (happy + 3 edge case) + 8 multi-lot (ML-1..ML-8) + 6 đặc thù đại lý (E1-E6) | 0.6 |
-| F.2 E2E SQL `.tmp/e2e_b2b_intake.py` + manual UI smoke test | 0.5 |
-| F.3 Deploy wave 1: SQL Sprint A (nullable, backward-compat) | 0.2 |
-| F.4 Deploy wave 2: SQL Sprint B + B1 + FE Sprint C service | 0.3 |
-| F.5 Deploy wave 3: FE Sprint D UI 3 flow + portal partner | 0.3 |
-| F.6 Monitor 48h: error rate, ticket mismatch, DRC dispute rate | 0.1 |
-
----
-
-## 8. Risk matrix + rollback per sprint
-
-### 8.1 Risk matrix
-
-| Rủi ro | Mức | Mitigation |
-|---|---|---|
-| Trigger Sprint J nới lỏng sai → cân lậu | 🔴 HIGH | Exception chỉ kích hoạt khi `purchase_type IN (outright, walk-in)` VÀ `buyer_user_id IS NOT NULL` (có người chịu trách nhiệm) |
-| Flow 🅱️ actual_drc bypass lock → tranh chấp | 🔴 HIGH | Exception chỉ cho update 1 lần NULL→value. Sau đó LOCK. DB trigger enforce. |
-| Multi-lot allocate lệch > 1kg | 🟠 MED | Mode `direct`: RAISE EXCEPTION. Mode `by_share`: precision NUMERIC(12,2) |
-| DRC variance auto-dispute spam | 🟠 MED | Threshold 3% có thể điều chỉnh per partner tier. Cron daily deduplicate. |
-| Pool production DRC không fair | 🔴 HIGH | Hiển thị pool members public. Weighted average theo nvl_kg. Isolated mode cho đại lý tier gold+ muốn tránh. |
-| Daily price race 23:59/00:01 | 🟠 MED | tstzrange + EXCLUDE gist → không overlap không gap |
-| CCCD duplicate giữa hộ và đại lý | 🟡 LOW | UNIQUE INDEX `b2b.partners.national_id` |
-| Backfill purchase_type='standard' miss | 🔴 HIGH | Verify `COUNT(*) FILTER (WHERE NULL) = 0` trước khi SET NOT NULL |
-| Portal badge purchase_type sai | 🟡 LOW | Portal chỉ read — deploy wave cuối |
-| App cân v1 không hiểu `has_items=true` | 🟠 MED | Sprint A deploy trước, app cân deploy wave 2 sau khi có helper |
-| Production SLA quá ngắn 7 ngày | 🟠 MED | Configurable per partner tier (diamond 5d / gold 7d / silver 10d) |
-| Reject reason đại lý không chấp nhận | 🔴 HIGH | Reuse dispute flow hiện có. BGĐ resolve với adjustment_amount. |
-
-### 8.2 Rollback per sprint
-
-| Fail at | Rollback | Data impact |
-|---|---|---|
-| Sprint F post-deploy | Revert FE → user quay về standard flow | Ticket mới `purchase_type` orphan → cron auto-fix |
-| Sprint E advance guard | Revert constants → advance không giới hạn | Không mất data |
-| Sprint D UI | Revert FE → UI không hiện 3 flow | DB đã có schema, không break |
-| Sprint C service | Revert service → API cũ | Trigger mới chạy OK standard flow |
-| Sprint B1 đại lý | Revert 4 trigger B1 → không auto-dispute | Flow 🅱️ degraded nhưng không crash |
-| Sprint B trigger | `DROP TRIGGER ... CREATE old` | Flow 🅰️🅲 block, standard OK |
-| Sprint A schema | **KHÔNG rollback** (point of no return) | Nullable columns backward-compat |
-
-**Key rule:** Sprint A = **point of no return**. Pre-deploy phải có staging 48h + regression test full.
-
----
-
-## 9. Weighbridge app coordination
-
-`can.huyanhrubber.vn` (deploy riêng `apps/weighbridge/`) share DB Supabase. Sprint A migration phải compat.
-
-### 9.1 Gap app cân
-
-| # | Gap | Sprint fix |
-|---|---|---|
-| W1 | `weighbridge_tickets.source_type` chưa có | Sprint A |
-| W2 | Không UI quick-create household | Sprint D reuse |
-| W3 | Không settlement modal tại cân (flow 🅰️🅲) | Sprint D add |
-| W4 | Không QC DRC input tại cân (flow 🅲) | Sprint D add |
-| W5 | Không daily price lookup | Sprint C reuse |
-| W6 | HomePage filter deal `status` cứng | Sprint D update |
-| W7 | Trigger block cân khi chưa accepted | Sprint B bypass |
-| W8 | Seed `weighbridge_scales` | Sprint A data seed |
-
-### 9.2 App cân effort (+4 ngày song song)
-
-| Sprint | Task | Effort |
-|---|---|---|
-| W-A | Schema share + seed scales | 0.5 |
-| W-D1 | Outright flow UI + settlement modal | 1.5 |
-| W-D2 | Farmer walk-in UI + CCCD + daily price + QC input | 1.5 |
-| W-D3 | DRC-after reuse existing flow (chỉ filter include `drc_after_production`) | 0.5 |
-
-### 9.3 Deploy 3 wave
-
-| Wave | Target | Content |
-|---|---|---|
-| 1 | ERP + weighbridge + portal | SQL Sprint A nullable (backward-compat) |
-| 2 | ERP + weighbridge | SQL Sprint B + B1 + FE Sprint C service |
-| 3 | ERP + weighbridge + portal | FE Sprint D UI + portal badge |
-
-**Sau 48h monitor wave 3:** SQL Sprint A2 SET NOT NULL + cleanup.
-
----
-
-## 10. Permission & role (B2B only — không Sales)
-
-### 10.1 Roles cần
-
-- **Admin BGĐ** — full quyền, duyệt deal, resolve dispute
-- **Kinh doanh (sale)** — tạo deal standard, chốt offer
-- **QC** — đo sample_drc + actual_drc
-- **Kế toán** — advance + settlement + payment
-- **Weighbridge operator (scale_operator)** — cân, KHÔNG sửa deal
-- **NEW: Intake operator** — quick-create household + chi tiền cash flow 🅰️🅲
-
-### 10.2 RLS mới cần
-
-```sql
--- Household partner — không có user account, chỉ admin/kế toán thấy
-CREATE POLICY b2b_partners_household_read ON b2b.partners
-  FOR SELECT TO authenticated USING (
-    partner_type != 'household' OR auth.uid() IN (
-      SELECT user_id FROM auth.users WHERE email IN
-        (SELECT email FROM b2b.admin_emails)
-    )
-  );
-
--- Daily price list — tất cả authenticated read, admin write
-CREATE POLICY daily_price_read ON b2b.daily_price_list
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY daily_price_write ON b2b.daily_price_list
-  FOR ALL TO service_role USING (true);
-
--- Weighbridge ticket items — inherit từ ticket (theo partner_id)
-CREATE POLICY ticket_items_partner ON weighbridge_ticket_items
-  FOR SELECT USING (
-    partner_id = current_partner_id() OR
-    EXISTS (SELECT 1 FROM weighbridge_tickets t
-            WHERE t.id = ticket_id AND t.partner_id = current_partner_id())
-  );
-```
-
-### 10.3 Permission matrix
-
-| Action | Standard | Outright | DRC-after | Walk-in |
+| # | Flow | purchase_type | Status path | Đặc thù |
 |---|---|---|---|---|
-| Tạo deal | KD, admin | KT, admin | KD, admin | KT, intake |
-| Duyệt | BGĐ | _bypass_ | BGĐ | _bypass_ |
-| Cập nhật actual_drc | QC | _N/A_ | QC (1 lần) | _N/A_ |
-| Tạo advance | KT | _N/A_ | KT | _N/A_ |
-| Tạo settlement | KT | auto | auto (hook) | auto |
-| Chi tiền | KT | KT tại cân | KT | KT/intake tại cân |
+| 📦 | Standard (giữ) | `standard` | draft→processing→accepted→settled | Chat/demand qua BGĐ |
+| 🅰️ | Outright | `outright` | draft→processing→settled | Bypass QC+BGĐ, chi tiền tại cân |
+| 🅱️ | DRC-after | `drc_after_production` | draft→processing→accepted→settled | QC mẫu → SX → actual_drc |
+| 🅲 | Walk-in | `farmer_walkin` | draft→processing→settled | Hộ nông dân, chi tiền tại cân |
 
 ---
 
-## 11. Gap analysis — hiện tại vs v3
+## 2. Micro-phase plan — 40 phases
 
-### 11.1 Compatibility matrix
+### 🅰️ GIAI ĐOẠN A: Schema foundation (9 phases, ~4 giờ)
 
-| Feature hiện tại | v3 giữ nguyên? | Lý do |
+Tổng thời gian ~4 giờ dev + test. Từng phase commit riêng.
+
+#### **P1** — Add `b2b.deals.purchase_type` (15 phút)
+- Migration SQL idempotent: `ALTER TABLE b2b.deals ADD COLUMN purchase_type TEXT DEFAULT 'standard'`
+- CHECK IN ('standard','outright','drc_after_production','farmer_walkin')
+- Backfill: `UPDATE ... SET purchase_type='standard' WHERE NULL`
+- SET NOT NULL
+- **Test:** `SELECT purchase_type, COUNT(*) FROM b2b.deals GROUP BY 1` → tất cả 'standard'
+- **Rollback:** `ALTER TABLE ... DROP COLUMN purchase_type`
+
+#### **P2** — Add 3 audit cột `buyer_user_id`, `qc_user_id`, `sample_drc` (15 phút)
+- ALTER ADD nullable
+- **Test:** `\d b2b.deals` → 3 cột mới hiện
+- **Rollback:** DROP COLUMN
+
+#### **P3** — Add `finished_product_kg` cho flow 🅱️ (10 phút)
+- ALTER ADD NUMERIC(12,2) nullable
+- **Test:** `\d` verify
+
+#### **P4** — Add `b2b.partners.national_id` + `nationality` (20 phút)
+- ALTER ADD + UNIQUE INDEX trên national_id (WHERE NOT NULL)
+- CHECK nationality IN ('VN','LAO')
+- **Test:** INSERT 2 partner cùng national_id → reject 2nd
+- **Gotcha:** CCCD 12 số VN ≠ hộ chiếu LAO format khác → regex khác nhau
+
+#### **P5** — Create `b2b.daily_price_list` với tstzrange EXCLUDE (30 phút)
+- CREATE TABLE với EXCLUDE gist constraint
+- Cần extension `btree_gist` (check có chưa)
+- **Test SQL:**
+  ```sql
+  INSERT INTO b2b.daily_price_list (product_code, base_price_per_kg, effective_from)
+    VALUES ('mu_tap', 12000, NOW());
+  -- Thêm row overlap → expect reject
+  INSERT INTO b2b.daily_price_list (product_code, base_price_per_kg, effective_from)
+    VALUES ('mu_tap', 13000, NOW() - INTERVAL '1 hour');
+  -- EXCLUDE violation expected
+  ```
+- **Bug predicted:** extension btree_gist chưa có → fail. Cần `CREATE EXTENSION IF NOT EXISTS btree_gist;`
+
+#### **P6** — Create `weighbridge_ticket_items` table (30 phút)
+- Full schema §4.2 v3
+- CHECK exactly one source (deal_id XOR partner_id XOR supplier_id)
+- UNIQUE (ticket_id, line_no)
+- Index trên ticket_id + deal_id (WHERE NOT NULL)
+- **Test:** insert 3 rows khác source — check constraint fire đúng
+
+#### **P7** — Add `weighbridge_tickets.has_items` + `allocation_mode` (15 phút)
+- ALTER ADD BOOLEAN DEFAULT FALSE
+- CHECK allocation_mode IN ('by_share','direct')
+- **Test:** default ticket cũ has_items=false không break query hiện tại
+
+#### **P8** — Add 3 cột `stock_in_details` (15 phút)
+- ticket_item_id UUID REFERENCES
+- deal_id UUID REFERENCES
+- lot_code TEXT
+- Tất cả nullable (backward-compat)
+- **Test:** `\d stock_in_details` verify
+
+#### **P9** — Regenerate Supabase types + rebuild ERP + weighbridge (45 phút)
+- `npx supabase gen types typescript > src/types/database.types.ts`
+- Update Deal interface trong dealService.ts thủ công nếu cần
+- `npm run build` ERP + `apps/weighbridge/`
+- **Test:** tsc không lỗi, vite build xanh
+- **Bug predicted:** interface TypeScript mismatch với schema mới, ~5-10 TS errors cần fix
+
+**Gate Gate Giai đoạn A:** schema OK, build xanh, không break standard flow hiện tại (regression smoke test).
+
+---
+
+### 🅱️ GIAI ĐOẠN B: Multi-lot trigger + helper (4 phases, ~3 giờ)
+
+#### **P10** — Function `allocate_ticket_item_weights()` (45 phút)
+- CREATE FUNCTION (xem §4.3 v3)
+- Logic: mode `by_share` = prorata, mode `direct` = strict match
+- **Test SQL chi tiết:**
+  ```sql
+  -- Setup
+  INSERT INTO weighbridge_tickets (id, net_weight, has_items, allocation_mode)
+    VALUES ('T1', 985, TRUE, 'by_share');
+  INSERT INTO weighbridge_ticket_items (ticket_id, line_no, deal_id, rubber_type, declared_qty_kg)
+    VALUES ('T1', 1, 'D1', 'mu_tap', 500),
+           ('T1', 2, 'D2', 'mu_nuoc', 300),
+           ('T1', 3, 'D3', 'mu_tap', 200);
+  -- Update net_weight trigger nên fire
+  UPDATE weighbridge_tickets SET net_weight=985 WHERE id='T1';
+  -- Expect actual_qty_kg = [492.5, 295.5, 197]
+  SELECT line_no, actual_qty_kg FROM weighbridge_ticket_items WHERE ticket_id='T1';
+  ```
+- **Bug predicted:** ROUND precision có thể lệch sum±0.01 → tạo ra NET=985.01 thay vì 985. Test edge.
+
+#### **P11** — Trigger `trg_items_allocate_on_insert/update` (15 phút)
+- AFTER INSERT OR UPDATE trên weighbridge_ticket_items
+- WHEN tuned để không recompute khi chỉ update notes
+- **Test:** Update declared_qty_kg → actual recompute; update notes → không fire
+
+#### **P12** — Trigger `trg_ticket_allocate_on_weigh` (15 phút)
+- AFTER UPDATE OF net_weight ON weighbridge_tickets
+- WHEN (NEW.has_items = true)
+- **Test:** Update ticket.net_weight → items auto allocate
+
+#### **P13** — Helper `getTicketLines()` + unit test (1 giờ)
+- Create `src/services/weighbridge/ticketLinesService.ts`
+- Logic: nếu has_items → query items; else synthesize 1 line từ scalar
+- Return type unified: `TicketLine[]` với `_source: 'scalar'|'item'`
+- **Test:** 2 case — legacy ticket (has_items=false) + new ticket (has_items=true) cùng trả shape nhất quán
+
+**Gate B:** Chạy `.tmp/test_multi_lot.py` với 4 case (ML-1 through ML-4 từ v3 §8.8).
+
+---
+
+### 🅲 GIAI ĐOẠN C: Đặc thù đại lý Flow 🅱️ (5 phases, ~3.5 giờ)
+
+#### **P14** — Schema `production_mode`, `pool_id`, `production_sla_days` (20 phút)
+- ALTER b2b.deals ADD 3 cột
+- production_mode DEFAULT 'pooled' CHECK IN ('pooled','isolated')
+- production_sla_days INT DEFAULT 7
+- production_pool_id UUID nullable
+- **Test:** verify column added
+
+#### **P15** — Schema `production_reject_reason`, `reject_loss_amount` + `production_started_at` (15 phút)
+- ALTER ADD với CHECK reject_reason IN ('raw_material_quality','production_error','force_majeure')
+- `production_sla_deadline` GENERATED column = started_at + sla_days
+- **Test:** INSERT reject_reason='invalid' → reject
+
+#### **P16** — Trigger `auto_raise_drc_dispute` (1 giờ)
+- Function check |actual - sample| > 3%
+- AFTER UPDATE OF actual_drc ON b2b.deals
+- WHEN purchase_type='drc_after_production'
+- INSERT vào b2b.drc_disputes với status='open'
+- **Test SQL:**
+  ```sql
+  UPDATE b2b.deals SET actual_drc=30 WHERE id='D-drc' AND sample_drc=35;
+  -- Expect: drc_disputes có 1 row mới với reason "variance 5%"
+  ```
+- **Bug predicted:** drc_disputes có dispute_number NOT NULL không có default → cần generate trong trigger
+- **Bug predicted:** raised_by NOT NULL → dùng NULL hay auth.uid()? → cần set 'system' user riêng
+
+#### **P17** — Service `previewSettlement(deal)` (45 phút)
+- `src/services/b2b/dealService.ts::previewSettlement(dealId)`
+- Tính gross estimated từ sample_drc + range ±5%
+- Return `{estimated_gross, estimated_remaining, range: {low, high}, disclaimer}`
+- Unit test với mock data 3 case: sample có / không có / standard flow
+- **Test:** Call với deal drc_after_production → trả range hợp lý
+
+#### **P18** — Service `productionProgressService.getTimeline(dealId)` (45 phút)
+- Return array stages với status (done/current/pending) + timestamp
+- Stages: cân → nhập kho → QC sample → BGĐ duyệt → tạm ứng → SX → ra TP → QC final → quyết toán → thanh toán
+- **Test:** Mock deal ở các status khác nhau → trả timeline đúng
+
+**Gate C:** Test DRC variance trigger fire đúng + preview range hợp lý + timeline display OK.
+
+---
+
+### 🅳 GIAI ĐOẠN D: Triggers bypass Sprint J (3 phases, ~2 giờ)
+
+#### **P19** — Rewrite `trg_enforce_weighbridge_accepted` (1 giờ)
+- Logic mới:
+  - Nếu ticket.has_items=false: giữ logic cũ + exception outright/walk-in
+  - Nếu has_items=true: loop items, mỗi item nếu có deal_id thì check status
+- Exception: `purchase_type IN ('outright','farmer_walkin')` + `buyer_user_id IS NOT NULL` → allow
+- **Test 5 case:**
+  1. Standard deal processing → reject ✅
+  2. Standard deal accepted → allow ✅
+  3. Outright deal processing → allow (bypass) ✅
+  4. Outright không có buyer_user_id → reject (guard) ✅
+  5. Multi-lot 3 items, 1 item deal processing → reject, 2 item OK → reject all (safest)
+
+#### **P20** — Rewrite `trg_enforce_b2b_stock_in_accepted` (30 phút)
+- Tương tự P19 cho stock_in
+- **Test:** 4 case tương ứng
+
+#### **P21** — Exception `trg_deal_lock` cho flow 🅱️ (30 phút)
+- Cho phép actual_drc update 1 lần NULL → value khi purchase_type='drc_after_production'
+- Sau value → lock bất biến
+- **Test 3 case:**
+  1. Flow B deal accepted, actual_drc NULL → set 35.5 ✅
+  2. Flow B deal có actual_drc, update lại → reject ❌
+  3. Standard deal → giữ logic cũ (block update sau accepted) ❌
+
+**Gate D:** 3 flow happy path + 2 regression standard flow PASS. 12 test case tổng.
+
+---
+
+### 🅴 GIAI ĐOẠN E: Services foundation (5 phases, ~4 giờ)
+
+#### **P22** — `dailyPriceListService` CRUD + `getCurrent()` (1 giờ)
+- File mới `src/services/b2b/dailyPriceListService.ts`
+- Methods: list, create, update, delete, getCurrent(productCode, at=NOW)
+- **Test:** getCurrent với overlap time → trả row effective đúng
+
+#### **P23** — `partnerService.quickCreateHousehold()` + CCCD validate (45 phút)
+- Method mới với regex CCCD VN 12 số
+- Throw error rõ ràng nếu CCCD fail
+- Auto tier='new', partner_type='household', nationality='VN'
+- **Test:** 3 case — CCCD hợp lệ / 11 số / 13 số / có chữ cái
+
+#### **P24** — `batchService.generateBatchCode()` extension (30 phút)
+- Accept `options: { purchase_type, nationality }`
+- LAO- prefix nếu nationality='LAO'
+- PCB- nếu drc_after_production
+- FW- nếu farmer_walkin
+- Giữ NVL- default
+- **Test:** 4 combination → 4 prefix khác nhau
+
+#### **P25** — `autoSettlementService.createFromTicket()` multi-lot fan-out (1.5 giờ)
+- Input: ticketId
+- Call `getTicketLines()` → group by deal_id
+- Create settlement per deal group
+- Partner-only lines (walk-in) → path riêng, tạo settlement không link deal
+- **Test:** ML-3 + ML-4 + ML-7 từ §8.8 v3
+
+#### **P26** — Guard tier advance max (30 phút)
+- Constants `ADVANCE_MAX_PERCENT_BY_TIER = {diamond:0.85, gold:0.70, silver:0.55, bronze:0.40, new:0.25}`
+- Sửa `advanceService.createAdvance` reject nếu > max
+- Error message rõ: "Tạm ứng vượt hạn mức tier gold 70% (max: X đ)"
+- **Test:** 5 tier × 2 case (trong/ngoài max)
+
+**Gate E:** Unit test suite cho 5 service PASS.
+
+---
+
+### 🅵 GIAI ĐOẠN F: Orchestrators (3 phases, ~6 giờ)
+
+#### **P27** — `intakeOutrightService.execute()` (2 giờ)
+- Transaction 1-shot RPC function hoặc service wrapper
+- Steps: createDeal(purchase_type='outright') → createTicket → stockIn → advance (nếu có) → settlement → payment
+- Rollback nếu bất kỳ step fail
+- Return: `{deal, ticket, stock_in, settlement, payment, receipt_url}`
+- **Test:** Happy path + 3 fail case (partner không có, giá âm, net=0)
+
+#### **P28** — `intakeWalkinService.execute()` (2 giờ)
+- Tương tự outright nhưng lookup daily price + quickCreateHousehold nếu partner mới
+- **Test:** Happy path + 2 edge (chưa có bảng giá hôm nay, CCCD duplicate)
+
+#### **P29** — `intakeProductionService` + hook `productionOutputHookService` (2 giờ)
+- productionOutputHookService.onFinish(po_id) — chạy khi production_orders.finished_at set
+- Compute actual_drc = finished_product_kg / nvl_kg × 100
+- Update deal.actual_drc → trigger auto-dispute fire nếu variance > 3%
+- Call createFromTicket → settlement
+- **Test:** 3 case (variance 1% → no dispute, variance 5% → dispute, nvl_kg=0 → error handling)
+
+**Gate F:** E2E test 3 flow mỗi flow 1 happy + 2 fail case PASS.
+
+---
+
+### 🅶 GIAI ĐOẠN G: UI components (6 phases, ~10 giờ)
+
+#### **P30** — Component `<MultiLotEditor/>` (3 giờ)
+- Ant Design Table editable
+- Mặc định 1 dòng + nút "+ Thêm lô"
+- Mỗi dòng: Source (deal/partner/supplier dropdown), Rubber type, Declared qty, DRC, Unit price
+- Validation: exactly 1 source, qty > 0
+- Auto-compute line_amount preview
+- Mode toggle by_share / direct
+- **Test manual:** render với 1/2/5 dòng, xóa dòng, switch mode
+
+#### **P31** — `OutrightWizardPage` 4-step (2 giờ)
+- Step 1: Partner + product + giá cáp + DRC cáp
+- Step 2: MultiLotEditor (default 1 line)
+- Step 3: Weighbridge integration (open scale in new tab or embed)
+- Step 4: Settlement preview + "Chi tiền + In phiếu" button
+- **Test UI:** navigate next/back/skip steps, validation errors hiện đúng
+
+#### **P32** — `WalkinWizardPage` 4-step (2 giờ)
+- Step 1: Quick create household (CCCD + name + phone)
+- Step 2: QC DRC input + product type
+- Step 3: Weighbridge + daily price lookup
+- Step 4: Settlement cash modal + receipt
+- **Test:** CCCD validate realtime, daily price auto-load
+
+#### **P33** — `ProductionWizardPage` 8-step + ProductionProgress (3 giờ)
+- Step 1-3: partner + product + sample_drc + BGĐ duyệt
+- Step 4: Weighbridge + stock-in
+- Step 5: Advance (tier-based max warning)
+- Step 6: SX hook (link production_order)
+- Step 7: QC final + actual_drc (có variance warning)
+- Step 8: Settlement preview + confirm
+- Progress timeline component render realtime
+- **Test:** 8 step navigate + tier advance reject test
+
+#### **P34** — `DailyPriceListPage` admin (1 giờ)
+- Table list + add/edit/delete
+- Warning đỏ nếu hôm nay chưa có giá cho product quan trọng
+- **Test:** CRUD basic
+
+#### **P35** — Portal partner `/deals/:id/production` timeline (1.5 giờ)
+- Reuse ProductionProgress component từ ERP
+- Supabase realtime subscribe `b2b.deals.status` + production_orders
+- **Test:** Open 2 tab (ERP + portal), update status ERP → portal reload &lt; 2s
+
+**Gate G:** Manual UI test 4 wizard + 2 admin page + 1 portal page PASS.
+
+---
+
+### 🅷 GIAI ĐOẠN H: Weighbridge app (4 phases, ~4 giờ)
+
+#### **P36** — App cân schema compat + source_type (30 phút)
+- Check weighbridge_tickets.source_type? Hiện có hay cần add?
+- Nếu thiếu: ADD column nullable
+- Seed weighbridge_scales nếu chưa có
+- **Test:** app cân load không lỗi
+
+#### **P37** — App cân multi-lot UI (2 giờ)
+- Integrate `<MultiLotEditor/>` vào WeighingPage (share code với ERP)
+- Giữ mode 1-dòng mặc định (backward compat operator cũ)
+- **Test:** operator nhập 3 dòng khác deal → auto-allocate đúng
+
+#### **P38** — App cân settlement modal (outright + walkin) (1 giờ)
+- Sau khi cân xong + purchase_type='outright' hoặc 'farmer_walkin':
+  - Hiện modal "Chi tiền + In phiếu"
+  - Compute auto từ line_amount
+  - Button "Đã chi" → update settlement status='paid'
+- **Test:** 2 case outright + walkin + print receipt dạng PDF
+
+#### **P39** — App cân QC DRC input (walk-in) (30 phút)
+- Field mới xuất hiện khi purchase_type='farmer_walkin'
+- QC nhập DRC measured tại cân, save vào item.drc_percent
+- **Test:** walkin flow hoàn chỉnh từ cân → chi tiền
+
+---
+
+### 🅸 GIAI ĐOẠN I: Testing + Bug hunt (3 phases, ~4 giờ)
+
+#### **P40** — E2E Python test script `.tmp/e2e_b2b_intake.py` (1.5 giờ)
+- 4 luồng × (1 happy + 2 edge) = 12 scenarios
+- + 8 multi-lot ML-1..ML-8
+- + 6 đặc thù đại lý E1-E6
+- Total ~26 scenarios
+- Chạy qua service_role REST + agent_sql
+- **Expected:** 26/26 PASS
+
+#### **P41** — Manual UI smoke test (1 giờ)
+- Chạy dev server ERP + weighbridge + portal song song
+- Test mỗi wizard + progress + admin page
+- Document bugs vào `.tmp/bugs_intake_v4.md`
+
+#### **P42** — Bug fix pass (1.5 giờ)
+- Fix 5-10 bugs tìm được
+- Commit riêng per bug
+- Regression test sau fix
+
+**Gate I:** 26 E2E PASS + 0 blocking UI bug.
+
+---
+
+### 🅹 GIAI ĐOẠN J: Production deploy (3 phases, ~2 giờ + monitor 48h)
+
+#### **P43** — Deploy wave 1 (30 phút)
+- Apply SQL migration Sprint A-C (nullable, backward-compat)
+- Không deploy FE
+- **Verify:** standard flow vẫn chạy bình thường 30 phút sau migrate
+
+#### **P44** — Deploy wave 2 (30 phút)
+- Apply SQL trigger bypass (Sprint D)
+- Deploy FE ERP service layer (không UI mới)
+- **Verify:** API test PASS, không break
+
+#### **P45** — Deploy wave 3 (30 phút)
+- Deploy FE UI full (wizards + portal progress)
+- Deploy weighbridge app v2
+- **Monitor 48h:** error rate < 1%, DRC dispute rate < 5%, settlement mismatch = 0
+
+**Gate J:** 48h monitor green → sprint hoàn thành.
+
+---
+
+## 3. Tổng kết effort 45 phases
+
+| Giai đoạn | Phases | Hours | Gate criteria |
+|---|---|---|---|
+| 🅰️ Schema foundation | P1-P9 | 4h | Schema verify + build xanh + regression OK |
+| 🅱️ Multi-lot trigger | P10-P13 | 3h | ML-1..ML-4 test PASS |
+| 🅲 Đặc thù đại lý | P14-P18 | 3.5h | DRC variance trigger + preview OK |
+| 🅳 Triggers bypass | P19-P21 | 2h | 12 test case (3 flow + regression) PASS |
+| 🅴 Services foundation | P22-P26 | 4h | 5 service unit test PASS |
+| 🅵 Orchestrators | P27-P29 | 6h | E2E 3 flow × 3 case PASS |
+| 🅶 UI components | P30-P35 | 10h | Manual UI test 7 pages PASS |
+| 🅷 Weighbridge app | P36-P39 | 4h | Operator workflow 4 flow OK |
+| 🅸 Testing + bug hunt | P40-P42 | 4h | 26 E2E + 0 blocking bug |
+| 🅹 Production deploy | P43-P45 | 2h + 48h monitor | Error rate < 1% |
+| **Tổng** | **45 phases** | **~43h dev + 48h monitor** | ≈ 5-6 ngày full-time hoặc 10-12 ngày part-time |
+
+**Chốt:** ~1.5-2 tuần calendar time nếu code liên tục, test kỹ, fix bug tại chỗ. So với v3 nói 4-5 tuần → rút còn ~2 tuần vì không cần wait BGĐ approve + không có padding.
+
+---
+
+## 4. Test cases — chi tiết tập trung
+
+### 4.1 Multi-lot (8 cases)
+
+| ID | Scenario | Expected |
 |---|---|---|
-| Chat/Demand booking flow | ✅ | Standard flow không đụng |
-| Sprint J guards | ⚠️ Mở exception | Bypass outright/walk-in, giữ cho standard |
-| Partner ledger cumulative | ✅ | Reuse cho 3 flow mới |
-| Tier auto-upgrade | ✅ | Flow mới cũng trigger |
-| DRC Dispute | ⚠️ Enhance | Auto-raise khi variance > 3% |
-| Weighbridge 1:1 | ⚠️ Upgrade | has_items flag, backward-compat |
-| Stock-in auto-create | ✅ | Extension cho 3 flow mới |
-| Partner portal | ✅ | Chỉ thêm badge + progress page |
-| Sales module permissions | ✅ | KHÔNG đụng |
-| RLS partner_id | ✅ | Reuse + thêm household policy |
+| ML-1 | 1 ticket 3 items by_share NET=985 declared=[500,300,200] | actual=[492.5, 295.5, 197] |
+| ML-2 | 1 ticket 2 items direct declared=[600,400] NET=1000 | actual=[600,400] (pass) |
+| ML-3 | 1 ticket 2 items same deal | 1 settlement 2 intake_ids |
+| ML-4 | 1 ticket 3 items 3 deals khác | 3 settlement riêng |
+| ML-5 | Legacy ticket has_items=false | `getTicketLines()` trả array 1 phần tử |
+| ML-6 | 1 ticket 3 items, 1 item deal pending | RAISE EXCEPTION name deal vi phạm |
+| ML-7 | 2 farmer walk-in chung xe (partner_id only) | createFromTicket bypass deal path |
+| ML-8 | Update item.drc_percent | line_amount recalc |
 
-### 11.2 Files mới
+### 4.2 Đặc thù đại lý Flow 🅱️ (6 cases)
 
-| File | Purpose |
-|---|---|
-| `docs/migrations/b2b_intake_sprint_a_foundation.sql` | Schema mới |
-| `docs/migrations/b2b_intake_sprint_b_triggers.sql` | Trigger bypass |
-| `docs/migrations/b2b_intake_sprint_b1_agent_hardening.sql` | Flow 🅱️ đại lý |
-| `src/services/b2b/dailyPriceListService.ts` | CRUD giá ngày |
-| `src/services/b2b/intakeOutrightService.ts` | Flow 🅰️ orchestrator |
-| `src/services/b2b/intakeWalkinService.ts` | Flow 🅲 orchestrator |
-| `src/services/b2b/intakeProductionService.ts` | Flow 🅱️ orchestrator |
-| `src/services/b2b/productionOutputHookService.ts` | Hook production finish |
-| `src/services/b2b/productionProgressService.ts` | Portal timeline |
-| `src/services/weighbridge/ticketLinesService.ts` | Multi-lot helper |
-| `src/components/b2b/MultiLotEditor.tsx` | UI multi-lot |
-| `src/pages/b2b/intake/OutrightWizardPage.tsx` | 4-step |
-| `src/pages/b2b/intake/ProductionWizardPage.tsx` | 8-step + progress |
-| `src/pages/b2b/intake/WalkinWizardPage.tsx` | 4-step + CCCD |
-| `src/pages/b2b/settings/DailyPriceListPage.tsx` | Admin nhập giá |
+| ID | Scenario | Expected |
+|---|---|---|
+| E1 | Đại lý gộp 2 lô sample_drc khác | Multi-lot: mỗi lô 1 item, settlement riêng |
+| E2 | Đại lý rút mủ trước SX | Cancel deal, reverse ledger, refund advance |
+| E3 | Production yield < 80% | Auto-pause settlement, notification BGĐ |
+| E4 | 2 deal cùng đại lý 1 pool SX | Allocate TP theo tỷ lệ nvl_kg |
+| E5 | Tỷ giá thay đổi | advance_fx_rate vs settlement_fx_rate riêng |
+| E6 | Partner tier downgrade giữa chừng | Lock advance max theo tier lúc cân |
 
----
+### 4.3 4 flow happy path + edge
 
-## 12. Deliverable checklist — Sprint A gate
+Mỗi flow: 1 happy + 2 edge = 12 scenarios:
 
-Trước khi merge Sprint A vào `main`:
-
-- [ ] Migration SQL idempotent (DROP IF EXISTS trước CREATE) — test re-run 3 lần OK
-- [ ] Rollback SQL sẵn (`b2b_intake_sprint_a_rollback.sql`)
-- [ ] Staging deploy 48h không break standard flow (regression test)
-- [ ] `src/services/b2b/dealService.ts` — `Deal` interface có 10 field mới
-- [ ] `src/services/weighbridge/ticketLinesService.ts` — `getTicketLines()` export
-- [ ] `src/types/database.types.ts` — regenerate từ Supabase
-- [ ] `npm run build` pass (tsc + vite)
-- [ ] Test script `.tmp/e2e_sprint_a_foundation.py`:
-  - Schema verify (columns, CHECK, triggers existent)
-  - Backfill verify (all deals have purchase_type)
-  - Multi-lot allocate trigger fires (by_share + direct)
-  - Backward-compat: ticket has_items=false vẫn đọc qua `getTicketLines()`
-- [ ] Memory update `b2b_intake_v3_status.md` tracking progress
+| Flow | Happy | Edge 1 | Edge 2 |
+|---|---|---|---|
+| Standard | Chat booking → settled | Partner tier downgrade | Dispute mid-flow |
+| Outright | 1-shot cân + chi tiền | buyer_user_id NULL → reject | Giá cáp âm → reject |
+| DRC-after | Full 8 step | Variance 5% → auto-dispute | SLA quá hạn → advance bổ sung |
+| Walk-in | Cân + chi tiền | CCCD duplicate → household lookup | Daily price missing → UI đỏ |
 
 ---
 
-## 13. Sau khi chốt
+## 5. Bug tracking
 
-1. **Gửi 9+4 default (§6) cho BGĐ** — approve qua email/chat 1 lần
-2. **Setup branch** `feat/b2b-intake-v3` (hoặc merge thẳng main)
-3. **Kick-off Sprint A** — SQL migration đi trước, UI sau
-4. **Daily standup** với team dev + Vercel admin
-5. **Memory:** tạo `b2b_intake_v3_status.md` theo dõi per sprint
+Tạo `.tmp/bugs_intake_v4.md` sau mỗi phase, format:
+```
+## P<N> — <title>
+- Date: YYYY-MM-DD HH:MM
+- Phase: P<N>
+- Description: ...
+- Root cause: ...
+- Fix: commit <sha>
+- Severity: critical/high/med/low
+```
 
----
-
-## 14. Changelog
-
-| v1 → v2 | v2 → v3 |
-|---|---|
-| Multi-lot defer §8 → Sprint A | Thêm Sprint B1 đặc thù đại lý (2d) |
-| 9 câu `?` → default approve-ready | 9 → 13 defaults (thêm 4 cho Flow 🅱️) |
-| Status flow implicit → state diagram | Mermaid state diagram 4 luồng |
-| `daily_price_list DATE` → tstzrange | Giữ |
-| Không rollback plan → có | Thêm rollback Sprint B1 |
-| Include Sales module | **Removed Sales** (focus B2B) |
-| Effort 15-20d → 18-22d | Grand total ~4-5 tuần (ERP+weighbridge+portal) |
+Dự đoán **~15-20 bugs** qua 45 phases (3-5% bug rate). Cuối giai đoạn I sẽ có cleanup pass.
 
 ---
 
-## 15. Câu hỏi mở (chờ BGĐ quyết)
+## 6. Schema changes consolidated
 
-Ngoài 13 defaults đã gợi ý, có 3 câu còn open:
+### 6 migration files
 
-1. **Dây chuyền isolated production** — có sẵn chưa? Nếu chưa cần đầu tư hardware (line riêng).
-2. **Cron cho SLA check + daily price reminder** — deploy Vercel Cron hay Supabase Edge Function?
-3. **Portal visibility cho Flow 🅱️ đại lý** — hiện realtime timeline hay chỉ daily snapshot?
+| File | Phases | Purpose |
+|---|---|---|
+| `b2b_intake_p1_deals_schema.sql` | P1-P3 | deals +5 cột |
+| `b2b_intake_p4_partners_household.sql` | P4 | household + CCCD |
+| `b2b_intake_p5_daily_price_list.sql` | P5 | daily price tstzrange |
+| `b2b_intake_p6_multi_lot.sql` | P6-P8, P10-P12 | items table + trigger |
+| `b2b_intake_p14_agent_hardening.sql` | P14-P16 | 6 đặc thù đại lý |
+| `b2b_intake_p19_bypass_triggers.sql` | P19-P21 | Sprint J exception |
+
+Mỗi file idempotent (DROP IF EXISTS + CREATE). Có rollback SQL counterpart.
 
 ---
 
-**File này là nguồn duy nhất cho B2B intake migration. v1 và v2 đã deprecated.**
+## 7. Files tạo mới
 
-Ready để BGĐ approve → Sprint A kick-off.
+```
+src/services/b2b/
+├── dailyPriceListService.ts       (P22)
+├── intakeOutrightService.ts       (P27)
+├── intakeWalkinService.ts         (P28)
+├── intakeProductionService.ts     (P29)
+├── productionOutputHookService.ts (P29)
+├── productionProgressService.ts   (P18)
+└── dealService.ts (extend P17)
+
+src/services/weighbridge/
+└── ticketLinesService.ts          (P13)
+
+src/components/b2b/
+├── MultiLotEditor.tsx             (P30)
+└── ProductionProgress.tsx         (P18)
+
+src/pages/b2b/intake/
+├── OutrightWizardPage.tsx         (P31)
+├── WalkinWizardPage.tsx           (P32)
+└── ProductionWizardPage.tsx       (P33)
+
+src/pages/b2b/settings/
+└── DailyPriceListPage.tsx         (P34)
+
+src/pages/b2b/deals/
+└── ProductionTimelinePortal.tsx   (P35, portal)
+
+apps/weighbridge/src/pages/
+└── WeighingPageV2.tsx (hoặc extend) (P36-P39)
+```
+
+---
+
+## 8. 13 defaults BGĐ (không cần approve, dùng luôn)
+
+| # | Config | Default |
+|---|---|---|
+| 1 | Range DRC cáp | 25-70%, warning ±10% trung bình 30d |
+| 2 | Công thức flow 🅰️ | qty × price |
+| 3 | Chụp ảnh | Bắt buộc 2 ảnh (xe + mẫu) |
+| 4 | Bảng giá | daily_price_list, admin nhập 7h sáng |
+| 5 | Tier advance max | diamond 85 / gold 70 / silver 55 / bronze 40 / new 25 |
+| 6 | Trừ phí SX | KHÔNG (ghi riêng production_cost) |
+| 7 | CMND flow 🅲 | Bắt buộc |
+| 8 | Farmer table | b2b.partners type='household' |
+| 9 | Hộ LAO flow 🅲 | KHÔNG (đi flow 🅰️) |
+| 10 | Production mode | pooled default, isolated tier gold+ |
+| 11 | DRC variance threshold | 3% → auto dispute |
+| 12 | Production SLA | 7 ngày (diamond 5d / gold 7d / silver 10d) |
+| 13 | Reject loss split | raw→đại lý 100%, production→nhà máy 100%, force→50/50 |
+
+---
+
+## 9. Current status + next step
+
+### Trạng thái trước Phase 1
+- Schema B2B baseline Sprint E-Q stable
+- Portal fix 4 bug (commit b96f21d3, d42d8fc0, 43f32aa5, 54b4b47c)
+- Sales module permission tách riêng (commit 5d9cc769 không đụng)
+- Documentation: FLOWS_PRESENTATION + INTAKE_PROTOTYPE + ROADMAP v4 này
+
+### Bắt đầu Phase 1 (P1 — Add purchase_type)
+Ready để chạy ngay. Không cần BGĐ approve. Chỉ cần:
+1. User confirm "start P1"
+2. Tôi viết SQL + apply via agent_sql + commit
+3. Next phase tiếp
+
+**Cũng OK nếu user muốn:**
+- Skip đến phase nào
+- Đổi thứ tự
+- Chia nhỏ hơn nữa phase nào khó
+- Pause giữa chừng
+
+---
+
+## 10. Rule guard
+
+1. **Không skip test.** Gate mỗi giai đoạn phải PASS mới qua.
+2. **1 phase = 1 commit** (trừ phase quá lớn chia 2-3 commit).
+3. **Schema migration idempotent + có rollback.**
+4. **Bug tìm được → commit fix ngay.** Không dồn đuôi.
+5. **Memory update** nếu phát hiện gotcha hoặc quy tắc mới.
+6. **48h monitor** sau deploy wave 3.
+7. **Standard flow không được break** suốt 45 phases.
+
+---
+
+**File canonical duy nhất cho B2B intake. v1, v2, v3 đã deprecated.**
+
+Ready P1 → start ngay.

@@ -294,11 +294,18 @@ export default function HomePage() {
     const deals = filterPartnerId !== 'all'
       ? activeDeals.filter(d => (d as any).partner_id === filterPartnerId)
       : activeDeals
+    // B2B Intake v4 P37: add badge emoji theo purchase_type
+    const flowBadge = (pt: string | null | undefined) => {
+      if (pt === 'outright') return '🅰️ '
+      if (pt === 'drc_after_production') return '🅱️ '
+      if (pt === 'farmer_walkin') return '🅲 '
+      return ''
+    }
     return [
       { value: 'all', label: 'Tất cả Deal' },
       ...deals.map(d => ({
         value: d.id,
-        label: `${d.deal_number} — ${d.partner_name} — Còn ${(d.remaining_kg / 1000).toFixed(1)}T`,
+        label: `${flowBadge((d as any).purchase_type)}${d.deal_number} — ${d.partner_name} — Còn ${(d.remaining_kg / 1000).toFixed(1)}T`,
       })),
     ]
   })()

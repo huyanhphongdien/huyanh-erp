@@ -75,6 +75,10 @@ export interface ActiveDealForStockIn {
   rubber_type?: string | null
   target_facility_id?: string | null
   lot_code?: string | null
+  // B2B Intake v4 P38: expose purchase_type + status để weighbridge UI
+  // hiển thị badge flow + cho phép cân khi outright/walkin status=processing/settled
+  purchase_type?: 'standard' | 'outright' | 'drc_after_production' | 'farmer_walkin' | null
+  status?: string | null
 }
 
 // ============================================
@@ -241,15 +245,17 @@ export const dealWmsService = {
     /** Filter deals đi vào facility này. NULL deals (chưa assign) vẫn hiện để legacy. */
     currentFacilityId?: string,
   ): Promise<ActiveDealForStockIn[]> {
-    // 1. Lấy deals status = 'processing' hoặc 'accepted'
+    // 1. Lấy deals status = processing/accepted/settled (settled cho outright+walkin 1-shot flow)
+    //    B2B Intake v4 P38: include purchase_type + settled status cho bypass flows
     let query = supabase
       .from('b2b_deals')
       .select(`
         id, deal_number, product_name, quantity_kg, target_facility_id,
         expected_drc, unit_price, price_unit, rubber_type, lot_code, partner_id,
+        purchase_type, status,
         partner:b2b_partners!partner_id ( id, name )
       `)
-      .in('status', ['processing', 'accepted'])
+      .in('status', ['processing', 'accepted', 'settled'])
 
     if (partnerId) {
       query = query.eq('partner_id', partnerId)
@@ -299,6 +305,8 @@ export const dealWmsService = {
         rubber_type: d.rubber_type ?? null,
         target_facility_id: d.target_facility_id ?? null,
         lot_code: d.lot_code ?? null,
+        purchase_type: d.purchase_type ?? 'standard',
+        status: d.status ?? null,
       })
     }
 

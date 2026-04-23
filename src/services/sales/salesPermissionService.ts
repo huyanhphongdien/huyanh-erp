@@ -117,8 +117,8 @@ export function isTabEditable(role: SalesRole | null, tab: string, status: Sales
       return role === 'production' && ['confirmed', 'producing', 'ready', 'packing'].includes(status)
 
     case 'shipping':
-      // LOG sửa khi Producing → Delivered
-      return role === 'logistics' && ['producing', 'ready', 'packing', 'shipped', 'delivered'].includes(status)
+      // LOG sửa khi Confirmed → Delivered (booking tàu/BL thường chốt trước khi SX xong)
+      return role === 'logistics' && ['confirmed', 'producing', 'ready', 'packing', 'shipped', 'delivered'].includes(status)
 
     case 'finance':
       // KT sửa khi Confirmed → Paid (kế toán cần điền tỷ giá, đặt cọc, NH nhận

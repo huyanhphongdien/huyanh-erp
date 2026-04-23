@@ -39,20 +39,21 @@ export const SALES_ROLE_LABELS: Record<SalesRole, string> = {
 }
 
 // Permission checks — field level
+// NOTE: Logistics được treat như admin — full quyền mọi khu vực trong module Sales.
 export const salesPermissions = {
   // Khách hàng
-  canCreateCustomer: (role: SalesRole) => ['sale', 'admin'].includes(role),
-  canEditCustomer: (role: SalesRole) => ['sale', 'admin'].includes(role),
-  canViewCustomer: (role: SalesRole) => ['sale', 'accounting', 'admin'].includes(role),
+  canCreateCustomer: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
+  canEditCustomer: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
+  canViewCustomer: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin'].includes(role),
 
   // Đơn hàng - tạo/sửa thông tin chung
-  canCreateOrder: (role: SalesRole) => ['sale', 'admin'].includes(role),
-  canEditOrder: (role: SalesRole) => ['sale', 'admin'].includes(role),
-  canCancelOrder: (role: SalesRole) => ['sale', 'admin'].includes(role),
+  canCreateOrder: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
+  canEditOrder: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
+  canCancelOrder: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
   canViewOrder: (_role: SalesRole) => true, // ai cũng xem được
 
   // Tab Sản xuất
-  canEditProduction: (role: SalesRole) => ['production', 'admin'].includes(role),
+  canEditProduction: (role: SalesRole) => ['production', 'logistics', 'admin'].includes(role),
   canViewProduction: (role: SalesRole) => ['sale', 'production', 'logistics', 'admin'].includes(role),
 
   // Tab Đóng gói + Logistics
@@ -65,23 +66,23 @@ export const salesPermissions = {
   // Tab Chứng từ
   canCreateCOA: (role: SalesRole) => ['logistics', 'admin'].includes(role),
   canCreatePL: (role: SalesRole) => ['logistics', 'admin'].includes(role),
-  canCreateInvoice: (role: SalesRole) => ['accounting', 'admin'].includes(role),
+  canCreateInvoice: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
   canViewDocs: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin'].includes(role),
 
   // Tab Tài chính (MỚI)
-  canViewFinance: (role: SalesRole) => ['accounting', 'admin'].includes(role),
-  canEditFinance: (role: SalesRole) => ['accounting', 'admin'].includes(role),
-  canEditLC: (role: SalesRole) => ['accounting', 'admin'].includes(role),
-  canEditPayment: (role: SalesRole) => ['accounting', 'admin'].includes(role),
-  canEditDiscount: (role: SalesRole) => ['accounting', 'admin'].includes(role),
-  canEditCommission: (role: SalesRole) => ['accounting', 'admin'].includes(role),
+  canViewFinance: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
+  canEditFinance: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
+  canEditLC: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
+  canEditPayment: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
+  canEditDiscount: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
+  canEditCommission: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
 
   // Shipment Following
   canEditShipmentLogistics: (role: SalesRole) => ['logistics', 'admin'].includes(role),
-  canEditShipmentFinance: (role: SalesRole) => ['accounting', 'admin'].includes(role),
+  canEditShipmentFinance: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
 
   // Executive Dashboard
-  canViewExecutive: (role: SalesRole) => role === 'admin',
+  canViewExecutive: (role: SalesRole) => ['logistics', 'admin'].includes(role),
 
   // Dashboard
   canViewDashboard: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin'].includes(role),
@@ -105,7 +106,7 @@ export type SalesOrderStatus = 'draft' | 'confirmed' | 'producing' | 'ready' | '
 
 export function isTabEditable(role: SalesRole | null, tab: string, status: SalesOrderStatus, isLocked: boolean): boolean {
   if (!role) return false
-  if (role === 'admin') return true // Admin luôn sửa được
+  if (role === 'admin' || role === 'logistics') return true // Admin + Logistics full quyền mọi tab
 
   switch (tab) {
     case 'contract':
@@ -117,8 +118,8 @@ export function isTabEditable(role: SalesRole | null, tab: string, status: Sales
       return role === 'production' && ['confirmed', 'producing', 'ready', 'packing'].includes(status)
 
     case 'shipping':
-      // LOG sửa khi Confirmed → Delivered (booking tàu/BL thường chốt trước khi SX xong)
-      return role === 'logistics' && ['confirmed', 'producing', 'ready', 'packing', 'shipped', 'delivered'].includes(status)
+      // (đã cover ở early return)
+      return false
 
     case 'finance':
       // KT sửa khi Confirmed → Paid (kế toán cần điền tỷ giá, đặt cọc, NH nhận
@@ -134,7 +135,7 @@ export function isTabEditable(role: SalesRole | null, tab: string, status: Sales
 // ★ v4: Kiểm tra field cụ thể — tỷ giá CK do KT nhập nhưng hiện ở tab LOG
 export function isFieldEditableV4(role: SalesRole | null, field: string): boolean {
   if (!role) return false
-  if (role === 'admin') return true
+  if (role === 'admin' || role === 'logistics') return true // Admin + Logistics full quyền mọi field
 
   // Tỷ giá CK: chỉ KT nhập
   if (field === 'discount_exchange_rate') return role === 'accounting'
@@ -147,6 +148,7 @@ export function isFieldEditableV4(role: SalesRole | null, field: string): boolea
 // Check if field is editable for role (legacy — giữ tương thích)
 export function isFieldEditable(role: SalesRole | null, fieldGroup: string): boolean {
   if (!role) return false
+  if (role === 'admin' || role === 'logistics') return true // Admin + Logistics full quyền
   switch (fieldGroup) {
     case 'customer': return salesPermissions.canEditCustomer(role)
     case 'order_info': return salesPermissions.canEditOrder(role)
@@ -158,6 +160,6 @@ export function isFieldEditable(role: SalesRole | null, fieldGroup: string): boo
     case 'coa_pl': return salesPermissions.canCreateCOA(role)
     case 'invoice': return salesPermissions.canCreateInvoice(role)
     case 'finance': return salesPermissions.canEditFinance(role)
-    default: return role === 'admin'
+    default: return false
   }
 }

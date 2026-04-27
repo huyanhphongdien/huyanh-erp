@@ -495,7 +495,7 @@ const SalesOrderListPage = () => {
       title: hdr('Loại hàng'),
       dataIndex: 'grade',
       key: 'grade',
-      width: 90,
+      width: 140,  // tăng từ 90 → 140 vì sort + filter icons chiếm thêm ~50px
       sorter: true,
       sortOrder: sortedColumn('grade'),
       filters: SVR_GRADE_OPTIONS.map((g: any) => ({

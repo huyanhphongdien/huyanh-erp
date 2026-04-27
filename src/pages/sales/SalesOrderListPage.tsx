@@ -24,6 +24,7 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
+import type { FilterValue, SorterResult } from 'antd/es/table/interface'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -153,6 +154,9 @@ const SalesOrderListPage = () => {
   const [gradeFilter, setGradeFilter] = useState<string | undefined>(undefined)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+  // Sort + column filter state (Ant Table onChange driven)
+  const [sortBy, setSortBy] = useState<string>('order_date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   // Detail panel v4
   const [panelOrderId, setPanelOrderId] = useState<string | null>(null)
@@ -174,6 +178,8 @@ const SalesOrderListPage = () => {
         grade: gradeFilter || undefined,
         date_from: dateRange?.[0]?.format('YYYY-MM-DD') || undefined,
         date_to: dateRange?.[1]?.format('YYYY-MM-DD') || undefined,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       }
       const response = await salesOrderService.getList(params)
       setOrders(response.data)
@@ -184,7 +190,7 @@ const SalesOrderListPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination, searchText, statusTab, customerFilter, gradeFilter, dateRange])
+  }, [pagination, searchText, statusTab, customerFilter, gradeFilter, dateRange, sortBy, sortOrder])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -227,11 +233,60 @@ const SalesOrderListPage = () => {
     setPagination((prev) => ({ ...prev, current: 1 }))
   }
 
-  const handleTableChange = (pag: TablePaginationConfig) => {
+  /**
+   * Ant Table onChange — gọi khi user pagination, sort, filter
+   * Map sorter.field → server sort_by; map filters.grade → gradeFilter state
+   */
+  const handleTableChange = (
+    pag: TablePaginationConfig,
+    filters: Record<string, FilterValue | null>,
+    sorter: SorterResult<SalesOrder> | SorterResult<SalesOrder>[],
+  ) => {
     setPagination({
       current: pag.current || 1,
       pageSize: pag.pageSize || 10,
     })
+
+    // Sort: map column key → server field. Server hỗ trợ sort theo column trong table.
+    const single = Array.isArray(sorter) ? sorter[0] : sorter
+    if (single && single.order && single.field) {
+      // single.field có thể là string hoặc array — Ant Design typing
+      const field = String(single.field)
+      // Map column key → DB field
+      const fieldMap: Record<string, string> = {
+        contract_no: 'contract_no',
+        customer: 'customer_id',
+        grade: 'grade',
+        lot: 'customer_po',
+        qty: 'quantity_tons',
+        delivery: 'delivery_date',
+        ready_date: 'ready_date',
+        bank: 'bank_name',
+        bkg: 'booking_reference',
+        etd: 'etd',
+        unit_price: 'unit_price',
+        total_usd: 'total_value_usd',
+        deposit: 'deposit_amount',
+        discount: 'discount_amount',
+        discount_bank: 'discount_bank',
+        remaining: 'remaining_amount',
+        payment_date: 'payment_received_date',
+      }
+      setSortBy(fieldMap[field] || field)
+      setSortOrder(single.order === 'ascend' ? 'asc' : 'desc')
+    } else {
+      // Reset sort khi user click lần 3 (clear)
+      setSortBy('order_date')
+      setSortOrder('desc')
+    }
+
+    // Filter: chỉ grade hiện hỗ trợ ở column header (đồng bộ với gradeFilter ở toolbar)
+    if (filters.grade && filters.grade.length > 0) {
+      setGradeFilter(String(filters.grade[0]))
+    } else if (filters.grade !== undefined) {
+      // user clear filter
+      setGradeFilter(undefined)
+    }
   }
 
   const handleConfirm = async (order: SalesOrder) => {
@@ -386,8 +441,22 @@ const SalesOrderListPage = () => {
     <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{title}</span>
   )
 
+  // Helpers map state ↔ Ant sort order
+  const sortedColumn = (key: string) =>
+    sortBy === (key === 'lot' ? 'customer_po' : key === 'qty' ? 'quantity_tons' :
+      key === 'delivery' ? 'delivery_date' : key === 'bank' ? 'bank_name' :
+      key === 'bkg' ? 'booking_reference' : key === 'total_usd' ? 'total_value_usd' :
+      key === 'deposit' ? 'deposit_amount' : key === 'discount' ? 'discount_amount' :
+      key === 'remaining' ? 'remaining_amount' : key === 'payment_date' ? 'payment_received_date' :
+      key === 'customer' ? 'customer_id' : key)
+      ? (sortOrder === 'asc' ? 'ascend' as const : 'descend' as const)
+      : null
+
+  // Filter values — đồng bộ với toolbar
+  const gradeFilteredValue = gradeFilter ? [gradeFilter] : null
+
   const columns: ColumnsType<SalesOrder> = [
-    // ═══ CỘT THEO YÊU CẦU ═══
+    // ═══ CỘT THEO YÊU CẦU — sorter + filter ═══
     {
       title: '#',
       key: 'index',
@@ -403,6 +472,8 @@ const SalesOrderListPage = () => {
       key: 'contract_no',
       width: 120,
       fixed: 'left',
+      sorter: true,
+      sortOrder: sortedColumn('contract_no'),
       render: (_: string, r: SalesOrder) => mono(<strong>{(r as any).contract_no || r.code}</strong>),
     },
     {
@@ -412,6 +483,8 @@ const SalesOrderListPage = () => {
       width: 150,
       fixed: 'left',
       ellipsis: true,
+      sorter: true,
+      sortOrder: sortedColumn('customer'),
       render: (_: unknown, r: SalesOrder) => {
         const c = r.customer
         if (!c) return gray(null)
@@ -423,6 +496,14 @@ const SalesOrderListPage = () => {
       dataIndex: 'grade',
       key: 'grade',
       width: 90,
+      sorter: true,
+      sortOrder: sortedColumn('grade'),
+      filters: SVR_GRADE_OPTIONS.map((g: any) => ({
+        text: typeof g === 'string' ? g : (g.label || g.value),
+        value: typeof g === 'string' ? g : g.value,
+      })),
+      filteredValue: gradeFilteredValue,
+      filterMultiple: false,
       render: (g: string) => g ? <GradeBadge grade={g} size="small" /> : gray(null),
     },
     {
@@ -431,6 +512,8 @@ const SalesOrderListPage = () => {
       key: 'lot',
       width: 100,
       ellipsis: true,
+      sorter: true,
+      sortOrder: sortedColumn('lot'),
       render: (v: string) => v ? <span style={{ fontSize: 11, fontFamily: 'monospace' }}>{v}</span> : gray(null),
     },
     {
@@ -439,6 +522,8 @@ const SalesOrderListPage = () => {
       key: 'qty',
       width: 75,
       align: 'right',
+      sorter: true,
+      sortOrder: sortedColumn('qty'),
       render: (v: number) => v != null ? mono(v.toLocaleString('vi-VN')) : gray(null),
     },
     {
@@ -446,6 +531,8 @@ const SalesOrderListPage = () => {
       dataIndex: 'delivery_date',
       key: 'delivery',
       width: 90,
+      sorter: true,
+      sortOrder: sortedColumn('delivery'),
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
@@ -453,6 +540,8 @@ const SalesOrderListPage = () => {
       dataIndex: 'ready_date',
       key: 'ready_date',
       width: 85,
+      sorter: true,
+      sortOrder: sortedColumn('ready_date'),
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
@@ -461,6 +550,8 @@ const SalesOrderListPage = () => {
       key: 'bank',
       width: 110,
       ellipsis: true,
+      sorter: true,
+      sortOrder: sortedColumn('bank'),
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
@@ -469,6 +560,8 @@ const SalesOrderListPage = () => {
       key: 'bkg',
       width: 100,
       ellipsis: true,
+      sorter: true,
+      sortOrder: sortedColumn('bkg'),
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
@@ -476,6 +569,8 @@ const SalesOrderListPage = () => {
       dataIndex: 'etd',
       key: 'etd',
       width: 90,
+      sorter: true,
+      sortOrder: sortedColumn('etd'),
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {
@@ -484,6 +579,8 @@ const SalesOrderListPage = () => {
       key: 'unit_price',
       width: 80,
       align: 'right',
+      sorter: true,
+      sortOrder: sortedColumn('unit_price'),
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
     {
@@ -492,6 +589,8 @@ const SalesOrderListPage = () => {
       key: 'total_usd',
       width: 110,
       align: 'right',
+      sorter: true,
+      sortOrder: sortedColumn('total_usd'),
       render: (v: number) => v ? <strong style={{ color: '#1B4D3E', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(v)}</strong> : gray(null),
     },
     {
@@ -500,6 +599,8 @@ const SalesOrderListPage = () => {
       key: 'deposit',
       width: 85,
       align: 'right',
+      sorter: true,
+      sortOrder: sortedColumn('deposit'),
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
     {
@@ -508,6 +609,8 @@ const SalesOrderListPage = () => {
       key: 'discount',
       width: 85,
       align: 'right',
+      sorter: true,
+      sortOrder: sortedColumn('discount'),
       render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
     },
     {
@@ -516,6 +619,8 @@ const SalesOrderListPage = () => {
       key: 'discount_bank',
       width: 90,
       ellipsis: true,
+      sorter: true,
+      sortOrder: sortedColumn('discount_bank'),
       render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
     },
     {
@@ -524,6 +629,8 @@ const SalesOrderListPage = () => {
       key: 'remaining',
       width: 90,
       align: 'right',
+      sorter: true,
+      sortOrder: sortedColumn('remaining'),
       render: (v: number, r: SalesOrder) => {
         const remaining = v ?? ((r.total_value_usd || 0) - ((r as any).deposit_amount || 0) - ((r as any).discount_amount || 0) - ((r as any).bank_charges || 0))
         return remaining ? <strong style={{ color: '#1677ff', fontFamily: 'monospace', fontSize: 12 }}>{formatCurrency(remaining)}</strong> : gray(null)
@@ -534,6 +641,8 @@ const SalesOrderListPage = () => {
       dataIndex: 'payment_received_date',
       key: 'payment_date',
       width: 80,
+      sorter: true,
+      sortOrder: sortedColumn('payment_date'),
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
     },
     {

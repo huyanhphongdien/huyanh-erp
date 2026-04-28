@@ -360,6 +360,9 @@ export interface PerformanceKPIs {
   on_time_rate: number;
   overdue_count: number;
   grade_distribution: { A: number; B: number; C: number; D: number; F: number };
+  // Sprint 1.6: minh bạch — phân biệt task có/không deadline
+  tasks_with_deadline?: number;
+  no_deadline_count?: number;
 }
 
 export interface MonthlyTrend {
@@ -465,21 +468,26 @@ export const performanceDashboardService = {
         gradeDistribution[calculateDashboardGrade(avg)]++;
       });
 
+      // Sprint 1.6: phân biệt 3 trạng thái — task không có deadline KHÔNG được tính ON-TIME
+      // (trước đây: task không có due_date tự động ON-TIME → bias).
       let onTimeCount = 0;
       let overdueCount = 0;
+      let noDeadlineCount = 0;
       (tasks || []).forEach(task => {
-        if (task.due_date) {
-          const dueDate = new Date(task.due_date);
-          dueDate.setHours(23, 59, 59, 999);
-          const completedDate = task.completed_date ? new Date(task.completed_date) : new Date(to);
-          if (completedDate <= dueDate) onTimeCount++;
-          else overdueCount++;
-        } else {
-          onTimeCount++;
+        if (!task.due_date) {
+          noDeadlineCount++;
+          return;
         }
+        const dueDate = new Date(task.due_date);
+        dueDate.setHours(23, 59, 59, 999);
+        const completedDate = task.completed_date ? new Date(task.completed_date) : new Date(to);
+        if (completedDate <= dueDate) onTimeCount++;
+        else overdueCount++;
       });
 
       const totalCompleted = (tasks || []).length;
+      const tasksWithDeadline = onTimeCount + overdueCount;
+
       const empAvgs = Array.from(employeeWeighted.values()).map(d => d.totalWeight > 0 ? Math.round(d.totalScore / d.totalWeight) : 0);
       const avgScore = empAvgs.length > 0
         ? Math.round(empAvgs.reduce((a, b) => a + b, 0) / empAvgs.length)
@@ -489,16 +497,23 @@ export const performanceDashboardService = {
         total_evaluated: evaluatedEmployees.size,
         avg_score: avgScore,
         total_completed: totalCompleted,
-        on_time_rate: totalCompleted > 0 ? Math.round((onTimeCount / totalCompleted) * 100) : 0,
+        // on_time_rate: tỷ lệ trên task CÓ deadline (không tính task no-deadline)
+        on_time_rate: tasksWithDeadline > 0
+          ? Math.round((onTimeCount / tasksWithDeadline) * 100)
+          : 0,
         overdue_count: overdueCount,
         grade_distribution: gradeDistribution,
-      };
+        // Sprint 1.6: minh bạch 3 con số
+        tasks_with_deadline: tasksWithDeadline,
+        no_deadline_count: noDeadlineCount,
+      } as PerformanceKPIs;
     } catch (error) {
       console.error('Error fetching KPIs:', error);
       return {
         total_evaluated: 0, avg_score: 0, total_completed: 0,
         on_time_rate: 0, overdue_count: 0,
         grade_distribution: { A: 0, B: 0, C: 0, D: 0, F: 0 },
+        tasks_with_deadline: 0, no_deadline_count: 0,
       };
     }
   },
@@ -788,42 +803,48 @@ export const performanceDashboardService = {
         const { from, to } = getPeriodRange({ month, year });
         const monthLabel = `${String(month).padStart(2, '0')}/${year}`;
 
+        // Sprint 1.5 + 1.6: dùng tasks.final_score + completed_date (nhất quán với getKPIs)
+        // Bỏ dependency task_evaluations (gần như rỗng cho luồng auto-approve)
+        // Bỏ updated_at (không phản ánh tháng task hoàn thành)
         const { data: tasks } = await supabase
           .from('tasks')
-          .select('id, due_date, completed_date')
+          .select('id, due_date, completed_date, final_score')
           .eq('status', 'finished')
-          .gte('updated_at', from)
-          .lte('updated_at', to);
+          .gte('completed_date', from)
+          .lte('completed_date', to);
 
-        const taskIds = (tasks || []).map(t => t.id);
-        let avgScore = 0;
-        if (taskIds.length > 0) {
-          const { data: evals } = await supabase
-            .from('task_evaluations')
-            .select('score')
-            .in('task_id', taskIds);
-          if (evals && evals.length > 0) {
-            avgScore = Math.round(evals.reduce((a, b) => a + b.score, 0) / evals.length);
-          }
-        }
+        const tasksWithScore = (tasks || []).filter(t => t.final_score != null && t.final_score > 0);
+        const avgScore = tasksWithScore.length > 0
+          ? Math.round(tasksWithScore.reduce((a, b) => a + (b.final_score || 0), 0) / tasksWithScore.length)
+          : 0;
 
+        // Sprint 1.6: phân biệt 3 trạng thái (đúng hạn / trễ / không deadline)
         let onTimeCount = 0;
+        let lateCount = 0;
+        let noDeadlineCount = 0;
         (tasks || []).forEach(t => {
-          if (t.due_date) {
-            const due = new Date(t.due_date);
-            due.setHours(23, 59, 59, 999);
-            const completed = t.completed_date ? new Date(t.completed_date) : new Date();
-            if (completed <= due) onTimeCount++;
-          } else {
-            onTimeCount++;
+          if (!t.due_date) {
+            noDeadlineCount++;
+            return;
           }
+          const due = new Date(t.due_date);
+          due.setHours(23, 59, 59, 999);
+          const completed = t.completed_date ? new Date(t.completed_date) : new Date();
+          if (completed <= due) onTimeCount++;
+          else lateCount++;
         });
 
+        // on_time_rate chỉ tính trên task CÓ deadline
+        const tasksWithDeadline = onTimeCount + lateCount;
+        const onTimeRate = tasksWithDeadline > 0
+          ? Math.round((onTimeCount / tasksWithDeadline) * 100)
+          : 0;
+
         result.push({
-          month: monthLabel, avg_score: avgScore,
+          month: monthLabel,
+          avg_score: avgScore,
           completed: (tasks || []).length,
-          on_time_rate: (tasks || []).length > 0
-            ? Math.round((onTimeCount / (tasks || []).length) * 100) : 0,
+          on_time_rate: onTimeRate,
         });
       }
       return result;

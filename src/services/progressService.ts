@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
+import { insertAutoApproval, type AutoApproveSource } from './approvalService'
 
 // ============================================================================
 // TYPES
@@ -171,7 +172,7 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
   // Kiểm tra progress_mode + parent_task_id
   const { data: task, error: fetchError } = await supabase
     .from('tasks')
-    .select('progress_mode, status, parent_task_id, task_source')
+    .select('progress_mode, status, parent_task_id, task_source, assigner_id')
     .eq('id', taskId)
     .single()
 
@@ -191,6 +192,7 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
   }
 
   // Tự động chuyển status khi đạt 100%
+  let autoApproveSource: AutoApproveSource | null = null
   if (progress >= 100) {
     updateData.completed_date = new Date().toISOString()
     updateData.progress = 100
@@ -202,18 +204,21 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
       updateData.self_score = 100
       updateData.final_score = 80
       updateData.evaluation_status = 'approved'
+      autoApproveSource = 'recurring'
     } else if (source === 'self') {
       // Self: auto-approve 85đ
       updateData.status = 'finished'
       updateData.self_score = 100
       updateData.final_score = 85
       updateData.evaluation_status = 'approved'
+      autoApproveSource = 'self'
     } else if (source === 'project') {
       // Project: auto-approve 90đ
       updateData.status = 'finished'
       updateData.self_score = 100
       updateData.final_score = 90
       updateData.evaluation_status = 'approved'
+      autoApproveSource = 'project'
     } else {
       // Assigned: chờ Manager duyệt
       updateData.status = 'pending_review'
@@ -233,6 +238,20 @@ export async function updateTaskProgress(input: UpdateProgressInput) {
   if (error) {
     console.error('Error updating progress:', error)
     throw error
+  }
+
+  // Insert task_approvals row để trigger update_participant_scores_on_approval
+  // lan tỏa shared_score sang task_assignments cho participants
+  if (autoApproveSource) {
+    const approverId = input.changedBy || (task as any).assigner_id
+    if (approverId) {
+      await insertAutoApproval({
+        task_id: taskId,
+        approver_id: approverId,
+        source: autoApproveSource,
+        self_score: 100,
+      })
+    }
   }
 
   console.log('✅ [progressService] Updated progress:', taskId, '->', progress)

@@ -26,6 +26,7 @@ import { message } from 'antd'
 import { SubtasksList } from './components/SubtasksList'
 import { ParentTaskInfo } from './components/ParentTaskInfo'
 import subtaskService from '../../services/subtaskService'
+import { insertAutoApproval } from '../../services/approvalService'
 import { AttachmentSection } from './components/AttachmentSection'
 import { CommentSection } from './components/CommentSection'
 import { ActivityTimeline } from './components/ActivityTimeline'
@@ -197,6 +198,8 @@ export function TaskViewPage() {
 
       const isSelf = t?.task_source === 'self'
 
+      const approverId = user?.employee_id || t?.assigner_id || ''
+
       if (isRecurring) {
         // ★ Recurring: auto-complete + 80 điểm, KHÔNG popup
         const { error } = await supabase.from('tasks').update({
@@ -206,6 +209,7 @@ export function TaskViewPage() {
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
+        await insertAutoApproval({ task_id: id!, approver_id: approverId, source: 'recurring', self_score: 100 })
         if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
         await refetch()
         message.success('Hoàn thành! (Tự động 80 điểm)')
@@ -218,6 +222,7 @@ export function TaskViewPage() {
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
+        await insertAutoApproval({ task_id: id!, approver_id: approverId, source: 'self', self_score: 100 })
         if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
         await refetch()
         message.success('Hoàn thành! (Tự giao — 85 điểm)')
@@ -230,6 +235,7 @@ export function TaskViewPage() {
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
+        await insertAutoApproval({ task_id: id!, approver_id: approverId, source: 'project', self_score: 100 })
         if (t?.parent_task_id) await subtaskService.recalculateParent(t.parent_task_id)
         await refetch()
         message.success('Hoàn thành! (Dự án — 90 điểm)')
@@ -270,6 +276,7 @@ export function TaskViewPage() {
           evaluation_status: 'approved',
         }).eq('id', id)
         if (error) throw error
+        await insertAutoApproval({ task_id: id!, approver_id: approverId, source: 'deptmanager', self_score: 100 })
         if (t?.parent_task_id) {
           await subtaskService.recalculateParent(t.parent_task_id)
         }

@@ -3,6 +3,7 @@ import { Modal, Rate, Input, Button, Typography, message } from 'antd'
 import { StarFilled } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { insertAutoApproval, type AutoApproveSource } from '../../services/approvalService'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
@@ -98,6 +99,18 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
           score: finalScore,
           rating: finalScore >= 90 ? 'excellent' : finalScore >= 75 ? 'good' : finalScore >= 60 ? 'average' : 'below_average',
         })
+
+        // Insert task_approvals → trigger update_participant_scores_on_approval
+        // lan tỏa shared_score cho mọi participant
+        const approverId = user?.employee_id || (user as any)?.id
+        if (approverId) {
+          await insertAutoApproval({
+            task_id: task.id,
+            approver_id: approverId,
+            source: source as AutoApproveSource,
+            self_score: score,
+          })
+        }
 
         message.success(`Đã tự động duyệt! Điểm: ${finalScore}`)
       } else {

@@ -175,6 +175,55 @@ function calculateRating(score: number): string {
   return 'below_average';
 }
 
+const AUTO_APPROVE_SCORE = {
+  recurring: 80,
+  self: 85,
+  project: 90,
+  deptmanager: 100,
+} as const;
+
+export type AutoApproveSource = keyof typeof AUTO_APPROVE_SCORE;
+
+export interface AutoApproveInput {
+  task_id: string;
+  approver_id: string;
+  source: AutoApproveSource;
+  self_score?: number;
+  comments?: string;
+}
+
+/**
+ * Insert task_approvals row cho auto-approve flow (recurring/self/project/deptmanager).
+ * Trigger update_participant_scores_on_approval sẽ tự lan tỏa shared_score
+ * cho mọi participant của task. Caller chịu trách nhiệm UPDATE bảng tasks
+ * (status, progress, scores, evaluation_status) trước khi gọi hàm này.
+ */
+export async function insertAutoApproval(
+  input: AutoApproveInput
+): Promise<{ success: boolean; error: Error | null }> {
+  const finalScore = AUTO_APPROVE_SCORE[input.source];
+  const rating = calculateRating(finalScore);
+
+  try {
+    const { error } = await supabase.from('task_approvals').insert({
+      task_id: input.task_id,
+      approver_id: input.approver_id,
+      action: 'approved',
+      approved_score: finalScore,
+      original_score: input.self_score ?? finalScore,
+      rating,
+      auto_approved: true,
+      comments: input.comments ?? `Auto-approve: ${input.source} (${finalScore}đ)`,
+    });
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('❌ [insertAutoApproval] error:', error);
+    return { success: false, error: error as Error };
+  }
+}
+
 // ============================================================================
 // STANDALONE FUNCTIONS (for evaluationStore)
 // ============================================================================

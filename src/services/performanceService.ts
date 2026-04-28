@@ -404,9 +404,102 @@ function getPeriodRange(period?: { month: number; year: number }): { from: strin
   return { from, to };
 }
 
+// ============================================================================
+// SPRINT 2 — Snapshot-based helpers
+// Đọc từ employee_monthly_score thay vì tính realtime mỗi load.
+// Cron 23:30 hằng đêm refresh tháng hiện tại; cron 00:30 ngày 1 lock tháng trước.
+// ============================================================================
+
+/**
+ * Refresh snapshot cho tháng hiện tại (RPC call).
+ * Gọi khi user load dashboard tháng đang chạy → đảm bảo data fresh.
+ * Tháng đã lock (locked_at IS NOT NULL) → DB function tự skip.
+ */
+async function refreshCurrentMonthIfNeeded(year: number, month: number): Promise<void> {
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1);
+  if (!isCurrentMonth) return;
+  // Fire-and-forget: gọi RPC nhưng không await full result để dashboard load nhanh.
+  // (Snapshot đã có từ cron 23:30 đêm trước, chỉ là refresh thêm các update sáng nay.)
+  try {
+    await supabase.rpc('fn_refresh_current_month_snapshots');
+  } catch (e) {
+    console.warn('[performanceService] refresh snapshot failed (non-blocking):', e);
+  }
+}
+
 export const performanceDashboardService = {
 
   async getKPIs(period?: { month: number; year: number }): Promise<PerformanceKPIs> {
+    try {
+      const now = new Date();
+      const year = period?.year || now.getFullYear();
+      const month = period?.month || (now.getMonth() + 1);
+
+      // Sprint 2: đọc từ snapshot table thay vì tính realtime
+      // Refresh fire-and-forget cho tháng hiện tại (cron đã tính từ tối qua, đây chỉ refresh thêm)
+      // KHÔNG await để load nhanh — user thấy data từ snapshot cron trước
+      void refreshCurrentMonthIfNeeded(year, month);
+
+      const { data: snapshots, error } = await supabase
+        .from('employee_monthly_score')
+        .select('employee_id, final_score, grade, completed_tasks, on_time_count, overdue_count, no_deadline_count')
+        .eq('year', year)
+        .eq('month', month);
+
+      if (error) throw error;
+      if (!snapshots || snapshots.length === 0) {
+        return {
+          total_evaluated: 0, avg_score: 0, total_completed: 0,
+          on_time_rate: 0, overdue_count: 0,
+          grade_distribution: { A: 0, B: 0, C: 0, D: 0, F: 0 },
+          tasks_with_deadline: 0, no_deadline_count: 0,
+        };
+      }
+
+      // NV được đánh giá: có ≥1 task hoặc final_score > 0
+      const evaluated = snapshots.filter(s => (s.completed_tasks || 0) > 0 || (s.final_score || 0) > 0);
+
+      const avgScore = evaluated.length > 0
+        ? Math.round(evaluated.reduce((a, b) => a + (b.final_score || 0), 0) / evaluated.length)
+        : 0;
+
+      const gradeDistribution = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+      evaluated.forEach(s => {
+        const g = s.grade as 'A' | 'B' | 'C' | 'D' | 'F';
+        if (gradeDistribution[g] !== undefined) gradeDistribution[g]++;
+      });
+
+      const totalCompleted = snapshots.reduce((a, b) => a + (b.completed_tasks || 0), 0);
+      const totalOnTime = snapshots.reduce((a, b) => a + (b.on_time_count || 0), 0);
+      const totalOverdue = snapshots.reduce((a, b) => a + (b.overdue_count || 0), 0);
+      const totalNoDeadline = snapshots.reduce((a, b) => a + (b.no_deadline_count || 0), 0);
+      const tasksWithDeadline = totalOnTime + totalOverdue;
+
+      return {
+        total_evaluated: evaluated.length,
+        avg_score: avgScore,
+        total_completed: totalCompleted,
+        on_time_rate: tasksWithDeadline > 0
+          ? Math.round((totalOnTime / tasksWithDeadline) * 100)
+          : 0,
+        overdue_count: totalOverdue,
+        grade_distribution: gradeDistribution,
+        tasks_with_deadline: tasksWithDeadline,
+        no_deadline_count: totalNoDeadline,
+      };
+    } catch (error) {
+      console.error('[Sprint 2] getKPIs error:', error);
+      return {
+        total_evaluated: 0, avg_score: 0, total_completed: 0,
+        on_time_rate: 0, overdue_count: 0,
+        grade_distribution: { A: 0, B: 0, C: 0, D: 0, F: 0 },
+        tasks_with_deadline: 0, no_deadline_count: 0,
+      };
+    }
+  },
+
+  async _legacyGetKPIs(period?: { month: number; year: number }): Promise<PerformanceKPIs> {
     try {
       const { from, to } = getPeriodRange(period);
 
@@ -519,6 +612,74 @@ export const performanceDashboardService = {
   },
 
   async getEmployeeRanking(params?: {
+    department_id?: string; month?: number; year?: number; limit?: number;
+  }): Promise<EmployeePerformance[]> {
+    try {
+      // Sprint 2: đọc từ employee_monthly_score
+      const now = new Date();
+      const year = params?.year || now.getFullYear();
+      const month = params?.month || (now.getMonth() + 1);
+
+      void refreshCurrentMonthIfNeeded(year, month);
+
+      let q = supabase
+        .from('employee_monthly_score')
+        .select(`
+          employee_id, final_score, grade,
+          quality_score, on_time_score, volume_score, difficulty_score,
+          total_tasks, completed_tasks, on_time_count, overdue_count, no_deadline_count,
+          employee:employees!employee_monthly_score_employee_id_fkey (
+            id, code, full_name, avatar_url, status, department_id,
+            department:departments!employees_department_id_fkey (id, name)
+          )
+        `)
+        .eq('year', year)
+        .eq('month', month)
+        .order('final_score', { ascending: false });
+
+      const { data: snapshots, error } = await q;
+      if (error) throw error;
+
+      let result: EmployeePerformance[] = (snapshots || [])
+        .map((s: any) => {
+          const emp = Array.isArray(s.employee) ? s.employee[0] : s.employee;
+          if (!emp) return null;
+          if (emp.status && emp.status !== 'active') return null; // skip inactive
+          if (params?.department_id && emp.department_id !== params.department_id) return null;
+          const dept = Array.isArray(emp.department) ? emp.department[0] : emp.department;
+
+          const tasksWithDeadline = (s.on_time_count || 0) + (s.overdue_count || 0);
+          const onTimeRate = tasksWithDeadline > 0
+            ? Math.round((s.on_time_count / tasksWithDeadline) * 100)
+            : 0;
+
+          return {
+            employee_id: emp.id,
+            employee_name: emp.full_name || '',
+            avatar_url: emp.avatar_url || null,
+            department_name: dept?.name || '',
+            department_id: emp.department_id || dept?.id || '',
+            total_tasks: s.total_tasks || 0,
+            completed_tasks: s.completed_tasks || 0,
+            on_time_count: s.on_time_count || 0,
+            overdue_count: s.overdue_count || 0,
+            avg_self_score: s.quality_score || 0,
+            avg_manager_score: s.quality_score || 0,
+            final_score: s.final_score || 0,
+            on_time_rate: onTimeRate,
+            grade: (s.grade || 'F') as 'A' | 'B' | 'C' | 'D' | 'F',
+          };
+        })
+        .filter((x): x is EmployeePerformance => x !== null);
+
+      return result.slice(0, params?.limit || 100);
+    } catch (error) {
+      console.error('[Sprint 2] getEmployeeRanking error:', error);
+      return [];
+    }
+  },
+
+  async _legacyGetEmployeeRanking(params?: {
     department_id?: string; month?: number; year?: number; limit?: number;
   }): Promise<EmployeePerformance[]> {
     try {
@@ -793,63 +954,66 @@ export const performanceDashboardService = {
 
   async getMonthlyTrend(months: number = 6): Promise<MonthlyTrend[]> {
     try {
-      const result: MonthlyTrend[] = [];
+      // Sprint 2: đọc từ employee_monthly_score (1 query duy nhất thay vì 6 queries)
       const now = new Date();
-
+      const targetMonths: { year: number; month: number; label: string }[] = [];
       for (let i = months - 1; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const month = d.getMonth() + 1;
-        const year = d.getFullYear();
-        const { from, to } = getPeriodRange({ month, year });
-        const monthLabel = `${String(month).padStart(2, '0')}/${year}`;
-
-        // Sprint 1.5 + 1.6: dùng tasks.final_score + completed_date (nhất quán với getKPIs)
-        // Bỏ dependency task_evaluations (gần như rỗng cho luồng auto-approve)
-        // Bỏ updated_at (không phản ánh tháng task hoàn thành)
-        const { data: tasks } = await supabase
-          .from('tasks')
-          .select('id, due_date, completed_date, final_score')
-          .eq('status', 'finished')
-          .gte('completed_date', from)
-          .lte('completed_date', to);
-
-        const tasksWithScore = (tasks || []).filter(t => t.final_score != null && t.final_score > 0);
-        const avgScore = tasksWithScore.length > 0
-          ? Math.round(tasksWithScore.reduce((a, b) => a + (b.final_score || 0), 0) / tasksWithScore.length)
-          : 0;
-
-        // Sprint 1.6: phân biệt 3 trạng thái (đúng hạn / trễ / không deadline)
-        let onTimeCount = 0;
-        let lateCount = 0;
-        let noDeadlineCount = 0;
-        (tasks || []).forEach(t => {
-          if (!t.due_date) {
-            noDeadlineCount++;
-            return;
-          }
-          const due = new Date(t.due_date);
-          due.setHours(23, 59, 59, 999);
-          const completed = t.completed_date ? new Date(t.completed_date) : new Date();
-          if (completed <= due) onTimeCount++;
-          else lateCount++;
-        });
-
-        // on_time_rate chỉ tính trên task CÓ deadline
-        const tasksWithDeadline = onTimeCount + lateCount;
-        const onTimeRate = tasksWithDeadline > 0
-          ? Math.round((onTimeCount / tasksWithDeadline) * 100)
-          : 0;
-
-        result.push({
-          month: monthLabel,
-          avg_score: avgScore,
-          completed: (tasks || []).length,
-          on_time_rate: onTimeRate,
+        const m = d.getMonth() + 1;
+        const y = d.getFullYear();
+        targetMonths.push({
+          year: y, month: m,
+          label: `${String(m).padStart(2, '0')}/${y}`,
         });
       }
-      return result;
+
+      // Refresh tháng hiện tại fire-and-forget
+      const cur = targetMonths[targetMonths.length - 1];
+      void refreshCurrentMonthIfNeeded(cur.year, cur.month);
+
+      // OR conditions cho (year, month) tuples
+      const yearList = Array.from(new Set(targetMonths.map(t => t.year)));
+      const { data: snapshots, error } = await supabase
+        .from('employee_monthly_score')
+        .select('year, month, final_score, completed_tasks, on_time_count, overdue_count')
+        .in('year', yearList);
+
+      if (error) throw error;
+
+      // Aggregate per (year, month)
+      const byKey = new Map<string, {
+        scores: number[]; completed: number; on_time: number; overdue: number;
+      }>();
+      (snapshots || []).forEach((s: any) => {
+        const key = `${s.year}-${s.month}`;
+        if (!byKey.has(key)) byKey.set(key, { scores: [], completed: 0, on_time: 0, overdue: 0 });
+        const agg = byKey.get(key)!;
+        if (s.final_score != null && s.final_score > 0) agg.scores.push(s.final_score);
+        agg.completed += s.completed_tasks || 0;
+        agg.on_time += s.on_time_count || 0;
+        agg.overdue += s.overdue_count || 0;
+      });
+
+      return targetMonths.map(t => {
+        const key = `${t.year}-${t.month}`;
+        const agg = byKey.get(key);
+        if (!agg) {
+          return { month: t.label, avg_score: 0, completed: 0, on_time_rate: 0 };
+        }
+        const avg = agg.scores.length > 0
+          ? Math.round(agg.scores.reduce((a, b) => a + b, 0) / agg.scores.length)
+          : 0;
+        const tasksWithDeadline = agg.on_time + agg.overdue;
+        return {
+          month: t.label,
+          avg_score: avg,
+          completed: agg.completed,
+          on_time_rate: tasksWithDeadline > 0
+            ? Math.round((agg.on_time / tasksWithDeadline) * 100) : 0,
+        };
+      });
     } catch (error) {
-      console.error('Error fetching monthly trend:', error);
+      console.error('[Sprint 2] getMonthlyTrend error:', error);
       return [];
     }
   },

@@ -58,8 +58,9 @@ export {
 // ===== PHASE 4.3: Progress Service =====
 export * from './progressService';
 
-// ===== PHASE 4.3: Task Detail Service =====
-export * from './taskDetailService';
+// ===== Sprint 4 M1: taskDetailService merged into taskService =====
+// (Re-exports already covered by `export * from './taskService'` if added — currently
+//  taskService is imported directly by name, so symbols moved are auto-available.)
 
 // ===== PHASE 4.3: Task Assignment Service =====
 export * from './taskAssignmentService';

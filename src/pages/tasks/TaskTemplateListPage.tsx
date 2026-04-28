@@ -17,8 +17,10 @@ import {
   PlayCircleOutlined, MinusCircleOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
-import { taskTemplateService, TaskTemplate, TEMPLATE_CATEGORIES } from '../../services/taskTemplateService'
-import { taskRecurringService, RecurringRule, FREQ_LABELS, DAY_LABELS } from '../../services/taskRecurringService'
+import {
+  taskTemplateService, TaskTemplate, TEMPLATE_CATEGORIES,
+  taskRecurringService, RecurringRule, FREQ_LABELS, DAY_LABELS,
+} from '../../services/taskTemplateService'
 
 const { Title } = Typography
 

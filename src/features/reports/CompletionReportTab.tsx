@@ -30,12 +30,12 @@ import {
   FileText,
   ChevronDown
 } from 'lucide-react'
-import taskReportService from '../../services/taskReportService'
+import taskReportService from '../../services/taskAnalyticsService'
 import type {
   CompletionByDepartment,
   CompletionByPosition,
   CompletionByEmployee
-} from '../../services/taskReportService'
+} from '../../services/taskAnalyticsService'
 import {
   exportDepartmentReportToExcel,
   exportEmployeeReportToExcel,

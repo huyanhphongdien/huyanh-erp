@@ -19,12 +19,12 @@ import {
   XCircle,
   Target
 } from 'lucide-react'
-import taskReportService from '../../services/taskReportService'
+import taskReportService from '../../services/taskAnalyticsService'
 import type {
   PerformanceMetrics,
   TopPerformer,
   OverdueTask
-} from '../../services/taskReportService'
+} from '../../services/taskAnalyticsService'
 import { departmentService } from '../../services/departmentService'
 
 // ============================================================================

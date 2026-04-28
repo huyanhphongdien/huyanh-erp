@@ -39,7 +39,7 @@ import {
   OverviewStats,
   DepartmentTaskStats,
   StatsFilter,
-} from '../../../services/taskStatsService';
+} from '../../../services/taskAnalyticsService';
 import { departmentService } from '../../../services/departmentService';
 
 // ============================================================================

@@ -659,3 +659,126 @@ export const taskService = {
 }
 
 export default taskService
+
+// ============================================================================
+// TASK DETAIL (merged from taskDetailService — Sprint 4 M1)
+// task_details table = chi tiết bổ sung (description nâng cao, budget, milestones)
+// ============================================================================
+
+export interface TaskDetail {
+  id?: string
+  task_id: string
+  detailed_description?: string | null
+  acceptance_criteria?: string | null
+  technical_requirements?: string | null
+  estimated_budget?: number | null
+  actual_budget?: number | null
+  resources_needed?: string | null
+  attachments?: string[] | null
+  reference_links?: string[] | null
+  risk_assessment?: string | null
+  dependencies?: string | null
+  milestones?: Record<string, any>[] | null
+  created_at?: string
+  updated_at?: string
+}
+
+async function canUpdateTaskDetail(taskId: string): Promise<{
+  canUpdate: boolean
+  reason?: string
+}> {
+  const { data: approval } = await supabase
+    .from('task_approvals')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('action', 'approved')
+    .maybeSingle()
+
+  if (approval) {
+    return { canUpdate: false, reason: 'Không thể cập nhật chi tiết của công việc đã được phê duyệt' }
+  }
+
+  const { data: task, error } = await supabase
+    .from('tasks').select('status').eq('id', taskId).single()
+
+  if (error || !task) return { canUpdate: false, reason: 'Không tìm thấy công việc' }
+  if (task.status === 'accepted') return { canUpdate: false, reason: 'Không thể cập nhật chi tiết của công việc đã được phê duyệt' }
+  if (task.status === 'cancelled') return { canUpdate: false, reason: 'Không thể cập nhật chi tiết của công việc đã hủy' }
+
+  return { canUpdate: true }
+}
+
+export const taskDetailService = {
+  async getByTaskId(taskId: string): Promise<TaskDetail | null> {
+    const { data, error } = await supabase
+      .from('task_details').select('*').eq('task_id', taskId).single()
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  },
+
+  async upsert(taskId: string, input: Partial<TaskDetail>): Promise<TaskDetail> {
+    const { canUpdate, reason } = await canUpdateTaskDetail(taskId)
+    if (!canUpdate) throw new Error(reason || 'Không thể cập nhật chi tiết công việc')
+
+    const existing = await this.getByTaskId(taskId)
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('task_details')
+        .update({ ...input, updated_at: new Date().toISOString() })
+        .eq('task_id', taskId).select().single()
+      if (error) throw error
+      return data
+    } else {
+      const { data, error } = await supabase
+        .from('task_details')
+        .insert({ ...input, task_id: taskId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .select().single()
+      if (error) throw error
+      return data
+    }
+  },
+
+  async create(taskId: string, input: Partial<TaskDetail>): Promise<TaskDetail> {
+    const { canUpdate, reason } = await canUpdateTaskDetail(taskId)
+    if (!canUpdate) throw new Error(reason || 'Không thể tạo chi tiết công việc')
+
+    const existing = await this.getByTaskId(taskId)
+    if (existing) throw new Error('Chi tiết công việc đã tồn tại')
+
+    const { data, error } = await supabase
+      .from('task_details')
+      .insert({ ...input, task_id: taskId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .select().single()
+    if (error) throw error
+    return data
+  },
+
+  async update(taskId: string, input: Partial<TaskDetail>): Promise<TaskDetail> {
+    const { canUpdate, reason } = await canUpdateTaskDetail(taskId)
+    if (!canUpdate) throw new Error(reason || 'Không thể cập nhật chi tiết công việc')
+
+    const existing = await this.getByTaskId(taskId)
+    if (!existing) throw new Error('Chi tiết công việc chưa tồn tại')
+
+    const { data, error } = await supabase
+      .from('task_details')
+      .update({ ...input, updated_at: new Date().toISOString() })
+      .eq('task_id', taskId).select().single()
+    if (error) throw error
+    return data
+  },
+
+  async delete(taskId: string): Promise<void> {
+    const { canUpdate, reason } = await canUpdateTaskDetail(taskId)
+    if (!canUpdate) throw new Error(reason || 'Không thể xóa chi tiết công việc')
+    const { error } = await supabase.from('task_details').delete().eq('task_id', taskId)
+    if (error) throw error
+  },
+
+  async updateField(taskId: string, field: keyof TaskDetail, value: any): Promise<TaskDetail> {
+    return this.upsert(taskId, { [field]: value } as Partial<TaskDetail>)
+  },
+
+  canUpdateTaskDetail,
+}

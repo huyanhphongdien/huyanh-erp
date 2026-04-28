@@ -22,7 +22,7 @@ import {
   Table
 } from 'lucide-react'
 import { departmentService } from '../../services/departmentService'
-import taskReportService from '../../services/taskReportService'
+import taskReportService from '../../services/taskAnalyticsService'
 import {
   exportDepartmentReportToExcel,
   exportEmployeeReportToExcel,

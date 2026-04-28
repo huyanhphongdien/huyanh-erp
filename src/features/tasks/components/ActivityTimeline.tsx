@@ -20,7 +20,7 @@ import {
   ACTION_CONFIG,
   formatRelativeTime,
   generateActivityDescription,
-} from '../../../services/taskActivityService';
+} from '../../../services/taskAuditService';
 
 // ============================================================================
 // TYPES

@@ -1,59 +1,74 @@
-# Task Services Guide — Sprint 3.1
+# Task Services Guide — Sprint 4 status
 
-15 file `task*Service.ts` hiện tồn tại với scope chồng chéo. Sprint 3.1 (full merge) **bị defer**
-vì refactor lớn touch nhiều UI component → rủi ro cao stack trên Sprint 1+2 vừa deploy.
+**Sprint 4 đã merge 4 cặp file** (15 → 11 files). Còn 2 cặp defer sang Sprint 5
+vì rủi ro cao (taskStatusService overlap với DB trigger fn_normalize_task_state,
+taskAssignmentService overlap với business logic phức tạp).
 
-Document này mô tả **scope hiện tại** + **kế hoạch merge tương lai** để dev mới hiểu nhanh.
+## Hiện trạng — 11 files (sau Sprint 4)
 
-## Hiện trạng — 15 files
+| File | Scope | Status Sprint 4 |
+|---|---|---|
+| `taskService.ts` | CRUD core + TaskDetail (merged M1) | ✅ Đã gộp taskDetailService |
+| `taskAssignmentService.ts` | Assign/reassign | ⏳ Defer Sprint 5 |
+| `taskStatusService.ts` | updateStatus + transitions | ⏳ Defer Sprint 5 |
+| `taskParticipantService.ts` | Participants | Giữ riêng (logic permissions phức tạp) |
+| `taskChecklistService.ts` | Checklist | Giữ riêng |
+| `taskCommentService.ts` | Comments | Giữ riêng |
+| `taskAttachmentService.ts` | Attachments | Giữ riêng |
+| `taskNotificationService.ts` | Notifications | Giữ riêng |
+| `taskTemplateService.ts` | Templates + Recurring (merged M3) | ✅ Đã gộp taskRecurringService |
+| `taskAuditService.ts` | Activities + History (merged M2) | ✅ Đã gộp taskActivityService + taskHistoryService |
+| `taskAnalyticsService.ts` | Stats + Reports (merged M4) | ✅ Đã gộp taskStatsService + taskReportService |
 
-| File | Scope chính | Trùng với | Note |
-|---|---|---|---|
-| `taskService.ts` | CRUD core: getAll, getById, create, update, delete, updateStatus, updateProgress, getSubtasks | — | **Service chính**, giữ lại |
-| `taskDetailService.ts` | getTaskDetail (1 task + relations) | taskService.getById | Có thể merge vào taskService |
-| `taskStatusService.ts` | updateStatus + transitions | taskService.updateStatus | Logic transition phức tạp — review trước khi merge |
-| `taskAssignmentService.ts` | Assign/reassign | taskService.assignTask | Có thể merge |
-| `taskParticipantService.ts` | Participants (add/remove, available employees) | task_assignments queries | **Giữ riêng** — logic phức tạp về quyền |
-| `taskChecklistService.ts` | Checklist items CRUD + getProgress | — | **Giữ riêng** |
-| `taskCommentService.ts` | Comments | — | **Giữ riêng** |
-| `taskAttachmentService.ts` | Attachments (file uploads) | — | **Giữ riêng** |
-| `taskActivityService.ts` | task_activities log | task_status_history? | Audit log — có thể merge với history |
-| `taskHistoryService.ts` | task_status_history queries | taskActivityService | Có thể merge |
-| `taskNotificationService.ts` | Notifications cho task events | notificationHelper | **Giữ riêng** |
-| `taskTemplateService.ts` | Templates CRUD | — | **Giữ riêng** |
-| `taskRecurringService.ts` | Recurring rules + generation | taskTemplateService | Có thể merge với template |
-| `taskStatsService.ts` | Aggregate stats (count, charts) | performanceService | Có thể merge với performance |
-| `taskReportService.ts` | Reports/exports | taskStatsService | Có thể merge với stats |
+## Xóa khỏi codebase (sau Sprint 4)
 
-## Kế hoạch merge — Sprint 4 (defer)
+- ❌ `taskDetailService.ts` (merged → `taskService.ts`)
+- ❌ `taskRecurringService.ts` (merged → `taskTemplateService.ts`)
+- ❌ `taskActivityService.ts` (merged → `taskAuditService.ts`)
+- ❌ `taskHistoryService.ts` (merged → `taskAuditService.ts`)
+- ❌ `taskStatsService.ts` (merged → `taskAnalyticsService.ts`)
+- ❌ `taskReportService.ts` (merged → `taskAnalyticsService.ts`)
 
-Đề xuất gộp về **6 file core**:
+## Backward compat
 
-1. **`taskService.ts`** — CRUD core (giữ + thêm logic từ taskDetail, taskStatus, taskAssignment)
-2. **`taskParticipantService.ts`** — Participants (logic permissions phức tạp, giữ riêng)
-3. **`taskChecklistService.ts`** — Checklist (giữ)
-4. **`taskCommentService.ts`** — Comments (giữ)
-5. **`taskAttachmentService.ts`** — Attachments (giữ)
-6. **`taskNotificationService.ts`** — Notifications (giữ)
-7. **`taskTemplateService.ts`** — Templates + recurring (merge)
-8. **`taskAuditService.ts`** — Activities + history (merge từ activity + history)
-9. **`taskAnalyticsService.ts`** — Stats + reports (merge từ stats + report)
+Các named exports cũ (taskRecurringService, taskActivityService, taskHistoryService,
+taskStatsService, taskReportService) vẫn được export từ file mới — code legacy
+import qua named exports vẫn chạy được. Chỉ đường dẫn file thay đổi.
 
-→ Giảm từ 15 → 9 files. Functionality giữ nguyên, code dễ maintain hơn.
+```typescript
+// Trước:
+import { taskRecurringService } from '../services/taskRecurringService'
 
-## Tại sao defer Sprint 3.1?
+// Sau:
+import { taskRecurringService } from '../services/taskTemplateService'
+```
 
-1. **Risk cao**: 15 file đang được import từ 50+ component. Merge sai → break UI nhiều chỗ.
-2. **ROI thấp ngắn hạn**: Code vẫn chạy tốt. Refactor chỉ giúp dev mới đọc dễ hơn.
-3. **Sprint 1+2 vừa deploy**: stack thêm refactor lớn → gấp đôi risk regression.
+## Defer Sprint 5
+
+### `taskStatusService.ts` (558 dòng)
+**Lý do defer**: Logic transition tại đây có overlap phức tạp với DB trigger
+`fn_normalize_task_state` (Sprint 1.3) đã handle status↔progress consistency.
+Merge cần audit kỹ để không break behavior cron + UI flow.
+
+### `taskAssignmentService.ts` (310 dòng)
+**Lý do defer**: Có business rules đặc thù cho việc assign (chuyển NV, validate
+permissions). Merge vào taskService cần regression test toàn bộ luồng task
+assignment + email notification.
 
 ## Hướng dẫn cho dev mới
 
 Khi cần thêm feature task:
-- Thêm CRUD method → `taskService.ts`
-- Thêm liên quan tới checklist → `taskChecklistService.ts`
-- Thêm liên quan participants → `taskParticipantService.ts`
-- Cần aggregate/report → `taskStatsService.ts`
-- Liên quan template/recurring → `taskTemplateService.ts` hoặc `taskRecurringService.ts`
+- CRUD core → `taskService.ts`
+- Detail/budget/milestones → `taskService.ts` (TaskDetail interface, taskDetailService object)
+- Checklist → `taskChecklistService.ts`
+- Participants → `taskParticipantService.ts`
+- Comments → `taskCommentService.ts`
+- Files → `taskAttachmentService.ts`
+- Notifications → `taskNotificationService.ts`
+- Template + Recurring → `taskTemplateService.ts`
+- Activity log + History → `taskAuditService.ts`
+- Stats + Reports → `taskAnalyticsService.ts`
+- Assign → `taskAssignmentService.ts` (sẽ merge vào taskService Sprint 5)
+- Status transitions → `taskStatusService.ts` (sẽ merge Sprint 5)
 
 **Không** tạo file service mới. Đặt vào file phù hợp scope.

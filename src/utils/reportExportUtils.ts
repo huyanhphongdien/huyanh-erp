@@ -14,7 +14,7 @@ import type {
   PerformanceMetrics,
   TopPerformer,
   OverdueTask
-} from '../services/taskReportService'
+} from '../services/taskAnalyticsService'
 
 // ============================================================================
 // TYPES

@@ -2,7 +2,7 @@
 // Timeline hiển thị lịch sử thay đổi trạng thái task
 
 import { useState, useEffect } from 'react'
-import { taskHistoryService, type TaskStatusChange } from '../../services/taskHistoryService'
+import { taskHistoryService, type TaskStatusChange } from '../../services/taskAuditService'
 import { ChevronDown, ChevronUp, History, ArrowRight } from 'lucide-react'
 
 // ============================================================

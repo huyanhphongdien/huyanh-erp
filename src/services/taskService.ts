@@ -702,7 +702,8 @@ async function canUpdateTaskDetail(taskId: string): Promise<{
     .from('tasks').select('status').eq('id', taskId).single()
 
   if (error || !task) return { canUpdate: false, reason: 'Không tìm thấy công việc' }
-  if (task.status === 'accepted') return { canUpdate: false, reason: 'Không thể cập nhật chi tiết của công việc đã được phê duyệt' }
+  // A-C4 fix: 'accepted' không có trong tasks_status_check enum → dùng 'finished' (đúng với schema thực)
+  if (task.status === 'finished') return { canUpdate: false, reason: 'Không thể cập nhật chi tiết của công việc đã hoàn thành' }
   if (task.status === 'cancelled') return { canUpdate: false, reason: 'Không thể cập nhật chi tiết của công việc đã hủy' }
 
   return { canUpdate: true }

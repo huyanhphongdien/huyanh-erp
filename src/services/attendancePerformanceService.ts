@@ -83,8 +83,20 @@ export const attendancePerformanceService = {
     const absentDays = (records || []).filter(r => r.status === 'absent').length
     const lateCount = (records || []).filter(r => r.status === 'late').length
 
-    // Đếm về sớm — nếu có column phát hiện (giả định status='early_leave' hoặc check_out_time < shift_end)
-    const earlyLeaveCount = (records || []).filter(r => r.status === 'early_leave').length
+    // A-H9 fix: Đếm về sớm theo 2 dấu hiệu — status='early_leave' HOẶC check_out_time < shift_end
+    const earlyLeaveCount = (records || []).filter(r => {
+      if (r.status === 'early_leave') return true
+      // Fallback: tính theo time nếu có data
+      if (r.check_out_time && r.shift_end) {
+        try {
+          // shift_end + check_out_time là time string "HH:MM:SS"
+          return r.check_out_time < r.shift_end
+        } catch {
+          return false
+        }
+      }
+      return false
+    }).length
 
     // 2. Overtime — CHỈ tính approved (rule policy, memory feedback_overtime_must_approved)
     const { data: overtimeRecords } = await supabase
@@ -112,11 +124,26 @@ export const attendancePerformanceService = {
 
     score = Math.max(0, Math.min(100, score))
 
+    // A-H8 fix: working_days tính theo lịch ca thực tế (count số ngày NV có shift assigned trong tháng)
+    // Fallback 26 nếu không query được shift assignments
+    let workingDays = 26
+    try {
+      const { count } = await supabase
+        .from('shift_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('employee_id', employeeId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+      if (count != null && count > 0) workingDays = count
+    } catch {
+      // Bảng shift_assignments có thể chưa exist → fallback 26
+    }
+
     return {
       employee_id: employeeId,
       period_month: month,
       period_year: year,
-      working_days: 26,
+      working_days: workingDays,
       present_days: presentDays,
       absent_without_leave: absentDays,
       late_count: lateCount,

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modal, Rate, Input, Button, Typography, message } from 'antd'
 import { StarFilled } from '@ant-design/icons'
 import { supabase } from '../../lib/supabase'
@@ -32,14 +32,14 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
   const [loading, setLoading] = useState(false)
   const [taskSource, setTaskSource] = useState<string>('assigned')
 
-  // ★ Fetch task_source khi mở modal
-  useState(() => {
+  // ★ A-C1 fix: Fetch task_source khi mở modal — dùng useEffect chứ không phải useState lazy init
+  useEffect(() => {
     if (!task?.id || !open) return
     supabase.from('tasks').select('task_source, is_self_assigned').eq('id', task.id).single()
       .then(({ data }) => {
         if (data) setTaskSource(data.task_source || (data.is_self_assigned ? 'self' : 'assigned'))
       })
-  })
+  }, [task?.id, open])
 
   const sourceInfo = SOURCE_INFO[taskSource] || SOURCE_INFO.assigned
   const isAutoApprove = ['self', 'recurring', 'project'].includes(taskSource)
@@ -59,12 +59,17 @@ export default function QuickEvalModal({ open, onClose, task, onSuccess }: Quick
       const score = STAR_TO_SCORE[stars]
 
       // Save self-evaluation
+      // ★ A-C2 fix: schema thực dùng self_score + quality_assessment (không phải score/rating/notes)
+      // Đối chiếu approvalService.quickApprove line 738-748 + bảng task_self_evaluations
       await supabase.from('task_self_evaluations').insert({
         task_id: task.id,
         employee_id: user?.employee_id || user?.id,
-        score,
-        rating: stars >= 4 ? 'excellent' : stars >= 3 ? 'good' : stars >= 2 ? 'average' : 'below_average',
-        notes: notes || null,
+        completion_percentage: 100,
+        self_score: score,
+        quality_assessment: stars >= 4 ? 'excellent' : stars >= 3 ? 'good' : stars >= 2 ? 'average' : 'below_average',
+        achievements: notes || null,
+        status: 'approved',
+        revision_count: 0,
         submitted_at: new Date().toISOString(),
       })
 

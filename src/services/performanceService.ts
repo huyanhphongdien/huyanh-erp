@@ -363,6 +363,8 @@ export interface PerformanceKPIs {
   // Sprint 1.6: minh bạch — phân biệt task có/không deadline
   tasks_with_deadline?: number;
   no_deadline_count?: number;
+  // A-H7 fix: expose raw on_time_count thay vì back-compute (avoid off-by-one rounding)
+  on_time_count?: number;
 }
 
 export interface MonthlyTrend {
@@ -414,18 +416,40 @@ function getPeriodRange(period?: { month: number; year: number }): { from: strin
  * Refresh snapshot cho tháng hiện tại (RPC call).
  * Gọi khi user load dashboard tháng đang chạy → đảm bảo data fresh.
  * Tháng đã lock (locked_at IS NOT NULL) → DB function tự skip.
+ *
+ * A-H5 fix: Debounce + dedup. Dashboard load gọi 3 hàm parallel
+ * (getKPIs/Ranking/Trend) đều fire RPC này — gây 3 lần compute đè nhau.
+ * Dùng module-level promise cache: 3 caller share 1 RPC; cooldown 60s.
  */
+let _refreshInflight: Promise<void> | null = null;
+let _lastRefreshAt = 0;
+const REFRESH_COOLDOWN_MS = 60_000; // 60s — không refresh quá thường xuyên
+
 async function refreshCurrentMonthIfNeeded(year: number, month: number): Promise<void> {
   const now = new Date();
   const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1);
   if (!isCurrentMonth) return;
-  // Fire-and-forget: gọi RPC nhưng không await full result để dashboard load nhanh.
-  // (Snapshot đã có từ cron 23:30 đêm trước, chỉ là refresh thêm các update sáng nay.)
-  try {
-    await supabase.rpc('fn_refresh_current_month_snapshots');
-  } catch (e) {
-    console.warn('[performanceService] refresh snapshot failed (non-blocking):', e);
+
+  // Đã refresh trong 60s qua → skip (cooldown)
+  if (Date.now() - _lastRefreshAt < REFRESH_COOLDOWN_MS) return;
+
+  // Đang có refresh inflight → reuse promise (dedup)
+  if (_refreshInflight) {
+    return _refreshInflight;
   }
+
+  _refreshInflight = (async () => {
+    try {
+      await supabase.rpc('fn_refresh_current_month_snapshots');
+      _lastRefreshAt = Date.now();
+    } catch (e) {
+      console.warn('[performanceService] refresh snapshot failed (non-blocking):', e);
+    } finally {
+      _refreshInflight = null;
+    }
+  })();
+
+  return _refreshInflight;
 }
 
 export const performanceDashboardService = {
@@ -487,6 +511,7 @@ export const performanceDashboardService = {
         grade_distribution: gradeDistribution,
         tasks_with_deadline: tasksWithDeadline,
         no_deadline_count: totalNoDeadline,
+        on_time_count: totalOnTime,  // A-H7 fix: expose raw count
       };
     } catch (error) {
       console.error('[Sprint 2] getKPIs error:', error);
@@ -1105,8 +1130,9 @@ export const performanceDashboardService = {
       });
 
       const avgSelf = selfCount > 0 ? Math.round(totalSelf / selfCount) : 0;
-      const avgManager = 0;
+      // A-C3 fix: avgManager hardcoded 0 → dùng quality score (manager đánh giá qua approval)
       const qualityScore = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : 0;
+      const avgManager = qualityScore;
       const completedTasks = (tasks || []).length;
       const onTimeRate = completedTasks > 0 ? Math.round((onTimeCount / completedTasks) * 100) : 0;
 

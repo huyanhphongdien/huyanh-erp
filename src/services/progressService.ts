@@ -337,6 +337,7 @@ export async function getSubtasksProgress(parentTaskId: string): Promise<Subtask
 
 /**
  * Cập nhật progress trực tiếp (không qua RPC, dùng cho form)
+ * A-H2 fix: gọi insertAutoApproval khi auto-complete đẩy task lên 100%.
  */
 export async function updateTaskProgressDirect(
   taskId: string,
@@ -352,11 +353,38 @@ export async function updateTaskProgressDirect(
     updateData.progress_mode = progressMode
   }
 
-  // Tự động set status khi progress = 100
+  // Cần task source + assigner trước khi update để biết auto-approve loại nào
+  let taskMeta: { task_source: string | null; assigner_id: string | null; status: string | null } | null = null
   if (progress >= 100) {
+    const { data: existing } = await supabase
+      .from('tasks')
+      .select('task_source, assigner_id, status')
+      .eq('id', taskId)
+      .single()
+    taskMeta = existing as any
+
     updateData.status = 'finished'
     updateData.completed_date = new Date().toISOString()
     updateData.progress = 100
+
+    // Auto-approve scoring theo task_source (giống updateTaskProgress)
+    const source = taskMeta?.task_source || 'assigned'
+    if (source === 'recurring') {
+      updateData.self_score = 100
+      updateData.final_score = 80
+      updateData.evaluation_status = 'approved'
+    } else if (source === 'self') {
+      updateData.self_score = 100
+      updateData.final_score = 85
+      updateData.evaluation_status = 'approved'
+    } else if (source === 'project') {
+      updateData.self_score = 100
+      updateData.final_score = 90
+      updateData.evaluation_status = 'approved'
+    } else if (taskMeta?.status !== 'finished' && taskMeta?.status !== 'pending_review') {
+      updateData.status = 'pending_review'
+      updateData.evaluation_status = 'pending_approval'
+    }
   }
 
   const { data, error } = await supabase
@@ -369,6 +397,23 @@ export async function updateTaskProgressDirect(
   if (error) {
     console.error('Error updating task progress:', error)
     throw error
+  }
+
+  // Insert task_approvals row → trigger lan tỏa shared_score cho participants
+  if (progress >= 100 && taskMeta?.assigner_id) {
+    const source = taskMeta.task_source || 'assigned'
+    const autoSource: AutoApproveSource | null =
+      source === 'recurring' ? 'recurring' :
+      source === 'self' ? 'self' :
+      source === 'project' ? 'project' : null
+    if (autoSource) {
+      await insertAutoApproval({
+        task_id: taskId,
+        approver_id: taskMeta.assigner_id,
+        source: autoSource,
+        self_score: 100,
+      })
+    }
   }
 
   return data

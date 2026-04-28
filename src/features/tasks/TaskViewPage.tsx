@@ -735,6 +735,10 @@ export function TaskViewPage() {
 
                 const isSelf2 = t.task_source === 'self'
 
+                // ★ A-H1 fix: Sprint 1 bug — path này (auto-complete khi tick checklist 100%)
+                // KHÔNG gọi insertAutoApproval → participants miss shared_score.
+                const approverId2 = user?.employee_id || t.assigner_id || ''
+
                 if (isRecurring) {
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
@@ -742,6 +746,7 @@ export function TaskViewPage() {
                     self_score: 100, final_score: 80,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
+                  await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'recurring', self_score: 100 })
                   message.success('Hoàn thành! (Tự động 80 điểm)')
                 } else if (isSelf2) {
                   await supabase.from('tasks').update({
@@ -750,6 +755,7 @@ export function TaskViewPage() {
                     self_score: 100, final_score: 85,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
+                  await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'self', self_score: 100 })
                   message.success('Hoàn thành! (Tự giao — 85 điểm)')
                 } else if (isProject2) {
                   await supabase.from('tasks').update({
@@ -758,6 +764,7 @@ export function TaskViewPage() {
                     self_score: 100, final_score: 90,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
+                  await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'project', self_score: 100 })
                   message.success('Hoàn thành! (Dự án — 90 điểm)')
                 } else if (isAssignee2) {
                   await supabase.from('tasks').update({
@@ -765,14 +772,17 @@ export function TaskViewPage() {
                     completed_date: new Date().toISOString().split('T')[0],
                     evaluation_status: 'pending_approval',
                   }).eq('id', t.id)
+                  // KHÔNG insertAutoApproval — đợi manager duyệt qua approve-batch
                   message.success('Checklist hoàn tất! Đã gửi cho quản lý phê duyệt.')
                 } else {
+                  // Fallback: dept manager / khác → 85 điểm (cùng logic isSelf)
                   await supabase.from('tasks').update({
                     status: 'finished', progress: 100,
                     completed_date: new Date().toISOString().split('T')[0],
                     self_score: 100, final_score: 85,
                     evaluation_status: 'approved',
                   }).eq('id', t.id)
+                  await insertAutoApproval({ task_id: t.id, approver_id: approverId2, source: 'self', self_score: 100 })
                   message.success('Công việc đã hoàn thành! (85 điểm)')
                 }
               }

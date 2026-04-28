@@ -197,30 +197,29 @@ export interface AutoApproveInput {
  * Trigger update_participant_scores_on_approval sẽ tự lan tỏa shared_score
  * cho mọi participant của task. Caller chịu trách nhiệm UPDATE bảng tasks
  * (status, progress, scores, evaluation_status) trước khi gọi hàm này.
+ *
+ * A-H3 fix: THROW khi DB fail thay vì return silent. Caller cần try/catch.
+ * Nếu fail: caller có thể compensate (rollback tasks update) hoặc ít nhất
+ * user thấy error thay vì silent miss shared_score.
  */
-export async function insertAutoApproval(
-  input: AutoApproveInput
-): Promise<{ success: boolean; error: Error | null }> {
+export async function insertAutoApproval(input: AutoApproveInput): Promise<void> {
   const finalScore = AUTO_APPROVE_SCORE[input.source];
   const rating = calculateRating(finalScore);
 
-  try {
-    const { error } = await supabase.from('task_approvals').insert({
-      task_id: input.task_id,
-      approver_id: input.approver_id,
-      action: 'approved',
-      approved_score: finalScore,
-      original_score: input.self_score ?? finalScore,
-      rating,
-      auto_approved: true,
-      comments: input.comments ?? `Auto-approve: ${input.source} (${finalScore}đ)`,
-    });
+  const { error } = await supabase.from('task_approvals').insert({
+    task_id: input.task_id,
+    approver_id: input.approver_id,
+    action: 'approved',
+    approved_score: finalScore,
+    original_score: input.self_score ?? finalScore,
+    rating,
+    auto_approved: true,
+    comments: input.comments ?? `Auto-approve: ${input.source} (${finalScore}đ)`,
+  });
 
-    if (error) throw error;
-    return { success: true, error: null };
-  } catch (error) {
-    console.error('❌ [insertAutoApproval] error:', error);
-    return { success: false, error: error as Error };
+  if (error) {
+    console.error('❌ [insertAutoApproval] DB insert failed — participants may miss shared_score:', error);
+    throw new Error(`Auto-approve failed: ${error.message}. Manager cần phê duyệt thủ công để participants nhận điểm.`);
   }
 }
 

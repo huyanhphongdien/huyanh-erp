@@ -495,7 +495,7 @@ export default function PerformanceDashboardPage() {
           <div style={{ ...cardValueStyle, color: '#16a34a' }}>{kpis?.on_time_rate || 0}%</div>
           {(kpis?.tasks_with_deadline ?? 0) > 0 && (
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-              {Math.round(((kpis?.on_time_rate || 0) * (kpis?.tasks_with_deadline || 0)) / 100)}/{kpis?.tasks_with_deadline} task có deadline
+              {kpis?.on_time_count ?? 0}/{kpis?.tasks_with_deadline} task có deadline
               {(kpis?.no_deadline_count ?? 0) > 0 && ` · ${kpis?.no_deadline_count} task không có deadline`}
             </div>
           )}

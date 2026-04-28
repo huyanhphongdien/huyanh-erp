@@ -397,10 +397,12 @@ export async function getTopEmployees(filter: StatsFilter, limit: number = 5): P
     let query = supabase
       .from('tasks')
       .select(`
+        id,
         assignee_id,
         assignee:employees!tasks_assignee_id_fkey(id, full_name, department:departments(name))
       `)
       .eq('status', 'finished')  // ✅ Fixed: 'finished' thay vì 'completed'
+      // A-H4 fix: thêm 'id' vào select để taskIds có giá trị
       .gte('created_at', filter.from_date)
       .lte('created_at', filter.to_date + 'T23:59:59');
 

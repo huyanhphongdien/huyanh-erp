@@ -88,21 +88,38 @@ export default function PerformanceConfigPage() {
     let parsed: any;
     try { parsed = JSON.parse(jsonStr); } catch { return 'JSON không hợp lệ'; }
 
-    if (typeof parsed !== 'object' || parsed === null) return 'Phải là object';
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return 'Phải là object (key-value)';
+    }
+
+    // A-H6 fix: validate mọi value là số hữu hạn (Number.isFinite chặn NaN, Infinity, string non-numeric)
+    for (const [k, v] of Object.entries(parsed)) {
+      if (!Number.isFinite(Number(v))) {
+        return `Value của "${k}" phải là số (đang "${v}")`;
+      }
+    }
 
     // Validation theo key
     if (key === 'formula_weights' || key === 'combined_weights') {
       const sum = Object.values(parsed).reduce((a: number, b: any) => a + Number(b), 0);
-      if (Math.abs(sum - 1.0) > 0.001) {
-        return `Tổng phải = 1.0 (đang ${sum.toFixed(3)})`;
+      if (!Number.isFinite(sum) || Math.abs(sum - 1.0) > 0.001) {
+        return `Tổng phải = 1.0 (đang ${Number.isFinite(sum) ? sum.toFixed(3) : 'NaN'})`;
       }
     }
     if (key === 'grade_thresholds') {
+      const required = ['A', 'B', 'C', 'D'] as const;
+      for (const k of required) {
+        if (parsed[k] == null) return `Thiếu key "${k}"`;
+      }
       const { A, B, C, D } = parsed;
       if (!(A > B && B > C && C > D)) return 'Phải A > B > C > D';
       if (A > 100 || D < 0) return 'Range phải [0, 100]';
     }
     if (key === 'difficulty_scores') {
+      const required = ['normal', 'hard', 'critical'] as const;
+      for (const k of required) {
+        if (parsed[k] == null) return `Thiếu key "${k}"`;
+      }
       const { normal, hard, critical } = parsed;
       if (!(normal <= hard && hard <= critical)) return 'Phải normal ≤ hard ≤ critical';
     }

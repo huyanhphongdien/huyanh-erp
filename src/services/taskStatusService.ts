@@ -3,6 +3,13 @@
 // ============================================================
 // UPDATED: Tích hợp cascade logic cho công việc cha-con
 // ============================================================
+//
+// ⚠️ DEPRECATION (Sprint 3.1, defer to Sprint 4):
+//   Logic transition tại đây CHỒNG CHÉO với taskService.updateStatus()
+//   và DB trigger fn_normalize_task_state (Sprint 1.3).
+//   Kế hoạch: merge vào taskService.ts; logic transition giữ ở DB trigger.
+//   Xem chi tiết tại src/services/TASK_SERVICES_GUIDE.md
+// ============================================================
 
 import { supabase } from '../lib/supabase'
 import subtaskService from './subtaskService'

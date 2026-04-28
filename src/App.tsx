@@ -68,6 +68,7 @@ const TaskReportsPage = lazy(() => import('./features/reports/TaskReportsPage'))
 const PerformanceDashboardPage = lazy(() => import('./pages/performance/PerformanceDashboardPage'));
 const EmployeePerformancePage = lazy(() => import('./pages/performance/EmployeePerformancePage'));
 const PerformanceReportPage = lazy(() => import('./pages/performance/PerformanceReportPage'));
+const PerformanceConfigPage = lazy(() => import('./pages/performance/PerformanceConfigPage'));
 
 // User Settings
 const UserSettingsPage = lazy(() => import('./pages/settings/UserSettingsPage'));
@@ -543,6 +544,7 @@ function App() {
               {/* ===== PERFORMANCE DASHBOARD ===== */}
               <Route path="performance" element={<PerformanceDashboardPage />} />
               <Route path="performance/reports" element={<PerformanceReportPage />} />
+              <Route path="performance/config" element={<PerformanceConfigPage />} />
               <Route path="performance/:employeeId" element={<EmployeePerformancePage />} />
 
               {/* ===== PURCHASING MODULE ===== */}

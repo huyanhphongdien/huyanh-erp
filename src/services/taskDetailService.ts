@@ -7,6 +7,13 @@
 // - Thêm validation cho approved tasks
 // - Thêm helper functions
 // ============================================================================
+//
+// ⚠️ DEPRECATION (Sprint 3.1, defer to Sprint 4):
+//   File này có scope CHỒNG CHÉO với taskService.getById().
+//   Kế hoạch: merge vào taskService.ts. Dev mới KHÔNG nên import file này
+//   cho code mới — dùng taskService thay thế.
+//   Xem chi tiết tại src/services/TASK_SERVICES_GUIDE.md
+// ============================================================================
 
 import { supabase } from '../lib/supabase'
 

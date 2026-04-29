@@ -1,5 +1,5 @@
 // ============================================================================
-// ATTENDANCE-PERFORMANCE SERVICE — Sprint 2
+// ATTENDANCE-PERFORMANCE SERVICE — Sprint 2 + ATT bug fixes (29/04)
 // File: src/services/attendancePerformanceService.ts
 // ============================================================================
 // Sprint 2 changes:
@@ -7,6 +7,16 @@
 // - Đọc weights từ performance_config (config-able qua DB)
 // - Task score đọc từ employee_monthly_score snapshot (không tính realtime)
 // - Overtime CHỈ tính khi status='approved' (rule policy)
+//
+// ATT-1/2/3/4 bug fixes (29/04/2026 — discovered khi audit "Chấm công 80 hết"):
+// - ATT-1: Bỏ shift_start/shift_end (column không tồn tại trong schema)
+//          → query attendance fail → records=null → score luôn = base 80
+// - ATT-2: overtime_requests dùng request_date + planned_minutes/actual_minutes
+//          (không phải date + hours)
+// - ATT-3: Status enum thật có 6 giá trị: present, late, late_and_early,
+//          early_leave, business_trip, leave (code chỉ xử lý 3 → miss 3)
+// - ATT-4: Dùng late_minutes / early_leave_minutes (cột số phút thật)
+//          thay vì binary count "lần"
 // ============================================================================
 
 import { supabase } from '../lib/supabase'
@@ -19,8 +29,12 @@ export interface AttendanceScore {
   present_days: number
   absent_without_leave: number
   late_count: number
+  late_minutes_total: number          // ATT-4: tổng phút trễ
   early_leave_count: number
-  overtime_hours_approved: number   // ⚠️ CHỈ approved
+  early_leave_minutes_total: number    // ATT-4: tổng phút về sớm
+  overtime_hours_approved: number      // ⚠️ CHỈ approved
+  business_trip_days: number           // ATT-3: thêm metric
+  leave_days: number                   // ATT-3: nghỉ phép có duyệt
   attendance_score: number
 }
 
@@ -63,6 +77,23 @@ async function loadConfig<T>(key: string, defaults: T): Promise<T> {
   }
 }
 
+// ATT-3: status mapping đầy đủ 6 enum values
+const STATUS_GROUPS = {
+  // "Đi làm" = present + late + late_and_early + business_trip
+  PRESENT: ['present', 'late', 'late_and_early', 'business_trip'],
+  // "Trễ" = late + late_and_early
+  LATE: ['late', 'late_and_early'],
+  // "Về sớm" = early_leave + late_and_early
+  EARLY_LEAVE: ['early_leave', 'late_and_early'],
+  // "Vắng không phép" = absent (KHÔNG có status='absent' trong schema thật,
+  //   thường được suy ra từ ngày có shift assigned mà không có attendance row)
+  ABSENT: ['absent'],
+  // "Nghỉ phép" = leave (đã duyệt — không penalty)
+  LEAVE_APPROVED: ['leave'],
+  // "Công tác" = business_trip
+  BUSINESS_TRIP: ['business_trip'],
+}
+
 export const attendancePerformanceService = {
 
   async getAttendanceScore(employeeId: string, month: number, year: number): Promise<AttendanceScore> {
@@ -71,61 +102,74 @@ export const attendancePerformanceService = {
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]
 
-    // 1. Attendance records
-    const { data: records } = await supabase
+    // ATT-1 fix: bỏ shift_start, shift_end (không tồn tại) — dùng late_minutes
+    // và early_leave_minutes (cột phút thật trong schema)
+    const { data: records, error: attendanceError } = await supabase
       .from('attendance')
-      .select('date, status, check_in_time, check_out_time, shift_start, shift_end')
+      .select('date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes, working_minutes, overtime_minutes')
       .eq('employee_id', employeeId)
       .gte('date', startDate)
       .lte('date', endDate)
 
-    const presentDays = (records || []).filter(r => ['present', 'late', 'half_day'].includes(r.status)).length
-    const absentDays = (records || []).filter(r => r.status === 'absent').length
-    const lateCount = (records || []).filter(r => r.status === 'late').length
+    if (attendanceError) {
+      console.error('[attendance] query error:', attendanceError)
+    }
 
-    // A-H9 fix: Đếm về sớm theo 2 dấu hiệu — status='early_leave' HOẶC check_out_time < shift_end
-    const earlyLeaveCount = (records || []).filter(r => {
-      if (r.status === 'early_leave') return true
-      // Fallback: tính theo time nếu có data
-      if (r.check_out_time && r.shift_end) {
-        try {
-          // shift_end + check_out_time là time string "HH:MM:SS"
-          return r.check_out_time < r.shift_end
-        } catch {
-          return false
-        }
-      }
-      return false
-    }).length
+    const recs = records || []
 
-    // 2. Overtime — CHỈ tính approved (rule policy, memory feedback_overtime_must_approved)
-    const { data: overtimeRecords } = await supabase
+    // ATT-3: dùng STATUS_GROUPS để count theo enum thật 6 giá trị
+    const presentDays = recs.filter(r => STATUS_GROUPS.PRESENT.includes(r.status)).length
+    const lateCount = recs.filter(r => STATUS_GROUPS.LATE.includes(r.status)).length
+    const earlyLeaveCount = recs.filter(r => STATUS_GROUPS.EARLY_LEAVE.includes(r.status)).length
+    const absentDays = recs.filter(r => STATUS_GROUPS.ABSENT.includes(r.status)).length
+    const leaveDays = recs.filter(r => STATUS_GROUPS.LEAVE_APPROVED.includes(r.status)).length
+    const businessTripDays = recs.filter(r => STATUS_GROUPS.BUSINESS_TRIP.includes(r.status)).length
+
+    // ATT-4: tổng phút trễ + về sớm (chính xác hơn binary count "lần")
+    const lateMinutesTotal = recs.reduce((sum, r) => sum + (Number(r.late_minutes) || 0), 0)
+    const earlyLeaveMinutesTotal = recs.reduce((sum, r) => sum + (Number(r.early_leave_minutes) || 0), 0)
+
+    // ATT-2 fix: overtime_requests có request_date (không date) + planned_minutes/actual_minutes (không hours)
+    const { data: overtimeRecords, error: otError } = await supabase
       .from('overtime_requests')
-      .select('hours, status, date')
+      .select('actual_minutes, planned_minutes, status, request_date')
       .eq('employee_id', employeeId)
       .eq('status', 'approved')   // ⚠️ MEMORY: tăng ca chưa duyệt KHÔNG cộng
-      .gte('date', startDate)
-      .lte('date', endDate)
+      .gte('request_date', startDate)
+      .lte('request_date', endDate)
 
-    const overtimeHoursApproved = (overtimeRecords || []).reduce((sum, ot) => sum + (Number(ot.hours) || 0), 0)
+    if (otError) {
+      console.error('[overtime] query error:', otError)
+    }
+
+    // Convert phút → giờ. Ưu tiên actual_minutes (thực tế), fallback planned_minutes.
+    const overtimeMinutesTotal = (overtimeRecords || []).reduce((sum, ot) => {
+      const minutes = Number(ot.actual_minutes) || Number(ot.planned_minutes) || 0
+      return sum + minutes
+    }, 0)
+    const overtimeHoursApproved = Math.round((overtimeMinutesTotal / 60) * 10) / 10  // 1 chữ số thập phân
 
     // 3. Calculate (2-way: bonus + penalty)
     let score = weights.base
 
     // Bonuses
+    // bonus_full_attendance: chỉ khi không vắng VÀ có ngày làm việc thực
     if (absentDays === 0 && presentDays > 0) score += weights.bonus_full_attendance
+    // bonus_no_late: không trễ (kể cả late + late_and_early)
     if (lateCount === 0 && presentDays > 0) score += weights.bonus_no_late
+    // bonus overtime: cộng theo giờ approved, max cap
     score += Math.min(weights.bonus_overtime_max, overtimeHoursApproved * weights.bonus_overtime_per_hour)
 
     // Penalties
     score -= absentDays * weights.penalty_absent
+    // ATT-4: penalty late vẫn theo "lần" (không đổi behavior). Có thể nâng cấp:
+    //   penalty = ceil(lateMinutesTotal / 30) × penalty_late để phạt theo phút.
     score -= Math.min(weights.penalty_late_max, lateCount * weights.penalty_late)
     score -= earlyLeaveCount * weights.penalty_early_leave
 
     score = Math.max(0, Math.min(100, score))
 
-    // A-H8 fix: working_days tính theo lịch ca thực tế (count số ngày NV có shift assigned trong tháng)
-    // Fallback 26 nếu không query được shift assignments
+    // ATT-1: working_days theo shift_assignments (Sprint 2 fix A-H8)
     let workingDays = 26
     try {
       const { count } = await supabase
@@ -147,8 +191,12 @@ export const attendancePerformanceService = {
       present_days: presentDays,
       absent_without_leave: absentDays,
       late_count: lateCount,
+      late_minutes_total: lateMinutesTotal,
       early_leave_count: earlyLeaveCount,
+      early_leave_minutes_total: earlyLeaveMinutesTotal,
       overtime_hours_approved: overtimeHoursApproved,
+      business_trip_days: businessTripDays,
+      leave_days: leaveDays,
       attendance_score: score,
     }
   },

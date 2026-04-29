@@ -452,6 +452,47 @@ async function refreshCurrentMonthIfNeeded(year: number, month: number): Promise
   return _refreshInflight;
 }
 
+/**
+ * Lấy danh sách employee_id bị exclude khỏi aggregate stats.
+ * Đọc config excluded_departments → query employees thuộc dept đó → trả UUID list.
+ * Cache module-level 5 phút để giảm query lặp.
+ *
+ * (User yêu cầu 29/04/2026: bỏ BGD khỏi bảng thống kê hiệu suất)
+ */
+let _excludedIdsCache: { ids: string[]; expiresAt: number } | null = null;
+const EXCLUDED_CACHE_MS = 5 * 60_000;
+
+async function getExcludedEmployeeIds(): Promise<string[]> {
+  if (_excludedIdsCache && _excludedIdsCache.expiresAt > Date.now()) {
+    return _excludedIdsCache.ids;
+  }
+  try {
+    const { data: cfg } = await supabase
+      .from('performance_config')
+      .select('config_value')
+      .eq('config_key', 'excluded_departments')
+      .maybeSingle();
+
+    const excludedDeptIds: string[] = Array.isArray(cfg?.config_value) ? cfg!.config_value : [];
+    if (excludedDeptIds.length === 0) {
+      _excludedIdsCache = { ids: [], expiresAt: Date.now() + EXCLUDED_CACHE_MS };
+      return [];
+    }
+
+    const { data: emps } = await supabase
+      .from('employees')
+      .select('id')
+      .in('department_id', excludedDeptIds);
+
+    const ids = (emps || []).map(e => e.id);
+    _excludedIdsCache = { ids, expiresAt: Date.now() + EXCLUDED_CACHE_MS };
+    return ids;
+  } catch (e) {
+    console.warn('[performanceService] getExcludedEmployeeIds failed:', e);
+    return [];
+  }
+}
+
 export const performanceDashboardService = {
 
   async getKPIs(period?: { month: number; year: number }): Promise<PerformanceKPIs> {
@@ -465,11 +506,20 @@ export const performanceDashboardService = {
       // KHÔNG await để load nhanh — user thấy data từ snapshot cron trước
       void refreshCurrentMonthIfNeeded(year, month);
 
-      const { data: snapshots, error } = await supabase
+      // Loại NV thuộc excluded_departments (vd BGD) khỏi aggregate
+      const excludedIds = await getExcludedEmployeeIds();
+
+      let q = supabase
         .from('employee_monthly_score')
         .select('employee_id, final_score, grade, completed_tasks, on_time_count, overdue_count, no_deadline_count')
         .eq('year', year)
         .eq('month', month);
+
+      if (excludedIds.length > 0) {
+        q = q.not('employee_id', 'in', `(${excludedIds.join(',')})`);
+      }
+
+      const { data: snapshots, error } = await q;
 
       if (error) throw error;
       if (!snapshots || snapshots.length === 0) {
@@ -647,6 +697,9 @@ export const performanceDashboardService = {
 
       void refreshCurrentMonthIfNeeded(year, month);
 
+      // Loại NV thuộc excluded_departments (vd BGD)
+      const excludedIds = await getExcludedEmployeeIds();
+
       let q = supabase
         .from('employee_monthly_score')
         .select(`
@@ -661,6 +714,10 @@ export const performanceDashboardService = {
         .eq('year', year)
         .eq('month', month)
         .order('final_score', { ascending: false });
+
+      if (excludedIds.length > 0) {
+        q = q.not('employee_id', 'in', `(${excludedIds.join(',')})`);
+      }
 
       const { data: snapshots, error } = await q;
       if (error) throw error;
@@ -996,12 +1053,21 @@ export const performanceDashboardService = {
       const cur = targetMonths[targetMonths.length - 1];
       void refreshCurrentMonthIfNeeded(cur.year, cur.month);
 
+      // Loại NV thuộc excluded_departments (vd BGD)
+      const excludedIds = await getExcludedEmployeeIds();
+
       // OR conditions cho (year, month) tuples
       const yearList = Array.from(new Set(targetMonths.map(t => t.year)));
-      const { data: snapshots, error } = await supabase
+      let trendQ = supabase
         .from('employee_monthly_score')
         .select('year, month, final_score, completed_tasks, on_time_count, overdue_count')
         .in('year', yearList);
+
+      if (excludedIds.length > 0) {
+        trendQ = trendQ.not('employee_id', 'in', `(${excludedIds.join(',')})`);
+      }
+
+      const { data: snapshots, error } = await trendQ;
 
       if (error) throw error;
 

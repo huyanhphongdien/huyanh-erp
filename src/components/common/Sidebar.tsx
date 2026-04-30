@@ -125,7 +125,8 @@ interface MenuGroup {
   icon: React.ReactNode;
   items: MenuItem[];
   collapsible?: boolean;
-  executiveOnly?: boolean;
+  executiveOnly?: boolean;       // chỉ BGD (level ≤ 3)
+  managerLevelOnly?: boolean;    // BGD + TP + PP (level ≤ 5) — vd Quản lý Dự án
   requirePurchaseAccess?: boolean;
   requireB2BPurchaser?: boolean;
   hiddenByDefault?: boolean;
@@ -199,7 +200,7 @@ const getMenuGroups = (
   {
     title: 'QUẢN LÝ DỰ ÁN',
     icon: <FolderKanban size={18} />,
-    executiveOnly: true,
+    managerLevelOnly: true,    // BGD + TP + PP (level ≤ 5)
     collapsible: true,
     items: [
       { path: '/projects/list', label: 'Danh sách DA', icon: <ListTodo size={18} /> },
@@ -462,6 +463,7 @@ export function Sidebar() {
   const userLevel = user?.position_level || (isAdmin ? 1 : 7);
   const isExecutive = isAdmin || userLevel <= 3;
   const isBGD = isAdmin || userLevel <= 3;
+  const isManagerLevel = isAdmin || userLevel <= 5;  // BGD + TP + PP — dùng cho Quản lý Dự án
   const canApproveOT = userLevel >= 4 && userLevel <= 5;
   const isManager = user?.role === 'admin' || user?.role === 'manager' || user?.is_manager;
 
@@ -649,6 +651,7 @@ export function Sidebar() {
 
   const isGroupVisible = (group: MenuGroup): boolean => {
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
+    if (group.managerLevelOnly && !isManagerLevel) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;
     if (group.requireB2BPurchaser && !isB2BPurchaser && !isAdmin) return false;
     if (group.requireSalesRole) {

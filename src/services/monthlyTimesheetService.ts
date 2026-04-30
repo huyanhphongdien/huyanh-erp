@@ -300,8 +300,9 @@ export const monthlyTimesheetService = {
           totalCong += dayWU
           totalWorkingMins += dayWorkMins
           totalOTMins += dayOTMins
+          // R2-1 fix: count cả late_and_early khi đếm trễ (trước miss → thiếu late_days)
           // Trễ/về sớm: chỉ tính 1 lần nếu bất kỳ ca nào trễ
-          if (validAtts.some(a => a.status === 'late' || a.late_minutes > 0)) totalLateDays++
+          if (validAtts.some(a => a.status === 'late' || a.status === 'late_and_early' || a.late_minutes > 0)) totalLateDays++
           if (validAtts.some(a => a.status === 'early_leave' || a.status === 'late_and_early' || a.early_leave_minutes > 15)) totalEarlyDays++
         } else if (isFuture) {
           symbol = '—'

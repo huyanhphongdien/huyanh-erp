@@ -20,6 +20,33 @@ export const SUNDAY_OFF_DEPT_CODES = ['HAP-KT', 'HAP-RD']
 export const AUTO_ATTENDANCE_DEPT_CODES = ['HAP-KT']
 
 // ============================================================================
+// DATE HELPERS — pure-string math để tránh timezone bug
+// ============================================================================
+
+/** Format Date → 'YYYY-MM-DD' theo local time (KHÔNG dùng toISOString) */
+function fmtDateLocal(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Cộng N ngày vào date string 'YYYY-MM-DD', trả về 'YYYY-MM-DD' */
+export function addDaysToDateStr(dateStr: string, days: number): string {
+  // Parse local (không UTC) để tránh shift ngày
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  date.setDate(date.getDate() + days)
+  return fmtDateLocal(date)
+}
+
+/** Tạo Date object từ 'YYYY-MM-DD' tại local midnight (không UTC) */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -270,12 +297,13 @@ export const shiftAssignmentService = {
       const dateMap: Record<string, DayAssignment[]> = {}
       
       // Duyệt từng ngày
-      const start = new Date(date_from)
-      const end = new Date(date_to)
+      // R2-3 fix: dùng parseLocalDate để tránh UTC shift
+      const start = parseLocalDate(date_from)
+      const end = parseLocalDate(date_to)
       const current = new Date(start)
-      
+
       while (current <= end) {
-        const dateStr = current.toISOString().split('T')[0]
+        const dateStr = fmtDateLocal(current)
         const key = `${emp.id}|${dateStr}`
         const dayAssignments = assignmentMap.get(key) || []
         
@@ -385,13 +413,14 @@ export const shiftAssignmentService = {
       .gte('date', date_from)
       .lte('date', date_to)
 
+    // R2-3 fix: dùng parseLocalDate + fmtDateLocal để tránh UTC shift ngày
     // Build set để check nhanh: "empId_date" → true
     const offDays = new Set<string>()
     ;(approvedLeaves || []).forEach(l => {
-      const s = new Date(l.start_date + 'T00:00:00')
-      const e = new Date(l.end_date + 'T00:00:00')
+      const s = parseLocalDate(l.start_date)
+      const e = parseLocalDate(l.end_date)
       for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-        offDays.add(`${l.employee_id}_${d.toISOString().split('T')[0]}`)
+        offDays.add(`${l.employee_id}_${fmtDateLocal(d)}`)
       }
     })
     ;(businessTrips || []).forEach(t => {
@@ -400,12 +429,12 @@ export const shiftAssignmentService = {
 
     let skippedLeaveOrTrip = 0
 
-    const startDate = new Date(date_from)
-    const endDate = new Date(date_to)
+    const startDate = parseLocalDate(date_from)
+    const endDate = parseLocalDate(date_to)
 
     let currentDate = new Date(startDate)
     while (currentDate <= endDate) {
-      const dateStr = currentDate.toISOString().split('T')[0]
+      const dateStr = fmtDateLocal(currentDate)
 
       const diffDays = Math.floor(
         (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -610,10 +639,45 @@ export const shiftAssignmentService = {
       })
     }
 
+    // R2-4 fix: Build offDays set giống batchSchedule (line 416-427)
+    // để skip phép + công tác. Trước đây batchScheduleByTeams MISS bước này
+    // → phân ca cho NV đang nghỉ phép → conflict với leaveRequestService._applyLeaveToSchedule.
+    const offDays = new Set<string>()
+    if (allMemberIds.length > 0) {
+      const { data: approvedLeaves } = await supabase
+        .from('leave_requests')
+        .select('employee_id, start_date, end_date')
+        .in('employee_id', allMemberIds)
+        .eq('status', 'approved')
+        .lte('start_date', date_to)
+        .gte('end_date', date_from)
+
+      ;(approvedLeaves || []).forEach(l => {
+        const s = parseLocalDate(l.start_date)
+        const e = parseLocalDate(l.end_date)
+        for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+          offDays.add(`${l.employee_id}_${fmtDateLocal(d)}`)
+        }
+      })
+
+      const { data: businessTrips } = await supabase
+        .from('attendance')
+        .select('employee_id, date')
+        .in('employee_id', allMemberIds)
+        .eq('status', 'business_trip')
+        .gte('date', date_from)
+        .lte('date', date_to)
+
+      ;(businessTrips || []).forEach(t => {
+        offDays.add(`${t.employee_id}_${t.date}`)
+      })
+    }
+
     // ④ Generate assignments
     const batchId = crypto.randomUUID()
     const allRows: any[] = []
     const teamCreatedCount: Record<string, number> = {}
+    let skippedLeaveOrTrip = 0
 
     // Track current shift cho mỗi đội
     const teamShiftState = new Map<string, string>()
@@ -629,13 +693,14 @@ export const shiftAssignmentService = {
       return rotationShiftIds[(idx + 1) % rotationShiftIds.length]
     }
 
+    // R2-3 fix: dùng parseLocalDate + fmtDateLocal
     // Duyệt từng ngày
-    const startDate = new Date(date_from)
-    const endDate = new Date(date_to)
+    const startDate = parseLocalDate(date_from)
+    const endDate = parseLocalDate(date_to)
     let currentDate = new Date(startDate)
 
     while (currentDate <= endDate) {
-      const dateStr = currentDate.toISOString().split('T')[0]
+      const dateStr = fmtDateLocal(currentDate)
       const dayOfWeek = currentDate.getDay()
 
       // Kiểm tra có phải ngày đổi ca không
@@ -659,7 +724,10 @@ export const shiftAssignmentService = {
           const deptCode = empDeptMap.get(empId) || ''
           const isSundayOff = dayOfWeek === 0 && SUNDAY_OFF_DEPT_CODES.includes(deptCode)
 
-          if (!isSundayOff) {
+          // R2-4 fix: skip ngày NV đang nghỉ phép / công tác
+          const isLeaveOrTrip = offDays.has(`${empId}_${dateStr}`)
+
+          if (!isSundayOff && !isLeaveOrTrip) {
             allRows.push({
               employee_id: empId,
               shift_id: shiftId,
@@ -670,6 +738,8 @@ export const shiftAssignmentService = {
               notes: notes || `Team ${team.team_code}`
             })
             teamCreatedCount[team.team_code]++
+          } else if (isLeaveOrTrip) {
+            skippedLeaveOrTrip++
           }
         }
       }
@@ -806,12 +876,13 @@ export const shiftAssignmentService = {
     const schedule: Record<string, Record<string, string>> = {}
     team_patterns.forEach(tp => { schedule[tp.team_code] = {} })
 
-    const startDate = new Date(date_from)
-    const endDate = new Date(date_to)
+    // R2-3 fix
+    const startDate = parseLocalDate(date_from)
+    const endDate = parseLocalDate(date_to)
     let current = new Date(startDate)
 
     while (current <= endDate) {
-      const dateStr = current.toISOString().split('T')[0]
+      const dateStr = fmtDateLocal(current)
       dates.push(dateStr)
 
       const isSwap = isSwapDay(current, swap_rule)

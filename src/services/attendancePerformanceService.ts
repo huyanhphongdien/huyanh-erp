@@ -121,9 +121,29 @@ export const attendancePerformanceService = {
     const presentDays = recs.filter(r => STATUS_GROUPS.PRESENT.includes(r.status)).length
     const lateCount = recs.filter(r => STATUS_GROUPS.LATE.includes(r.status)).length
     const earlyLeaveCount = recs.filter(r => STATUS_GROUPS.EARLY_LEAVE.includes(r.status)).length
-    const absentDays = recs.filter(r => STATUS_GROUPS.ABSENT.includes(r.status)).length
     const leaveDays = recs.filter(r => STATUS_GROUPS.LEAVE_APPROVED.includes(r.status)).length
     const businessTripDays = recs.filter(r => STATUS_GROUPS.BUSINESS_TRIP.includes(r.status)).length
+
+    // R2-2 fix: Vắng = đã được phân ca nhưng KHÔNG có row attendance bất kỳ status nào
+    // (status='absent' không tồn tại trong DB enum thật. attendanceEditService DELETE
+    // attendance row khi mark X — không insert. → tính từ shift_assignments diff.)
+    let absentDays = 0
+    try {
+      const { data: scheduledShifts } = await supabase
+        .from('shift_assignments')
+        .select('date')
+        .eq('employee_id', employeeId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+
+      const presentDates = new Set(recs.map(r => r.date))
+      // Today không tính (chưa kết thúc ngày → có thể chưa check-in)
+      const todayStr = new Date().toISOString().split('T')[0]
+      const pastScheduled = (scheduledShifts || []).filter(s => s.date < todayStr)
+      absentDays = pastScheduled.filter(s => !presentDates.has(s.date)).length
+    } catch (e) {
+      console.warn('[attendance] cannot compute absent_days from shift_assignments:', e)
+    }
 
     // ATT-4: tổng phút trễ + về sớm (chính xác hơn binary count "lần")
     const lateMinutesTotal = recs.reduce((sum, r) => sum + (Number(r.late_minutes) || 0), 0)

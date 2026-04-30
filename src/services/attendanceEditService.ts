@@ -433,6 +433,10 @@ export const attendanceEditService = {
       if (!perm.allowed) return { success: false, error: perm.reason }
 
       // ② Symbol → shift code
+      // R2-2 fix: status 'absent' KHÔNG có trong DB enum thật (chỉ có 6 values:
+      //   present, late, late_and_early, early_leave, business_trip, leave).
+      //   Symbol 'X' xử lý đặc biệt: DELETE attendance row (line 473-477).
+      //   Vắng được tính từ shift_assignments diff trong attendancePerformanceService.
       const SYMBOL_MAP: Record<string, { shiftCode: string; status: string }> = {
         'HC':    { shiftCode: 'ADMIN_PROD', status: 'present' },
         'S':     { shiftCode: 'SHORT_1',    status: 'present' },
@@ -442,7 +446,7 @@ export const attendanceEditService = {
         'Đ_dài': { shiftCode: 'LONG_NIGHT', status: 'present' },
         'CT':    { shiftCode: '',           status: 'business_trip' },
         'P':     { shiftCode: '',           status: 'leave' },
-        'X':     { shiftCode: '',           status: 'absent' },
+        'X':     { shiftCode: '',           status: '__delete__' },  // marker — không insert, chỉ delete
       }
       const mapping = SYMBOL_MAP[symbol]
       if (!mapping) return { success: false, error: 'Ký hiệu không hợp lệ: ' + symbol }

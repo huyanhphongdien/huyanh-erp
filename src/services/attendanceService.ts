@@ -555,7 +555,10 @@ export const attendanceService = {
     }
 
     // ② GPS
-    let gpsVerified = isGpsVerified || false
+    // R2-6 fix: KHÔNG tin client claim isGpsVerified=true. Chỉ set verified=true
+    // khi server-side validateGPS pass. Client gửi flag chỉ để debug/fallback,
+    // không có giá trị trust.
+    let gpsVerified = false
     let checkInLat: number | null = gps?.latitude || null
     let checkInLng: number | null = gps?.longitude || null
 
@@ -570,7 +573,11 @@ export const attendanceService = {
           `Bạn không ở trong khu vực công ty. Khoảng cách đến ${gpsResult.location_name}: ${gpsResult.distance}m (cho phép: ${gpsConfig.locations[0]?.radius_meters || 300}m)`
         )
       }
-      gpsVerified = true
+      gpsVerified = true  // chỉ true khi validateGPS pass
+    } else if (gps && isGpsVerified) {
+      // GPS config disabled nhưng client tự verify — chỉ ghi nhận có lat/lng,
+      // không trust verified flag
+      gpsVerified = false
     }
 
     // ③ LOOKUP shift_assignments — cả today + yesterday

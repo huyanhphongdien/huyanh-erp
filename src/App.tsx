@@ -70,6 +70,9 @@ const EmployeePerformancePage = lazy(() => import('./pages/performance/EmployeeP
 const PerformanceReportPage = lazy(() => import('./pages/performance/PerformanceReportPage'));
 const PerformanceConfigPage = lazy(() => import('./pages/performance/PerformanceConfigPage'));
 
+// Operations
+const CoverageDashboardPage = lazy(() => import('./pages/operations/CoverageDashboardPage'));
+
 // User Settings
 const UserSettingsPage = lazy(() => import('./pages/settings/UserSettingsPage'));
 
@@ -546,6 +549,7 @@ function App() {
               <Route path="performance/reports" element={<PerformanceReportPage />} />
               <Route path="performance/config" element={<PerformanceConfigPage />} />
               <Route path="performance/:employeeId" element={<EmployeePerformancePage />} />
+              <Route path="operations/coverage" element={<CoverageDashboardPage />} />
 
               {/* ===== PURCHASING MODULE ===== */}
               <Route path="purchasing">

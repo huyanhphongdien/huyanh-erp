@@ -1,24 +1,44 @@
 // ============================================================================
-// COVERAGE DASHBOARD — Real-time Shift Coverage (Idea #1 mock)
+// COVERAGE DASHBOARD — Real-time Shift Coverage (Idea #1 production)
 // File: src/pages/operations/CoverageDashboardPage.tsx
 // ============================================================================
 // Hiển thị live trạng thái phân ca + chấm công cho mọi phòng có ca máy.
 // Auto-refresh 60s. Cảnh báo NV chưa check-in sau giờ ca + 15 phút.
 //
-// DATA: JOIN shift_assignments × attendance × shifts × employees × departments
-// theo ngày hiện tại. Group: department → shift → list NV
+// PHÂN LOẠI 6 trạng thái NV theo ca:
+//   ✅ Đã CI (present/late)
+//   🕐 Trễ (late hoặc late_and_early)
+//   🚪 Về sớm (early_leave hoặc late_and_early có check_out)
+//   🛫 Công tác (BUSINESS_TRIP/CONG_TAC leave_request approved HOẶC attendance.status='business_trip')
+//   📋 Nghỉ phép (PHEP_NAM/NGHI_OM/KHONG_LUONG/THAI_SAN/VIEC_RIENG approved HOẶC status='leave')
+//   ❌ Vắng/Chưa CI (cần alert nếu đã quá grace)
 //
-// Quyền: managerLevelOnly (BGD + TP + PP, level <= 5)
+// CROSSES MIDNIGHT: ca đêm (LONG_NIGHT 18:00-06:00, SHORT_3 22:00-06:00)
+// được handle riêng — nowMin so với start sau midnight.
+//
+// Quyền: managerOnly (BGD + TP + PP, level <= 5)
 // ============================================================================
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   CheckCircle2, AlertTriangle, Clock, RefreshCw,
   Phone, MessageSquare, UserCheck, Loader2, Users,
+  Plane, FileText, LogOut as LogOutIcon,
 } from 'lucide-react'
 import { Card, Button, Tag, message, Empty } from 'antd'
 import { supabase } from '../../lib/supabase'
-import { useAuthStore } from '../../stores/authStore'
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type StatusCategory =
+  | 'present'        // CI bình thường
+  | 'late'           // CI nhưng trễ
+  | 'early_leave'    // CI nhưng về sớm
+  | 'on_trip'        // Công tác — đã được ghi nhận
+  | 'on_leave'       // Nghỉ phép — đã được ghi nhận
+  | 'missing'        // Chưa CI — cần alert
 
 interface AssignmentRow {
   id: string
@@ -33,12 +53,19 @@ interface AssignmentRow {
   emp_code: string
   emp_full_name: string
   emp_phone?: string
+  dept_id: string
   dept_code: string
   dept_name: string
   attendance_status: string | null
   check_in_time: string | null
   check_out_time: string | null
   late_minutes: number | null
+  early_leave_minutes: number | null
+  // Leave request info (nếu có)
+  leave_type_code?: string | null
+  leave_type_name?: string | null
+  // Computed
+  category: StatusCategory
 }
 
 interface ShiftCoverage {
@@ -47,11 +74,15 @@ interface ShiftCoverage {
   shift_name: string
   shift_start: string
   shift_end: string
+  shift_crosses_midnight: boolean
   scheduled: number
-  checked_in: number
-  late: number
-  missing: AssignmentRow[]
-  state: 'pending' | 'partial' | 'full' | 'late'
+  present: number      // CI bình thường
+  late: number         // CI nhưng trễ (subset của present)
+  early_leave: number  // Về sớm (subset của present)
+  on_trip: number
+  on_leave: number
+  missing: AssignmentRow[]   // chưa CI
+  state: 'pending' | 'full' | 'partial' | 'late'
   start_time_status: 'before' | 'started' | 'ended'
 }
 
@@ -61,16 +92,32 @@ interface DeptCoverage {
   dept_name: string
   shifts: ShiftCoverage[]
   total_scheduled: number
-  total_checked_in: number
+  total_handled: number  // present + on_trip + on_leave
+  total_missing: number
   has_alerts: boolean
 }
 
+interface OrphanAttendance {
+  employee_id: string
+  emp_code: string
+  emp_full_name: string
+  dept_name: string
+  status: string
+  check_in_time: string | null
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const REFRESH_MS = 60_000  // 1 phút
 const LATE_GRACE_MIN = 15  // sau start + 15 phút mới flag missing
+const TRIP_LEAVE_TYPES = ['BUSINESS_TRIP', 'CONG_TAC']
+const LEAVE_TYPES_REGULAR = ['PHEP_NAM', 'NGHI_OM', 'KHONG_LUONG', 'THAI_SAN', 'VIEC_RIENG']
 
-// Cả 2 phòng đều cần coverage view (ca máy + ca văn phòng)
-// Nếu muốn lọc — uncomment dòng dưới
-// const COVERAGE_DEPT_CODES: string[] = []  // empty = all
+// ============================================================================
+// HELPERS
+// ============================================================================
 
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
@@ -93,19 +140,79 @@ function timeToMinutes(t: string): number {
   return h * 60 + m
 }
 
+/**
+ * Tính start_time_status cho 1 ca, có handle crosses_midnight.
+ * Ví dụ ca SHORT_3 (22:00-06:00 next day):
+ *   - 18:00 → before
+ *   - 22:30 → started
+ *   - 03:00 (next day) → started
+ *   - 07:00 (next day) → ended
+ */
+function getShiftStartStatus(
+  shiftStart: string,
+  shiftEnd: string,
+  crossesMidnight: boolean,
+  nowMin: number
+): 'before' | 'started' | 'ended' {
+  const startMin = timeToMinutes(shiftStart)
+  const endMin = timeToMinutes(shiftEnd)
+
+  if (!crossesMidnight) {
+    if (nowMin < startMin) return 'before'
+    if (nowMin > endMin) return 'ended'
+    return 'started'
+  }
+
+  // Crosses midnight (vd 22:00-06:00):
+  // started khi nowMin >= startMin (cùng ngày, vd 23:00) HOẶC nowMin <= endMin (sau midnight, vd 03:00)
+  if (nowMin >= startMin || nowMin <= endMin) return 'started'
+  return 'before'  // window 06:01–21:59 cùng ngày = chưa đến ca tối
+}
+
+/**
+ * Phân loại 1 NV theo data attendance + leave + shift
+ */
+function categorize(
+  attendanceStatus: string | null,
+  checkInTime: string | null,
+  leaveTypeCode: string | null
+): StatusCategory {
+  // 1. Có row attendance
+  if (attendanceStatus) {
+    if (attendanceStatus === 'business_trip') return 'on_trip'
+    if (attendanceStatus === 'leave') return 'on_leave'
+    if (attendanceStatus === 'early_leave' || attendanceStatus === 'late_and_early') return 'early_leave'
+    if (attendanceStatus === 'late') return 'late'
+    if (checkInTime) return 'present'
+  }
+
+  // 2. Không có attendance — check leave_request approved
+  if (leaveTypeCode) {
+    if (TRIP_LEAVE_TYPES.includes(leaveTypeCode)) return 'on_trip'
+    if (LEAVE_TYPES_REGULAR.includes(leaveTypeCode)) return 'on_leave'
+  }
+
+  // 3. Không có gì → missing
+  return 'missing'
+}
+
+// ============================================================================
+// PAGE
+// ============================================================================
+
 export default function CoverageDashboardPage() {
-  const { user } = useAuthStore()
   const [rows, setRows] = useState<AssignmentRow[]>([])
+  const [orphans, setOrphans] = useState<OrphanAttendance[]>([])
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [autoRefresh, setAutoRefresh] = useState(true)
 
-  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) // YYYY-MM-DD
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
 
   // ── Fetch data ──
   const fetchData = useCallback(async () => {
     try {
-      // 1. Get shift_assignments cho hôm nay
+      // 1. Get shift_assignments hôm nay với JOIN shifts + employees + dept
       const { data: assignments, error: aErr } = await supabase
         .from('shift_assignments')
         .select(`
@@ -120,58 +227,125 @@ export default function CoverageDashboardPage() {
 
       if (aErr) throw aErr
 
-      const taIds = (assignments || []).map((a: any) => a.employee_id)
-      if (taIds.length === 0) {
-        setRows([])
-        setLastRefresh(new Date())
-        return
-      }
+      const empIds = [...new Set((assignments || []).map((a: any) => a.employee_id))]
 
-      // 2. Get attendance hôm nay cho các NV này
-      const { data: atts } = await supabase
+      // 2. Get attendance hôm nay
+      const { data: atts } = empIds.length === 0 ? { data: [] } : await supabase
         .from('attendance')
-        .select('employee_id, shift_id, status, check_in_time, check_out_time, late_minutes')
+        .select('employee_id, shift_id, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')
         .eq('date', todayStr)
-        .in('employee_id', taIds)
+        .in('employee_id', empIds)
 
       const attMap = new Map<string, any>()
       ;(atts || []).forEach(a => {
-        // Key: employee_id|shift_id (multi-shift per day)
+        // Multi-shift per day → key by employee_id + shift_id
         attMap.set(`${a.employee_id}|${a.shift_id}`, a)
+        // Cũng map theo employee_id only (cho NV ca = 1)
+        if (!attMap.has(a.employee_id)) attMap.set(a.employee_id, a)
       })
 
-      // 3. Flatten
-      const flat: AssignmentRow[] = (assignments || []).map((a: any) => {
-        const shift = Array.isArray(a.shift) ? a.shift[0] : a.shift
-        const emp = Array.isArray(a.employee) ? a.employee[0] : a.employee
-        const dept = emp?.department
-          ? (Array.isArray(emp.department) ? emp.department[0] : emp.department)
-          : null
-        const att = attMap.get(`${a.employee_id}|${a.shift_id}`)
+      // 3. Get leave_requests approved overlapping today
+      const { data: leaves } = empIds.length === 0 ? { data: [] } : await supabase
+        .from('leave_requests')
+        .select(`
+          employee_id, start_date, end_date, status, leave_type_id,
+          leave_type:leave_types!leave_requests_leave_type_id_fkey(code, name)
+        `)
+        .in('employee_id', empIds)
+        .eq('status', 'approved')
+        .lte('start_date', todayStr)
+        .gte('end_date', todayStr)
 
-        return {
-          id: a.id,
-          date: a.date,
-          employee_id: a.employee_id,
-          shift_id: a.shift_id,
-          shift_code: shift?.code || '',
-          shift_name: shift?.name || '',
-          shift_start: shift?.start_time || '',
-          shift_end: shift?.end_time || '',
-          shift_crosses_midnight: !!shift?.crosses_midnight,
-          emp_code: emp?.code || '',
-          emp_full_name: emp?.full_name || '',
-          emp_phone: emp?.phone || '',
-          dept_code: dept?.code || '',
-          dept_name: dept?.name || 'Không xác định',
-          attendance_status: att?.status || null,
-          check_in_time: att?.check_in_time || null,
-          check_out_time: att?.check_out_time || null,
-          late_minutes: att?.late_minutes ?? null,
+      const leaveMap = new Map<string, { code: string | null; name: string | null }>()
+      ;(leaves || []).forEach((l: any) => {
+        const lt = Array.isArray(l.leave_type) ? l.leave_type[0] : l.leave_type
+        leaveMap.set(l.employee_id, {
+          code: lt?.code || null,
+          name: lt?.name || null,
+        })
+      })
+
+      // 4. Build flat rows + categorize
+      const flat: AssignmentRow[] = (assignments || [])
+        .filter((a: any) => {
+          const emp = Array.isArray(a.employee) ? a.employee[0] : a.employee
+          return emp && emp.status === 'active'
+        })
+        .map((a: any) => {
+          const shift = Array.isArray(a.shift) ? a.shift[0] : a.shift
+          const emp = Array.isArray(a.employee) ? a.employee[0] : a.employee
+          const dept = emp?.department
+            ? (Array.isArray(emp.department) ? emp.department[0] : emp.department)
+            : null
+          const att = attMap.get(`${a.employee_id}|${a.shift_id}`) || attMap.get(a.employee_id)
+          const leaveInfo = leaveMap.get(a.employee_id)
+
+          const category = categorize(att?.status || null, att?.check_in_time || null, leaveInfo?.code || null)
+
+          return {
+            id: a.id,
+            date: a.date,
+            employee_id: a.employee_id,
+            shift_id: a.shift_id,
+            shift_code: shift?.code || '',
+            shift_name: shift?.name || '',
+            shift_start: shift?.start_time || '',
+            shift_end: shift?.end_time || '',
+            shift_crosses_midnight: !!shift?.crosses_midnight,
+            emp_code: emp?.code || '',
+            emp_full_name: emp?.full_name || '',
+            emp_phone: emp?.phone || '',
+            dept_id: dept?.id || '',
+            dept_code: dept?.code || '',
+            dept_name: dept?.name || 'Không xác định',
+            attendance_status: att?.status || null,
+            check_in_time: att?.check_in_time || null,
+            check_out_time: att?.check_out_time || null,
+            late_minutes: att?.late_minutes ?? null,
+            early_leave_minutes: att?.early_leave_minutes ?? null,
+            leave_type_code: leaveInfo?.code || null,
+            leave_type_name: leaveInfo?.name || null,
+            category,
+          }
+        })
+
+      // 5. Detect orphan attendance: NV có attendance hôm nay nhưng KHÔNG có shift_assignment
+      const scheduledEmpIds = new Set(flat.map(r => r.employee_id))
+      const orphanList: OrphanAttendance[] = []
+      ;(atts || []).forEach((a: any) => {
+        if (!scheduledEmpIds.has(a.employee_id)) {
+          // NV này CI nhưng không có shift today
+          // Cần lấy emp info — query riêng
+          orphanList.push({
+            employee_id: a.employee_id,
+            emp_code: '',
+            emp_full_name: '',
+            dept_name: '',
+            status: a.status,
+            check_in_time: a.check_in_time,
+          })
         }
-      }).filter((r: AssignmentRow) => emp_active_filter(r))
+      })
+
+      if (orphanList.length > 0) {
+        const orphanIds = orphanList.map(o => o.employee_id)
+        const { data: orphanEmps } = await supabase
+          .from('employees')
+          .select('id, code, full_name, department:departments!employees_department_id_fkey(name)')
+          .in('id', orphanIds)
+        ;(orphanEmps || []).forEach((e: any) => {
+          const dept = Array.isArray(e.department) ? e.department[0] : e.department
+          const o = orphanList.find(x => x.employee_id === e.id)
+          if (o) {
+            o.emp_code = e.code
+            o.emp_full_name = e.full_name
+            o.dept_name = dept?.name || ''
+          }
+        })
+      }
 
       setRows(flat)
+      setOrphans(orphanList)
       setLastRefresh(new Date())
     } catch (err: any) {
       console.error('[CoverageDashboard] fetch error:', err)
@@ -181,9 +355,6 @@ export default function CoverageDashboardPage() {
     }
   }, [todayStr])
 
-  // (no-op filter để bỏ NV nếu cần extend sau — hiện trả true tất cả)
-  function emp_active_filter(_r: AssignmentRow): boolean { return true }
-
   // Auto-refresh
   useEffect(() => {
     fetchData()
@@ -192,23 +363,23 @@ export default function CoverageDashboardPage() {
     return () => clearInterval(id)
   }, [fetchData, autoRefresh])
 
-  // ── Aggregate theo dept × shift ──
+  // ── Aggregate ──
   const deptCoverage: DeptCoverage[] = useMemo(() => {
     const nowMin = getNowMinutes()
 
     const deptMap = new Map<string, DeptCoverage>()
-    const shiftMap = new Map<string, Map<string, ShiftCoverage>>() // dept_id → shift_id → coverage
+    const shiftMap = new Map<string, Map<string, ShiftCoverage>>()
 
     rows.forEach(r => {
-      // Init dept
       if (!deptMap.has(r.dept_code)) {
         deptMap.set(r.dept_code, {
-          dept_id: r.dept_code,
+          dept_id: r.dept_id,
           dept_code: r.dept_code,
           dept_name: r.dept_name,
           shifts: [],
           total_scheduled: 0,
-          total_checked_in: 0,
+          total_handled: 0,
+          total_missing: 0,
           has_alerts: false,
         })
         shiftMap.set(r.dept_code, new Map())
@@ -216,28 +387,26 @@ export default function CoverageDashboardPage() {
       const dept = deptMap.get(r.dept_code)!
       const dShifts = shiftMap.get(r.dept_code)!
 
-      // Init shift
       if (!dShifts.has(r.shift_id)) {
-        const startMin = timeToMinutes(r.shift_start)
-        const endMin = timeToMinutes(r.shift_end)
-        const crosses = r.shift_crosses_midnight
-        const startTimeStatus: 'before' | 'started' | 'ended' =
-          nowMin < startMin ? 'before' :
-          (!crosses && nowMin > endMin) ? 'ended' :
-          'started'
-
+        const startStatus = getShiftStartStatus(
+          r.shift_start, r.shift_end, r.shift_crosses_midnight, nowMin
+        )
         dShifts.set(r.shift_id, {
           shift_id: r.shift_id,
           shift_code: r.shift_code,
           shift_name: r.shift_name,
           shift_start: r.shift_start,
           shift_end: r.shift_end,
+          shift_crosses_midnight: r.shift_crosses_midnight,
           scheduled: 0,
-          checked_in: 0,
+          present: 0,
           late: 0,
+          early_leave: 0,
+          on_trip: 0,
+          on_leave: 0,
           missing: [],
           state: 'pending',
-          start_time_status: startTimeStatus,
+          start_time_status: startStatus,
         })
       }
       const shift = dShifts.get(r.shift_id)!
@@ -245,41 +414,67 @@ export default function CoverageDashboardPage() {
       shift.scheduled++
       dept.total_scheduled++
 
-      const hasCheckin = !!r.check_in_time
-      if (hasCheckin) {
-        shift.checked_in++
-        dept.total_checked_in++
-        if (r.attendance_status === 'late' || r.attendance_status === 'late_and_early') {
+      switch (r.category) {
+        case 'present':
+          shift.present++
+          dept.total_handled++
+          break
+        case 'late':
+          shift.present++
           shift.late++
-        }
-      } else {
-        // Chưa check-in
-        shift.missing.push(r)
+          dept.total_handled++
+          break
+        case 'early_leave':
+          shift.present++
+          shift.early_leave++
+          if (r.attendance_status === 'late_and_early') shift.late++
+          dept.total_handled++
+          break
+        case 'on_trip':
+          shift.on_trip++
+          dept.total_handled++
+          break
+        case 'on_leave':
+          shift.on_leave++
+          dept.total_handled++
+          break
+        case 'missing':
+          shift.missing.push(r)
+          dept.total_missing++
+          break
       }
     })
 
-    // Compute state cho mỗi shift
+    // Compute state per shift
     deptMap.forEach((dept, deptCode) => {
       const dShifts = shiftMap.get(deptCode)!
       dShifts.forEach(shift => {
-        // State logic
+        const handled = shift.present + shift.on_trip + shift.on_leave
+
         if (shift.start_time_status === 'before') {
           shift.state = 'pending'
-        } else if (shift.start_time_status === 'ended' && shift.checked_in === shift.scheduled) {
-          shift.state = 'full'
-        } else if (shift.checked_in === shift.scheduled) {
+        } else if (handled === shift.scheduled) {
           shift.state = 'full'
         } else if (shift.start_time_status === 'started') {
-          // Đã đến giờ ca, có grace LATE_GRACE_MIN phút sau start
+          // Đã bắt đầu, có grace LATE_GRACE_MIN
           const startMin = timeToMinutes(shift.shift_start)
-          if (nowMin > startMin + LATE_GRACE_MIN) {
-            shift.state = 'late'  // alert
+          const beyondGrace = !shift.shift_crosses_midnight
+            ? nowMin > startMin + LATE_GRACE_MIN
+            : (nowMin >= startMin && nowMin > startMin + LATE_GRACE_MIN) ||
+              (nowMin <= timeToMinutes(shift.shift_end))  // crosses_midnight + sau midnight = chắc chắn quá grace
+          if (beyondGrace) {
+            shift.state = 'late'
             dept.has_alerts = true
           } else {
             shift.state = 'partial'
           }
+        } else {
+          // ended
+          shift.state = handled === shift.scheduled ? 'full' : 'late'
+          if (handled !== shift.scheduled) dept.has_alerts = true
         }
       })
+
       dept.shifts = Array.from(dShifts.values()).sort((a, b) =>
         timeToMinutes(a.shift_start) - timeToMinutes(b.shift_start)
       )
@@ -301,10 +496,14 @@ export default function CoverageDashboardPage() {
   }, [deptCoverage])
 
   const totalScheduled = deptCoverage.reduce((s, d) => s + d.total_scheduled, 0)
-  const totalCheckedIn = deptCoverage.reduce((s, d) => s + d.total_checked_in, 0)
+  const totalHandled = deptCoverage.reduce((s, d) => s + d.total_handled, 0)
+  const totalMissing = deptCoverage.reduce((s, d) => s + d.total_missing, 0)
   const totalAlertNV = allAlerts.length
 
-  // ── Action handlers (mock) ──
+  const totalTrip = deptCoverage.reduce((s, d) => s + d.shifts.reduce((ss, sh) => ss + sh.on_trip, 0), 0)
+  const totalLeave = deptCoverage.reduce((s, d) => s + d.shifts.reduce((ss, sh) => ss + sh.on_leave, 0), 0)
+
+  // ── Action handlers ──
   function handleCall(phone?: string) {
     if (!phone) {
       message.warning('NV chưa có số điện thoại trong hệ thống')
@@ -323,11 +522,9 @@ export default function CoverageDashboardPage() {
   }
 
   async function handleMarkLateApproved(row: AssignmentRow) {
-    // Mock: insert attendance row với late_minutes ước tính
     const nowMin = getNowMinutes()
     const startMin = timeToMinutes(row.shift_start)
     const lateMin = Math.max(0, nowMin - startMin)
-    const note = 'Manager xác nhận xin phép trễ'
 
     try {
       const { error } = await supabase.from('attendance').insert({
@@ -343,7 +540,7 @@ export default function CoverageDashboardPage() {
         overtime_minutes: 0,
         is_gps_verified: false,
         auto_checkout: false,
-        notes: note,
+        notes: 'Manager xác nhận xin phép trễ',
       })
       if (error) throw error
       message.success(`Đã xác nhận xin phép trễ cho ${row.emp_full_name}`)
@@ -385,28 +582,14 @@ export default function CoverageDashboardPage() {
         </div>
       </div>
 
-      {/* Top metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <Card>
-          <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase' }}>Tổng NV scheduled</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#1f2937' }}>{totalScheduled}</div>
-        </Card>
-        <Card>
-          <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase' }}>Đã check-in</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#16a34a' }}>{totalCheckedIn}</div>
-        </Card>
-        <Card>
-          <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase' }}>Tỷ lệ</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#2563eb' }}>
-            {totalScheduled > 0 ? Math.round((totalCheckedIn / totalScheduled) * 100) : 0}%
-          </div>
-        </Card>
-        <Card>
-          <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase' }}>Alerts</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: totalAlertNV > 0 ? '#ef4444' : '#16a34a' }}>
-            {totalAlertNV}
-          </div>
-        </Card>
+      {/* Top metrics — 6 ô */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <Card><MetricCard label="Tổng phân ca" value={totalScheduled} color="#1f2937" /></Card>
+        <Card><MetricCard label="Đã CI" value={totalHandled} color="#16a34a" /></Card>
+        <Card><MetricCard label="Tỷ lệ" value={`${totalScheduled > 0 ? Math.round((totalHandled / totalScheduled) * 100) : 0}%`} color="#2563eb" /></Card>
+        <Card><MetricCard label="🛫 Công tác" value={totalTrip} color="#0891b2" /></Card>
+        <Card><MetricCard label="📋 Nghỉ phép" value={totalLeave} color="#7c3aed" /></Card>
+        <Card><MetricCard label="❌ Vắng/Alerts" value={totalAlertNV} color={totalAlertNV > 0 ? '#ef4444' : '#16a34a'} /></Card>
       </div>
 
       {/* Departments */}
@@ -420,15 +603,19 @@ export default function CoverageDashboardPage() {
                 <h3 style={{ margin: 0, fontSize: 16 }}>
                   Phòng <span style={{ color: dept.has_alerts ? '#ef4444' : '#1f2937' }}>{dept.dept_name}</span>
                 </h3>
-                <Tag color={dept.has_alerts ? 'red' : 'green'}>
-                  {dept.total_checked_in}/{dept.total_scheduled} NV
-                </Tag>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Tag color={dept.has_alerts ? 'red' : 'green'}>
+                    {dept.total_handled}/{dept.total_scheduled} đã xử lý
+                  </Tag>
+                  {dept.total_missing > 0 && <Tag color="red">{dept.total_missing} vắng</Tag>}
+                </div>
               </div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {dept.shifts.map(shift => (
                   <ShiftRow
                     key={shift.shift_id}
                     shift={shift}
+                    rows={rows.filter(r => r.shift_id === shift.shift_id && r.dept_code === dept.dept_code)}
                     onCall={handleCall}
                     onSMS={handleSMS}
                     onMarkLate={handleMarkLateApproved}
@@ -440,12 +627,31 @@ export default function CoverageDashboardPage() {
         </div>
       )}
 
+      {/* Orphan attendance */}
+      {orphans.length > 0 && (
+        <Card style={{ marginTop: 20, borderColor: '#fde68a' }}>
+          <h3 style={{ margin: 0, marginBottom: 12, color: '#a16207', fontSize: 14 }}>
+            ℹ️ {orphans.length} NV check-in nhưng KHÔNG có phân ca hôm nay
+          </h3>
+          <div style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+            {orphans.map(o => (
+              <div key={o.employee_id} style={{ padding: 6, background: '#fef9c3', borderRadius: 4 }}>
+                <span style={{ fontWeight: 600 }}>{o.emp_code} {o.emp_full_name}</span>
+                <span style={{ color: '#6b7280', marginLeft: 8 }}>
+                  ({o.dept_name}) — CI lúc {fmtTime(o.check_in_time)} — status: {o.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Alerts panel */}
       {allAlerts.length > 0 && (
         <Card style={{ marginTop: 20, borderColor: '#fca5a5' }}>
           <h3 style={{ margin: 0, marginBottom: 12, color: '#dc2626', fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
             <AlertTriangle size={18} />
-            ALERTS — {allAlerts.length} NV chưa check-in sau giờ ca
+            ALERTS — {allAlerts.length} NV chưa check-in sau giờ ca + {LATE_GRACE_MIN} phút
           </h3>
           <div style={{ display: 'grid', gap: 8 }}>
             {allAlerts.map(r => (
@@ -456,7 +662,8 @@ export default function CoverageDashboardPage() {
       )}
 
       <div style={{ textAlign: 'center', marginTop: 24, fontSize: 11, color: '#9ca3af' }}>
-        💡 Tip: Trang này refresh tự động mỗi 60 giây. Nút trên góc phải để bật/tắt auto-refresh.
+        💡 Tip: NV đi công tác / nghỉ phép (đã được duyệt) tự động được ghi nhận, không cần action.
+        Chỉ alert khi NV scheduled mà CHƯA có check-in / phép / công tác.
       </div>
     </div>
   )
@@ -466,62 +673,112 @@ export default function CoverageDashboardPage() {
 // Sub-components
 // ============================================================================
 
+function MetricCard({ label, value, color }: { label: string; value: number | string; color: string }) {
+  return (
+    <>
+      <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color, marginTop: 2 }}>{value}</div>
+    </>
+  )
+}
+
 function ShiftRow({
-  shift, onCall, onSMS, onMarkLate,
+  shift, rows, onCall, onSMS, onMarkLate,
 }: {
   shift: ShiftCoverage
+  rows: AssignmentRow[]
   onCall: (phone?: string) => void
   onSMS: (phone?: string, name?: string) => void
   onMarkLate: (row: AssignmentRow) => void
 }) {
   const stateConfig = {
     pending: { icon: <Clock size={16} />, color: '#9ca3af', label: 'Chưa đến giờ', bg: '#f3f4f6' },
-    full: { icon: <CheckCircle2 size={16} />, color: '#16a34a', label: 'Đủ', bg: '#dcfce7' },
+    full: { icon: <CheckCircle2 size={16} />, color: '#16a34a', label: 'Đủ NV', bg: '#dcfce7' },
     partial: { icon: <Clock size={16} />, color: '#f59e0b', label: 'Đang vào ca', bg: '#fef3c7' },
     late: { icon: <AlertTriangle size={16} />, color: '#dc2626', label: 'Thiếu NV', bg: '#fee2e2' },
   }[shift.state]
 
+  // Build description tags
+  const breakdown: string[] = []
+  if (shift.present > 0) breakdown.push(`${shift.present} CI`)
+  if (shift.late > 0) breakdown.push(`${shift.late} trễ`)
+  if (shift.early_leave > 0) breakdown.push(`${shift.early_leave} về sớm`)
+  if (shift.on_trip > 0) breakdown.push(`🛫 ${shift.on_trip}`)
+  if (shift.on_leave > 0) breakdown.push(`📋 ${shift.on_leave}`)
+  if (shift.missing.length > 0) breakdown.push(`❌ ${shift.missing.length} chưa CI`)
+
   return (
     <div style={{
       display: 'flex',
-      alignItems: 'center',
-      gap: 12,
+      flexDirection: 'column',
+      gap: 6,
       padding: '8px 12px',
       background: stateConfig.bg,
       borderRadius: 6,
     }}>
-      <div style={{ color: stateConfig.color }}>{stateConfig.icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600 }}>
-          {shift.shift_name} <span style={{ color: '#6b7280', fontWeight: 400, fontSize: 12 }}>
-            ({fmtShortShiftTime(shift.shift_start, shift.shift_end)})
-          </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ color: stateConfig.color }}>{stateConfig.icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600 }}>
+            {shift.shift_name} <span style={{ color: '#6b7280', fontWeight: 400, fontSize: 12 }}>
+              ({fmtShortShiftTime(shift.shift_start, shift.shift_end)}{shift.shift_crosses_midnight ? ' qua đêm' : ''})
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            {breakdown.join(' · ') || `0/${shift.scheduled}`}
+            {shift.start_time_status === 'before' && <span> · start lúc {shift.shift_start.substring(0, 5)}</span>}
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: '#6b7280' }}>
-          {shift.checked_in}/{shift.scheduled} NV check-in
-          {shift.late > 0 && <span style={{ color: '#f59e0b' }}> · {shift.late} trễ</span>}
-          {shift.start_time_status === 'before' && <span> · start lúc {shift.shift_start.substring(0, 5)}</span>}
-        </div>
+        <Tag color={
+          shift.state === 'full' ? 'green' :
+          shift.state === 'late' ? 'red' :
+          shift.state === 'partial' ? 'orange' : 'default'
+        }>
+          {stateConfig.label}
+        </Tag>
       </div>
-      <Tag color={
-        shift.state === 'full' ? 'green' :
-        shift.state === 'late' ? 'red' :
-        shift.state === 'partial' ? 'orange' : 'default'
-      }>
-        {stateConfig.label}
-      </Tag>
-      {shift.missing.length > 0 && shift.state === 'late' && (
-        <details style={{ flexBasis: '100%', marginTop: 4 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>
-            Xem {shift.missing.length} NV chưa check-in
+
+      {shift.missing.length > 0 && (shift.state === 'late' || shift.state === 'partial') && (
+        <details>
+          <summary style={{ cursor: 'pointer', fontSize: 12, color: '#6b7280', paddingLeft: 28 }}>
+            Xem {shift.missing.length} NV chưa CI
           </summary>
-          <div style={{ marginTop: 8, display: 'grid', gap: 4 }}>
+          <div style={{ marginTop: 8, marginLeft: 28, display: 'grid', gap: 4 }}>
             {shift.missing.map(r => (
               <AlertRow key={r.id} row={r} compact onCall={onCall} onSMS={onSMS} onMarkLate={onMarkLate} />
             ))}
           </div>
         </details>
       )}
+
+      {/* Đã có on_trip / on_leave — show tóm tắt */}
+      {(shift.on_trip + shift.on_leave > 0) && (
+        <details>
+          <summary style={{ cursor: 'pointer', fontSize: 12, color: '#0891b2', paddingLeft: 28 }}>
+            Xem {shift.on_trip + shift.on_leave} NV công tác / nghỉ phép
+          </summary>
+          <div style={{ marginTop: 8, marginLeft: 28, display: 'grid', gap: 4 }}>
+            {rows.filter(r => r.category === 'on_trip' || r.category === 'on_leave').map(r => (
+              <HandledRow key={r.id} row={r} />
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  )
+}
+
+function HandledRow({ row }: { row: AssignmentRow }) {
+  const isTrip = row.category === 'on_trip'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', fontSize: 12 }}>
+      {isTrip ? <Plane size={12} style={{ color: '#0891b2' }} /> : <FileText size={12} style={{ color: '#7c3aed' }} />}
+      <span style={{ fontWeight: 600 }}>{row.emp_code} {row.emp_full_name}</span>
+      <span style={{ color: '#6b7280' }}>
+        — {row.leave_type_name || (isTrip ? 'Công tác' : 'Nghỉ phép')}
+        {row.attendance_status && row.attendance_status !== 'leave' && row.attendance_status !== 'business_trip' &&
+          ` (att: ${row.attendance_status})`}
+      </span>
     </div>
   )
 }

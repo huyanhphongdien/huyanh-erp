@@ -55,13 +55,14 @@ async function checkEditPermission(
   editorEmployeeId: string,
   targetEmployeeId: string
 ): Promise<PermissionResult> {
-  // Kiểm tra admin từ auth session
+  // ATT-A4 fix: bỏ hardcode email + dùng app_metadata (server-controlled, NV
+  // không tự đổi được) thay vì user_metadata (client-controlled).
+  // Permission check hoàn toàn dựa vào employees.position.level (DB).
   const { data: { user: authUser } } = await supabase.auth.getUser()
-  const authRole = authUser?.user_metadata?.role
-  const authEmail = authUser?.email?.toLowerCase()
+  const authRole = (authUser?.app_metadata as any)?.role
 
-  // Admin role hoặc email đặc biệt → sửa được tất cả
-  if (authRole === 'admin' || authEmail === 'minhld@huyanhrubber.com') {
+  // Service-role / admin app_metadata → full access
+  if (authRole === 'admin' || authRole === 'service_role') {
     return { allowed: true }
   }
 

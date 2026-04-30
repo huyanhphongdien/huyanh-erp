@@ -176,17 +176,27 @@ export const monthlyTimesheetService = {
     if (attError) throw attError
 
     // ③ Lấy nghỉ phép approved trong tháng
+    // ATT-A2 fix: schema thật chỉ có leave_type_id (UUID FK), không phải leave_type (string)
+    // Cần JOIN với leave_types để lấy tên loại phép
     let leaveRecords: any[] = []
     try {
       const { data: leaves } = await supabase
         .from('leave_requests')
-        .select('employee_id, start_date, end_date, leave_type, status')
+        .select('employee_id, start_date, end_date, leave_type_id, status, leave_type:leave_types!leave_requests_leave_type_id_fkey(code, name)')
         .in('employee_id', empIds)
         .eq('status', 'approved')
         .lte('start_date', endDate)
         .gte('end_date', startDate)
 
-      leaveRecords = leaves || []
+      // Flatten leave_type để giữ shape cũ {leave_type: 'string'}
+      leaveRecords = (leaves || []).map((l: any) => {
+        const lt = Array.isArray(l.leave_type) ? l.leave_type[0] : l.leave_type
+        return {
+          ...l,
+          leave_type: lt?.name || lt?.code || null,
+          leave_type_obj: lt,
+        }
+      })
     } catch {
       // Table might not exist yet
     }

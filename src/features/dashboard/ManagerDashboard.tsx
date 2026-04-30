@@ -382,8 +382,15 @@ export function ManagerDashboard() {
         const { data: leaves } = await supabase.from('leave_requests').select('id, employee_id, start_date, end_date, total_days, created_at, employee:employees!leave_requests_employee_id_fkey(full_name), leave_type:leave_types!leave_requests_leave_type_id_fkey(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
         setPendingLeaves((leaves || []).map((l: any) => ({ ...l, employee: Array.isArray(l.employee) ? l.employee[0] : l.employee, leave_type: Array.isArray(l.leave_type) ? l.leave_type[0] : l.leave_type })))
 
-        const { data: ots } = await supabase.from('overtime_requests').select('id, employee_id, overtime_date, hours, created_at, employee:employees(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
-        setPendingOvertimes((ots || []).map((o: any) => ({ ...o, employee: Array.isArray(o.employee) ? o.employee[0] : o.employee })))
+        // ATT-A1 fix: schema thật là request_date + planned_minutes/actual_minutes (không phải overtime_date + hours)
+        const { data: ots } = await supabase.from('overtime_requests').select('id, employee_id, request_date, planned_minutes, actual_minutes, created_at, employee:employees(full_name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5)
+        setPendingOvertimes((ots || []).map((o: any) => ({
+          ...o,
+          // Backward-compat: map sang field cũ để UI render không phải đổi
+          overtime_date: o.request_date,
+          hours: Math.round(((Number(o.actual_minutes) || Number(o.planned_minutes) || 0) / 60) * 10) / 10,
+          employee: Array.isArray(o.employee) ? o.employee[0] : o.employee,
+        })))
 
         // ★ Task chờ phê duyệt (evaluation_status = pending_approval)
         const { count: taskPendingCount } = await supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('evaluation_status', 'pending_approval')

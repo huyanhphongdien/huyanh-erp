@@ -161,7 +161,12 @@ export default function QRCheckInPage() {
       const nowISO = now.toISOString()
       const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })
 
-      // Check if already checked in today
+      // ATT-A3 fix: delegate sang attendanceService.checkIn/checkOut thay vì raw insert.
+      // Service core đã handle: late_minutes, business_trip block, duplicate-shift check,
+      // GPS verify, shift_assignments lookup theo ngày, ADMIN_PROD fallback.
+      const { attendanceService } = await import('../../services/attendanceService')
+
+      // Check existing today
       const { data: existing } = await supabase
         .from('attendance')
         .select('id, check_in_time, check_out_time')
@@ -177,11 +182,8 @@ export default function QRCheckInPage() {
           setTodayRecord({ checkIn: lastRecord.check_in_time, checkOut: lastRecord.check_out_time })
           return
         }
-        // Check-in exists but no check-out → do check-out
-        await supabase
-          .from('attendance')
-          .update({ check_out_time: nowISO })
-          .eq('id', lastRecord.id)
+        // Check-in exists but no check-out → use service checkOut (đúng logic late_and_early/early_leave detection)
+        await attendanceService.checkOut(user.employee_id, {})
 
         setStatus('success')
         setMessage(`Check-out thành công lúc ${timeStr}`)
@@ -189,49 +191,10 @@ export default function QRCheckInPage() {
         return
       }
 
-      // No record today → create check-in
-      // Find active shift for this employee (if any assigned)
-      let shiftId: string | null = null
-      try {
-        const { data: assignment } = await supabase
-          .from('shift_assignments')
-          .select('shift_id')
-          .eq('employee_id', user.employee_id)
-          .eq('is_active', true)
-          .limit(1)
-          .maybeSingle()
-        shiftId = assignment?.shift_id || null
-      } catch {}
-
-      // If no assignment, try to find default shift (ADMIN_PROD)
-      if (!shiftId) {
-        const { data: defaultShift } = await supabase
-          .from('shifts')
-          .select('id')
-          .eq('code', 'ADMIN_PROD')
-          .limit(1)
-          .maybeSingle()
-        shiftId = defaultShift?.id || null
-      }
-
-      const { error: insertErr } = await supabase
-        .from('attendance')
-        .insert({
-          employee_id: user.employee_id,
-          date: todayStr,
-          shift_date: todayStr,
-          check_in_time: nowISO,
-          shift_id: shiftId,
-          status: 'present',
-          auto_checkout: false,
-          is_gps_verified: false,
-          working_minutes: 0,
-          overtime_minutes: 0,
-          late_minutes: 0,
-          early_leave_minutes: 0,
-        })
-
-      if (insertErr) throw insertErr
+      // No record today → use service checkIn (đúng logic shift lookup theo date + late_minutes + business_trip block)
+      await attendanceService.checkIn(user.employee_id, {
+        // QR scan không có GPS → để default false (service sẽ validate theo gps_config)
+      })
 
       setStatus('success')
       setMessage(`Check-in thành công lúc ${timeStr}`)

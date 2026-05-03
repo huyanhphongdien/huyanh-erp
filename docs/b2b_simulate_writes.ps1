@@ -301,14 +301,21 @@ if ($r.ok) {
 }
 
 if ($DEAL_5B_ID) {
-  # Update with actual_drc=30, variance |30-40|/40=25% > 3%
+  # Set status=accepted FIRST -- enforce_deal_lock chi engage khi
+  # OLD.status IN (accepted, settled, cancelled). Khong promote thi
+  # trigger khong fire va lock test fail (false positive)
+  $upd5bStatus = @{ status = 'accepted' } | ConvertTo-Json
+  $r = Invoke-Rest -Method PATCH -Path "/rest/v1/b2b_deals?id=eq.$DEAL_5B_ID" -Body $upd5bStatus
+  if ($r.ok) { Pass "UPDATE status=accepted (setup lock condition)" } else { Fail "UPDATE status: $($r.data)" }
+
+  # Update with actual_drc=30, variance |30-40|/40=25% > 3% -- 1st time NULL->value allowed
   $upd5b = @{
     actual_drc = 30
     actual_weight_kg = 5000
   } | ConvertTo-Json
   $r = Invoke-Rest -Method PATCH -Path "/rest/v1/b2b_deals?id=eq.$DEAL_5B_ID" -Body $upd5b
   if ($r.ok) {
-    Pass "UPDATE actual_drc=30 (variance 25%) OK"
+    Pass "UPDATE actual_drc=30 (variance 25%) 1st time OK"
     Start-Sleep -Milliseconds 500  # let trigger fire
     $r2 = Invoke-Rest -Method GET -Path "/rest/v1/b2b_drc_disputes?select=id,dispute_number,reason&deal_id=eq.$DEAL_5B_ID"
     $rows = $r2.data | ConvertFrom-Json
@@ -322,13 +329,13 @@ if ($DEAL_5B_ID) {
     Fail "UPDATE 5B: $($r.data)"
   }
 
-  # 5.3 Test drc_after lock -- second update should FAIL
+  # 5.3 Test drc_after lock -- 2nd update should FAIL (locked after 1st value set)
   $upd5b2 = @{ actual_drc = 25 } | ConvertTo-Json
   $r = Invoke-Rest -Method PATCH -Path "/rest/v1/b2b_deals?id=eq.$DEAL_5B_ID" -Body $upd5b2 -ExpectFail
   if ($r.expectedFail) {
-    Pass "Second UPDATE actual_drc correctly BLOCKED by enforce_deal_lock"
+    Pass "2nd UPDATE actual_drc correctly BLOCKED by enforce_deal_lock"
   } else {
-    Info "GAP: Second UPDATE actual_drc succeeded -- enforce_deal_lock may need refinement for drc_after_production flow"
+    Fail "2nd UPDATE actual_drc should be blocked but succeeded"
   }
 }
 

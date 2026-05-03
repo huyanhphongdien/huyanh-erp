@@ -71,7 +71,7 @@ export default function DealInlineDetail({ deal }: Props) {
           </Row>
           <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginTop: 12 }} labelStyle={{ fontWeight: 600 }}>
             <Descriptions.Item label="Mã Deal">{deal.deal_number}</Descriptions.Item>
-            <Descriptions.Item label="Trạng thái"><Tag color={DEAL_STATUS_COLORS[deal.status]}>{DEAL_STATUS_LABELS[deal.status]}</Tag></Descriptions.Item>
+            <Descriptions.Item label="Trạng thái"><Tag color={DEAL_STATUS_COLORS[deal.status as keyof typeof DEAL_STATUS_COLORS]}>{DEAL_STATUS_LABELS[deal.status as keyof typeof DEAL_STATUS_LABELS]}</Tag></Descriptions.Item>
             <Descriptions.Item label="Đại lý">{deal.partner?.name || '—'} <Text type="secondary">({deal.partner?.code})</Text></Descriptions.Item>
             <Descriptions.Item label="Sản phẩm">{deal.product_name || '—'}</Descriptions.Item>
             <Descriptions.Item label="Số lượng">{deal.quantity_tons ? `${deal.quantity_tons.toFixed(1)} tấn` : '—'} ({(deal.quantity_kg || 0).toLocaleString('vi-VN')} kg)</Descriptions.Item>

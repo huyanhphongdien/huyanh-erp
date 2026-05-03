@@ -256,6 +256,9 @@ const SettlementCreatePage: React.FC = () => {
           amount: item.amount,
           is_credit: item.is_credit,
           notes: item.notes,
+          reference_id: null,
+          reference_number: null,
+          reference_date: null,
         })),
         linked_advances: selectedAdvanceIds
           .map(id => unlinkedAdvances.find(a => a.id === id))

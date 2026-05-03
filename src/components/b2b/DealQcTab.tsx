@@ -121,7 +121,7 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
         qc_status: values.qc_status,
         notes: values.qc_notes
           ? `[QC ${editorName} @ ${new Date().toLocaleString('vi-VN')}] ${values.qc_notes}`
-          : deal.notes,
+          : (deal.notes ?? undefined),
       })
 
       message.success(`Đã cập nhật QC: DRC ${values.actual_drc}%, trạng thái "${values.qc_status}"`)
@@ -328,7 +328,7 @@ const DealQcTab = ({ dealId, deal: initialDeal }: DealQcTabProps) => {
                 : undefined
             }
           >
-            <InputNumber
+            <InputNumber<number>
               style={{ width: '100%' }}
               min={0.1}
               step={100}

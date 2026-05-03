@@ -69,6 +69,18 @@ export interface Deal {
   rubber_region_lng: number | null
   // Nhà máy đích nhận hàng (FK public.facilities.id)
   target_facility_id: string | null
+  // B2B Intake v4 (P1-P45) — 11 cột intake mở rộng
+  purchase_type: 'standard' | 'outright' | 'drc_after_production' | 'farmer_walkin' | null
+  buyer_user_id: string | null
+  qc_user_id: string | null
+  sample_drc: number | null
+  finished_product_kg: number | null
+  production_mode: 'pooled' | 'isolated' | null
+  production_pool_id: string | null
+  production_sla_days: number | null
+  production_started_at: string | null
+  production_reject_reason: string | null
+  reject_loss_amount: number | null
   // Joined fields
   partner?: {
     id: string

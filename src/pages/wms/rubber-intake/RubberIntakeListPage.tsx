@@ -82,11 +82,11 @@ export default function RubberIntakeListPage() {
         </Card></Col>
       </Row>
       <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} labelStyle={{ fontWeight: 600 }}>
-        <Descriptions.Item label="Mã lô">{intake.batch_code || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Trạng thái"><Tag color={STATUS_COLORS[intake.status]}>{STATUS_LABELS[intake.status]}</Tag></Descriptions.Item>
-        <Descriptions.Item label="Thanh toán">{intake.payment_status ? <Tag color={PAYMENT_COLORS[intake.payment_status]}>{PAYMENT_LABELS[intake.payment_status]}</Tag> : '—'}</Descriptions.Item>
-        <Descriptions.Item label="NCC">{intake.supplier_name || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Loại mủ">{intake.rubber_type || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Mã lô">{(intake as any).batch_code || intake.product_code || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Trạng thái"><Tag color={STATUS_COLORS[intake.status as keyof typeof STATUS_COLORS]}>{STATUS_LABELS[intake.status as keyof typeof STATUS_LABELS]}</Tag></Descriptions.Item>
+        <Descriptions.Item label="Thanh toán">{intake.payment_status ? <Tag color={PAYMENT_COLORS[intake.payment_status as keyof typeof PAYMENT_COLORS]}>{PAYMENT_LABELS[intake.payment_status as keyof typeof PAYMENT_LABELS]}</Tag> : '—'}</Descriptions.Item>
+        <Descriptions.Item label="NCC">{intake.supplier?.name || (intake as any).supplier_name || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Loại mủ">{(intake as any).rubber_type || intake.product_code || '—'}</Descriptions.Item>
         <Descriptions.Item label="Ngày nhập">{formatDate(intake.intake_date)}</Descriptions.Item>
         <Descriptions.Item label="Xe">{(intake as any).vehicle_plate || '—'}</Descriptions.Item>
         <Descriptions.Item label="Tài xế">{(intake as any).driver_name || '—'}</Descriptions.Item>

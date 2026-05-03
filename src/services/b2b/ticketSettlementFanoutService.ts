@@ -59,16 +59,9 @@ export async function createSettlementsFromTicket(ticketId: string): Promise<Fan
         continue
       }
 
-      // Tạo settlement tự động cho deal
-      const settlementResult = await autoSettlementService.createAutoSettlement(dealId)
-      if (settlementResult.success) {
-        result.deals_settled.push(dealId)
-      } else {
-        result.errors.push({
-          deal_id: dealId,
-          message: settlementResult.error || 'Unknown error',
-        })
-      }
+      // Tạo settlement tự động cho deal — throws on error
+      await autoSettlementService.createAutoSettlement(dealId)
+      result.deals_settled.push(dealId)
     } catch (err: any) {
       result.errors.push({
         deal_id: dealId,

@@ -51,6 +51,7 @@ import {
   WalletOutlined,
   CarOutlined,
   FileProtectOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 import {
   dealService,
@@ -71,6 +72,7 @@ import DealQcTab from '../../../components/b2b/DealQcTab'
 import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
 import DealDeliveryTab from '../../../components/b2b/DealDeliveryTab'
 import DealContractTab from '../../../components/b2b/DealContractTab'
+import ProductionProgress from '../../../components/b2b/ProductionProgress'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -941,6 +943,15 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
             ),
             children: <DealContractTab dealId={deal.id} />,
           },
+          // Tab "Sản xuất" — chỉ hiện cho deal flow drc_after_production
+          // (đại lý chạy đầu ra). Các deal khác không có timeline production.
+          ...(deal.purchase_type === 'drc_after_production' ? [{
+            key: 'production',
+            label: (
+              <span><RocketOutlined /> Sản xuất</span>
+            ),
+            children: <ProductionProgress dealId={deal.id} />,
+          }] : []),
         ]}
       />
     </div>

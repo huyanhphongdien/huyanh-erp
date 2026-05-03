@@ -10,7 +10,17 @@ import { supabase } from '../../lib/supabase'
 // TYPES
 // ============================================
 
-export type LedgerEntryType = 'settlement' | 'advance' | 'payment' | 'adjustment' | 'opening_balance'
+// Aligned với DB CHECK constraint thật: settlement_receivable, advance_paid,
+// payment_paid, processing_fee, adjustment_debit, adjustment_credit.
+// opening_balance giữ lại (legacy migration data có thể có).
+export type LedgerEntryType =
+  | 'settlement_receivable'
+  | 'advance_paid'
+  | 'payment_paid'
+  | 'processing_fee'
+  | 'adjustment_debit'
+  | 'adjustment_credit'
+  | 'opening_balance'
 
 export interface LedgerEntry {
   id: string
@@ -106,18 +116,22 @@ export interface AgingItem {
 // ============================================
 
 export const ENTRY_TYPE_LABELS: Record<LedgerEntryType, string> = {
-  settlement: 'Quyết toán',
-  advance: 'Tạm ứng',
-  payment: 'Thanh toán',
-  adjustment: 'Điều chỉnh',
+  settlement_receivable: 'Quyết toán (phải thu)',
+  advance_paid: 'Tạm ứng',
+  payment_paid: 'Thanh toán',
+  processing_fee: 'Phí gia công',
+  adjustment_debit: 'Điều chỉnh (nợ)',
+  adjustment_credit: 'Điều chỉnh (có)',
   opening_balance: 'Số dư đầu kỳ',
 }
 
 export const ENTRY_TYPE_COLORS: Record<LedgerEntryType, string> = {
-  settlement: 'blue',
-  advance: 'orange',
-  payment: 'green',
-  adjustment: 'purple',
+  settlement_receivable: 'blue',
+  advance_paid: 'orange',
+  payment_paid: 'green',
+  processing_fee: 'cyan',
+  adjustment_debit: 'red',
+  adjustment_credit: 'purple',
   opening_balance: 'default',
 }
 

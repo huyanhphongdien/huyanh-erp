@@ -85,20 +85,20 @@ export default function SettlementListPage() {
       <div style={{ padding: '4px 0' }}>
         <Row gutter={[16, 12]} style={{ marginBottom: 12 }}>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic title="Tổng giá trị" value={s.total_amount || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: '#1B4D3E' }} />
+            <Statistic title="Tổng giá trị" value={s.gross_amount || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: '#1B4D3E' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic title="Đã ứng" value={s.total_advanced || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: '#722ed1' }} />
+            <Statistic title="Đã ứng" value={s.total_advance || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: '#722ed1' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
-            <Statistic title="Còn nợ" value={s.balance_due || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: (s.balance_due || 0) > 0 ? '#cf1322' : '#52c41a' }} />
+            <Statistic title="Còn nợ" value={s.remaining_amount || 0} formatter={v => formatCurrency(Number(v))} valueStyle={{ fontSize: 18, color: (s.remaining_amount || 0) > 0 ? '#cf1322' : '#52c41a' }} />
           </Card></Col>
           <Col xs={6}><Card size="small" style={{ borderRadius: 10, textAlign: 'center' }}>
             <Statistic title="Aging" value={aging} suffix="ngày" valueStyle={{ fontSize: 18, color: aging > 30 ? '#cf1322' : aging > 14 ? '#fa8c16' : '#52c41a' }} />
           </Card></Col>
         </Row>
         <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} labelStyle={{ fontWeight: 600 }}>
-          <Descriptions.Item label="Mã QT">{s.settlement_number}</Descriptions.Item>
+          <Descriptions.Item label="Mã QT">{s.code}</Descriptions.Item>
           <Descriptions.Item label="Trạng thái"><Tag color={SETTLEMENT_STATUS_COLORS[s.status as keyof typeof SETTLEMENT_STATUS_COLORS]}>{SETTLEMENT_STATUS_LABELS[s.status as keyof typeof SETTLEMENT_STATUS_LABELS]}</Tag></Descriptions.Item>
           <Descriptions.Item label="Đại lý">{(s as any).partner?.name || '—'}</Descriptions.Item>
           <Descriptions.Item label="Loại">{SETTLEMENT_TYPE_LABELS[s.settlement_type as keyof typeof SETTLEMENT_TYPE_LABELS] || s.settlement_type}</Descriptions.Item>

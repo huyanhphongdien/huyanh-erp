@@ -387,7 +387,7 @@ const DemandDetailPage = () => {
                 type="link"
                 size="small"
                 icon={<EyeOutlined />}
-                onClick={() => openDealTab({ id: record.deal_id })}
+                onClick={() => record.deal_id && openDealTab({ id: record.deal_id })}
               >
                 Xem Deal
               </Button>

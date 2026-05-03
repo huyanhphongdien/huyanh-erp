@@ -834,8 +834,9 @@ export const settlementService = {
 
     const stats: Record<SettlementStatus, number> = {
       draft: 0,
-      pending: 0,
+      pending_approval: 0,
       approved: 0,
+      partial_paid: 0,
       paid: 0,
       cancelled: 0,
       rejected: 0,

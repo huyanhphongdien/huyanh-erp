@@ -633,7 +633,7 @@ const SettlementDetailPage = () => {
             </Col>
             <Col span={8}>
               <Form.Item name="unit_price" label="Đơn giá">
-                <InputNumber
+                <InputNumber<number>
                   style={{ width: '100%' }}
                   min={0}
                   placeholder="(nếu có)"
@@ -649,7 +649,7 @@ const SettlementDetailPage = () => {
                 rules={[{ required: true, message: 'Nhập thành tiền' }]}
                 tooltip="Hoặc để trống nếu đã nhập SL × Đơn giá"
               >
-                <InputNumber
+                <InputNumber<number>
                   style={{ width: '100%' }}
                   min={0}
                   formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}

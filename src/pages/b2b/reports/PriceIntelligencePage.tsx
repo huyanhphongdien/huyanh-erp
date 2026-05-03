@@ -183,7 +183,7 @@ export default function PriceIntelligencePage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} width={60} tickFormatter={v => `${(v / 1000).toFixed(0)}K`} />
-                    <Tooltip formatter={(v: number) => `${v.toLocaleString('vi-VN')} VNĐ/kg`} />
+                    <Tooltip formatter={(v) => `${Number(v).toLocaleString('vi-VN')} VNĐ/kg`} />
                     <Legend />
                     <Line type="monotone" dataKey="avgPrice" name="Giá TB" stroke="#1B4D3E" strokeWidth={2} dot={{ r: 4 }} />
                     <Line type="monotone" dataKey="maxPrice" name="Cao nhất" stroke="#cf1322" strokeWidth={1} strokeDasharray="4 4" />

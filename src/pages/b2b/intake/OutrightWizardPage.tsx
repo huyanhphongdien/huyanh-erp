@@ -130,7 +130,7 @@ export default function OutrightWizardPage() {
                 </Col>
                 <Col span={8}>
                   <Form.Item name="unit_price" label="Đơn giá VNĐ/kg" rules={[{ required: true }]}>
-                    <InputNumber min={0} step={1000}
+                    <InputNumber<number> min={0} step={1000}
                       formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                       parser={v => Number(String(v).replace(/\D/g, '')) || 0}
                       style={{ width: '100%' }} />

@@ -308,7 +308,9 @@ export const drcDisputeService = {
 
         await ledgerService.createManualEntry({
           partner_id: resolved.partner_id,
-          entry_type: 'adjustment',
+          // amount > 0 → factory thu thêm = adjustment_debit (partner nợ).
+          // amount < 0 → factory trả thêm = adjustment_credit (partner có).
+          entry_type: amount > 0 ? 'adjustment_debit' : 'adjustment_credit',
           debit,
           credit,
           reference_code: resolved.dispute_number,

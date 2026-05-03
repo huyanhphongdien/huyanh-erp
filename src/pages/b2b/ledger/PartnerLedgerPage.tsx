@@ -104,7 +104,8 @@ const PartnerLedgerPage: React.FC = () => {
       const isDebit = values.type === 'debit'
       const data: LedgerCreateData = {
         partner_id: partnerId,
-        entry_type: 'adjustment' as LedgerEntryType,
+        // Manual adjustment → split debit/credit theo loại NV chọn.
+        entry_type: (isDebit ? 'adjustment_debit' : 'adjustment_credit') as LedgerEntryType,
         description: values.description,
         entry_date: values.entry_date
           ? values.entry_date.format('YYYY-MM-DD')

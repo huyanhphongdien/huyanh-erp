@@ -207,6 +207,12 @@ export interface SalesOrder {
   created_at: string
   updated_at: string
 
+  // Internal stage tracking (Sprint 1 D1, 2026-05-04)
+  current_stage?: 'sales' | 'raw_material' | 'production' | 'qc' | 'packing' | 'logistics' | 'delivered'
+  current_owner_id?: string
+  stage_started_at?: string
+  stage_sla_hours?: number
+
   // Joined
   customer?: Pick<SalesCustomer, 'id' | 'code' | 'name' | 'short_name' | 'country' | 'tier'>
   items?: SalesOrderItem[]

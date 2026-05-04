@@ -63,6 +63,7 @@ import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/s
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
 import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
+import StageOwnershipCard from './components/StageOwnershipCard'
 import { useAuthStore } from '../../stores/authStore'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
@@ -1530,6 +1531,27 @@ function SalesOrderDetailPage() {
               </span>
             ),
             children: renderInfoTab(),
+          },
+          {
+            key: 'progress',
+            label: (
+              <span>
+                🏉 Tiến độ
+              </span>
+            ),
+            children: (
+              <div style={{ padding: '8px 0' }}>
+                <StageOwnershipCard
+                  orderId={order.id}
+                  orderCode={order.code}
+                  currentStage={(order.current_stage as any) || 'sales'}
+                  currentOwnerName={null}
+                  stageStartedAt={order.stage_started_at || null}
+                  stageSlaHours={order.stage_sla_hours || null}
+                  onChanged={loadOrder}
+                />
+              </div>
+            ),
           },
           {
             key: 'quality',

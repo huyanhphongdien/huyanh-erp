@@ -169,11 +169,17 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       const perm = await attendanceEditService.canEdit(editorId, employeeId)
       if (!perm) throw new Error('Không có quyền')
 
-      const { error: delErr } = await supabase
+      // Dùng .select() + count để detect RLS silent fail
+      // (RLS reject trả về 0 rows nhưng error=null → cần check rowCount)
+      const { data, error: delErr } = await supabase
         .from('attendance')
         .delete()
         .eq('id', recordId)
+        .select('id')
       if (delErr) throw new Error(delErr.message)
+      if (!data || data.length === 0) {
+        throw new Error('Không xóa được. Có thể do RLS policy chặn — liên hệ admin.')
+      }
     },
     onSuccess: () => {
       refetchRecords()
@@ -189,12 +195,17 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       const perm = await attendanceEditService.canEdit(editorId, employeeId)
       if (!perm) throw new Error('Không có quyền')
 
-      const { error: delErr } = await supabase
+      // Detect RLS silent fail: dùng .select() để biết số rows xóa được
+      const { data, error: delErr } = await supabase
         .from('attendance')
         .delete()
         .eq('employee_id', employeeId)
         .eq('date', day.date)
+        .select('id')
       if (delErr) throw new Error(delErr.message)
+      if (dayRecords.length > 0 && (!data || data.length === 0)) {
+        throw new Error('Không xóa được. Có thể do RLS policy chặn — liên hệ admin.')
+      }
     },
     onSuccess: () => {
       refetchRecords()

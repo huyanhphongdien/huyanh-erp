@@ -14,6 +14,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesDashboardService } from '../../services/sales/salesDashboardService'
+import CapacityDashboard from './components/CapacityDashboard'
 import type { MonthlyRevenue, GradeDistribution, TopCustomer, PipelineStage } from '../../services/sales/salesDashboardService'
 import type { SalesOrder } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../services/sales/salesTypes'
@@ -449,6 +450,9 @@ export default function SalesDashboardPage() {
           ]}
         />
       </div>
+
+      {/* ═══ CAPACITY 7 DEPT — Sprint 2 D5 ═══ */}
+      <CapacityDashboard />
 
       {/* ═══ KPI ROW ═══ */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">

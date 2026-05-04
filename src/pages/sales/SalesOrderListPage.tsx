@@ -40,6 +40,9 @@ import {
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams } from '../../services/sales/salesOrderService'
+import StagePill from '../../components/common/StagePill'
+import type { SalesStage } from '../../services/sales/salesStages'
+import { getSLAStatus } from '../../services/sales/salesStages'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import {
   type SalesOrder,
@@ -644,6 +647,23 @@ const SalesOrderListPage = () => {
       sorter: true,
       sortOrder: sortedColumn('payment_date'),
       render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+    },
+    {
+      title: hdr('Bộ phận'),
+      key: 'current_stage',
+      width: 120,
+      align: 'center',
+      render: (_: unknown, r: SalesOrder) => {
+        const stage = (r.current_stage as SalesStage) || 'sales'
+        return (
+          <StagePill
+            stage={stage}
+            stageStartedAt={r.stage_started_at}
+            slaHours={r.stage_sla_hours}
+            variant="compact"
+          />
+        )
+      },
     },
     {
       title: hdr('T.độ'),

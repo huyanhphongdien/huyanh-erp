@@ -16,6 +16,7 @@ import {
   Button,
   Space,
   message,
+  AutoComplete,
 } from 'antd'
 import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -327,14 +328,19 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                   {editItems.map((it, idx) => (
                     <tr key={idx} style={{ borderTop: '1px solid #f0f0f0' }}>
                       <td style={{ padding: '4px 6px' }}>
-                        <Select
+                        <AutoComplete
                           size="small"
                           value={it.grade}
                           style={{ width: '100%' }}
-                          onChange={(v) => {
-                            const next = [...editItems]; next[idx] = { ...it, grade: v }; setEditItems(next)
-                          }}
+                          placeholder="Chọn hoặc tự nhập"
                           options={SVR_GRADE_OPTIONS.map((g) => ({ value: g.value, label: g.label }))}
+                          filterOption={(input, opt) =>
+                            String(opt?.value || '').toLowerCase().includes(input.toLowerCase()) ||
+                            String(opt?.label || '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          onChange={(v: string) => {
+                            const next = [...editItems]; next[idx] = { ...it, grade: v || '' }; setEditItems(next)
+                          }}
                         />
                       </td>
                       <td style={{ padding: '4px 6px' }}>

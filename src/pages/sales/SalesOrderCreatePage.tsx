@@ -23,6 +23,7 @@ import {
   Divider,
   message,
   Breadcrumb,
+  AutoComplete,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -325,9 +326,17 @@ function SalesOrderCreatePage() {
               <Row gutter={[12, 8]} align="middle">
                 <Col xs={24} sm={5}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Grade</div>
-                  <Select value={item.grade || undefined} placeholder="Chọn..." style={{ width: '100%' }}
+                  <AutoComplete
+                    value={item.grade || undefined}
+                    placeholder="Chọn hoặc tự nhập (vd SVR10mixture SBR1502 60/40)"
+                    style={{ width: '100%' }}
                     options={SVR_GRADE_OPTIONS.map(g => ({ value: g.value, label: g.label }))}
-                    onChange={(v) => updateItem(item.key, 'grade', v)} />
+                    filterOption={(input, opt) =>
+                      String(opt?.value || '').toLowerCase().includes(input.toLowerCase()) ||
+                      String(opt?.label || '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    onChange={(v: string) => updateItem(item.key, 'grade', v || '')}
+                  />
                 </Col>
                 <Col xs={12} sm={4}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Tấn</div>

@@ -568,6 +568,7 @@ export const BANK_DETAILS: Record<string, { name: string; account: string; swift
 
 // Cảng xếp hàng tại Việt Nam
 export const PORT_OF_LOADING_OPTIONS = [
+  { value: 'ANY_PORT_VN', label: 'Any port, Viet Nam' },
   { value: 'HCM_CAT_LAI', label: 'Cát Lái — TP.HCM' },
   { value: 'HCM_HIEP_PHUOC', label: 'Hiệp Phước — TP.HCM' },
   { value: 'VUNG_TAU', label: 'Cái Mép — Vũng Tàu' },

@@ -31,6 +31,10 @@ import ProductionTab from './ProductionTab'
 import ShippingTab from './ShippingTab'
 import FinanceTabV4 from './FinanceTabV4'
 import DocumentChecklistTab from './DocumentChecklistTab'
+import StageOwnershipCard from './StageOwnershipCard'
+import HandoffTimeline from './HandoffTimeline'
+import StagePill from '../../../components/common/StagePill'
+import type { SalesStage } from '../../../services/sales/salesStages'
 
 // ============================================================================
 // TYPES
@@ -62,7 +66,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('contract')
+  const [activeTab, setActiveTab] = useState('progress')
   const [lockLoading, setLockLoading] = useState(false)
 
   // ── Load order ──
@@ -82,7 +86,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   useEffect(() => {
     if (open && orderId) {
       loadOrder()
-      setActiveTab('contract')
+      setActiveTab('progress')
     } else {
       setOrder(null)
     }
@@ -138,7 +142,40 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   const canLock = salesRole === 'sale' || salesRole === 'admin'
   const canUnlock = salesRole === 'admin'
 
-  const tabItems = visibleTabs
+  // Tabs core (Tiến độ + Lịch sử) — luôn hiển thị, không filter qua role
+  const coreTabItems = order ? [
+    {
+      key: 'progress',
+      label: <span>🏉 Tiến độ</span>,
+      children: (
+        <div style={{ padding: '12px 4px' }}>
+          <StageOwnershipCard
+            orderId={order.id}
+            orderCode={order.code}
+            currentStage={(order.current_stage as SalesStage) || 'sales'}
+            currentOwnerName={null}
+            stageStartedAt={order.stage_started_at || null}
+            stageSlaHours={order.stage_sla_hours || null}
+            onChanged={handleSaved}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'history',
+      label: <span>🕒 Lịch sử</span>,
+      children: (
+        <HandoffTimeline
+          orderId={order.id}
+          orderCode={order.code}
+          currentStage={(order.current_stage as SalesStage) || 'sales'}
+          stageStartedAt={order.stage_started_at || null}
+        />
+      ),
+    },
+  ] : []
+
+  const legacyTabItems = visibleTabs
     .filter((t) => TAB_META[t])
     .map((tabKey) => {
       const meta = TAB_META[tabKey]
@@ -163,6 +200,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         children: renderTabContent(tabKey),
       }
     })
+
+  const tabItems = [...coreTabItems, ...legacyTabItems]
 
   function renderTabContent(tabKey: string) {
     if (!order) return null
@@ -230,6 +269,14 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
               {ORDER_STATUS_LABELS[order.status] || order.status}
             </Tag>
+            {order.current_stage && (
+              <StagePill
+                stage={order.current_stage as SalesStage}
+                stageStartedAt={order.stage_started_at}
+                slaHours={order.stage_sla_hours}
+                variant="compact"
+              />
+            )}
             {order.customer && (
               <span style={{ color: '#666', fontSize: 13 }}>
                 {order.customer.name}

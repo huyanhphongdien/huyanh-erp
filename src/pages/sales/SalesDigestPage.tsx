@@ -5,14 +5,16 @@
 // ============================================================================
 
 import { useEffect, useState } from 'react'
-import { Card, Button, Spin, message } from 'antd'
-import { Mail, RefreshCw, Eye } from 'lucide-react'
+import { Card, Button, Spin, message, Modal } from 'antd'
+import { RefreshCw, Eye, Send } from 'lucide-react'
 import { salesDigestService, type DigestData } from '../../services/sales/salesDigestService'
+import { supabase } from '../../lib/supabase'
 
 export default function SalesDigestPage() {
   const [data, setData] = useState<DigestData | null>(null)
   const [html, setHtml] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
 
   const generate = async () => {
     setLoading(true)
@@ -40,6 +42,46 @@ export default function SalesDigestPage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleSendTest = () => {
+    Modal.confirm({
+      title: 'Gửi email test ngay?',
+      content: (
+        <div>
+          <p style={{ margin: 0, marginBottom: 8 }}>
+            Sẽ gọi edge function <code>sales-digest</code> để gửi email tới:
+          </p>
+          <div style={{ padding: '8px 12px', background: '#f8f9fa', borderRadius: 6, fontFamily: 'monospace', fontSize: 12 }}>
+            minhld@huyanhrubber.com
+          </div>
+          <p style={{ margin: '12px 0 0 0', fontSize: 12, color: '#6b7280' }}>
+            (Test mode — chỉ 1 recipient. Sau khi confirm OK sẽ mở rộng cho subscribers list.)
+          </p>
+        </div>
+      ),
+      okText: 'Gửi ngay',
+      cancelText: 'Hủy',
+      okButtonProps: { style: { background: '#1B4D3E', borderColor: '#1B4D3E' } },
+      onOk: async () => {
+        setSending(true)
+        try {
+          const { data: result, error } = await supabase.functions.invoke('sales-digest', {
+            body: {},
+          })
+          if (error) throw error
+          if (result?.success) {
+            message.success(`Đã gửi đến ${result.sent_to?.join(', ') || 'minhld@huyanhrubber.com'}`)
+          } else {
+            message.error('Lỗi gửi: ' + (result?.error || 'Unknown'))
+          }
+        } catch (err: any) {
+          message.error('Lỗi: ' + (err.message || err))
+        } finally {
+          setSending(false)
+        }
+      },
+    })
+  }
+
   return (
     <div style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
       <Card
@@ -58,12 +100,13 @@ export default function SalesDigestPage() {
             </Button>
             <Button
               type="primary"
-              icon={<Mail size={14} />}
-              disabled
-              style={{ background: '#9ca3af', borderColor: '#9ca3af' }}
-              title="Email send chưa setup — cần SMTP/Resend ở D8"
+              icon={<Send size={14} />}
+              onClick={handleSendTest}
+              loading={sending}
+              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+              title="Gọi edge function sales-digest gửi tới minhld@huyanhrubber.com (test mode)"
             >
-              Gửi email (D8)
+              Gửi email test
             </Button>
           </div>
         }

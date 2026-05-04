@@ -323,7 +323,12 @@ export const overtimeRequestService = {
       .select(OVERTIME_SELECT)
       .single()
 
-    if (error) throw error
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new Error('Bạn không có quyền duyệt phiếu tăng ca này, hoặc phiếu đã được duyệt/từ chối trước đó.')
+      }
+      throw error
+    }
     return data as OvertimeRequest
   },
 
@@ -349,7 +354,12 @@ export const overtimeRequestService = {
       .select(OVERTIME_SELECT)
       .single()
 
-    if (error) throw error
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new Error('Bạn không có quyền từ chối phiếu tăng ca này, hoặc phiếu đã được xử lý.')
+      }
+      throw error
+    }
     return data as OvertimeRequest
   },
 

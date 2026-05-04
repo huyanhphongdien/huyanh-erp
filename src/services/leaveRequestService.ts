@@ -497,7 +497,14 @@ export const leaveRequestService = {
       .select(LEAVE_SELECT)
       .single()
 
-    if (error) throw error
+    if (error) {
+      // PGRST116 = "Cannot coerce the result to a single JSON object"
+      // → UPDATE return 0 rows (RLS chặn hoặc id sai)
+      if (error.code === 'PGRST116') {
+        throw new Error('Bạn không có quyền duyệt đơn nghỉ phép này (chỉ Trưởng/Phó phòng cùng phòng hoặc BGĐ).')
+      }
+      throw error
+    }
 
     // ★ Auto-attendance cho công tác
     await this._createBusinessTripAttendance(data)
@@ -538,7 +545,12 @@ export const leaveRequestService = {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new Error('Bạn không có quyền từ chối đơn nghỉ phép này.')
+      }
+      throw error
+    }
 
     // ★ Thông báo cho NV: đơn bị từ chối
     try {

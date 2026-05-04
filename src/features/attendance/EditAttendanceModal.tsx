@@ -158,7 +158,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       setFormReason('')
       refetchRecords()
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
-      onSaved()
+      // Giữ modal mở để user có thể tiếp tục thao tác (xem, thêm, sửa)
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -184,7 +184,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
     onSuccess: () => {
       refetchRecords()
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
-      onSaved()
+      // Giữ modal mở sau khi xóa 1 ca để user xem ca còn lại / tiếp tục thao tác
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -252,7 +252,7 @@ export default function EditAttendanceModal({ open, onClose, day, employeeId, em
       setEditingId(null)
       refetchRecords()
       queryClient.invalidateQueries({ queryKey: ['monthly-timesheet'] })
-      onSaved()
+      // Giữ modal mở sau khi đổi ca để user xem kết quả ngay
     },
     onError: (err: Error) => setError(err.message),
   })

@@ -64,6 +64,7 @@ import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
 import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
 import StageOwnershipCard from './components/StageOwnershipCard'
+import HandoffTimeline from './components/HandoffTimeline'
 import { useAuthStore } from '../../stores/authStore'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
@@ -1551,6 +1552,22 @@ function SalesOrderDetailPage() {
                   onChanged={loadOrder}
                 />
               </div>
+            ),
+          },
+          {
+            key: 'history',
+            label: (
+              <span>
+                🕒 Lịch sử
+              </span>
+            ),
+            children: (
+              <HandoffTimeline
+                orderId={order.id}
+                orderCode={order.code}
+                currentStage={(order.current_stage as any) || 'sales'}
+                stageStartedAt={order.stage_started_at || null}
+              />
             ),
           },
           {

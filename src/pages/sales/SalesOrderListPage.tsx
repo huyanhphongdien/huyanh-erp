@@ -694,17 +694,33 @@ const SalesOrderListPage = () => {
       key: 'actions',
       width: 50,
       fixed: 'right',
-      render: (_: unknown, record: SalesOrder) => (
+      render: (_: unknown, record: SalesOrder) => {
+        // Quyền xóa:
+        //   - Admin: xóa mọi đơn
+        //   - Sale: chỉ xóa đơn draft + chưa khóa (đơn confirmed trở đi đã
+        //     ký với khách, chỉ admin mới được xóa)
+        const canDelete = isAdmin
+          || (salesRole === 'sale' && record.status === 'draft' && !record.is_locked)
+
+        return (
         <Space size={0}>
           <Button type="text" size="small" icon={<EyeOutlined />}
             onClick={(e) => { e.stopPropagation(); setPanelOrderId(record.id); setPanelOpen(true) }} />
-          {isAdmin && (
-            <Popconfirm title={`Xóa ${(record as any).contract_no || record.code}?`} onConfirm={() => handleDelete(record)} okText="Xóa" cancelText="Hủy" okButtonProps={{ danger: true }}>
+          {canDelete && (
+            <Popconfirm
+              title={`Xóa ${(record as any).contract_no || record.code}?`}
+              description={record.status === 'draft' ? 'Đơn nháp — sẽ xóa vĩnh viễn' : 'Sẽ xóa kèm tất cả items / containers / docs'}
+              onConfirm={() => handleDelete(record)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+            >
               <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
             </Popconfirm>
           )}
         </Space>
-      ),
+        )
+      },
     },
   ]
 

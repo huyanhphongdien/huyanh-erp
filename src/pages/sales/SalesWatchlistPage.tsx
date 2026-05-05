@@ -107,17 +107,32 @@ export default function SalesWatchlistPage() {
 
   useEffect(() => { fetchOrders() }, [])
 
+  // ── Helpers: so sánh DATE (ignore time) để khớp Order List service ──
+  // ETD = today nghĩa là "đến hạn hôm nay", CHƯA quá hạn.
+  // Chỉ overdue khi etd_date < today_date (strict).
+  const todayMidnight = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d.getTime()
+  }, [])
+
+  const etdMidnight = (dateStr: string | null): number | null => {
+    if (!dateStr) return null
+    const d = new Date(dateStr)
+    d.setHours(0, 0, 0, 0)
+    return d.getTime()
+  }
+
   const filtered = useMemo(() => {
-    const now = Date.now()
-    const within = (dateStr: string | null, days: number) => {
-      if (!dateStr) return false
-      const ms = new Date(dateStr).getTime() - now
-      const diffDays = ms / (1000 * 3600 * 24)
-      return diffDays <= days && diffDays >= 0
-    }
     const isOverdue = (dateStr: string | null) => {
-      if (!dateStr) return false
-      return new Date(dateStr).getTime() < now
+      const m = etdMidnight(dateStr)
+      return m !== null && m < todayMidnight
+    }
+    const within = (dateStr: string | null, days: number) => {
+      const m = etdMidnight(dateStr)
+      if (m === null) return false
+      const diffDays = (m - todayMidnight) / 86400000
+      return diffDays >= 0 && diffDays <= days
     }
 
     return orders.filter(o => {
@@ -133,21 +148,24 @@ export default function SalesWatchlistPage() {
           return true
       }
     })
-  }, [orders, filterMode])
+  }, [orders, filterMode, todayMidnight])
 
   const stats = useMemo(() => {
-    const now = Date.now()
-    const overdueEta = orders.filter(o => o.etd && new Date(o.etd).getTime() < now).length
+    const overdueEta = orders.filter(o => {
+      const m = etdMidnight(o.etd)
+      return m !== null && m < todayMidnight
+    }).length
     const within7 = orders.filter(o => {
-      if (!o.etd) return false
-      const ms = new Date(o.etd).getTime() - now
-      return ms >= 0 && ms <= 7 * 86400000
+      const m = etdMidnight(o.etd)
+      if (m === null) return false
+      const diffDays = (m - todayMidnight) / 86400000
+      return diffDays >= 0 && diffDays <= 7
     }).length
     const overdueSla = orders.filter(o =>
       getSLAStatus(o.stage_started_at, o.stage_sla_hours, o.current_stage) === 'overdue',
     ).length
     return { overdueEta, within7, overdueSla, total: orders.length }
-  }, [orders])
+  }, [orders, todayMidnight])
 
   return (
     <div style={{ padding: 16, maxWidth: 1400, margin: '0 auto' }}>

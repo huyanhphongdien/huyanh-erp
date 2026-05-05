@@ -45,14 +45,18 @@ interface WatchlistOrder {
   status: string
 }
 
-type FilterMode = 'urgent' | 'overdue_eta' | 'overdue_sla' | 'all_active'
+type FilterMode = 'urgent' | 'overdue_eta' | 'overdue_sla' | 'no_etd' | 'all_active'
 
 const FILTER_OPTIONS = [
   { label: '🔥 Khẩn (≤7d)', value: 'urgent' as FilterMode },
   { label: '🚨 Quá ETD', value: 'overdue_eta' as FilterMode },
   { label: '⚠ Quá SLA bộ phận', value: 'overdue_sla' as FilterMode },
+  { label: '❓ Chưa có ETD', value: 'no_etd' as FilterMode },
   { label: '📋 Tất cả đơn active', value: 'all_active' as FilterMode },
 ]
+
+// Stage nào mà nếu chưa có ETD thì đáng lo (gần xuất hàng rồi mà chưa book tàu)
+const STAGES_NEEDING_ETD: SalesStage[] = ['production', 'qc', 'packing', 'logistics']
 
 export default function SalesWatchlistPage() {
   const navigate = useNavigate()
@@ -134,6 +138,9 @@ export default function SalesWatchlistPage() {
       const diffDays = (m - todayMidnight) / 86400000
       return diffDays >= 0 && diffDays <= days
     }
+    // Đơn cần ETD (đã ở stage SX/QC/Packing/Logistics) nhưng chưa có ETD
+    // → cảnh báo Logistics phải book tàu gấp
+    const needsEtd = (o: WatchlistOrder) => !o.etd && STAGES_NEEDING_ETD.includes(o.current_stage)
 
     return orders.filter(o => {
       switch (filterMode) {
@@ -143,6 +150,8 @@ export default function SalesWatchlistPage() {
           return isOverdue(o.etd)
         case 'overdue_sla':
           return getSLAStatus(o.stage_started_at, o.stage_sla_hours, o.current_stage) === 'overdue'
+        case 'no_etd':
+          return needsEtd(o)
         case 'all_active':
         default:
           return true
@@ -164,7 +173,10 @@ export default function SalesWatchlistPage() {
     const overdueSla = orders.filter(o =>
       getSLAStatus(o.stage_started_at, o.stage_sla_hours, o.current_stage) === 'overdue',
     ).length
-    return { overdueEta, within7, overdueSla, total: orders.length }
+    const noEtd = orders.filter(o =>
+      !o.etd && STAGES_NEEDING_ETD.includes(o.current_stage),
+    ).length
+    return { overdueEta, within7, overdueSla, noEtd, total: orders.length }
   }, [orders, todayMidnight])
 
   return (
@@ -217,6 +229,14 @@ export default function SalesWatchlistPage() {
             hint="Apply filter Quá SLA ở dưới"
           />
           <StatCard
+            icon={<AlertTriangle size={18} />}
+            label="Chưa có ETD (cần book tàu)"
+            value={stats.noEtd}
+            color="#722ed1"
+            onClick={() => setFilterMode('no_etd')}
+            hint="Đơn đã sang SX/QC/Packing/Logistics mà chưa có ETD — Logistics cần book tàu gấp"
+          />
+          <StatCard
             icon={<CheckCircle2 size={18} />}
             label="Tổng active (chưa giao)"
             value={stats.total}
@@ -265,7 +285,7 @@ export default function SalesWatchlistPage() {
               </thead>
               <tbody>
                 {filtered.map((o, idx) => {
-                  const etdInfo = computeEtdInfo(o.etd)
+                  const etdInfo = computeEtdInfo(o.etd, o.delivery_date, o.current_stage)
                   return (
                     <tr
                       key={o.id}
@@ -307,10 +327,17 @@ export default function SalesWatchlistPage() {
                         </span>
                       </Td>
                       <Td>
-                        <Tooltip title={o.etd ? `ETD: ${o.etd}` : 'Chưa có ETD'}>
-                          <Tag color={etdInfo.tagColor} style={{ marginInlineEnd: 0, fontSize: 11, fontWeight: 600 }}>
-                            {etdInfo.label}
-                          </Tag>
+                        <Tooltip title={etdInfo.tooltip}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Tag color={etdInfo.tagColor} style={{ marginInlineEnd: 0, fontSize: 11, fontWeight: 600 }}>
+                              {etdInfo.label}
+                            </Tag>
+                            {etdInfo.subLabel && (
+                              <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                                {etdInfo.subLabel}
+                              </span>
+                            )}
+                          </div>
                         </Tooltip>
                       </Td>
                       <Td>
@@ -335,9 +362,14 @@ export default function SalesWatchlistPage() {
         )}
 
         {/* Footer note */}
-        <div style={{ marginTop: 14, padding: '8px 12px', background: '#f8f9fa', borderRadius: 6, fontSize: 11, color: '#6b7280' }}>
+        <div style={{ marginTop: 14, padding: '8px 12px', background: '#f8f9fa', borderRadius: 6, fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>
           ℹ️ Click vô dòng để mở chi tiết. Đã sort theo ETD tăng dần (đơn sắp quá hạn lên trước).
           Loại trừ đơn đã giao + đơn hủy.
+          <br />
+          📅 <strong>ETD</strong> = ngày tàu rời cảng (Logistics nhập sau khi book tàu).
+          Đơn ở stage <em>SX/QC/Packing/Logistics</em> mà chưa có ETD (tag <span style={{ background: '#f9f0ff', color: '#722ed1', padding: '1px 4px', borderRadius: 3 }}>Chưa có ETD</span>) → cảnh báo Logistics cần book tàu gấp.
+          <br />
+          📋 Đơn stage Sales/Mua mủ chưa có ETD là bình thường (chưa book tàu lúc đầu) — system fallback hiển thị "Theo HĐ: ngày giao".
         </div>
       </Card>
 
@@ -353,46 +385,114 @@ export default function SalesWatchlistPage() {
 
 // ── Helpers ──
 
-function computeEtdInfo(etd: string | null): {
+function computeEtdInfo(
+  etd: string | null,
+  deliveryDate: string | null,
+  stage: SalesStage,
+): {
   label: string
+  subLabel?: string
   tagColor: string
   rowBg: string
   hoverBg: string
+  tooltip: string
 } {
-  if (!etd) return { label: '—', tagColor: 'default', rowBg: '#ffffff', hoverBg: '#f9fafb' }
-  const ms = new Date(etd).getTime() - Date.now()
-  const days = Math.ceil(ms / (1000 * 3600 * 24))
+  // Case 1: KHÔNG có ETD nhưng đơn đã sang stage SX/QC/Packing/Logistics
+  // → Cảnh báo Logistics cần book tàu (nguy hiểm, có thể trễ giao)
+  if (!etd && STAGES_NEEDING_ETD.includes(stage)) {
+    return {
+      label: 'Chưa có ETD',
+      subLabel: deliveryDate ? `HĐ: ${formatVnDate(deliveryDate)}` : undefined,
+      tagColor: 'purple',
+      rowBg: '#f9f0ff',  // light purple
+      hoverBg: '#efdbff',
+      tooltip: deliveryDate
+        ? `Đơn đã sang ${stage} nhưng chưa book tàu. Hạn giao theo HĐ: ${deliveryDate}. Cần Logistics cập nhật ETD gấp.`
+        : `Đơn đã sang ${stage} nhưng chưa book tàu. Cần Logistics cập nhật ETD.`,
+    }
+  }
+
+  // Case 2: Không có ETD ở stage sales/raw_material — bình thường, dùng delivery_date làm reference
+  if (!etd) {
+    if (deliveryDate) {
+      return {
+        label: 'Theo HĐ',
+        subLabel: formatVnDate(deliveryDate),
+        tagColor: 'default',
+        rowBg: '#ffffff',
+        hoverBg: '#f9fafb',
+        tooltip: `Chưa có ETD (chưa book tàu). Hạn giao theo HĐ: ${deliveryDate}`,
+      }
+    }
+    return {
+      label: '—',
+      tagColor: 'default',
+      rowBg: '#ffffff',
+      hoverBg: '#f9fafb',
+      tooltip: 'Chưa có ETD và không có hạn giao trên HĐ',
+    }
+  }
+
+  // Case 3: Có ETD — countdown như cũ
+  const etdDate = new Date(etd)
+  etdDate.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.round((etdDate.getTime() - today.getTime()) / 86400000)
 
   if (days < 0) {
     return {
       label: `Quá ${Math.abs(days)}d`,
+      subLabel: formatVnDate(etd),
       tagColor: 'red',
-      rowBg: '#fff1f0',  // light red bg
+      rowBg: '#fff1f0',
       hoverBg: '#ffccc7',
+      tooltip: `ETD: ${etd} (đã quá ${Math.abs(days)} ngày)`,
+    }
+  }
+  if (days === 0) {
+    return {
+      label: 'Hôm nay',
+      subLabel: formatVnDate(etd),
+      tagColor: 'orange',
+      rowBg: '#fff7e6',
+      hoverBg: '#ffe7ba',
+      tooltip: `ETD: ${etd} (đến hạn hôm nay)`,
     }
   }
   if (days <= 7) {
     return {
       label: `${days}d`,
+      subLabel: formatVnDate(etd),
       tagColor: 'orange',
-      rowBg: '#fff7e6',  // light amber
+      rowBg: '#fff7e6',
       hoverBg: '#ffe7ba',
+      tooltip: `ETD: ${etd} (còn ${days} ngày)`,
     }
   }
   if (days <= 30) {
     return {
       label: `${days}d`,
+      subLabel: formatVnDate(etd),
       tagColor: 'gold',
       rowBg: '#ffffff',
       hoverBg: '#fafafa',
+      tooltip: `ETD: ${etd} (còn ${days} ngày)`,
     }
   }
   return {
     label: `${days}d`,
+    subLabel: formatVnDate(etd),
     tagColor: 'default',
     rowBg: '#ffffff',
     hoverBg: '#fafafa',
+    tooltip: `ETD: ${etd} (còn ${days} ngày)`,
   }
+}
+
+function formatVnDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
 }
 
 interface ThProps { children: React.ReactNode; align?: 'left' | 'right' | 'center' }

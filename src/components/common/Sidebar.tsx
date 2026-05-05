@@ -352,6 +352,8 @@ const getMenuGroups = (
         requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin'] },
       { path: '/sales/kanban', label: 'Kanban tiến độ', icon: <LayoutDashboard size={18} />,
         requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin'] },
+      { path: '/sales/watchlist', label: 'Watchlist BGĐ', icon: <AlertTriangle size={18} />,
+        requireSalesRoles: ['sale', 'logistics', 'accounting', 'admin'] },
       { path: '/sales/ar-aging', label: 'Nợ phải thu (A/R)', icon: <Clock size={18} />,
         requireSalesRoles: ['accounting', 'admin'] },
       { path: '/sales/cash-flow', label: 'Dòng tiền & LC', icon: <CreditCard size={18} />,

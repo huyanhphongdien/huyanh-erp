@@ -24,6 +24,7 @@ import {
   Spin,
   Empty,
   Alert,
+  Collapse,
   message,
 } from 'antd'
 import { useNavigate } from 'react-router-dom'
@@ -595,21 +596,107 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
     !order.production_order_id &&
     (salesRole === 'production' || salesRole === 'admin')
 
+  // ── Simple summary header — BP Sản xuất/QC nhìn vào biết ngay đơn cần gì ──
+  const renderSimpleHeader = () => {
+    const etdDays = order.etd
+      ? Math.ceil((new Date(order.etd).getTime() - Date.now()) / 86400000)
+      : null
+    const etdColor = etdDays === null ? 'default'
+      : etdDays < 0 ? 'red'
+      : etdDays <= 7 ? 'orange'
+      : 'blue'
+    const etdLabel = etdDays === null ? 'Chưa có ETD'
+      : etdDays < 0 ? `Quá ${Math.abs(etdDays)} ngày`
+      : `Còn ${etdDays} ngày`
+
+    return (
+      <div style={{
+        padding: '14px 16px',
+        background: '#f8f9fa',
+        border: '1px solid #e5e7eb',
+        borderRadius: 10,
+        marginBottom: 12,
+      }}>
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, letterSpacing: 1, marginBottom: 6 }}>
+          THÔNG TIN CẦN BIẾT CHO ĐƠN HÀNG
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>Grade</div>
+            <Tag color="green" style={{ marginInlineEnd: 0, fontSize: 12, fontWeight: 600 }}>
+              {order.grade || '—'}
+            </Tag>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>Số lượng</div>
+            <span style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 600 }}>
+              {order.quantity_tons || 0} tấn
+              <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>
+                ({order.total_bales || 0} bành)
+              </span>
+            </span>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>ETD</div>
+            <Tag color={etdColor} style={{ marginInlineEnd: 0, fontSize: 12, fontWeight: 600 }}>
+              {etdLabel}
+            </Tag>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>Container</div>
+            <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
+              {order.container_count || 0} × {order.container_type || '20ft'}
+            </span>
+          </div>
+        </div>
+        <div style={{
+          padding: '8px 10px',
+          background: '#fffbe6',
+          border: '1px solid #ffe58f',
+          borderRadius: 6,
+          fontSize: 12,
+          color: '#874d00',
+          marginBottom: 8,
+        }}>
+          💡 BP Sản xuất / QC: chỉ cần xác nhận đơn này đã sẵn sàng. Bấm nút bên phải để chuyển stage tiếp theo (chi tiết SX có thể xem trong section bên dưới).
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="production" size="middle" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '8px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="production" size="small" />
-      </div>
-      {showStockPicker && (
-        <StockPickerSection
-          order={order}
-          canEdit={editable && (salesRole === 'production' || salesRole === 'admin')}
-          onSaved={onSaved}
-        />
-      )}
-      {renderProductionProgress()}
+      {renderSimpleHeader()}
       {renderReadyDate()}
       {renderContainers()}
+
+      {/* Chi tiết SX + StockPicker — collapsed, không clutter view chính */}
+      <Collapse
+        size="small"
+        ghost
+        style={{ marginTop: 8 }}
+        items={[
+          {
+            key: 'detail',
+            label: <span style={{ fontSize: 12, color: '#6b7280' }}>📊 Chi tiết tiến độ sản xuất + nguồn NVL</span>,
+            children: (
+              <div style={{ paddingTop: 4 }}>
+                {showStockPicker && (
+                  <StockPickerSection
+                    order={order}
+                    canEdit={editable && (salesRole === 'production' || salesRole === 'admin')}
+                    onSaved={onSaved}
+                  />
+                )}
+                {renderProductionProgress()}
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }

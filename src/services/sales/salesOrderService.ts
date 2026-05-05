@@ -722,13 +722,16 @@ export const salesOrderService = {
   // ==========================================================================
 
   /**
-   * Lấy thống kê tổng quan đơn hàng
+   * Lấy thống kê tổng quan đơn hàng — KHÔNG tính đơn hủy.
+   * "Tổng đơn" = số đơn active + đã giao + đã thanh toán, đơn cancelled
+   * không tính (đã hủy = không tồn tại nghiệp vụ).
    */
   async getStats(): Promise<SalesOrderStats> {
-    // Tổng số đơn hàng
+    // Tổng số đơn hàng (loại đơn hủy)
     const { count: total } = await supabase
       .from('sales_orders')
       .select('id', { count: 'exact', head: true })
+      .neq('status', 'cancelled')
 
     // Đếm theo từng trạng thái song song
     const statusCounts = async (s: SalesOrderStatus) => {

@@ -365,7 +365,10 @@ export function LeaveRequestListPage() {
                     {showApprovalActions && (
                       <div className="flex gap-2 mt-4">
                         <button
-                          onClick={() => setApproveId(req.id)}
+                          onClick={() => {
+                            approveMutation.reset()  // clear stale error từ lần duyệt trước
+                            setApproveId(req.id)
+                          }}
                           className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-3 sm:py-2.5
                             text-sm font-semibold text-green-700 bg-green-50 border border-green-200 rounded-xl
                             active:bg-green-100 transition-colors"
@@ -374,7 +377,10 @@ export function LeaveRequestListPage() {
                           Duyệt
                         </button>
                         <button
-                          onClick={() => setRejectId(req.id)}
+                          onClick={() => {
+                            rejectMutation.reset()
+                            setRejectId(req.id)
+                          }}
                           className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-3 sm:py-2.5
                             text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl
                             active:bg-red-100 transition-colors"
@@ -520,7 +526,12 @@ export function LeaveRequestListPage() {
       {approveId && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center"
-          onClick={e => { if (e.target === e.currentTarget) setApproveId(null) }}
+          onClick={e => {
+            if (e.target === e.currentTarget) {
+              setApproveId(null)
+              approveMutation.reset()
+            }
+          }}
         >
           <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl">
             <div className="flex justify-center pt-2 sm:hidden">
@@ -545,7 +556,10 @@ export function LeaveRequestListPage() {
 
               <div className="flex flex-col-reverse sm:flex-row gap-2.5">
                 <button
-                  onClick={() => setApproveId(null)}
+                  onClick={() => {
+                    setApproveId(null)
+                    approveMutation.reset()
+                  }}
                   className="w-full sm:w-auto px-5 py-3.5 sm:py-2.5 text-[15px] sm:text-sm text-gray-700
                     bg-white border border-gray-300 rounded-xl active:bg-gray-100"
                 >
@@ -578,7 +592,13 @@ export function LeaveRequestListPage() {
       {rejectId && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center"
-          onClick={e => { if (e.target === e.currentTarget) { setRejectId(null); setRejectReason('') }}}
+          onClick={e => {
+            if (e.target === e.currentTarget) {
+              setRejectId(null)
+              setRejectReason('')
+              rejectMutation.reset()
+            }
+          }}
         >
           <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl">
             <div className="flex justify-center pt-2 sm:hidden">
@@ -606,7 +626,11 @@ export function LeaveRequestListPage() {
 
               <div className="flex flex-col-reverse sm:flex-row gap-2.5 mt-5">
                 <button
-                  onClick={() => { setRejectId(null); setRejectReason('') }}
+                  onClick={() => {
+                    setRejectId(null)
+                    setRejectReason('')
+                    rejectMutation.reset()
+                  }}
                   className="w-full sm:w-auto px-5 py-3.5 sm:py-2.5 text-[15px] sm:text-sm text-gray-700
                     bg-white border border-gray-300 rounded-xl active:bg-gray-100"
                 >

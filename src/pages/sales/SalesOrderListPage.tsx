@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card,
   Table,
@@ -130,6 +130,7 @@ const STATUS_TABS: { key: string; label: string }[] = [
 
 const SalesOrderListPage = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuthStore()
   const salesRole = getSalesRole(user)
   const isAdmin = salesRole === 'admin'
@@ -145,6 +146,7 @@ const SalesOrderListPage = () => {
     producing: 0,
     ready: 0,
     shipped: 0,
+    overdue_etd: 0,
     total_value_usd_month: 0,
     orders_this_month: 0,
   })
@@ -158,8 +160,12 @@ const SalesOrderListPage = () => {
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
   // Sort + column filter state (Ant Table onChange driven)
-  const [sortBy, setSortBy] = useState<string>('order_date')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  // Default = ETD ascending → đơn quá hạn / sắp đến hạn lên đầu (BGĐ scan dễ).
+  // Đổi sang order_date desc nếu muốn xem đơn mới nhất.
+  const [sortBy, setSortBy] = useState<string>('etd')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  // Filter "chỉ show đơn quá ETD" — set qua query param ?filter=overdue_etd
+  const [overdueEtdOnly, setOverdueEtdOnly] = useState<boolean>(false)
 
   // Detail panel v4
   const [panelOrderId, setPanelOrderId] = useState<string | null>(null)
@@ -183,6 +189,7 @@ const SalesOrderListPage = () => {
         date_to: dateRange?.[1]?.format('YYYY-MM-DD') || undefined,
         sort_by: sortBy,
         sort_order: sortOrder,
+        overdue_etd_only: overdueEtdOnly || undefined,
       }
       const response = await salesOrderService.getList(params)
       setOrders(response.data)
@@ -193,7 +200,7 @@ const SalesOrderListPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination, searchText, statusTab, customerFilter, gradeFilter, dateRange, sortBy, sortOrder])
+  }, [pagination, searchText, statusTab, customerFilter, gradeFilter, dateRange, sortBy, sortOrder, overdueEtdOnly])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -221,6 +228,14 @@ const SalesOrderListPage = () => {
     fetchStats()
     fetchCustomers()
   }, [fetchStats, fetchCustomers])
+
+  // Parse query param ?filter=overdue_etd để jump từ Watchlist
+  useEffect(() => {
+    const filter = searchParams.get('filter')
+    if (filter === 'overdue_etd') {
+      setOverdueEtdOnly(true)
+    }
+  }, [searchParams])
 
   // ============================================
   // HANDLERS
@@ -718,9 +733,37 @@ const SalesOrderListPage = () => {
         </Col>
       </Row>
 
-      {/* Stats Row — 6 mini cards */}
+      {/* Stats Row — 7 mini cards (1 click-to-filter) */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={4}>
+        <Col xs={12} sm={3}>
+          <Card
+            size="small"
+            style={{
+              borderRadius: 8,
+              cursor: 'pointer',
+              border: overdueEtdOnly ? '2px solid #cf1322' : undefined,
+              background: overdueEtdOnly ? '#fff1f0' : undefined,
+            }}
+            onClick={() => {
+              const next = !overdueEtdOnly
+              setOverdueEtdOnly(next)
+              if (next) {
+                setSearchParams({ filter: 'overdue_etd' })
+              } else {
+                setSearchParams({})
+              }
+              setPagination(p => ({ ...p, current: 1 }))
+            }}
+            title="Click để filter chỉ đơn quá ETD chưa giao"
+          >
+            <Statistic
+              title={<span style={{ color: '#cf1322', fontWeight: 600 }}>🚨 Quá ETD</span>}
+              value={stats.overdue_etd}
+              valueStyle={{ color: '#cf1322', fontSize: 22 }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={3}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
               title="Tổng đơn"
@@ -730,7 +773,7 @@ const SalesOrderListPage = () => {
             />
           </Card>
         </Col>
-        <Col xs={12} sm={4}>
+        <Col xs={12} sm={3}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
               title="Nháp"
@@ -740,7 +783,7 @@ const SalesOrderListPage = () => {
             />
           </Card>
         </Col>
-        <Col xs={12} sm={4}>
+        <Col xs={12} sm={3}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
               title="Đã xác nhận"
@@ -750,7 +793,7 @@ const SalesOrderListPage = () => {
             />
           </Card>
         </Col>
-        <Col xs={12} sm={4}>
+        <Col xs={12} sm={3}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
               title="Đang SX"
@@ -760,7 +803,7 @@ const SalesOrderListPage = () => {
             />
           </Card>
         </Col>
-        <Col xs={12} sm={4}>
+        <Col xs={12} sm={3}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
               title="Sẵn sàng"
@@ -770,7 +813,7 @@ const SalesOrderListPage = () => {
             />
           </Card>
         </Col>
-        <Col xs={12} sm={4}>
+        <Col xs={12} sm={3}>
           <Card size="small" style={{ borderRadius: 8 }}>
             <Statistic
               title="Đã xuất"
@@ -792,6 +835,34 @@ const SalesOrderListPage = () => {
           label: tab.label,
         }))}
       />
+
+      {/* Banner: filter Quá ETD đang active */}
+      {overdueEtdOnly && (
+        <div style={{
+          padding: '8px 12px',
+          background: '#fff1f0',
+          border: '1px solid #ffa39e',
+          borderRadius: 6,
+          marginBottom: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: 13,
+        }}>
+          <span style={{ color: '#cf1322' }}>
+            🚨 Đang lọc: <strong>chỉ đơn quá ETD chưa giao</strong> ({stats.overdue_etd} đơn)
+          </span>
+          <Button
+            size="small"
+            onClick={() => {
+              setOverdueEtdOnly(false)
+              setSearchParams({})
+            }}
+          >
+            Xóa filter
+          </Button>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <Card size="small" style={{ marginBottom: 16, borderRadius: 8 }}>

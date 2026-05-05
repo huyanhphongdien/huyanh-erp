@@ -122,6 +122,7 @@ export interface SalesOrderListParams {
   date_to?: string
   sort_by?: string
   sort_order?: 'asc' | 'desc'
+  overdue_etd_only?: boolean   // chỉ show đơn quá ETD chưa giao
 }
 
 export interface SalesOrderStats {
@@ -131,6 +132,7 @@ export interface SalesOrderStats {
   producing: number
   ready: number
   shipped: number
+  overdue_etd: number          // đơn active chưa giao mà ETD đã qua
   total_value_usd_month: number
   orders_this_month: number
 }
@@ -248,6 +250,13 @@ export const salesOrderService = {
     }
     if (date_to) {
       query = query.lte('order_date', date_to)
+    }
+
+    // Filter "chỉ đơn quá ETD chưa giao" (dùng từ Watchlist click → jump qua list)
+    if (params.overdue_etd_only) {
+      const today = new Date().toISOString().split('T')[0]
+      query = query.lt('etd', today)
+        .not('status', 'in', '(delivered,invoiced,paid,cancelled)')
     }
 
     // Tìm kiếm thông minh: số HĐ, mã hệ thống, PO#, grade, booking, B/L, ngân hàng
@@ -738,6 +747,14 @@ export const salesOrderService = {
       statusCounts('shipped'),
     ])
 
+    // Đơn quá ETD: ETD < today, chưa delivered/paid/cancelled
+    const today = new Date().toISOString().split('T')[0]
+    const { count: overdueEtd } = await supabase
+      .from('sales_orders')
+      .select('id', { count: 'exact', head: true })
+      .lt('etd', today)
+      .not('status', 'in', '(delivered,invoiced,paid,cancelled)')
+
     // Thống kê tháng này
     const now = new Date()
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -769,6 +786,7 @@ export const salesOrderService = {
       producing,
       ready,
       shipped,
+      overdue_etd: overdueEtd || 0,
       total_value_usd_month: totalValueUsdMonth,
       orders_this_month: ordersThisMonth || 0,
     }

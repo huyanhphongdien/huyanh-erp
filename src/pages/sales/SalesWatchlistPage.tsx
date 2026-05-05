@@ -179,24 +179,32 @@ export default function SalesWatchlistPage() {
             label="Quá ETD"
             value={stats.overdueEta}
             color="#cf1322"
+            onClick={() => navigate('/sales/orders?filter=overdue_etd')}
+            hint="Click để xem chi tiết các đơn quá ETD trên trang Đơn hàng"
           />
           <StatCard
             icon={<Clock size={18} />}
             label="ETD ≤ 7 ngày"
             value={stats.within7}
             color="#fa8c16"
+            onClick={() => setFilterMode('urgent')}
+            hint="Apply filter Khẩn ở dưới"
           />
           <StatCard
             icon={<AlertTriangle size={18} />}
             label="Quá SLA bộ phận"
             value={stats.overdueSla}
             color="#d4380d"
+            onClick={() => setFilterMode('overdue_sla')}
+            hint="Apply filter Quá SLA ở dưới"
           />
           <StatCard
             icon={<CheckCircle2 size={18} />}
             label="Tổng active (chưa giao)"
             value={stats.total}
             color="#1B4D3E"
+            onClick={() => setFilterMode('all_active')}
+            hint="Show tất cả đơn active"
           />
         </div>
 
@@ -400,22 +408,49 @@ function Td({ children, align = 'left', style }: TdProps) {
   )
 }
 
-interface StatCardProps { icon: React.ReactNode; label: string; value: number; color: string }
-function StatCard({ icon, label, value, color }: StatCardProps) {
+interface StatCardProps {
+  icon: React.ReactNode
+  label: string
+  value: number
+  color: string
+  onClick?: () => void
+  hint?: string
+}
+function StatCard({ icon, label, value, color, onClick, hint }: StatCardProps) {
+  const isClickable = !!onClick
   return (
-    <div style={{
-      padding: '10px 14px',
-      background: '#ffffff',
-      border: '1px solid #e4e4e7',
-      borderLeft: `3px solid ${color}`,
-      borderRadius: 8,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-    }}>
+    <div
+      onClick={onClick}
+      title={hint}
+      style={{
+        padding: '10px 14px',
+        background: '#ffffff',
+        border: '1px solid #e4e4e7',
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        cursor: isClickable ? 'pointer' : 'default',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+      }}
+      onMouseEnter={(e) => {
+        if (isClickable) {
+          e.currentTarget.style.transform = 'translateY(-1px)'
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+    >
       <span style={{ color }}>{icon}</span>
-      <div>
-        <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>{label}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+          {label}
+          {isClickable && <span style={{ fontSize: 9, color: '#9ca3af' }}>↗</span>}
+        </div>
         <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
       </div>
     </div>

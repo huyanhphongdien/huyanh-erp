@@ -522,7 +522,18 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="contract" size="small" />
         <div style={{ display: 'flex', gap: 8 }}>
           {canEdit ? (
-            <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              size="small"
+              onClick={startEdit}
+              style={{
+                background: '#1B4D3E',
+                borderColor: '#1B4D3E',
+                color: '#ffffff',
+                fontWeight: 500,
+              }}
+            >
               Chỉnh sửa
             </Button>
           ) : isLocked ? (

@@ -243,7 +243,18 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="finance" size="small" />
         <div style={{ display: 'flex', gap: 8 }}>
           {canEdit && (
-            <Button type="primary" ghost icon={<EditOutlined />} size="small" onClick={startEdit}>
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              size="small"
+              onClick={startEdit}
+              style={{
+                background: '#1B4D3E',
+                borderColor: '#1B4D3E',
+                color: '#ffffff',
+                fontWeight: 500,
+              }}
+            >
               Chỉnh sửa
             </Button>
           )}

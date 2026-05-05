@@ -7,6 +7,9 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Production
   'trunglxh@huyanhrubber.com': 'production',
   'nhanlt@huyanhrubber.com': 'production',
+  // Mua mủ NVL (raw_material) — owner stage 'raw_material', cấp quyền production để
+  // edit tab Sản xuất + xem Sales module (2026-05-05)
+  'tannv@huyanhrubber.com': 'production',
   // Logistics (Xuất nhập khẩu) — quyền edit Booking / Container / Shipping only
   'logistics@huyanhrubber.com': 'logistics',
   'anhlp@huyanhrubber.com': 'logistics',

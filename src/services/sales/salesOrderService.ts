@@ -141,7 +141,8 @@ export interface SalesOrderStats {
 
 const CUSTOMER_JOIN = 'customer:sales_customers!customer_id(id,code,name,short_name,country,tier)'
 const ITEMS_JOIN = 'items:sales_order_items!sales_order_items_sales_order_id_fkey(*)'
-const SELECT_WITH_CUSTOMER = `*,${CUSTOMER_JOIN},${ITEMS_JOIN}`
+const OWNER_JOIN = 'current_owner:employees!sales_orders_current_owner_id_fkey(id,code,full_name,email)'
+const SELECT_WITH_CUSTOMER = `*,${CUSTOMER_JOIN},${ITEMS_JOIN},${OWNER_JOIN}`
 
 // ============================================================================
 // VALID STATUS TRANSITIONS

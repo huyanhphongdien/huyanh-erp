@@ -90,7 +90,8 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   const itemsTotalUSD = editItems.reduce((s, i) => s + (Number(i.quantity_tons) || 0) * (Number(i.unit_price) || 0), 0)
 
   const startEdit = () => {
-    // Khởi tạo items editor nếu đơn có items
+    // Luôn dùng items editor — kể cả đơn cũ single-item (sẽ được promote
+    // sang multi-item khi save, vì BGĐ muốn 1 đơn nhập được nhiều mặt hàng)
     if (hasItems && order.items) {
       setEditItems(order.items.map((it: SalesOrderItem) => ({
         id: it.id,
@@ -103,7 +104,16 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         payment_terms: it.payment_terms,
       })))
     } else {
-      setEditItems([])
+      // Đơn legacy chưa có items → seed 1 dòng từ header để user có thể "Thêm dòng"
+      setEditItems([{
+        grade: order.grade || 'SVR_10',
+        quantity_tons: order.quantity_tons || 0,
+        unit_price: order.unit_price || 0,
+        bale_weight_kg: order.bale_weight_kg || 33.33,
+        bales_per_container: order.bales_per_container || 576,
+        packing_type: order.packing_type || 'loose_bale',
+        payment_terms: order.payment_terms || undefined,
+      }])
     }
     form.setFieldsValue({
       customer_po: order.customer_po,
@@ -139,14 +149,12 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       const vals = await form.validateFields()
       setSaving(true)
 
-      // Validate items nếu dùng items editor
-      if (hasItems) {
-        const validItems = editItems.filter(i => i.grade && i.quantity_tons > 0 && i.unit_price > 0)
-        if (validItems.length === 0) {
-          message.error('Phải có ít nhất 1 sản phẩm hợp lệ')
-          setSaving(false)
-          return
-        }
+      // Validate items — bắt buộc phải có ≥1 sản phẩm hợp lệ
+      const validItems = editItems.filter(i => i.grade && i.quantity_tons > 0 && i.unit_price > 0)
+      if (validItems.length === 0) {
+        message.error('Phải có ít nhất 1 sản phẩm hợp lệ')
+        setSaving(false)
+        return
       }
 
       const updateData: Record<string, any> = {
@@ -166,63 +174,44 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         notes: vals.notes || null,
       }
 
-      let totalTons: number
-      let totalValueUsd: number
-      let totalBales: number
-      let containerCount: number
-      let aggregatedGrade: string
-      let firstItem: EditItem | undefined
+      // ── Replace sales_order_items với giá trị mới (multi-item path luôn) ──
+      const { error: delErr } = await supabase
+        .from('sales_order_items')
+        .delete()
+        .eq('sales_order_id', order.id)
+      if (delErr) throw delErr
 
-      if (hasItems) {
-        // ── Replace sales_order_items với giá trị mới ──
-        const { error: delErr } = await supabase
-          .from('sales_order_items')
-          .delete()
-          .eq('sales_order_id', order.id)
-        if (delErr) throw delErr
+      const itemRows = validItems.map((it, idx) => {
+        const qtyKg = it.quantity_tons * 1000
+        const bw = it.bale_weight_kg || 33.33
+        const bales = Math.round(qtyKg / bw)
+        const bpc = it.bales_per_container || 576
+        return {
+          sales_order_id: order.id,
+          grade: it.grade,
+          quantity_tons: it.quantity_tons,
+          unit_price: it.unit_price,
+          currency: order.currency || 'USD',
+          payment_terms: it.payment_terms || null,
+          total_value_usd: it.quantity_tons * it.unit_price,
+          quantity_kg: qtyKg,
+          bale_weight_kg: bw,
+          total_bales: bales,
+          bales_per_container: bpc,
+          container_count: Math.ceil(bales / bpc),
+          packing_type: it.packing_type || 'loose_bale',
+          sort_order: idx,
+        }
+      })
+      const { error: insErr } = await supabase.from('sales_order_items').insert(itemRows)
+      if (insErr) throw insErr
 
-        const itemRows = editItems.map((it, idx) => {
-          const qtyKg = it.quantity_tons * 1000
-          const bw = it.bale_weight_kg || 33.33
-          const bales = Math.round(qtyKg / bw)
-          const bpc = it.bales_per_container || 576
-          return {
-            sales_order_id: order.id,
-            grade: it.grade,
-            quantity_tons: it.quantity_tons,
-            unit_price: it.unit_price,
-            currency: order.currency || 'USD',
-            payment_terms: it.payment_terms || null,
-            total_value_usd: it.quantity_tons * it.unit_price,
-            quantity_kg: qtyKg,
-            bale_weight_kg: bw,
-            total_bales: bales,
-            bales_per_container: bpc,
-            container_count: Math.ceil(bales / bpc),
-            packing_type: it.packing_type || 'loose_bale',
-            sort_order: idx,
-          }
-        })
-        const { error: insErr } = await supabase.from('sales_order_items').insert(itemRows)
-        if (insErr) throw insErr
-
-        totalTons = itemRows.reduce((s, i) => s + i.quantity_tons, 0)
-        totalValueUsd = itemRows.reduce((s, i) => s + (i.total_value_usd || 0), 0)
-        totalBales = itemRows.reduce((s, i) => s + (i.total_bales || 0), 0)
-        containerCount = itemRows.reduce((s, i) => s + (i.container_count || 0), 0)
-        aggregatedGrade = itemRows.length === 1 ? itemRows[0].grade : itemRows.map(i => i.grade).join(' + ')
-        firstItem = editItems[0]
-      } else {
-        // Legacy single-item flow — không có items table
-        totalTons = vals.quantity_tons
-        totalValueUsd = vals.quantity_tons * vals.unit_price
-        const qtyKg = vals.quantity_tons * 1000
-        totalBales = Math.round(qtyKg / (vals.bale_weight_kg || 33.33))
-        containerCount = vals.bales_per_container > 0
-          ? Math.ceil(totalBales / vals.bales_per_container)
-          : order.container_count || 0
-        aggregatedGrade = order.grade || ''
-      }
+      const totalTons = itemRows.reduce((s, i) => s + i.quantity_tons, 0)
+      const totalValueUsd = itemRows.reduce((s, i) => s + (i.total_value_usd || 0), 0)
+      const totalBales = itemRows.reduce((s, i) => s + (i.total_bales || 0), 0)
+      const containerCount = itemRows.reduce((s, i) => s + (i.container_count || 0), 0)
+      const aggregatedGrade = itemRows.length === 1 ? itemRows[0].grade : itemRows.map(i => i.grade).join(' + ')
+      const firstItem = validItems[0]
 
       const avgUnitPrice = totalTons > 0 ? Math.round((totalValueUsd / totalTons) * 100) / 100 : 0
       const commissionAmount = vals.commission_usd_per_mt
@@ -236,15 +225,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       updateData.total_bales = totalBales
       updateData.container_count = containerCount
       updateData.grade = aggregatedGrade
-      if (hasItems && firstItem) {
-        updateData.bale_weight_kg = firstItem.bale_weight_kg
-        updateData.bales_per_container = firstItem.bales_per_container
-        updateData.packing_type = firstItem.packing_type
-      } else {
-        updateData.bale_weight_kg = vals.bale_weight_kg
-        updateData.bales_per_container = vals.bales_per_container
-        updateData.packing_type = vals.packing_type
-      }
+      updateData.bale_weight_kg = firstItem.bale_weight_kg
+      updateData.bales_per_container = firstItem.bales_per_container
+      updateData.packing_type = firstItem.packing_type
       updateData.commission_amount = commissionAmount
 
       await salesOrderService.updateFields(order.id, updateData)
@@ -305,11 +288,23 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           </Form.Item>
         </div>
 
-        {/* Section: Sản phẩm & Giá */}
+        {/* Section: Sản phẩm & Giá — luôn dùng multi-item table */}
         <SectionHeader title="Sản phẩm & Giá" color="#1B4D3E" />
-        {hasItems ? (
-          <>
-            <div style={{ overflowX: 'auto', marginBottom: 12 }}>
+        {!hasItems && editItems.length > 0 && (
+          <div style={{
+            padding: '6px 10px',
+            background: '#fffbe6',
+            border: '1px solid #ffe58f',
+            borderRadius: 4,
+            fontSize: 11,
+            color: '#874d00',
+            marginBottom: 8,
+          }}>
+            ℹ️ Đơn này được tạo theo format cũ (1 mặt hàng). Bạn có thể bấm "Thêm dòng" để bổ sung mặt hàng — đơn sẽ tự convert sang multi-item.
+          </div>
+        )}
+        <>
+          <div style={{ overflowX: 'auto', marginBottom: 12 }}>
               <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', border: '1px solid #f0f0f0', borderRadius: 6 }}>
                 <thead>
                   <tr style={{ background: '#fafafa' }}>
@@ -460,30 +455,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
             >
               Thêm dòng
             </Button>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-              <Form.Item label="Số lượng (tấn)" name="quantity_tons" rules={[{ required: true }]}>
-                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item label="Đơn giá (USD/tấn)" name="unit_price" rules={[{ required: true }]}>
-                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item label="KL bành (kg)" name="bale_weight_kg">
-                <InputNumber min={1} max={100} style={{ width: '100%' }} />
-              </Form.Item>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-              <Form.Item label="Bành/container" name="bales_per_container">
-                <InputNumber min={1} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item label="Loại đóng gói" name="packing_type">
-                <Select options={Object.entries(PACKING_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
-              </Form.Item>
-            </div>
-          </>
-        )}
+        </>
 
         {/* Section: Điều khoản */}
         <SectionHeader title="Điều khoản" color="#1B4D3E" />

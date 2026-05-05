@@ -5,9 +5,11 @@
 // ============================================================================
 
 import { useState, useEffect, useMemo } from 'react'
-import { Modal, Input, message, Button, Tag } from 'antd'
+import { Modal, Input, message, Button, Tag, Select } from 'antd'
+import { EditOutlined } from '@ant-design/icons'
 import { useAuthStore } from '../../../stores/authStore'
 import { salesStageService } from '../../../services/sales/salesStageService'
+import { supabase } from '../../../lib/supabase'
 import {
   type SalesStage,
   SALES_STAGE_LABELS,
@@ -23,10 +25,17 @@ interface StageOwnershipCardProps {
   orderId: string
   orderCode: string
   currentStage: SalesStage
+  currentOwnerId: string | null
   currentOwnerName: string | null
   stageStartedAt: string | null
   stageSlaHours: number | null
   onChanged?: () => void
+}
+
+interface EmployeeOpt {
+  id: string
+  full_name: string
+  email: string | null
 }
 
 const { TextArea } = Input
@@ -35,6 +44,7 @@ export default function StageOwnershipCard({
   orderId,
   orderCode,
   currentStage,
+  currentOwnerId,
   currentOwnerName,
   stageStartedAt,
   stageSlaHours,
@@ -45,6 +55,48 @@ export default function StageOwnershipCard({
   const [modalOpen, setModalOpen] = useState(false)
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Owner edit state
+  const [ownerEditOpen, setOwnerEditOpen] = useState(false)
+  const [ownerOptions, setOwnerOptions] = useState<EmployeeOpt[]>([])
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(currentOwnerId)
+  const [ownerSaving, setOwnerSaving] = useState(false)
+
+  useEffect(() => {
+    setSelectedOwnerId(currentOwnerId)
+  }, [currentOwnerId])
+
+  const openOwnerEdit = async () => {
+    setOwnerEditOpen(true)
+    if (ownerOptions.length === 0) {
+      const { data } = await supabase
+        .from('employees')
+        .select('id, full_name, email')
+        .eq('status', 'active')
+        .order('full_name')
+      setOwnerOptions((data as EmployeeOpt[]) || [])
+    }
+  }
+
+  const handleSaveOwner = async () => {
+    if (!selectedOwnerId) {
+      message.warning('Vui lòng chọn nhân viên')
+      return
+    }
+    setOwnerSaving(true)
+    const { error } = await supabase
+      .from('sales_orders')
+      .update({ current_owner_id: selectedOwnerId, updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+    setOwnerSaving(false)
+    if (error) {
+      message.error('Lỗi cập nhật owner: ' + error.message)
+      return
+    }
+    message.success('Đã cập nhật người phụ trách')
+    setOwnerEditOpen(false)
+    onChanged?.()
+  }
 
   // Tick mỗi 30s để update SLA elapsed
   useEffect(() => {
@@ -113,7 +165,16 @@ export default function StageOwnershipCard({
       {/* Owner + dwell time */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2 }}>Owner</div>
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>Owner</span>
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined style={{ fontSize: 11 }} />}
+              onClick={openOwnerEdit}
+              style={{ padding: '0 4px', height: 18, lineHeight: 1 }}
+            />
+          </div>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#111111' }}>
             {currentOwnerName || <span style={{ color: '#a1a1aa' }}>Chưa gán</span>}
           </div>
@@ -213,6 +274,41 @@ export default function StageOwnershipCard({
             onChange={e => setNotes(e.target.value)}
             placeholder="VD: NVL đã đầy đủ, sẵn sàng SX..."
           />
+        </div>
+      </Modal>
+
+      {/* Owner edit modal */}
+      <Modal
+        title={`Cập nhật người phụ trách — ${orderCode}`}
+        open={ownerEditOpen}
+        onCancel={() => setOwnerEditOpen(false)}
+        onOk={handleSaveOwner}
+        confirmLoading={ownerSaving}
+        okText="Lưu"
+        cancelText="Hủy"
+        okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
+      >
+        <p style={{ margin: 0, marginBottom: 8, fontSize: 13, color: '#374151' }}>
+          Đang ở: <strong>{SALES_STAGE_LABELS[currentStage]}</strong>
+          {currentOwnerName && <> — owner hiện tại: <strong>{currentOwnerName}</strong></>}
+        </p>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Người phụ trách mới</div>
+          <Select
+            showSearch
+            value={selectedOwnerId || undefined}
+            placeholder="Chọn nhân viên..."
+            style={{ width: '100%' }}
+            optionFilterProp="label"
+            onChange={(v) => setSelectedOwnerId(v)}
+            options={ownerOptions.map(e => ({
+              value: e.id,
+              label: `${e.full_name}${e.email ? ` — ${e.email}` : ''}`,
+            }))}
+          />
+          <div style={{ fontSize: 11, color: '#a1a1aa', marginTop: 6 }}>
+            BGĐ có thể đổi owner bất kỳ lúc nào để giao việc rõ ràng. Lịch sử handoff vẫn được giữ nguyên.
+          </div>
         </div>
       </Modal>
     </div>

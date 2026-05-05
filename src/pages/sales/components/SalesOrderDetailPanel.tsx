@@ -153,7 +153,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             orderId={order.id}
             orderCode={order.code}
             currentStage={(order.current_stage as SalesStage) || 'sales'}
-            currentOwnerName={null}
+            currentOwnerId={order.current_owner_id || null}
+            currentOwnerName={order.current_owner?.full_name || null}
             stageStartedAt={order.stage_started_at || null}
             stageSlaHours={order.stage_sla_hours || null}
             onChanged={handleSaved}

@@ -216,6 +216,12 @@ export interface SalesOrder {
   // Joined
   customer?: Pick<SalesCustomer, 'id' | 'code' | 'name' | 'short_name' | 'country' | 'tier'>
   items?: SalesOrderItem[]
+  current_owner?: {
+    id: string
+    code?: string
+    full_name: string
+    email?: string
+  } | null
 }
 
 // ===== SẢN PHẨM TRONG ĐƠN HÀNG (sales_order_items) =====

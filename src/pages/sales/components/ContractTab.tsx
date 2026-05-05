@@ -157,6 +157,22 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         return
       }
 
+      // Validate contract_no không trùng với đơn active khác
+      if (vals.contract_no && vals.contract_no.trim()) {
+        const { data: dups } = await supabase
+          .from('sales_orders')
+          .select('code')
+          .eq('contract_no', vals.contract_no.trim())
+          .neq('id', order.id)
+          .neq('status', 'cancelled')
+          .limit(1)
+        if (dups && dups.length > 0) {
+          message.error(`Số HĐ "${vals.contract_no}" đã tồn tại ở đơn ${dups[0].code}. Vui lòng dùng số khác.`)
+          setSaving(false)
+          return
+        }
+      }
+
       const updateData: Record<string, any> = {
         customer_po: vals.customer_po || null,
         incoterm: vals.incoterm,
@@ -341,8 +357,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                       <td style={{ padding: '4px 6px' }}>
                         <InputNumber
                           size="small"
-                          min={0}
+                          min={0.01}
                           step={0.01}
+                          placeholder="vd: 19.20"
                           value={it.quantity_tons}
                           style={{ width: '100%' }}
                           onChange={(v) => {
@@ -353,8 +370,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                       <td style={{ padding: '4px 6px' }}>
                         <InputNumber
                           size="small"
-                          min={0}
+                          min={0.01}
                           step={0.01}
+                          placeholder="vd: 2150"
                           value={it.unit_price}
                           style={{ width: '100%' }}
                           onChange={(v) => {

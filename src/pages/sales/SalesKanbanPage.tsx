@@ -16,6 +16,17 @@ import {
   SALES_STAGE_EMOJI,
   type SalesStage,
 } from '../../services/sales/salesStages'
+
+// Stage rank cho forward-only validation
+const STAGE_RANK: Record<SalesStage, number> = {
+  sales: 1,
+  raw_material: 2,
+  production: 3,
+  qc: 4,
+  packing: 5,
+  logistics: 6,
+  delivered: 7,
+}
 import KanbanCard, { type KanbanOrder } from './components/KanbanCard'
 
 // ============================================================================
@@ -144,6 +155,29 @@ export default function SalesKanbanPage() {
     const order = orders.find(o => o.id === orderId)
     if (!order) return
     if (order.current_stage === toStage) return // no-op
+
+    // Forward-only: ngăn kéo lùi stage (vd packing → sales) — workflow chỉ
+    // cho phép tiến tới. Muốn revert phải nhờ admin DB intervention.
+    const fromRank = STAGE_RANK[order.current_stage] || 0
+    const toRank = STAGE_RANK[toStage] || 0
+    if (toRank < fromRank) {
+      message.warning(
+        `Không thể kéo lùi từ "${SALES_STAGE_LABELS[order.current_stage]}" về "${SALES_STAGE_LABELS[toStage]}". ` +
+        `Workflow chỉ tiến tới — liên hệ admin nếu cần revert.`,
+      )
+      return
+    }
+    // Skip stage cũng cảnh báo (nhảy nhiều bước)
+    if (toRank > fromRank + 1) {
+      const skipped = toRank - fromRank - 1
+      message.warning(
+        `Bỏ qua ${skipped} stage (${SALES_STAGE_LABELS[order.current_stage]} → ${SALES_STAGE_LABELS[toStage]}). ` +
+        `Tiếp tục? Hệ thống sẽ ghi handoff trực tiếp, không qua các stage trung gian.`,
+        4,
+      )
+      // Vẫn cho proceed (admin có thể skip), chỉ cảnh báo
+    }
+
     setConfirmTransition({
       orderId,
       orderCode: order.code,

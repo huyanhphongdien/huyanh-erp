@@ -79,6 +79,30 @@ export const SALES_STAGE_NEXT: Record<SalesStage, SalesStage | null> = {
   delivered:     null,
 }
 
+// Owner mặc định mỗi stage — đồng bộ với DB trigger log_sales_stage_change.
+// Nếu bạn đổi ở đây, NHỚ chạy lại migration sales_auto_assign_owner_on_stage.sql.
+// (BGĐ vẫn có thể đổi owner manual qua nút ✏ trong StageOwnershipCard)
+export const SALES_STAGE_DEFAULT_OWNER_EMAIL: Record<SalesStage, string | null> = {
+  sales:         'sales@huyanhrubber.com',     // Hồ Thị Liễu
+  raw_material:  'tannv@huyanhrubber.com',     // Nguyễn Nhật Tân
+  production:    'trunglxh@huyanhrubber.com',  // Lê Xuân Hồng Trung
+  qc:            'nhanlt@huyanhrubber.com',    // Lê Thành Nhân
+  packing:       'nhanlt@huyanhrubber.com',    // Lê Thành Nhân (cùng người với QC)
+  logistics:     'anhlp@huyanhrubber.com',     // Lê Phương Anh
+  delivered:     'phulv@huyanhrubber.com',     // Phú LV (Kế toán) — lập HĐ + thu tiền
+}
+
+// Tên hiển thị (không phải fetch DB) cho preview UI
+export const SALES_STAGE_DEFAULT_OWNER_NAME: Record<SalesStage, string | null> = {
+  sales:         'Hồ Thị Liễu',
+  raw_material:  'Nguyễn Nhật Tân',
+  production:    'Lê Xuân Hồng Trung',
+  qc:            'Lê Thành Nhân',
+  packing:       'Lê Thành Nhân',
+  logistics:     'Lê Phương Anh',
+  delivered:     'Phú LV (Kế toán)',
+}
+
 // Map status (10 values) → stage gợi ý (cho backfill + sync)
 export function statusToStage(status: string): SalesStage {
   switch (status) {

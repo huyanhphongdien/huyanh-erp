@@ -15,6 +15,7 @@ import {
   SALES_STAGE_LABELS,
   SALES_STAGE_EMOJI,
   SALES_STAGE_NEXT,
+  SALES_STAGE_DEFAULT_OWNER_NAME,
   SLA_PILL_COLORS,
   getSLAStatus,
   formatDwell,
@@ -228,6 +229,14 @@ export default function StageOwnershipCard({
             <span>{SALES_STAGE_EMOJI[nextStage]}</span>
             <span style={{ fontSize: 13, fontWeight: 500 }}>{SALES_STAGE_LABELS[nextStage]}</span>
           </div>
+          {SALES_STAGE_DEFAULT_OWNER_NAME[nextStage] && (
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>→ Auto giao cho:</span>
+              <span style={{ fontWeight: 500, color: '#111111' }}>
+                {SALES_STAGE_DEFAULT_OWNER_NAME[nextStage]}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

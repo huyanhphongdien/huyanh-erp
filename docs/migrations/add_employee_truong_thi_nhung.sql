@@ -25,7 +25,7 @@ DECLARE
   v_dept_id UUID;
   v_dept_name TEXT;
   v_position_id UUID;
-  v_position_title TEXT;
+  v_position_name TEXT;
   v_existing_count INT;
   v_next_code TEXT;
   v_max_num INT;
@@ -71,16 +71,16 @@ BEGIN
   RAISE NOTICE 'OK - Department: % (%)', v_dept_name, v_dept_id;
 
   -- Find position "Trưởng phòng" (level 4)
-  SELECT id, title INTO v_position_id, v_position_title
+  SELECT id, name INTO v_position_id, v_position_name
   FROM positions
-  WHERE title ILIKE '%Tr%ng ph%ng%' AND level = 4
+  WHERE name ILIKE '%Tr%ng ph%ng%' AND level = 4
   ORDER BY level
   LIMIT 1;
 
   IF v_position_id IS NULL THEN
     RAISE EXCEPTION 'KHONG TIM THAY position "Truong phong" level 4. Kiem tra bang positions.';
   END IF;
-  RAISE NOTICE 'OK - Position: % (level 4) = %', v_position_title, v_position_id;
+  RAISE NOTICE 'OK - Position: % (level 4) = %', v_position_name, v_position_id;
 
   -- Generate next employee code (HA-XXXX)
   SELECT COALESCE(
@@ -99,7 +99,7 @@ BEGIN
   RAISE NOTICE 'Name:       Truong Thi Nhung';
   RAISE NOTICE 'Email:      nhungtt@huyanhrubber.com';
   RAISE NOTICE 'Department: %', v_dept_name;
-  RAISE NOTICE 'Position:   % (level 4)', v_position_title;
+  RAISE NOTICE 'Position:   % (level 4)', v_position_name;
   RAISE NOTICE 'auth_user:  %', v_auth_user_id;
 END $$;
 
@@ -133,7 +133,7 @@ SELECT
     WHERE name ILIKE '%logistic%' OR name ILIKE '%xu%t nh%p kh%u%'
     ORDER BY CASE WHEN name ILIKE '%logistic%' THEN 1 ELSE 2 END
     LIMIT 1),
-  (SELECT id FROM positions WHERE title ILIKE '%Tr%ng ph%ng%' AND level = 4 LIMIT 1),
+  (SELECT id FROM positions WHERE name ILIKE '%Tr%ng ph%ng%' AND level = 4 LIMIT 1),
   'active',
   NOW();
 
@@ -148,7 +148,7 @@ SELECT
   e.email,
   e.status,
   d.name AS department,
-  p.title AS position,
+  p.name AS position,
   p.level AS position_level,
   e.user_id IS NOT NULL AS has_auth_link
 FROM employees e

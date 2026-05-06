@@ -22,7 +22,7 @@ DECLARE
   v_dept_id UUID;
   v_dept_name TEXT;
   v_position_id UUID;
-  v_position_title TEXT;
+  v_position_name TEXT;
   v_existing_count INT;
   v_next_code TEXT;
   v_max_num INT;
@@ -48,15 +48,15 @@ BEGIN
   RAISE NOTICE 'OK - Department: % (%)', v_dept_name, v_dept_id;
 
   -- Find position TP level 4
-  SELECT id, title INTO v_position_id, v_position_title
+  SELECT id, name INTO v_position_id, v_position_name
   FROM positions
-  WHERE title ILIKE '%Tr%ng ph%ng%' AND level = 4
+  WHERE name ILIKE '%Tr%ng ph%ng%' AND level = 4
   LIMIT 1;
 
   IF v_position_id IS NULL THEN
     RAISE EXCEPTION 'KHONG TIM THAY position Truong phong level 4.';
   END IF;
-  RAISE NOTICE 'OK - Position: % (level 4)', v_position_title;
+  RAISE NOTICE 'OK - Position: % (level 4)', v_position_name;
 
   -- Next code
   SELECT COALESCE(
@@ -101,7 +101,7 @@ SELECT
     WHERE name ILIKE '%logistic%' OR name ILIKE '%xu%t nh%p kh%u%'
     ORDER BY CASE WHEN name ILIKE '%logistic%' THEN 1 ELSE 2 END
     LIMIT 1),
-  (SELECT id FROM positions WHERE title ILIKE '%Tr%ng ph%ng%' AND level = 4 LIMIT 1),
+  (SELECT id FROM positions WHERE name ILIKE '%Tr%ng ph%ng%' AND level = 4 LIMIT 1),
   'active',
   NOW();
 
@@ -116,7 +116,7 @@ SELECT
   e.email,
   e.status,
   d.name AS department,
-  p.title AS position,
+  p.name AS position,
   e.user_id IS NOT NULL AS has_auth_link
 FROM employees e
 LEFT JOIN departments d ON d.id = e.department_id

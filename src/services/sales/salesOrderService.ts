@@ -266,8 +266,13 @@ export const salesOrderService = {
       )
     }
 
-    // Sắp xếp
-    query = query.order(sort_by, { ascending: sort_order === 'asc' })
+    // Sắp xếp — explicit NULLS LAST khi ASC để đơn chưa có giá trị
+    // (vd ETD null) xuống cuối list. Thêm secondary sort theo code DESC
+    // để break tie deterministically khi nhiều row cùng giá trị primary.
+    const isAsc = sort_order === 'asc'
+    query = query
+      .order(sort_by, { ascending: isAsc, nullsFirst: false })
+      .order('code', { ascending: false })  // tie-breaker
 
     // Phân trang
     const { data, error, count } = await query.range(from, to)

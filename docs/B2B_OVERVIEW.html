@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module B2B Thu mua — Tổng quan + Luồng nghiệp vụ</title>
+<style>
+  :root {
+    --green-900: #0d3329;
+    --green-700: #1B4D3E;
+    --green-500: #2d7a5f;
+    --green-100: #d1ecdf;
+    --green-50: #f0faf5;
+    --red: #CA252C;
+    --amber: #f59e0b;
+    --blue: #2563eb;
+    --gray-900: #0f1419;
+    --gray-600: #4b5563;
+    --gray-300: #d1d5db;
+    --gray-100: #f3f4f6;
+    --gray-50: #f9fafb;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    line-height: 1.55;
+  }
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, var(--green-700), var(--green-900));
+    color: #fff;
+    border-radius: 16px;
+    padding: 40px 36px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow);
+  }
+  .hero h1 {
+    margin: 0 0 6px;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .hero .subtitle { font-size: 14px; opacity: 0.85; margin-bottom: 16px; }
+  .hero .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hero .pill {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* SECTION */
+  section { margin-bottom: 36px; }
+  h2 {
+    color: var(--green-700);
+    font-size: 22px;
+    margin: 0 0 16px;
+    padding-left: 14px;
+    border-left: 4px solid var(--green-700);
+    font-weight: 700;
+  }
+  h3 {
+    color: var(--gray-900);
+    font-size: 16px;
+    margin: 24px 0 10px;
+    font-weight: 600;
+  }
+  p { margin: 6px 0 14px; color: var(--gray-600); font-size: 14px; }
+
+  /* CARD */
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-300);
+  }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 720px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  th {
+    background: var(--green-50);
+    color: var(--green-900);
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  td {
+    padding: 10px 12px;
+    border-top: 1px solid var(--gray-100);
+    vertical-align: top;
+  }
+  tr:hover td { background: var(--gray-50); }
+
+  /* BADGE / TAG */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-green { background: var(--green-100); color: var(--green-700); }
+  .badge-red { background: #fee2e2; color: #b91c1c; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-gray { background: var(--gray-100); color: var(--gray-600); }
+
+  /* ARCHITECTURE BOX */
+  .arch-box {
+    border: 2px solid var(--green-700);
+    border-radius: 12px;
+    padding: 18px;
+    background: #fff;
+    position: relative;
+  }
+  .arch-box.portal { border-color: var(--blue); }
+  .arch-box-title {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 15px; margin-bottom: 4px;
+  }
+  .arch-box-domain {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 12px;
+    color: var(--gray-600);
+    margin-bottom: 12px;
+  }
+  .arch-box ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+  }
+  .arch-box li { margin: 4px 0; color: var(--gray-600); }
+
+  /* WORKFLOW STEPS */
+  .workflow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 14px 16px;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid var(--gray-300);
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s;
+  }
+  .workflow-step:hover { transform: translateX(2px); }
+  .step-number {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--green-700);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .step-actor {
+    font-size: 11px;
+    color: var(--green-700);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .step-content { flex: 1; }
+  .step-content h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  .step-content p { margin: 0; font-size: 13px; }
+
+  /* PURCHASE TYPE CARD */
+  .ptype-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid var(--gray-300);
+    border-top: 4px solid var(--green-700);
+    box-shadow: var(--shadow-sm);
+  }
+  .ptype-card.outright { border-top-color: var(--amber); }
+  .ptype-card.walkin { border-top-color: var(--blue); }
+  .ptype-card.production { border-top-color: var(--red); }
+  .ptype-icon { font-size: 28px; margin-bottom: 6px; }
+  .ptype-title { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+  .ptype-code {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 11px;
+    color: var(--gray-600);
+    margin-bottom: 10px;
+    background: var(--gray-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .ptype-card ul { margin: 8px 0 0; padding-left: 18px; font-size: 12px; }
+  .ptype-card li { margin: 3px 0; color: var(--gray-600); }
+
+  /* STATE MACHINE SVG container */
+  .state-machine {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--gray-300);
+    overflow-x: auto;
+  }
+
+  /* MENU ITEM */
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid var(--gray-300);
+    margin-bottom: 8px;
+  }
+  .menu-icon { font-size: 22px; flex-shrink: 0; width: 32px; text-align: center; }
+  .menu-title {
+    font-weight: 600; font-size: 14px;
+    color: var(--gray-900);
+  }
+  .menu-url {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 11px;
+    color: var(--gray-600);
+  }
+  .menu-desc { font-size: 12px; color: var(--gray-600); margin-top: 2px; }
+
+  /* STAT CARD */
+  .stat-card {
+    background: linear-gradient(135deg, #fff, var(--gray-50));
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left: 3px solid var(--green-700);
+  }
+  .stat-card.red { border-left-color: var(--red); }
+  .stat-card.amber { border-left-color: var(--amber); }
+  .stat-card.blue { border-left-color: var(--blue); }
+  .stat-label { font-size: 11px; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-value { font-size: 20px; font-weight: 700; color: var(--gray-900); margin-top: 2px; }
+
+  /* CALLOUT */
+  .callout {
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin: 12px 0;
+    font-size: 13px;
+    border-left: 4px solid var(--blue);
+    background: #eff6ff;
+    color: #1e40af;
+  }
+  .callout.warn { border-left-color: var(--amber); background: #fef3c7; color: #92400e; }
+  .callout.danger { border-left-color: var(--red); background: #fee2e2; color: #b91c1c; }
+
+  /* CODE INLINE */
+  code {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 12px;
+    background: var(--gray-100);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--green-900);
+  }
+
+  /* TOC */
+  .toc {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px 20px;
+    border: 1px solid var(--gray-300);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 32px;
+  }
+  .toc h3 { margin-top: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); }
+  .toc ol { margin: 0; padding-left: 20px; font-size: 14px; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: var(--green-700); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* SVG defs */
+  .arrow-line { stroke: var(--green-500); stroke-width: 2; fill: none; }
+  .arrow-head { fill: var(--green-500); }
+  .state-circle { fill: #fff; stroke: var(--green-700); stroke-width: 2; }
+  .state-circle.terminal { fill: var(--green-100); }
+  .state-circle.danger { fill: #fee2e2; stroke: var(--red); }
+  .state-text { font-family: -apple-system, sans-serif; font-size: 12px; font-weight: 600; fill: var(--gray-900); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HERO -->
+<header class="hero">
+  <h1>📦 Module B2B Thu mua — Huy Anh Rubber</h1>
+  <div class="subtitle">Hệ thống mua mủ cao su từ đại lý + hộ nông dân — ERP nhà máy + Partner Portal</div>
+  <div class="pills">
+    <span class="pill">Sprint Intake v4 + F</span>
+    <span class="pill">2026-05-04 stable</span>
+    <span class="pill">12 menu items</span>
+    <span class="pill">4 luồng mua</span>
+    <span class="pill">5 bảng realtime</span>
+    <span class="pill">30/30 SQL test PASS</span>
+  </div>
+</header>
+
+<!-- TOC -->
+<div class="toc">
+  <h3>Mục lục</h3>
+  <ol>
+    <li><a href="#arch">Kiến trúc 2 phía: ERP + Portal</a></li>
+    <li><a href="#purchase-types">4 luồng mua mủ</a></li>
+    <li><a href="#standard-flow">Workflow Standard (10 bước)</a></li>
+    <li><a href="#state-machine">State machine — Deal</a></li>
+    <li><a href="#menu">Sidebar 12 menu — chức năng từng module</a></li>
+    <li><a href="#wizards">4 Wizard Intake (URL trực tiếp)</a></li>
+    <li><a href="#permissions">Phân quyền</a></li>
+    <li><a href="#realtime">Realtime + Triggers + Locks</a></li>
+    <li><a href="#sprint-history">Sprint history (timeline)</a></li>
+  </ol>
+</div>
+
+<!-- 1. ARCHITECTURE -->
+<section id="arch">
+  <h2>1. Kiến trúc 2 phía</h2>
+  <p>Module B2B chạy song song trên 2 domain — phần ERP (nhà máy) và Partner Portal (đại lý). Hai phía giao tiếp qua Supabase realtime + REST.</p>
+
+  <div class="grid-2">
+    <div class="arch-box">
+      <div class="arch-box-title">🏭 ERP NHÀ MÁY</div>
+      <div class="arch-box-domain">huyanhrubber.vn</div>
+      <ul>
+        <li><strong>Người dùng:</strong> NV Thu mua (4 email), QC, BGĐ, Kế toán, Admin</li>
+        <li><strong>Quyền:</strong> Tạo deal, duyệt, quyết toán, mark paid</li>
+        <li><strong>Routes:</strong> <code>/b2b/*</code></li>
+        <li><strong>Repo:</strong> huyanh-erp (this project)</li>
+      </ul>
+    </div>
+    <div class="arch-box portal">
+      <div class="arch-box-title" style="color: var(--blue)">🏪 PARTNER PORTAL</div>
+      <div class="arch-box-domain">b2b.huyanhrubber.vn</div>
+      <ul>
+        <li><strong>Người dùng:</strong> Đại lý đã đăng ký + verified</li>
+        <li><strong>Quyền:</strong> Gửi booking/offer, ack advance, raise dispute</li>
+        <li><strong>Routes:</strong> <code>/partner/*</code></li>
+        <li><strong>Repo:</strong> huyanh-b2b-portal (riêng)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Communication arrow diagram -->
+  <svg viewBox="0 0 800 100" style="margin-top: 16px; width: 100%; height: 100px;">
+    <defs>
+      <marker id="arr1" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L9,3 z" fill="var(--green-500)" />
+      </marker>
+    </defs>
+    <text x="100" y="20" font-size="12" fill="var(--gray-600)">Booking, Offer, Dispute, Ack →</text>
+    <line x1="80" y1="35" x2="720" y2="35" stroke="var(--green-500)" stroke-width="2" marker-end="url(#arr1)" />
+    <text x="100" y="65" font-size="12" fill="var(--gray-600)">Deal status, Settlement, Ledger payment ←</text>
+    <line x1="720" y1="80" x2="80" y2="80" stroke="var(--blue)" stroke-width="2" marker-end="url(#arr1)" />
+  </svg>
+</section>
+
+<!-- 2. PURCHASE TYPES -->
+<section id="purchase-types">
+  <h2>2. 4 luồng mua mủ (theo <code>purchase_type</code>)</h2>
+  <p>Mỗi luồng có UX riêng + bypass rule riêng. Chọn đúng luồng theo loại đại lý / tốc độ giao dịch.</p>
+
+  <div class="grid-4">
+    <div class="ptype-card">
+      <div class="ptype-icon">📦</div>
+      <div class="ptype-title">Standard</div>
+      <span class="ptype-code">standard</span>
+      <ul>
+        <li>QC sample → BGĐ duyệt → Cân → Thanh toán sau</li>
+        <li>Đại lý đã có hồ sơ</li>
+        <li>Lượng lớn, không gấp</li>
+        <li>Cân + nhập kho CHỈ khi <code>accepted</code></li>
+      </ul>
+    </div>
+    <div class="ptype-card outright">
+      <div class="ptype-icon">🅰️</div>
+      <div class="ptype-title">Outright (Mua đứt)</div>
+      <span class="ptype-code">outright</span>
+      <ul>
+        <li>Bypass QC + BGĐ</li>
+        <li>Kế toán cáp DRC bằng kinh nghiệm</li>
+        <li>Chi tiền ngay tại cân</li>
+        <li>Đại lý quen, đặc biệt từ Lào</li>
+      </ul>
+    </div>
+    <div class="ptype-card walkin">
+      <div class="ptype-icon">🅲</div>
+      <div class="ptype-title">Walk-in (Hộ nông dân)</div>
+      <span class="ptype-code">farmer_walkin</span>
+      <ul>
+        <li>CCCD lookup (12 số VN)</li>
+        <li>Giá ngày từ admin</li>
+        <li>Chi tiền ngay</li>
+        <li>Khách lẻ chưa có hồ sơ</li>
+      </ul>
+    </div>
+    <div class="ptype-card production">
+      <div class="ptype-icon">🅱️</div>
+      <div class="ptype-title">DRC-after-production</div>
+      <span class="ptype-code">drc_after_production</span>
+      <ul>
+        <li>Sample DRC trước</li>
+        <li>Sản xuất pooled</li>
+        <li>DRC thật chốt sau (auto-dispute nếu lệch &gt;3%)</li>
+        <li>Đại lý gold/silver</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 3. STANDARD FLOW -->
+<section id="standard-flow">
+  <h2>3. Workflow Standard — 10 bước</h2>
+  <p>Luồng "đầy đủ" áp dụng cho đại lý lớn, mặc định trong hệ thống. Outright/Walkin/Production rút gọn 1 số bước.</p>
+
+  <div class="workflow-step">
+    <div class="step-number">1</div>
+    <div class="step-content">
+      <div class="step-actor">🏪 Đại lý (Portal)</div>
+      <h4>Tạo Phiếu chốt mủ (Booking)</h4>
+      <p>Đại lý vào portal → mở chat → tạo Booking với product/qty/expected DRC → gửi.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">2</div>
+    <div class="step-content">
+      <div class="step-actor">🛒 NV Thu mua (ERP)</div>
+      <h4>Nhận chat → click "Tạo Deal"</h4>
+      <p>ConfirmDealModal mở: xác định partner, qty, price, target_facility → submit. Deal status='pending'.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">3</div>
+    <div class="step-content">
+      <div class="step-actor">🛒 NV Thu mua (ERP)</div>
+      <h4>Bắt đầu xử lý → status='processing'</h4>
+      <p>Click "Bắt đầu xử lý" trên Deal. Trigger fire notification cho QC.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">4</div>
+    <div class="step-content">
+      <div class="step-actor">🔬 QC</div>
+      <h4>Đo DRC sample</h4>
+      <p>Tab QC → nhập sample_drc + ghi chú → Save. Result conclusion: pass / warning / failed.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">5</div>
+    <div class="step-content">
+      <div class="step-actor">🏛️ BGĐ</div>
+      <h4>Duyệt Deal → status='accepted'</h4>
+      <p>Tab Header → "Duyệt Deal" → modal nhập <strong>Giá chốt</strong> → submit. Trigger <code>enforce_deal_lock</code> kích hoạt: core fields khóa lại.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">6</div>
+    <div class="step-content">
+      <div class="step-actor">⚖️ Scale Operator</div>
+      <h4>Cân xe (Gross + Tare → Net)</h4>
+      <p>Vào can.huyanhrubber.vn → tạo ticket IN. Trigger <code>enforce_weighbridge_requires_accepted_deal</code> reject nếu deal chưa accepted.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">7</div>
+    <div class="step-content">
+      <div class="step-actor">🛒 NV Thu mua (ERP)</div>
+      <h4>Tab Tạm ứng → tạo Advance</h4>
+      <p>Nhập số tiền, lý do → save. Trigger gửi notification cho đại lý qua portal realtime.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">8</div>
+    <div class="step-content">
+      <div class="step-actor">🏪 Đại lý (Portal)</div>
+      <h4>Ack advance trên portal</h4>
+      <p>Tab Tài chính → thấy advance → click ACK → ledger ghi <code>advance_paid</code>.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">9</div>
+    <div class="step-content">
+      <div class="step-actor">💵 NV Thu mua (ERP)</div>
+      <h4>Header "Quyết toán" → Settlement auto-create</h4>
+      <p>Settlement gom deal + advances → status='draft' → Submit for Approval.</p>
+    </div>
+  </div>
+  <div class="workflow-step">
+    <div class="step-number">10</div>
+    <div class="step-content">
+      <div class="step-actor">🧮 Kế toán</div>
+      <h4>BGĐ Approve → Mark Paid</h4>
+      <p>Modal: ngày + payment_method (bank/cash/check). Trigger <code>on_settlement_paid</code> auto sinh ledger entry <code>payment_paid</code>. Realtime cập nhật ERP + portal.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. STATE MACHINE -->
+<section id="state-machine">
+  <h2>4. State machine — Deal</h2>
+  <p>Deal đi qua 4 status forward + 1 terminal status. Sau <code>accepted</code> các core fields bị khóa (trigger <code>enforce_deal_lock</code>).</p>
+
+  <div class="state-machine">
+    <svg viewBox="0 0 900 280" style="width: 100%; min-width: 700px; height: 280px;">
+      <defs>
+        <marker id="arr2" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L10,3 z" fill="var(--green-500)" />
+        </marker>
+        <marker id="arr-red" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L10,3 z" fill="var(--red)" />
+        </marker>
+      </defs>
+
+      <!-- State circles -->
+      <g>
+        <circle cx="80" cy="80" r="42" class="state-circle" />
+        <text x="80" y="78" text-anchor="middle" class="state-text">pending</text>
+        <text x="80" y="93" text-anchor="middle" font-size="9" fill="var(--gray-600)">vừa tạo</text>
+      </g>
+      <g>
+        <circle cx="260" cy="80" r="42" class="state-circle" />
+        <text x="260" y="78" text-anchor="middle" class="state-text">processing</text>
+        <text x="260" y="93" text-anchor="middle" font-size="9" fill="var(--gray-600)">QC + BGĐ</text>
+      </g>
+      <g>
+        <circle cx="460" cy="80" r="42" class="state-circle" />
+        <text x="460" y="78" text-anchor="middle" class="state-text">accepted</text>
+        <text x="460" y="93" text-anchor="middle" font-size="9" fill="var(--gray-600)">đã duyệt 🔒</text>
+      </g>
+      <g>
+        <circle cx="660" cy="80" r="42" class="state-circle terminal" />
+        <text x="660" y="78" text-anchor="middle" class="state-text">settled</text>
+        <text x="660" y="93" text-anchor="middle" font-size="9" fill="var(--gray-600)">đã QT, locked</text>
+      </g>
+      <g>
+        <circle cx="270" cy="220" r="42" class="state-circle danger" />
+        <text x="270" y="218" text-anchor="middle" class="state-text" fill="var(--red)">cancelled</text>
+        <text x="270" y="233" text-anchor="middle" font-size="9" fill="var(--gray-600)">terminal</text>
+      </g>
+
+      <!-- Forward arrows -->
+      <line x1="125" y1="80" x2="215" y2="80" class="arrow-line" marker-end="url(#arr2)" />
+      <text x="170" y="70" text-anchor="middle" font-size="10" fill="var(--gray-600)">Bắt đầu xử lý</text>
+
+      <line x1="305" y1="80" x2="415" y2="80" class="arrow-line" marker-end="url(#arr2)" />
+      <text x="360" y="70" text-anchor="middle" font-size="10" fill="var(--gray-600)">BGĐ duyệt + final price</text>
+
+      <line x1="505" y1="80" x2="615" y2="80" class="arrow-line" marker-end="url(#arr2)" />
+      <text x="560" y="70" text-anchor="middle" font-size="10" fill="var(--gray-600)">Quyết toán + Mark Paid</text>
+
+      <!-- Cancel arrows -->
+      <line x1="80" y1="125" x2="240" y2="195" stroke="var(--red)" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arr-red)" />
+      <line x1="260" y1="125" x2="270" y2="175" stroke="var(--red)" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arr-red)" />
+      <text x="160" y="170" font-size="10" fill="var(--red)">Hủy (chỉ trước accepted)</text>
+
+      <!-- Locked indicator -->
+      <text x="460" y="140" text-anchor="middle" font-size="11" fill="var(--gray-600)">Sau accepted: 🔒 qty / unit_price / partner_id / expected_drc</text>
+    </svg>
+  </div>
+
+  <div class="callout warn">
+    <strong>Lưu ý:</strong> Riêng <code>purchase_type='drc_after_production'</code>: cho phép set <code>actual_drc</code> 1 lần (NULL → value), sau đó khóa. Trigger <code>trg_drc_variance_dispute</code> check variance &gt; 3% → auto-raise dispute.
+  </div>
+</section>
+
+<!-- 5. MENU -->
+<section id="menu">
+  <h2>5. Sidebar 12 menu — chức năng từng module</h2>
+  <p>Chỉ <strong>4 email</strong> được phép truy cập (B2B Purchaser): <code>khuyennt@</code>, <code>duyhh@</code>, <code>minhld@</code>, <code>trunglxh@</code>.</p>
+
+  <div class="grid-2">
+    <div class="menu-item">
+      <div class="menu-icon">📊</div>
+      <div>
+        <div class="menu-title">Dashboard</div>
+        <div class="menu-url">/b2b</div>
+        <div class="menu-desc">6 KPI cards + line chart 6 tháng (sản lượng/doanh thu) + pie cơ cấu sản phẩm + booking chờ duyệt + top 5 đại lý + activity timeline. Auto-refresh 30s.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">💬</div>
+      <div>
+        <div class="menu-title">Chat Đại lý <span class="badge badge-red">badge unread</span></div>
+        <div class="menu-url">/b2b/chat</div>
+        <div class="menu-desc">Split-screen Zalo style. Loại tin: hình, file, voice, Booking, Quotation. Click "Tạo Deal" trên booking → mở ConfirmDealModal. Auto-mark read sau 1s.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">📋</div>
+      <div>
+        <div class="menu-title">Nhu cầu mua</div>
+        <div class="menu-url">/b2b/demands</div>
+        <div class="menu-desc">Pull flow: NM phát đơn nhu cầu → đại lý gửi offer → chốt offer = tạo Deal. Wizard 4 bước (loại+sản phẩm/spec/logistics/preview).</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">👥</div>
+      <div>
+        <div class="menu-title">Đại lý</div>
+        <div class="menu-url">/b2b/partners</div>
+        <div class="menu-desc">Card grid 12/page với tier badge (💎🥇🥈🥉🆕). Detail 4 tabs: Info / Chat / Deals / Công nợ. Admin có thêm /partners/requests duyệt đăng ký mới.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">🤝</div>
+      <div>
+        <div class="menu-title">Deals</div>
+        <div class="menu-url">/b2b/deals</div>
+        <div class="menu-desc">Status tabs (All/Pending/Processing/Accepted/Settled/Cancelled). Detail 6-7 tabs: Info / Nhập kho / QC / Tạm ứng / Giao hàng / HĐ / Sản xuất (chỉ DRC-after).</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">⏱️</div>
+      <div>
+        <div class="menu-title">Đấu giá</div>
+        <div class="menu-url">/b2b/auctions</div>
+        <div class="menu-desc">Phiên đấu giá lô mủ tồn → đại lý bid → chọn người thắng. Status: Draft/Upcoming/Active/Extended/Ended/Awarded/Cancelled.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">📦</div>
+      <div>
+        <div class="menu-title">Lý lịch mủ</div>
+        <div class="menu-url">/b2b/rubber-intake</div>
+        <div class="menu-desc">Mỗi lô mủ NHẬP về 1 card: KL/DRC/Giá trị, partner+tier, vehicle, link tới deal. Filter status+date+product. Detail có lịch sử biến động + log + ảnh.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">📒</div>
+      <div>
+        <div class="menu-title">Công nợ</div>
+        <div class="menu-url">/b2b/ledger</div>
+        <div class="menu-desc">Sổ cái đại lý — running balance auto-compute. 6 entry_type: settlement_receivable, advance_paid, payment_paid, processing_fee, adjustment_debit/credit.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">💵</div>
+      <div>
+        <div class="menu-title">Quyết toán</div>
+        <div class="menu-url">/b2b/settlements</div>
+        <div class="menu-desc">Wizard 4 bước. Status: Draft → Pending Approval → Approved → Mark Paid. Trigger on_settlement_paid auto sinh ledger entry payment_paid.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">⚠️</div>
+      <div>
+        <div class="menu-title">Khiếu nại DRC</div>
+        <div class="menu-url">/b2b/disputes</div>
+        <div class="menu-desc">B7 workflow: Open → Investigating → Resolved (adjust DRC + ledger) / Rejected. Auto-raise nếu variance &gt; 3% (Sprint Intake v4 P14).</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">📈</div>
+      <div>
+        <div class="menu-title">Phân tích B2B</div>
+        <div class="menu-url">/b2b/analytics</div>
+        <div class="menu-desc">Top đại lý theo doanh số + Funnel conversion (Demands→Offers→Deals→Settlements) + Settlement aging color-coded. Year selector.</div>
+      </div>
+    </div>
+    <div class="menu-item">
+      <div class="menu-icon">📑</div>
+      <div>
+        <div class="menu-title">Báo cáo công nợ</div>
+        <div class="menu-url">/b2b/reports</div>
+        <div class="menu-desc">Aging report: 0-30d, 31-60d, 61-90d, &gt;90d color-coded. Year+Month selector. Export Excel.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. WIZARDS -->
+<section id="wizards">
+  <h2>6. 4 Wizard Intake (URL trực tiếp)</h2>
+  <p>Không có ở sidebar — truy cập qua URL hoặc shortcut từ Dashboard. Mỗi wizard 4 bước.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Wizard</th>
+        <th>URL</th>
+        <th>Bypass</th>
+        <th>Khi dùng</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>🅰️ <strong>Mua đứt</strong></td>
+        <td><code>/b2b/intake/outright</code></td>
+        <td>QC + BGĐ + weighbridge constraint</td>
+        <td>Đại lý quen, đặc biệt từ Lào, kế toán cáp DRC</td>
+      </tr>
+      <tr>
+        <td>🅲 <strong>Walk-in</strong></td>
+        <td><code>/b2b/intake/walkin</code></td>
+        <td>QC + BGĐ + partner verification</td>
+        <td>Hộ nông dân, CCCD lookup 12 số</td>
+      </tr>
+      <tr>
+        <td>🅱️ <strong>DRC-after-production</strong></td>
+        <td><code>/b2b/intake/production</code></td>
+        <td>Không bypass; tạo deal status=accepted ngay</td>
+        <td>Đại lý gold/silver, sample DRC trước</td>
+      </tr>
+      <tr>
+        <td>🛠️ <strong>Daily Price Admin</strong></td>
+        <td><code>/b2b/settings/daily-prices</code></td>
+        <td>Admin only</td>
+        <td>Set giá ngày cho walkin wizard tự load</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 7. PERMISSIONS -->
+<section id="permissions">
+  <h2>7. Phân quyền</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Role</th>
+        <th>Action được phép</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Đại lý (portal)</strong></td>
+        <td>Gửi booking, gửi offer cho demand, raise dispute, ack advance, xem deal/settlement của mình</td>
+      </tr>
+      <tr>
+        <td><strong>NV Thu mua</strong> (4 email)</td>
+        <td>Tất cả menu B2B, tạo deal/settlement, trao đổi chat</td>
+      </tr>
+      <tr>
+        <td><strong>QC</strong></td>
+        <td>Tab QC trong DealDetail — đo DRC sample + actual</td>
+      </tr>
+      <tr>
+        <td><strong>BGĐ</strong> (level 1-3)</td>
+        <td>Approve deal + final_price; Approve/Reject settlement</td>
+      </tr>
+      <tr>
+        <td><strong>Kế toán</strong></td>
+        <td>Mark paid, ledger adjustment, báo cáo công nợ</td>
+      </tr>
+      <tr>
+        <td><strong>Admin</strong></td>
+        <td>Toàn quyền + duyệt partner request + daily price + pickup locations</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 8. REALTIME + TRIGGERS -->
+<section id="realtime">
+  <h2>8. Realtime + Triggers + Locks</h2>
+
+  <h3>5 bảng B2B realtime (B8)</h3>
+  <p>Đã enable Realtime publication — Portal nhận card update không cần F5:</p>
+  <div class="grid-3">
+    <div class="stat-card blue"><div class="stat-label">advances</div><div class="stat-value">Tạm ứng</div></div>
+    <div class="stat-card blue"><div class="stat-label">chat_messages</div><div class="stat-value">Tin nhắn</div></div>
+    <div class="stat-card blue"><div class="stat-label">deals</div><div class="stat-value">Deal status</div></div>
+    <div class="stat-card blue"><div class="stat-label">drc_disputes</div><div class="stat-value">Khiếu nại</div></div>
+    <div class="stat-card blue"><div class="stat-label">settlements</div><div class="stat-value">Quyết toán</div></div>
+  </div>
+
+  <h3>Triggers nghiệp vụ chính</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Trigger</th>
+        <th>Mục đích</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>enforce_deal_lock</code></td><td>Khóa core fields sau khi deal accepted (qty, price, partner, expected_drc)</td></tr>
+      <tr><td><code>enforce_weighbridge_requires_accepted_deal</code></td><td>Reject ticket cân nếu deal chưa accepted (Standard flow)</td></tr>
+      <tr><td><code>enforce_b2b_stock_in_requires_accepted_deal</code></td><td>Reject phiếu nhập kho nếu deal chưa accepted</td></tr>
+      <tr><td><code>trg_ticket_allocate_on_weigh</code></td><td>Multi-lot: 1 xe gom 3 đại lý → tự chia NET theo declared_qty_kg</td></tr>
+      <tr><td><code>trg_drc_variance_dispute</code></td><td>Auto-raise dispute khi UPDATE actual_drc với variance &gt; 3%</td></tr>
+      <tr><td><code>on_settlement_paid</code></td><td>Khi mark paid → auto sinh ledger entry payment_paid + update balance</td></tr>
+      <tr><td><code>compute_running_balance</code></td><td>Auto compute running_balance trên mỗi ledger entry</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Bypass rules cho Outright/Walkin:</strong> Sprint J P19-P21 đã loosen <code>enforce_weighbridge_requires_accepted_deal</code> và <code>enforce_b2b_stock_in_requires_accepted_deal</code> cho 2 luồng này — vì chi tiền tại cân, không qua BGĐ.
+  </div>
+</section>
+
+<!-- 9. SPRINT HISTORY -->
+<section id="sprint-history">
+  <h2>9. Sprint history (timeline)</h2>
+  <div style="position: relative; padding-left: 40px;">
+    <div style="position: absolute; left: 16px; top: 0; bottom: 0; width: 2px; background: var(--green-500);"></div>
+
+    <div style="position: relative; margin-bottom: 18px;">
+      <div style="position: absolute; left: -28px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--green-700); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--green-500);"></div>
+      <strong>Sprint 1-4 (4/2026)</strong> — 14 gap CRITICAL/HIGH/MED/LOW enforce ở DB+code, validated 2026-04-21
+    </div>
+    <div style="position: relative; margin-bottom: 18px;">
+      <div style="position: absolute; left: -28px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--green-700); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--green-500);"></div>
+      <strong>Portal V2 redesign</strong> — Menu 10→5 + Sprint A/B/C/D fixes + RLS leak closed (2026-04-21)
+    </div>
+    <div style="position: relative; margin-bottom: 18px;">
+      <div style="position: absolute; left: -28px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--green-700); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--green-500);"></div>
+      <strong>Intake v4 P1-P45</strong> — 4 wizard intake mới (outright/walkin/production), DRC variance auto-dispute, multi-lot allocation
+    </div>
+    <div style="position: relative; margin-bottom: 18px;">
+      <div style="position: absolute; left: -28px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--green-700); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--green-500);"></div>
+      <strong>Sprint E/N/O/P</strong> — Ledger running balance trigger, settlement paid trigger, view resync, daily price admin
+    </div>
+    <div style="position: relative; margin-bottom: 18px;">
+      <div style="position: absolute; left: -28px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--amber); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--green-500);"></div>
+      <strong>Sprint F (2026-05-04)</strong> — CCCD format CHECK constraint (VN=12 số), b2b_views resync sau ALTER base
+    </div>
+    <div style="position: relative;">
+      <div style="position: absolute; left: -28px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--gray-300); border: 3px solid #fff; box-shadow: 0 0 0 1px var(--green-500);"></div>
+      <strong>Pending</strong> — B7 dispute UI deep test, B8 cross-portal realtime, portal /production route
+    </div>
+  </div>
+</section>
+
+<footer style="margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--gray-300); text-align: center; color: var(--gray-600); font-size: 12px;">
+  Module B2B Thu mua — Huy Anh Rubber ERP — Cập nhật 2026-05-04 sau khi apply Sprint F + view-resync.<br>
+  Xem chi tiết tại <code>docs/B2B_USER_HANDBOOK.md</code> + <code>docs/B2B_DEEP_GUIDE.docx</code>.
+</footer>
+
+</div>
+</body>
+</html>

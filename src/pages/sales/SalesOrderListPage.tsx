@@ -160,10 +160,11 @@ const SalesOrderListPage = () => {
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
   // Sort + column filter state (Ant Table onChange driven)
-  // Default = ETD ascending → đơn quá hạn / sắp đến hạn lên đầu (BGĐ scan dễ).
-  // Đổi sang order_date desc nếu muốn xem đơn mới nhất.
-  const [sortBy, setSortBy] = useState<string>('etd')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  // Default = created_at DESC (đơn mới tạo lên đầu) — chuẩn ERP cho daily ops.
+  // Khi filter overdue_etd_only=true → auto-switch ETD asc để show urgent first.
+  // Watchlist BGĐ là page riêng, mặc định ETD asc cho mục đích catch quá hạn.
+  const [sortBy, setSortBy] = useState<string>('created_at')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   // Filter "chỉ show đơn quá ETD" — set qua query param ?filter=overdue_etd
   const [overdueEtdOnly, setOverdueEtdOnly] = useState<boolean>(false)
 
@@ -230,10 +231,13 @@ const SalesOrderListPage = () => {
   }, [fetchStats, fetchCustomers])
 
   // Parse query param ?filter=overdue_etd để jump từ Watchlist
+  // → Khi filter active, auto-switch sort sang ETD asc (urgent first)
   useEffect(() => {
     const filter = searchParams.get('filter')
     if (filter === 'overdue_etd') {
       setOverdueEtdOnly(true)
+      setSortBy('etd')
+      setSortOrder('asc')
     }
   }, [searchParams])
 
@@ -293,10 +297,9 @@ const SalesOrderListPage = () => {
       setSortBy(fieldMap[field] || field)
       setSortOrder(single.order === 'ascend' ? 'asc' : 'desc')
     } else if (single && single.field && !single.order) {
-      // User click lần 3 trên cùng cột → clear sort → fallback ETD asc
-      // (KHÔNG reset về order_date desc nữa — tránh override default tốt hơn).
-      setSortBy('etd')
-      setSortOrder('asc')
+      // User click lần 3 trên cùng cột → clear sort → fallback default
+      setSortBy('created_at')
+      setSortOrder('desc')
     }
     // Trường hợp khác (pagination, filter, ...): GIỮ NGUYÊN sort hiện tại,
     // không setSortBy gì cả → tránh bug pagination reset sort.

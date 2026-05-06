@@ -267,12 +267,13 @@ export const salesOrderService = {
     }
 
     // Sắp xếp — explicit NULLS LAST khi ASC để đơn chưa có giá trị
-    // (vd ETD null) xuống cuối list. Thêm secondary sort theo code DESC
-    // để break tie deterministically khi nhiều row cùng giá trị primary.
+    // (vd ETD null) xuống cuối list. Secondary sort by id để stable order
+    // khi nhiều row cùng primary value (avoid Postgres arbitrary plan).
     const isAsc = sort_order === 'asc'
-    query = query
-      .order(sort_by, { ascending: isAsc, nullsFirst: false })
-      .order('code', { ascending: false })  // tie-breaker
+    query = query.order(sort_by, { ascending: isAsc, nullsFirst: false })
+    if (sort_by !== 'code' && sort_by !== 'id') {
+      query = query.order('id', { ascending: false })  // stable tie-breaker
+    }
 
     // Phân trang
     const { data, error, count } = await query.range(from, to)

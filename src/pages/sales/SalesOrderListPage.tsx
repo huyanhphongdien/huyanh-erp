@@ -303,10 +303,7 @@ const SalesOrderListPage = () => {
       const field = String(single.field)
       // Map column key → DB field
       const fieldMap: Record<string, string> = {
-        // SỐ HĐ click → sort theo `code` (SO-YYYY-NNNN) thay vì contract_no
-        // Vì contract_no user nhập tay có thể inconsistent (whitespace, format
-        // khác nhau, NULL...), code là mã hệ thống sequential nên sort đáng tin cậy.
-        contract_no: 'code',
+        contract_no: 'contract_no',
         customer: 'customer_id',
         grade: 'grade',
         lot: 'customer_po',
@@ -502,7 +499,7 @@ const SalesOrderListPage = () => {
       key === 'bkg' ? 'booking_reference' : key === 'total_usd' ? 'total_value_usd' :
       key === 'deposit' ? 'deposit_amount' : key === 'discount' ? 'discount_amount' :
       key === 'remaining' ? 'remaining_amount' : key === 'payment_date' ? 'payment_received_date' :
-      key === 'customer' ? 'customer_id' : key === 'contract_no' ? 'code' : key)
+      key === 'customer' ? 'customer_id' : key)
       ? (sortOrder === 'asc' ? 'ascend' as const : 'descend' as const)
       : null
 

@@ -102,6 +102,7 @@ const SORT_FIELD_LABELS: Record<string, string> = {
   delivery_date: 'Hạn giao',
   ready_date: 'Sẵn hàng',
   contract_no: 'Số HĐ',
+  contract_no_sort_key: 'Số HĐ (theo số đơn)',
   customer_id: 'Khách hàng',
   grade: 'Grade',
   customer_po: 'Số LOT',
@@ -303,12 +304,12 @@ const SalesOrderListPage = () => {
       const field = String(single.field)
       // Map column key → DB field
       const fieldMap: Record<string, string> = {
-        // Click cột SỐ HĐ → sort theo `code` (SO-YYYY-NNNN sequential),
-        // KHÔNG theo contract_no string. Lý do:
-        //   contract_no user nhập tay (vd HA20240046, HA20260001) → string sort
-        //   đặt '2024...' trước '2026...' → user thấy lạ.
-        //   `code` là mã hệ thống auto-tăng → order natural khớp expectation.
-        contract_no: 'code',
+        // Click cột SỐ HĐ → sort theo `contract_no_sort_key` (generated column,
+        // = last 4 chữ số của contract_no parse INT). Vd HA20260001→1,
+        // HA20240046→46, HA20260050→50. Sort numeric ASC sẽ:
+        //   HA20260001 (1), HA20260002 (2), ..., HA20240046 (46), ..., HA20260050 (50)
+        // → User thấy đơn 2024 chen giữa list theo suffix number, đúng mong muốn.
+        contract_no: 'contract_no_sort_key',
         customer: 'customer_id',
         grade: 'grade',
         lot: 'customer_po',
@@ -504,7 +505,7 @@ const SalesOrderListPage = () => {
       key === 'bkg' ? 'booking_reference' : key === 'total_usd' ? 'total_value_usd' :
       key === 'deposit' ? 'deposit_amount' : key === 'discount' ? 'discount_amount' :
       key === 'remaining' ? 'remaining_amount' : key === 'payment_date' ? 'payment_received_date' :
-      key === 'customer' ? 'customer_id' : key === 'contract_no' ? 'code' : key)
+      key === 'customer' ? 'customer_id' : key === 'contract_no' ? 'contract_no_sort_key' : key)
       ? (sortOrder === 'asc' ? 'ascend' as const : 'descend' as const)
       : null
 

@@ -292,11 +292,14 @@ const SalesOrderListPage = () => {
       }
       setSortBy(fieldMap[field] || field)
       setSortOrder(single.order === 'ascend' ? 'asc' : 'desc')
-    } else {
-      // Reset sort khi user click lần 3 (clear)
-      setSortBy('order_date')
-      setSortOrder('desc')
+    } else if (single && single.field && !single.order) {
+      // User click lần 3 trên cùng cột → clear sort → fallback ETD asc
+      // (KHÔNG reset về order_date desc nữa — tránh override default tốt hơn).
+      setSortBy('etd')
+      setSortOrder('asc')
     }
+    // Trường hợp khác (pagination, filter, ...): GIỮ NGUYÊN sort hiện tại,
+    // không setSortBy gì cả → tránh bug pagination reset sort.
 
     // Filter: chỉ grade hiện hỗ trợ ở column header (đồng bộ với gradeFilter ở toolbar)
     if (filters.grade && filters.grade.length > 0) {

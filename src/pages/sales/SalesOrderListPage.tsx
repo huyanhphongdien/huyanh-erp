@@ -95,6 +95,33 @@ const getCountryFlag = (code?: string): string => {
 // FORMAT HELPERS
 // ============================================
 
+const SORT_FIELD_LABELS: Record<string, string> = {
+  created_at: 'Ngày tạo',
+  order_date: 'Ngày đặt hàng',
+  etd: 'ETD (ngày tàu chạy)',
+  delivery_date: 'Hạn giao',
+  ready_date: 'Sẵn hàng',
+  contract_no: 'Số HĐ',
+  customer_id: 'Khách hàng',
+  grade: 'Grade',
+  customer_po: 'Số LOT',
+  quantity_tons: 'Số lượng (tấn)',
+  unit_price: 'Đơn giá',
+  total_value_usd: 'Thành tiền',
+  bank_name: 'Ngân hàng',
+  booking_reference: 'Số BKG',
+  deposit_amount: 'Đặt cọc',
+  discount_amount: 'CK',
+  remaining_amount: 'Còn lại',
+  payment_received_date: 'Ngày TT',
+  code: 'Mã đơn',
+  id: 'ID',
+}
+
+function sortFieldLabel(field: string): string {
+  return SORT_FIELD_LABELS[field] || field
+}
+
 const formatCurrency = (value?: number): string => {
   if (value == null) return '-'
   return new Intl.NumberFormat('en-US', {
@@ -885,6 +912,57 @@ const SalesOrderListPage = () => {
           </Button>
         </div>
       )}
+
+      {/* Sort status banner */}
+      <div style={{
+        padding: '8px 12px',
+        background: '#f0faf5',
+        border: '1px solid #d1ecdf',
+        borderRadius: 6,
+        marginBottom: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        fontSize: 12,
+        flexWrap: 'wrap',
+        gap: 8,
+      }}>
+        <span style={{ color: '#1B4D3E' }}>
+          📊 Đang sắp xếp theo: <strong>{sortFieldLabel(sortBy)}</strong>
+          {' '}
+          <span style={{
+            display: 'inline-block',
+            padding: '1px 8px',
+            background: '#1B4D3E',
+            color: '#fff',
+            borderRadius: 4,
+            fontFamily: 'monospace',
+            fontSize: 11,
+            marginLeft: 4,
+          }}>
+            {sortOrder === 'asc' ? '↑ Tăng dần' : '↓ Giảm dần'}
+          </span>
+          {' — Click cột bất kỳ để đổi sort. Click 3 lần (cùng cột) để reset.'}
+        </span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Button
+            size="small"
+            onClick={() => { setSortBy('created_at'); setSortOrder('desc') }}
+            disabled={sortBy === 'created_at' && sortOrder === 'desc'}
+          >
+            Đơn mới nhất
+          </Button>
+          <Button
+            size="small"
+            onClick={() => { setSortBy('etd'); setSortOrder('asc') }}
+            disabled={sortBy === 'etd' && sortOrder === 'asc'}
+            type={sortBy === 'etd' ? 'primary' : 'default'}
+            style={sortBy === 'etd' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
+          >
+            🚨 ETD gần nhất
+          </Button>
+        </div>
+      </div>
 
       {/* Filter Bar */}
       <Card size="small" style={{ marginBottom: 16, borderRadius: 8 }}>

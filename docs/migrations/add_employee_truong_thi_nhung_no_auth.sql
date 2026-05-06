@@ -30,7 +30,7 @@ BEGIN
   -- Check chưa tồn tại
   SELECT COUNT(*) INTO v_existing_count
   FROM employees
-  WHERE LOWER(email) = 'nhungnt@huyanhrubber.com';
+  WHERE LOWER(email) = 'nhungtt@huyanhrubber.com';
   IF v_existing_count > 0 THEN
     RAISE EXCEPTION 'Employee voi email nhungnt@ DA TON TAI - khong tao trung.';
   END IF;
@@ -95,7 +95,7 @@ SELECT
     ) + 1
   )::TEXT, 4, '0'),
   'Trương Thị Nhung',
-  'nhungnt@huyanhrubber.com',
+  'nhungtt@huyanhrubber.com',
   NULL,              -- ★ chưa có auth, link sau
   (SELECT id FROM departments
     WHERE name ILIKE '%logistic%' OR name ILIKE '%xu%t nh%p kh%u%'
@@ -121,7 +121,7 @@ SELECT
 FROM employees e
 LEFT JOIN departments d ON d.id = e.department_id
 LEFT JOIN positions p ON p.id = e.position_id
-WHERE e.email = 'nhungnt@huyanhrubber.com';
+WHERE e.email = 'nhungtt@huyanhrubber.com';
 -- has_auth_link = false → đúng, link sau
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -129,14 +129,14 @@ WHERE e.email = 'nhungnt@huyanhrubber.com';
 -- ════════════════════════════════════════════════════════════════════════════
 -- Sau khi tạo auth account trên Supabase Dashboard:
 --   UPDATE employees
---   SET user_id = (SELECT id FROM auth.users WHERE LOWER(email) = 'nhungnt@huyanhrubber.com' LIMIT 1)
---   WHERE email = 'nhungnt@huyanhrubber.com';
+--   SET user_id = (SELECT id FROM auth.users WHERE LOWER(email) = 'nhungtt@huyanhrubber.com' LIMIT 1)
+--   WHERE email = 'nhungtt@huyanhrubber.com';
 --
 --   Verify:
 --   SELECT code, full_name, email, user_id IS NOT NULL AS linked
---   FROM employees WHERE email = 'nhungnt@huyanhrubber.com';
+--   FROM employees WHERE email = 'nhungtt@huyanhrubber.com';
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- ROLLBACK
 -- ════════════════════════════════════════════════════════════════════════════
--- DELETE FROM employees WHERE email = 'nhungnt@huyanhrubber.com';
+-- DELETE FROM employees WHERE email = 'nhungtt@huyanhrubber.com';

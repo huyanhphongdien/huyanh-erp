@@ -13,7 +13,7 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Logistics (Xuất nhập khẩu) — quyền edit Booking / Container / Shipping only
   'logistics@huyanhrubber.com': 'logistics',
   'anhlp@huyanhrubber.com': 'logistics',
-  'nhungnt@huyanhrubber.com': 'logistics',  // Trương Thị Nhung — TP Logistics (2026-05-05)
+  'nhungtt@huyanhrubber.com': 'logistics',  // Trương Thị Nhung — TP Logistics (2026-05-05)
   // Accounting
   'yendt@huyanhrubber.com': 'accounting',
   'phulv@huyanhrubber.com': 'accounting',

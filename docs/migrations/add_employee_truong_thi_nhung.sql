@@ -1,11 +1,11 @@
 -- ============================================================================
 -- Add employee: Trương Thị Nhung — Trưởng phòng Logistics
 -- Date: 2026-05-05
--- Email: nhungnt@huyanhrubber.com (auth account đã tạo bằng tay)
+-- Email: nhungtt@huyanhrubber.com (auth account đã tạo bằng tay)
 -- ============================================================================
 --
 -- Yêu cầu user 2026-05-05:
---   "Trương Thị Nhung — nhungnt@huyanhrubber.com — Trưởng phòng Logistics
+--   "Trương Thị Nhung — nhungtt@huyanhrubber.com — Trưởng phòng Logistics
 --    đã tạo tài khoản mail trên authen, bạn add vào giùm tôi"
 --
 -- SCRIPT này:
@@ -33,18 +33,18 @@ BEGIN
   -- Check auth.users có account
   SELECT id INTO v_auth_user_id
   FROM auth.users
-  WHERE LOWER(email) = 'nhungnt@huyanhrubber.com'
+  WHERE LOWER(email) = 'nhungtt@huyanhrubber.com'
   LIMIT 1;
 
   IF v_auth_user_id IS NULL THEN
-    RAISE EXCEPTION 'KHONG TIM THAY auth user voi email nhungnt@huyanhrubber.com. User can tao auth account truoc tren Supabase Dashboard > Authentication > Users.';
+    RAISE EXCEPTION 'KHONG TIM THAY auth user voi email nhungtt@huyanhrubber.com. User can tao auth account truoc tren Supabase Dashboard > Authentication > Users.';
   END IF;
   RAISE NOTICE 'OK - Tim thay auth user_id = %', v_auth_user_id;
 
   -- Check chưa tồn tại employee với email này
   SELECT COUNT(*) INTO v_existing_count
   FROM employees
-  WHERE LOWER(email) = 'nhungnt@huyanhrubber.com';
+  WHERE LOWER(email) = 'nhungtt@huyanhrubber.com';
   IF v_existing_count > 0 THEN
     RAISE EXCEPTION 'Employee voi email nhungnt@ DA TON TAI - khong tao trung. Kiem tra lai.';
   END IF;
@@ -97,7 +97,7 @@ BEGIN
   RAISE NOTICE '=== SAP INSERT ===';
   RAISE NOTICE 'Code:       %', v_next_code;
   RAISE NOTICE 'Name:       Truong Thi Nhung';
-  RAISE NOTICE 'Email:      nhungnt@huyanhrubber.com';
+  RAISE NOTICE 'Email:      nhungtt@huyanhrubber.com';
   RAISE NOTICE 'Department: %', v_dept_name;
   RAISE NOTICE 'Position:   % (level 4)', v_position_title;
   RAISE NOTICE 'auth_user:  %', v_auth_user_id;
@@ -127,8 +127,8 @@ SELECT
     ) + 1
   )::TEXT, 4, '0'),
   'Trương Thị Nhung',
-  'nhungnt@huyanhrubber.com',
-  (SELECT id FROM auth.users WHERE LOWER(email) = 'nhungnt@huyanhrubber.com' LIMIT 1),
+  'nhungtt@huyanhrubber.com',
+  (SELECT id FROM auth.users WHERE LOWER(email) = 'nhungtt@huyanhrubber.com' LIMIT 1),
   (SELECT id FROM departments
     WHERE name ILIKE '%logistic%' OR name ILIKE '%xu%t nh%p kh%u%'
     ORDER BY CASE WHEN name ILIKE '%logistic%' THEN 1 ELSE 2 END
@@ -154,10 +154,10 @@ SELECT
 FROM employees e
 LEFT JOIN departments d ON d.id = e.department_id
 LEFT JOIN positions p ON p.id = e.position_id
-WHERE e.email = 'nhungnt@huyanhrubber.com';
+WHERE e.email = 'nhungtt@huyanhrubber.com';
 -- Mong đợi: 1 row, has_auth_link=true, position_level=4
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- ROLLBACK (nếu lỡ insert sai)
 -- ════════════════════════════════════════════════════════════════════════════
--- DELETE FROM employees WHERE email = 'nhungnt@huyanhrubber.com';
+-- DELETE FROM employees WHERE email = 'nhungtt@huyanhrubber.com';

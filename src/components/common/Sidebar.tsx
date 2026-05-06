@@ -419,6 +419,8 @@ const getMenuGroups = (
     collapsible: true,
     items: [
       { path: '/settings', label: 'Cài đặt tài khoản', icon: <User size={18} /> },
+      // Audit Log: chỉ hiện cho admin/BGĐ (executiveOnly = level <= 3)
+      { path: '/admin/audit-log', label: 'Audit Log (BGĐ)', icon: <Shield size={18} />, executiveOnly: true },
     ],
   },
 ];

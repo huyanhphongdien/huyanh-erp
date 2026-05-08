@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Tab UX Mockups — Huy Anh ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Cormorant+Garamond:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ==========================================================================
+     RESET + BASE
+     ========================================================================== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #faf9f5;
+    color: #141413;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  h1, h2, h3 { font-family: 'Cormorant Garamond', 'Tiempos Headline', Georgia, serif; font-weight: 500; letter-spacing: -0.02em; }
+  code, .mono { font-family: 'JetBrains Mono', 'Consolas', monospace; }
+
+  /* ==========================================================================
+     PAGE FRAME
+     ========================================================================== */
+  .page {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  .page-header {
+    border-bottom: 1px solid #e6dfd8;
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+  }
+  .page-header h1 {
+    font-size: 56px;
+    line-height: 1.05;
+    letter-spacing: -1.5px;
+    margin-bottom: 16px;
+  }
+  .page-header .lede {
+    font-size: 18px;
+    color: #3d3d3a;
+    max-width: 700px;
+  }
+  .page-header .meta {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .meta .pill {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #efe9de;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #3d3d3a;
+  }
+  .meta .pill.coral { background: #cc785c; color: #fff; }
+  .meta .pill.dark  { background: #181715; color: #faf9f5; }
+
+  .toc {
+    margin: 48px 0;
+    padding: 24px 28px;
+    background: #efe9de;
+    border-radius: 12px;
+  }
+  .toc h2 { font-size: 22px; margin-bottom: 12px; }
+  .toc ol { padding-left: 20px; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; font-size: 14px; }
+  .toc a { color: #cc785c; text-decoration: none; font-weight: 500; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ==========================================================================
+     VARIANT SECTION FRAME
+     ========================================================================== */
+  .variant {
+    margin-bottom: 96px;
+    padding-top: 24px;
+  }
+  .variant-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .variant-header .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: #6c6a64;
+    font-weight: 500;
+  }
+  .variant-header h2 {
+    font-size: 36px;
+    letter-spacing: -0.5px;
+  }
+  .variant .source {
+    font-size: 13px;
+    color: #6c6a64;
+    margin-bottom: 24px;
+    font-style: italic;
+  }
+  .variant .desc {
+    font-size: 16px;
+    color: #3d3d3a;
+    margin-bottom: 24px;
+    max-width: 800px;
+  }
+  .variant .pros-cons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .pros-cons .box {
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .pros-cons .pros { background: #ecf7ed; border-left: 3px solid #5db872; }
+  .pros-cons .cons { background: #fdecec; border-left: 3px solid #c64545; }
+  .pros-cons strong { display: block; margin-bottom: 6px; }
+  .pros-cons li { margin-left: 18px; margin-bottom: 4px; }
+
+  /* ==========================================================================
+     MOCKUP FRAME — common shell wrapping each visual mockup
+     ========================================================================== */
+  .mockup {
+    background: #fff;
+    border: 1px solid #e6dfd8;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(20,20,19,0.08);
+    margin-bottom: 16px;
+  }
+  .mockup-titlebar {
+    background: #f0ede8;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e6dfd8;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #6c6a64;
+  }
+  .mockup-titlebar .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #d0cec9;
+  }
+  .mockup-titlebar .dot.red    { background: #ff6058; }
+  .mockup-titlebar .dot.yellow { background: #ffbd2e; }
+  .mockup-titlebar .dot.green  { background: #28c941; }
+  .mockup-titlebar .url {
+    flex: 1;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: #fff;
+    border: 1px solid #e6dfd8;
+    border-radius: 4px;
+    padding: 4px 12px;
+    color: #6c6a64;
+    margin: 0 80px;
+  }
+
+  /* ==========================================================================
+     VARIANT A — ECOUNT-inspired (current ERP style, enhanced)
+     ========================================================================== */
+  .v-a-app {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    height: 600px;
+    background: #fafaf8;
+  }
+  .v-a-side {
+    background: #1B4D3E;
+    color: #fff;
+    padding: 0;
+    overflow-y: auto;
+  }
+  .v-a-side-brand {
+    padding: 16px 18px;
+    font-weight: 700;
+    font-size: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background: #143a2e;
+  }
+  .v-a-side-section {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .v-a-side-title {
+    padding: 6px 18px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.5);
+  }
+  .v-a-side-item {
+    padding: 7px 18px 7px 28px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    cursor: pointer;
+  }
+  .v-a-side-item:hover { background: rgba(255,255,255,0.08); }
+  .v-a-side-item.active { background: #2D8B6E; color: #fff; font-weight: 600; }
+
+  .v-a-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .v-a-tabbar {
+    background: linear-gradient(to bottom, #F0EDE8 0%, #E5E1D8 100%);
+    padding: 8px 12px 0 12px;
+    border-bottom: 3px solid #1B4D3E;
+    box-shadow: 0 2px 6px rgba(27,77,62,0.15);
+    display: flex;
+    align-items: end;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .v-a-tab {
+    background: #fff;
+    border: 1px solid #d0cec9;
+    border-radius: 6px 6px 0 0;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #595959;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .v-a-tab:hover { background: #f6ffed; border-color: #2D8B6E; color: #1B4D3E; }
+  .v-a-tab.active {
+    background: #1B4D3E;
+    border-color: #1B4D3E;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 -2px 4px rgba(27,77,62,0.2);
+  }
+  .v-a-tab .close { opacity: 0.6; font-size: 11px; }
+  .v-a-tab .close:hover { opacity: 1; }
+  .v-a-tab .dirty { color: #faad14; font-size: 8px; }
+
+  .v-a-subtabbar {
+    background: linear-gradient(to bottom, #E5E1D8 0%, #D8D3C8 100%);
+    padding: 6px 12px 0 24px;
+    border-bottom: 3px solid #1B4D3E;
+    display: flex;
+    align-items: end;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .v-a-subtab {
+    background: #fff;
+    border: 1px solid #d0cec9;
+    border-radius: 4px 4px 0 0;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #595959;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .v-a-subtab.active { background: #2D8B6E; color: #fff; border-color: #2D8B6E; }
+
+  .v-a-content {
+    flex: 1;
+    padding: 16px;
+    overflow: auto;
+    background: #fff;
+  }
+  .v-a-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+  }
+  .v-a-toolbar input, .v-a-toolbar select {
+    border: 1px solid #d0cec9;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .v-a-toolbar .btn {
+    background: #1B4D3E;
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .v-a-toolbar .btn.ghost { background: transparent; color: #1B4D3E; border: 1px solid #1B4D3E; }
+
+  .v-a-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .v-a-table th {
+    background: #f5f0e8;
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 2px solid #1B4D3E;
+    font-weight: 600;
+    color: #1B4D3E;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .v-a-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f0ede8;
+  }
+  .v-a-table tr:hover { background: #fafaf5; }
+  .v-a-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .v-a-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .v-a-status.green { background: #d6efd6; color: #1f5f1f; }
+  .v-a-status.amber { background: #fbe7c5; color: #8b5a05; }
+  .v-a-status.gray  { background: #e8e8e6; color: #6c6a64; }
+
+  /* ==========================================================================
+     VARIANT B — Linear-style Dark Dense
+     ========================================================================== */
+  .v-b-app {
+    display: grid;
+    grid-template-columns: 56px 220px 1fr;
+    height: 600px;
+    background: #010102;
+    color: #f7f8f8;
+    font-size: 13px;
+  }
+  .v-b-rail {
+    background: #010102;
+    border-right: 1px solid #23252a;
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .v-b-rail-icon {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    color: #8a8f98;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .v-b-rail-icon:hover { background: #18191a; color: #f7f8f8; }
+  .v-b-rail-icon.active { background: #5e6ad2; color: #fff; }
+
+  .v-b-side {
+    background: #0f1011;
+    border-right: 1px solid #23252a;
+    padding: 12px 0;
+    overflow-y: auto;
+  }
+  .v-b-side-title {
+    padding: 4px 16px;
+    font-size: 11px;
+    color: #62666d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+  }
+  .v-b-side-item {
+    padding: 5px 16px;
+    font-size: 13px;
+    color: #d0d6e0;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .v-b-side-item:hover { background: #18191a; }
+  .v-b-side-item.active { background: #18191a; border-left-color: #5e6ad2; color: #fff; }
+
+  .v-b-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .v-b-tabbar {
+    background: #0f1011;
+    border-bottom: 1px solid #23252a;
+    padding: 0 8px;
+    display: flex;
+    align-items: end;
+    gap: 1px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+  .v-b-tab {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px 6px 0 0;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: #8a8f98;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .v-b-tab:hover { color: #f7f8f8; background: #141516; }
+  .v-b-tab.active {
+    color: #f7f8f8;
+    background: #010102;
+    border-color: #23252a;
+    border-bottom-color: #010102;
+    font-weight: 500;
+  }
+  .v-b-tab.active::before {
+    content: ''; position: absolute; height: 2px;
+    background: #5e6ad2; top: 0; left: 8px; right: 8px;
+  }
+  .v-b-tab { position: relative; }
+  .v-b-tab .badge {
+    background: #5e6ad2; color: #fff;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .v-b-content {
+    flex: 1;
+    padding: 24px 28px;
+    overflow: auto;
+  }
+  .v-b-content h3 {
+    color: #f7f8f8;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+    margin-bottom: 4px;
+  }
+  .v-b-content .subtitle { color: #8a8f98; font-size: 13px; margin-bottom: 24px; }
+  .v-b-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .v-b-table th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: #62666d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    border-bottom: 1px solid #23252a;
+  }
+  .v-b-table td {
+    padding: 12px;
+    border-bottom: 1px solid #18191a;
+    color: #d0d6e0;
+  }
+  .v-b-table tr:hover td { background: #0f1011; }
+  .v-b-table .num { text-align: right; font-variant-numeric: tabular-nums; color: #f7f8f8; }
+  .v-b-pill {
+    padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500;
+    display: inline-block;
+  }
+  .v-b-pill.green { background: rgba(39,166,68,0.15); color: #5db872; }
+  .v-b-pill.violet{ background: rgba(94,106,210,0.15); color: #828fff; }
+  .v-b-pill.amber { background: rgba(212,160,23,0.15); color: #d4a017; }
+
+  /* ==========================================================================
+     VARIANT C — Notion-style Sidebar Workspace
+     ========================================================================== */
+  .v-c-app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    height: 600px;
+    background: #fbfaf8;
+    font-size: 14px;
+  }
+  .v-c-side {
+    background: #f7f6f3;
+    border-right: 1px solid #ebebe9;
+    padding: 12px 0;
+    overflow-y: auto;
+  }
+  .v-c-side-search {
+    margin: 0 12px 12px;
+    padding: 6px 10px;
+    background: #fff;
+    border: 1px solid #ebebe9;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #9b9a97;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .v-c-side-pinned {
+    padding: 4px 12px;
+    margin-bottom: 8px;
+  }
+  .v-c-side-section-label {
+    padding: 4px 14px;
+    font-size: 12px;
+    color: #9b9a97;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .v-c-side-item {
+    padding: 4px 12px 4px 28px;
+    font-size: 14px;
+    color: #37352f;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .v-c-side-item:hover { background: #ebebe9; }
+  .v-c-side-item.active { background: #e3e0d9; font-weight: 500; }
+  .v-c-side-item .icon { width: 18px; text-align: center; }
+
+  .v-c-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .v-c-tabbar {
+    background: #fff;
+    border-bottom: 1px solid #ebebe9;
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .v-c-tab {
+    padding: 6px 12px;
+    border-radius: 9999px;
+    font-size: 13px;
+    color: #6f6e69;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: all 0.12s ease;
+  }
+  .v-c-tab:hover { background: #f1f0ee; color: #37352f; }
+  .v-c-tab.active {
+    background: #37352f;
+    color: #fff;
+    font-weight: 500;
+  }
+  .v-c-tab .close {
+    opacity: 0.5;
+    margin-left: 4px;
+    font-size: 11px;
+    width: 14px; height: 14px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+  }
+  .v-c-tab.active .close { color: rgba(255,255,255,0.7); }
+  .v-c-tab .close:hover { opacity: 1; background: rgba(0,0,0,0.1); }
+  .v-c-tab.active .close:hover { background: rgba(255,255,255,0.2); }
+  .v-c-newtab {
+    color: #9b9a97;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .v-c-newtab:hover { color: #37352f; }
+
+  .v-c-content {
+    flex: 1;
+    padding: 24px 56px;
+    overflow: auto;
+  }
+  .v-c-content h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 32px;
+    color: #37352f;
+    font-weight: 500;
+    margin-bottom: 4px;
+    letter-spacing: -0.4px;
+  }
+  .v-c-content .breadcrumb { font-size: 12px; color: #9b9a97; margin-bottom: 16px; }
+  .v-c-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .v-c-table th {
+    text-align: left;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #6f6e69;
+    border-bottom: 1px solid #ebebe9;
+    font-weight: 500;
+  }
+  .v-c-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f0ee;
+    color: #37352f;
+  }
+  .v-c-table tr:hover td { background: #fafaf9; }
+  .v-c-pill {
+    padding: 2px 8px; border-radius: 3px; font-size: 11px;
+    display: inline-block; font-weight: 500;
+  }
+  .v-c-pill.green { background: #ddedea; color: #4d6461; }
+  .v-c-pill.amber { background: #fbecdd; color: #d9730d; }
+
+  /* ==========================================================================
+     VARIANT D — Stripe-style Split Master/Detail Tabs
+     ========================================================================== */
+  .v-d-app {
+    display: grid;
+    grid-template-columns: 240px 360px 1fr;
+    height: 600px;
+    background: #fff;
+    font-size: 14px;
+  }
+  .v-d-side {
+    background: #f6f9fc;
+    border-right: 1px solid #e3e8ee;
+    padding: 16px 0;
+  }
+  .v-d-side-brand {
+    padding: 0 18px 16px;
+    font-weight: 700;
+    color: #425466;
+  }
+  .v-d-side-item {
+    padding: 6px 18px;
+    font-size: 14px;
+    color: #425466;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  .v-d-side-item:hover { background: #eaf0f7; }
+  .v-d-side-item.active {
+    background: #fff;
+    border-left-color: #635bff;
+    color: #0a2540;
+    font-weight: 600;
+  }
+
+  .v-d-list {
+    border-right: 1px solid #e3e8ee;
+    overflow-y: auto;
+  }
+  .v-d-list-toolbar {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e3e8ee;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .v-d-list-toolbar input {
+    flex: 1;
+    border: 1px solid #e3e8ee;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .v-d-list-row {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f5f7fa;
+    cursor: pointer;
+  }
+  .v-d-list-row:hover { background: #f6f9fc; }
+  .v-d-list-row.active { background: #f0f3ff; border-left: 3px solid #635bff; padding-left: 13px; }
+  .v-d-list-row .row-title { font-weight: 600; color: #0a2540; font-size: 13px; }
+  .v-d-list-row .row-meta { font-size: 12px; color: #697386; margin-top: 4px; }
+  .v-d-list-row .row-amount { font-weight: 600; color: #0a2540; font-size: 14px; float: right; }
+
+  .v-d-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .v-d-tabbar {
+    background: #fff;
+    border-bottom: 1px solid #e3e8ee;
+    padding: 0 24px;
+    display: flex;
+    align-items: end;
+    gap: 4px;
+    flex-shrink: 0;
+    height: 44px;
+  }
+  .v-d-tab {
+    padding: 12px 4px;
+    margin: 0 12px;
+    font-size: 13px;
+    color: #697386;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .v-d-tab:hover { color: #0a2540; }
+  .v-d-tab.active { color: #635bff; border-bottom-color: #635bff; font-weight: 600; }
+  .v-d-tab .close { opacity: 0.5; font-size: 12px; }
+
+  .v-d-content {
+    flex: 1;
+    padding: 28px 32px;
+    overflow: auto;
+    background: #fff;
+  }
+  .v-d-content h3 {
+    font-size: 24px;
+    color: #0a2540;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    margin-bottom: 4px;
+  }
+  .v-d-content .subtitle { color: #697386; font-size: 14px; margin-bottom: 24px; }
+  .v-d-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .v-d-stat {
+    padding: 16px 18px;
+    background: #f6f9fc;
+    border-radius: 8px;
+    border: 1px solid #e3e8ee;
+  }
+  .v-d-stat .label { font-size: 12px; color: #697386; text-transform: uppercase; letter-spacing: 0.5px; }
+  .v-d-stat .value { font-size: 24px; color: #0a2540; font-weight: 600; margin-top: 6px; }
+  .v-d-stat .delta { font-size: 12px; color: #1ea672; margin-top: 4px; }
+  .v-d-pill {
+    padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    display: inline-block;
+  }
+  .v-d-pill.green { background: #cbf4c9; color: #006908; }
+  .v-d-pill.amber { background: #ffe7b8; color: #b35900; }
+
+  /* ==========================================================================
+     VARIANT E — Hybrid Recommendation (Current ERP + ECOUNT + Linear shortcuts)
+     ========================================================================== */
+  .v-e-app {
+    display: grid;
+    grid-template-columns: 56px 200px 1fr;
+    height: 600px;
+    background: #fafaf8;
+  }
+  .v-e-rail {
+    background: #143a2e;
+    color: #fff;
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .v-e-rail-icon {
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.6);
+    font-size: 16px;
+    cursor: pointer;
+    position: relative;
+  }
+  .v-e-rail-icon:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .v-e-rail-icon.active { background: #2D8B6E; color: #fff; }
+  .v-e-rail-icon .badge {
+    position: absolute;
+    top: 4px; right: 4px;
+    background: #cc785c;
+    color: #fff;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 9999px;
+    font-weight: 700;
+  }
+  .v-e-rail-spacer { flex: 1; }
+  .v-e-rail-divider {
+    width: 24px; height: 1px;
+    background: rgba(255,255,255,0.15);
+    margin: 4px 0;
+  }
+
+  .v-e-side {
+    background: #1B4D3E;
+    color: #fff;
+    overflow-y: auto;
+  }
+  .v-e-side-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background: #143a2e;
+  }
+  .v-e-side-header .module {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .v-e-side-header .name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .v-e-side-section {
+    padding: 8px 0;
+  }
+  .v-e-side-title {
+    padding: 4px 16px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.4);
+    font-weight: 600;
+  }
+  .v-e-side-item {
+    padding: 6px 16px 6px 24px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .v-e-side-item:hover { background: rgba(255,255,255,0.08); }
+  .v-e-side-item.active { background: #2D8B6E; color: #fff; font-weight: 600; }
+  .v-e-side-item .count {
+    margin-left: auto;
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    font-variant-numeric: tabular-nums;
+  }
+  .v-e-side-item.active .count { color: rgba(255,255,255,0.85); }
+
+  .v-e-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .v-e-topbar {
+    background: #fff;
+    border-bottom: 1px solid #e6dfd8;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    height: 44px;
+  }
+  .v-e-cmdk {
+    flex: 1;
+    max-width: 480px;
+    background: #f5f0e8;
+    border: 1px solid #e6dfd8;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #6c6a64;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .v-e-cmdk kbd {
+    margin-left: auto;
+    background: #fff;
+    border: 1px solid #d0cec9;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #6c6a64;
+  }
+  .v-e-topbar-action {
+    color: #6c6a64;
+    cursor: pointer;
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+  .v-e-avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: #2D8B6E;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .v-e-tabbar {
+    background: linear-gradient(to bottom, #F0EDE8 0%, #E5E1D8 100%);
+    padding: 6px 12px 0 12px;
+    border-bottom: 1px solid #d0cec9;
+    display: flex;
+    align-items: end;
+    gap: 4px;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .v-e-tab {
+    background: #fff;
+    border: 1px solid #d0cec9;
+    border-radius: 6px 6px 0 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: #595959;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .v-e-tab:hover { background: #f6ffed; border-color: #2D8B6E; color: #1B4D3E; }
+  .v-e-tab.active {
+    background: #1B4D3E;
+    border-color: #1B4D3E;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 -2px 4px rgba(27,77,62,0.2);
+  }
+  .v-e-tab .icon { font-size: 11px; }
+  .v-e-tab .dirty { color: #faad14; font-size: 8px; }
+  .v-e-tab .close { opacity: 0.6; font-size: 10px; }
+  .v-e-tab .close:hover { opacity: 1; }
+
+  .v-e-subtabbar {
+    background: linear-gradient(to bottom, #E5E1D8 0%, #D8D3C8 100%);
+    padding: 5px 12px 0 24px;
+    border-bottom: 3px solid #1B4D3E;
+    display: flex;
+    align-items: end;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .v-e-subtab {
+    background: #fff;
+    border: 1px solid #d0cec9;
+    border-radius: 4px 4px 0 0;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #595959;
+    font-weight: 500;
+  }
+  .v-e-subtab.active { background: #2D8B6E; color: #fff; border-color: #2D8B6E; }
+
+  .v-e-content {
+    flex: 1;
+    padding: 16px;
+    overflow: auto;
+    background: #fff;
+  }
+  .v-e-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .v-e-page-header h3 {
+    font-size: 22px;
+    color: #1B4D3E;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .v-e-page-header .subtitle {
+    font-size: 12px;
+    color: #6c6a64;
+    margin-top: 2px;
+  }
+  .v-e-page-actions { display: flex; gap: 6px; }
+  .v-e-btn {
+    background: #1B4D3E;
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .v-e-btn.ghost { background: transparent; color: #1B4D3E; border: 1px solid #d0cec9; }
+  .v-e-btn.coral { background: #cc785c; }
+
+  .v-e-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .v-e-stat {
+    padding: 12px 16px;
+    background: #fafaf5;
+    border: 1px solid #e6dfd8;
+    border-radius: 8px;
+  }
+  .v-e-stat .label {
+    font-size: 11px;
+    color: #6c6a64;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .v-e-stat .value {
+    font-size: 22px;
+    color: #1B4D3E;
+    font-weight: 700;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .v-e-stat .delta { font-size: 11px; color: #5db872; margin-top: 2px; }
+
+  .v-e-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    border: 1px solid #e6dfd8;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .v-e-table th {
+    background: #f5f0e8;
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #e6dfd8;
+    font-weight: 600;
+    color: #1B4D3E;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .v-e-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f0ede8;
+  }
+  .v-e-table tr:last-child td { border-bottom: none; }
+  .v-e-table tr:hover td { background: #fafaf5; }
+  .v-e-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ==========================================================================
+     COMPARISON TABLE
+     ========================================================================== */
+  .compare {
+    margin: 64px 0;
+    padding: 32px;
+    background: #181715;
+    border-radius: 16px;
+    color: #faf9f5;
+  }
+  .compare h2 { color: #faf9f5; font-size: 32px; margin-bottom: 24px; }
+  .compare table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .compare th {
+    text-align: left;
+    padding: 10px 12px;
+    color: #a09d96;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid #252320;
+  }
+  .compare td {
+    padding: 12px;
+    border-bottom: 1px solid #252320;
+    color: #d4d0c7;
+    vertical-align: top;
+  }
+  .compare td:first-child { color: #faf9f5; font-weight: 600; }
+
+  /* ==========================================================================
+     RECOMMENDATION + ROADMAP
+     ========================================================================== */
+  .recommendation {
+    background: #cc785c;
+    color: #fff;
+    padding: 48px;
+    border-radius: 16px;
+    margin: 48px 0;
+  }
+  .recommendation h2 { color: #fff; font-size: 36px; margin-bottom: 8px; }
+  .recommendation .lede { font-size: 18px; opacity: 0.9; margin-bottom: 24px; }
+  .recommendation ol { padding-left: 22px; }
+  .recommendation li { margin-bottom: 8px; font-size: 15px; }
+  .recommendation strong { font-weight: 700; }
+
+  .roadmap {
+    margin: 48px 0;
+    padding: 32px;
+    background: #faf9f5;
+    border: 1px solid #e6dfd8;
+    border-radius: 12px;
+  }
+  .roadmap h2 { font-size: 28px; margin-bottom: 16px; }
+  .roadmap .step {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e6dfd8;
+  }
+  .roadmap .step:last-child { border-bottom: none; }
+  .roadmap .step .week {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #cc785c;
+    font-weight: 600;
+  }
+  .roadmap .step .what { font-size: 14px; }
+  .roadmap .step .what strong { display: block; margin-bottom: 4px; }
+
+  /* footnote */
+  .footnote {
+    margin-top: 64px;
+    padding: 24px;
+    background: #efe9de;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #3d3d3a;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<!-- ============================================================ -->
+<!-- HEADER                                                        -->
+<!-- ============================================================ -->
+<header class="page-header">
+  <h1>Multi-Tab UX Mockups<br><small style="font-size: 32px; color: #6c6a64;">Áp dụng cho toàn bộ Huy Anh ERP</small></h1>
+  <p class="lede">
+    Tổng hợp 5 phương án thiết kế tab đa tác vụ — mỗi phương án ghép một
+    design language khác nhau (ECOUNT, Linear, Notion, Stripe, Hybrid) với
+    pattern <code>TabbedWorkspace</code> hiện đang chạy ở module Kho. Mockup
+    tĩnh để chọn hướng — chưa code.
+  </p>
+  <div class="meta">
+    <span class="pill dark">2026-05-06</span>
+    <span class="pill">5 variants</span>
+    <span class="pill">getdesign.md + ECOUNT screenshots</span>
+    <span class="pill coral">★ Khuyến nghị: Variant E</span>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<!-- TOC                                                            -->
+<!-- ============================================================ -->
+<nav class="toc">
+  <h2>Mục lục</h2>
+  <ol>
+    <li><a href="#a">Variant A — ECOUNT Pro (giữ branded green hiện tại)</a></li>
+    <li><a href="#b">Variant B — Linear Dark Dense (tham khảo)</a></li>
+    <li><a href="#c">Variant C — Notion Sidebar Workspace</a></li>
+    <li><a href="#d">Variant D — Stripe Master/Detail Tabs</a></li>
+    <li><a href="#e">Variant E — Hybrid (★ khuyến nghị)</a></li>
+    <li><a href="#compare">So sánh 5 variant</a></li>
+    <li><a href="#roadmap">Roadmap rollout</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<!-- VARIANT A — ECOUNT Pro                                         -->
+<!-- ============================================================ -->
+<section class="variant" id="a">
+  <div class="variant-header">
+    <span class="num">VARIANT A</span>
+    <h2>ECOUNT Pro — branded green</h2>
+  </div>
+  <p class="source">Inspiration: 2 ảnh ECOUNT bạn paste + TabbedWorkspace.tsx hiện tại + airtable.md (dense table)</p>
+  <p class="desc">
+    Giữ nguyên ngôn ngữ Vietnamese ERP: sidebar xanh đậm, tab card cream gradient,
+    sub-tab row cho detail page con. Đây là cách <strong>nâng cấp tăng dần</strong>
+    cái đang có ở Kho — risk thấp nhất, phù hợp cho rollout sang Sales/HR/Production.
+  </p>
+  <div class="pros-cons">
+    <div class="box pros">
+      <strong>Ưu điểm</strong>
+      <ul>
+        <li>Reuse được <code>TabbedWorkspace.tsx</code> + <code>tabStore</code></li>
+        <li>User Việt quen layout này (giống MISA/FAST/ECOUNT)</li>
+        <li>Density cao — vừa nhiều thông tin trên 1 màn hình</li>
+        <li>Dễ rollout từng module 1, không cần đập đi xây lại</li>
+      </ul>
+    </div>
+    <div class="box cons">
+      <strong>Hạn chế</strong>
+      <ul>
+        <li>Dày đặc cho user mới — cần training</li>
+        <li>Mobile khó dùng — bắt buộc fallback navigate</li>
+        <li>Không có command palette (Ctrl+K) → search chậm</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-titlebar">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      <div class="url">huyanhrubber.vn/sales/orders</div>
+    </div>
+    <div class="v-a-app">
+      <aside class="v-a-side">
+        <div class="v-a-side-brand">🌱 HUY ANH ERP</div>
+        <div class="v-a-side-section">
+          <div class="v-a-side-title">Bán hàng</div>
+          <div class="v-a-side-item active">Danh sách đơn</div>
+          <div class="v-a-side-item">Tạo đơn mới</div>
+          <div class="v-a-side-item">Hợp đồng</div>
+          <div class="v-a-side-item">Báo giá</div>
+          <div class="v-a-side-item">Phải thu</div>
+        </div>
+        <div class="v-a-side-section">
+          <div class="v-a-side-title">Kho</div>
+          <div class="v-a-side-item">Tồn kho</div>
+          <div class="v-a-side-item">Phiếu nhập</div>
+          <div class="v-a-side-item">Phiếu xuất</div>
+        </div>
+        <div class="v-a-side-section">
+          <div class="v-a-side-title">Sản xuất</div>
+          <div class="v-a-side-item">Lịch sản xuất</div>
+          <div class="v-a-side-item">QA / QC</div>
+        </div>
+      </aside>
+      <main class="v-a-main">
+        <!-- Top tabbar -->
+        <div class="v-a-tabbar">
+          <div class="v-a-tab active">📋 Danh sách đơn <span class="close">✕</span></div>
+          <div class="v-a-tab">📄 SO-2026-0050 <span class="dirty">●</span><span class="close">✕</span></div>
+          <div class="v-a-tab">📄 SO-2026-0048 <span class="close">✕</span></div>
+          <div class="v-a-tab">🚚 Phiếu xuất XK-217 <span class="close">✕</span></div>
+        </div>
+        <!-- Sub-tabbar (parent SO-2026-0050) -->
+        <div class="v-a-subtabbar">
+          <div class="v-a-subtab active">Thông tin chung</div>
+          <div class="v-a-subtab">Chi tiết hàng hoá</div>
+          <div class="v-a-subtab">Lịch giao</div>
+          <div class="v-a-subtab">Thanh toán</div>
+        </div>
+        <!-- Content -->
+        <div class="v-a-content">
+          <div class="v-a-toolbar">
+            <input placeholder="Tìm kiếm... (F3)">
+            <select><option>Tất cả trạng thái</option></select>
+            <select><option>Tháng này</option></select>
+            <button class="btn ghost">Sắp xếp</button>
+            <button class="btn">+ Tạo đơn</button>
+            <button class="btn ghost" style="margin-left: auto;">📥 Excel</button>
+          </div>
+          <table class="v-a-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox"></th>
+                <th>Số HĐ</th><th>Khách hàng</th><th>Ngày</th>
+                <th class="num">Số lượng</th><th class="num">Đơn giá</th>
+                <th class="num">Thành tiền</th><th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>HA20260050</strong></td><td>Cty CP Cao su Đồng Phú</td><td>06/05</td>
+                <td class="num">5,000</td><td class="num">38,500</td>
+                <td class="num"><strong>192,500,000</strong></td>
+                <td><span class="v-a-status green">delivered</span></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>HA20260049</strong></td><td>Cty TNHH Hoà Phát</td><td>05/05</td>
+                <td class="num">3,500</td><td class="num">39,000</td>
+                <td class="num"><strong>136,500,000</strong></td>
+                <td><span class="v-a-status amber">processing</span></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>HA20260048</strong></td><td>Đại lý Lộc Thuận</td><td>05/05</td>
+                <td class="num">2,000</td><td class="num">38,200</td>
+                <td class="num"><strong>76,400,000</strong></td>
+                <td><span class="v-a-status amber">processing</span></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>HA20260046</strong></td><td>Cty XNK Phương Nam</td><td>04/05</td>
+                <td class="num">8,000</td><td class="num">39,200</td>
+                <td class="num"><strong>313,600,000</strong></td>
+                <td><span class="v-a-status green">delivered</span></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>HA20240046</strong></td><td>(đơn cũ) DLBL HHT</td><td>17/12</td>
+                <td class="num">1,200</td><td class="num">37,000</td>
+                <td class="num"><strong>44,400,000</strong></td>
+                <td><span class="v-a-status gray">cancelled</span></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>HA20260044</strong></td><td>Casumina</td><td>03/05</td>
+                <td class="num">12,000</td><td class="num">39,000</td>
+                <td class="num"><strong>468,000,000</strong></td>
+                <td><span class="v-a-status green">delivered</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VARIANT B — Linear Dark                                        -->
+<!-- ============================================================ -->
+<section class="variant" id="b">
+  <div class="variant-header">
+    <span class="num">VARIANT B</span>
+    <h2>Linear Dark Dense — software-craft</h2>
+  </div>
+  <p class="source">Inspiration: linear.app.md — near-black canvas, lavender accent #5e6ad2, IDE-like density</p>
+  <p class="desc">
+    Theme tối toàn bộ. Rail icon-only bên trái + sidebar ngữ cảnh + tab strip
+    cao 36px. Phong cách như IDE / VS Code. Đẹp, hiện đại, nhưng <strong>không
+    phù hợp văn phòng kế toán Việt Nam</strong> — user lớn tuổi sẽ phản đối
+    màn hình tối. Để tham khảo cho dashboard quản trị / Coverage Dashboard.
+  </p>
+  <div class="pros-cons">
+    <div class="box pros">
+      <strong>Ưu điểm</strong>
+      <ul>
+        <li>Density cực cao, đẹp với dữ liệu nhiều</li>
+        <li>Phù hợp cho admin/dev/BGĐ xem dashboard</li>
+        <li>Tab strip 36px tiết kiệm chiều dọc</li>
+      </ul>
+    </div>
+    <div class="box cons">
+      <strong>Hạn chế</strong>
+      <ul>
+        <li>User văn phòng VN không quen dark theme</li>
+        <li>Số liệu kế toán in giấy → chỉ dùng được cho web</li>
+        <li>Đập hoàn toàn cái đang có — rủi ro cao</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-titlebar">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      <div class="url">huyanhrubber.vn/coverage</div>
+    </div>
+    <div class="v-b-app">
+      <aside class="v-b-rail">
+        <div class="v-b-rail-icon">⌘</div>
+        <div class="v-b-rail-icon active">📊</div>
+        <div class="v-b-rail-icon">📦</div>
+        <div class="v-b-rail-icon">💰</div>
+        <div class="v-b-rail-icon">👥</div>
+        <div style="flex:1"></div>
+        <div class="v-b-rail-icon">⚙</div>
+      </aside>
+      <aside class="v-b-side">
+        <div class="v-b-side-title">Sales</div>
+        <div class="v-b-side-item active">Đơn hàng</div>
+        <div class="v-b-side-item">Khách hàng</div>
+        <div class="v-b-side-item">Hợp đồng</div>
+        <div class="v-b-side-item">Báo giá</div>
+        <div class="v-b-side-title">Coverage</div>
+        <div class="v-b-side-item">Performance</div>
+        <div class="v-b-side-item">KPI tracking</div>
+      </aside>
+      <main class="v-b-main">
+        <div class="v-b-tabbar">
+          <div class="v-b-tab active">Đơn hàng <span class="badge">128</span></div>
+          <div class="v-b-tab">SO-2026-0050</div>
+          <div class="v-b-tab">SO-2026-0048</div>
+          <div class="v-b-tab">XK-217</div>
+        </div>
+        <div class="v-b-content">
+          <h3>Đơn hàng</h3>
+          <p class="subtitle">128 đơn — tháng này · last sync 2 phút trước</p>
+          <table class="v-b-table">
+            <thead>
+              <tr><th>Số HĐ</th><th>Khách hàng</th><th>Ngày</th><th class="num">SL</th><th class="num">Thành tiền</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>HA20260050</td><td>Cao su Đồng Phú</td><td>06/05</td><td class="num">5,000</td><td class="num">192,500,000</td><td><span class="v-b-pill green">delivered</span></td></tr>
+              <tr><td>HA20260049</td><td>Hoà Phát</td><td>05/05</td><td class="num">3,500</td><td class="num">136,500,000</td><td><span class="v-b-pill amber">processing</span></td></tr>
+              <tr><td>HA20260048</td><td>DL Lộc Thuận</td><td>05/05</td><td class="num">2,000</td><td class="num">76,400,000</td><td><span class="v-b-pill amber">processing</span></td></tr>
+              <tr><td>HA20260046</td><td>XNK Phương Nam</td><td>04/05</td><td class="num">8,000</td><td class="num">313,600,000</td><td><span class="v-b-pill green">delivered</span></td></tr>
+              <tr><td>HA20260044</td><td>Casumina</td><td>03/05</td><td class="num">12,000</td><td class="num">468,000,000</td><td><span class="v-b-pill green">delivered</span></td></tr>
+              <tr><td>HA20260042</td><td>Vinasun</td><td>02/05</td><td class="num">6,500</td><td class="num">253,500,000</td><td><span class="v-b-pill violet">draft</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VARIANT C — Notion Sidebar                                     -->
+<!-- ============================================================ -->
+<section class="variant" id="c">
+  <div class="variant-header">
+    <span class="num">VARIANT C</span>
+    <h2>Notion Workspace — friendly editorial</h2>
+  </div>
+  <p class="source">Inspiration: notion.md, claude.md — cream canvas, serif headline, pill tabs</p>
+  <p class="desc">
+    Sidebar Notion-style với search trên cùng + pinned items + nested. Tab dạng
+    pill (bo tròn) thay vì card. Headline serif (Cormorant) cho cảm giác editorial.
+    Phù hợp cho <strong>dashboard B2B hoặc Settings</strong>, kém phù hợp cho
+    nhập liệu nhanh.
+  </p>
+  <div class="pros-cons">
+    <div class="box pros">
+      <strong>Ưu điểm</strong>
+      <ul>
+        <li>Cảm giác hiện đại, ít doạ user mới</li>
+        <li>Sidebar search ngay đầu — tìm module nhanh</li>
+        <li>Pill tab nhẹ nhàng, không cứng nhắc</li>
+      </ul>
+    </div>
+    <div class="box cons">
+      <strong>Hạn chế</strong>
+      <ul>
+        <li>Mất tính enterprise-Vietnamese (kế toán không quen)</li>
+        <li>Density thấp hơn — ít data trên 1 màn hình</li>
+        <li>Pill tab khó nhìn dirty indicator</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-titlebar">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      <div class="url">huyanhrubber.vn/b2b/dashboard</div>
+    </div>
+    <div class="v-c-app">
+      <aside class="v-c-side">
+        <div class="v-c-side-search">🔍 Tìm kiếm…</div>
+        <div class="v-c-side-section-label">Pinned</div>
+        <div class="v-c-side-item"><span class="icon">⭐</span> Báo cáo doanh thu</div>
+        <div class="v-c-side-item"><span class="icon">⭐</span> Top khách hàng</div>
+        <div class="v-c-side-section-label">Workspace</div>
+        <div class="v-c-side-item active"><span class="icon">📊</span> Dashboard</div>
+        <div class="v-c-side-item"><span class="icon">📋</span> Đơn hàng</div>
+        <div class="v-c-side-item"><span class="icon">👥</span> Khách hàng</div>
+        <div class="v-c-side-item"><span class="icon">📄</span> Hợp đồng</div>
+        <div class="v-c-side-item"><span class="icon">💰</span> Phải thu</div>
+        <div class="v-c-side-section-label">B2B Portal</div>
+        <div class="v-c-side-item"><span class="icon">🤝</span> Đối tác</div>
+        <div class="v-c-side-item"><span class="icon">📦</span> Phiếu cân</div>
+        <div class="v-c-side-item"><span class="icon">⚖</span> Quyết toán</div>
+      </aside>
+      <main class="v-c-main">
+        <div class="v-c-tabbar">
+          <div class="v-c-tab active">📊 Dashboard <span class="close">✕</span></div>
+          <div class="v-c-tab">📋 Đơn hàng <span class="close">✕</span></div>
+          <div class="v-c-tab">📄 SO-2026-0050 <span class="close">✕</span></div>
+          <div class="v-c-tab">🤝 Đồng Phú <span class="close">✕</span></div>
+          <div class="v-c-newtab">+</div>
+        </div>
+        <div class="v-c-content">
+          <div class="breadcrumb">Workspace › Dashboard</div>
+          <h3>Bảng điều khiển</h3>
+          <p style="color:#9b9a97;font-size:14px;margin-bottom:24px;">Tổng quan tháng 05/2026</p>
+          <table class="v-c-table">
+            <thead>
+              <tr><th>Số HĐ</th><th>Khách hàng</th><th>Ngày</th><th>Thành tiền</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>HA20260050</td><td>Cao su Đồng Phú</td><td>06/05</td><td>192,500,000 đ</td><td><span class="v-c-pill green">đã giao</span></td></tr>
+              <tr><td>HA20260049</td><td>Hoà Phát</td><td>05/05</td><td>136,500,000 đ</td><td><span class="v-c-pill amber">đang xử lý</span></td></tr>
+              <tr><td>HA20260048</td><td>DL Lộc Thuận</td><td>05/05</td><td>76,400,000 đ</td><td><span class="v-c-pill amber">đang xử lý</span></td></tr>
+              <tr><td>HA20260046</td><td>XNK Phương Nam</td><td>04/05</td><td>313,600,000 đ</td><td><span class="v-c-pill green">đã giao</span></td></tr>
+              <tr><td>HA20260044</td><td>Casumina</td><td>03/05</td><td>468,000,000 đ</td><td><span class="v-c-pill green">đã giao</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VARIANT D — Stripe Master/Detail                               -->
+<!-- ============================================================ -->
+<section class="variant" id="d">
+  <div class="variant-header">
+    <span class="num">VARIANT D</span>
+    <h2>Stripe Master/Detail — financial clean</h2>
+  </div>
+  <p class="source">Inspiration: stripe.md — 3-pane (sidebar/list/detail), tab nằm trong detail pane, accent #635bff</p>
+  <p class="desc">
+    Layout 3 cột: nav module / list đơn / detail tabs. Tab chỉ tồn tại trong
+    cột detail. <strong>Không multi-tab toàn cục</strong> — mỗi lần chọn 1 đơn
+    sẽ mở detail của đơn đó với các tab nội bộ (info / items / payment / log).
+    Phù hợp cho Settlements, Phải thu, Phải trả.
+  </p>
+  <div class="pros-cons">
+    <div class="box pros">
+      <strong>Ưu điểm</strong>
+      <ul>
+        <li>List + detail luôn nhìn thấy đồng thời</li>
+        <li>Số liệu tài chính hiển thị rất rõ</li>
+        <li>Density vừa phải — không quá tải</li>
+      </ul>
+    </div>
+    <div class="box cons">
+      <strong>Hạn chế</strong>
+      <ul>
+        <li>Không multi-tab thật — chỉ 1 detail tại 1 thời điểm</li>
+        <li>Cần 3 cột → màn hình &lt; 1280px chật</li>
+        <li>Không tái sử dụng được TabbedWorkspace hiện có</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-titlebar">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      <div class="url">huyanhrubber.vn/finance/settlements</div>
+    </div>
+    <div class="v-d-app">
+      <aside class="v-d-side">
+        <div class="v-d-side-brand">🌱 Huy Anh ERP</div>
+        <div class="v-d-side-item">Dashboard</div>
+        <div class="v-d-side-item">Bán hàng</div>
+        <div class="v-d-side-item">Mua hàng</div>
+        <div class="v-d-side-item active">Quyết toán</div>
+        <div class="v-d-side-item">Phải thu</div>
+        <div class="v-d-side-item">Phải trả</div>
+        <div class="v-d-side-item">Báo cáo</div>
+      </aside>
+      <section class="v-d-list">
+        <div class="v-d-list-toolbar">
+          <input placeholder="Tìm…">
+        </div>
+        <div class="v-d-list-row active">
+          <span class="row-amount">192,500,000 đ</span>
+          <div class="row-title">SO-2026-0050</div>
+          <div class="row-meta">Cao su Đồng Phú · 06/05</div>
+        </div>
+        <div class="v-d-list-row">
+          <span class="row-amount">136,500,000 đ</span>
+          <div class="row-title">SO-2026-0049</div>
+          <div class="row-meta">Hoà Phát · 05/05</div>
+        </div>
+        <div class="v-d-list-row">
+          <span class="row-amount">76,400,000 đ</span>
+          <div class="row-title">SO-2026-0048</div>
+          <div class="row-meta">DL Lộc Thuận · 05/05</div>
+        </div>
+        <div class="v-d-list-row">
+          <span class="row-amount">313,600,000 đ</span>
+          <div class="row-title">SO-2026-0046</div>
+          <div class="row-meta">XNK Phương Nam · 04/05</div>
+        </div>
+        <div class="v-d-list-row">
+          <span class="row-amount">468,000,000 đ</span>
+          <div class="row-title">SO-2026-0044</div>
+          <div class="row-meta">Casumina · 03/05</div>
+        </div>
+      </section>
+      <main class="v-d-main">
+        <div class="v-d-tabbar">
+          <div class="v-d-tab active">Tổng quan</div>
+          <div class="v-d-tab">Chi tiết hàng</div>
+          <div class="v-d-tab">Phiếu cân</div>
+          <div class="v-d-tab">Thanh toán</div>
+          <div class="v-d-tab">Lịch sử</div>
+        </div>
+        <div class="v-d-content">
+          <h3>SO-2026-0050</h3>
+          <p class="subtitle">Hợp đồng HA20260050 · Cao su Đồng Phú · ngày 06/05/2026</p>
+          <div class="v-d-stats">
+            <div class="v-d-stat"><div class="label">Tổng tiền</div><div class="value">192,500,000 đ</div><div class="delta">+15% so với đơn trước</div></div>
+            <div class="v-d-stat"><div class="label">Đã thu</div><div class="value">100,000,000 đ</div><div class="delta">52% hoàn thành</div></div>
+            <div class="v-d-stat"><div class="label">Còn lại</div><div class="value">92,500,000 đ</div><div class="delta" style="color:#cc785c;">Hạn 10/05</div></div>
+          </div>
+          <table class="v-c-table">
+            <thead><tr><th>Mặt hàng</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th><th>Trạng thái</th></tr></thead>
+            <tbody>
+              <tr><td>RSS3 — bành 35kg</td><td>5,000 kg</td><td>38,500</td><td>192,500,000 đ</td><td><span class="v-d-pill green">đã giao</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VARIANT E — HYBRID ★                                           -->
+<!-- ============================================================ -->
+<section class="variant" id="e" style="position: relative;">
+  <div style="position: absolute; right: 0; top: 0; background: #cc785c; color: #fff; padding: 6px 16px; border-radius: 9999px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">★ KHUYẾN NGHỊ</div>
+  <div class="variant-header">
+    <span class="num">VARIANT E</span>
+    <h2>Hybrid — ECOUNT × Linear × hiện trạng</h2>
+  </div>
+  <p class="source">Tổng hợp: ECOUNT layout + Linear icon rail + command palette + TabbedWorkspace.tsx + Anthropic warm cream highlights</p>
+  <p class="desc">
+    Phương án thực tế nhất để rollout toàn ERP. Giữ branded green +
+    cream tab card hiện tại, <strong>thêm</strong> 3 thứ:
+    (1) <strong>Icon rail 56px</strong> bên ngoài cùng để switch giữa các module mà không
+    mất sidebar context;
+    (2) <strong>Command palette Ctrl+K</strong> ở topbar để tìm/mở bất kỳ entity nào;
+    (3) <strong>Stat card cream</strong> trên đầu mỗi page để hiện KPI tổng quan.
+    Toàn bộ logic <code>TabbedWorkspace.tsx</code> + <code>tabStore</code> + sub-tab row giữ nguyên.
+  </p>
+  <div class="pros-cons">
+    <div class="box pros">
+      <strong>Ưu điểm</strong>
+      <ul>
+        <li>Reuse 100% code <code>TabbedWorkspace</code> hiện có</li>
+        <li>Module switch nhanh qua icon rail (không cần mở menu)</li>
+        <li>Ctrl+K mở entity bất kỳ — đáp ứng request "tab đa tác vụ"</li>
+        <li>Header stat cream (Anthropic-warm) → enterprise vẫn cảm giác mềm</li>
+        <li>Dễ rollout dần: Sales → HR → Production → Accounting → B2B</li>
+      </ul>
+    </div>
+    <div class="box cons">
+      <strong>Hạn chế</strong>
+      <ul>
+        <li>Cần thêm component <code>CommandPalette</code> + module rail</li>
+        <li>Tốn thêm 56px chiều ngang — màn hình &lt; 1280px hơi chật</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-titlebar">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      <div class="url">huyanhrubber.vn/sales/orders</div>
+    </div>
+    <div class="v-e-app">
+      <!-- Module icon rail -->
+      <aside class="v-e-rail">
+        <div class="v-e-rail-icon" title="Dashboard">📊</div>
+        <div class="v-e-rail-icon active" title="Bán hàng">💰<span class="badge">3</span></div>
+        <div class="v-e-rail-icon" title="Mua hàng">🛒</div>
+        <div class="v-e-rail-icon" title="Kho">📦</div>
+        <div class="v-e-rail-icon" title="Sản xuất">🏭</div>
+        <div class="v-e-rail-icon" title="Nhân sự">👥</div>
+        <div class="v-e-rail-icon" title="B2B">🤝</div>
+        <div class="v-e-rail-divider"></div>
+        <div class="v-e-rail-icon" title="Báo cáo">📈</div>
+        <div class="v-e-rail-spacer"></div>
+        <div class="v-e-rail-divider"></div>
+        <div class="v-e-rail-icon" title="Cài đặt">⚙</div>
+      </aside>
+      <!-- Contextual sidebar -->
+      <aside class="v-e-side">
+        <div class="v-e-side-header">
+          <div class="module">Module</div>
+          <div class="name">Bán hàng</div>
+        </div>
+        <div class="v-e-side-section">
+          <div class="v-e-side-title">Đơn hàng</div>
+          <div class="v-e-side-item active">Tất cả <span class="count">128</span></div>
+          <div class="v-e-side-item">Đang xử lý <span class="count">14</span></div>
+          <div class="v-e-side-item">Đã giao <span class="count">96</span></div>
+          <div class="v-e-side-item">Đã huỷ <span class="count">18</span></div>
+        </div>
+        <div class="v-e-side-section">
+          <div class="v-e-side-title">Khác</div>
+          <div class="v-e-side-item">Khách hàng</div>
+          <div class="v-e-side-item">Báo giá</div>
+          <div class="v-e-side-item">Hợp đồng</div>
+          <div class="v-e-side-item">Phải thu</div>
+        </div>
+      </aside>
+      <main class="v-e-main">
+        <!-- Topbar with command palette -->
+        <div class="v-e-topbar">
+          <div class="v-e-cmdk">🔍 Tìm đơn hàng, khách hàng, sản phẩm… <kbd>Ctrl K</kbd></div>
+          <div class="v-e-topbar-action">🔔</div>
+          <div class="v-e-topbar-action">❓</div>
+          <div class="v-e-avatar">HA</div>
+        </div>
+        <!-- Multi-tab bar -->
+        <div class="v-e-tabbar">
+          <div class="v-e-tab active"><span class="icon">📋</span> Đơn hàng <span class="close">✕</span></div>
+          <div class="v-e-tab"><span class="icon">📄</span> SO-2026-0050 <span class="dirty">●</span><span class="close">✕</span></div>
+          <div class="v-e-tab"><span class="icon">📄</span> SO-2026-0048 <span class="close">✕</span></div>
+          <div class="v-e-tab"><span class="icon">🚚</span> XK-217 <span class="close">✕</span></div>
+          <div class="v-e-tab"><span class="icon">🤝</span> Đồng Phú <span class="close">✕</span></div>
+        </div>
+        <!-- Sub-tabbar (cho parent SO-2026-0050) -->
+        <div class="v-e-subtabbar">
+          <div class="v-e-subtab active">Tổng quan</div>
+          <div class="v-e-subtab">Chi tiết hàng</div>
+          <div class="v-e-subtab">Phiếu xuất</div>
+          <div class="v-e-subtab">Thanh toán</div>
+          <div class="v-e-subtab">Lịch sử</div>
+        </div>
+        <!-- Content with stat cards + table -->
+        <div class="v-e-content">
+          <div class="v-e-page-header">
+            <div>
+              <h3>Đơn hàng</h3>
+              <div class="subtitle">128 đơn · tháng 05/2026 · cập nhật 2 phút trước</div>
+            </div>
+            <div class="v-e-page-actions">
+              <button class="v-e-btn ghost">📥 Excel</button>
+              <button class="v-e-btn ghost">⚙ Sắp xếp</button>
+              <button class="v-e-btn coral">+ Tạo đơn</button>
+            </div>
+          </div>
+          <div class="v-e-stats">
+            <div class="v-e-stat"><div class="label">Doanh thu tháng</div><div class="value">2.4 tỷ</div><div class="delta">+18% vs T4</div></div>
+            <div class="v-e-stat"><div class="label">Đơn đang xử lý</div><div class="value">14</div><div class="delta" style="color:#cc785c;">3 quá hạn</div></div>
+            <div class="v-e-stat"><div class="label">Phải thu</div><div class="value">680 tr</div><div class="delta">52 tr quá hạn</div></div>
+            <div class="v-e-stat"><div class="label">Đơn TB</div><div class="value">38.5 tr</div><div class="delta">+5%</div></div>
+          </div>
+          <table class="v-e-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox"></th>
+                <th>Số HĐ</th><th>Khách hàng</th><th>Ngày</th>
+                <th class="num">SL (kg)</th><th class="num">Thành tiền</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><input type="checkbox"></td><td><strong>HA20260050</strong></td><td>Cao su Đồng Phú</td><td>06/05</td><td class="num">5,000</td><td class="num"><strong>192,500,000</strong></td><td><span class="v-a-status green">delivered</span></td></tr>
+              <tr><td><input type="checkbox"></td><td><strong>HA20260049</strong></td><td>Cty TNHH Hoà Phát</td><td>05/05</td><td class="num">3,500</td><td class="num"><strong>136,500,000</strong></td><td><span class="v-a-status amber">processing</span></td></tr>
+              <tr><td><input type="checkbox"></td><td><strong>HA20260048</strong></td><td>DL Lộc Thuận</td><td>05/05</td><td class="num">2,000</td><td class="num"><strong>76,400,000</strong></td><td><span class="v-a-status amber">processing</span></td></tr>
+              <tr><td><input type="checkbox"></td><td><strong>HA20260046</strong></td><td>XNK Phương Nam</td><td>04/05</td><td class="num">8,000</td><td class="num"><strong>313,600,000</strong></td><td><span class="v-a-status green">delivered</span></td></tr>
+              <tr><td><input type="checkbox"></td><td><strong>HA20260044</strong></td><td>Casumina</td><td>03/05</td><td class="num">12,000</td><td class="num"><strong>468,000,000</strong></td><td><span class="v-a-status green">delivered</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMPARISON                                                     -->
+<!-- ============================================================ -->
+<section class="compare" id="compare">
+  <h2>So sánh 5 variant</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tiêu chí</th>
+        <th>A · ECOUNT</th>
+        <th>B · Linear</th>
+        <th>C · Notion</th>
+        <th>D · Stripe</th>
+        <th>E · Hybrid ★</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Reuse code hiện tại</td>
+        <td>100%</td><td>0%</td><td>30%</td><td>50%</td><td>95%</td>
+      </tr>
+      <tr>
+        <td>Multi-tab thật</td>
+        <td>✓ (đang chạy)</td><td>✓</td><td>✓</td><td>✗ (chỉ detail)</td><td>✓</td>
+      </tr>
+      <tr>
+        <td>Sub-tab cho parent-child</td>
+        <td>✓</td><td>✗</td><td>✗</td><td>n/a</td><td>✓</td>
+      </tr>
+      <tr>
+        <td>Density (data per screen)</td>
+        <td>★★★★</td><td>★★★★★</td><td>★★★</td><td>★★★</td><td>★★★★</td>
+      </tr>
+      <tr>
+        <td>Phù hợp văn phòng VN</td>
+        <td>★★★★★</td><td>★★ (dark khó)</td><td>★★★</td><td>★★★★</td><td>★★★★★</td>
+      </tr>
+      <tr>
+        <td>Command palette Ctrl+K</td>
+        <td>✗</td><td>✓</td><td>✓</td><td>✗</td><td>✓</td>
+      </tr>
+      <tr>
+        <td>Mobile usable</td>
+        <td>fallback nav</td><td>fallback nav</td><td>tốt nhất</td><td>khó</td><td>fallback nav</td>
+      </tr>
+      <tr>
+        <td>Effort rollout (toàn ERP)</td>
+        <td>1–2 tuần</td><td>6–8 tuần</td><td>4–6 tuần</td><td>3–4 tuần</td><td>2–3 tuần</td>
+      </tr>
+      <tr>
+        <td>Phù hợp cho</td>
+        <td>tất cả module</td><td>Coverage Dashboard, BGĐ view</td><td>B2B Portal, Settings</td><td>Settlements, Phải thu</td><td><strong>tất cả module</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- RECOMMENDATION                                                 -->
+<!-- ============================================================ -->
+<section class="recommendation">
+  <h2>Khuyến nghị: chọn Variant E (Hybrid)</h2>
+  <p class="lede">Lý do — bạn đã có TabbedWorkspace chạy ổn ở Kho. Việc cần làm là <strong>rollout pattern đó sang các module khác</strong>, KHÔNG phải đập đi xây lại.</p>
+  <ol>
+    <li><strong>Reuse 95% code hiện có</strong> — TabbedWorkspace.tsx, tabStore, sub-tab row đều giữ nguyên.</li>
+    <li><strong>Thêm 2 component mới</strong>: <code>ModuleRail.tsx</code> (icon rail 56px) + <code>CommandPalette.tsx</code> (Ctrl+K). Cả 2 đều standalone, không đụng vào logic tab.</li>
+    <li><strong>Thêm 1 layout</strong>: <code>StatHeader.tsx</code> để hiển thị 4 KPI card cream phía trên mỗi list page (đáp ứng yêu cầu "tab đa tác vụ" với context hữu ích).</li>
+    <li><strong>Rollout từng module</strong>: Sales (next, vì user đang làm SO) → HR → Production → Accounting → B2B Portal cuối cùng.</li>
+    <li><strong>Variant B & C để dành</strong>: Coverage Dashboard có thể dùng style Linear (dark) như 1 page riêng. B2B Portal có thể dùng pill tab style Notion.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
+<!-- ROADMAP                                                        -->
+<!-- ============================================================ -->
+<section class="roadmap" id="roadmap">
+  <h2>Roadmap rollout (nếu chọn Variant E)</h2>
+  <div class="step">
+    <div class="week">Tuần 1</div>
+    <div class="what">
+      <strong>Build ModuleRail + CommandPalette</strong>
+      Component <code>src/components/layout/ModuleRail.tsx</code> + <code>CommandPalette.tsx</code>. Test trên Sales trước.
+    </div>
+  </div>
+  <div class="step">
+    <div class="week">Tuần 1</div>
+    <div class="what">
+      <strong>Build StatHeader</strong>
+      Component <code>src/components/common/StatHeader.tsx</code> nhận props 4 KPI. Reuse cho mọi list page.
+    </div>
+  </div>
+  <div class="step">
+    <div class="week">Tuần 2</div>
+    <div class="what">
+      <strong>Rollout Sales</strong>
+      Wrap pages bán hàng (orders, customers, contracts) vào <code>TabbedWorkspace</code>. Đăng ký detail components vào <code>tabStore</code> registry. UAT với BGĐ.
+    </div>
+  </div>
+  <div class="step">
+    <div class="week">Tuần 3</div>
+    <div class="what">
+      <strong>Rollout HR + Production</strong>
+      Áp dụng cho attendance, payroll, lịch sản xuất, QA. Test với phòng nhân sự + xưởng.
+    </div>
+  </div>
+  <div class="step">
+    <div class="week">Tuần 4</div>
+    <div class="what">
+      <strong>Rollout Accounting + B2B</strong>
+      Settlements, Phải thu, Phải trả, B2B Portal. Lưu ý: B2B portal có thể chọn pill tab Notion-style nếu BGĐ thấy hợp.
+    </div>
+  </div>
+  <div class="step">
+    <div class="week">Tuần 5</div>
+    <div class="what">
+      <strong>Coverage Dashboard với Linear theme</strong>
+      Trang riêng cho BGĐ xem KPI tổng. Dark theme + dense table. Truy cập từ rail icon "📊".
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FOOTNOTE                                                       -->
+<!-- ============================================================ -->
+<aside class="footnote">
+  <strong>Files tham chiếu:</strong>
+  <ul style="margin-left: 18px; margin-top: 8px;">
+    <li><code>src/components/common/TabbedWorkspace.tsx</code> — shell hiện đang chạy ở Kho (giữ nguyên)</li>
+    <li><code>src/components/common/TabContent.tsx</code> — keep-alive wrapper (giữ nguyên)</li>
+    <li><code>src/stores/tabStore.ts</code> — Zustand store + component registry (giữ nguyên)</li>
+    <li><code>docs/design-references/linear.app.md</code> — color/typography cho Variant B</li>
+    <li><code>docs/design-references/notion.md</code> — pill tab pattern cho Variant C</li>
+    <li><code>docs/design-references/stripe.md</code> — master/detail pattern cho Variant D</li>
+    <li><code>docs/design-references/claude.md</code> — cream + coral cho stat header & accent CTA Variant E</li>
+  </ul>
+  <p style="margin-top: 12px;">Mockup này là tĩnh — chưa code. Sau khi chọn variant, mình sẽ build component theo roadmap ở trên.</p>
+</aside>
+
+</div>
+</body>
+</html>

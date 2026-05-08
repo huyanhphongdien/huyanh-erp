@@ -42,10 +42,13 @@ CREATE POLICY "Admin write performance_config"
   );
 
 -- ============================================================
--- Verify
+-- Verify (FIX: pg_policies view dùng policyname + cmd, không phải polname/polcmd)
 -- ============================================================
 SELECT
-  pol.polname AS policy_name,
-  CASE pol.polcmd WHEN '*' THEN 'ALL' WHEN 'r' THEN 'SELECT' WHEN 'a' THEN 'INSERT' WHEN 'w' THEN 'UPDATE' WHEN 'd' THEN 'DELETE' END AS command
-FROM pg_policies pol
-WHERE pol.tablename = 'performance_config';
+  policyname,
+  cmd AS command,
+  permissive,
+  roles
+FROM pg_policies
+WHERE tablename = 'performance_config'
+ORDER BY policyname;

@@ -34,5 +34,11 @@
     ".claude/**",
     "memory/**",
     "**/*.md"
-  ]
+  ],
+
+  // Tắt Spell Right extension (ban.spellright) — đây là extension tạo
+  // các gợi ý "suggestions: Chun, Chuang, ..." inline cho từ tiếng Việt.
+  // Empty arrays → không load dictionary nào + không check bất kỳ filetype nào.
+  "spellright.documentTypes": [],
+  "spellright.language": []
 }

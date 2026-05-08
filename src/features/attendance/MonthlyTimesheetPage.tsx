@@ -34,6 +34,7 @@ const SYMBOL_STYLES: Record<string, { bg: string; text: string; label: string }>
   'CT': { bg: 'bg-cyan-100',    text: 'text-cyan-700',    label: 'Công tác' },
   'P':  { bg: 'bg-yellow-100',  text: 'text-yellow-700',  label: 'Nghỉ phép' },
   '2ca':{ bg: 'bg-pink-100',    text: 'text-pink-700',    label: '2 ca' },
+  'L':  { bg: 'bg-amber-200',   text: 'text-amber-800',   label: 'Nghỉ lễ' },
   'X':  { bg: 'bg-red-100',     text: 'text-red-600',     label: 'Vắng' },
   '—':  { bg: 'bg-gray-50',     text: 'text-gray-300',    label: '' },
   '':   { bg: '',               text: 'text-gray-200',    label: '' },
@@ -50,6 +51,15 @@ const WEEKDAY_VN = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 const COL_STT = 44
 const COL_NAME = 164
 const COL_NAME_LEFT = COL_STT
+
+// ── Ẩn 1 số NV trên bảng công của phòng QLSX (managers/admin không chấm công)
+//    Lê Vang HA-0045, Phạm Bá Lượng HA-0071, Trần Văn Hiền HA-0070, Lê Duy Minh HA-0059
+const QLSX_DEPT_ID = 'd0000000-0000-0000-0000-000000000002'
+const QLSX_HIDDEN_EMPLOYEE_CODES = new Set(['HA-0045', 'HA-0071', 'HA-0070', 'HA-0059'])
+
+// Symbol có nghĩa "đi làm" — dùng để check NV có làm việc thật vào ngày lễ không.
+// Loại trừ L/P/X/—/'': nghỉ lễ / phép / vắng / chưa tới / trống.
+const WORKING_SYMBOLS = new Set(['S', 'Đ', 'C2', 'HC', 'CT', '2ca'])
 
 // ============================================================================
 // HELPER
@@ -95,6 +105,19 @@ export default function MonthlyTimesheetPage() {
 
   const daysInMonth = timesheet?.daysInMonth || new Date(selectedYear, selectedMonth, 0).getDate()
 
+  // Filter ẩn các NV không chấm công của phòng QLSX (xem const QLSX_HIDDEN_EMPLOYEE_CODES)
+  // Khi user chọn "Phòng QLSX" → bỏ 4 người. Các phòng khác giữ nguyên.
+  const displayedTimesheet = useMemo(() => {
+    if (!timesheet) return null
+    if (selectedDept === QLSX_DEPT_ID) {
+      return {
+        ...timesheet,
+        employees: timesheet.employees.filter(e => !QLSX_HIDDEN_EMPLOYEE_CODES.has(e.employeeCode)),
+      }
+    }
+    return timesheet
+  }, [timesheet, selectedDept])
+
   const dayHeaders = useMemo(() => {
     const h: { day: number; weekday: string; isWeekend: boolean }[] = []
     for (let d = 1; d <= daysInMonth; d++) {
@@ -117,11 +140,11 @@ export default function MonthlyTimesheetPage() {
   }
 
   const handleExportExcel = () => {
-    if (!timesheet || timesheet.employees.length === 0) {
+    if (!displayedTimesheet || displayedTimesheet.employees.length === 0) {
       alert('Không có dữ liệu để xuất')
       return
     }
-    exportMonthlyTimesheetExcel(timesheet)
+    exportMonthlyTimesheetExcel(displayedTimesheet)
   }
 
   const showTooltip = (day: DayDetail, e: React.MouseEvent) => {
@@ -132,7 +155,7 @@ export default function MonthlyTimesheetPage() {
 
   // ★ Live data from timesheet (after refetch) for slide-in panel
   const liveSelectedEmp = selectedEmployee
-    ? (timesheet?.employees.find(e => e.employeeId === selectedEmployee.employeeId) || selectedEmployee)
+    ? (displayedTimesheet?.employees.find(e => e.employeeId === selectedEmployee.employeeId) || selectedEmployee)
     : null
 
   // ============================================================
@@ -182,7 +205,7 @@ export default function MonthlyTimesheetPage() {
             <Loader2 size={24} className="animate-spin text-[#1B4D3E] mr-2" />
             <span className="text-gray-500">Đang tải bảng chấm công...</span>
           </div>
-        ) : !timesheet || timesheet.employees.length === 0 ? (
+        ) : !displayedTimesheet || displayedTimesheet.employees.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <Calendar size={40} className="mx-auto mb-3 opacity-50" />
             <p className="text-[15px] font-medium">Không có dữ liệu</p>
@@ -206,11 +229,12 @@ export default function MonthlyTimesheetPage() {
                     <th className="px-2 py-2 text-center border-l-2 border-white/30 bg-emerald-800" style={{ minWidth: 48 }}>Công</th>
                     <th className="px-2 py-2 text-center bg-amber-700" style={{ minWidth: 40 }}>Trễ</th>
                     <th className="px-2 py-2 text-center bg-red-700" style={{ minWidth: 40 }}>Vắng</th>
+                    <th className="px-2 py-2 text-center bg-amber-600" style={{ minWidth: 40 }}>Lễ</th>
                     <th className="px-1 py-2 text-center bg-gray-700" style={{ minWidth: 36 }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(timesheet.employees || []).map((emp, idx) => {
+                  {(displayedTimesheet.employees || []).map((emp, idx) => {
                     const bg = idx % 2 === 0 ? '#ffffff' : '#f9fafb'
                     return (
                       <tr key={emp.employeeId} className="border-t border-gray-100 hover:bg-blue-50/30">
@@ -224,13 +248,18 @@ export default function MonthlyTimesheetPage() {
                         {emp.days.map((day, di) => {
                           const isWE = dayHeaders[di]?.isWeekend
                           const s = SYMBOL_STYLES[day.symbol] || SYMBOL_STYLES['']
-                          const hasDetail = day.checkIn || day.isLeave || day.isBusinessTrip || day.symbol === 'X'
+                          const hasDetail = day.checkIn || day.isLeave || day.isBusinessTrip || day.isHoliday || day.symbol === 'X'
+                          // Ngày lễ NV đi làm (có shift symbol thực) → ring vàng để nhận diện sẽ được nghỉ bù.
+                          // CN-lễ + NV không đi làm → symbol='X' nhưng KHÔNG phải worked → không ring vàng.
+                          const workedHoliday = day.isHoliday && WORKING_SYMBOLS.has(day.symbol)
+                          // Cell background tint vàng nhạt cho ngày lễ (cả đi làm + nghỉ) để dễ thấy cả cột
+                          const tdBg = isWE ? 'bg-red-50' : (day.isHoliday ? 'bg-amber-50' : '')
                           return (
-                            <td key={di} className={`px-0 py-1.5 text-center border-l border-gray-50 ${isWE ? 'bg-red-50' : ''}`}
+                            <td key={di} className={`px-0 py-1.5 text-center border-l border-gray-50 ${tdBg}`}
                               onMouseEnter={e => hasDetail && showTooltip(day, e)} onMouseLeave={() => setTooltipData(null)}
                               onClick={() => { setTooltipData(null); setEditModal({ day, employeeId: emp.employeeId, employeeName: emp.fullName }) }}
                               style={{ cursor: 'pointer' }}>
-                              <div className={`mx-auto w-7 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-transform hover:scale-110 ${isWE && day.symbol === '—' ? 'bg-red-100 text-red-300' : `${s.bg} ${s.text}`} ${day.lateMinutes > 0 ? 'ring-1 ring-amber-400' : ''} ${day.overtimeMinutes > 0 ? 'ring-1 ring-red-400' : ''}`}>
+                              <div className={`mx-auto w-7 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-transform hover:scale-110 ${isWE && day.symbol === '—' ? 'bg-red-100 text-red-300' : `${s.bg} ${s.text}`} ${workedHoliday ? 'ring-2 ring-amber-500' : ''} ${day.lateMinutes > 0 ? 'ring-1 ring-amber-400' : ''} ${day.overtimeMinutes > 0 ? 'ring-1 ring-red-400' : ''}`}>
                                 {day.symbol}
                               </div>
                             </td>
@@ -239,6 +268,7 @@ export default function MonthlyTimesheetPage() {
                         <td className="px-1 py-1.5 text-center font-bold text-[15px] text-emerald-800 border-l-2 border-gray-200">{emp.totalCong}</td>
                         <td className="px-1 py-1.5 text-center">{emp.totalLateDays > 0 ? <span className="text-amber-600 font-bold text-[13px]">{emp.totalLateDays}</span> : <span className="text-gray-300">—</span>}</td>
                         <td className="px-1 py-1.5 text-center">{emp.totalAbsentDays > 0 ? <span className="text-red-500 font-bold text-[13px]">{emp.totalAbsentDays}</span> : <span className="text-gray-300">—</span>}</td>
+                        <td className="px-1 py-1.5 text-center">{emp.totalHolidayDays > 0 ? <span className="text-amber-700 font-bold text-[13px]">{emp.totalHolidayDays}</span> : <span className="text-gray-300">—</span>}</td>
                         <td className="px-1 py-1 text-center">
                           <button onClick={() => setSelectedEmployee(emp)} className="p-1 rounded hover:bg-gray-200 active:bg-gray-300" title="Xem chi tiết">
                             <Eye size={13} className="text-gray-400" />
@@ -252,18 +282,19 @@ export default function MonthlyTimesheetPage() {
                   <tr className="border-t-2 border-[#1B4D3E]/20 font-bold text-[12px]">
                     <td style={{ position: 'sticky', left: 0, zIndex: 5, backgroundColor: '#f0fdf4' }} className="px-2 py-2 border-r border-gray-100" />
                     <td style={{ position: 'sticky', left: COL_NAME_LEFT, zIndex: 5, backgroundColor: '#f0fdf4', boxShadow: '2px 0 4px rgba(0,0,0,0.06)' }}
-                      className="px-2 py-2 text-[#1B4D3E] border-r border-gray-200">Tổng ({timesheet.employees.length} NV)</td>
+                      className="px-2 py-2 text-[#1B4D3E] border-r border-gray-200">Tổng ({displayedTimesheet.employees.length} NV)</td>
                     {dayHeaders.map((_, i) => <td key={i} className="border-l border-gray-50" style={{ backgroundColor: '#f0fdf4' }} />)}
-                    <td className="px-1 py-2 text-center text-[14px] text-[#1B4D3E] border-l-2 border-gray-200" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(timesheet.employees.reduce((s, e) => s + e.totalCong, 0) * 10) / 10}</td>
-                    <td className="px-1 py-2 text-center text-amber-600" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalLateDays, 0) || ''}</td>
-                    <td className="px-1 py-2 text-center text-red-500" style={{ backgroundColor: '#f0fdf4' }}>{timesheet.employees.reduce((s, e) => s + e.totalAbsentDays, 0) || ''}</td>
+                    <td className="px-1 py-2 text-center text-[14px] text-[#1B4D3E] border-l-2 border-gray-200" style={{ backgroundColor: '#f0fdf4' }}>{Math.round(displayedTimesheet.employees.reduce((s, e) => s + e.totalCong, 0) * 10) / 10}</td>
+                    <td className="px-1 py-2 text-center text-amber-600" style={{ backgroundColor: '#f0fdf4' }}>{displayedTimesheet.employees.reduce((s, e) => s + e.totalLateDays, 0) || ''}</td>
+                    <td className="px-1 py-2 text-center text-red-500" style={{ backgroundColor: '#f0fdf4' }}>{displayedTimesheet.employees.reduce((s, e) => s + e.totalAbsentDays, 0) || ''}</td>
+                    <td className="px-1 py-2 text-center text-amber-700" style={{ backgroundColor: '#f0fdf4' }}>{displayedTimesheet.employees.reduce((s, e) => s + e.totalHolidayDays, 0) || ''}</td>
                     <td style={{ backgroundColor: '#f0fdf4' }} />
                   </tr>
                 </tfoot>
               </table>
             </div>
             <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-between text-[11px] text-gray-400">
-              <span>{timesheet.departmentName} • {MONTHS_VN[selectedMonth]} {selectedYear}</span>
+              <span>{displayedTimesheet.departmentName} • {MONTHS_VN[selectedMonth]} {selectedYear}</span>
               <div className="flex gap-12">
                 {['Người lập', 'Trưởng phòng', 'Giám đốc'].map(t => (
                   <div key={t} className="text-center"><div className="mb-6">{t}</div><div className="border-t border-gray-300 pt-1 min-w-[100px]" /></div>
@@ -278,13 +309,17 @@ export default function MonthlyTimesheetPage() {
       {liveSelectedEmp && (() => {
         const emp = liveSelectedEmp
         // Count by symbol category for stats
-        let statHC = 0, statShift = 0, statCT = 0, statP = 0, statX = 0
+        let statHC = 0, statShift = 0, statCT = 0, statP = 0, statL = 0, statWorkedHoliday = 0, statX = 0
         emp.days.forEach(d => {
           if (d.symbol === 'HC') statHC++
           else if (['S', 'C2', 'Đ', '2ca'].includes(d.symbol)) statShift++
           else if (d.symbol === 'CT') statCT++
           else if (d.symbol === 'P') statP++
+          else if (d.symbol === 'L') statL++
           else if (d.symbol === 'X') statX++
+          // Ngày lễ NV đi làm thật (có shift symbol) — cộng riêng để admin biết bao nhiêu ngày phải duyệt nghỉ bù.
+          // Lễ rơi CN + NV không đi làm → symbol='X', KHÔNG count vào đây.
+          if (d.isHoliday && WORKING_SYMBOLS.has(d.symbol)) statWorkedHoliday++
         })
         return (
           <>
@@ -330,6 +365,13 @@ export default function MonthlyTimesheetPage() {
                     <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">Ca sáng/chiều/đêm</td><td className="text-right font-semibold">{statShift}</td></tr>
                     <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">Công tác</td><td className="text-right font-semibold text-cyan-700">{statCT}</td></tr>
                     <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">Nghỉ phép</td><td className="text-right font-semibold text-yellow-700">{statP}</td></tr>
+                    <tr className="border-b border-gray-100"><td className="py-1.5 text-gray-600">Nghỉ lễ</td><td className="text-right font-semibold text-amber-700">{statL}</td></tr>
+                    {statWorkedHoliday > 0 && (
+                      <tr className="border-b border-gray-100 bg-amber-50/50">
+                        <td className="py-1.5 text-amber-800 text-[11px]">↳ Đi làm lễ (sẽ nghỉ bù)</td>
+                        <td className="text-right font-semibold text-amber-700">{statWorkedHoliday}</td>
+                      </tr>
+                    )}
                     <tr><td className="py-1.5 text-gray-600">Vắng</td><td className="text-right font-semibold text-red-600">{statX}</td></tr>
                   </tbody>
                 </table>
@@ -388,6 +430,12 @@ export default function MonthlyTimesheetPage() {
           <div className="font-bold text-gray-800 mb-1">
             {new Date(tooltipData.day.date + 'T00:00:00+07:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}
           </div>
+          {tooltipData.day.isHoliday && (
+            <div className="text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded text-[11px] mb-1">
+              🎉 Lễ: {tooltipData.day.holidayName}
+              {tooltipData.day.checkIn && ' — đi làm sẽ được nghỉ bù'}
+            </div>
+          )}
           {tooltipData.day.shiftName && <div className="text-gray-500">Ca: {tooltipData.day.shiftName}</div>}
           {tooltipData.day.shiftCount >= 2 && <div className="text-amber-600 font-medium">{tooltipData.day.shiftCount} ca — {tooltipData.day.dayWorkUnits} công</div>}
           {tooltipData.day.checkIn && (

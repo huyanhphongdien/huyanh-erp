@@ -21,6 +21,7 @@ export type DaySymbol =
   | 'P'    // Nghỉ phép (approved leave)
   | 'CT'   // ★ Công tác (business_trip)
   | '2ca'  // ★ 2 ca trong ngày
+  | 'L'    // ★ Nghỉ lễ (public holiday — 1 công, không đi làm)
   | 'X'    // Vắng không phép
   | '—'    // Chưa tới ngày / CN
   | ''     // Trống (không có data)
@@ -42,6 +43,8 @@ export interface DayDetail {
   isWeekend: boolean        // CN
   isLeave: boolean          // Nghỉ phép
   isBusinessTrip: boolean   // ★ Công tác
+  isHoliday: boolean        // ★ Ngày lễ VN (theo VN_PUBLIC_HOLIDAYS)
+  holidayName: string | null  // VD: "Giải phóng miền Nam"
   leaveType: string | null  // "annual", "sick"...
   crossesMidnight: boolean
   // ★ Multi-shift support
@@ -68,6 +71,7 @@ export interface EmployeeMonthlySummary {
   totalAbsentDays: number   // Vắng không phép
   totalLeaveDays: number    // Nghỉ phép
   totalBusinessTripDays: number  // ★ Công tác
+  totalHolidayDays: number  // ★ Số ngày lễ trong tháng (chỉ tính ngày NV không đi làm; đi làm lễ vẫn count vào totalCong qua shift symbol)
 }
 
 /** Kết quả bảng chấm công tháng */
@@ -109,6 +113,43 @@ function shiftToSymbol(shiftCode: string | null): DaySymbol {
 // ============================================================================
 
 const VIP_EMAILS = ['huylv@huyanhrubber.com', 'thuyht@huyanhrubber.com', 'trunglxh@huyanhrubber.com']
+
+// ============================================================================
+// NGÀY LỄ VN — quy tắc Huy Anh: lễ 1 công, đi làm lễ vẫn 1 công + được nghỉ bù
+// ----------------------------------------------------------------------------
+// Khi đổi năm: thêm entry mới ở đây. Nếu sau này muốn admin tự sửa → chuyển
+// sang bảng `public_holidays` ở DB (Phương án 2/3 trong MULTITAB plan).
+// ============================================================================
+
+const VN_PUBLIC_HOLIDAYS: Record<string, string> = {
+  // 2025
+  '2025-01-01': 'Tết Dương lịch',
+  '2025-01-28': 'Tết Âm lịch (29 tháng chạp)',
+  '2025-01-29': 'Tết Âm lịch (mùng 1)',
+  '2025-01-30': 'Tết Âm lịch (mùng 2)',
+  '2025-01-31': 'Tết Âm lịch (mùng 3)',
+  '2025-02-03': 'Tết Âm lịch (mùng 6 — bù)',
+  '2025-04-07': 'Giỗ Tổ Hùng Vương',
+  '2025-04-30': 'Giải phóng miền Nam',
+  '2025-05-01': 'Quốc tế Lao động',
+  '2025-09-01': 'Quốc khánh (bù)',
+  '2025-09-02': 'Quốc khánh',
+  // 2026 — kiểm tra lại theo nghị định trước Tết
+  '2026-01-01': 'Tết Dương lịch',
+  '2026-02-16': 'Tết Âm lịch (giao thừa)',
+  '2026-02-17': 'Tết Âm lịch (mùng 1)',
+  '2026-02-18': 'Tết Âm lịch (mùng 2)',
+  '2026-02-19': 'Tết Âm lịch (mùng 3)',
+  '2026-02-20': 'Tết Âm lịch (mùng 4)',
+  '2026-04-26': 'Giỗ Tổ Hùng Vương',
+  '2026-04-30': 'Giải phóng miền Nam',
+  '2026-05-01': 'Quốc tế Lao động',
+  '2026-09-02': 'Quốc khánh',
+}
+
+function getHolidayName(dateStr: string): string | null {
+  return VN_PUBLIC_HOLIDAYS[dateStr] || null
+}
 
 // ============================================================================
 // SERVICE
@@ -220,6 +261,7 @@ export const monthlyTimesheetService = {
       let totalAbsentDays = 0
       let totalLeaveDays = 0
       let totalBusinessTripDays = 0
+      let totalHolidayDays = 0
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -227,6 +269,8 @@ export const monthlyTimesheetService = {
         const dayOfWeek = dateObj.getDay() // 0=CN
         const isWeekend = dayOfWeek === 0
         const isFuture = new Date(dateStr + 'T23:59:59+07:00') > new Date()
+        const holidayName = getHolidayName(dateStr)
+        const isHoliday = !!holidayName
 
         // Check nghỉ phép
         const leave = empLeaves.find(l =>
@@ -294,7 +338,7 @@ export const monthlyTimesheetService = {
           symbol = 'P'
           totalLeaveDays++
         } else if (shiftCount > 0) {
-          // ★ Có ít nhất 1 ca check-in
+          // ★ Có ít nhất 1 ca check-in (kể cả ngày lễ → giữ shift symbol; nghỉ bù xử lý sau qua leave_request)
           symbol = shiftCount >= 2 ? '2ca' : shiftToSymbol(shift?.code || null)
           totalWorkDays++
           totalCong += dayWU
@@ -304,6 +348,12 @@ export const monthlyTimesheetService = {
           // Trễ/về sớm: chỉ tính 1 lần nếu bất kỳ ca nào trễ
           if (validAtts.some(a => a.status === 'late' || a.status === 'late_and_early' || a.late_minutes > 0)) totalLateDays++
           if (validAtts.some(a => a.status === 'early_leave' || a.status === 'late_and_early' || a.early_leave_minutes > 15)) totalEarlyDays++
+        } else if (isHoliday) {
+          // ★ Ngày lễ + không đi làm → 'L' chỉ là NOTE đánh dấu ngày lễ, KHÔNG +1 công.
+          // Quy tắc Huy Anh: lễ không tính công, người đi làm lễ → shift symbol + 1 công + nghỉ bù.
+          // Áp dụng cho mọi ngày lễ, kể cả 30/4 thứ Năm hoặc 26/4 chủ nhật.
+          symbol = 'L'
+          totalHolidayDays++
         } else if (isFuture) {
           symbol = '—'
         } else {
@@ -327,6 +377,8 @@ export const monthlyTimesheetService = {
           isWeekend,
           isLeave,
           isBusinessTrip,
+          isHoliday,
+          holidayName,
           leaveType: leave?.leave_type || null,
           crossesMidnight: dayCrossesMidnight,
           shiftCount,
@@ -367,6 +419,8 @@ export const monthlyTimesheetService = {
           dayCong = 1.0
           recalcWorkDays++
         }
+        // L (Nghỉ lễ) = 0 công — chỉ là NOTE. Công ty Huy Anh không tính công ngày lễ.
+        //   NV đi làm lễ → shift symbol + 1 công + được nghỉ bù qua leave_request riêng.
         // P, X, —, '' = 0 công
         day.dayWorkUnits = Math.round(dayCong * 10) / 10
         recalcCong += dayCong
@@ -387,6 +441,7 @@ export const monthlyTimesheetService = {
         totalAbsentDays,
         totalLeaveDays,
         totalBusinessTripDays,
+        totalHolidayDays,
       })
     }
 

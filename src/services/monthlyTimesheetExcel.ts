@@ -28,14 +28,21 @@ const WHITE = 'FFFFFF'
 const GRAY_BG = 'F3F4F6'
 const GRAY_BORDER = 'D1D5DB'
 
+// Symbol có nghĩa "đi làm thật" — dùng để check NV làm việc vào ngày lễ
+const WORKING_SYMBOLS = new Set(['S', 'Đ', 'C2', 'HC', 'CT', '2ca'])
+
 // Symbol → fill color
 const SYMBOL_FILL: Record<string, string> = {
   'S': 'DBEAFE', 'Đ': 'EDE9FE', 'C2': 'D1FAE5',
-  'HC': 'F3F4F6', 'P': 'FFEDD5', 'CT': 'E0F2FE', '2ca': 'FEF3C7', 'X': 'FEE2E2',
+  'HC': 'F3F4F6', 'P': 'FFEDD5', 'CT': 'E0F2FE', '2ca': 'FEF3C7',
+  'L': 'FDE68A',  // vàng đậm — Nghỉ lễ
+  'X': 'FEE2E2',
 }
 const SYMBOL_FONT: Record<string, string> = {
   'S': '1D4ED8', 'Đ': '6D28D9', 'C2': '047857',
-  'HC': '4B5563', 'P': 'EA580C', 'CT': '0369A1', '2ca': 'B45309', 'X': 'DC2626',
+  'HC': '4B5563', 'P': 'EA580C', 'CT': '0369A1', '2ca': 'B45309',
+  'L': '92400E',  // amber-800
+  'X': 'DC2626',
 }
 
 // Border style
@@ -52,7 +59,9 @@ const thinBorder: Partial<ExcelJS.Borders> = {
 
 export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): Promise<void> {
   const { month, year, daysInMonth, employees, departmentName } = data
-  const totalCols = 3 + daysInMonth + 7
+  // 3 cột đầu (STT/Họ tên/Mã NV) + ngày trong tháng + 8 cột tổng (Công/Giờ/Trễ/V.Sớm/OT/Vắng/Phép/Lễ) + 1 cột "Ký xác nhận"
+  const totalCols = 3 + daysInMonth + 8 + 1
+  const confirmCol = totalCols // cột cuối cùng = ký xác nhận
 
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Huy Anh ERP'
@@ -65,18 +74,23 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
-      margins: { left: 0.25, right: 0.25, top: 0.3, bottom: 0.3, header: 0.15, footer: 0.15 },
+      horizontalCentered: true,  // căn giữa nội dung khi in
+      margins: { left: 0.2, right: 0.2, top: 0.3, bottom: 0.3, header: 0.15, footer: 0.15 },
     },
   })
 
   // ── Column widths ──
-  ws.getColumn(1).width = 5    // STT
-  ws.getColumn(2).width = 22   // Họ tên
-  ws.getColumn(3).width = 13   // Mã NV
-  for (let d = 1; d <= daysInMonth; d++) ws.getColumn(3 + d).width = 4.5
+  // Tinh chỉnh để tổng width vừa khít A3 ngang (~407mm in được sau margin) → fitToWidth không cần co.
+  // STT 4 + Họ tên 24 + Mã NV 11 + 31 ngày × 4.0 = 124 + 8 cột tổng (~40) + ký 18 = ~221 units (~16")
+  ws.getColumn(1).width = 4    // STT
+  ws.getColumn(2).width = 24   // Họ tên
+  ws.getColumn(3).width = 11   // Mã NV
+  for (let d = 1; d <= daysInMonth; d++) ws.getColumn(3 + d).width = 4.0
   const sumStart = 3 + daysInMonth + 1
-  const sumWidths = [5.5, 5.5, 4.5, 5.5, 4.5, 5.5, 5.5]
+  // Width cho 8 cột tổng: Công, Giờ, Trễ, V.Sớm, OT, Vắng, Phép, Lễ
+  const sumWidths = [6, 6, 5, 6, 5, 5, 5, 5]
   sumWidths.forEach((w, i) => { ws.getColumn(sumStart + i).width = w })
+  ws.getColumn(confirmCol).width = 18  // Ký xác nhận — đủ chỗ ký tay
 
   // ══════════════════════════════════════════════════
   // ROW 1: Company name
@@ -84,9 +98,9 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
   ws.mergeCells(1, 1, 1, totalCols)
   const r1 = ws.getRow(1)
   r1.getCell(1).value = 'CÔNG TY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN'
-  r1.getCell(1).font = { name: 'Arial', size: 11, bold: true, color: { argb: BRAND_GREEN } }
+  r1.getCell(1).font = { name: 'Arial', size: 13, bold: true, color: { argb: BRAND_GREEN } }
   r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  r1.height = 22
+  r1.height = 26
 
   // ROW 2: empty
   ws.getRow(2).height = 6
@@ -95,17 +109,17 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
   ws.mergeCells(3, 1, 3, totalCols)
   const r3 = ws.getRow(3)
   r3.getCell(1).value = `BẢNG CHẤM CÔNG ${MONTHS_VN[month].toUpperCase()} ${year}`
-  r3.getCell(1).font = { name: 'Arial', size: 14, bold: true, color: { argb: BRAND_GREEN } }
+  r3.getCell(1).font = { name: 'Arial', size: 18, bold: true, color: { argb: BRAND_GREEN } }
   r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  r3.height = 28
+  r3.height = 34
 
   // ROW 4: Department
   ws.mergeCells(4, 1, 4, totalCols)
   const r4 = ws.getRow(4)
   r4.getCell(1).value = `Phòng ban: ${departmentName}`
-  r4.getCell(1).font = { name: 'Arial', size: 10, italic: true, color: { argb: '6B7280' } }
+  r4.getCell(1).font = { name: 'Arial', size: 12, italic: true, color: { argb: '6B7280' } }
   r4.getCell(1).alignment = { horizontal: 'center' }
-  r4.height = 18
+  r4.height = 22
 
   // ROW 5: empty
   ws.getRow(5).height = 4
@@ -125,7 +139,7 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
   const styleHeaderCell = (row: number, col: number, value: string, isWeekend = false) => {
     const cell = ws.getRow(row).getCell(col)
     cell.value = value
-    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: WHITE } }
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isWeekend ? 'B91C1C' : BRAND_GREEN } }
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
     cell.border = thinBorder
@@ -146,20 +160,29 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
   }
 
   // Summary headers (merge 2 rows each)
-  const sumLabels = ['Công', 'Giờ', 'Trễ', 'V.Sớm', 'OT', 'Vắng', 'Phép']
+  const sumLabels = ['Công', 'Giờ', 'Trễ', 'V.Sớm', 'OT', 'Vắng', 'Phép', 'Lễ']
   sumLabels.forEach((label, i) => {
     const col = sumStart + i
     ws.mergeCells(hdrRow1, col, hdrRow2, col)
     const cell = ws.getRow(hdrRow1).getCell(col)
     cell.value = label
-    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: WHITE } }
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '163D32' } }
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
     cell.border = thinBorder
   })
 
-  ws.getRow(hdrRow1).height = 22
-  ws.getRow(hdrRow2).height = 16
+  // Header cột "Ký xác nhận" — màu khác (xám đậm) để phân biệt
+  ws.mergeCells(hdrRow1, confirmCol, hdrRow2, confirmCol)
+  const cConfirmHdr = ws.getRow(hdrRow1).getCell(confirmCol)
+  cConfirmHdr.value = 'Ký xác nhận'
+  cConfirmHdr.font = { name: 'Arial', size: 11, bold: true, color: { argb: WHITE } }
+  cConfirmHdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '374151' } }
+  cConfirmHdr.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  cConfirmHdr.border = thinBorder
+
+  ws.getRow(hdrRow1).height = 26
+  ws.getRow(hdrRow2).height = 20
 
   // ══════════════════════════════════════════════════
   // DATA ROWS
@@ -172,12 +195,12 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
     const isEvenRow = idx % 2 === 0
     const rowBg = isEvenRow ? WHITE : 'F9FAFB'
 
-    row.height = 20
+    row.height = 32  // chiều cao dòng — đủ font 11 + chỗ ký xác nhận
 
     // STT
     const cSTT = row.getCell(1)
     cSTT.value = idx + 1
-    cSTT.font = { name: 'Arial', size: 9, color: { argb: '9CA3AF' } }
+    cSTT.font = { name: 'Arial', size: 10, color: { argb: '9CA3AF' } }
     cSTT.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
     cSTT.alignment = { horizontal: 'center', vertical: 'middle' }
     cSTT.border = thinBorder
@@ -185,7 +208,7 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
     // Họ tên
     const cName = row.getCell(2)
     cName.value = emp.fullName
-    cName.font = { name: 'Arial', size: 9, bold: true }
+    cName.font = { name: 'Arial', size: 11, bold: true }
     cName.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
     cName.alignment = { horizontal: 'left', vertical: 'middle' }
     cName.border = thinBorder
@@ -193,7 +216,7 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
     // Mã NV
     const cCode = row.getCell(3)
     cCode.value = emp.employeeCode
-    cCode.font = { name: 'Arial', size: 8, color: { argb: '6B7280' } }
+    cCode.font = { name: 'Arial', size: 9, color: { argb: '6B7280' } }
     cCode.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
     cCode.alignment = { horizontal: 'center', vertical: 'middle' }
     cCode.border = thinBorder
@@ -205,13 +228,29 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
       const sym = day.symbol === '—' ? '' : day.symbol
       cell.value = sym
 
-      const fillColor = SYMBOL_FILL[day.symbol] || rowBg
+      let fillColor = SYMBOL_FILL[day.symbol] || rowBg
       const fontColor = SYMBOL_FONT[day.symbol] || '374151'
+      // NV ĐI LÀM THẬT vào ngày lễ → tint nền + border vàng đậm để đánh dấu nghỉ bù.
+      // Lễ rơi CN + NV không đi làm → symbol='X', KHÔNG có treatment đặc biệt.
+      const isWorkedHoliday = day.isHoliday && WORKING_SYMBOLS.has(day.symbol)
+      if (isWorkedHoliday) {
+        fillColor = 'FEF3C7'  // amber-100
+      }
 
-      cell.font = { name: 'Arial', size: 8, bold: !!sym, color: { argb: fontColor } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sym ? fillColor : rowBg } }
+      cell.font = { name: 'Arial', size: 10, bold: !!sym, color: { argb: fontColor } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sym ? fillColor : (day.isHoliday ? 'FEF3C7' : rowBg) } }
       cell.alignment = { horizontal: 'center', vertical: 'middle' }
-      cell.border = thinBorder
+      // Ngày lễ NV đi làm → border vàng đậm (báo "sẽ nghỉ bù")
+      if (isWorkedHoliday) {
+        cell.border = {
+          top: { style: 'medium', color: { argb: 'D97706' } },
+          left: { style: 'medium', color: { argb: 'D97706' } },
+          bottom: { style: 'medium', color: { argb: 'D97706' } },
+          right: { style: 'medium', color: { argb: 'D97706' } },
+        }
+      } else {
+        cell.border = thinBorder
+      }
     })
 
     // Summary cells
@@ -223,16 +262,23 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
       { val: emp.totalOvertimeHours || '', color: 'DC2626', bold: true },
       { val: emp.totalAbsentDays || '', color: 'DC2626', bold: true },
       { val: emp.totalLeaveDays || '', color: 'EA580C', bold: false },
+      { val: emp.totalHolidayDays || '', color: '92400E', bold: true },  // Lễ — amber-800
     ]
 
     summaryValues.forEach((sv, i) => {
       const cell = row.getCell(sumStart + i)
       cell.value = sv.val
-      cell.font = { name: 'Arial', size: 9, bold: sv.bold, color: { argb: sv.color } }
+      cell.font = { name: 'Arial', size: 11, bold: sv.bold, color: { argb: sv.color } }
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
       cell.alignment = { horizontal: 'center', vertical: 'middle' }
       cell.border = thinBorder
     })
+
+    // Cell ký xác nhận — empty + border để NV ký tay
+    const cConfirm = row.getCell(confirmCol)
+    cConfirm.value = ''
+    cConfirm.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
+    cConfirm.border = thinBorder
   })
 
   // ══════════════════════════════════════════════════
@@ -240,7 +286,7 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
   // ══════════════════════════════════════════════════
   const totRowNum = dataStartRow + employees.length
   const totRow = ws.getRow(totRowNum)
-  totRow.height = 22
+  totRow.height = 28
 
   // Merge STT cell
   const cTotSTT = totRow.getCell(1)
@@ -249,14 +295,14 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
 
   const cTotName = totRow.getCell(2)
   cTotName.value = 'TỔNG CỘNG'
-  cTotName.font = { name: 'Arial', size: 9, bold: true, color: { argb: BRAND_GREEN } }
+  cTotName.font = { name: 'Arial', size: 11, bold: true, color: { argb: BRAND_GREEN } }
   cTotName.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } }
   cTotName.alignment = { horizontal: 'left', vertical: 'middle' }
   cTotName.border = thinBorder
 
   const cTotCode = totRow.getCell(3)
   cTotCode.value = `${employees.length} NV`
-  cTotCode.font = { name: 'Arial', size: 8, color: { argb: '6B7280' } }
+  cTotCode.font = { name: 'Arial', size: 9, color: { argb: '6B7280' } }
   cTotCode.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } }
   cTotCode.alignment = { horizontal: 'center', vertical: 'middle' }
   cTotCode.border = thinBorder
@@ -277,24 +323,30 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
     Math.round(employees.reduce((s, e) => s + e.totalOvertimeHours, 0) * 10) / 10 || '',
     employees.reduce((s, e) => s + e.totalAbsentDays, 0) || '',
     employees.reduce((s, e) => s + e.totalLeaveDays, 0) || '',
+    employees.reduce((s, e) => s + e.totalHolidayDays, 0) || '',  // Lễ
   ]
-  const totColors = ['1D4ED8', '374151', 'D97706', '7C3AED', 'DC2626', 'DC2626', 'EA580C']
+  const totColors = ['1D4ED8', '374151', 'D97706', '7C3AED', 'DC2626', 'DC2626', 'EA580C', '92400E']
 
   totals.forEach((val, i) => {
     const cell = totRow.getCell(sumStart + i)
     cell.value = val
-    cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: totColors[i] } }
+    cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: totColors[i] } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } }
     cell.alignment = { horizontal: 'center', vertical: 'middle' }
     cell.border = thinBorder
   })
+
+  // Cell ký xác nhận ở dòng tổng — để trống nhưng giữ border
+  const cTotConfirm = totRow.getCell(confirmCol)
+  cTotConfirm.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } }
+  cTotConfirm.border = thinBorder
 
   // ══════════════════════════════════════════════════
   // SIGNATURE AREA
   // ══════════════════════════════════════════════════
   const sigRow = totRowNum + 3
   const sigStyle: Partial<ExcelJS.Style> = {
-    font: { name: 'Arial', size: 9, italic: true, color: { argb: '6B7280' } },
+    font: { name: 'Arial', size: 11, italic: true, color: { argb: '6B7280' } },
     alignment: { horizontal: 'center' },
   }
 
@@ -336,6 +388,8 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
     ['P', 'Nghỉ phép', 'Đã được duyệt'],
     ['CT', 'Công tác', 'Đi công tác (đã duyệt)'],
     ['2ca', '2 ca/ngày', 'VD: Ca 1 + Ca 3 = 2.0 công'],
+    ['L', 'Nghỉ lễ', '1 công — ngày lễ VN, NV không đi làm'],
+    ['(viền vàng)', 'Đi làm ngày lễ', '1 công + 1 ngày nghỉ bù sau (xin qua leave_request)'],
     ['X', 'Vắng không phép', ''],
   ]
 

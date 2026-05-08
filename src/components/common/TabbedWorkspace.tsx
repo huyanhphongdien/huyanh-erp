@@ -16,8 +16,8 @@
 // ============================================================================
 
 import { useEffect, type ReactNode } from 'react'
-import { Tabs, Dropdown, type TabsProps, type MenuProps } from 'antd'
-import { CloseOutlined } from '@ant-design/icons'
+import { Tabs, Dropdown, Button, Tooltip, Modal, type TabsProps, type MenuProps } from 'antd'
+import { CloseOutlined, CloseCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTabStore, type OpenTab } from '../../stores/tabStore'
 import { TabContent } from './TabContent'
@@ -45,9 +45,33 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
   const matchingTab = tabs.find((t) => t.path === location.pathname)
   const effectiveActiveKey = matchingTab ? matchingTab.key : null
 
-  // Keyboard shortcuts: Ctrl+W close tab, Ctrl+Tab next tab
+  // Đóng tất cả tab — confirm nếu có tab dirty
+  const handleCloseAll = () => {
+    const dirtyCount = tabs.filter((t) => t.dirty).length
+    if (dirtyCount > 0) {
+      Modal.confirm({
+        title: 'Đóng tất cả tab?',
+        icon: <ExclamationCircleOutlined />,
+        content: `Có ${dirtyCount} tab có thay đổi chưa lưu. Đóng hết sẽ mất các thay đổi này.`,
+        okText: 'Đóng hết',
+        okButtonProps: { danger: true },
+        cancelText: 'Hủy',
+        onOk: () => closeAll(),
+      })
+    } else {
+      closeAll()
+    }
+  }
+
+  // Keyboard shortcuts: Ctrl+W close tab, Ctrl+Shift+W close all, Ctrl+Tab next tab
   useEffect(() => {
     const onKeydown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Shift + W: close all
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'w') {
+        e.preventDefault()
+        if (tabs.length > 0) handleCloseAll()
+        return
+      }
       if (!effectiveActiveKey) return
       // Ctrl/Cmd + W: close active tab
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'w') {
@@ -67,6 +91,7 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
     }
     window.addEventListener('keydown', onKeydown)
     return () => window.removeEventListener('keydown', onKeydown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveActiveKey, tabs, closeTab, setActive, navigate])
 
   // Split tabs: top-level (no parentKey) vs child tabs (has parentKey)
@@ -161,6 +186,22 @@ export default function TabbedWorkspace({ children }: TabbedWorkspaceProps) {
           items={topTabItems}
           size="middle"
           tabBarStyle={{ margin: 0, borderBottom: 'none' }}
+          tabBarExtraContent={{
+            right: tabs.length > 1 ? (
+              <Tooltip title="Đóng tất cả tab (Ctrl+Shift+W)">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<CloseCircleOutlined />}
+                  onClick={handleCloseAll}
+                  style={{ marginRight: 4, color: '#cf1322', fontWeight: 500 }}
+                >
+                  Đóng hết ({tabs.length})
+                </Button>
+              </Tooltip>
+            ) : null,
+          }}
         />
       </div>
       {/* Sub-tab row — hiện khi active tab có children hoặc chính là child */}

@@ -108,8 +108,14 @@ interface CustomerDetailStats {
 // MAIN COMPONENT
 // ============================================
 
-export default function CustomerDetailPage() {
-  const { customerId } = useParams<{ customerId: string }>()
+// Accept optional customerId prop cho tab mode — fallback useParams cho direct URL
+interface CustomerDetailPageProps {
+  customerId?: string
+}
+
+export default function CustomerDetailPage({ customerId: propCustomerId }: CustomerDetailPageProps = {}) {
+  const { customerId: paramCustomerId } = useParams<{ customerId: string }>()
+  const customerId = propCustomerId || paramCustomerId
   const navigate = useNavigate()
 
   const [customer, setCustomer] = useState<SalesCustomer | null>(null)

@@ -56,6 +56,7 @@ import {
   COUNTRY_OPTIONS,
 } from '../../services/sales/salesTypes'
 import GradeBadge from '../../components/wms/GradeBadge'
+import { useOpenTab } from '../../hooks/useOpenTab'
 
 const { Title, Text } = Typography
 
@@ -102,7 +103,19 @@ const getCountryLabel = (code?: string): string => {
 
 const CustomerListPage = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
   const [form] = Form.useForm()
+
+  // Mở chi tiết KH thành tab
+  const openCustomerTab = (record: SalesCustomer) => {
+    openTab({
+      key: `sales-customer-${record.id}`,
+      title: record.short_name || record.name,
+      componentId: 'sales-customer-detail',
+      props: { customerId: record.id },
+      path: `/sales/customers/${record.id}`,
+    })
+  }
 
   // State
   const [customers, setCustomers] = useState<SalesCustomer[]>([])
@@ -378,14 +391,14 @@ const CustomerListPage = () => {
       fixed: 'right',
       render: (_: unknown, record: SalesCustomer) => (
         <Space size={4}>
-          <Tooltip title="Xem chi tiết">
+          <Tooltip title="Xem chi tiết (tab)">
             <Button
               type="text"
               size="small"
               icon={<EyeOutlined />}
               onClick={(e) => {
                 e.stopPropagation()
-                navigate(`/sales/customers/${record.id}`)
+                openCustomerTab(record)
               }}
             />
           </Tooltip>
@@ -578,7 +591,7 @@ const CustomerListPage = () => {
           onChange={handleTableChange}
           scroll={{ x: 1000 }}
           onRow={(record) => ({
-            onClick: () => navigate(`/sales/customers/${record.id}`),
+            onClick: () => openCustomerTab(record),
             style: { cursor: 'pointer' },
           })}
           size="middle"

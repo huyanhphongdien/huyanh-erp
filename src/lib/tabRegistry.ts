@@ -123,6 +123,21 @@ registerTabComponent('b2b-deal-print', DealPrintPage)
 const B2BChatRoomPage = lazy(() => import('../pages/b2b/B2BChatRoomPage'))
 registerTabComponent('b2b-chat-room', B2BChatRoomPage)
 
-// Thêm vào đây khi rollout các module khác:
-// const SalesOrderDetailPage = lazy(() => import('../pages/sales/SalesOrderDetailPage'))
-// registerTabComponent('sales-order-detail', SalesOrderDetailPage)
+// ===== SALES — Order detail flow =====
+
+const SalesOrderDetailPage = lazy(() => import('../pages/sales/SalesOrderDetailPage'))
+registerTabComponent('sales-order-detail', SalesOrderDetailPage)
+
+const SalesOrderCreatePage = lazy(() => import('../pages/sales/SalesOrderCreatePage'))
+registerTabComponent('sales-order-create', SalesOrderCreatePage)
+
+const ContainerPackingPage = lazy(() => import('../pages/sales/ContainerPackingPage'))
+registerTabComponent('sales-container-packing', ContainerPackingPage)
+
+const ExportDocumentsPage = lazy(() => import('../pages/sales/ExportDocumentsPage'))
+registerTabComponent('sales-export-documents', ExportDocumentsPage)
+
+// ===== SALES — Customer detail =====
+
+const CustomerDetailPage = lazy(() => import('../pages/sales/CustomerDetailPage'))
+registerTabComponent('sales-customer-detail', CustomerDetailPage)

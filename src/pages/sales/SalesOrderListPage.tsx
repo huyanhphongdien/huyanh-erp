@@ -56,6 +56,7 @@ import GradeBadge from '../../components/wms/GradeBadge'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import SalesOrderDetailPanel from './components/SalesOrderDetailPanel'
+import { useOpenTab } from '../../hooks/useOpenTab'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -158,10 +159,23 @@ const STATUS_TABS: { key: string; label: string }[] = [
 
 const SalesOrderListPage = () => {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuthStore()
   const salesRole = getSalesRole(user)
   const isAdmin = salesRole === 'admin'
+
+  // Mở chi tiết đơn thành tab (full editing) — phân biệt với row click (slide panel preview)
+  const openOrderTab = (record: SalesOrder) => {
+    const contractNo = (record as any).contract_no || record.code
+    openTab({
+      key: `sales-order-${record.id}`,
+      title: `Đơn ${contractNo}`,
+      componentId: 'sales-order-detail',
+      props: { orderId: record.id },
+      path: `/sales/orders/${record.id}`,
+    })
+  }
 
   // State
   const [orders, setOrders] = useState<SalesOrder[]>([])
@@ -743,8 +757,10 @@ const SalesOrderListPage = () => {
 
         return (
         <Space size={0}>
-          <Button type="text" size="small" icon={<EyeOutlined />}
-            onClick={(e) => { e.stopPropagation(); setPanelOrderId(record.id); setPanelOpen(true) }} />
+          <Tooltip title="Mở chi tiết (tab)">
+            <Button type="text" size="small" icon={<EyeOutlined />}
+              onClick={(e) => { e.stopPropagation(); openOrderTab(record) }} />
+          </Tooltip>
           {canDelete && (
             <Popconfirm
               title={`Xóa ${(record as any).contract_no || record.code}?`}
@@ -780,7 +796,13 @@ const SalesOrderListPage = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => navigate('/sales/orders/new')}
+            onClick={() => openTab({
+              key: 'sales-order-create',
+              title: 'Tạo đơn hàng',
+              componentId: 'sales-order-create',
+              props: {},
+              path: '/sales/orders/new',
+            })}
             style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
           >
             Tạo đơn hàng

@@ -141,8 +141,14 @@ const STATUS_FLOW: SalesOrderStatus[] = [
 // COMPONENT
 // ============================================================================
 
-function SalesOrderDetailPage() {
-  const { orderId } = useParams<{ orderId: string }>()
+// Accept optional orderId prop cho tab mode — fallback useParams cho direct URL
+interface SalesOrderDetailPageProps {
+  orderId?: string
+}
+
+function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProps = {}) {
+  const { orderId: paramOrderId } = useParams<{ orderId: string }>()
+  const orderId = propOrderId || paramOrderId
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTab = searchParams.get('tab') || 'info'

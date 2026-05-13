@@ -3,7 +3,7 @@
 // File: src/pages/sales/SalesOrderListPage.tsx
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card,
@@ -214,6 +214,21 @@ const SalesOrderListPage = () => {
   const [panelOrderId, setPanelOrderId] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
+  // Row selection — checkbox tick từng đơn, hỗ trợ bulk action
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
+    columnWidth: 36,
+    fixed: true as const,
+  }
+
+  const selectedOrders = useMemo<SalesOrder[]>(
+    () => orders.filter((o: SalesOrder) => selectedRowKeys.includes(o.id)),
+    [orders, selectedRowKeys],
+  )
+
   // ============================================
   // DATA FETCHING
   // ============================================
@@ -397,68 +412,45 @@ const SalesOrderListPage = () => {
   }
 
   // ============================================
-  // ROW COLOR — v4: nhìn vào biết ngay thiếu gì
+  // ROW COLOR — v5 UX simplified: chỉ 2 trạng thái
   // ============================================
   //
-  // 🟢 Xanh lá: Đã thanh toán (xong)
-  // 🔵 Xanh dương: Đã xuất/giao — chờ tiền
-  // 🟡 Vàng: Thiếu logistics (chưa có BK/BL/ETD)
-  // 🔴 Đỏ nhạt: Quá hạn giao hoặc L/C hết hạn
-  // ⚪ Trắng: Đang sản xuất (bình thường)
-  // 🩶 Xám: Nháp / Hủy
+  // ✅ Xanh nhạt: Đã thanh toán (paid)
+  // 🚨 Đỏ nhạt: Quá hạn giao HOẶC L/C hết hạn (cần action gấp)
+  // ⚪ Trắng: tất cả còn lại — đỡ rối, focus vào 2 case quan trọng
 
   const getRowStyle = (r: SalesOrder): React.CSSProperties => {
-    if (r.status === 'cancelled') return { background: '#f5f5f5', opacity: 0.6 }
-    if (r.status === 'paid') return { background: '#f6ffed' } // xanh lá nhạt — xong
+    if (r.status === 'cancelled') return { opacity: 0.5 } // xám nhạt qua opacity
+    if (r.status === 'paid') return { background: '#f6ffed' } // xanh — xong xuôi
 
-    // Quá hạn giao?
+    // Quá hạn giao chưa giao?
     if (r.delivery_date) {
       const overdue = Math.ceil((Date.now() - new Date(r.delivery_date).getTime()) / 86400000)
       if (overdue > 0 && !['shipped', 'delivered', 'paid'].includes(r.status)) {
-        return { background: '#fff1f0' } // đỏ nhạt — quá hạn giao
+        return { background: '#fff1f0' } // đỏ — quá hạn
       }
     }
-    // L/C hết hạn?
+    // L/C đã hết hạn?
     if (r.lc_expiry_date) {
       const lcDays = Math.ceil((new Date(r.lc_expiry_date).getTime() - Date.now()) / 86400000)
-      if (lcDays <= 0) return { background: '#fff1f0' } // đỏ nhạt
-      if (lcDays <= 7) return { background: '#fff7e6' } // cam nhạt
+      if (lcDays <= 0) return { background: '#fff1f0' } // đỏ — L/C hết hạn
     }
 
-    if (['shipped', 'delivered', 'invoiced'].includes(r.status)) {
-      return { background: '#e6f4ff' } // xanh dương nhạt — chờ tiền
-    }
-
-    // Đã confirm nhưng thiếu logistics
-    if (['confirmed', 'producing', 'ready', 'packing'].includes(r.status)) {
-      const missingLog = !r.booking_reference || !r.bl_number || !r.etd
-      if (missingLog && ['ready', 'packing'].includes(r.status)) {
-        return { background: '#fffbe6' } // vàng nhạt — thiếu LOG
-      }
-    }
-
-    if (r.status === 'draft') return { background: '#fafafa' } // xám nhạt
-
-    return {} // trắng — bình thường
+    return {} // trắng — bình thường (bao gồm shipped/delivered/invoiced/confirmed/producing/ready/packing/draft)
   }
 
-  // Left border accent theo trạng thái thiếu
+  // Left border accent — v5 simplified: chỉ 3 màu (paid/overdue/default)
   const getRowBorderLeft = (r: SalesOrder): string => {
-    if (r.status === 'paid') return '3px solid #52c41a'
-    if (r.status === 'cancelled') return '3px solid #d9d9d9'
-    if (['shipped', 'delivered', 'invoiced'].includes(r.status)) return '3px solid #1677ff'
-
+    if (r.status === 'paid') return '3px solid #52c41a'  // xanh — xong
     if (r.delivery_date) {
       const overdue = Math.ceil((Date.now() - new Date(r.delivery_date).getTime()) / 86400000)
-      if (overdue > 0 && !['shipped', 'delivered', 'paid'].includes(r.status)) return '3px solid #ff4d4f'
+      if (overdue > 0 && !['shipped', 'delivered', 'paid'].includes(r.status)) return '3px solid #ff4d4f'  // đỏ — quá hạn
     }
-
-    if (['ready', 'packing'].includes(r.status) && (!r.booking_reference || !r.bl_number || !r.etd)) {
-      return '3px solid #faad14'
+    if (r.lc_expiry_date) {
+      const lcDays = Math.ceil((new Date(r.lc_expiry_date).getTime() - Date.now()) / 86400000)
+      if (lcDays <= 0) return '3px solid #ff4d4f'  // đỏ — L/C hết
     }
-
-    if (r.status === 'draft') return '3px solid #d9d9d9'
-    return '3px solid #1B4D3E'
+    return '3px solid #1B4D3E'  // mặc định — xanh brand
   }
 
   // ============================================
@@ -508,9 +500,24 @@ const SalesOrderListPage = () => {
   }
 
   // ── Header style ──
-  const hdr = (title: string) => (
-    <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{title}</span>
-  )
+  // Q5 UX: nếu là viết tắt → wrap Tooltip cho rõ nghĩa
+  const HDR_TOOLTIPS: Record<string, string> = {
+    'Số HĐ': 'Số hợp đồng (HA20YYYYNNNN)',
+    'SL (tấn)': 'Số lượng (tấn)',
+    'Số LOT': 'Số LOT của khách hàng (Customer PO)',
+    'Số BKG': 'Số booking vận tải (đặt tàu)',
+    'ETD': 'Estimated Time of Departure — Ngày tàu chạy dự kiến',
+    'Đ.giá': 'Đơn giá USD/tấn',
+    'CK': 'Chiết khấu',
+    'NH CK': 'Ngân hàng chiết khấu',
+    'T.độ': 'Tiến độ 4 phase: Hợp đồng → Sản xuất → Logistics → Kế toán',
+    'Tiền về': 'Ngày tiền về tài khoản',
+  }
+  const hdr = (title: string) => {
+    const tip = HDR_TOOLTIPS[title]
+    const inner = <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{title}</span>
+    return tip ? <Tooltip title={tip}>{inner}</Tooltip> : inner
+  }
 
   // Helpers map state ↔ Ant sort order
   const sortedColumn = (key: string) =>
@@ -575,7 +582,8 @@ const SalesOrderListPage = () => {
       })),
       filteredValue: gradeFilteredValue,
       filterMultiple: false,
-      render: (g: string) => g ? <GradeBadge grade={g} size="small" /> : gray(null),
+      // Bỏ phân màu — chỉ hiển thị text grade dạng plain để bảng đỡ rối
+      render: (g: string) => g ? <span style={{ fontSize: 12, fontWeight: 500, color: '#262626' }}>{g}</span> : gray(null),
     },
     {
       title: hdr('Số LOT'),
@@ -810,187 +818,63 @@ const SalesOrderListPage = () => {
         </Col>
       </Row>
 
-      {/* Stats Row — 7 mini cards (1 click-to-filter) */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={3}>
-          <Card
-            size="small"
-            style={{
-              borderRadius: 8,
-              cursor: 'pointer',
-              border: overdueEtdOnly ? '2px solid #cf1322' : undefined,
-              background: overdueEtdOnly ? '#fff1f0' : undefined,
-            }}
+      {/* Status tabs có badge count + nút "🚨 Quá ETD" inline (Q1 UX) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <Tabs
+          activeKey={statusTab}
+          onChange={handleTabChange}
+          style={{ flex: 1, minWidth: 0 }}
+          tabBarStyle={{ marginBottom: 0 }}
+          items={STATUS_TABS.map((tab) => {
+            const count = tab.key === 'all' ? stats.total
+              : tab.key === 'draft' ? stats.draft
+              : tab.key === 'confirmed' ? stats.confirmed
+              : tab.key === 'producing' ? stats.producing
+              : tab.key === 'ready' ? stats.ready
+              : tab.key === 'shipped' ? stats.shipped
+              : 0
+            return {
+              key: tab.key,
+              label: (
+                <span>
+                  {tab.label}
+                  {count > 0 && (
+                    <span style={{
+                      marginLeft: 6,
+                      padding: '0 6px',
+                      background: statusTab === tab.key ? '#1B4D3E' : '#f0f0f0',
+                      color: statusTab === tab.key ? '#fff' : '#666',
+                      borderRadius: 9999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}>{count}</span>
+                  )}
+                </span>
+              ),
+            }
+          })}
+        />
+        {/* Nút "🚨 Quá ETD" — toggle filter overdue */}
+        {stats.overdue_etd > 0 && (
+          <Button
+            danger={overdueEtdOnly}
+            type={overdueEtdOnly ? 'primary' : 'default'}
             onClick={() => {
               const next = !overdueEtdOnly
               setOverdueEtdOnly(next)
-              if (next) {
-                setSearchParams({ filter: 'overdue_etd' })
-              } else {
-                setSearchParams({})
-              }
+              setSearchParams(next ? { filter: 'overdue_etd' } : {})
               setPagination(p => ({ ...p, current: 1 }))
             }}
-            title="Click để filter chỉ đơn quá ETD chưa giao"
+            style={overdueEtdOnly ? {} : { color: '#cf1322', borderColor: '#ffa39e' }}
           >
-            <Statistic
-              title={<span style={{ color: '#cf1322', fontWeight: 600 }}>🚨 Quá ETD</span>}
-              value={stats.overdue_etd}
-              valueStyle={{ color: '#cf1322', fontSize: 22 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={3}>
-          <Card size="small" style={{ borderRadius: 8 }}>
-            <Statistic
-              title="Tổng đơn"
-              value={stats.total}
-              prefix={<FileTextOutlined style={{ color: '#1B4D3E' }} />}
-              valueStyle={{ color: '#1B4D3E' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={3}>
-          <Card size="small" style={{ borderRadius: 8 }}>
-            <Statistic
-              title="Nháp"
-              value={stats.draft}
-              prefix={<EditOutlined style={{ color: '#8c8c8c' }} />}
-              valueStyle={{ color: '#8c8c8c' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={3}>
-          <Card size="small" style={{ borderRadius: 8 }}>
-            <Statistic
-              title="Đã xác nhận"
-              value={stats.confirmed}
-              prefix={<CheckCircleOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={3}>
-          <Card size="small" style={{ borderRadius: 8 }}>
-            <Statistic
-              title="Đang SX"
-              value={stats.producing}
-              prefix={<InboxOutlined style={{ color: '#fa8c16' }} />}
-              valueStyle={{ color: '#fa8c16' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={3}>
-          <Card size="small" style={{ borderRadius: 8 }}>
-            <Statistic
-              title="Sẵn sàng"
-              value={stats.ready}
-              prefix={<CarOutlined style={{ color: '#13c2c2' }} />}
-              valueStyle={{ color: '#13c2c2' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={3}>
-          <Card size="small" style={{ borderRadius: 8 }}>
-            <Statistic
-              title="Đã xuất"
-              value={stats.shipped}
-              prefix={<RocketOutlined style={{ color: '#52c41a' }} />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Tabs by status */}
-      <Tabs
-        activeKey={statusTab}
-        onChange={handleTabChange}
-        style={{ marginBottom: 16 }}
-        items={STATUS_TABS.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-        }))}
-      />
-
-      {/* Banner: filter Quá ETD đang active */}
-      {overdueEtdOnly && (
-        <div style={{
-          padding: '8px 12px',
-          background: '#fff1f0',
-          border: '1px solid #ffa39e',
-          borderRadius: 6,
-          marginBottom: 12,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 13,
-        }}>
-          <span style={{ color: '#cf1322' }}>
-            🚨 Đang lọc: <strong>chỉ đơn quá ETD chưa giao</strong> ({stats.overdue_etd} đơn)
-          </span>
-          <Button
-            size="small"
-            onClick={() => {
-              setOverdueEtdOnly(false)
-              setSearchParams({})
-            }}
-          >
-            Xóa filter
+            🚨 Quá ETD ({stats.overdue_etd})
           </Button>
-        </div>
-      )}
-
-      {/* Sort status banner */}
-      <div style={{
-        padding: '8px 12px',
-        background: '#f0faf5',
-        border: '1px solid #d1ecdf',
-        borderRadius: 6,
-        marginBottom: 12,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        fontSize: 12,
-        flexWrap: 'wrap',
-        gap: 8,
-      }}>
-        <span style={{ color: '#1B4D3E' }}>
-          📊 Đang sắp xếp theo: <strong>{sortFieldLabel(sortBy)}</strong>
-          {' '}
-          <span style={{
-            display: 'inline-block',
-            padding: '1px 8px',
-            background: '#1B4D3E',
-            color: '#fff',
-            borderRadius: 4,
-            fontFamily: 'monospace',
-            fontSize: 11,
-            marginLeft: 4,
-          }}>
-            {sortOrder === 'asc' ? '↑ Tăng dần' : '↓ Giảm dần'}
-          </span>
-          {' — Click cột bất kỳ để đổi sort. Click 3 lần (cùng cột) để reset.'}
-        </span>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Button
-            size="small"
-            onClick={() => { setSortBy('created_at'); setSortOrder('desc') }}
-            disabled={sortBy === 'created_at' && sortOrder === 'desc'}
-          >
-            Đơn mới nhất
-          </Button>
-          <Button
-            size="small"
-            onClick={() => { setSortBy('etd'); setSortOrder('asc') }}
-            disabled={sortBy === 'etd' && sortOrder === 'asc'}
-            type={sortBy === 'etd' ? 'primary' : 'default'}
-            style={sortBy === 'etd' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
-          >
-            🚨 ETD gần nhất
-          </Button>
-        </div>
+        )}
       </div>
+
+      {/* Q2: Banner "đang lọc Quá ETD" + "Đang sắp xếp" — đã bỏ.
+          Status filter overdue_etd thấy ở nút "Quá ETD" (đỏ khi active).
+          Sort state thấy qua arrow trên column header (Ant Design tự render). */}
 
       {/* Filter Bar */}
       <Card size="small" style={{ marginBottom: 16, borderRadius: 8 }}>
@@ -1056,14 +940,37 @@ const SalesOrderListPage = () => {
         </Row>
       </Card>
 
-      {/* Color Legend */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', fontSize: 12, color: '#666' }}>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#f6ffed', border: '1px solid #b7eb8f', marginRight: 4, verticalAlign: 'middle' }} /> Đã TT</span>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#e6f4ff', border: '1px solid #91caff', marginRight: 4, verticalAlign: 'middle' }} /> Chờ tiền</span>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#fffbe6', border: '1px solid #ffe58f', marginRight: 4, verticalAlign: 'middle' }} /> Thiếu LOG</span>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#fff1f0', border: '1px solid #ffa39e', marginRight: 4, verticalAlign: 'middle' }} /> Quá hạn / L/C hết</span>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: '#fafafa', border: '1px solid #d9d9d9', marginRight: 4, verticalAlign: 'middle' }} /> Nháp</span>
-      </div>
+      {/* Q3: Color legend đã bỏ. Row chỉ còn 2 màu — xanh nhạt (đã TT) + đỏ nhạt (quá hạn/L/C hết).
+          User hover row sẽ thấy tooltip giải thích — không cần legend chip riêng. */}
+
+      {/* Bulk action bar — hiện khi có row được chọn */}
+      {selectedRowKeys.length > 0 && (
+        <div style={{
+          padding: '8px 14px',
+          background: '#e6f4ff',
+          border: '1px solid #91caff',
+          borderRadius: 6,
+          marginBottom: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          fontSize: 13,
+        }}>
+          <span style={{ color: '#0958d9', fontWeight: 600 }}>
+            ✓ Đã chọn {selectedRowKeys.length} đơn
+          </span>
+          <span style={{ color: '#666' }}>·</span>
+          <Button size="small" onClick={() => setSelectedRowKeys([])}>Bỏ chọn</Button>
+          <Button size="small" onClick={() => {
+            const codes = selectedOrders.map((o: SalesOrder) => (o as any).contract_no || o.code).join(', ')
+            message.info(`Đã copy ${selectedOrders.length} mã đơn: ${codes}`)
+            navigator.clipboard?.writeText(codes)
+          }}>📋 Copy mã đơn</Button>
+          <span style={{ marginLeft: 'auto', color: '#666' }}>
+            Tổng giá trị: <strong>${selectedOrders.reduce((s: number, o: SalesOrder) => s + (o.total_value_usd || 0), 0).toLocaleString()}</strong>
+          </span>
+        </div>
+      )}
 
       {/* Table */}
       <Card style={{ borderRadius: 8 }}>
@@ -1071,6 +978,7 @@ const SalesOrderListPage = () => {
           rowKey="id"
           columns={columns}
           dataSource={orders}
+          rowSelection={rowSelection}
           loading={loading}
           expandable={{
             expandedRowRender: (record) => {

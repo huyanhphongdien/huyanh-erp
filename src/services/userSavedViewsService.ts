@@ -46,8 +46,9 @@ export const userSavedViewsService = {
     // Get current user's employee_id
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Chưa login')
+    // Cột link auth trong bảng employees là `user_id` (KHÔNG phải auth_user_id)
     const { data: emp } = await supabase
-      .from('employees').select('id').eq('auth_user_id', user.id).single()
+      .from('employees').select('id').eq('user_id', user.id).single()
     if (!emp) throw new Error('Không tìm thấy employee record')
 
     const { data, error } = await supabase

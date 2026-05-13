@@ -32,10 +32,11 @@ DROP POLICY IF EXISTS "users see their own views" ON user_saved_views;
 CREATE POLICY "users see their own views" ON user_saved_views
   FOR ALL
   USING (
-    user_id IN (SELECT id FROM employees WHERE auth_user_id = auth.uid())
+    -- Lưu ý: cột link auth ở bảng employees là `user_id` (KHÔNG phải auth_user_id)
+    user_id IN (SELECT id FROM employees WHERE user_id = auth.uid())
   )
   WITH CHECK (
-    user_id IN (SELECT id FROM employees WHERE auth_user_id = auth.uid())
+    user_id IN (SELECT id FROM employees WHERE user_id = auth.uid())
   );
 
 -- Reload schema cache

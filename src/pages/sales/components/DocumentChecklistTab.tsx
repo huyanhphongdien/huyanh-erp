@@ -88,7 +88,8 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
 
   useEffect(() => { load() }, [load])
 
-  const visibleDocs = docs.filter(d => canViewDocument(d.doc_type, salesRole))
+  // ★ Hợp đồng được xử lý riêng tại ContractTab → loại khỏi checklist
+  const visibleDocs = docs.filter(d => d.doc_type !== 'contract' && canViewDocument(d.doc_type, salesRole))
   const received = visibleDocs.filter(d => d.is_received).length
   const uploaded = visibleDocs.filter(d => d.file_url).length
   const total = visibleDocs.length
@@ -187,7 +188,7 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
           <Empty description="Chưa có chứng từ" />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {docs.filter(doc => canViewDocument(doc.doc_type, salesRole)).map((doc) => (
+            {docs.filter(doc => doc.doc_type !== 'contract' && canViewDocument(doc.doc_type, salesRole)).map((doc) => (
               <div key={doc.id}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',

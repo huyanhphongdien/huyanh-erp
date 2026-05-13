@@ -34,6 +34,21 @@ export function hasSalesAccess(user: any): boolean {
   return getSalesRole(user) !== null
 }
 
+// ★ BGĐ (Ban Giám Đốc) — whitelist email được xem hợp đồng đã upload
+// Bao gồm admin (Minh/Thúy/Huy) + Mr. Trung (giữ role production cho tab SX,
+// nhưng có quyền BGĐ riêng để xem hợp đồng)
+const BOD_EMAILS: string[] = [
+  'minhld@huyanhrubber.com',
+  'thuyht@huyanhrubber.com',
+  'huylv@huyanhrubber.com',
+  'trunglxh@huyanhrubber.com',  // Mr. Trung — BGĐ contract view
+]
+
+export function isBOD(user: any): boolean {
+  if (!user?.email) return false
+  return BOD_EMAILS.includes(user.email.toLowerCase())
+}
+
 export const SALES_ROLE_LABELS: Record<SalesRole, string> = {
   sale: 'Kinh doanh',
   production: 'Sản xuất',

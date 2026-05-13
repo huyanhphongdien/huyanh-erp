@@ -35,6 +35,7 @@ import {
 } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
+import ContractFileSection from './ContractFileSection'
 
 type EditItem = {
   id?: string
@@ -559,6 +560,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           ) : null}
         </div>
       </div>
+
+      {/* Section: File Hợp đồng — upload + view/download + access log */}
+      <ContractFileSection orderId={order.id} salesRole={salesRole} />
 
       {/* Section: Hợp đồng */}
       <SectionHeader title="Hợp đồng" color="#1B4D3E" />

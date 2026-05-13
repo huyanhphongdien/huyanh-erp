@@ -54,8 +54,10 @@ export function canEditDocument(docType: string, role: string | null): boolean {
 
 // Quyền xem/tải: mỗi BP xem CT của mình + CT chung. Không xem CT BP khác.
 // viewers: danh sách role được XEM (ngoài owner + admin)
+// ★ contract: KHÔNG ai xem qua checklist tab — hợp đồng được xử lý riêng tại
+//   ContractTab + salesContractService (chỉ BGĐ + sale-uploader xem được).
 const DOC_VIEWERS: Record<string, string[]> = {
-  contract:           ['sale', 'logistics', 'accounting', 'production'],  // HĐ — ai cũng xem
+  contract:           [],  // ★ Hợp đồng: dùng salesContractService, không hiện ở checklist
   bl:                 ['logistics', 'accounting'],        // B/L — LOG + KT
   commercial_invoice: ['accounting'],                     // Invoice — chỉ KT
   packing_list:       ['logistics', 'production'],        // PL — LOG + SX

@@ -642,6 +642,80 @@ const SalesOrderListPage = () => {
     return tip ? <Tooltip title={tip}>{inner}</Tooltip> : inner
   }
 
+  // R4: Inline edit — click cell mở DatePicker/Input → blur/Enter để lưu
+  const [editingCell, setEditingCell] = useState<{ rowId: string; key: string } | null>(null)
+
+  const saveInlineField = async (orderId: string, field: keyof SalesOrder, value: any) => {
+    try {
+      await salesOrderService.updateFields(orderId, { [field]: value } as any)
+      message.success('Đã cập nhật')
+      setEditingCell(null)
+      fetchOrders()
+    } catch (e: any) {
+      message.error(e.message || 'Không lưu được')
+    }
+  }
+
+  // Cell wrapper: click → mở editor; click ngoài → đóng. e.stopPropagation()
+  // để không trigger row click (mở slide panel).
+  const InlineDateCell = ({ orderId, field, value }: { orderId: string; field: keyof SalesOrder; value?: string | null }) => {
+    const isEditing = editingCell?.rowId === orderId && editingCell?.key === field
+    if (isEditing) {
+      return (
+        <DatePicker
+          autoFocus
+          open
+          size="small"
+          defaultValue={value ? dayjs(value) : undefined}
+          format="DD/MM/YYYY"
+          onChange={(d) => saveInlineField(orderId, field, d ? d.format('YYYY-MM-DD') : null)}
+          onBlur={() => setEditingCell(null)}
+          onClick={(e) => e.stopPropagation()}
+          style={{ width: '100%' }}
+        />
+      )
+    }
+    return (
+      <span
+        onClick={(e) => { e.stopPropagation(); setEditingCell({ rowId: orderId, key: field }) }}
+        style={{ fontSize: 12, cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
+        className="inline-edit-cell"
+      >
+        {value ? formatDate(value) : <span style={{ color: '#d9d9d9' }}>—</span>}
+      </span>
+    )
+  }
+
+  const InlineTextCell = ({ orderId, field, value, placeholder }: { orderId: string; field: keyof SalesOrder; value?: string | null; placeholder?: string }) => {
+    const isEditing = editingCell?.rowId === orderId && editingCell?.key === field
+    const [tmp, setTmp] = useState(value || '')
+    useEffect(() => { setTmp(value || '') }, [value, isEditing])
+
+    if (isEditing) {
+      return (
+        <Input
+          autoFocus
+          size="small"
+          value={tmp}
+          placeholder={placeholder}
+          onChange={(e) => setTmp(e.target.value)}
+          onPressEnter={() => saveInlineField(orderId, field, tmp || null)}
+          onBlur={() => saveInlineField(orderId, field, tmp || null)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )
+    }
+    return (
+      <span
+        onClick={(e) => { e.stopPropagation(); setEditingCell({ rowId: orderId, key: field }) }}
+        style={{ fontSize: 11, cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
+        className="inline-edit-cell"
+      >
+        {value || <span style={{ color: '#d9d9d9' }}>—</span>}
+      </span>
+    )
+  }
+
   // Helpers map state ↔ Ant sort order
   const sortedColumn = (key: string) =>
     sortBy === (key === 'lot' ? 'customer_po' : key === 'qty' ? 'quantity_tons' :
@@ -732,10 +806,10 @@ const SalesOrderListPage = () => {
       title: hdr('Hạn giao'),
       dataIndex: 'delivery_date',
       key: 'delivery',
-      width: 90,
+      width: 110,
       sorter: true,
       sortOrder: sortedColumn('delivery'),
-      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+      render: (d: string, r: SalesOrder) => <InlineDateCell orderId={r.id} field="delivery_date" value={d} />,
     },
     {
       title: hdr('Sẵn hàng'),
@@ -760,20 +834,19 @@ const SalesOrderListPage = () => {
       title: hdr('Số BKG'),
       dataIndex: 'booking_reference',
       key: 'bkg',
-      width: 100,
-      ellipsis: true,
+      width: 120,
       sorter: true,
       sortOrder: sortedColumn('bkg'),
-      render: (v: string) => v ? <span style={{ fontSize: 11 }}>{v}</span> : gray(null),
+      render: (v: string, r: SalesOrder) => <InlineTextCell orderId={r.id} field="booking_reference" value={v} placeholder="Nhập booking..." />,
     },
     {
       title: hdr('ETD'),
       dataIndex: 'etd',
       key: 'etd',
-      width: 90,
+      width: 110,
       sorter: true,
       sortOrder: sortedColumn('etd'),
-      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+      render: (d: string, r: SalesOrder) => <InlineDateCell orderId={r.id} field="etd" value={d} />,
     },
     {
       title: hdr('Đ.giá'),
@@ -842,10 +915,10 @@ const SalesOrderListPage = () => {
       title: hdr('Tiền về'),
       dataIndex: 'payment_received_date',
       key: 'payment_date',
-      width: 80,
+      width: 110,
       sorter: true,
       sortOrder: sortedColumn('payment_date'),
-      render: (d: string) => d ? <span style={{ fontSize: 12 }}>{formatDate(d)}</span> : gray(null),
+      render: (d: string, r: SalesOrder) => <InlineDateCell orderId={r.id} field="payment_received_date" value={d} />,
     },
     {
       title: hdr('Bộ phận'),
@@ -916,6 +989,12 @@ const SalesOrderListPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      <style>{`
+        .inline-edit-cell:hover {
+          background: #e6f4ff !important;
+          outline: 1px dashed #1677ff;
+        }
+      `}</style>
       {/* Header */}
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
@@ -924,20 +1003,31 @@ const SalesOrderListPage = () => {
           </Title>
         </Col>
         <Col>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => openTab({
-              key: 'sales-order-create',
-              title: 'Tạo đơn hàng',
-              componentId: 'sales-order-create',
-              props: {},
-              path: '/sales/orders/new',
-            })}
-            style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
-          >
-            Tạo đơn hàng
-          </Button>
+          <Space>
+            {/* R3: Toggle view sang Kanban (đã có ở /sales/kanban) */}
+            <Tooltip title="Xem dạng Kanban — kéo thả theo công đoạn">
+              <Button
+                icon={<span style={{ fontSize: 14 }}>📋</span>}
+                onClick={() => navigate('/sales/kanban')}
+              >
+                Kanban
+              </Button>
+            </Tooltip>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => openTab({
+                key: 'sales-order-create',
+                title: 'Tạo đơn hàng',
+                componentId: 'sales-order-create',
+                props: {},
+                path: '/sales/orders/new',
+              })}
+              style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
+            >
+              Tạo đơn hàng
+            </Button>
+          </Space>
         </Col>
       </Row>
 

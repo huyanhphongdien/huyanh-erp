@@ -21,6 +21,8 @@ import {
   Tabs,
   Popconfirm,
   DatePicker,
+  Dropdown,
+  Checkbox,
   message,
 } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
@@ -36,6 +38,8 @@ import {
   InboxOutlined,
   CarOutlined,
   RocketOutlined,
+  SettingOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../services/sales/salesOrderService'
@@ -138,6 +142,25 @@ const formatDate = (date?: string): string => {
 }
 
 // ============================================
+// COLUMN VISIBILITY (M1 — Tùy chỉnh cột)
+// ============================================
+// Cột có thể ẩn/hiện qua dropdown "Tùy chỉnh cột". Default hide 4 cột chi
+// tiết ít dùng — finance review mới enable lại. Persist qua localStorage.
+const HIDEABLE_COLUMNS: { key: string; label: string }[] = [
+  { key: 'lot',           label: 'Số LOT' },
+  { key: 'ready_date',    label: 'Sẵn hàng' },
+  { key: 'bank',          label: 'Ngân hàng' },
+  { key: 'bkg',           label: 'Số BKG' },
+  { key: 'discount',      label: 'CK' },
+  { key: 'discount_bank', label: 'NH CK' },
+  { key: 'payment_date',  label: 'Tiền về' },
+  { key: 'current_stage', label: 'Bộ phận' },
+  { key: 'progress',      label: 'T.độ' },
+]
+const DEFAULT_HIDDEN_COLS = new Set(['lot', 'ready_date', 'discount_bank', 'payment_date'])
+const COL_VISIBILITY_KEY = 'sales-order-hidden-cols-v1'
+
+// ============================================
 // TABS CONFIG
 // ============================================
 
@@ -217,6 +240,27 @@ const SalesOrderListPage = () => {
   // Row selection — checkbox tick từng đơn, hỗ trợ bulk action
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
+  // M1: Column visibility — persist localStorage
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(COL_VISIBILITY_KEY)
+      if (saved) return new Set(JSON.parse(saved))
+    } catch {}
+    return new Set(DEFAULT_HIDDEN_COLS)
+  })
+  const toggleColumn = (key: string) => {
+    setHiddenCols(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      localStorage.setItem(COL_VISIBILITY_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
+  const resetColumns = () => {
+    setHiddenCols(new Set(DEFAULT_HIDDEN_COLS))
+    localStorage.setItem(COL_VISIBILITY_KEY, JSON.stringify([...DEFAULT_HIDDEN_COLS]))
+  }
+
   const rowSelection = {
     selectedRowKeys,
     onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
@@ -228,6 +272,85 @@ const SalesOrderListPage = () => {
     () => orders.filter((o: SalesOrder) => selectedRowKeys.includes(o.id)),
     [orders, selectedRowKeys],
   )
+
+  // M3: Export Excel chỉ những đơn được chọn — load ExcelJS lazy để không nặng bundle
+  const handleExportSelected = async () => {
+    if (selectedOrders.length === 0) return
+    try {
+      const ExcelJS = (await import('exceljs')).default
+      const { saveAs } = await import('file-saver')
+
+      const wb = new ExcelJS.Workbook()
+      wb.creator = 'Huy Anh ERP'
+      const ws = wb.addWorksheet('Đơn hàng bán', {
+        pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+      })
+
+      // Header row
+      ws.addRow([
+        'STT', 'Số HĐ', 'Khách hàng', 'Loại hàng', 'Số LOT',
+        'SL (tấn)', 'Đơn giá USD', 'Thành tiền USD',
+        'Đặt cọc', 'CK', 'NH CK', 'Còn lại',
+        'Hạn giao', 'Sẵn hàng', 'Ngân hàng', 'Số BKG', 'ETD', 'Tiền về',
+        'Trạng thái',
+      ])
+      const hdr = ws.getRow(1)
+      hdr.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+      hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B4D3E' } }
+      hdr.alignment = { horizontal: 'center', vertical: 'middle' }
+      hdr.height = 24
+
+      // Data rows
+      selectedOrders.forEach((o: any, idx) => {
+        ws.addRow([
+          idx + 1,
+          o.contract_no || o.code,
+          o.customer?.name || '',
+          o.grade || '',
+          o.customer_po || '',
+          o.quantity_tons || 0,
+          o.unit_price || 0,
+          o.total_value_usd || 0,
+          o.deposit_amount || 0,
+          o.discount_amount || 0,
+          o.discount_bank || '',
+          o.remaining_amount || ((o.total_value_usd || 0) - (o.deposit_amount || 0) - (o.discount_amount || 0)),
+          o.delivery_date || '',
+          o.ready_date || '',
+          o.bank_name || '',
+          o.booking_reference || '',
+          o.etd || '',
+          o.payment_received_date || '',
+          ORDER_STATUS_LABELS[o.status as keyof typeof ORDER_STATUS_LABELS] || o.status,
+        ])
+      })
+
+      // Auto-size cột (approximate)
+      const widths = [5, 13, 28, 10, 10, 9, 11, 14, 12, 10, 12, 14, 11, 11, 14, 14, 11, 11, 14]
+      widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
+
+      // Border all cells
+      const lastRow = selectedOrders.length + 1
+      for (let r = 1; r <= lastRow; r++) {
+        for (let c = 1; c <= 19; c++) {
+          ws.getRow(r).getCell(c).border = {
+            top: { style: 'thin', color: { argb: 'FFE5E5E5' } },
+            left: { style: 'thin', color: { argb: 'FFE5E5E5' } },
+            bottom: { style: 'thin', color: { argb: 'FFE5E5E5' } },
+            right: { style: 'thin', color: { argb: 'FFE5E5E5' } },
+          }
+        }
+      }
+
+      const buffer = await wb.xlsx.writeBuffer()
+      const fileName = `Don_hang_ban_${selectedOrders.length}_${dayjs().format('YYYYMMDD_HHmm')}.xlsx`
+      saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName)
+      message.success(`Đã xuất ${selectedOrders.length} đơn → ${fileName}`)
+    } catch (e: any) {
+      console.error(e)
+      message.error(e.message || 'Lỗi xuất Excel')
+    }
+  }
 
   // ============================================
   // DATA FETCHING
@@ -870,6 +993,36 @@ const SalesOrderListPage = () => {
             🚨 Quá ETD ({stats.overdue_etd})
           </Button>
         )}
+        {/* M1: Tùy chỉnh cột — dropdown checkbox */}
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: [
+              ...HIDEABLE_COLUMNS.map(c => ({
+                key: c.key,
+                label: (
+                  <Checkbox
+                    checked={!hiddenCols.has(c.key)}
+                    onChange={() => toggleColumn(c.key)}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {c.label}
+                  </Checkbox>
+                ),
+              })),
+              { type: 'divider' as const },
+              {
+                key: 'reset',
+                label: <span style={{ color: '#1B4D3E' }}>↻ Khôi phục mặc định</span>,
+                onClick: resetColumns,
+              },
+            ],
+          }}
+        >
+          <Button icon={<SettingOutlined />}>
+            Tùy chỉnh cột ({HIDEABLE_COLUMNS.length - hiddenCols.size}/{HIDEABLE_COLUMNS.length})
+          </Button>
+        </Dropdown>
       </div>
 
       {/* Q2: Banner "đang lọc Quá ETD" + "Đang sắp xếp" — đã bỏ.
@@ -966,6 +1119,15 @@ const SalesOrderListPage = () => {
             message.info(`Đã copy ${selectedOrders.length} mã đơn: ${codes}`)
             navigator.clipboard?.writeText(codes)
           }}>📋 Copy mã đơn</Button>
+          <Button
+            size="small"
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleExportSelected}
+            style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+          >
+            Xuất Excel ({selectedOrders.length})
+          </Button>
           <span style={{ marginLeft: 'auto', color: '#666' }}>
             Tổng giá trị: <strong>${selectedOrders.reduce((s: number, o: SalesOrder) => s + (o.total_value_usd || 0), 0).toLocaleString()}</strong>
           </span>
@@ -976,7 +1138,7 @@ const SalesOrderListPage = () => {
       <Card style={{ borderRadius: 8 }}>
         <Table<SalesOrder>
           rowKey="id"
-          columns={columns}
+          columns={columns.filter(c => !hiddenCols.has(c.key as string))}
           dataSource={orders}
           rowSelection={rowSelection}
           loading={loading}

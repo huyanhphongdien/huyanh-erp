@@ -23,6 +23,7 @@ import {
   DatePicker,
   Dropdown,
   Checkbox,
+  Modal,
   message,
 } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
@@ -42,6 +43,7 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams } from '../../services/sales/salesOrderService'
 import StagePill from '../../components/common/StagePill'
@@ -61,6 +63,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import SalesOrderDetailPanel from './components/SalesOrderDetailPanel'
 import { useOpenTab } from '../../hooks/useOpenTab'
+import { userSavedViewsService, type SavedView } from '../../services/userSavedViewsService'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -151,11 +154,13 @@ const HIDEABLE_COLUMNS: { key: string; label: string }[] = [
   { key: 'ready_date',    label: 'Sẵn hàng' },
   { key: 'bank',          label: 'Ngân hàng' },
   { key: 'bkg',           label: 'Số BKG' },
+  { key: 'deposit',       label: 'Đặt cọc' },
   { key: 'discount',      label: 'CK' },
   { key: 'discount_bank', label: 'NH CK' },
   { key: 'payment_date',  label: 'Tiền về' },
   { key: 'current_stage', label: 'Bộ phận' },
   { key: 'progress',      label: 'T.độ' },
+  { key: 'status',        label: 'Trạng thái' },
 ]
 const DEFAULT_HIDDEN_COLS = new Set(['lot', 'ready_date', 'discount_bank', 'payment_date'])
 const COL_VISIBILITY_KEY = 'sales-order-hidden-cols-v1'
@@ -240,6 +245,26 @@ const SalesOrderListPage = () => {
   // Row selection — checkbox tick từng đơn, hỗ trợ bulk action
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
+  // M4-C: Density toggle (Compact / Normal / Comfortable) — persist localStorage
+  type Density = 'compact' | 'normal' | 'comfortable'
+  const [density, setDensity] = useState<Density>(() => {
+    try {
+      const saved = localStorage.getItem('sales-order-density-v1') as Density
+      if (saved === 'compact' || saved === 'normal' || saved === 'comfortable') return saved
+    } catch {}
+    return 'normal'
+  })
+  const setDensityAndSave = (d: Density) => {
+    setDensity(d)
+    localStorage.setItem('sales-order-density-v1', d)
+  }
+  // Map density → Ant size + row CSS overrides
+  const densityConfig = {
+    compact: { size: 'small' as const, rowPadding: '4px 6px', fontSize: 11 },
+    normal: { size: 'small' as const, rowPadding: '6px 8px', fontSize: 12 },
+    comfortable: { size: 'middle' as const, rowPadding: '10px 12px', fontSize: 13 },
+  }[density]
+
   // M1: Column visibility — persist localStorage
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
     try {
@@ -259,6 +284,148 @@ const SalesOrderListPage = () => {
   const resetColumns = () => {
     setHiddenCols(new Set(DEFAULT_HIDDEN_COLS))
     localStorage.setItem(COL_VISIBILITY_KEY, JSON.stringify([...DEFAULT_HIDDEN_COLS]))
+  }
+
+  // M4-A: Active filter chips — build list từ state hiện tại
+  const activeFilters = useMemo(() => {
+    const chips: { key: string; label: string; onRemove: () => void }[] = []
+    if (searchText) {
+      chips.push({ key: 'search', label: `Tìm: "${searchText}"`, onRemove: () => setSearchText('') })
+    }
+    if (statusTab !== 'all') {
+      const t = STATUS_TABS.find(x => x.key === statusTab)
+      chips.push({ key: 'status', label: `Trạng thái: ${t?.label || statusTab}`, onRemove: () => setStatusTab('all') })
+    }
+    if (customerFilter) {
+      const c = customers.find(x => x.id === customerFilter)
+      chips.push({ key: 'customer', label: `KH: ${c?.short_name || c?.name || ''}`, onRemove: () => setCustomerFilter(undefined) })
+    }
+    if (gradeFilter) {
+      chips.push({ key: 'grade', label: `Grade: ${gradeFilter}`, onRemove: () => setGradeFilter(undefined) })
+    }
+    if (dateRange) {
+      chips.push({
+        key: 'date',
+        label: `${dateRange[0].format('DD/MM')} → ${dateRange[1].format('DD/MM')}`,
+        onRemove: () => setDateRange(null),
+      })
+    }
+    if (overdueEtdOnly) {
+      chips.push({ key: 'overdue', label: '🚨 Quá ETD', onRemove: () => { setOverdueEtdOnly(false); setSearchParams({}) } })
+    }
+    return chips
+  }, [searchText, statusTab, customerFilter, gradeFilter, dateRange, overdueEtdOnly, customers, setSearchParams])
+
+  const clearAllFilters = () => {
+    setSearchText('')
+    setStatusTab('all')
+    setCustomerFilter(undefined)
+    setGradeFilter(undefined)
+    setDateRange(null)
+    setOverdueEtdOnly(false)
+    setSearchParams({})
+    setPagination(p => ({ ...p, current: 1 }))
+  }
+
+  // M4-B: Saved views per user
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [saveViewModalOpen, setSaveViewModalOpen] = useState(false)
+  const [newViewName, setNewViewName] = useState('')
+
+  useEffect(() => {
+    userSavedViewsService.list('sales_orders')
+      .then(setSavedViews)
+      .catch(err => console.warn('Saved views load failed (table may not exist yet):', err))
+  }, [])
+
+  // M4-F: Realtime collab — subscribe sales_orders table changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('sales-orders-list-realtime')
+      .on(
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'sales_orders' },
+        (payload: any) => {
+          const row = payload.new || payload.old
+          const code = (row as any)?.contract_no || (row as any)?.code || ''
+          if (payload.eventType === 'INSERT') {
+            message.info(`📥 Đơn mới: ${code}`)
+          } else if (payload.eventType === 'UPDATE') {
+            // Chỉ refresh nếu đơn nằm trong danh sách đang hiện
+            if (orders.some(o => o.id === (row as any).id)) {
+              message.info(`✏️ Đơn ${code} vừa được cập nhật`)
+            }
+          } else if (payload.eventType === 'DELETE') {
+            if (orders.some(o => o.id === (row as any).id)) {
+              message.warning(`🗑 Đơn ${code} đã bị xóa`)
+            }
+          }
+          fetchOrders()
+          fetchStats()
+        },
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders.length])
+
+  const applyView = (v: SavedView) => {
+    const f = v.filters || {}
+    setSearchText(f.searchText || '')
+    setStatusTab(f.statusTab || 'all')
+    setCustomerFilter(f.customerFilter || undefined)
+    setGradeFilter(f.gradeFilter || undefined)
+    setDateRange(f.dateRange ? [dayjs(f.dateRange[0]), dayjs(f.dateRange[1])] : null)
+    setOverdueEtdOnly(!!f.overdueEtdOnly)
+    if (v.columns?.hiddenCols) {
+      setHiddenCols(new Set(v.columns.hiddenCols))
+    }
+    if (v.sort?.sortBy) {
+      setSortBy(v.sort.sortBy)
+      setSortOrder(v.sort.sortOrder || 'desc')
+    }
+    if (v.density && ['compact', 'normal', 'comfortable'].includes(v.density)) {
+      setDensityAndSave(v.density as Density)
+    }
+    message.success(`Đã áp dụng view: ${v.name}`)
+  }
+
+  const handleSaveView = async () => {
+    if (!newViewName.trim()) {
+      message.warning('Nhập tên view')
+      return
+    }
+    try {
+      const view = await userSavedViewsService.create({
+        module: 'sales_orders',
+        name: newViewName.trim(),
+        filters: {
+          searchText, statusTab, customerFilter, gradeFilter,
+          dateRange: dateRange ? [dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')] : null,
+          overdueEtdOnly,
+        },
+        columns: { hiddenCols: [...hiddenCols] },
+        sort: { sortBy, sortOrder },
+        density,
+      })
+      setSavedViews(prev => [...prev, view])
+      setSaveViewModalOpen(false)
+      setNewViewName('')
+      message.success(`Đã lưu view: ${view.name}`)
+    } catch (e: any) {
+      message.error(e.message || 'Không lưu được view')
+    }
+  }
+
+  const handleDeleteView = async (id: string) => {
+    try {
+      await userSavedViewsService.delete(id)
+      setSavedViews(prev => prev.filter(v => v.id !== id))
+      message.success('Đã xóa view')
+    } catch (e: any) {
+      message.error(e.message || 'Không xóa được')
+    }
   }
 
   const rowSelection = {
@@ -686,6 +853,79 @@ const SalesOrderListPage = () => {
     )
   }
 
+  // M4-E: Inline edit số (đơn giá, đặt cọc...)
+  const InlineNumberCell = ({ orderId, field, value }: { orderId: string; field: keyof SalesOrder; value?: number | null }) => {
+    const isEditing = editingCell?.rowId === orderId && editingCell?.key === field
+    const [tmp, setTmp] = useState<string>(value != null ? String(value) : '')
+    useEffect(() => { setTmp(value != null ? String(value) : '') }, [value, isEditing])
+
+    if (isEditing) {
+      return (
+        <Input
+          autoFocus
+          size="small"
+          type="number"
+          value={tmp}
+          onChange={(e) => setTmp(e.target.value)}
+          onPressEnter={() => saveInlineField(orderId, field, tmp ? Number(tmp) : null)}
+          onBlur={() => saveInlineField(orderId, field, tmp ? Number(tmp) : null)}
+          onClick={(e) => e.stopPropagation()}
+          style={{ fontFamily: 'monospace', textAlign: 'right' }}
+        />
+      )
+    }
+    return (
+      <span
+        onClick={(e) => { e.stopPropagation(); setEditingCell({ rowId: orderId, key: field }) }}
+        style={{ fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
+        className="inline-edit-cell"
+      >
+        {value ? formatCurrency(value) : <span style={{ color: '#d9d9d9' }}>—</span>}
+      </span>
+    )
+  }
+
+  // M4-E: Inline edit status (dropdown)
+  const InlineStatusCell = ({ order }: { order: SalesOrder }) => {
+    const isEditing = editingCell?.rowId === order.id && editingCell?.key === 'status'
+    if (isEditing) {
+      return (
+        <Select
+          autoFocus
+          size="small"
+          defaultValue={order.status}
+          open
+          onChange={async (val) => {
+            try {
+              await salesOrderService.updateStatus(order.id, val as SalesOrderStatus)
+              message.success(`Đã chuyển trạng thái → ${ORDER_STATUS_LABELS[val as SalesOrderStatus]}`)
+              setEditingCell(null)
+              fetchOrders()
+              fetchStats()
+            } catch (e: any) {
+              message.error(e.message || 'Không đổi được')
+            }
+          }}
+          onBlur={() => setEditingCell(null)}
+          onClick={(e) => e.stopPropagation()}
+          style={{ width: '100%' }}
+          options={Object.entries(ORDER_STATUS_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+        />
+      )
+    }
+    return (
+      <span
+        onClick={(e) => { e.stopPropagation(); setEditingCell({ rowId: order.id, key: 'status' }) }}
+        className="inline-edit-cell"
+        style={{ cursor: 'pointer', display: 'inline-block', padding: '2px 4px', borderRadius: 3 }}
+      >
+        <Tag color={ORDER_STATUS_COLORS[order.status]} style={{ margin: 0, fontSize: 11 }}>
+          {ORDER_STATUS_LABELS[order.status]}
+        </Tag>
+      </span>
+    )
+  }
+
   const InlineTextCell = ({ orderId, field, value, placeholder }: { orderId: string; field: keyof SalesOrder; value?: string | null; placeholder?: string }) => {
     const isEditing = editingCell?.rowId === orderId && editingCell?.key === field
     const [tmp, setTmp] = useState(value || '')
@@ -852,11 +1092,11 @@ const SalesOrderListPage = () => {
       title: hdr('Đ.giá'),
       dataIndex: 'unit_price',
       key: 'unit_price',
-      width: 80,
+      width: 95,
       align: 'right',
       sorter: true,
       sortOrder: sortedColumn('unit_price'),
-      render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
+      render: (v: number, r: SalesOrder) => <InlineNumberCell orderId={r.id} field="unit_price" value={v} />,
     },
     {
       title: hdr('Thành tiền'),
@@ -872,11 +1112,11 @@ const SalesOrderListPage = () => {
       title: hdr('Đặt cọc'),
       dataIndex: 'deposit_amount',
       key: 'deposit',
-      width: 85,
+      width: 100,
       align: 'right',
       sorter: true,
       sortOrder: sortedColumn('deposit'),
-      render: (v: number) => v ? mono(formatCurrency(v)) : gray(null),
+      render: (v: number, r: SalesOrder) => <InlineNumberCell orderId={r.id} field={'deposit_amount' as any} value={v} />,
     },
     {
       title: hdr('CK'),
@@ -944,6 +1184,13 @@ const SalesOrderListPage = () => {
       align: 'center',
       render: (_: unknown, r: SalesOrder) => progressDots(r),
     },
+    {
+      title: hdr('Trạng thái'),
+      key: 'status',
+      width: 110,
+      align: 'center',
+      render: (_: unknown, r: SalesOrder) => <InlineStatusCell order={r} />,
+    },
 
     // ═══ ACTIONS ═══
     {
@@ -1004,6 +1251,53 @@ const SalesOrderListPage = () => {
         </Col>
         <Col>
           <Space>
+            {/* M4-B: Saved Views dropdown */}
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  ...(savedViews.length === 0
+                    ? [{ key: 'empty', label: <span style={{ color: '#999' }}>Chưa có view nào</span>, disabled: true }]
+                    : savedViews.map(v => ({
+                        key: v.id,
+                        label: (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 200 }}>
+                            <span onClick={() => applyView(v)}>⭐ {v.name}</span>
+                            <Popconfirm title={`Xóa view "${v.name}"?`} onConfirm={() => handleDeleteView(v.id)}>
+                              <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
+                            </Popconfirm>
+                          </div>
+                        ),
+                      }))),
+                  { type: 'divider' as const },
+                  {
+                    key: 'save',
+                    label: <span style={{ color: '#1B4D3E' }}>💾 Lưu view hiện tại</span>,
+                    onClick: () => setSaveViewModalOpen(true),
+                  },
+                ],
+              }}
+            >
+              <Button icon={<span style={{ fontSize: 14 }}>⭐</span>}>
+                Views ({savedViews.length})
+              </Button>
+            </Dropdown>
+
+            {/* M4-C: Density toggle */}
+            <Tooltip title="Chế độ hiển thị (Compact / Normal / Comfortable)">
+              <Button.Group>
+                <Button size="small" type={density === 'compact' ? 'primary' : 'default'}
+                  onClick={() => setDensityAndSave('compact')}
+                  style={density === 'compact' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>≡</Button>
+                <Button size="small" type={density === 'normal' ? 'primary' : 'default'}
+                  onClick={() => setDensityAndSave('normal')}
+                  style={density === 'normal' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>≣</Button>
+                <Button size="small" type={density === 'comfortable' ? 'primary' : 'default'}
+                  onClick={() => setDensityAndSave('comfortable')}
+                  style={density === 'comfortable' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}>☰</Button>
+              </Button.Group>
+            </Tooltip>
+
             {/* R3: Toggle view sang Kanban (đã có ở /sales/kanban) */}
             <Tooltip title="Xem dạng Kanban — kéo thả theo công đoạn">
               <Button
@@ -1030,6 +1324,36 @@ const SalesOrderListPage = () => {
           </Space>
         </Col>
       </Row>
+
+      {/* M4-A: Filter chips bar — hiện khi có >=1 filter active */}
+      {activeFilters.length > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '8px 12px',
+          background: '#f5f7fa',
+          border: '1px solid #e6e8ec',
+          borderRadius: 6,
+          marginBottom: 12,
+          flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 12, color: '#6c6a64', fontWeight: 500 }}>🔍 Đang lọc:</span>
+          {activeFilters.map(f => (
+            <Tag
+              key={f.key}
+              closable
+              onClose={(e) => { e.preventDefault(); f.onRemove() }}
+              style={{ margin: 0, padding: '2px 8px', fontSize: 12, background: '#fff', border: '1px solid #d0cec9' }}
+            >
+              {f.label}
+            </Tag>
+          ))}
+          <Button size="small" type="link" danger onClick={clearAllFilters} style={{ padding: '0 4px', fontSize: 12 }}>
+            Xóa tất cả
+          </Button>
+        </div>
+      )}
 
       {/* Status tabs có badge count + nút "🚨 Quá ETD" inline (Q1 UX) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -1283,7 +1607,42 @@ const SalesOrderListPage = () => {
           }}
           onChange={handleTableChange}
           scroll={{ x: 1600 }}
-          size="small"
+          size={densityConfig.size}
+          locale={{
+            emptyText: (
+              // M4-D: Empty state đẹp
+              <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 64, marginBottom: 12, opacity: 0.6 }}>📦</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#1B4D3E', marginBottom: 6 }}>
+                  Không tìm thấy đơn hàng nào
+                </div>
+                <div style={{ fontSize: 13, color: '#6c6a64', marginBottom: 20 }}>
+                  {activeFilters.length > 0
+                    ? `Bộ lọc hiện tại không có đơn nào khớp (${activeFilters.length} filter đang active).`
+                    : 'Chưa có đơn hàng nào trong tháng — bắt đầu tạo đơn đầu tiên.'}
+                </div>
+                <Space>
+                  {activeFilters.length > 0 && (
+                    <Button onClick={clearAllFilters}>Xóa filter</Button>
+                  )}
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => openTab({
+                      key: 'sales-order-create',
+                      title: 'Tạo đơn hàng',
+                      componentId: 'sales-order-create',
+                      props: {},
+                      path: '/sales/orders/new',
+                    })}
+                    style={{ backgroundColor: '#1B4D3E', borderColor: '#1B4D3E' }}
+                  >
+                    Tạo đơn mới
+                  </Button>
+                </Space>
+              </div>
+            ),
+          }}
           onRow={(record) => ({
             onClick: () => {
               setPanelOrderId(record.id)
@@ -1297,6 +1656,30 @@ const SalesOrderListPage = () => {
           })}
         />
       </Card>
+
+      {/* M4-B: Modal lưu view */}
+      <Modal
+        title="Lưu view hiện tại"
+        open={saveViewModalOpen}
+        onCancel={() => { setSaveViewModalOpen(false); setNewViewName('') }}
+        onOk={handleSaveView}
+        okText="Lưu"
+        cancelText="Hủy"
+      >
+        <p style={{ marginBottom: 12, color: '#666', fontSize: 13 }}>
+          Đặt tên cho view này. View sẽ lưu toàn bộ filter + cột + sort + density hiện tại.
+        </p>
+        <Input
+          autoFocus
+          placeholder="VD: Đơn quá hạn của tôi"
+          value={newViewName}
+          onChange={(e) => setNewViewName(e.target.value)}
+          onPressEnter={handleSaveView}
+        />
+        <div style={{ marginTop: 12, fontSize: 12, color: '#999' }}>
+          {activeFilters.length} filter active · {HIDEABLE_COLUMNS.length - hiddenCols.size}/{HIDEABLE_COLUMNS.length} cột hiện · Density: {density}
+        </div>
+      </Modal>
 
       {/* v4: Slide-in Detail Panel */}
       <SalesOrderDetailPanel

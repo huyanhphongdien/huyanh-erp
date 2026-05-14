@@ -63,6 +63,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import SalesOrderDetailPanel from './components/SalesOrderDetailPanel'
 import SalesOrderSplitView from './components/SalesOrderSplitView'
+import SalesCommandPalette from './components/SalesCommandPalette'
 import { useOpenTab } from '../../hooks/useOpenTab'
 import { userSavedViewsService, type SavedView } from '../../services/userSavedViewsService'
 
@@ -1726,12 +1727,21 @@ const SalesOrderListPage = () => {
         </div>
       </Modal>
 
-      {/* v4: Slide-in Detail Panel */}
+      {/* v4: Slide-in Detail Panel — chỉ dùng cho Table view, Split tự render inline */}
       <SalesOrderDetailPanel
         orderId={panelOrderId}
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
         onOrderUpdated={fetchOrders}
+      />
+
+      {/* Cmd+K Command Palette — global, mount sau cùng để overlay đầy đủ */}
+      <SalesCommandPalette
+        orders={orders}
+        onOpenOrder={(id) => {
+          setPanelOrderId(id)
+          setPanelOpen(true)
+        }}
       />
     </div>
   )

@@ -3,7 +3,7 @@
 // File: src/pages/sales/components/ContractTab.tsx
 // ============================================================================
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Descriptions,
   Tag,
@@ -36,6 +36,8 @@ import {
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
 import ContractFileSection from './ContractFileSection'
+import ContractWorkflowSection from './ContractWorkflowSection'
+import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
 
 type EditItem = {
   id?: string
@@ -82,6 +84,25 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   const [saving, setSaving] = useState(false)
   const [editItems, setEditItems] = useState<EditItem[]>([])
   const [form] = Form.useForm()
+
+  // Cut-over (phương án A): detect đơn này dùng workflow mới hay HĐ cũ.
+  // - hasWorkflow=true (có row trong sales_order_contracts) → render ContractWorkflowSection
+  // - false → render ContractFileSection (legacy upload PDF scan)
+  const [hasWorkflow, setHasWorkflow] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    salesContractWorkflowService
+      .listBySalesOrder(order.id)
+      .then((rows) => {
+        if (!cancelled) setHasWorkflow(rows.length > 0)
+      })
+      .catch(() => {
+        if (!cancelled) setHasWorkflow(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [order.id])
 
   const isLocked = !!order.is_locked
   const canEdit = editable && !isLocked
@@ -561,8 +582,15 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         </div>
       </div>
 
-      {/* Section: File Hợp đồng — upload + view/download + access log */}
-      <ContractFileSection orderId={order.id} salesRole={salesRole} />
+      {/* ═══ Section: Hợp đồng ═══
+          Phương án A cut-over:
+          - Đơn dùng workflow mới (Sale→Kiểm tra→Ký) → ContractWorkflowSection
+          - Đơn cũ (chưa có row sales_order_contracts) → ContractFileSection legacy
+          Khi hasWorkflow=null (đang load) chưa render gì để tránh flash giữa 2 UI. */}
+      {hasWorkflow === true && <ContractWorkflowSection salesOrderId={order.id} />}
+      {hasWorkflow === false && (
+        <ContractFileSection orderId={order.id} salesRole={salesRole} />
+      )}
 
       {/* Section: Hợp đồng */}
       <SectionHeader title="Hợp đồng" color="#1B4D3E" />

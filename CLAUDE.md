@@ -59,6 +59,7 @@ apps/weighbridge/  # Sub-app for weighbridge scale integration
   + `src/services/sales/salesContractWorkflowService.ts` (workflow CRUD)
 - Page: `/sales/contracts/review` (queue Kiểm tra)
 - Templates: `public/contract-templates/template_{SC,PI}_{CIF,FOB}.docx`
+- **Cut-over (phương án A)**: HĐ trước 2026-05-14 không động vào, vẫn dùng `ContractFileSection` (upload PDF scan); HĐ mới (có row `sales_order_contracts`) dùng `ContractWorkflowSection`. `ContractTab.tsx` tự detect.
 
 ## Git
 - Single branch: `main`

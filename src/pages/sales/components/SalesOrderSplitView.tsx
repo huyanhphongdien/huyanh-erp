@@ -19,10 +19,30 @@ const PRIMARY = '#1B4D3E'
 const PRIMARY_BG = '#f0f9f4'
 const PRIMARY_BG2 = '#d9f4e3'
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  IN: '🇮🇳', PH: '🇵🇭', ID: '🇮🇩', KR: '🇰🇷', SG: '🇸🇬', FR: '🇫🇷',
-  AE: '🇦🇪', TW: '🇹🇼', TR: '🇹🇷', ES: '🇪🇸', BD: '🇧🇩', CN: '🇨🇳', LK: '🇱🇰',
-  JP: '🇯🇵', MY: '🇲🇾', US: '🇺🇸', DE: '🇩🇪', VN: '🇻🇳',
+// Gradient color per country (Windows không render flag emoji → dùng badge code)
+const COUNTRY_GRADIENT: Record<string, string> = {
+  IN: 'linear-gradient(135deg, #ff9933 0%, #fff 50%, #138808 100%)',
+  PH: 'linear-gradient(135deg, #0038a8 0%, #ce1126 100%)',
+  ID: 'linear-gradient(180deg, #ff0000 50%, #fff 50%)',
+  KR: 'linear-gradient(135deg, #cd2e3a 0%, #fff 50%, #0047a0 100%)',
+  SG: 'linear-gradient(180deg, #ed2939 50%, #fff 50%)',
+  FR: 'linear-gradient(90deg, #002395 33%, #fff 33%, #fff 66%, #ed2939 66%)',
+  AE: 'linear-gradient(135deg, #00732f 0%, #fff 50%, #ff0000 100%)',
+  TW: 'linear-gradient(135deg, #fe0000 0%, #000095 100%)',
+  TR: 'linear-gradient(135deg, #e30a17 0%, #fff 100%)',
+  ES: 'linear-gradient(180deg, #aa151b 33%, #f1bf00 33%, #f1bf00 66%, #aa151b 66%)',
+  BD: 'linear-gradient(135deg, #006a4e 0%, #f42a41 100%)',
+  CN: 'linear-gradient(135deg, #de2910 0%, #ffde00 100%)',
+  LK: 'linear-gradient(135deg, #8d2129 0%, #fec810 50%, #00534e 100%)',
+  JP: 'radial-gradient(circle at center, #bc002d 30%, #fff 30%)',
+  MY: 'linear-gradient(135deg, #cc0001 0%, #ffcc00 50%, #010066 100%)',
+  US: 'linear-gradient(135deg, #b22234 0%, #fff 50%, #3c3b6e 100%)',
+  DE: 'linear-gradient(180deg, #000 33%, #dd0000 33%, #dd0000 66%, #ffce00 66%)',
+  VN: 'linear-gradient(135deg, #da251d 0%, #ffff00 100%)',
+}
+function countryColor(code?: string | null): string {
+  if (!code) return 'linear-gradient(135deg, #8c8c8c 0%, #595959 100%)'
+  return COUNTRY_GRADIENT[code.toUpperCase()] || 'linear-gradient(135deg, #8c8c8c 0%, #595959 100%)'
 }
 
 const fmtUSD = (v: number | undefined | null) => {
@@ -149,7 +169,7 @@ function OrderItem({ order, selected, onClick }: {
   selected: boolean
   onClick: () => void
 }) {
-  const flag = COUNTRY_FLAGS[order.customer?.country || ''] || '🌐'
+  const country = (order.customer?.country || '').toUpperCase()
   const slaStatus = getSLAStatus(
     order.stage_started_at || null,
     order.stage_sla_hours || null,
@@ -190,7 +210,16 @@ function OrderItem({ order, selected, onClick }: {
         if (!selected) (e.currentTarget as HTMLElement).style.background = 'transparent'
       }}
     >
-      <div style={itemAvatar}>{flag}</div>
+      {/* Country badge — gradient bg theo cờ quốc gia + 2 letter code đè lên */}
+      <div style={{ ...itemAvatar, background: countryColor(country) }}>
+        <span style={{
+          background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '1px 5px',
+          borderRadius: 3, fontSize: 10, fontWeight: 800, fontFamily: 'monospace',
+          letterSpacing: 0.3,
+        }}>
+          {country || '??'}
+        </span>
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={itemCode}>
@@ -303,13 +332,12 @@ const itemStyle: React.CSSProperties = {
 }
 
 const itemAvatar: React.CSSProperties = {
-  width: 32, height: 32, borderRadius: 8,
-  background: '#f5f5f5',
+  width: 36, height: 36, borderRadius: 8,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 18,
   flexShrink: 0,
+  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)',
 }
 
 const itemCode: React.CSSProperties = {

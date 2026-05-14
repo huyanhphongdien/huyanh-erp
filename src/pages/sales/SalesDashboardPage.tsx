@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import { Tag, Button, Spin, message } from 'antd'
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Trophy,
-  ShoppingCart, FileText, Activity, CreditCard, TrendingUp,
+  ShoppingCart, FileText, Activity, CreditCard, TrendingUp, Calendar,
   Sparkles, Plus, ListChecks, Edit3, Search,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
@@ -78,6 +78,18 @@ interface LcItem {
   lc_amount: number; lc_expiry_date: string; daysLeft: number
 }
 
+interface CalendarEvent {
+  date: string         // 'YYYY-MM-DD'
+  count: number        // số đơn ETD ngày này
+  urgent: boolean      // có đơn quá hạn / SLA đỏ
+  topLabel?: string    // VD "Apollo 10 cont"
+}
+interface CashflowBar {
+  label: string
+  value: number
+  future: boolean      // true = dự kiến (chưa chốt)
+}
+
 interface DashboardData {
   kpis: Awaited<ReturnType<typeof salesDashboardService.getKPIs>> | null
   pipeline: PipelineStage[]
@@ -86,6 +98,9 @@ interface DashboardData {
   workflowCounts: Record<string, number>
   activityFeed: ActivityItem[]
   lcNearExpiry: LcItem[]
+  calendar: CalendarEvent[]
+  cashflow: CashflowBar[]
+  cycleTimeAvgDays: number
   myPendingReview: number
   myPendingSign: number
 }
@@ -109,6 +124,9 @@ export default function SalesDashboardPage() {
     workflowCounts: {},
     activityFeed: [],
     lcNearExpiry: [],
+    calendar: [],
+    cashflow: [],
+    cycleTimeAvgDays: 0,
     myPendingReview: 0,
     myPendingSign: 0,
   })
@@ -120,7 +138,8 @@ export default function SalesDashboardPage() {
       const isReviewer = salesContractWorkflowService.isAllowedReviewer(user?.email)
       const isSigner = salesContractWorkflowService.isAllowedSigner(user?.email)
 
-      const [kpis, pipeline, topCustomers, slaRisk, workflowCounts, activityFeed, lcNearExpiry, reviewList, signList] =
+      const [kpis, pipeline, topCustomers, slaRisk, workflowCounts, activityFeed, lcNearExpiry,
+             calendar, cashflow, cycleTimeAvgDays, reviewList, signList] =
         await Promise.all([
           salesDashboardService.getKPIs(period),
           salesDashboardService.getPipeline(),
@@ -129,6 +148,9 @@ export default function SalesDashboardPage() {
           fetchWorkflowCounts(),
           fetchActivityFeed(),
           fetchLcNearExpiry(),
+          fetchCalendar(),
+          fetchCashflow(),
+          fetchCycleTime(),
           isReviewer ? salesContractWorkflowService.listForReview(empId, true) : Promise.resolve([]),
           isSigner ? salesContractWorkflowService.listForSigning() : Promise.resolve([]),
         ])
@@ -141,6 +163,9 @@ export default function SalesDashboardPage() {
         workflowCounts,
         activityFeed,
         lcNearExpiry,
+        calendar,
+        cashflow,
+        cycleTimeAvgDays,
         myPendingReview: reviewList.length,
         myPendingSign: signList.length,
       })
@@ -317,7 +342,7 @@ export default function SalesDashboardPage() {
         </Widget>
       </div>
 
-      {/* ═══ BENTO ROW 2: Action + Top customers + Workflow ═══ */}
+      {/* ═══ BENTO ROW 2: Action + Calendar + Top customers ═══ */}
       <div style={{ ...bento, gridTemplateColumns: '1fr 1fr 1fr' }}>
 
         <Widget icon={<CheckCircle size={14} />} title="Cần action của bạn" iconColor="purple"
@@ -343,6 +368,12 @@ export default function SalesDashboardPage() {
           )}
         </Widget>
 
+        <Widget icon={<Calendar size={14} />} title="Lịch giao 14 ngày tới" iconColor="blue"
+                sub={`${data.calendar.reduce((s, e) => s + e.count, 0)} ETD`}>
+          <CalendarWidget events={data.calendar} onClickDay={(d) =>
+            navigate(`/sales/orders?etd=${d}`)} />
+        </Widget>
+
         <Widget icon={<Trophy size={14} />} title={`Top KH ${periodLabel.toLowerCase()}`}
                 iconColor="green" sub="USD">
           {data.topCustomers.length === 0 ? (
@@ -366,36 +397,41 @@ export default function SalesDashboardPage() {
             )
           })}
         </Widget>
+      </div>
 
-        <Widget icon={<FileText size={14} />} title="Workflow HĐ" iconColor="purple"
-                sub={`${totalWorkflow} HĐ`}>
+      {/* ═══ BENTO ROW 3: Workflow Donut + Activity ═══ */}
+      <div style={{ ...bento, gridTemplateColumns: '1fr 1fr' }}>
+
+        <Widget icon={<FileText size={14} />} title="Workflow HĐ — trạng thái" iconColor="purple"
+                sub={`${totalWorkflow} HĐ active`}>
           {totalWorkflow === 0 ? (
             <div style={emptyStyle}>Chưa có HĐ workflow</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {Object.entries(data.workflowCounts).map(([status, count]) => {
-                const meta = WORKFLOW_META[status]
-                if (!meta || count === 0) return null
-                const pct = (count / totalWorkflow) * 100
-                return (
-                  <div key={status}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                      <span style={{ color: '#8c8c8c' }}>{meta.label}</span>
-                      <span style={{ fontWeight: 700 }}>{count}</span>
-                    </div>
-                    <div style={barWrap}>
-                      <div style={{ ...bar, width: `${pct}%`, background: meta.color }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <DonutChart counts={data.workflowCounts} total={totalWorkflow} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
+                  {Object.entries(WORKFLOW_META).map(([status, meta]) => {
+                    const count = data.workflowCounts[status] || 0
+                    if (count === 0) return null
+                    return (
+                      <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 4, background: meta.color, flexShrink: 0 }} />
+                        <span style={{ color: '#8c8c8c', flex: 1 }}>{meta.label}</span>
+                        <span style={{ fontWeight: 700 }}>{count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              {data.cycleTimeAvgDays > 0 && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #f0f0f0', fontSize: 11, color: '#8c8c8c' }}>
+                  ⚡ <strong>Cycle time avg:</strong> Sale → Ký = <strong>{data.cycleTimeAvgDays.toFixed(1)} ngày</strong>
+                </div>
+              )}
+            </>
           )}
         </Widget>
-      </div>
-
-      {/* ═══ BENTO ROW 3: Activity + LC ═══ */}
-      <div style={{ ...bento, gridTemplateColumns: '1fr 1fr' }}>
 
         <Widget icon={<Activity size={14} />} title="Hoạt động gần đây" iconColor="blue"
                 action={<span style={widgetLink}>Xem tất cả →</span>}>
@@ -416,6 +452,10 @@ export default function SalesDashboardPage() {
             </div>
           ))}
         </Widget>
+      </div>
+
+      {/* ═══ BENTO ROW 4: LC + Cashflow ═══ */}
+      <div style={{ ...bento, gridTemplateColumns: '1fr 1fr' }}>
 
         <Widget icon={<CreditCard size={14} />} title="L/C theo dõi" iconColor="yellow"
                 sub={`${data.lcNearExpiry.length} LC ≤30d`}>
@@ -451,6 +491,20 @@ export default function SalesDashboardPage() {
             </table>
           )}
         </Widget>
+
+        <Widget icon={<TrendingUp size={14} />} title="Cash flow dự kiến" iconColor="green"
+                sub="7 tuần tới">
+          <CashflowWidget bars={data.cashflow} />
+        </Widget>
+      </div>
+
+      {/* ═══ FOOTER NOTE ═══ */}
+      <div style={{
+        marginTop: 16, padding: '12px 16px', background: '#fafafa',
+        borderRadius: 8, fontSize: 11, color: '#8c8c8c', textAlign: 'center',
+      }}>
+        💡 Bento dashboard auto-refresh khi quay lại trang. AI summary tính từ real
+        data Supabase. Widget có thể tùy chỉnh sau (drag-to-rearrange, hide theo role).
       </div>
 
       {/* ═══ QUICK ACTIONS STICKY ═══ */}
@@ -536,6 +590,159 @@ function Widget({ icon, title, sub, action, iconColor, children }: {
         {action && <div style={{ marginLeft: sub ? 8 : 'auto' }}>{action}</div>}
       </div>
       {children}
+    </div>
+  )
+}
+
+// ─── Calendar widget (7x3 = 21 days, current + next 14) ────────────
+function CalendarWidget({ events, onClickDay }: {
+  events: CalendarEvent[]
+  onClickDay: (date: string) => void
+}) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  // Start from Monday of current week
+  const start = new Date(today)
+  const dayOfWeek = (start.getDay() + 6) % 7 // 0 = Monday
+  start.setDate(start.getDate() - dayOfWeek)
+
+  const days: { date: string; day: number; isToday: boolean; isPast: boolean; event?: CalendarEvent }[] = []
+  for (let i = 0; i < 21; i++) {
+    const d = new Date(start)
+    d.setDate(d.getDate() + i)
+    const dateStr = d.toISOString().split('T')[0]
+    const event = events.find(e => e.date === dateStr)
+    days.push({
+      date: dateStr,
+      day: d.getDate(),
+      isToday: d.getTime() === today.getTime(),
+      isPast: d.getTime() < today.getTime(),
+      event,
+    })
+  }
+
+  const headers = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
+  return (
+    <div>
+      <div style={calWrap}>
+        {headers.map((h) => (
+          <div key={h} style={calHead}>{h}</div>
+        ))}
+        {days.map((d) => {
+          let cellStyle: React.CSSProperties = { ...calCell }
+          if (d.isPast && !d.event) cellStyle = { ...cellStyle, color: '#bfbfbf', cursor: 'default' }
+          if (d.event) {
+            cellStyle = { ...cellStyle, background: '#f0f9f4', color: PRIMARY, fontWeight: 600 }
+            if (d.event.urgent) {
+              cellStyle = { ...cellStyle, background: '#fff1f0', color: '#cf1322' }
+            }
+          }
+          if (d.isToday) {
+            cellStyle = { ...cellStyle, background: PRIMARY, color: '#fff', fontWeight: 700 }
+          }
+          return (
+            <div
+              key={d.date}
+              style={cellStyle}
+              onClick={() => d.event && onClickDay(d.date)}
+              title={d.event ? `${d.event.count} đơn ETD${d.event.topLabel ? ' · ' + d.event.topLabel : ''}` : ''}
+            >
+              {d.day}
+              {d.event && <div style={{ width: 4, height: 4, borderRadius: 2, background: 'currentColor', marginTop: 2 }} />}
+            </div>
+          )
+        })}
+      </div>
+      {events.length > 0 && (
+        <div style={{ marginTop: 10, fontSize: 11, color: '#8c8c8c', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {events.slice(0, 2).map((e) => (
+            <span key={e.date}>📍 {new Date(e.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} {e.topLabel || `${e.count} đơn`}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Cashflow widget (7 vertical bars) ─────────────────────────────
+function CashflowWidget({ bars }: { bars: CashflowBar[] }) {
+  const max = Math.max(...bars.map(b => b.value), 1)
+  const totalConfirmed = bars.filter(b => !b.future).reduce((s, b) => s + b.value, 0)
+  const totalFuture = bars.filter(b => b.future).reduce((s, b) => s + b.value, 0)
+  return (
+    <div>
+      <div style={cfBars}>
+        {bars.map((b, i) => {
+          const height = max > 0 ? (b.value / max) * 100 : 4
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div
+                style={{
+                  width: '100%',
+                  height: `${Math.max(height, 4)}%`,
+                  borderRadius: '4px 4px 0 0',
+                  minHeight: 4,
+                  background: b.future
+                    ? 'linear-gradient(180deg, #ffd591, #d46b08)'
+                    : 'linear-gradient(180deg, #2E7D5B, #1B4D3E)',
+                  transition: '0.3s',
+                  cursor: 'pointer',
+                }}
+                title={`${b.label}: ${fmtUSD(b.value)}${b.future ? ' (dự kiến)' : ''}`}
+              />
+              <div style={{ fontSize: 10, color: '#8c8c8c' }}>{b.label}</div>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 11, color: '#8c8c8c',
+                    borderTop: '1px solid #f0f0f0', paddingTop: 10 }}>
+        <div>
+          <strong style={{ color: '#389e0d', fontSize: 14 }}>{fmtUSD(totalConfirmed)}</strong>
+          <div>Đã chốt</div>
+        </div>
+        <div>
+          <strong style={{ color: '#d46b08', fontSize: 14 }}>{fmtUSD(totalFuture)}</strong>
+          <div>Dự kiến</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Donut chart (SVG) ─────────────────────────────────────────────
+function DonutChart({ counts, total }: { counts: Record<string, number>; total: number }) {
+  const C = 88 // circumference baseline (2πr ≈ 87.96 for r=14)
+  let offset = 0
+  const segments: { status: string; len: number; off: number; color: string }[] = []
+  for (const [status, meta] of Object.entries(WORKFLOW_META)) {
+    const count = counts[status] || 0
+    if (count === 0) continue
+    const len = (count / total) * C
+    segments.push({ status, len, off: -offset, color: meta.color })
+    offset += len
+  }
+  return (
+    <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
+      <svg viewBox="0 0 36 36" width="100" height="100" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="18" cy="18" r="14" fill="none" stroke="#f0f0f0" strokeWidth="4" />
+        {segments.map((s) => (
+          <circle
+            key={s.status}
+            cx="18" cy="18" r="14"
+            fill="none"
+            stroke={s.color}
+            strokeWidth="4"
+            strokeDasharray={`${s.len} ${C}`}
+            strokeDashoffset={s.off}
+          />
+        ))}
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex',
+                    flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{total}</div>
+        <div style={{ fontSize: 10, color: '#8c8c8c' }}>HĐ active</div>
+      </div>
     </div>
   )
 }
@@ -642,6 +849,74 @@ async function fetchActivityFeed(): Promise<ActivityItem[]> {
     }
   }
   return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+}
+
+async function fetchCalendar(): Promise<CalendarEvent[]> {
+  const now = new Date()
+  const limit = new Date(now)
+  limit.setDate(limit.getDate() + 14)
+  const { data } = await supabase
+    .from('sales_orders')
+    .select('etd, delivery_date, contract_no, customer:sales_customers!customer_id(short_name, name)')
+    .or(`etd.gte.${now.toISOString().split('T')[0]},delivery_date.gte.${now.toISOString().split('T')[0]}`)
+    .lte('etd', limit.toISOString().split('T')[0])
+    .neq('status', 'cancelled')
+    .order('etd', { ascending: true })
+
+  const byDate: Record<string, { count: number; urgent: boolean; topLabel?: string }> = {}
+  for (const o of (data as any[]) || []) {
+    const d = o.etd || o.delivery_date
+    if (!d) continue
+    if (!byDate[d]) byDate[d] = { count: 0, urgent: false }
+    byDate[d].count++
+    if (!byDate[d].topLabel) {
+      const name = o.customer?.short_name || o.customer?.name?.split(' ')[0] || o.contract_no
+      byDate[d].topLabel = byDate[d].count > 1 ? `${name} +${byDate[d].count - 1}` : name
+    }
+  }
+  return Object.entries(byDate).map(([date, info]) => ({ date, ...info }))
+}
+
+async function fetchCycleTime(): Promise<number> {
+  const { data } = await supabase
+    .from('sales_order_contracts')
+    .select('submitted_at, signed_at')
+    .eq('status', 'signed')
+    .not('submitted_at', 'is', null)
+    .not('signed_at', 'is', null)
+    .limit(30)
+  const rows = (data as { submitted_at: string; signed_at: string }[]) || []
+  if (rows.length === 0) return 0
+  const totalMs = rows.reduce((s, r) => s + (new Date(r.signed_at).getTime() - new Date(r.submitted_at).getTime()), 0)
+  return totalMs / rows.length / 86400000
+}
+
+async function fetchCashflow(): Promise<CashflowBar[]> {
+  // 7 tuần: 4 đã/đang xử lý + 3 dự kiến. Tính từ sales_orders với delivery_date trong window.
+  const now = new Date()
+  const bars: CashflowBar[] = []
+  // Week boundaries: [-4w, -3w], [-3w, -2w], [-2w, -1w], [-1w, now], [now, +1w], [+1w, +2w], [+2w, +3w]
+  for (let offset = -4; offset < 3; offset++) {
+    const start = new Date(now); start.setDate(start.getDate() + offset * 7)
+    const end = new Date(start); end.setDate(end.getDate() + 7)
+    const { data } = await supabase
+      .from('sales_orders')
+      .select('total_value_usd')
+      .gte('delivery_date', start.toISOString().split('T')[0])
+      .lt('delivery_date', end.toISOString().split('T')[0])
+      .neq('status', 'cancelled')
+    const sum = ((data as { total_value_usd: number | null }[]) || []).reduce(
+      (s, r) => s + (r.total_value_usd || 0), 0,
+    )
+    bars.push({
+      label: offset < 0
+        ? `T${-offset}w trước`
+        : offset === 0 ? 'Tuần này' : `+${offset}w`,
+      value: sum,
+      future: offset > 0,
+    })
+  }
+  return bars
 }
 
 async function fetchLcNearExpiry(): Promise<LcItem[]> {
@@ -817,4 +1092,20 @@ const qaTitle: React.CSSProperties = {
 }
 const emptyStyle: React.CSSProperties = {
   padding: 24, textAlign: 'center', color: '#bfbfbf', fontSize: 12,
+}
+
+const calWrap: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4,
+}
+const calHead: React.CSSProperties = {
+  fontSize: 10, textAlign: 'center', color: '#8c8c8c', padding: 4, fontWeight: 600,
+}
+const calCell: React.CSSProperties = {
+  aspectRatio: '1', borderRadius: 6, display: 'flex', flexDirection: 'column',
+  alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer',
+  background: '#fafafa', position: 'relative',
+}
+
+const cfBars: React.CSSProperties = {
+  display: 'flex', alignItems: 'flex-end', gap: 8, height: 120, padding: '8px 0',
 }

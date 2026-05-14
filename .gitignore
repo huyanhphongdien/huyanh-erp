@@ -13,3 +13,6 @@ apps/weighbridge/camera-proxy-win32/
 
 # Accidental nested clone
 huyanh-erp-8/
+
+# Test render outputs (sinh từ docs/contract-templates/test_render.mjs)
+docs/contract-templates/_out_*.docx

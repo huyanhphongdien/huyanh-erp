@@ -1,0 +1,2166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tab Hợp đồng — Workflow ký HĐ bán | Huy Anh ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    background: #f0f2f5;
+    color: rgba(0,0,0,0.88);
+    font-size: 14px;
+    line-height: 1.5715;
+  }
+
+  /* ──────── PAGE FRAME ──────── */
+  .container { max-width: 1600px; margin: 0 auto; padding: 24px; }
+  .page-title {
+    font-size: 22px; font-weight: 600; margin-bottom: 4px; color: #1B4D3E;
+  }
+  .page-subtitle { color: #8c8c8c; margin-bottom: 24px; font-size: 13px; }
+
+  /* ──────── STATE SWITCHER ──────── */
+  .switcher {
+    background: #fff; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03); border: 1px solid #f0f0f0;
+  }
+  .switcher-label {
+    font-size: 12px; text-transform: uppercase; color: #8c8c8c;
+    letter-spacing: 0.5px; margin-bottom: 10px;
+  }
+  .switcher-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .state-btn {
+    padding: 6px 14px; border-radius: 16px; border: 1px solid #d9d9d9;
+    background: #fff; font-size: 12px; cursor: pointer; transition: 0.15s;
+    color: #595959; font-weight: 500;
+  }
+  .state-btn:hover { border-color: #1B4D3E; color: #1B4D3E; }
+  .state-btn.active { background: #1B4D3E; color: #fff; border-color: #1B4D3E; }
+  .role-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    margin-left: 6px; font-weight: 600;
+  }
+  .role-sale { background: #e6f4ff; color: #1677ff; }
+  .role-reviewer { background: #fff7e6; color: #d48806; }
+  .role-signer { background: #f6ffed; color: #389e0d; }
+
+  /* ──────── DRAWER (Antd-like) ──────── */
+  .drawer-wrap {
+    background: #fff; border-radius: 8px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #f0f0f0;
+  }
+  .drawer-header {
+    padding: 12px 20px; border-bottom: 1px solid #f0f0f0;
+    display: flex; align-items: center; justify-content: space-between;
+    background: #fff; flex-wrap: wrap; gap: 8px;
+  }
+  .drawer-header .so-code { font-weight: 600; font-size: 15px; }
+  .drawer-header .close-btn {
+    width: 22px; height: 22px; border-radius: 50%; background: transparent;
+    border: none; cursor: pointer; color: #8c8c8c; font-size: 16px;
+  }
+  .so-meta { display: flex; gap: 8px; align-items: center; font-size: 12px; flex-wrap: wrap; }
+
+  /* Antd Tag */
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px; font-size: 12px; line-height: 1.5;
+    border: 1px solid; background: #fafafa;
+  }
+  .tag-blue { color: #1677ff; border-color: #91caff; background: #e6f4ff; }
+  .tag-green { color: #389e0d; border-color: #b7eb8f; background: #f6ffed; }
+  .tag-orange { color: #d46b08; border-color: #ffd591; background: #fff7e6; }
+  .tag-red { color: #cf1322; border-color: #ffa39e; background: #fff1f0; }
+  .tag-purple { color: #531dab; border-color: #d3adf7; background: #f9f0ff; }
+  .tag-gray { color: #595959; border-color: #d9d9d9; background: #fafafa; }
+  .tag-processing { color: #1677ff; border-color: #91caff; background: #e6f4ff; }
+  .tag-success { color: #389e0d; border-color: #b7eb8f; background: #f6ffed; }
+  .tag-warning { color: #d46b08; border-color: #ffd591; background: #fff7e6; }
+  .tag-error { color: #cf1322; border-color: #ffa39e; background: #fff1f0; }
+
+  /* ──────── TABS BAR ──────── */
+  .tabs-bar {
+    border-bottom: 1px solid #f0f0f0; padding: 0 20px; display: flex; gap: 24px;
+    background: #fff; overflow-x: auto;
+  }
+  .tab-item {
+    padding: 12px 0; font-size: 14px; color: rgba(0,0,0,0.65); cursor: pointer;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  .tab-item.active { color: #1B4D3E; border-color: #1B4D3E; font-weight: 500; }
+  .tab-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+  /* ──────── DRAWER BODY ──────── */
+  .drawer-body { padding: 16px; max-height: calc(100vh - 200px); overflow-y: auto; background: #fafafa; }
+
+  .section-header {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    color: #1B4D3E; letter-spacing: 1px; margin-bottom: 10px; margin-top: 4px;
+  }
+  .section-header.gray { color: #8c8c8c; }
+
+  .card {
+    background: #fff; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px;
+    border: 1px solid #f0f0f0;
+  }
+  .card-tight { padding: 10px 14px; }
+
+  /* Timeline */
+  .timeline {
+    display: flex; align-items: center; gap: 0; padding: 12px 0 6px;
+    overflow-x: auto;
+  }
+  .timeline-step {
+    flex: 1; min-width: 90px; text-align: center; position: relative;
+  }
+  .timeline-step .dot {
+    width: 26px; height: 26px; border-radius: 50%; background: #f0f0f0;
+    color: #8c8c8c; font-size: 12px; line-height: 26px; margin: 0 auto 6px;
+    border: 2px solid #f0f0f0; font-weight: 600;
+  }
+  .timeline-step.done .dot { background: #1B4D3E; color: #fff; border-color: #1B4D3E; }
+  .timeline-step.current .dot {
+    background: #fff; color: #1B4D3E; border-color: #1B4D3E;
+    box-shadow: 0 0 0 4px rgba(27,77,62,0.15);
+  }
+  .timeline-step.rejected .dot { background: #fff1f0; color: #cf1322; border-color: #cf1322; }
+  .timeline-step .label { font-size: 11px; color: #595959; }
+  .timeline-step.current .label { color: #1B4D3E; font-weight: 600; }
+  .timeline-step:not(:last-child)::after {
+    content: ''; position: absolute; top: 13px; left: calc(50% + 18px);
+    width: calc(100% - 36px); height: 2px; background: #f0f0f0; z-index: 0;
+  }
+  .timeline-step.done:not(:last-child)::after { background: #1B4D3E; }
+  .timeline-current-note {
+    font-size: 13px; color: #d46b08; font-weight: 500;
+    margin-top: 12px; padding: 8px 12px; background: #fff7e6;
+    border-radius: 6px; border: 1px solid #ffe7ba;
+  }
+  .timeline-current-note.error { color: #cf1322; background: #fff1f0; border-color: #ffccc7; }
+  .timeline-current-note.success { color: #389e0d; background: #f6ffed; border-color: #b7eb8f; }
+
+  /* Antd Descriptions */
+  .desc-grid {
+    display: grid; grid-template-columns: 180px 1fr 180px 1fr;
+    border: 1px solid #f0f0f0; border-radius: 6px; overflow: hidden; background: #fff;
+  }
+  .desc-grid > div { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+  .desc-grid .label { background: #fafafa; color: #595959; font-weight: 500; border-right: 1px solid #f0f0f0; }
+  .desc-grid > div:nth-last-child(-n+4) { border-bottom: none; }
+
+  .desc-3col {
+    display: grid; grid-template-columns: 110px 1fr 110px 1fr 110px 1fr;
+    border: 1px solid #f0f0f0; border-radius: 6px; background: #fff;
+  }
+  .desc-3col > div { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+  .desc-3col .label { background: #fafafa; color: #595959; font-weight: 500; border-right: 1px solid #f0f0f0; }
+
+  /* Form */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-bottom: 10px; }
+  .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .form-row.four { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .form-field label {
+    display: block; font-size: 12px; color: #595959; margin-bottom: 4px; font-weight: 500;
+  }
+  .input, .select, .textarea {
+    width: 100%; padding: 5px 10px; border: 1px solid #d9d9d9; border-radius: 6px;
+    font-size: 13px; background: #fff; outline: none; font-family: inherit;
+  }
+  .input:focus, .select:focus, .textarea:focus { border-color: #1B4D3E; box-shadow: 0 0 0 2px rgba(27,77,62,0.1); }
+  .textarea { resize: vertical; min-height: 60px; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px;
+    border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.15s;
+    border: 1px solid #d9d9d9; background: #fff; color: rgba(0,0,0,0.88); font-weight: 400;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: #1B4D3E; color: #1B4D3E; }
+  .btn-primary { background: #1B4D3E; color: #fff; border-color: #1B4D3E; }
+  .btn-primary:hover { background: #14392d; color: #fff; border-color: #14392d; }
+  .btn-danger { background: #fff; color: #cf1322; border-color: #ffa39e; }
+  .btn-danger:hover { background: #cf1322; color: #fff; border-color: #cf1322; }
+  .btn-success { background: #389e0d; color: #fff; border-color: #389e0d; }
+  .btn-success:hover { background: #2e8c08; color: #fff; }
+  .btn-sm { padding: 3px 10px; font-size: 12px; }
+  .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+  /* Uploader */
+  .uploader {
+    border: 1px dashed #d9d9d9; border-radius: 8px; padding: 24px; text-align: center;
+    background: #fafafa; cursor: pointer; transition: 0.15s;
+  }
+  .uploader:hover { border-color: #1B4D3E; background: #f6ffed; }
+  .uploader .icon { font-size: 24px; color: #1B4D3E; margin-bottom: 6px; }
+  .uploader .main { font-size: 13px; color: rgba(0,0,0,0.88); margin-bottom: 2px; }
+  .uploader .sub { font-size: 11px; color: #8c8c8c; }
+
+  /* File row */
+  .file-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    background: #fafafa; border: 1px solid #f0f0f0; border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .file-row .file-icon {
+    width: 30px; height: 30px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-weight: 600; font-size: 10px;
+  }
+  .file-row .file-icon.docx { background: #e6f4ff; color: #1677ff; }
+  .file-row .file-icon.pdf { background: #fff1f0; color: #cf1322; }
+  .file-row .file-name { font-size: 13px; flex: 1; font-weight: 500; }
+  .file-row .file-meta { font-size: 11px; color: #8c8c8c; }
+  .file-row .file-actions { display: flex; gap: 6px; }
+
+  /* Collapse */
+  .collapse {
+    border: 1px solid #f0f0f0; border-radius: 6px; background: #fff; margin-bottom: 10px;
+  }
+  .collapse-header {
+    padding: 9px 14px; cursor: pointer; display: flex; justify-content: space-between;
+    align-items: center; font-size: 13px; font-weight: 500;
+  }
+  .collapse-header:hover { background: #fafafa; }
+  .collapse-body { padding: 10px 14px; border-top: 1px solid #f0f0f0; }
+  .collapse-body.hidden { display: none; }
+
+  /* Audit */
+  .audit-row {
+    display: flex; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #f0f0f0;
+    font-size: 12px; align-items: flex-start;
+  }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #1B4D3E; color: #fff; display: flex; align-items: center;
+    justify-content: center; font-weight: 600; font-size: 11px; flex-shrink: 0;
+  }
+  .audit-content { flex: 1; }
+  .audit-actor { font-weight: 600; }
+  .audit-action { color: #595959; }
+  .audit-time { color: #8c8c8c; font-size: 11px; }
+
+  /* Action bar */
+  .action-bar {
+    background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;
+    padding: 12px 14px; margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  .action-bar .left, .action-bar .right { display: flex; gap: 8px; align-items: center; }
+
+  .version-pill {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border-radius: 12px; font-size: 11px; background: #f5f5f5; color: #595959;
+    cursor: pointer;
+  }
+  .version-pill.current { background: #1B4D3E; color: #fff; }
+  .version-pill.rejected { background: #fff1f0; color: #cf1322; }
+
+  .reject-box {
+    background: #fff1f0; border: 1px solid #ffccc7; border-radius: 6px;
+    padding: 12px; margin-top: 12px;
+  }
+  .review-ok-box {
+    background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px;
+    padding: 10px 14px; margin-top: 10px; font-size: 13px;
+  }
+  .checkbox-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .checkbox-list label {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+    padding: 5px 8px; cursor: pointer; border-radius: 4px;
+  }
+  .checkbox-list label:hover { background: #fafafa; }
+  .checkbox-list input { accent-color: #1B4D3E; }
+
+  .empty { text-align: center; padding: 40px 20px; color: #8c8c8c; }
+  .empty .icon { font-size: 48px; color: #d9d9d9; margin-bottom: 12px; }
+  .empty .text { font-size: 13px; }
+
+  .callout {
+    padding: 9px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 10px;
+    border: 1px solid;
+  }
+  .callout-info { background: #e6f4ff; border-color: #91caff; color: #0958d9; }
+  .callout-warning { background: #fff7e6; border-color: #ffd591; color: #ad6800; }
+
+  .hidden { display: none !important; }
+
+  .state-banner {
+    background: linear-gradient(90deg, #1B4D3E, #2d6a55);
+    color: #fff; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px;
+    font-size: 13px; display: flex; align-items: center; gap: 10px;
+  }
+  .state-banner .badge {
+    background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+
+  /* Template gallery */
+  .tpl-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+  .tpl-card {
+    border: 1px solid #f0f0f0; border-radius: 8px; padding: 14px; background: #fff;
+  }
+  .tpl-card .tpl-title { font-weight: 600; margin-bottom: 4px; font-size: 14px; }
+  .tpl-card .tpl-meta { font-size: 11px; color: #8c8c8c; margin-bottom: 8px; }
+
+  /* ════════════════════════════════════════════════════════════
+     COMPOSE STUDIO (split layout — form left, preview right)
+     ════════════════════════════════════════════════════════════ */
+  .studio {
+    display: grid; grid-template-columns: minmax(420px, 5fr) 6fr;
+    gap: 12px;
+  }
+  @media (max-width: 1100px) {
+    .studio { grid-template-columns: 1fr; }
+  }
+  .studio-left {
+    background: #fff; border-radius: 8px; border: 1px solid #f0f0f0;
+    padding: 14px 16px; max-height: calc(100vh - 280px); overflow-y: auto;
+  }
+  .studio-right {
+    background: #fff; border-radius: 8px; border: 1px solid #f0f0f0;
+    display: flex; flex-direction: column; max-height: calc(100vh - 280px);
+  }
+  .studio-right-header {
+    border-bottom: 1px solid #f0f0f0; padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: #fafafa; border-radius: 8px 8px 0 0;
+  }
+  .preview-tabs {
+    display: flex; gap: 2px; flex: 1; min-width: 280px;
+  }
+  .preview-tab {
+    padding: 5px 10px; font-size: 12px; border-radius: 6px 6px 0 0;
+    cursor: pointer; color: #595959; border: 1px solid transparent;
+    border-bottom: none; background: #f0f0f0;
+  }
+  .preview-tab:hover { color: #1B4D3E; }
+  .preview-tab.active {
+    background: #fff; color: #1B4D3E; font-weight: 600;
+    border-color: #d9d9d9;
+  }
+  .studio-right-body {
+    flex: 1; overflow-y: auto; padding: 0;
+    background: #f0f0f0;
+  }
+  .doc-paper {
+    background: #fff; margin: 16px auto; padding: 32px 36px;
+    max-width: 720px; min-height: 600px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    font-family: 'Times New Roman', Times, serif; font-size: 12px;
+    line-height: 1.5; color: #000; white-space: pre-wrap;
+  }
+  .doc-paper h2 {
+    text-align: center; font-size: 16px; font-weight: 700;
+    margin-bottom: 8px; font-family: 'Times New Roman', Times, serif;
+    letter-spacing: 1px;
+  }
+  .doc-paper .doc-meta {
+    text-align: center; margin-bottom: 16px; font-size: 12px;
+  }
+  .doc-paper .doc-section { margin-bottom: 12px; }
+  .doc-paper .doc-label { font-weight: 700; }
+  .doc-paper table {
+    width: 100%; border-collapse: collapse; margin: 10px 0;
+  }
+  .doc-paper th, .doc-paper td {
+    border: 1px solid #000; padding: 4px 8px; font-size: 11px;
+    text-align: left; vertical-align: top;
+  }
+  .doc-paper th { background: #f5f5f5; text-align: center; font-weight: 700; }
+  .doc-paper td.center, .doc-paper th.center { text-align: center; }
+  .doc-paper td.right { text-align: right; }
+  .doc-paper .signatures {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+    margin-top: 30px; text-align: center; font-weight: 700;
+  }
+  .doc-paper .footer-note { font-style: italic; font-size: 11px; }
+  .placeholder-hl {
+    background: #fffbe6; padding: 0 2px; border-radius: 2px;
+    box-shadow: inset 0 -1px 0 #ffd591;
+  }
+
+  .studio-actions {
+    border-top: 1px solid #f0f0f0; padding: 10px 14px;
+    background: #fff; border-radius: 0 0 8px 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .preset-row {
+    background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px;
+    padding: 8px 12px; margin-bottom: 10px; font-size: 12px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+
+  /* ──── Tự động tính toán card ──── */
+  .summary-card {
+    background: linear-gradient(135deg, #1B4D3E 0%, #2E7D5B 100%);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 12px;
+    color: #fff;
+  }
+  .summary-title {
+    font-size: 13px; font-weight: 600; opacity: 0.92; margin-bottom: 12px;
+  }
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  }
+  @media (max-width: 700px) { .summary-grid { grid-template-columns: 1fr 1fr; } }
+  .sm-label { color: rgba(255,255,255,0.6); font-size: 11px; margin-bottom: 4px; }
+  .sm-value { color: #fff; font-size: 26px; font-weight: 700; line-height: 1; }
+  .sm-sub { color: rgba(255,255,255,0.55); font-size: 11px; margin-top: 4px; }
+
+  /* ──── Item row (multi-item) ──── */
+  .item-row {
+    background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px;
+  }
+  .item-row.alt { background: #fff; }
+  .item-grid {
+    display: grid; grid-template-columns: 1.5fr 0.8fr 0.8fr 0.7fr 0.7fr 1fr auto;
+    gap: 6px; align-items: end;
+  }
+  .item-grid label {
+    font-size: 10px; color: #999; margin-bottom: 2px;
+  }
+  .item-summary {
+    margin-top: 6px; font-size: 11px; color: #666;
+  }
+  .item-remove {
+    background: transparent; border: none; color: #cf1322; cursor: pointer;
+    font-size: 14px; padding: 4px 8px;
+  }
+  .payment-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .payment-tag {
+    cursor: pointer; font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    border: 1px solid #d9d9d9; background: #fff; color: #666; user-select: none;
+  }
+  .payment-tag.active {
+    background: #1B4D3E; color: #fff; border-color: #1B4D3E;
+  }
+
+  /* ──── Compare 4 grid ──── */
+  .compare4 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  @media (max-width: 1100px) { .compare4 { grid-template-columns: 1fr; } }
+  .compare-card {
+    background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .compare-header {
+    background: #fafafa; border-bottom: 1px solid #f0f0f0;
+    padding: 10px 14px; font-size: 13px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .compare-body {
+    flex: 1; overflow: auto; max-height: 540px;
+    background: #f5f5f5; padding: 12px;
+  }
+  .compare-body .doc-paper {
+    margin: 0; padding: 16px 18px; font-size: 9px;
+    max-width: none; min-height: auto;
+    transform-origin: top left;
+  }
+  .compare-body .doc-paper h2 { font-size: 12px; margin-bottom: 4px; }
+  .compare-body .doc-paper table th,
+  .compare-body .doc-paper table td { padding: 2px 4px; font-size: 9px; }
+  .compare-body .doc-paper .doc-section { margin-bottom: 6px; }
+  .compare-body .doc-paper .doc-meta { font-size: 9px; margin-bottom: 8px; }
+  .compare-body .doc-paper .signatures { font-size: 9px; margin-top: 14px; gap: 16px; }
+  .compare-body .doc-paper .footer-note { font-size: 8px; }
+  .compare-tabs {
+    display: flex; gap: 2px;
+  }
+  .compare-tabs .preview-tab {
+    padding: 3px 8px; font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1 class="page-title">Tab Hợp đồng — Workflow ký HĐ bán</h1>
+  <p class="page-subtitle">
+    Mock UX cho SO-2026-0062 — Compose Studio (form + live preview) + 9 trạng thái workflow.
+    Click vào nút state, đổi giá trị form → live preview 4 file (SC/PI × CIF/FOB) tự cập nhật.
+  </p>
+
+  <!-- STATE SWITCHER -->
+  <div class="switcher">
+    <div class="switcher-label">Chọn trạng thái workflow để xem</div>
+    <div class="switcher-row">
+      <button class="state-btn active" data-state="compose">① Soạn HĐ + Live Preview <span class="role-tag role-sale">Sale</span></button>
+      <button class="state-btn" data-state="saved">② Đã lưu v1 <span class="role-tag role-sale">Sale</span></button>
+      <button class="state-btn" data-state="reviewing">③ Đang kiểm tra <span class="role-tag role-reviewer">Reviewer</span></button>
+      <button class="state-btn" data-state="rejected">↩ Trả lại <span class="role-tag role-sale">Sale</span></button>
+      <button class="state-btn" data-state="reviewed">④ Đã duyệt <span class="role-tag role-signer">Trung/Huy</span></button>
+      <button class="state-btn" data-state="ha_signed">⑤ HA đã ký <span class="role-tag role-sale">Sale</span></button>
+      <button class="state-btn" data-state="sent">⑥ Đã gửi KH <span class="role-tag role-sale">Sale</span></button>
+      <button class="state-btn" data-state="final">⑦ Final <span class="role-tag role-sale">Sale</span></button>
+      <button class="state-btn" data-state="addendum">+ Phụ lục <span class="role-tag role-sale">Sale</span></button>
+      <button class="state-btn" data-state="compare4">🔲 So sánh 4 HĐ song song</button>
+      <button class="state-btn" data-state="admin">⚙ Admin Templates</button>
+    </div>
+  </div>
+
+  <div class="drawer-wrap">
+    <div class="drawer-header">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <button class="close-btn">✕</button>
+        <span class="so-code">SO-2026-0062</span>
+        <span class="tag tag-blue" id="header-status">Soạn HĐ</span>
+        <span class="tag tag-purple">📑 Mua mủ</span>
+        <span style="font-size:13px; color:#595959; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="header-customer">PHILIPPINE RUBBER TRADE SOLUTION CORP.</span>
+      </div>
+      <div class="so-meta"><span class="tag tag-gray">🔓 Chưa khóa</span></div>
+    </div>
+
+    <div class="tabs-bar">
+      <div class="tab-item">🏉 Tiến độ</div>
+      <div class="tab-item">🕒 Lịch sử</div>
+      <div class="tab-item active">📄 Hợp đồng <span class="tab-dot" style="background:#1B4D3E;"></span></div>
+      <div class="tab-item">🔨 Sản xuất</div>
+      <div class="tab-item">🚚 Vận chuyển</div>
+      <div class="tab-item">📁 Chứng từ</div>
+      <div class="tab-item">💵 Tài chính</div>
+    </div>
+
+    <div class="drawer-body" id="drawer-body">
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: COMPOSE — gộp Soạn + Sinh + Live Preview vào 1 màn hình
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel" data-panel="compose">
+
+        <div class="state-banner">
+          <span class="badge">COMPOSE</span>
+          <span>Gộp <strong>Step 1 (KH+SP+Điều khoản)</strong> và <strong>Step 2 (Confirm + Quality specs)</strong> vào 1 màn — không phải bấm Next/Back. Sửa form trái → preview phải tự update.</span>
+        </div>
+
+        <!-- Timeline + preset bar -->
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step current"><div class="dot">1</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step"><div class="dot">2</div><div class="label">Kiểm tra</div></div>
+            <div class="timeline-step"><div class="dot">3</div><div class="label">HA ký</div></div>
+            <div class="timeline-step"><div class="dot">4</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step"><div class="dot">5</div><div class="label">KH ký</div></div>
+            <div class="timeline-step"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+        </div>
+
+        <!-- "Tự động tính toán" summary card (giống panel xanh đen ERP hiện tại) -->
+        <div class="summary-card">
+          <div class="summary-title">📊 Tự động tính toán <span style="opacity:0.5; font-size:11px; margin-left:8px;">(realtime theo form)</span></div>
+          <div class="summary-grid">
+            <div>
+              <div class="sm-label">Tổng bành</div>
+              <div class="sm-value" id="sm_bales">2,304</div>
+              <div class="sm-sub">bành</div>
+            </div>
+            <div>
+              <div class="sm-label">Số container</div>
+              <div class="sm-value" style="color:#FFD700;" id="sm_conts">4</div>
+              <div class="sm-sub" id="sm_cont_type">20ft</div>
+            </div>
+            <div>
+              <div class="sm-label">Giá trị</div>
+              <div class="sm-value" style="color:#4ADE80; font-size:22px;" id="sm_amount">$190,713.60</div>
+              <div class="sm-sub" id="sm_currency">USD</div>
+            </div>
+            <div>
+              <div class="sm-label">Hoa hồng</div>
+              <div class="sm-value" style="font-size:16px;" id="sm_commission">—</div>
+              <div class="sm-sub" id="sm_commission_sub"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="preset-row">
+          <strong style="color:#389e0d;">💡 Demo preset:</strong>
+          <button class="btn btn-sm" onclick="loadPreset('philrubber')">Phil Rubber (FOB · SVR_3L · 80.64 tấn)</button>
+          <button class="btn btn-sm" onclick="loadPreset('apollo')">Apollo (FOB · RSS3 · 201.6 tấn)</button>
+          <button class="btn btn-sm" onclick="loadPreset('yoongdo')">Yoong Do (CIF · SVR3L · 20.16 tấn)</button>
+          <button class="btn btn-sm" onclick="loadPreset('vitry')">VITRY (CIF · RSS3 · 20.16 tấn)</button>
+          <span style="color:#8c8c8c; font-size:11px;">— bấm để load nhanh data mẫu, preview sẽ tự cập nhật</span>
+        </div>
+
+        <!-- ──── SPLIT STUDIO ──── -->
+        <div class="studio">
+
+          <!-- LEFT: FORM -->
+          <div class="studio-left">
+
+            <div class="section-header">Hợp đồng — thông tin chung</div>
+            <div class="form-row">
+              <div class="form-field"><label>Số HĐ (Contract No.)</label>
+                <input class="input" id="f_contract_no" value="HA20260054"></div>
+              <div class="form-field"><label>Ngày HĐ</label>
+                <input class="input" id="f_contract_date" value="11/05/2026" placeholder="DD/MM/YYYY"></div>
+              <div class="form-field"><label>Mẫu HĐ</label>
+                <select class="select" id="f_template">
+                  <option value="FOB">FOB</option>
+                  <option value="CIF" selected>CIF</option>
+                </select>
+              </div>
+              <div class="form-field"><label>Grade</label>
+                <select class="select" id="f_grade">
+                  <option>SVR_3L</option>
+                  <option>SVR_10</option>
+                  <option>SVR_CV60</option>
+                  <option>RSS3</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="section-header">Khách hàng (Buyer)</div>
+            <div class="form-row">
+              <div class="form-field"><label>Tên KH</label>
+                <input class="input" id="f_buyer_name" value="PHILIPPINE RUBBER TRADE SOLUTION CORPORATION"></div>
+              <div class="form-field"><label>SĐT / Fax</label>
+                <input class="input" id="f_buyer_phone" value="+63 2 8800 1234"></div>
+            </div>
+            <div class="form-field" style="margin-bottom:10px;"><label>Địa chỉ KH</label>
+              <input class="input" id="f_buyer_address" value="Unit 1502, Cityland Megaplaza, ADB Avenue, Ortigas, Pasig City, Philippines"></div>
+
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Sản phẩm & Giá — <span style="color:#1677ff;" id="item_count">1</span> sản phẩm</span>
+              <button class="btn btn-sm" onclick="addItem()" style="text-transform:none; letter-spacing:0;">+ Thêm SP</button>
+            </div>
+
+            <div id="items_container">
+              <!-- Item rows rendered by JS -->
+            </div>
+
+            <div class="form-row three">
+              <div class="form-field"><label>Currency</label>
+                <select class="select" id="f_currency">
+                  <option>USD</option>
+                  <option>EUR</option>
+                  <option>JPY</option>
+                  <option>CNY</option>
+                </select>
+              </div>
+              <div class="form-field"><label>Số container</label>
+                <input class="input" id="f_containers" value="4" type="number"></div>
+              <div class="form-field"><label>Loại cont</label>
+                <select class="select" id="f_cont_type">
+                  <option>20ft</option>
+                  <option>40ft</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="section-header">Shipment</div>
+            <div class="form-row">
+              <div class="form-field"><label>Port of Loading</label>
+                <input class="input" id="f_pol" value="Da Nang port, Viet Nam"></div>
+              <div class="form-field"><label>Port of Discharge <span style="color:#8c8c8c;">(CIF only)</span></label>
+                <input class="input" id="f_pod" value="Manila, Philippines"></div>
+            </div>
+            <div class="form-field" style="margin-bottom:10px;"><label>Time of shipment</label>
+              <textarea class="textarea" id="f_shipment_time" rows="2">June, 2026</textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><label>Partial shipment</label>
+                <select class="select" id="f_partial">
+                  <option>Not Allowed</option>
+                  <option>Allowed</option>
+                </select>
+              </div>
+              <div class="form-field"><label>Transshipment</label>
+                <select class="select" id="f_trans">
+                  <option>Allowed</option>
+                  <option>Not Allowed</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="section-header">Thanh toán & Ngân hàng</div>
+            <div class="form-row">
+              <div class="form-field"><label>Term of Payment</label>
+                <input class="input" id="f_payment" value="T/T 100%"></div>
+              <div class="form-field"><label>Payment extra note</label>
+                <input class="input" id="f_payment_extra" placeholder="vd: L/C draft within 5 days...">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><label>Bank account name</label>
+                <input class="input" id="f_bank_name" value="HUY ANH RUBBER COMPANY LIMITED"></div>
+              <div class="form-field"><label>Account No.</label>
+                <input class="input" id="f_bank_acc" value="111002648221"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><label>Tên ngân hàng</label>
+                <input class="input" id="f_bank_at" value="VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE — HUE BRANCH"></div>
+              <div class="form-field"><label>SWIFT</label>
+                <input class="input" id="f_bank_swift" value="ICBVVNVX460"></div>
+            </div>
+
+            <div class="form-row three">
+              <div class="form-field"><label>Hoa hồng (%)</label>
+                <input class="input" id="f_commission_pct" value="0" type="number" step="0.1" min="0" max="20"></div>
+              <div class="form-field"><label>Hoa hồng (USD/MT)</label>
+                <input class="input" id="f_commission_usd_mt" value="0" type="number" step="1" min="0"></div>
+              <div class="form-field"><label>Delivery date</label>
+                <input class="input" id="f_delivery_date" value="30/06/2026" placeholder="DD/MM/YYYY"></div>
+            </div>
+
+            <!-- Quality specs collapse (was Step 2) -->
+            <div class="collapse" style="margin-top:8px;">
+              <div class="collapse-header" onclick="toggleCollapse(this)">
+                <span><span class="cl-toggle">▸</span> Chỉ tiêu kỹ thuật (Quality specs — auto từ Grade, sửa nếu cần)</span>
+                <span class="tag tag-gray">9 chỉ tiêu</span>
+              </div>
+              <div class="collapse-body hidden">
+                <div class="form-row three">
+                  <div class="form-field"><label>DRC min %</label><input class="input" id="f_drc_min" type="number" step="0.1" placeholder="—"></div>
+                  <div class="form-field"><label>DRC max %</label><input class="input" id="f_drc_max" type="number" step="0.1" placeholder="—"></div>
+                  <div class="form-field"><label>Moisture %</label><input class="input" id="f_moisture_max" type="number" step="0.01" placeholder="0.8"></div>
+                </div>
+                <div class="form-row three">
+                  <div class="form-field"><label>Dirt %</label><input class="input" id="f_dirt_max" type="number" step="0.001" placeholder="0.03"></div>
+                  <div class="form-field"><label>Ash %</label><input class="input" id="f_ash_max" type="number" step="0.01" placeholder="0.5"></div>
+                  <div class="form-field"><label>N₂ %</label><input class="input" id="f_nitrogen_max" type="number" step="0.01" placeholder="0.6"></div>
+                </div>
+                <div class="form-row three">
+                  <div class="form-field"><label>Volatile %</label><input class="input" id="f_volatile_max" type="number" step="0.01" placeholder="0.8"></div>
+                  <div class="form-field"><label>PRI min</label><input class="input" id="f_pri_min" type="number" placeholder="60"></div>
+                  <div class="form-field"><label>Mooney</label><input class="input" id="f_mooney_max" type="number" placeholder="—"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notes (was Step 2) -->
+            <div class="form-field" style="margin-top:10px;">
+              <label>Ghi chú nội bộ</label>
+              <textarea class="textarea" id="f_notes" rows="2" placeholder="Ghi chú cho đơn hàng (không in vào HĐ)..."></textarea>
+            </div>
+
+            <!-- Clause overrides -->
+            <div class="collapse" style="margin-top:14px;">
+              <div class="collapse-header" onclick="toggleCollapse(this)">
+                <span><span class="cl-toggle">▸</span> Ràng buộc bổ sung (tùy biến theo KH/shipment)</span>
+                <span class="tag tag-orange" id="override_count">0 override</span>
+              </div>
+              <div class="collapse-body hidden">
+                <div class="form-field" style="margin-bottom:10px;">
+                  <label>Documents required</label>
+                  <div class="checkbox-list">
+                    <label><input type="checkbox" class="f_doc" value="3/3 Original Bill of Lading" checked> 3/3 Original B/L</label>
+                    <label><input type="checkbox" class="f_doc" value="Commercial Invoice" checked> Commercial Invoice</label>
+                    <label><input type="checkbox" class="f_doc" value="Packing List" checked> Packing List</label>
+                    <label><input type="checkbox" class="f_doc" value="Certificate of Origin" checked> Certificate of Origin</label>
+                    <label><input type="checkbox" class="f_doc" value="Insurance Certificate"> Insurance Certificate</label>
+                    <label><input type="checkbox" class="f_doc" value="Test Certificate with Lot No." checked> Test Certificate</label>
+                    <label><input type="checkbox" class="f_doc" value="Phytosanitary Certificate" checked> Phytosanitary</label>
+                    <label><input type="checkbox" class="f_doc" value="Fumigation Certificate"> Fumigation</label>
+                  </div>
+                </div>
+                <div class="form-row three">
+                  <div class="form-field"><label>Claims period (days)</label>
+                    <input class="input" id="f_claims_days" type="number" value="20"></div>
+                  <div class="form-field"><label>Arbitration</label>
+                    <select class="select" id="f_arbitration">
+                      <option>SICOM Singapore</option>
+                      <option>HKIAC Hong Kong</option>
+                      <option>LCIA London</option>
+                    </select>
+                  </div>
+                  <div class="form-field"><label>Freight marking</label>
+                    <select class="select" id="f_freight_mark">
+                      <option>freight prepaid</option>
+                      <option>freight Collect</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /studio-left -->
+
+          <!-- RIGHT: LIVE PREVIEW -->
+          <div class="studio-right">
+            <div class="studio-right-header">
+              <strong style="font-size:13px;">📄 Live Preview</strong>
+              <div class="preview-tabs">
+                <div class="preview-tab active" data-doc="sc">SC (Sales Contract)</div>
+                <div class="preview-tab" data-doc="pi">PI (Proforma Invoice)</div>
+              </div>
+              <button class="btn btn-sm" onclick="window.print()">🖨 Print</button>
+            </div>
+            <div class="studio-right-body">
+              <div class="doc-paper" id="doc-sc"><!-- rendered by JS --></div>
+              <div class="doc-paper hidden" id="doc-pi"><!-- rendered by JS --></div>
+            </div>
+            <div class="studio-actions">
+              <span style="font-size:12px; color:#8c8c8c;">
+                <span class="tag tag-warning" style="font-size:10px;">🟡 vùng đánh dấu</span> = placeholder bind tới form
+              </span>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-sm" onclick="downloadTxt()">⬇ .txt</button>
+                <button class="btn btn-primary btn-sm" onclick="saveAsV1()">💾 Lưu thành v1 → gửi kiểm tra</button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /studio -->
+
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: SAVED v1
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="saved">
+
+        <div class="state-banner">
+          <span class="badge">v1 SAVED</span>
+          <span>Đã lưu v1 lúc 14/05/2026 09:32. Có thể: tải xem, sửa & sinh v2, hoặc gửi đi kiểm tra.</span>
+        </div>
+
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step current"><div class="dot">2</div><div class="label">Kiểm tra</div></div>
+            <div class="timeline-step"><div class="dot">3</div><div class="label">HA ký</div></div>
+            <div class="timeline-step"><div class="dot">4</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step"><div class="dot">5</div><div class="label">KH ký</div></div>
+            <div class="timeline-step"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <div class="left">
+            <span class="tag tag-processing">v1 — 14/05 09:32</span>
+            <span class="version-pill current">v1 hiện hành</span>
+          </div>
+          <div class="right">
+            <button class="btn btn-sm">✏ Sửa & sinh v2</button>
+            <button class="btn btn-primary btn-sm">📤 Gửi đi kiểm tra →</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-header">📎 File hợp đồng (v1)</div>
+          <div class="file-row">
+            <div class="file-icon docx">DOC</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v1_SC.docx</div>
+              <div class="file-meta">Sales Contract · 142 KB · Sinh từ mẫu "SC — CIF chuẩn"</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm">👁 Xem online</button>
+              <button class="btn btn-sm">⬇ Tải</button>
+            </div>
+          </div>
+          <div class="file-row">
+            <div class="file-icon docx">DOC</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v1_PI.docx</div>
+              <div class="file-meta">Proforma Invoice · HA20260054/PR.CI · 108 KB</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm">👁 Xem online</button>
+              <button class="btn btn-sm">⬇ Tải</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: REVIEWING
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="reviewing">
+        <div class="state-banner">
+          <span class="badge">REVIEWING</span>
+          <span>HĐ đã gửi đi kiểm tra. Reviewer nhận thông báo, mở HĐ và đánh dấu Duyệt / Trả lại.</span>
+        </div>
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step current"><div class="dot">2</div><div class="label">Kiểm tra</div></div>
+            <div class="timeline-step"><div class="dot">3</div><div class="label">HA ký</div></div>
+            <div class="timeline-step"><div class="dot">4</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step"><div class="dot">5</div><div class="label">KH ký</div></div>
+            <div class="timeline-step"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+          <div class="timeline-current-note">⏳ Chờ kiểm tra · gửi 14/05/2026 10:05 · Reviewer: <strong>Thuý HT</strong></div>
+        </div>
+        <div class="action-bar">
+          <div class="left"><span style="font-size:12px; color:#595959;">Bạn đang đăng nhập với vai trò: <strong style="color:#d46b08;">REVIEWER</strong></span></div>
+          <div class="right">
+            <button class="btn btn-danger btn-sm">↩ Trả lại + ghi chú</button>
+            <button class="btn btn-success btn-sm">✓ Duyệt HĐ</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">📎 File hợp đồng (v1) — chờ kiểm tra</div>
+          <div class="file-row">
+            <div class="file-icon docx">DOC</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v1_SC.docx</div>
+              <div class="file-meta">142 KB · 14/05/2026 09:32 · Sinh bởi Sale Nhung TT</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm btn-primary">👁 Xem online</button>
+              <button class="btn btn-sm">⬇ Tải</button>
+            </div>
+          </div>
+          <div class="file-row">
+            <div class="file-icon docx">DOC</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v1_PI.docx</div>
+              <div class="file-meta">108 KB</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm">👁 Xem online</button>
+              <button class="btn btn-sm">⬇ Tải</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">📝 Lý do trả lại (nếu có)</div>
+          <textarea class="textarea" placeholder="vd: Số bành đang sai (2304 vs thực tế 2300). Sale check lại rồi sinh v2."></textarea>
+          <div style="margin-top:10px; display:flex; justify-content:flex-end; gap:8px;">
+            <button class="btn btn-sm">Hủy</button>
+            <button class="btn btn-sm btn-danger">↩ Gửi trả lại Sale</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: REJECTED
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="rejected">
+        <div class="state-banner" style="background:linear-gradient(90deg,#cf1322,#ff4d4f);">
+          <span class="badge">REJECTED</span>
+          <span>Reviewer trả lại bản v1 — Sale cần sửa form và sinh v2.</span>
+        </div>
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step rejected"><div class="dot">✗</div><div class="label">Trả lại</div></div>
+            <div class="timeline-step"><div class="dot">3</div><div class="label">HA ký</div></div>
+            <div class="timeline-step"><div class="dot">4</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step"><div class="dot">5</div><div class="label">KH ký</div></div>
+            <div class="timeline-step"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+          <div class="timeline-current-note error">↩ v1 đã bị trả lại lúc 14/05/2026 14:20 · Reviewer: Thuý HT</div>
+        </div>
+        <div class="card" style="border-left:4px solid #cf1322; background:#fff1f0;">
+          <div class="section-header" style="color:#cf1322;">📝 Ghi chú từ Reviewer</div>
+          <p style="font-size:13px; line-height:1.7;">
+            <strong>Thuý HT</strong> — 14/05/2026 14:20<br>
+            "Số bành đang là 2304 nhưng PI ghi 2300. Kiểm tra lại với production + sinh v2. Ngoài ra, dòng Bank cần đổi từ tiếng Việt sang tiếng Anh cho phần Address."
+          </p>
+        </div>
+        <div class="action-bar">
+          <div class="left"><span class="version-pill rejected">v1 đã trả lại</span></div>
+          <div class="right"><button class="btn btn-primary btn-sm">✏ Sửa form + sinh v2 →</button></div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: REVIEWED (chờ HA ký)
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="reviewed">
+        <div class="state-banner">
+          <span class="badge">REVIEWED</span>
+          <span>Reviewer đã duyệt v2. Chờ Trung hoặc Huy tải bản đã ký (PDF có chữ ký + dấu).</span>
+        </div>
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Kiểm tra</div></div>
+            <div class="timeline-step current"><div class="dot">3</div><div class="label">HA ký</div></div>
+            <div class="timeline-step"><div class="dot">4</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step"><div class="dot">5</div><div class="label">KH ký</div></div>
+            <div class="timeline-step"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+          <div class="timeline-current-note">⏳ Chờ <strong>Trung</strong> hoặc <strong>Huy</strong> ký · 1 trong 2 ký là đủ (OR-gate)</div>
+        </div>
+        <div class="action-bar">
+          <div class="left"><span style="font-size:12px; color:#595959;">Bạn đang đăng nhập với vai trò: <strong style="color:#389e0d;">SIGNER (Trung)</strong></span></div>
+          <div class="right"><button class="btn btn-primary btn-sm">⬆ Upload bản đã ký HA</button></div>
+        </div>
+        <div class="card">
+          <div class="section-header">📎 File đã duyệt — chờ ký</div>
+          <div class="file-row">
+            <div class="file-icon docx">DOC</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v2_SC.docx</div>
+              <div class="file-meta">✓ Đã duyệt bởi Thuý HT — 14/05/2026 16:30</div>
+            </div>
+            <div class="file-actions"><button class="btn btn-sm">⬇ Tải để in</button></div>
+          </div>
+          <div class="file-row">
+            <div class="file-icon docx">DOC</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v2_PI.docx</div>
+              <div class="file-meta">✓ Đã duyệt</div>
+            </div>
+            <div class="file-actions"><button class="btn btn-sm">⬇ Tải để in</button></div>
+          </div>
+          <div class="review-ok-box">✓ Reviewer ghi chú: "OK, số liệu chính xác. Đề nghị BGĐ ký."</div>
+        </div>
+        <div class="card">
+          <div class="section-header">⬆ Upload bản đã ký HA (PDF)</div>
+          <div class="uploader">
+            <div class="icon">📤</div>
+            <div class="main">Bấm để chọn file PDF đã in + ký + đóng dấu Huy Anh</div>
+            <div class="sub">PDF only · tối đa 20MB · scan đủ trang có chữ ký Giám đốc + dấu</div>
+          </div>
+          <div class="callout callout-warning" style="margin-top:10px;">
+            ⚠ Hệ thống chỉ lưu file, KHÔNG kiểm tra nội dung — Trung/Huy tự chịu trách nhiệm chất lượng scan.
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: HA_SIGNED
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="ha_signed">
+        <div class="state-banner">
+          <span class="badge">HA SIGNED</span>
+          <span>Trung đã ký + upload PDF. Sale gửi cho KH và đánh dấu đã gửi.</span>
+        </div>
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Kiểm tra</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">HA ký</div></div>
+            <div class="timeline-step current"><div class="dot">4</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step"><div class="dot">5</div><div class="label">KH ký</div></div>
+            <div class="timeline-step"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+          <div class="timeline-current-note success">✓ HA đã ký — bởi <strong>Lê Xuân Hữu Trung</strong> · 14/05/2026 17:15</div>
+        </div>
+        <div class="action-bar">
+          <div class="left">
+            <span class="tag tag-success">✓ HA đã ký</span>
+            <span class="version-pill current">v2 hiện hành</span>
+          </div>
+          <div class="right"><button class="btn btn-primary btn-sm">📧 Đánh dấu đã gửi KH</button></div>
+        </div>
+        <div class="card">
+          <div class="section-header">📎 File hợp đồng — đã có chữ ký HA</div>
+          <div class="file-row">
+            <div class="file-icon pdf">PDF</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v2_SC_signed_HA.pdf</div>
+              <div class="file-meta">✓ Lê Xuân Hữu Trung — 14/05/2026 17:15 · 1.4 MB · 8 trang</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm btn-primary">👁 Xem</button>
+              <button class="btn btn-sm">⬇ Tải gửi KH</button>
+            </div>
+          </div>
+          <div class="file-row">
+            <div class="file-icon pdf">PDF</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v2_PI_signed_HA.pdf</div>
+              <div class="file-meta">320 KB</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm btn-primary">👁 Xem</button>
+              <button class="btn btn-sm">⬇ Tải gửi KH</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">📧 Gửi cho khách hàng</div>
+          <div class="form-row">
+            <div class="form-field"><label>Đã gửi cho email</label>
+              <input class="input" placeholder="vd: contact@philrubber.com"></div>
+            <div class="form-field"><label>Ghi chú gửi (optional)</label>
+              <input class="input" placeholder="vd: Đã gửi qua Skype + email lúc 18h"></div>
+          </div>
+          <button class="btn btn-primary btn-sm">✓ Xác nhận đã gửi KH</button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: SENT
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="sent">
+        <div class="state-banner">
+          <span class="badge">SENT</span>
+          <span>Đã gửi HĐ cho KH lúc 14/05 18:30. Chờ KH ký + gửi lại PDF có 2 chữ ký.</span>
+        </div>
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Kiểm tra</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">HA ký</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step current"><div class="dot">5</div><div class="label">KH ký</div></div>
+            <div class="timeline-step"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+          <div class="timeline-current-note">⏳ Chờ KH ký · gửi 2 ngày trước · KH: <strong>contact@philrubber.com</strong></div>
+        </div>
+        <div class="action-bar">
+          <div class="left">
+            <span class="tag tag-success">✓ HA đã ký</span>
+            <span class="tag tag-warning">📧 Đã gửi KH 14/05 18:30</span>
+          </div>
+          <div class="right">
+            <button class="btn btn-sm">📧 Gửi nhắc lại</button>
+            <button class="btn btn-primary btn-sm">⬆ Upload bản KH đã ký →</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">⬆ Upload bản KH đã ký (Final)</div>
+          <div class="uploader">
+            <div class="icon">📤</div>
+            <div class="main">Bấm để chọn PDF KH ký lại (có cả 2 chữ ký)</div>
+            <div class="sub">PDF only · tối đa 20MB</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: FINAL
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="final">
+        <div class="state-banner" style="background:linear-gradient(90deg,#389e0d,#52c41a);">
+          <span class="badge">FINAL</span>
+          <span>Cả 2 bên đã ký. HĐ có hiệu lực — SO tự chuyển "Đã xác nhận" + khóa.</span>
+        </div>
+        <div class="card card-tight">
+          <div class="timeline">
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Soạn HĐ</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Kiểm tra</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">HA ký</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Gửi KH</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">KH ký</div></div>
+            <div class="timeline-step done"><div class="dot">✓</div><div class="label">Final</div></div>
+          </div>
+          <div class="timeline-current-note success">✓ HĐ có hiệu lực · 16/05/2026 11:00 · KH: Philippine Rubber Trade Solution Corp.</div>
+        </div>
+        <div class="action-bar">
+          <div class="left">
+            <span class="tag tag-success">✓ Có hiệu lực</span>
+            <span class="tag tag-gray">🔒 Khóa</span>
+          </div>
+          <div class="right">
+            <button class="btn btn-sm">+ Thêm phụ lục</button>
+            <button class="btn btn-sm">📊 Lịch sử truy cập</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">📎 Hợp đồng FINAL (v2)</div>
+          <div class="file-row" style="background:#f6ffed; border-color:#b7eb8f;">
+            <div class="file-icon pdf">PDF</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v2_SC_FINAL.pdf <span class="tag tag-success" style="margin-left:8px;">2 chữ ký</span></div>
+              <div class="file-meta">✓ HA: Trung 14/05 · ✓ KH: Philippine Rubber 16/05 · 1.6 MB</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm btn-primary">👁 Xem</button>
+              <button class="btn btn-sm">⬇ Tải</button>
+            </div>
+          </div>
+          <div class="file-row" style="background:#f6ffed; border-color:#b7eb8f;">
+            <div class="file-icon pdf">PDF</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v2_PI_FINAL.pdf</div>
+              <div class="file-meta">320 KB</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-sm btn-primary">👁 Xem</button>
+              <button class="btn btn-sm">⬇ Tải</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">🕒 Lịch sử truy cập</div>
+          <div class="audit-row">
+            <div class="audit-avatar">TH</div>
+            <div class="audit-content">
+              <span class="audit-actor">Thuý HT</span> <span class="audit-action">đã xem bản FINAL</span><br>
+              <span class="audit-time">16/05/2026 11:32 · IP: 14.231.x.x</span>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-avatar" style="background:#d46b08;">SA</div>
+            <div class="audit-content">
+              <span class="audit-actor">Sale (Nhung TT)</span> <span class="audit-action">đã upload bản KH ký + chuyển sang Final</span><br>
+              <span class="audit-time">16/05/2026 11:00</span>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-avatar" style="background:#1677ff;">TR</div>
+            <div class="audit-content">
+              <span class="audit-actor">Lê Xuân Hữu Trung</span> <span class="audit-action">đã upload bản HA ký</span><br>
+              <span class="audit-time">14/05/2026 17:15</span>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-avatar" style="background:#389e0d;">TH</div>
+            <div class="audit-content">
+              <span class="audit-actor">Thuý HT (Reviewer)</span> <span class="audit-action">đã duyệt v2</span><br>
+              <span class="audit-time">14/05/2026 16:30</span>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-avatar" style="background:#cf1322;">TH</div>
+            <div class="audit-content">
+              <span class="audit-actor">Thuý HT (Reviewer)</span> <span class="audit-action">đã trả lại v1 + ghi chú</span><br>
+              <span class="audit-time">14/05/2026 14:20</span>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-avatar" style="background:#d46b08;">SA</div>
+            <div class="audit-content">
+              <span class="audit-actor">Sale (Nhung TT)</span> <span class="audit-action">đã sinh v1 từ Compose Studio</span><br>
+              <span class="audit-time">14/05/2026 09:32</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: ADDENDUM
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="addendum">
+        <div class="state-banner" style="background:linear-gradient(90deg,#531dab,#722ed1);">
+          <span class="badge">ADDENDUM</span>
+          <span>HĐ gốc đã FINAL. Phụ lục đi qua workflow rút gọn: Sinh → Kiểm tra → HA ký → KH ký.</span>
+        </div>
+        <div class="card">
+          <div class="section-header">📑 HĐ gốc (FINAL)</div>
+          <div class="file-row" style="background:#f6ffed; border-color:#b7eb8f;">
+            <div class="file-icon pdf">PDF</div>
+            <div style="flex:1;">
+              <div class="file-name">HA20260054_v2_SC_FINAL.pdf <span class="tag tag-success" style="margin-left:8px;">2 chữ ký</span></div>
+              <div class="file-meta">HĐ gốc · 16/05/2026 · không sửa được</div>
+            </div>
+            <div class="file-actions"><button class="btn btn-sm">⬇ Tải</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">📑 Phụ lục #1 (đang soạn)</div>
+          <div class="form-row">
+            <div class="form-field"><label>Loại phụ lục</label>
+              <select class="select">
+                <option>Gia hạn thời gian giao</option>
+                <option>Thay đổi cảng đích</option>
+                <option>Điều chỉnh số lượng / giá</option>
+                <option>Bổ sung documents required</option>
+                <option>Khác — tự nhập</option>
+              </select>
+            </div>
+            <div class="form-field"><label>Số phụ lục</label>
+              <input class="input" value="HA20260054/PL01"></div>
+          </div>
+          <div class="form-field" style="margin-bottom:10px;"><label>Nội dung phụ lục</label>
+            <textarea class="textarea" rows="4" placeholder="vd: Gia hạn thời gian giao từ 30/06/2026 sang 15/07/2026..."></textarea></div>
+          <button class="btn btn-primary btn-sm">🪄 Sinh phụ lục → workflow ký rút gọn</button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: ADMIN
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="admin">
+        <div class="state-banner" style="background:linear-gradient(90deg,#595959,#8c8c8c);">
+          <span class="badge">ADMIN</span>
+          <span>Quản lý mẫu HĐ (/sales/admin/contract-templates) — chỉ admin truy cập.</span>
+        </div>
+        <div class="action-bar">
+          <div class="left"><strong>Mẫu hợp đồng — 4 active</strong></div>
+          <div class="right"><button class="btn btn-sm">⬆ Upload mẫu mới</button></div>
+        </div>
+        <div class="card">
+          <div class="section-header">Mẫu Sales Contract (SC)</div>
+          <div class="tpl-grid">
+            <div class="tpl-card">
+              <div class="tpl-title">SC — FOB chuẩn (USD)</div>
+              <div class="tpl-meta">Code: <code>SC_FOB</code> · 111 KB · 1 bảng + 2 ảnh</div>
+              <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <span class="tag tag-blue">FOB</span>
+                <span class="tag tag-success">Active</span>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm">👁 Xem</button>
+                <button class="btn btn-sm">✏ Sửa</button>
+              </div>
+            </div>
+            <div class="tpl-card">
+              <div class="tpl-title">SC — CIF chuẩn (USD)</div>
+              <div class="tpl-meta">Code: <code>SC_CIF</code> · 113 KB</div>
+              <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <span class="tag tag-purple">CIF</span>
+                <span class="tag tag-success">Active</span>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm">👁 Xem</button>
+                <button class="btn btn-sm">✏ Sửa</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header">Mẫu Proforma Invoice (PI)</div>
+          <div class="tpl-grid">
+            <div class="tpl-card">
+              <div class="tpl-title">PI — FOB chuẩn (USD)</div>
+              <div class="tpl-meta">Code: <code>PI_FOB</code> · 104 KB</div>
+              <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <span class="tag tag-blue">FOB</span>
+                <span class="tag tag-success">Active</span>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm">👁 Xem</button>
+                <button class="btn btn-sm">✏ Sửa</button>
+              </div>
+            </div>
+            <div class="tpl-card">
+              <div class="tpl-title">PI — CIF chuẩn (USD)</div>
+              <div class="tpl-meta">Code: <code>PI_CIF</code> · 157 KB</div>
+              <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <span class="tag tag-purple">CIF</span>
+                <span class="tag tag-success">Active</span>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm">👁 Xem</button>
+                <button class="btn btn-sm">✏ Sửa</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-header gray">Hướng dẫn placeholder</div>
+          <div style="font-size:13px; line-height:1.7;">
+            Mỗi mẫu là 1 file <code>.docx</code>, chỗ nào cần điền dữ liệu thì gõ <code>{tên_biến}</code> — hệ thống tự thay.<br>
+            Ví dụ: <code>{contract_no}</code>, <code>{buyer.name}</code>, <code>{total_amount_usd}</code>, <code>{amount_in_words}</code>, <code>{#items}{grade} {quantity}{/items}</code>.
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════
+           STATE: COMPARE 4 HĐ song song
+           ════════════════════════════════════════════════════════════════════ -->
+      <div class="state-panel hidden" data-panel="compare4">
+
+        <div class="state-banner">
+          <span class="badge">COMPARE 4</span>
+          <span>So sánh 4 HĐ song song — đổi data preset ở thanh trên thì 4 file đều cập nhật. Xem được khác biệt CIF vs FOB và giữa các KH.</span>
+        </div>
+
+        <div class="preset-row">
+          <strong style="color:#389e0d;">💡 Load 1 preset đồng loạt cho cả 4 ô:</strong>
+          <button class="btn btn-sm" onclick="loadPreset('philrubber')">Phil Rubber</button>
+          <button class="btn btn-sm" onclick="loadPreset('apollo')">Apollo</button>
+          <button class="btn btn-sm" onclick="loadPreset('yoongdo')">Yoong Do</button>
+          <button class="btn btn-sm" onclick="loadPreset('vitry')">VITRY</button>
+          <span style="color:#8c8c8c; font-size:11px;">— hoặc giữ "Mặc định cho 4 KH" để xem 4 KH riêng biệt</span>
+          <button class="btn btn-primary btn-sm" onclick="resetCompare4()" style="margin-left:auto;">↻ Reset 4 KH mặc định</button>
+        </div>
+
+        <div class="compare4">
+          <div class="compare-card">
+            <div class="compare-header">
+              <span>🇵🇭 Phil Rubber <span class="tag tag-blue" style="margin-left:6px;">FOB · SVR_3L</span></span>
+              <div class="compare-tabs">
+                <div class="preview-tab active" data-cmp="philrubber" data-doc="sc">SC</div>
+                <div class="preview-tab" data-cmp="philrubber" data-doc="pi">PI</div>
+              </div>
+            </div>
+            <div class="compare-body">
+              <div class="doc-paper" id="cmp_sc_philrubber"></div>
+              <div class="doc-paper hidden" id="cmp_pi_philrubber"></div>
+            </div>
+          </div>
+
+          <div class="compare-card">
+            <div class="compare-header">
+              <span>🇮🇳 Apollo Tyres <span class="tag tag-blue" style="margin-left:6px;">FOB · RSS3</span></span>
+              <div class="compare-tabs">
+                <div class="preview-tab active" data-cmp="apollo" data-doc="sc">SC</div>
+                <div class="preview-tab" data-cmp="apollo" data-doc="pi">PI</div>
+              </div>
+            </div>
+            <div class="compare-body">
+              <div class="doc-paper" id="cmp_sc_apollo"></div>
+              <div class="doc-paper hidden" id="cmp_pi_apollo"></div>
+            </div>
+          </div>
+
+          <div class="compare-card">
+            <div class="compare-header">
+              <span>🇰🇷 Yoong Do <span class="tag tag-purple" style="margin-left:6px;">CIF · SVR_3L · LC</span></span>
+              <div class="compare-tabs">
+                <div class="preview-tab active" data-cmp="yoongdo" data-doc="sc">SC</div>
+                <div class="preview-tab" data-cmp="yoongdo" data-doc="pi">PI</div>
+              </div>
+            </div>
+            <div class="compare-body">
+              <div class="doc-paper" id="cmp_sc_yoongdo"></div>
+              <div class="doc-paper hidden" id="cmp_pi_yoongdo"></div>
+            </div>
+          </div>
+
+          <div class="compare-card">
+            <div class="compare-header">
+              <span>🇫🇷 VITRY <span class="tag tag-purple" style="margin-left:6px;">CIF · RSS3 · LCIA</span></span>
+              <div class="compare-tabs">
+                <div class="preview-tab active" data-cmp="vitry" data-doc="sc">SC</div>
+                <div class="preview-tab" data-cmp="vitry" data-doc="pi">PI</div>
+              </div>
+            </div>
+            <div class="compare-body">
+              <div class="doc-paper" id="cmp_sc_vitry"></div>
+              <div class="doc-paper hidden" id="cmp_pi_vitry"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="section-header gray">📊 So sánh nhanh</div>
+          <table style="width:100%; border-collapse:collapse; font-size:12px;">
+            <thead>
+              <tr style="background:#fafafa;">
+                <th style="text-align:left; padding:6px 10px; border:1px solid #f0f0f0;">Tiêu chí</th>
+                <th style="text-align:left; padding:6px 10px; border:1px solid #f0f0f0;">Phil Rubber</th>
+                <th style="text-align:left; padding:6px 10px; border:1px solid #f0f0f0;">Apollo</th>
+                <th style="text-align:left; padding:6px 10px; border:1px solid #f0f0f0;">Yoong Do</th>
+                <th style="text-align:left; padding:6px 10px; border:1px solid #f0f0f0;">VITRY</th>
+              </tr>
+            </thead>
+            <tbody id="compare_table_body">
+              <!-- rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div><!-- /drawer-body -->
+  </div><!-- /drawer-wrap -->
+
+  <div style="background:#fff; border-radius:8px; padding:18px; margin-top:18px; border:1px solid #f0f0f0;">
+    <h3 style="font-size:16px; margin-bottom:10px; color:#1B4D3E;">📝 Ghi chú thiết kế</h3>
+    <ul style="font-size:13px; line-height:1.8; padding-left:20px;">
+      <li><strong>Gộp 2 wizard step thành 1 màn:</strong> trang ERP hiện tại <code>SalesOrderCreatePage.tsx</code> dùng wizard 2 step (KH+SP → Confirm), buộc Sale bấm Next. Mock gộp toàn bộ field vào Compose Studio (form trái + live preview phải). Quality specs + Notes (vốn ở Step 2) đặt vào collapse ngay trong form trái.</li>
+      <li><strong>Card "Tự động tính toán"</strong> (xanh đen) — y hệt layout hiện có ở Step 1 ERP, đặt ngay trên form để Sale luôn thấy tổng bành / container / giá trị / hoa hồng realtime.</li>
+      <li><strong>Multi-item</strong>: 1 SO có thể có nhiều grade (vd SVR10/SBR1502 mixture) — nút "+ Thêm SP" thêm item row, mỗi item tự tính bành/cont/$ riêng, tổng cộng dồn vào card xanh đen + bảng SC/PI.</li>
+      <li><strong>4 preset thực</strong> (Phil Rubber, Apollo, Yoong Do, VITRY) — bấm để load đúng data từ 4 file mẫu <code>.docx</code> đã đọc, form + preview SC/PI cập nhật ngay. Riêng VITRY có Claims 30 ngày + LCIA London → auto-mở khung "Ràng buộc bổ sung".</li>
+      <li><strong>🔲 So sánh 4 HĐ song song</strong> — grid 2×2 + bảng so sánh 16 tiêu chí — dùng khi cần check khác biệt CIF/FOB hoặc giữa các KH (Sale training, BGĐ review). Mỗi card có riêng tab SC/PI.</li>
+      <li><strong>"Ràng buộc bổ sung"</strong> = collapse ẩn mặc định. Mở khi cần override Documents/Claims/Arbitration/Freight cho từng KH đặc biệt.</li>
+      <li><strong>Engine khi triển khai thật:</strong> dùng <code>docxtemplater</code> client-side → file <code>.docx</code> giữ logo + dấu + format Word gốc, mock này chỉ là HTML render preview.</li>
+      <li><strong>Pilot:</strong> feature flag <code>ENABLE_CONTRACT_WORKFLOW</code>. Bật cho 3-5 SO test, sau 2 tuần OK → bật toàn cục.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  // ═══════════════════════════════════════════════════════════════════
+  // STATE SWITCHER
+  // ═══════════════════════════════════════════════════════════════════
+  document.querySelectorAll('.state-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.state;
+      document.querySelectorAll('.state-panel').forEach(p => p.classList.add('hidden'));
+      const panel = document.querySelector(`[data-panel="${target}"]`);
+      if (panel) panel.classList.remove('hidden');
+      const header = document.getElementById('header-status');
+      const map = {
+        compose:   { label: 'Soạn HĐ', cls: 'tag-blue' },
+        saved:     { label: 'Đã lưu v1', cls: 'tag-processing' },
+        reviewing: { label: 'Đang kiểm tra', cls: 'tag-warning' },
+        rejected:  { label: 'Trả lại', cls: 'tag-error' },
+        reviewed:  { label: 'Đã duyệt — chờ HA ký', cls: 'tag-warning' },
+        ha_signed: { label: 'HA đã ký — chờ gửi KH', cls: 'tag-processing' },
+        sent:      { label: 'Đã gửi KH', cls: 'tag-warning' },
+        final:     { label: 'Đã xác nhận', cls: 'tag-success' },
+        addendum:  { label: 'Đã xác nhận + phụ lục', cls: 'tag-success' },
+        compare4:  { label: 'So sánh 4 HĐ', cls: 'tag-gray' },
+        admin:     { label: '⚙ Admin', cls: 'tag-gray' },
+      };
+      const info = map[target] || map.compose;
+      header.className = 'tag ' + info.cls;
+      header.textContent = info.label;
+      document.getElementById('drawer-body').scrollTop = 0;
+    });
+  });
+
+  function toggleCollapse(el) {
+    const body = el.nextElementSibling;
+    body.classList.toggle('hidden');
+    const tog = el.querySelector('.cl-toggle');
+    if (tog) tog.textContent = body.classList.contains('hidden') ? '▸' : '▾';
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // TEMPLATE ENGINE — render SC + PI from form data
+  // ═══════════════════════════════════════════════════════════════════
+
+  function n(v) { return Number(v) || 0; }
+  function fmt$(v) {
+    return n(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtNum(v, dec = 2) {
+    return n(v).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function dateOrdinal(s) {
+    // input: DD/MM/YYYY → output: 08th May 2026
+    if (!s) return '';
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return s;
+    const d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = m[3];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const suf = (d % 10 === 1 && d !== 11) ? 'st'
+              : (d % 10 === 2 && d !== 12) ? 'nd'
+              : (d % 10 === 3 && d !== 13) ? 'rd' : 'th';
+    return `${String(d).padStart(2,'0')}${suf} ${months[mo-1]} ${y}`;
+  }
+  // Number → English words (simple, covers 0-999,999,999.99)
+  function numToWords(num) {
+    const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+    const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    function under1000(n) {
+      let s = '';
+      const h = Math.floor(n/100); const rest = n % 100;
+      if (h) s += a[h] + ' Hundred' + (rest ? ' ' : '');
+      if (rest < 20) s += a[rest];
+      else s += b[Math.floor(rest/10)] + (rest%10 ? '-' + a[rest%10] : '');
+      return s;
+    }
+    const whole = Math.floor(num);
+    const cents = Math.round((num - whole) * 100);
+    if (whole === 0 && cents === 0) return 'Zero US Dollars Only';
+    let s = '';
+    const bn = Math.floor(whole / 1_000_000_000);
+    const mn = Math.floor((whole % 1_000_000_000) / 1_000_000);
+    const th = Math.floor((whole % 1_000_000) / 1_000);
+    const re = whole % 1_000;
+    if (bn) s += under1000(bn) + ' Billion ';
+    if (mn) s += under1000(mn) + ' Million ';
+    if (th) s += under1000(th) + ' Thousand ';
+    if (re) s += under1000(re);
+    s = s.trim() + ' US Dollars';
+    if (cents > 0) s += ' and ' + under1000(cents) + ' Cents';
+    s += ' Only.';
+    return s;
+  }
+
+  // Multi-item state
+  let items = [
+    { grade: 'SVR_3L', quantity: 80.64, unit_price: 2365, bale_weight: 35, bales_per_cont: 576, packing: 'SW Pallet (Shrink Wrap)', packing_note: '', payment_terms: 'TT_100' },
+  ];
+  const PAYMENT_TERM_OPTIONS = [
+    { value: 'TT_100', label: 'T/T 100%' },
+    { value: 'TT_30_70', label: 'T/T 30/70' },
+    { value: 'LC_SIGHT', label: 'L/C at sight' },
+    { value: 'LC_UPAS', label: 'L/C UPAS' },
+    { value: 'DP', label: 'D/P' },
+    { value: 'CAD', label: 'CAD' },
+  ];
+
+  function getFormData() {
+    const docs = [...document.querySelectorAll('.f_doc:checked')].map(c => c.value);
+    return {
+      contract_no: document.getElementById('f_contract_no').value || 'HA-XXXXXXXX',
+      contract_date_en: dateOrdinal(document.getElementById('f_contract_date').value),
+      template: document.getElementById('f_template').value,
+      currency: document.getElementById('f_currency') ? document.getElementById('f_currency').value : 'USD',
+      grade: items[0]?.grade || 'SVR_3L',
+      buyer_name: document.getElementById('f_buyer_name').value,
+      buyer_address: document.getElementById('f_buyer_address').value,
+      buyer_phone: document.getElementById('f_buyer_phone').value,
+      items: items.slice(),
+      // legacy fields kept for back-compat in renderSC/PI
+      quantity: items.reduce((s, it) => s + n(it.quantity), 0),
+      unit_price: items[0]?.unit_price || 0,
+      bale_weight: items[0]?.bale_weight || 35,
+      bales_per_cont: items[0]?.bales_per_cont || 576,
+      packing: items[0]?.packing || '',
+      containers: n(document.getElementById('f_containers').value),
+      cont_type: document.getElementById('f_cont_type').value,
+      pol: document.getElementById('f_pol').value,
+      pod: document.getElementById('f_pod').value,
+      shipment_time: document.getElementById('f_shipment_time').value,
+      partial: document.getElementById('f_partial').value,
+      trans: document.getElementById('f_trans').value,
+      payment: document.getElementById('f_payment').value,
+      payment_extra: document.getElementById('f_payment_extra').value,
+      bank_name: document.getElementById('f_bank_name').value,
+      bank_acc: document.getElementById('f_bank_acc').value,
+      bank_at: document.getElementById('f_bank_at').value,
+      bank_swift: document.getElementById('f_bank_swift').value,
+      commission_pct: n(document.getElementById('f_commission_pct') ? document.getElementById('f_commission_pct').value : 0),
+      commission_usd_mt: n(document.getElementById('f_commission_usd_mt') ? document.getElementById('f_commission_usd_mt').value : 0),
+      docs: docs,
+      claims_days: n(document.getElementById('f_claims_days').value) || 20,
+      arbitration: document.getElementById('f_arbitration').value,
+      freight_mark: document.getElementById('f_freight_mark').value,
+    };
+  }
+
+  function calc(d) {
+    // aggregate items
+    d.amount = d.items.reduce((s, it) => s + n(it.quantity) * n(it.unit_price), 0);
+    d.amount_str = fmt$(d.amount);
+    d.amount_words = numToWords(d.amount);
+    d.total_bales = d.items.reduce((s, it) => s + Math.round(n(it.quantity) * 1000 / n(it.bale_weight || 35)), 0);
+    d.total_containers = d.items.reduce((s, it) => {
+      const b = Math.round(n(it.quantity) * 1000 / n(it.bale_weight || 35));
+      return s + Math.ceil(b / n(it.bales_per_cont || 576));
+    }, 0);
+    d.commission = d.commission_usd_mt > 0
+      ? d.commission_usd_mt * d.quantity
+      : (d.commission_pct > 0 ? d.amount * d.commission_pct / 100 : 0);
+    d.incoterm_full = d.template === 'CIF'
+      ? `CIF — ${(d.pod || '').toUpperCase()}`
+      : `FOB ${(d.pol || '').toUpperCase()}`;
+    return d;
+  }
+
+  // ──── Multi-item UI ────
+  function renderItems() {
+    const c = document.getElementById('items_container');
+    if (!c) return;
+    c.innerHTML = items.map((it, i) => `
+      <div class="item-row ${i % 2 ? 'alt' : ''}">
+        <div class="item-grid">
+          <div>
+            <label>Grade</label>
+            <select class="select" onchange="updItem(${i}, 'grade', this.value)">
+              ${['SVR_3L','SVR_10','SVR_CV60','SVR_5','RSS1','RSS3','SVR10/SBR1502 (97.5/2.5)'].map(g =>
+                `<option ${it.grade===g?'selected':''}>${g}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Tấn</label>
+            <input class="input" type="number" step="0.01" value="${it.quantity}" oninput="updItem(${i}, 'quantity', this.value)">
+          </div>
+          <div>
+            <label>$/tấn</label>
+            <input class="input" type="number" step="1" value="${it.unit_price}" oninput="updItem(${i}, 'unit_price', this.value)">
+          </div>
+          <div>
+            <label>KG/bành</label>
+            <select class="select" onchange="updItem(${i}, 'bale_weight', this.value)">
+              <option value="35" ${it.bale_weight==35?'selected':''}>35</option>
+              <option value="33.33" ${it.bale_weight==33.33?'selected':''}>33.33</option>
+            </select>
+          </div>
+          <div>
+            <label>Bành/cont</label>
+            <input class="input" type="number" value="${it.bales_per_cont}" oninput="updItem(${i}, 'bales_per_cont', this.value)">
+          </div>
+          <div>
+            <label>Đóng gói</label>
+            <select class="select" onchange="updItem(${i}, 'packing', this.value)">
+              ${['SW Pallet (Shrink Wrap)','Loose bales','Wooden pallet','Metal box'].map(p =>
+                `<option ${it.packing===p?'selected':''}>${p}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <button class="item-remove" onclick="removeItem(${i})" ${items.length === 1 ? 'style="visibility:hidden;"' : ''}>✕</button>
+        </div>
+        <div class="payment-tags">
+          ${PAYMENT_TERM_OPTIONS.map(p => {
+            const sel = (it.payment_terms || '').split(',').includes(p.value);
+            return `<span class="payment-tag ${sel?'active':''}" onclick="togglePayment(${i}, '${p.value}')">${sel?'✓ ':''}${p.label}</span>`;
+          }).join('')}
+        </div>
+        <input class="input" style="margin-top:6px;" placeholder="Ghi chú bao bì (tuỳ chọn) — vd: Pallet gỗ fumigation, bao PE lót đáy cont..." value="${it.packing_note || ''}" oninput="updItem(${i}, 'packing_note', this.value)">
+        ${n(it.quantity) > 0 && n(it.unit_price) > 0 ? `
+          <div class="item-summary">
+            ${Math.round(n(it.quantity) * 1000 / n(it.bale_weight || 35)).toLocaleString()} bành ·
+            ${Math.ceil(Math.round(n(it.quantity) * 1000 / n(it.bale_weight || 35)) / n(it.bales_per_cont || 576))} cont ·
+            <strong>$${fmt$(n(it.quantity) * n(it.unit_price))}</strong>
+          </div>
+        ` : ''}
+      </div>
+    `).join('');
+    document.getElementById('item_count').textContent = items.length;
+  }
+
+  function updItem(i, key, val) {
+    if (['quantity','unit_price','bale_weight','bales_per_cont'].includes(key)) val = Number(val) || 0;
+    items[i][key] = val;
+    renderAll();
+  }
+  function addItem() {
+    items.push({ grade: 'SVR_3L', quantity: 0, unit_price: 0, bale_weight: 35, bales_per_cont: 576, packing: 'Loose bales', packing_note: '', payment_terms: '' });
+    renderItems(); renderAll();
+  }
+  function removeItem(i) {
+    if (items.length === 1) return;
+    items.splice(i, 1);
+    renderItems(); renderAll();
+  }
+  function togglePayment(i, val) {
+    const cur = (items[i].payment_terms || '').split(',').filter(Boolean);
+    items[i].payment_terms = (cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val]).join(',');
+    renderItems(); renderAll();
+  }
+
+  function hl(v) {
+    return `<span class="placeholder-hl">${v}</span>`;
+  }
+
+  // ───── Items table rows ─────
+  function itemRowsHtml(d, withTotal) {
+    const rows = d.items.map(it => {
+      const amt = n(it.quantity) * n(it.unit_price);
+      return `
+        <tr>
+          <td>NATURAL RUBBER ${hl(it.grade)}</td>
+          <td class="center">${hl(fmtNum(n(it.quantity), 2))}</td>
+          <td class="center">${hl(fmtNum(n(it.unit_price), 0))}</td>
+          <td class="right">${hl(fmt$(amt))}</td>
+        </tr>`;
+    }).join('');
+    if (!withTotal) return rows;
+    return rows + `
+      <tr>
+        <td><b>TOTAL</b></td>
+        <td class="center"><b>${fmtNum(d.quantity, 2)}</b></td>
+        <td></td>
+        <td class="right"><b>${d.amount_str}</b></td>
+      </tr>`;
+  }
+  function piItemRows(d) {
+    return d.items.map(it => {
+      const amt = n(it.quantity) * n(it.unit_price);
+      const bales = Math.round(n(it.quantity) * 1000 / n(it.bale_weight || 35));
+      const conts = Math.ceil(bales / n(it.bales_per_cont || 576));
+      return `
+        <tr>
+          <td class="center">${hl(conts + ' x ' + d.cont_type)}</td>
+          <td>NATURAL RUBBER ${hl(it.grade)}<br><i>(${hl(n(it.bale_weight) + 'kg/bale')} — ${hl(it.packing)})</i></td>
+          <td class="center">${hl(fmtNum(n(it.quantity), 2))}</td>
+          <td class="center">${hl(fmtNum(n(it.unit_price), 0))}</td>
+          <td class="right">${hl(fmt$(amt))}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  // ───── Render SC ─────
+  function renderSC(d) {
+    const arbBlock = {
+      'SICOM Singapore': 'Arbitration, if any, by SICOM Singapore arbitration clause as follow: The parties shall first attempt to resolve any dispute arising from or in connection with this contract by way of good faith negotiations, failing which, such disputes shall be referred by either party to and finally resolved by arbitration in Singapore in accordance with the Singapore Commodity Exchange Limited ("SICOM") arbitration rules for physical rubber contract as may be prevailing the award of the SICOM shall be final and binding upon the parties.',
+      'HKIAC Hong Kong': 'Arbitration, if any, by HKIAC arbitration clause as follow: Any dispute arising out of or in connection with this contract shall be referred to and finally resolved by arbitration administered by the Hong Kong International Arbitration Centre (HKIAC) under the HKIAC Administered Arbitration Rules in force when the Notice of Arbitration is submitted.',
+      'LCIA London': 'Arbitration, if any, by LCIA arbitration clause as follow: Any dispute arising out of or in connection with this contract shall be referred to and finally resolved by arbitration under the LCIA Arbitration Rules, which are deemed to be incorporated by reference into this clause.',
+    }[d.arbitration];
+
+    const cifSections = d.template === 'CIF' ? `
+<div class="doc-section"><span class="doc-label">7. Legal Responsibility, Risk, and Cost Clause</span>
+Once the shipment passes the ship's rail at the port of loading, the Seller is responsible for arranging and paying for the transportation to the port of destination (${hl(d.pod)}) and must provide insurance coverage for the goods during transit, up to the named port of destination. Upon the shipment's arrival at the port of destination, the Seller's obligations under the CIF (Cost, Insurance, and Freight) Incoterm 2020 are fulfilled.</div>
+<div class="doc-section"><span class="doc-label">8. Rights and Obligations</span>
+8.1 Seller: provide shipping documents, pay freight + insurance to ${hl(d.pod)}, not liable for Force Majeure delay.
+8.2 Buyer: all customs/duties/taxes at destination, all risks once goods pass ship's rail.</div>` : '';
+
+    const docsList = d.docs.map((doc, i) => {
+      const docDisplay = (doc === '3/3 Original Bill of Lading')
+        ? `3/3 Original Bill of lading marked ${hl(d.freight_mark)}`
+        : doc;
+      return `${i+1}. ${docDisplay}`;
+    }).join('<br>');
+
+    const fmSection = `<div class="doc-section"><span class="doc-label">${d.template === 'CIF' ? '9' : '7'}. Force Majeure</span>
+Neither party shall be liable for failure to perform if delayed/hindered by force majeure (Acts of God, strikes, fire, floods, wars, riots, government restrictions, etc.). The affected party shall notify the other in writing. If force majeure persists more than 30 days from notification, the parties may suspend or cancel by mutual decision.</div>`;
+
+    return `
+<h2>SALES CONTRACT</h2>
+<div class="doc-meta">No.: ${hl(d.contract_no)}<br>Date: ${hl(d.contract_date_en)}</div>
+
+<div class="doc-section"><span class="doc-label">THE SELLER: HUY ANH RUBBER COMPANY LIMITED</span><br>
+KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM<br>
+Tel: +84-0234 3774994&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fax: +84-0234 3774995</div>
+
+<div class="doc-section"><span class="doc-label">THE BUYER: ${hl(d.buyer_name)}</span><br>
+ADDRESS: ${hl(d.buyer_address)}<br>
+PHONE / FAX: ${hl(d.buyer_phone)}</div>
+
+<div class="doc-section">This sales contract is made by and between The Buyer and The Seller. Whereby the Buyer agrees to buy and the Seller agrees to sell the under-mentioned commodity according to the terms and conditions stipulated below:</div>
+
+<div class="doc-section"><span class="doc-label">1. Commodity – Quantity – Price:</span></div>
+<table>
+  <tr>
+    <th>COMMODITY</th>
+    <th class="center">QUANTITY (MTS)</th>
+    <th class="center">UNIT PRICE (USD/MT)<br>${hl(d.incoterm_full)}</th>
+    <th class="center">AMOUNT (USD)</th>
+  </tr>
+  ${itemRowsHtml(d, true)}
+</table>
+
+<div class="doc-section"><span class="doc-label">2. Packing</span><br>
+- ${hl(d.bale_weight + 'kg/bale')}, ${hl(d.packing)}<br>
+- Total: ${hl(d.total_bales.toLocaleString())} bales / ${hl(d.containers + ' x ' + d.cont_type)}</div>
+
+<div class="doc-section"><span class="doc-label">3. Shipment:</span><br>
+- Port of loading: ${hl(d.pol)}<br>
+${d.template === 'CIF' ? `- Port of discharge: ${hl(d.pod)}<br>` : ''}- Time of shipment: ${hl(d.shipment_time)}<br>
+- Partial shipment: ${hl(d.partial)}<br>
+- Transshipment: ${hl(d.trans)}</div>
+
+<div class="doc-section"><span class="doc-label">4. Term of payment:</span> ${hl(d.payment)}
+${d.payment_extra ? '<br>' + hl(d.payment_extra) : ''}</div>
+
+<div class="doc-section"><span class="doc-label">Ben's Bank detail:</span><br>
+ACCOUNT NAME: ${hl(d.bank_name)}<br>
+ACCOUNT NO: ${hl(d.bank_acc)}<br>
+AT BANK'S NAME: ${hl(d.bank_at)}<br>
+SWIFT CODE: ${hl(d.bank_swift)}</div>
+
+<div class="doc-section"><span class="doc-label">5. Document:</span><br>${docsList || '(none)'}</div>
+
+<div class="doc-section"><span class="doc-label">6. Claims</span><br>
+Any claims related to the quality or quantity of the product must be made in writing within ${hl(d.claims_days)} days of receipt of goods. Claims made after this period shall not be considered.</div>
+
+${cifSections}
+
+${fmSection}
+
+<div class="doc-section"><span class="doc-label">${d.template === 'CIF' ? '10' : '8'}. Arbitration:</span><br>${arbBlock}</div>
+
+<div class="footer-note">This contract is made in English and comes into effect from signing date. This contract is made through facsimile or scan with the same value as original one.</div>
+
+<div class="signatures">
+  <div>FOR THE BUYER<br><br><br><br>${hl(d.buyer_name)}</div>
+  <div>FOR THE SELLER<br><br><br><br>HUY ANH RUBBER COMPANY LIMITED</div>
+</div>
+`;
+  }
+
+  // ───── Render PI ─────
+  function renderPI(d) {
+    return `
+<h2>PROFORMA INVOICE</h2>
+<div class="doc-meta">No: ${hl(d.contract_no + '/PR.CI')}<br>Date: ${hl(d.contract_date_en)}</div>
+
+<div class="doc-section"><span class="doc-label">THE SELLER: HUY ANH RUBBER COMPANY LIMITED</span><br>
+KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM<br>
+Tel: +84-0234 3774994&nbsp;&nbsp;&nbsp;&nbsp;Fax: +84-0234 3774995</div>
+
+<div class="doc-section"><span class="doc-label">THE BUYER: ${hl(d.buyer_name)}</span><br>
+ADDRESS: ${hl(d.buyer_address)}<br>
+PHONE / FAX: ${hl(d.buyer_phone)}</div>
+
+<table>
+  <tr>
+    <th>No of Containers</th>
+    <th>Description of Goods</th>
+    <th class="center">Quantity (MTs)</th>
+    <th class="center">Unit Price (USD/MT)<br>${hl(d.incoterm_full)}</th>
+    <th class="center">Total Amount (USD)</th>
+  </tr>
+  ${piItemRows(d)}
+  <tr>
+    <td colspan="2"><b>Total:</b></td>
+    <td class="center"><b>${fmtNum(d.quantity, 2)}</b></td>
+    <td></td>
+    <td class="right"><b>${d.amount_str}</b></td>
+  </tr>
+</table>
+
+<div class="doc-section"><span class="doc-label">Words:</span> ${hl(d.amount_words)}</div>
+
+<div class="doc-section"><span class="doc-label">Payment:</span> ${hl(d.payment)}
+${d.payment_extra ? '<br>' + hl(d.payment_extra) : ''}</div>
+
+<div class="doc-section"><span class="doc-label">Ben's Bank detail:</span><br>
+ACCOUNT NAME: ${hl(d.bank_name)}<br>
+ACCOUNT NO: ${hl(d.bank_acc)}<br>
+AT BANK'S NAME: ${hl(d.bank_at)}<br>
+SWIFT CODE: ${hl(d.bank_swift)}</div>
+
+<div class="signatures">
+  <div>${hl(d.buyer_name)}</div>
+  <div>HUY ANH RUBBER COMPANY LIMITED</div>
+</div>
+`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // RE-RENDER ON FORM CHANGE
+  // ═══════════════════════════════════════════════════════════════════
+  function renderAll() {
+    const d = calc(getFormData());
+    const docSc = document.getElementById('doc-sc');
+    const docPi = document.getElementById('doc-pi');
+    if (docSc) docSc.innerHTML = renderSC(d);
+    if (docPi) docPi.innerHTML = renderPI(d);
+    document.getElementById('header-customer').textContent = d.buyer_name;
+
+    // Summary card (Tự động tính toán)
+    setText('sm_bales', d.total_bales.toLocaleString());
+    setText('sm_conts', d.total_containers);
+    setText('sm_cont_type', d.cont_type);
+    setText('sm_currency', d.currency);
+    setText('sm_amount', (d.currency === 'USD' ? '$' : d.currency + ' ') + fmt$(d.amount));
+    if (d.commission > 0) {
+      setText('sm_commission', '$' + fmt$(d.commission));
+      setText('sm_commission_sub', d.commission_usd_mt > 0
+        ? `$${d.commission_usd_mt}/MT` : `${d.commission_pct}%`);
+    } else {
+      setText('sm_commission', '—');
+      setText('sm_commission_sub', '');
+    }
+
+    // override count
+    const defaultDocsByTpl = d.template === 'CIF'
+      ? ['3/3 Original Bill of Lading','Commercial Invoice','Packing List','Certificate of Origin','Insurance Certificate','Test Certificate with Lot No.','Phytosanitary Certificate']
+      : ['3/3 Original Bill of Lading','Commercial Invoice','Packing List','Certificate of Origin','Test Certificate with Lot No.','Phytosanitary Certificate'];
+    let overrides = 0;
+    if (JSON.stringify([...d.docs].sort()) !== JSON.stringify([...defaultDocsByTpl].sort())) overrides++;
+    if (d.claims_days !== 20) overrides++;
+    if (d.arbitration !== 'SICOM Singapore') overrides++;
+    if (d.payment_extra) overrides++;
+    if (d.partial !== 'Not Allowed' && d.template === 'CIF') overrides++;
+    setText('override_count', overrides + ' override');
+
+    // Compare4 grid (if visible)
+    if (!document.querySelector('[data-panel="compare4"]').classList.contains('hidden')) {
+      renderCompare4();
+    }
+  }
+
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // COMPARE 4 — render 4 mini HĐ song song
+  // ═══════════════════════════════════════════════════════════════════
+  function presetToData(name) {
+    const p = PRESETS[name];
+    const baseItem = {
+      grade: p.grade, quantity: n(p.quantity), unit_price: n(p.unit_price),
+      bale_weight: n(p.bale_weight), bales_per_cont: n(p.bales_per_cont),
+      packing: p.packing, packing_note: '', payment_terms: '',
+    };
+    const d = {
+      contract_no: p.contract_no,
+      contract_date_en: dateOrdinal(p.contract_date),
+      template: p.template, currency: 'USD', grade: p.grade,
+      buyer_name: p.buyer_name, buyer_address: p.buyer_address, buyer_phone: p.buyer_phone,
+      items: [baseItem],
+      quantity: n(p.quantity), unit_price: n(p.unit_price),
+      bale_weight: n(p.bale_weight), bales_per_cont: n(p.bales_per_cont),
+      packing: p.packing,
+      containers: n(p.containers), cont_type: p.cont_type,
+      pol: p.pol, pod: p.pod,
+      shipment_time: p.shipment_time, partial: p.partial, trans: p.trans,
+      payment: p.payment, payment_extra: p.payment_extra,
+      bank_name: 'HUY ANH RUBBER COMPANY LIMITED',
+      bank_acc: '111002648221',
+      bank_at: 'VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE — HUE BRANCH',
+      bank_swift: 'ICBVVNVX460',
+      commission_pct: 0, commission_usd_mt: 0,
+      docs: p.docs,
+      claims_days: n(p.claims_days),
+      arbitration: p.arbitration,
+      freight_mark: p.freight_mark,
+    };
+    return calc(d);
+  }
+
+  function renderCompare4() {
+    const KEYS = ['philrubber', 'apollo', 'yoongdo', 'vitry'];
+    const allData = {};
+    KEYS.forEach(k => {
+      const d = presetToData(k);
+      allData[k] = d;
+      const scEl = document.getElementById('cmp_sc_' + k);
+      const piEl = document.getElementById('cmp_pi_' + k);
+      if (scEl) scEl.innerHTML = renderSC(d);
+      if (piEl) piEl.innerHTML = renderPI(d);
+    });
+    // Build compare table
+    const rows = [
+      ['Số HĐ', d => d.contract_no],
+      ['Incoterm', d => d.template + (d.template === 'CIF' ? ' (Insurance)' : '')],
+      ['Grade', d => d.grade],
+      ['Số lượng', d => fmtNum(d.quantity, 2) + ' tấn'],
+      ['Đơn giá', d => '$' + fmtNum(d.unit_price, 0) + '/tấn'],
+      ['Tổng giá trị', d => '<strong>$' + d.amount_str + '</strong>'],
+      ['Container', d => d.total_containers + ' x ' + d.cont_type],
+      ['Tổng bành', d => d.total_bales.toLocaleString()],
+      ['Đóng gói', d => d.packing],
+      ['Time of shipment', d => d.shipment_time.replace(/\n/g, '<br>')],
+      ['Partial / Trans', d => d.partial + ' / ' + d.trans],
+      ['Payment', d => d.payment + (d.payment_extra ? '<br><i>+ ' + d.payment_extra.slice(0, 60) + '...</i>' : '')],
+      ['Documents', d => d.docs.length + ' loại'],
+      ['Claims period', d => d.claims_days + ' days'],
+      ['Arbitration', d => d.arbitration],
+      ['Freight', d => d.freight_mark],
+    ];
+    const tbody = document.getElementById('compare_table_body');
+    if (tbody) {
+      tbody.innerHTML = rows.map(([label, fn]) => `
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #f0f0f0; background:#fafafa; font-weight:500;">${label}</td>
+          <td style="padding:6px 10px; border:1px solid #f0f0f0;">${fn(allData.philrubber)}</td>
+          <td style="padding:6px 10px; border:1px solid #f0f0f0;">${fn(allData.apollo)}</td>
+          <td style="padding:6px 10px; border:1px solid #f0f0f0;">${fn(allData.yoongdo)}</td>
+          <td style="padding:6px 10px; border:1px solid #f0f0f0;">${fn(allData.vitry)}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  function resetCompare4() { renderCompare4(); }
+
+  // Attach listeners
+  document.querySelectorAll('.studio-left input, .studio-left select, .studio-left textarea').forEach(el => {
+    el.addEventListener('input', renderAll);
+    el.addEventListener('change', renderAll);
+  });
+
+  // Preview tab switch — handles both Compose Studio and Compare cards
+  document.addEventListener('click', (e) => {
+    const tab = e.target.closest('.preview-tab');
+    if (!tab) return;
+    const cmp = tab.dataset.cmp;
+    if (cmp) {
+      // Inside a compare card — scope toggle to that card
+      const card = tab.closest('.compare-card');
+      card.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.doc;
+      card.querySelector('#cmp_sc_' + cmp).classList.toggle('hidden', target !== 'sc');
+      card.querySelector('#cmp_pi_' + cmp).classList.toggle('hidden', target !== 'pi');
+    } else {
+      // Inside Compose Studio — toggle doc-sc / doc-pi
+      const container = tab.closest('.studio-right-header');
+      if (!container) return;
+      container.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.doc;
+      document.getElementById('doc-sc').classList.toggle('hidden', target !== 'sc');
+      document.getElementById('doc-pi').classList.toggle('hidden', target !== 'pi');
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PRESETS — load nhanh 4 data thực
+  // ═══════════════════════════════════════════════════════════════════
+  const PRESETS = {
+    philrubber: {
+      contract_no: 'HA20260054', contract_date: '11/05/2026', template: 'FOB', grade: 'SVR_3L',
+      buyer_name: 'PHILIPPINE RUBBER TRADE SOLUTION CORPORATION',
+      buyer_address: 'Unit 1502, Cityland Megaplaza, ADB Avenue, Ortigas, Pasig City, Philippines',
+      buyer_phone: '+63 2 8800 1234',
+      quantity: '80.64', unit_price: '2365', bale_weight: '35', bales_per_cont: '576',
+      containers: '4', cont_type: '20ft', packing: 'SW Pallet (Shrink Wrap)',
+      pol: 'Da Nang port, Viet Nam', pod: 'Manila, Philippines',
+      shipment_time: 'June, 2026', partial: 'Not Allowed', trans: 'Allowed',
+      payment: 'T/T 100%', payment_extra: '',
+      claims_days: '20', arbitration: 'SICOM Singapore', freight_mark: 'freight prepaid',
+      docs: ['3/3 Original Bill of Lading','Commercial Invoice','Packing List','Certificate of Origin','Test Certificate with Lot No.','Phytosanitary Certificate'],
+    },
+    apollo: {
+      contract_no: 'HA20260051', contract_date: '08/05/2026', template: 'FOB', grade: 'RSS3',
+      buyer_name: 'APOLLO TYRES LTD',
+      buyer_address: '7, INSTITUTIONAL AREA, SECTOR 32, GURGAON, INDIA 122001',
+      buyer_phone: '1800 212 7070',
+      quantity: '201.6', unit_price: '2350', bale_weight: '35', bales_per_cont: '576',
+      containers: '10', cont_type: '20ft', packing: 'Loose bales',
+      pol: 'Da Nang port, Viet Nam', pod: '',
+      shipment_time: '1st Lot: Before 15th June, 2026\n2nd Lot: Before 30th June, 2026',
+      partial: 'Allowed', trans: 'Allowed',
+      payment: 'CAD 5 days', payment_extra: '',
+      claims_days: '20', arbitration: 'SICOM Singapore', freight_mark: 'freight Collect',
+      docs: ['3/3 Original Bill of Lading','Commercial Invoice','Packing List','Certificate of Origin','Test Certificate with Lot No.','Phytosanitary Certificate'],
+    },
+    yoongdo: {
+      contract_no: 'HA20260053', contract_date: '08/05/2026', template: 'CIF', grade: 'SVR_3L',
+      buyer_name: 'YOONG DO ENGINEERING CO.,LTD',
+      buyer_address: '295, YANGYEON-RO, NAM-MYEON, YANGJU-SI, GYEONGGI-DO, REPUBLIC OF KOREA',
+      buyer_phone: '',
+      quantity: '20.16', unit_price: '2460', bale_weight: '35', bales_per_cont: '576',
+      containers: '1', cont_type: '20ft', packing: 'Wooden pallet',
+      pol: 'Any port, Viet Nam', pod: 'Incheon, Korea',
+      shipment_time: 'June, 2026', partial: 'Not Allowed', trans: 'Allowed',
+      payment: 'LC at sight',
+      payment_extra: 'The L/C draft must be opened within five (5) days from the contract signing date.',
+      claims_days: '20', arbitration: 'SICOM Singapore', freight_mark: 'freight prepaid',
+      docs: ['3/3 Original Bill of Lading','Commercial Invoice','Packing List','Certificate of Origin','Insurance Certificate','Test Certificate with Lot No.','Phytosanitary Certificate','Fumigation Certificate'],
+    },
+    vitry: {
+      contract_no: 'HA20260055', contract_date: '12/05/2026', template: 'CIF', grade: 'RSS3',
+      buyer_name: 'VITRY SAS',
+      buyer_address: '12 Avenue de la République, 75011 Paris, France',
+      buyer_phone: '+33 1 4500 1234',
+      quantity: '20.16', unit_price: '2410', bale_weight: '35', bales_per_cont: '576',
+      containers: '1', cont_type: '20ft', packing: 'Wooden pallet',
+      pol: 'Da Nang port, Viet Nam', pod: 'Le Havre, France',
+      shipment_time: 'July, 2026', partial: 'Not Allowed', trans: 'Allowed',
+      payment: 'LC at sight',
+      payment_extra: '',
+      claims_days: '30', arbitration: 'LCIA London', freight_mark: 'freight prepaid',
+      docs: ['3/3 Original Bill of Lading','Commercial Invoice','Packing List','Certificate of Origin','Insurance Certificate','Test Certificate with Lot No.','Phytosanitary Certificate'],
+    },
+  };
+
+  function loadPreset(name) {
+    const p = PRESETS[name];
+    if (!p) return;
+    Object.entries(p).forEach(([key, val]) => {
+      if (key === 'docs') {
+        document.querySelectorAll('.f_doc').forEach(cb => {
+          cb.checked = val.includes(cb.value);
+        });
+      } else {
+        const el = document.getElementById('f_' + key);
+        if (el) el.value = val;
+      }
+    });
+    renderAll();
+    // open clause overrides if vitry (has non-default values)
+    if (name === 'vitry') {
+      const collapseBody = document.querySelector('.collapse-body');
+      const collapseHeader = collapseBody.previousElementSibling;
+      if (collapseBody.classList.contains('hidden')) toggleCollapse(collapseHeader);
+    }
+  }
+
+  function downloadTxt() {
+    const d = calc(getFormData());
+    const sc = document.getElementById('doc-sc').innerText;
+    const pi = document.getElementById('doc-pi').innerText;
+    const blob = new Blob([
+      '═══════════════ ' + d.contract_no + '_SC.txt ═══════════════\n\n',
+      sc, '\n\n\n═══════════════ ' + d.contract_no + '_PI.txt ═══════════════\n\n', pi
+    ], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = d.contract_no + '_SC_PI.txt';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function saveAsV1() {
+    alert('Mock: bấm nút này khi triển khai thật → engine docxtemplater sinh ra HA20260054_v1_SC.docx + HA20260054_v1_PI.docx, lưu Supabase Storage bucket sales-contracts/, INSERT vào sales_order_contracts, chuyển state → reviewing.');
+  }
+
+  // Initial render
+  renderItems();
+  renderAll();
+  renderCompare4();
+</script>
+
+</body>
+</html>

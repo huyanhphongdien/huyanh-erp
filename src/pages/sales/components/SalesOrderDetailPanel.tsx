@@ -407,11 +407,40 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                   </span>
                 )}
               </div>
+
+              {/* Action buttons row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                <span style={{
+                  padding: '3px 10px', background: '#f0f9f4', color: '#1B4D3E',
+                  border: '1px solid #d9f4e3', borderRadius: 12,
+                  fontSize: 11, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: 'JetBrains Mono, monospace',
+                }}>
+                  {order.code} <span style={{ opacity: 0.4, marginLeft: 4 }}>●</span>
+                </span>
+                <span style={{ color: '#bfbfbf', fontSize: 11 }}>+ Mở tab khác (sắp ra mắt)</span>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                  <Button size="small" onClick={() => {
+                    navigator.clipboard?.writeText(`${window.location.origin}/sales/orders/${order.id}`)
+                    message.success('Đã copy link đơn hàng')
+                  }}>
+                    🔗 Copy link
+                  </Button>
+                  <Button size="small">📥 Xuất PDF</Button>
+                  <Button size="small" type="primary" style={{ background: '#1B4D3E' }}>⚡ Hành động</Button>
+                </div>
+              </div>
             </>
           ) : (
             <span style={{ color: '#999' }}>Đang tải...</span>
           )}
         </div>
+
+        {/* Pipeline 5-circle visual + alert banner (inline only) */}
+        {order && (
+          <PipelineHero order={order} />
+        )}
+
         <div style={{ flex: 1, overflow: 'auto' }}>{bodyContent}</div>
       </div>
     )
@@ -516,6 +545,108 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         </div>
       )}
     </Drawer>
+  )
+}
+
+// ============================================================================
+// PIPELINE HERO — 5-stage visual ở đầu inline detail (giống mock)
+// ============================================================================
+
+const PIPELINE_STAGES = [
+  { key: 'mua_mu',         icon: '🛒', label: 'Mua NVL' },
+  { key: 'production',     icon: '🏭', label: 'Sản xuất' },
+  { key: 'packing',        icon: '📦', label: 'Đóng gói' },
+  { key: 'shipping',       icon: '🚢', label: 'Vận chuyển' },
+  { key: 'payment',        icon: '💰', label: 'Thanh toán' },
+]
+
+// Map current_stage → index trong PIPELINE_STAGES
+function stageIndex(stage: string | null | undefined): number {
+  if (!stage) return 0
+  const s = stage.toLowerCase()
+  if (s.includes('mua_mu') || s.includes('raw_material')) return 0
+  if (s.includes('production') || s.includes('sản xuất')) return 1
+  if (s.includes('packing') || s.includes('ready') || s.includes('đóng gói')) return 2
+  if (s.includes('shipping') || s.includes('shipped') || s.includes('vận')) return 3
+  if (s.includes('payment') || s.includes('paid') || s.includes('thanh toán')) return 4
+  return 0
+}
+
+function PipelineHero({ order }: { order: SalesOrder }) {
+  const currentIdx = stageIndex(order.current_stage)
+  // SLA elapsed
+  let slaText: string | null = null
+  let slaColor = '#8c8c8c'
+  if (order.stage_started_at && order.stage_sla_hours) {
+    const elapsedH = (Date.now() - new Date(order.stage_started_at).getTime()) / 3600000
+    const daysElapsed = Math.floor(elapsedH / 24)
+    if (elapsedH > order.stage_sla_hours) {
+      const overD = Math.ceil((elapsedH - order.stage_sla_hours) / 24)
+      slaText = `+${overD}d quá hạn`
+      slaColor = '#cf1322'
+    } else {
+      const leftH = order.stage_sla_hours - elapsedH
+      if (leftH < 24) {
+        slaText = `Còn ${Math.round(leftH)}h`
+        slaColor = '#d46b08'
+      } else {
+        slaText = `${daysElapsed}d đã giữ`
+      }
+    }
+  }
+
+  return (
+    <div style={{ padding: '12px 24px 16px', background: '#fafafa', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
+      <div style={{ fontSize: 11, color: '#8c8c8c', fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>
+        📍 PIPELINE
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, position: 'relative' }}>
+        {PIPELINE_STAGES.map((s, idx) => {
+          const done = idx < currentIdx
+          const current = idx === currentIdx
+          return (
+            <div key={s.key} style={{ flex: 1, position: 'relative', textAlign: 'center' }}>
+              {/* Connector line */}
+              {idx > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: 16,
+                  left: '-50%',
+                  right: '50%',
+                  height: 2,
+                  background: idx <= currentIdx ? '#389e0d' : '#e8e8e8',
+                  zIndex: 0,
+                }} />
+              )}
+              {/* Circle */}
+              <div style={{
+                width: 32, height: 32, borderRadius: 16,
+                background: done ? '#389e0d' : current ? '#1B4D3E' : '#fff',
+                border: done || current ? 'none' : '2px solid #d9d9d9',
+                color: done || current ? '#fff' : '#bfbfbf',
+                margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 14, position: 'relative', zIndex: 1,
+                boxShadow: current ? '0 0 0 4px rgba(27,77,62,0.2)' : 'none',
+              }}>
+                {done ? '✓' : current ? s.icon : idx + 1}
+              </div>
+              <div style={{
+                fontSize: 11, marginTop: 6,
+                fontWeight: current ? 700 : 500,
+                color: current ? '#1B4D3E' : done ? '#389e0d' : '#bfbfbf',
+              }}>
+                {s.label}
+              </div>
+              {current && slaText && (
+                <div style={{ fontSize: 10, color: slaColor, fontWeight: 600, marginTop: 2 }}>
+                  {slaText}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

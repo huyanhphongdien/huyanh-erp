@@ -70,11 +70,22 @@ export function canViewAccessLog(user: any, salesRole: SalesRole | null): boolea
   return salesRole === 'admin' || isBOD(user)
 }
 
+/** Ai được XÓA file HĐ (hard delete + remove storage object).
+ *  Đồng bộ với migration sales_contract_files_multi_v4.sql (RLS DELETE policy). */
+export function canDeleteContract(
+  salesRole: SalesRole | null,
+  user: any,
+): boolean {
+  if (!salesRole) return false
+  // Admin role (Minh, Thúy, Huy) + BGĐ (Trung) — Sale + accounting + logistics KHÔNG được xóa
+  return salesRole === 'admin' || isBOD(user)
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type ContractAction = 'upload' | 'view' | 'download' | 'replace'
+export type ContractAction = 'upload' | 'view' | 'download' | 'replace' | 'delete'
 
 export interface ContractAccessLogEntry {
   id: string
@@ -98,19 +109,86 @@ export interface ContractAccessLogEntry {
 
 export const salesContractService = {
 
-  /** Lấy record hợp đồng của đơn hàng (nếu có) */
+  /** Lấy 1 record HĐ đầu tiên (legacy single-file mode).
+   *  KHUYẾN NGHỊ: dùng getContracts() để hỗ trợ multi-file. */
   async getContract(orderId: string): Promise<SalesDocument | null> {
+    const rows = await this.getContracts(orderId)
+    return rows[0] || null
+  },
+
+  /** Lấy TẤT CẢ file HĐ của 1 đơn hàng (mới upload lên đầu). */
+  async getContracts(orderId: string): Promise<SalesDocument[]> {
     const { data, error } = await supabase
       .from('sales_order_documents')
       .select('*')
       .eq('sales_order_id', orderId)
       .eq('doc_type', 'contract')
-      .maybeSingle()
+      .order('received_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false, nullsFirst: false })
     if (error) {
-      console.error('[salesContract] getContract error:', error)
-      return null
+      console.error('[salesContract] getContracts error:', error)
+      return []
     }
-    return data
+    return (data || []) as SalesDocument[]
+  },
+
+  /** Xóa 1 file HĐ (hard delete row + storage object). Best-effort cho storage:
+   *  nếu xóa storage fail (permission), vẫn xóa row + log. */
+  async deleteContract(
+    docId: string,
+    user: any,
+    salesRole: SalesRole | null,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!canDeleteContract(salesRole, user)) {
+      return { ok: false, error: 'Không có quyền xóa file HĐ' }
+    }
+    try {
+      // 1. Lấy doc để biết file_url + orderId
+      const { data: doc, error: getErr } = await supabase
+        .from('sales_order_documents')
+        .select('*')
+        .eq('id', docId)
+        .maybeSingle()
+      if (getErr || !doc) {
+        return { ok: false, error: getErr?.message || 'Không tìm thấy file' }
+      }
+
+      // 2. Xóa file trong Storage (best-effort)
+      if (doc.file_url) {
+        const { error: rmErr } = await supabase.storage
+          .from(BUCKET)
+          .remove([doc.file_url])
+        if (rmErr) {
+          console.warn('[salesContract] storage remove failed (vẫn xóa row):', rmErr)
+        }
+      }
+
+      // 3. Xóa row
+      const { error: delErr } = await supabase
+        .from('sales_order_documents')
+        .delete()
+        .eq('id', docId)
+      if (delErr) {
+        return { ok: false, error: delErr.message }
+      }
+
+      // 4. Log
+      await this.logAccess({
+        orderId: doc.sales_order_id,
+        documentId: docId,
+        action: 'delete',
+        user,
+        salesRole,
+        fileName: doc.file_name,
+        filePath: doc.file_url,
+        fileSize: doc.file_size,
+      })
+
+      return { ok: true }
+    } catch (e: any) {
+      console.error('[salesContract] deleteContract error:', e)
+      return { ok: false, error: e?.message || 'Lỗi xóa file' }
+    }
   },
 
   /** Khởi tạo row contract nếu chưa có (gọi trước khi upload lần đầu) */
@@ -139,28 +217,24 @@ export const salesContractService = {
    * Upload file HĐ.
    * - Lưu vào bucket private 'sales-contracts'
    * - Path: orders/{orderId}/contracts/{timestamp}_{filename}
-   * - Update sales_order_documents.file_url = storage PATH (không phải public URL)
-   * - Log action: upload | replace
+   * - Hành vi:
+   *   + `replaceDocId` được truyền → UPDATE row đó, action='replace'
+   *   + Không truyền + chưa có row nào → INSERT row mới (lần đầu), action='upload'
+   *   + Không truyền + đã có rows → INSERT thêm row mới (multi-file), action='upload'
+   * - File cũ khi replace giữ nguyên trong storage (đã log) — không xóa
    */
   async uploadContract(
     orderId: string,
     file: File,
     user: any,
     salesRole: SalesRole | null,
+    options: { replaceDocId?: string } = {},
   ): Promise<{ ok: boolean; doc?: SalesDocument; error?: string }> {
     try {
-      // Đảm bảo có row
-      const existing = await this.ensureContractRow(orderId)
-      if (!existing) return { ok: false, error: 'Không tạo được record hợp đồng' }
-
-      const isReplace = !!existing.file_url
-      const action: ContractAction = isReplace ? 'replace' : 'upload'
-
-      // Sanitize filename — loại ký tự lạ
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `orders/${orderId}/contracts/${Date.now()}_${safeName}`
 
-      // Upload — bucket private
+      // 1. Upload lên storage
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
         .upload(path, file, { cacheControl: '3600', upsert: false })
@@ -168,29 +242,55 @@ export const salesContractService = {
         return { ok: false, error: upErr.message }
       }
 
-      // Update DB — file_url lưu PATH (không phải public URL)
-      const { data: updated, error: dbErr } = await supabase
-        .from('sales_order_documents')
-        .update({
-          file_url: path,
-          file_name: file.name,
-          file_size: file.size,
-          is_received: true,
-          received_at: new Date().toISOString(),
-          uploaded_by: user?.employee_id || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id)
-        .select('*')
-        .single()
-      if (dbErr) {
-        return { ok: false, error: dbErr.message }
+      let dbDoc: SalesDocument | null = null
+      let action: ContractAction = 'upload'
+
+      if (options.replaceDocId) {
+        // 2a. UPDATE row được chỉ định
+        const { data: updated, error: dbErr } = await supabase
+          .from('sales_order_documents')
+          .update({
+            file_url: path,
+            file_name: file.name,
+            file_size: file.size,
+            is_received: true,
+            received_at: new Date().toISOString(),
+            uploaded_by: user?.employee_id || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', options.replaceDocId)
+          .select('*')
+          .single()
+        if (dbErr) return { ok: false, error: dbErr.message }
+        dbDoc = updated
+        action = 'replace'
+      } else {
+        // 2b. INSERT row mới (lần đầu hoặc thêm file vào danh sách)
+        const { data: inserted, error: dbErr } = await supabase
+          .from('sales_order_documents')
+          .insert({
+            sales_order_id: orderId,
+            doc_type: 'contract',
+            doc_name: 'Hợp đồng (Contract)',
+            sort_order: 0,
+            file_url: path,
+            file_name: file.name,
+            file_size: file.size,
+            is_received: true,
+            received_at: new Date().toISOString(),
+            uploaded_by: user?.employee_id || null,
+          })
+          .select('*')
+          .single()
+        if (dbErr) return { ok: false, error: dbErr.message }
+        dbDoc = inserted
+        action = 'upload'
       }
 
-      // Log
+      // 3. Log
       await this.logAccess({
         orderId,
-        documentId: existing.id,
+        documentId: dbDoc?.id || null,
         action,
         user,
         salesRole,
@@ -199,7 +299,7 @@ export const salesContractService = {
         fileSize: file.size,
       })
 
-      return { ok: true, doc: updated }
+      return { ok: true, doc: dbDoc || undefined }
     } catch (e: any) {
       console.error('[salesContract] uploadContract error:', e)
       return { ok: false, error: e?.message || 'Lỗi upload' }

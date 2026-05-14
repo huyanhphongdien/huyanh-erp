@@ -162,6 +162,18 @@ function OrderItem({ order, selected, onClick }: {
     : slaStatus === 'done' ? '#bfbfbf'
     : '#d9d9d9'
 
+  // Container count
+  const containers = (order as { container_count?: number }).container_count
+  const incoterm = (order as { incoterm?: string }).incoterm || ''
+  const contType = (order as { container_type?: string }).container_type || '20DC'
+
+  // Days overdue (cho SLA pill)
+  let daysOver: number | null = null
+  if (slaStatus === 'overdue' && order.stage_started_at && order.stage_sla_hours) {
+    const elapsedH = (Date.now() - new Date(order.stage_started_at).getTime()) / 3600000
+    daysOver = Math.ceil((elapsedH - order.stage_sla_hours) / 24)
+  }
+
   return (
     <div
       data-order-id={order.id}
@@ -181,8 +193,10 @@ function OrderItem({ order, selected, onClick }: {
       <div style={itemAvatar}>{flag}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={itemCode}>{order.contract_no || order.code || order.id.slice(0, 8)}</span>
-          {slaStatus !== 'pending' && (
+          <span style={itemCode}>
+            {order.contract_no || order.code || order.id.slice(0, 8)}
+          </span>
+          {slaStatus !== 'pending' && slaStatus !== 'done' && (
             <span
               title={`SLA: ${slaStatus}`}
               style={{
@@ -194,27 +208,44 @@ function OrderItem({ order, selected, onClick }: {
         </div>
         <div
           style={{
-            fontSize: 12, color: '#595959', marginTop: 2,
+            fontSize: 12, color: '#595959', marginTop: 2, fontWeight: 500,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}
         >
           {order.customer?.name || '—'}
         </div>
-        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 3, display: 'flex', gap: 6 }}>
+        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4, display: 'flex',
+                       gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>📦 {order.grade || '—'} · {(order.quantity_tons || 0).toFixed(2)}MT</span>
+          {(incoterm || containers) && (
+            <>
+              <span style={{ color: '#d9d9d9' }}>·</span>
+              <span>🚢 {incoterm} {containers ? `· ${containers}×${contType}` : ''}</span>
+            </>
+          )}
         </div>
-        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Tag color={ORDER_STATUS_COLORS[order.status as SalesOrderStatus]} style={{ fontSize: 10, padding: '0 6px', margin: 0 }}>
-            {ORDER_STATUS_LABELS[order.status as SalesOrderStatus] || order.status}
-          </Tag>
-          <span
+        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Tag
+            color={ORDER_STATUS_COLORS[order.status as SalesOrderStatus]}
             style={{
-              marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: PRIMARY,
-              fontFamily: 'monospace',
+              fontSize: 10, padding: '1px 7px', margin: 0,
+              borderRadius: 10, lineHeight: '16px',
             }}
           >
-            {fmtUSD(order.total_value_usd)}
-          </span>
+            {ORDER_STATUS_LABELS[order.status as SalesOrderStatus] || order.status}
+          </Tag>
+          {daysOver !== null && daysOver > 0 && (
+            <Tag
+              color="error"
+              style={{
+                fontSize: 10, padding: '1px 7px', margin: 0,
+                borderRadius: 10, lineHeight: '16px',
+              }}
+            >
+              ⚠ +{daysOver}d SLA
+            </Tag>
+          )}
+          <span style={itemValue}>{fmtUSD(order.total_value_usd)}</span>
         </div>
       </div>
     </div>
@@ -283,6 +314,11 @@ const itemAvatar: React.CSSProperties = {
 
 const itemCode: React.CSSProperties = {
   fontWeight: 700, fontSize: 12, color: PRIMARY,
+  fontFamily: 'monospace',
+}
+
+const itemValue: React.CSSProperties = {
+  marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: PRIMARY,
   fontFamily: 'monospace',
 }
 

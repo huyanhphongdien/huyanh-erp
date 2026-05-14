@@ -296,16 +296,121 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     </div>
   )
 
-  // INLINE MODE — Split View
+  // INLINE MODE — Split View (rich header giống mock)
   if (inline) {
     if (!open) return null
+    const fmtUSD = (v: number | undefined | null) => {
+      if (!v) return '—'
+      if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
+      if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
+      return `$${Math.round(v)}`
+    }
+    const COUNTRY_FLAGS: Record<string, string> = {
+      IN: '🇮🇳', PH: '🇵🇭', ID: '🇮🇩', KR: '🇰🇷', SG: '🇸🇬', FR: '🇫🇷',
+      AE: '🇦🇪', TW: '🇹🇼', TR: '🇹🇷', ES: '🇪🇸', BD: '🇧🇩', CN: '🇨🇳',
+      LK: '🇱🇰', JP: '🇯🇵', MY: '🇲🇾', VN: '🇻🇳',
+    }
+    const flag = order?.customer?.country ? COUNTRY_FLAGS[order.customer.country] || '🌐' : '🌐'
+
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+        {/* Rich header — bigger code + multiple pills + sub-info line */}
         <div style={{
-          padding: '12px 20px', borderBottom: '1px solid #e8e8e8', background: '#fff',
-          position: 'sticky', top: 0, zIndex: 2,
+          padding: '14px 24px 10px', borderBottom: '1px solid #e8e8e8', background: '#fff',
+          position: 'sticky', top: 0, zIndex: 5, flexShrink: 0,
         }}>
-          {titleContent || <span style={{ color: '#999' }}>Đang tải...</span>}
+          {order ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{
+                  fontWeight: 700, fontSize: 18, color: '#1B4D3E',
+                  fontFamily: 'JetBrains Mono, monospace',
+                }}>
+                  {order.code}
+                </span>
+                <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
+                  {ORDER_STATUS_LABELS[order.status] || order.status}
+                </Tag>
+                {order.current_stage && (
+                  <StagePill
+                    stage={order.current_stage as SalesStage}
+                    stageStartedAt={order.stage_started_at}
+                    slaHours={order.stage_sla_hours}
+                    variant="compact"
+                  />
+                )}
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                  {isLocked ? (
+                    canUnlock && (
+                      <Popconfirm
+                        title="Mở khóa đơn hàng?"
+                        description="Cho phép Sale sửa lại thông tin hợp đồng"
+                        onConfirm={handleUnlock}
+                        okText="Mở khóa"
+                        cancelText="Hủy"
+                      >
+                        <Button size="small" icon={<UnlockOutlined />} loading={lockLoading} danger>
+                          Mở khóa
+                        </Button>
+                      </Popconfirm>
+                    )
+                  ) : (
+                    canLock && order.status === 'draft' && (
+                      <Popconfirm
+                        title="Khóa đơn hàng?"
+                        description="Sau khi khóa, Sale không thể sửa thông tin hợp đồng"
+                        onConfirm={handleLock}
+                        okText="Khóa"
+                        cancelText="Hủy"
+                      >
+                        <Button size="small" icon={<LockOutlined />} loading={lockLoading}
+                                type="primary" style={{ background: '#1B4D3E' }}>
+                          Khóa HĐ
+                        </Button>
+                      </Popconfirm>
+                    )
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-info line: country/buyer/grade/incoterm/$/ETD */}
+              <div style={{
+                marginTop: 8, display: 'flex', alignItems: 'center', gap: 14,
+                fontSize: 12, color: '#8c8c8c', flexWrap: 'wrap',
+              }}>
+                {order.customer && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {flag} <b style={{ color: '#262626', fontWeight: 600 }}>{order.customer.name}</b>
+                  </span>
+                )}
+                {order.grade && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    📦 <b style={{ color: '#262626', fontWeight: 600 }}>{order.grade}</b>
+                    {order.quantity_tons ? ` · ${order.quantity_tons.toFixed(2)}MT` : ''}
+                  </span>
+                )}
+                {(order as { incoterm?: string }).incoterm && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    🚢 <b style={{ color: '#262626', fontWeight: 600 }}>{(order as { incoterm?: string }).incoterm}</b>
+                  </span>
+                )}
+                {order.total_value_usd ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    💰 <b style={{ color: '#1B4D3E', fontWeight: 700 }}>{fmtUSD(order.total_value_usd)}</b>
+                  </span>
+                ) : null}
+                {(order as { etd?: string }).etd && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    📅 ETD <b style={{ color: '#262626', fontWeight: 600 }}>
+                      {new Date((order as { etd?: string }).etd!).toLocaleDateString('vi-VN')}
+                    </b>
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <span style={{ color: '#999' }}>Đang tải...</span>
+          )}
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>{bodyContent}</div>
       </div>

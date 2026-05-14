@@ -249,6 +249,7 @@ const SalesDigestSubscribersPage = lazy(() => import('./pages/sales/SalesDigestS
 const SalesOrderCreatePage = lazy(() => import('./pages/sales/SalesOrderCreatePage'))
 const SalesOrderDetailPage = lazy(() => import('./pages/sales/SalesOrderDetailPage'))
 const ContractGeneratorTestPage = lazy(() => import('./pages/sales/ContractGeneratorTestPage'))
+const ContractReviewPage = lazy(() => import('./pages/sales/ContractReviewPage'))
 const ContainerPackingPage = lazy(() => import('./pages/sales/ContainerPackingPage'))
 const ExportDocumentsPage = lazy(() => import('./pages/sales/ExportDocumentsPage'))
 const SalesDashboardPage = lazy(() => import('./pages/sales/SalesDashboardPage'))
@@ -400,6 +401,7 @@ function App() {
               <Route path="sales/digest/subscribers" element={<Suspense fallback={<LoadingSpinner />}><SalesDigestSubscribersPage /></Suspense>} />
               <Route path="sales/orders/new" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderCreatePage /></Suspense>} />
               <Route path="sales/contract-test" element={<Suspense fallback={<LoadingSpinner />}><ContractGeneratorTestPage /></Suspense>} />
+              <Route path="sales/contracts/review" element={<Suspense fallback={<LoadingSpinner />}><ContractReviewPage /></Suspense>} />
               <Route path="sales/orders/:orderId" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderDetailPage /></Suspense>} />
               <Route path="sales/orders/:orderId/packing" element={<Suspense fallback={<LoadingSpinner />}><ContainerPackingPage /></Suspense>} />
               <Route path="sales/orders/:orderId/documents" element={<Suspense fallback={<LoadingSpinner />}><ExportDocumentsPage /></Suspense>} />

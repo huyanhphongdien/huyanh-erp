@@ -39,6 +39,7 @@ import {
   DEFAULT_BANK,
   type ContractFormData,
 } from '../../services/sales/contractGeneratorService'
+import { salesContractWorkflowService } from '../../services/sales/salesContractWorkflowService'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import { salesOrderService, type CreateSalesOrderData } from '../../services/sales/salesOrderService'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
@@ -65,6 +66,7 @@ function SalesOrderCreatePage() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [submittingReview, setSubmittingReview] = useState(false)
   const [docLoading, setDocLoading] = useState<'SC' | 'PI' | 'BOTH' | null>(null)
   const [previewTab, setPreviewTab] = useState<'SC' | 'PI'>('SC')
 
@@ -337,6 +339,101 @@ function SalesOrderCreatePage() {
       message.error(errMsg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ── Submit cho Phú LV review ──
+  // 1. Validate + lưu sales_order (status='draft')
+  // 2. Tạo sales_order_contracts (status='reviewing', reviewer=Phú LV)
+  // 3. Navigate về danh sách
+  const handleSubmitForReview = async () => {
+    if (!contractData.contract_no) {
+      message.error('Cần nhập "Số hợp đồng" trước khi trình kiểm tra')
+      return
+    }
+    if (!contractData.buyer_name) {
+      message.error('Cần chọn khách hàng trước khi trình kiểm tra')
+      return
+    }
+    try {
+      const values = await form.validateFields()
+      setSubmittingReview(true)
+
+      const validItems = orderItems.filter(
+        (i) => i.grade && i.quantity_tons > 0 && i.unit_price > 0,
+      )
+      if (validItems.length === 0) {
+        message.error('Vui lòng thêm ít nhất 1 sản phẩm')
+        setSubmittingReview(false)
+        return
+      }
+
+      // Build payload tương tự handleSubmit
+      const itemPackingNotes = validItems
+        .map((i) => (i.packing_note || '').trim())
+        .filter(Boolean)
+      const aggregatedPackingNote =
+        validItems.length === 1
+          ? itemPackingNotes[0] || undefined
+          : itemPackingNotes.length
+            ? validItems
+                .filter((i) => (i.packing_note || '').trim())
+                .map((i) => `${i.grade}: ${i.packing_note}`)
+                .join('\n')
+            : undefined
+
+      const payload: CreateSalesOrderData = {
+        ...values,
+        grade:
+          validItems.length === 1
+            ? validItems[0].grade
+            : validItems.map((i) => i.grade).join(' + '),
+        quantity_tons: itemsTotalTons,
+        unit_price:
+          validItems.length === 1
+            ? validItems[0].unit_price
+            : Math.round((itemsTotalUSD / itemsTotalTons) * 100) / 100,
+        bale_weight_kg: validItems[0].bale_weight_kg,
+        bales_per_container: validItems[0].bales_per_container,
+        packing_type: validItems[0].packing_type as never,
+        packing_note: values.packing_note || aggregatedPackingNote,
+        delivery_date: values.delivery_date
+          ? values.delivery_date.format('YYYY-MM-DD')
+          : undefined,
+        contract_date: values.contract_date
+          ? values.contract_date.format('YYYY-MM-DD')
+          : undefined,
+        etd: values.etd ? values.etd.format('YYYY-MM-DD') : undefined,
+        eta: values.eta ? values.eta.format('YYYY-MM-DD') : undefined,
+        lc_expiry_date: values.lc_expiry_date
+          ? values.lc_expiry_date.format('YYYY-MM-DD')
+          : undefined,
+        commission_amount: values.commission_usd_per_mt
+          ? itemsTotalTons * values.commission_usd_per_mt
+          : values.commission_pct
+            ? itemsTotalUSD * (values.commission_pct / 100)
+            : undefined,
+        items: validItems,
+      }
+
+      // 1) Tạo sales_order
+      const created = await salesOrderService.create(payload)
+      if (!created?.id) throw new Error('Tạo sales_order thất bại')
+
+      // 2) Tạo contract draft + submit reviewing
+      await salesContractWorkflowService.createDraftAndSubmit(created.id, contractData)
+
+      message.success(
+        `Đã trình HĐ ${contractData.contract_no} cho Phú LV (Kiểm tra) duyệt`,
+      )
+      navigate('/sales/orders')
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return // form validation
+      console.error(err)
+      const errMsg = err instanceof Error ? err.message : 'Không thể trình kiểm tra'
+      message.error(errMsg)
+    } finally {
+      setSubmittingReview(false)
     }
   }
 
@@ -725,21 +822,26 @@ function SalesOrderCreatePage() {
               block
               size="large"
               loading={loading}
+              disabled={submittingReview}
               onClick={() => handleSubmit(true)}
             >
-              Lưu nháp
+              Lưu nháp (chưa trình)
             </Button>
             <Button
               type="primary"
               icon={<CheckCircleOutlined />}
               block
               size="large"
-              loading={loading}
-              onClick={() => handleSubmit(false)}
+              loading={submittingReview}
+              disabled={loading}
+              onClick={handleSubmitForReview}
               style={{ background: '#1B4D3E' }}
             >
-              Xác nhận đơn hàng
+              Trình Kiểm tra (Phú LV)
             </Button>
+            <div style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 4 }}>
+              Phú LV nhập bank info → trình Trung/Huy ký
+            </div>
           </Space>
         </Card>
         </div>

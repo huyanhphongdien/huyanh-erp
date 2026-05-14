@@ -62,6 +62,7 @@ import GradeBadge from '../../components/wms/GradeBadge'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import SalesOrderDetailPanel from './components/SalesOrderDetailPanel'
+import SalesOrderSplitView from './components/SalesOrderSplitView'
 import { useOpenTab } from '../../hooks/useOpenTab'
 import { userSavedViewsService, type SavedView } from '../../services/userSavedViewsService'
 
@@ -241,6 +242,17 @@ const SalesOrderListPage = () => {
   // Detail panel v4
   const [panelOrderId, setPanelOrderId] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
+
+  // View mode: 'table' (default cũ) | 'split' (Linear/Gmail-style 2-cột)
+  // Persist vào localStorage để giữ lựa chọn user
+  const [viewMode, setViewMode] = useState<'table' | 'split'>(() => {
+    const saved = localStorage.getItem('sales-orders-view-mode')
+    return saved === 'split' ? 'split' : 'table'
+  })
+  const changeViewMode = (mode: 'table' | 'split') => {
+    setViewMode(mode)
+    localStorage.setItem('sales-orders-view-mode', mode)
+  }
 
   // Row selection — checkbox tick từng đơn, hỗ trợ bulk action
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
@@ -1298,15 +1310,40 @@ const SalesOrderListPage = () => {
               </Button.Group>
             </Tooltip>
 
-            {/* R3: Toggle view sang Kanban (đã có ở /sales/kanban) */}
-            <Tooltip title="Xem dạng Kanban — kéo thả theo công đoạn">
-              <Button
-                icon={<span style={{ fontSize: 14 }}>📋</span>}
-                onClick={() => navigate('/sales/kanban')}
-              >
-                Kanban
-              </Button>
-            </Tooltip>
+            {/* View mode toggle: Bảng (current default) | Split (Linear/Gmail-style) | Kanban */}
+            <Button.Group>
+              <Tooltip title="Bảng — danh sách đầy đủ cột">
+                <Button
+                  size="middle"
+                  icon={<span style={{ fontSize: 14 }}>▦</span>}
+                  type={viewMode === 'table' ? 'primary' : 'default'}
+                  onClick={() => changeViewMode('table')}
+                  style={viewMode === 'table' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
+                >
+                  Bảng
+                </Button>
+              </Tooltip>
+              <Tooltip title="Split — list trái + detail luôn hiện bên phải (J/K phím chuyển)">
+                <Button
+                  size="middle"
+                  icon={<span style={{ fontSize: 14 }}>▤▥</span>}
+                  type={viewMode === 'split' ? 'primary' : 'default'}
+                  onClick={() => changeViewMode('split')}
+                  style={viewMode === 'split' ? { background: '#1B4D3E', borderColor: '#1B4D3E' } : {}}
+                >
+                  Split
+                </Button>
+              </Tooltip>
+              <Tooltip title="Kanban — kéo thả theo công đoạn">
+                <Button
+                  size="middle"
+                  icon={<span style={{ fontSize: 14 }}>📋</span>}
+                  onClick={() => navigate('/sales/kanban')}
+                >
+                  Kanban
+                </Button>
+              </Tooltip>
+            </Button.Group>
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -1548,7 +1585,14 @@ const SalesOrderListPage = () => {
         </div>
       )}
 
-      {/* Table */}
+      {/* Body: Split view HOẶC Table view tuỳ viewMode */}
+      {viewMode === 'split' ? (
+        <SalesOrderSplitView
+          orders={orders}
+          loading={loading}
+          onOrderUpdated={fetchOrders}
+        />
+      ) : (
       <Card style={{ borderRadius: 8 }}>
         <Table<SalesOrder>
           rowKey="id"
@@ -1656,6 +1700,7 @@ const SalesOrderListPage = () => {
           })}
         />
       </Card>
+      )}
 
       {/* M4-B: Modal lưu view */}
       <Modal

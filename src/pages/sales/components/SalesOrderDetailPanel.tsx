@@ -45,6 +45,8 @@ interface Props {
   open: boolean
   onClose: () => void
   onOrderUpdated?: () => void
+  /** Render content trực tiếp (không Drawer) cho Split View. Default = false. */
+  inline?: boolean
 }
 
 const TAB_META: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
@@ -59,7 +61,7 @@ const TAB_META: Record<string, { icon: React.ReactNode; label: string; color: st
 // COMPONENT
 // ============================================================================
 
-export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderUpdated }: Props) {
+export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderUpdated, inline = false }: Props) {
   const { user } = useAuthStore()
   const salesRole = getSalesRole(user)
   const visibleTabs = getVisibleTabs(salesRole)
@@ -255,6 +257,62 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     }
   }
 
+  // Title content shared giữa Drawer mode + inline mode
+  const titleContent = order ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <span style={{ fontWeight: 700, fontSize: 16 }}>{order.code}</span>
+      <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
+        {ORDER_STATUS_LABELS[order.status] || order.status}
+      </Tag>
+      {order.current_stage && (
+        <StagePill
+          stage={order.current_stage as SalesStage}
+          stageStartedAt={order.stage_started_at}
+          slaHours={order.stage_sla_hours}
+          variant="compact"
+        />
+      )}
+      {order.customer && (
+        <span style={{ color: '#666', fontSize: 13 }}>{order.customer.name}</span>
+      )}
+    </div>
+  ) : null
+
+  const bodyContent = loading ? (
+    <div style={{ textAlign: 'center', padding: 80 }}>
+      <Spin size="large" />
+    </div>
+  ) : order ? (
+    <Tabs
+      activeKey={activeTab}
+      onChange={setActiveTab}
+      items={tabItems}
+      style={{ padding: '0 16px' }}
+      size="small"
+    />
+  ) : (
+    <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
+      Không tìm thấy đơn hàng
+    </div>
+  )
+
+  // INLINE MODE — Split View
+  if (inline) {
+    if (!open) return null
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+        <div style={{
+          padding: '12px 20px', borderBottom: '1px solid #e8e8e8', background: '#fff',
+          position: 'sticky', top: 0, zIndex: 2,
+        }}>
+          {titleContent || <span style={{ color: '#999' }}>Đang tải...</span>}
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>{bodyContent}</div>
+      </div>
+    )
+  }
+
+  // DRAWER MODE — default
   return (
     <Drawer
       open={open}

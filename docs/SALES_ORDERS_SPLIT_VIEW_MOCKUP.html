@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Đơn hàng bán — Split View + Cmd+K | Huy Anh ERP Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #1B4D3E;
+    --primary-light: #2E7D5B;
+    --primary-bg: #f0f9f4;
+    --primary-bg2: #d9f4e3;
+    --red: #cf1322; --red-bg: #fff1f0;
+    --yellow: #d46b08; --yellow-bg: #fff7e6;
+    --green: #389e0d; --green-bg: #f6ffed;
+    --blue: #1677ff; --blue-bg: #e6f4ff;
+    --purple: #531dab; --purple-bg: #f9f0ff;
+    --bg: #f5f6f8;
+    --card: #fff;
+    --border: #e8e8e8;
+    --border-light: #f0f0f0;
+    --text: rgba(0,0,0,0.88);
+    --text-2: #595959;
+    --text-3: #8c8c8c;
+    --text-4: #bfbfbf;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ─── App shell ─── */
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ─── Topbar ─── */
+  .topbar {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 10px 20px; display: flex; align-items: center; gap: 16px;
+    flex-shrink: 0;
+  }
+  .breadcrumb { font-size: 12px; color: var(--text-3); }
+  .breadcrumb b { color: var(--text); font-weight: 600; }
+  .title { font-size: 16px; font-weight: 700; color: var(--primary); }
+
+  .view-switch {
+    display: flex; gap: 2px; padding: 3px; background: #f0f0f0;
+    border-radius: 8px; margin-left: 20px;
+  }
+  .view-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    border: none; background: transparent; cursor: pointer; color: var(--text-3);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .view-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); font-weight: 600; }
+  .view-btn:hover:not(.active) { color: var(--text); }
+
+  .cmdk-trigger {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 12px; color: var(--text-3); cursor: pointer;
+    margin-left: auto; transition: 0.15s;
+  }
+  .cmdk-trigger:hover { border-color: var(--primary); color: var(--primary); }
+  .kbd {
+    display: inline-flex; align-items: center; padding: 1px 6px;
+    background: #fff; border: 1px solid var(--border); border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-2);
+    box-shadow: 0 1px 0 var(--border);
+  }
+  .btn-primary {
+    padding: 6px 14px; background: var(--primary); color: #fff;
+    border: none; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .btn-primary:hover { background: var(--primary-light); }
+
+  .role-chip {
+    display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+    background: var(--primary-bg); border: 1px solid var(--primary-bg2);
+    border-radius: 12px; font-size: 11px; font-weight: 600; color: var(--primary);
+  }
+
+  /* ─── Status tabs ─── */
+  .status-tabs {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 0 20px; display: flex; gap: 4px; flex-shrink: 0; overflow-x: auto;
+  }
+  .status-tab {
+    padding: 10px 14px; font-size: 12px; color: var(--text-3); cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px; font-weight: 500;
+  }
+  .status-tab:hover { color: var(--text); }
+  .status-tab.active { color: var(--primary); border-color: var(--primary); font-weight: 600; }
+  .status-count {
+    background: #f0f0f0; color: var(--text-2); padding: 1px 6px;
+    border-radius: 8px; font-size: 10px; font-weight: 700;
+  }
+  .status-tab.active .status-count { background: var(--primary-bg); color: var(--primary); }
+
+  /* ─── Filter row ─── */
+  .filter-row {
+    background: #fff; padding: 10px 20px; display: flex; gap: 10px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center;
+  }
+  .input, .select-input {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 12px; outline: none; background: #fff;
+  }
+  .input { flex: 1; max-width: 280px; }
+  .input::placeholder { color: var(--text-4); }
+  .input:focus, .select-input:focus { border-color: var(--primary); }
+  .input-icon-wrap { position: relative; flex: 1; max-width: 280px; }
+  .input-icon-wrap .input { width: 100%; padding-left: 30px; max-width: none; }
+  .input-icon-wrap::before {
+    content: '🔍'; position: absolute; left: 8px; top: 50%;
+    transform: translateY(-50%); font-size: 11px;
+  }
+  .filter-tag {
+    padding: 3px 8px; background: var(--primary-bg); color: var(--primary);
+    border: 1px solid var(--primary-bg2); border-radius: 12px; font-size: 11px;
+    display: flex; align-items: center; gap: 4px; cursor: pointer;
+  }
+  .filter-tag:hover { background: var(--primary-bg2); }
+  .filter-tag .x { font-weight: 700; opacity: 0.6; }
+
+  /* ─── Split layout ─── */
+  .split {
+    flex: 1; display: grid; grid-template-columns: 460px 1fr; overflow: hidden;
+  }
+  .panel-left {
+    background: #fff; border-right: 1px solid var(--border);
+    overflow-y: auto; display: flex; flex-direction: column;
+  }
+  .panel-right { overflow-y: auto; background: var(--bg); }
+
+  /* ─── List header ─── */
+  .list-header {
+    padding: 8px 16px; background: #fafafa; border-bottom: 1px solid var(--border);
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-3); font-weight: 600; display: flex;
+    justify-content: space-between; align-items: center; flex-shrink: 0;
+  }
+  .list-header b { color: var(--primary); font-weight: 700; }
+  .list-actions { display: flex; gap: 4px; }
+  .list-actions button {
+    width: 24px; height: 24px; border: none; background: transparent;
+    border-radius: 4px; cursor: pointer; color: var(--text-3); font-size: 12px;
+  }
+  .list-actions button:hover { background: #f0f0f0; color: var(--text); }
+
+  /* ─── List items ─── */
+  .list-items { flex: 1; }
+  .item {
+    padding: 12px 16px; border-bottom: 1px solid var(--border-light);
+    cursor: pointer; transition: background 0.15s; position: relative;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .item:hover { background: var(--primary-bg); }
+  .item.selected {
+    background: var(--primary-bg);
+    box-shadow: inset 3px 0 0 var(--primary);
+  }
+  .item-avatar {
+    width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; background: #f5f5f5;
+  }
+  .item-body { flex: 1; min-width: 0; }
+  .item-line1 { display: flex; align-items: center; gap: 6px; }
+  .item-code {
+    font-weight: 700; font-size: 12px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .item-customer {
+    font-size: 12px; color: var(--text-2); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1;
+  }
+  .item-line2 {
+    font-size: 11px; color: var(--text-3); margin-top: 4px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .item-meta {
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .item-line3 {
+    margin-top: 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
+  }
+  .pill.draft { background: #f5f5f5; color: var(--text-2); }
+  .pill.confirmed { background: var(--blue-bg); color: var(--blue); }
+  .pill.producing { background: var(--yellow-bg); color: var(--yellow); }
+  .pill.ready { background: #e0f7fa; color: #06b6d4; }
+  .pill.shipped { background: var(--purple-bg); color: var(--purple); }
+  .pill.delivered { background: var(--green-bg); color: var(--green); }
+  .pill.paid { background: var(--primary-bg); color: var(--primary); }
+  .pill.alert { background: var(--red-bg); color: var(--red); }
+
+  .sla-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .sla-green { background: var(--green); }
+  .sla-yellow { background: var(--yellow); }
+  .sla-red { background: var(--red); }
+
+  .item-value {
+    font-size: 13px; font-weight: 700; color: var(--primary);
+    margin-left: auto; font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ─── Detail panel ─── */
+  .detail-empty {
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: var(--text-3);
+    gap: 12px;
+  }
+  .detail-empty-icon { font-size: 64px; opacity: 0.3; }
+
+  .detail-header {
+    background: #fff; padding: 16px 24px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .detail-tabs-wrap {
+    background: #fff; padding: 0 24px; border-bottom: 1px solid var(--border);
+    display: flex; gap: 4px; overflow-x: auto;
+    position: sticky; top: 80px; z-index: 4;
+  }
+  .detail-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .detail-title {
+    font-size: 18px; font-weight: 700; color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .detail-customer { font-size: 14px; color: var(--text-2); }
+  .detail-actions {
+    display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap;
+  }
+  .btn-sm {
+    padding: 5px 10px; font-size: 11px; border-radius: 6px;
+    border: 1px solid var(--border); background: #fff; cursor: pointer;
+    color: var(--text-2); display: flex; align-items: center; gap: 4px; font-weight: 500;
+  }
+  .btn-sm:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-sm.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-sm.primary:hover { background: var(--primary-light); }
+
+  .detail-subline {
+    margin-top: 8px; display: flex; align-items: center; gap: 14px;
+    font-size: 12px; color: var(--text-3);
+  }
+  .detail-subline > div { display: flex; align-items: center; gap: 5px; }
+  .detail-subline b { color: var(--text); font-weight: 600; }
+
+  /* Multi-tab chips */
+  .open-tabs {
+    display: flex; gap: 4px; align-items: center;
+    margin-left: 16px; flex-wrap: wrap;
+  }
+  .open-tab {
+    padding: 3px 10px; background: var(--primary-bg); color: var(--primary);
+    border: 1px solid var(--primary-bg2); border-radius: 12px;
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .open-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .open-tab .close-x {
+    opacity: 0.5; font-weight: 700; padding: 0 2px;
+  }
+  .open-tab .close-x:hover { opacity: 1; }
+
+  .detail-tab {
+    padding: 10px 14px; font-size: 12px; color: var(--text-3); cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+    display: flex; align-items: center; gap: 5px; font-weight: 500;
+  }
+  .detail-tab:hover { color: var(--text); }
+  .detail-tab.active { color: var(--primary); border-color: var(--primary); font-weight: 600; }
+  .detail-tab .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ─── Detail content ─── */
+  .detail-content { padding: 20px 24px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  .card {
+    background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-3); font-weight: 700; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .field-row {
+    display: flex; justify-content: space-between; padding: 6px 0;
+    border-bottom: 1px dashed var(--border-light); font-size: 12px;
+  }
+  .field-row:last-child { border-bottom: none; }
+  .field-label { color: var(--text-3); }
+  .field-value { font-weight: 600; }
+
+  /* Timeline */
+  .timeline { padding-left: 20px; position: relative; }
+  .timeline::before {
+    content: ''; position: absolute; left: 7px; top: 8px; bottom: 8px;
+    width: 2px; background: var(--border);
+  }
+  .tl-item { position: relative; padding-bottom: 14px; }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-dot {
+    position: absolute; left: -20px; top: 4px; width: 14px; height: 14px;
+    border-radius: 50%; border: 2px solid #fff;
+    box-shadow: 0 0 0 2px var(--border);
+  }
+  .tl-dot.done { background: var(--green); box-shadow: 0 0 0 2px var(--green); }
+  .tl-dot.current { background: var(--primary); box-shadow: 0 0 0 2px var(--primary); animation: pulse 1.5s infinite; }
+  .tl-dot.pending { background: #fff; }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 2px var(--primary); }
+    50% { box-shadow: 0 0 0 4px rgba(27,77,62,0.3); }
+  }
+  .tl-content { font-size: 12px; }
+  .tl-stage { font-weight: 600; }
+  .tl-meta { color: var(--text-3); font-size: 11px; margin-top: 2px; }
+
+  /* Section heading */
+  .section-h {
+    font-size: 13px; font-weight: 700; color: var(--primary);
+    margin: 20px 0 10px; display: flex; align-items: center; gap: 6px;
+  }
+  .section-h:first-child { margin-top: 0; }
+
+  /* Items table */
+  .items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .items-table th {
+    text-align: left; padding: 8px; font-size: 10px; text-transform: uppercase;
+    color: var(--text-3); font-weight: 600; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .items-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-light); }
+  .items-table tr:last-child td { border-bottom: none; }
+
+  /* Workflow card */
+  .workflow-card {
+    background: linear-gradient(135deg, #fff 0%, var(--primary-bg) 100%);
+    border: 1px solid var(--primary-bg2);
+  }
+  .workflow-actor {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  }
+  .workflow-avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--primary);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px;
+  }
+
+  /* ─── Footer keyboard hints ─── */
+  .keyhint {
+    background: #fff; padding: 8px 20px;
+    border-top: 1px solid var(--border); flex-shrink: 0;
+    display: flex; gap: 16px; align-items: center; font-size: 11px;
+    color: var(--text-3);
+  }
+  .keyhint b { color: var(--text-2); font-weight: 600; }
+
+  /* ─── Cmd+K modal ─── */
+  .cmdk-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px); z-index: 100;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 12vh;
+  }
+  .cmdk-overlay.hidden { display: none; }
+  .cmdk-box {
+    width: min(640px, 92vw); background: #fff; border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden;
+    display: flex; flex-direction: column; max-height: 70vh;
+  }
+  .cmdk-input-wrap {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .cmdk-input {
+    flex: 1; border: none; outline: none; font-size: 15px;
+    font-family: inherit; color: var(--text);
+  }
+  .cmdk-input::placeholder { color: var(--text-4); }
+  .cmdk-results { overflow-y: auto; padding: 8px 0; flex: 1; }
+  .cmdk-group-title {
+    padding: 10px 20px 6px; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-3); font-weight: 700;
+  }
+  .cmdk-row {
+    padding: 8px 20px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer; font-size: 13px;
+  }
+  .cmdk-row:hover, .cmdk-row.active { background: var(--primary-bg); }
+  .cmdk-row.active { box-shadow: inset 3px 0 0 var(--primary); }
+  .cmdk-icon {
+    width: 28px; height: 28px; border-radius: 6px; background: #f5f5f5;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    flex-shrink: 0;
+  }
+  .cmdk-text { flex: 1; min-width: 0; }
+  .cmdk-title { font-weight: 600; }
+  .cmdk-meta { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .cmdk-shortcut { color: var(--text-3); font-size: 11px; }
+  .cmdk-footer {
+    padding: 10px 20px; border-top: 1px solid var(--border);
+    display: flex; gap: 16px; align-items: center; font-size: 11px;
+    color: var(--text-3); background: #fafafa;
+  }
+  .cmdk-footer .kbd { background: #fff; }
+
+  /* ─── Right-click context menu ─── */
+  .ctx-menu {
+    position: fixed; background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 4px; z-index: 50; min-width: 200px;
+  }
+  .ctx-menu.hidden { display: none; }
+  .ctx-item {
+    padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ctx-item:hover { background: var(--primary-bg); color: var(--primary); }
+  .ctx-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* Hover preview tooltip */
+  .hover-preview {
+    position: fixed; width: 320px; background: #fff;
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.15); padding: 14px;
+    z-index: 30; pointer-events: none;
+    opacity: 0; transform: translateX(-8px); transition: 0.15s;
+  }
+  .hover-preview.visible { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- TOPBAR -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="topbar">
+    <div class="title">📋 Đơn hàng bán</div>
+    <div class="breadcrumb">
+      <span>Sales</span> / <b>Đơn hàng</b>
+    </div>
+
+    <div class="view-switch">
+      <button class="view-btn active" title="Split View — list trái, detail phải">
+        ▤▥ Split
+      </button>
+      <button class="view-btn" title="Table — bảng đầy đủ cột">
+        ▦ Bảng
+      </button>
+      <button class="view-btn" title="Kanban — drag stage">
+        ▦▦ Kanban
+      </button>
+      <button class="view-btn" title="Card gallery">
+        ▢▢ Cards
+      </button>
+    </div>
+
+    <button class="cmdk-trigger" onclick="openCmdK()">
+      <span>🔍</span> <span>Tìm nhanh hoặc gõ lệnh</span>
+      <span style="display:flex; gap:2px;">
+        <span class="kbd">Ctrl</span><span class="kbd">K</span>
+      </span>
+    </button>
+
+    <div class="role-chip">👁️ Lê Duy Minh · Admin</div>
+    <button class="btn-primary">+ Tạo đơn mới</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- STATUS TABS -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="status-tabs">
+    <div class="status-tab active">Tất cả <span class="status-count">53</span></div>
+    <div class="status-tab">Nháp <span class="status-count">6</span></div>
+    <div class="status-tab">Đã xác nhận <span class="status-count">24</span></div>
+    <div class="status-tab">Đang SX <span class="status-count">2</span></div>
+    <div class="status-tab">Sẵn sàng <span class="status-count">1</span></div>
+    <div class="status-tab">Đã xuất <span class="status-count">1</span></div>
+    <div class="status-tab">Đã giao</div>
+    <div class="status-tab">Đã lập HĐ</div>
+    <div class="status-tab">Đã TT</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- FILTER ROW -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="filter-row">
+    <div class="input-icon-wrap">
+      <input class="input" placeholder="Số HĐ, booking, B/L, grade, ngân hàng...">
+    </div>
+    <select class="select-input">
+      <option>Tất cả khách hàng</option>
+      <option>Apollo Tyres</option>
+      <option>Vitry SAS</option>
+      <option>Yoong Do Engineering</option>
+    </select>
+    <select class="select-input">
+      <option>Tất cả Grade</option>
+      <option>SVR3L</option>
+      <option>RSS3</option>
+      <option>SVR10</option>
+    </select>
+    <div class="filter-tag">SLA at risk <span class="x">×</span></div>
+    <div class="filter-tag">$ ≥ $100K <span class="x">×</span></div>
+    <div style="margin-left:auto; color:var(--text-3); font-size:11px;">
+      Hiển thị <b style="color:var(--text);">9 / 53</b> đơn ·
+      <span style="color:var(--primary); cursor:pointer; font-weight:500;">💾 Lưu view này</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SPLIT LAYOUT -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="split">
+
+    <!-- ═════ LEFT: COMPACT LIST ═════ -->
+    <div class="panel-left">
+      <div class="list-header">
+        <span>9 đơn · sắp xếp <b>ưu tiên cao nhất</b></span>
+        <div class="list-actions">
+          <button title="Sort">⇅</button>
+          <button title="Filter">⚙</button>
+          <button title="Density">▤</button>
+        </div>
+      </div>
+
+      <div class="list-items" id="listItems">
+        <!-- Item 1 - SELECTED -->
+        <div class="item selected" data-id="HA20260055" onclick="selectItem(this)">
+          <div class="item-avatar">🇫🇷</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260055</span>
+              <span class="sla-dot sla-red" title="SLA quá hạn 6 ngày"></span>
+            </div>
+            <div class="item-customer">Vitry SAS · Le Havre, France</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 RSS3 · 20.16MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 CIF · 1×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill draft">Đóng gói</span>
+              <span class="pill alert">⚠ +6d SLA</span>
+              <span class="item-value">$48.5K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 2 -->
+        <div class="item" data-id="HA20260051" onclick="selectItem(this)">
+          <div class="item-avatar">🇮🇳</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260051</span>
+              <span class="sla-dot sla-red"></span>
+            </div>
+            <div class="item-customer">Apollo Tyres LTD · India</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 RSS3 · 201.6MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 FOB · 10×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill producing">Sản xuất</span>
+              <span class="pill alert">⚠ +4d SLA</span>
+              <span class="item-value">$473K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 3 -->
+        <div class="item" data-id="HA20260053" onclick="selectItem(this)">
+          <div class="item-avatar">🇰🇷</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260053</span>
+              <span class="sla-dot sla-yellow"></span>
+            </div>
+            <div class="item-customer">Yoong Do Engineering · Korea</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 SVR3L · 20.16MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 CIF · 1×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill ready">Chờ ký</span>
+              <span class="pill alert">⚠ +2d SLA</span>
+              <span class="item-value">$49.6K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 4 -->
+        <div class="item" data-id="HA20260054" onclick="selectItem(this)">
+          <div class="item-avatar">🇵🇭</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260054</span>
+              <span class="sla-dot sla-yellow"></span>
+            </div>
+            <div class="item-customer">Philippine Rubber Trade Solution</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 SVR3L · 80.64MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 FOB · 4×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill producing">Kiểm tra HĐ</span>
+              <span class="item-value">$190K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 5 -->
+        <div class="item" data-id="HA20260052" onclick="selectItem(this)">
+          <div class="item-avatar">🇹🇼</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260052</span>
+              <span class="sla-dot sla-green"></span>
+            </div>
+            <div class="item-customer">UKKO Corporation · Taiwan</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 RSS3 · 20.16MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 FOB · 1×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill confirmed">Mua mủ NVL</span>
+              <span class="item-value">$47.0K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 6 -->
+        <div class="item" data-id="HA20260050" onclick="selectItem(this)">
+          <div class="item-avatar">🇮🇩</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260050</span>
+              <span class="sla-dot sla-green"></span>
+            </div>
+            <div class="item-customer">PT Alphen Internasional Corp</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 SVR3L · 100.8MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 CIF · 5×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill delivered">Đã giao</span>
+              <span class="item-value">$240K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 7 -->
+        <div class="item" data-id="HA20260049" onclick="selectItem(this)">
+          <div class="item-avatar">🇮🇳</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260049</span>
+              <span class="sla-dot sla-green"></span>
+            </div>
+            <div class="item-customer">Apollo Tyres LTD · India</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 RSS3 · 201.6MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 FOB · 10×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill paid">Đã TT</span>
+              <span class="item-value">$473K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 8 -->
+        <div class="item" data-id="HA20260048" onclick="selectItem(this)">
+          <div class="item-avatar">🇸🇬</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260048</span>
+              <span class="sla-dot sla-green"></span>
+            </div>
+            <div class="item-customer">R1 International Pte Ltd</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 SVR_3L · 60.48MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 FOB · 3×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill shipped">Đã xuất</span>
+              <span class="item-value">$144K</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 9 -->
+        <div class="item" data-id="HA20260047" onclick="selectItem(this)">
+          <div class="item-avatar">🇨🇳</div>
+          <div class="item-body">
+            <div class="item-line1">
+              <span class="item-code">HA20260047</span>
+              <span class="sla-dot sla-green"></span>
+            </div>
+            <div class="item-customer">Zhejiang Jinhong Petrochemical</div>
+            <div class="item-line2">
+              <span class="item-meta">📦 SVR10 · 80.64MT</span>
+              <span>·</span>
+              <span class="item-meta">🚢 CIF · 4×20DC</span>
+            </div>
+            <div class="item-line3">
+              <span class="pill confirmed">Đã xác nhận</span>
+              <span class="item-value">$181K</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═════ RIGHT: DETAIL PANEL ═════ -->
+    <div class="panel-right">
+
+      <!-- Detail header (sticky) -->
+      <div class="detail-header">
+        <div class="detail-title-row">
+          <span class="detail-title">HA20260055</span>
+          <span class="pill draft">📦 Đóng gói</span>
+          <span class="pill alert">⚠ SLA +6 ngày</span>
+
+          <!-- MULTI-TAB FEATURE: open multiple orders side-by-side -->
+          <div class="open-tabs">
+            <span class="open-tab active">HA...055 <span class="close-x">×</span></span>
+            <span class="open-tab">HA...051 <span class="close-x">×</span></span>
+            <span class="open-tab">+ Mở tab</span>
+          </div>
+
+          <div class="detail-actions">
+            <button class="btn-sm">⇧⌘N Sửa</button>
+            <button class="btn-sm">📋 Copy link</button>
+            <button class="btn-sm">📥 Xuất PDF</button>
+            <button class="btn-sm primary">⚡ Action</button>
+          </div>
+        </div>
+
+        <div class="detail-subline">
+          <div>🇫🇷 <b>Vitry SAS</b></div>
+          <div>📍 Le Havre, France</div>
+          <div>📦 <b>RSS3 · 20.16MT</b></div>
+          <div>🚢 <b>CIF</b> · 1×20DC</div>
+          <div>💰 <b>$48,585</b></div>
+          <div>📅 ETD <b>30/05/2026</b></div>
+          <div style="color:var(--red); font-weight:600;">⏰ Quá hạn 6 ngày</div>
+        </div>
+      </div>
+
+      <!-- Detail tabs -->
+      <div class="detail-tabs-wrap">
+        <div class="detail-tab active">📈 Tiến độ</div>
+        <div class="detail-tab">📋 Hợp đồng <span class="dot" style="background:var(--red);"></span></div>
+        <div class="detail-tab">🏭 Sản xuất</div>
+        <div class="detail-tab">🚢 Vận chuyển</div>
+        <div class="detail-tab">📑 Chứng từ</div>
+        <div class="detail-tab">💰 Tài chính <span class="dot" style="background:var(--yellow);"></span></div>
+        <div class="detail-tab">📜 Lịch sử</div>
+      </div>
+
+      <!-- Detail content -->
+      <div class="detail-content">
+
+        <!-- Top alert -->
+        <div style="background: var(--red-bg); border: 1px solid #ffccc7; border-radius: 10px;
+                    padding: 12px 16px; margin-bottom: 16px;
+                    display: flex; align-items: flex-start; gap: 12px;">
+          <span style="font-size:20px;">⚠</span>
+          <div style="flex:1;">
+            <div style="font-weight:600; color: var(--red); margin-bottom: 4px;">
+              Đơn này quá hạn giao (delivery_date 14/05/2026)
+            </div>
+            <div style="font-size:12px; color:var(--text-2);">
+              Đề xuất: liên hệ Logistics + Vitry để dời ETD; cập nhật shipment plan.
+            </div>
+          </div>
+          <button class="btn-sm primary">→ Xử lý ngay</button>
+        </div>
+
+        <!-- Pipeline visual -->
+        <div class="section-h">📍 Đang ở stage</div>
+        <div style="background: #fff; border-radius: 10px; padding: 16px; border: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 0; position: relative;">
+            <div style="flex:1; text-align:center;">
+              <div style="width:32px; height:32px; border-radius:50%; background:var(--green);
+                          color:#fff; margin:0 auto; display:flex; align-items:center;
+                          justify-content:center; font-weight:700;">✓</div>
+              <div style="font-size:11px; margin-top:6px; font-weight:600;">Mua NVL</div>
+              <div style="font-size:10px; color:var(--text-3);">14/04</div>
+            </div>
+            <div style="flex:1; text-align:center;">
+              <div style="width:32px; height:32px; border-radius:50%; background:var(--green);
+                          color:#fff; margin:0 auto; display:flex; align-items:center;
+                          justify-content:center; font-weight:700;">✓</div>
+              <div style="font-size:11px; margin-top:6px; font-weight:600;">Sản xuất</div>
+              <div style="font-size:10px; color:var(--text-3);">20/04→05/05</div>
+            </div>
+            <div style="flex:1; text-align:center;">
+              <div style="width:32px; height:32px; border-radius:50%; background:var(--primary);
+                          color:#fff; margin:0 auto; display:flex; align-items:center;
+                          justify-content:center; font-weight:700;
+                          box-shadow: 0 0 0 4px rgba(27,77,62,0.3);">📦</div>
+              <div style="font-size:11px; margin-top:6px; font-weight:700; color:var(--primary);">
+                Đóng gói (8 ngày)
+              </div>
+              <div style="font-size:10px; color:var(--red); font-weight:600;">+6d quá hạn</div>
+            </div>
+            <div style="flex:1; text-align:center;">
+              <div style="width:32px; height:32px; border-radius:50%; background:#fff; border:2px solid var(--border);
+                          color:var(--text-3); margin:0 auto; display:flex; align-items:center;
+                          justify-content:center; font-weight:700;">5</div>
+              <div style="font-size:11px; margin-top:6px; color:var(--text-3);">Vận chuyển</div>
+            </div>
+            <div style="flex:1; text-align:center;">
+              <div style="width:32px; height:32px; border-radius:50%; background:#fff; border:2px solid var(--border);
+                          color:var(--text-3); margin:0 auto; display:flex; align-items:center;
+                          justify-content:center; font-weight:700;">6</div>
+              <div style="font-size:11px; margin-top:6px; color:var(--text-3);">Thanh toán</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workflow + Timeline -->
+        <div class="grid-2" style="margin-top:16px;">
+
+          <div class="card workflow-card">
+            <div class="card-title">📋 Workflow HĐ — Đang chờ Phú LV duyệt</div>
+            <div class="workflow-actor" style="background: var(--green-bg); padding: 6px 10px; border-radius: 6px;">
+              <div class="workflow-avatar" style="background:var(--green);">✓</div>
+              <div>
+                <div style="font-weight:600; font-size:12px;">Sale (Sales) đã lên HĐ</div>
+                <div style="font-size:11px; color:var(--text-3);">11/05/2026 16:30 · rev #2</div>
+              </div>
+            </div>
+            <div class="workflow-actor" style="background: var(--primary-bg); padding: 6px 10px; border-radius: 6px; margin-top: 6px;
+                                                box-shadow: inset 3px 0 0 var(--primary);">
+              <div class="workflow-avatar" style="background:var(--primary); animation: pulse 1.5s infinite;">⌛</div>
+              <div>
+                <div style="font-weight:600; font-size:12px;">Phú LV đang kiểm tra</div>
+                <div style="font-size:11px; color:var(--text-3);">Đã 1d 4h từ lúc trình</div>
+              </div>
+              <button class="btn-sm primary" style="margin-left:auto;">→ Vào duyệt</button>
+            </div>
+            <div class="workflow-actor" style="padding: 6px 10px;">
+              <div class="workflow-avatar" style="background:#bfbfbf;">3</div>
+              <div>
+                <div style="font-weight:500; font-size:12px; color: var(--text-3);">Mr. Trung / Mr. Huy sẽ ký</div>
+                <div style="font-size:11px; color:var(--text-4);">Sau khi Phú duyệt</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">⏰ Lịch sử gần đây</div>
+            <div class="timeline">
+              <div class="tl-item">
+                <div class="tl-dot done"></div>
+                <div class="tl-content">
+                  <div class="tl-stage">Phú LV trả lại HĐ rev #1</div>
+                  <div class="tl-meta">11/05 14:20 — "Sai số PO, sửa lại"</div>
+                </div>
+              </div>
+              <div class="tl-item">
+                <div class="tl-dot done"></div>
+                <div class="tl-content">
+                  <div class="tl-stage">Sale tạo lại + trình rev #2</div>
+                  <div class="tl-meta">11/05 16:30</div>
+                </div>
+              </div>
+              <div class="tl-item">
+                <div class="tl-dot current"></div>
+                <div class="tl-content">
+                  <div class="tl-stage">Chờ Phú LV duyệt rev #2</div>
+                  <div class="tl-meta">SLA 24h · còn 8h</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Items + Summary -->
+        <div class="section-h">📦 Chi tiết hàng</div>
+        <div class="card" style="padding: 0;">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="padding-left:16px;">Grade</th>
+                <th>Tấn</th>
+                <th>$/MT</th>
+                <th>Bành</th>
+                <th>Đóng gói</th>
+                <th>Thanh toán</th>
+                <th style="text-align:right; padding-right:16px;">Tổng USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding-left:16px;"><b>RSS3</b></td>
+                <td>20.16</td>
+                <td>$2,410</td>
+                <td>576</td>
+                <td>35 kg/bale · Wooden pallet</td>
+                <td>LC at sight</td>
+                <td style="text-align:right; padding-right:16px;"><b>$48,585.60</b></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Financial summary -->
+        <div class="grid-3" style="margin-top:16px;">
+          <div class="card">
+            <div class="card-title">💰 Tài chính</div>
+            <div class="field-row"><span class="field-label">Giá trị HĐ</span><span class="field-value">$48,585</span></div>
+            <div class="field-row"><span class="field-label">L/C</span><span class="field-value">$48K · BIDV · 23d còn</span></div>
+            <div class="field-row"><span class="field-label">Hoa hồng</span><span class="field-value">$0 (0%)</span></div>
+            <div class="field-row"><span class="field-label">Đã thanh toán</span><span class="field-value" style="color: var(--text-3);">$0</span></div>
+            <div class="field-row" style="border:none;">
+              <span class="field-label">Còn lại</span>
+              <span class="field-value" style="color: var(--primary); font-size: 14px;">$48,585</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">🚢 Vận chuyển</div>
+            <div class="field-row"><span class="field-label">Incoterm</span><span class="field-value">CIF Le Havre</span></div>
+            <div class="field-row"><span class="field-label">POL</span><span class="field-value">Da Nang, VN</span></div>
+            <div class="field-row"><span class="field-label">POD</span><span class="field-value">Le Havre, FR</span></div>
+            <div class="field-row"><span class="field-label">Container</span><span class="field-value">1 × 20DC</span></div>
+            <div class="field-row"><span class="field-label">Booking</span><span class="field-value" style="color: var(--text-3);">— chưa book</span></div>
+            <div class="field-row" style="border:none;"><span class="field-label">ETD / ETA</span><span class="field-value">30/05 → 30/06</span></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">🔗 Liên kết</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:12px; padding: 6px 10px; background: #fafafa; border-radius: 6px; display:flex; align-items:center; gap:8px;">
+                📋 HĐ rev #2 → <a style="color: var(--primary); cursor:pointer;">Xem PDF</a>
+              </div>
+              <div style="font-size:12px; padding: 6px 10px; background: #fafafa; border-radius: 6px; display:flex; align-items:center; gap:8px;">
+                🏭 Lệnh SX → <a style="color: var(--primary); cursor:pointer;">LSX-26-091</a>
+              </div>
+              <div style="font-size:12px; padding: 6px 10px; background: #fafafa; border-radius: 6px; display:flex; align-items:center; gap:8px;">
+                📑 COA + PL → <span style="color: var(--text-3);">— chưa lập</span>
+              </div>
+              <div style="font-size:12px; padding: 6px 10px; background: #fafafa; border-radius: 6px; display:flex; align-items:center; gap:8px;">
+                🚛 Phiếu cân → <span style="color: var(--text-3);">— chưa cân</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- KEYBOARD HINTS FOOTER -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="keyhint">
+    <span><b>Phím tắt:</b></span>
+    <span><span class="kbd">J</span><span class="kbd">K</span> chuyển đơn</span>
+    <span><span class="kbd">/</span> focus search</span>
+    <span><span class="kbd">Ctrl</span><span class="kbd">K</span> command palette</span>
+    <span><span class="kbd">⇧</span><span class="kbd">Click</span> mở tab mới</span>
+    <span><span class="kbd">Right-click</span> menu hành động</span>
+    <span style="margin-left:auto; color: var(--text-3);">
+      53 đơn · Auto-save · Cập nhật 8s trước
+    </span>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CMD+K PALETTE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="cmdk-overlay hidden" id="cmdkOverlay" onclick="closeCmdK(event)">
+  <div class="cmdk-box" onclick="event.stopPropagation()">
+    <div class="cmdk-input-wrap">
+      <span style="font-size:18px;">🔍</span>
+      <input class="cmdk-input" id="cmdkInput" placeholder="Gõ số HĐ, KH, lệnh hoặc câu hỏi..."
+             oninput="filterCmdK(this.value)">
+      <span class="kbd">ESC</span>
+    </div>
+    <div class="cmdk-results" id="cmdkResults">
+
+      <div class="cmdk-group-title">📋 Đơn hàng (3)</div>
+      <div class="cmdk-row active">
+        <div class="cmdk-icon">🇫🇷</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">HA20260055 · Vitry SAS</div>
+          <div class="cmdk-meta">RSS3 · $48.5K · ⚠ SLA +6d</div>
+        </div>
+        <span class="cmdk-shortcut">↵ mở</span>
+      </div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">🇮🇳</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">HA20260051 · Apollo Tyres</div>
+          <div class="cmdk-meta">RSS3 · $473K · ⚠ SLA +4d</div>
+        </div>
+      </div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">🇰🇷</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">HA20260053 · Yoong Do Engineering</div>
+          <div class="cmdk-meta">SVR3L · $49.6K · Chờ ký</div>
+        </div>
+      </div>
+
+      <div class="cmdk-group-title">⚡ Hành động (4)</div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">+</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">Tạo đơn hàng mới</div>
+          <div class="cmdk-meta">Mở form Compose Studio</div>
+        </div>
+        <span class="cmdk-shortcut">⌘N</span>
+      </div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">📋</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">Vào Queue Kiểm tra HĐ</div>
+          <div class="cmdk-meta">2 HĐ chờ Phú LV duyệt</div>
+        </div>
+      </div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">✍️</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">Vào Queue Trình ký</div>
+          <div class="cmdk-meta">2 HĐ chờ Trung/Huy ký</div>
+        </div>
+      </div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">📊</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">Mở Bento Dashboard</div>
+          <div class="cmdk-meta">Tổng quan đơn hàng bán</div>
+        </div>
+        <span class="cmdk-shortcut">⌘D</span>
+      </div>
+
+      <div class="cmdk-group-title">🏢 Khách hàng (5)</div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">🇮🇳</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">Apollo Tyres LTD</div>
+          <div class="cmdk-meta">3 đơn active · $1.42M tháng này</div>
+        </div>
+      </div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">🇵🇭</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">Philippine Rubber Trade Solution</div>
+          <div class="cmdk-meta">2 đơn active · $680K tháng này</div>
+        </div>
+      </div>
+
+      <div class="cmdk-group-title">✨ Hỏi AI</div>
+      <div class="cmdk-row">
+        <div class="cmdk-icon">🤖</div>
+        <div class="cmdk-text">
+          <div class="cmdk-title">Đơn nào có SLA cao nhất tháng này?</div>
+          <div class="cmdk-meta">AI sẽ phân tích & trả lời</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="cmdk-footer">
+      <span><span class="kbd">↑</span><span class="kbd">↓</span> chuyển</span>
+      <span><span class="kbd">↵</span> mở</span>
+      <span><span class="kbd">⇧</span><span class="kbd">↵</span> mở tab mới</span>
+      <span style="margin-left:auto;">Powered by AI · ⚡ instant</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CONTEXT MENU (right-click on row) -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="ctx-menu hidden" id="ctxMenu">
+  <div class="ctx-item">👁️ Mở chi tiết</div>
+  <div class="ctx-item">⊞ Mở tab mới <span style="margin-left:auto; color:var(--text-3);">⇧Click</span></div>
+  <div class="ctx-item">🔗 Copy link</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item">✏️ Sửa inline</div>
+  <div class="ctx-item">📋 Nhân bản đơn</div>
+  <div class="ctx-item">📥 Xuất PDF</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item">⭐ Đánh dấu watch</div>
+  <div class="ctx-item">📁 Archive</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item" style="color: var(--red);">🗑 Xóa (admin)</div>
+</div>
+
+<script>
+  // Selection
+  function selectItem(el) {
+    document.querySelectorAll('.item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+    // In real app: navigate(`/sales/orders/${el.dataset.id}`)
+  }
+
+  // Cmd+K
+  function openCmdK() {
+    document.getElementById('cmdkOverlay').classList.remove('hidden');
+    document.getElementById('cmdkInput').focus();
+  }
+  function closeCmdK(e) {
+    if (!e || e.target === e.currentTarget) {
+      document.getElementById('cmdkOverlay').classList.add('hidden');
+      document.getElementById('cmdkInput').value = '';
+    }
+  }
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openCmdK();
+    }
+    if (e.key === 'Escape') closeCmdK();
+    // j/k navigate
+    if (!document.getElementById('cmdkOverlay').classList.contains('hidden')) return;
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    if (e.key === 'j' || e.key === 'k') {
+      const items = document.querySelectorAll('.item');
+      let idx = Array.from(items).findIndex(i => i.classList.contains('selected'));
+      idx = e.key === 'j' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+      selectItem(items[idx]);
+      items[idx].scrollIntoView({ block: 'nearest' });
+    }
+    if (e.key === '/') {
+      e.preventDefault();
+      document.querySelector('.filter-row .input').focus();
+    }
+  });
+
+  function filterCmdK(query) {
+    // Mock filter — in real app filter results array
+  }
+
+  // Cmd+K row navigation
+  document.querySelectorAll('.cmdk-row').forEach(r => {
+    r.addEventListener('mouseenter', () => {
+      document.querySelectorAll('.cmdk-row').forEach(x => x.classList.remove('active'));
+      r.classList.add('active');
+    });
+  });
+
+  // Right-click menu
+  document.querySelectorAll('.item').forEach(item => {
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const menu = document.getElementById('ctxMenu');
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+      menu.classList.remove('hidden');
+    });
+  });
+  document.addEventListener('click', () => {
+    document.getElementById('ctxMenu').classList.add('hidden');
+  });
+
+  // Status tabs
+  document.querySelectorAll('.status-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.status-tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

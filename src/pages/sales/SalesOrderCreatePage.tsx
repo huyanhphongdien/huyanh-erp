@@ -359,6 +359,18 @@ function SalesOrderCreatePage() {
       const values = await form.validateFields()
       setSubmittingReview(true)
 
+      // Check trùng số HĐ
+      const isTaken = await salesContractWorkflowService.isContractNoTaken(
+        contractData.contract_no,
+      )
+      if (isTaken) {
+        message.error(
+          `Số HĐ "${contractData.contract_no}" đã tồn tại — vui lòng chọn số khác`,
+        )
+        setSubmittingReview(false)
+        return
+      }
+
       const validItems = orderItems.filter(
         (i) => i.grade && i.quantity_tons > 0 && i.unit_price > 0,
       )

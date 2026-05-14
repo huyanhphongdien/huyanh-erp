@@ -477,9 +477,9 @@ export default function ContractGeneratorTestPage() {
                 <Input value={data.arbitration} onChange={(e) => set('arbitration', e.target.value)} />
               </Form.Item>
 
-              <Divider orientation="left" style={{ marginTop: 16 }}>
+              <Divider style={{ marginTop: 16 }}>
                 <Tag color="orange">phulv@huyanhrubber.com (Kiểm tra) nhập</Tag>
-                Bank info – tài khoản nhận tiền
+                <span style={{ marginLeft: 8 }}>Bank info – tài khoản nhận tiền</span>
               </Divider>
 
               <Row gutter={12}>

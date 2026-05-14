@@ -3,11 +3,10 @@
 // File: src/pages/sales/SalesOrderCreatePage.tsx
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card,
-  Steps,
   Form,
   Select,
   InputNumber,
@@ -24,14 +23,22 @@ import {
   message,
   Breadcrumb,
   AutoComplete,
+  Tabs,
+  Collapse,
 } from 'antd'
 import {
   ArrowLeftOutlined,
   SaveOutlined,
   CheckCircleOutlined,
-  UserOutlined,
-  FileTextOutlined,
+  DownloadOutlined,
+  FileWordOutlined,
 } from '@ant-design/icons'
+import {
+  downloadContract,
+  deriveKind,
+  DEFAULT_BANK,
+  type ContractFormData,
+} from '../../services/sales/contractGeneratorService'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
 import { salesOrderService, type CreateSalesOrderData } from '../../services/sales/salesOrderService'
 import { rubberGradeService } from '../../services/wms/rubberGradeService'
@@ -41,38 +48,14 @@ import {
   SVR_GRADE_OPTIONS,
   INCOTERM_LABELS,
   PAYMENT_TERMS_LABELS,
-  PACKING_TYPE_LABELS,
   PORT_OF_LOADING_OPTIONS,
   CUSTOMER_TIER_LABELS,
   CUSTOMER_TIER_COLORS,
   COUNTRY_OPTIONS,
 } from '../../services/sales/salesTypes'
-import type { Incoterm, PaymentTerms, PackingType } from '../../services/sales/salesTypes'
 
 const { Title } = Typography
 const { TextArea } = Input
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-const formatCurrency = (value: number | undefined | null, currency = 'USD'): string => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
-
-
-const CURRENCY_OPTIONS = [
-  { value: 'USD', label: 'USD' },
-  { value: 'EUR', label: 'EUR' },
-  { value: 'JPY', label: 'JPY' },
-  { value: 'CNY', label: 'CNY' },
-]
 
 // ============================================================================
 // COMPONENT
@@ -81,8 +64,9 @@ const CURRENCY_OPTIONS = [
 function SalesOrderCreatePage() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
-  const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [docLoading, setDocLoading] = useState<'SC' | 'PI' | 'BOTH' | null>(null)
+  const [previewTab, setPreviewTab] = useState<'SC' | 'PI'>('SC')
 
   // Data
   const [customers, setCustomers] = useState<SalesCustomer[]>([])
@@ -160,6 +144,16 @@ function SalesOrderCreatePage() {
   const commissionPct = Form.useWatch('commission_pct', form) || 0
   const commissionUsdPerMt = Form.useWatch('commission_usd_per_mt', form) || 0
 
+  // ── Watch fields cần cho live preview ──
+  const watchContractNo = Form.useWatch('contract_no', form) || ''
+  const watchContractDate = Form.useWatch('contract_date', form)
+  const watchIncoterm = Form.useWatch('incoterm', form) || 'FOB'
+  const watchPOL = Form.useWatch('port_of_loading', form) || ''
+  const watchPOD = Form.useWatch('port_of_destination', form) || ''
+  const watchShipmentTime = Form.useWatch('shipment_time', form) || ''
+  const watchPaymentNote = Form.useWatch('payment_terms_note', form) || ''
+  const watchPackingNote = Form.useWatch('packing_note', form) || ''
+
   const totalBales = baleWeight > 0 ? Math.round((quantityTons * 1000) / baleWeight) : 0
   const balesPerContainer = containerType === '40ft' ? balesPerContInput * 2 : balesPerContInput
   const containerCount = balesPerContainer > 0 ? Math.ceil(totalBales / balesPerContainer) : 0
@@ -168,6 +162,94 @@ function SalesOrderCreatePage() {
   const commissionAmt = commissionUsdPerMt > 0
     ? quantityTons * commissionUsdPerMt
     : totalValueUSD * (commissionPct / 100)
+
+  // ── Build ContractFormData từ form state + items ──
+  // Sale KHÔNG nhập bank info — gắn DEFAULT_BANK để preview, Phú LV sẽ override khi review.
+  const contractData = useMemo<Partial<ContractFormData>>(() => {
+    const firstItem = orderItems[0] || ({} as Partial<OrderItem>)
+    const allGrades = orderItems
+      .filter((i) => i.grade && i.quantity_tons > 0)
+      .map((i) => i.grade)
+    const isFOB = ['FOB', 'EXW'].includes((watchIncoterm || '').toUpperCase())
+    return {
+      contract_no: watchContractNo || '',
+      contract_date: watchContractDate ? watchContractDate.format('DD MMM YYYY') : '',
+      buyer_name: selectedCustomer?.name || '',
+      buyer_address: selectedCustomer?.address || '',
+      buyer_phone: selectedCustomer?.phone || '',
+      grade: allGrades.length ? allGrades.join(' + ') : '',
+      quantity: itemsTotalTons ? itemsTotalTons.toFixed(2) : '',
+      unit_price: firstItem.unit_price
+        ? firstItem.unit_price.toLocaleString('en-US')
+        : '',
+      amount: itemsTotalUSD
+        ? itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      incoterm: watchIncoterm,
+      pol: watchPOL,
+      pod: isFOB ? '' : watchPOD,
+      packing_desc: firstItem.packing_note || watchPackingNote
+        || `${firstItem.bale_weight_kg || 35} kg/bale, ${(firstItem.packing_type || '').replace('_', ' ')}`,
+      bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString() : '',
+      pallets_total: '',
+      containers: String(itemsTotalContainers || ''),
+      cont_type: containerType === '40ft' ? '40HC' : '20DC',
+      shipment_time: watchShipmentTime,
+      partial: 'Not Allowed',
+      trans: 'Allowed',
+      payment: watchPaymentNote || 'LC at sight',
+      payment_extra: '',
+      claims_days: '20',
+      arbitration: 'SICOM Singapore',
+      freight_mark: isFOB ? 'freight Collect' : 'freight prepaid',
+      ...DEFAULT_BANK,
+    }
+  }, [
+    orderItems,
+    selectedCustomer,
+    watchContractNo,
+    watchContractDate,
+    watchIncoterm,
+    watchPOL,
+    watchPOD,
+    watchShipmentTime,
+    watchPaymentNote,
+    watchPackingNote,
+    itemsTotalTons,
+    itemsTotalUSD,
+    itemsTotalBales,
+    itemsTotalContainers,
+    containerType,
+  ])
+
+  // ── Sinh HĐ .docx ──
+  const handleDownloadDoc = async (type: 'SC' | 'PI' | 'BOTH') => {
+    if (!contractData.contract_no) {
+      message.error('Cần nhập "Số hợp đồng" trước khi sinh HĐ')
+      return
+    }
+    if (!contractData.buyer_name) {
+      message.error('Cần chọn khách hàng trước khi sinh HĐ')
+      return
+    }
+    setDocLoading(type)
+    try {
+      if (type === 'BOTH') {
+        await downloadContract(deriveKind(contractData.incoterm || 'FOB', 'SC'), contractData, `${contractData.contract_no}_SC.docx`)
+        await downloadContract(deriveKind(contractData.incoterm || 'FOB', 'PI'), contractData, `${contractData.contract_no}_PI.docx`)
+        message.success(`Đã sinh SC + PI cho ${contractData.contract_no}`)
+      } else {
+        const kind = deriveKind(contractData.incoterm || 'FOB', type)
+        await downloadContract(kind, contractData, `${contractData.contract_no}_${type}.docx`)
+        message.success(`Đã sinh ${type} (${kind})`)
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      message.error(`Sinh ${type} thất bại: ${msg}`)
+    } finally {
+      setDocLoading(null)
+    }
+  }
 
   // ── Customer selection ──
   const handleCustomerChange = useCallback(
@@ -184,25 +266,6 @@ function SalesOrderCreatePage() {
     },
     [customers, form],
   )
-
-  // ── Step validation & navigation ──
-  const nextStep = async () => {
-    try {
-      // Validate form fields
-      await form.validateFields(['customer_id', 'contract_no'])
-      // Validate items
-      const validItems = orderItems.filter(i => i.grade && i.quantity_tons > 0 && i.unit_price > 0)
-      if (validItems.length === 0) {
-        message.error('Vui lòng thêm ít nhất 1 sản phẩm (chọn Grade, nhập Tấn, $/tấn)')
-        return
-      }
-      setCurrentStep((s) => Math.min(s + 1, 3))
-    } catch {
-      // validation failed
-    }
-  }
-
-  const prevStep = () => setCurrentStep((s) => Math.max(s - 1, 0))
 
   // ── Submit ──
   const handleSubmit = async (asDraft: boolean) => {
@@ -282,8 +345,8 @@ function SalesOrderCreatePage() {
   // ══════════════════════════════════════════════════════════════
 
   const renderStep1 = () => (
-    <Row gutter={24}>
-      <Col xs={24} lg={16}>
+    <Row gutter={20}>
+      <Col xs={24} lg={14}>
         {/* ═══ Thông tin Hợp đồng ═══ */}
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
           title={<span style={{ fontSize: 14, fontWeight: 600 }}>📋 Thông tin Hợp đồng</span>}>
@@ -486,12 +549,48 @@ function SalesOrderCreatePage() {
             </Col>
           </Row>
         </Card>
+
+        {/* ═══ Chỉ tiêu kỹ thuật + Ghi chú (collapsible) ═══ */}
+        <Collapse
+          ghost
+          style={{ marginBottom: 16 }}
+          items={[
+            {
+              key: 'quality',
+              label: <span style={{ fontSize: 13, fontWeight: 600 }}>📊 Chỉ tiêu kỹ thuật (mở rộng để sửa)</span>,
+              children: (
+                <Row gutter={[8, 0]}>
+                  <Col xs={8} sm={4}><Form.Item label="DRC min %" name="drc_min" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="DRC max %" name="drc_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="Moisture %" name="moisture_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={10} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="Dirt %" name="dirt_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={1} step={0.001} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="Ash %" name="ash_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="N₂ %" name="nitrogen_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={2} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="Volatile %" name="volatile_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="PRI min" name="pri_min" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="Mooney" name="mooney_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={8} sm={4}><Form.Item label="Color" name="color_lovibond_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={10} step={0.5} style={{ width: '100%' }} /></Form.Item></Col>
+                </Row>
+              ),
+            },
+            {
+              key: 'notes',
+              label: <span style={{ fontSize: 13, fontWeight: 600 }}>📝 Ghi chú đơn hàng</span>,
+              children: (
+                <Form.Item name="notes" style={{ marginBottom: 0 }}>
+                  <TextArea rows={4} placeholder="Ghi chú nội bộ cho đơn hàng..." />
+                </Form.Item>
+              ),
+            },
+          ]}
+        />
       </Col>
 
-      <Col xs={24} lg={8}>
+      <Col xs={24} lg={10}>
+        <div style={{ position: 'sticky', top: 16 }}>
         {/* ═══ Thông tin khách hàng ═══ */}
         {selectedCustomer && (
-          <Card size="small" style={{ marginBottom: 16, borderRadius: 12, background: '#fafffe', borderColor: '#d9f7e8' }}
+          <Card size="small" style={{ marginBottom: 12, borderRadius: 12, background: '#fafffe', borderColor: '#d9f7e8' }}
             title={<span style={{ fontSize: 13, fontWeight: 600, color: '#1B4D3E' }}>Thông tin khách hàng</span>}>
             <Descriptions column={1} size="small" labelStyle={{ color: '#888', width: 80 }}>
               <Descriptions.Item label="Mã"><Tag style={{ fontFamily: 'monospace' }}>{selectedCustomer.code}</Tag></Descriptions.Item>
@@ -549,176 +648,212 @@ function SalesOrderCreatePage() {
             </Col>
           </Row>
         </Card>
+
+        {/* ═══ Live Preview HĐ (SC + PI) ═══ */}
+        <Card
+          size="small"
+          style={{ marginTop: 12, borderRadius: 12 }}
+          title={
+            <Space size={6}>
+              <FileWordOutlined style={{ color: '#1B4D3E' }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Hợp đồng (Live Preview)</span>
+              <Tag color={deriveKind(contractData.incoterm || 'FOB', 'SC') === 'SC_CIF' ? 'blue' : 'green'} style={{ fontSize: 10 }}>
+                {deriveKind(contractData.incoterm || 'FOB', 'SC').replace('_', ' ')}
+              </Tag>
+            </Space>
+          }
+          extra={
+            <Tabs
+              size="small"
+              activeKey={previewTab}
+              onChange={(k) => setPreviewTab(k as 'SC' | 'PI')}
+              items={[
+                { key: 'SC', label: 'SC' },
+                { key: 'PI', label: 'PI' },
+              ]}
+              tabBarStyle={{ marginBottom: 0 }}
+            />
+          }
+        >
+          <div style={{
+            maxHeight: 420,
+            overflowY: 'auto',
+            background: '#fff',
+            padding: 12,
+            border: '1px solid #f0f0f0',
+            borderRadius: 6,
+          }}>
+            {previewTab === 'SC' ? <PreviewSC /> : <PreviewPI />}
+          </div>
+
+          {/* Nút sinh .docx */}
+          <Space.Compact block style={{ marginTop: 12 }}>
+            <Button
+              icon={<DownloadOutlined />}
+              loading={docLoading === 'SC'}
+              onClick={() => handleDownloadDoc('SC')}
+              style={{ flex: 1 }}
+            >
+              Tải SC
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              loading={docLoading === 'PI'}
+              onClick={() => handleDownloadDoc('PI')}
+              style={{ flex: 1 }}
+            >
+              Tải PI
+            </Button>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              loading={docLoading === 'BOTH'}
+              onClick={() => handleDownloadDoc('BOTH')}
+              style={{ flex: 1.2, background: '#1B4D3E' }}
+            >
+              Tải SC + PI
+            </Button>
+          </Space.Compact>
+        </Card>
+
+        {/* ═══ Action buttons ═══ */}
+        <Card size="small" style={{ marginTop: 12, borderRadius: 12 }}>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Button
+              type="default"
+              icon={<SaveOutlined />}
+              block
+              size="large"
+              loading={loading}
+              onClick={() => handleSubmit(true)}
+            >
+              Lưu nháp
+            </Button>
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              block
+              size="large"
+              loading={loading}
+              onClick={() => handleSubmit(false)}
+              style={{ background: '#1B4D3E' }}
+            >
+              Xác nhận đơn hàng
+            </Button>
+          </Space>
+        </Card>
+        </div>
       </Col>
     </Row>
   )
 
-  const renderStep4 = () => {
-    const vals = form.getFieldsValue(true)
-    const grade = SVR_GRADE_OPTIONS.find((g) => g.value === vals.grade)
-    const cust = selectedCustomer
-    const pol = PORT_OF_LOADING_OPTIONS.find((p) => p.value === vals.port_of_loading)
+  // ── Live preview HTML (mirror cấu trúc 4 template .docx) ──
+  const PreviewSC = () => (
+    <div style={{ fontFamily: 'Georgia, serif', fontSize: 11, lineHeight: 1.5, color: '#333' }}>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+        SALES CONTRACT
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span>No.: <strong>{contractData.contract_no || '—'}</strong></span>
+        <span>Date: <strong>{contractData.contract_date || '—'}</strong></span>
+      </div>
+      <div style={{ marginBottom: 6 }}><strong>THE SELLER:</strong> HUY ANH RUBBER COMPANY LIMITED</div>
+      <div style={{ marginBottom: 6 }}><strong>THE BUYER:</strong> {contractData.buyer_name || '—'}</div>
+      <div style={{ marginBottom: 10, color: '#666' }}>ADDRESS: {contractData.buyer_address || '—'}</div>
+      <div style={{ background: '#f5f5f5', padding: 6, marginBottom: 8, fontSize: 10 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #ccc' }}>
+              <th style={{ textAlign: 'left' }}>COMMODITY</th>
+              <th style={{ textAlign: 'right' }}>QTY (MTs)</th>
+              <th style={{ textAlign: 'right' }}>{contractData.incoterm} {contractData.pod ? `– ${contractData.pod}` : contractData.pol} (USD/MT)</th>
+              <th style={{ textAlign: 'right' }}>AMOUNT (USD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>NATURAL RUBBER {contractData.grade || '—'}</td>
+              <td style={{ textAlign: 'right' }}>{contractData.quantity || '—'}</td>
+              <td style={{ textAlign: 'right' }}>{contractData.unit_price || '—'}</td>
+              <td style={{ textAlign: 'right' }}>{contractData.amount || '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginBottom: 4 }}><strong>Packing:</strong> {contractData.bales_total} bales / {contractData.containers} x {contractData.cont_type}</div>
+      <div style={{ marginBottom: 4 }}><strong>Shipment:</strong></div>
+      <div style={{ paddingLeft: 12, marginBottom: 4 }}>- Port of loading: {contractData.pol || '—'}</div>
+      {contractData.pod && <div style={{ paddingLeft: 12, marginBottom: 4 }}>- Port of discharge: {contractData.pod}</div>}
+      <div style={{ paddingLeft: 12, marginBottom: 4 }}>- Time of shipment: {contractData.shipment_time || '—'}</div>
+      <div style={{ paddingLeft: 12, marginBottom: 8 }}>- Partial: {contractData.partial} / Transshipment: {contractData.trans}</div>
+      <div style={{ marginBottom: 4 }}><strong>Term of payment:</strong> {contractData.payment || '—'}</div>
+      <Divider style={{ margin: '8px 0', borderColor: '#e0e0e0' }} />
+      <div style={{ background: '#fff7e6', padding: 6, marginBottom: 6, fontSize: 10, color: '#d48806' }}>
+        <strong>Ben's Bank detail (do Phú LV nhập khi review):</strong><br />
+        ACCOUNT NAME: {contractData.bank_account_name}<br />
+        ACCOUNT NO: {contractData.bank_account_no}<br />
+        BANK: {contractData.bank_full_name}<br />
+        SWIFT: {contractData.bank_swift}
+      </div>
+      <div style={{ marginBottom: 4 }}><strong>Documents:</strong> 3/3 Original B/L marked {contractData.freight_mark}, Commercial Invoice, Packing List, C/O, Test Cert, Phytosanitary{contractData.pod ? ', Insurance Cert' : ''}</div>
+      <div style={{ marginBottom: 4 }}><strong>Claims:</strong> within {contractData.claims_days} days of receipt</div>
+      <div style={{ marginBottom: 4 }}><strong>Arbitration:</strong> {contractData.arbitration}</div>
+    </div>
+  )
 
-    return (
-      <Row gutter={24}>
-        <Col xs={24} lg={16}>
-          <Card title="Xác nhận đơn hàng" size="small">
-            <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-              <Descriptions.Item label="Khách hàng" span={2}>
-                {cust ? `${cust.code} — ${cust.name}` : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Grade">
-                <Tag color="blue">{grade?.label || vals.grade || '-'}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="PO# KH">{vals.customer_po || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Số lượng">{vals.quantity_tons} tấn</Descriptions.Item>
-              <Descriptions.Item label="Đơn giá">
-                {formatCurrency(vals.unit_price, vals.currency)} / tấn
-              </Descriptions.Item>
-              <Descriptions.Item label="Giá trị USD">
-                {formatCurrency(totalValueUSD, 'USD')}
-              </Descriptions.Item>
-              <Descriptions.Item label="Hoa hồng">
-                {commissionAmt > 0
-                  ? `$${commissionAmt.toLocaleString('en-US', { maximumFractionDigits: 0 })} (${vals.commission_usd_per_mt ? `$${vals.commission_usd_per_mt}/MT` : `${vals.commission_pct || 0}%`})`
-                  : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Tổng bành">{totalBales}</Descriptions.Item>
-              <Descriptions.Item label="Container">
-                {containerCount} x {vals.container_type || '20ft'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Incoterm">
-                {INCOTERM_LABELS[vals.incoterm as Incoterm] || vals.incoterm || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Cảng xếp hàng">
-                {pol?.label || vals.port_of_loading || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Cảng đích">
-                {vals.port_of_destination || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngày giao">
-                {vals.delivery_date ? vals.delivery_date.format('DD/MM/YYYY') : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Thanh toán">
-                {PAYMENT_TERMS_LABELS[vals.payment_terms as PaymentTerms] || vals.payment_terms || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Số L/C">{vals.lc_number || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Đóng gói">
-                {PACKING_TYPE_LABELS[vals.packing_type as PackingType] || vals.packing_type || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="KL bành">{vals.bale_weight_kg || 33.33} kg</Descriptions.Item>
-            </Descriptions>
-
-            {/* Quality specs — editable */}
-            <Divider plain style={{ margin: '12px 0 8px' }}>
-              Chỉ tiêu kỹ thuật (tự động từ Grade, sửa nếu cần)
-            </Divider>
-            <Row gutter={[8, 0]}>
-              <Col xs={8} sm={4}>
-                <Form.Item label="DRC min %" name="drc_min" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="DRC max %" name="drc_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="Moisture %" name="moisture_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={10} step={0.01} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="Dirt %" name="dirt_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={1} step={0.001} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="Ash %" name="ash_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="N₂ %" name="nitrogen_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={2} step={0.01} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="Volatile %" name="volatile_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="PRI min" name="pri_min" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="Mooney" name="mooney_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={8} sm={4}>
-                <Form.Item label="Color" name="color_lovibond_max" style={{ marginBottom: 8 }}>
-                  <InputNumber size="small" min={0} max={10} step={0.5} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-
-        <Col xs={24} lg={8}>
-          <Card title="Ghi chú" size="small">
-            <Form.Item name="notes">
-              <TextArea rows={6} placeholder="Ghi chú cho đơn hàng..." />
-            </Form.Item>
-          </Card>
-
-          <Card size="small" style={{ marginTop: 16 }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Button
-                type="default"
-                icon={<SaveOutlined />}
-                block
-                size="large"
-                loading={loading}
-                onClick={() => handleSubmit(true)}
-              >
-                Lưu nháp
-              </Button>
-              <Button
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                block
-                size="large"
-                loading={loading}
-                onClick={() => handleSubmit(false)}
-                style={{ background: '#1B4D3E' }}
-              >
-                Xác nhận đơn hàng
-              </Button>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
-    )
-  }
+  const PreviewPI = () => (
+    <div style={{ fontFamily: 'Georgia, serif', fontSize: 11, lineHeight: 1.5, color: '#333' }}>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+        PROFORMA INVOICE
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span>No: <strong>{contractData.contract_no || '—'}/PR.CI</strong></span>
+        <span>Date: <strong>{contractData.contract_date || '—'}</strong></span>
+      </div>
+      <div style={{ marginBottom: 6 }}><strong>THE SELLER:</strong> HUY ANH RUBBER COMPANY LIMITED</div>
+      <div style={{ marginBottom: 6 }}><strong>THE BUYER:</strong> {contractData.buyer_name || '—'}</div>
+      <div style={{ marginBottom: 10, color: '#666' }}>ADDRESS: {contractData.buyer_address || '—'}</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8, fontSize: 10 }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid #ccc' }}>
+            <th style={{ textAlign: 'left' }}># Cont</th>
+            <th style={{ textAlign: 'left' }}>Description of Goods</th>
+            <th style={{ textAlign: 'right' }}>Qty (MTs)</th>
+            <th style={{ textAlign: 'right' }}>Unit Price (USD/MT)</th>
+            <th style={{ textAlign: 'right' }}>Total (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{contractData.containers} x {contractData.cont_type}</td>
+            <td>NATURAL RUBBER {contractData.grade || '—'} ({contractData.packing_desc || '—'})</td>
+            <td style={{ textAlign: 'right' }}>{contractData.quantity || '—'}</td>
+            <td style={{ textAlign: 'right' }}>{contractData.unit_price || '—'}</td>
+            <td style={{ textAlign: 'right' }}>{contractData.amount || '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style={{ marginBottom: 6, fontStyle: 'italic', color: '#888' }}>
+        Words: <span style={{ color: '#aaa' }}>(amount in words — fill khi sinh .docx)</span>
+      </div>
+      <div style={{ marginBottom: 4 }}><strong>Payment:</strong> {contractData.payment || '—'}</div>
+      <div style={{ background: '#fff7e6', padding: 6, marginTop: 6, fontSize: 10, color: '#d48806' }}>
+        <strong>Ben's Bank detail (Phú LV nhập):</strong><br />
+        ACCOUNT: {contractData.bank_account_name} — {contractData.bank_account_no}<br />
+        SWIFT: {contractData.bank_swift}
+      </div>
+    </div>
+  )
 
   // ══════════════════════════════════════════════════════════════
   // RENDER
   // ══════════════════════════════════════════════════════════════
 
-  const stepItems = [
-    { title: 'Khách hàng & Sản phẩm', icon: <UserOutlined />, description: 'BP Sale nhập' },
-    { title: 'Xác nhận đơn hàng', icon: <FileTextOutlined />, description: 'Review & lưu' },
-  ]
-
   return (
-    <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '16px 24px', maxWidth: 1600, margin: '0 auto' }}>
       {/* Breadcrumb */}
       <Breadcrumb
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: 12 }}
         items={[
           { title: 'Đơn hàng bán' },
           {
@@ -729,45 +864,21 @@ function SalesOrderCreatePage() {
       />
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => {
-          if (currentStep > 0) {
-            prevStep()
-          } else {
-            navigate('/sales/orders')
-          }
-        }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/sales/orders')} />
         <Title level={4} style={{ margin: 0 }}>
           Tạo đơn hàng bán
         </Title>
+        <Tag color="orange" style={{ marginLeft: 8 }}>BP Sale nhập</Tag>
+        <span style={{ marginLeft: 'auto', color: '#999', fontSize: 12 }}>
+          Form trái — Live preview HĐ bên phải · Bank info do Phú LV (Kiểm tra) nhập
+        </span>
       </div>
 
-      {/* Steps */}
-      <Card style={{ marginBottom: 24 }}>
-        <Steps current={currentStep} items={stepItems} />
-      </Card>
-
-      {/* Form — dùng display:none thay vì unmount để giữ data khi back */}
+      {/* Form single-page (Compose Studio) */}
       <Form form={form} layout="vertical" requiredMark="optional" preserve>
-        <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
-          {renderStep1()}
-        </div>
-        <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
-          {renderStep4()}
-        </div>
+        {renderStep1()}
       </Form>
-
-      {/* Navigation buttons */}
-      {currentStep < 1 && (
-        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between' }}>
-          <Button onClick={prevStep} disabled={currentStep === 0}>
-            Quay lại
-          </Button>
-          <Button type="primary" onClick={nextStep} style={{ background: '#1B4D3E' }}>
-            Tiếp theo
-          </Button>
-        </div>
-      )}
     </div>
   )
 }

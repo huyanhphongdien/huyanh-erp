@@ -163,9 +163,34 @@ const PRESETS: Record<string, Preset> = {
   },
 }
 
+// Gate: chỉ admin email mới vào được trang test (dev tool)
+const ADMIN_EMAILS_ALLOWED = [
+  'minhld@huyanhrubber.com',
+  'thuyht@huyanhrubber.com',
+  'huylv@huyanhrubber.com',
+]
+
 export default function ContractGeneratorTestPage() {
+  const userEmail = (typeof window !== 'undefined'
+    ? (JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.user?.email || '')
+    : '').toLowerCase()
+  const isAllowed = ADMIN_EMAILS_ALLOWED.includes(userEmail)
+
   const [data, setData] = useState<ContractFormData>(PRESETS.yoongdo)
   const [loading, setLoading] = useState<ContractKind | null>(null)
+
+  if (!isAllowed) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center' }}>
+        <Title level={4} style={{ color: '#cf1322' }}>403 — Không có quyền</Title>
+        <p>
+          Trang test này chỉ dành cho admin (Minh/Thúy/Huy). Truy cập thực tế qua{' '}
+          <a href="/sales/contracts/review">Queue Kiểm tra</a> hoặc{' '}
+          <a href="/sales/contracts/sign">Queue Ký</a>.
+        </p>
+      </div>
+    )
+  }
 
   const set = <K extends keyof ContractFormData>(key: K, value: ContractFormData[K]) =>
     setData((d) => ({ ...d, [key]: value }))

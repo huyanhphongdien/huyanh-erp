@@ -16,6 +16,7 @@
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { saveAs } from 'file-saver'
+import { SALES_CONFIG } from '../../config/sales.config'
 
 // ----------------------------------------------------------------------------
 // Types
@@ -69,23 +70,18 @@ export interface ContractFormData {
   bank_swift?: string         // "ICBVVNVX460"
 }
 
-/** Default bank (Vietin Hue) — fallback nếu Phú LV chưa nhập. */
+/** Default bank (Vietin Hue) — fallback nếu Phú LV chưa nhập.
+ *  Source: src/config/sales.config.ts (single source of truth). */
 export const DEFAULT_BANK: Pick<
   ContractFormData,
   'bank_account_name' | 'bank_account_no' | 'bank_full_name' | 'bank_address' | 'bank_swift'
-> = {
-  bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
-  bank_account_no: '111002648221',
-  bank_full_name: 'VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE HUE BRANCH',
-  bank_address: '02 LE QUY DON STREET, THUAN HOA WARD, HUE CITY, VIET NAM',
-  bank_swift: 'ICBVVNVX460',
-}
+> = SALES_CONFIG.DEFAULT_BANK
 
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
 
-const TEMPLATE_BASE = '/contract-templates'
+const TEMPLATE_BASE = SALES_CONFIG.TEMPLATE_BASE
 
 /**
  * Map Incoterm → kiểu template (CIF/FOB).

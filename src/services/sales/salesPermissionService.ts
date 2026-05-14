@@ -1,6 +1,14 @@
 export type SalesRole = 'sale' | 'production' | 'logistics' | 'accounting' | 'admin'
 
+// ============================================================================
 // ★ Phân quyền email cụ thể cho module Đơn hàng bán
+//
+// ⚠️ SYNC NOTE: Bảng dưới chỉ quyết định ROLE (sale/admin/...) — KHÔNG quyết
+// định ai duyệt/ký HĐ workflow. Whitelist cho workflow xem ở:
+//   - src/config/sales.config.ts → REVIEWER_EMAILS / SIGNER_EMAILS / DELETE_PERMISSION_EMAILS
+//   - docs/migrations/sales_contract_workflow_v{2,3}_*.sql (RLS policies)
+// Khi thêm/đổi reviewer hoặc signer mới: phải sửa CẢ 3 nơi (role, config, SQL).
+// ============================================================================
 const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Sale
   'sales@huyanhrubber.com': 'sale',
@@ -37,6 +45,13 @@ export function hasSalesAccess(user: any): boolean {
 // ★ BGĐ (Ban Giám Đốc) — whitelist email được xem hợp đồng đã upload
 // Bao gồm admin (Minh/Thúy/Huy) + Mr. Trung (giữ role production cho tab SX,
 // nhưng có quyền BGĐ riêng để xem hợp đồng)
+//
+// SYNC NOTE: workflow ký HĐ mới có whitelist riêng ở src/config/sales.config.ts
+// (REVIEWER_EMAILS, SIGNER_EMAILS, DELETE_PERMISSION_EMAILS) + SQL migrations
+// v2/v3/v4. Khi thêm/bớt user, update CẢ 3 nơi:
+//   1. salesPermissionService.ts (BOD_EMAILS + SALES_EMAIL_ROLE_MAP)
+//   2. src/config/sales.config.ts (REVIEWER/SIGNER/DELETE lists)
+//   3. docs/migrations/sales_contract_workflow_v*.sql (RLS policies)
 const BOD_EMAILS: string[] = [
   'minhld@huyanhrubber.com',
   'thuyht@huyanhrubber.com',

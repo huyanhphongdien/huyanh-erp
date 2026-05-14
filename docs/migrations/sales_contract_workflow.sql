@@ -1,7 +1,15 @@
 -- ============================================================
--- SALES CONTRACT WORKFLOW — Migration
+-- SALES CONTRACT WORKFLOW — Migration V1
 -- Ngày: 2026-05-14
 -- Mục đích: workflow ký HĐ bán = Sale (lên) → Kiểm tra (duyệt) → Trung/Huy (ký)
+--
+-- THỨ TỰ APPLY (manually chạy trong Supabase SQL Editor):
+--   1. sales_contract_access_log.sql      (audit log table, prereq)
+--   2. sales_contract_workflow.sql        (V1 — file này, base schema)
+--   3. sales_contract_workflow_v2_reviewers.sql  (V2 — mở rộng reviewer)
+--   4. sales_contract_workflow_v3_signers.sql    (V3 — Trung/Huy signers)
+--   5. sales_contract_files_multi_v4.sql         (V4 — multi-file + delete)
+--   6. sales_contract_workflow_v5_with_check.sql (V5 — WITH CHECK RLS)
 -- ============================================================
 
 -- 1. Bảng draft hợp đồng (mỗi sales_order có thể có nhiều revision)

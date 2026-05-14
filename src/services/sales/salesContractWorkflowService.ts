@@ -18,6 +18,7 @@
 
 import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
+import { SALES_CONFIG } from '../../config/sales.config'
 
 export type ContractStatus =
   | 'drafting'
@@ -69,35 +70,24 @@ export interface SalesOrderContract {
   signer_employee?: { id: string; full_name?: string; email?: string } | null
 }
 
-/** Default reviewer khi Sale submit — Phú LV xử lý chính. */
-export const REVIEWER_EMAIL = 'phulv@huyanhrubber.com'
-
-/** Whitelist email được phép xem queue + duyệt/trả lại HĐ (đồng bộ với
- *  migration sales_contract_workflow_v2_reviewers.sql). */
-export const ALLOWED_REVIEWER_EMAILS = [
-  'phulv@huyanhrubber.com', // Phú LV — Kế toán, người mặc định
-  'minhld@huyanhrubber.com', // Minh LD — Admin
-]
+// Re-export từ SALES_CONFIG để giữ backward-compat các caller cũ.
+// Source of truth duy nhất: src/config/sales.config.ts (sync với SQL migrations).
+export const REVIEWER_EMAIL = SALES_CONFIG.DEFAULT_REVIEWER_EMAIL
+export const ALLOWED_REVIEWER_EMAILS = SALES_CONFIG.REVIEWER_EMAILS
+export const ALLOWED_SIGNER_EMAILS = SALES_CONFIG.SIGNER_EMAILS
 
 export function isAllowedReviewer(email?: string | null): boolean {
   if (!email) return false
   return ALLOWED_REVIEWER_EMAILS.includes(email.toLowerCase())
 }
 
-/** Whitelist email được phép ký HĐ (đồng bộ với
- *  migration sales_contract_workflow_v3_signers.sql). */
-export const ALLOWED_SIGNER_EMAILS = [
-  'trunglxh@huyanhrubber.com', // Mr. Trung
-  'huylv@huyanhrubber.com', // Mr. Huy
-]
-
 export function isAllowedSigner(email?: string | null): boolean {
   if (!email) return false
   return ALLOWED_SIGNER_EMAILS.includes(email.toLowerCase())
 }
 
-const SIGNED_BUCKET = 'sales-contracts'
-const SIGNED_URL_TTL_SEC = 120
+const SIGNED_BUCKET = SALES_CONFIG.CONTRACT_BUCKET
+const SIGNED_URL_TTL_SEC = SALES_CONFIG.SIGNED_URL_TTL_SEC
 
 // ----------------------------------------------------------------------------
 // Helpers
@@ -147,6 +137,28 @@ export const salesContractWorkflowService = {
   isAllowedSigner,
   getCurrentEmployeeId,
   getEmployeeIdByEmail,
+
+  /** Check số HĐ đã tồn tại chưa (bỏ qua sales_order_id hiện tại nếu đang edit).
+   *  Trả về true nếu trùng → caller hiển thị error. */
+  async isContractNoTaken(
+    contractNo: string,
+    excludeSalesOrderId?: string,
+  ): Promise<boolean> {
+    if (!contractNo || !contractNo.trim()) return false
+    let query = supabase
+      .from('sales_orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('contract_no', contractNo.trim())
+    if (excludeSalesOrderId) {
+      query = query.neq('id', excludeSalesOrderId)
+    }
+    const { count, error } = await query
+    if (error) {
+      console.error('isContractNoTaken error:', error)
+      return false
+    }
+    return (count || 0) > 0
+  },
 
   /** Sale tạo HĐ draft + submit thẳng cho Phú LV review. */
   async createDraftAndSubmit(
@@ -352,5 +364,17 @@ export const salesContractWorkflowService = {
     formData: Partial<ContractFormData>,
   ): Promise<SalesOrderContract> {
     return this.createDraftAndSubmit(salesOrderId, formData)
+  },
+
+  /** Lưu trữ HĐ đã ký (signed → archived). Admin only — RLS guard. */
+  async archive(id: string): Promise<SalesOrderContract> {
+    const { data, error } = await supabase
+      .from('sales_order_contracts')
+      .update({ status: 'archived' })
+      .eq('id', id)
+      .select('*')
+      .single()
+    if (error) throw error
+    return data as SalesOrderContract
   },
 }

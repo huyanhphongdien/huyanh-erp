@@ -16,7 +16,10 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Tag, Space, Button, Typography, Empty, Spin, message, Tooltip } from 'antd'
+import {
+  Card, Tag, Space, Button, Typography, Spin, message, Tooltip, Modal, Drawer,
+  Form, Input, Alert, Row, Col,
+} from 'antd'
 import {
   EyeOutlined,
   DownloadOutlined,
@@ -25,7 +28,11 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   EditOutlined,
+  InboxOutlined,
+  RedoOutlined,
 } from '@ant-design/icons'
+import { useAuthStore } from '../../../stores/authStore'
+import { SALES_CONFIG, isAllowedToDelete } from '../../../config/sales.config'
 import {
   salesContractWorkflowService,
   type SalesOrderContract,
@@ -67,9 +74,21 @@ const fmtDate = (s?: string | null) =>
 
 export default function ContractWorkflowSection({ salesOrderId }: Props) {
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
   const [rows, setRows] = useState<SalesOrderContract[]>([])
   const [loading, setLoading] = useState(true)
   const [docLoading, setDocLoading] = useState<string | null>(null)
+  const [resubmitOpen, setResubmitOpen] = useState(false)
+  const [resubmitting, setResubmitting] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [resubmitForm] = Form.useForm()
+
+  // SALES_CONFIG dùng được vì là source-of-truth single. Admin email được archive.
+  const canArchive = SALES_CONFIG.DELETE_PERMISSION_EMAILS.includes(
+    (user?.email || '').toLowerCase(),
+  )
+  // Ai trong DELETE list cũng được archive (admin/BOD)
+  void isAllowedToDelete  // re-export helper
 
   useEffect(() => {
     salesContractWorkflowService
@@ -145,6 +164,66 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
                 style={{ background: '#1B4D3E' }}
               >
                 Mở queue Kiểm tra
+              </Button>
+            </Tooltip>
+          )}
+          {latest.status === 'rejected' && (
+            <Tooltip title="Tạo revision mới để Phú LV duyệt lại">
+              <Button
+                size="small"
+                type="primary"
+                icon={<RedoOutlined />}
+                onClick={() => {
+                  resubmitForm.setFieldsValue(latest.form_data || {})
+                  setResubmitOpen(true)
+                }}
+                style={{ background: '#1B4D3E' }}
+              >
+                Sửa & Trình lại
+              </Button>
+            </Tooltip>
+          )}
+          {latest.status === 'approved' && (
+            <Tooltip title="Mở trang Trình ký để Trung/Huy ký">
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => navigate('/sales/contracts/sign')}
+              >
+                Mở queue Ký
+              </Button>
+            </Tooltip>
+          )}
+          {latest.status === 'signed' && canArchive && (
+            <Tooltip title="Lưu trữ HĐ đã ký (terminal state)">
+              <Button
+                size="small"
+                icon={<InboxOutlined />}
+                loading={archiving}
+                onClick={() => {
+                  Modal.confirm({
+                    title: 'Lưu trữ HĐ?',
+                    content: `HĐ ${latest.form_data?.contract_no} (rev #${latest.revision_no}) sẽ chuyển sang archived. Không undo được.`,
+                    okText: 'Lưu trữ',
+                    cancelText: 'Huỷ',
+                    onOk: async () => {
+                      setArchiving(true)
+                      try {
+                        await salesContractWorkflowService.archive(latest.id)
+                        message.success('Đã lưu trữ')
+                        const updated = await salesContractWorkflowService.listBySalesOrder(salesOrderId)
+                        setRows(updated)
+                      } catch (e: unknown) {
+                        const msg = e instanceof Error ? e.message : String(e)
+                        message.error(`Lưu trữ thất bại: ${msg}`)
+                      } finally {
+                        setArchiving(false)
+                      }
+                    },
+                  })
+                }}
+              >
+                Lưu trữ
               </Button>
             </Tooltip>
           )}
@@ -280,6 +359,113 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
           </div>
         </details>
       )}
+
+      {/* Drawer Sửa & Trình lại (chỉ khi rejected) */}
+      <Drawer
+        title={
+          <Space>
+            <RedoOutlined />
+            <span>Sửa & Trình lại — {latest.form_data?.contract_no}</span>
+            <Tag>rev #{latest.revision_no + 1} (mới)</Tag>
+          </Space>
+        }
+        open={resubmitOpen}
+        onClose={() => setResubmitOpen(false)}
+        width={640}
+        extra={
+          <Space>
+            <Button onClick={() => setResubmitOpen(false)}>Huỷ</Button>
+            <Button
+              type="primary"
+              icon={<RedoOutlined />}
+              loading={resubmitting}
+              onClick={async () => {
+                const vals = await resubmitForm.validateFields()
+                const merged = { ...latest.form_data, ...vals }
+                setResubmitting(true)
+                try {
+                  await salesContractWorkflowService.resubmitRevision(salesOrderId, merged)
+                  message.success('Đã trình revision mới — Phú LV sẽ kiểm tra lại')
+                  setResubmitOpen(false)
+                  const updated = await salesContractWorkflowService.listBySalesOrder(salesOrderId)
+                  setRows(updated)
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e)
+                  message.error(`Trình lại thất bại: ${msg}`)
+                } finally {
+                  setResubmitting(false)
+                }
+              }}
+              style={{ background: '#1B4D3E' }}
+            >
+              Trình lại
+            </Button>
+          </Space>
+        }
+      >
+        <Alert
+          type="error"
+          showIcon
+          message={`Phú LV đã trả lại với lý do: "${latest.rejected_reason || '—'}"`}
+          description="Sửa các trường bị Phú LV report, sau đó bấm 'Trình lại' để tạo revision mới."
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={resubmitForm} layout="vertical" size="middle">
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item label="Số HĐ" name="contract_no" rules={[{ required: true }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Ngày HĐ" name="contract_date">
+                <Input placeholder="08 May 2026" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item label="Grade" name="grade">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Quantity (MT)" name="quantity">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Unit price" name="unit_price">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label="Amount (USD)" name="amount">
+            <Input />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item label="Time of shipment" name="shipment_time">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Payment" name="payment">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label="Packing description" name="packing_desc">
+            <Input />
+          </Form.Item>
+          <Alert
+            type="info"
+            showIcon
+            message="Các trường khác (buyer, bank, ports, etc.) giữ nguyên từ revision cũ. Cần edit chi tiết thì vào trang Sales Order Create."
+            style={{ marginTop: 8 }}
+          />
+        </Form>
+      </Drawer>
     </Card>
   )
 }
@@ -292,6 +478,3 @@ export async function hasWorkflowContract(salesOrderId: string): Promise<boolean
   return rows.length > 0
 }
 
-// Re-export Empty để tránh ESLint unused-import warning (Empty hiện không
-// dùng trực tiếp, giữ lại trong import phòng khi muốn customize empty state)
-export const _Empty = Empty

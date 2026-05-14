@@ -31,9 +31,10 @@ import {
 import type { SalesDocument } from '../../../services/sales/salesDocumentUploadService'
 import { isBOD, type SalesRole } from '../../../services/sales/salesPermissionService'
 import { useAuthStore } from '../../../stores/authStore'
+import { SALES_CONFIG } from '../../../config/sales.config'
 
-const MAX_FILES = 10
-const MAX_FILE_SIZE_MB = 20
+const MAX_FILES = SALES_CONFIG.MAX_CONTRACT_FILES
+const MAX_FILE_SIZE_MB = SALES_CONFIG.MAX_FILE_SIZE_MB
 const ALLOWED_MIME = [
   'application/pdf',
   'image/jpeg',

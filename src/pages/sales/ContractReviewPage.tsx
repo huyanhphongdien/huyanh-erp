@@ -80,11 +80,20 @@ export default function ContractReviewPage() {
     salesContractWorkflowService.getCurrentEmployeeId().then(setReviewerEmpId)
   }, [])
 
+  const isAllowedReviewer = useMemo(
+    () => salesContractWorkflowService.isAllowedReviewer(user?.email),
+    [user],
+  )
+
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      // Nếu chưa biết reviewerEmpId (chưa load) → load all reviewing
-      const data = await salesContractWorkflowService.listForReview(reviewerEmpId)
+      // User trong whitelist → xem TẤT CẢ queue (viewAll=true), không filter
+      // theo reviewer_id. Người khác (nếu có) chỉ thấy HĐ assigned cho mình.
+      const data = await salesContractWorkflowService.listForReview(
+        reviewerEmpId,
+        isAllowedReviewer,
+      )
       setRows(data)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -92,7 +101,7 @@ export default function ContractReviewPage() {
     } finally {
       setLoading(false)
     }
-  }, [reviewerEmpId])
+  }, [reviewerEmpId, isAllowedReviewer])
 
   useEffect(() => {
     void refresh()
@@ -249,10 +258,12 @@ export default function ContractReviewPage() {
     })
   }
 
-  const isPhuLV = useMemo(
-    () => user?.email?.toLowerCase() === salesContractWorkflowService.REVIEWER_EMAIL,
-    [user],
-  )
+  const reviewerLabel = useMemo(() => {
+    const email = user?.email?.toLowerCase()
+    if (email === 'phulv@huyanhrubber.com') return 'Phú LV (Kế toán — Kiểm tra)'
+    if (email === 'minhld@huyanhrubber.com') return 'Minh LD (Admin — Kiểm tra)'
+    return user?.email || '—'
+  }, [user])
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
@@ -269,9 +280,7 @@ export default function ContractReviewPage() {
         <Title level={3} style={{ margin: 0, color: '#1B4D3E' }}>
           <BankOutlined /> Queue Kiểm tra HĐ
         </Title>
-        <Tag color={isPhuLV ? 'green' : 'orange'}>
-          {isPhuLV ? 'Phú LV (Kiểm tra)' : user?.email || '—'}
-        </Tag>
+        <Tag color={isAllowedReviewer ? 'green' : 'orange'}>{reviewerLabel}</Tag>
         <Button
           icon={<ReloadOutlined />}
           onClick={refresh}
@@ -282,12 +291,12 @@ export default function ContractReviewPage() {
         </Button>
       </div>
 
-      {!isPhuLV && (
+      {!isAllowedReviewer && (
         <Alert
           type="warning"
           showIcon
-          message="Trang này được thiết kế cho Phú LV (Kiểm tra)."
-          description={`Bạn đang đăng nhập với email ${user?.email || '—'}. Nếu không phải Phú LV, bạn vẫn xem được queue nhưng action duyệt/trả lại sẽ chỉ thành công nếu RLS cho phép.`}
+          message="Bạn không nằm trong danh sách được phép kiểm tra HĐ."
+          description={`Email được phép: ${salesContractWorkflowService.ALLOWED_REVIEWER_EMAILS.join(', ')}. Bạn đang đăng nhập với ${user?.email || '—'}. RLS DB sẽ chặn các action duyệt/trả lại.`}
           style={{ marginBottom: 16 }}
         />
       )}

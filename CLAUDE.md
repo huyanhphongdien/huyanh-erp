@@ -49,11 +49,15 @@ apps/weighbridge/  # Sub-app for weighbridge scale integration
 ## Sales Contract Workflow
 - Tab Hợp đồng bán: 3 actor
   - **Sale** lên HĐ (form Compose Studio, KHÔNG nhập bank)
-  - **Phú LV** (phulv@huyanhrubber.com) = "Kiểm tra" → duyệt + nhập bank info
+  - **Kiểm tra** = `phulv@huyanhrubber.com` (default) **HOẶC** `minhld@huyanhrubber.com`
+    → duyệt + nhập bank info. Cả 2 thấy chung queue, ai vào trước duyệt trước.
   - **Trung hoặc Huy** ký HĐ (upload PDF đã ký + đóng dấu)
-- Bank info (5 field: account name/no/full_name/address/swift) chỉ Phú LV được nhập
-- Migration: `docs/migrations/sales_contract_workflow.sql`
-- Service: `src/services/sales/contractGeneratorService.ts`
+- Bank info (5 field: account name/no/full_name/address/swift) chỉ Kiểm tra nhập
+- Migration: `docs/migrations/sales_contract_workflow.sql` (V1)
+  + `docs/migrations/sales_contract_workflow_v2_reviewers.sql` (mở rộng cho minhld)
+- Service: `src/services/sales/contractGeneratorService.ts` (sinh .docx)
+  + `src/services/sales/salesContractWorkflowService.ts` (workflow CRUD)
+- Page: `/sales/contracts/review` (queue Kiểm tra)
 - Templates: `public/contract-templates/template_{SC,PI}_{CIF,FOB}.docx`
 
 ## Git

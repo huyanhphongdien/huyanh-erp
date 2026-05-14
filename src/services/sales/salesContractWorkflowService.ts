@@ -69,7 +69,20 @@ export interface SalesOrderContract {
   signer_employee?: { id: string; full_name?: string; email?: string } | null
 }
 
+/** Default reviewer khi Sale submit — Phú LV xử lý chính. */
 export const REVIEWER_EMAIL = 'phulv@huyanhrubber.com'
+
+/** Whitelist email được phép xem queue + duyệt/trả lại HĐ (đồng bộ với
+ *  migration sales_contract_workflow_v2_reviewers.sql). */
+export const ALLOWED_REVIEWER_EMAILS = [
+  'phulv@huyanhrubber.com', // Phú LV — Kế toán, người mặc định
+  'minhld@huyanhrubber.com', // Minh LD — Admin
+]
+
+export function isAllowedReviewer(email?: string | null): boolean {
+  if (!email) return false
+  return ALLOWED_REVIEWER_EMAILS.includes(email.toLowerCase())
+}
 
 // ----------------------------------------------------------------------------
 // Helpers
@@ -113,6 +126,8 @@ export async function getEmployeeIdByEmail(email: string): Promise<string | null
 
 export const salesContractWorkflowService = {
   REVIEWER_EMAIL,
+  ALLOWED_REVIEWER_EMAILS,
+  isAllowedReviewer,
   getCurrentEmployeeId,
   getEmployeeIdByEmail,
 
@@ -146,8 +161,15 @@ export const salesContractWorkflowService = {
     return data as SalesOrderContract
   },
 
-  /** List HĐ pending review. Nếu reviewerId rỗng → list tất cả status='reviewing'. */
-  async listForReview(reviewerId?: string | null): Promise<SalesOrderContract[]> {
+  /** List HĐ pending review.
+   *  - Nếu user trong ALLOWED_REVIEWER_EMAILS → list TẤT CẢ status='reviewing'
+   *    (cả 2 reviewer thấy chung 1 queue, ai vào trước duyệt trước).
+   *  - Nếu khác → chỉ list HĐ assign trực tiếp cho reviewerId.
+   *  Caller truyền `viewAll=true` để bypass filter (admin). */
+  async listForReview(
+    reviewerId?: string | null,
+    viewAll = false,
+  ): Promise<SalesOrderContract[]> {
     let query = supabase
       .from('sales_order_contracts')
       .select(
@@ -161,7 +183,7 @@ export const salesContractWorkflowService = {
       .eq('status', 'reviewing')
       .order('submitted_at', { ascending: false })
 
-    if (reviewerId) {
+    if (!viewAll && reviewerId) {
       query = query.eq('reviewer_id', reviewerId)
     }
     const { data, error } = await query

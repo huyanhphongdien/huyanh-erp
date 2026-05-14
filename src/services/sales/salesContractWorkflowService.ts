@@ -84,6 +84,21 @@ export function isAllowedReviewer(email?: string | null): boolean {
   return ALLOWED_REVIEWER_EMAILS.includes(email.toLowerCase())
 }
 
+/** Whitelist email được phép ký HĐ (đồng bộ với
+ *  migration sales_contract_workflow_v3_signers.sql). */
+export const ALLOWED_SIGNER_EMAILS = [
+  'trunglxh@huyanhrubber.com', // Mr. Trung
+  'huylv@huyanhrubber.com', // Mr. Huy
+]
+
+export function isAllowedSigner(email?: string | null): boolean {
+  if (!email) return false
+  return ALLOWED_SIGNER_EMAILS.includes(email.toLowerCase())
+}
+
+const SIGNED_BUCKET = 'sales-contracts'
+const SIGNED_URL_TTL_SEC = 120
+
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
@@ -127,7 +142,9 @@ export async function getEmployeeIdByEmail(email: string): Promise<string | null
 export const salesContractWorkflowService = {
   REVIEWER_EMAIL,
   ALLOWED_REVIEWER_EMAILS,
+  ALLOWED_SIGNER_EMAILS,
   isAllowedReviewer,
+  isAllowedSigner,
   getCurrentEmployeeId,
   getEmployeeIdByEmail,
 
@@ -159,6 +176,58 @@ export const salesContractWorkflowService = {
       .single()
     if (error) throw error
     return data as SalesOrderContract
+  },
+
+  /** List HĐ status='approved' chờ Trung/Huy ký. */
+  async listForSigning(): Promise<SalesOrderContract[]> {
+    const { data, error } = await supabase
+      .from('sales_order_contracts')
+      .select(
+        `*,
+         sales_order:sales_orders!sales_order_contracts_sales_order_id_fkey(
+           id, contract_no, customer_id, grade, quantity_tons, unit_price, status
+         ),
+         created_by_employee:employees!sales_order_contracts_created_by_fkey(id, full_name, email),
+         reviewer_employee:employees!sales_order_contracts_reviewer_id_fkey(id, full_name, email)`,
+      )
+      .eq('status', 'approved')
+      .order('reviewed_at', { ascending: false })
+    if (error) throw error
+    return (data as unknown as SalesOrderContract[]) || []
+  },
+
+  /** Upload PDF đã ký + đóng dấu lên Supabase Storage.
+   *  Trả về storage path (lưu vào signed_pdf_url). */
+  async uploadSignedPdf(
+    contractId: string,
+    revisionNo: number,
+    file: File,
+  ): Promise<string> {
+    const ext = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'pdf'
+    const path = `workflow-signed/${contractId}_rev${revisionNo}_${Date.now()}.${ext}`
+    const { error } = await supabase.storage
+      .from(SIGNED_BUCKET)
+      .upload(path, file, {
+        contentType: 'application/pdf',
+        upsert: false,
+      })
+    if (error) throw error
+    return path
+  },
+
+  /** Tạo signed URL ngắn hạn để mở/tải PDF đã ký. */
+  async getSignedPdfUrl(path: string): Promise<string | null> {
+    if (!path) return null
+    // Nếu path đã là full URL (legacy) → return luôn
+    if (path.startsWith('http')) return path
+    const { data, error } = await supabase.storage
+      .from(SIGNED_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_TTL_SEC)
+    if (error) {
+      console.error('getSignedPdfUrl error:', error)
+      return null
+    }
+    return data?.signedUrl || null
   },
 
   /** List HĐ pending review.

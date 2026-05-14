@@ -149,11 +149,17 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
             </Tooltip>
           )}
           {latest.signed_pdf_url && (
-            <Tooltip title="Tải PDF đã ký + đóng dấu">
+            <Tooltip title="Tải PDF đã ký + đóng dấu (signed URL 2 phút)">
               <Button
                 size="small"
                 icon={<DownloadOutlined />}
-                onClick={() => window.open(latest.signed_pdf_url || '', '_blank')}
+                onClick={async () => {
+                  const url = await salesContractWorkflowService.getSignedPdfUrl(
+                    latest.signed_pdf_url || '',
+                  )
+                  if (url) window.open(url, '_blank')
+                  else message.error('Không tạo được signed URL')
+                }}
               >
                 PDF đã ký
               </Button>

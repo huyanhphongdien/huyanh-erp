@@ -33,6 +33,7 @@ import FinanceTabV4 from './FinanceTabV4'
 import DocumentChecklistTab from './DocumentChecklistTab'
 import StageOwnershipCard from './StageOwnershipCard'
 import HandoffTimeline from './HandoffTimeline'
+import OrderProgressDashboard from './OrderProgressDashboard'
 import StagePill from '../../../components/common/StagePill'
 import type { SalesStage } from '../../../services/sales/salesStages'
 
@@ -148,7 +149,14 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   const coreTabItems = order ? [
     {
       key: 'progress',
-      label: <span>🏉 Tiến độ</span>,
+      label: <span>📈 Tiến độ</span>,
+      children: (
+        <OrderProgressDashboard order={order} onChanged={handleSaved} />
+      ),
+    },
+    {
+      key: 'progress-legacy',
+      label: <span>🏉 Bộ phận / SLA</span>,
       children: (
         <div style={{ padding: '12px 4px' }}>
           <StageOwnershipCard

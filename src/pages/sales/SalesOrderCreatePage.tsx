@@ -46,8 +46,6 @@ import {
   CUSTOMER_TIER_LABELS,
   CUSTOMER_TIER_COLORS,
   COUNTRY_OPTIONS,
-  BANK_OPTIONS,
-  BANK_DETAILS,
 } from '../../services/sales/salesTypes'
 import type { Incoterm, PaymentTerms, PackingType } from '../../services/sales/salesTypes'
 
@@ -418,9 +416,10 @@ function SalesOrderCreatePage() {
           ))}
         </Card>
 
-        {/* ═══ Điều khoản & Ngân hàng ═══ */}
+        {/* ═══ Điều khoản ═══ */}
+        {/* Bank info (Ngân hàng / Số TK / SWIFT) chuyển sang bước "Kiểm tra" — Phú LV nhập per-order */}
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
-          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Điều khoản & Ngân hàng</span>}>
+          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Điều khoản (Bank info do Kiểm tra nhập)</span>}>
           <Row gutter={16}>
             <Col xs={24} sm={12}>
               <Form.Item label="Incoterm" name="incoterm" initialValue="FOB">
@@ -486,38 +485,6 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
           </Row>
-          <Divider style={{ margin: '12px 0' }} />
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Ngân hàng" name="bank_code" initialValue="VCB">
-                <Select size="large" onChange={(val: string) => {
-                  const details = BANK_DETAILS[val]
-                  if (details) {
-                    form.setFieldsValue({
-                      bank_name: details.name,
-                      bank_account: details.account,
-                      bank_swift: details.swift,
-                    })
-                  } else {
-                    form.setFieldsValue({ bank_name: '', bank_account: '', bank_swift: '' })
-                  }
-                }}
-                  options={BANK_OPTIONS.map(b => ({ value: b.value, label: b.label }))}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Số tài khoản" name="bank_account" initialValue="0071001046372">
-                <Input size="large" style={{ fontFamily: 'monospace' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="SWIFT Code" name="bank_swift" initialValue="BFTVVNVX">
-                <Input size="large" style={{ fontFamily: 'monospace' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="bank_name" hidden><Input /></Form.Item>
         </Card>
       </Col>
 

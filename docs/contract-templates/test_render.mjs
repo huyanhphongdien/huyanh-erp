@@ -11,6 +11,15 @@ import Docxtemplater from 'docxtemplater';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Bank info chung (Phú LV nhập per-order — default Vietinbank Hue)
+const BANK = {
+  bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+  bank_account_no: '111002648221',
+  bank_full_name: 'VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE HUE BRANCH',
+  bank_address: '02 LE QUY DON STREET, THUAN HOA WARD, HUE CITY, VIET NAM',
+  bank_swift: 'ICBVVNVX460',
+};
+
 const presets = {
   yoongdo_SC_CIF: {
     template: 'template_SC_CIF.docx',
@@ -40,6 +49,7 @@ const presets = {
       claims_days: '20',
       arbitration: 'SICOM Singapore',
       freight_mark: 'freight prepaid',
+      ...BANK,
     },
   },
   yoongdo_PI_CIF: {
@@ -61,6 +71,7 @@ const presets = {
       cont_type: '20DC',
       payment: 'LC at sight',
       payment_extra: 'The L/C draft must be opened within five (5) days from the contract signing date.',
+      ...BANK,
     },
   },
   apollo_SC_FOB: {
@@ -88,6 +99,7 @@ const presets = {
       claims_days: '20',
       arbitration: 'SICOM Singapore',
       freight_mark: 'freight Collect',
+      ...BANK,
     },
   },
   apollo_PI_FOB: {
@@ -109,6 +121,7 @@ const presets = {
       containers: '10',
       cont_type: '20DC',
       payment: 'CAD 5 days',
+      ...BANK,
     },
   },
 };

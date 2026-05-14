@@ -46,6 +46,16 @@ apps/weighbridge/  # Sub-app for weighbridge scale integration
 - RLS enabled on most tables — use service role key for admin operations
 - Key tables: employees, attendance, shifts, departments, positions, leave_requests, b2b_demand_offers, b2b_chat_messages
 
+## Sales Contract Workflow
+- Tab Hợp đồng bán: 3 actor
+  - **Sale** lên HĐ (form Compose Studio, KHÔNG nhập bank)
+  - **Phú LV** (phulv@huyanhrubber.com) = "Kiểm tra" → duyệt + nhập bank info
+  - **Trung hoặc Huy** ký HĐ (upload PDF đã ký + đóng dấu)
+- Bank info (5 field: account name/no/full_name/address/swift) chỉ Phú LV được nhập
+- Migration: `docs/migrations/sales_contract_workflow.sql`
+- Service: `src/services/sales/contractGeneratorService.ts`
+- Templates: `public/contract-templates/template_{SC,PI}_{CIF,FOB}.docx`
+
 ## Git
 - Single branch: `main`
 - Push = auto-deploy to Vercel (huyanhrubber.vn)

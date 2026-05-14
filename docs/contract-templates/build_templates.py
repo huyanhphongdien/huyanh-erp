@@ -1,6 +1,12 @@
 """
 Build docxtemplater templates from 4 sample contracts.
 
+QUAN TRỌNG: bank info được placeholderize để Phú (Kiểm tra) nhập per-order
+(do mỗi HĐ có thể dùng Vietcombank / Vietinbank / BIDV… khác nhau). 5 field:
+{bank_account_name}, {bank_account_no}, {bank_full_name}, {bank_address}, {bank_swift}
+
+
+
 Source: SC + PI ( CIF)/* và SC + PI (FOB)/*
 Output: docs/contract-templates/template_{SC,PI}_{CIF,FOB}.docx
 
@@ -24,12 +30,29 @@ from docx.oxml.ns import qn
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # repo root
 OUT_DIR = ROOT / "docs" / "contract-templates"
+PUBLIC_DIR = ROOT / "public" / "contract-templates"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
 
 # ----------------------------------------------------------------------
 # Replacement maps cho từng file (literal → placeholder)
 # Tham chiếu chính xác text trong file mẫu (lưu ý dấu cách lạ "2, 460", "49 ,593.60")
 # ----------------------------------------------------------------------
+
+# Bank info chung cho cả 4 file — Phú LV (Kiểm tra) nhập per-order
+# 4 file mẫu đều dùng cùng 1 account Vietin Hue của Huy Anh; nhưng thực tế
+# có thể đổi bank/branch/account → cần placeholder.
+BANK_REPL = [
+    ("ACCOUNT NAME: HUY ANH RUBBER COMPANY LIMITED", "ACCOUNT NAME: {bank_account_name}"),
+    ("ACCOUNT NO: 111002648221", "ACCOUNT NO: {bank_account_no}"),
+    ("AT BANK’S NAME: VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE HUE BRANCH",
+     "AT BANK’S NAME: {bank_full_name}"),
+    ("AT BANK'S NAME: VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE HUE BRANCH",
+     "AT BANK’S NAME: {bank_full_name}"),
+    ("ADDRESS: 02 LE QUY DON STREET, THUAN HOA WARD, HUE CITY, VIET NAM",
+     "ADDRESS: {bank_address}"),
+    ("SWIFT CODE: ICBVVNVX460", "SWIFT CODE: {bank_swift}"),
+]
 
 # CIF Yoong Do (SC)
 REPL_SC_CIF = [
@@ -70,6 +93,7 @@ REPL_SC_CIF = [
     # Freight
     ("freight prepaid", "{freight_mark}"),
 ]
+REPL_SC_CIF += BANK_REPL
 
 # CIF Yoong Do (PI)
 REPL_PI_CIF = [
@@ -96,6 +120,7 @@ REPL_PI_CIF = [
      "{payment}. {payment_extra}"),
     ("LC at sight", "{payment}"),
 ]
+REPL_PI_CIF += BANK_REPL
 
 # FOB Apollo (SC)
 REPL_SC_FOB = [
@@ -136,6 +161,7 @@ REPL_SC_FOB = [
     ("freight Collect", "{freight_mark}"),
     ("freight collect", "{freight_mark}"),
 ]
+REPL_SC_FOB += BANK_REPL
 
 # FOB Apollo (PI)
 REPL_PI_FOB = [
@@ -161,6 +187,7 @@ REPL_PI_FOB = [
      "{amount_words}"),
     ("CAD 5 days", "{payment}"),
 ]
+REPL_PI_FOB += BANK_REPL
 
 
 def _replace_in_paragraph(paragraph, replacements):
@@ -222,7 +249,11 @@ def build_template(src_path, out_path, replacements, label):
                 if find in before:
                     matched_keys.add(repl)
     doc.save(str(out_path))
+    # Copy ra /public/contract-templates/ để Vite serve cho frontend fetch
+    public_path = PUBLIC_DIR / out_path.name
+    public_path.write_bytes(out_path.read_bytes())
     print(f"  out: {out_path.relative_to(ROOT)}  ({changed} paragraphs modified)")
+    print(f"  + copy → {public_path.relative_to(ROOT)}")
     print(f"  placeholders inserted: {sorted(matched_keys)}")
     return changed, matched_keys
 

@@ -31,6 +31,7 @@ import { FileWordOutlined, DownloadOutlined, CodeOutlined, HomeOutlined } from '
 import {
   downloadContract,
   deriveKind,
+  DEFAULT_BANK,
   type ContractFormData,
   type ContractKind,
 } from '../../services/sales/contractGeneratorService'
@@ -69,6 +70,7 @@ const PRESETS: Record<string, Preset> = {
     claims_days: '20',
     arbitration: 'SICOM Singapore',
     freight_mark: 'freight prepaid',
+    ...DEFAULT_BANK,
   },
   apollo: {
     _label: 'Apollo Tyres (FOB · RSS3 · multi-lot)',
@@ -96,6 +98,7 @@ const PRESETS: Record<string, Preset> = {
     claims_days: '20',
     arbitration: 'SICOM Singapore',
     freight_mark: 'freight Collect',
+    ...DEFAULT_BANK,
   },
   yoongdo: {
     _label: 'Yoong Do Engineering (CIF · SVR3L · Incheon)',
@@ -126,6 +129,7 @@ const PRESETS: Record<string, Preset> = {
     claims_days: '20',
     arbitration: 'SICOM Singapore',
     freight_mark: 'freight prepaid',
+    ...DEFAULT_BANK,
   },
   vitry: {
     _label: 'VITRY SAS (CIF · RSS3 · Le Havre · LCIA)',
@@ -155,6 +159,7 @@ const PRESETS: Record<string, Preset> = {
     claims_days: '30',
     arbitration: 'LCIA London',
     freight_mark: 'freight prepaid',
+    ...DEFAULT_BANK,
   },
 }
 
@@ -471,6 +476,56 @@ export default function ContractGeneratorTestPage() {
               <Form.Item label="Arbitration">
                 <Input value={data.arbitration} onChange={(e) => set('arbitration', e.target.value)} />
               </Form.Item>
+
+              <Divider orientation="left" style={{ marginTop: 16 }}>
+                <Tag color="orange">phulv@huyanhrubber.com (Kiểm tra) nhập</Tag>
+                Bank info – tài khoản nhận tiền
+              </Divider>
+
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item label="Account name">
+                    <Input
+                      value={data.bank_account_name}
+                      onChange={(e) => set('bank_account_name', e.target.value)}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="Account No.">
+                    <Input
+                      value={data.bank_account_no}
+                      onChange={(e) => set('bank_account_no', e.target.value)}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item label="Bank full name">
+                <Input
+                  value={data.bank_full_name}
+                  onChange={(e) => set('bank_full_name', e.target.value)}
+                />
+              </Form.Item>
+
+              <Row gutter={12}>
+                <Col span={16}>
+                  <Form.Item label="Bank address">
+                    <Input
+                      value={data.bank_address}
+                      onChange={(e) => set('bank_address', e.target.value)}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="SWIFT">
+                    <Input
+                      value={data.bank_swift}
+                      onChange={(e) => set('bank_swift', e.target.value)}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
             </Form>
           </Card>
 

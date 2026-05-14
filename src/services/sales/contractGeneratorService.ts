@@ -58,6 +58,27 @@ export interface ContractFormData {
   claims_days?: string        // "20" (default)
   arbitration?: string        // "SICOM Singapore" | "LCIA London"
   freight_mark?: string       // "freight prepaid" | "freight Collect"
+
+  // ----- Bank info: Phú LV (Kiểm tra) nhập per-order -----
+  // Sale lên HĐ → submit reviewing → Phú LV mở review, chọn/nhập bank →
+  // approved → Trung/Huy ký. Sale KHÔNG nhập 5 field này.
+  bank_account_name?: string  // "HUY ANH RUBBER COMPANY LIMITED"
+  bank_account_no?: string    // "111002648221"
+  bank_full_name?: string     // "VIETNAM JOINT STOCK COMMERCIAL BANK…HUE BRANCH"
+  bank_address?: string       // "02 LE QUY DON STREET…HUE CITY, VIET NAM"
+  bank_swift?: string         // "ICBVVNVX460"
+}
+
+/** Default bank (Vietin Hue) — fallback nếu Phú LV chưa nhập. */
+export const DEFAULT_BANK: Pick<
+  ContractFormData,
+  'bank_account_name' | 'bank_account_no' | 'bank_full_name' | 'bank_address' | 'bank_swift'
+> = {
+  bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+  bank_account_no: '111002648221',
+  bank_full_name: 'VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE HUE BRANCH',
+  bank_address: '02 LE QUY DON STREET, THUAN HOA WARD, HUE CITY, VIET NAM',
+  bank_swift: 'ICBVVNVX460',
 }
 
 // ----------------------------------------------------------------------------

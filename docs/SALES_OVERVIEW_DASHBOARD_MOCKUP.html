@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tổng quan Đơn hàng bán — Mock Bento Dashboard | Huy Anh ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #1B4D3E;
+    --primary-light: #2E7D5B;
+    --primary-bg: #f0f9f4;
+    --gold: #FFD700;
+    --red: #cf1322;
+    --red-bg: #fff1f0;
+    --yellow: #d46b08;
+    --yellow-bg: #fff7e6;
+    --green: #389e0d;
+    --green-bg: #f6ffed;
+    --blue: #1677ff;
+    --blue-bg: #e6f4ff;
+    --purple: #531dab;
+    --purple-bg: #f9f0ff;
+    --border: #e8e8e8;
+    --bg: #f5f6f8;
+    --card: #fff;
+    --text: rgba(0,0,0,0.88);
+    --text-secondary: #8c8c8c;
+    --text-tertiary: #bfbfbf;
+  }
+  body {
+    font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ─── Container ─── */
+  .container { max-width: 1600px; margin: 0 auto; padding: 20px 24px 48px; }
+
+  /* ─── Top bar ─── */
+  .topbar {
+    background: var(--card); border-radius: 12px; padding: 14px 20px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid var(--border);
+  }
+  .back-btn {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; font-size: 16px; color: var(--text-secondary);
+  }
+  .back-btn:hover { background: var(--primary-bg); color: var(--primary); border-color: var(--primary); }
+  .page-title { font-size: 18px; font-weight: 700; color: var(--primary); }
+  .page-subtitle { color: var(--text-secondary); font-size: 12px; margin-left: 4px; }
+
+  .seg {
+    display: flex; gap: 2px; padding: 3px; background: #f0f0f0; border-radius: 8px;
+    margin-left: auto;
+  }
+  .seg-btn {
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    border: none; background: transparent; cursor: pointer; color: var(--text-secondary);
+    transition: 0.15s;
+  }
+  .seg-btn.active { background: var(--card); color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+  .role-chip {
+    display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+    background: var(--primary-bg); border-radius: 16px; font-size: 12px; font-weight: 600;
+    color: var(--primary); border: 1px solid #b7e3c8; cursor: pointer;
+  }
+  .role-chip:hover { background: #d9f4e3; }
+
+  /* ─── AI Summary banner ─── */
+  .ai-banner {
+    background: linear-gradient(135deg, #1B4D3E 0%, #2E7D5B 100%);
+    color: #fff; border-radius: 14px; padding: 16px 20px; margin-bottom: 16px;
+    display: flex; align-items: flex-start; gap: 14px;
+    box-shadow: 0 4px 16px rgba(27,77,62,0.15);
+  }
+  .ai-icon {
+    width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+  }
+  .ai-content { flex: 1; min-width: 0; }
+  .ai-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.75; margin-bottom: 4px; }
+  .ai-text { font-size: 13.5px; line-height: 1.65; }
+  .ai-text .high { color: #FFD700; font-weight: 600; }
+  .ai-text .red { color: #ff7875; font-weight: 600; }
+  .ai-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .ai-action {
+    padding: 4px 10px; background: rgba(255,255,255,0.18); border-radius: 6px;
+    font-size: 11px; cursor: pointer; transition: 0.15s; border: 1px solid rgba(255,255,255,0.1);
+  }
+  .ai-action:hover { background: rgba(255,255,255,0.28); }
+
+  /* ─── KPI Row ─── */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px;
+  }
+  .kpi {
+    background: var(--card); border-radius: 12px; padding: 14px 16px;
+    border: 1px solid var(--border); cursor: pointer; transition: 0.15s;
+    position: relative; overflow: hidden;
+  }
+  .kpi:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+  .kpi-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-value { font-size: 26px; font-weight: 700; color: var(--text); margin: 6px 0 2px; line-height: 1.1; }
+  .kpi-sub { font-size: 11px; color: var(--text-secondary); }
+  .kpi-trend { font-size: 11px; font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+  .kpi-trend.up { color: var(--green); }
+  .kpi-trend.down { color: var(--red); }
+  .kpi-trend.neutral { color: var(--text-secondary); }
+  .kpi.alert .kpi-value { color: var(--red); }
+  .kpi.alert .kpi-sub { color: var(--red); }
+  .kpi-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--primary); }
+  .kpi.alert .kpi-accent { background: var(--red); }
+  .kpi.success .kpi-accent { background: var(--green); }
+  .kpi.warn .kpi-accent { background: var(--yellow); }
+
+  /* ─── Bento Grid ─── */
+  .bento {
+    display: grid; gap: 16px; margin-bottom: 16px;
+  }
+  .bento.row-2 { grid-template-columns: 2fr 1fr; }
+  .bento.row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .widget {
+    background: var(--card); border-radius: 12px; border: 1px solid var(--border);
+    padding: 16px; display: flex; flex-direction: column;
+  }
+  .widget-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+  }
+  .widget-icon {
+    width: 28px; height: 28px; border-radius: 7px; background: var(--primary-bg);
+    color: var(--primary); display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .widget-icon.red { background: var(--red-bg); color: var(--red); }
+  .widget-icon.yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .widget-icon.green { background: var(--green-bg); color: var(--green); }
+  .widget-icon.blue { background: var(--blue-bg); color: var(--blue); }
+  .widget-icon.purple { background: var(--purple-bg); color: var(--purple); }
+  .widget-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .widget-sub { font-size: 11px; color: var(--text-secondary); margin-left: auto; }
+  .widget-link {
+    margin-left: auto; font-size: 11px; color: var(--primary); cursor: pointer; font-weight: 500;
+  }
+  .widget-link:hover { text-decoration: underline; }
+
+  /* ─── Pipeline by stage (horizontal bar) ─── */
+  .pipeline-stage {
+    display: flex; align-items: center; gap: 12px; padding: 8px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .pipeline-stage:last-child { border-bottom: none; }
+  .stage-icon {
+    width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .stage-info { flex: 1; min-width: 0; }
+  .stage-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .stage-bar-wrap { background: #f0f0f0; height: 6px; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .stage-bar { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .stage-stats { text-align: right; font-size: 11px; flex-shrink: 0; min-width: 100px; }
+  .stage-count { font-size: 14px; font-weight: 700; color: var(--text); }
+  .stage-value { color: var(--text-secondary); font-size: 11px; }
+
+  /* ─── SLA at risk list ─── */
+  .sla-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px;
+    border-radius: 8px; margin-bottom: 6px; border: 1px solid #f0f0f0;
+    transition: 0.15s; cursor: pointer;
+  }
+  .sla-item:hover { border-color: var(--primary); background: var(--primary-bg); }
+  .sla-item.red { background: var(--red-bg); border-color: #ffccc7; }
+  .sla-item.yellow { background: var(--yellow-bg); border-color: #ffd591; }
+  .sla-ring {
+    width: 40px; height: 40px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+    flex-shrink: 0; position: relative;
+  }
+  .sla-ring.red { background: var(--red); color: #fff; }
+  .sla-ring.yellow { background: var(--yellow); color: #fff; }
+  .sla-info { flex: 1; min-width: 0; }
+  .sla-code { font-size: 12px; font-weight: 700; }
+  .sla-meta { font-size: 11px; color: var(--text-secondary); }
+  .sla-action {
+    font-size: 11px; padding: 4px 8px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; cursor: pointer; font-weight: 500;
+  }
+  .sla-action:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  /* ─── Action queue ─── */
+  .action-group { margin-bottom: 12px; }
+  .action-group:last-child { margin-bottom: 0; }
+  .action-group-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-secondary); margin-bottom: 8px; display: flex; gap: 6px; align-items: center;
+  }
+  .badge-num {
+    background: var(--primary); color: #fff; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 700;
+  }
+  .badge-num.red { background: var(--red); }
+  .badge-num.yellow { background: var(--yellow); }
+  .action-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    border-radius: 6px; cursor: pointer; transition: 0.1s; font-size: 12px;
+  }
+  .action-row:hover { background: var(--primary-bg); }
+  .action-code { font-weight: 600; color: var(--primary); min-width: 88px; }
+  .action-desc { color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .action-age { font-size: 10px; color: var(--text-tertiary); flex-shrink: 0; }
+
+  /* ─── Calendar mini ─── */
+  .cal-wrap { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-head { font-size: 10px; text-align: center; color: var(--text-secondary); padding: 4px; font-weight: 600; }
+  .cal-cell {
+    aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 11px; cursor: pointer;
+    background: #fafafa; transition: 0.15s; position: relative;
+  }
+  .cal-cell:hover { background: var(--primary-bg); }
+  .cal-cell.has-event { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+  .cal-cell.today { background: var(--primary); color: #fff; font-weight: 700; }
+  .cal-cell.urgent { background: var(--red-bg); color: var(--red); font-weight: 600; }
+  .cal-cell .dot {
+    width: 4px; height: 4px; border-radius: 50%; background: currentColor; margin-top: 2px;
+  }
+  .cal-cell.muted { color: var(--text-tertiary); cursor: default; }
+  .cal-cell.muted:hover { background: #fafafa; }
+
+  /* ─── Top customers bar ─── */
+  .cust-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+  .cust-row:last-child { border: none; }
+  .cust-flag { font-size: 18px; }
+  .cust-info { flex: 1; min-width: 0; }
+  .cust-name { font-size: 12px; font-weight: 600; }
+  .cust-bar-wrap { background: #f0f0f0; height: 4px; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .cust-bar { height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-light)); border-radius: 2px; }
+  .cust-amount { font-size: 12px; font-weight: 700; min-width: 70px; text-align: right; }
+
+  /* ─── Donut chart (workflow) ─── */
+  .donut-wrap { display: flex; align-items: center; gap: 16px; }
+  .donut { position: relative; width: 100px; height: 100px; }
+  .donut svg { transform: rotate(-90deg); }
+  .donut-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .donut-num { font-size: 22px; font-weight: 700; }
+  .donut-label { font-size: 10px; color: var(--text-secondary); }
+  .donut-legend { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 11px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { color: var(--text-secondary); flex: 1; }
+  .legend-num { font-weight: 700; color: var(--text); }
+
+  /* ─── Activity feed ─── */
+  .feed-item {
+    display: flex; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid #f5f5f5; align-items: flex-start;
+  }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-dot {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    background: var(--primary-bg); color: var(--primary);
+  }
+  .feed-content { flex: 1; min-width: 0; font-size: 12px; }
+  .feed-actor { font-weight: 600; }
+  .feed-action { color: var(--text-secondary); }
+  .feed-target { font-weight: 600; color: var(--primary); }
+  .feed-time { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+
+  /* ─── LC table ─── */
+  .table-mini { width: 100%; font-size: 12px; }
+  .table-mini th {
+    text-align: left; padding: 6px 8px; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--text-secondary); border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  .table-mini td { padding: 8px; border-bottom: 1px solid #f5f5f5; }
+  .table-mini tr:last-child td { border: none; }
+  .table-mini tr:hover { background: var(--primary-bg); cursor: pointer; }
+
+  /* ─── Cash flow chart ─── */
+  .cashflow-bars { display: flex; align-items: flex-end; gap: 8px; height: 120px; padding: 8px 0; }
+  .cf-bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cf-bar {
+    width: 100%; border-radius: 4px 4px 0 0; min-height: 4px;
+    background: linear-gradient(180deg, var(--primary-light), var(--primary));
+    transition: 0.3s; position: relative;
+  }
+  .cf-bar.future { background: linear-gradient(180deg, #ffd591, var(--yellow)); }
+  .cf-bar:hover::after {
+    content: attr(data-value); position: absolute; bottom: 100%; left: 50%;
+    transform: translateX(-50%); background: var(--text); color: #fff;
+    padding: 3px 8px; border-radius: 4px; font-size: 10px; white-space: nowrap; margin-bottom: 4px;
+  }
+  .cf-label { font-size: 10px; color: var(--text-secondary); }
+
+  /* ─── Quick actions footer ─── */
+  .quick-actions {
+    position: sticky; bottom: 20px; background: var(--card); border-radius: 14px;
+    padding: 12px 16px; display: flex; gap: 10px; align-items: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08); border: 1px solid var(--border);
+    margin-top: 16px;
+  }
+  .qa-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+  .qa-btn {
+    padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--card); cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .qa-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .qa-btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .qa-btn.primary:hover { background: var(--primary-light); }
+  .kbd {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    padding: 2px 6px; background: #f0f0f0; border-radius: 4px; color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  /* ─── Footer note ─── */
+  .footer-note {
+    margin-top: 16px; padding: 12px 16px; background: #fafafa;
+    border-radius: 8px; font-size: 11px; color: var(--text-secondary); text-align: center;
+  }
+
+  @media (max-width: 1200px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .bento.row-2 { grid-template-columns: 1fr; }
+    .bento.row-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- TOP BAR -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="topbar">
+    <button class="back-btn">←</button>
+    <div>
+      <div class="page-title">📊 Tổng quan Đơn hàng bán <span class="page-subtitle">/ Bento Dashboard</span></div>
+    </div>
+    <div class="seg">
+      <button class="seg-btn">Tuần này</button>
+      <button class="seg-btn active">Tháng 5/2026</button>
+      <button class="seg-btn">Quý 2/2026</button>
+      <button class="seg-btn">Năm 2026</button>
+    </div>
+    <div class="role-chip" onclick="switchRole()">
+      <span id="role-icon">👁️</span>
+      <span id="role-label">BGĐ (Mr. Huy)</span>
+      <span style="opacity:0.6">▼</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- AI SUMMARY BANNER -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="ai-banner">
+    <div class="ai-icon">✨</div>
+    <div class="ai-content">
+      <div class="ai-label">AI Summary · Cập nhật 8 phút trước</div>
+      <div class="ai-text">
+        Tháng <span class="high">5/2026: 24 đơn đang xử lý</span>, tổng giá trị <span class="high">$4.82M</span>.
+        <span class="red">⚠ 3 đơn SLA đỏ</span> cần xử lý ngay:
+        <strong>HA20260055 (Vitry · 6d quá hạn)</strong>,
+        <strong>HA20260051 (Apollo · 4d quá hạn)</strong>,
+        <strong>HA20260053 (Yoong Do · 2d quá hạn)</strong>.
+        <span class="high">📈 Doanh thu T5 +12%</span> so với T4 nhờ KH Apollo Tyres mở thêm 3 đơn RSS3.
+        <strong>2 L/C sắp hết hạn trong 7 ngày</strong> — đề xuất nhắc KH gia hạn.
+      </div>
+      <div class="ai-actions">
+        <span class="ai-action">→ Mở 3 đơn SLA đỏ</span>
+        <span class="ai-action">→ Xem L/C sắp hết</span>
+        <span class="ai-action">→ Báo cáo T5 đầy đủ</span>
+        <span class="ai-action">⚙ Tuỳ chỉnh AI summary</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- HERO KPI ROW -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-accent"></div>
+      <div class="kpi-label">Đang xử lý</div>
+      <div class="kpi-value">24</div>
+      <div class="kpi-sub">đơn · $4.82M pipeline</div>
+      <div class="kpi-trend up">↗ +3 so với T4</div>
+    </div>
+    <div class="kpi alert">
+      <div class="kpi-accent"></div>
+      <div class="kpi-label">SLA at risk</div>
+      <div class="kpi-value">3</div>
+      <div class="kpi-sub">đơn quá hạn ≥ 2 ngày</div>
+      <div class="kpi-trend down">↘ Cần xử lý hôm nay</div>
+    </div>
+    <div class="kpi warn">
+      <div class="kpi-accent"></div>
+      <div class="kpi-label">Cần action của bạn</div>
+      <div class="kpi-value">5</div>
+      <div class="kpi-sub">đơn chờ duyệt + ký</div>
+      <div class="kpi-trend neutral">→ Xem chi tiết</div>
+    </div>
+    <div class="kpi success">
+      <div class="kpi-accent"></div>
+      <div class="kpi-label">Đã ký T5</div>
+      <div class="kpi-value">12</div>
+      <div class="kpi-sub">đơn · $2.10M ký xong</div>
+      <div class="kpi-trend up">↗ +20% vs T4</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent"></div>
+      <div class="kpi-label">L/C theo dõi</div>
+      <div class="kpi-value">7</div>
+      <div class="kpi-sub mono" style="color:var(--yellow); font-weight:600">⏰ 2 hết hạn ≤7d</div>
+      <div class="kpi-trend neutral">→ Vietin · Vietcom</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- BENTO ROW 1: Pipeline + SLA -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="bento row-2">
+
+    <!-- Pipeline by stage -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon">📊</div>
+        <div class="widget-title">Pipeline theo giai đoạn</div>
+        <div class="widget-link">Xem Kanban →</div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="stage-icon" style="background:#fff7e6; color:#d46b08">🛒</div>
+        <div class="stage-info">
+          <div class="stage-name">Mua mủ NVL</div>
+          <div class="stage-bar-wrap"><div class="stage-bar" style="width:70%; background:#d46b08"></div></div>
+        </div>
+        <div class="stage-stats">
+          <div class="stage-count">7 đơn</div>
+          <div class="stage-value">$1.42M</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="stage-icon" style="background:#e6f4ff; color:#1677ff">🏭</div>
+        <div class="stage-info">
+          <div class="stage-name">Đang sản xuất</div>
+          <div class="stage-bar-wrap"><div class="stage-bar" style="width:55%; background:#1677ff"></div></div>
+        </div>
+        <div class="stage-stats">
+          <div class="stage-count">5 đơn</div>
+          <div class="stage-value">$0.94M</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="stage-icon" style="background:#f9f0ff; color:#531dab">📋</div>
+        <div class="stage-info">
+          <div class="stage-name">HĐ — chờ Kiểm tra (Phú LV)</div>
+          <div class="stage-bar-wrap"><div class="stage-bar" style="width:40%; background:#531dab"></div></div>
+        </div>
+        <div class="stage-stats">
+          <div class="stage-count">3 đơn</div>
+          <div class="stage-value">$0.62M</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="stage-icon" style="background:#fff7e6; color:#d46b08">✍️</div>
+        <div class="stage-info">
+          <div class="stage-name">HĐ — chờ Trung/Huy ký</div>
+          <div class="stage-bar-wrap"><div class="stage-bar" style="width:30%; background:#fa8c16"></div></div>
+        </div>
+        <div class="stage-stats">
+          <div class="stage-count">2 đơn</div>
+          <div class="stage-value">$0.48M</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="stage-icon" style="background:#e6f4ff; color:#1677ff">📦</div>
+        <div class="stage-info">
+          <div class="stage-name">Đóng cont & xếp hàng</div>
+          <div class="stage-bar-wrap"><div class="stage-bar" style="width:48%; background:#1677ff"></div></div>
+        </div>
+        <div class="stage-stats">
+          <div class="stage-count">4 đơn</div>
+          <div class="stage-value">$0.78M</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="stage-icon" style="background:#f6ffed; color:#389e0d">🚢</div>
+        <div class="stage-info">
+          <div class="stage-name">Đã xuất / On the way</div>
+          <div class="stage-bar-wrap"><div class="stage-bar" style="width:35%; background:#389e0d"></div></div>
+        </div>
+        <div class="stage-stats">
+          <div class="stage-count">3 đơn</div>
+          <div class="stage-value">$0.58M</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLA at risk -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon red">⚠</div>
+        <div class="widget-title">SLA at risk</div>
+        <div class="widget-sub">3 đơn</div>
+      </div>
+      <div class="sla-item red">
+        <div class="sla-ring red">+6d</div>
+        <div class="sla-info">
+          <div class="sla-code">HA20260055 🇫🇷 Vitry</div>
+          <div class="sla-meta">RSS3 · 20.16MT · $48,585 · Đóng gói</div>
+        </div>
+        <button class="sla-action">Xử lý</button>
+      </div>
+      <div class="sla-item red">
+        <div class="sla-ring red">+4d</div>
+        <div class="sla-info">
+          <div class="sla-code">HA20260051 🇮🇳 Apollo</div>
+          <div class="sla-meta">RSS3 · 201.6MT · $473K · Sản xuất</div>
+        </div>
+        <button class="sla-action">Xử lý</button>
+      </div>
+      <div class="sla-item yellow">
+        <div class="sla-ring yellow">+2d</div>
+        <div class="sla-info">
+          <div class="sla-code">HA20260053 🇰🇷 Yoong Do</div>
+          <div class="sla-meta">SVR3L · 20.16MT · $49,594 · Chờ ký</div>
+        </div>
+        <button class="sla-action">Xử lý</button>
+      </div>
+      <div style="margin-top:10px; text-align:center;">
+        <a class="widget-link" style="font-size:12px;">Xem tất cả 5 cảnh báo →</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- BENTO ROW 2: Action queue + Calendar + Top customers -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="bento row-3">
+
+    <!-- Action queue -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon purple">✓</div>
+        <div class="widget-title">Cần action của bạn</div>
+        <div class="widget-sub">5 mục</div>
+      </div>
+
+      <div class="action-group">
+        <div class="action-group-title">
+          <span>📋 Cần duyệt</span>
+          <span class="badge-num">2</span>
+        </div>
+        <div class="action-row" onclick="alert('Mở /sales/contracts/review')">
+          <span class="action-code">HA20260055</span>
+          <span class="action-desc">Vitry · RSS3 · $48,585</span>
+          <span class="action-age">3h</span>
+        </div>
+        <div class="action-row" onclick="alert('Mở review')">
+          <span class="action-code">HA20260060</span>
+          <span class="action-desc">UKKO · RSS_3 · $47,560</span>
+          <span class="action-age">1d</span>
+        </div>
+      </div>
+
+      <div class="action-group">
+        <div class="action-group-title">
+          <span>✍️ Cần ký</span>
+          <span class="badge-num">2</span>
+        </div>
+        <div class="action-row">
+          <span class="action-code">HA20260053</span>
+          <span class="action-desc">Yoong Do · SVR3L · $49,594</span>
+          <span class="action-age">2d</span>
+        </div>
+        <div class="action-row">
+          <span class="action-code">HA20260054</span>
+          <span class="action-desc">Phil Rubber · SVR3L · $190K</span>
+          <span class="action-age">5h</span>
+        </div>
+      </div>
+
+      <div class="action-group">
+        <div class="action-group-title">
+          <span>💰 LC sắp hết hạn</span>
+          <span class="badge-num red">1</span>
+        </div>
+        <div class="action-row">
+          <span class="action-code">HA20260049</span>
+          <span class="action-desc">Còn 3 ngày — LC Vietcom</span>
+          <span class="action-age">!!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon blue">📅</div>
+        <div class="widget-title">Lịch giao 14 ngày tới</div>
+        <div class="widget-sub">8 ETD</div>
+      </div>
+      <div class="cal-wrap">
+        <div class="cal-head">T2</div>
+        <div class="cal-head">T3</div>
+        <div class="cal-head">T4</div>
+        <div class="cal-head">T5</div>
+        <div class="cal-head">T6</div>
+        <div class="cal-head">T7</div>
+        <div class="cal-head">CN</div>
+
+        <div class="cal-cell muted">12</div>
+        <div class="cal-cell muted">13</div>
+        <div class="cal-cell today">14<div class="dot"></div></div>
+        <div class="cal-cell">15</div>
+        <div class="cal-cell has-event">16<div class="dot"></div></div>
+        <div class="cal-cell">17</div>
+        <div class="cal-cell">18</div>
+
+        <div class="cal-cell has-event">19<div class="dot"></div></div>
+        <div class="cal-cell">20</div>
+        <div class="cal-cell urgent">21<div class="dot"></div></div>
+        <div class="cal-cell has-event">22<div class="dot"></div></div>
+        <div class="cal-cell">23</div>
+        <div class="cal-cell">24</div>
+        <div class="cal-cell">25</div>
+
+        <div class="cal-cell has-event">26<div class="dot"></div></div>
+        <div class="cal-cell">27</div>
+        <div class="cal-cell">28</div>
+        <div class="cal-cell has-event">29<div class="dot"></div></div>
+        <div class="cal-cell urgent">30<div class="dot"></div></div>
+        <div class="cal-cell">31</div>
+        <div class="cal-cell muted">1</div>
+      </div>
+      <div style="margin-top:10px; font-size:11px; color:var(--text-secondary); display:flex; justify-content:space-between;">
+        <span>📍 21/5 Apollo (10 cont)</span>
+        <span>📍 30/5 Vitry (1 cont)</span>
+      </div>
+    </div>
+
+    <!-- Top customers -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon green">🏆</div>
+        <div class="widget-title">Top KH tháng 5</div>
+        <div class="widget-sub">USD</div>
+      </div>
+      <div class="cust-row">
+        <span class="cust-flag">🇮🇳</span>
+        <div class="cust-info">
+          <div class="cust-name">Apollo Tyres</div>
+          <div class="cust-bar-wrap"><div class="cust-bar" style="width:100%"></div></div>
+        </div>
+        <div class="cust-amount">$1.42M</div>
+      </div>
+      <div class="cust-row">
+        <span class="cust-flag">🇵🇭</span>
+        <div class="cust-info">
+          <div class="cust-name">Phil Rubber Trade</div>
+          <div class="cust-bar-wrap"><div class="cust-bar" style="width:48%"></div></div>
+        </div>
+        <div class="cust-amount">$680K</div>
+      </div>
+      <div class="cust-row">
+        <span class="cust-flag">🇮🇩</span>
+        <div class="cust-info">
+          <div class="cust-name">PT Alphen</div>
+          <div class="cust-bar-wrap"><div class="cust-bar" style="width:36%"></div></div>
+        </div>
+        <div class="cust-amount">$512K</div>
+      </div>
+      <div class="cust-row">
+        <span class="cust-flag">🇰🇷</span>
+        <div class="cust-info">
+          <div class="cust-name">Yoong Do</div>
+          <div class="cust-bar-wrap"><div class="cust-bar" style="width:18%"></div></div>
+        </div>
+        <div class="cust-amount">$248K</div>
+      </div>
+      <div class="cust-row">
+        <span class="cust-flag">🇸🇬</span>
+        <div class="cust-info">
+          <div class="cust-name">R1 International</div>
+          <div class="cust-bar-wrap"><div class="cust-bar" style="width:12%"></div></div>
+        </div>
+        <div class="cust-amount">$168K</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- BENTO ROW 3: Workflow + Activity -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="bento row-2">
+
+    <!-- Workflow donut -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon purple">📑</div>
+        <div class="widget-title">Workflow HĐ — trạng thái</div>
+        <div class="widget-sub">24 HĐ active</div>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut">
+          <svg viewBox="0 0 36 36" width="100" height="100">
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#f0f0f0" stroke-width="4"/>
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#1677ff" stroke-width="4"
+              stroke-dasharray="25 88" stroke-dashoffset="0"/>
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#531dab" stroke-width="4"
+              stroke-dasharray="18 88" stroke-dashoffset="-25"/>
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#fa8c16" stroke-width="4"
+              stroke-dasharray="14 88" stroke-dashoffset="-43"/>
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#389e0d" stroke-width="4"
+              stroke-dasharray="22 88" stroke-dashoffset="-57"/>
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#bfbfbf" stroke-width="4"
+              stroke-dasharray="9 88" stroke-dashoffset="-79"/>
+          </svg>
+          <div class="donut-center">
+            <div class="donut-num">24</div>
+            <div class="donut-label">HĐ active</div>
+          </div>
+        </div>
+        <div class="donut-legend">
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#1677ff"></span>
+            <span class="legend-label">Nháp (Sale)</span>
+            <span class="legend-num">6</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#531dab"></span>
+            <span class="legend-label">Chờ Kiểm tra</span>
+            <span class="legend-num">5</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#fa8c16"></span>
+            <span class="legend-label">Đã duyệt, chờ ký</span>
+            <span class="legend-num">4</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#389e0d"></span>
+            <span class="legend-label">Đã ký</span>
+            <span class="legend-num">7</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#cf1322"></span>
+            <span class="legend-label">Bị trả lại</span>
+            <span class="legend-num">2</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid #f0f0f0; font-size:11px; color:var(--text-secondary);">
+        ⚡ <strong>Cycle time avg:</strong> Sale → Ký = <strong>3.2 ngày</strong> (giảm 18% so với T4)
+      </div>
+    </div>
+
+    <!-- Activity feed -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon blue">⚡</div>
+        <div class="widget-title">Hoạt động gần đây</div>
+        <div class="widget-link">Xem tất cả →</div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-dot" style="background:#f6ffed; color:#389e0d">✓</div>
+        <div class="feed-content">
+          <span class="feed-actor">Mr. Huy</span>
+          <span class="feed-action">đã ký HĐ</span>
+          <span class="feed-target">HA20260052</span>
+          <span class="feed-action">(UKKO · $47K)</span>
+          <div class="feed-time">12 phút trước</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-dot" style="background:#fff7e6; color:#d46b08">📋</div>
+        <div class="feed-content">
+          <span class="feed-actor">Phú LV</span>
+          <span class="feed-action">duyệt HĐ</span>
+          <span class="feed-target">HA20260054</span>
+          <span class="feed-action">+ chọn Vietin Bank</span>
+          <div class="feed-time">1 giờ trước</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-dot" style="background:#e6f4ff; color:#1677ff">📤</div>
+        <div class="feed-content">
+          <span class="feed-actor">Sales</span>
+          <span class="feed-action">tạo + trình</span>
+          <span class="feed-target">HA20260060</span>
+          <span class="feed-action">(UKKO · RSS_3 · $47K)</span>
+          <div class="feed-time">2 giờ trước</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-dot" style="background:#fff1f0; color:#cf1322">✗</div>
+        <div class="feed-content">
+          <span class="feed-actor">Phú LV</span>
+          <span class="feed-action">trả lại HĐ</span>
+          <span class="feed-target">HA20260058</span>
+          <span class="feed-action">— "Số PO sai, sửa lại"</span>
+          <div class="feed-time">3 giờ trước</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-dot" style="background:#f9f0ff; color:#531dab">📦</div>
+        <div class="feed-content">
+          <span class="feed-actor">Logistics</span>
+          <span class="feed-action">cập nhật ETD</span>
+          <span class="feed-target">HA20260051</span>
+          <span class="feed-action">→ 21/5/2026</span>
+          <div class="feed-time">5 giờ trước</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-dot" style="background:#f6ffed; color:#389e0d">💰</div>
+        <div class="feed-content">
+          <span class="feed-actor">Kế toán</span>
+          <span class="feed-action">ghi nhận thanh toán</span>
+          <span class="feed-target">HA20260042</span>
+          <span class="feed-action">$680K (Phil Rubber)</span>
+          <div class="feed-time">Hôm qua</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- BENTO ROW 4: LC tracking + Cash flow forecast -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="bento row-2">
+
+    <!-- LC table -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon yellow">💳</div>
+        <div class="widget-title">L/C theo dõi — sắp hết hạn</div>
+        <div class="widget-sub">7 LC active</div>
+      </div>
+      <table class="table-mini">
+        <thead>
+          <tr>
+            <th>HĐ</th>
+            <th>KH</th>
+            <th>Bank</th>
+            <th style="text-align:right">Giá trị</th>
+            <th style="text-align:right">Còn lại</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>HA20260049</strong></td>
+            <td>Apollo</td>
+            <td>Vietcom</td>
+            <td style="text-align:right">$473K</td>
+            <td style="text-align:right; color:var(--red); font-weight:600">3 ngày 🔴</td>
+          </tr>
+          <tr>
+            <td><strong>HA20260050</strong></td>
+            <td>Yoong Do</td>
+            <td>Vietin</td>
+            <td style="text-align:right">$50K</td>
+            <td style="text-align:right; color:var(--yellow); font-weight:600">7 ngày ⚠</td>
+          </tr>
+          <tr>
+            <td><strong>HA20260053</strong></td>
+            <td>Yoong Do</td>
+            <td>Vietin</td>
+            <td style="text-align:right">$50K</td>
+            <td style="text-align:right">14 ngày</td>
+          </tr>
+          <tr>
+            <td><strong>HA20260055</strong></td>
+            <td>Vitry</td>
+            <td>BIDV</td>
+            <td style="text-align:right">$49K</td>
+            <td style="text-align:right">23 ngày</td>
+          </tr>
+          <tr>
+            <td><strong>HA20260051</strong></td>
+            <td>Apollo</td>
+            <td>Vietcom</td>
+            <td style="text-align:right">$473K</td>
+            <td style="text-align:right">35 ngày</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cash flow forecast -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-icon green">📈</div>
+        <div class="widget-title">Cash flow dự kiến</div>
+        <div class="widget-sub">90 ngày tới</div>
+      </div>
+      <div class="cashflow-bars">
+        <div class="cf-bar-group">
+          <div class="cf-bar" style="height:35%" data-value="$280K"></div>
+          <div class="cf-label">Tuần 1</div>
+        </div>
+        <div class="cf-bar-group">
+          <div class="cf-bar" style="height:62%" data-value="$520K"></div>
+          <div class="cf-label">Tuần 2</div>
+        </div>
+        <div class="cf-bar-group">
+          <div class="cf-bar" style="height:88%" data-value="$740K"></div>
+          <div class="cf-label">Tuần 3</div>
+        </div>
+        <div class="cf-bar-group">
+          <div class="cf-bar" style="height:75%" data-value="$630K"></div>
+          <div class="cf-label">Tuần 4</div>
+        </div>
+        <div class="cf-bar-group">
+          <div class="cf-bar future" style="height:55%" data-value="$460K (dự)"></div>
+          <div class="cf-label">T6</div>
+        </div>
+        <div class="cf-bar-group">
+          <div class="cf-bar future" style="height:78%" data-value="$650K (dự)"></div>
+          <div class="cf-label">T7</div>
+        </div>
+        <div class="cf-bar-group">
+          <div class="cf-bar future" style="height:42%" data-value="$350K (dự)"></div>
+          <div class="cf-label">T8</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:16px; margin-top:8px; font-size:11px; color:var(--text-secondary); border-top:1px solid #f0f0f0; padding-top:10px;">
+        <div>
+          <strong style="color:var(--green); font-size:14px;">$2.17M</strong>
+          <span style="display:block;">Tháng 5 đã chốt</span>
+        </div>
+        <div>
+          <strong style="color:var(--yellow); font-size:14px;">$1.46M</strong>
+          <span style="display:block;">T6-T8 dự kiến</span>
+        </div>
+        <div>
+          <strong style="color:var(--blue); font-size:14px;">+12%</strong>
+          <span style="display:block;">vs cùng kỳ năm trước</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- QUICK ACTIONS STICKY FOOTER -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="quick-actions">
+    <span class="qa-title">⚡ Quick actions</span>
+    <button class="qa-btn primary">+ Tạo đơn mới</button>
+    <button class="qa-btn">📋 Queue Kiểm tra <span style="background:var(--purple); color:#fff; padding:1px 6px; border-radius:8px; font-size:10px;">2</span></button>
+    <button class="qa-btn">✍️ Queue Ký <span style="background:var(--yellow); color:#fff; padding:1px 6px; border-radius:8px; font-size:10px;">2</span></button>
+    <button class="qa-btn">📊 Xem Kanban</button>
+    <button class="qa-btn" style="margin-left:auto">🔍 Tìm nhanh <span class="kbd">Ctrl+K</span></button>
+  </div>
+
+  <div class="footer-note">
+    💡 Mock này demo concept Bento Dashboard cho /sales/dashboard. Widget có thể tùy chỉnh (drag-to-rearrange, ẩn/hiện theo role). AI summary update mỗi 15 phút.
+    Tất cả số liệu là giả lập từ data tháng 5/2026 thực của Huy Anh ERP.
+  </div>
+
+</div>
+
+<script>
+  // Role switcher demo
+  const ROLES = [
+    { icon: '👁️', label: 'BGĐ (Mr. Huy)' },
+    { icon: '💼', label: 'Sale (Sales)' },
+    { icon: '📋', label: 'Kiểm tra (Phú LV)' },
+    { icon: '✍️', label: 'Trình ký (Mr. Trung)' },
+    { icon: '🚚', label: 'Logistics (Anh LP)' },
+    { icon: '💰', label: 'Kế toán (Phú LV)' },
+  ];
+  let roleIdx = 0;
+  function switchRole() {
+    roleIdx = (roleIdx + 1) % ROLES.length;
+    document.getElementById('role-icon').textContent = ROLES[roleIdx].icon;
+    document.getElementById('role-label').textContent = ROLES[roleIdx].label;
+  }
+
+  // Period segment toggle
+  document.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

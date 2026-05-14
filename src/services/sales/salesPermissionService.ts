@@ -13,7 +13,6 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Sale
   'sales@huyanhrubber.com': 'sale',
   // Production
-  'trunglxh@huyanhrubber.com': 'production',
   'nhanlt@huyanhrubber.com': 'production',
   // Mua mủ NVL (raw_material) — owner stage 'raw_material', cấp quyền production để
   // edit tab Sản xuất + xem Sales module (2026-05-05)
@@ -25,10 +24,11 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Accounting
   'yendt@huyanhrubber.com': 'accounting',
   'phulv@huyanhrubber.com': 'accounting',
-  // Admin
+  // Admin (toàn quyền module Đơn hàng bán)
   'minhld@huyanhrubber.com': 'admin',
   'thuyht@huyanhrubber.com': 'admin',
   'huylv@huyanhrubber.com': 'admin',
+  'trunglxh@huyanhrubber.com': 'admin', // Mr. Trung — admin toàn quyền (2026-05-14)
 }
 
 export function getSalesRole(user: any): SalesRole | null {

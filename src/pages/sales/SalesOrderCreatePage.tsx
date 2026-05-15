@@ -723,16 +723,16 @@ function SalesOrderCreatePage() {
             <Tag color="orange" style={{ fontSize: 10 }}>Mặc định OK · sửa khi đặc thù KH</Tag>
           </Space>}>
           <Row gutter={16}>
-            <Col xs={12} sm={6}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item label="Partial shipment" name="contract_partial" initialValue="Not Allowed"
-                tooltip="Cho phép giao nhiều đợt? Mặc định KHÔNG. Apollo multi-lot = Allowed.">
+                tooltip="Cho phép giao nhiều đợt? Mặc định KHÔNG.">
                 <Select size="large" options={[
                   { value: 'Not Allowed', label: 'Not Allowed' },
                   { value: 'Allowed', label: 'Allowed' },
                 ]} />
               </Form.Item>
             </Col>
-            <Col xs={12} sm={6}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item label="Transshipment" name="contract_trans" initialValue="Allowed"
                 tooltip="Cho phép chuyển tàu giữa đường? Mặc định YES.">
                 <Select size="large" options={[
@@ -741,15 +741,15 @@ function SalesOrderCreatePage() {
                 ]} />
               </Form.Item>
             </Col>
-            <Col xs={12} sm={4}>
-              <Form.Item label="Claims (ngày)" name="contract_claims_days" initialValue={20}
-                tooltip="Số ngày KH được khiếu nại sau khi nhận hàng. Default 20. VITRY/EU thường 30.">
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item label="Claims period (ngày)" name="contract_claims_days" initialValue={20}
+                tooltip="Số ngày KH được khiếu nại sau khi nhận hàng. Default 20.">
                 <InputNumber min={1} max={90} step={5} size="large" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item label="Arbitration" name="contract_arbitration" initialValue="SICOM Singapore"
-                tooltip="Tòa trọng tài giải quyết tranh chấp. Phổ biến: SICOM Singapore. Châu Âu: LCIA London. Việt Nam nội bộ: VIAC.">
+                tooltip="Tòa trọng tài giải quyết tranh chấp.">
                 <Select size="large" showSearch options={[
                   { value: 'SICOM Singapore', label: 'SICOM Singapore' },
                   { value: 'LCIA London', label: 'LCIA London' },
@@ -763,13 +763,12 @@ function SalesOrderCreatePage() {
           <Row gutter={16}>
             <Col xs={24} sm={12}>
               <Form.Item label="Freight mark trên B/L" name="contract_freight_mark"
-                tooltip="Auto theo Incoterm: CIF/CFR → 'freight prepaid' (HA trả); FOB → 'freight Collect' (KH trả). Override nếu thoả thuận khác.">
-                <Input size="large" placeholder="freight prepaid / freight Collect (auto theo Incoterm)" />
+                tooltip="Auto theo Incoterm: CIF/CFR → 'freight prepaid' (HA trả); FOB → 'freight Collect' (KH trả).">
+                <Input size="large" placeholder="Auto theo Incoterm — sửa nếu thoả thuận khác" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item label="amount_words (English) — auto"
-                tooltip="Auto compute từ Tổng giá trị USD cho PI section 'Words:'. Sale không cần sửa.">
+              <Form.Item label="Amount in words" tooltip="Auto compute từ Tổng USD cho PI section 'Words:'. Sale không cần sửa.">
                 <Input size="large" disabled value={contractData.amount_words || '(sẽ tự sinh khi có giá trị USD)'}
                   style={{ background: '#fafafa', fontStyle: 'italic', color: '#595959' }} />
               </Form.Item>
@@ -790,17 +789,17 @@ function SalesOrderCreatePage() {
               key: 'quality',
               label: <span style={{ fontSize: 13, fontWeight: 600 }}>📊 Chỉ tiêu kỹ thuật (mở rộng để sửa)</span>,
               children: (
-                <Row gutter={[8, 0]}>
-                  <Col xs={8} sm={4}><Form.Item label="DRC min %" name="drc_min" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="DRC max %" name="drc_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="Moisture %" name="moisture_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={10} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="Dirt %" name="dirt_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={1} step={0.001} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="Ash %" name="ash_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="N₂ %" name="nitrogen_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={2} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="Volatile %" name="volatile_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="PRI min" name="pri_min" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="Mooney" name="mooney_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
-                  <Col xs={8} sm={4}><Form.Item label="Color" name="color_lovibond_max" style={{ marginBottom: 8 }}><InputNumber size="small" min={0} max={10} step={0.5} style={{ width: '100%' }} /></Form.Item></Col>
+                <Row gutter={[12, 4]}>
+                  <Col xs={12} sm={6}><Form.Item label="DRC min %" name="drc_min" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="DRC max %" name="drc_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={100} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="Moisture %" name="moisture_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={10} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="Dirt %" name="dirt_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={1} step={0.001} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="Ash %" name="ash_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="N₂ %" name="nitrogen_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={2} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="Volatile %" name="volatile_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={5} step={0.01} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="PRI min" name="pri_min" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="Mooney" name="mooney_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
+                  <Col xs={12} sm={6}><Form.Item label="Color" name="color_lovibond_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={10} step={0.5} style={{ width: '100%' }} /></Form.Item></Col>
                 </Row>
               ),
             },
@@ -1112,7 +1111,7 @@ function SalesOrderCreatePage() {
       </div>
 
       {/* Form single-page (Compose Studio) */}
-      <Form form={form} layout="vertical" requiredMark="optional" preserve>
+      <Form form={form} layout="vertical" requiredMark preserve>
         {renderStep1()}
       </Form>
     </div>

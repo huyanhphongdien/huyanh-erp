@@ -25,6 +25,7 @@ import {
   AutoComplete,
   Tabs,
   Collapse,
+  Alert,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -935,6 +936,21 @@ function SalesOrderCreatePage() {
             {previewTab === 'SC' ? <PreviewSC /> : <PreviewPI />}
           </div>
 
+          {/* Banner cảnh báo bank chưa duyệt */}
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginTop: 12, fontSize: 12 }}
+            message="⚠ Bản preview — bank info chưa được duyệt"
+            description={
+              <span style={{ fontSize: 11 }}>
+                File tải về dùng bank <strong>DEFAULT (Vietin Hue)</strong> để preview.
+                <strong> KHÔNG gửi cho khách</strong> — sau khi submit, Phú LV
+                sẽ duyệt + nhập bank đúng → lúc đó mới tải bản chính thức gửi KH.
+              </span>
+            }
+          />
+
           {/* Nút sinh .docx */}
           <Space.Compact block style={{ marginTop: 12 }}>
             <Button
@@ -943,7 +959,7 @@ function SalesOrderCreatePage() {
               onClick={() => handleDownloadDoc('SC')}
               style={{ flex: 1 }}
             >
-              Tải SC
+              Preview SC
             </Button>
             <Button
               icon={<DownloadOutlined />}
@@ -951,7 +967,7 @@ function SalesOrderCreatePage() {
               onClick={() => handleDownloadDoc('PI')}
               style={{ flex: 1 }}
             >
-              Tải PI
+              Preview PI
             </Button>
             <Button
               type="primary"
@@ -960,7 +976,7 @@ function SalesOrderCreatePage() {
               onClick={() => handleDownloadDoc('BOTH')}
               style={{ flex: 1.2, background: '#1B4D3E' }}
             >
-              Tải SC + PI
+              Preview SC + PI
             </Button>
           </Space.Compact>
         </Card>

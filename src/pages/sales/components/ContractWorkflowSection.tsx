@@ -98,16 +98,18 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
       .finally(() => setLoading(false))
   }, [salesOrderId])
 
-  const handleDownload = async (
-    contract: SalesOrderContract,
-    type: 'SC' | 'PI',
-  ) => {
+  /** Quy tắc: chỉ HĐ status='approved'/'signed'/'archived' mới có bank info xác nhận
+   *  (Phú LV đã review). Trước đó bank vẫn là DEFAULT (Vietin Hue) → có thể SAI cho
+   *  khách hàng đó. Block tải nếu chưa duyệt. Admin/BGĐ bypass được với warning. */
+  const isBankConfirmed = (status: ContractStatus): boolean =>
+    ['approved', 'signed', 'archived'].includes(status)
+
+  const performDownload = async (contract: SalesOrderContract, type: 'SC' | 'PI') => {
     const key = `${contract.id}_${type}`
     setDocLoading(key)
     try {
       const fd = contract.form_data || {}
       const kind = deriveKind(fd.incoterm || 'FOB', type)
-      // Truyền salesOrderId → downloadContract auto-heal buyer_address/phone từ DB
       await downloadContract(
         kind,
         fd,
@@ -121,6 +123,50 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
     } finally {
       setDocLoading(null)
     }
+  }
+
+  const handleDownload = async (
+    contract: SalesOrderContract,
+    type: 'SC' | 'PI',
+  ) => {
+    // ★ Gate: HĐ chưa được Phú LV duyệt bank → block / cảnh báo
+    if (!isBankConfirmed(contract.status)) {
+      const isAdmin = canArchive  // admin/BGĐ bypass được
+      if (!isAdmin) {
+        Modal.warning({
+          title: '⚠ HĐ chưa được Phú LV duyệt bank info',
+          content: (
+            <div>
+              <p>HĐ <strong>{contract.form_data?.contract_no}</strong> đang ở
+              trạng thái <Tag color="orange">{STATUS_META[contract.status].label}</Tag>.</p>
+              <p style={{ marginTop: 8 }}>
+                Bank info hiện đang dùng <strong>DEFAULT (Vietin Hue)</strong> —
+                có thể KHÔNG đúng với deal này. Nếu gửi KH bản này, khách sẽ chuyển
+                tiền nhầm ngân hàng.
+              </p>
+              <p style={{ marginTop: 8, fontWeight: 600 }}>
+                Vui lòng đợi Phú LV review + nhập bank trước khi gửi KH.
+              </p>
+            </div>
+          ),
+          okText: 'Đã hiểu',
+          width: 480,
+        })
+        return
+      }
+      // Admin bypass với confirm
+      Modal.confirm({
+        title: '⚠ Bank info chưa được duyệt — vẫn tải?',
+        content: `HĐ đang ${STATUS_META[contract.status].label}. Bank info đang dùng DEFAULT Vietin Hue. Bạn là admin — có thể tải bản preview, NHƯNG KHÔNG gửi cho khách bản này.`,
+        okText: 'Tải bản preview',
+        cancelText: 'Huỷ',
+        okButtonProps: { danger: true },
+        onOk: () => performDownload(contract, type),
+      })
+      return
+    }
+    // Bank confirmed → tải bình thường
+    await performDownload(contract, type)
   }
 
   if (loading) {
@@ -285,6 +331,24 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
           </div>
         )}
       </Space>
+
+      {/* Banner cảnh báo bank chưa duyệt — block gửi KH */}
+      {!isBankConfirmed(latest.status) && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginTop: 12 }}
+          message="⚠ Bank info chưa được Phú LV duyệt"
+          description={
+            <span style={{ fontSize: 12 }}>
+              HĐ đang ở trạng thái <Tag color="orange">{STATUS_META[latest.status].label}</Tag>{' '}
+              — bank đang dùng DEFAULT (Vietin Hue), có thể KHÔNG đúng với deal này.{' '}
+              <strong>Không nên gửi HĐ này cho khách</strong> đến khi Phú LV duyệt
+              (status → "Đã duyệt").
+            </span>
+          }
+        />
+      )}
 
       {/* Bank info (nếu đã có) */}
       {fd.bank_account_no && (

@@ -264,6 +264,103 @@ def _iter_paragraphs(doc):
                                 yield np
 
 
+def _normalize_head_letter(doc):
+    """
+    ★ ĐỒNG BỘ HEAD LETTER giữa SC và PI ★
+
+    Source SC dùng format đẹp (title sz=44, No/Date sz=28 centered bold,
+    SELLER block sz=26). Source PI thì lệch:
+    - Title "PROFORMA INVOICE" chỉ sz=32 (nhỏ hơn SC)
+    - "No: ..." paragraph align=left thay vì center (lệch hàng so với Date)
+    - SELLER + Tel block không set explicit sz (mặc định ~22pt, nhỏ hơn SC sz=26)
+
+    Hàm này detect các paragraph head letter và normalize về format SC.
+    Áp dụng cho cả 4 template (SC dùng để 'idempotent', PI thực sự thay đổi).
+
+    Format chuẩn:
+    - Title (SALES CONTRACT / PROFORMA INVOICE / SALE CONTRACT): centered, sz=44, bold
+    - No: / Date: lines: centered, sz=28, bold
+    - THE SELLER + Address + Tel: justify, sz=26 (giữ bold riêng từng run)
+    """
+    from docx.oxml.ns import qn
+    from copy import deepcopy
+
+    W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+
+    def _set_align(p, val):
+        pPr = p._p.find(qn('w:pPr'))
+        if pPr is None:
+            pPr = p._p.makeelement(qn('w:pPr'), {})
+            p._p.insert(0, pPr)
+        jc = pPr.find(qn('w:jc'))
+        if jc is None:
+            jc = pPr.makeelement(qn('w:jc'), {qn('w:val'): val})
+            pPr.append(jc)
+        else:
+            jc.set(qn('w:val'), val)
+
+    def _set_run_sz(run, sz_val):
+        """sz là half-points (44 = 22pt). Set sz + szCs cho cả Latin + complex script."""
+        rPr = run._r.find(qn('w:rPr'))
+        if rPr is None:
+            rPr = run._r.makeelement(qn('w:rPr'), {})
+            run._r.insert(0, rPr)
+        for tag in (qn('w:sz'), qn('w:szCs')):
+            el = rPr.find(tag)
+            if el is None:
+                el = rPr.makeelement(tag, {qn('w:val'): str(sz_val)})
+                rPr.append(el)
+            else:
+                el.set(qn('w:val'), str(sz_val))
+
+    def _set_bold(run, bold):
+        rPr = run._r.find(qn('w:rPr'))
+        if rPr is None:
+            rPr = run._r.makeelement(qn('w:rPr'), {})
+            run._r.insert(0, rPr)
+        b = rPr.find(qn('w:b'))
+        if bold and b is None:
+            rPr.append(rPr.makeelement(qn('w:b'), {}))
+        elif not bold and b is not None:
+            rPr.remove(b)
+
+    changed = 0
+    for i, p in enumerate(doc.paragraphs[:12]):  # head letter nằm ở 10 para đầu
+        raw = p.text or ''
+        text = raw.strip()
+        upper = text.upper()
+        # Strip leading whitespace (PI_FOB nhập tay nhiều space cho căn lề trông sai)
+        if raw != text and raw.lstrip() != text and len(p.runs) > 0:
+            # Chỉ trim nếu para sẽ được normalize (title/No/Date/SELLER)
+            pass  # actual trim xử lý ở các block dưới khi rewrite runs
+        # Title paragraph
+        if any(k in upper for k in ['SALES CONTRACT', 'SALE CONTRACT', 'PROFORMA INVOICE']):
+            _set_align(p, 'center')
+            for r in p.runs:
+                _set_run_sz(r, 44)
+                _set_bold(r, True)
+            changed += 1
+        # No: HA... / Date: ... lines (ngay sau title, thường nằm trong para 1-3)
+        elif (text.startswith('No:') or text.startswith('No.:') or text.startswith('No ') or
+              text.startswith('Date:') or text.startswith('Date ')):
+            _set_align(p, 'center')
+            for r in p.runs:
+                _set_run_sz(r, 28)
+                _set_bold(r, True)
+            # Trim leading whitespace (PI_FOB src có "                     No: ..." manual padding)
+            if raw != raw.lstrip() and p.runs:
+                first = p.runs[0]
+                first.text = first.text.lstrip()
+            changed += 1
+        # SELLER / KHE MA / Tel-Fax block (giữ alignment 'both' = justify, normalize sz=26)
+        elif ('THE SELLER' in upper or 'KHE MA' in upper or
+              text.startswith('Tel:') or text.startswith('Tel ')):
+            for r in p.runs:
+                _set_run_sz(r, 26)
+            changed += 1
+    return changed
+
+
 def _inject_extra_terms(doc):
     """
     Tìm paragraph chứa {payment_extra} (SC) hoặc {payment} (PI — trong table cell)
@@ -311,6 +408,10 @@ def build_template(src_path, out_path, replacements, label):
     # Inject placeholder điều khoản bổ sung sau section Payment
     if _inject_extra_terms(doc):
         matched_keys.add('{#has_extra_terms}...{/has_extra_terms}')
+    # Đồng bộ head letter (title sz=44, No/Date sz=28 centered, SELLER block sz=26)
+    head_changed = _normalize_head_letter(doc)
+    if head_changed:
+        matched_keys.add(f'[head_letter normalized: {head_changed} paragraphs]')
     doc.save(str(out_path))
     # Copy ra /public/contract-templates/ để Vite serve cho frontend fetch
     public_path = PUBLIC_DIR / out_path.name

@@ -151,8 +151,39 @@ function render(name, { template, data }) {
       || (!!data.pallets_total && data.pallets_total !== '' && data.pallets_total !== '0');
     const paymentLower = (data.payment || '').toLowerCase();
     const isLcPayment = paymentLower.includes('l/c') || paymentLower.includes('lc');
+    // Port enum (DA_NANG, QUY_NHON, ...) → English contract format
+    const POL = {
+      ANY_PORT_VN: 'Any port, Viet Nam',
+      HCM_CAT_LAI: 'Cat Lai port, Ho Chi Minh City, Viet Nam',
+      HCM_HIEP_PHUOC: 'Hiep Phuoc port, Ho Chi Minh City, Viet Nam',
+      VUNG_TAU: 'Cai Mep port, Vung Tau, Viet Nam',
+      QUY_NHON: 'Quy Nhon port, Viet Nam',
+      DA_NANG: 'Da Nang port, Viet Nam',
+      HAI_PHONG: 'Hai Phong port, Viet Nam',
+    };
+    const fmtPort = (p) => {
+      if (!p) return '';
+      const t = p.trim();
+      if (/[ ,]/.test(t)) return t;
+      return POL[t.toUpperCase()] || t;
+    };
+    // Packing — append type label nếu thiếu
+    const PKG = {
+      loose_bale: 'Loose bales packing',
+      sw_pallet: 'SW Pallet packing',
+      wooden_pallet: 'Wooden pallets (fumigated)',
+      metal_box: 'Metal box packing',
+    };
+    let packing = (data.packing_desc || '').trim();
+    if (!/(loose|pallet|box|packing|fumigat|polybag)/i.test(packing)) {
+      const human = PKG[data.packing_type || 'loose_bale'] || 'Loose bales packing';
+      packing = packing ? `${packing}, ${human}` : `35 kg/bale, ${human}`;
+    }
     doc.render({
       ...data,
+      pol: fmtPort(data.pol),
+      pod: fmtPort(data.pod),
+      packing_desc: packing,
       has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
       has_fumigation: hasFumigation,
       has_pallets: hasPallets,

@@ -152,6 +152,50 @@ export function formatGradeForContract(grade: string | null | undefined): string
 }
 
 /**
+ * Normalize port enum → English contract format.
+ * DB enum: DA_NANG → "Da Nang port, Viet Nam" (cho HĐ quốc tế).
+ * Nếu input đã là English text (chứa space/comma) thì giữ nguyên.
+ */
+const POL_LABEL_EN: Record<string, string> = {
+  ANY_PORT_VN: 'Any port, Viet Nam',
+  HCM_CAT_LAI: 'Cat Lai port, Ho Chi Minh City, Viet Nam',
+  HCM_HIEP_PHUOC: 'Hiep Phuoc port, Ho Chi Minh City, Viet Nam',
+  VUNG_TAU: 'Cai Mep port, Vung Tau, Viet Nam',
+  QUY_NHON: 'Quy Nhon port, Viet Nam',
+  DA_NANG: 'Da Nang port, Viet Nam',
+  HAI_PHONG: 'Hai Phong port, Viet Nam',
+}
+export function formatPortForContract(port: string | null | undefined): string {
+  if (!port) return ''
+  const trimmed = port.trim()
+  // Đã là English text (có space hoặc dấu phẩy) → giữ nguyên
+  if (/[ ,]/.test(trimmed)) return trimmed
+  // Enum match → trả label English
+  return POL_LABEL_EN[trimmed.toUpperCase()] || trimmed
+}
+
+/**
+ * Auto-heal packing_desc: nếu chỉ có "35 kg/bale" mà thiếu kiểu đóng gói
+ * (Loose bales packing / Wooden pallets / ...) → tự append từ packing_type.
+ */
+const PACKING_TYPE_LABEL: Record<string, string> = {
+  loose_bale: 'Loose bales packing',
+  sw_pallet: 'SW Pallet packing',
+  wooden_pallet: 'Wooden pallets (fumigated)',
+  metal_box: 'Metal box packing',
+}
+export function ensurePackingDesc(desc: string | null | undefined, packingType?: string): string {
+  const trimmed = (desc || '').trim()
+  // Đã có từ packaging type → OK
+  if (trimmed && /(loose|pallet|box|packing|fumigat|polybag)/i.test(trimmed)) {
+    return trimmed
+  }
+  const human = PACKING_TYPE_LABEL[packingType || 'loose_bale'] || 'Loose bales packing'
+  if (!trimmed) return `35 kg/bale, ${human}`
+  return `${trimmed}, ${human}`
+}
+
+/**
  * Map Incoterm → kiểu template (CIF/FOB).
  * - CIF / CFR / CNF / DDP → dùng template_*_CIF.docx (có Port of discharge + Insurance)
  * - FOB / EXW             → dùng template_*_FOB.docx
@@ -212,9 +256,16 @@ export async function generateContractBlob(
     const num = parseFloat(String(data.amount).replace(/,/g, ''))
     if (num > 0) amountWords = amountToWords(num)
   }
+  // Normalize pol/pod + packing_desc trước khi render
+  const polEn = formatPortForContract(data.pol)
+  const podEn = formatPortForContract(data.pod)
+  const packingFinal = ensurePackingDesc(data.packing_desc, data.packing_type)
   doc.render({
     ...data,
     grade: formatGradeForContract(data.grade),
+    pol: polEn,
+    pod: podEn,
+    packing_desc: packingFinal,
     amount_words: amountWords || '',
     has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
     has_fumigation: hasFumigation,
@@ -229,11 +280,14 @@ export async function generateContractBlob(
 }
 
 /**
- * Self-heal form_data bằng cách fetch fresh customer info (address/phone/name)
- * từ sales_orders → sales_customers nếu form_data lưu rỗng.
+ * Self-heal form_data bằng cách fetch fresh order + customer info từ DB.
  *
- * Dùng cho HĐ tạo TRƯỚC khi CUSTOMER_JOIN có address (commit 134c41e0).
- * Caller pass salesOrderId để biết fetch từ đâu.
+ * Fields được enrich nếu form_data trống:
+ *  - buyer_name/buyer_address/buyer_phone từ customer
+ *  - packing_type, port_of_loading, port_of_destination từ sales_orders
+ *
+ * Dùng cho HĐ tạo TRƯỚC commit 134c41e0 (CUSTOMER_JOIN có address) hoặc tạo
+ * trước khi packing/port normalization được apply ở render layer.
  */
 export async function enrichFormDataWithCustomer(
   formData: Partial<ContractFormData>,
@@ -241,20 +295,37 @@ export async function enrichFormDataWithCustomer(
 ): Promise<Partial<ContractFormData>> {
   const fd = { ...formData }
   if (!salesOrderId) return fd
-  // Đã có đủ data → skip để tiết kiệm 1 query
-  if (fd.buyer_name && fd.buyer_address && fd.buyer_phone) return fd
+  // Đã có đủ data quan trọng → skip để tiết kiệm 1 query
+  if (
+    fd.buyer_name && fd.buyer_address && fd.buyer_phone &&
+    fd.packing_type && fd.pol && fd.pod
+  ) return fd
   try {
     const { data: order } = await supabase
       .from('sales_orders')
-      .select('customer:sales_customers!customer_id(name,address,phone)')
+      .select(`
+        packing_type,
+        port_of_loading,
+        port_of_destination,
+        customer:sales_customers!customer_id(name,address,phone)
+      `)
       .eq('id', salesOrderId)
       .maybeSingle()
-    const cust = (order?.customer as { name?: string; address?: string; phone?: string } | null) || null
-    if (cust) {
-      if (!fd.buyer_name) fd.buyer_name = cust.name || ''
-      if (!fd.buyer_address) fd.buyer_address = cust.address || ''
-      if (!fd.buyer_phone) fd.buyer_phone = cust.phone || ''
+    if (!order) return fd
+    const o = order as {
+      packing_type?: string | null
+      port_of_loading?: string | null
+      port_of_destination?: string | null
+      customer?: { name?: string; address?: string; phone?: string } | null
     }
+    if (o.customer) {
+      if (!fd.buyer_name) fd.buyer_name = o.customer.name || ''
+      if (!fd.buyer_address) fd.buyer_address = o.customer.address || ''
+      if (!fd.buyer_phone) fd.buyer_phone = o.customer.phone || ''
+    }
+    if (!fd.packing_type && o.packing_type) fd.packing_type = o.packing_type
+    if (!fd.pol && o.port_of_loading) fd.pol = o.port_of_loading
+    if (!fd.pod && o.port_of_destination) fd.pod = o.port_of_destination
   } catch (e) {
     console.warn('enrichFormDataWithCustomer fail:', e)
   }

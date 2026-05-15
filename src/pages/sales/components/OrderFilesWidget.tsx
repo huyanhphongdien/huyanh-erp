@@ -2,8 +2,11 @@
 // ORDER FILES WIDGET — 6 folder grid trong tab Tiến độ
 // File: src/pages/sales/components/OrderFilesWidget.tsx
 //
-// Hiện ngay khi mở đơn (tab Tiến độ default). Click folder → onNavigate
-// callback từ parent để switch tab tương ứng.
+// Hợp đồng folder split 2 sub-folders:
+//   📤 HĐ gửi KH  (sent_to_customer)  — drafts gửi khách duyệt, có revision
+//   ✅ HĐ FINAL    (final_signed)      — bản scan PDF ký + đóng dấu 2 bên
+//
+// 5 folder còn lại (Vận chuyển, Chứng từ, Tài chính, Phiếu cân, Khác) giữ flat.
 // ============================================================================
 
 import { useEffect, useState } from 'react'
@@ -18,7 +21,7 @@ interface FolderConfig {
   name: string
   bg: string
   color: string
-  tabKey: string  // tab key tương ứng để navigate
+  tabKey: string
 }
 
 const FOLDERS: FolderConfig[] = [
@@ -36,14 +39,20 @@ interface FolderStat {
   sample_names: string[]
 }
 
+interface SubFolderStat {
+  doc_sub_type: string  // 'sent_to_customer' | 'final_signed'
+  count: number
+  sample_names: string[]
+}
+
 interface Props {
   salesOrderId: string
-  /** Callback khi user click folder — parent switch sang tab tương ứng */
   onNavigateTab?: (tabKey: string) => void
 }
 
 export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props) {
   const [stats, setStats] = useState<Record<string, FolderStat>>({})
+  const [contractSub, setContractSub] = useState<Record<string, SubFolderStat>>({})
   const [loading, setLoading] = useState(true)
   const [totalSize, setTotalSize] = useState(0)
 
@@ -53,13 +62,20 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
       try {
         const { data } = await supabase
           .from('sales_order_documents')
-          .select('doc_type, file_name, file_size')
+          .select('doc_type, doc_sub_type, file_name, file_size')
           .eq('sales_order_id', salesOrderId)
           .not('file_url', 'is', null)
         if (!mounted) return
         const map: Record<string, FolderStat> = {}
+        const subMap: Record<string, SubFolderStat> = {}
         let total = 0
-        for (const row of (data || []) as { doc_type: string; file_name: string | null; file_size: number | null }[]) {
+        type Row = {
+          doc_type: string
+          doc_sub_type: string | null
+          file_name: string | null
+          file_size: number | null
+        }
+        for (const row of (data || []) as Row[]) {
           const t = row.doc_type || 'other'
           if (!map[t]) map[t] = { doc_type: t, count: 0, sample_names: [] }
           map[t].count++
@@ -67,8 +83,20 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
             map[t].sample_names.push(row.file_name)
           }
           if (row.file_size) total += row.file_size
+
+          // Tách sub-folder cho contract
+          if (t === 'contract') {
+            // Default file legacy không có sub_type → coi như sent_to_customer
+            const sub = row.doc_sub_type || 'sent_to_customer'
+            if (!subMap[sub]) subMap[sub] = { doc_sub_type: sub, count: 0, sample_names: [] }
+            subMap[sub].count++
+            if (row.file_name && subMap[sub].sample_names.length < 3) {
+              subMap[sub].sample_names.push(row.file_name)
+            }
+          }
         }
         setStats(map)
+        setContractSub(subMap)
         setTotalSize(total)
       } finally {
         if (mounted) setLoading(false)
@@ -91,7 +119,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
         <span style={{ fontSize: 14, fontWeight: 700, color: PRIMARY }}>
           📁 Tài liệu đính kèm
         </span>
-        <span style={total}>
+        <span style={totalBadge}>
           {loading ? <Spin size="small" /> : `${totalCount} file · ${fmtSize(totalSize)}`}
         </span>
       </div>
@@ -101,25 +129,24 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
           const stat = stats[f.doc_type]
           const count = stat?.count || 0
           const samples = stat?.sample_names || []
+          const isContract = f.doc_type === 'contract'
           return (
             <div
               key={f.doc_type}
               style={{
                 ...folder,
                 opacity: loading ? 0.6 : 1,
+                // HĐ folder spans 2 columns vì có 2 sub-folder bên dưới
+                gridColumn: isContract ? 'span 2' : 'span 1',
               }}
               onClick={() => onNavigateTab?.(f.tabKey)}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = PRIMARY
                 e.currentTarget.style.background = '#f0f9f4'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = '#e8e8e8'
                 e.currentTarget.style.background = '#fafafa'
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = 'none'
               }}
             >
               <div style={folderHead}>
@@ -131,16 +158,77 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                   {count}
                 </span>
               </div>
-              <div style={folderFiles}>
-                {samples.length === 0 ? (
-                  <span style={{ fontStyle: 'italic' }}>— chưa có file</span>
-                ) : (
-                  samples.join(' · ').slice(0, 60) + (samples.join(' · ').length > 60 ? '...' : '')
-                )}
-              </div>
+
+              {/* HĐ folder: 2 sub-folders thay vì danh sách phẳng */}
+              {isContract ? (
+                <div style={subFolderRow}>
+                  <ContractSubFolder
+                    icon="📤"
+                    name="HĐ gửi KH"
+                    color="#fa8c16"
+                    bg="#fff7e6"
+                    stat={contractSub['sent_to_customer']}
+                    hint="Drafts gửi khách duyệt — có revision"
+                  />
+                  <ContractSubFolder
+                    icon="✅"
+                    name="HĐ FINAL"
+                    color="#389e0d"
+                    bg="#f6ffed"
+                    stat={contractSub['final_signed']}
+                    hint="Bản ký + đóng dấu 2 bên"
+                  />
+                </div>
+              ) : (
+                <div style={folderFiles}>
+                  {samples.length === 0 ? (
+                    <span style={{ fontStyle: 'italic' }}>— chưa có file</span>
+                  ) : (
+                    samples.join(' · ').slice(0, 60) + (samples.join(' · ').length > 60 ? '...' : '')
+                  )}
+                </div>
+              )}
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Sub-folder card (chỉ dùng trong HĐ folder) ───
+function ContractSubFolder({
+  icon, name, color, bg, stat, hint,
+}: {
+  icon: string
+  name: string
+  color: string
+  bg: string
+  stat?: SubFolderStat
+  hint: string
+}) {
+  const count = stat?.count || 0
+  const samples = stat?.sample_names || []
+  return (
+    <div style={{
+      ...subFolder,
+      borderColor: count > 0 ? color : '#e8e8e8',
+    }}>
+      <div style={subFolderHead}>
+        <span style={{
+          width: 22, height: 22, borderRadius: 6, background: bg, color,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, flexShrink: 0,
+        }}>{icon}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, flex: 1 }}>{name}</span>
+        <span style={{
+          ...folderCount,
+          ...(count > 0 ? { background: color, color: '#fff', borderColor: color } : {}),
+          fontSize: 10, padding: '0 6px',
+        }}>{count}</span>
+      </div>
+      <div style={{ fontSize: 10, color: '#8c8c8c', marginTop: 4, fontStyle: 'italic' }}>
+        {samples.length === 0 ? hint : samples.join(' · ').slice(0, 55) + (samples.join(' · ').length > 55 ? '...' : '')}
       </div>
     </div>
   )
@@ -157,7 +245,7 @@ const widgetHeader: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
 }
 
-const total: React.CSSProperties = {
+const totalBadge: React.CSSProperties = {
   marginLeft: 'auto', padding: '3px 10px',
   background: '#f0f9f4', color: PRIMARY,
   borderRadius: 10, fontSize: 11, fontWeight: 700,
@@ -199,4 +287,17 @@ const folderCountHas: React.CSSProperties = {
 const folderFiles: React.CSSProperties = {
   fontSize: 11, color: '#8c8c8c',
   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+}
+
+const subFolderRow: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6,
+}
+
+const subFolder: React.CSSProperties = {
+  background: '#fff', border: '1px dashed #d9d9d9', borderRadius: 8,
+  padding: '8px 10px',
+}
+
+const subFolderHead: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 6,
 }

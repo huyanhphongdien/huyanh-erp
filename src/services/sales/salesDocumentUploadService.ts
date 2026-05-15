@@ -13,6 +13,10 @@ export interface SalesDocument {
   id: string
   sales_order_id: string
   doc_type: string
+  /** Sub-type chỉ áp dụng cho doc_type=contract:
+   *  - 'sent_to_customer': drafts gửi KH duyệt (có thể nhiều revision)
+   *  - 'final_signed': bản scan PDF ký + đóng dấu 2 bên (terminal, 1 file) */
+  doc_sub_type?: 'sent_to_customer' | 'final_signed' | null
   doc_name: string
   file_url: string | null
   file_name: string | null

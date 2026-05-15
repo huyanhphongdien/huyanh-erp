@@ -88,6 +88,8 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const replaceInputRef = useRef<HTMLInputElement>(null)
   const replaceTargetIdRef = useRef<string | null>(null)
+  // Sub-type cho upload: drafts gửi KH hoặc FINAL ký 2 bên
+  const uploadSubTypeRef = useRef<'sent_to_customer' | 'final_signed'>('sent_to_customer')
 
   const userIsBOD = isBOD(user)
   const hasFile = docs.length > 0
@@ -136,8 +138,9 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
     setUploading(true)
     let okCount = 0
     let failCount = 0
+    const subType = uploadSubTypeRef.current
     for (const f of arr) {
-      const res = await salesContractService.uploadContract(orderId, f, user, salesRole)
+      const res = await salesContractService.uploadContract(orderId, f, user, salesRole, { subType })
       if (res.ok) okCount++
       else {
         failCount++
@@ -247,18 +250,42 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {hasFile && canUpload && (
-            <Button
-              size="small"
-              icon={<UploadOutlined />}
-              onClick={() => uploadInputRef.current?.click()}
-              loading={uploading}
-            >
-              Thêm file (tối đa {MAX_FILES})
-            </Button>
+            <>
+              <Tooltip title="Drafts gửi KH duyệt (.docx / PDF, có revision)">
+                <Button
+                  size="small"
+                  icon={<UploadOutlined />}
+                  onClick={() => {
+                    uploadSubTypeRef.current = 'sent_to_customer'
+                    uploadInputRef.current?.click()
+                  }}
+                  loading={uploading}
+                >
+                  📤 HĐ gửi KH
+                </Button>
+              </Tooltip>
+              {(salesRole === 'admin' || userIsBOD) && (
+                <Tooltip title="HĐ FINAL ký + đóng dấu 2 bên (PDF)">
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<UploadOutlined />}
+                    onClick={() => {
+                      uploadSubTypeRef.current = 'final_signed'
+                      uploadInputRef.current?.click()
+                    }}
+                    loading={uploading}
+                    style={{ background: '#389e0d', borderColor: '#389e0d' }}
+                  >
+                    ✅ HĐ FINAL
+                  </Button>
+                </Tooltip>
+              )}
+            </>
           )}
           {canSeeLog && (
             <Button size="small" icon={<HistoryOutlined />} onClick={openLog}>
-              Lịch sử truy cập
+              Lịch sử
             </Button>
           )}
         </div>
@@ -289,10 +316,31 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
             </div>
           )
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {docs.map((doc) => {
-              const canView = canViewContract(doc, user, salesRole)
-              return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {(() => {
+              // Group docs by doc_sub_type
+              const sentDocs = docs.filter((d) =>
+                !d.doc_sub_type || d.doc_sub_type === 'sent_to_customer'
+              )
+              const finalDocs = docs.filter((d) => d.doc_sub_type === 'final_signed')
+              const groups: { key: string; label: string; icon: string; color: string; items: typeof docs }[] = [
+                { key: 'sent', label: '📤 HĐ gửi KH', icon: '📤', color: '#fa8c16', items: sentDocs },
+                { key: 'final', label: '✅ HĐ FINAL (ký 2 bên)', icon: '✅', color: '#389e0d', items: finalDocs },
+              ].filter((g) => g.items.length > 0)
+              return groups
+            })().map((group) => (
+              <div key={group.key}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: group.color, letterSpacing: 0.5,
+                  textTransform: 'uppercase', marginBottom: 6,
+                  paddingBottom: 4, borderBottom: `2px solid ${group.color}33`,
+                }}>
+                  {group.label} <span style={{ color: '#999', fontWeight: 500 }}>({group.items.length})</span>
+                </div>
+                {group.items.map((doc) => {
+                  const canView = canViewContract(doc, user, salesRole)
+                  const isFinal = doc.doc_sub_type === 'final_signed'
+                  return (
                 <div
                   key={doc.id}
                   style={{
@@ -300,10 +348,13 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                     padding: '8px 4px', borderBottom: '1px dashed #d9f7be',
                   }}
                 >
-                  <FilePdfOutlined style={{ fontSize: 24, color: '#f5222d', flexShrink: 0 }} />
+                  <FilePdfOutlined style={{ fontSize: 24, color: isFinal ? '#389e0d' : '#f5222d', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: '#1B4D3E' }}>
                       {doc.file_name || 'contract'}
+                      {isFinal && (
+                        <Tag color="green" style={{ marginLeft: 6, fontSize: 10 }}>FINAL</Tag>
+                      )}
                     </div>
                     <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
                       {formatSize(doc.file_size)}
@@ -358,14 +409,18 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                     )}
                     {canDelete && (
                       <Popconfirm
-                        title="Xóa file này?"
-                        description={`"${doc.file_name}" sẽ bị xóa khỏi DB + storage. Audit log vẫn giữ.`}
+                        title={isFinal ? '⚠ Xóa HĐ FINAL ký 2 bên?' : 'Xóa file này?'}
+                        description={
+                          isFinal
+                            ? `"${doc.file_name}" là bản pháp lý có chữ ký. Xóa sẽ ghi vào audit log.`
+                            : `"${doc.file_name}" sẽ bị xóa khỏi DB + storage. Audit log vẫn giữ.`
+                        }
                         okText="Xóa"
                         cancelText="Huỷ"
                         okButtonProps={{ danger: true, loading: deletingId === doc.id }}
                         onConfirm={() => handleDelete(doc)}
                       >
-                        <Tooltip title="Xóa (hard delete) — admin only">
+                        <Tooltip title={isFinal ? 'Xóa FINAL — admin/BGĐ only' : 'Xóa (hard delete)'}>
                           <Button
                             size="small"
                             danger
@@ -380,7 +435,9 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                   </div>
                 </div>
               )
-            })}
+                })}
+              </div>
+            ))}
           </div>
         )}
       </div>

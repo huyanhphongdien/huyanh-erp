@@ -13,12 +13,13 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Tag, Spin } from 'antd'
+import { Button, Tag, Spin, Modal, message } from 'antd'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import {
   salesContractWorkflowService,
   type SalesOrderContract,
 } from '../../../services/sales/salesContractWorkflowService'
+import { DEFAULT_BANK, type ContractFormData } from '../../../services/sales/contractGeneratorService'
 
 const PRIMARY = '#1B4D3E'
 
@@ -44,6 +45,7 @@ export default function OrderProgressDashboard({ order, onChanged }: Props) {
   const navigate = useNavigate()
   const [contracts, setContracts] = useState<SalesOrderContract[]>([])
   const [loadingContracts, setLoadingContracts] = useState(true)
+  const [creatingContract, setCreatingContract] = useState(false)
 
   useEffect(() => {
     setLoadingContracts(true)
@@ -53,6 +55,88 @@ export default function OrderProgressDashboard({ order, onChanged }: Props) {
       .catch(() => setContracts([]))
       .finally(() => setLoadingContracts(false))
   }, [order.id])
+
+  // Build form_data từ order fields (cho "Tạo HĐ workflow" — đơn draft chưa có HĐ)
+  const buildFormDataFromOrder = (): Partial<ContractFormData> => {
+    const o = order as SalesOrder & {
+      incoterm?: string; port_of_loading?: string; port_of_destination?: string;
+      container_count?: number; container_type?: string;
+      total_value_usd?: number; bales_per_container?: number; bale_weight_kg?: number;
+      shipment_time?: string; payment_terms_note?: string;
+    }
+    const isFOB = ['FOB', 'EXW'].includes((o.incoterm || 'FOB').toUpperCase())
+    const totalUSD = o.total_value_usd || (o.quantity_tons || 0) * (o.unit_price || 0)
+    const bales = o.bale_weight_kg ? Math.round((o.quantity_tons || 0) * 1000 / o.bale_weight_kg) : 0
+    return {
+      contract_no: o.contract_no || o.code || '',
+      contract_date: o.contract_date ? new Date(o.contract_date).toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric'
+      }) : '',
+      buyer_name: o.customer?.name || '',
+      buyer_address: (o.customer as { address?: string } | undefined)?.address || '',
+      buyer_phone: (o.customer as { phone?: string } | undefined)?.phone || '',
+      grade: o.grade || '',
+      quantity: o.quantity_tons ? o.quantity_tons.toFixed(2) : '',
+      unit_price: o.unit_price ? o.unit_price.toLocaleString('en-US') : '',
+      amount: totalUSD ? totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+      incoterm: o.incoterm || 'FOB',
+      pol: o.port_of_loading || '',
+      pod: isFOB ? '' : (o.port_of_destination || ''),
+      packing_desc: `${o.bale_weight_kg || 35} kg/bale`,
+      bales_total: bales ? bales.toLocaleString() : '',
+      pallets_total: '',
+      containers: String(o.container_count || ''),
+      cont_type: o.container_type === '40ft' ? '40HC' : '20DC',
+      shipment_time: o.shipment_time || '',
+      partial: 'Not Allowed',
+      trans: 'Allowed',
+      payment: o.payment_terms_note || 'LC at sight',
+      payment_extra: '',
+      claims_days: '20',
+      arbitration: 'SICOM Singapore',
+      freight_mark: isFOB ? 'freight Collect' : 'freight prepaid',
+      ...DEFAULT_BANK,
+    }
+  }
+
+  const handleCreateContract = () => {
+    Modal.confirm({
+      title: 'Tạo HĐ workflow cho đơn này?',
+      content: (
+        <div style={{ fontSize: 13 }}>
+          <p>Hệ thống sẽ tạo HĐ workflow từ data của đơn hàng:</p>
+          <ul style={{ paddingLeft: 20, marginTop: 8 }}>
+            <li>Số HĐ: <strong>{order.contract_no || order.code}</strong></li>
+            <li>Khách hàng: <strong>{order.customer?.name || '—'}</strong></li>
+            <li>Tấn: <strong>{order.quantity_tons}</strong> · Grade: <strong>{order.grade}</strong></li>
+          </ul>
+          <p style={{ marginTop: 12, color: '#d46b08' }}>
+            ⚠️ Phú LV sẽ nhận trong queue kiểm tra để nhập bank info + duyệt.
+          </p>
+        </div>
+      ),
+      okText: 'Tạo + Trình Phú LV',
+      cancelText: 'Huỷ',
+      okButtonProps: { style: { background: PRIMARY, borderColor: PRIMARY } },
+      onOk: async () => {
+        setCreatingContract(true)
+        try {
+          const formData = buildFormDataFromOrder()
+          await salesContractWorkflowService.createDraftAndSubmit(order.id, formData)
+          message.success('Đã tạo HĐ workflow + trình Phú LV')
+          // Reload contracts
+          const rows = await salesContractWorkflowService.listBySalesOrder(order.id)
+          setContracts(rows)
+          onChanged?.()
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e)
+          message.error(`Tạo HĐ thất bại: ${msg}`)
+        } finally {
+          setCreatingContract(false)
+        }
+      },
+    })
+  }
 
   // Tính SLA + overdue
   let slaOver: number | null = null
@@ -104,10 +188,25 @@ export default function OrderProgressDashboard({ order, onChanged }: Props) {
           ) : !latest ? (
             <div style={empty}>
               <div style={{ marginBottom: 8 }}>Chưa có HĐ workflow</div>
-              <Button size="small" type="primary" onClick={() => navigate(`/sales/orders/${order.id}/edit`)}
-                      style={{ background: PRIMARY }}>
-                + Tạo HĐ
-              </Button>
+              {order.status === 'draft' ? (
+                <>
+                  <Button size="small" type="primary" onClick={handleCreateContract}
+                          loading={creatingContract}
+                          style={{ background: PRIMARY }}>
+                    + Tạo HĐ workflow
+                  </Button>
+                  <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 8 }}>
+                    Hệ thống tạo từ data đơn + trình Phú LV duyệt
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 12, color: '#8c8c8c', padding: 8, background: '#fafafa',
+                              borderRadius: 6, textAlign: 'left', maxWidth: 340 }}>
+                  📁 <strong>Đơn cũ trước cut-over</strong> — không có HĐ workflow.
+                  <br />
+                  Dùng tab <strong>"Hợp đồng"</strong> để upload file PDF scan đã ký (legacy flow).
+                </div>
+              )}
             </div>
           ) : (
             <>

@@ -81,14 +81,20 @@ REPL_SC_CIF = [
     ("In 1.26mts Per Wooden pallets, 35kg/bale with thick polybag", "{packing_desc}"),
     ("In 1.26mts Per Wooden pallets , 35 kg/bale with thick polybag", "{packing_desc}"),
     ("1.26mts Per Wooden pallets , 35 kg/bale with thick polybag", "{packing_desc}"),
-    # Container line — source có "01 x 20’" (smart quote = feet symbol)
-    ("576 bales/ 16 Wooden pallets/ 01 x 20’", "{bales_total} bales / {pallets_total} Wooden pallets / {containers} x {cont_type}"),
-    ("576 bales/ 16 Wooden pallets/ 01 x 20'", "{bales_total} bales / {pallets_total} Wooden pallets / {containers} x {cont_type}"),
-    ("576 bales/ 16 Wooden pallets/ 01 x 20DC", "{bales_total} bales / {pallets_total} Wooden pallets / {containers} x {cont_type}"),
-    ("576 bales/ 16 Wooden pallets/ 01 x 20", "{bales_total} bales / {pallets_total} Wooden pallets / {containers} x {cont_type}"),
-    # Fumigation certificate — chỉ hiện khi packing=wooden_pallet (Korea/EU requirement)
+    # Container line — source có "01 x 20’" (smart quote = feet symbol).
+    # Wrap "{pallets_total} Wooden pallets / " bằng {#has_pallets}...{/has_pallets}
+    # để ẩn segment khi loose_bale (không có pallet).
+    ("576 bales/ 16 Wooden pallets/ 01 x 20’", "{bales_total} bales / {#has_pallets}{pallets_total} Wooden pallets / {/has_pallets}{containers} x {cont_type}"),
+    ("576 bales/ 16 Wooden pallets/ 01 x 20'", "{bales_total} bales / {#has_pallets}{pallets_total} Wooden pallets / {/has_pallets}{containers} x {cont_type}"),
+    ("576 bales/ 16 Wooden pallets/ 01 x 20DC", "{bales_total} bales / {#has_pallets}{pallets_total} Wooden pallets / {/has_pallets}{containers} x {cont_type}"),
+    ("576 bales/ 16 Wooden pallets/ 01 x 20", "{bales_total} bales / {#has_pallets}{pallets_total} Wooden pallets / {/has_pallets}{containers} x {cont_type}"),
+    # Fumigation certificate — chỉ hiện khi packing=wooden_pallet (Korea/EU requirement).
+    # Source thực: " Fumigation certificate" (leading space). CHỈ 1 pattern — pattern
+    # thứ 2 "Fumigation certificate" sẽ fire LẦN NỮA trên text đã wrap → double-wrap.
     (" Fumigation certificate", "{#has_fumigation} Fumigation certificate{/has_fumigation}"),
-    ("Fumigation certificate", "{#has_fumigation}Fumigation certificate{/has_fumigation}"),
+    # L/C draft sentence — chỉ hiện khi payment là L/C (CIF Korea/EU mới có L/C).
+    ("The L/C draft must be opened within five (5) days from the contract signing date.",
+     "{#is_lc_payment}The L/C draft must be opened within five (5) days from the contract signing date.{/is_lc_payment}"),
     # Shipment
     ("Time of shipment: June , 2026", "Time of shipment: {shipment_time}"),
     ("Time of shipment: June, 2026", "Time of shipment: {shipment_time}"),
@@ -424,6 +430,46 @@ def _normalize_head_letter(doc):
     return changed
 
 
+def _fix_pi_packing_in_cells(doc):
+    """
+    PI templates có dòng packing description trong cell sau "NATURAL RUBBER {grade}".
+    PI_CIF source: "(35kg/ bale with thick polybag – Wooden pallets)" — 1 paragraph,
+        replace patterns trong REPL_PI_CIF match → OK.
+    PI_FOB source: "(35kg/ bale.\nLoose bales packing)" — SPLIT 2 paragraphs →
+        str.replace không span paragraph được → text vẫn hardcode.
+
+    Hàm này detect cell có paragraph bắt đầu bằng "(35kg/" hoặc "(35 kg/" và
+    rewrite về single paragraph "({packing_desc})".
+    """
+    fixed = 0
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                paras = list(cell.paragraphs)
+                for i, p in enumerate(paras):
+                    text = p.text.strip()
+                    # Detect hardcoded packing opener
+                    if text.startswith('(35kg/') or text.startswith('(35 kg/'):
+                        # Rewrite this paragraph
+                        for r in list(p.runs):
+                            r._element.getparent().remove(r._element)
+                        new_run = p.add_run('({packing_desc})')
+                        # Xóa các paragraph kế tiếp thuộc cùng packing block (kết thúc bằng ")")
+                        for j in range(i + 1, len(paras)):
+                            nxt = paras[j]
+                            nxt_text = nxt.text.strip()
+                            if not nxt_text:
+                                continue
+                            if nxt_text.endswith(')') and ('pack' in nxt_text.lower() or 'pallet' in nxt_text.lower() or 'bale' in nxt_text.lower()):
+                                nxt._element.getparent().remove(nxt._element)
+                                break
+                            else:
+                                break
+                        fixed += 1
+                        break
+    return fixed
+
+
 def _inject_extra_terms(doc):
     """
     Tìm paragraph chứa {payment_extra} (SC) hoặc {payment} (PI — trong table cell)
@@ -471,6 +517,9 @@ def build_template(src_path, out_path, replacements, label):
     # Inject placeholder điều khoản bổ sung sau section Payment
     if _inject_extra_terms(doc):
         matched_keys.add('{#has_extra_terms}...{/has_extra_terms}')
+    # Fix PI_FOB hardcoded packing description (split across paragraphs)
+    if _fix_pi_packing_in_cells(doc):
+        matched_keys.add('[pi_packing_cell_fixed]')
     # Đồng bộ head letter (title sz=44, No/Date sz=28 centered, SELLER block sz=26)
     head_changed = _normalize_head_letter(doc)
     if head_changed:

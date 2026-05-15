@@ -147,10 +147,16 @@ function render(name, { template, data }) {
     const packingDesc = (data.packing_desc || '').toLowerCase();
     const hasFumigation = data.packing_type === 'wooden_pallet'
       || (packingDesc.includes('wooden pallet') && !packingDesc.includes('loose'));
+    const hasPallets = ['wooden_pallet', 'sw_pallet'].includes(data.packing_type || '')
+      || (!!data.pallets_total && data.pallets_total !== '' && data.pallets_total !== '0');
+    const paymentLower = (data.payment || '').toLowerCase();
+    const isLcPayment = paymentLower.includes('l/c') || paymentLower.includes('lc');
     doc.render({
       ...data,
       has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
       has_fumigation: hasFumigation,
+      has_pallets: hasPallets,
+      is_lc_payment: isLcPayment,
     });
   } catch (e) {
     console.error(`✗ Render ${name} thất bại:`, e.message);

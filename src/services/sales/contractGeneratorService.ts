@@ -199,6 +199,13 @@ export async function generateContractBlob(
   const hasFumigation =
     data.packing_type === 'wooden_pallet' ||
     (packingDesc.includes('wooden pallet') && !packingDesc.includes('loose'))
+  // has_pallets: ẩn segment "X Wooden pallets /" khi loose_bale (không có pallet)
+  const hasPallets =
+    ['wooden_pallet', 'sw_pallet'].includes(data.packing_type || '') ||
+    (!!data.pallets_total && data.pallets_total !== '' && data.pallets_total !== '0')
+  // is_lc_payment: ẩn câu "The L/C draft must be opened..." khi không phải L/C
+  const paymentLower = (data.payment || '').toLowerCase()
+  const isLcPayment = paymentLower.includes('l/c') || paymentLower.includes('lc')
   let amountWords = data.amount_words
   if (!amountWords && data.amount) {
     const num = parseFloat(String(data.amount).replace(/,/g, ''))
@@ -210,6 +217,8 @@ export async function generateContractBlob(
     amount_words: amountWords || '',
     has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
     has_fumigation: hasFumigation,
+    has_pallets: hasPallets,
+    is_lc_payment: isLcPayment,
   })
   return doc.getZip().generate({
     type: 'blob',

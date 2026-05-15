@@ -101,7 +101,12 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
         return `${kg} kg/bale, ${human}`
       })(),
       bales_total: bales ? bales.toLocaleString() : '',
-      pallets_total: '',
+      // pallets_total: chỉ tính khi pallet packing, standard 36 bales/pallet
+      pallets_total: (() => {
+        const pt = o.packing_type || ''
+        if (!['wooden_pallet', 'sw_pallet'].includes(pt)) return ''
+        return bales > 0 ? String(Math.ceil(bales / 36)) : ''
+      })(),
       containers: String(o.container_count || ''),
       cont_type: o.container_type === '40ft' ? '40HC' : '20DC',
       shipment_time: o.shipment_time || '',

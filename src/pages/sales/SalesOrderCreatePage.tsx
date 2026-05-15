@@ -217,7 +217,14 @@ function SalesOrderCreatePage() {
           return `${kg} kg/bale, ${human}`
         })(),
       bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString() : '',
-      pallets_total: '',
+      // pallets_total: chỉ tính khi packing dùng pallet (wooden_pallet/sw_pallet),
+      // standard 36 bales/pallet (16 pallets x 36 = 576 bales/20DC). Khác thì để rỗng.
+      pallets_total: (() => {
+        const pt = firstItem.packing_type || ''
+        if (!['wooden_pallet', 'sw_pallet'].includes(pt)) return ''
+        const balesPerPallet = 36
+        return itemsTotalBales > 0 ? String(Math.ceil(itemsTotalBales / balesPerPallet)) : ''
+      })(),
       containers: String(itemsTotalContainers || ''),
       cont_type: containerType === '40ft' ? '40HC' : '20DC',
       shipment_time: watchShipmentTime,

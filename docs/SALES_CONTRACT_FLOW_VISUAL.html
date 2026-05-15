@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow Hợp Đồng Bán — Huy Anh Rubber</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #f0f9f4 0%, #e6f4ff 100%);
+    color: #1f2937;
+    line-height: 1.6;
+    padding: 24px 16px;
+  }
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .hero {
+    background: linear-gradient(135deg, #1B4D3E 0%, #2D8B6E 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 40px 32px;
+    margin-bottom: 32px;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(27,77,62,0.2);
+  }
+  .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .hero p { font-size: 14px; opacity: 0.9; }
+  .hero .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 12px;
+    letter-spacing: 0.5px;
+  }
+  section {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid #e8e8e8;
+  }
+  section h2 {
+    font-size: 22px;
+    color: #1B4D3E;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #f0f9f4;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  section h3 {
+    font-size: 16px;
+    color: #374151;
+    margin: 18px 0 10px;
+  }
+
+  /* Actor cards */
+  .actors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .actor {
+    padding: 16px;
+    border-radius: 10px;
+    border: 2px solid;
+    background: #fff;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .actor:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  .actor .role {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .actor .person { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+  .actor .perms {
+    font-size: 11px;
+    color: #4b5563;
+    line-height: 1.5;
+  }
+  .actor.sale     { border-color: #16a34a; }
+  .actor.sale .role { color: #16a34a; }
+  .actor.review   { border-color: #d97706; }
+  .actor.review .role { color: #d97706; }
+  .actor.signer   { border-color: #dc2626; }
+  .actor.signer .role { color: #dc2626; }
+  .actor.admin    { border-color: #7c3aed; }
+  .actor.admin .role { color: #7c3aed; }
+  .actor.customer { border-color: #6b7280; }
+  .actor.customer .role { color: #6b7280; }
+
+  /* State machine */
+  .states {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    padding: 20px 0;
+  }
+  .state {
+    padding: 12px 20px;
+    border-radius: 24px;
+    background: #f3f4f6;
+    border: 2px solid #d1d5db;
+    color: #4b5563;
+    font-weight: 600;
+    font-size: 13px;
+    position: relative;
+    min-width: 110px;
+    text-align: center;
+  }
+  .state.drafting   { background: #f3f4f6; border-color: #9ca3af; color: #4b5563; }
+  .state.reviewing  { background: #fef3c7; border-color: #d97706; color: #78350f; }
+  .state.rejected   { background: #fee2e2; border-color: #dc2626; color: #7f1d1d; }
+  .state.approved   { background: #d1fae5; border-color: #16a34a; color: #14532d; }
+  .state.signed     { background: #dbeafe; border-color: #1d4ed8; color: #1e3a8a; }
+  .state.archived   { background: #e5e7eb; border-color: #6b7280; color: #374151; }
+  .state.cancelled  { background: #f3f4f6; border-color: #9ca3af; color: #6b7280; text-decoration: line-through; }
+
+  /* Flow diagram with arrows */
+  .flow-diagram {
+    background: #fafafa;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin: 8px 0;
+    background: #fff;
+    border-radius: 8px;
+    border-left: 4px solid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .flow-step .num {
+    width: 28px; height: 28px; border-radius: 50%;
+    color: #fff; font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .flow-step .content { flex: 1; }
+  .flow-step .title { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+  .flow-step .desc { font-size: 12px; color: #6b7280; }
+  .flow-step .actor-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .flow-step.sale     { border-left-color: #16a34a; }
+  .flow-step.sale .num, .flow-step.sale .actor-tag { background: #16a34a; color: #fff; }
+  .flow-step.review   { border-left-color: #d97706; }
+  .flow-step.review .num, .flow-step.review .actor-tag { background: #d97706; color: #fff; }
+  .flow-step.signer   { border-left-color: #dc2626; }
+  .flow-step.signer .num, .flow-step.signer .actor-tag { background: #dc2626; color: #fff; }
+  .flow-step.admin    { border-left-color: #7c3aed; }
+  .flow-step.admin .num, .flow-step.admin .actor-tag { background: #7c3aed; color: #fff; }
+  .flow-step.customer { border-left-color: #6b7280; }
+  .flow-step.customer .num, .flow-step.customer .actor-tag { background: #6b7280; color: #fff; }
+
+  .arrow-down {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 24px;
+    margin: -4px 0;
+  }
+
+  /* Branch */
+  .branch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .branch-label {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #9ca3af;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+
+  /* Channels */
+  .channels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .channel {
+    padding: 18px;
+    border-radius: 10px;
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+  }
+  .channel .icon { font-size: 28px; margin-bottom: 8px; }
+  .channel .name { font-weight: 700; font-size: 14px; color: #1B4D3E; margin-bottom: 6px; }
+  .channel .desc { font-size: 11px; color: #6b7280; line-height: 1.5; }
+
+  /* Files */
+  .files {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .file-card {
+    padding: 16px;
+    border-radius: 10px;
+    border: 2px solid;
+    background: #fff;
+  }
+  .file-card .ftitle { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .file-card .fdesc { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+  .file-card .fmeta { font-size: 11px; padding: 4px 8px; background: #f9fafb; border-radius: 4px; }
+  .file-card.sent   { border-color: #fa8c16; background: #fff7e6; }
+  .file-card.sent .ftitle { color: #d46b08; }
+  .file-card.ha     { border-color: #1677ff; background: #e6f4ff; }
+  .file-card.ha .ftitle { color: #1677ff; }
+  .file-card.final  { border-color: #389e0d; background: #f6ffed; }
+  .file-card.final .ftitle { color: #389e0d; }
+
+  /* Permission table */
+  table.perm {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.perm th {
+    background: #1B4D3E;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  table.perm td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e8e8e8;
+  }
+  table.perm tr:hover { background: #fafafa; }
+  table.perm .yes { color: #16a34a; font-weight: 700; }
+  table.perm .no  { color: #dc2626; font-weight: 700; }
+  table.perm .partial { color: #d97706; font-weight: 700; }
+
+  /* Notice */
+  .notice {
+    padding: 14px 16px;
+    border-radius: 8px;
+    border-left: 4px solid;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  .notice.warn { background: #fef3c7; border-color: #d97706; color: #78350f; }
+  .notice.info { background: #dbeafe; border-color: #1d4ed8; color: #1e3a8a; }
+  .notice.danger { background: #fee2e2; border-color: #dc2626; color: #7f1d1d; }
+  .notice.success { background: #d1fae5; border-color: #16a34a; color: #14532d; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 12px;
+    padding: 24px 0 12px;
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    section { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+    .hero { background: #1B4D3E; color: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>🏗 Flow Hợp Đồng Bán Quốc Tế</h1>
+    <p>Huy Anh Rubber — Quy trình từ lên HĐ đến lưu trữ pháp lý</p>
+    <span class="badge">Cập nhật 2026-05-15 · v9 schema</span>
+  </div>
+
+  <!-- ACTORS -->
+  <section>
+    <h2>👥 5 Vai trò</h2>
+    <div class="actors">
+      <div class="actor sale">
+        <div class="role">🟢 SALE</div>
+        <div class="person">Hồ Thị Liễu<br>sales@huyanhrubber.com</div>
+        <div class="perms">• Lên HĐ + submit<br>• Upload 3 loại file<br>• Gửi KH<br>• Hủy đơn</div>
+      </div>
+      <div class="actor review">
+        <div class="role">🟡 KIỂM TRA</div>
+        <div class="person">Phú LV (chính) + Minh LD (ngầm)</div>
+        <div class="perms">• Review HĐ<br>• Nhập bank info<br>• Duyệt / Trả lại<br>• Chọn 7 banks</div>
+      </div>
+      <div class="actor signer">
+        <div class="role">🟠 KÝ HĐ</div>
+        <div class="person">Trung + Huy</div>
+        <div class="perms">• Xác nhận đã duyệt<br>• Trả lại Phú LV<br>• Markup FINAL</div>
+      </div>
+      <div class="actor admin">
+        <div class="role">🟣 ADMIN/BGĐ</div>
+        <div class="person">Minh / Thúy / Huy / Trung</div>
+        <div class="perms">• Toàn quyền<br>• Xóa FINAL<br>• Archive<br>• Override</div>
+      </div>
+      <div class="actor customer">
+        <div class="role">⚪ KHÁCH HÀNG</div>
+        <div class="person">Customer (offline)</div>
+        <div class="perms">• Duyệt nội dung HĐ<br>• Ký HĐ trên giấy<br>• Gửi lại bản scan</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATE MACHINE -->
+  <section>
+    <h2>🔄 7 Trạng thái HĐ</h2>
+    <div class="states">
+      <div class="state drafting">drafting<br>📝 Nháp</div>
+      <div class="state reviewing">reviewing<br>⏳ Chờ Kiểm tra</div>
+      <div class="state rejected">rejected<br>❌ Bị trả lại</div>
+      <div class="state approved">approved<br>✅ Đã duyệt</div>
+      <div class="state signed">signed<br>✍️ Đã ký FINAL</div>
+      <div class="state archived">archived<br>📁 Lưu trữ</div>
+      <div class="state cancelled">cancelled<br>🚫 Đã hủy</div>
+    </div>
+  </section>
+
+  <!-- MAIN FLOW -->
+  <section>
+    <h2>🌊 Workflow Chi tiết (Happy Path)</h2>
+
+    <div class="flow-diagram">
+
+      <div class="flow-step sale">
+        <span class="num">1</span>
+        <div class="content">
+          <div class="title">Sale lên HĐ mới (Compose Studio)</div>
+          <div class="desc">Điền form: KH, grade, qty, price, packing, port, payment... <strong>KHÔNG có bank</strong></div>
+        </div>
+        <span class="actor-tag">SALE</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step sale">
+        <span class="num">2</span>
+        <div class="content">
+          <div class="title">Submit cho Phú LV</div>
+          <div class="desc">Status: <code>drafting → reviewing</code> · Phú+Minh nhận 🔔📧💬</div>
+        </div>
+        <span class="actor-tag">SALE</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step review">
+        <span class="num">3</span>
+        <div class="content">
+          <div class="title">Phú LV review + nhập bank info</div>
+          <div class="desc">Chọn 1 trong 7 bank presets (auto-fill 5 field) hoặc nhập tay</div>
+        </div>
+        <span class="actor-tag">PHÚ LV</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="branch">
+        <div>
+          <div class="branch-label">⤴ Nhánh A: Trả lại</div>
+          <div class="flow-step review">
+            <span class="num">❌</span>
+            <div class="content">
+              <div class="title">Phú LV trả lại Sale</div>
+              <div class="desc">Chọn 1+ trong 9 lý do + chi tiết. Status: <code>reviewing → rejected</code></div>
+            </div>
+          </div>
+          <div class="arrow-down">▼</div>
+          <div class="flow-step sale">
+            <span class="num">4a</span>
+            <div class="content">
+              <div class="title">Sale sửa & trình lại (revision +1)</div>
+              <div class="desc">22 field trong drawer OR full Compose Studio. INSERT row mới</div>
+            </div>
+          </div>
+          <div class="arrow-down">↩</div>
+          <p style="text-align:center;font-size:11px;color:#6b7280;">Quay lại bước 3</p>
+        </div>
+        <div>
+          <div class="branch-label">⤴ Nhánh B: Duyệt</div>
+          <div class="flow-step review">
+            <span class="num">✅</span>
+            <div class="content">
+              <div class="title">Phú LV duyệt + trình ký</div>
+              <div class="desc">Bank info lưu vào form_data · Status: <code>reviewing → approved</code></div>
+            </div>
+          </div>
+          <div class="arrow-down">▼</div>
+          <div class="flow-step signer">
+            <span class="num">4b</span>
+            <div class="content">
+              <div class="title">Trung/Huy mở queue Ký HĐ</div>
+              <div class="desc">2 lựa chọn: Xác nhận đã duyệt OR Trả lại Phú LV</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step signer">
+        <span class="num">5</span>
+        <div class="content">
+          <div class="title">Xác nhận đã duyệt</div>
+          <div class="desc">Set <code>signer_confirmed_at/by</code> · KHÔNG đổi status · Sale+Phú nhận thông báo</div>
+        </div>
+        <span class="actor-tag">TRUNG/HUY</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step sale">
+        <span class="num">6</span>
+        <div class="content">
+          <div class="title">In HĐ + ký HA (ai cũng làm được)</div>
+          <div class="desc">Tải SC/PI .docx → Print A4 → Trung/Huy ký + đóng dấu HA</div>
+        </div>
+        <span class="actor-tag">BẤT KỲ AI</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step sale">
+        <span class="num">7</span>
+        <div class="content">
+          <div class="title">Scan + upload "HĐ HA đã ký"</div>
+          <div class="desc">File PDF vào folder <code>doc_sub_type='ha_signed'</code></div>
+        </div>
+        <span class="actor-tag">SALE/AI</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step sale">
+        <span class="num">8</span>
+        <div class="content">
+          <div class="title">Sale gửi KH (email/chat)</div>
+          <div class="desc">Đính kèm PDF HA ký · Yêu cầu KH ký + dấu lại</div>
+        </div>
+        <span class="actor-tag">SALE</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step customer">
+        <span class="num">9</span>
+        <div class="content">
+          <div class="title">KH ký HĐ trên giấy + gửi PDF FINAL về</div>
+          <div class="desc">Bản scan có chữ ký + dấu của CẢ 2 BÊN</div>
+        </div>
+        <span class="actor-tag">KH</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step sale">
+        <span class="num">10</span>
+        <div class="content">
+          <div class="title">Sale upload "HĐ FINAL"</div>
+          <div class="desc">Folder <code>doc_sub_type='final_signed'</code> · Bấm "Đánh dấu FINAL" · Status: <code>approved → signed</code></div>
+        </div>
+        <span class="actor-tag">SALE</span>
+      </div>
+      <div class="arrow-down">▼</div>
+
+      <div class="flow-step admin">
+        <span class="num">11</span>
+        <div class="content">
+          <div class="title">Admin lưu trữ (optional)</div>
+          <div class="desc">Status: <code>signed → archived</code> (terminal) · DB trigger: SO <code>draft → confirmed</code></div>
+        </div>
+        <span class="actor-tag">ADMIN</span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3 CHANNELS -->
+  <section>
+    <h2>🔔 3 Kênh Thông báo Song song</h2>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:16px;">Mỗi workflow event trigger CẢ 3 kênh — đảm bảo không miss:</p>
+    <div class="channels">
+      <div class="channel" style="border-left:4px solid #dc2626;">
+        <div class="icon">🔔</div>
+        <div class="name">Bell ERP</div>
+        <div class="desc">Chuông góc phải trên với số đỏ. Click → mở thẳng HĐ. Real-time qua Supabase Realtime.</div>
+      </div>
+      <div class="channel" style="border-left:4px solid #1d4ed8;">
+        <div class="icon">📧</div>
+        <div class="name">Email</div>
+        <div class="desc">Mobile-first template (max 600px). Send qua Microsoft Graph API. Subject + emoji + CTA button. Delay ~1-2 phút.</div>
+      </div>
+      <div class="channel" style="border-left:4px solid #16a34a;">
+        <div class="icon">💬</div>
+        <div class="name">Chat đơn</div>
+        <div class="desc">System message tự đăng vào tab "Trao đổi" của đơn. DB trigger AFTER UPDATE. Real-time.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 FILE TYPES -->
+  <section>
+    <h2>📁 3 Loại HĐ Files (doc_sub_type)</h2>
+    <div class="files">
+      <div class="file-card sent">
+        <div class="ftitle">📤 HĐ gửi KH</div>
+        <div class="fdesc">Drafts gửi khách duyệt nội dung — có thể nhiều revision</div>
+        <div class="fmeta"><strong>sub_type:</strong> sent_to_customer</div>
+        <div class="fmeta" style="margin-top:4px;"><strong>Upload:</strong> Sale + Admin</div>
+        <div class="fmeta" style="margin-top:4px;"><strong>Pháp lý:</strong> ❌</div>
+      </div>
+      <div class="file-card ha">
+        <div class="ftitle">✍️ HĐ HA đã ký</div>
+        <div class="fdesc">Bản scan PDF Huy Anh ký + đóng dấu (1 bên). Sau khi Trung/Huy xác nhận → in + ký</div>
+        <div class="fmeta"><strong>sub_type:</strong> ha_signed</div>
+        <div class="fmeta" style="margin-top:4px;"><strong>Upload:</strong> Mọi role (ai cũng in ký được)</div>
+        <div class="fmeta" style="margin-top:4px;"><strong>Pháp lý:</strong> ⚠ 1 bên</div>
+      </div>
+      <div class="file-card final">
+        <div class="ftitle">✅ HĐ FINAL (2 bên)</div>
+        <div class="fdesc">Bản scan PDF có chữ ký + dấu CỦA CẢ 2 BÊN. KH gửi về sau khi ký.</div>
+        <div class="fmeta"><strong>sub_type:</strong> final_signed</div>
+        <div class="fmeta" style="margin-top:4px;"><strong>Upload:</strong> Sale + Admin/BGĐ</div>
+        <div class="fmeta" style="margin-top:4px;"><strong>Xóa:</strong> CHỈ admin emails (RLS)</div>
+        <div class="fmeta" style="margin-top:4px;"><strong>Pháp lý:</strong> ✅ HỢP PHÁP TRỌN VẸN</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PERMISSION MATRIX -->
+  <section>
+    <h2>🔐 Ma trận Permission</h2>
+    <table class="perm">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Sale</th>
+          <th>Phú LV / Minh</th>
+          <th>Trung / Huy</th>
+          <th>Admin/BGĐ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Lên HĐ + submit</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Sửa & trình lại</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Review HĐ</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td><strong>Nhập bank info</strong></td><td class="no">❌</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Duyệt HĐ</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Trả lại Sale</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Xác nhận đã duyệt</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>Trả lại Phú LV</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>In HĐ + ký HA</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>Upload HĐ gửi KH</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Upload HĐ HA đã ký</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td><strong>Upload HĐ FINAL</strong></td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Đánh dấu FINAL (markSigned)</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td><strong>Xóa HĐ FINAL</strong></td><td class="no">❌</td><td class="no">❌</td><td class="partial">⚠ Huy/Trung</td><td class="yes">✓ 4 admin emails</td></tr>
+        <tr><td>Hủy đơn</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td>Archive HĐ signed</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- AUDIT TRAIL -->
+  <section>
+    <h2>📊 Audit Trail — 13 Event Types</h2>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px;">Tất cả hành động log vào <code>sales_contract_access_log</code> — xem qua nút "🕐 Lịch sử" trong tab Hợp đồng:</p>
+    <table class="perm">
+      <thead>
+        <tr><th>Event</th><th>Mô tả</th><th>Loại</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>📤 upload</td><td>Tải file lên</td><td>File</td></tr>
+        <tr><td>🔄 replace</td><td>Thay file cũ</td><td>File</td></tr>
+        <tr><td>👁 view</td><td>Xem file (signed URL)</td><td>File</td></tr>
+        <tr><td>📥 download</td><td>Tải file về</td><td>File</td></tr>
+        <tr><td>🗑 delete</td><td>Xóa file</td><td>File</td></tr>
+        <tr><td>📨 submit</td><td>Sale trình HĐ</td><td>Workflow</td></tr>
+        <tr><td>🔁 resubmit</td><td>Sale trình lại sau reject</td><td>Workflow</td></tr>
+        <tr><td>✅ approve</td><td>Phú LV duyệt</td><td>Workflow</td></tr>
+        <tr><td>❌ reject</td><td>Phú LV trả lại Sale</td><td>Workflow</td></tr>
+        <tr><td>🖊 signer_confirm</td><td>Trung/Huy xác nhận</td><td>Workflow</td></tr>
+        <tr><td>🔁 send_back</td><td>Trung/Huy trả lại Phú LV</td><td>Workflow</td></tr>
+        <tr><td>✍️ sign</td><td>Đánh dấu FINAL (markSigned)</td><td>Workflow</td></tr>
+        <tr><td>📁 archive</td><td>Lưu trữ HĐ</td><td>Workflow</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- CRITICAL NOTICES -->
+  <section>
+    <h2>⚠ Quy tắc Quan trọng</h2>
+
+    <div class="notice danger">
+      <strong>🚫 KHÔNG gửi bản "Preview" cho khách</strong><br>
+      Bản preview ở Compose Studio dùng DEFAULT bank (Vietin Hue) — có thể SAI bank. Phải đợi Phú LV duyệt + có bản "HĐ HA đã ký" mới gửi.
+    </div>
+
+    <div class="notice warn">
+      <strong>🔒 Bank info chỉ Phú LV nhập</strong><br>
+      Sale KHÔNG có form input bank ở Compose Studio. Bank quick-pick dropdown 7 banks chỉ hiện ở Review HĐ page (Phú LV/Minh).
+    </div>
+
+    <div class="notice info">
+      <strong>📁 Phân biệt 3 folder HĐ</strong><br>
+      Folder <strong>HĐ HA đã ký</strong> = 1 bên (gửi KH). Folder <strong>HĐ FINAL</strong> = 2 bên (bản pháp lý KH ký lại). Không nhầm 2 cái này.
+    </div>
+
+    <div class="notice success">
+      <strong>📊 Audit log đầy đủ</strong><br>
+      Mỗi hành động đều log tự động với timestamp + user + action. Truy cập "🕐 Lịch sử" trong tab Hợp đồng.
+    </div>
+
+    <div class="notice warn">
+      <strong>🔁 Khi Trung/Huy trả lại Phú LV</strong><br>
+      Status: <code>approved → reviewing</code>. Bank info giữ nguyên. Phú LV chỉ cần sửa field cụ thể Trung/Huy chỉ ra, không phải nhập lại từ đầu.
+    </div>
+
+    <div class="notice danger">
+      <strong>📝 Cut-over policy A</strong><br>
+      HĐ trước 2026-05-14 KHÔNG dùng workflow mới — vẫn dùng legacy ContractFileSection. UI tự detect qua <code>hasWorkflow</code>.
+    </div>
+  </section>
+
+  <!-- DB SCHEMA QUICK -->
+  <section>
+    <h2>🗄 Schema chính</h2>
+    <table class="perm">
+      <thead><tr><th>Bảng</th><th>Mục đích</th><th>Quan trọng</th></tr></thead>
+      <tbody>
+        <tr><td><code>sales_orders</code></td><td>Đơn hàng bán quốc tế</td><td>Master table</td></tr>
+        <tr><td><code>sales_order_items</code></td><td>Multi-item per order</td><td>Grade × qty × price</td></tr>
+        <tr><td><code>sales_order_contracts</code></td><td>Workflow HĐ — mỗi revision = 1 row</td><td>Status + form_data JSONB</td></tr>
+        <tr><td><code>sales_order_documents</code></td><td>Files đính kèm</td><td>doc_type + doc_sub_type</td></tr>
+        <tr><td><code>sales_order_messages</code></td><td>Chat + system messages</td><td>Realtime subscribe</td></tr>
+        <tr><td><code>sales_contract_access_log</code></td><td>Audit trail 13 event types</td><td>Full audit</td></tr>
+        <tr><td><code>notifications</code></td><td>Bell notifications</td><td>Cross-module</td></tr>
+        <tr><td><code>email_notifications</code></td><td>Log email gửi ra</td><td>Audit email</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    Huy Anh Rubber Company Limited · ERP System v9 · 2026-05-15<br>
+    Tạo bởi auto-generated từ codebase · <a href="https://huyanhrubber.vn" style="color:#1B4D3E;">huyanhrubber.vn</a>
+  </footer>
+
+</div>
+</body>
+</html>

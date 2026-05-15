@@ -8,6 +8,7 @@
 
 import { supabase } from '../../lib/supabase'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { createNotification } from '../notificationService'
 
 export type MessageType = 'user' | 'system' | 'event'
 export type MessageAuthorRole =
@@ -110,7 +111,7 @@ export const salesOrderMessageService = {
     return (data as unknown as SalesOrderMessage[]) || []
   },
 
-  /** Gửi tin user. */
+  /** Gửi tin user. Tự gửi notification cho mỗi người được @mention. */
   async sendMessage(params: {
     salesOrderId: string
     content: string
@@ -122,6 +123,7 @@ export const salesOrderMessageService = {
     if (!me) throw new Error('Không xác định được nhân viên')
 
     const role = roleFromEmail(me.email)
+    const mentionedIds = (params.mentionedIds || []).filter((id) => id && id !== me.id)
 
     const { data, error } = await supabase
       .from('sales_order_messages')
@@ -132,12 +134,47 @@ export const salesOrderMessageService = {
         author_id: me.id,
         author_role: role,
         parent_message_id: params.parentMessageId || null,
-        mentioned_ids: params.mentionedIds || [],
+        mentioned_ids: mentionedIds,
         attachment_doc_id: params.attachmentDocId || null,
       })
       .select('*')
       .single()
     if (error) throw error
+
+    // ─── Notify mỗi người được mention (chuông góc trên ERP) ───
+    if (mentionedIds.length > 0) {
+      const { data: order } = await supabase
+        .from('sales_orders')
+        .select('code, contract_no')
+        .eq('id', params.salesOrderId)
+        .maybeSingle()
+      const orderRef = order?.contract_no || order?.code || params.salesOrderId.slice(0, 8)
+      const senderName = me.full_name || me.email || 'Một ai đó'
+      const excerpt = params.content.trim().slice(0, 120)
+
+      // Gửi song song (không await để không block reply)
+      void Promise.all(
+        mentionedIds.map((recipientId) =>
+          createNotification({
+            recipient_id: recipientId,
+            sender_id: me.id,
+            module: 'system',
+            notification_type: 'system_announcement',
+            title: `💬 ${senderName} mention bạn trong đơn ${orderRef}`,
+            message: excerpt,
+            reference_id: params.salesOrderId,
+            reference_type: 'sales_order_chat',
+            reference_url: `/sales/orders/${params.salesOrderId}?tab=chat`,
+            priority: 'normal',
+            metadata: {
+              chat_message_id: data.id,
+              order_code: orderRef,
+            },
+          }),
+        ),
+      ).catch((e) => console.error('Notification gửi thất bại:', e))
+    }
+
     return data as SalesOrderMessage
   },
 

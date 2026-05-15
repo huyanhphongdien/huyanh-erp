@@ -62,6 +62,11 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
   const [sending, setSending] = useState(false)
   const [input, setInput] = useState('')
   const [showMentionMenu, setShowMentionMenu] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionActiveIdx, setMentionActiveIdx] = useState(0)
+  // Track mentions picked: email_prefix → { id, full_name }
+  // Khi gửi, lấy mentioned_ids từ map này (chính xác, không phải regex)
+  const [pickedMentions, setPickedMentions] = useState<Record<string, { id: string; full_name: string }>>({})
 
   const messagesRef = useRef<HTMLDivElement>(null)
 
@@ -116,36 +121,68 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
     }
   }
 
-  // ── Detect @ trigger ──
+  // ── Detect @ trigger + extract query ──
   useEffect(() => {
-    const trigger = /@\w*$/.test(input)
-    setShowMentionMenu(trigger && input.length > 0)
+    const match = input.match(/@(\w*)$/)
+    if (match) {
+      setMentionQuery(match[1].toLowerCase())
+      setShowMentionMenu(true)
+      setMentionActiveIdx(0)
+    } else {
+      setShowMentionMenu(false)
+      setMentionQuery('')
+    }
   }, [input])
+
+  // Filter mentionables theo query (match email_prefix HOẶC full_name)
+  const filteredMentions = useMemo(() => {
+    if (!showMentionMenu) return []
+    const q = mentionQuery.toLowerCase()
+    if (!q) return mentionables.slice(0, 8)
+    return mentionables
+      .filter((u) => {
+        const emailPrefix = u.email.split('@')[0].toLowerCase()
+        return emailPrefix.includes(q) ||
+               u.full_name.toLowerCase().includes(q) ||
+               u.role_label.toLowerCase().includes(q)
+      })
+      .slice(0, 8)
+  }, [mentionables, mentionQuery, showMentionMenu])
 
   const handleSend = async () => {
     const text = input.trim()
     if (!text) return
     setSending(true)
     try {
-      // Extract mentions (simple: @email or @short_name)
-      const mentionMatches = text.match(/@(\w+)/g) || []
-      const mentionedIds: string[] = []
+      // Resolve mentions: từ pickedMentions (chính xác) + fallback regex match
+      const mentionMatches = text.match(/@([\w.]+)/g) || []
+      const mentionedIdSet = new Set<string>()
+
       for (const m of mentionMatches) {
-        const search = m.slice(1).toLowerCase()
-        const found = mentionables.find((u) =>
-          u.email.toLowerCase().startsWith(search) ||
-          u.full_name.toLowerCase().includes(search),
-        )
-        if (found) mentionedIds.push(found.id)
+        const prefix = m.slice(1).toLowerCase()
+        // 1. Ưu tiên pickedMentions (user đã pick từ dropdown)
+        const picked = pickedMentions[prefix]
+        if (picked) {
+          mentionedIdSet.add(picked.id)
+          continue
+        }
+        // 2. Fallback: match qua email prefix HOẶC full_name
+        const found = mentionables.find((u) => {
+          const p = u.email.split('@')[0].toLowerCase()
+          return p === prefix ||
+                 u.full_name.toLowerCase().replace(/\s+/g, '').includes(prefix.replace(/\s+/g, ''))
+        })
+        if (found) mentionedIdSet.add(found.id)
       }
 
       await salesOrderMessageService.sendMessage({
         salesOrderId,
         content: text,
-        mentionedIds,
+        mentionedIds: Array.from(mentionedIdSet),
       })
       setInput('')
-      // Realtime sẽ tự thêm vào list
+      setPickedMentions({})
+      // Realtime sẽ tự thêm tin vào list
     } catch (e: unknown) {
       antMessage.error('Gửi tin thất bại: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
@@ -173,11 +210,47 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
   }
 
   const insertMention = (u: MentionableUser) => {
-    // Replace @xxx (incomplete) with @email_prefix
+    // Replace @xxx (incomplete) với @emailPrefix, track employee_id chính xác
     const emailPrefix = u.email.split('@')[0]
     const newText = input.replace(/@\w*$/, `@${emailPrefix} `)
     setInput(newText)
+    setPickedMentions((prev) => ({
+      ...prev,
+      [emailPrefix.toLowerCase()]: { id: u.id, full_name: u.full_name },
+    }))
     setShowMentionMenu(false)
+    setMentionQuery('')
+  }
+
+  // Keyboard nav cho mention dropdown
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMentionMenu && filteredMentions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionActiveIdx((i) => Math.min(i + 1, filteredMentions.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionActiveIdx((i) => Math.max(i - 1, 0))
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        insertMention(filteredMentions[mentionActiveIdx])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowMentionMenu(false)
+        return
+      }
+    }
+    // Enter (no shift, no mention menu) → send
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
   }
 
   // Participants (distinct authors)
@@ -314,23 +387,63 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
         {/* INPUT */}
         <div style={chatInputBox}>
           <div style={{ position: 'relative' }}>
-            {showMentionMenu && mentionables.length > 0 && (
+            {showMentionMenu && filteredMentions.length > 0 && (
               <div style={mentionMenu}>
-                <div style={{ padding: '6px 10px', fontSize: 11, color: '#8c8c8c', background: '#fafafa' }}>
-                  💡 Chọn người để mention:
+                <div style={{
+                  padding: '8px 12px', fontSize: 11, color: '#8c8c8c', background: '#fafafa',
+                  borderBottom: '1px solid #f0f0f0',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span>💡 Chọn người để mention {mentionQuery && <b>· lọc "{mentionQuery}"</b>}</span>
+                  <span style={{ fontSize: 10 }}>↑↓ chuyển · Enter/Tab chọn</span>
                 </div>
-                {mentionables.slice(0, 8).map((u) => (
-                  <div
-                    key={u.id}
-                    style={mentionItem}
-                    onClick={() => insertMention(u)}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f9f4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <div style={{ fontWeight: 600, fontSize: 12 }}>@{u.email.split('@')[0]}</div>
-                    <div style={{ fontSize: 11, color: '#8c8c8c' }}>{u.full_name} · {u.role_label}</div>
-                  </div>
-                ))}
+                {filteredMentions.map((u, idx) => {
+                  const emailPrefix = u.email.split('@')[0]
+                  const isActive = idx === mentionActiveIdx
+                  const meta = (() => {
+                    const r = roleFromEmail(u.email)
+                    return r ? ROLE_META[r] : null
+                  })()
+                  return (
+                    <div
+                      key={u.id}
+                      style={{
+                        ...mentionItem,
+                        background: isActive ? '#f0f9f4' : 'transparent',
+                        boxShadow: isActive ? `inset 3px 0 0 ${PRIMARY}` : 'none',
+                        display: 'flex', alignItems: 'center', gap: 10,
+                      }}
+                      onClick={() => insertMention(u)}
+                      onMouseEnter={() => setMentionActiveIdx(idx)}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: meta?.bg || 'linear-gradient(135deg,#8c8c8c,#595959)',
+                        color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 700, flexShrink: 0,
+                      }}>
+                        {(u.full_name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>
+                          {u.full_name}
+                          {meta && (
+                            <span style={{
+                              marginLeft: 6, padding: '1px 6px', borderRadius: 8,
+                              background: meta.bg, color: '#fff', fontSize: 10, fontWeight: 600,
+                            }}>
+                              {meta.label}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#8c8c8c', fontFamily: 'monospace' }}>
+                          @{emailPrefix} · {u.email}
+                        </div>
+                      </div>
+                      {isActive && <span style={{ color: PRIMARY, fontSize: 14 }}>↵</span>}
+                    </div>
+                  )
+                })}
               </div>
             )}
             <div style={chatInputBar}>
@@ -340,13 +453,8 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
               <Input.TextArea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onPressEnter={(e) => {
-                  if (!e.shiftKey) {
-                    e.preventDefault()
-                    handleSend()
-                  }
-                }}
-                placeholder={`Gõ tin nhắn... · @ mention · vai trò bạn: ${myRole ? ROLE_META[myRole]?.label : '—'}`}
+                onKeyDown={handleInputKeyDown}
+                placeholder={`Gõ tin... gõ @ để mention · vai trò bạn: ${myRole ? ROLE_META[myRole]?.label : '—'}`}
                 autoSize={{ minRows: 1, maxRows: 4 }}
                 style={{ border: 'none', boxShadow: 'none', resize: 'none' }}
               />
@@ -363,7 +471,14 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
             </div>
           </div>
           <div style={{ marginTop: 6, fontSize: 11, color: '#8c8c8c', display: 'flex', justifyContent: 'space-between' }}>
-            <span>💡 <b>@</b> mention · <b>Enter</b> gửi · <b>Shift+Enter</b> xuống dòng</span>
+            <span>
+              💡 Gõ <b>@</b> chọn từ dropdown · <b>Enter</b> gửi · <b>Shift+Enter</b> xuống dòng
+              {Object.keys(pickedMentions).length > 0 && (
+                <span style={{ marginLeft: 8, color: PRIMARY }}>
+                  · Đã mention: {Object.values(pickedMentions).map((m) => m.full_name).join(', ')} (sẽ thông báo ERP)
+                </span>
+              )}
+            </span>
             <span>{messages.length} tin trong đơn</span>
           </div>
         </div>

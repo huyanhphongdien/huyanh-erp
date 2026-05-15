@@ -17,6 +17,7 @@ import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { saveAs } from 'file-saver'
 import { SALES_CONFIG } from '../../config/sales.config'
+import { supabase } from '../../lib/supabase'
 
 // ----------------------------------------------------------------------------
 // Types
@@ -227,14 +228,52 @@ export async function generateContractBlob(
   })
 }
 
-/** Sinh + download trực tiếp xuống máy. */
+/**
+ * Self-heal form_data bằng cách fetch fresh customer info (address/phone/name)
+ * từ sales_orders → sales_customers nếu form_data lưu rỗng.
+ *
+ * Dùng cho HĐ tạo TRƯỚC khi CUSTOMER_JOIN có address (commit 134c41e0).
+ * Caller pass salesOrderId để biết fetch từ đâu.
+ */
+export async function enrichFormDataWithCustomer(
+  formData: Partial<ContractFormData>,
+  salesOrderId?: string,
+): Promise<Partial<ContractFormData>> {
+  const fd = { ...formData }
+  if (!salesOrderId) return fd
+  // Đã có đủ data → skip để tiết kiệm 1 query
+  if (fd.buyer_name && fd.buyer_address && fd.buyer_phone) return fd
+  try {
+    const { data: order } = await supabase
+      .from('sales_orders')
+      .select('customer:sales_customers!customer_id(name,address,phone)')
+      .eq('id', salesOrderId)
+      .maybeSingle()
+    const cust = (order?.customer as { name?: string; address?: string; phone?: string } | null) || null
+    if (cust) {
+      if (!fd.buyer_name) fd.buyer_name = cust.name || ''
+      if (!fd.buyer_address) fd.buyer_address = cust.address || ''
+      if (!fd.buyer_phone) fd.buyer_phone = cust.phone || ''
+    }
+  } catch (e) {
+    console.warn('enrichFormDataWithCustomer fail:', e)
+  }
+  return fd
+}
+
+/** Sinh + download trực tiếp xuống máy.
+ *  Truyền salesOrderId để auto-heal buyer_address/phone từ DB nếu form_data thiếu. */
 export async function downloadContract(
   kind: ContractKind,
   data: Partial<ContractFormData>,
   filename?: string,
+  salesOrderId?: string,
 ): Promise<void> {
-  const blob = await generateContractBlob(kind, data)
-  const name = filename || `${data.contract_no || 'contract'}_${kind}.docx`
+  const enriched = salesOrderId
+    ? await enrichFormDataWithCustomer(data, salesOrderId)
+    : data
+  const blob = await generateContractBlob(kind, enriched)
+  const name = filename || `${enriched.contract_no || 'contract'}_${kind}.docx`
   saveAs(blob, name)
 }
 

@@ -108,22 +108,26 @@ export default function ContractSignPage() {
     setDocLoading(type)
     try {
       const fd = active.form_data || {}
+      const orderId = active.sales_order_id  // auto-heal buyer_address từ DB
       if (type === 'BOTH') {
         await downloadContract(
           deriveKind(fd.incoterm || 'FOB', 'SC'),
           fd,
           `${fd.contract_no || 'contract'}_SC.docx`,
+          orderId,
         )
         await downloadContract(
           deriveKind(fd.incoterm || 'FOB', 'PI'),
           fd,
           `${fd.contract_no || 'contract'}_PI.docx`,
+          orderId,
         )
       } else {
         await downloadContract(
           deriveKind(fd.incoterm || 'FOB', type),
           fd,
           `${fd.contract_no || 'contract'}_${type}.docx`,
+          orderId,
         )
       }
       message.success('Đã tải .docx — in ra ký + đóng dấu rồi scan upload lại')

@@ -142,22 +142,27 @@ export default function ContractReviewPage() {
     const updated = buildUpdatedFormData()
     setDocLoading(type)
     try {
+      // Truyền sales_order_id để auto-heal buyer_address/phone từ DB
+      const orderId = active.sales_order_id
       if (type === 'BOTH') {
         await downloadContract(
           deriveKind(updated.incoterm || 'FOB', 'SC'),
           updated,
           `${updated.contract_no || 'contract'}_SC.docx`,
+          orderId,
         )
         await downloadContract(
           deriveKind(updated.incoterm || 'FOB', 'PI'),
           updated,
           `${updated.contract_no || 'contract'}_PI.docx`,
+          orderId,
         )
       } else {
         await downloadContract(
           deriveKind(updated.incoterm || 'FOB', type),
           updated,
           `${updated.contract_no || 'contract'}_${type}.docx`,
+          orderId,
         )
       }
       message.success('Đã sinh .docx (preview, không lưu lên server)')

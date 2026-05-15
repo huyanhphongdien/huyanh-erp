@@ -15,8 +15,9 @@ export interface SalesDocument {
   doc_type: string
   /** Sub-type chỉ áp dụng cho doc_type=contract:
    *  - 'sent_to_customer': drafts gửi KH duyệt (có thể nhiều revision)
-   *  - 'final_signed': bản scan PDF ký + đóng dấu 2 bên (terminal, 1 file) */
-  doc_sub_type?: 'sent_to_customer' | 'final_signed' | null
+   *  - 'ha_signed':       HĐ Huy Anh đã ký 1 bên (sau khi Trung/Huy xác nhận + in ký)
+   *  - 'final_signed':    HĐ FINAL có chữ ký 2 bên (KH ký lại — pháp lý) */
+  doc_sub_type?: 'sent_to_customer' | 'ha_signed' | 'final_signed' | null
   doc_name: string
   file_url: string | null
   file_name: string | null

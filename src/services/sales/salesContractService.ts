@@ -234,9 +234,10 @@ export const salesContractService = {
       replaceDocId?: string
       /** sub_type cho doc_type=contract:
        *  - 'sent_to_customer': drafts gửi KH duyệt (default)
-       *  - 'final_signed': bản ký 2 bên (chỉ admin/BGĐ upload)
+       *  - 'ha_signed':       HĐ Huy Anh ký 1 bên (chưa final)
+       *  - 'final_signed':    bản ký 2 bên — pháp lý (chỉ admin/BGĐ upload/xóa)
        *  - undefined: legacy/không chỉ định → 'sent_to_customer' */
-      subType?: 'sent_to_customer' | 'final_signed'
+      subType?: 'sent_to_customer' | 'ha_signed' | 'final_signed'
     } = {},
   ): Promise<{ ok: boolean; doc?: SalesDocument; error?: string }> {
     try {
@@ -276,9 +277,10 @@ export const salesContractService = {
       } else {
         // 2b. INSERT row mới (lần đầu hoặc thêm file vào danh sách)
         const subType = options.subType || 'sent_to_customer'
-        const docName = subType === 'final_signed'
-          ? 'HĐ FINAL (ký + đóng dấu 2 bên)'
-          : 'HĐ gửi KH'
+        const docName =
+          subType === 'final_signed' ? 'HĐ FINAL (ký + đóng dấu 2 bên)' :
+          subType === 'ha_signed' ? 'HĐ HA đã ký (1 bên)' :
+          'HĐ gửi KH'
         const { data: inserted, error: dbErr } = await supabase
           .from('sales_order_documents')
           .insert({

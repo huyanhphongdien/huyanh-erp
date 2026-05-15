@@ -88,8 +88,8 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const replaceInputRef = useRef<HTMLInputElement>(null)
   const replaceTargetIdRef = useRef<string | null>(null)
-  // Sub-type cho upload: drafts gửi KH hoặc FINAL ký 2 bên
-  const uploadSubTypeRef = useRef<'sent_to_customer' | 'final_signed'>('sent_to_customer')
+  // Sub-type cho upload: 3 loại theo workflow ký
+  const uploadSubTypeRef = useRef<'sent_to_customer' | 'ha_signed' | 'final_signed'>('sent_to_customer')
 
   const userIsBOD = isBOD(user)
   const hasFile = docs.length > 0
@@ -248,10 +248,10 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
           )}
           {userIsBOD && <Tag color="gold" style={{ marginLeft: 4, fontSize: 10 }}>BGĐ</Tag>}
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {hasFile && canUpload && (
             <>
-              <Tooltip title="Drafts gửi KH duyệt (.docx / PDF, có revision)">
+              <Tooltip title="Drafts gửi KH duyệt (.docx / PDF)">
                 <Button
                   size="small"
                   icon={<UploadOutlined />}
@@ -264,8 +264,22 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                   📤 HĐ gửi KH
                 </Button>
               </Tooltip>
+              <Tooltip title="HĐ Huy Anh đã ký 1 bên (sau khi in + ký + đóng dấu HA)">
+                <Button
+                  size="small"
+                  icon={<UploadOutlined />}
+                  onClick={() => {
+                    uploadSubTypeRef.current = 'ha_signed'
+                    uploadInputRef.current?.click()
+                  }}
+                  loading={uploading}
+                  style={{ borderColor: '#1677ff', color: '#1677ff' }}
+                >
+                  ✍️ HĐ HA đã ký
+                </Button>
+              </Tooltip>
               {(salesRole === 'admin' || userIsBOD) && (
-                <Tooltip title="HĐ FINAL ký + đóng dấu 2 bên (PDF)">
+                <Tooltip title="HĐ FINAL — KH ký lại 2 bên (PHÁP LÝ)">
                   <Button
                     size="small"
                     type="primary"
@@ -277,7 +291,7 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                     loading={uploading}
                     style={{ background: '#389e0d', borderColor: '#389e0d' }}
                   >
-                    ✅ HĐ FINAL
+                    ✅ HĐ FINAL (2 bên)
                   </Button>
                 </Tooltip>
               )}
@@ -318,14 +332,16 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {(() => {
-              // Group docs by doc_sub_type
+              // Group docs by doc_sub_type — 3 nhóm theo workflow ký
               const sentDocs = docs.filter((d) =>
                 !d.doc_sub_type || d.doc_sub_type === 'sent_to_customer'
               )
+              const haSignedDocs = docs.filter((d) => d.doc_sub_type === 'ha_signed')
               const finalDocs = docs.filter((d) => d.doc_sub_type === 'final_signed')
               const groups: { key: string; label: string; icon: string; color: string; items: typeof docs }[] = [
                 { key: 'sent', label: '📤 HĐ gửi KH', icon: '📤', color: '#fa8c16', items: sentDocs },
-                { key: 'final', label: '✅ HĐ FINAL (ký 2 bên)', icon: '✅', color: '#389e0d', items: finalDocs },
+                { key: 'ha_signed', label: '✍️ HĐ HA đã ký (1 bên)', icon: '✍️', color: '#1677ff', items: haSignedDocs },
+                { key: 'final', label: '✅ HĐ FINAL — ký 2 bên (PHÁP LÝ)', icon: '✅', color: '#389e0d', items: finalDocs },
               ].filter((g) => g.items.length > 0)
               return groups
             })().map((group) => (
@@ -340,6 +356,8 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                 {group.items.map((doc) => {
                   const canView = canViewContract(doc, user, salesRole)
                   const isFinal = doc.doc_sub_type === 'final_signed'
+                  const isHASigned = doc.doc_sub_type === 'ha_signed'
+                  const iconColor = isFinal ? '#389e0d' : isHASigned ? '#1677ff' : '#f5222d'
                   return (
                 <div
                   key={doc.id}
@@ -348,12 +366,15 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                     padding: '8px 4px', borderBottom: '1px dashed #d9f7be',
                   }}
                 >
-                  <FilePdfOutlined style={{ fontSize: 24, color: isFinal ? '#389e0d' : '#f5222d', flexShrink: 0 }} />
+                  <FilePdfOutlined style={{ fontSize: 24, color: iconColor, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: '#1B4D3E' }}>
                       {doc.file_name || 'contract'}
                       {isFinal && (
-                        <Tag color="green" style={{ marginLeft: 6, fontSize: 10 }}>FINAL</Tag>
+                        <Tag color="green" style={{ marginLeft: 6, fontSize: 10 }}>FINAL ký 2 bên</Tag>
+                      )}
+                      {isHASigned && (
+                        <Tag color="blue" style={{ marginLeft: 6, fontSize: 10 }}>HA ký 1 bên</Tag>
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>

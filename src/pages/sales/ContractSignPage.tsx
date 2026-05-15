@@ -29,16 +29,19 @@ import {
   Breadcrumb,
   Alert,
   Divider,
+  Input,
 } from 'antd'
 import type { UploadFile, UploadProps } from 'antd/es/upload/interface'
 import {
   CheckCircleOutlined,
+  CloseCircleOutlined,
   DownloadOutlined,
   EyeOutlined,
   ReloadOutlined,
   HomeOutlined,
   EditOutlined,
   InboxOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import {
@@ -51,6 +54,7 @@ import {
 } from '../../services/sales/contractGeneratorService'
 
 const { Title, Text } = Typography
+const { TextArea } = Input
 
 export default function ContractSignPage() {
   const navigate = useNavigate()
@@ -62,6 +66,8 @@ export default function ContractSignPage() {
   const [active, setActive] = useState<SalesOrderContract | null>(null)
   const [fileList, setFileList] = useState<UploadFile[]>([])
   const [signing, setSigning] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [sendingBack, setSendingBack] = useState(false)
   const [docLoading, setDocLoading] = useState<'SC' | 'PI' | 'BOTH' | null>(null)
 
   const isAllowedSigner = useMemo(
@@ -158,6 +164,99 @@ export default function ContractSignPage() {
     onRemove: () => {
       setFileList([])
     },
+  }
+
+  /** Trung/Huy bấm "Xác nhận đã duyệt" — HĐ OK, sẵn sàng in ký.
+   *  Không đổi status, không upload PDF — chỉ set timestamp confirm. */
+  const handleConfirmReady = () => {
+    if (!active) return
+    Modal.confirm({
+      title: '✅ Xác nhận HĐ đã duyệt — sẵn sàng in ký',
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>
+            Bạn xác nhận thông tin HĐ <strong>{active.form_data?.contract_no}</strong> đã ĐÚNG
+            (bao gồm bank info Phú LV nhập).
+          </p>
+          <Alert
+            type="info"
+            showIcon
+            message="Sau khi xác nhận"
+            description={<>
+              • Có thể tải SC/PI .docx → in ra → ký + đóng dấu (ai cũng làm được, không cần chữ ký số)<br />
+              • Scan PDF có chữ ký HA → upload vào folder <strong>"HĐ HA đã ký"</strong><br />
+              • Khi KH gửi lại bản đã ký 2 bên → upload <strong>"HĐ FINAL ký 2 bên"</strong>
+            </>}
+            style={{ marginTop: 8 }}
+          />
+        </div>
+      ),
+      okText: 'Xác nhận đã duyệt',
+      cancelText: 'Quay lại',
+      okButtonProps: { type: 'primary', style: { background: '#1B4D3E' } },
+      width: 520,
+      onOk: async () => {
+        setConfirming(true)
+        try {
+          const updated = await salesContractWorkflowService.confirmReadyToSign(active.id)
+          message.success(`Đã xác nhận HĐ ${active.form_data?.contract_no}`)
+          setActive(updated)  // refresh drawer với signer_confirmed_at
+          void refresh()
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e)
+          message.error(`Xác nhận thất bại: ${msg}`)
+        } finally {
+          setConfirming(false)
+        }
+      },
+    })
+  }
+
+  /** Trung/Huy bấm "Trả lại Phú LV" — phát hiện sai (bank/giá/...). */
+  const handleSendBack = () => {
+    if (!active) return
+    let reason = ''
+    Modal.confirm({
+      title: '🔁 Trả lại Phú LV để review lại',
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>
+            HĐ <strong>{active.form_data?.contract_no}</strong> sẽ chuyển{' '}
+            <Tag color="orange">reviewing</Tag>. Phú LV/Minh LD nhận thông báo + email.
+          </p>
+          <p style={{ marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
+            Lý do trả lại <span style={{ color: '#cf1322' }}>*</span>
+          </p>
+          <TextArea
+            rows={3}
+            placeholder="VD: Bank account sai số TK, số HĐ trùng đơn khác, giá USD không khớp với deal đã chốt..."
+            onChange={(e) => { reason = e.target.value }}
+          />
+        </div>
+      ),
+      okText: 'Trả lại',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      width: 520,
+      onOk: async () => {
+        if (!reason.trim()) {
+          message.error('Cần nhập lý do trả lại')
+          throw new Error('missing reason')
+        }
+        setSendingBack(true)
+        try {
+          await salesContractWorkflowService.sendBackToReview(active.id, reason.trim())
+          message.success('Đã trả lại Phú LV review')
+          closeSign()
+          void refresh()
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e)
+          message.error(`Trả lại thất bại: ${msg}`)
+        } finally {
+          setSendingBack(false)
+        }
+      },
+    })
   }
 
   const handleConfirmSigned = async () => {
@@ -358,34 +457,81 @@ export default function ContractSignPage() {
         onClose={closeSign}
         width={720}
         extra={
-          <Button
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            onClick={handleConfirmSigned}
-            loading={signing}
-            disabled={fileList.length === 0}
-            style={{ background: '#1B4D3E' }}
-          >
-            Xác nhận đã ký
-          </Button>
+          active && (
+            <Space>
+              {/* Step 1: Chưa xác nhận → 2 nút chọn */}
+              {!active.signer_confirmed_at && (
+                <>
+                  <Button
+                    danger
+                    icon={<RollbackOutlined />}
+                    onClick={handleSendBack}
+                    loading={sendingBack}
+                  >
+                    Trả lại Phú LV
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleConfirmReady}
+                    loading={confirming}
+                    style={{ background: '#1B4D3E' }}
+                  >
+                    Xác nhận đã duyệt
+                  </Button>
+                </>
+              )}
+              {/* Step 2: Đã xác nhận → nút upload FINAL khi có file */}
+              {active.signer_confirmed_at && (
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleConfirmSigned}
+                  loading={signing}
+                  disabled={fileList.length === 0}
+                  style={{ background: '#1B4D3E' }}
+                >
+                  Đánh dấu FINAL (KH đã ký lại)
+                </Button>
+              )}
+            </Space>
+          )
         }
       >
         {active && (
           <>
-            <Alert
-              type="info"
-              showIcon
-              message="Quy trình ký"
-              description={
-                <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
-                  <li>Bấm "Tải SC + PI" → in ra trên giấy</li>
-                  <li>Anh Trung/Huy ký + đóng dấu trên cả 2 bản</li>
-                  <li>Scan thành 1 file PDF</li>
-                  <li>Upload PDF ở dưới → "Xác nhận đã ký"</li>
-                </ol>
-              }
-              style={{ marginBottom: 16 }}
-            />
+            {/* Step 1: Quy trình review */}
+            {!active.signer_confirmed_at ? (
+              <Alert
+                type="info"
+                showIcon
+                message="Bước 1: Review thông tin HĐ"
+                description={
+                  <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
+                    <li>Xem kỹ thông tin bên dưới (KH, grade, giá, bank info Phú LV nhập)</li>
+                    <li>Tải SC/PI .docx → kiểm tra format</li>
+                    <li><strong>OK</strong> → bấm "✅ Xác nhận đã duyệt" — cho phép in HĐ</li>
+                    <li><strong>Sai</strong> → bấm "🔁 Trả lại Phú LV" với lý do — Phú LV sẽ review lại</li>
+                  </ol>
+                }
+                style={{ marginBottom: 16 }}
+              />
+            ) : (
+              <Alert
+                type="success"
+                showIcon
+                message={`✅ Đã xác nhận lúc ${new Date(active.signer_confirmed_at).toLocaleString('vi-VN')}`}
+                description={
+                  <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
+                    <li>Tải SC/PI .docx → in ra giấy → ký + đóng dấu HA (ai cũng làm được)</li>
+                    <li>Scan bản HA ký → upload vào folder "<strong>HĐ HA đã ký</strong>" (tab Hợp đồng)</li>
+                    <li>Gửi cho KH duyệt → KH ký lại + scan PDF FINAL gửi về</li>
+                    <li>Upload PDF FINAL của KH bên dưới → bấm "Đánh dấu FINAL"</li>
+                  </ol>
+                }
+                style={{ marginBottom: 16 }}
+              />
+            )}
 
             <Card size="small" style={{ marginBottom: 16 }} title="Tóm tắt HĐ">
               <Descriptions size="small" column={2} bordered>
@@ -446,7 +592,7 @@ export default function ContractSignPage() {
               </Descriptions>
             </Card>
 
-            <Divider>Bước 1 · Tải HĐ ra in</Divider>
+            <Divider>{active.signer_confirmed_at ? 'Bước 1 · Tải HĐ ra in (ai cũng làm được)' : 'Tải HĐ để review'}</Divider>
             <Space.Compact block style={{ marginBottom: 16 }}>
               <Button
                 icon={<DownloadOutlined />}
@@ -475,26 +621,42 @@ export default function ContractSignPage() {
               </Button>
             </Space.Compact>
 
-            <Divider>Bước 2 · Upload PDF đã ký + đóng dấu</Divider>
-            <Upload.Dragger {...uploadProps} style={{ marginBottom: 8 }}>
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined />
-              </p>
-              <p className="ant-upload-text">
-                Kéo file PDF vào đây hoặc bấm chọn
-              </p>
-              <p className="ant-upload-hint">
-                Chỉ chấp nhận 1 file PDF, &lt; 20MB. Tốt nhất gộp cả SC + PI đã ký
-                vào 1 file PDF.
-              </p>
-            </Upload.Dragger>
-            {fileList.length > 0 && (
-              <Alert
-                type="success"
-                showIcon
-                message={`Đã chọn: ${fileList[0].name} (${((fileList[0].size || 0) / 1024).toFixed(0)} KB)`}
-                style={{ marginTop: 8 }}
-              />
+            {/* Step 2: Upload FINAL — CHỈ hiện sau khi đã xác nhận */}
+            {active.signer_confirmed_at && (
+              <>
+                <Divider>Bước 2 · Upload PDF FINAL (KH đã ký lại — 2 bên)</Divider>
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Quy trình"
+                  description={<>
+                    File <strong>HĐ HA đã ký</strong> (1 bên) → upload vào tab "Hợp đồng" → folder
+                    "<strong>✍️ HĐ HA đã ký</strong>" (không cần đánh dấu trạng thái).<br />
+                    File <strong>HĐ FINAL</strong> (KH ký lại, 2 bên) → upload ở đây để đánh dấu HĐ
+                    chuyển sang trạng thái <Tag color="success">signed</Tag>.
+                  </>}
+                  style={{ marginBottom: 12 }}
+                />
+                <Upload.Dragger {...uploadProps} style={{ marginBottom: 8 }}>
+                  <p className="ant-upload-drag-icon">
+                    <InboxOutlined />
+                  </p>
+                  <p className="ant-upload-text">
+                    Kéo file PDF FINAL (KH ký lại) vào đây hoặc bấm chọn
+                  </p>
+                  <p className="ant-upload-hint">
+                    PDF có chữ ký + đóng dấu CỦA CẢ 2 BÊN. &lt; 20MB.
+                  </p>
+                </Upload.Dragger>
+                {fileList.length > 0 && (
+                  <Alert
+                    type="success"
+                    showIcon
+                    message={`Đã chọn: ${fileList[0].name} (${((fileList[0].size || 0) / 1024).toFixed(0)} KB)`}
+                    style={{ marginTop: 8 }}
+                  />
+                )}
+              </>
             )}
           </>
         )}

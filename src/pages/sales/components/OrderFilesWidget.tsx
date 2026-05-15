@@ -2,9 +2,10 @@
 // ORDER FILES WIDGET — 6 folder grid trong tab Tiến độ
 // File: src/pages/sales/components/OrderFilesWidget.tsx
 //
-// Hợp đồng folder split 2 sub-folders:
-//   📤 HĐ gửi KH  (sent_to_customer)  — drafts gửi khách duyệt, có revision
-//   ✅ HĐ FINAL    (final_signed)      — bản scan PDF ký + đóng dấu 2 bên
+// Hợp đồng folder split 3 sub-folders (theo workflow ký):
+//   📤 HĐ gửi KH       (sent_to_customer) — drafts gửi khách duyệt
+//   ✍️ HĐ HA đã ký      (ha_signed)        — HA ký 1 bên, sau Trung/Huy xác nhận
+//   ✅ HĐ FINAL         (final_signed)     — KH ký lại 2 bên (PHÁP LÝ)
 //
 // 5 folder còn lại (Vận chuyển, Chứng từ, Tài chính, Phiếu cân, Khác) giữ flat.
 // ============================================================================
@@ -40,7 +41,7 @@ interface FolderStat {
 }
 
 interface SubFolderStat {
-  doc_sub_type: string  // 'sent_to_customer' | 'final_signed'
+  doc_sub_type: string  // 'sent_to_customer' | 'ha_signed' | 'final_signed'
   count: number
   sample_names: string[]
 }
@@ -159,7 +160,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                 </span>
               </div>
 
-              {/* HĐ folder: 2 sub-folders thay vì danh sách phẳng */}
+              {/* HĐ folder: 3 sub-folders theo workflow ký */}
               {isContract ? (
                 <div style={subFolderRow}>
                   <ContractSubFolder
@@ -168,7 +169,15 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                     color="#fa8c16"
                     bg="#fff7e6"
                     stat={contractSub['sent_to_customer']}
-                    hint="Drafts gửi khách duyệt — có revision"
+                    hint="Drafts gửi KH duyệt"
+                  />
+                  <ContractSubFolder
+                    icon="✍️"
+                    name="HĐ HA đã ký"
+                    color="#1677ff"
+                    bg="#e6f4ff"
+                    stat={contractSub['ha_signed']}
+                    hint="HA ký 1 bên (chưa final)"
                   />
                   <ContractSubFolder
                     icon="✅"
@@ -176,7 +185,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                     color="#389e0d"
                     bg="#f6ffed"
                     stat={contractSub['final_signed']}
-                    hint="Bản ký + đóng dấu 2 bên"
+                    hint="KH ký lại — 2 bên (pháp lý)"
                   />
                 </div>
               ) : (
@@ -290,7 +299,7 @@ const folderFiles: React.CSSProperties = {
 }
 
 const subFolderRow: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6,
+  display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 6,
 }
 
 const subFolder: React.CSSProperties = {

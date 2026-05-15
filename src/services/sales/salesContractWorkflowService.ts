@@ -55,6 +55,11 @@ export interface SalesOrderContract {
   signer_id?: string | null
   signed_at?: string | null
 
+  /** Trung/Huy bấm "Xác nhận đã duyệt" — confirm thông tin OK, sẵn sàng in ký.
+   *  Không đổi status. UI dùng để hiện section upload sau khi confirm. */
+  signer_confirmed_at?: string | null
+  signer_confirmed_by?: string | null
+
   rejected_at?: string | null
   rejected_reason?: string | null
 
@@ -492,6 +497,107 @@ export const salesContractWorkflowService = {
         ctx: { ...ctx, rejection_reason: rejectedReason.trim() },
       }),
     ).catch((e) => console.error('Email reject fail:', e))
+
+    return row
+  },
+
+  /** Trung/Huy bấm "Xác nhận đã duyệt" — confirm thông tin HĐ OK, sẵn sàng in ký.
+   *  KHÔNG đổi status (vẫn 'approved'). Set signer_confirmed_at/by để UI hiện
+   *  section upload "HĐ HA ký" và "HĐ FINAL ký 2 bên".
+   *  Sau confirm: ai cũng có thể in HĐ ra ký + scan upload. */
+  async confirmReadyToSign(id: string): Promise<SalesOrderContract> {
+    const senderId = await getCurrentEmployeeId()
+    if (!senderId) throw new Error('Không xác định được nhân viên hiện tại')
+    const { data, error } = await supabase
+      .from('sales_order_contracts')
+      .update({
+        signer_confirmed_at: new Date().toISOString(),
+        signer_confirmed_by: senderId,
+        // signer_id = current để identify ai confirm; sẽ overwrite khi markSigned
+        signer_id: senderId,
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+    if (error) throw error
+    const row = data as SalesOrderContract
+
+    // Notify Sale + Phú LV (HĐ đã được Trung/Huy chốt, chờ in ký + KH ký lại)
+    const contractNo = row.form_data?.contract_no || row.sales_order_id.slice(0, 8)
+    _notifyContractEvent({
+      recipientIds: [row.created_by, row.reviewer_id],
+      senderId,
+      salesOrderId: row.sales_order_id,
+      contractNo,
+      revisionNo: row.revision_no,
+      title: `🖊 HĐ ${contractNo} đã được Trung/Huy xác nhận — sẵn sàng in ký`,
+      message: 'Có thể in HĐ ra → ký + đóng dấu HA → upload bản scan vào folder "HĐ HA đã ký". Khi KH gửi lại bản ký 2 bên → upload vào "HĐ FINAL".',
+      priority: 'normal',
+    })
+
+    return row
+  },
+
+  /** Trung/Huy "Trả lại" về Phú LV nếu phát hiện sai (bank/giá/...).
+   *  Status approved → reviewing (Phú LV xem lại). Reset reviewed_at + bank fields. */
+  async sendBackToReview(id: string, reason: string): Promise<SalesOrderContract> {
+    if (!reason || !reason.trim()) {
+      throw new Error('Cần nhập lý do trả lại')
+    }
+    const senderId = await getCurrentEmployeeId()
+    // Lấy form_data hiện tại để reset bank fields (Phú LV nhập lại)
+    const { data: current } = await supabase
+      .from('sales_order_contracts')
+      .select('form_data, sales_order_id, revision_no, created_by, reviewer_id')
+      .eq('id', id)
+      .single()
+    if (!current) throw new Error('Không tìm thấy HĐ')
+    const resetFormData = {
+      ...(current.form_data || {}),
+      // KHÔNG reset bank fields hoàn toàn — giữ để Phú LV sửa, đỡ phải gõ lại
+      // chỉ note vào review_notes
+    }
+    const { data, error } = await supabase
+      .from('sales_order_contracts')
+      .update({
+        status: 'reviewing',
+        form_data: resetFormData,
+        review_notes: `[Trung/Huy trả lại ${new Date().toLocaleDateString('vi-VN')}] ${reason.trim()}`,
+        reviewed_at: null,                  // reset để Phú LV review lại
+        signer_confirmed_at: null,          // reset confirm flag
+        signer_confirmed_by: null,
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+    if (error) throw error
+    const row = data as SalesOrderContract
+
+    // Notify Phú LV + Minh (queue review) — Trung/Huy trả lại
+    const reviewerIds = await Promise.all(
+      ALLOWED_REVIEWER_EMAILS.map((email) => getEmployeeIdByEmail(email)),
+    )
+    const contractNo = row.form_data?.contract_no || row.sales_order_id.slice(0, 8)
+    _notifyContractEvent({
+      recipientIds: reviewerIds,
+      senderId,
+      salesOrderId: row.sales_order_id,
+      contractNo,
+      revisionNo: row.revision_no,
+      title: `🔁 Trung/Huy TRẢ LẠI HĐ ${contractNo} — review lại`,
+      message: reason.trim().slice(0, 200),
+      priority: 'high',
+      reference_url: '/sales/contracts/review',
+    })
+
+    // Email cho Phú LV + Minh
+    void _buildEmailContext(row, senderId).then((ctx) =>
+      salesContractEmailService.notifySubmitted({
+        reviewerEmails: ALLOWED_REVIEWER_EMAILS,
+        ctx: { ...ctx, rejection_reason: reason.trim() },
+        isResubmit: true,  // dùng template "đã sửa — trình lại" với note hint
+      }),
+    ).catch((e) => console.error('Email send-back fail:', e))
 
     return row
   },

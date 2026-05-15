@@ -126,7 +126,12 @@ export async function generateContractBlob(
     // Missing key → trả về empty (đỡ crash nếu thiếu field)
     nullGetter: () => '',
   })
-  doc.render(data)
+  // Tự derive has_extra_terms để template ẩn paragraph khi extra_terms rỗng
+  // (docxtemplater {#has_extra_terms}...{/has_extra_terms} pattern)
+  doc.render({
+    ...data,
+    has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
+  })
   return doc.getZip().generate({
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

@@ -235,6 +235,37 @@ def _iter_paragraphs(doc):
                                 yield np
 
 
+def _inject_extra_terms(doc):
+    """
+    Tìm paragraph chứa {payment_extra} (SC) hoặc {payment} (PI — trong table cell)
+    và insert AFTER nó một paragraph mới:
+        {#has_extra_terms}Other Conditions: {extra_terms}{/has_extra_terms}
+
+    docxtemplater paragraphLoop=true sẽ ẩn paragraph khi has_extra_terms=false.
+    """
+    target = None
+    # Pass 1: tìm {payment_extra} trong body paragraphs (SC)
+    for p in doc.paragraphs:
+        if '{payment_extra}' in (p.text or ''):
+            target = p
+            break
+    # Pass 2: tìm {payment} trong toàn bộ paragraphs (kể cả table cell — PI)
+    if target is None:
+        for p in _iter_paragraphs(doc):
+            text = p.text or ''
+            if '{payment}' in text and 'Ben' not in text and 'Bank' not in text:
+                target = p
+                break
+
+    if target is None:
+        return False
+
+    new_text = '{#has_extra_terms}Other Conditions: {extra_terms}{/has_extra_terms}'
+    new_para = target.insert_paragraph_before(new_text)
+    target._element.addnext(new_para._element)
+    return True
+
+
 def build_template(src_path, out_path, replacements, label):
     print(f"\n── {label} ──")
     print(f"  src: {src_path.relative_to(ROOT)}")
@@ -248,6 +279,9 @@ def build_template(src_path, out_path, replacements, label):
             for find, repl in replacements:
                 if find in before:
                     matched_keys.add(repl)
+    # Inject placeholder điều khoản bổ sung sau section Payment
+    if _inject_extra_terms(doc):
+        matched_keys.add('{#has_extra_terms}...{/has_extra_terms}')
     doc.save(str(out_path))
     # Copy ra /public/contract-templates/ để Vite serve cho frontend fetch
     public_path = PUBLIC_DIR / out_path.name

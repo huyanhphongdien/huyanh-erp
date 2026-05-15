@@ -49,6 +49,7 @@ const presets = {
       claims_days: '20',
       arbitration: 'SICOM Singapore',
       freight_mark: 'freight prepaid',
+      extra_terms: 'KH yêu cầu fumigation trước khi shipping. Giảm 2% nếu giao trước 15/6/2026. Bao bì in logo riêng theo file đính kèm.',
       ...BANK,
     },
   },
@@ -143,7 +144,7 @@ function render(name, { template, data }) {
   });
 
   try {
-    doc.render(data);
+    doc.render({ ...data, has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()) });
   } catch (e) {
     console.error(`✗ Render ${name} thất bại:`, e.message);
     if (e.properties && e.properties.errors) {

@@ -87,7 +87,21 @@ export function canDeleteContract(
 // TYPES
 // ============================================================================
 
-export type ContractAction = 'upload' | 'view' | 'download' | 'replace' | 'delete'
+export type ContractAction =
+  | 'upload'        // upload file mới
+  | 'view'          // xem file (signed URL view)
+  | 'download'      // tải file
+  | 'replace'       // thay file cũ
+  | 'delete'        // xóa file
+  // Workflow events (track audit trail workflow ký):
+  | 'submit'        // Sale trình HĐ cho Phú LV
+  | 'resubmit'      // Sale sửa + trình lại sau reject
+  | 'approve'       // Phú LV duyệt
+  | 'reject'        // Phú LV trả lại Sale
+  | 'signer_confirm' // Trung/Huy xác nhận đã duyệt
+  | 'send_back'     // Trung/Huy trả lại Phú LV
+  | 'sign'          // markSigned (upload FINAL)
+  | 'archive'       // Lưu trữ HĐ signed → archived
 
 export interface ContractAccessLogEntry {
   id: string

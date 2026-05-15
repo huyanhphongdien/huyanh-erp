@@ -135,6 +135,46 @@ export async function getEmployeeIdByEmail(email: string): Promise<string | null
   return data?.id || null
 }
 
+/** Log workflow event vào sales_contract_access_log (audit trail).
+ *  Fire-and-forget — không block workflow nếu log fail. */
+async function _logWorkflowEvent(params: {
+  salesOrderId: string
+  contractId: string
+  action: 'submit' | 'resubmit' | 'approve' | 'reject' | 'signer_confirm' | 'send_back' | 'sign' | 'archive'
+  userId: string | null
+  notes?: string
+}): Promise<void> {
+  try {
+    // Lấy user info (email + name) từ employees
+    let user_email: string | null = null
+    let user_name: string | null = null
+    if (params.userId) {
+      const { data } = await supabase
+        .from('employees')
+        .select('email, full_name')
+        .eq('id', params.userId)
+        .maybeSingle()
+      user_email = data?.email || null
+      user_name = data?.full_name || null
+    }
+    await supabase.from('sales_contract_access_log').insert({
+      sales_order_id: params.salesOrderId,
+      document_id: null,           // workflow event không gắn doc cụ thể
+      action: params.action,
+      user_id: params.userId,
+      user_email,
+      user_name,
+      user_role: null,
+      file_name: null,
+      file_path: null,
+      file_size: null,
+      notes: params.notes || `Contract ID: ${params.contractId}`,
+    })
+  } catch (e) {
+    console.error('[workflow] logEvent fail:', e)
+  }
+}
+
 /** Build email context từ contract row + sender name. Fire-and-forget. */
 async function _buildEmailContext(
   row: SalesOrderContract,
@@ -305,6 +345,15 @@ export const salesContractWorkflowService = {
       }),
     ).catch((e) => console.error('Email submit fail:', e))
 
+    // ─── Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId,
+      contractId: row.id,
+      action: isResubmit ? 'resubmit' : 'submit',
+      userId: createdBy,
+      notes: `${isResubmit ? 'Resubmit' : 'Submit'} HĐ ${contractNo} rev #${row.revision_no}`,
+    })
+
     return row
   },
 
@@ -454,6 +503,15 @@ export const salesContractWorkflowService = {
       }),
     ).catch((e) => console.error('Email approve fail:', e))
 
+    // ─── Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId: row.sales_order_id,
+      contractId: row.id,
+      action: 'approve',
+      userId: senderId,
+      notes: `Approve HĐ ${contractNo} rev #${row.revision_no}${reviewNotes ? ` — ${reviewNotes}` : ''}`,
+    })
+
     return row
   },
 
@@ -498,6 +556,15 @@ export const salesContractWorkflowService = {
       }),
     ).catch((e) => console.error('Email reject fail:', e))
 
+    // ─── Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId: row.sales_order_id,
+      contractId: row.id,
+      action: 'reject',
+      userId: senderId,
+      notes: `Reject HĐ ${contractNo} rev #${row.revision_no} — ${rejectedReason.trim().slice(0, 300)}`,
+    })
+
     return row
   },
 
@@ -533,6 +600,15 @@ export const salesContractWorkflowService = {
       title: `🖊 HĐ ${contractNo} đã được Trung/Huy xác nhận — sẵn sàng in ký`,
       message: 'Có thể in HĐ ra → ký + đóng dấu HA → upload bản scan vào folder "HĐ HA đã ký". Khi KH gửi lại bản ký 2 bên → upload vào "HĐ FINAL".',
       priority: 'normal',
+    })
+
+    // ─── Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId: row.sales_order_id,
+      contractId: row.id,
+      action: 'signer_confirm',
+      userId: senderId,
+      notes: `Signer xác nhận đã duyệt HĐ ${contractNo} rev #${row.revision_no} — sẵn sàng in ký`,
     })
 
     return row
@@ -599,6 +675,15 @@ export const salesContractWorkflowService = {
       }),
     ).catch((e) => console.error('Email send-back fail:', e))
 
+    // ─── Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId: row.sales_order_id,
+      contractId: row.id,
+      action: 'send_back',
+      userId: senderId,
+      notes: `Trung/Huy trả lại Phú LV — HĐ ${contractNo} rev #${row.revision_no} — ${reason.trim().slice(0, 300)}`,
+    })
+
     return row
   },
 
@@ -654,6 +739,15 @@ export const salesContractWorkflowService = {
       })
     }).catch((e) => console.error('Email signed fail:', e))
 
+    // ─── Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId: row.sales_order_id,
+      contractId: row.id,
+      action: 'sign',
+      userId: signerId,
+      notes: `HĐ ${contractNo} rev #${row.revision_no} đã ký + đóng dấu — PDF: ${signedPdfUrl}`,
+    })
+
     return row
   },
 
@@ -692,6 +786,7 @@ export const salesContractWorkflowService = {
 
   /** Lưu trữ HĐ đã ký (signed → archived). Admin only — RLS guard. */
   async archive(id: string): Promise<SalesOrderContract> {
+    const senderId = await getCurrentEmployeeId()
     const { data, error } = await supabase
       .from('sales_order_contracts')
       .update({ status: 'archived' })
@@ -699,6 +794,18 @@ export const salesContractWorkflowService = {
       .select('*')
       .single()
     if (error) throw error
-    return data as SalesOrderContract
+    const row = data as SalesOrderContract
+    const contractNo = row.form_data?.contract_no || row.sales_order_id.slice(0, 8)
+
+    // ─── Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId: row.sales_order_id,
+      contractId: row.id,
+      action: 'archive',
+      userId: senderId,
+      notes: `Lưu trữ HĐ ${contractNo} rev #${row.revision_no}`,
+    })
+
+    return row
   },
 }

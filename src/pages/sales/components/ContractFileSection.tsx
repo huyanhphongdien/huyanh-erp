@@ -44,11 +44,20 @@ const ALLOWED_MIME = [
 ]
 
 const ACTION_LABELS: Record<string, { text: string; color: string }> = {
-  upload:   { text: 'Tải lên',     color: 'green' },
-  replace:  { text: 'Thay thế',    color: 'orange' },
-  view:     { text: 'Xem',         color: 'blue' },
-  download: { text: 'Tải về',      color: 'geekblue' },
-  delete:   { text: 'Xóa',         color: 'red' },
+  upload:         { text: '📤 Tải lên',           color: 'green' },
+  replace:        { text: '🔄 Thay thế',          color: 'orange' },
+  view:           { text: '👁 Xem',               color: 'blue' },
+  download:       { text: '📥 Tải về',            color: 'geekblue' },
+  delete:         { text: '🗑 Xóa',               color: 'red' },
+  // Workflow events
+  submit:         { text: '📨 Trình HĐ',          color: 'cyan' },
+  resubmit:       { text: '🔁 Trình lại',         color: 'cyan' },
+  approve:        { text: '✅ Duyệt',             color: 'green' },
+  reject:         { text: '❌ Trả lại Sale',      color: 'red' },
+  signer_confirm: { text: '🖊 Xác nhận đã duyệt',  color: 'gold' },
+  send_back:      { text: '🔁 Trả Phú LV',        color: 'volcano' },
+  sign:           { text: '✍️ Đã ký FINAL',       color: 'success' },
+  archive:        { text: '📁 Lưu trữ',           color: 'default' },
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -278,8 +287,10 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                   ✍️ HĐ HA đã ký
                 </Button>
               </Tooltip>
-              {(salesRole === 'admin' || userIsBOD) && (
-                <Tooltip title="HĐ FINAL — KH ký lại 2 bên (PHÁP LÝ)">
+              {/* HĐ FINAL: Sale + Admin/BGĐ đều upload được (Sale làm việc với KH,
+                  nhận bản FINAL từ KH gửi về). Xóa vẫn chỉ Admin/BGĐ (RLS guard). */}
+              {(salesRole === 'sale' || salesRole === 'admin' || userIsBOD) && (
+                <Tooltip title="HĐ FINAL — KH ký lại 2 bên (PHÁP LÝ). Sale upload khi nhận từ KH.">
                   <Button
                     size="small"
                     type="primary"

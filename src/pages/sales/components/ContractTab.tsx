@@ -152,9 +152,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       packing_type: order.packing_type,
       commission_pct: order.commission_pct,
       commission_usd_per_mt: order.commission_usd_per_mt,
-      bank_name: order.bank_name,
-      bank_account: order.bank_account,
-      bank_swift: order.bank_swift,
+      // Bank info do Phú LV nhập qua Review HĐ workflow — Sale KHÔNG nhập ở đây
       contract_no: order.contract_no,
       notes: order.notes,
     })
@@ -205,9 +203,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         contract_date: vals.contract_date?.format('YYYY-MM-DD') || null,
         commission_pct: vals.commission_pct || null,
         commission_usd_per_mt: vals.commission_usd_per_mt || null,
-        bank_name: vals.bank_name || null,
-        bank_account: vals.bank_account || null,
-        bank_swift: vals.bank_swift || null,
+        // Bank info do Phú LV nhập qua Review HĐ workflow — không update từ tab này
         contract_no: vals.contract_no || null,
         notes: vals.notes || null,
       }
@@ -529,19 +525,8 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
           </Form.Item>
         </div>
 
-        {/* Section: Ngân hàng */}
-        <SectionHeader title="Ngân hàng" color="#1B4D3E" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-          <Form.Item label="Ngân hàng" name="bank_name">
-            <Input placeholder="Vietcombank CN Huế" />
-          </Form.Item>
-          <Form.Item label="Số tài khoản" name="bank_account">
-            <Input />
-          </Form.Item>
-          <Form.Item label="SWIFT code" name="bank_swift">
-            <Input />
-          </Form.Item>
-        </div>
+        {/* Bank info bị BỎ khỏi đây — do Phú LV nhập qua Review HĐ workflow.
+            Sale KHÔNG nhập bank ở đơn hàng (chỉ Phú LV mới có quyền). */}
 
         {/* Section: Ghi chú */}
         <Form.Item label="Ghi chú" name="notes">
@@ -708,15 +693,24 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         </Descriptions.Item>
       </Descriptions>
 
+      {/* Bank info read-only — hiện đầy đủ ở ContractWorkflowSection (workflow card).
+          Block view cũ bỏ vì gây nhầm lẫn (Sale tưởng có thể edit). */}
       {(order.bank_name || order.bank_account || order.bank_swift) && (
         <>
           <Divider style={{ margin: '12px 0' }} />
-          <SectionHeader title="Ngân hàng" color="#1B4D3E" />
-          <Descriptions column={3} size="small" bordered>
-            <Descriptions.Item label="Ngân hàng">{order.bank_name || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Tài khoản">{order.bank_account || '—'}</Descriptions.Item>
-            <Descriptions.Item label="SWIFT">{order.bank_swift || '—'}</Descriptions.Item>
-          </Descriptions>
+          <SectionHeader title="Ngân hàng (legacy)" color="#999" />
+          <div style={{
+            fontSize: 11, color: '#8c8c8c', fontStyle: 'italic',
+            padding: '6px 10px', background: '#fafafa', borderRadius: 4,
+          }}>
+            {order.bank_name && <>🏦 {order.bank_name} · </>}
+            {order.bank_account && <>TK: {order.bank_account} · </>}
+            {order.bank_swift && <>SWIFT: {order.bank_swift}</>}
+            <br />
+            <span style={{ color: '#cf1322' }}>
+              ⓘ Đơn cũ. Bank info HĐ mới do Phú LV nhập qua workflow Review HĐ.
+            </span>
+          </div>
         </>
       )}
 

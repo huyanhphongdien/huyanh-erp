@@ -16,22 +16,55 @@
 -- Hiện tại doc_type='contract' duy nhất. Mở rộng cho 5 nhóm mới.
 -- Không dùng ENUM (tránh ALTER khó) — dùng VARCHAR + CHECK.
 
--- Drop old constraint nếu có
+-- ── Diagnose: list distinct doc_type hiện có (chạy trước để biết data cũ) ──
+-- SELECT doc_type, COUNT(*) FROM sales_order_documents GROUP BY doc_type ORDER BY 2 DESC;
+
+-- ── Step 1: Migrate data cũ sang 6 enum mới ──
+-- Map các doc_type cũ (legacy free-text) sang 6 nhóm chuẩn
+UPDATE sales_order_documents
+   SET doc_type = CASE
+     -- Đã đúng enum mới → giữ nguyên
+     WHEN doc_type IN ('contract','shipping','cert','finance','weighbridge','other') THEN doc_type
+     -- HĐ
+     WHEN doc_type IN ('hop_dong','hd','sales_contract','proforma_invoice','pi','sc') THEN 'contract'
+     -- Shipping
+     WHEN doc_type IN ('bl','bill_of_lading','booking','booking_confirmation','booking_note') THEN 'shipping'
+     -- Chứng từ (cert)
+     WHEN doc_type IN (
+       'coa','certificate_of_analysis','phyto','phytosanitary','phytosanitary_cert',
+       'fumigation','fumigation_cert','insurance','insurance_cert',
+       'test_cert','test_certificate','origin','c_of_o','co'
+     ) THEN 'cert'
+     -- Tài chính
+     WHEN doc_type IN (
+       'lc','letter_of_credit','commercial_invoice','invoice','inv',
+       'packing_list','pl','debit_note','credit_note'
+     ) THEN 'finance'
+     -- Phiếu cân
+     WHEN doc_type IN ('weighbridge','weighing','phieu_can') THEN 'weighbridge'
+     -- Còn lại → other
+     ELSE 'other'
+   END
+ WHERE doc_type IS NULL
+    OR doc_type NOT IN ('contract','shipping','cert','finance','weighbridge','other');
+
+-- ── Step 2: Drop old constraint nếu có ──
 DO $$
+DECLARE
+  v_constraint_name TEXT;
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'sales_order_documents'::regclass
-      AND contype = 'c'
-      AND conname LIKE '%doc_type%'
-  ) THEN
-    EXECUTE 'ALTER TABLE sales_order_documents DROP CONSTRAINT ' ||
-      (SELECT conname FROM pg_constraint
-       WHERE conrelid = 'sales_order_documents'::regclass
-         AND contype = 'c' AND conname LIKE '%doc_type%' LIMIT 1);
+  SELECT conname INTO v_constraint_name
+    FROM pg_constraint
+   WHERE conrelid = 'sales_order_documents'::regclass
+     AND contype = 'c'
+     AND conname LIKE '%doc_type%'
+   LIMIT 1;
+  IF v_constraint_name IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE sales_order_documents DROP CONSTRAINT ' || quote_ident(v_constraint_name);
   END IF;
 END $$;
 
+-- ── Step 3: Add new constraint (giờ data đã sạch) ──
 ALTER TABLE sales_order_documents
   ADD CONSTRAINT sales_order_documents_doc_type_check
   CHECK (doc_type IN (
@@ -42,6 +75,12 @@ ALTER TABLE sales_order_documents
     'weighbridge',   -- Phiếu cân (link từ WMS)
     'other'          -- Khác
   ));
+
+-- ── Step 4: Verify migration kết quả ──
+SELECT doc_type, COUNT(*) AS file_count
+  FROM sales_order_documents
+ GROUP BY doc_type
+ ORDER BY 2 DESC;
 
 -- Default doc_type cho row mới
 ALTER TABLE sales_order_documents

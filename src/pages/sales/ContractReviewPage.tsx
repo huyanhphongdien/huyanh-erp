@@ -56,6 +56,23 @@ import { BANK_PRESETS, getBankPreset } from '../../config/sales.config'
 const { Title, Text } = Typography
 const { TextArea } = Input
 
+// ============================================================================
+// REJECT_REASONS — Common lý do từ chối HĐ (Phú LV chọn nhanh + textarea detail)
+// Phú LV pick 1+ category để Sale biết RÕ phải sửa gì.
+// ============================================================================
+
+const REJECT_REASONS = [
+  { value: 'price',       icon: '💰', label: 'Giá đơn / Đơn giá sai',          color: 'red' },
+  { value: 'buyer',       icon: '🏢', label: 'Tên / Địa chỉ KH sai',           color: 'orange' },
+  { value: 'incoterm',    icon: '🚢', label: 'Incoterm / Port (POL/POD) sai',  color: 'orange' },
+  { value: 'packing',     icon: '📦', label: 'Đóng gói / Số lượng / Bales',    color: 'gold' },
+  { value: 'payment',     icon: '💳', label: 'Điều khoản thanh toán sai',      color: 'purple' },
+  { value: 'shipment',    icon: '📅', label: 'Thời gian giao hàng sai',        color: 'cyan' },
+  { value: 'terms',       icon: '📝', label: 'Điều khoản kèm theo sai',        color: 'blue' },
+  { value: 'contract_no', icon: '🔢', label: 'Số HĐ / Ngày HĐ sai',            color: 'magenta' },
+  { value: 'other',       icon: '❓', label: 'Khác (ghi chi tiết bên dưới)',   color: 'default' },
+]
+
 export default function ContractReviewPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
@@ -76,6 +93,11 @@ export default function ContractReviewPage() {
   const [approving, setApproving] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [docLoading, setDocLoading] = useState<'SC' | 'PI' | 'BOTH' | null>(null)
+
+  // Reject modal state
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectCategories, setRejectCategories] = useState<string[]>([])
+  const [rejectDetail, setRejectDetail] = useState('')
 
   // Resolve current employee id (để filter queue theo reviewer_id = mình)
   useEffect(() => {
@@ -222,47 +244,44 @@ export default function ContractReviewPage() {
     })
   }
 
-  const handleReject = async () => {
+  /** Mở modal trả lại (Phú LV chọn category + nhập chi tiết). */
+  const handleReject = () => {
     if (!active) return
-    let reason = ''
-    Modal.confirm({
-      title: 'Trả lại Sale',
-      content: (
-        <div>
-          <div style={{ marginBottom: 8 }}>
-            HĐ <strong>{active.form_data?.contract_no}</strong> sẽ chuyển <Tag color="red">rejected</Tag>. Sale sẽ sửa và submit lại revision mới.
-          </div>
-          <TextArea
-            rows={3}
-            placeholder="Nhập lý do trả lại (bắt buộc) — VD: Sai số PO, thiếu thông tin packing, giá không khớp..."
-            onChange={(e) => {
-              reason = e.target.value
-            }}
-          />
-        </div>
-      ),
-      okText: 'Trả lại',
-      cancelText: 'Huỷ',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        if (!reason.trim()) {
-          message.error('Cần nhập lý do trả lại')
-          throw new Error('missing reason')
-        }
-        setRejecting(true)
-        try {
-          await salesContractWorkflowService.reject(active.id, reason)
-          message.success('Đã trả lại Sale')
-          closeReview()
-          void refresh()
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          message.error(`Trả lại thất bại: ${msg}`)
-        } finally {
-          setRejecting(false)
-        }
-      },
-    })
+    setRejectCategories([])
+    setRejectDetail('')
+    setRejectOpen(true)
+  }
+
+  /** Submit trả lại sau khi Phú LV chọn xong reason category + detail. */
+  const handleRejectSubmit = async () => {
+    if (!active) return
+    if (rejectCategories.length === 0) {
+      message.error('Cần chọn ít nhất 1 lý do từ chối')
+      return
+    }
+    if (!rejectDetail.trim()) {
+      message.error('Cần ghi chi tiết để Sale biết phải sửa gì')
+      return
+    }
+    // Build structured reason: "[Category labels] — detail"
+    const catLabels = rejectCategories
+      .map((c) => REJECT_REASONS.find((r) => r.value === c)?.label || c)
+      .join(' · ')
+    const fullReason = `[${catLabels}] — ${rejectDetail.trim()}`
+
+    setRejecting(true)
+    try {
+      await salesContractWorkflowService.reject(active.id, fullReason)
+      message.success('Đã trả lại Sale')
+      setRejectOpen(false)
+      closeReview()
+      void refresh()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      message.error(`Trả lại thất bại: ${msg}`)
+    } finally {
+      setRejecting(false)
+    }
   }
 
   const reviewerLabel = useMemo(() => {
@@ -639,6 +658,97 @@ export default function ContractReviewPage() {
           </>
         )}
       </Drawer>
+
+      {/* ═══ Modal trả lại Sale ═══ */}
+      <Modal
+        title={
+          <Space>
+            <CloseCircleOutlined style={{ color: '#cf1322' }} />
+            <span>Trả lại Sale — {active?.form_data?.contract_no}</span>
+          </Space>
+        }
+        open={rejectOpen}
+        onCancel={() => setRejectOpen(false)}
+        width={560}
+        footer={[
+          <Button key="cancel" onClick={() => setRejectOpen(false)}>Huỷ</Button>,
+          <Button
+            key="submit"
+            type="primary"
+            danger
+            loading={rejecting}
+            icon={<CloseCircleOutlined />}
+            onClick={handleRejectSubmit}
+          >
+            Trả lại Sale
+          </Button>,
+        ]}
+        destroyOnClose
+      >
+        <Alert
+          type="warning"
+          showIcon
+          message="HĐ sẽ chuyển sang trạng thái 'rejected'"
+          description="Sale sẽ nhận thông báo + thấy lý do bạn ghi và bấm 'Sửa & Trình lại' để tạo revision mới."
+          style={{ marginBottom: 16 }}
+        />
+
+        <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
+          🏷 Lý do (chọn 1 hoặc nhiều) <span style={{ color: '#cf1322' }}>*</span>
+        </div>
+        <Select
+          mode="multiple"
+          value={rejectCategories}
+          onChange={setRejectCategories}
+          placeholder="Chọn lý do — Sale sẽ thấy danh sách này"
+          style={{ width: '100%', marginBottom: 16 }}
+          options={REJECT_REASONS.map((r) => ({
+            value: r.value,
+            label: (
+              <Space>
+                <span>{r.icon}</span>
+                <span>{r.label}</span>
+              </Space>
+            ),
+          }))}
+          tagRender={({ value, closable, onClose }) => {
+            const meta = REJECT_REASONS.find((r) => r.value === value)
+            return (
+              <Tag
+                color={meta?.color}
+                closable={closable}
+                onClose={onClose}
+                style={{ marginRight: 4 }}
+              >
+                {meta?.icon} {meta?.label}
+              </Tag>
+            )
+          }}
+        />
+
+        <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
+          📝 Chi tiết <span style={{ color: '#cf1322' }}>*</span>
+        </div>
+        <TextArea
+          rows={4}
+          value={rejectDetail}
+          onChange={(e) => setRejectDetail(e.target.value)}
+          placeholder={
+            rejectCategories.includes('price')
+              ? 'VD: Giá USD 2,435 không khớp với deal đã chốt — KH yêu cầu 2,420'
+              : rejectCategories.includes('buyer')
+              ? 'VD: Tên cty thiếu "PTE LTD", địa chỉ thiếu Postal Code 049705'
+              : rejectCategories.includes('incoterm')
+              ? 'VD: KH yêu cầu CIF Colombo nhưng HĐ ghi FOB Da Nang'
+              : 'Ghi cụ thể để Sale biết phải sửa field nào, giá trị đúng là gì'
+          }
+        />
+        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
+          Reason sẽ lưu thành: <strong>[{rejectCategories.length > 0
+            ? rejectCategories.map(c => REJECT_REASONS.find(r => r.value === c)?.label).join(' · ')
+            : '...'}]</strong> — {rejectDetail || '(chi tiết)'}
+        </div>
+      </Modal>
     </div>
   )
 }

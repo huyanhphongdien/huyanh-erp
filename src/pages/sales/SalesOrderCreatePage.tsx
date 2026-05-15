@@ -59,6 +59,49 @@ const { Title } = Typography
 const { TextArea } = Input
 
 // ============================================================================
+// HELPERS — Amount → English words (cho PI section "Words: ...")
+// ============================================================================
+
+const _UNITS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
+const _TEENS = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+const _TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+function _under1000(n: number): string {
+  if (n === 0) return ''
+  if (n < 10) return _UNITS[n]
+  if (n < 20) return _TEENS[n - 10]
+  if (n < 100) {
+    const t = Math.floor(n / 10), u = n % 10
+    return _TENS[t] + (u ? '-' + _UNITS[u] : '')
+  }
+  const h = Math.floor(n / 100), rest = n % 100
+  return _UNITS[h] + ' Hundred' + (rest ? ' ' + _under1000(rest) : '')
+}
+function amountToWords(amount: number): string {
+  if (!amount || amount <= 0) return ''
+  const dollars = Math.floor(amount)
+  const cents = Math.round((amount - dollars) * 100)
+  let result = ''
+  if (dollars >= 1_000_000) {
+    const m = Math.floor(dollars / 1_000_000)
+    result += _under1000(m) + ' Million'
+    const rest = dollars % 1_000_000
+    if (rest >= 1000) result += ' ' + _under1000(Math.floor(rest / 1000)) + ' Thousand'
+    const last = rest % 1000
+    if (last) result += ' ' + _under1000(last)
+  } else if (dollars >= 1000) {
+    result += _under1000(Math.floor(dollars / 1000)) + ' Thousand'
+    const last = dollars % 1000
+    if (last) result += ' ' + _under1000(last)
+  } else {
+    result += _under1000(dollars)
+  }
+  result += ' US Dollars'
+  if (cents > 0) result += ' and ' + _under1000(cents) + ' Cents'
+  result += ' Only'
+  return result.trim().replace(/\s+/g, ' ')
+}
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -156,6 +199,13 @@ function SalesOrderCreatePage() {
   const watchPaymentNote = Form.useWatch('payment_terms_note', form) || ''
   const watchPackingNote = Form.useWatch('packing_note', form) || ''
 
+  // ── Điều kiện kèm theo (Sale chọn override default theo từng đơn) ──
+  const watchPartial     = Form.useWatch('contract_partial', form) || 'Not Allowed'
+  const watchTrans       = Form.useWatch('contract_trans', form) || 'Allowed'
+  const watchClaimsDays  = Form.useWatch('contract_claims_days', form) || 20
+  const watchArbitration = Form.useWatch('contract_arbitration', form) || 'SICOM Singapore'
+  const watchFreightMark = Form.useWatch('contract_freight_mark', form) || ''
+
   const totalBales = baleWeight > 0 ? Math.round((quantityTons * 1000) / baleWeight) : 0
   const balesPerContainer = containerType === '40ft' ? balesPerContInput * 2 : balesPerContInput
   const containerCount = balesPerContainer > 0 ? Math.ceil(totalBales / balesPerContainer) : 0
@@ -197,13 +247,15 @@ function SalesOrderCreatePage() {
       containers: String(itemsTotalContainers || ''),
       cont_type: containerType === '40ft' ? '40HC' : '20DC',
       shipment_time: watchShipmentTime,
-      partial: 'Not Allowed',
-      trans: 'Allowed',
+      partial: watchPartial,
+      trans: watchTrans,
       payment: watchPaymentNote || 'LC at sight',
       payment_extra: '',
-      claims_days: '20',
-      arbitration: 'SICOM Singapore',
-      freight_mark: isFOB ? 'freight Collect' : 'freight prepaid',
+      claims_days: String(watchClaimsDays),
+      arbitration: watchArbitration,
+      freight_mark: watchFreightMark || (isFOB ? 'freight Collect' : 'freight prepaid'),
+      // amount_words auto compute cho PI section "Words: ..."
+      amount_words: itemsTotalUSD ? amountToWords(itemsTotalUSD) : '',
       ...DEFAULT_BANK,
     }
   }, [
@@ -217,6 +269,11 @@ function SalesOrderCreatePage() {
     watchShipmentTime,
     watchPaymentNote,
     watchPackingNote,
+    watchPartial,
+    watchTrans,
+    watchClaimsDays,
+    watchArbitration,
+    watchFreightMark,
     itemsTotalTons,
     itemsTotalUSD,
     itemsTotalBales,
@@ -657,6 +714,71 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
           </Row>
+        </Card>
+
+        {/* ═══ Điều kiện kèm theo trên HĐ (mục 3, 4, 6, 8 của template SC) ═══ */}
+        <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
+          title={<Space size={6}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>📑 Điều kiện kèm theo</span>
+            <Tag color="orange" style={{ fontSize: 10 }}>Mặc định OK · sửa khi đặc thù KH</Tag>
+          </Space>}>
+          <Row gutter={16}>
+            <Col xs={12} sm={6}>
+              <Form.Item label="Partial shipment" name="contract_partial" initialValue="Not Allowed"
+                tooltip="Cho phép giao nhiều đợt? Mặc định KHÔNG. Apollo multi-lot = Allowed.">
+                <Select size="large" options={[
+                  { value: 'Not Allowed', label: 'Not Allowed' },
+                  { value: 'Allowed', label: 'Allowed' },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Form.Item label="Transshipment" name="contract_trans" initialValue="Allowed"
+                tooltip="Cho phép chuyển tàu giữa đường? Mặc định YES.">
+                <Select size="large" options={[
+                  { value: 'Allowed', label: 'Allowed' },
+                  { value: 'Not Allowed', label: 'Not Allowed' },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={4}>
+              <Form.Item label="Claims (ngày)" name="contract_claims_days" initialValue={20}
+                tooltip="Số ngày KH được khiếu nại sau khi nhận hàng. Default 20. VITRY/EU thường 30.">
+                <InputNumber min={1} max={90} step={5} size="large" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Arbitration" name="contract_arbitration" initialValue="SICOM Singapore"
+                tooltip="Tòa trọng tài giải quyết tranh chấp. Phổ biến: SICOM Singapore. Châu Âu: LCIA London. Việt Nam nội bộ: VIAC.">
+                <Select size="large" showSearch options={[
+                  { value: 'SICOM Singapore', label: 'SICOM Singapore' },
+                  { value: 'LCIA London', label: 'LCIA London' },
+                  { value: 'VIAC Vietnam', label: 'VIAC Vietnam' },
+                  { value: 'ICC Paris', label: 'ICC Paris' },
+                  { value: 'HKIAC Hong Kong', label: 'HKIAC Hong Kong' },
+                ]} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Freight mark trên B/L" name="contract_freight_mark"
+                tooltip="Auto theo Incoterm: CIF/CFR → 'freight prepaid' (HA trả); FOB → 'freight Collect' (KH trả). Override nếu thoả thuận khác.">
+                <Input size="large" placeholder="freight prepaid / freight Collect (auto theo Incoterm)" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item label="amount_words (English) — auto"
+                tooltip="Auto compute từ Tổng giá trị USD cho PI section 'Words:'. Sale không cần sửa.">
+                <Input size="large" disabled value={contractData.amount_words || '(sẽ tự sinh khi có giá trị USD)'}
+                  style={{ background: '#fafafa', fontStyle: 'italic', color: '#595959' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4, padding: '6px 8px',
+                        background: '#fff7e6', borderRadius: 6, borderLeft: '3px solid #d46b08' }}>
+            ⚠️ <strong>Force Majeure</strong> và <strong>Legal Responsibility</strong> đã được template HĐ hard-code (theo Incoterm CIF vs FOB) — KHÔNG cần Sale chỉnh. Nếu KH yêu cầu clause đặc biệt, ghi vào "Ghi chú đơn hàng" để Phú LV review.
+          </div>
         </Card>
 
         {/* ═══ Chỉ tiêu kỹ thuật + Ghi chú (collapsible) ═══ */}

@@ -323,6 +323,17 @@ def _normalize_head_letter(doc):
         elif not bold and b is not None:
             rPr.remove(b)
 
+    def _set_italic(run, italic):
+        rPr = run._r.find(qn('w:rPr'))
+        if rPr is None:
+            rPr = run._r.makeelement(qn('w:rPr'), {})
+            run._r.insert(0, rPr)
+        it = rPr.find(qn('w:i'))
+        if italic and it is None:
+            rPr.append(rPr.makeelement(qn('w:i'), {}))
+        elif not italic and it is not None:
+            rPr.remove(it)
+
     TITLE_SET = {'SALES CONTRACT', 'SALE CONTRACT', 'PROFORMA INVOICE'}
     changed = 0
     for i, p in enumerate(doc.paragraphs[:12]):  # head letter trong 12 para đầu
@@ -336,16 +347,19 @@ def _normalize_head_letter(doc):
                 _set_run_sz(r, 44)
                 _set_bold(r, True)
             changed += 1
-        # ─ No: HA... / Date: ... lines
+        # ─ No: HA... / Date: ... lines: RIGHT-aligned, italic + bold, sz=24 (12pt)
+        # Match mẫu PI gốc của Apollo/Yoong Do (italic, right-aligned, không quá to)
         elif (text.startswith('No:') or text.startswith('No.:') or text.startswith('No ') or
               text.startswith('Date:') or text.startswith('Date ')):
-            _set_align(p, 'center')
+            _set_align(p, 'right')
             for r in p.runs:
-                _set_run_sz(r, 28)
+                _set_run_sz(r, 24)
                 _set_bold(r, True)
-            # Trim leading whitespace (PI_FOB src có "                     No: ..." padding)
-            if raw != raw.lstrip() and p.runs:
+                _set_italic(r, True)
+            # Trim leading/trailing whitespace (PI_FOB src có "                     No: ..." padding)
+            if p.runs:
                 p.runs[0].text = p.runs[0].text.lstrip()
+                p.runs[-1].text = p.runs[-1].text.rstrip()
             changed += 1
         # ─ SELLER block (THE SELLER + KHE MA + Tel/Fax): sz=26 (giữ alignment)
         elif ('THE SELLER' in upper or

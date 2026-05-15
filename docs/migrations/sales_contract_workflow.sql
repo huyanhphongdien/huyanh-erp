@@ -10,6 +10,7 @@
 --   4. sales_contract_workflow_v3_signers.sql    (V3 — Trung/Huy signers)
 --   5. sales_contract_files_multi_v4.sql         (V4 — multi-file + delete)
 --   6. sales_contract_workflow_v5_with_check.sql (V5 — WITH CHECK RLS)
+--   7. sales_contract_workflow_v6_auto_promote.sql (V6 — auto promote SO status)
 -- ============================================================
 
 -- 1. Bảng draft hợp đồng (mỗi sales_order có thể có nhiều revision)

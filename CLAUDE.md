@@ -55,6 +55,10 @@ apps/weighbridge/  # Sub-app for weighbridge scale integration
 - Bank info (5 field: account name/no/full_name/address/swift) chỉ Kiểm tra nhập
 - Migration: `docs/migrations/sales_contract_workflow.sql` (V1)
   + `docs/migrations/sales_contract_workflow_v2_reviewers.sql` (mở rộng cho minhld)
+  + `docs/migrations/sales_contract_workflow_v3_signers.sql` (Trung/Huy ký)
+  + `docs/migrations/sales_contract_files_multi_v4.sql` (multi-file + delete)
+  + `docs/migrations/sales_contract_workflow_v5_with_check.sql` (RLS hardening)
+  + `docs/migrations/sales_contract_workflow_v6_auto_promote.sql` (HĐ signed → SO confirmed)
 - Service: `src/services/sales/contractGeneratorService.ts` (sinh .docx)
   + `src/services/sales/salesContractWorkflowService.ts` (workflow CRUD)
 - Page: `/sales/contracts/review` (queue Kiểm tra)

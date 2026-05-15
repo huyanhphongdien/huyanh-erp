@@ -60,6 +60,93 @@ export const SALES_CONFIG = {
   },
 }
 
+// ============================================================================
+// Bank presets — chọn 1 phát, fill 5 field tự động ở Review HĐ page.
+// Account name luôn 'HUY ANH RUBBER COMPANY LIMITED' (đã đăng ký với từng bank).
+// Tài khoản USD của Huy Anh Rubber tại các bank chi nhánh Huế.
+// ============================================================================
+
+export interface BankPreset {
+  value: string                    // key
+  label: string                    // short display (cho dropdown)
+  bank_account_name: string        // luôn 'HUY ANH RUBBER COMPANY LIMITED'
+  bank_account_no: string          // số tài khoản USD
+  bank_full_name: string           // tên đầy đủ trên contract / L/C
+  bank_address: string             // địa chỉ chi nhánh
+  bank_swift: string               // SWIFT code
+}
+
+export const BANK_PRESETS: BankPreset[] = [
+  {
+    value: 'VTB_HUE',
+    label: 'Vietin Bank — Hue Branch (default)',
+    bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+    bank_account_no: '111002648221',
+    bank_full_name: 'VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE HUE BRANCH',
+    bank_address: '02 LE QUY DON STREET, THUAN HOA WARD, HUE CITY, VIET NAM',
+    bank_swift: 'ICBVVNVX460',
+  },
+  {
+    value: 'VCB_HUE',
+    label: 'Vietcombank — Hue Branch',
+    bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+    bank_account_no: '0071001046372',
+    bank_full_name: 'JOINT STOCK COMMERCIAL BANK FOR FOREIGN TRADE OF VIETNAM — HUE BRANCH',
+    bank_address: '78 HUNG VUONG STREET, PHU NHUAN WARD, HUE CITY, VIET NAM',
+    bank_swift: 'BFTVVNVX',
+  },
+  {
+    value: 'BIDV_HUE',
+    label: 'BIDV — Hue Branch',
+    bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+    bank_account_no: '5510020372',
+    bank_full_name: 'JOINT STOCK COMMERCIAL BANK FOR INVESTMENT AND DEVELOPMENT OF VIETNAM — HUE BRANCH',
+    bank_address: '41 HUNG VUONG STREET, PHU NHUAN WARD, HUE CITY, VIET NAM',
+    bank_swift: 'BIDVVNVX',
+  },
+  {
+    value: 'AGRI_HUE',
+    label: 'Agribank — Hue Branch',
+    bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+    bank_account_no: '4000201014000',
+    bank_full_name: 'VIETNAM BANK FOR AGRICULTURE AND RURAL DEVELOPMENT — HUE BRANCH',
+    bank_address: '10 HOANG HOA THAM STREET, VINH NINH WARD, HUE CITY, VIET NAM',
+    bank_swift: 'VBAAVNVX540',
+  },
+  {
+    value: 'TPB_HUE',
+    label: 'TP Bank — Hue Branch',
+    bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+    bank_account_no: '78468686868',
+    bank_full_name: 'TIEN PHONG COMMERCIAL JOINT STOCK BANK — HUE BRANCH',
+    bank_address: '37 HA NOI STREET, PHU NHUAN WARD, HUE CITY, VIET NAM',
+    bank_swift: 'TPBVVNVX',
+  },
+  {
+    value: 'EXIM_HUE',
+    label: 'Eximbank — Hue Branch',
+    bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+    bank_account_no: '100201085',
+    bank_full_name: 'VIETNAM EXPORT IMPORT COMMERCIAL JOINT STOCK BANK — HUE BRANCH',
+    bank_address: '07 HUNG VUONG STREET, PHU HOI WARD, HUE CITY, VIET NAM',
+    bank_swift: 'EBVIVNVX',
+  },
+  {
+    value: 'UOB_HCM',
+    label: 'UOB — Ho Chi Minh City',
+    bank_account_name: 'HUY ANH RUBBER COMPANY LIMITED',
+    bank_account_no: '1039019421',
+    bank_full_name: 'UNITED OVERSEAS BANK (VIETNAM) LIMITED — HO CHI MINH CITY BRANCH',
+    bank_address: 'CENTRAL PLAZA, 17 LE DUAN BOULEVARD, DISTRICT 1, HO CHI MINH CITY, VIET NAM',
+    bank_swift: 'UOVBVNVX',
+  },
+]
+
+export function getBankPreset(value: string | null | undefined): BankPreset | null {
+  if (!value) return null
+  return BANK_PRESETS.find((b) => b.value === value) || null
+}
+
 export function isAllowedReviewer(email?: string | null): boolean {
   if (!email) return false
   return SALES_CONFIG.REVIEWER_EMAILS.includes(email.toLowerCase())

@@ -30,6 +30,7 @@ import {
   Breadcrumb,
   Alert,
   Divider,
+  Select,
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -50,6 +51,7 @@ import {
   deriveKind,
   type ContractFormData,
 } from '../../services/sales/contractGeneratorService'
+import { BANK_PRESETS, getBankPreset } from '../../config/sales.config'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -513,6 +515,42 @@ export default function ContractReviewPage() {
             </Divider>
 
             <Form form={bankForm} layout="vertical" size="middle">
+              {/* Quick-pick: chọn 1 ngân hàng → tự fill 5 field */}
+              <Form.Item
+                label={<><BankOutlined /> <span style={{ marginLeft: 6 }}>Chọn nhanh ngân hàng (auto-fill 5 field)</span></>}
+                tooltip="Chọn TK USD nhận tiền của Huy Anh ở bank nào. Sau khi chọn, 5 field bên dưới sẽ tự điền — bạn có thể sửa lại nếu cần."
+              >
+                <Select
+                  placeholder="— Chọn TK ngân hàng để fill nhanh —"
+                  showSearch
+                  optionFilterProp="label"
+                  allowClear
+                  onChange={(v: string | undefined) => {
+                    const preset = getBankPreset(v || null)
+                    if (preset) {
+                      bankForm.setFieldsValue({
+                        bank_account_name: preset.bank_account_name,
+                        bank_account_no: preset.bank_account_no,
+                        bank_full_name: preset.bank_full_name,
+                        bank_address: preset.bank_address,
+                        bank_swift: preset.bank_swift,
+                      })
+                      message.success(`Đã fill ${preset.label}`)
+                    }
+                  }}
+                  options={BANK_PRESETS.map((b) => ({
+                    value: b.value,
+                    label: b.label,
+                    searchText: `${b.label} ${b.bank_account_no} ${b.bank_swift}`,
+                  }))}
+                  filterOption={(input, option) => {
+                    const o = option as { searchText?: string; label?: string }
+                    return ((o?.searchText || o?.label || '') as string)
+                      .toLowerCase().includes(input.toLowerCase())
+                  }}
+                />
+              </Form.Item>
+
               <Row gutter={12}>
                 <Col span={14}>
                   <Form.Item

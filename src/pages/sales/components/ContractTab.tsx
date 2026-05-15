@@ -561,7 +561,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
             >
               Chỉnh sửa
             </Button>
-          ) : isLocked ? (
+          ) : (isLocked && !hasWorkflow) ? (
             <Tag icon={<LockOutlined />} color="default">Đã khóa</Tag>
           ) : null}
         </div>

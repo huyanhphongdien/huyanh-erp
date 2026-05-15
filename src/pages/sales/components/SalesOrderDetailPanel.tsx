@@ -385,7 +385,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
           <Space size={4}>
             {meta.icon}
             <span>{meta.label}</span>
-            {tabKey === 'contract' && isLocked && (
+            {/* Icon khóa CHỈ hiện cho legacy lock (không có workflow) */}
+            {tabKey === 'contract' && isLocked && !hasWorkflow && (
               <LockOutlined style={{ color: '#999', fontSize: 11 }} />
             )}
             {editable && (

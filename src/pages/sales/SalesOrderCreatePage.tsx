@@ -37,6 +37,7 @@ import {
   downloadContract,
   deriveKind,
   DEFAULT_BANK,
+  amountToWords,
   type ContractFormData,
 } from '../../services/sales/contractGeneratorService'
 import { salesContractWorkflowService } from '../../services/sales/salesContractWorkflowService'
@@ -58,48 +59,8 @@ import {
 const { Title } = Typography
 const { TextArea } = Input
 
-// ============================================================================
-// HELPERS — Amount → English words (cho PI section "Words: ...")
-// ============================================================================
-
-const _UNITS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
-const _TEENS = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
-const _TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
-function _under1000(n: number): string {
-  if (n === 0) return ''
-  if (n < 10) return _UNITS[n]
-  if (n < 20) return _TEENS[n - 10]
-  if (n < 100) {
-    const t = Math.floor(n / 10), u = n % 10
-    return _TENS[t] + (u ? '-' + _UNITS[u] : '')
-  }
-  const h = Math.floor(n / 100), rest = n % 100
-  return _UNITS[h] + ' Hundred' + (rest ? ' ' + _under1000(rest) : '')
-}
-function amountToWords(amount: number): string {
-  if (!amount || amount <= 0) return ''
-  const dollars = Math.floor(amount)
-  const cents = Math.round((amount - dollars) * 100)
-  let result = ''
-  if (dollars >= 1_000_000) {
-    const m = Math.floor(dollars / 1_000_000)
-    result += _under1000(m) + ' Million'
-    const rest = dollars % 1_000_000
-    if (rest >= 1000) result += ' ' + _under1000(Math.floor(rest / 1000)) + ' Thousand'
-    const last = rest % 1000
-    if (last) result += ' ' + _under1000(last)
-  } else if (dollars >= 1000) {
-    result += _under1000(Math.floor(dollars / 1000)) + ' Thousand'
-    const last = dollars % 1000
-    if (last) result += ' ' + _under1000(last)
-  } else {
-    result += _under1000(dollars)
-  }
-  result += ' US Dollars'
-  if (cents > 0) result += ' and ' + _under1000(cents) + ' Cents'
-  result += ' Only'
-  return result.trim().replace(/\s+/g, ' ')
-}
+// amountToWords moved to contractGeneratorService — share giữa Compose Studio
+// và buildFormDataFromOrder để tránh drift logic.
 
 // ============================================================================
 // COMPONENT

@@ -19,7 +19,7 @@ import {
   salesContractWorkflowService,
   type SalesOrderContract,
 } from '../../../services/sales/salesContractWorkflowService'
-import { DEFAULT_BANK, type ContractFormData } from '../../../services/sales/contractGeneratorService'
+import { DEFAULT_BANK, amountToWords, type ContractFormData } from '../../../services/sales/contractGeneratorService'
 import OrderFilesWidget from './OrderFilesWidget'
 
 const PRIMARY = '#1B4D3E'
@@ -83,6 +83,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
       quantity: o.quantity_tons ? o.quantity_tons.toFixed(2) : '',
       unit_price: o.unit_price ? o.unit_price.toLocaleString('en-US') : '',
       amount: totalUSD ? totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+      amount_words: totalUSD ? amountToWords(totalUSD) : '',
       incoterm: o.incoterm || 'FOB',
       pol: o.port_of_loading || '',
       pod: isFOB ? '' : (o.port_of_destination || ''),

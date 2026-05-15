@@ -92,6 +92,51 @@ export const DEFAULT_BANK: Pick<
 
 const TEMPLATE_BASE = SALES_CONFIG.TEMPLATE_BASE
 
+// ----------------------------------------------------------------------------
+// Amount → English words ("Forty-Nine Thousand … US Dollars and Sixty Cents Only")
+// Dùng cho PI section "Words: ..."
+// ----------------------------------------------------------------------------
+
+const _UNITS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
+const _TEENS = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+const _TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+function _under1000(n: number): string {
+  if (n === 0) return ''
+  if (n < 10) return _UNITS[n]
+  if (n < 20) return _TEENS[n - 10]
+  if (n < 100) {
+    const t = Math.floor(n / 10), u = n % 10
+    return _TENS[t] + (u ? '-' + _UNITS[u] : '')
+  }
+  const h = Math.floor(n / 100), rest = n % 100
+  return _UNITS[h] + ' Hundred' + (rest ? ' ' + _under1000(rest) : '')
+}
+
+export function amountToWords(amount: number): string {
+  if (!amount || amount <= 0) return ''
+  const dollars = Math.floor(amount)
+  const cents = Math.round((amount - dollars) * 100)
+  let result = ''
+  if (dollars >= 1_000_000) {
+    const m = Math.floor(dollars / 1_000_000)
+    result += _under1000(m) + ' Million'
+    const rest = dollars % 1_000_000
+    if (rest >= 1000) result += ' ' + _under1000(Math.floor(rest / 1000)) + ' Thousand'
+    const last = rest % 1000
+    if (last) result += ' ' + _under1000(last)
+  } else if (dollars >= 1000) {
+    result += _under1000(Math.floor(dollars / 1000)) + ' Thousand'
+    const last = dollars % 1000
+    if (last) result += ' ' + _under1000(last)
+  } else {
+    result += _under1000(dollars)
+  }
+  result += ' US Dollars'
+  if (cents > 0) result += ' and ' + _under1000(cents) + ' Cents'
+  result += ' Only'
+  return result.trim().replace(/\s+/g, ' ')
+}
+
 /**
  * Normalize grade enum → display format for contracts.
  * DB enum dùng underscore (SVR_3L, RSS_3, LATEX_60) — HĐ quốc tế viết liền (SVR3L,
@@ -148,13 +193,21 @@ export async function generateContractBlob(
   // - has_fumigation: chỉ wooden_pallet cần Fumigation cert (Korea/EU requirement).
   //   Detect qua packing_type enum, hoặc fallback từ packing_desc string.
   // - grade: normalize SVR_3L → SVR3L
+  // - amount_words: auto-compute từ {amount} nếu form_data chưa có (self-heal cho
+  //   HĐ cũ được tạo trước khi buildFormDataFromOrder compute amount_words)
   const packingDesc = (data.packing_desc || '').toLowerCase()
   const hasFumigation =
     data.packing_type === 'wooden_pallet' ||
     (packingDesc.includes('wooden pallet') && !packingDesc.includes('loose'))
+  let amountWords = data.amount_words
+  if (!amountWords && data.amount) {
+    const num = parseFloat(String(data.amount).replace(/,/g, ''))
+    if (num > 0) amountWords = amountToWords(num)
+  }
   doc.render({
     ...data,
     grade: formatGradeForContract(data.grade),
+    amount_words: amountWords || '',
     has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
     has_fumigation: hasFumigation,
   })

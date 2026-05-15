@@ -42,6 +42,7 @@ import {
   downloadContract,
   deriveKind,
 } from '../../../services/sales/contractGeneratorService'
+import { supabase } from '../../../lib/supabase'
 
 const { Text } = Typography
 
@@ -98,6 +99,32 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
       .finally(() => setLoading(false))
   }, [salesOrderId])
 
+  /** Self-heal form_data: fetch fresh customer info + recompute amount_words
+   *  cho HĐ cũ được tạo trước khi CUSTOMER_JOIN có address. */
+  async function enrichFormData(
+    contract: SalesOrderContract,
+  ): Promise<Partial<typeof contract.form_data>> {
+    const fd = { ...(contract.form_data || {}) }
+    if (!fd.buyer_address || !fd.buyer_phone) {
+      try {
+        const { data: order } = await supabase
+          .from('sales_orders')
+          .select('customer:sales_customers!customer_id(name,address,phone)')
+          .eq('id', salesOrderId)
+          .maybeSingle()
+        const cust = (order?.customer as { name?: string; address?: string; phone?: string } | null) || null
+        if (cust) {
+          if (!fd.buyer_name) fd.buyer_name = cust.name || ''
+          if (!fd.buyer_address) fd.buyer_address = cust.address || ''
+          if (!fd.buyer_phone) fd.buyer_phone = cust.phone || ''
+        }
+      } catch (e) {
+        console.warn('enrichFormData: không fetch được customer', e)
+      }
+    }
+    return fd
+  }
+
   const handleDownload = async (
     contract: SalesOrderContract,
     type: 'SC' | 'PI',
@@ -105,11 +132,12 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
     const key = `${contract.id}_${type}`
     setDocLoading(key)
     try {
-      const kind = deriveKind(contract.form_data?.incoterm || 'FOB', type)
+      const enriched = await enrichFormData(contract)
+      const kind = deriveKind(enriched.incoterm || 'FOB', type)
       await downloadContract(
         kind,
-        contract.form_data,
-        `${contract.form_data?.contract_no || 'contract'}_${type}_rev${contract.revision_no}.docx`,
+        enriched,
+        `${enriched.contract_no || 'contract'}_${type}_rev${contract.revision_no}.docx`,
       )
       message.success(`Đã tải ${type} (rev #${contract.revision_no})`)
     } catch (e: unknown) {

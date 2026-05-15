@@ -266,21 +266,20 @@ def _iter_paragraphs(doc):
 
 def _normalize_head_letter(doc):
     """
-    ★ ĐỒNG BỘ HEAD LETTER giữa SC và PI ★
+    ★ ĐỒNG BỘ HEAD LETTER giữa SC và PI bằng TEXT canonical ★
 
-    Source SC dùng format đẹp (title sz=44, No/Date sz=28 centered bold,
-    SELLER block sz=26). Source PI thì lệch:
-    - Title "PROFORMA INVOICE" chỉ sz=32 (nhỏ hơn SC)
-    - "No: ..." paragraph align=left thay vì center (lệch hàng so với Date)
-    - SELLER + Tel block không set explicit sz (mặc định ~22pt, nhỏ hơn SC sz=26)
+    Title section (sz=44 centered bold), No/Date (sz=28 centered bold), rồi
+    THAY THẾ block SELLER cũ bằng letterhead text canonical 6 dòng:
 
-    Hàm này detect các paragraph head letter và normalize về format SC.
-    Áp dụng cho cả 4 template (SC dùng để 'idempotent', PI thực sự thay đổi).
+        HUY ANH RUBBER COMPANY LIMITED          (sz=32, bold)
+        KHE MA, PHONG DIEN WARD, HUE CITY, VIET NAM   (sz=26)
+        TEL: 054.3774994       FAX: 054.3774995       (sz=26)
+        Mobi/Whatsapp: +84971619955 | +84 974398488   (sz=22)
+        Email: Sales@huyanhrubber.com | Huylv@huyanhrubber.com  (sz=22)
+        Website: Huyanhrubber.com.vn                  (sz=22)
 
-    Format chuẩn:
-    - Title (SALES CONTRACT / PROFORMA INVOICE / SALE CONTRACT): centered, sz=44, bold
-    - No: / Date: lines: centered, sz=28, bold
-    - THE SELLER + Address + Tel: justify, sz=26 (giữ bold riêng từng run)
+    Cả 6 dòng centered. Áp dụng cho cả 4 template — đảm bảo SC và PI
+    có letterhead identical.
     """
     from docx.oxml.ns import qn
     from copy import deepcopy
@@ -352,12 +351,65 @@ def _normalize_head_letter(doc):
                 first = p.runs[0]
                 first.text = first.text.lstrip()
             changed += 1
-        # SELLER / KHE MA / Tel-Fax block (giữ alignment 'both' = justify, normalize sz=26)
-        elif ('THE SELLER' in upper or 'KHE MA' in upper or
-              text.startswith('Tel:') or text.startswith('Tel ')):
-            for r in p.runs:
-                _set_run_sz(r, 26)
-            changed += 1
+    # ─── REPLACE old SELLER block với letterhead canonical (6 dòng) ───
+    # Detect "THE SELLER" paragraph, replace text + 2 paragraphs following
+    # (KHE MA + Tel/Fax), rồi insert 3 paragraphs NEW (Mobi/Email/Website).
+    LETTERHEAD = [
+        ('HUY ANH RUBBER COMPANY LIMITED', 32, True),
+        ('KHE MA, PHONG DIEN WARD, HUE CITY, VIET NAM', 26, False),
+        ('TEL: 054.3774994       FAX: 054.3774995', 26, False),
+        ('Mobi/Whatsapp: +84971619955 | +84 974398488', 22, False),
+        ('Email: Sales@huyanhrubber.com | Huylv@huyanhrubber.com', 22, False),
+        ('Website: Huyanhrubber.com.vn', 22, False),
+    ]
+
+    seller_para = None
+    seller_idx = -1
+    for i, p in enumerate(doc.paragraphs[:15]):
+        if 'THE SELLER' in (p.text or '').upper():
+            seller_para = p
+            seller_idx = i
+            break
+
+    if seller_para is not None:
+        all_paras = doc.paragraphs
+        # Rewrite paragraph SELLER + 2 paragraphs sau (KHE MA + Tel) → 3 dòng đầu letterhead
+        for j in range(3):
+            if seller_idx + j < len(all_paras):
+                target_p = all_paras[seller_idx + j]
+                text, sz, bold = LETTERHEAD[j]
+                # Clear all runs of target
+                for r in list(target_p.runs):
+                    r._element.getparent().remove(r._element)
+                # Add single run với text mới
+                new_run = target_p.add_run(text)
+                _set_run_sz(new_run, sz)
+                _set_bold(new_run, bold)
+                _set_align(target_p, 'center')
+                changed += 1
+
+        # Insert 3 paragraphs NEW (Mobi/Email/Website) sau Tel paragraph
+        tel_para = all_paras[seller_idx + 2] if seller_idx + 2 < len(all_paras) else None
+        if tel_para is not None:
+            anchor = tel_para._element
+            for k in range(3, 6):
+                text, sz, bold = LETTERHEAD[k]
+                # Clone Tel paragraph element + replace text/sz
+                from copy import deepcopy as _dc
+                new_p = _dc(tel_para._element)
+                anchor.addnext(new_p)
+                anchor = new_p  # insert next after this one
+                # Sửa text/format trên new_p
+                from docx.text.paragraph import Paragraph
+                wrapper = Paragraph(new_p, tel_para._parent)
+                for r in list(wrapper.runs):
+                    r._element.getparent().remove(r._element)
+                new_run = wrapper.add_run(text)
+                _set_run_sz(new_run, sz)
+                _set_bold(new_run, bold)
+                _set_align(wrapper, 'center')
+                changed += 1
+
     return changed
 
 

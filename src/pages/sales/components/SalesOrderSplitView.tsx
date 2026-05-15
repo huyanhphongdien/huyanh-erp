@@ -107,6 +107,7 @@ export default function SalesOrderSplitView({ orders, loading, onOrderUpdated }:
   )
 
   return (
+    <div>
     <div style={splitContainer}>
       {/* ═══ LEFT: COMPACT LIST ═══ */}
       <div style={panelLeft}>
@@ -158,6 +159,19 @@ export default function SalesOrderSplitView({ orders, loading, onOrderUpdated }:
           </div>
         )}
       </div>
+    </div>
+
+    {/* ═══ KEYBOARD HINTS FOOTER ═══ */}
+    <div style={hintsFooter}>
+      <span><strong style={{ color: '#595959' }}>Phím tắt:</strong></span>
+      <span><span style={kbd}>J</span><span style={kbd}>K</span> chuyển đơn</span>
+      <span><span style={kbd}>/</span> focus search</span>
+      <span><span style={kbd}>Ctrl</span><span style={kbd}>K</span> command palette</span>
+      <span><span style={kbd}>Click</span> mở chi tiết</span>
+      <span style={{ marginLeft: 'auto', color: '#bfbfbf' }}>
+        {orders.length} đơn · Auto-save · {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+      </span>
+    </div>
     </div>
   )
 }
@@ -370,6 +384,20 @@ const kbd: React.CSSProperties = {
   fontFamily: 'monospace', fontSize: 10, color: '#595959',
   marginLeft: 3, marginRight: 1,
   boxShadow: '0 1px 0 #d9d9d9',
+}
+
+const hintsFooter: React.CSSProperties = {
+  background: '#fff',
+  padding: '8px 20px',
+  borderTop: '1px solid #e8e8e8',
+  borderRadius: '0 0 8px 8px',
+  marginTop: -1,
+  display: 'flex',
+  gap: 16,
+  alignItems: 'center',
+  fontSize: 11,
+  color: '#8c8c8c',
+  flexWrap: 'wrap',
 }
 
 // Re-export utility — give it a placeholder reference for ESLint

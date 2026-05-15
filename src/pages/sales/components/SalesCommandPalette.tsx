@@ -161,8 +161,14 @@ export default function SalesCommandPalette({ orders, onOpenOrder }: Props) {
         setOpen(false)
       }
     }
+    // Cũng listen custom event để Cmd+K trigger button (visible) có thể mở
+    const openHandler = () => setOpen(true)
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    window.addEventListener('sales-cmdk-open', openHandler)
+    return () => {
+      window.removeEventListener('keydown', handler)
+      window.removeEventListener('sales-cmdk-open', openHandler)
+    }
   }, [open])
 
   // ↑↓ Enter inside palette

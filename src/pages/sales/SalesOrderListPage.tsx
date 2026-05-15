@@ -1311,6 +1311,28 @@ const SalesOrderListPage = () => {
               </Button.Group>
             </Tooltip>
 
+            {/* Cmd+K trigger button — visible nút mở command palette (giống mock) */}
+            <Tooltip title="Tìm nhanh + Lệnh tắt (Ctrl+K)">
+              <Button
+                size="middle"
+                onClick={() => window.dispatchEvent(new Event('sales-cmdk-open'))}
+                style={{
+                  background: '#fafafa',
+                  borderColor: '#e8e8e8',
+                  color: '#8c8c8c',
+                  fontWeight: 500,
+                }}
+              >
+                🔍 Tìm nhanh
+                <span style={{
+                  marginLeft: 8, padding: '0 6px',
+                  background: '#fff', border: '1px solid #d9d9d9', borderRadius: 4,
+                  fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#595959',
+                  boxShadow: '0 1px 0 #d9d9d9',
+                }}>Ctrl+K</span>
+              </Button>
+            </Tooltip>
+
             {/* View mode toggle: Bảng (current default) | Split (Linear/Gmail-style) | Kanban */}
             <Button.Group>
               <Tooltip title="Bảng — danh sách đầy đủ cột">

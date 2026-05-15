@@ -36,7 +36,13 @@ import HandoffTimeline from './HandoffTimeline'
 import OrderProgressDashboard from './OrderProgressDashboard'
 import SalesOrderChat from './SalesOrderChat'
 import StagePill from '../../../components/common/StagePill'
-import type { SalesStage } from '../../../services/sales/salesStages'
+import {
+  SALES_STAGES,
+  SALES_STAGE_SHORT,
+  SALES_STAGE_EMOJI,
+  statusToStage,
+  type SalesStage,
+} from '../../../services/sales/salesStages'
 
 // ============================================================================
 // TYPES
@@ -565,31 +571,27 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
 }
 
 // ============================================================================
-// PIPELINE HERO — 5-stage visual ở đầu inline detail (giống mock)
+// PIPELINE HERO — 7-stage visual ĐỒNG BỘ với SALES_STAGES (Kanban + List)
 // ============================================================================
 
-const PIPELINE_STAGES = [
-  { key: 'mua_mu',         icon: '🛒', label: 'Mua NVL' },
-  { key: 'production',     icon: '🏭', label: 'Sản xuất' },
-  { key: 'packing',        icon: '📦', label: 'Đóng gói' },
-  { key: 'shipping',       icon: '🚢', label: 'Vận chuyển' },
-  { key: 'payment',        icon: '💰', label: 'Thanh toán' },
-]
+// Pipeline dùng đúng 7 stages của SALES_STAGES — đảm bảo Detail panel,
+// Sales Kanban (/sales/kanban) và List view (BỘ PHẬN column) cùng source of truth.
+const PIPELINE_STAGES = SALES_STAGES.map((k) => ({
+  key: k as SalesStage,
+  icon: SALES_STAGE_EMOJI[k],
+  label: SALES_STAGE_SHORT[k],
+}))
 
-// Map current_stage → index trong PIPELINE_STAGES
-function stageIndex(stage: string | null | undefined): number {
-  if (!stage) return 0
-  const s = stage.toLowerCase()
-  if (s.includes('mua_mu') || s.includes('raw_material')) return 0
-  if (s.includes('production') || s.includes('sản xuất')) return 1
-  if (s.includes('packing') || s.includes('ready') || s.includes('đóng gói')) return 2
-  if (s.includes('shipping') || s.includes('shipped') || s.includes('vận')) return 3
-  if (s.includes('payment') || s.includes('paid') || s.includes('thanh toán')) return 4
-  return 0
+/** Lấy current stage index. Ưu tiên order.current_stage; fallback statusToStage(status). */
+function getCurrentStageIdx(order: SalesOrder): number {
+  const stage = (order.current_stage as SalesStage | null | undefined)
+    || statusToStage(order.status || 'draft')
+  const idx = SALES_STAGES.indexOf(stage as SalesStage)
+  return idx >= 0 ? idx : 0
 }
 
 function PipelineHero({ order }: { order: SalesOrder }) {
-  const currentIdx = stageIndex(order.current_stage)
+  const currentIdx = getCurrentStageIdx(order)
   // SLA elapsed
   let slaText: string | null = null
   let slaColor = '#8c8c8c'

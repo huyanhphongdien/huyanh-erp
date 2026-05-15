@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card, Tag, Space, Button, Typography, Spin, message, Tooltip, Modal, Drawer,
-  Form, Input, Alert, Row, Col,
+  Form, Input, Alert, Row, Col, Divider,
 } from 'antd'
 import {
   EyeOutlined,
@@ -474,10 +474,28 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
           type="error"
           showIcon
           message={`Phú LV đã trả lại với lý do: "${latest.rejected_reason || '—'}"`}
-          description="Sửa các trường bị Phú LV report, sau đó bấm 'Trình lại' để tạo revision mới."
+          description={
+            <div>
+              Sửa trường bị report, sau đó bấm "Trình lại".
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: '0 4px', fontSize: 12 }}
+                onClick={() => {
+                  setResubmitOpen(false)
+                  navigate(`/sales/orders/${salesOrderId}/edit`)
+                }}
+              >
+                Hoặc mở Compose Studio để sửa toàn bộ →
+              </Button>
+            </div>
+          }
           style={{ marginBottom: 16 }}
         />
         <Form form={resubmitForm} layout="vertical" size="middle">
+          <Divider plain style={{ margin: '4px 0 12px' }}>
+            <span style={{ fontSize: 11, color: '#8c8c8c' }}>📋 HĐ</span>
+          </Divider>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item label="Số HĐ" name="contract_no" rules={[{ required: true }]}>
@@ -490,6 +508,29 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
               </Form.Item>
             </Col>
           </Row>
+
+          <Divider plain style={{ margin: '4px 0 12px' }}>
+            <span style={{ fontSize: 11, color: '#8c8c8c' }}>🏢 Buyer</span>
+          </Divider>
+          <Form.Item label="Buyer name" name="buyer_name">
+            <Input />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={18}>
+              <Form.Item label="Buyer address" name="buyer_address">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Phone" name="buyer_phone">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider plain style={{ margin: '4px 0 12px' }}>
+            <span style={{ fontSize: 11, color: '#8c8c8c' }}>💰 Commodity & Price</span>
+          </Divider>
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item label="Grade" name="grade">
@@ -510,26 +551,96 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
           <Form.Item label="Amount (USD)" name="amount">
             <Input />
           </Form.Item>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item label="Time of shipment" name="shipment_time">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Payment" name="payment">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
+
+          <Divider plain style={{ margin: '4px 0 12px' }}>
+            <span style={{ fontSize: 11, color: '#8c8c8c' }}>📦 Packing & Container</span>
+          </Divider>
           <Form.Item label="Packing description" name="packing_desc">
             <Input />
           </Form.Item>
+          <Row gutter={12}>
+            <Col span={6}>
+              <Form.Item label="Bales total" name="bales_total">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Pallets total" name="pallets_total">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Containers" name="containers">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Cont type" name="cont_type">
+                <Input placeholder="20DC / 40HC" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider plain style={{ margin: '4px 0 12px' }}>
+            <span style={{ fontSize: 11, color: '#8c8c8c' }}>🚢 Trade & Shipment</span>
+          </Divider>
+          <Row gutter={12}>
+            <Col span={6}>
+              <Form.Item label="Incoterm" name="incoterm">
+                <Input placeholder="FOB / CIF / CNF" />
+              </Form.Item>
+            </Col>
+            <Col span={9}>
+              <Form.Item label="POL" name="pol">
+                <Input placeholder="Da Nang port, Viet Nam" />
+              </Form.Item>
+            </Col>
+            <Col span={9}>
+              <Form.Item label="POD" name="pod">
+                <Input placeholder="Colombo, Sri Lanka" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label="Time of shipment" name="shipment_time">
+            <Input />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item label="Partial" name="partial">
+                <Input placeholder="Allowed / Not Allowed" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Transshipment" name="trans">
+                <Input placeholder="Allowed / Not Allowed" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Claims days" name="claims_days">
+                <Input placeholder="20" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider plain style={{ margin: '4px 0 12px' }}>
+            <span style={{ fontSize: 11, color: '#8c8c8c' }}>💳 Payment & Conditions</span>
+          </Divider>
+          <Form.Item label="Payment" name="payment">
+            <Input />
+          </Form.Item>
+          <Form.Item
+            label="Điều khoản kèm theo (extra terms)"
+            name="extra_terms"
+            tooltip="Max 300 ký tự"
+          >
+            <Input.TextArea rows={2} maxLength={300} showCount />
+          </Form.Item>
+
           <Alert
             type="info"
             showIcon
-            message="Các trường khác (buyer, bank, ports, etc.) giữ nguyên từ revision cũ. Cần edit chi tiết thì vào trang Sales Order Create."
-            style={{ marginTop: 8 }}
+            message="Bank info do Phú LV nhập — KHÔNG sửa được ở đây. Sale chỉ sửa các field trên."
+            style={{ marginTop: 8, fontSize: 11 }}
           />
         </Form>
       </Drawer>

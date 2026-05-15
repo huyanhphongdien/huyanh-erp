@@ -19,6 +19,7 @@
 import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
 import { SALES_CONFIG } from '../../config/sales.config'
+import { createNotification } from '../notificationService'
 
 export type ContractStatus =
   | 'drafting'
@@ -125,6 +126,45 @@ export async function getEmployeeIdByEmail(email: string): Promise<string | null
   return data?.id || null
 }
 
+/** Helper notify — fire-and-forget (không block workflow nếu noti fail). */
+function _notifyContractEvent(params: {
+  recipientIds: (string | null | undefined)[]
+  senderId: string | null
+  salesOrderId: string
+  contractNo: string
+  revisionNo: number
+  title: string
+  message: string
+  priority?: 'normal' | 'high' | 'urgent'
+  reference_url?: string
+}) {
+  const recipients = (params.recipientIds || []).filter(
+    (id): id is string => !!id && id !== params.senderId,  // không tự ping mình
+  )
+  if (recipients.length === 0) return
+  const refUrl = params.reference_url || `/sales/orders/${params.salesOrderId}?tab=contract`
+  void Promise.all(
+    recipients.map((recipientId) =>
+      createNotification({
+        recipient_id: recipientId,
+        sender_id: params.senderId || undefined,
+        module: 'system',
+        notification_type: 'system_announcement',
+        title: params.title,
+        message: params.message,
+        reference_id: params.salesOrderId,
+        reference_type: 'sales_order_contract',
+        reference_url: refUrl,
+        priority: params.priority || 'normal',
+        metadata: {
+          contract_no: params.contractNo,
+          revision_no: params.revisionNo,
+        },
+      }),
+    ),
+  ).catch((e) => console.error('Contract workflow notification failed:', e))
+}
+
 // ----------------------------------------------------------------------------
 // Service
 // ----------------------------------------------------------------------------
@@ -160,7 +200,8 @@ export const salesContractWorkflowService = {
     return (count || 0) > 0
   },
 
-  /** Sale tạo HĐ draft + submit thẳng cho Phú LV review. */
+  /** Sale tạo HĐ draft + submit thẳng cho Phú LV review.
+   *  Notify reviewer (cả Phú LV mặc định + Minh LD nếu có queue chung). */
   async createDraftAndSubmit(
     salesOrderId: string,
     formData: Partial<ContractFormData>,
@@ -187,7 +228,31 @@ export const salesContractWorkflowService = {
       .select('*')
       .single()
     if (error) throw error
-    return data as SalesOrderContract
+    const row = data as SalesOrderContract
+
+    // ─── B. Notify cả 2 reviewer (Phú LV + Minh LD) — ai vào queue trước thì duyệt ───
+    const reviewerIds = await Promise.all(
+      ALLOWED_REVIEWER_EMAILS.map((email) => getEmployeeIdByEmail(email)),
+    )
+    const contractNo = formData.contract_no || salesOrderId.slice(0, 8)
+    const isResubmit = row.revision_no > 1
+    _notifyContractEvent({
+      recipientIds: reviewerIds,
+      senderId: createdBy,
+      salesOrderId,
+      contractNo,
+      revisionNo: row.revision_no,
+      title: isResubmit
+        ? `🔄 Sale trình LẠI HĐ ${contractNo} rev #${row.revision_no} — cần kiểm tra`
+        : `📤 Sale trình HĐ ${contractNo} — cần kiểm tra + nhập bank`,
+      message: isResubmit
+        ? `Sale đã sửa + trình revision mới. Vào queue review để duyệt.`
+        : `HĐ mới chờ bạn nhập bank info + duyệt trình Trung/Huy ký.`,
+      priority: 'normal',
+      reference_url: '/sales/contracts/review',
+    })
+
+    return row
   },
 
   /** List HĐ status='approved' chờ Trung/Huy ký. */
@@ -272,16 +337,20 @@ export const salesContractWorkflowService = {
     return (data as unknown as SalesOrderContract[]) || []
   },
 
-  /** Phú LV duyệt: update form_data (đã chèn bank info) + status='approved'. */
+  /** Phú LV duyệt: update form_data (đã chèn bank info) + status='approved'.
+   *  Notify cả Sale (báo HĐ đã duyệt) + Trung/Huy (chờ ký). */
   async approve(
     id: string,
     updatedFormData?: Partial<ContractFormData>,
     reviewNotes?: string,
   ): Promise<SalesOrderContract> {
+    const senderId = await getCurrentEmployeeId()
     const updates: Record<string, unknown> = {
       status: 'approved',
       reviewed_at: new Date().toISOString(),
     }
+    // Phú LV cũng là reviewer được record — set reviewer_id nếu chưa có
+    if (senderId) updates.reviewer_id = senderId
     if (updatedFormData) updates.form_data = updatedFormData
     if (reviewNotes && reviewNotes.trim()) updates.review_notes = reviewNotes.trim()
 
@@ -292,14 +361,46 @@ export const salesContractWorkflowService = {
       .select('*')
       .single()
     if (error) throw error
-    return data as SalesOrderContract
+    const row = data as SalesOrderContract
+
+    // ─── D. Notify Trung/Huy (signers) — họ chờ ký ───
+    const signerIds = await Promise.all(
+      ALLOWED_SIGNER_EMAILS.map((email) => getEmployeeIdByEmail(email)),
+    )
+    const contractNo = row.form_data?.contract_no || row.sales_order_id.slice(0, 8)
+    _notifyContractEvent({
+      recipientIds: signerIds,
+      senderId,
+      salesOrderId: row.sales_order_id,
+      contractNo,
+      revisionNo: row.revision_no,
+      title: `✍️ HĐ ${contractNo} chờ ký — Phú LV đã duyệt`,
+      message: 'Vào queue Ký HĐ để in + ký + đóng dấu + upload PDF.',
+      priority: 'high',
+      reference_url: '/sales/contracts/sign',
+    })
+
+    // ─── D bonus. Notify Sale (báo đã được duyệt) ───
+    _notifyContractEvent({
+      recipientIds: [row.created_by],
+      senderId,
+      salesOrderId: row.sales_order_id,
+      contractNo,
+      revisionNo: row.revision_no,
+      title: `✅ HĐ ${contractNo} đã được Phú LV duyệt`,
+      message: 'Bank info đã chốt. Đang chờ Trung/Huy ký + đóng dấu.',
+      priority: 'normal',
+    })
+
+    return row
   },
 
-  /** Phú LV trả lại: status='rejected', cần lý do. */
+  /** Phú LV trả lại: status='rejected', cần lý do. Notify Sale (created_by). */
   async reject(id: string, rejectedReason: string): Promise<SalesOrderContract> {
     if (!rejectedReason || !rejectedReason.trim()) {
       throw new Error('Cần nhập lý do trả lại')
     }
+    const senderId = await getCurrentEmployeeId()
     const { data, error } = await supabase
       .from('sales_order_contracts')
       .update({
@@ -310,10 +411,28 @@ export const salesContractWorkflowService = {
       .select('*')
       .single()
     if (error) throw error
-    return data as SalesOrderContract
+    const row = data as SalesOrderContract
+
+    // ─── A. Notify Sale (created_by) — họ phải biết để sửa + trình lại ───
+    const contractNo = row.form_data?.contract_no || row.sales_order_id.slice(0, 8)
+    const reasonExcerpt = rejectedReason.trim().slice(0, 200)
+    _notifyContractEvent({
+      recipientIds: [row.created_by],
+      senderId,
+      salesOrderId: row.sales_order_id,
+      contractNo,
+      revisionNo: row.revision_no,
+      title: `❌ HĐ ${contractNo} bị Phú LV trả lại — cần sửa`,
+      message: reasonExcerpt,
+      priority: 'high',
+      reference_url: `/sales/orders/${row.sales_order_id}?tab=contract`,
+    })
+
+    return row
   },
 
-  /** Trung/Huy đánh dấu đã ký + upload PDF đã ký. */
+  /** Trung/Huy đánh dấu đã ký + upload PDF đã ký.
+   *  Notify Sale + Phú LV (HĐ pháp lý đã sẵn sàng gửi KH). */
   async markSigned(id: string, signedPdfUrl: string): Promise<SalesOrderContract> {
     const signerId = await getCurrentEmployeeId()
     if (!signerId) throw new Error('Không xác định được nhân viên hiện tại')
@@ -330,7 +449,22 @@ export const salesContractWorkflowService = {
       .select('*')
       .single()
     if (error) throw error
-    return data as SalesOrderContract
+    const row = data as SalesOrderContract
+
+    // ─── E. Notify Sale + Phú LV (reviewer) — HĐ pháp lý sẵn sàng ───
+    const contractNo = row.form_data?.contract_no || row.sales_order_id.slice(0, 8)
+    _notifyContractEvent({
+      recipientIds: [row.created_by, row.reviewer_id],
+      senderId: signerId,
+      salesOrderId: row.sales_order_id,
+      contractNo,
+      revisionNo: row.revision_no,
+      title: `✍️ HĐ ${contractNo} đã được ký + đóng dấu`,
+      message: 'HĐ pháp lý sẵn sàng. Sale có thể gửi bản FINAL cho khách.',
+      priority: 'high',
+    })
+
+    return row
   },
 
   async getById(id: string): Promise<SalesOrderContract | null> {

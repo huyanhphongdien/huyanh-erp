@@ -34,6 +34,7 @@ import DocumentChecklistTab from './DocumentChecklistTab'
 import StageOwnershipCard from './StageOwnershipCard'
 import HandoffTimeline from './HandoffTimeline'
 import OrderProgressDashboard from './OrderProgressDashboard'
+import SalesOrderChat from './SalesOrderChat'
 import StagePill from '../../../components/common/StagePill'
 import type { SalesStage } from '../../../services/sales/salesStages'
 
@@ -151,7 +152,14 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       key: 'progress',
       label: <span>📈 Tiến độ</span>,
       children: (
-        <OrderProgressDashboard order={order} onChanged={handleSaved} />
+        <OrderProgressDashboard order={order} onChanged={handleSaved} onNavigateTab={setActiveTab} />
+      ),
+    },
+    {
+      key: 'chat',
+      label: <span>💬 Trao đổi</span>,
+      children: (
+        <SalesOrderChat salesOrderId={order.id} />
       ),
     },
     {

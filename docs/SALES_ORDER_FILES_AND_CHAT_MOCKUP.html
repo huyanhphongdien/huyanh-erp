@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Đơn hàng — Thư mục Tài liệu + Chat trao đổi | Huy Anh ERP Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #1B4D3E;
+    --primary-light: #2E7D5B;
+    --primary-bg: #f0f9f4;
+    --primary-bg2: #d9f4e3;
+    --blue: #1677ff; --blue-bg: #e6f4ff;
+    --orange: #d46b08; --orange-bg: #fff7e6;
+    --green: #389e0d; --green-bg: #f6ffed;
+    --red: #cf1322; --red-bg: #fff1f0;
+    --purple: #531dab; --purple-bg: #f9f0ff;
+    --cyan: #06b6d4; --cyan-bg: #e0f7fa;
+    --gray: #595959; --gray-bg: #f5f5f5;
+    --border: #e8e8e8;
+    --bg: #f5f6f8;
+  }
+  body {
+    font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: rgba(0,0,0,0.88);
+    font-size: 13px;
+    line-height: 1.55;
+    padding: 16px;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  .container { max-width: 1700px; margin: 0 auto; }
+
+  /* ─── Section banner ─── */
+  .section-banner {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: #fff; padding: 18px 24px; border-radius: 12px; margin-bottom: 16px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .section-banner h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .section-banner .sub { opacity: 0.85; font-size: 13px; }
+  .section-banner .num {
+    background: rgba(255,255,255,0.18); padding: 4px 12px; border-radius: 8px;
+    font-size: 11px; font-weight: 600;
+  }
+
+  /* ─── Detail panel ─── */
+  .detail {
+    background: #fff; border-radius: 14px; border: 1px solid var(--border);
+    overflow: hidden; margin-bottom: 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .detail-header {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    background: #fff;
+  }
+  .detail-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .detail-title {
+    font-size: 18px; font-weight: 700; color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+  }
+  .pill.confirmed { background: var(--primary-bg); color: var(--primary); }
+  .pill.production { background: var(--orange-bg); color: var(--orange); }
+  .pill.alert { background: var(--red-bg); color: var(--red); }
+
+  .detail-subline {
+    margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 12px; color: var(--gray);
+  }
+  .detail-subline b { color: rgba(0,0,0,0.88); }
+
+  /* ─── Tab bar ─── */
+  .tab-bar {
+    border-bottom: 1px solid var(--border); padding: 0 20px; display: flex;
+    gap: 4px; background: #fff; overflow-x: auto;
+  }
+  .tab {
+    padding: 12px 14px; font-size: 13px; color: var(--gray); cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab.active { color: var(--primary); border-color: var(--primary); font-weight: 700; }
+  .tab:hover:not(.active) { color: rgba(0,0,0,0.88); }
+  .tab .badge {
+    background: var(--primary-bg); color: var(--primary); padding: 1px 8px;
+    border-radius: 10px; font-size: 10px; font-weight: 700;
+  }
+  .tab.active .badge { background: var(--primary); color: #fff; }
+  .tab.has-unread .badge {
+    background: var(--red); color: #fff; animation: blink 1.5s infinite;
+  }
+  @keyframes blink {
+    0%,100% { opacity: 1; } 50% { opacity: 0.5; }
+  }
+
+  /* ─── Files Library Widget (in Tiến độ tab) ─── */
+  .tab-content { padding: 20px 24px; }
+  .files-widget {
+    background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    padding: 18px; margin-bottom: 20px;
+  }
+  .files-widget-h {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+  }
+  .files-widget-h h3 {
+    font-size: 14px; font-weight: 700; color: var(--primary);
+  }
+  .files-widget-h .total {
+    margin-left: auto; padding: 3px 10px;
+    background: var(--primary-bg); color: var(--primary);
+    border-radius: 10px; font-size: 11px; font-weight: 700;
+  }
+  .folders-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  }
+  .folder {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+    cursor: pointer; transition: 0.15s; background: #fafafa;
+  }
+  .folder:hover {
+    border-color: var(--primary); background: var(--primary-bg);
+    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  }
+  .folder-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .folder-icon {
+    width: 30px; height: 30px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .folder-name { font-size: 12px; font-weight: 600; flex: 1; }
+  .folder-count {
+    background: #fff; padding: 1px 7px; border-radius: 8px;
+    font-size: 11px; font-weight: 700; color: var(--gray);
+    border: 1px solid var(--border);
+  }
+  .folder-count.has { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .folder-files {
+    font-size: 11px; color: var(--gray);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .folder.contract .folder-icon { background: var(--green-bg); color: var(--green); }
+  .folder.shipping .folder-icon { background: var(--blue-bg); color: var(--blue); }
+  .folder.cert .folder-icon { background: var(--purple-bg); color: var(--purple); }
+  .folder.finance .folder-icon { background: var(--orange-bg); color: var(--orange); }
+  .folder.weighbridge .folder-icon { background: var(--cyan-bg); color: var(--cyan); }
+  .folder.other .folder-icon { background: var(--gray-bg); color: var(--gray); }
+
+  /* ─── File section (single folder view) ─── */
+  .filesec {
+    background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .filesec-h {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; background: #fafafa;
+  }
+  .filesec-h .icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+    background: var(--primary-bg); color: var(--primary);
+  }
+  .filesec-h .title { font-size: 13px; font-weight: 700; color: var(--primary); }
+  .filesec-h .count {
+    background: var(--primary-bg); color: var(--primary); padding: 1px 8px;
+    border-radius: 8px; font-size: 11px; font-weight: 600;
+  }
+  .filesec-h .btn-up {
+    margin-left: auto; padding: 4px 12px;
+    background: var(--primary); color: #fff; border: none;
+    border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .filesec-h .btn-up:hover { background: var(--primary-light); }
+
+  .file-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+    border-top: 1px solid #f0f0f0;
+  }
+  .file-row:hover { background: #fafafa; }
+  .file-icon-pdf {
+    width: 30px; height: 30px; border-radius: 6px;
+    background: var(--red-bg); color: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 11px; flex-shrink: 0;
+  }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name {
+    font-size: 13px; font-weight: 600; color: var(--primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .file-meta { font-size: 11px; color: var(--gray); margin-top: 2px; }
+  .file-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .btn-sm {
+    padding: 3px 8px; border: 1px solid var(--border); background: #fff;
+    border-radius: 5px; cursor: pointer; font-size: 11px; color: var(--gray);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .btn-sm:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-sm.danger { color: var(--red); }
+  .btn-sm.danger:hover { border-color: var(--red); background: var(--red-bg); }
+
+  /* ─── Chat Tab Content ─── */
+  .chat-layout {
+    display: grid; grid-template-columns: 1fr 280px; gap: 16px;
+    height: 600px;
+  }
+  .chat-main {
+    background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .chat-header {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; background: #fafafa;
+  }
+  .chat-header h3 { font-size: 14px; font-weight: 700; color: var(--primary); flex: 1; }
+  .chat-participants {
+    display: flex; align-items: center; gap: -4px;
+  }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid #fff; margin-left: -6px;
+    background: linear-gradient(135deg, #1B4D3E, #2E7D5B);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .avatar.sale    { background: linear-gradient(135deg, #1677ff, #4096ff); }
+  .avatar.review  { background: linear-gradient(135deg, #d46b08, #fa8c16); }
+  .avatar.sign    { background: linear-gradient(135deg, #389e0d, #52c41a); }
+  .avatar.logistics { background: linear-gradient(135deg, #531dab, #722ed1); }
+  .avatar.production { background: linear-gradient(135deg, #d4380d, #fa541c); }
+  .avatar.acct    { background: linear-gradient(135deg, #cf1322, #f5222d); }
+  .avatar-list { display: flex; }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 16px; display: flex;
+    flex-direction: column; gap: 14px;
+  }
+
+  /* Message bubble */
+  .msg { display: flex; gap: 10px; }
+  .msg-body { flex: 1; min-width: 0; }
+  .msg-head {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+    font-size: 11px;
+  }
+  .msg-name { font-weight: 700; }
+  .msg-role {
+    padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 600;
+  }
+  .msg-role.sale    { background: var(--blue-bg);    color: var(--blue); }
+  .msg-role.review  { background: var(--orange-bg);  color: var(--orange); }
+  .msg-role.sign    { background: var(--green-bg);   color: var(--green); }
+  .msg-role.logistics { background: var(--purple-bg); color: var(--purple); }
+  .msg-time { color: var(--gray); font-size: 10px; margin-left: auto; }
+  .msg-content {
+    background: #fafafa; padding: 8px 12px; border-radius: 10px;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  .msg.system .msg-content {
+    background: #fff7e6; border: 1px dashed #ffd591;
+    color: var(--orange); font-style: italic; font-size: 11.5px;
+  }
+  .msg.me { flex-direction: row-reverse; }
+  .msg.me .msg-content {
+    background: var(--primary); color: #fff;
+  }
+  .msg.me .msg-head { justify-content: flex-end; }
+  .msg .mention {
+    background: var(--blue-bg); color: var(--blue);
+    padding: 0 4px; border-radius: 3px; font-weight: 600;
+  }
+  .msg.me .mention { background: rgba(255,255,255,0.2); color: #fff; }
+  .msg-attach {
+    margin-top: 6px; display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: #fff;
+    border: 1px solid var(--border); border-radius: 8px; max-width: 280px;
+  }
+  .msg.me .msg-attach { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+  .msg-attach .icon {
+    width: 24px; height: 24px; border-radius: 5px;
+    background: var(--red-bg); color: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .msg-attach .info { flex: 1; min-width: 0; }
+  .msg-attach .name {
+    font-size: 11px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .msg-attach .size { font-size: 10px; opacity: 0.6; }
+
+  .msg-reactions { display: flex; gap: 4px; margin-top: 4px; }
+  .reaction {
+    padding: 1px 7px; background: #fff; border: 1px solid var(--border);
+    border-radius: 10px; font-size: 11px; cursor: pointer;
+  }
+  .reaction.mine { background: var(--primary-bg); border-color: var(--primary); }
+
+  .msg-thread-toggle {
+    margin-top: 4px; font-size: 11px; color: var(--primary); cursor: pointer;
+    font-weight: 500;
+  }
+  .msg-thread { margin-top: 8px; padding-left: 16px; border-left: 3px solid var(--primary-bg); }
+  .msg-thread .msg { margin-top: 8px; }
+
+  /* Chat input */
+  .chat-input {
+    padding: 12px 16px; border-top: 1px solid var(--border); background: #fff;
+  }
+  .chat-input-bar {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border); border-radius: 22px;
+    padding: 6px 10px 6px 14px;
+  }
+  .chat-input-bar:focus-within { border-color: var(--primary); }
+  .chat-input-bar input {
+    flex: 1; border: none; outline: none; font-size: 13px;
+    background: transparent; padding: 4px 0;
+    font-family: inherit;
+  }
+  .chat-input-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: none;
+    background: transparent; cursor: pointer; color: var(--gray);
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .chat-input-btn:hover { background: var(--primary-bg); color: var(--primary); }
+  .chat-input-btn.send {
+    background: var(--primary); color: #fff;
+  }
+  .chat-input-btn.send:hover { background: var(--primary-light); }
+  .chat-mention-hint {
+    margin-top: 6px; font-size: 11px; color: var(--gray); display: flex; gap: 12px;
+  }
+  .chat-mention-hint b { color: var(--primary); }
+
+  /* Chat sidebar (right column) */
+  .chat-side {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .chat-side .panel {
+    background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 12px 14px;
+  }
+  .chat-side .panel h4 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--gray); font-weight: 700; margin-bottom: 10px;
+  }
+  .actor-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0;
+    border-bottom: 1px solid #f5f5f5; font-size: 12px;
+  }
+  .actor-row:last-child { border: none; }
+  .actor-info { flex: 1; }
+  .actor-name { font-weight: 600; }
+  .actor-role-text { font-size: 10px; color: var(--gray); }
+  .actor-status {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #d9d9d9; flex-shrink: 0;
+  }
+  .actor-status.online { background: var(--green); }
+  .actor-status.away { background: var(--orange); }
+
+  .pinned-msg {
+    padding: 8px 10px; background: #fffbe6; border: 1px solid #ffe58f;
+    border-radius: 6px; margin-bottom: 8px; font-size: 11.5px;
+    cursor: pointer;
+  }
+  .pinned-msg-h {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 10px; color: var(--orange); font-weight: 600; margin-bottom: 4px;
+  }
+
+  /* ─── Inline note ─── */
+  .note {
+    background: var(--blue-bg); border: 1px solid #91caff;
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;
+    display: flex; gap: 10px; font-size: 12px; align-items: flex-start;
+  }
+  .note .icon { font-size: 18px; flex-shrink: 0; }
+  .note b { color: var(--blue); }
+
+  /* ─── Alt views demo ─── */
+  .alt-views {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 24px;
+  }
+  .alt-view {
+    background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    padding: 16px;
+  }
+  .alt-view h4 {
+    font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .alt-mockup {
+    background: #fafafa; border: 1px dashed var(--border);
+    border-radius: 8px; padding: 12px; font-size: 11px; color: var(--gray);
+    font-family: 'JetBrains Mono', monospace; line-height: 1.7;
+    white-space: pre;
+  }
+
+  /* ─── Floating chat indicator (option B alternative) ─── */
+  .floating-chat-demo {
+    position: relative; height: 200px; background: var(--primary-bg);
+    border-radius: 12px; border: 1px solid var(--primary-bg2);
+    padding: 16px; margin-top: 16px;
+    overflow: hidden;
+  }
+  .floating-chat-demo .label {
+    font-size: 12px; color: var(--gray); margin-bottom: 8px;
+  }
+  .floating-bubble {
+    position: absolute; bottom: 20px; right: 20px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(27,77,62,0.4);
+    animation: bounce 2s infinite;
+  }
+  .floating-bubble .ring {
+    position: absolute; top: -2px; right: -2px;
+    width: 18px; height: 18px; background: var(--red);
+    color: #fff; border-radius: 50%; font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; border: 2px solid #fff;
+  }
+  @keyframes bounce {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- HEADER -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div class="section-banner">
+    <div>
+      <h2>📋 Đơn hàng — Thư mục Tài liệu + Chat trao đổi</h2>
+      <div class="sub">Mockup thiết kế thư mục dùng chung (6 nhóm) + khu vực chat cho mọi người trong đơn</div>
+    </div>
+    <div class="num">Mockup · 2026-05-15</div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- DEMO 1: Detail panel với Tab + Widget files + Tab chat -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div class="detail">
+    <!-- HEADER -->
+    <div class="detail-header">
+      <div class="detail-title-row">
+        <span class="detail-title">HA20260055</span>
+        <span class="pill confirmed">Đã xác nhận</span>
+        <span class="pill production">🏭 Sản xuất</span>
+        <span style="color: #666; font-size: 13px;">🇫🇷 Vitry SAS</span>
+        <span style="margin-left: auto;">
+          <button class="btn-sm">🔗 Copy link</button>
+          <button class="btn-sm">📥 Xuất PDF</button>
+        </span>
+      </div>
+      <div class="detail-subline">
+        <div>📦 <b>RSS3 · 20.16MT</b></div>
+        <div>🚢 <b>CIF · 1×20DC</b></div>
+        <div>💰 <b>$48,585</b></div>
+        <div>📅 ETD <b>30/05/2026</b></div>
+        <div>📁 <b>12 files</b></div>
+        <div>💬 <b style="color: var(--red);">3 tin mới</b></div>
+      </div>
+    </div>
+
+    <!-- TAB BAR (badge số file mỗi tab) -->
+    <div class="tab-bar">
+      <div class="tab active">📈 Tiến độ</div>
+      <div class="tab">🏉 Bộ phận / SLA</div>
+      <div class="tab">📋 Hợp đồng <span class="badge">3</span></div>
+      <div class="tab">🏭 Sản xuất</div>
+      <div class="tab">🚢 Vận chuyển <span class="badge">2</span></div>
+      <div class="tab">📑 Chứng từ <span class="badge">4</span></div>
+      <div class="tab">💰 Tài chính <span class="badge">2</span></div>
+      <div class="tab has-unread">💬 Trao đổi <span class="badge">3</span></div>
+      <div class="tab">🕒 Lịch sử</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- TAB CONTENT: TIẾN ĐỘ (with Files widget) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="tab-content">
+
+      <div class="note">
+        <span class="icon">💡</span>
+        <div>
+          <b>Widget "📁 Tài liệu" luôn hiện ở tab Tiến độ</b> — mở đơn lần đầu là thấy tổng quan
+          tất cả file thuộc 6 nhóm. Click vào mỗi folder → nhảy tới tab tương ứng với danh sách file
+          chi tiết + nút Upload riêng từng tab.
+        </div>
+      </div>
+
+      <!-- FILES WIDGET (luôn xuất hiện ở Tiến độ) -->
+      <div class="files-widget">
+        <div class="files-widget-h">
+          <h3>📁 Tài liệu đính kèm</h3>
+          <span class="total">12 file · 4.2 MB</span>
+        </div>
+        <div class="folders-grid">
+
+          <div class="folder contract" onclick="alert('Nhảy tab Hợp đồng')">
+            <div class="folder-h">
+              <div class="folder-icon">📋</div>
+              <div class="folder-name">Hợp đồng</div>
+              <div class="folder-count has">3</div>
+            </div>
+            <div class="folder-files">SC.docx · PI.docx · scan đã ký.pdf</div>
+          </div>
+
+          <div class="folder shipping" onclick="alert('Nhảy tab Vận chuyển')">
+            <div class="folder-h">
+              <div class="folder-icon">🚢</div>
+              <div class="folder-name">Vận chuyển</div>
+              <div class="folder-count has">2</div>
+            </div>
+            <div class="folder-files">B/L #ABC123.pdf · Booking confirmation.pdf</div>
+          </div>
+
+          <div class="folder cert" onclick="alert('Nhảy tab Chứng từ')">
+            <div class="folder-h">
+              <div class="folder-icon">📑</div>
+              <div class="folder-name">Chứng từ</div>
+              <div class="folder-count has">4</div>
+            </div>
+            <div class="folder-files">COA.pdf · Phyto.pdf · Fumigation.pdf · Insurance.pdf</div>
+          </div>
+
+          <div class="folder finance" onclick="alert('Nhảy tab Tài chính')">
+            <div class="folder-h">
+              <div class="folder-icon">💰</div>
+              <div class="folder-name">Tài chính</div>
+              <div class="folder-count has">2</div>
+            </div>
+            <div class="folder-files">L/C BIDV.pdf · Commercial Invoice.pdf</div>
+          </div>
+
+          <div class="folder weighbridge" onclick="alert('Nhảy tab Sản xuất → Phiếu cân từ WMS')">
+            <div class="folder-h">
+              <div class="folder-icon">🚛</div>
+              <div class="folder-name">Phiếu cân</div>
+              <div class="folder-count has">1</div>
+            </div>
+            <div class="folder-files">Phiếu cân OUT 2026-05-14.pdf (từ WMS)</div>
+          </div>
+
+          <div class="folder other" onclick="alert('Tab Khác — admin upload')">
+            <div class="folder-h">
+              <div class="folder-icon">📦</div>
+              <div class="folder-name">Khác</div>
+              <div class="folder-count">0</div>
+            </div>
+            <div class="folder-files" style="font-style: italic;">— chưa có file</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ALERT BANNER (giữ workflow ContractWorkflowSection) -->
+      <div style="background: var(--green-bg); border: 1px solid #b7eb8f; border-radius: 10px;
+                  padding: 12px 16px; display: flex; gap: 12px; align-items: flex-start;">
+        <span style="font-size: 20px;">✓</span>
+        <div style="flex: 1;">
+          <b style="color: var(--green);">Hợp đồng đã ký xong</b> rev #2 — lúc 14:30 ngày 14/05/2026
+        </div>
+        <button class="btn-sm">📥 PDF đã ký</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- DEMO 2: Tab Chat (Trao đổi) -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div class="section-banner" style="background: linear-gradient(135deg, #531dab 0%, #722ed1 100%);">
+    <div>
+      <h2>💬 Tab Trao đổi — Chat cho mọi người trong đơn</h2>
+      <div class="sub">Tham khảo project chat: @mention, reply, attach file, system message, pin, read receipts</div>
+    </div>
+    <div class="num">Real-time</div>
+  </div>
+
+  <div class="detail">
+    <div class="detail-header" style="background: #faf5ff;">
+      <div class="detail-title-row">
+        <span class="detail-title">HA20260055 · 💬 Trao đổi</span>
+        <span class="pill" style="background: var(--purple-bg); color: var(--purple);">5 người tham gia</span>
+        <span style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+          <button class="btn-sm">🔍 Tìm tin</button>
+          <button class="btn-sm">📌 Pin (1)</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- CHAT TAB CONTENT -->
+    <div class="tab-content" style="background: #fafafa;">
+      <div class="chat-layout">
+
+        <!-- CHAT MAIN -->
+        <div class="chat-main">
+          <div class="chat-header">
+            <h3>Trao đổi về đơn HA20260055</h3>
+            <div class="chat-participants">
+              <div class="avatar-list">
+                <div class="avatar sale">S</div>
+                <div class="avatar review">P</div>
+                <div class="avatar sign">T</div>
+                <div class="avatar logistics">N</div>
+                <div class="avatar production">L</div>
+              </div>
+              <span style="font-size: 11px; color: var(--gray); margin-left: 6px;">5 người</span>
+            </div>
+          </div>
+
+          <!-- MESSAGES -->
+          <div class="chat-messages">
+
+            <!-- SYSTEM MESSAGE -->
+            <div class="msg system">
+              <div style="width: 32px;"></div>
+              <div class="msg-body">
+                <div class="msg-content">
+                  📢 Đơn HA20260055 được tạo bởi <b>Sale</b> lúc 11/05/2026 09:15
+                </div>
+              </div>
+            </div>
+
+            <!-- SALE -->
+            <div class="msg">
+              <div class="avatar sale">S</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Sales</span>
+                  <span class="msg-role sale">Sale</span>
+                  <span class="msg-time">11/05 09:20</span>
+                </div>
+                <div class="msg-content">
+                  Em mới lên HĐ cho Vitry, có điều khoản đặc biệt: KH yêu cầu fumigation trước khi shipping.
+                  Đã ghi vào "Điều khoản bổ sung". <span class="mention">@phulv</span> check giúp em với ạ.
+                </div>
+              </div>
+            </div>
+
+            <!-- SYSTEM -->
+            <div class="msg system">
+              <div style="width: 32px;"></div>
+              <div class="msg-body">
+                <div class="msg-content">
+                  ⚙️ Sale trình HĐ cho Phú LV kiểm tra · lúc 11/05 09:25
+                </div>
+              </div>
+            </div>
+
+            <!-- PHU REPLY -->
+            <div class="msg">
+              <div class="avatar review">P</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Phú LV</span>
+                  <span class="msg-role review">Kiểm tra</span>
+                  <span class="msg-time">11/05 14:20</span>
+                </div>
+                <div class="msg-content">
+                  HĐ này dùng <b>Vietin Hue</b> hay BIDV vậy bạn? Khách Pháp thường dùng BIDV USD.
+                </div>
+              </div>
+            </div>
+
+            <!-- SALE REPLY -->
+            <div class="msg me">
+              <div class="avatar sale">S</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-time">11/05 14:25</span>
+                  <span class="msg-name">Bạn</span>
+                  <span class="msg-role sale">Sale</span>
+                </div>
+                <div class="msg-content">
+                  Anh chọn giùm em phù hợp ạ. KH chưa nói cụ thể bank nào, anh quyết theo policy.
+                </div>
+              </div>
+            </div>
+
+            <!-- SYSTEM: APPROVED -->
+            <div class="msg system">
+              <div style="width: 32px;"></div>
+              <div class="msg-body">
+                <div class="msg-content">
+                  ✅ Phú LV duyệt HĐ · chọn <b>BIDV Hue · SWIFT BIDVVNVX</b> · lúc 11/05 14:35
+                </div>
+              </div>
+            </div>
+
+            <!-- TRUNG -->
+            <div class="msg">
+              <div class="avatar sign">T</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Mr. Trung</span>
+                  <span class="msg-role sign">Trình ký</span>
+                  <span class="msg-time">12/05 08:10</span>
+                </div>
+                <div class="msg-content">
+                  Đã in 2 bản, ký + đóng dấu xong. Sẽ scan + upload PDF chiều nay.
+                </div>
+              </div>
+            </div>
+
+            <!-- TRUNG ATTACHMENT -->
+            <div class="msg">
+              <div class="avatar sign">T</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Mr. Trung</span>
+                  <span class="msg-role sign">Trình ký</span>
+                  <span class="msg-time">12/05 14:30</span>
+                </div>
+                <div class="msg-content">
+                  HĐ đã ký xong, upload đây. Logistics nhận booking đi nhé.
+                </div>
+                <div class="msg-attach">
+                  <div class="icon">PDF</div>
+                  <div class="info">
+                    <div class="name">HA20260055_signed.pdf</div>
+                    <div class="size">2.4 MB · Đã ký + đóng dấu</div>
+                  </div>
+                </div>
+                <div class="msg-reactions">
+                  <span class="reaction">👍 3</span>
+                  <span class="reaction mine">🎉 2</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- SYSTEM: SIGNED → AUTO PROMOTE -->
+            <div class="msg system">
+              <div class="msg-body" style="margin-left: 32px;">
+                <div class="msg-content">
+                  🤖 <b>System</b>: HĐ đã signed → đơn tự chuyển <b>Draft → Đã xác nhận</b> · 12/05 14:31
+                  <br>
+                  → Bộ phận Sản xuất đã được thông báo. Mua mủ NVL bắt đầu.
+                </div>
+              </div>
+            </div>
+
+            <!-- LOGISTICS WITH MENTION + THREAD -->
+            <div class="msg">
+              <div class="avatar logistics">N</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Nhung TT</span>
+                  <span class="msg-role logistics">Logistics</span>
+                  <span class="msg-time">14/05 10:15</span>
+                </div>
+                <div class="msg-content">
+                  Em đã book được cont MSC, ETD <b>30/05</b>. <span class="mention">@sales</span>
+                  có cần em đặt cont reefer không? Vitry chưa nói.
+                </div>
+                <div class="msg-thread-toggle">↪ 2 phản hồi · cập nhật 2 phút trước</div>
+                <div class="msg-thread">
+                  <div class="msg">
+                    <div class="avatar sale" style="width: 22px; height: 22px; font-size: 9px;">S</div>
+                    <div class="msg-body">
+                      <div class="msg-head">
+                        <span class="msg-name">Sales</span>
+                        <span class="msg-time">14/05 10:20</span>
+                      </div>
+                      <div class="msg-content">Cont 20DC thường thôi, không cần reefer.</div>
+                    </div>
+                  </div>
+                  <div class="msg">
+                    <div class="avatar logistics" style="width: 22px; height: 22px; font-size: 9px;">N</div>
+                    <div class="msg-body">
+                      <div class="msg-head">
+                        <span class="msg-name">Nhung TT</span>
+                        <span class="msg-time">14/05 10:22</span>
+                      </div>
+                      <div class="msg-content">OK em chốt 20DC thường nhé.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- UNREAD MARKER -->
+            <div style="text-align: center; padding: 6px 0; color: var(--red); font-size: 11px; font-weight: 600;
+                        border-top: 1px dashed var(--red); margin-top: 6px;">
+              ─── 3 tin mới ───
+            </div>
+
+            <!-- HUY -->
+            <div class="msg">
+              <div class="avatar sign">H</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Mr. Huy</span>
+                  <span class="msg-role sign">BGĐ</span>
+                  <span class="msg-time">14/05 16:10</span>
+                </div>
+                <div class="msg-content">
+                  <span class="mention">@nhungtt</span> bao giờ có B/L draft thì gửi lên đây cho mọi người check trước.
+                </div>
+              </div>
+            </div>
+
+            <!-- LOGISTICS NEWER -->
+            <div class="msg">
+              <div class="avatar logistics">N</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Nhung TT</span>
+                  <span class="msg-role logistics">Logistics</span>
+                  <span class="msg-time">15/05 09:30</span>
+                </div>
+                <div class="msg-content">
+                  B/L draft từ MSC đây ạ. <span class="mention">@huylv</span> review giúp em.
+                </div>
+                <div class="msg-attach">
+                  <div class="icon">PDF</div>
+                  <div class="info">
+                    <div class="name">BL_draft_MSC123.pdf</div>
+                    <div class="size">450 KB · Draft từ MSC</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PHU LATEST -->
+            <div class="msg">
+              <div class="avatar review">P</div>
+              <div class="msg-body">
+                <div class="msg-head">
+                  <span class="msg-name">Phú LV</span>
+                  <span class="msg-role review">Kế toán</span>
+                  <span class="msg-time">15/05 11:00</span>
+                </div>
+                <div class="msg-content">
+                  L/C BIDV đã issue, hết hạn 14/06. Em đính kèm bản gốc đây.
+                </div>
+                <div class="msg-attach">
+                  <div class="icon">PDF</div>
+                  <div class="info">
+                    <div class="name">LC_BIDV_HA20260055.pdf</div>
+                    <div class="size">320 KB · Hết hạn 14/06/2026</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- INPUT -->
+          <div class="chat-input">
+            <div class="chat-input-bar">
+              <button class="chat-input-btn">📎</button>
+              <button class="chat-input-btn">😀</button>
+              <input type="text" placeholder="Gõ @ để mention ai · Enter để gửi · Shift+Enter xuống dòng">
+              <button class="chat-input-btn send">➤</button>
+            </div>
+            <div class="chat-mention-hint">
+              <span>💡 <b>@sale</b> · <b>@phulv</b> · <b>@trunglxh</b> · <b>@huylv</b> · <b>@nhungtt</b> để báo cụ thể</span>
+              <span style="margin-left: auto;">⌨️ <b>Ctrl + Enter</b> gửi nhanh</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHAT SIDEBAR -->
+        <div class="chat-side">
+
+          <!-- Pinned -->
+          <div class="panel">
+            <h4>📌 Đã ghim (1)</h4>
+            <div class="pinned-msg">
+              <div class="pinned-msg-h">
+                📌 Phú LV · 11/05 14:35
+              </div>
+              <div>Bank: <b>BIDV Hue · SWIFT BIDVVNVX</b></div>
+            </div>
+          </div>
+
+          <!-- Participants -->
+          <div class="panel">
+            <h4>👥 Người tham gia (5)</h4>
+            <div class="actor-row">
+              <div class="avatar sale">S</div>
+              <div class="actor-info">
+                <div class="actor-name">Sales</div>
+                <div class="actor-role-text">Người tạo đơn</div>
+              </div>
+              <div class="actor-status online" title="Online"></div>
+            </div>
+            <div class="actor-row">
+              <div class="avatar review">P</div>
+              <div class="actor-info">
+                <div class="actor-name">Phú LV</div>
+                <div class="actor-role-text">Kiểm tra · Kế toán</div>
+              </div>
+              <div class="actor-status online"></div>
+            </div>
+            <div class="actor-row">
+              <div class="avatar sign">T</div>
+              <div class="actor-info">
+                <div class="actor-name">Mr. Trung</div>
+                <div class="actor-role-text">Trình ký · BGĐ</div>
+              </div>
+              <div class="actor-status away"></div>
+            </div>
+            <div class="actor-row">
+              <div class="avatar sign">H</div>
+              <div class="actor-info">
+                <div class="actor-name">Mr. Huy</div>
+                <div class="actor-role-text">Trình ký · BGĐ</div>
+              </div>
+              <div class="actor-status"></div>
+            </div>
+            <div class="actor-row">
+              <div class="avatar logistics">N</div>
+              <div class="actor-info">
+                <div class="actor-name">Nhung TT</div>
+                <div class="actor-role-text">Logistics</div>
+              </div>
+              <div class="actor-status online"></div>
+            </div>
+          </div>
+
+          <!-- Quick file refs -->
+          <div class="panel">
+            <h4>📎 File chia sẻ trong chat (3)</h4>
+            <div class="actor-row">
+              <div class="file-icon-pdf" style="width: 22px; height: 22px; font-size: 9px;">PDF</div>
+              <div class="actor-info">
+                <div style="font-size: 11px; font-weight: 600;">HA20260055_signed.pdf</div>
+                <div style="font-size: 10px; color: var(--gray);">Trung · 12/05</div>
+              </div>
+            </div>
+            <div class="actor-row">
+              <div class="file-icon-pdf" style="width: 22px; height: 22px; font-size: 9px;">PDF</div>
+              <div class="actor-info">
+                <div style="font-size: 11px; font-weight: 600;">BL_draft_MSC123.pdf</div>
+                <div style="font-size: 10px; color: var(--gray);">Nhung · 15/05</div>
+              </div>
+            </div>
+            <div class="actor-row">
+              <div class="file-icon-pdf" style="width: 22px; height: 22px; font-size: 9px;">PDF</div>
+              <div class="actor-info">
+                <div style="font-size: 11px; font-weight: 600;">LC_BIDV_HA20260055.pdf</div>
+                <div style="font-size: 10px; color: var(--gray);">Phú LV · 15/05</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- DEMO 3: SAMPLE FILE SECTION (1 tab cụ thể, vd Hợp đồng) -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div class="section-banner" style="background: linear-gradient(135deg, #389e0d 0%, #52c41a 100%);">
+    <div>
+      <h2>📋 Tab Hợp đồng — FileSection cho từng nhóm</h2>
+      <div class="sub">Cùng component dùng lại 5 lần cho 5 tab — UI hoàn toàn đồng bộ</div>
+    </div>
+  </div>
+
+  <div class="filesec">
+    <div class="filesec-h">
+      <div class="icon">📋</div>
+      <div class="title">File Hợp đồng</div>
+      <div class="count">3 file</div>
+      <button class="btn-up">+ Upload (tối đa 10)</button>
+    </div>
+
+    <div class="file-row">
+      <div class="file-icon-pdf">DOCX</div>
+      <div class="file-info">
+        <div class="file-name">SC HA20260055.docx</div>
+        <div class="file-meta">128 KB · Tạo bởi Sale · 11/05/2026 09:15 · Workflow rev #2 (signed)</div>
+      </div>
+      <div class="file-actions">
+        <button class="btn-sm">👁 Xem</button>
+        <button class="btn-sm">📥 Tải</button>
+        <button class="btn-sm">🔄 Thay thế</button>
+      </div>
+    </div>
+    <div class="file-row">
+      <div class="file-icon-pdf">DOCX</div>
+      <div class="file-info">
+        <div class="file-name">PI HA20260055.docx</div>
+        <div class="file-meta">95 KB · Tạo bởi Sale · 11/05/2026 09:15 · Workflow rev #2</div>
+      </div>
+      <div class="file-actions">
+        <button class="btn-sm">👁 Xem</button>
+        <button class="btn-sm">📥 Tải</button>
+      </div>
+    </div>
+    <div class="file-row">
+      <div class="file-icon-pdf">PDF</div>
+      <div class="file-info">
+        <div class="file-name">HA20260055_signed.pdf</div>
+        <div class="file-meta">2.4 MB · Upload Mr. Trung · 12/05/2026 14:30 · 🔒 Đã ký + đóng dấu</div>
+      </div>
+      <div class="file-actions">
+        <button class="btn-sm">👁 Xem</button>
+        <button class="btn-sm">📥 Tải</button>
+        <button class="btn-sm danger">🗑 Xóa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- DEMO 4: ALTERNATIVE VIEWS (Floating chat bubble) -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div class="section-banner" style="background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);">
+    <div>
+      <h2>📱 Mở rộng: Floating chat bubble (alt)</h2>
+      <div class="sub">Nếu user không muốn click tab "Trao đổi" mới thấy chat — bubble dưới phải luôn hiện ở mọi view</div>
+    </div>
+  </div>
+
+  <div class="floating-chat-demo">
+    <div class="label">🖼 Hình minh hoạ: Khi đang xem tab Sản xuất / Vận chuyển / bất kỳ tab nào, bubble chat vẫn lơ lửng dưới phải. Click → slide-up panel chat.</div>
+    <div style="background: #fff; height: 100px; border-radius: 8px; padding: 12px; color: var(--gray); font-size: 12px;">
+      [Nội dung tab khác đang xem...]
+    </div>
+    <div class="floating-bubble">
+      💬
+      <div class="ring">3</div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- DEMO 5: ĐỒNG BỘ Ở CÁC VIEW MODE -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div class="section-banner" style="background: linear-gradient(135deg, #531dab 0%, #722ed1 100%);">
+    <div>
+      <h2>🔄 Đồng bộ ở các view mode</h2>
+      <div class="sub">Cùng UI component → cùng visual ở Split View / Table Drawer / Detail Page / Mobile</div>
+    </div>
+  </div>
+
+  <div class="alt-views">
+    <div class="alt-view">
+      <h4>▤▥ Split View (Default)</h4>
+      <div class="alt-mockup">┌─────────┬──────────────────┐
+│ List    │ Detail inline    │
+│ HA055 ● │  Header + tabs   │
+│ HA054   │  📈 Tiến độ      │
+│ HA053   │  📋 HĐ [3]       │
+│  ...    │  🚢 VC [2]       │
+│         │  📑 CT [4]       │
+│         │  💰 TC [2]       │
+│         │  💬 Chat [3] 🔴  │ ← cùng tab bar
+│         │  ─────────────  │
+│         │  Files widget    │
+│         │  📋[3] 🚢[2]...  │ ← cùng widget
+└─────────┴──────────────────┘</div>
+    </div>
+
+    <div class="alt-view">
+      <h4>▦ Table View → Drawer (click)</h4>
+      <div class="alt-mockup">┌─────────────────────────┐
+│ Table full màn          │
+│ ───────────────────────  │
+│ ┌─────────────────────┐ │
+│ │ Drawer phải mở      │ │ ← slide từ phải
+│ │ Header + tabs       │ │
+│ │ 📈 📋[3] 🚢[2] ...  │ │ ← cùng tab bar
+│ │ 💬 Chat [3] 🔴      │ │
+│ │ Files widget        │ │ ← cùng widget
+│ │ 📋[3] 🚢[2] ...     │ │
+│ └─────────────────────┘ │
+└─────────────────────────┘</div>
+    </div>
+
+    <div class="alt-view">
+      <h4>📄 Detail Page (URL trực tiếp)</h4>
+      <div class="alt-mockup">/sales/orders/:id
+┌─────────────────────────┐
+│ Header + tabs          │
+│ 📈 📋[3] 🚢[2] 💬[3] 🔴 │ ← cùng tab bar
+│ ──────────────────────  │
+│ Files widget            │
+│ 📋[3] 🚢[2] 📑[4] 💰[2] │ ← cùng widget
+│                         │
+│ [tab content here]      │
+└─────────────────────────┘
++ floating chat bubble dưới phải</div>
+    </div>
+
+    <div class="alt-view">
+      <h4>📱 Mobile responsive</h4>
+      <div class="alt-mockup">┌─────────────┐
+│ Header (1   │
+│ line nhỏ)   │
+│ ─────────── │
+│ Tab        │
+│ dropdown ▾  │
+│  📈 Tiến độ│
+│  📋[3]     │
+│  🚢[2]     │
+│  💬[3] 🔴  │
+│ ─────────── │
+│ Content     │
+│ scrolling   │
+│             │
+│   💬 →      │ ← floating
+└─────────────┘</div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- FOOTER SUMMARY -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div style="background: #fff; border-radius: 12px; padding: 24px; margin-top: 28px; border: 1px solid var(--border);">
+    <h3 style="font-size: 16px; font-weight: 700; color: var(--primary); margin-bottom: 14px;">
+      ✅ Tóm tắt thiết kế
+    </h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 13px; line-height: 1.7;">
+      <div>
+        <b style="color: var(--primary);">📁 Thư mục Tài liệu (6 folder dùng chung)</b>
+        <ul style="padding-left: 18px; margin-top: 6px; color: var(--gray);">
+          <li>📋 Hợp đồng — Sale upload, BGĐ + Phú duyệt</li>
+          <li>🚢 Vận chuyển — Logistics upload (B/L, booking)</li>
+          <li>📑 Chứng từ — Logistics + KT upload (COA, Phyto, Fumigation, Insurance)</li>
+          <li>💰 Tài chính — KT upload (LC, Commercial Invoice, Packing List)</li>
+          <li>🚛 Phiếu cân — auto link từ WMS (readonly)</li>
+          <li>📦 Khác — admin upload (general)</li>
+        </ul>
+        <div style="margin-top: 10px; padding: 10px; background: var(--primary-bg); border-radius: 8px;">
+          <b>UX</b>: Widget "📁 Tài liệu" ở tab Tiến độ (default) → thấy ngay tổng quan; mỗi tab có FileSection riêng cho nhóm đó; badge số file trên tab bar.
+        </div>
+      </div>
+      <div>
+        <b style="color: var(--primary);">💬 Chat trao đổi (Khu vực cho mọi người)</b>
+        <ul style="padding-left: 18px; margin-top: 6px; color: var(--gray);">
+          <li><b>Tab "Trao đổi"</b> ngang hàng với các tab khác — badge tin mới</li>
+          <li><b>@mention</b> (gõ @ ra dropdown) — thông báo người được mention</li>
+          <li><b>Reply threading</b> — phản hồi tin cụ thể</li>
+          <li><b>Attach file</b> — drag/drop hoặc click 📎</li>
+          <li><b>Reactions</b> 👍 🎉 ❤️</li>
+          <li><b>System messages</b> — auto khi có sự kiện (trình, duyệt, ký, promote)</li>
+          <li><b>Pin</b> — ghim tin quan trọng (bank info, deadline)</li>
+          <li><b>Read receipts</b> — thấy ai đã đọc</li>
+          <li><b>Sidebar phải</b>: 📌 ghim · 👥 participants · 📎 files đính kèm chat</li>
+        </ul>
+        <div style="margin-top: 10px; padding: 10px; background: var(--purple-bg); border-radius: 8px;">
+          <b>Stack tech</b>: Tham khảo <code style="background:#fff;padding:1px 5px;border-radius:3px;">project_comments</code> + Supabase realtime channel cho live update.
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px; padding: 14px; background: #fffbe6; border: 1px solid #ffe58f;
+                border-radius: 8px; font-size: 12px;">
+      💡 <b>Quyết định thiết kế:</b>
+      <ul style="padding-left: 20px; margin-top: 6px;">
+        <li>Files dùng <b>doc_type enum</b> trong sales_order_documents → 1 bảng quản lý tất cả file của đơn</li>
+        <li>Chat dùng bảng mới <b>sales_order_messages</b> (mô phỏng project_comments) với realtime subscribe</li>
+        <li>System message auto generated bởi DB trigger khi status thay đổi</li>
+        <li>Tab "Trao đổi" có realtime badge — number tin chưa đọc highlight đỏ</li>
+        <li>Floating bubble (alt) chỉ enable cho mobile / nhỏ màn — desktop dùng tab</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

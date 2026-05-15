@@ -20,6 +20,7 @@ import {
   type SalesOrderContract,
 } from '../../../services/sales/salesContractWorkflowService'
 import { DEFAULT_BANK, type ContractFormData } from '../../../services/sales/contractGeneratorService'
+import OrderFilesWidget from './OrderFilesWidget'
 
 const PRIMARY = '#1B4D3E'
 
@@ -39,9 +40,11 @@ const fmtDateTime = (d?: string | null) =>
 interface Props {
   order: SalesOrder
   onChanged?: () => void
+  /** Callback khi user click 1 folder trong Files Widget → switch tab. */
+  onNavigateTab?: (tabKey: string) => void
 }
 
-export default function OrderProgressDashboard({ order, onChanged }: Props) {
+export default function OrderProgressDashboard({ order, onChanged, onNavigateTab }: Props) {
   const navigate = useNavigate()
   const [contracts, setContracts] = useState<SalesOrderContract[]>([])
   const [loadingContracts, setLoadingContracts] = useState(true)
@@ -158,6 +161,9 @@ export default function OrderProgressDashboard({ order, onChanged }: Props) {
 
   return (
     <div style={{ padding: '12px 4px' }}>
+
+      {/* ═══ 0. FILES WIDGET (6 folder dùng chung — nổi bật trên cùng) ═══ */}
+      <OrderFilesWidget salesOrderId={order.id} onNavigateTab={onNavigateTab} />
 
       {/* ═══ 1. SLA ALERT ═══ */}
       {slaOver !== null && (

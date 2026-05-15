@@ -86,6 +86,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
       incoterm: o.incoterm || 'FOB',
       pol: o.port_of_loading || '',
       pod: isFOB ? '' : (o.port_of_destination || ''),
+      packing_type: o.packing_type || 'loose_bale',
       packing_desc: o.packing_note || (() => {
         const kg = o.bale_weight_kg || 35
         const pt = o.packing_type || 'loose_bale'

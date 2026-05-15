@@ -65,6 +65,10 @@ export interface ContractFormData {
   // (render khi rebuild templates với {extra_terms} ở section Payment).
   extra_terms?: string
 
+  // packing_type enum gốc — dùng để derive has_fumigation (chỉ wooden_pallet
+  // cần Fumigation certificate). Không render trực tiếp.
+  packing_type?: string
+
   // ----- Bank info: Phú LV (Kiểm tra) nhập per-order -----
   // Sale lên HĐ → submit reviewing → Phú LV mở review, chọn/nhập bank →
   // approved → Trung/Huy ký. Sale KHÔNG nhập 5 field này.
@@ -139,13 +143,20 @@ export async function generateContractBlob(
     // Missing key → trả về empty (đỡ crash nếu thiếu field)
     nullGetter: () => '',
   })
-  // Tự derive has_extra_terms để template ẩn paragraph khi extra_terms rỗng
-  // (docxtemplater {#has_extra_terms}...{/has_extra_terms} pattern)
-  // Đồng thời normalize grade về format HĐ (SVR_3L → SVR3L)
+  // Tự derive flags conditional cho template:
+  // - has_extra_terms: hiện paragraph "Other Conditions: ..." khi extra_terms có chữ
+  // - has_fumigation: chỉ wooden_pallet cần Fumigation cert (Korea/EU requirement).
+  //   Detect qua packing_type enum, hoặc fallback từ packing_desc string.
+  // - grade: normalize SVR_3L → SVR3L
+  const packingDesc = (data.packing_desc || '').toLowerCase()
+  const hasFumigation =
+    data.packing_type === 'wooden_pallet' ||
+    (packingDesc.includes('wooden pallet') && !packingDesc.includes('loose'))
   doc.render({
     ...data,
     grade: formatGradeForContract(data.grade),
     has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
+    has_fumigation: hasFumigation,
   })
   return doc.getZip().generate({
     type: 'blob',

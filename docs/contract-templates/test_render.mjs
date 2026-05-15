@@ -144,7 +144,14 @@ function render(name, { template, data }) {
   });
 
   try {
-    doc.render({ ...data, has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()) });
+    const packingDesc = (data.packing_desc || '').toLowerCase();
+    const hasFumigation = data.packing_type === 'wooden_pallet'
+      || (packingDesc.includes('wooden pallet') && !packingDesc.includes('loose'));
+    doc.render({
+      ...data,
+      has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
+      has_fumigation: hasFumigation,
+    });
   } catch (e) {
     console.error(`✗ Render ${name} thất bại:`, e.message);
     if (e.properties && e.properties.errors) {

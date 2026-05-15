@@ -241,6 +241,7 @@ function SalesOrderCreatePage() {
       incoterm: watchIncoterm,
       pol: watchPOL,
       pod: isFOB ? '' : watchPOD,
+      packing_type: firstItem.packing_type || 'loose_bale',
       packing_desc: firstItem.packing_note || watchPackingNote
         || (() => {
           const kg = firstItem.bale_weight_kg || 35

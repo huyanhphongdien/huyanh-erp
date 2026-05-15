@@ -351,64 +351,75 @@ def _normalize_head_letter(doc):
                 first = p.runs[0]
                 first.text = first.text.lstrip()
             changed += 1
-    # ─── REPLACE old SELLER block với letterhead canonical (6 dòng) ───
-    # Detect "THE SELLER" paragraph, replace text + 2 paragraphs following
-    # (KHE MA + Tel/Fax), rồi insert 3 paragraphs NEW (Mobi/Email/Website).
+    # ─── LETTERHEAD canonical (6 dòng, TẤT CẢ BOLD, line 1 lớn hơn) ───
+    # Đặt ở TOP của trang — trước title "SALES CONTRACT" / "PROFORMA INVOICE".
+    # Đồng thời XÓA block SELLER cũ (THE SELLER + KHE MA + Tel/Fax) vì đã có
+    # trong letterhead.
+    #
+    # Size (half-points: 40 = 20pt, 28 = 14pt)
     LETTERHEAD = [
-        ('HUY ANH RUBBER COMPANY LIMITED', 32, True),
-        ('KHE MA, PHONG DIEN WARD, HUE CITY, VIET NAM', 26, False),
-        ('TEL: 054.3774994       FAX: 054.3774995', 26, False),
-        ('Mobi/Whatsapp: +84971619955 | +84 974398488', 22, False),
-        ('Email: Sales@huyanhrubber.com | Huylv@huyanhrubber.com', 22, False),
-        ('Website: Huyanhrubber.com.vn', 22, False),
+        ('HUY ANH RUBBER COMPANY LIMITED', 40, True),
+        ('KHE MA, PHONG DIEN WARD, HUE CITY, VIET NAM', 26, True),
+        ('TEL: 054.3774994       FAX: 054.3774995', 26, True),
+        ('Mobi/Whatsapp: +84971619955 | +84 974398488', 24, True),
+        ('Email: Sales@huyanhrubber.com | Huylv@huyanhrubber.com', 24, True),
+        ('Website: Huyanhrubber.com.vn', 24, True),
     ]
 
-    seller_para = None
-    seller_idx = -1
-    for i, p in enumerate(doc.paragraphs[:15]):
-        if 'THE SELLER' in (p.text or '').upper():
-            seller_para = p
-            seller_idx = i
+    body = doc.element.body
+    first_para_el = None
+    for child in body:
+        if child.tag.endswith('}p'):
+            first_para_el = child
             break
 
-    if seller_para is not None:
-        all_paras = doc.paragraphs
-        # Rewrite paragraph SELLER + 2 paragraphs sau (KHE MA + Tel) → 3 dòng đầu letterhead
-        for j in range(3):
-            if seller_idx + j < len(all_paras):
-                target_p = all_paras[seller_idx + j]
-                text, sz, bold = LETTERHEAD[j]
-                # Clear all runs of target
-                for r in list(target_p.runs):
-                    r._element.getparent().remove(r._element)
-                # Add single run với text mới
-                new_run = target_p.add_run(text)
-                _set_run_sz(new_run, sz)
-                _set_bold(new_run, bold)
-                _set_align(target_p, 'center')
-                changed += 1
+    if first_para_el is not None:
+        # INSERT 6 letterhead paragraphs trước first paragraph (theo thứ tự đúng)
+        from copy import deepcopy as _dc
+        from docx.text.paragraph import Paragraph
+        # Forward loop + addprevious(first_para_el) → mỗi para mới chèn ngay
+        # trước first_para_el, cộng dồn theo đúng thứ tự HUY ANH → ... → Website
+        for k in range(6):
+            text, sz, bold = LETTERHEAD[k]
+            new_p_el = _dc(first_para_el)
+            # Clear children (giữ pPr nếu có)
+            for c in list(new_p_el):
+                if not c.tag.endswith('}pPr'):
+                    new_p_el.remove(c)
+            first_para_el.addprevious(new_p_el)
+            wrapper = Paragraph(new_p_el, first_para_el.getparent())
+            for r in list(wrapper.runs):
+                r._element.getparent().remove(r._element)
+            new_run = wrapper.add_run(text)
+            _set_run_sz(new_run, sz)
+            _set_bold(new_run, bold)
+            _set_align(wrapper, 'center')
+            changed += 1
 
-        # Insert 3 paragraphs NEW (Mobi/Email/Website) sau Tel paragraph
-        tel_para = all_paras[seller_idx + 2] if seller_idx + 2 < len(all_paras) else None
-        if tel_para is not None:
-            anchor = tel_para._element
-            for k in range(3, 6):
-                text, sz, bold = LETTERHEAD[k]
-                # Clone Tel paragraph element + replace text/sz
-                from copy import deepcopy as _dc
-                new_p = _dc(tel_para._element)
-                anchor.addnext(new_p)
-                anchor = new_p  # insert next after this one
-                # Sửa text/format trên new_p
-                from docx.text.paragraph import Paragraph
-                wrapper = Paragraph(new_p, tel_para._parent)
-                for r in list(wrapper.runs):
-                    r._element.getparent().remove(r._element)
-                new_run = wrapper.add_run(text)
-                _set_run_sz(new_run, sz)
-                _set_bold(new_run, bold)
-                _set_align(wrapper, 'center')
-                changed += 1
+    # XÓA block SELLER cũ (sau khi insert letterhead, indexes thay đổi → re-scan)
+    all_paras = doc.paragraphs
+    seller_idx = -1
+    for i, p in enumerate(all_paras[:20]):
+        if 'THE SELLER' in (p.text or '').upper():
+            seller_idx = i
+            break
+    if seller_idx >= 0:
+        # Xóa SELLER + 2 paragraphs sau (KHE MA + Tel) + 1 blank paragraph sau
+        # (giữ logic chỉ xóa 4 paragraph để không phá vỡ structure)
+        to_remove = []
+        for j in range(4):
+            idx = seller_idx + j
+            if idx >= len(all_paras):
+                break
+            para = all_paras[idx]
+            ptext = (para.text or '').strip().upper()
+            # Chỉ xóa SELLER block — dừng nếu gặp BUYER
+            if j > 0 and ('BUYER' in ptext or 'THE BUYER' in ptext):
+                break
+            to_remove.append(para._element)
+        for el in to_remove:
+            el.getparent().remove(el)
+            changed += 1
 
     return changed
 

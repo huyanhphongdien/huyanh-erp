@@ -272,25 +272,20 @@ def _iter_paragraphs(doc):
 
 def _normalize_head_letter(doc):
     """
-    ★ ĐỒNG BỘ HEAD LETTER giữa SC và PI bằng TEXT canonical ★
+    ★ NORMALIZE format head letter — KHÔNG xóa SELLER block, KHÔNG add letterhead. ★
 
-    Title section (sz=44 centered bold), No/Date (sz=28 centered bold), rồi
-    THAY THẾ block SELLER cũ bằng letterhead text canonical 6 dòng:
+    Page header (logo HUYANH + text letterhead nhỏ) đã có sẵn trong template gốc
+    (rendered tự động ở đỉnh page). Em chỉ cần normalize format các paragraph
+    body cho SC/PI sync nhau:
 
-        HUY ANH RUBBER COMPANY LIMITED          (sz=32, bold)
-        KHE MA, PHONG DIEN WARD, HUE CITY, VIET NAM   (sz=26)
-        TEL: 054.3774994       FAX: 054.3774995       (sz=26)
-        Mobi/Whatsapp: +84971619955 | +84 974398488   (sz=22)
-        Email: Sales@huyanhrubber.com | Huylv@huyanhrubber.com  (sz=22)
-        Website: Huyanhrubber.com.vn                  (sz=22)
-
-    Cả 6 dòng centered. Áp dụng cho cả 4 template — đảm bảo SC và PI
-    có letterhead identical.
+    - Title "SALES CONTRACT" / "PROFORMA INVOICE": EXACT match (không substring),
+      sz=44 centered bold
+    - "No:" / "Date:" lines: sz=28 centered bold + trim leading whitespace
+    - SELLER block (THE SELLER + KHE MA + Tel/Fax): sz=26 (giữ alignment 'both')
+    - KHÔNG ADD letterhead text (page header đã có)
+    - KHÔNG XÓA SELLER block (mẫu có)
     """
     from docx.oxml.ns import qn
-    from copy import deepcopy
-
-    W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 
     def _set_align(p, val):
         pPr = p._p.find(qn('w:pPr'))
@@ -305,7 +300,6 @@ def _normalize_head_letter(doc):
             jc.set(qn('w:val'), val)
 
     def _set_run_sz(run, sz_val):
-        """sz là half-points (44 = 22pt). Set sz + szCs cho cả Latin + complex script."""
         rPr = run._r.find(qn('w:rPr'))
         if rPr is None:
             rPr = run._r.makeelement(qn('w:rPr'), {})
@@ -329,104 +323,37 @@ def _normalize_head_letter(doc):
         elif not bold and b is not None:
             rPr.remove(b)
 
+    TITLE_SET = {'SALES CONTRACT', 'SALE CONTRACT', 'PROFORMA INVOICE'}
     changed = 0
-    for i, p in enumerate(doc.paragraphs[:12]):  # head letter nằm ở 10 para đầu
+    for i, p in enumerate(doc.paragraphs[:12]):  # head letter trong 12 para đầu
         raw = p.text or ''
         text = raw.strip()
         upper = text.upper()
-        # Strip leading whitespace (PI_FOB nhập tay nhiều space cho căn lề trông sai)
-        if raw != text and raw.lstrip() != text and len(p.runs) > 0:
-            # Chỉ trim nếu para sẽ được normalize (title/No/Date/SELLER)
-            pass  # actual trim xử lý ở các block dưới khi rewrite runs
-        # Title paragraph
-        if any(k in upper for k in ['SALES CONTRACT', 'SALE CONTRACT', 'PROFORMA INVOICE']):
+        # ─ Title — EXACT match (không substring!) — fix bug "This sales contract..."
+        if upper in TITLE_SET:
             _set_align(p, 'center')
             for r in p.runs:
                 _set_run_sz(r, 44)
                 _set_bold(r, True)
             changed += 1
-        # No: HA... / Date: ... lines (ngay sau title, thường nằm trong para 1-3)
+        # ─ No: HA... / Date: ... lines
         elif (text.startswith('No:') or text.startswith('No.:') or text.startswith('No ') or
               text.startswith('Date:') or text.startswith('Date ')):
             _set_align(p, 'center')
             for r in p.runs:
                 _set_run_sz(r, 28)
                 _set_bold(r, True)
-            # Trim leading whitespace (PI_FOB src có "                     No: ..." manual padding)
+            # Trim leading whitespace (PI_FOB src có "                     No: ..." padding)
             if raw != raw.lstrip() and p.runs:
-                first = p.runs[0]
-                first.text = first.text.lstrip()
+                p.runs[0].text = p.runs[0].text.lstrip()
             changed += 1
-    # ─── LETTERHEAD canonical (6 dòng, TẤT CẢ BOLD, line 1 lớn hơn) ───
-    # Đặt ở TOP của trang — trước title "SALES CONTRACT" / "PROFORMA INVOICE".
-    # Đồng thời XÓA block SELLER cũ (THE SELLER + KHE MA + Tel/Fax) vì đã có
-    # trong letterhead.
-    #
-    # Size (half-points: 40 = 20pt, 28 = 14pt)
-    LETTERHEAD = [
-        ('HUY ANH RUBBER COMPANY LIMITED', 40, True),
-        ('KHE MA, PHONG DIEN WARD, HUE CITY, VIET NAM', 26, True),
-        ('TEL: 054.3774994       FAX: 054.3774995', 26, True),
-        ('Mobi/Whatsapp: +84971619955 | +84 974398488', 24, True),
-        ('Email: Sales@huyanhrubber.com | Huylv@huyanhrubber.com', 24, True),
-        ('Website: Huyanhrubber.com.vn', 24, True),
-    ]
-
-    body = doc.element.body
-    first_para_el = None
-    for child in body:
-        if child.tag.endswith('}p'):
-            first_para_el = child
-            break
-
-    if first_para_el is not None:
-        # INSERT 6 letterhead paragraphs trước first paragraph (theo thứ tự đúng)
-        from copy import deepcopy as _dc
-        from docx.text.paragraph import Paragraph
-        # Forward loop + addprevious(first_para_el) → mỗi para mới chèn ngay
-        # trước first_para_el, cộng dồn theo đúng thứ tự HUY ANH → ... → Website
-        for k in range(6):
-            text, sz, bold = LETTERHEAD[k]
-            new_p_el = _dc(first_para_el)
-            # Clear children (giữ pPr nếu có)
-            for c in list(new_p_el):
-                if not c.tag.endswith('}pPr'):
-                    new_p_el.remove(c)
-            first_para_el.addprevious(new_p_el)
-            wrapper = Paragraph(new_p_el, first_para_el.getparent())
-            for r in list(wrapper.runs):
-                r._element.getparent().remove(r._element)
-            new_run = wrapper.add_run(text)
-            _set_run_sz(new_run, sz)
-            _set_bold(new_run, bold)
-            _set_align(wrapper, 'center')
+        # ─ SELLER block (THE SELLER + KHE MA + Tel/Fax): sz=26 (giữ alignment)
+        elif ('THE SELLER' in upper or
+              upper.startswith('KHE MA') or
+              text.startswith('Tel:') or text.startswith('Tel ')):
+            for r in p.runs:
+                _set_run_sz(r, 26)
             changed += 1
-
-    # XÓA block SELLER cũ (sau khi insert letterhead, indexes thay đổi → re-scan)
-    all_paras = doc.paragraphs
-    seller_idx = -1
-    for i, p in enumerate(all_paras[:20]):
-        if 'THE SELLER' in (p.text or '').upper():
-            seller_idx = i
-            break
-    if seller_idx >= 0:
-        # Xóa SELLER + 2 paragraphs sau (KHE MA + Tel) + 1 blank paragraph sau
-        # (giữ logic chỉ xóa 4 paragraph để không phá vỡ structure)
-        to_remove = []
-        for j in range(4):
-            idx = seller_idx + j
-            if idx >= len(all_paras):
-                break
-            para = all_paras[idx]
-            ptext = (para.text or '').strip().upper()
-            # Chỉ xóa SELLER block — dừng nếu gặp BUYER
-            if j > 0 and ('BUYER' in ptext or 'THE BUYER' in ptext):
-                break
-            to_remove.append(para._element)
-        for el in to_remove:
-            el.getparent().remove(el)
-            changed += 1
-
     return changed
 
 

@@ -242,7 +242,18 @@ function SalesOrderCreatePage() {
       pol: watchPOL,
       pod: isFOB ? '' : watchPOD,
       packing_desc: firstItem.packing_note || watchPackingNote
-        || `${firstItem.bale_weight_kg || 35} kg/bale, ${(firstItem.packing_type || '').replace('_', ' ')}`,
+        || (() => {
+          const kg = firstItem.bale_weight_kg || 35
+          const pt = firstItem.packing_type || 'loose_bale'
+          const map: Record<string, string> = {
+            loose_bale: 'Loose bales packing',
+            sw_pallet: 'SW Pallet packing',
+            wooden_pallet: 'Wooden pallets (fumigated)',
+            metal_box: 'Metal box packing',
+          }
+          const human = map[pt] || 'Loose bales packing'
+          return `${kg} kg/bale, ${human}`
+        })(),
       bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString() : '',
       pallets_total: '',
       containers: String(itemsTotalContainers || ''),
@@ -250,7 +261,21 @@ function SalesOrderCreatePage() {
       shipment_time: watchShipmentTime,
       partial: watchPartial,
       trans: watchTrans,
-      payment: watchPaymentNote || 'LC at sight',
+      payment: (() => {
+        // Ưu tiên textarea override (Sale tự gõ); nếu rỗng → aggregate quick picks
+        // từ items (PAYMENT_TERMS_LABELS keys: LC_30, TT_100, CAD, DP, ...).
+        if (watchPaymentNote && watchPaymentNote.trim()) return watchPaymentNote.trim()
+        const ENUM_TO_EN: Record<string, string> = {
+          LC_30: 'L/C 30 days', LC_60: 'L/C 60 days', LC_90: 'L/C 90 days',
+          TT_10: 'T/T 10%', TT_30: 'T/T 30%', TT_60: 'T/T 60%', TT_100: 'T/T 100%',
+          CAD: 'CAD', DP: 'D/P',
+        }
+        const aggregated = orderItems
+          .flatMap((i) => (i.payment_terms || '').split(',').filter(Boolean))
+          .filter((v, idx, arr) => arr.indexOf(v) === idx) // dedupe
+          .map((v) => ENUM_TO_EN[v] || v)
+        return aggregated.length > 0 ? aggregated.join(' + ') : 'LC at sight'
+      })(),
       payment_extra: '',
       claims_days: String(watchClaimsDays),
       arbitration: watchArbitration,

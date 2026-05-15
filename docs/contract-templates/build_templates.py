@@ -75,8 +75,10 @@ REPL_SC_CIF = [
     ("2,460", "{unit_price}"),
     ("49 ,593.60", "{amount}"),
     ("49,593.60", "{amount}"),
-    # Packing
+    # Packing — replace full hardcoded text bằng placeholder
+    ("In 1.26mts Per Wooden pallets , 35 kg/bale with thick polybag", "{packing_desc}"),
     ("1.26mts Per Wooden pallets , 35 kg/bale with thick polybag", "{packing_desc}"),
+    ("576 bales/ 16 Wooden pallets/ 01 x 20DC", "{bales_total} bales / {pallets_total} Wooden pallets / {containers} x {cont_type}"),
     ("576 bales/ 16 Wooden pallets/ 01 x 20", "{bales_total} bales / {pallets_total} Wooden pallets / {containers} x {cont_type}"),
     # Shipment
     ("Time of shipment: June , 2026", "Time of shipment: {shipment_time}"),
@@ -106,6 +108,10 @@ REPL_PI_CIF = [
     ("CIF - INCHEON , KOREA", "{incoterm} – {pod}"),
     ("CIF – INCHEON, KOREA", "{incoterm} – {pod}"),
     ("NATURAL RUBBER SVR3L", "NATURAL RUBBER {grade}"),
+    # Container — bao gồm trailing DC' để không duplicate khi cont_type=20DC
+    ("01 x 20DC'", "{containers} x {cont_type}"),
+    ("01 x 20DC’", "{containers} x {cont_type}"),
+    ("01 x 20DC", "{containers} x {cont_type}"),
     ("01 x 20", "{containers} x {cont_type}"),
     ("35kg/ bale with thick polybag – Wooden pallets", "{packing_desc}"),
     ("35kg/ bale with thick polybag - Wooden pallets", "{packing_desc}"),
@@ -144,6 +150,10 @@ REPL_SC_FOB = [
     # Packing
     ("35kg /bales. Loose bales packing", "{packing_desc}"),
     ("35 kg/bales. Loose bales packing", "{packing_desc}"),
+    # Container — bao gồm trailing DC' để không duplicate khi cont_type=20DC
+    ("5,760 bales/ 10 x 20DC'", "{bales_total} bales / {containers} x {cont_type}"),
+    ("5,760 bales/ 10 x 20DC’", "{bales_total} bales / {containers} x {cont_type}"),
+    ("5,760 bales/ 10 x 20DC", "{bales_total} bales / {containers} x {cont_type}"),
     ("5,760 bales/ 10 x 20", "{bales_total} bales / {containers} x {cont_type}"),
     # Shipment (multi-lot) — nếu file gốc tách 2 paragraph "+ 1st Lot..." và "+ 2nd Lot...",
     # ta thay paragraph đầu thành "{shipment_time}" và xóa nội dung paragraph "+ 2nd Lot..."
@@ -174,6 +184,10 @@ REPL_PI_FOB = [
     ("FOB DA NANG PORT , VIET NAM", "{incoterm} {pol}"),
     ("FOB DA NANG PORT, VIET NAM", "{incoterm} {pol}"),
     ("NATURAL RUBBER RSS3", "NATURAL RUBBER {grade}"),
+    # Container — bao gồm trailing DC' để không duplicate khi cont_type=20DC
+    ("10 x 20DC'", "{containers} x {cont_type}"),
+    ("10 x 20DC’", "{containers} x {cont_type}"),
+    ("10 x 20DC", "{containers} x {cont_type}"),
     ("10 x 20", "{containers} x {cont_type}"),
     ("35 kg/ bale . Loose bales packing", "{packing_desc}"),
     ("35 kg/ bale. Loose bales packing", "{packing_desc}"),

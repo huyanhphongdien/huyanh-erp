@@ -89,6 +89,19 @@ export const DEFAULT_BANK: Pick<
 const TEMPLATE_BASE = SALES_CONFIG.TEMPLATE_BASE
 
 /**
+ * Normalize grade enum → display format for contracts.
+ * DB enum dùng underscore (SVR_3L, RSS_3, LATEX_60) — HĐ quốc tế viết liền (SVR3L,
+ * RSS3, LATEX60). Áp dụng cho cả single grade và multi-grade ("SVR_3L + RSS_3").
+ */
+export function formatGradeForContract(grade: string | null | undefined): string {
+  if (!grade) return ''
+  return grade
+    .split('+')
+    .map((g) => g.trim().replace(/_/g, ''))
+    .join(' + ')
+}
+
+/**
  * Map Incoterm → kiểu template (CIF/FOB).
  * - CIF / CFR / CNF / DDP → dùng template_*_CIF.docx (có Port of discharge + Insurance)
  * - FOB / EXW             → dùng template_*_FOB.docx
@@ -128,8 +141,10 @@ export async function generateContractBlob(
   })
   // Tự derive has_extra_terms để template ẩn paragraph khi extra_terms rỗng
   // (docxtemplater {#has_extra_terms}...{/has_extra_terms} pattern)
+  // Đồng thời normalize grade về format HĐ (SVR_3L → SVR3L)
   doc.render({
     ...data,
+    grade: formatGradeForContract(data.grade),
     has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
   })
   return doc.getZip().generate({

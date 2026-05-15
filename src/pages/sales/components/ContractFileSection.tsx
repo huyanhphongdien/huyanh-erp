@@ -69,9 +69,11 @@ function formatSize(bytes?: number | null): string {
 interface Props {
   orderId: string
   salesRole: SalesRole | null
+  title?: string
+  emptyHint?: string
 }
 
-export default function ContractFileSection({ orderId, salesRole }: Props) {
+export default function ContractFileSection({ orderId, salesRole, title = 'File hợp đồng', emptyHint }: Props) {
   const { user } = useAuthStore()
   const [docs, setDocs] = useState<SalesDocument[]>([])
   const [loading, setLoading] = useState(true)
@@ -235,7 +237,7 @@ export default function ContractFileSection({ orderId, salesRole }: Props) {
           fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
           color: '#1B4D3E', letterSpacing: 1,
         }}>
-          File hợp đồng
+          {title}
           {docs.length > 0 && (
             <Tag color="blue" style={{ marginLeft: 8, fontSize: 10 }}>
               {docs.length} file
@@ -280,7 +282,9 @@ export default function ContractFileSection({ orderId, salesRole }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#999', padding: 8 }}>
               <LockOutlined />
               <span style={{ fontSize: 13 }}>
-                Chưa có file hợp đồng. {salesRole === 'sale' ? '' : 'Chỉ Sale được upload lần đầu.'}
+                {emptyHint || (
+                  <>Chưa có file. {salesRole === 'sale' ? '' : 'Chỉ Sale + BGĐ được upload.'}</>
+                )}
               </span>
             </div>
           )

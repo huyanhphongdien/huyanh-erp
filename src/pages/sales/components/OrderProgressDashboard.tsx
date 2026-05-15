@@ -66,6 +66,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
       container_count?: number; container_type?: string;
       total_value_usd?: number; bales_per_container?: number; bale_weight_kg?: number;
       shipment_time?: string; payment_terms_note?: string;
+      packing_type?: string; packing_note?: string;
     }
     const isFOB = ['FOB', 'EXW'].includes((o.incoterm || 'FOB').toUpperCase())
     const totalUSD = o.total_value_usd || (o.quantity_tons || 0) * (o.unit_price || 0)
@@ -85,7 +86,18 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
       incoterm: o.incoterm || 'FOB',
       pol: o.port_of_loading || '',
       pod: isFOB ? '' : (o.port_of_destination || ''),
-      packing_desc: `${o.bale_weight_kg || 35} kg/bale`,
+      packing_desc: o.packing_note || (() => {
+        const kg = o.bale_weight_kg || 35
+        const pt = o.packing_type || 'loose_bale'
+        const map: Record<string, string> = {
+          loose_bale: 'Loose bales packing',
+          sw_pallet: 'SW Pallet packing',
+          wooden_pallet: 'Wooden pallets (fumigated)',
+          metal_box: 'Metal box packing',
+        }
+        const human = map[pt] || 'Loose bales packing'
+        return `${kg} kg/bale, ${human}`
+      })(),
       bales_total: bales ? bales.toLocaleString() : '',
       pallets_total: '',
       containers: String(o.container_count || ''),

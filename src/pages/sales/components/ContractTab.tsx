@@ -584,10 +584,22 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
 
       {/* ═══ Section: Hợp đồng ═══
           Phương án A cut-over:
-          - Đơn dùng workflow mới (Sale→Kiểm tra→Ký) → ContractWorkflowSection
-          - Đơn cũ (chưa có row sales_order_contracts) → ContractFileSection legacy
+          - Đơn dùng workflow mới → ContractWorkflowSection + ContractFileSection
+            (Sale up tài liệu bổ sung: PI khách ký, bản scan, docs...). Sale add OK,
+            không xóa (canDeleteContract loại role=sale).
+          - Đơn cũ → ContractFileSection legacy (upload PDF scan của HĐ chính)
           Khi hasWorkflow=null (đang load) chưa render gì để tránh flash giữa 2 UI. */}
-      {hasWorkflow === true && <ContractWorkflowSection salesOrderId={order.id} />}
+      {hasWorkflow === true && (
+        <>
+          <ContractWorkflowSection salesOrderId={order.id} />
+          <ContractFileSection
+            orderId={order.id}
+            salesRole={salesRole}
+            title="Tài liệu bổ sung"
+            emptyHint="Sale up thêm tài liệu (PI khách ký, scan bản gốc, phụ lục...). Chỉ Admin/BGĐ được xóa."
+          />
+        </>
+      )}
       {hasWorkflow === false && (
         <ContractFileSection orderId={order.id} salesRole={salesRole} />
       )}

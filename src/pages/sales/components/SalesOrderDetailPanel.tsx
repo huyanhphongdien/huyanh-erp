@@ -4,7 +4,8 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { Drawer, Tabs, Tag, Space, Button, Spin, message, Popconfirm, Tooltip } from 'antd'
+import { Drawer, Tabs, Tag, Space, Button, Spin, message, Popconfirm, Tooltip, Dropdown, Modal, Input } from 'antd'
+import type { MenuProps } from 'antd'
 import {
   LockOutlined,
   UnlockOutlined,
@@ -14,8 +15,17 @@ import {
   DollarOutlined,
   FolderOpenOutlined,
   CloseOutlined,
+  CopyOutlined,
+  MessageOutlined,
+  FolderOutlined,
+  StopOutlined,
+  PrinterOutlined,
+  DownOutlined,
+  ThunderboltOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
+import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../../services/sales/salesTypes'
 import {
@@ -78,6 +88,10 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('progress')
   const [lockLoading, setLockLoading] = useState(false)
+  /** True = đơn dùng workflow mới (có row sales_order_contracts) → ẩn "Khóa HĐ"
+   *  vì workflow tự lock khi status='signed'/'archived'. */
+  const [hasWorkflow, setHasWorkflow] = useState<boolean>(false)
+  const [cancelling, setCancelling] = useState(false)
 
   // ── Load order ──
   const loadOrder = useCallback(async () => {
@@ -86,6 +100,13 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     try {
       const data = await salesOrderService.getById(orderId)
       setOrder(data)
+      // Detect workflow: ẩn Khóa HĐ nếu đơn đã dùng workflow mới
+      try {
+        const rows = await salesContractWorkflowService.listBySalesOrder(orderId)
+        setHasWorkflow(rows.length > 0)
+      } catch {
+        setHasWorkflow(false)
+      }
     } catch {
       message.error('Không thể tải thông tin đơn hàng')
     } finally {
@@ -132,6 +153,159 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       setLockLoading(false)
     }
   }
+
+  // ─── ACTION BUTTON HANDLERS ─────────────────────────────────────────────
+
+  /** Copy URL đơn vào clipboard — dùng cả ở drawer + inline mode. */
+  const handleCopyLink = () => {
+    if (!order) return
+    const url = `${window.location.origin}/sales/orders/${order.id}`
+    navigator.clipboard?.writeText(url)
+      .then(() => message.success('Đã copy link đơn hàng'))
+      .catch(() => message.error('Trình duyệt không hỗ trợ copy'))
+  }
+
+  /** In trang detail → cho phép Save as PDF qua dialog in. */
+  const handlePrintPDF = () => {
+    if (!order) return
+    // Inject print stylesheet tạm thời để in gọn (hide chrome)
+    const styleId = '_so_print_style'
+    let style = document.getElementById(styleId) as HTMLStyleElement | null
+    if (!style) {
+      style = document.createElement('style')
+      style.id = styleId
+      style.media = 'print'
+      style.textContent = `
+        @page { size: A4; margin: 1.5cm; }
+        body * { visibility: hidden !important; }
+        .so-detail-print-root, .so-detail-print-root * { visibility: visible !important; }
+        .so-detail-print-root { position: absolute !important; left: 0; top: 0; width: 100%; }
+        .ant-tabs-nav, .ant-drawer-header, .ant-btn, .ant-dropdown, .no-print { display: none !important; }
+        .ant-tabs-content-holder { padding: 0 !important; }
+      `
+      document.head.appendChild(style)
+    }
+    setTimeout(() => window.print(), 50)
+  }
+
+  /** Copy thông tin tóm tắt đơn (cho Sale paste vào email/chat KH). */
+  const handleCopyInfo = () => {
+    if (!order) return
+    const lines = [
+      `Đơn hàng: ${order.code}`,
+      order.contract_no ? `Số HĐ: ${order.contract_no}` : null,
+      order.customer ? `Khách hàng: ${order.customer.name}` : null,
+      order.grade ? `Grade: ${order.grade}` : null,
+      order.quantity_tons ? `Số lượng: ${order.quantity_tons} MT` : null,
+      order.unit_price ? `Đơn giá: $${order.unit_price}/MT` : null,
+      order.total_value_usd ? `Tổng: $${order.total_value_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : null,
+      (order as { incoterm?: string }).incoterm ? `Incoterm: ${(order as { incoterm?: string }).incoterm}` : null,
+      `Trạng thái: ${ORDER_STATUS_LABELS[order.status as SalesOrderStatus] || order.status}`,
+      `Link: ${window.location.origin}/sales/orders/${order.id}`,
+    ].filter(Boolean).join('\n')
+    navigator.clipboard?.writeText(lines)
+      .then(() => message.success('Đã copy thông tin đơn — paste vào email/chat'))
+      .catch(() => message.error('Trình duyệt không hỗ trợ copy'))
+  }
+
+  /** Switch sang tab chat trao đổi. */
+  const handleOpenChat = () => {
+    setActiveTab('chat')
+  }
+
+  /** Switch sang tab Tiến độ (có Files Widget ở đầu). */
+  const handleOpenFiles = () => {
+    setActiveTab('progress')
+    // Scroll xuống Files Widget sau 100ms (đợi tab render)
+    setTimeout(() => {
+      const filesWidget = document.querySelector('[data-files-widget]')
+      filesWidget?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
+
+  /** Hủy đơn — chỉ Sale + Admin được làm, đơn status=draft/confirmed/producing.
+   *  Update status='cancelled'. */
+  const handleCancelOrder = () => {
+    if (!order) return
+    let reason = ''
+    Modal.confirm({
+      title: '🚫 Hủy đơn hàng',
+      content: (
+        <div>
+          <p style={{ marginBottom: 12 }}>
+            Đơn <strong>{order.code}</strong> sẽ chuyển sang{' '}
+            <Tag color="default">Đã hủy</Tag>. Hành động này không undo được.
+          </p>
+          <Input.TextArea
+            rows={3}
+            placeholder="Lý do hủy (bắt buộc) — VD: KH cancel, sai thông tin, đổi sang đơn khác..."
+            onChange={(e) => { reason = e.target.value }}
+          />
+        </div>
+      ),
+      okText: 'Hủy đơn',
+      cancelText: 'Quay lại',
+      okButtonProps: { danger: true },
+      width: 480,
+      onOk: async () => {
+        if (!reason.trim()) {
+          message.error('Cần nhập lý do hủy')
+          throw new Error('missing reason')
+        }
+        setCancelling(true)
+        try {
+          await salesOrderService.updateFields(order.id, {
+            status: 'cancelled',
+            notes: `${order.notes || ''}\n[HỦY ĐƠN ${new Date().toLocaleDateString('vi-VN')}] ${reason.trim()}`.trim(),
+          })
+          message.success(`Đã hủy đơn ${order.code}`)
+          await loadOrder()
+          onOrderUpdated?.()
+        } catch (e: any) {
+          message.error(`Hủy đơn thất bại: ${e.message}`)
+        } finally {
+          setCancelling(false)
+        }
+      },
+    })
+  }
+
+  /** Menu items cho dropdown "Hành động". */
+  const actionMenuItems: MenuProps['items'] = order ? [
+    {
+      key: 'copy-info',
+      icon: <CopyOutlined />,
+      label: 'Copy thông tin đơn',
+      onClick: handleCopyInfo,
+    },
+    {
+      key: 'open-chat',
+      icon: <MessageOutlined />,
+      label: 'Mở chat đơn',
+      onClick: handleOpenChat,
+    },
+    {
+      key: 'open-files',
+      icon: <FolderOutlined />,
+      label: 'Xem tài liệu đính kèm',
+      onClick: handleOpenFiles,
+    },
+    // Divider trước hành động nguy hiểm
+    ...((salesRole === 'sale' || salesRole === 'admin') &&
+        !['cancelled', 'delivered', 'paid'].includes(order.status)
+      ? [
+          { type: 'divider' as const },
+          {
+            key: 'cancel-order',
+            icon: <StopOutlined />,
+            label: 'Hủy đơn',
+            danger: true,
+            disabled: cancelling,
+            onClick: handleCancelOrder,
+          },
+        ]
+      : []),
+  ] : []
 
   // ── Refresh after save ──
   const handleSaved = () => {
@@ -335,7 +509,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     const flag = order?.customer?.country ? COUNTRY_FLAGS[order.customer.country] || '🌐' : '🌐'
 
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div className="so-detail-print-root" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
         {/* Rich header — bigger code + multiple pills + sub-info line */}
         <div style={{
           padding: '14px 24px 10px', borderBottom: '1px solid #e8e8e8', background: '#fff',
@@ -362,34 +536,38 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                   />
                 )}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                  {isLocked ? (
-                    canUnlock && (
-                      <Popconfirm
-                        title="Mở khóa đơn hàng?"
-                        description="Cho phép Sale sửa lại thông tin hợp đồng"
-                        onConfirm={handleUnlock}
-                        okText="Mở khóa"
-                        cancelText="Hủy"
-                      >
-                        <Button size="small" icon={<UnlockOutlined />} loading={lockLoading} danger>
-                          Mở khóa
-                        </Button>
-                      </Popconfirm>
-                    )
-                  ) : (
-                    canLock && order.status === 'draft' && (
-                      <Popconfirm
-                        title="Khóa đơn hàng?"
-                        description="Sau khi khóa, Sale không thể sửa thông tin hợp đồng"
-                        onConfirm={handleLock}
-                        okText="Khóa"
-                        cancelText="Hủy"
-                      >
-                        <Button size="small" icon={<LockOutlined />} loading={lockLoading}
-                                type="primary" style={{ background: '#1B4D3E' }}>
-                          Khóa HĐ
-                        </Button>
-                      </Popconfirm>
+                  {/* "Khóa HĐ" CHỈ hiện cho LEGACY orders (chưa có workflow).
+                      Đơn dùng workflow tự lock qua status='signed'/'archived'. */}
+                  {!hasWorkflow && (
+                    isLocked ? (
+                      canUnlock && (
+                        <Popconfirm
+                          title="Mở khóa đơn hàng?"
+                          description="Cho phép Sale sửa lại thông tin hợp đồng"
+                          onConfirm={handleUnlock}
+                          okText="Mở khóa"
+                          cancelText="Hủy"
+                        >
+                          <Button size="small" icon={<UnlockOutlined />} loading={lockLoading} danger>
+                            Mở khóa
+                          </Button>
+                        </Popconfirm>
+                      )
+                    ) : (
+                      canLock && order.status === 'draft' && (
+                        <Popconfirm
+                          title="Khóa đơn hàng?"
+                          description="Sau khi khóa, Sale không thể sửa thông tin hợp đồng"
+                          onConfirm={handleLock}
+                          okText="Khóa"
+                          cancelText="Hủy"
+                        >
+                          <Button size="small" icon={<LockOutlined />} loading={lockLoading}
+                                  type="primary" style={{ background: '#1B4D3E' }}>
+                            Khóa HĐ
+                          </Button>
+                        </Popconfirm>
+                      )
                     )
                   )}
                 </div>
@@ -431,7 +609,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
               </div>
 
               {/* Action buttons row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{
                   padding: '3px 10px', background: '#f0f9f4', color: '#1B4D3E',
                   border: '1px solid #d9f4e3', borderRadius: 12,
@@ -442,14 +620,22 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                 </span>
                 <span style={{ color: '#bfbfbf', fontSize: 11 }}>+ Mở tab khác (sắp ra mắt)</span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                  <Button size="small" onClick={() => {
-                    navigator.clipboard?.writeText(`${window.location.origin}/sales/orders/${order.id}`)
-                    message.success('Đã copy link đơn hàng')
-                  }}>
-                    🔗 Copy link
-                  </Button>
-                  <Button size="small">📥 Xuất PDF</Button>
-                  <Button size="small" type="primary" style={{ background: '#1B4D3E' }}>⚡ Hành động</Button>
+                  <Tooltip title="Copy URL đơn vào clipboard">
+                    <Button size="small" icon={<ShareAltOutlined />} onClick={handleCopyLink}>
+                      Copy link
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="In hoặc Save as PDF (Ctrl+P)">
+                    <Button size="small" icon={<PrinterOutlined />} onClick={handlePrintPDF}>
+                      Xuất PDF
+                    </Button>
+                  </Tooltip>
+                  <Dropdown menu={{ items: actionMenuItems }} trigger={['click']} placement="bottomRight">
+                    <Button size="small" type="primary" icon={<ThunderboltOutlined />}
+                            style={{ background: '#1B4D3E' }}>
+                      Hành động <DownOutlined style={{ fontSize: 10 }} />
+                    </Button>
+                  </Dropdown>
                 </div>
               </div>
             </>
@@ -498,48 +684,60 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
               </span>
             )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-              {isLocked ? (
-                canUnlock && (
-                  <Popconfirm
-                    title="Mở khóa đơn hàng?"
-                    description="Cho phép Sale sửa lại thông tin hợp đồng"
-                    onConfirm={handleUnlock}
-                    okText="Mở khóa"
-                    cancelText="Hủy"
-                  >
-                    <Tooltip title="Mở khóa (Admin)">
-                      <Button
-                        size="small"
-                        icon={<UnlockOutlined />}
-                        loading={lockLoading}
-                        danger
-                      >
-                        Mở khóa
-                      </Button>
-                    </Tooltip>
-                  </Popconfirm>
-                )
-              ) : (
-                canLock && order.status === 'draft' && (
-                  <Popconfirm
-                    title="Khóa đơn hàng?"
-                    description="Sau khi khóa, Sale không thể sửa thông tin hợp đồng"
-                    onConfirm={handleLock}
-                    okText="Khóa"
-                    cancelText="Hủy"
-                  >
-                    <Tooltip title="Khóa sau khi xác nhận">
-                      <Button
-                        size="small"
-                        icon={<LockOutlined />}
-                        loading={lockLoading}
-                        type="primary"
-                        style={{ background: '#1B4D3E' }}
-                      >
-                        Khóa HĐ
-                      </Button>
-                    </Tooltip>
-                  </Popconfirm>
+              {/* Copy link — chuẩn hoá với inline mode */}
+              <Tooltip title="Copy URL đơn vào clipboard">
+                <Button size="small" icon={<ShareAltOutlined />} onClick={handleCopyLink}>
+                  Copy link
+                </Button>
+              </Tooltip>
+              {/* Xuất PDF */}
+              <Tooltip title="In hoặc Save as PDF">
+                <Button size="small" icon={<PrinterOutlined />} onClick={handlePrintPDF}>
+                  Xuất PDF
+                </Button>
+              </Tooltip>
+              {/* Hành động dropdown */}
+              <Dropdown menu={{ items: actionMenuItems }} trigger={['click']} placement="bottomRight">
+                <Button size="small" type="primary" icon={<ThunderboltOutlined />}
+                        style={{ background: '#1B4D3E' }}>
+                  Hành động <DownOutlined style={{ fontSize: 10 }} />
+                </Button>
+              </Dropdown>
+              {/* Khóa HĐ — chỉ legacy orders */}
+              {!hasWorkflow && (
+                isLocked ? (
+                  canUnlock && (
+                    <Popconfirm
+                      title="Mở khóa đơn hàng?"
+                      description="Cho phép Sale sửa lại thông tin hợp đồng"
+                      onConfirm={handleUnlock}
+                      okText="Mở khóa"
+                      cancelText="Hủy"
+                    >
+                      <Tooltip title="Mở khóa (Admin)">
+                        <Button size="small" icon={<UnlockOutlined />} loading={lockLoading} danger>
+                          Mở khóa
+                        </Button>
+                      </Tooltip>
+                    </Popconfirm>
+                  )
+                ) : (
+                  canLock && order.status === 'draft' && (
+                    <Popconfirm
+                      title="Khóa đơn hàng?"
+                      description="Sau khi khóa, Sale không thể sửa thông tin hợp đồng"
+                      onConfirm={handleLock}
+                      okText="Khóa"
+                      cancelText="Hủy"
+                    >
+                      <Tooltip title="Khóa sau khi xác nhận">
+                        <Button size="small" icon={<LockOutlined />} loading={lockLoading}
+                                type="primary" style={{ background: '#1B4D3E' }}>
+                          Khóa HĐ
+                        </Button>
+                      </Tooltip>
+                    </Popconfirm>
+                  )
                 )
               )}
             </div>

@@ -20,6 +20,10 @@ import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
 import { SALES_CONFIG } from '../../config/sales.config'
 import { createNotification } from '../notificationService'
+import {
+  salesContractEmailService,
+  type ContractEmailContext,
+} from './salesContractEmailService'
 
 export type ContractStatus =
   | 'drafting'
@@ -124,6 +128,41 @@ export async function getEmployeeIdByEmail(email: string): Promise<string | null
     return null
   }
   return data?.id || null
+}
+
+/** Build email context từ contract row + sender name. Fire-and-forget. */
+async function _buildEmailContext(
+  row: SalesOrderContract,
+  senderId: string | null,
+): Promise<ContractEmailContext> {
+  let senderName = 'Hệ thống'
+  if (senderId) {
+    const { data } = await supabase
+      .from('employees')
+      .select('full_name')
+      .eq('id', senderId)
+      .maybeSingle()
+    senderName = data?.full_name || 'Hệ thống'
+  }
+  const fd = row.form_data || {}
+  return {
+    contract_no: fd.contract_no || row.sales_order_id.slice(0, 8),
+    revision_no: row.revision_no,
+    buyer_name: fd.buyer_name,
+    grade: fd.grade,
+    quantity: fd.quantity,
+    unit_price: fd.unit_price,
+    amount: fd.amount,
+    incoterm: fd.incoterm,
+    sender_name: senderName,
+    sales_order_id: row.sales_order_id,
+  }
+}
+
+/** Build bank_summary string từ form_data (cho email approve) */
+function _bankSummary(fd: Partial<ContractFormData>): string | undefined {
+  if (!fd.bank_account_no) return undefined
+  return `${fd.bank_account_name} — TK: ${fd.bank_account_no}<br>${fd.bank_full_name}<br>SWIFT: ${fd.bank_swift}`
 }
 
 /** Helper notify — fire-and-forget (không block workflow nếu noti fail). */
@@ -251,6 +290,15 @@ export const salesContractWorkflowService = {
       priority: 'normal',
       reference_url: '/sales/contracts/review',
     })
+
+    // ─── B. Email cho reviewers (Phú LV + Minh LD) ───
+    void _buildEmailContext(row, createdBy).then((ctx) =>
+      salesContractEmailService.notifySubmitted({
+        reviewerEmails: ALLOWED_REVIEWER_EMAILS,
+        ctx,
+        isResubmit,
+      }),
+    ).catch((e) => console.error('Email submit fail:', e))
 
     return row
   },
@@ -392,6 +440,15 @@ export const salesContractWorkflowService = {
       priority: 'normal',
     })
 
+    // ─── D. Email cho Trung/Huy (signers) + Sale (info) ───
+    void _buildEmailContext(row, senderId).then((ctx) =>
+      salesContractEmailService.notifyApproved({
+        signerEmails: ALLOWED_SIGNER_EMAILS,
+        saleEmployeeId: row.created_by,
+        ctx: { ...ctx, bank_summary: _bankSummary(row.form_data || {}) },
+      }),
+    ).catch((e) => console.error('Email approve fail:', e))
+
     return row
   },
 
@@ -428,6 +485,14 @@ export const salesContractWorkflowService = {
       reference_url: `/sales/orders/${row.sales_order_id}?tab=contract`,
     })
 
+    // ─── A. Email cho Sale với full lý do ───
+    void _buildEmailContext(row, senderId).then((ctx) =>
+      salesContractEmailService.notifyRejected({
+        saleEmployeeId: row.created_by,
+        ctx: { ...ctx, rejection_reason: rejectedReason.trim() },
+      }),
+    ).catch((e) => console.error('Email reject fail:', e))
+
     return row
   },
 
@@ -463,6 +528,25 @@ export const salesContractWorkflowService = {
       message: 'HĐ pháp lý sẵn sàng. Sale có thể gửi bản FINAL cho khách.',
       priority: 'high',
     })
+
+    // ─── E. Email cho Sale + Phú LV ───
+    void _buildEmailContext(row, signerId).then(async (ctx) => {
+      // Lookup signer name
+      let signerName = 'Trung/Huy'
+      if (signerId) {
+        const { data } = await supabase
+          .from('employees')
+          .select('full_name')
+          .eq('id', signerId)
+          .maybeSingle()
+        signerName = data?.full_name || signerName
+      }
+      return salesContractEmailService.notifySigned({
+        saleEmployeeId: row.created_by,
+        reviewerEmployeeId: row.reviewer_id,
+        ctx: { ...ctx, signer_name: signerName },
+      })
+    }).catch((e) => console.error('Email signed fail:', e))
 
     return row
   },

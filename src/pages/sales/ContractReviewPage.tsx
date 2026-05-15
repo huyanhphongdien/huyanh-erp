@@ -490,6 +490,16 @@ export default function ContractReviewPage() {
                 <Descriptions.Item label="Payment" span={2}>
                   {active.form_data?.payment}
                 </Descriptions.Item>
+                {active.form_data?.extra_terms && (
+                  <Descriptions.Item label="📌 Other Conditions" span={2}>
+                    <div style={{
+                      padding: 8, background: '#e6f4ff', border: '1px solid #91caff',
+                      borderRadius: 6, whiteSpace: 'pre-wrap', fontSize: 12, color: '#1677ff',
+                    }}>
+                      {active.form_data.extra_terms}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </Descriptions>
             </Card>
 

@@ -413,6 +413,16 @@ export default function ContractSignPage() {
                 <Descriptions.Item label="Tổng USD" span={2}>
                   <strong>${active.form_data?.amount}</strong>
                 </Descriptions.Item>
+                {active.form_data?.extra_terms && (
+                  <Descriptions.Item label="📌 Other Conditions" span={2}>
+                    <div style={{
+                      padding: 8, background: '#e6f4ff', border: '1px solid #91caff',
+                      borderRadius: 6, whiteSpace: 'pre-wrap', fontSize: 12, color: '#1677ff',
+                    }}>
+                      {active.form_data.extra_terms}
+                    </div>
+                  </Descriptions.Item>
+                )}
                 <Descriptions.Item label="Bank (Kiểm tra nhập)" span={2}>
                   <div style={{ fontSize: 12 }}>
                     {active.form_data?.bank_account_name} —{' '}

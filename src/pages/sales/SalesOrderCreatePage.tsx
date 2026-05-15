@@ -205,6 +205,7 @@ function SalesOrderCreatePage() {
   const watchClaimsDays  = Form.useWatch('contract_claims_days', form) || 20
   const watchArbitration = Form.useWatch('contract_arbitration', form) || 'SICOM Singapore'
   const watchFreightMark = Form.useWatch('contract_freight_mark', form) || ''
+  const watchExtraTerms  = Form.useWatch('contract_extra_terms', form) || ''
 
   const totalBales = baleWeight > 0 ? Math.round((quantityTons * 1000) / baleWeight) : 0
   const balesPerContainer = containerType === '40ft' ? balesPerContInput * 2 : balesPerContInput
@@ -254,6 +255,7 @@ function SalesOrderCreatePage() {
       claims_days: String(watchClaimsDays),
       arbitration: watchArbitration,
       freight_mark: watchFreightMark || (isFOB ? 'freight Collect' : 'freight prepaid'),
+      extra_terms: watchExtraTerms,
       // amount_words auto compute cho PI section "Words: ..."
       amount_words: itemsTotalUSD ? amountToWords(itemsTotalUSD) : '',
       ...DEFAULT_BANK,
@@ -274,6 +276,7 @@ function SalesOrderCreatePage() {
     watchClaimsDays,
     watchArbitration,
     watchFreightMark,
+    watchExtraTerms,
     itemsTotalTons,
     itemsTotalUSD,
     itemsTotalBales,
@@ -774,9 +777,31 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
           </Row>
+          <Row gutter={16}>
+            <Col xs={24}>
+              <Form.Item
+                label={
+                  <Space size={6}>
+                    <span>📌 Điều khoản bổ sung khác</span>
+                    <Tag color="blue" style={{ fontSize: 10 }}>Tối đa 300 ký tự</Tag>
+                  </Space>
+                }
+                name="contract_extra_terms"
+                tooltip="Các clause đặc thù của KH mà không lường trước được khi thiết kế form. VD: 'Giảm 2% nếu giao trước 15/6', 'KH lo phí fumigation', 'Bao bì in logo riêng theo file đính kèm', 'Trả lại pallet khi rỗng'... Phú LV + Trung/Huy đều thấy ở bước review."
+                rules={[{ max: 300, message: 'Tối đa 300 ký tự' }]}
+              >
+                <TextArea
+                  rows={3}
+                  showCount
+                  maxLength={300}
+                  placeholder="VD: KH yêu cầu fumigation trước khi shipping · Giảm 2% nếu giao trước 15/6 · Bao bì in logo riêng theo file đính kèm..."
+                />
+              </Form.Item>
+            </Col>
+          </Row>
           <div style={{ fontSize: 11, color: '#999', marginTop: 4, padding: '6px 8px',
                         background: '#fff7e6', borderRadius: 6, borderLeft: '3px solid #d46b08' }}>
-            ⚠️ <strong>Force Majeure</strong> và <strong>Legal Responsibility</strong> đã được template HĐ hard-code (theo Incoterm CIF vs FOB) — KHÔNG cần Sale chỉnh. Nếu KH yêu cầu clause đặc biệt, ghi vào "Ghi chú đơn hàng" để Phú LV review.
+            ⚠️ <strong>Force Majeure</strong> và <strong>Legal Responsibility</strong> đã được template HĐ hard-code (theo Incoterm CIF vs FOB) — KHÔNG cần Sale chỉnh.
           </div>
         </Card>
 
@@ -1033,6 +1058,15 @@ function SalesOrderCreatePage() {
       <div style={{ marginBottom: 4 }}><strong>Documents:</strong> 3/3 Original B/L marked {contractData.freight_mark}, Commercial Invoice, Packing List, C/O, Test Cert, Phytosanitary{contractData.pod ? ', Insurance Cert' : ''}</div>
       <div style={{ marginBottom: 4 }}><strong>Claims:</strong> within {contractData.claims_days} days of receipt</div>
       <div style={{ marginBottom: 4 }}><strong>Arbitration:</strong> {contractData.arbitration}</div>
+      {contractData.extra_terms && (
+        <div style={{
+          marginTop: 8, padding: 8, background: '#e6f4ff',
+          border: '1px solid #91caff', borderRadius: 6, fontSize: 10,
+        }}>
+          <strong style={{ color: '#1677ff' }}>Other Conditions:</strong>{' '}
+          <span style={{ whiteSpace: 'pre-wrap' }}>{contractData.extra_terms}</span>
+        </div>
+      )}
     </div>
   )
 
@@ -1072,6 +1106,15 @@ function SalesOrderCreatePage() {
         Words: <span style={{ color: '#aaa' }}>(amount in words — fill khi sinh .docx)</span>
       </div>
       <div style={{ marginBottom: 4 }}><strong>Payment:</strong> {contractData.payment || '—'}</div>
+      {contractData.extra_terms && (
+        <div style={{
+          marginTop: 6, padding: 8, background: '#e6f4ff',
+          border: '1px solid #91caff', borderRadius: 6, fontSize: 10,
+        }}>
+          <strong style={{ color: '#1677ff' }}>Other Conditions:</strong>{' '}
+          <span style={{ whiteSpace: 'pre-wrap' }}>{contractData.extra_terms}</span>
+        </div>
+      )}
       <div style={{ background: '#fff7e6', padding: 6, marginTop: 6, fontSize: 10, color: '#d48806' }}>
         <strong>Ben's Bank detail (Phú LV nhập):</strong><br />
         ACCOUNT: {contractData.bank_account_name} — {contractData.bank_account_no}<br />

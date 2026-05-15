@@ -60,6 +60,11 @@ export interface ContractFormData {
   arbitration?: string        // "SICOM Singapore" | "LCIA London"
   freight_mark?: string       // "freight prepaid" | "freight Collect"
 
+  // Điều khoản bổ sung tự do (Sale nhập, max 300 chars). Render ở preview
+  // SC + PI và lưu trong form_data. Template hiện chưa có placeholder
+  // (render khi rebuild templates với {extra_terms} ở section Payment).
+  extra_terms?: string
+
   // ----- Bank info: Phú LV (Kiểm tra) nhập per-order -----
   // Sale lên HĐ → submit reviewing → Phú LV mở review, chọn/nhập bank →
   // approved → Trung/Huy ký. Sale KHÔNG nhập 5 field này.

@@ -37,6 +37,21 @@ export function getSalesRole(user: any): SalesRole | null {
   return SALES_EMAIL_ROLE_MAP[email] || null
 }
 
+/** Toàn bộ email tham gia module Đơn hàng bán (cho mention, notification, ...) */
+export const SALES_PARTICIPANT_EMAILS: string[] = Object.keys(SALES_EMAIL_ROLE_MAP)
+
+/** Check email có tham gia module Sales không (case-insensitive) */
+export function isSalesParticipant(email?: string | null): boolean {
+  if (!email) return false
+  return email.toLowerCase() in SALES_EMAIL_ROLE_MAP
+}
+
+/** Get role của 1 email (case-insensitive). Trả null nếu không tham gia. */
+export function getSalesRoleByEmail(email?: string | null): SalesRole | null {
+  if (!email) return null
+  return SALES_EMAIL_ROLE_MAP[email.toLowerCase()] || null
+}
+
 /** Kiểm tra user có quyền truy cập module Sales không */
 export function hasSalesAccess(user: any): boolean {
   return getSalesRole(user) !== null

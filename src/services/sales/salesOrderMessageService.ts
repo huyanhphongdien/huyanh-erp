@@ -9,6 +9,7 @@
 import { supabase } from '../../lib/supabase'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createNotification } from '../notificationService'
+import { SALES_PARTICIPANT_EMAILS } from './salesPermissionService'
 
 export type MessageType = 'user' | 'system' | 'event'
 export type MessageAuthorRole =
@@ -275,12 +276,15 @@ export const salesOrderMessageService = {
     return count || 0
   },
 
-  /** Get all mentionable users (employees có email Huy Anh). */
+  /** Get mentionable users — CHỈ những người tham gia module Đơn hàng bán
+   *  (định nghĩa trong SALES_EMAIL_ROLE_MAP của salesPermissionService).
+   *  KHÔNG include toàn bộ @huyanhrubber.com (HR, sản xuất khác, etc.) */
   async getMentionableUsers(): Promise<MentionableUser[]> {
+    if (SALES_PARTICIPANT_EMAILS.length === 0) return []
     const { data, error } = await supabase
       .from('employees')
       .select('id, full_name, email')
-      .ilike('email', '%@huyanhrubber.com')
+      .in('email', SALES_PARTICIPANT_EMAILS)
       .order('full_name', { ascending: true })
     if (error) return []
     return (data || []).map((e) => ({

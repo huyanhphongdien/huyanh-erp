@@ -121,7 +121,8 @@ const presets = {
       packing_desc: '35 kg/bale. Loose bales packing',
       containers: '10',
       cont_type: '20DC',
-      payment: 'CAD 5 days',
+      // Test text payment Sale tự nhập (custom format)
+      payment: 'L/C UPAS 90 days from B/L date',
       ...BANK,
     },
   },

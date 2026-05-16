@@ -232,19 +232,13 @@ function SalesOrderCreatePage() {
       partial: watchPartial,
       trans: watchTrans,
       payment: (() => {
-        // Ưu tiên textarea override (Sale tự gõ); nếu rỗng → aggregate quick picks
-        // từ items (PAYMENT_TERMS_LABELS keys: LC_30, TT_100, CAD, DP, ...).
+        // Ưu tiên textarea override "Ghi chú thanh toán" cấp đơn (nếu Sale gõ).
+        // Nếu rỗng → lấy payment_terms ở item đầu tiên (Sale tự nhập text).
+        // Fallback cuối: "LC at sight".
         if (watchPaymentNote && watchPaymentNote.trim()) return watchPaymentNote.trim()
-        const ENUM_TO_EN: Record<string, string> = {
-          LC_30: 'L/C 30 days', LC_60: 'L/C 60 days', LC_90: 'L/C 90 days',
-          TT_10: 'T/T 10%', TT_30: 'T/T 30%', TT_60: 'T/T 60%', TT_100: 'T/T 100%',
-          CAD: 'CAD', DP: 'D/P',
-        }
-        const aggregated = orderItems
-          .flatMap((i) => (i.payment_terms || '').split(',').filter(Boolean))
-          .filter((v, idx, arr) => arr.indexOf(v) === idx) // dedupe
-          .map((v) => ENUM_TO_EN[v] || v)
-        return aggregated.length > 0 ? aggregated.join(' + ') : 'LC at sight'
+        const itemPayment = firstItem.payment_terms?.trim()
+        if (itemPayment) return itemPayment
+        return 'LC at sight'
       })(),
       payment_extra: '',
       claims_days: String(watchClaimsDays),
@@ -604,26 +598,26 @@ function SalesOrderCreatePage() {
                   />
                 </Col>
                 <Col xs={24}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 4, marginTop: 4 }}>Thanh toán</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {Object.entries(PAYMENT_TERMS_LABELS).map(([val, label]) => {
-                      const selected = (item.payment_terms || '').split(',').includes(val)
-                      return (
-                        <Tag
-                          key={val}
-                          style={{ cursor: 'pointer', fontSize: 11, padding: '2px 8px', borderRadius: 4, userSelect: 'none',
-                            background: selected ? '#1B4D3E' : '#fff', color: selected ? '#fff' : '#666',
-                            border: selected ? '1px solid #1B4D3E' : '1px solid #d9d9d9' }}
-                          onClick={() => {
-                            const current = (item.payment_terms || '').split(',').filter(Boolean)
-                            const next = selected ? current.filter(v => v !== val) : [...current, val]
-                            updateItem(item.key, 'payment_terms', next.join(','))
-                          }}
-                        >
-                          {selected ? '✓ ' : ''}{label}
-                        </Tag>
-                      )
-                    })}
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 4, marginTop: 4 }}>
+                    Phương thức thanh toán (Sale tự nhập — render vào "Term of payment:" của HĐ)
+                  </div>
+                  <Input
+                    value={item.payment_terms || ''}
+                    placeholder="VD: L/C at sight · L/C UPAS 90 days · CAD 5 days · 30% TT trước ETD + 70% sau B/L · 10% cọc + 90% D/P..."
+                    onChange={(e) => updateItem(item.key, 'payment_terms', e.target.value)}
+                  />
+                  <div style={{ fontSize: 10, color: '#bfbfbf', marginTop: 4, fontStyle: 'italic' }}>
+                    Gợi ý nhanh:&nbsp;
+                    {['L/C at sight', 'L/C UPAS 90 days', 'CAD 5 days', 'D/P at sight', 'T/T 30/70', 'T/T 100%']
+                      .map((preset, idx, arr) => (
+                        <span key={preset}>
+                          <a
+                            style={{ color: '#1677ff', cursor: 'pointer' }}
+                            onClick={() => updateItem(item.key, 'payment_terms', preset)}
+                          >{preset}</a>
+                          {idx < arr.length - 1 ? ' · ' : ''}
+                        </span>
+                      ))}
                   </div>
                 </Col>
                 <Col xs={4} sm={1} style={{ textAlign: 'center' }}>

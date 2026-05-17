@@ -109,6 +109,8 @@ REPL_SC_CIF = [
     ("within 20 days of receipt of goods", "within {claims_days} days of receipt of goods"),
     # Freight
     ("freight prepaid", "{freight_mark}"),
+    # Arbitration — Sale có thể chọn SICOM Singapore / LCIA London / ...
+    ("by SICOM Singapore arbitration clause", "by {arbitration} arbitration clause"),
 ]
 REPL_SC_CIF += BANK_REPL
 
@@ -189,6 +191,8 @@ REPL_SC_FOB = [
     ("within 20 days of receipt of goods", "within {claims_days} days of receipt of goods"),
     ("freight Collect", "{freight_mark}"),
     ("freight collect", "{freight_mark}"),
+    # Arbitration — Sale có thể chọn SICOM Singapore / LCIA London / ...
+    ("by SICOM Singapore arbitration clause", "by {arbitration} arbitration clause"),
 ]
 REPL_SC_FOB += BANK_REPL
 
@@ -442,6 +446,62 @@ def _inject_extra_terms(doc):
     return True
 
 
+def _fix_signature_cell_merge(doc):
+    """
+    PI templates có signature cell với "HUY ANH RUBBER COMPANY" + "LIMITED" tách
+    2 paragraphs → render 2 dòng thay vì 1.
+    Merge thành 1 paragraph "HUY ANH RUBBER COMPANY LIMITED".
+    """
+    fixed = 0
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                paras = list(cell.paragraphs)
+                for i, p in enumerate(paras):
+                    text = (p.text or '').rstrip()
+                    # Detect "HUY ANH RUBBER COMPANY" (without LIMITED) at end of text
+                    if text.endswith('HUY ANH RUBBER COMPANY') and i + 1 < len(paras):
+                        next_p = paras[i + 1]
+                        next_text = (next_p.text or '').strip()
+                        if next_text == 'LIMITED':
+                            # Append " LIMITED" to current para's first run
+                            if p.runs:
+                                # Rewrite first run text
+                                p.runs[0].text = p.runs[0].text.rstrip() + ' LIMITED'
+                                # Remove other runs
+                                for r in p.runs[1:]:
+                                    r._element.getparent().remove(r._element)
+                            else:
+                                p.add_run('HUY ANH RUBBER COMPANY LIMITED')
+                            # Remove next paragraph (was "LIMITED")
+                            next_p._element.getparent().remove(next_p._element)
+                            fixed += 1
+                            break
+    return fixed
+
+
+def _clean_buyer_address_spacing(doc):
+    """
+    "ADDRESS      : 295, YANGYEON-RO..." có nhiều space giữa từ ADDRESS và dấu :
+    (alignment manual gốc). Clean lại thành "ADDRESS: ...".
+    Chỉ áp dụng cho block THE BUYER (không chạm ADDRESS: của bank).
+    """
+    import re
+    fixed = 0
+    for p in doc.paragraphs:
+        text = p.text or ''
+        # Match "ADDRESS<multiple_spaces>:" — but NOT preceded by "BANK" context
+        if re.match(r'^ADDRESS\s{2,}:', text):
+            if p.runs:
+                # Replace pattern in first run
+                first = p.runs[0]
+                new_text = re.sub(r'^ADDRESS\s+:', 'ADDRESS:', first.text)
+                if new_text != first.text:
+                    first.text = new_text
+                    fixed += 1
+    return fixed
+
+
 def _normalize_last_page(doc):
     """
     Cleanup format các paragraph ở section cuối HĐ (Force Majeure / Arbitration /
@@ -537,6 +597,14 @@ def build_template(src_path, out_path, replacements, label):
     last_changed = _normalize_last_page(doc)
     if last_changed:
         matched_keys.add(f'[last_page normalized: {last_changed} paragraphs]')
+    # Merge "HUY ANH RUBBER COMPANY" + "LIMITED" 1 line trong PI signature
+    sig_fixed = _fix_signature_cell_merge(doc)
+    if sig_fixed:
+        matched_keys.add(f'[signature_cell merged: {sig_fixed}]')
+    # Clean "ADDRESS      :" extra spaces (THE BUYER block)
+    addr_fixed = _clean_buyer_address_spacing(doc)
+    if addr_fixed:
+        matched_keys.add(f'[buyer_address spacing cleaned: {addr_fixed}]')
     doc.save(str(out_path))
     # Copy ra /public/contract-templates/ để Vite serve cho frontend fetch
     public_path = PUBLIC_DIR / out_path.name

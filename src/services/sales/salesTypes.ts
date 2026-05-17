@@ -155,6 +155,9 @@ export interface SalesOrder {
   commission_amount?: number
   bank_account?: string
   bank_swift?: string
+  /** v10 — auto-sync từ sales_order_contracts.form_data khi HĐ approved/signed */
+  bank_full_name?: string      // Tên đầy đủ bank (English, cho L/C)
+  bank_address?: string        // Địa chỉ chi nhánh bank
   bales_per_container?: number
   pallets_per_container?: number
   bales_per_pallet?: number

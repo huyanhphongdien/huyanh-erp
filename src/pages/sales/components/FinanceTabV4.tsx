@@ -292,8 +292,27 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         <Descriptions.Item label="Ngày tiền về">{fmtDate(order.payment_received_date)}</Descriptions.Item>
         <Descriptions.Item label="Thực nhận">{fmtUSD(order.actual_payment_amount)}</Descriptions.Item>
         <Descriptions.Item label="Phí NH">{fmtUSD(order.bank_charges)}</Descriptions.Item>
-        <Descriptions.Item label="NH nhận">{order.bank_name || '—'}</Descriptions.Item>
+        <Descriptions.Item label="NH nhận">
+          {order.bank_name || '—'}
+        </Descriptions.Item>
       </Descriptions>
+
+      {/* Bank info đầy đủ (5 fields) — tự sync từ HĐ workflow v10 */}
+      {(order.bank_name || order.bank_account || order.bank_swift) && (
+        <>
+          <SectionHeader title="🏦 Bank info (auto-sync từ HĐ)" color="#1B4D3E" />
+          <Descriptions column={1} size="small" bordered style={{ fontSize: 11 }}>
+            <Descriptions.Item label="Account Name">{order.bank_name || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Account No.">{order.bank_account || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Bank Full Name">{order.bank_full_name || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Bank Address">{order.bank_address || '—'}</Descriptions.Item>
+            <Descriptions.Item label="SWIFT Code">{order.bank_swift || '—'}</Descriptions.Item>
+          </Descriptions>
+          <div style={{ fontSize: 10, color: '#8c8c8c', fontStyle: 'italic', marginTop: 4 }}>
+            ⓘ Tự đồng bộ từ HĐ workflow khi Phú LV duyệt. Không phải nhập lại.
+          </div>
+        </>
+      )}
 
       <Divider style={{ margin: '12px 0' }} />
 

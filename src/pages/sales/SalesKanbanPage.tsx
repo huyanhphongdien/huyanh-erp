@@ -260,8 +260,10 @@ export default function SalesKanbanPage() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
-        // Swimlane container — horizontal scroll
-        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12 }}>
+        // Swimlane container — co giãn vừa màn hình, 7 cột chia đều
+        // Desktop: 7 cột fit toàn bộ width
+        // Narrow screen (<1400px): fallback scroll horizontal khi minWidth không đủ
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 12 }}>
           {SALES_STAGES.map(stage => {
             const list = byStage[stage]
             const isOver = dragOverStage === stage
@@ -273,13 +275,12 @@ export default function SalesKanbanPage() {
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, stage)}
                 style={{
-                  minWidth: 260,
-                  width: 260,
+                  flex: '1 1 0',          // chia đều width
+                  minWidth: 180,          // sàn responsive — dưới 180px thì scroll ngang
                   background: isOver ? '#dbeafe' : '#f4f5f7',
                   border: isOver ? '2px dashed #0a72ef' : '1px solid #e4e4e7',
                   borderRadius: 8,
-                  padding: 10,
-                  flexShrink: 0,
+                  padding: 8,
                   transition: 'background 0.15s',
                 }}
               >

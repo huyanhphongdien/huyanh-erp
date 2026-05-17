@@ -742,12 +742,8 @@ function SalesOrderCreatePage() {
             <Col xs={24} sm={12} md={6}>
               <Form.Item label="Arbitration" name="contract_arbitration" initialValue="SICOM Singapore"
                 tooltip="Tòa trọng tài giải quyết tranh chấp.">
-                <Select size="large" showSearch options={[
+                <Select size="large" disabled options={[
                   { value: 'SICOM Singapore', label: 'SICOM Singapore' },
-                  { value: 'LCIA London', label: 'LCIA London' },
-                  { value: 'VIAC Vietnam', label: 'VIAC Vietnam' },
-                  { value: 'ICC Paris', label: 'ICC Paris' },
-                  { value: 'HKIAC Hong Kong', label: 'HKIAC Hong Kong' },
                 ]} />
               </Form.Item>
             </Col>
@@ -1151,7 +1147,6 @@ function SalesOrderCreatePage() {
         <Title level={4} style={{ margin: 0 }}>
           Tạo đơn hàng bán
         </Title>
-        <Tag color="orange" style={{ marginLeft: 8 }}>BP Sale nhập</Tag>
         <span style={{ marginLeft: 'auto', color: '#999', fontSize: 12 }}>
           Form trái — Live preview HĐ bên phải · Bank info do Phú LV (Kiểm tra) nhập
         </span>

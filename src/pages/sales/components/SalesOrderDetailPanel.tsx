@@ -26,6 +26,7 @@ import {
 } from '@ant-design/icons'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
+import { supabase } from '../../../lib/supabase'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../../services/sales/salesTypes'
 import {
@@ -121,6 +122,23 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     } else {
       setOrder(null)
     }
+  }, [open, orderId, loadOrder])
+
+  // ── Realtime sync — đăng ký subscribe sales_orders cho đơn đang xem ──
+  // Khi ai khác drag Kanban / update đơn → panel tự refetch
+  useEffect(() => {
+    if (!open || !orderId) return
+    const channel = supabase
+      .channel(`sales-order-detail-${orderId}`)
+      .on(
+        'postgres_changes' as never,
+        { event: 'UPDATE', schema: 'public', table: 'sales_orders', filter: `id=eq.${orderId}` },
+        () => {
+          loadOrder()
+        },
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [open, orderId, loadOrder])
 
   // ── Lock / Unlock ──

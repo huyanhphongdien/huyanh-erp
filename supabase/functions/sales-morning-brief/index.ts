@@ -1,15 +1,19 @@
 // =============================================================================
 // EDGE FUNCTION: sales-morning-brief
-// Báo cáo Sales 07:00 sáng hằng ngày cho BGĐ — KHÁC với sales-digest 08:00.
+// (Function name lịch sử — thực ra giờ chạy 17:30 day-end summary, không đổi tên
+//  để tránh churn migration. User-facing labels đã update.)
 //
-// Mục tiêu (đầu giờ sáng → ACTION items, không phải diễn biến):
+// Báo cáo Sales DUY NHẤT cho BGĐ hằng ngày 17:30 chiều — gom thay cho 3 mail cũ
+// (daily-task-report-1730 + sales-digest-daily + task-daily-reminders BGĐ portion).
+//
+// 7 section:
 //   ⚡ Cần làm ngay     : HĐ chờ ký + ETD < 3d chưa logistics + Bottleneck ≥ 80%
-//   📦 Đóng gói hôm nay : QC pass 24h qua → cần pack
+//   📦 Đóng gói trong 24h: QC pass 24h qua
 //   💰 Thanh toán chờ   : LC/DP chưa thu, days quá ETD
 //   🚢 Vừa xuất 24h qua : shipped 24h, BL + vessel
 //   📊 Pipeline tổng    : 7 cột bar chart SVG inline + $ in-progress + $ delivered hôm qua
 //
-// Schedule: pg_cron `0 0 * * *` UTC = 07:00 VN hằng ngày (T2-CN)
+// Schedule: pg_cron `30 10 * * *` UTC = 17:30 VN hằng ngày (T2-CN)
 // Deploy:   npx supabase functions deploy sales-morning-brief --no-verify-jwt
 // Test:     curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/sales-morning-brief" \
 //             -H "Authorization: Bearer <SERVICE_ROLE_KEY>" -H "Content-Type: application/json" -d "{}"
@@ -482,8 +486,8 @@ function renderHtml(d: any): string {
 <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;padding:20px;border:1px solid #e4e4e7;">
 
   <div style="text-align:center;border-bottom:2px solid #1B4D3E;padding-bottom:12px;margin-bottom:8px;">
-    <h1 style="color:#1B4D3E;font-size:20px;margin:0;">🌅 Sales Morning Brief</h1>
-    <p style="color:#6b7280;margin:4px 0 0 0;font-size:12px;">${d.date_label} · 07:00 sáng</p>
+    <h1 style="color:#1B4D3E;font-size:20px;margin:0;">🌙 Sales Day-End Brief</h1>
+    <p style="color:#6b7280;margin:4px 0 0 0;font-size:12px;">${d.date_label} · 17:30 chiều</p>
   </div>
 
   <div style="display:flex;gap:8px;margin:12px 0;text-align:center;">
@@ -523,7 +527,7 @@ function renderHtml(d: any): string {
   )}
 
   ${section(
-    '📦 Đóng gói hôm nay (QC pass 24h qua)',
+    '📦 Đóng gói trong 24h (QC pass 24h qua)',
     '#0a72ef',
     d.packing_today.length,
     packingRows,
@@ -571,7 +575,7 @@ serve(async (req) => {
     const html = renderHtml(data)
 
     const actionCount = data.contracts_pending.length + data.etd_risk.length + data.bottlenecks.length
-    const subject = `[Sales 07:00] ${data.date_label} — ${actionCount} action · ${data.total_active} active · ${data.payment_pending.length} \$pending`
+    const subject = `[Sales 17:30] ${data.date_label} — ${actionCount} action · ${data.total_active} active · ${data.payment_pending.length} \$pending`
 
     const token = await getAccessToken()
     await sendEmail(token, REPORT_RECIPIENTS, subject, html)

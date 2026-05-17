@@ -442,6 +442,74 @@ def _inject_extra_terms(doc):
     return True
 
 
+def _normalize_last_page(doc):
+    """
+    Cleanup format các paragraph ở section cuối HĐ (Force Majeure / Arbitration /
+    Signature line). Các source DOCX của HA có nhiều chỗ:
+      - Para 9.1, 9.2, 9.3 có indent left/right tự đặt (lệch so với 6/7/8)
+      - Para 9.3 có leading tab character (extra indent)
+      - "FOR THE BUYER ... FOR THE SELLER" có firstLine indent (đẩy text lệch)
+      - Empty paragraphs có whitespace thừa
+    Hàm này strip leading whitespace + remove indent left/right cho các section
+    Force Majeure (9.x), Arbitration (10.x), và signature line.
+    """
+    from docx.oxml.ns import qn
+
+    def _remove_indents(p, keep_first_line=False):
+        pPr = p._p.find(qn('w:pPr'))
+        if pPr is None:
+            return
+        ind = pPr.find(qn('w:ind'))
+        if ind is None:
+            return
+        # Remove left/right/end indent attributes
+        for attr in (qn('w:left'), qn('w:right'), qn('w:start'), qn('w:end')):
+            if ind.get(attr) is not None:
+                del ind.attrib[attr]
+        if not keep_first_line:
+            for attr in (qn('w:firstLine'), qn('w:hanging')):
+                if ind.get(attr) is not None:
+                    del ind.attrib[attr]
+        # Nếu ind empty thì remove luôn
+        if not ind.attrib:
+            pPr.remove(ind)
+
+    def _strip_leading_ws(p):
+        if not p.runs:
+            return
+        first = p.runs[0]
+        if first.text and first.text != first.text.lstrip():
+            first.text = first.text.lstrip()
+
+    changed = 0
+    all_paras = doc.paragraphs
+    for i, p in enumerate(all_paras):
+        text = (p.text or '').strip()
+        upper = text.upper()
+        # Section 9.x (Force Majeure body) — strip leading WS + remove all indents
+        if (text.startswith('9.1 ') or text.startswith('9.2 ') or text.startswith('9.3 ')
+            or text.startswith('9.1.') or text.startswith('9.2.') or text.startswith('9.3.')):
+            _strip_leading_ws(p)
+            _remove_indents(p, keep_first_line=False)
+            changed += 1
+        # Section 10 (Arbitration body) — keep firstLine indent (paragraph intro), strip other
+        elif text.startswith('Arbitration, if any'):
+            _strip_leading_ws(p)
+            _remove_indents(p, keep_first_line=True)
+            changed += 1
+        # Signature line "FOR THE BUYER ... FOR THE SELLER" — remove firstLine indent
+        elif 'FOR THE BUYER' in upper and 'FOR THE SELLER' in upper:
+            _strip_leading_ws(p)
+            _remove_indents(p, keep_first_line=False)
+            changed += 1
+        # Empty paragraphs ở cuối — strip whitespace thừa
+        elif not text and p.runs:
+            for r in p.runs:
+                if r.text and r.text.strip() == '':
+                    r.text = ''
+    return changed
+
+
 def build_template(src_path, out_path, replacements, label):
     print(f"\n── {label} ──")
     print(f"  src: {src_path.relative_to(ROOT)}")
@@ -465,6 +533,10 @@ def build_template(src_path, out_path, replacements, label):
     head_changed = _normalize_head_letter(doc)
     if head_changed:
         matched_keys.add(f'[head_letter normalized: {head_changed} paragraphs]')
+    # Cleanup format last page (Force Majeure / Arbitration / Signature)
+    last_changed = _normalize_last_page(doc)
+    if last_changed:
+        matched_keys.add(f'[last_page normalized: {last_changed} paragraphs]')
     doc.save(str(out_path))
     # Copy ra /public/contract-templates/ để Vite serve cho frontend fetch
     public_path = PUBLIC_DIR / out_path.name

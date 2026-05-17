@@ -180,11 +180,14 @@ function render(name, { template, data }) {
       const human = PKG[data.packing_type || 'loose_bale'] || 'Loose bales packing';
       packing = packing ? `${packing}, ${human}` : `35 kg/bale, ${human}`;
     }
+    // Strip "DC"/"HC" suffix khỏi cont_type
+    const contTypeClean = (data.cont_type || '').replace(/(DC|HC)$/i, '').trim();
     doc.render({
       ...data,
       pol: fmtPort(data.pol),
       pod: fmtPort(data.pod),
       packing_desc: packing,
+      cont_type: contTypeClean,
       has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
       has_fumigation: hasFumigation,
       has_pallets: hasPallets,

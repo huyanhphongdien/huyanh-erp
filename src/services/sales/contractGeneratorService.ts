@@ -256,16 +256,20 @@ export async function generateContractBlob(
     const num = parseFloat(String(data.amount).replace(/,/g, ''))
     if (num > 0) amountWords = amountToWords(num)
   }
-  // Normalize pol/pod + packing_desc trước khi render
+  // Normalize pol/pod + packing_desc + cont_type trước khi render
   const polEn = formatPortForContract(data.pol)
   const podEn = formatPortForContract(data.pod)
   const packingFinal = ensurePackingDesc(data.packing_desc, data.packing_type)
+  // cont_type strip "DC"/"HC" suffix — chỉ giữ số ("20DC" → "20", "40HC" → "40")
+  // Theo phản hồi BGĐ: HĐ rubber chuẩn quốc tế viết "1 x 20" không cần DC
+  const contTypeClean = (data.cont_type || '').replace(/(DC|HC)$/i, '').trim()
   doc.render({
     ...data,
     grade: formatGradeForContract(data.grade),
     pol: polEn,
     pod: podEn,
     packing_desc: packingFinal,
+    cont_type: contTypeClean,
     amount_words: amountWords || '',
     has_extra_terms: !!(data.extra_terms && data.extra_terms.trim()),
     has_fumigation: hasFumigation,

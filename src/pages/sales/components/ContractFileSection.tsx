@@ -356,7 +356,9 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
               ].filter((g) => g.items.length > 0)
               return groups
             })().map((group) => (
-              <div key={group.key}>
+              // id `contract-group-{key}` để Files Widget có thể scroll tới khi user
+              // click sub-folder (xem handleNavigateTab ở SalesOrderDetailPanel).
+              <div key={group.key} id={`contract-group-${group.key}`} style={{ scrollMarginTop: 12 }}>
                 <div style={{
                   fontSize: 11, fontWeight: 700, color: group.color, letterSpacing: 0.5,
                   textTransform: 'uppercase', marginBottom: 6,

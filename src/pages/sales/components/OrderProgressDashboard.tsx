@@ -40,8 +40,9 @@ const fmtDateTime = (d?: string | null) =>
 interface Props {
   order: SalesOrder
   onChanged?: () => void
-  /** Callback khi user click 1 folder trong Files Widget → switch tab. */
-  onNavigateTab?: (tabKey: string) => void
+  /** Callback khi user click 1 folder trong Files Widget → switch tab.
+   * subType (tuỳ chọn, chỉ áp dụng cho tab 'contract') để scroll tới đúng nhóm HĐ. */
+  onNavigateTab?: (tabKey: string, subType?: 'sent_to_customer' | 'ha_signed' | 'final_signed') => void
 }
 
 export default function OrderProgressDashboard({ order, onChanged, onNavigateTab }: Props) {

@@ -241,6 +241,38 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     }, 100)
   }
 
+  /** Switch tab từ Files Widget. Khi user click 1 sub-folder của HĐ, subType được
+   *  truyền theo để scroll tới đúng nhóm trong ContractFileSection. */
+  const handleNavigateTab = (tabKey: string, subType?: 'sent_to_customer' | 'ha_signed' | 'final_signed') => {
+    setActiveTab(tabKey)
+    if (tabKey === 'contract' && subType) {
+      // Scroll tới anchor `#contract-group-{subType}` (do ContractFileSection render).
+      // Delay 200ms vì ContractTab fetch hasWorkflow + ContractFileSection load docs async.
+      // Retry tối đa 10 lần (mỗi 150ms) để bắt được khi DOM mount xong.
+      const anchorMap: Record<string, string> = {
+        sent_to_customer: 'contract-group-sent',
+        ha_signed: 'contract-group-ha_signed',
+        final_signed: 'contract-group-final',
+      }
+      const anchorId = anchorMap[subType]
+      if (!anchorId) return
+      let tries = 0
+      const tick = () => {
+        const el = document.getElementById(anchorId)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          // Highlight tạm thời để user thấy rõ nhóm vừa nhảy tới
+          el.style.transition = 'background 0.4s'
+          el.style.background = '#fffbe6'
+          setTimeout(() => { el.style.background = '' }, 1500)
+          return
+        }
+        if (++tries < 10) setTimeout(tick, 150)
+      }
+      setTimeout(tick, 200)
+    }
+  }
+
   /** Hủy đơn — chỉ Sale + Admin được làm, đơn status=draft/confirmed/producing.
    *  Update status='cancelled'. */
   const handleCancelOrder = () => {
@@ -350,7 +382,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       key: 'progress',
       label: <span>📈 Tiến độ</span>,
       children: (
-        <OrderProgressDashboard order={order} onChanged={handleSaved} onNavigateTab={setActiveTab} />
+        <OrderProgressDashboard order={order} onChanged={handleSaved} onNavigateTab={handleNavigateTab} />
       ),
     },
     {

@@ -46,9 +46,13 @@ interface SubFolderStat {
   sample_names: string[]
 }
 
+// Sub-type của HĐ — đồng bộ với doc_sub_type trong sales_order_documents
+export type ContractSubType = 'sent_to_customer' | 'ha_signed' | 'final_signed'
+
 interface Props {
   salesOrderId: string
-  onNavigateTab?: (tabKey: string) => void
+  /** Khi user click folder → switch tab. subType (tuỳ chọn) để scroll tới đúng nhóm trong tab Hợp đồng. */
+  onNavigateTab?: (tabKey: string, subType?: ContractSubType) => void
 }
 
 export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props) {
@@ -170,6 +174,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                     bg="#fff7e6"
                     stat={contractSub['sent_to_customer']}
                     hint="Drafts gửi KH duyệt"
+                    onClick={() => onNavigateTab?.('contract', 'sent_to_customer')}
                   />
                   <ContractSubFolder
                     icon="✍️"
@@ -178,6 +183,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                     bg="#e6f4ff"
                     stat={contractSub['ha_signed']}
                     hint="HA ký 1 bên (chưa final)"
+                    onClick={() => onNavigateTab?.('contract', 'ha_signed')}
                   />
                   <ContractSubFolder
                     icon="✅"
@@ -186,6 +192,7 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
                     bg="#f6ffed"
                     stat={contractSub['final_signed']}
                     hint="KH ký lại — 2 bên (pháp lý)"
+                    onClick={() => onNavigateTab?.('contract', 'final_signed')}
                   />
                 </div>
               ) : (
@@ -206,8 +213,10 @@ export default function OrderFilesWidget({ salesOrderId, onNavigateTab }: Props)
 }
 
 // ─── Sub-folder card (chỉ dùng trong HĐ folder) ───
+// Có onClick riêng + stopPropagation để KHÔNG bubble lên card cha (cha cũng nhảy 'contract'
+// nhưng không có subType → ContractTab không scroll đúng nhóm).
 function ContractSubFolder({
-  icon, name, color, bg, stat, hint,
+  icon, name, color, bg, stat, hint, onClick,
 }: {
   icon: string
   name: string
@@ -215,14 +224,35 @@ function ContractSubFolder({
   bg: string
   stat?: SubFolderStat
   hint: string
+  onClick?: () => void
 }) {
   const count = stat?.count || 0
   const samples = stat?.sample_names || []
   return (
-    <div style={{
-      ...subFolder,
-      borderColor: count > 0 ? color : '#e8e8e8',
-    }}>
+    <div
+      style={{
+        ...subFolder,
+        borderColor: count > 0 ? color : '#d9d9d9',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+      }}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick?.()
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = bg
+        e.currentTarget.style.borderStyle = 'solid'
+        e.currentTarget.style.borderColor = color
+        e.currentTarget.style.boxShadow = `0 2px 8px ${color}33`
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = '#fff'
+        e.currentTarget.style.borderStyle = 'dashed'
+        e.currentTarget.style.borderColor = count > 0 ? color : '#d9d9d9'
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+    >
       <div style={subFolderHead}>
         <span style={{
           width: 22, height: 22, borderRadius: 6, background: bg, color,

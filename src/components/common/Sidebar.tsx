@@ -351,7 +351,7 @@ const getMenuGroups = (
       { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} />,
         requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin'] },
       { path: '/sales/contracts/review', label: 'Kiểm tra HĐ', icon: <FileText size={18} />,
-        allowedEmails: ['phulv@huyanhrubber.com', 'minhld@huyanhrubber.com'] },
+        allowedEmails: ['phulv@huyanhrubber.com', 'minhld@huyanhrubber.com', 'sales@huyanhrubber.com'] },
       { path: '/sales/contracts/sign', label: 'Ký HĐ', icon: <FileText size={18} />,
         allowedEmails: ['trunglxh@huyanhrubber.com', 'huylv@huyanhrubber.com'] },
       { path: '/sales/kanban', label: 'Kanban tiến độ', icon: <LayoutDashboard size={18} />,

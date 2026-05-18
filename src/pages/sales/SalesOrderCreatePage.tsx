@@ -667,9 +667,13 @@ function SalesOrderCreatePage() {
               <Form.Item
                 label="Shipment Time"
                 name="shipment_time"
-                tooltip="Điều khoản thời gian giao hàng trên hợp đồng/L/C (text tự do). VD: Within 30 days from L/C date, End of May 2026, June/July 2026..."
+                tooltip="Điều khoản thời gian giao hàng trên hợp đồng/L/C (text tự do, cho phép xuống dòng). VD: Within 30 days from L/C date / End of May 2026 / June–July shipment, lot 1: ..., lot 2: ..."
               >
-                <Input size="large" placeholder="VD: Within 30 days from L/C date / End of May 2026 / June–July shipment" />
+                <TextArea
+                  rows={2}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  placeholder="VD: Within 30 days from L/C date — hoặc nhiều dòng cho multi-lot shipment"
+                />
               </Form.Item>
             </Col>
           </Row>

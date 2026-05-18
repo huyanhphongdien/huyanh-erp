@@ -37,6 +37,7 @@ import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
 import ContractFileSection from './ContractFileSection'
 import ContractWorkflowSection from './ContractWorkflowSection'
+import DraftContractPreview from './DraftContractPreview'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
 
 type EditItem = {
@@ -586,7 +587,12 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         </>
       )}
       {hasWorkflow === false && (
-        <ContractFileSection orderId={order.id} salesRole={salesRole} />
+        <>
+          {/* Sale lưu nháp chưa trình → vẫn xem được preview SC/PI + tải mock .docx
+              ngay từ Detail (không phải bấm "Sửa" để mở lại Compose Studio) */}
+          {order.status === 'draft' && <DraftContractPreview order={order} />}
+          <ContractFileSection orderId={order.id} salesRole={salesRole} />
+        </>
       )}
 
       {/* Section: Hợp đồng */}

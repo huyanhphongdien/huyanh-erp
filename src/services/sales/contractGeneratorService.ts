@@ -182,6 +182,7 @@ const PACKING_TYPE_LABEL: Record<string, string> = {
   loose_bale: 'Loose bales packing',
   sw_pallet: 'SW Pallet packing',
   wooden_pallet: 'Wooden pallets (fumigated)',
+  plastic_pallet: 'Plastic pallets',
   metal_box: 'Metal box packing',
 }
 export function ensurePackingDesc(desc: string | null | undefined, packingType?: string): string {
@@ -246,7 +247,7 @@ export async function generateContractBlob(
     (packingDesc.includes('wooden pallet') && !packingDesc.includes('loose'))
   // has_pallets: ẩn segment "X Wooden pallets /" khi loose_bale (không có pallet)
   const hasPallets =
-    ['wooden_pallet', 'sw_pallet'].includes(data.packing_type || '') ||
+    ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(data.packing_type || '') ||
     (!!data.pallets_total && data.pallets_total !== '' && data.pallets_total !== '0')
   // is_lc_payment: ẩn câu "The L/C draft must be opened..." khi không phải L/C
   const paymentLower = (data.payment || '').toLowerCase()

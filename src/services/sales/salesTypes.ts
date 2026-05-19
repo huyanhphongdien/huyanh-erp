@@ -11,7 +11,7 @@ export type CustomerTier = 'standard' | 'premium' | 'strategic'
 export type PaymentTerms = 'LC_30' | 'LC_60' | 'LC_90' | 'TT_10' | 'TT_30' | 'TT_60' | 'TT_100' | 'CAD' | 'DP'
 export type Incoterm = 'FOB' | 'CIF' | 'CNF' | 'DDP' | 'EXW'
 export type QualityStandard = 'TCVN_3769' | 'ISO_2000' | 'CUSTOM'
-export type PackingType = 'loose_bale' | 'sw_pallet' | 'wooden_pallet' | 'metal_box'
+export type PackingType = 'loose_bale' | 'sw_pallet' | 'wooden_pallet' | 'plastic_pallet' | 'metal_box'
 export type ContainerType = '20ft' | '40ft'
 export type SalesCurrency = 'USD' | 'EUR' | 'JPY' | 'CNY'
 
@@ -472,6 +472,7 @@ export const PACKING_TYPE_LABELS: Record<PackingType, string> = {
   loose_bale: 'Loose Bale',
   sw_pallet: 'SW Pallet (Shrink Wrap)',
   wooden_pallet: 'Wooden Pallet',
+  plastic_pallet: 'Plastic Pallet',
   metal_box: 'Metal Box',
 }
 

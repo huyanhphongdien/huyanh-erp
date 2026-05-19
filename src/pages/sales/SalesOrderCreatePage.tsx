@@ -218,7 +218,7 @@ function SalesOrderCreatePage() {
           const human = map[pt] || 'Loose bales packing'
           return `${kg} kg/bale, ${human}`
         })(),
-      bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString() : '',
+      bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString('en-US') : '',
       // pallets_total: chỉ tính khi packing dùng pallet (wooden_pallet/sw_pallet/plastic_pallet),
       // standard 36 bales/pallet (16 pallets x 36 = 576 bales/20DC). Khác thì để rỗng.
       pallets_total: (() => {
@@ -544,7 +544,7 @@ function SalesOrderCreatePage() {
           {orderItems.map((item, idx) => (
             <div key={item.key} style={{ background: idx % 2 === 0 ? '#fafafa' : '#fff', padding: '12px', borderRadius: 8, marginBottom: 8, border: '1px solid #f0f0f0' }}>
               <Row gutter={[12, 8]} align="middle">
-                <Col xs={24} sm={5}>
+                <Col xs={24} sm={6}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Grade</div>
                   <AutoComplete
                     value={item.grade || undefined}
@@ -568,20 +568,21 @@ function SalesOrderCreatePage() {
                   <InputNumber value={item.unit_price || undefined} min={0} step={10} style={{ width: '100%' }} placeholder="1,924"
                     onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
                 </Col>
-                <Col xs={12} sm={3}>
+                <Col xs={12} sm={5}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>KG/bành</div>
                   <Select value={item.bale_weight_kg} style={{ width: '100%' }}
                     options={[{ value: 35, label: '35' }, { value: 33.33, label: '33.33' }]}
                     onChange={(v) => updateItem(item.key, 'bale_weight_kg', v)} />
                 </Col>
-                <Col xs={12} sm={3}>
+                <Col xs={12} sm={5}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Bành/cont</div>
                   <InputNumber value={item.bales_per_container} min={1} style={{ width: '100%' }}
                     onChange={(v) => updateItem(item.key, 'bales_per_container', v || 576)} />
                 </Col>
-                <Col xs={12} sm={4}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Đóng gói</div>
+                <Col xs={24} sm={8}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2, marginTop: 4 }}>Đóng gói</div>
                   <Select value={item.packing_type} style={{ width: '100%' }}
+                    popupMatchSelectWidth={false}
                     options={[
                       { value: 'loose_bale', label: 'Loose Bale' },
                       { value: 'sw_pallet', label: 'SW Pallet' },
@@ -591,7 +592,7 @@ function SalesOrderCreatePage() {
                     ]}
                     onChange={(v) => updateItem(item.key, 'packing_type', v)} />
                 </Col>
-                <Col xs={24}>
+                <Col xs={24} sm={16}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2, marginTop: 4 }}>Ghi chú bao bì (tuỳ chọn)</div>
                   <Input
                     value={item.packing_note || ''}

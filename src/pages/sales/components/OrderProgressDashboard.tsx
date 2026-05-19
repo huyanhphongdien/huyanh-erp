@@ -96,16 +96,17 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
           loose_bale: 'Loose bales packing',
           sw_pallet: 'SW Pallet packing',
           wooden_pallet: 'Wooden pallets (fumigated)',
+          plastic_pallet: 'Plastic pallets',
           metal_box: 'Metal box packing',
         }
         const human = map[pt] || 'Loose bales packing'
         return `${kg} kg/bale, ${human}`
       })(),
-      bales_total: bales ? bales.toLocaleString() : '',
+      bales_total: bales ? bales.toLocaleString('en-US') : '',
       // pallets_total: chỉ tính khi pallet packing, standard 36 bales/pallet
       pallets_total: (() => {
         const pt = o.packing_type || ''
-        if (!['wooden_pallet', 'sw_pallet'].includes(pt)) return ''
+        if (!['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(pt)) return ''
         return bales > 0 ? String(Math.ceil(bales / 36)) : ''
       })(),
       containers: String(o.container_count || ''),

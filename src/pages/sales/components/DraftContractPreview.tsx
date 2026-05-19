@@ -64,13 +64,14 @@ function salesOrderToContractData(order: SalesOrder): Partial<ContractFormData> 
       loose_bale: 'Loose bales packing',
       sw_pallet: 'SW Pallet packing',
       wooden_pallet: 'Wooden pallets (fumigated)',
+      plastic_pallet: 'Plastic pallets',
       metal_box: 'Metal box packing',
     }
     return `${kg} kg/bale, ${map[pt] || 'Loose bales packing'}`
   })()
 
   const pt = firstItem?.packing_type || order.packing_type || ''
-  const pallets_total = ['wooden_pallet', 'sw_pallet'].includes(pt) && itemsTotalBales > 0
+  const pallets_total = ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(pt) && itemsTotalBales > 0
     ? String(Math.ceil(itemsTotalBales / 36))
     : ''
 
@@ -105,7 +106,7 @@ function salesOrderToContractData(order: SalesOrder): Partial<ContractFormData> 
     pod: isFOB ? '' : (order.port_of_destination || ''),
     packing_type: pt,
     packing_desc,
-    bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString() : '',
+    bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString('en-US') : '',
     pallets_total,
     containers: String(itemsTotalContainers || ''),
     cont_type: order.container_type === '40ft' ? '40HC' : '20DC',

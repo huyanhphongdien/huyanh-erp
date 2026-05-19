@@ -212,17 +212,18 @@ function SalesOrderCreatePage() {
             loose_bale: 'Loose bales packing',
             sw_pallet: 'SW Pallet packing',
             wooden_pallet: 'Wooden pallets (fumigated)',
+            plastic_pallet: 'Plastic pallets',
             metal_box: 'Metal box packing',
           }
           const human = map[pt] || 'Loose bales packing'
           return `${kg} kg/bale, ${human}`
         })(),
       bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString() : '',
-      // pallets_total: chỉ tính khi packing dùng pallet (wooden_pallet/sw_pallet),
+      // pallets_total: chỉ tính khi packing dùng pallet (wooden_pallet/sw_pallet/plastic_pallet),
       // standard 36 bales/pallet (16 pallets x 36 = 576 bales/20DC). Khác thì để rỗng.
       pallets_total: (() => {
         const pt = firstItem.packing_type || ''
-        if (!['wooden_pallet', 'sw_pallet'].includes(pt)) return ''
+        if (!['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(pt)) return ''
         const balesPerPallet = 36
         return itemsTotalBales > 0 ? String(Math.ceil(itemsTotalBales / balesPerPallet)) : ''
       })(),
@@ -585,6 +586,7 @@ function SalesOrderCreatePage() {
                       { value: 'loose_bale', label: 'Loose Bale' },
                       { value: 'sw_pallet', label: 'SW Pallet' },
                       { value: 'wooden_pallet', label: 'Wooden Pallet' },
+                      { value: 'plastic_pallet', label: 'Plastic Pallet' },
                       { value: 'metal_box', label: 'Metal Box' },
                     ]}
                     onChange={(v) => updateItem(item.key, 'packing_type', v)} />

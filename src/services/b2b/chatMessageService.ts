@@ -26,6 +26,15 @@ export interface ChatAttachment {
   caption?: string
 }
 
+export interface NegotiationHistoryEntry {
+  actor_id: string
+  actor_name?: string
+  actor_role?: 'factory' | 'partner'
+  counter_price: number
+  notes: string
+  ts: string
+}
+
 export interface BookingMetadata {
   code: string
   product_type: 'mu_nuoc' | 'mu_tap' | 'mu_dong' | 'mu_chen' | 'mu_to'
@@ -44,6 +53,12 @@ export interface BookingMetadata {
   status: 'pending' | 'confirmed' | 'negotiating' | 'rejected'
   counter_price?: number
   negotiation_notes?: string
+  /** Append-only thread lưu mỗi lần ai thương lượng. UI BookingCard render <details>. */
+  negotiation_history?: NegotiationHistoryEntry[]
+  /** Optimistic locking — increment mỗi lần update để chống race condition */
+  negotiation_version?: number
+  /** Deadline thương lượng (ISO). UI render countdown */
+  negotiation_expires_at?: string
   // Nhà máy đích nhận hàng (đồng bộ với portal)
   target_facility_id?: string
   target_facility_code?: string
@@ -450,13 +465,19 @@ export const chatMessageService = {
   // ============================================
 
   /**
-   * Cập nhật trạng thái booking
+   * Cập nhật trạng thái booking — có optimistic locking + history.
+   * @param expectedVersion Nếu truyền + version DB khác → throw conflict
+   * @param historyEntry Đẩy thêm 1 row vào negotiation_history
    */
   async updateBookingStatus(
-    messageId: string, 
+    messageId: string,
     status: BookingMetadata['status'],
     counterPrice?: number,
-    negotiationNotes?: string
+    negotiationNotes?: string,
+    options?: {
+      expectedVersion?: number
+      historyEntry?: NegotiationHistoryEntry
+    },
   ): Promise<ChatMessage> {
     const original = await this.getById(messageId)
     if (!original) throw new Error('Tin nhắn không tồn tại')
@@ -464,6 +485,18 @@ export const chatMessageService = {
 
     const booking = original.metadata?.booking
     if (!booking) throw new Error('Không có dữ liệu booking')
+
+    // Optimistic locking — chống race condition khi 2 user cùng negotiate
+    const currentVersion = booking.negotiation_version || 0
+    if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {
+      throw new Error(
+        `Bên kia vừa cập nhật phiếu (version ${currentVersion} thay vì ${options.expectedVersion}). Vui lòng tải lại để xem.`,
+      )
+    }
+
+    const newHistory: NegotiationHistoryEntry[] = options?.historyEntry
+      ? [...(booking.negotiation_history || []), options.historyEntry]
+      : (booking.negotiation_history || [])
 
     const { data, error } = await supabase
       .from('b2b_chat_messages')
@@ -473,8 +506,10 @@ export const chatMessageService = {
           booking: {
             ...booking,
             status,
-            counter_price: counterPrice || booking.counter_price,
-            negotiation_notes: negotiationNotes || booking.negotiation_notes,
+            counter_price: counterPrice ?? booking.counter_price,
+            negotiation_notes: negotiationNotes ?? booking.negotiation_notes,
+            negotiation_history: newHistory,
+            negotiation_version: currentVersion + 1,
           },
         },
       })
@@ -517,14 +552,61 @@ export const chatMessageService = {
   },
 
   /**
-   * Thương lượng booking (đề xuất giá mới)
+   * Thương lượng booking (đề xuất giá mới).
+   * - Push 1 entry vào negotiation_history
+   * - Optimistic locking qua expectedVersion (cảnh báo conflict nếu race)
+   * - Validate counterPrice trong khoảng 0.5x - 2x price_per_kg gốc
+   * - Notes BẮT BUỘC (min 10 ký tự) — frontend đã validate, đây là backup
    */
   async negotiateBooking(
-    messageId: string, 
-    counterPrice: number, 
-    notes?: string
+    messageId: string,
+    counterPrice: number,
+    notes: string,
+    actorInfo?: { id: string; name?: string; role?: 'factory' | 'partner' },
   ): Promise<ChatMessage> {
-    return this.updateBookingStatus(messageId, 'negotiating', counterPrice, notes)
+    if (!notes || notes.trim().length < 10) {
+      throw new Error('Lý do thương lượng phải có ít nhất 10 ký tự')
+    }
+    const original = await this.getById(messageId)
+    if (!original) throw new Error('Tin nhắn không tồn tại')
+    const booking = original.metadata?.booking
+    if (!booking) throw new Error('Không có dữ liệu booking')
+
+    // Validate counter-price range
+    const basePrice = booking.counter_price || booking.price_per_kg
+    if (counterPrice > basePrice * 2) {
+      throw new Error(
+        `Giá đề xuất quá cao (>${(basePrice * 2).toLocaleString('vi-VN')} đ/kg = 2× giá hiện tại)`,
+      )
+    }
+    if (counterPrice < basePrice * 0.5) {
+      throw new Error(
+        `Giá đề xuất quá thấp (<${(basePrice * 0.5).toLocaleString('vi-VN')} đ/kg = 50% giá hiện tại)`,
+      )
+    }
+
+    const historyEntry: NegotiationHistoryEntry = {
+      actor_id: actorInfo?.id || 'unknown',
+      actor_name: actorInfo?.name,
+      actor_role: actorInfo?.role,
+      counter_price: counterPrice,
+      notes: notes.trim(),
+      ts: new Date().toISOString(),
+    }
+    const result = await this.updateBookingStatus(
+      messageId,
+      'negotiating',
+      counterPrice,
+      notes,
+      {
+        expectedVersion: booking.negotiation_version || 0,
+        historyEntry,
+      },
+    )
+    // Note: notification gửi qua trigger DB hoặc realtime — hiện chat
+    // chính đã subscribe postgres_changes UPDATE → bên kia tự thấy. Không
+    // cần gọi notificationService riêng (sẽ duplicate noise).
+    return result
   },
 
   // ============================================

@@ -41,6 +41,15 @@ const { TextArea } = Input;
 // TYPES
 // ==========================================
 
+export interface NegotiationEntry {
+  actor_id: string;        // employee_id ai đề xuất
+  actor_name?: string;     // tên hiển thị (snapshot)
+  actor_role?: 'factory' | 'partner';
+  counter_price: number;   // giá đề xuất tại bước này
+  notes: string;           // lý do (BẮT BUỘC từ v2026-05-20)
+  ts: string;              // ISO timestamp
+}
+
 export interface BookingMetadata {
   code?: string;
   product_type?: string;
@@ -55,7 +64,13 @@ export interface BookingMetadata {
   status?: 'pending' | 'confirmed' | 'negotiating' | 'rejected';
   counter_price?: number;
   negotiation_notes?: string;
-  // Nhà máy đích nhận hàng
+  /** Lịch sử thương lượng — append-only. Mỗi lần negotiate push 1 entry. */
+  negotiation_history?: NegotiationEntry[];
+  /** Optimistic locking: increment mỗi lần update để chống race condition */
+  negotiation_version?: number;
+  /** Deadline thương lượng (ISO). Vượt quá → frontend hiện cảnh báo. */
+  negotiation_expires_at?: string;
+  /** Nhà máy đích nhận hàng */
   target_facility_id?: string;
   target_facility_code?: string;
   target_facility_name?: string;
@@ -109,6 +124,34 @@ const productTypeLabels: Record<string, string> = {
 };
 
 // ==========================================
+// COUNTDOWN (deadline thương lượng)
+// ==========================================
+
+const NegotiationCountdown: React.FC<{ expiresAt: string }> = ({ expiresAt }) => {
+  const [now, setNow] = React.useState(Date.now())
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000) // tick mỗi phút
+    return () => clearInterval(t)
+  }, [])
+  const diff = new Date(expiresAt).getTime() - now
+  if (diff <= 0) {
+    return (
+      <div style={{ marginTop: 6, fontSize: 11, color: '#ff4d4f', fontWeight: 600 }}>
+        ⏰ Hết hạn thương lượng — vui lòng confirm hoặc reject
+      </div>
+    )
+  }
+  const hours = Math.floor(diff / 3_600_000)
+  const days = Math.floor(hours / 24)
+  const label = days > 0 ? `${days} ngày ${hours % 24}h` : `${hours}h`
+  return (
+    <div style={{ marginTop: 6, fontSize: 11, color: '#fa8c16' }}>
+      ⏱ Còn {label} để chốt giá
+    </div>
+  )
+}
+
+// ==========================================
 // NEGOTIATION MODAL
 // ==========================================
 
@@ -147,24 +190,58 @@ const NegotiationModal: React.FC<NegotiationModalProps> = ({
       <Form form={form} layout="vertical" initialValues={{ counterPrice: currentPrice }}>
         <Form.Item
           name="counterPrice"
-          label="Giá đề xuất (VNĐ/kg)"
-          rules={[{ required: true, message: 'Vui lòng nhập giá đề xuất' }]}
+          label="Giá đề xuất (đ/kg)"
+          rules={[
+            { required: true, message: 'Vui lòng nhập giá đề xuất' },
+            // Cận trên: 2x giá gốc — chống nhập nhầm số quá lớn
+            {
+              validator: (_, v) => {
+                if (!currentPrice || !v) return Promise.resolve()
+                if (v > currentPrice * 2) {
+                  return Promise.reject(new Error(
+                    `Giá đề xuất quá cao (>${(currentPrice * 2).toLocaleString('vi-VN')} đ/kg = 2× giá gốc). Vui lòng kiểm tra lại.`,
+                  ))
+                }
+                if (v < currentPrice * 0.5) {
+                  return Promise.reject(new Error(
+                    `Giá đề xuất quá thấp (<${(currentPrice * 0.5).toLocaleString('vi-VN')} đ/kg = 50% giá gốc). Vui lòng kiểm tra lại.`,
+                  ))
+                }
+                return Promise.resolve()
+              },
+            },
+          ]}
         >
           <InputNumber
             style={{ width: '100%' }}
             min={0}
-            step={1000}
+            step={500}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={(value) => value!.replace(/,/g, '') as any}
-            suffix="VNĐ/kg"
+            parser={(value) => Number(value!.replace(/,/g, '')) || 0 as any}
+            addonAfter="đ/kg"
           />
         </Form.Item>
-        <Form.Item name="notes" label="Ghi chú">
-          <TextArea rows={3} placeholder="Lý do hoặc ghi chú thêm..." />
+        <Form.Item
+          name="notes"
+          label="Lý do thương lượng"
+          rules={[
+            { required: true, message: 'Vui lòng nhập lý do thương lượng' },
+            { min: 10, message: 'Lý do tối thiểu 10 ký tự' },
+            { max: 500, message: 'Lý do tối đa 500 ký tự' },
+          ]}
+        >
+          <TextArea
+            rows={3}
+            showCount
+            maxLength={500}
+            placeholder="VD: Chất lượng mủ ướt, DRC thấp hơn dự kiến, giá thị trường giảm 5%..."
+          />
         </Form.Item>
         {currentPrice && (
           <div style={{ color: colors.textSecondary, fontSize: 13 }}>
-            Giá đại lý đề xuất: {currentPrice.toLocaleString('vi-VN')} VNĐ/kg
+            Giá gốc: <strong>{currentPrice.toLocaleString('vi-VN')} đ/kg</strong>
+            <br />
+            Cho phép: {(currentPrice * 0.5).toLocaleString('vi-VN')} → {(currentPrice * 2).toLocaleString('vi-VN')} đ/kg
           </div>
         )}
       </Form>
@@ -306,16 +383,53 @@ const BookingCard: React.FC<BookingCardProps> = ({
               borderRadius: 8,
             }}
           >
-            <Text type="secondary" style={{ fontSize: 11 }}>Giá đề xuất từ nhà máy</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>Giá đề xuất hiện tại</Text>
             <div style={{ fontWeight: 600, color: '#1890ff' }}>
-              {counter_price.toLocaleString('vi-VN')} VNĐ/kg
+              {counter_price.toLocaleString('vi-VN')} đ/kg
             </div>
             {negotiation_notes && (
               <Text style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
                 "{negotiation_notes}"
               </Text>
             )}
+            {metadata.negotiation_expires_at && (
+              <NegotiationCountdown expiresAt={metadata.negotiation_expires_at} />
+            )}
           </div>
+        )}
+
+        {/* Negotiation history thread (collapsible) — sau 2 round trở lên */}
+        {metadata.negotiation_history && metadata.negotiation_history.length >= 2 && (
+          <details style={{ marginTop: 8 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 11, color: colors.textSecondary }}>
+              📜 Lịch sử thương lượng ({metadata.negotiation_history.length} bước)
+            </summary>
+            <div style={{ marginTop: 6, padding: 8, background: '#fafafa', borderRadius: 6, maxHeight: 200, overflow: 'auto' }}>
+              {metadata.negotiation_history.map((h, i) => (
+                <div key={i} style={{
+                  padding: '6px 0',
+                  borderBottom: i < (metadata.negotiation_history!.length - 1) ? '1px dashed #eee' : 'none',
+                  fontSize: 11,
+                }}>
+                  <div>
+                    <strong>{h.actor_name || h.actor_id.substring(0, 8)}</strong>
+                    <Text type="secondary" style={{ marginLeft: 6, fontSize: 10 }}>
+                      ({h.actor_role === 'factory' ? 'Nhà máy' : 'Đại lý'})
+                    </Text>
+                    <Text type="secondary" style={{ float: 'right', fontSize: 10 }}>
+                      {new Date(h.ts).toLocaleString('vi-VN')}
+                    </Text>
+                  </div>
+                  <div>
+                    Đề xuất: <strong style={{ color: '#1890ff' }}>{h.counter_price.toLocaleString('vi-VN')} đ/kg</strong>
+                  </div>
+                  <div style={{ color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 }}>
+                    "{h.notes}"
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
         )}
 
         <Divider style={{ margin: '12px 0 8px' }} />

@@ -1138,18 +1138,39 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   }
 
   const handleBookingAction = async (messageId: string, action: 'confirm' | 'reject' | 'negotiate') => {
+    const msg = messages.find(m => m.id === messageId)
+    const booking = msg?.metadata?.booking as BookingMetadata | undefined
+    if (!booking) {
+      message.error('Không tìm thấy phiếu chốt mủ')
+      return
+    }
+    // Status guard: chỉ pending/negotiating mới được action
+    if (booking.status === 'confirmed') {
+      message.warning('Phiếu đã xác nhận, không thể thao tác thêm')
+      return
+    }
+    if (booking.status === 'rejected') {
+      message.warning('Phiếu đã bị từ chối')
+      return
+    }
+
     if (action === 'negotiate') {
+      // Pre-fill giá hiện tại (counter_price nếu đang negotiating, hoặc price_per_kg gốc)
+      const currentPrice = booking.counter_price || booking.price_per_kg
+      negotiateForm.setFieldsValue({ counterPrice: currentPrice, notes: '' })
       setNegotiateModal({ visible: true, messageId })
       return
     }
 
     if (action === 'confirm') {
-      // Mở ConfirmDealModal thay vì auto-confirm
-      const msg = messages.find(m => m.id === messageId)
-      const booking = msg?.metadata?.booking as BookingMetadata | undefined
-      if (booking) {
-        setConfirmDealModal({ visible: true, booking, messageId })
+      // Pre-fill counter_price (giá đã thương lượng) thay vì price_per_kg gốc.
+      // Trước đây Confirm khi negotiating → Deal lưu giá GỐC → mismatch nghiêm trọng.
+      const finalPrice = booking.counter_price || booking.price_per_kg
+      const enrichedBooking: BookingMetadata = {
+        ...booking,
+        price_per_kg: finalPrice,
       }
+      setConfirmDealModal({ visible: true, booking: enrichedBooking, messageId })
       return
     }
 
@@ -1333,12 +1354,22 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
 
     try {
       const values = await negotiateForm.validateFields()
-      await chatMessageService.negotiateBooking(negotiateModal.messageId, values.counterPrice, values.notes)
+      await chatMessageService.negotiateBooking(
+        negotiateModal.messageId,
+        values.counterPrice,
+        values.notes,
+        {
+          id: user?.employee_id || 'unknown',
+          name: user?.full_name,
+          role: 'factory',
+        },
+      )
       message.success('Đã gửi đề xuất giá')
       setNegotiateModal({ visible: false, messageId: null })
       negotiateForm.resetFields()
-    } catch (error) {
-      message.error('Không thể gửi đề xuất')
+    } catch (error: any) {
+      // negotiateBooking throw error rõ ràng (giá out of range, race condition…)
+      message.error(error?.message || 'Không thể gửi đề xuất')
     }
   }
 
@@ -1687,20 +1718,71 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
         okText="Gửi đề xuất"
         cancelText="Hủy"
       >
-        <Form form={negotiateForm} layout="vertical">
-          <Form.Item name="counterPrice" label="Giá đề xuất (đ/kg)" rules={[{ required: true, message: 'Vui lòng nhập giá đề xuất' }]}>
-            <InputNumber<number>
-              style={{ width: '100%' }}
-              min={0}
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) || 0}
-              placeholder="Nhập giá đề xuất"
-            />
-          </Form.Item>
-          <Form.Item name="notes" label="Ghi chú">
-            <TextArea rows={3} placeholder="Lý do thương lượng..." />
-          </Form.Item>
-        </Form>
+        {(() => {
+          const msg = messages.find(m => m.id === negotiateModal.messageId)
+          const booking = msg?.metadata?.booking as BookingMetadata | undefined
+          const basePrice = booking ? (booking.counter_price || booking.price_per_kg) : 0
+          return (
+            <Form form={negotiateForm} layout="vertical">
+              <Form.Item
+                name="counterPrice"
+                label="Giá đề xuất (đ/kg)"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập giá đề xuất' },
+                  {
+                    validator: (_, v) => {
+                      if (!basePrice || !v) return Promise.resolve()
+                      if (v > basePrice * 2) {
+                        return Promise.reject(new Error(
+                          `Giá quá cao (>${(basePrice * 2).toLocaleString('vi-VN')} = 2× giá hiện tại)`,
+                        ))
+                      }
+                      if (v < basePrice * 0.5) {
+                        return Promise.reject(new Error(
+                          `Giá quá thấp (<${(basePrice * 0.5).toLocaleString('vi-VN')} = 50% giá hiện tại)`,
+                        ))
+                      }
+                      return Promise.resolve()
+                    },
+                  },
+                ]}
+              >
+                <InputNumber<number>
+                  style={{ width: '100%' }}
+                  min={0}
+                  step={500}
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => Number(value!.replace(/,/g, '')) || 0}
+                  addonAfter="đ/kg"
+                  placeholder="Nhập giá đề xuất"
+                />
+              </Form.Item>
+              <Form.Item
+                name="notes"
+                label="Lý do thương lượng"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập lý do thương lượng' },
+                  { min: 10, message: 'Lý do tối thiểu 10 ký tự' },
+                  { max: 500, message: 'Lý do tối đa 500 ký tự' },
+                ]}
+              >
+                <TextArea
+                  rows={3}
+                  showCount
+                  maxLength={500}
+                  placeholder="VD: Mủ ướt DRC thấp hơn dự kiến, giá thị trường giảm 5%, đại lý đề xuất giá khác..."
+                />
+              </Form.Item>
+              {basePrice > 0 && (
+                <div style={{ color: '#8c8c8c', fontSize: 12 }}>
+                  Giá hiện tại: <strong>{basePrice.toLocaleString('vi-VN')} đ/kg</strong>
+                  <br />
+                  Cho phép: {(basePrice * 0.5).toLocaleString('vi-VN')} → {(basePrice * 2).toLocaleString('vi-VN')} đ/kg
+                </div>
+              )}
+            </Form>
+          )
+        })()}
       </Modal>
     </div>
   )

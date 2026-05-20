@@ -372,46 +372,66 @@ export default function ContractReviewPage() {
             },
             {
               title: 'Khách hàng',
-              dataIndex: ['form_data', 'buyer_name'],
               key: 'buyer_name',
               ellipsis: true,
-              render: (v: string) => v || '—',
+              // Upload flow: form_data minimal → fallback sang sales_order.customer.
+              // Compose flow: form_data có buyer_name (Sale nhập form).
+              render: (_: unknown, r: SalesOrderContract) =>
+                r.form_data?.buyer_name
+                || r.sales_order?.customer?.name
+                || r.sales_order?.customer?.short_name
+                || '—',
             },
             {
               title: 'Grade',
-              dataIndex: ['form_data', 'grade'],
               key: 'grade',
               width: 100,
-              render: (v: string) => <Tag color="blue">{v || '—'}</Tag>,
+              render: (_: unknown, r: SalesOrderContract) => {
+                const g = r.form_data?.grade || r.sales_order?.grade
+                return <Tag color="blue">{g || '—'}</Tag>
+              },
             },
             {
               title: 'Tấn / Cont',
               key: 'qty',
               width: 110,
-              render: (_: unknown, r: SalesOrderContract) => (
-                <Text>
-                  {r.form_data?.quantity || '—'} MT
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    {r.form_data?.containers} {r.form_data?.cont_type}
+              render: (_: unknown, r: SalesOrderContract) => {
+                const qty = r.form_data?.quantity || r.sales_order?.quantity_tons
+                const containers = r.form_data?.containers || r.sales_order?.container_count
+                const contType = r.form_data?.cont_type
+                return (
+                  <Text>
+                    {qty ?? '—'} MT
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {containers || ''} {contType || ''}
+                    </Text>
                   </Text>
-                </Text>
-              ),
+                )
+              },
             },
             {
               title: 'Giá trị USD',
-              dataIndex: ['form_data', 'amount'],
               key: 'amount',
               width: 140,
               align: 'right',
-              render: (v: string) => <Text strong>${v || '—'}</Text>,
+              render: (_: unknown, r: SalesOrderContract) => {
+                const amount = r.form_data?.amount
+                  ? r.form_data.amount
+                  : r.sales_order?.total_value_usd
+                    ? r.sales_order.total_value_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                    : null
+                return <Text strong>${amount || '—'}</Text>
+              },
             },
             {
               title: 'Incoterm',
-              dataIndex: ['form_data', 'incoterm'],
               key: 'incoterm',
               width: 100,
-              render: (v: string) => <Tag>{v || '—'}</Tag>,
+              render: (_: unknown, r: SalesOrderContract) => {
+                const inco = r.form_data?.incoterm || r.sales_order?.incoterm
+                return <Tag>{inco || '—'}</Tag>
+              },
             },
             {
               title: 'Người trình',

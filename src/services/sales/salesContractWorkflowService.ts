@@ -82,7 +82,11 @@ export interface SalesOrderContract {
     grade?: string
     quantity_tons?: number
     unit_price?: number
+    total_value_usd?: number
+    container_count?: number
+    incoterm?: string
     status?: string
+    customer?: { name?: string; short_name?: string; code?: string } | null
   } | null
   created_by_employee?: { id: string; full_name?: string; email?: string } | null
   reviewer_employee?: { id: string; full_name?: string; email?: string } | null
@@ -639,7 +643,9 @@ export const salesContractWorkflowService = {
       .select(
         `*,
          sales_order:sales_orders!sales_order_contracts_sales_order_id_fkey(
-           id, contract_no, customer_id, grade, quantity_tons, unit_price, status
+           id, contract_no, customer_id, grade, quantity_tons, unit_price,
+           total_value_usd, container_count, incoterm, status,
+           customer:sales_customers!sales_orders_customer_id_fkey(name, short_name, code)
          ),
          created_by_employee:employees!sales_order_contracts_created_by_fkey(id, full_name, email),
          reviewer_employee:employees!sales_order_contracts_reviewer_id_fkey(id, full_name, email)`,
@@ -698,7 +704,9 @@ export const salesContractWorkflowService = {
       .select(
         `*,
          sales_order:sales_orders!sales_order_contracts_sales_order_id_fkey(
-           id, contract_no, customer_id, grade, quantity_tons, unit_price, status
+           id, contract_no, customer_id, grade, quantity_tons, unit_price,
+           total_value_usd, container_count, incoterm, status,
+           customer:sales_customers!sales_orders_customer_id_fkey(name, short_name, code)
          ),
          created_by_employee:employees!sales_order_contracts_created_by_fkey(id, full_name, email),
          reviewer_employee:employees!sales_order_contracts_reviewer_id_fkey(id, full_name, email)`,

@@ -329,61 +329,96 @@ const BookingCard = ({
         </div>
       )}
 
-      {/* Action Buttons — 2 hàng để tránh tràn */}
-      {isFromPartner && (isPending || isNegotiating) && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Hàng 1: Xác nhận (nổi bật) */}
-          <Button
-            type="primary"
-            block
-            icon={<CheckCircleOutlined />}
-            style={{
-              background: '#52c41a',
-              borderColor: '#52c41a',
-              borderRadius: 10,
-              height: 38,
-              fontWeight: 600,
-            }}
-            onClick={onConfirm}
-          >
-            Xác nhận phiếu
-          </Button>
-          {/* Hàng 2: Thương lượng + Từ chối */}
-          <div style={{ display: 'flex', gap: 8 }}>
+      {/* Action Buttons — logic theo "lượt phản hồi":
+          - status='pending': chỉ phía partner gửi → factory respond
+          - status='negotiating': bên VỪA propose phải chờ, bên còn lại respond.
+            Dùng negotiation_history[last].actor_role = 'factory'/'partner'
+            để xác định ai vừa propose. Bên factory đang xem này:
+              * Nếu factory vừa propose → ẩn button + hiện "Đang chờ đại lý phản hồi"
+              * Nếu partner vừa propose → factory respond → show button */}
+      {(() => {
+        const lastNeg = booking.negotiation_history?.length
+          ? booking.negotiation_history[booking.negotiation_history.length - 1]
+          : null
+        const myTurn = isPending
+          ? isFromPartner  // partner gửi PCM → factory respond
+          : isNegotiating
+            ? (lastNeg ? lastNeg.actor_role !== 'factory' : isFromPartner)
+            : false
+        const waitingForPartner = isNegotiating && !myTurn
+
+        if (waitingForPartner) {
+          return (
+            <div style={{
+              textAlign: 'center',
+              padding: '10px 0',
+              color: 'rgba(255,255,255,0.85)',
+              fontSize: 13,
+              fontStyle: 'italic',
+              background: 'rgba(255,255,255,0.1)',
+              borderRadius: 8,
+            }}>
+              <DollarOutlined style={{ marginRight: 6 }} />
+              Đang chờ đại lý phản hồi…
+            </div>
+          )
+        }
+        if (!myTurn) return null
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Hàng 1: Xác nhận (nổi bật) — label đổi theo status */}
             <Button
+              type="primary"
               block
-              icon={<DollarOutlined />}
+              icon={<CheckCircleOutlined />}
               style={{
-                flex: 1,
+                background: '#52c41a',
+                borderColor: '#52c41a',
                 borderRadius: 10,
-                height: 36,
-                background: 'rgba(255,255,255,0.15)',
-                borderColor: 'rgba(255,255,255,0.3)',
-                color: '#fff',
+                height: 38,
+                fontWeight: 600,
               }}
-              onClick={onNegotiate}
+              onClick={onConfirm}
             >
-              Thương lượng
+              {isNegotiating ? 'Đồng ý giá đề xuất' : 'Xác nhận phiếu'}
             </Button>
-            <Button
-              block
-              danger
-              icon={<CloseCircleOutlined />}
-              style={{
-                flex: 1,
-                borderRadius: 10,
-                height: 36,
-                background: 'rgba(239,68,68,0.15)',
-                borderColor: 'rgba(239,68,68,0.4)',
-                color: '#ff6b6b',
-              }}
-              onClick={onReject}
-            >
-              Từ chối
-            </Button>
+            {/* Hàng 2: Thương lượng + Từ chối */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button
+                block
+                icon={<DollarOutlined />}
+                style={{
+                  flex: 1,
+                  borderRadius: 10,
+                  height: 36,
+                  background: 'rgba(255,255,255,0.15)',
+                  borderColor: 'rgba(255,255,255,0.3)',
+                  color: '#fff',
+                }}
+                onClick={onNegotiate}
+              >
+                {isNegotiating ? 'Thương lượng lại' : 'Thương lượng'}
+              </Button>
+              <Button
+                block
+                danger
+                icon={<CloseCircleOutlined />}
+                style={{
+                  flex: 1,
+                  borderRadius: 10,
+                  height: 36,
+                  background: 'rgba(239,68,68,0.15)',
+                  borderColor: 'rgba(239,68,68,0.4)',
+                  color: '#ff6b6b',
+                }}
+                onClick={onReject}
+              >
+                Từ chối
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </Card>
   )
 }

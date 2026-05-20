@@ -79,6 +79,10 @@ export interface BookingMetadata {
 export interface BookingCardProps {
   metadata?: BookingMetadata | null;
   isOwn?: boolean;
+  /** Role của người đang xem card. Dùng để xác định lượt phản hồi:
+   *  - status='negotiating' + lastNegotiator.role === viewerRole → đang đợi bên kia (hide action)
+   *  - status='negotiating' + lastNegotiator.role !== viewerRole → mình phản hồi (show action) */
+  viewerRole?: 'factory' | 'partner';
   onConfirm?: () => void;
   onReject?: () => void;
   onNegotiate?: (counterPrice: number, notes: string) => void;
@@ -256,6 +260,7 @@ const NegotiationModal: React.FC<NegotiationModalProps> = ({
 const BookingCard: React.FC<BookingCardProps> = ({
   metadata,
   isOwn = false,
+  viewerRole,
   onConfirm,
   onReject,
   onNegotiate,
@@ -290,7 +295,34 @@ const BookingCard: React.FC<BookingCardProps> = ({
 
   const statusConf = statusConfig[status] || statusConfig.pending;
   const productLabel = productTypeLabels[product_type || ''] || product_type || 'Mủ cao su';
-  const showActions = !isOwn && status === 'pending';
+  // Logic hiện action buttons (Xác nhận / Thương lượng / Từ chối):
+  //
+  // 1. status='pending' (chưa ai phản hồi):
+  //    → chỉ bên KHÔNG phải sender mới có button (!isOwn)
+  //
+  // 2. status='negotiating' (đã có ít nhất 1 counter-proposal):
+  //    → bên VỪA propose phải chờ → ẩn button
+  //    → bên còn lại có button → response
+  //    Dùng negotiation_history[last].actor_role để xác định bên vừa propose.
+  //    Nếu chưa có history (legacy data) → fallback show cho bên !isOwn.
+  //
+  // 3. status='confirmed' / 'rejected': terminal, ẩn button.
+  const lastNegotiation = metadata.negotiation_history?.length
+    ? metadata.negotiation_history[metadata.negotiation_history.length - 1]
+    : null;
+  const showActions = (() => {
+    if (status === 'pending') return !isOwn;
+    if (status === 'negotiating') {
+      if (lastNegotiation && viewerRole) {
+        // Bên vừa propose (= last actor role) đang chờ → ẩn
+        return lastNegotiation.actor_role !== viewerRole;
+      }
+      // Fallback (legacy data hoặc viewerRole không truyền): show cho bên !isOwn
+      return !isOwn;
+    }
+    return false; // confirmed / rejected
+  })();
+  const waitingForOther = status === 'negotiating' && !showActions;
 
   // Format currency
   const formatCurrency = (value?: number) => {
@@ -457,6 +489,23 @@ const BookingCard: React.FC<BookingCardProps> = ({
           </div>
         )}
 
+        {/* Waiting state: phía mình vừa propose, đợi bên kia phản hồi */}
+        {waitingForOther && (
+          <>
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{
+              textAlign: 'center',
+              padding: '8px 0',
+              color: colors.textSecondary,
+              fontSize: 13,
+              fontStyle: 'italic',
+            }}>
+              <SwapOutlined style={{ marginRight: 6 }} />
+              Đang chờ {lastNegotiation?.actor_role === 'factory' ? 'đại lý' : 'nhà máy'} phản hồi…
+            </div>
+          </>
+        )}
+
         {/* Action buttons */}
         {showActions && (
           <>
@@ -469,7 +518,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
                 block
                 style={{ background: '#52c41a', borderColor: '#52c41a' }}
               >
-                Xác nhận
+                {status === 'negotiating' ? 'Đồng ý giá đề xuất' : 'Xác nhận'}
               </Button>
               <Row gutter={8}>
                 <Col span={12}>

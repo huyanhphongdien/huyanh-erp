@@ -42,6 +42,7 @@ import {
   EditOutlined,
   InboxOutlined,
   RollbackOutlined,
+  FileWordOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import {
@@ -593,33 +594,41 @@ export default function ContractSignPage() {
             </Card>
 
             <Divider>{active.signer_confirmed_at ? 'Bước 1 · Tải HĐ ra in (ai cũng làm được)' : 'Tải HĐ để review'}</Divider>
-            <Space.Compact block style={{ marginBottom: 16 }}>
-              <Button
-                icon={<DownloadOutlined />}
-                loading={docLoading === 'SC'}
-                onClick={() => handleDownload('SC')}
-                style={{ flex: 1 }}
-              >
-                Tải SC
-              </Button>
-              <Button
-                icon={<DownloadOutlined />}
-                loading={docLoading === 'PI'}
-                onClick={() => handleDownload('PI')}
-                style={{ flex: 1 }}
-              >
-                Tải PI
-              </Button>
-              <Button
-                type="primary"
-                icon={<DownloadOutlined />}
-                loading={docLoading === 'BOTH'}
-                onClick={() => handleDownload('BOTH')}
-                style={{ flex: 1.2, background: '#1B4D3E' }}
-              >
-                Tải SC + PI
-              </Button>
-            </Space.Compact>
+
+            {/* Upload flow: hiển thị list file Phú đã fill (reviewer_filled_urls) +
+                file Docs upload gốc (sale_upload_urls) — Trung/Huy download bản
+                Phú fill để in ký + đóng dấu. Đây là file CHÍNH THỨC. */}
+            {active.flow_type === 'upload' ? (
+              <UploadFlowSignFiles contract={active} />
+            ) : (
+              <Space.Compact block style={{ marginBottom: 16 }}>
+                <Button
+                  icon={<DownloadOutlined />}
+                  loading={docLoading === 'SC'}
+                  onClick={() => handleDownload('SC')}
+                  style={{ flex: 1 }}
+                >
+                  Tải SC
+                </Button>
+                <Button
+                  icon={<DownloadOutlined />}
+                  loading={docLoading === 'PI'}
+                  onClick={() => handleDownload('PI')}
+                  style={{ flex: 1 }}
+                >
+                  Tải PI
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<DownloadOutlined />}
+                  loading={docLoading === 'BOTH'}
+                  onClick={() => handleDownload('BOTH')}
+                  style={{ flex: 1.2, background: '#1B4D3E' }}
+                >
+                  Tải SC + PI
+                </Button>
+              </Space.Compact>
+            )}
 
             {/* Step 2: Upload FINAL — CHỈ hiện sau khi đã xác nhận */}
             {active.signer_confirmed_at && (
@@ -661,6 +670,125 @@ export default function ContractSignPage() {
           </>
         )}
       </Drawer>
+    </div>
+  )
+}
+
+// ============================================================================
+// UploadFlowSignFiles — Trung/Huy xem file Phú đã fill (upload flow)
+// File CHÍNH THỨC để in ký = reviewer_filled_urls. sale_upload_urls = bản gốc Docs.
+// ============================================================================
+function UploadFlowSignFiles({ contract }: { contract: SalesOrderContract }) {
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null)
+
+  const filledFiles = contract.reviewer_filled_urls || []
+  const saleFiles = contract.sale_upload_urls || []
+
+  const handleDownload = async (key: string, path: string) => {
+    setDownloadingKey(key)
+    try {
+      const url = await salesContractWorkflowService.getDownloadUrl(path)
+      window.open(url, '_blank')
+    } catch (e: unknown) {
+      message.error(`Download thất bại: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setDownloadingKey(null)
+    }
+  }
+
+  // Strip prefix `{ts}-{idx}-sale-` / `{ts}-{idx}-filled-` để hiện tên gốc
+  const stripPrefix = (p: string) => {
+    const base = p.split('/').pop() || p
+    return base.replace(/^\d+-\d+-(sale|filled)-/, '')
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {/* File Phú đã fill — CHÍNH THỨC */}
+      <Card size="small" style={{ marginBottom: 10 }} title={
+        <Space>
+          <span style={{ color: '#1B4D3E' }}>📄 File Phú đã fill (BẢN CHÍNH THỨC)</span>
+          <Tag color="green">{filledFiles.length} file</Tag>
+        </Space>
+      }>
+        {filledFiles.length === 0 ? (
+          <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
+            ⚠ Phú chưa upload file đã fill — không thể ký
+          </Text>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filledFiles.map((path, idx) => (
+              <div
+                key={`filled-${idx}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 10px',
+                  background: '#f6ffed',
+                  border: '1px solid #b7eb8f',
+                  borderRadius: 6,
+                  fontSize: 12,
+                }}
+              >
+                <FileWordOutlined style={{ color: '#1B4D3E', fontSize: 18 }} />
+                <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {idx + 1}. {stripPrefix(path)}
+                </span>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<DownloadOutlined />}
+                  loading={downloadingKey === `filled-${idx}`}
+                  onClick={() => handleDownload(`filled-${idx}`, path)}
+                  style={{ background: '#1B4D3E' }}
+                >
+                  Tải về in
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* File Docs upload gốc — chỉ tham khảo */}
+      {saleFiles.length > 0 && (
+        <details style={{ marginBottom: 10 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 11, color: '#666' }}>
+            📎 Xem {saleFiles.length} file gốc Docs upload (tham khảo, không dùng để ký)
+          </summary>
+          <div style={{ marginTop: 6, padding: 8, background: '#fafafa', borderRadius: 6 }}>
+            {saleFiles.map((path, idx) => (
+              <div
+                key={`sale-${idx}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '4px 6px',
+                  fontSize: 11,
+                  borderBottom: idx < saleFiles.length - 1 ? '1px solid #eee' : 'none',
+                }}
+              >
+                <FileWordOutlined style={{ color: '#999', fontSize: 14 }} />
+                <span style={{ flex: 1, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {idx + 1}. {stripPrefix(path)}
+                </span>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  loading={downloadingKey === `sale-${idx}`}
+                  onClick={() => handleDownload(`sale-${idx}`, path)}
+                  style={{ padding: 0, fontSize: 11 }}
+                >
+                  Tải
+                </Button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   )
 }

@@ -82,6 +82,8 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
   const [resubmitting, setResubmitting] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [resubmitForm] = Form.useForm()
+  // Multi-file picker dùng cho upload flow resubmit
+  const [resubmitFiles, setResubmitFiles] = useState<File[]>([])
 
   // SALES_CONFIG dùng được vì là source-of-truth single. Admin email được archive.
   const canArchive = SALES_CONFIG.DELETE_PERMISSION_EMAILS.includes(
@@ -434,6 +436,7 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
             <RedoOutlined />
             <span>Sửa & Trình lại — {latest.form_data?.contract_no}</span>
             <Tag>rev #{latest.revision_no + 1} (mới)</Tag>
+            {latest.flow_type === 'upload' && <Tag color="purple">📎 Upload</Tag>}
           </Space>
         }
         open={resubmitOpen}
@@ -447,12 +450,26 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
               icon={<RedoOutlined />}
               loading={resubmitting}
               onClick={async () => {
-                const vals = await resubmitForm.validateFields()
-                const merged = { ...latest.form_data, ...vals }
                 setResubmitting(true)
                 try {
-                  await salesContractWorkflowService.resubmitRevision(salesOrderId, merged)
-                  message.success('Đã trình revision mới — Phú LV sẽ kiểm tra lại')
+                  if (latest.flow_type === 'upload') {
+                    if (resubmitFiles.length === 0) {
+                      message.error('Chọn ít nhất 1 file .docx')
+                      return
+                    }
+                    await salesContractWorkflowService.resubmitUploadRevision(
+                      salesOrderId,
+                      resubmitFiles,
+                      latest.form_data?.contract_no,
+                    )
+                    message.success(`Đã trình lại ${resubmitFiles.length} file — Phú LV sẽ kiểm tra`)
+                    setResubmitFiles([])
+                  } else {
+                    const vals = await resubmitForm.validateFields()
+                    const merged = { ...latest.form_data, ...vals }
+                    await salesContractWorkflowService.resubmitRevision(salesOrderId, merged)
+                    message.success('Đã trình revision mới — Phú LV sẽ kiểm tra lại')
+                  }
                   setResubmitOpen(false)
                   const updated = await salesContractWorkflowService.listBySalesOrder(salesOrderId)
                   setRows(updated)
@@ -465,7 +482,9 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
               }}
               style={{ background: '#1B4D3E' }}
             >
-              Trình lại
+              {latest.flow_type === 'upload'
+                ? `Trình lại ${resubmitFiles.length > 0 ? resubmitFiles.length + ' file' : ''}`
+                : 'Trình lại'}
             </Button>
           </Space>
         }
@@ -475,23 +494,112 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
           showIcon
           message={`Phú LV đã trả lại với lý do: "${latest.rejected_reason || '—'}"`}
           description={
-            <div>
-              Sửa trường bị report, sau đó bấm "Trình lại".
-              <Button
-                type="link"
-                size="small"
-                style={{ padding: '0 4px', fontSize: 12 }}
-                onClick={() => {
-                  setResubmitOpen(false)
-                  navigate(`/sales/orders/${salesOrderId}/edit`)
-                }}
-              >
-                Hoặc mở Compose Studio để sửa toàn bộ →
-              </Button>
-            </div>
+            latest.flow_type === 'upload' ? (
+              <div>Sửa file .docx (Word) theo lý do trên, sau đó upload lại bên dưới.</div>
+            ) : (
+              <div>
+                Sửa trường bị report, sau đó bấm "Trình lại".
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ padding: '0 4px', fontSize: 12 }}
+                  onClick={() => {
+                    setResubmitOpen(false)
+                    navigate(`/sales/orders/${salesOrderId}/edit`)
+                  }}
+                >
+                  Hoặc mở Compose Studio để sửa toàn bộ →
+                </Button>
+              </div>
+            )
           }
           style={{ marginBottom: 16 }}
         />
+
+        {/* Upload flow — multi-file picker */}
+        {latest.flow_type === 'upload' && (
+          <div>
+            <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
+              Upload tối đa 10 file .docx mới. File cũ ở rev #{latest.revision_no} vẫn lưu lại để audit.
+            </div>
+            <div
+              style={{
+                border: resubmitFiles.length > 0 ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
+                background: resubmitFiles.length > 0 ? '#f6ffed' : '#fafafa',
+                borderRadius: 8,
+                padding: 14,
+                textAlign: 'center',
+                cursor: 'pointer',
+              }}
+              onClick={() => document.getElementById('resubmit-files-input')?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                const dropped = Array.from(e.dataTransfer.files).filter(
+                  (f) => f.name.toLowerCase().endsWith('.docx'),
+                )
+                setResubmitFiles((prev) => {
+                  const merged = [...prev, ...dropped]
+                  return merged.slice(0, 10)
+                })
+              }}
+            >
+              <input
+                id="resubmit-files-input"
+                type="file"
+                multiple
+                accept=".docx"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  if (e.target.files) {
+                    const arr = Array.from(e.target.files).filter(
+                      (f) => f.name.toLowerCase().endsWith('.docx'),
+                    )
+                    setResubmitFiles((prev) => [...prev, ...arr].slice(0, 10))
+                  }
+                  e.target.value = ''
+                }}
+              />
+              <div style={{ fontSize: 13, color: '#444' }}>
+                {resubmitFiles.length > 0
+                  ? `Đã chọn ${resubmitFiles.length}/10 file`
+                  : 'Kéo thả .docx hoặc bấm để chọn'}
+              </div>
+            </div>
+            {resubmitFiles.length > 0 && (
+              <div style={{ marginTop: 8, border: '1px solid #e8e8e8', borderRadius: 6 }}>
+                {resubmitFiles.map((f, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 10px',
+                      borderBottom: idx < resubmitFiles.length - 1 ? '1px solid #f0f0f0' : 'none',
+                      fontSize: 12,
+                    }}
+                  >
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {idx + 1}. {f.name} ({(f.size / 1024).toFixed(0)} KB)
+                    </span>
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      onClick={() => setResubmitFiles((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Compose flow — form (deprecated nhưng giữ cho HĐ cũ rev='compose') */}
+        {latest.flow_type !== 'upload' && (
         <Form form={resubmitForm} layout="vertical" size="middle">
           <Divider plain style={{ margin: '4px 0 12px' }}>
             <span style={{ fontSize: 11, color: '#8c8c8c' }}>📋 HĐ</span>
@@ -643,6 +751,7 @@ export default function ContractWorkflowSection({ salesOrderId }: Props) {
             style={{ marginTop: 8, fontSize: 11 }}
           />
         </Form>
+        )}
       </Drawer>
     </Card>
   )

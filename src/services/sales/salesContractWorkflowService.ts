@@ -163,7 +163,10 @@ async function _copyContractFileToDocuments(params: {
       ha_signed: 'HĐ HA đã ký (Trung/Huy)',
       final_signed: 'HĐ FINAL (KH ký 2 bên)',
     }
-    const fileName = params.filePath.split('/').pop() || 'contract'
+    // Strip prefix `{ts}-{idx}-sale-` / `{ts}-{idx}-filled-` để file_name hiển thị
+    // tên gốc thân thiện thay vì timestamp dài
+    const basename = params.filePath.split('/').pop() || 'contract'
+    const fileName = basename.replace(/^\d+-\d+-(sale|filled)-/, '')
     const docName = params.contractNo
       ? `${labelMap[params.docSubType]} — ${params.contractNo}`
       : labelMap[params.docSubType]
@@ -775,18 +778,53 @@ export const salesContractWorkflowService = {
       }),
     ).catch((e) => console.error('Email approve fail:', e))
 
-    // ─── Auto-copy TẤT CẢ file Phú đã fill vào folder "HĐ gửi KH" ───
-    // Upload flow: Phú có thể upload 1-10 file đã fill (HĐ chính + phụ lục + …).
-    // Mỗi file được insert 1 row vào sales_order_documents (sub_type='sent_to_customer').
-    if (row.flow_type === 'upload' && row.reviewer_filled_urls && row.reviewer_filled_urls.length > 0) {
-      for (const filePath of row.reviewer_filled_urls) {
+    // ─── Auto-copy TẤT CẢ file vào folder "HĐ gửi KH" ───
+    // Upload flow: Docs có thể trình N file (HĐ chính + phụ lục + packing list + …),
+    // Phú có thể chỉ fill 1-2 file (HĐ có highlight). Mỗi file phụ lục cần
+    // được lưu vào folder "HĐ gửi KH" để KH thấy đủ bộ.
+    //
+    // Strategy: với mỗi sale_upload_urls[i], match với reviewer_filled_urls theo
+    // tên gốc (strip prefix `{ts}-{idx}-sale-` / `{ts}-{idx}-filled-`).
+    //  - Có file fill matched → dùng file fill (đã có số HĐ + bank)
+    //  - Không có file fill → dùng file Docs gốc (phụ lục, không cần fill)
+    if (row.flow_type === 'upload' && row.sale_upload_urls && row.sale_upload_urls.length > 0) {
+      const stripPrefix = (p: string) =>
+        (p.split('/').pop() || p).replace(/^\d+-\d+-(sale|filled)-/, '')
+
+      // Build map từ tên gốc → path filled (nếu có)
+      const filledByName = new Map<string, string>()
+      for (const p of (row.reviewer_filled_urls || [])) {
+        filledByName.set(stripPrefix(p), p)
+      }
+      const usedFilledPaths = new Set<string>()
+
+      // Loop sale uploads, prefer file filled cùng tên
+      for (const salePath of row.sale_upload_urls) {
+        const originalName = stripPrefix(salePath)
+        const filledPath = filledByName.get(originalName)
+        const pathToCopy = filledPath || salePath
+        if (filledPath) usedFilledPaths.add(filledPath)
         void _copyContractFileToDocuments({
           salesOrderId: row.sales_order_id,
-          filePath,
+          filePath: pathToCopy,
           docSubType: 'sent_to_customer',
           uploadedBy: senderId,
           contractNo,
         })
+      }
+
+      // Edge case: Phú upload file đã fill nhưng tên không khớp file Docs nào
+      // (vd Phú đổi tên file). Vẫn copy để không mất công Phú fill.
+      for (const p of (row.reviewer_filled_urls || [])) {
+        if (!usedFilledPaths.has(p)) {
+          void _copyContractFileToDocuments({
+            salesOrderId: row.sales_order_id,
+            filePath: p,
+            docSubType: 'sent_to_customer',
+            uploadedBy: senderId,
+            contractNo,
+          })
+        }
       }
     }
 
@@ -1082,6 +1120,26 @@ export const salesContractWorkflowService = {
     formData: Partial<ContractFormData>,
   ): Promise<SalesOrderContract> {
     return this.createDraftAndSubmit(salesOrderId, formData)
+  },
+
+  /** Resubmit cho UPLOAD FLOW — Docs upload lại N file mới sau khi Phú reject.
+   *  Hoạt động giống createUploadFlow nhưng nhãn audit là "resubmit". */
+  async resubmitUploadRevision(
+    salesOrderId: string,
+    files: File[],
+    contractNoHint?: string,
+  ): Promise<SalesOrderContract> {
+    // Re-use logic createUploadFlow (đã có validate + upload + insert).
+    // Log riêng action='resubmit' để audit phân biệt.
+    const row = await this.createUploadFlow(salesOrderId, files, contractNoHint)
+    void _logWorkflowEvent({
+      salesOrderId,
+      contractId: row.id,
+      action: 'resubmit',
+      userId: await getCurrentEmployeeId(),
+      notes: `Resubmit upload flow rev #${row.revision_no} với ${files.length} file`,
+    })
+    return row
   },
 
   /** Lưu trữ HĐ đã ký (signed → archived). Admin only — RLS guard. */

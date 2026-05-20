@@ -108,6 +108,9 @@ export interface SalesOrder {
   // Đóng gói
   packing_type: PackingType
   bale_weight_kg: number
+  /** Array các giá trị KG/bành chấp nhận trong HĐ (1-2 phần tử).
+   *  Multi-value = "linh động" — HĐ thương mại có thể đi 1 trong 2 quy cách. */
+  bale_weights_kg?: number[]
   total_bales?: number
   shrink_wrap: boolean
   pallet_required: boolean
@@ -240,6 +243,8 @@ export interface SalesOrderItem {
   total_value_usd?: number
   quantity_kg?: number
   bale_weight_kg?: number
+  /** Multi KG/bành accepted (mảng 1-2 phần tử). Linh động khi giao hàng. */
+  bale_weights_kg?: number[]
   total_bales?: number
   bales_per_container?: number
   container_count?: number

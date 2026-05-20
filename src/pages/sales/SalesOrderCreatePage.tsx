@@ -26,6 +26,7 @@ import {
   Tabs,
   Collapse,
   Alert,
+  Checkbox,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -87,18 +88,19 @@ function SalesOrderCreatePage() {
     grade: string
     quantity_tons: number
     unit_price: number
-    bale_weight_kg: number
+    bale_weight_kg: number  // legacy single, = bale_weights_kg[0]
+    bale_weights_kg: number[]  // multi (1-2 phần tử). Multi → "linh động"
     bales_per_container: number
     packing_type: string
     packing_note: string
     payment_terms: string
   }
   const [orderItems, setOrderItems] = useState<OrderItem[]>([
-    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' },
+    { key: '1', grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bale_weights_kg: [35], bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' },
   ])
 
   const addItem = () => {
-    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' }])
+    setOrderItems(prev => [...prev, { key: String(Date.now()), grade: '', quantity_tons: 0, unit_price: 0, bale_weight_kg: 35, bale_weights_kg: [35], bales_per_container: 576, packing_type: 'loose_bale', packing_note: '', payment_terms: '' }])
   }
 
   const removeItem = (key: string) => {
@@ -113,6 +115,10 @@ function SalesOrderCreatePage() {
   // Totals from items
   const itemsTotalTons = orderItems.reduce((s, i) => s + (i.quantity_tons || 0), 0)
   const itemsTotalUSD = orderItems.reduce((s, i) => s + (i.quantity_tons || 0) * (i.unit_price || 0), 0)
+  // Linh động flag: bất kỳ item nào check ≥ 2 KG/bành → tổng "linh động"
+  const hasFlexibleBaleWeight = orderItems.some(
+    (i) => (i.bale_weights_kg && i.bale_weights_kg.length > 1),
+  )
   const itemsTotalBales = orderItems.reduce((s, i) => {
     const bw = i.bale_weight_kg || 35
     return s + Math.round((i.quantity_tons * 1000) / bw)
@@ -581,10 +587,23 @@ function SalesOrderCreatePage() {
                     onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
                 </Col>
                 <Col xs={12} sm={5}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>KG/bành</div>
-                  <Select value={item.bale_weight_kg} style={{ width: '100%' }}
-                    options={[{ value: 35, label: '35' }, { value: 33.33, label: '33.33' }]}
-                    onChange={(v) => updateItem(item.key, 'bale_weight_kg', v)} />
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
+                    KG/bành <span style={{ color: '#bfbfbf' }}>(check 1 hoặc 2)</span>
+                  </div>
+                  <Checkbox.Group
+                    value={item.bale_weights_kg || [item.bale_weight_kg || 35]}
+                    options={[
+                      { value: 33.33, label: '33.33' },
+                      { value: 35, label: '35' },
+                    ]}
+                    onChange={(arr) => {
+                      // Min 1 giá trị — nếu user uncheck cả 2, ép giữ 35
+                      const next = (arr as number[]).length === 0 ? [35] : (arr as number[]).slice(0, 2)
+                      const primary = next[0]
+                      updateItem(item.key, 'bale_weights_kg', next)
+                      updateItem(item.key, 'bale_weight_kg', primary)
+                    }}
+                  />
                 </Col>
                 <Col xs={12} sm={5}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Bành/cont</div>
@@ -643,9 +662,17 @@ function SalesOrderCreatePage() {
               </Row>
               {item.quantity_tons > 0 && item.unit_price > 0 && (
                 <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
-                  {Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)).toLocaleString()} bành |
-                  {' '}{Math.ceil(Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)) / (item.bales_per_container || 576))} cont |
-                  {' '}${(item.quantity_tons * item.unit_price).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  {(item.bale_weights_kg && item.bale_weights_kg.length > 1) ? (
+                    <span style={{ color: '#d46b08', fontWeight: 600 }}>
+                      Bành/Cont: Linh động ({item.bale_weights_kg.join(' hoặc ')} kg/bành)
+                    </span>
+                  ) : (
+                    <>
+                      {Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)).toLocaleString()} bành |
+                      {' '}{Math.ceil(Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)) / (item.bales_per_container || 576))} cont
+                    </>
+                  )}
+                  {' | '}${(item.quantity_tons * item.unit_price).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                 </div>
               )}
             </div>
@@ -764,14 +791,24 @@ function SalesOrderCreatePage() {
           <Row gutter={[12, 8]}>
             <Col span={12}>
               <div style={{ fontSize: 11, color: '#999' }}>Tổng bành</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#1B4D3E' }}>
-                {itemsTotalBales.toLocaleString()}
+              <div style={{
+                fontSize: hasFlexibleBaleWeight ? 14 : 18,
+                fontWeight: 700,
+                color: hasFlexibleBaleWeight ? '#d46b08' : '#1B4D3E',
+              }}>
+                {hasFlexibleBaleWeight ? 'Linh động' : itemsTotalBales.toLocaleString()}
               </div>
             </Col>
             <Col span={12}>
               <div style={{ fontSize: 11, color: '#999' }}>Số cont</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#d46b08' }}>
-                {itemsTotalContainers} <span style={{ fontSize: 11, fontWeight: 400 }}>x 20ft</span>
+              <div style={{
+                fontSize: hasFlexibleBaleWeight ? 14 : 18,
+                fontWeight: 700,
+                color: '#d46b08',
+              }}>
+                {hasFlexibleBaleWeight
+                  ? 'Linh động'
+                  : <>{itemsTotalContainers} <span style={{ fontSize: 11, fontWeight: 400 }}>x 20ft</span></>}
               </div>
             </Col>
             <Col span={24}>

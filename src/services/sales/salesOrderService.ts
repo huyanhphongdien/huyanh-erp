@@ -95,6 +95,7 @@ export interface CreateSalesOrderData {
     currency?: string
     payment_terms?: string
     bale_weight_kg?: number
+    bale_weights_kg?: number[]
     bales_per_container?: number
     packing_type?: string
     packing_note?: string
@@ -466,6 +467,9 @@ export const salesOrderService = {
       const itemRows = input.items.map((item, idx) => {
         const qtyKg = item.quantity_tons * 1000
         const bw = item.bale_weight_kg || 33.33
+        const baleWeights = item.bale_weights_kg && item.bale_weights_kg.length > 0
+          ? item.bale_weights_kg
+          : [bw]
         const totalBales = Math.round(qtyKg / bw)
         const bpc = item.bales_per_container || 576
         return {
@@ -478,6 +482,7 @@ export const salesOrderService = {
           total_value_usd: item.quantity_tons * item.unit_price,
           quantity_kg: qtyKg,
           bale_weight_kg: bw,
+          bale_weights_kg: baleWeights,
           total_bales: totalBales,
           bales_per_container: bpc,
           container_count: Math.ceil(totalBales / bpc),

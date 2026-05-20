@@ -986,9 +986,13 @@ function SalesOrderCreatePage() {
           </Space.Compact>
         </Card>
 
-        {/* ═══ Action buttons — 2 tab: Compose tự động / Upload .docx ═══ */}
+        {/* ═══ Action buttons — Upload .docx (Docs trình HĐ) ═══
+            Compose flow bỏ hẳn (2026-05-20). HĐ mới CHỈ upload — Docs (Nhung+PA)
+            soạn Word + upload → Phú điền + duyệt → Trung/Huy ký → Docs upload FINAL.
+            HĐ cũ status='reviewing' flow_type='compose' vẫn render UI cũ ở
+            ContractReviewPage (backward compat). */}
         <Card size="small" style={{ marginTop: 12, borderRadius: 12 }}>
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <Space direction="vertical" style={{ width: '100%' }} size={8}>
             <Button
               type="default"
               icon={<SaveOutlined />}
@@ -998,54 +1002,19 @@ function SalesOrderCreatePage() {
               disabled={submittingReview}
               onClick={() => handleSubmit(true)}
             >
-              Lưu nháp (chưa trình)
+              Lưu nháp đơn (chưa trình HĐ)
             </Button>
-
-            <Tabs
-              defaultActiveKey="compose"
-              size="small"
-              style={{ marginTop: 4 }}
-              items={[
-                {
-                  key: 'compose',
-                  label: '🤖 Compose tự động',
-                  children: (
-                    <Space direction="vertical" style={{ width: '100%' }} size={6}>
-                      <Button
-                        type="primary"
-                        icon={<CheckCircleOutlined />}
-                        block
-                        size="large"
-                        loading={submittingReview}
-                        disabled={loading}
-                        onClick={handleSubmitForReview}
-                        style={{ background: '#1B4D3E' }}
-                      >
-                        Trình Kiểm tra (Phú LV) — Compose
-                      </Button>
-                      <div style={{ fontSize: 11, color: '#999', textAlign: 'center' }}>
-                        ERP render HĐ từ template tự động. Phú LV nhập bank → Trung/Huy ký.
-                      </div>
-                    </Space>
-                  ),
-                },
-                {
-                  key: 'upload',
-                  label: '📎 Upload bản đã sửa',
-                  children: (
-                    <UploadFlowAction
-                      contractNoHint={contractData.contract_no}
-                      loading={loading || submittingReview}
-                      onBeforeSubmit={async () => {
-                        // Tạo sales_order trước (validate + insert giống compose flow)
-                        const ok = await handleSubmit(true, { silent: true })
-                        return ok?.id || null
-                      }}
-                      onUploaded={() => navigate('/sales/orders')}
-                    />
-                  ),
-                },
-              ]}
+            <Divider style={{ margin: '4px 0' }}>
+              <Tag color="purple" style={{ fontSize: 11 }}>📎 Trình HĐ Workflow</Tag>
+            </Divider>
+            <UploadFlowAction
+              contractNoHint={contractData.contract_no}
+              loading={loading || submittingReview}
+              onBeforeSubmit={async () => {
+                const ok = await handleSubmit(true, { silent: true })
+                return ok?.id || null
+              }}
+              onUploaded={() => navigate('/sales/orders')}
             />
           </Space>
         </Card>

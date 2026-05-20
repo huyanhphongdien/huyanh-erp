@@ -287,10 +287,11 @@ export default function ContractFileSection({ orderId, salesRole, title = 'File 
                   ✍️ HĐ HA đã ký
                 </Button>
               </Tooltip>
-              {/* HĐ FINAL: Sale + Admin/BGĐ đều upload được (Sale làm việc với KH,
-                  nhận bản FINAL từ KH gửi về). Xóa vẫn chỉ Admin/BGĐ (RLS guard). */}
-              {(salesRole === 'sale' || salesRole === 'admin' || userIsBOD) && (
-                <Tooltip title="HĐ FINAL — KH ký lại 2 bên (PHÁP LÝ). Sale upload khi nhận từ KH.">
+              {/* HĐ FINAL: CHỈ Docs (Nhung/Phương Anh = logistics role) + Admin/BGĐ.
+                  Sale KHÔNG upload final (quy trình mới 2026-05-20).
+                  Lý do: Docs là người contact KH nhận lại bản ký 2 bên + lưu trữ. */}
+              {(salesRole === 'logistics' || salesRole === 'admin' || userIsBOD) && (
+                <Tooltip title="HĐ FINAL — KH ký lại 2 bên (PHÁP LÝ). Docs (Nhung/PA) upload khi nhận từ KH.">
                   <Button
                     size="small"
                     type="primary"

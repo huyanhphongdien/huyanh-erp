@@ -144,6 +144,51 @@ export async function getEmployeeIdByEmail(email: string): Promise<string | null
   return data?.id || null
 }
 
+/** Auto-insert file của workflow vào sales_order_documents để hiển thị ở 3
+ *  sub-folder Tab Hợp đồng. Dùng khi:
+ *   - Phú approve() upload flow → insert vào sub_type='sent_to_customer'
+ *   - Trung/Huy markSigned() → insert vào sub_type='ha_signed'
+ *  Không copy file vật lý — share cùng bucket 'sales-contracts', chỉ reference path.
+ *  Fire-and-forget — không throw để không rollback workflow nếu insert fail. */
+async function _copyContractFileToDocuments(params: {
+  salesOrderId: string
+  filePath: string  // path in 'sales-contracts' bucket
+  docSubType: 'sent_to_customer' | 'ha_signed' | 'final_signed'
+  uploadedBy: string | null
+  contractNo?: string
+}): Promise<void> {
+  try {
+    const labelMap = {
+      sent_to_customer: 'HĐ gửi KH (Phú duyệt)',
+      ha_signed: 'HĐ HA đã ký (Trung/Huy)',
+      final_signed: 'HĐ FINAL (KH ký 2 bên)',
+    }
+    const fileName = params.filePath.split('/').pop() || 'contract'
+    const docName = params.contractNo
+      ? `${labelMap[params.docSubType]} — ${params.contractNo}`
+      : labelMap[params.docSubType]
+    const { error } = await supabase
+      .from('sales_order_documents')
+      .insert({
+        sales_order_id: params.salesOrderId,
+        doc_type: 'contract',
+        doc_sub_type: params.docSubType,
+        doc_name: docName,
+        sort_order: 0,
+        file_url: params.filePath,
+        file_name: fileName,
+        is_received: true,
+        received_at: new Date().toISOString(),
+        uploaded_by: params.uploadedBy,
+      })
+    if (error) {
+      console.error('[_copyContractFileToDocuments] insert fail:', error)
+    }
+  } catch (e) {
+    console.error('[_copyContractFileToDocuments] unexpected:', e)
+  }
+}
+
 /** Log workflow event vào sales_contract_access_log (audit trail).
  *  Fire-and-forget — không block workflow nếu log fail. */
 async function _logWorkflowEvent(params: {
@@ -685,6 +730,19 @@ export const salesContractWorkflowService = {
       }),
     ).catch((e) => console.error('Email approve fail:', e))
 
+    // ─── Auto-copy file vào folder "HĐ gửi KH" (sent_to_customer) ───
+    // Khi flow_type='upload', file đã được Phú fill 2 chỗ highlight (reviewer_filled_url).
+    // File này coi như bản chính thức gửi KH duyệt — lưu vào sub_type='sent_to_customer'.
+    if (row.flow_type === 'upload' && row.reviewer_filled_url) {
+      void _copyContractFileToDocuments({
+        salesOrderId: row.sales_order_id,
+        filePath: row.reviewer_filled_url,
+        docSubType: 'sent_to_customer',
+        uploadedBy: senderId,
+        contractNo,
+      })
+    }
+
     // ─── Audit log ───
     void _logWorkflowEvent({
       salesOrderId: row.sales_order_id,
@@ -920,6 +978,19 @@ export const salesContractWorkflowService = {
         ctx: { ...ctx, signer_name: signerName },
       })
     }).catch((e) => console.error('Email signed fail:', e))
+
+    // ─── Auto-copy PDF đã ký vào folder "HĐ HA đã ký" (ha_signed) ───
+    // Trung/Huy upload PDF in + ký + đóng dấu HA → sub_type='ha_signed'.
+    // Folder FINAL (final_signed = ký 2 bên) sẽ do Docs upload sau khi nhận từ KH.
+    if (signedPdfUrl) {
+      void _copyContractFileToDocuments({
+        salesOrderId: row.sales_order_id,
+        filePath: signedPdfUrl,
+        docSubType: 'ha_signed',
+        uploadedBy: signerId,
+        contractNo,
+      })
+    }
 
     // ─── Audit log ───
     void _logWorkflowEvent({

@@ -342,7 +342,7 @@ async function tryConfigOnPort(
   port: SerialPort,
   cfg: { baudRate: number; parity: ParityType; dataBits?: number; stopBits?: number },
   timeoutMs = 4000
-): Promise<'ok' | 'parity' | 'no_data' | 'garbled' | 'error'> {
+): Promise<'ok' | 'parity' | 'no_data' | 'garbled' | 'error' | 'cannot_open'> {
   try {
     await port.open({
       baudRate: cfg.baudRate,
@@ -351,7 +351,13 @@ async function tryConfigOnPort(
       parity: cfg.parity,
       flowControl: 'none',
     })
-  } catch {
+  } catch (err: any) {
+    // DOMException "Failed to open serial port" — port bị app khác chiếm, driver
+    // chưa cài, hoặc port không tồn tại. Không có config nào fix được → bail.
+    const msg = (err?.message || '').toLowerCase()
+    if (err?.name === 'DOMException' || msg.includes('failed to open') || msg.includes('invalidstateerror')) {
+      return 'cannot_open'
+    }
     return 'error'
   }
 
@@ -607,6 +613,15 @@ export function useKeliScale(): UseKeliScaleReturn {
       })
 
       console.log(`[KeliScale] ${cfg.label} → ${result}`)
+
+      // Bail sớm: nếu port không mở được, không config nào cứu được — dừng ngay.
+      // Nguyên nhân: cổng đang bị app khác chiếm (CanOto...), driver chưa cài,
+      // hoặc cổng đã bị rút. Báo user rõ ràng thay vì spam 16 lần error.
+      if (result === 'cannot_open') {
+        console.error('[KeliScale] Cổng không mở được — dừng auto-detect, không thử tiếp.')
+        setError('Không mở được cổng COM này. Có thể do: (1) cổng đang bị app khác chiếm (CanOto?), (2) driver USB-Serial chưa cài, (3) chọn nhầm cổng. Bấm "Quên cổng đã lưu" rồi chọn cổng khác.')
+        return null
+      }
 
       if (result === 'ok') {
         const found: KeliScaleConfig = {

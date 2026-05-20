@@ -317,8 +317,10 @@ const BookingCard: React.FC<BookingCardProps> = ({
         // Bên vừa propose (= last actor role) đang chờ → ẩn
         return lastNegotiation.actor_role !== viewerRole;
       }
-      // Fallback (legacy data hoặc viewerRole không truyền): show cho bên !isOwn
-      return !isOwn;
+      // Fallback no-history (legacy data trước fix 2026-05-20):
+      // Bên SENDER ban đầu (isOwn=true) phải respond vì bên kia đã propose.
+      // Tức ngược logic 'pending'.
+      return isOwn;
     }
     return false; // confirmed / rejected
   })();

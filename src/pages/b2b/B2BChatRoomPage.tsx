@@ -340,10 +340,13 @@ const BookingCard = ({
         const lastNeg = booking.negotiation_history?.length
           ? booking.negotiation_history[booking.negotiation_history.length - 1]
           : null
+        // Logic lượt phản hồi (xem comment chi tiết ở portal BookingCard).
+        // Fallback no-history phải dùng !isFromPartner (legacy: bên kia đã negotiate
+        // trước fix, mình là sender ban đầu giờ phải respond).
         const myTurn = isPending
-          ? isFromPartner  // partner gửi PCM → factory respond
+          ? isFromPartner
           : isNegotiating
-            ? (lastNeg ? lastNeg.actor_role !== 'factory' : isFromPartner)
+            ? (lastNeg ? lastNeg.actor_role !== 'factory' : !isFromPartner)
             : false
         const waitingForPartner = isNegotiating && !myTurn
 

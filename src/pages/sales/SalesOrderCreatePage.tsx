@@ -957,11 +957,11 @@ function SalesOrderCreatePage() {
           Tạo đơn hàng bán
         </Title>
         <span style={{ marginLeft: 'auto', color: '#999', fontSize: 12 }}>
-          Form trái — Live preview HĐ bên phải · Bank info do Phú LV (Kiểm tra) nhập
+          Docs upload file .docx HĐ bên phải · Phú LV duyệt + nhập bank
         </span>
       </div>
 
-      {/* Form single-page (Compose Studio) */}
+      {/* Form single-page — quy trình upload (2026-05-20): bỏ compose UI */}
       <Form form={form} layout="vertical" requiredMark preserve>
         {renderStep1()}
       </Form>

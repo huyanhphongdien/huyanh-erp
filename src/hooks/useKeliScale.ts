@@ -121,6 +121,10 @@ const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; dataBit
 
 // Config key in localStorage
 const CONFIG_KEY = 'keli_scale_config'
+// Flag chỉ ON khi đã connect thành công 1 lần — gate cho auto-reconnect ở mount.
+// Nếu user chưa từng kết nối thành công → KHÔNG auto-reconnect (tránh spam DOMException
+// trên cổng cũ đã grant nhưng disconnected).
+const LAST_SUCCESS_KEY = 'keli_scale_last_success'
 
 // ============================================================================
 // PARSER — Parse Keli output formats (text + binary)
@@ -638,6 +642,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       setConnected(true)
       setError(null)
       fatalErrorRef.current = false
+      // Đánh dấu đã connect thành công ít nhất 1 lần — auto-reconnect lần load sau OK
+      try { localStorage.setItem(LAST_SUCCESS_KEY, '1') } catch { /* ignore */ }
       console.log(`[KeliScale] ✅ Connected — Model: XK3118T1-A3 | Baud: ${cfg.baudRate} | Parity: ${cfg.parity} | DataBits: ${cfg.dataBits} | StopBits: ${cfg.stopBits}`)
       console.log(`[KeliScale] 📡 Listening for weight data... (check console for raw bytes)`)
 
@@ -814,6 +820,15 @@ export function useKeliScale(): UseKeliScaleReturn {
     if (!supported || fatalErrorRef.current) return
 
     const tryAutoConnect = async () => {
+      // Gate: chỉ auto-reconnect nếu user đã từng connect thành công.
+      // Lần đầu chưa connect → skip, tránh spam DOMException trên port "ma".
+      const everConnected = (() => {
+        try { return localStorage.getItem(LAST_SUCCESS_KEY) === '1' } catch { return false }
+      })()
+      if (!everConnected) {
+        console.log('[KeliScale] Bỏ qua auto-reconnect — chưa có kết nối thành công trước đây. User cần bấm "Kết nối cổng COM".')
+        return
+      }
       try {
         const ports = await (navigator as any).serial.getPorts()
         if (ports.length > 0 && !portRef.current && !fatalErrorRef.current) {
@@ -867,12 +882,13 @@ export function useKeliScale(): UseKeliScaleReturn {
       }
     } catch { /* ignore */ }
     try { localStorage.removeItem(CONFIG_KEY) } catch { /* ignore */ }
+    try { localStorage.removeItem(LAST_SUCCESS_KEY) } catch { /* ignore */ }
     // Reset hook state local
     portRef.current = null
     setConnected(false)
     setLiveWeight(null)
     setError(null)
-    console.log('[KeliScale] Đã quên tất cả cổng đã lưu — user cần chọn lại')
+    console.log('[KeliScale] Đã quên tất cả cổng đã lưu + reset flag — user cần chọn lại')
   }, [])
 
   return {

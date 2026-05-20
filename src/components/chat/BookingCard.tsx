@@ -359,7 +359,14 @@ const BookingCard: React.FC<BookingCardProps> = ({
               <div style={{ fontSize: 11, color: colors.textSecondary }}>{code}</div>
             )}
           </div>
-          <Tag color={statusConf.color}>{statusConf.label}</Tag>
+          <Space direction="vertical" size={2} style={{ alignItems: 'flex-end' }}>
+            <Tag color={statusConf.color}>{statusConf.label}</Tag>
+            {status === 'negotiating' && metadata.negotiation_history && metadata.negotiation_history.length > 0 && (
+              <Tag color="purple" style={{ fontSize: 10, padding: '0 6px', margin: 0 }}>
+                Vòng {metadata.negotiation_history.length}
+              </Tag>
+            )}
+          </Space>
         </div>
 
         <Divider style={{ margin: '8px 0' }} />
@@ -432,38 +439,69 @@ const BookingCard: React.FC<BookingCardProps> = ({
           </div>
         )}
 
-        {/* Negotiation history thread (collapsible) — sau 2 round trở lên */}
-        {metadata.negotiation_history && metadata.negotiation_history.length >= 2 && (
-          <details style={{ marginTop: 8 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 11, color: colors.textSecondary }}>
-              📜 Lịch sử thương lượng ({metadata.negotiation_history.length} bước)
-            </summary>
-            <div style={{ marginTop: 6, padding: 8, background: '#fafafa', borderRadius: 6, maxHeight: 200, overflow: 'auto' }}>
-              {metadata.negotiation_history.map((h, i) => (
-                <div key={i} style={{
-                  padding: '6px 0',
-                  borderBottom: i < (metadata.negotiation_history!.length - 1) ? '1px dashed #eee' : 'none',
-                  fontSize: 11,
-                }}>
-                  <div>
-                    <strong>{h.actor_name || h.actor_id.substring(0, 8)}</strong>
-                    <Text type="secondary" style={{ marginLeft: 6, fontSize: 10 }}>
-                      ({h.actor_role === 'factory' ? 'Nhà máy' : 'Đại lý'})
-                    </Text>
-                    <Text type="secondary" style={{ float: 'right', fontSize: 10 }}>
-                      {new Date(h.ts).toLocaleString('vi-VN')}
-                    </Text>
-                  </div>
-                  <div>
-                    Đề xuất: <strong style={{ color: '#1890ff' }}>{h.counter_price.toLocaleString('vi-VN')} đ/kg</strong>
-                  </div>
-                  <div style={{ color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 }}>
-                    "{h.notes}"
-                  </div>
-                </div>
-              ))}
+        {/* Lịch sử thương lượng — LUÔN expanded khi có ≥1 round.
+            Hiển thị timeline để cả 2 bên thấy quá trình counter. */}
+        {metadata.negotiation_history && metadata.negotiation_history.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 600, marginBottom: 4 }}>
+              📜 Lịch sử thương lượng ({metadata.negotiation_history.length} vòng)
             </div>
-          </details>
+            <div style={{
+              padding: 8,
+              background: '#fafafa',
+              borderRadius: 6,
+              maxHeight: 220,
+              overflow: 'auto',
+              border: '1px solid #e8e8e8',
+            }}>
+              {metadata.negotiation_history.map((h, i) => {
+                const isFactory = h.actor_role === 'factory'
+                return (
+                  <div key={i} style={{
+                    padding: '6px 8px',
+                    borderBottom: i < (metadata.negotiation_history!.length - 1) ? '1px dashed #e8e8e8' : 'none',
+                    fontSize: 11,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={{
+                        background: isFactory ? '#1B4D3E' : '#fa8c16',
+                        color: '#fff',
+                        padding: '1px 6px',
+                        borderRadius: 8,
+                        fontSize: 9,
+                        fontWeight: 700,
+                      }}>
+                        #{i + 1} {isFactory ? 'NHÀ MÁY' : 'ĐẠI LÝ'}
+                      </span>
+                      <strong style={{ fontSize: 11 }}>
+                        {h.actor_name || h.actor_id.substring(0, 8)}
+                      </strong>
+                      <Text type="secondary" style={{ marginLeft: 'auto', fontSize: 10 }}>
+                        {new Date(h.ts).toLocaleString('vi-VN')}
+                      </Text>
+                    </div>
+                    <div style={{ marginLeft: 4 }}>
+                      💰 <strong style={{ color: '#1890ff' }}>{h.counter_price.toLocaleString('vi-VN')} đ/kg</strong>
+                    </div>
+                    {h.notes && (
+                      <div style={{
+                        color: '#595959',
+                        fontStyle: 'italic',
+                        marginTop: 2,
+                        marginLeft: 4,
+                        background: '#fff',
+                        padding: '4px 6px',
+                        borderRadius: 4,
+                        borderLeft: `2px solid ${isFactory ? '#1B4D3E' : '#fa8c16'}`,
+                      }}>
+                        💬 "{h.notes}"
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
 
         <Divider style={{ margin: '12px 0 8px' }} />

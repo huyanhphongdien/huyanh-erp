@@ -603,9 +603,38 @@ export const chatMessageService = {
         historyEntry,
       },
     )
-    // Note: notification gửi qua trigger DB hoặc realtime — hiện chat
-    // chính đã subscribe postgres_changes UPDATE → bên kia tự thấy. Không
-    // cần gọi notificationService riêng (sẽ duplicate noise).
+
+    // ─── Insert system message kèm vào chat (hiện trong timeline) ───
+    // Đại lý (portal) đã làm tương tự ở handleNegotiateBooking. Factory phải
+    // có để chat thread visibility đầy đủ — KHÔNG giới hạn vòng.
+    try {
+      const priceUnitLabel = booking.price_unit === 'dry' ? 'kg khô' : 'kg ướt'
+      const roundNo = (booking.negotiation_history?.length || 0) + 1
+      await supabase.from('b2b_chat_messages').insert({
+        room_id: original.room_id,
+        sender_id: actorInfo?.id || null,
+        sender_type: 'factory',
+        content: `💬 Vòng ${roundNo} — Nhà máy đề xuất thương lượng phiếu #${booking.code || ''}\nGiá: ${counterPrice.toLocaleString('vi-VN')} VNĐ/${priceUnitLabel}\nLý do: ${notes.trim()}`,
+        message_type: 'system',
+        reply_to_id: messageId,
+        metadata: {
+          action: 'booking_counter',
+          booking_message_id: messageId,
+          counter_price: counterPrice,
+          note: notes.trim(),
+          round_no: roundNo,
+        },
+        sent_at: new Date().toISOString(),
+      })
+      // Bump room last_message_at để chat list hiện trên cùng
+      await supabase.from('b2b_chat_rooms')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', original.room_id)
+    } catch (e) {
+      console.error('Insert system message fail:', e)
+      // Không throw — main update đã thành công, system message là bonus
+    }
+
     return result
   },
 

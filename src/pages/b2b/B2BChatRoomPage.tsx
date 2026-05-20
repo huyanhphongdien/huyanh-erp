@@ -215,9 +215,16 @@ const BookingCard = ({
           <Text strong style={{ color: '#fff', fontSize: 14 }}>
             📋 Phiếu chốt mủ
           </Text>
-          <Tag color={BOOKING_STATUS_COLORS[booking.status]}>
-            {BOOKING_STATUS_LABELS[booking.status]}
-          </Tag>
+          <Space size={4}>
+            <Tag color={BOOKING_STATUS_COLORS[booking.status]}>
+              {BOOKING_STATUS_LABELS[booking.status]}
+            </Tag>
+            {isNegotiating && booking.negotiation_history && booking.negotiation_history.length > 0 && (
+              <Tag color="purple" style={{ margin: 0, fontSize: 10, padding: '0 6px' }}>
+                Vòng {booking.negotiation_history.length}
+              </Tag>
+            )}
+          </Space>
         </Space>
         <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
           {booking.code}
@@ -307,7 +314,7 @@ const BookingCard = ({
         {isNegotiating && booking.counter_price && (
           <div style={{ marginTop: 8, padding: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 4 }}>
             <Text style={{ color: '#ffd700', fontSize: 12 }}>
-              💰 Giá đề xuất: {booking.counter_price?.toLocaleString()} đ/kg
+              💰 Giá đề xuất hiện tại: {booking.counter_price?.toLocaleString()} đ/kg
             </Text>
             {booking.negotiation_notes && (
               <div>
@@ -316,6 +323,70 @@ const BookingCard = ({
                 </Text>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Lịch sử thương lượng — luôn hiện expanded khi có ≥1 round.
+            KHÔNG giới hạn số vòng. Timeline để cả 2 bên thấy quá trình. */}
+        {isNegotiating && booking.negotiation_history && booking.negotiation_history.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 4 }}>
+              📜 Lịch sử thương lượng ({booking.negotiation_history.length} vòng)
+            </div>
+            <div style={{
+              padding: 8,
+              background: 'rgba(255,255,255,0.08)',
+              borderRadius: 6,
+              maxHeight: 200,
+              overflow: 'auto',
+            }}>
+              {booking.negotiation_history.map((h, i) => {
+                const isFactory = h.actor_role === 'factory'
+                return (
+                  <div key={i} style={{
+                    padding: '6px 0',
+                    borderBottom: i < booking.negotiation_history!.length - 1 ? '1px dashed rgba(255,255,255,0.2)' : 'none',
+                    fontSize: 11,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={{
+                        background: isFactory ? '#52c41a' : '#fa8c16',
+                        color: '#fff',
+                        padding: '1px 6px',
+                        borderRadius: 8,
+                        fontSize: 9,
+                        fontWeight: 700,
+                      }}>
+                        #{i + 1} {isFactory ? 'NHÀ MÁY' : 'ĐẠI LÝ'}
+                      </span>
+                      <strong style={{ color: '#fff', fontSize: 11 }}>
+                        {h.actor_name || (h.actor_id ? h.actor_id.substring(0, 8) : '?')}
+                      </strong>
+                      <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                        {new Date(h.ts).toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                    <div style={{ marginLeft: 4, color: '#ffd700' }}>
+                      💰 <strong>{h.counter_price.toLocaleString('vi-VN')} đ/kg</strong>
+                    </div>
+                    {h.notes && (
+                      <div style={{
+                        color: 'rgba(255,255,255,0.85)',
+                        fontStyle: 'italic',
+                        marginTop: 2,
+                        marginLeft: 4,
+                        background: 'rgba(0,0,0,0.15)',
+                        padding: '4px 6px',
+                        borderRadius: 4,
+                        borderLeft: `2px solid ${isFactory ? '#52c41a' : '#fa8c16'}`,
+                      }}>
+                        💬 "{h.notes}"
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>

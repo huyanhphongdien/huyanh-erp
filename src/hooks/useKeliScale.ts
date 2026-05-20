@@ -79,6 +79,8 @@ export interface UseKeliScaleReturn {
   config: KeliScaleConfig
   /** Update config */
   setConfig: (config: Partial<KeliScaleConfig>) => void
+  /** Quên tất cả port đã grant permission + clear localStorage saved config */
+  forgetSavedPort: () => Promise<void>
 }
 
 // ============================================================================
@@ -850,6 +852,29 @@ export function useKeliScale(): UseKeliScaleReturn {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supported])
 
+  /**
+   * Quên hết các port đã grant permission + clear saved config.
+   * Dùng khi user đã đổi cổng USB / thay máy / cần chọn lại cổng cân từ đầu.
+   * `port.forget()` yêu cầu Chrome 103+. Browser cũ sẽ chỉ clear localStorage.
+   */
+  const forgetSavedPort = useCallback(async () => {
+    try {
+      if ((navigator as any).serial) {
+        const ports = await (navigator as any).serial.getPorts()
+        for (const p of ports) {
+          try { await p.forget?.() } catch { /* ignore — Chrome < 103 không có forget() */ }
+        }
+      }
+    } catch { /* ignore */ }
+    try { localStorage.removeItem(CONFIG_KEY) } catch { /* ignore */ }
+    // Reset hook state local
+    portRef.current = null
+    setConnected(false)
+    setLiveWeight(null)
+    setError(null)
+    console.log('[KeliScale] Đã quên tất cả cổng đã lưu — user cần chọn lại')
+  }, [])
+
   return {
     supported,
     connected,
@@ -861,6 +886,7 @@ export function useKeliScale(): UseKeliScaleReturn {
     error,
     config,
     setConfig,
+    forgetSavedPort,
   }
 }
 

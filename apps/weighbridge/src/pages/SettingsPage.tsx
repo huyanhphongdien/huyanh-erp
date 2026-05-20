@@ -36,6 +36,7 @@ const PAPER_OPTIONS = [
 
 const KELI_MODELS = [
   { label: 'XK3118T1-A3 (Huy Anh)', baudRate: 2400 },
+  { label: 'XK3118K8 (Tân Lâm)', baudRate: 9600 },
   { label: 'D2008FA', baudRate: 9600 },
   { label: 'XK3190-A9', baudRate: 9600 },
   { label: 'XK3190-A12', baudRate: 2400 },
@@ -270,13 +271,25 @@ export default function SettingsPage() {
                   action={<Button size="small" danger onClick={() => scale.disconnect()}>Ngắt kết nối</Button>}
                 />
               ) : (
-                <Button type="primary" size="large" block
-                  style={{ background: PRIMARY, height: 48, fontSize: 15, fontWeight: 600, borderRadius: 8 }}
-                  icon={<WifiOutlined />}
-                  onClick={() => scale.connect()}
-                >
-                  Kết nối cổng COM (chọn cổng cân)
-                </Button>
+                <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                  <Button type="primary" size="large" block
+                    style={{ background: PRIMARY, height: 48, fontSize: 15, fontWeight: 600, borderRadius: 8 }}
+                    icon={<WifiOutlined />}
+                    onClick={() => scale.connect()}
+                  >
+                    Kết nối cổng COM (chọn cổng cân)
+                  </Button>
+                  {/* Nút "Quên cổng" — dùng khi đổi máy / đổi cổng USB / cổng cũ
+                      vẫn được Chrome nhớ permission nhưng không còn physical kết nối */}
+                  <Button block size="small"
+                    onClick={async () => {
+                      await scale.forgetSavedPort()
+                      message.success('Đã quên cổng đã lưu — bấm "Kết nối cổng COM" để chọn lại')
+                    }}
+                  >
+                    🔄 Quên cổng đã lưu + chọn lại (khi đổi cổng USB)
+                  </Button>
+                </Space>
               )}
             </div>
 
@@ -288,9 +301,10 @@ export default function SettingsPage() {
               description={
                 <div style={{ fontSize: 12 }}>
                   <div>1. Cắm cáp USB-to-RS232 từ đầu cân vào máy tính</div>
-                  <div>2. Nhấn <strong>"Kết nối cổng COM"</strong> → chọn cổng COM</div>
-                  <div>3. Nếu không đọc được → thử đổi Baud Rate (2400 hoặc 9600)</div>
-                  <div>4. Dùng Chrome hoặc Edge (Web Serial API)</div>
+                  <div>2. Chọn đúng đời cân ở trên (vd Tân Lâm = <strong>XK3118K8</strong>)</div>
+                  <div>3. Nhấn <strong>"Kết nối cổng COM"</strong> → chọn đúng cổng COM trong dialog</div>
+                  <div>4. Nếu lỗi "Failed to open" → bấm <strong>"Quên cổng đã lưu"</strong> rồi kết nối lại</div>
+                  <div>5. Dùng Chrome hoặc Edge (Web Serial API)</div>
                 </div>
               }
             />

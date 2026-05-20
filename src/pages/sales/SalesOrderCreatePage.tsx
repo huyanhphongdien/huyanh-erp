@@ -518,27 +518,31 @@ function SalesOrderCreatePage() {
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
           title={<span style={{ fontSize: 14, fontWeight: 600 }}>📋 Thông tin Hợp đồng</span>}>
           <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Số hợp đồng" name="contract_no" rules={[{ required: true, message: 'Nhập số HĐ' }]}>
-                <Input placeholder="VD: LTC2024/PD-ATC" size="large" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Ngày hợp đồng" name="contract_date">
-                <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="PO# khách hàng" name="customer_po">
-                <Input placeholder="Số PO" size="large" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
             <Col xs={24}>
               <Form.Item label="Khách hàng (Buyer)" name="customer_id" rules={[{ required: true, message: 'Chọn buyer' }]}>
                 <Select showSearch placeholder="Chọn khách hàng..." optionFilterProp="label" onChange={handleCustomerChange} size="large"
                   options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}${c.country ? ` (${c.country})` : ''}` }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={8}>
+              <Form.Item
+                label="Số HĐ (tuỳ chọn)"
+                name="contract_no"
+                tooltip="Docs có thể bỏ trống — Phú LV sẽ điền số HĐ chính thức vào file Word + cập nhật khi duyệt"
+              >
+                <Input placeholder="Phú sẽ điền — có thể bỏ trống" size="large" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Ngày HĐ (tuỳ chọn)" name="contract_date">
+                <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="PO# khách hàng (tuỳ chọn)" name="customer_po">
+                <Input placeholder="Số PO" size="large" />
               </Form.Item>
             </Col>
           </Row>

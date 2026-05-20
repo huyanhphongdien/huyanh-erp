@@ -648,161 +648,52 @@ function SalesOrderCreatePage() {
           ))}
         </Card>
 
-        {/* ═══ Điều khoản ═══ */}
-        {/* Bank info (Ngân hàng / Số TK / SWIFT) chuyển sang bước "Kiểm tra" — Phú LV nhập per-order */}
+        {/* ═══ Logistics ═══
+            Form simplified 2026-05-20: bỏ compose UI (HĐ render từ template).
+            Docs upload file Word trực tiếp → KHÔNG cần fill payment notes,
+            arbitration, claims_days, extra_terms, bank info — đã có trong file. */}
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
-          title={<span style={{ fontSize: 14, fontWeight: 600 }}>Điều khoản (Bank info do Kiểm tra nhập)</span>}>
+          title={<span style={{ fontSize: 14, fontWeight: 600 }}>🚢 Logistics</span>}>
           <Row gutter={16}>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={8}>
               <Form.Item label="Incoterm" name="incoterm" initialValue="FOB">
                 <Select size="large"
                   options={Object.entries(INCOTERM_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24} sm={12}>
-              <Form.Item label="Ngày giao dự kiến" name="delivery_date">
-                <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={8}>
               <Form.Item label="Cảng xếp hàng (POL)" name="port_of_loading">
                 <Select size="large" allowClear placeholder="Chọn cảng..."
                   options={PORT_OF_LOADING_OPTIONS.map((p) => ({ value: p.value, label: p.label }))} />
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24}>
-              <Form.Item
-                label="Shipment Time"
-                name="shipment_time"
-                tooltip="Điều khoản thời gian giao hàng trên hợp đồng/L/C (text tự do, cho phép xuống dòng). VD: Within 30 days from L/C date / End of May 2026 / June–July shipment, lot 1: ..., lot 2: ..."
-              >
-                <TextArea
-                  rows={2}
-                  autoSize={{ minRows: 1, maxRows: 4 }}
-                  placeholder="VD: Within 30 days from L/C date — hoặc nhiều dòng cho multi-lot shipment"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24}>
-              <Form.Item
-                label="Ghi chú thanh toán"
-                name="payment_terms_note"
-                tooltip="Dùng cho case thanh toán không khớp tag cố định phía trên. VD: L/C at sight, L/C usance, L/C UPAS, 10% cọc + 90% D/P, 30% TT trước + 70% khi giao..."
-              >
-                <TextArea
-                  rows={2}
-                  placeholder="VD: L/C at sight / L/C UPAS 90 days / 10% cọc + 90% D/P / 30% TT trước ETD + 70% sau B/L"
-                />
+            <Col xs={24} sm={8}>
+              <Form.Item label="Cảng đích (POD)" name="port_of_destination">
+                <Input size="large" placeholder="Shanghai, Yokohama..." />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item label="Hoa hồng (%)" name="commission_pct" tooltip="Tính theo % tổng giá trị đơn. Dùng % HOẶC USD/MT, không dùng cả hai.">
+              <Form.Item label="Ngày giao dự kiến" name="delivery_date">
+                <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item label="Hoa hồng (%)" name="commission_pct"
+                tooltip="Tuỳ chọn. Dùng % HOẶC USD/MT, không dùng cả hai.">
                 <InputNumber min={0} max={20} step={0.5} size="large" style={{ width: '100%' }} placeholder="2"
                   disabled={commissionUsdPerMt > 0} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt" tooltip="Số USD trên mỗi tấn. Dùng khi hợp đồng môi giới tính theo đô/tấn thay vì %.">
+              <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt"
+                tooltip="Tuỳ chọn. Dùng khi môi giới tính theo đô/tấn.">
                 <InputNumber min={0} max={1000} step={1} size="large" style={{ width: '100%' }} placeholder="25"
                   disabled={commissionPct > 0} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Cảng đích" name="port_of_destination">
-                <Input size="large" placeholder="Shanghai, Yokohama..." />
-              </Form.Item>
-            </Col>
           </Row>
-        </Card>
-
-        {/* ═══ Điều kiện kèm theo trên HĐ (mục 3, 4, 6, 8 của template SC) ═══ */}
-        <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
-          title={<Space size={6}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>📑 Điều kiện kèm theo</span>
-            <Tag color="orange" style={{ fontSize: 10 }}>Mặc định OK · sửa khi đặc thù KH</Tag>
-          </Space>}>
-          <Row gutter={16}>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label="Partial shipment" name="contract_partial" initialValue="Not Allowed"
-                tooltip="Cho phép giao nhiều đợt? Mặc định KHÔNG.">
-                <Select size="large" options={[
-                  { value: 'Not Allowed', label: 'Not Allowed' },
-                  { value: 'Allowed', label: 'Allowed' },
-                ]} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label="Transshipment" name="contract_trans" initialValue="Allowed"
-                tooltip="Cho phép chuyển tàu giữa đường? Mặc định YES.">
-                <Select size="large" options={[
-                  { value: 'Allowed', label: 'Allowed' },
-                  { value: 'Not Allowed', label: 'Not Allowed' },
-                ]} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label="Claims period (ngày)" name="contract_claims_days" initialValue={20}
-                tooltip="Số ngày KH được khiếu nại sau khi nhận hàng. Default 20.">
-                <InputNumber min={1} max={90} step={5} size="large" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label="Arbitration" name="contract_arbitration" initialValue="SICOM Singapore"
-                tooltip="Tòa trọng tài giải quyết tranh chấp.">
-                <Select size="large" disabled options={[
-                  { value: 'SICOM Singapore', label: 'SICOM Singapore' },
-                ]} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24} sm={12}>
-              <Form.Item label="Freight mark trên B/L" name="contract_freight_mark"
-                tooltip="Auto theo Incoterm: CIF/CFR → 'freight prepaid' (HA trả); FOB → 'freight Collect' (KH trả).">
-                <Input size="large" placeholder="Auto theo Incoterm — sửa nếu thoả thuận khác" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item label="Amount in words" tooltip="Auto compute từ Tổng USD cho PI section 'Words:'. Sale không cần sửa.">
-                <Input size="large" disabled value={contractData.amount_words || '(sẽ tự sinh khi có giá trị USD)'}
-                  style={{ background: '#fafafa', fontStyle: 'italic', color: '#595959' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24}>
-              <Form.Item
-                label={
-                  <Space size={6}>
-                    <span>📌 Điều khoản bổ sung khác</span>
-                    <Tag color="blue" style={{ fontSize: 10 }}>Tối đa 300 ký tự</Tag>
-                  </Space>
-                }
-                name="contract_extra_terms"
-                tooltip="Các clause đặc thù của KH mà không lường trước được khi thiết kế form. VD: 'Giảm 2% nếu giao trước 15/6', 'KH lo phí fumigation', 'Bao bì in logo riêng theo file đính kèm', 'Trả lại pallet khi rỗng'... Phú LV + Trung/Huy đều thấy ở bước review."
-                rules={[{ max: 300, message: 'Tối đa 300 ký tự' }]}
-              >
-                <TextArea
-                  rows={3}
-                  showCount
-                  maxLength={300}
-                  placeholder="VD: KH yêu cầu fumigation trước khi shipping · Giảm 2% nếu giao trước 15/6 · Bao bì in logo riêng theo file đính kèm..."
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-          <div style={{ fontSize: 11, color: '#999', marginTop: 4, padding: '6px 8px',
-                        background: '#fff7e6', borderRadius: 6, borderLeft: '3px solid #d46b08' }}>
-            ⚠️ <strong>Force Majeure</strong> và <strong>Legal Responsibility</strong> đã được template HĐ hard-code (theo Incoterm CIF vs FOB) — KHÔNG cần Sale chỉnh.
-          </div>
         </Card>
 
         {/* ═══ Chỉ tiêu kỹ thuật + Ghi chú (collapsible) ═══ */}
@@ -864,126 +755,28 @@ function SalesOrderCreatePage() {
           </Card>
         )}
 
-        {/* ═══ Tự động tính toán ═══ */}
-        <Card size="small" style={{ borderRadius: 12, background: 'linear-gradient(135deg, #1B4D3E 0%, #2E7D5B 100%)', border: 'none' }}>
-          <div style={{ color: '#fff', marginBottom: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>Tự động tính toán</span>
-          </div>
-          <Row gutter={[16, 20]}>
+        {/* ═══ Tóm tắt nhanh (mini summary thay cho card gradient cũ) ═══ */}
+        <Card size="small" style={{ borderRadius: 12, marginBottom: 12 }}>
+          <Row gutter={[12, 8]}>
             <Col span={12}>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Tổng bành</div>
-              <div style={{ color: '#fff', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{itemsTotalBales.toLocaleString()}</div>
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>bành</div>
-            </Col>
-            <Col span={12}>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Số container</div>
-              <div style={{ color: '#FFD700', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{itemsTotalContainers}</div>
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 }}>20ft</div>
-            </Col>
-            <Col span={12}>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Giá trị {currency}</div>
-              <div style={{ color: '#4ADE80', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
-                ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div style={{ fontSize: 11, color: '#999' }}>Tổng bành</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#1B4D3E' }}>
+                {itemsTotalBales.toLocaleString()}
               </div>
             </Col>
             <Col span={12}>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Hoa hồng</div>
-              <div style={{ color: '#fff', fontSize: 16, fontWeight: 600, lineHeight: 1 }}>
-                {commissionUsdPerMt > 0
-                  ? `$${(itemsTotalTons * commissionUsdPerMt).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-                  : commissionPct > 0
-                    ? `$${(itemsTotalUSD * commissionPct / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-                    : '—'}
+              <div style={{ fontSize: 11, color: '#999' }}>Số cont</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#d46b08' }}>
+                {itemsTotalContainers} <span style={{ fontSize: 11, fontWeight: 400 }}>x 20ft</span>
               </div>
-              {commissionUsdPerMt > 0 && (
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 }}>
-                  ${commissionUsdPerMt}/MT
-                </div>
-              )}
+            </Col>
+            <Col span={24}>
+              <div style={{ fontSize: 11, color: '#999' }}>Giá trị {currency}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>
+                ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
             </Col>
           </Row>
-        </Card>
-
-        {/* ═══ Live Preview HĐ (SC + PI) ═══ */}
-        <Card
-          size="small"
-          style={{ marginTop: 12, borderRadius: 12 }}
-          title={
-            <Space size={6}>
-              <FileWordOutlined style={{ color: '#1B4D3E' }} />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Hợp đồng (Live Preview)</span>
-              <Tag color={deriveKind(contractData.incoterm || 'FOB', 'SC') === 'SC_CIF' ? 'blue' : 'green'} style={{ fontSize: 10 }}>
-                {deriveKind(contractData.incoterm || 'FOB', 'SC').replace('_', ' ')}
-              </Tag>
-            </Space>
-          }
-          extra={
-            <Tabs
-              size="small"
-              activeKey={previewTab}
-              onChange={(k) => setPreviewTab(k as 'SC' | 'PI')}
-              items={[
-                { key: 'SC', label: 'SC' },
-                { key: 'PI', label: 'PI' },
-              ]}
-              tabBarStyle={{ marginBottom: 0 }}
-            />
-          }
-        >
-          <div style={{
-            maxHeight: 420,
-            overflowY: 'auto',
-            background: '#fff',
-            padding: 12,
-            border: '1px solid #f0f0f0',
-            borderRadius: 6,
-          }}>
-            {previewTab === 'SC' ? <PreviewSC /> : <PreviewPI />}
-          </div>
-
-          {/* Banner cảnh báo bank chưa duyệt */}
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginTop: 12, fontSize: 12 }}
-            message="⚠ Bản preview — bank info chưa được duyệt"
-            description={
-              <span style={{ fontSize: 11 }}>
-                File tải về dùng bank <strong>DEFAULT (Vietin Hue)</strong> để preview.
-                <strong> KHÔNG gửi cho khách</strong> — sau khi submit, Phú LV
-                sẽ duyệt + nhập bank đúng → lúc đó mới tải bản chính thức gửi KH.
-              </span>
-            }
-          />
-
-          {/* Nút sinh .docx */}
-          <Space.Compact block style={{ marginTop: 12 }}>
-            <Button
-              icon={<DownloadOutlined />}
-              loading={docLoading === 'SC'}
-              onClick={() => handleDownloadDoc('SC')}
-              style={{ flex: 1 }}
-            >
-              Preview SC
-            </Button>
-            <Button
-              icon={<DownloadOutlined />}
-              loading={docLoading === 'PI'}
-              onClick={() => handleDownloadDoc('PI')}
-              style={{ flex: 1 }}
-            >
-              Preview PI
-            </Button>
-            <Button
-              type="primary"
-              icon={<DownloadOutlined />}
-              loading={docLoading === 'BOTH'}
-              onClick={() => handleDownloadDoc('BOTH')}
-              style={{ flex: 1.2, background: '#1B4D3E' }}
-            >
-              Preview SC + PI
-            </Button>
-          </Space.Compact>
         </Card>
 
         {/* ═══ Action buttons — Upload .docx (Docs trình HĐ) ═══

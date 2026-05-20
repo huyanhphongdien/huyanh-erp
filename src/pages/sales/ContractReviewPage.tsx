@@ -202,10 +202,10 @@ export default function ContractReviewPage() {
   const handleApprove = async () => {
     if (!active) return
     // Upload flow: KHÔNG validate bank form (Phú đã fill trực tiếp trên .docx).
-    // Chỉ yêu cầu Phú đã upload file đã fill (reviewer_filled_url).
+    // Chỉ yêu cầu Phú đã upload ít nhất 1 file đã fill (reviewer_filled_urls).
     if (active.flow_type === 'upload') {
-      if (!active.reviewer_filled_url) {
-        message.error('Cần upload file .docx đã fill 2 chỗ highlight trước khi duyệt')
+      if (!active.reviewer_filled_urls || active.reviewer_filled_urls.length === 0) {
+        message.error('Cần upload ít nhất 1 file .docx đã fill 2 chỗ highlight trước khi duyệt')
         return
       }
     } else {
@@ -789,36 +789,53 @@ interface UploadFlowReviewProps {
 }
 
 function UploadFlowReview({ contract, onFilled }: UploadFlowReviewProps) {
-  const [downloading, setDownloading] = useState(false)
+  const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
 
-  const handleDownload = async () => {
-    if (!contract.sale_upload_url) {
-      message.error('HĐ này không có file Sale upload')
-      return
-    }
-    setDownloading(true)
+  const MAX_FILES = 10
+
+  const saleFiles = (contract.sale_upload_urls || [])
+  const filledFiles = (contract.reviewer_filled_urls || [])
+
+  const handleDownload = async (idx: number, path: string) => {
+    setDownloadingIdx(idx)
     try {
-      const url = await salesContractWorkflowService.getDownloadUrl(contract.sale_upload_url)
+      const url = await salesContractWorkflowService.getDownloadUrl(path)
       window.open(url, '_blank')
     } catch (e: unknown) {
       message.error(`Download thất bại: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
-      setDownloading(false)
+      setDownloadingIdx(null)
     }
   }
 
+  const addFiles = (incoming: FileList | File[]) => {
+    const arr = Array.from(incoming).filter((f) => f.name.toLowerCase().endsWith('.docx'))
+    if (arr.length === 0) {
+      message.error('Chỉ nhận file .docx')
+      return
+    }
+    setFiles((prev) => {
+      const merged = [...prev, ...arr]
+      if (merged.length > MAX_FILES) {
+        message.warning(`Tối đa ${MAX_FILES} file — giữ ${MAX_FILES} đầu tiên`)
+        return merged.slice(0, MAX_FILES)
+      }
+      return merged
+    })
+  }
+
   const handleUploadFilled = async () => {
-    if (!file) {
-      message.error('Chọn file .docx đã fill trước')
+    if (files.length === 0) {
+      message.error('Chọn ít nhất 1 file .docx đã fill')
       return
     }
     setUploading(true)
     try {
-      const updated = await salesContractWorkflowService.uploadFilledByReviewer(contract.id, file)
-      message.success(`Đã upload ${file.name} — bấm Duyệt để trình ký`)
-      setFile(null)
+      const updated = await salesContractWorkflowService.uploadFilledByReviewer(contract.id, files)
+      message.success(`Đã upload ${files.length} file — bấm Duyệt để trình ký`)
+      setFiles([])
       onFilled(updated)
     } catch (e: unknown) {
       message.error(`Upload thất bại: ${e instanceof Error ? e.message : String(e)}`)
@@ -827,69 +844,91 @@ function UploadFlowReview({ contract, onFilled }: UploadFlowReviewProps) {
     }
   }
 
-  const hasFilled = !!contract.reviewer_filled_url
-  const filledName = contract.reviewer_filled_url?.split('/').pop() || ''
-
   return (
     <>
       <Alert
         type="info"
         showIcon
-        message="📎 Upload flow — Sale tự sửa .docx, anh fill 2 chỗ highlight"
+        message="📎 Upload flow — Docs trình file, anh fill highlight + reupload"
         description={
           <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-            <div><strong>Bước 1:</strong> Bấm "Download file Sale upload" → mở bằng Word</div>
-            <div><strong>Bước 2:</strong> Fill 2 chỗ <strong>highlight vàng</strong>: số HĐ + bank info</div>
-            <div><strong>Bước 3:</strong> Save file → upload lại bằng nút bên dưới</div>
+            <div><strong>Bước 1:</strong> Download từng file Docs đã upload (xem ô ①)</div>
+            <div><strong>Bước 2:</strong> Mở Word fill 2 ô <strong>highlight vàng</strong> (số HĐ + bank)</div>
+            <div><strong>Bước 3:</strong> Upload lại {MAX_FILES} file tối đa (ô ②)</div>
             <div><strong>Bước 4:</strong> Bấm "Duyệt + Trình ký" ở header</div>
           </div>
         }
         style={{ marginBottom: 16 }}
       />
 
-      {/* Step 1 — Download file Sale */}
-      <Card size="small" style={{ marginBottom: 12 }} title="① File Sale upload (gốc)">
-        <Space>
-          <FileWordOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>
-              {contract.sale_upload_url?.split('/').pop() || '—'}
-            </div>
-            <Button
-              type="link"
-              size="small"
-              icon={<DownloadOutlined />}
-              loading={downloading}
-              onClick={handleDownload}
-              style={{ padding: 0 }}
-            >
-              Download để mở Word fill
-            </Button>
-          </div>
-        </Space>
-      </Card>
-
-      {/* Step 2 — Upload file đã fill */}
+      {/* ① Files Docs upload — list download */}
       <Card size="small" style={{ marginBottom: 12 }} title={
         <Space>
-          <span>② File đã fill (anh upload)</span>
-          {hasFilled && <Tag color="green">Đã upload</Tag>}
+          <span>① File Docs upload (gốc)</span>
+          <Tag color="blue">{saleFiles.length} file</Tag>
         </Space>
       }>
-        {hasFilled && (
+        {saleFiles.length === 0 ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>Không có file</Text>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {saleFiles.map((path, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 8px',
+                  border: '1px solid #f0f0f0',
+                  borderRadius: 6,
+                  fontSize: 12,
+                }}
+              >
+                <FileWordOutlined style={{ color: '#1B4D3E', fontSize: 18 }} />
+                <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {idx + 1}. {path.split('/').pop()}
+                </span>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  loading={downloadingIdx === idx}
+                  onClick={() => handleDownload(idx, path)}
+                >
+                  Tải về
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* ② Files Phú upload đã fill */}
+      <Card size="small" style={{ marginBottom: 12 }} title={
+        <Space>
+          <span>② File anh đã fill</span>
+          {filledFiles.length > 0 && <Tag color="green">{filledFiles.length} file — đã upload</Tag>}
+        </Space>
+      }>
+        {filledFiles.length > 0 && (
           <div style={{ marginBottom: 12, padding: 8, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
-            <Space>
-              <CheckCircleOutlined style={{ color: '#52c41a' }} />
-              <span style={{ fontSize: 12 }}>{filledName}</span>
-            </Space>
+            {filledFiles.map((p, i) => (
+              <div key={i} style={{ fontSize: 12 }}>
+                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+                {p.split('/').pop()}
+              </div>
+            ))}
+            <Text type="secondary" style={{ fontSize: 10, fontStyle: 'italic', marginTop: 4, display: 'block' }}>
+              Upload lại sẽ REPLACE toàn bộ list trên.
+            </Text>
           </div>
         )}
         <div
           style={{
-            border: file ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
-            background: file ? '#f6ffed' : '#fafafa',
+            border: files.length > 0 ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
+            background: files.length > 0 ? '#f6ffed' : '#fafafa',
             borderRadius: 8,
-            padding: 14,
+            padding: 12,
             textAlign: 'center',
             cursor: 'pointer',
           }}
@@ -897,50 +936,77 @@ function UploadFlowReview({ contract, onFilled }: UploadFlowReviewProps) {
           onDragOver={(e) => { e.preventDefault() }}
           onDrop={(e) => {
             e.preventDefault()
-            const f = e.dataTransfer.files[0]
-            if (f && f.name.toLowerCase().endsWith('.docx')) setFile(f)
-            else message.error('Chỉ nhận file .docx')
+            if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
           }}
         >
           <input
             id="reviewer-fill-input"
             type="file"
+            multiple
             accept=".docx"
             style={{ display: 'none' }}
             onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) setFile(f)
+              if (e.target.files) addFiles(e.target.files)
+              e.target.value = ''
             }}
           />
-          {file ? (
-            <div>
-              <FileWordOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
-              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{file.name}</div>
-              <div style={{ fontSize: 10, color: '#666' }}>{(file.size / 1024).toFixed(0)} KB</div>
-            </div>
-          ) : (
-            <div style={{ fontSize: 12, color: '#666' }}>
-              Kéo thả .docx đã fill hoặc bấm để chọn
-            </div>
-          )}
+          <FileWordOutlined style={{ fontSize: 22, color: files.length > 0 ? '#1B4D3E' : '#bbb' }} />
+          <div style={{ marginTop: 4, fontSize: 12, fontWeight: files.length > 0 ? 600 : 400, color: '#444' }}>
+            {files.length > 0 ? `${files.length}/${MAX_FILES} file đã chọn` : `Kéo thả ${MAX_FILES} file tối đa hoặc bấm chọn`}
+          </div>
         </div>
+
+        {files.length > 0 && (
+          <div style={{ marginTop: 8, border: '1px solid #e8e8e8', borderRadius: 6, maxHeight: 160, overflow: 'auto' }}>
+            {files.map((f, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 8px',
+                  borderBottom: idx < files.length - 1 ? '1px solid #f0f0f0' : 'none',
+                  fontSize: 11,
+                }}
+              >
+                <FileWordOutlined style={{ color: '#1B4D3E' }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {idx + 1}. {f.name}
+                </span>
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setFiles((prev) => prev.filter((_, i) => i !== idx))
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <Button
           type="primary"
           icon={<CheckCircleOutlined />}
           block
           loading={uploading}
-          disabled={!file}
+          disabled={files.length === 0}
           onClick={handleUploadFilled}
           style={{ marginTop: 8, background: '#1B4D3E' }}
         >
-          {hasFilled ? 'Upload thay file đã fill' : 'Upload file đã fill'}
+          {filledFiles.length > 0 ? `Replace ${files.length} file` : `Upload ${files.length} file đã fill`}
         </Button>
       </Card>
 
-      {/* Read-only context: order info */}
+      {/* Read-only context */}
       <Card size="small" title="Tóm tắt đơn (read-only)" style={{ marginBottom: 16 }}>
         <Descriptions size="small" column={2} bordered>
-          <Descriptions.Item label="Số HĐ (Sale ghi)">
+          <Descriptions.Item label="Số HĐ (Docs ghi)">
             {contract.form_data?.contract_no || '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Revision">#{contract.revision_no}</Descriptions.Item>

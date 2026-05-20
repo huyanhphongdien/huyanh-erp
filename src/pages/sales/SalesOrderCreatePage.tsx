@@ -1192,26 +1192,45 @@ interface UploadFlowActionProps {
 }
 
 function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded }: UploadFlowActionProps) {
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
 
+  const MAX_FILES = 10
+
+  const addFiles = (incoming: FileList | File[]) => {
+    const arr = Array.from(incoming).filter((f) => f.name.toLowerCase().endsWith('.docx'))
+    if (arr.length === 0) {
+      message.error('Chỉ nhận file .docx')
+      return
+    }
+    setFiles((prev) => {
+      const merged = [...prev, ...arr]
+      if (merged.length > MAX_FILES) {
+        message.warning(`Tối đa ${MAX_FILES} file — giữ ${MAX_FILES} đầu tiên`)
+        return merged.slice(0, MAX_FILES)
+      }
+      return merged
+    })
+  }
+
+  const removeFile = (idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx))
+  }
+
   const handleSubmit = async () => {
-    if (!file) {
-      message.error('Chọn file .docx trước')
+    if (files.length === 0) {
+      message.error('Chọn ít nhất 1 file .docx')
       return
     }
     setSubmitting(true)
     try {
-      // 1) Tạo sales_order (gọi handleSubmit silent)
       const orderId = await onBeforeSubmit()
       if (!orderId) {
-        // handleSubmit đã hiện error / validation message rồi
         setSubmitting(false)
         return
       }
-      // 2) Upload file + tạo contract upload flow
-      await salesContractWorkflowService.createUploadFlow(orderId, file, contractNoHint)
-      message.success(`Đã upload ${file.name} + trình Phú LV duyệt`)
+      await salesContractWorkflowService.createUploadFlow(orderId, files, contractNoHint)
+      message.success(`Đã upload ${files.length} file + trình Phú LV duyệt`)
       onUploaded()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload thất bại'
@@ -1230,25 +1249,23 @@ function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded 
         message="Hướng dẫn"
         description={
           <div style={{ fontSize: 11, lineHeight: 1.6 }}>
-            <strong>Bước 1:</strong> Sửa file HĐ Word của anh — <strong>highlight VÀNG 2 chỗ</strong>:
+            <strong>Bước 1:</strong> Sửa file HĐ Word — <strong>highlight VÀNG 2 chỗ</strong>:
+            số HĐ + Bank info (Beneficiary/Bank/Account/SWIFT/Address)
             <br />
-            &nbsp;&nbsp;• Số HĐ (Contract No)
+            <strong>Bước 2:</strong> Kéo thả {MAX_FILES} file .docx tối đa (HĐ chính + phụ lục + packing list…)
             <br />
-            &nbsp;&nbsp;• Block Bank info (Beneficiary / Bank / Account / SWIFT / Address)
-            <br />
-            <strong>Bước 2:</strong> Lưu file (.docx) → kéo thả vào ô dưới
-            <br />
-            <strong>Bước 3:</strong> Bấm Trình kiểm tra — Phú LV sẽ download, fill 2 chỗ
-            highlight trên Word, reupload lại.
+            <strong>Bước 3:</strong> Bấm Trình kiểm tra — Phú LV sẽ fill 2 ô highlight rồi reupload
           </div>
         }
       />
+
+      {/* Drop zone */}
       <div
         style={{
-          border: file ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
-          background: file ? '#f6ffed' : '#fafafa',
+          border: files.length > 0 ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
+          background: files.length > 0 ? '#f6ffed' : '#fafafa',
           borderRadius: 8,
-          padding: 16,
+          padding: 14,
           textAlign: 'center',
           cursor: 'pointer',
         }}
@@ -1258,69 +1275,86 @@ function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded 
           e.currentTarget.style.background = '#e6f7ff'
         }}
         onDragLeave={(e) => {
-          e.currentTarget.style.background = file ? '#f6ffed' : '#fafafa'
+          e.currentTarget.style.background = files.length > 0 ? '#f6ffed' : '#fafafa'
         }}
         onDrop={(e) => {
           e.preventDefault()
-          e.currentTarget.style.background = file ? '#f6ffed' : '#fafafa'
-          const f = e.dataTransfer.files[0]
-          if (f && f.name.toLowerCase().endsWith('.docx')) setFile(f)
-          else message.error('Chỉ nhận file .docx')
+          e.currentTarget.style.background = files.length > 0 ? '#f6ffed' : '#fafafa'
+          if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
         }}
       >
         <input
           id="upload-contract-input"
           type="file"
+          multiple
           accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           style={{ display: 'none' }}
           onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) setFile(f)
+            if (e.target.files) addFiles(e.target.files)
+            // Reset để chọn lại cùng file được
+            e.target.value = ''
           }}
         />
-        {file ? (
-          <>
-            <FileWordOutlined style={{ fontSize: 32, color: '#1B4D3E' }} />
-            <div style={{ marginTop: 8, fontWeight: 600, fontSize: 13 }}>{file.name}</div>
-            <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-              {(file.size / 1024).toFixed(0)} KB
-            </div>
-            <Button
-              type="link"
-              size="small"
-              danger
-              onClick={(e) => {
-                e.stopPropagation()
-                setFile(null)
-              }}
-              style={{ marginTop: 4 }}
-            >
-              Bỏ file này → chọn khác
-            </Button>
-          </>
-        ) : (
-          <>
-            <FileWordOutlined style={{ fontSize: 32, color: '#bbb' }} />
-            <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
-              Kéo thả file .docx vào đây hoặc bấm để chọn
-            </div>
-            <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-              Tối đa 20MB
-            </div>
-          </>
-        )}
+        <FileWordOutlined style={{ fontSize: 28, color: files.length > 0 ? '#1B4D3E' : '#bbb' }} />
+        <div style={{ marginTop: 6, fontSize: 13, color: '#444', fontWeight: files.length > 0 ? 600 : 400 }}>
+          {files.length > 0
+            ? `Đã chọn ${files.length}/${MAX_FILES} file — bấm để thêm`
+            : 'Kéo thả nhiều file .docx hoặc bấm để chọn'}
+        </div>
+        <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+          Tối đa {MAX_FILES} file · 20MB / file
+        </div>
       </div>
+
+      {/* File list */}
+      {files.length > 0 && (
+        <div style={{ border: '1px solid #e8e8e8', borderRadius: 6, maxHeight: 200, overflow: 'auto' }}>
+          {files.map((f, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 10px',
+                borderBottom: idx < files.length - 1 ? '1px solid #f0f0f0' : 'none',
+                fontSize: 12,
+              }}
+            >
+              <FileWordOutlined style={{ color: '#1B4D3E' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {idx + 1}. {f.name}
+                </div>
+                <div style={{ fontSize: 10, color: '#999' }}>{(f.size / 1024).toFixed(0)} KB</div>
+              </div>
+              <Button
+                type="text"
+                size="small"
+                danger
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeFile(idx)
+                }}
+              >
+                ✕
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <Button
         type="primary"
         icon={<CheckCircleOutlined />}
         block
         size="large"
         loading={submitting}
-        disabled={!file || loading}
+        disabled={files.length === 0 || loading}
         onClick={handleSubmit}
         style={{ background: '#1B4D3E' }}
       >
-        Upload + Trình Kiểm tra (Phú LV)
+        Upload {files.length > 0 ? `${files.length} file ` : ''}+ Trình Kiểm tra (Phú LV)
       </Button>
       <div style={{ fontSize: 11, color: '#999', textAlign: 'center' }}>
         Phú LV download → fill 2 ô highlight trên Word → reupload → Trung/Huy ký

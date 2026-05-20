@@ -40,13 +40,13 @@ export interface SalesOrderContract {
   sales_order_id: string
   revision_no: number
   status: ContractStatus
-  /** 'compose' = render từ template (flow cũ — Sale điền form, ERP merge template).
-   *  'upload' = Sale tự sửa .docx trên Word + highlight vàng 2 chỗ chừa cho Phú LV. */
+  /** 'compose' = render từ template (deprecated 2026-05-20).
+   *  'upload' = Docs upload .docx tự soạn, Phú fill 2 ô highlight rồi reupload. */
   flow_type: ContractFlowType
-  /** File .docx Sale upload (chỉ có khi flow_type='upload') */
-  sale_upload_url?: string | null
-  /** File .docx Phú đã fill 2 chỗ highlight (chỉ có khi flow_type='upload', sau approve) */
-  reviewer_filled_url?: string | null
+  /** Array tối đa 10 file .docx Docs upload (HĐ chính + phụ lục + packing list +…) */
+  sale_upload_urls: string[]
+  /** Array file .docx Phú đã fill 2 chỗ highlight (số HĐ + bank info) */
+  reviewer_filled_urls: string[]
   sc_file_url?: string | null
   pi_file_url?: string | null
   signed_pdf_url?: string | null
@@ -411,24 +411,29 @@ export const salesContractWorkflowService = {
     return row
   },
 
-  /** UPLOAD FLOW — Sale tự sửa .docx trên Word + highlight vàng 2 chỗ
-   *  (số HĐ + bank), upload file lên Storage, tạo contract với flow_type='upload'.
+  /** UPLOAD FLOW — Docs upload tối đa 10 file .docx (HĐ chính + phụ lục + packing list +…).
+   *  Phú download từng file → fill 2 chỗ highlight vàng (số HĐ + bank) → reupload.
    *
-   *  Khác createDraftAndSubmit (compose flow): formData chỉ chứa metadata tối thiểu
-   *  (contract_no, customer_name) để hiển thị queue + log; nội dung HĐ nằm trong file.
-   *
-   *  @param file File .docx Sale upload (max 20MB)
+   *  @param files Mảng file .docx Docs upload (1–10 file, mỗi file max 20MB)
    *  @param contractNoHint Số HĐ tạm — Phú sẽ confirm khi review */
   async createUploadFlow(
     salesOrderId: string,
-    file: File,
+    files: File[],
     contractNoHint?: string,
   ): Promise<SalesOrderContract> {
-    if (!file.name.toLowerCase().endsWith('.docx')) {
-      throw new Error('Chỉ nhận file .docx — vui lòng lưu lại từ Word')
+    if (!files || files.length === 0) {
+      throw new Error('Chọn ít nhất 1 file .docx')
     }
-    if (file.size > 20 * 1024 * 1024) {
-      throw new Error('File quá lớn (>20MB)')
+    if (files.length > 10) {
+      throw new Error(`Tối đa 10 file/HĐ — bạn đang chọn ${files.length}`)
+    }
+    for (const f of files) {
+      if (!f.name.toLowerCase().endsWith('.docx')) {
+        throw new Error(`File "${f.name}" không phải .docx — vui lòng lưu lại từ Word`)
+      }
+      if (f.size > 20 * 1024 * 1024) {
+        throw new Error(`File "${f.name}" quá lớn (>20MB)`)
+      }
     }
     const [createdBy, reviewerId] = await Promise.all([
       getCurrentEmployeeId(),
@@ -440,17 +445,30 @@ export const salesContractWorkflowService = {
       )
     }
 
-    // ─── A. Upload file .docx lên Storage ───
+    // ─── A. Upload từng file .docx lên Storage (parallel) ───
     const ts = Date.now()
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const path = `${salesOrderId}/upload-flow/${ts}-sale-${safeName}`
-    const { error: upErr } = await supabase.storage
-      .from('sales-contracts')
-      .upload(path, file, {
-        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        upsert: false,
-      })
-    if (upErr) throw new Error(`Upload thất bại: ${upErr.message}`)
+    const uploadedPaths: string[] = []
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i]
+        const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${salesOrderId}/upload-flow/${ts}-${i + 1}-sale-${safeName}`
+        const { error: upErr } = await supabase.storage
+          .from('sales-contracts')
+          .upload(path, f, {
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            upsert: false,
+          })
+        if (upErr) throw new Error(`Upload "${f.name}" thất bại: ${upErr.message}`)
+        uploadedPaths.push(path)
+      }
+    } catch (e) {
+      // Rollback các file đã upload
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from('sales-contracts').remove(uploadedPaths).catch(() => null)
+      }
+      throw e
+    }
 
     // ─── B. Tạo row sales_order_contracts ───
     const { data, error } = await supabase
@@ -459,7 +477,7 @@ export const salesContractWorkflowService = {
         sales_order_id: salesOrderId,
         status: 'reviewing',
         flow_type: 'upload',
-        sale_upload_url: path,
+        sale_upload_urls: uploadedPaths,
         form_data: contractNoHint ? { contract_no: contractNoHint } : {},
         created_by: createdBy,
         submitted_at: new Date().toISOString(),
@@ -468,8 +486,8 @@ export const salesContractWorkflowService = {
       .select('*')
       .single()
     if (error) {
-      // Rollback upload
-      await supabase.storage.from('sales-contracts').remove([path]).catch(() => null)
+      // Rollback uploads
+      await supabase.storage.from('sales-contracts').remove(uploadedPaths).catch(() => null)
       throw error
     }
     const row = data as SalesOrderContract
@@ -485,8 +503,8 @@ export const salesContractWorkflowService = {
       salesOrderId,
       contractNo,
       revisionNo: row.revision_no,
-      title: `📎 Sale upload HĐ ${contractNo} — cần Phú fill 2 chỗ highlight + duyệt`,
-      message: `Flow upload: Sale đã sửa .docx + highlight vàng 2 chỗ (số HĐ + bank). Download → fill Word → reupload → approve.`,
+      title: `📎 Docs upload HĐ ${contractNo} (${files.length} file) — cần Phú fill + duyệt`,
+      message: `Flow upload: Docs đã trình ${files.length} file. Download → fill Word ô highlight → reupload → approve.`,
       priority: 'normal',
       reference_url: '/sales/contracts/review',
     })
@@ -506,31 +524,38 @@ export const salesContractWorkflowService = {
       contractId: row.id,
       action: 'submit',
       userId: createdBy,
-      notes: `Upload flow: Sale upload ${file.name} rev #${row.revision_no}`,
+      notes: `Upload flow: Docs upload ${files.length} file (${files.map(f => f.name).join(', ')}) rev #${row.revision_no}`,
     })
 
     return row
   },
 
-  /** UPLOAD FLOW — Phú fill 2 chỗ highlight xong → upload file đã fill.
-   *  Lưu vào reviewer_filled_url. KHÔNG đổi status (status đổi qua approve()).
+  /** UPLOAD FLOW — Phú upload tối đa 10 file .docx đã fill (REPLACE toàn bộ
+   *  reviewer_filled_urls). KHÔNG đổi status (status đổi qua approve()).
    *
    *  @param contractId Contract đang review
-   *  @param file File .docx Phú đã fill */
+   *  @param files Mảng file .docx Phú đã fill (1–10) */
   async uploadFilledByReviewer(
     contractId: string,
-    file: File,
+    files: File[],
   ): Promise<SalesOrderContract> {
-    if (!file.name.toLowerCase().endsWith('.docx')) {
-      throw new Error('Chỉ nhận file .docx — vui lòng lưu lại từ Word')
+    if (!files || files.length === 0) {
+      throw new Error('Chọn ít nhất 1 file .docx')
     }
-    if (file.size > 20 * 1024 * 1024) {
-      throw new Error('File quá lớn (>20MB)')
+    if (files.length > 10) {
+      throw new Error(`Tối đa 10 file — bạn đang chọn ${files.length}`)
     }
-    // Get contract để biết salesOrderId
+    for (const f of files) {
+      if (!f.name.toLowerCase().endsWith('.docx')) {
+        throw new Error(`File "${f.name}" không phải .docx`)
+      }
+      if (f.size > 20 * 1024 * 1024) {
+        throw new Error(`File "${f.name}" quá lớn (>20MB)`)
+      }
+    }
     const { data: existing, error: fetchErr } = await supabase
       .from('sales_order_contracts')
-      .select('id, sales_order_id, flow_type, status')
+      .select('id, sales_order_id, flow_type, status, reviewer_filled_urls')
       .eq('id', contractId)
       .single()
     if (fetchErr) throw fetchErr
@@ -541,26 +566,46 @@ export const salesContractWorkflowService = {
       throw new Error(`HĐ status='${existing.status}' — chỉ upload được khi đang reviewing`)
     }
 
+    // ─── A. Upload mới ───
     const ts = Date.now()
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const path = `${existing.sales_order_id}/upload-flow/${ts}-filled-${safeName}`
-    const { error: upErr } = await supabase.storage
-      .from('sales-contracts')
-      .upload(path, file, {
-        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        upsert: false,
-      })
-    if (upErr) throw new Error(`Upload thất bại: ${upErr.message}`)
+    const newPaths: string[] = []
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i]
+        const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${existing.sales_order_id}/upload-flow/${ts}-${i + 1}-filled-${safeName}`
+        const { error: upErr } = await supabase.storage
+          .from('sales-contracts')
+          .upload(path, f, {
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            upsert: false,
+          })
+        if (upErr) throw new Error(`Upload "${f.name}" thất bại: ${upErr.message}`)
+        newPaths.push(path)
+      }
+    } catch (e) {
+      if (newPaths.length > 0) {
+        await supabase.storage.from('sales-contracts').remove(newPaths).catch(() => null)
+      }
+      throw e
+    }
 
+    // ─── B. Update row (replace toàn bộ reviewer_filled_urls) ───
     const { data, error } = await supabase
       .from('sales_order_contracts')
-      .update({ reviewer_filled_url: path, updated_at: new Date().toISOString() })
+      .update({ reviewer_filled_urls: newPaths, updated_at: new Date().toISOString() })
       .eq('id', contractId)
       .select('*')
       .single()
     if (error) {
-      await supabase.storage.from('sales-contracts').remove([path]).catch(() => null)
+      await supabase.storage.from('sales-contracts').remove(newPaths).catch(() => null)
       throw error
+    }
+
+    // ─── C. Cleanup file cũ (nếu Phú upload lại lần 2+) ───
+    const oldPaths = (existing.reviewer_filled_urls || []) as string[]
+    if (oldPaths.length > 0) {
+      await supabase.storage.from('sales-contracts').remove(oldPaths).catch(() => null)
     }
 
     void _logWorkflowEvent({
@@ -568,7 +613,7 @@ export const salesContractWorkflowService = {
       contractId,
       action: 'reviewer_fill',
       userId: await getCurrentEmployeeId(),
-      notes: `Phú upload file đã fill: ${file.name}`,
+      notes: `Phú upload ${files.length} file đã fill (${files.map(f => f.name).join(', ')})`,
     })
 
     return data as SalesOrderContract
@@ -730,17 +775,19 @@ export const salesContractWorkflowService = {
       }),
     ).catch((e) => console.error('Email approve fail:', e))
 
-    // ─── Auto-copy file vào folder "HĐ gửi KH" (sent_to_customer) ───
-    // Khi flow_type='upload', file đã được Phú fill 2 chỗ highlight (reviewer_filled_url).
-    // File này coi như bản chính thức gửi KH duyệt — lưu vào sub_type='sent_to_customer'.
-    if (row.flow_type === 'upload' && row.reviewer_filled_url) {
-      void _copyContractFileToDocuments({
-        salesOrderId: row.sales_order_id,
-        filePath: row.reviewer_filled_url,
-        docSubType: 'sent_to_customer',
-        uploadedBy: senderId,
-        contractNo,
-      })
+    // ─── Auto-copy TẤT CẢ file Phú đã fill vào folder "HĐ gửi KH" ───
+    // Upload flow: Phú có thể upload 1-10 file đã fill (HĐ chính + phụ lục + …).
+    // Mỗi file được insert 1 row vào sales_order_documents (sub_type='sent_to_customer').
+    if (row.flow_type === 'upload' && row.reviewer_filled_urls && row.reviewer_filled_urls.length > 0) {
+      for (const filePath of row.reviewer_filled_urls) {
+        void _copyContractFileToDocuments({
+          salesOrderId: row.sales_order_id,
+          filePath,
+          docSubType: 'sent_to_customer',
+          uploadedBy: senderId,
+          contractNo,
+        })
+      }
     }
 
     // ─── Audit log ───

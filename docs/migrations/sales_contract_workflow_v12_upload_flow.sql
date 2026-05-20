@@ -17,18 +17,26 @@
 -- ============================================================================
 
 -- Step 1: Add columns vào sales_order_contracts
+-- Dùng TEXT[] để hỗ trợ tối đa 10 file/HĐ (HĐ chính + phụ lục + packing list + …)
 ALTER TABLE public.sales_order_contracts
   ADD COLUMN IF NOT EXISTS flow_type TEXT NOT NULL DEFAULT 'compose'
     CHECK (flow_type IN ('compose', 'upload')),
-  ADD COLUMN IF NOT EXISTS sale_upload_url TEXT,
-  ADD COLUMN IF NOT EXISTS reviewer_filled_url TEXT;
+  ADD COLUMN IF NOT EXISTS sale_upload_urls TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+  ADD COLUMN IF NOT EXISTS reviewer_filled_urls TEXT[] NOT NULL DEFAULT '{}'::TEXT[];
+
+-- Constraint: tối đa 10 file mỗi mảng (tránh spam upload)
+ALTER TABLE public.sales_order_contracts
+  ADD CONSTRAINT chk_soc_sale_uploads_max
+    CHECK (array_length(sale_upload_urls, 1) IS NULL OR array_length(sale_upload_urls, 1) <= 10),
+  ADD CONSTRAINT chk_soc_reviewer_filled_max
+    CHECK (array_length(reviewer_filled_urls, 1) IS NULL OR array_length(reviewer_filled_urls, 1) <= 10);
 
 COMMENT ON COLUMN public.sales_order_contracts.flow_type IS
-  'compose = render từ template (flow cũ); upload = Sale upload file .docx tự sửa, Phú fill 2 ô highlight rồi reupload';
-COMMENT ON COLUMN public.sales_order_contracts.sale_upload_url IS
-  'URL file .docx Sale upload (flow upload). Phú download file này để mở Word fill 2 chỗ highlight vàng';
-COMMENT ON COLUMN public.sales_order_contracts.reviewer_filled_url IS
-  'URL file .docx Phú đã fill (số HĐ + bank). Trung/Huy download file này để in ký';
+  'compose = render từ template (flow cũ, deprecated 2026-05-20); upload = Docs upload .docx tự soạn';
+COMMENT ON COLUMN public.sales_order_contracts.sale_upload_urls IS
+  'Array tối đa 10 path file Docs upload (.docx). Phú download → fill highlight vàng → reupload';
+COMMENT ON COLUMN public.sales_order_contracts.reviewer_filled_urls IS
+  'Array path file Phú đã fill. Khi approve(): tự copy hết sang sales_order_documents sub_type=sent_to_customer';
 
 -- Step 2: Index cho query queue theo flow_type
 CREATE INDEX IF NOT EXISTS idx_soc_flow_type
@@ -42,16 +50,18 @@ SELECT column_name, data_type, column_default
 FROM information_schema.columns
 WHERE table_schema = 'public'
   AND table_name = 'sales_order_contracts'
-  AND column_name IN ('flow_type', 'sale_upload_url', 'reviewer_filled_url')
+  AND column_name IN ('flow_type', 'sale_upload_urls', 'reviewer_filled_urls')
 ORDER BY column_name;
--- Expected: 3 rows
+-- Expected: 3 rows (flow_type=text, sale_upload_urls=ARRAY, reviewer_filled_urls=ARRAY)
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- ROLLBACK
 -- ════════════════════════════════════════════════════════════════════════════
 -- ALTER TABLE public.sales_order_contracts
+--   DROP CONSTRAINT IF EXISTS chk_soc_sale_uploads_max,
+--   DROP CONSTRAINT IF EXISTS chk_soc_reviewer_filled_max,
 --   DROP COLUMN IF EXISTS flow_type,
---   DROP COLUMN IF EXISTS sale_upload_url,
---   DROP COLUMN IF EXISTS reviewer_filled_url;
+--   DROP COLUMN IF EXISTS sale_upload_urls,
+--   DROP COLUMN IF EXISTS reviewer_filled_urls;
 -- DROP INDEX IF EXISTS idx_soc_flow_type;
 -- NOTIFY pgrst, 'reload schema';

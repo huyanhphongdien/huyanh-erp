@@ -320,7 +320,10 @@ function SalesOrderCreatePage() {
   )
 
   // ── Submit ──
-  const handleSubmit = async (asDraft: boolean) => {
+  const handleSubmit = async (
+    asDraft: boolean,
+    opts?: { silent?: boolean },
+  ): Promise<{ id: string } | null> => {
     try {
       const values = await form.validateFields()
       setLoading(true)
@@ -330,7 +333,7 @@ function SalesOrderCreatePage() {
       if (validItems.length === 0) {
         message.error('Vui lòng thêm ít nhất 1 sản phẩm')
         setLoading(false)
-        return
+        return null
       }
 
       // Gộp packing_note từ items → header (để detail page hiển thị)
@@ -380,13 +383,18 @@ function SalesOrderCreatePage() {
         }
       }
 
-      message.success(asDraft ? 'Đã lưu nháp đơn hàng' : 'Đã xác nhận đơn hàng')
-      navigate('/sales/orders')
+      // silent mode: caller xử lý message + navigate (vd: upload flow cần SO trước)
+      if (!opts?.silent) {
+        message.success(asDraft ? 'Đã lưu nháp đơn hàng' : 'Đã xác nhận đơn hàng')
+        navigate('/sales/orders')
+      }
+      return created?.id ? { id: created.id } : null
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'errorFields' in err) return // form validation
+      if (err && typeof err === 'object' && 'errorFields' in err) return null // form validation
       console.error(err)
       const errMsg = err instanceof Error ? err.message : 'Không thể tạo đơn hàng'
       message.error(errMsg)
+      return null
     } finally {
       setLoading(false)
     }
@@ -978,7 +986,7 @@ function SalesOrderCreatePage() {
           </Space.Compact>
         </Card>
 
-        {/* ═══ Action buttons ═══ */}
+        {/* ═══ Action buttons — 2 tab: Compose tự động / Upload .docx ═══ */}
         <Card size="small" style={{ marginTop: 12, borderRadius: 12 }}>
           <Space direction="vertical" style={{ width: '100%' }}>
             <Button
@@ -992,21 +1000,53 @@ function SalesOrderCreatePage() {
             >
               Lưu nháp (chưa trình)
             </Button>
-            <Button
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              block
-              size="large"
-              loading={submittingReview}
-              disabled={loading}
-              onClick={handleSubmitForReview}
-              style={{ background: '#1B4D3E' }}
-            >
-              Trình Kiểm tra (Phú LV)
-            </Button>
-            <div style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 4 }}>
-              Phú LV nhập bank info → trình Trung/Huy ký
-            </div>
+
+            <Tabs
+              defaultActiveKey="compose"
+              size="small"
+              style={{ marginTop: 4 }}
+              items={[
+                {
+                  key: 'compose',
+                  label: '🤖 Compose tự động',
+                  children: (
+                    <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                      <Button
+                        type="primary"
+                        icon={<CheckCircleOutlined />}
+                        block
+                        size="large"
+                        loading={submittingReview}
+                        disabled={loading}
+                        onClick={handleSubmitForReview}
+                        style={{ background: '#1B4D3E' }}
+                      >
+                        Trình Kiểm tra (Phú LV) — Compose
+                      </Button>
+                      <div style={{ fontSize: 11, color: '#999', textAlign: 'center' }}>
+                        ERP render HĐ từ template tự động. Phú LV nhập bank → Trung/Huy ký.
+                      </div>
+                    </Space>
+                  ),
+                },
+                {
+                  key: 'upload',
+                  label: '📎 Upload bản đã sửa',
+                  children: (
+                    <UploadFlowAction
+                      contractNoHint={contractData.contract_no}
+                      loading={loading || submittingReview}
+                      onBeforeSubmit={async () => {
+                        // Tạo sales_order trước (validate + insert giống compose flow)
+                        const ok = await handleSubmit(true, { silent: true })
+                        return ok?.id || null
+                      }}
+                      onUploaded={() => navigate('/sales/orders')}
+                    />
+                  ),
+                },
+              ]}
+            />
           </Space>
         </Card>
         </div>
@@ -1168,3 +1208,154 @@ function SalesOrderCreatePage() {
 }
 
 export default SalesOrderCreatePage
+
+// ============================================================================
+// UPLOAD FLOW ACTION — Tab "Upload bản đã sửa" trong Action card
+// ============================================================================
+
+interface UploadFlowActionProps {
+  contractNoHint?: string
+  loading: boolean
+  /** Tạo sales_order trước, return order id (null nếu fail/validate fail) */
+  onBeforeSubmit: () => Promise<string | null>
+  /** Callback sau khi upload + tạo contract xong */
+  onUploaded: () => void
+}
+
+function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded }: UploadFlowActionProps) {
+  const [file, setFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!file) {
+      message.error('Chọn file .docx trước')
+      return
+    }
+    setSubmitting(true)
+    try {
+      // 1) Tạo sales_order (gọi handleSubmit silent)
+      const orderId = await onBeforeSubmit()
+      if (!orderId) {
+        // handleSubmit đã hiện error / validation message rồi
+        setSubmitting(false)
+        return
+      }
+      // 2) Upload file + tạo contract upload flow
+      await salesContractWorkflowService.createUploadFlow(orderId, file, contractNoHint)
+      message.success(`Đã upload ${file.name} + trình Phú LV duyệt`)
+      onUploaded()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Upload thất bại'
+      message.error(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Space direction="vertical" style={{ width: '100%' }} size={8}>
+      <Alert
+        type="info"
+        showIcon
+        style={{ borderRadius: 6, fontSize: 12 }}
+        message="Hướng dẫn"
+        description={
+          <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+            <strong>Bước 1:</strong> Sửa file HĐ Word của anh — <strong>highlight VÀNG 2 chỗ</strong>:
+            <br />
+            &nbsp;&nbsp;• Số HĐ (Contract No)
+            <br />
+            &nbsp;&nbsp;• Block Bank info (Beneficiary / Bank / Account / SWIFT / Address)
+            <br />
+            <strong>Bước 2:</strong> Lưu file (.docx) → kéo thả vào ô dưới
+            <br />
+            <strong>Bước 3:</strong> Bấm Trình kiểm tra — Phú LV sẽ download, fill 2 chỗ
+            highlight trên Word, reupload lại.
+          </div>
+        }
+      />
+      <div
+        style={{
+          border: file ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
+          background: file ? '#f6ffed' : '#fafafa',
+          borderRadius: 8,
+          padding: 16,
+          textAlign: 'center',
+          cursor: 'pointer',
+        }}
+        onClick={() => document.getElementById('upload-contract-input')?.click()}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.currentTarget.style.background = '#e6f7ff'
+        }}
+        onDragLeave={(e) => {
+          e.currentTarget.style.background = file ? '#f6ffed' : '#fafafa'
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.currentTarget.style.background = file ? '#f6ffed' : '#fafafa'
+          const f = e.dataTransfer.files[0]
+          if (f && f.name.toLowerCase().endsWith('.docx')) setFile(f)
+          else message.error('Chỉ nhận file .docx')
+        }}
+      >
+        <input
+          id="upload-contract-input"
+          type="file"
+          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) setFile(f)
+          }}
+        />
+        {file ? (
+          <>
+            <FileWordOutlined style={{ fontSize: 32, color: '#1B4D3E' }} />
+            <div style={{ marginTop: 8, fontWeight: 600, fontSize: 13 }}>{file.name}</div>
+            <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+              {(file.size / 1024).toFixed(0)} KB
+            </div>
+            <Button
+              type="link"
+              size="small"
+              danger
+              onClick={(e) => {
+                e.stopPropagation()
+                setFile(null)
+              }}
+              style={{ marginTop: 4 }}
+            >
+              Bỏ file này → chọn khác
+            </Button>
+          </>
+        ) : (
+          <>
+            <FileWordOutlined style={{ fontSize: 32, color: '#bbb' }} />
+            <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+              Kéo thả file .docx vào đây hoặc bấm để chọn
+            </div>
+            <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+              Tối đa 20MB
+            </div>
+          </>
+        )}
+      </div>
+      <Button
+        type="primary"
+        icon={<CheckCircleOutlined />}
+        block
+        size="large"
+        loading={submitting}
+        disabled={!file || loading}
+        onClick={handleSubmit}
+        style={{ background: '#1B4D3E' }}
+      >
+        Upload + Trình Kiểm tra (Phú LV)
+      </Button>
+      <div style={{ fontSize: 11, color: '#999', textAlign: 'center' }}>
+        Phú LV download → fill 2 ô highlight trên Word → reupload → Trung/Huy ký
+      </div>
+    </Space>
+  )
+}

@@ -40,6 +40,7 @@ import {
   ReloadOutlined,
   HomeOutlined,
   BankOutlined,
+  FileWordOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import {
@@ -200,19 +201,30 @@ export default function ContractReviewPage() {
 
   const handleApprove = async () => {
     if (!active) return
-    try {
-      await bankForm.validateFields([
-        'bank_account_name',
-        'bank_account_no',
-        'bank_full_name',
-        'bank_address',
-        'bank_swift',
-      ])
-    } catch {
-      message.error('Cần nhập đầy đủ 5 field bank info trước khi duyệt')
-      return
+    // Upload flow: KHÔNG validate bank form (Phú đã fill trực tiếp trên .docx).
+    // Chỉ yêu cầu Phú đã upload file đã fill (reviewer_filled_url).
+    if (active.flow_type === 'upload') {
+      if (!active.reviewer_filled_url) {
+        message.error('Cần upload file .docx đã fill 2 chỗ highlight trước khi duyệt')
+        return
+      }
+    } else {
+      try {
+        await bankForm.validateFields([
+          'bank_account_name',
+          'bank_account_no',
+          'bank_full_name',
+          'bank_address',
+          'bank_swift',
+        ])
+      } catch {
+        message.error('Cần nhập đầy đủ 5 field bank info trước khi duyệt')
+        return
+      }
     }
-    const updated = buildUpdatedFormData()
+    const updated = active.flow_type === 'upload'
+      ? (active.form_data || {})  // upload flow: form_data minimal, không merge bank
+      : buildUpdatedFormData()
     const notes = bankForm.getFieldValue('review_notes')
     Modal.confirm({
       title: 'Duyệt + Trình ký',
@@ -341,10 +353,17 @@ export default function ContractReviewPage() {
               title: 'Số HĐ',
               dataIndex: ['form_data', 'contract_no'],
               key: 'contract_no',
-              width: 140,
+              width: 160,
               render: (v: string, r: SalesOrderContract) => (
                 <Space direction="vertical" size={2}>
-                  <Text strong>{v || r.sales_order?.contract_no || '—'}</Text>
+                  <Space size={4}>
+                    <Text strong>{v || r.sales_order?.contract_no || '—'}</Text>
+                    {r.flow_type === 'upload' && (
+                      <Tag color="purple" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
+                        📎 Upload
+                      </Tag>
+                    )}
+                  </Space>
                   <Text type="secondary" style={{ fontSize: 11 }}>
                     rev #{r.revision_no}
                   </Text>
@@ -466,7 +485,13 @@ export default function ContractReviewPage() {
           </Space>
         }
       >
-        {active && (
+        {active && active.flow_type === 'upload' && (
+          <UploadFlowReview
+            contract={active}
+            onFilled={(updated) => setActive(updated)}
+          />
+        )}
+        {active && active.flow_type !== 'upload' && (
           <>
             <Alert
               type="info"
@@ -750,5 +775,177 @@ export default function ContractReviewPage() {
         </div>
       </Modal>
     </div>
+  )
+}
+
+// ============================================================================
+// UPLOAD FLOW REVIEW — Phú download file Sale upload, fill 2 ô highlight,
+// reupload lại. Hiển thị thay cho form bank info trong Drawer review.
+// ============================================================================
+
+interface UploadFlowReviewProps {
+  contract: SalesOrderContract
+  onFilled: (updated: SalesOrderContract) => void
+}
+
+function UploadFlowReview({ contract, onFilled }: UploadFlowReviewProps) {
+  const [downloading, setDownloading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+
+  const handleDownload = async () => {
+    if (!contract.sale_upload_url) {
+      message.error('HĐ này không có file Sale upload')
+      return
+    }
+    setDownloading(true)
+    try {
+      const url = await salesContractWorkflowService.getDownloadUrl(contract.sale_upload_url)
+      window.open(url, '_blank')
+    } catch (e: unknown) {
+      message.error(`Download thất bại: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const handleUploadFilled = async () => {
+    if (!file) {
+      message.error('Chọn file .docx đã fill trước')
+      return
+    }
+    setUploading(true)
+    try {
+      const updated = await salesContractWorkflowService.uploadFilledByReviewer(contract.id, file)
+      message.success(`Đã upload ${file.name} — bấm Duyệt để trình ký`)
+      setFile(null)
+      onFilled(updated)
+    } catch (e: unknown) {
+      message.error(`Upload thất bại: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const hasFilled = !!contract.reviewer_filled_url
+  const filledName = contract.reviewer_filled_url?.split('/').pop() || ''
+
+  return (
+    <>
+      <Alert
+        type="info"
+        showIcon
+        message="📎 Upload flow — Sale tự sửa .docx, anh fill 2 chỗ highlight"
+        description={
+          <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+            <div><strong>Bước 1:</strong> Bấm "Download file Sale upload" → mở bằng Word</div>
+            <div><strong>Bước 2:</strong> Fill 2 chỗ <strong>highlight vàng</strong>: số HĐ + bank info</div>
+            <div><strong>Bước 3:</strong> Save file → upload lại bằng nút bên dưới</div>
+            <div><strong>Bước 4:</strong> Bấm "Duyệt + Trình ký" ở header</div>
+          </div>
+        }
+        style={{ marginBottom: 16 }}
+      />
+
+      {/* Step 1 — Download file Sale */}
+      <Card size="small" style={{ marginBottom: 12 }} title="① File Sale upload (gốc)">
+        <Space>
+          <FileWordOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>
+              {contract.sale_upload_url?.split('/').pop() || '—'}
+            </div>
+            <Button
+              type="link"
+              size="small"
+              icon={<DownloadOutlined />}
+              loading={downloading}
+              onClick={handleDownload}
+              style={{ padding: 0 }}
+            >
+              Download để mở Word fill
+            </Button>
+          </div>
+        </Space>
+      </Card>
+
+      {/* Step 2 — Upload file đã fill */}
+      <Card size="small" style={{ marginBottom: 12 }} title={
+        <Space>
+          <span>② File đã fill (anh upload)</span>
+          {hasFilled && <Tag color="green">Đã upload</Tag>}
+        </Space>
+      }>
+        {hasFilled && (
+          <div style={{ marginBottom: 12, padding: 8, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
+            <Space>
+              <CheckCircleOutlined style={{ color: '#52c41a' }} />
+              <span style={{ fontSize: 12 }}>{filledName}</span>
+            </Space>
+          </div>
+        )}
+        <div
+          style={{
+            border: file ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
+            background: file ? '#f6ffed' : '#fafafa',
+            borderRadius: 8,
+            padding: 14,
+            textAlign: 'center',
+            cursor: 'pointer',
+          }}
+          onClick={() => document.getElementById('reviewer-fill-input')?.click()}
+          onDragOver={(e) => { e.preventDefault() }}
+          onDrop={(e) => {
+            e.preventDefault()
+            const f = e.dataTransfer.files[0]
+            if (f && f.name.toLowerCase().endsWith('.docx')) setFile(f)
+            else message.error('Chỉ nhận file .docx')
+          }}
+        >
+          <input
+            id="reviewer-fill-input"
+            type="file"
+            accept=".docx"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) setFile(f)
+            }}
+          />
+          {file ? (
+            <div>
+              <FileWordOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
+              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{file.name}</div>
+              <div style={{ fontSize: 10, color: '#666' }}>{(file.size / 1024).toFixed(0)} KB</div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: '#666' }}>
+              Kéo thả .docx đã fill hoặc bấm để chọn
+            </div>
+          )}
+        </div>
+        <Button
+          type="primary"
+          icon={<CheckCircleOutlined />}
+          block
+          loading={uploading}
+          disabled={!file}
+          onClick={handleUploadFilled}
+          style={{ marginTop: 8, background: '#1B4D3E' }}
+        >
+          {hasFilled ? 'Upload thay file đã fill' : 'Upload file đã fill'}
+        </Button>
+      </Card>
+
+      {/* Read-only context: order info */}
+      <Card size="small" title="Tóm tắt đơn (read-only)" style={{ marginBottom: 16 }}>
+        <Descriptions size="small" column={2} bordered>
+          <Descriptions.Item label="Số HĐ (Sale ghi)">
+            {contract.form_data?.contract_no || '—'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Revision">#{contract.revision_no}</Descriptions.Item>
+        </Descriptions>
+      </Card>
+    </>
   )
 }

@@ -859,6 +859,7 @@ export const salesContractWorkflowService = {
       .update({
         status: 'rejected',
         rejected_reason: rejectedReason.trim(),
+        rejected_at: new Date().toISOString(),
       })
       .eq('id', id)
       .select('*')

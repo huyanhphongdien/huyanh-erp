@@ -201,11 +201,12 @@ export default function ContractReviewPage() {
 
   const handleApprove = async () => {
     if (!active) return
+    const isUpload = active.flow_type === 'upload'
     // Upload flow: KHÔNG validate bank form (Phú đã fill trực tiếp trên .docx).
     // Chỉ yêu cầu Phú đã upload ít nhất 1 file đã fill (reviewer_filled_urls).
-    if (active.flow_type === 'upload') {
+    if (isUpload) {
       if (!active.reviewer_filled_urls || active.reviewer_filled_urls.length === 0) {
-        message.error('Cần upload ít nhất 1 file .docx đã fill 2 chỗ highlight trước khi duyệt')
+        message.error('Cần upload lại ít nhất 1 file .docx đã fill highlight trước khi duyệt')
         return
       }
     } else {
@@ -222,18 +223,26 @@ export default function ContractReviewPage() {
         return
       }
     }
-    const updated = active.flow_type === 'upload'
+    const updated = isUpload
       ? (active.form_data || {})  // upload flow: form_data minimal, không merge bank
       : buildUpdatedFormData()
     const notes = bankForm.getFieldValue('review_notes')
+    const displayNo =
+      active.form_data?.contract_no
+      || active.sales_order?.contract_no
+      || `(chưa có số)`
     Modal.confirm({
       title: 'Duyệt + Trình ký',
       content: (
         <div>
           <div>
-            HĐ <strong>{active.form_data?.contract_no}</strong> sẽ chuyển sang <Tag color="green">approved</Tag>, trình Trung/Huy ký.
+            HĐ <strong>{displayNo}</strong> sẽ chuyển sang <Tag color="green">approved</Tag>, trình Trung/Huy ký.
           </div>
-          <div style={{ marginTop: 8 }}>Bank info đã chọn sẽ được lưu vào form_data và dùng cho file ký.</div>
+          <div style={{ marginTop: 8 }}>
+            {isUpload
+              ? `Sẽ copy ${active.reviewer_filled_urls?.length || 0} file đã fill (ưu tiên) + file gốc còn lại vào folder "HĐ gửi KH".`
+              : 'Bank info đã chọn sẽ được lưu vào form_data và dùng cho file ký.'}
+          </div>
         </div>
       ),
       okText: 'Duyệt + Trình ký',
@@ -243,7 +252,7 @@ export default function ContractReviewPage() {
         setApproving(true)
         try {
           await salesContractWorkflowService.approve(active.id, updated, notes)
-          message.success(`Đã duyệt HĐ ${active.form_data?.contract_no} → trình ký`)
+          message.success(`Đã duyệt HĐ ${displayNo} → trình ký`)
           closeReview()
           void refresh()
         } catch (e: unknown) {
@@ -476,7 +485,7 @@ export default function ContractReviewPage() {
         title={
           <Space>
             <BankOutlined />
-            <span>Review HĐ {active?.form_data?.contract_no}</span>
+            <span>Review HĐ {active?.form_data?.contract_no || active?.sales_order?.contract_no || '(chưa có số)'}</span>
             <Tag color="orange">revision #{active?.revision_no}</Tag>
           </Space>
         }
@@ -709,7 +718,7 @@ export default function ContractReviewPage() {
         title={
           <Space>
             <CloseCircleOutlined style={{ color: '#cf1322' }} />
-            <span>Trả lại Sale — {active?.form_data?.contract_no}</span>
+            <span>Trả lại Sale — {active?.form_data?.contract_no || active?.sales_order?.contract_no || '(chưa có số)'}</span>
           </Space>
         }
         open={rejectOpen}
@@ -873,7 +882,15 @@ function UploadFlowReview({ contract, onFilled }: UploadFlowReviewProps) {
         description={
           <div style={{ fontSize: 12, lineHeight: 1.6 }}>
             <div><strong>Bước 1:</strong> Download từng file Docs đã upload (xem ô ①)</div>
-            <div><strong>Bước 2:</strong> Mở Word fill 2 ô <strong>highlight vàng</strong> (số HĐ + bank)</div>
+            <div style={{ marginTop: 4 }}>
+              <strong>Bước 2:</strong> Mở từng file Word, fill các ô <strong>highlight vàng</strong> theo loại:
+              <ul style={{ margin: '4px 0 4px 18px', paddingLeft: 0 }}>
+                <li><strong>SC (HĐ chính):</strong> chỉ số HĐ — bank thường ghi "Payment as stated in Commercial Invoice"</li>
+                <li><strong>PI / Commercial Invoice:</strong> số HĐ + bank info (2 ô)</li>
+                <li><strong>Packing List / Phụ lục:</strong> số HĐ nếu template có highlight, không thì skip</li>
+              </ul>
+              <em style={{ color: '#8c8c8c' }}>Bank chưa quyết được? Để trống highlight bank trong PI — duyệt revision sau khi tài vụ chốt TK.</em>
+            </div>
             <div><strong>Bước 3:</strong> Upload lại {MAX_FILES} file tối đa (ô ②)</div>
             <div><strong>Bước 4:</strong> Bấm "Duyệt + Trình ký" ở header</div>
           </div>

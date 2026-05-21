@@ -84,6 +84,7 @@ export default function ContractReviewPage() {
   // Drawer state
   const [active, setActive] = useState<SalesOrderContract | null>(null)
   const [bankForm] = Form.useForm<{
+    contract_no?: string  // upload flow: Phú gõ sync ngược ERP (Word vẫn là source)
     bank_account_name: string
     bank_account_no: string
     bank_full_name: string
@@ -136,6 +137,7 @@ export default function ContractReviewPage() {
     setActive(row)
     const fd = row.form_data || {}
     bankForm.setFieldsValue({
+      contract_no: fd.contract_no || row.sales_order?.contract_no || '',
       bank_account_name: fd.bank_account_name || 'HUY ANH RUBBER COMPANY LIMITED',
       bank_account_no: fd.bank_account_no || '',
       bank_full_name: fd.bank_full_name || '',
@@ -154,6 +156,7 @@ export default function ContractReviewPage() {
     const vals = bankForm.getFieldsValue()
     return {
       ...(active?.form_data || {}),
+      contract_no: (vals.contract_no || '').trim() || active?.form_data?.contract_no,
       bank_account_name: vals.bank_account_name,
       bank_account_no: vals.bank_account_no,
       bank_full_name: vals.bank_full_name,
@@ -223,12 +226,13 @@ export default function ContractReviewPage() {
         return
       }
     }
-    const updated = isUpload
-      ? (active.form_data || {})  // upload flow: form_data minimal, không merge bank
-      : buildUpdatedFormData()
+    // Upload flow: merge contract_no Phú vừa gõ vào form_data (bank vẫn để trống
+    //   vì bank lưu trong file Word). Compose flow: merge cả 5 bank field.
+    const updated = buildUpdatedFormData()
     const notes = bankForm.getFieldValue('review_notes')
     const displayNo =
-      active.form_data?.contract_no
+      updated.contract_no
+      || active.form_data?.contract_no
       || active.sales_order?.contract_no
       || `(chưa có số)`
     Modal.confirm({
@@ -518,6 +522,7 @@ export default function ContractReviewPage() {
           <UploadFlowReview
             contract={active}
             onFilled={(updated) => setActive(updated)}
+            bankForm={bankForm}
           />
         )}
         {active && active.flow_type !== 'upload' && (
@@ -815,9 +820,18 @@ export default function ContractReviewPage() {
 interface UploadFlowReviewProps {
   contract: SalesOrderContract
   onFilled: (updated: SalesOrderContract) => void
+  bankForm: ReturnType<typeof Form.useForm<{
+    contract_no?: string
+    bank_account_name: string
+    bank_account_no: string
+    bank_full_name: string
+    bank_address: string
+    bank_swift: string
+    review_notes?: string
+  }>>[0]
 }
 
-function UploadFlowReview({ contract, onFilled }: UploadFlowReviewProps) {
+function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProps) {
   const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const [files, setFiles] = useState<File[]>([])
@@ -1040,11 +1054,34 @@ function UploadFlowReview({ contract, onFilled }: UploadFlowReviewProps) {
         </Button>
       </Card>
 
+      {/* ③ Sync metadata ERP — Số HĐ Phú vừa fill trong Word, gõ lại đây để
+            ERP cập nhật queue/sales_orders. Optional, không block duyệt. */}
+      <Card size="small" style={{ marginBottom: 12 }} title={
+        <Space>
+          <span>③ Số HĐ — sync ngược ERP (optional)</span>
+        </Space>
+      }>
+        <Form form={bankForm} layout="vertical" size="middle">
+          <Form.Item
+            label="Số HĐ anh vừa fill trong Word"
+            name="contract_no"
+            tooltip="Gõ lại số HĐ anh vừa điền vào file Word để Drawer/Queue/Reports hiển thị đúng. Bank info giữ trong file Word, không cần nhập ở đây."
+            extra={
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                Để trống nếu chưa quyết số HĐ — duyệt vẫn được, queue sẽ hiện "(chưa có số)".
+              </Text>
+            }
+          >
+            <Input placeholder="VD: HA20260062" allowClear />
+          </Form.Item>
+        </Form>
+      </Card>
+
       {/* Read-only context */}
       <Card size="small" title="Tóm tắt đơn (read-only)" style={{ marginBottom: 16 }}>
         <Descriptions size="small" column={2} bordered>
-          <Descriptions.Item label="Số HĐ (Docs ghi)">
-            {contract.form_data?.contract_no || '—'}
+          <Descriptions.Item label="Số HĐ (Docs ghi ban đầu)">
+            {contract.form_data?.contract_no || contract.sales_order?.contract_no || '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Revision">#{contract.revision_no}</Descriptions.Item>
         </Descriptions>

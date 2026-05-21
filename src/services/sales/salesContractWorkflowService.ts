@@ -748,6 +748,23 @@ export const salesContractWorkflowService = {
     if (error) throw error
     const row = data as SalesOrderContract
 
+    // ─── Sync ngược sales_orders.contract_no nếu Phú nhập mới ở upload flow ───
+    // (compose flow đã sync từ lúc Sale submit; upload flow trước đó form_data trống).
+    const newContractNo = updatedFormData?.contract_no?.trim()
+    if (newContractNo) {
+      const { data: so } = await supabase
+        .from('sales_orders')
+        .select('contract_no')
+        .eq('id', row.sales_order_id)
+        .maybeSingle()
+      if (so && so.contract_no !== newContractNo) {
+        await supabase
+          .from('sales_orders')
+          .update({ contract_no: newContractNo })
+          .eq('id', row.sales_order_id)
+      }
+    }
+
     // ─── D. Notify Trung/Huy (signers) — họ chờ ký ───
     const signerIds = await Promise.all(
       ALLOWED_SIGNER_EMAILS.map((email) => getEmployeeIdByEmail(email)),

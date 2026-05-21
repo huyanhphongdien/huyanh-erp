@@ -178,6 +178,19 @@ const ConfirmDealModal = ({
 
   const handleSubmit = async () => {
     try {
+      // Lock-state guard: booking đã confirmed/rejected → block submit
+      const bookingStatus = (booking as { status?: string } | null)?.status
+      if (bookingStatus === 'confirmed') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { message: antMessage } = await import('antd')
+        antMessage.warning('Phiếu đã chốt thành Deal — không thể tạo lần 2')
+        return
+      }
+      if (bookingStatus === 'rejected') {
+        const { message: antMessage } = await import('antd')
+        antMessage.warning('Phiếu đã bị từ chối — không thể tạo Deal')
+        return
+      }
       const values = await form.validateFields()
       const bookingMeta = booking as any
       const finalFacilityId = values.target_facility_id

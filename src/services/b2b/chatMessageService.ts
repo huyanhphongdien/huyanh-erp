@@ -486,6 +486,15 @@ export const chatMessageService = {
     const booking = original.metadata?.booking
     if (!booking) throw new Error('Không có dữ liệu booking')
 
+    // Lock-state guard: phiếu đã confirmed/rejected → không cho update.
+    // Tránh case 2 phía cùng confirm hoặc thương lượng sau khi Deal đã tạo.
+    if (booking.status === 'confirmed') {
+      throw new Error('Phiếu đã chốt thành Deal — không thể thay đổi. Vui lòng tạo phiếu mới.')
+    }
+    if (booking.status === 'rejected' && status !== 'rejected') {
+      throw new Error('Phiếu đã bị từ chối — không thể thay đổi. Vui lòng tạo phiếu mới.')
+    }
+
     // Optimistic locking — chống race condition khi 2 user cùng negotiate
     const currentVersion = booking.negotiation_version || 0
     if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {

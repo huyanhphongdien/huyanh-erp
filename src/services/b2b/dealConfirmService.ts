@@ -389,6 +389,16 @@ export const dealConfirmService = {
       }
     }
 
+    // === Step 7: Notify BGĐ qua email (fire-and-forget, không block UX) ===
+    // Edge function b2b-deal-notify gửi mail 4 người: Huy/Thủy/Phú/Minh.
+    // Bao gồm: deal info + lịch sử thương lượng + người chốt.
+    void supabase.functions
+      .invoke('b2b-deal-notify', { body: { deal_id: deal.id } })
+      .then((res) => {
+        if (res.error) console.error('[dealConfirm] notify email error:', res.error)
+      })
+      .catch((err) => console.error('[dealConfirm] notify email throw:', err))
+
     return result
   },
 }

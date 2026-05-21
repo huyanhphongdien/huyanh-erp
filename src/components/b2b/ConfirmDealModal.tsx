@@ -275,6 +275,33 @@ const ConfirmDealModal = ({
           style={{ marginBottom: 16 }}
         />
 
+        {/* Loại giao dịch — Mua đứt vs Chạy đầu ra */}
+        <Form.Item
+          label={
+            <Space size={4}>
+              <span>Loại giao dịch</span>
+              <Tooltip title="Mua đứt: nhà máy mua ngay với giá chốt, không phụ thuộc DRC sản phẩm. Chạy đầu ra: giá tạm tính, sau khi SX + QC mới ra giá cuối theo DRC sản phẩm thực.">
+                <InfoCircleOutlined style={{ color: '#faad14' }} />
+              </Tooltip>
+            </Space>
+          }
+          required
+        >
+          <Radio.Group
+            value={dealType}
+            onChange={(e) => setDealType(e.target.value)}
+            buttonStyle="solid"
+            size="large"
+          >
+            <Radio.Button value="purchase">🛒 Mua đứt</Radio.Button>
+            <Radio.Button value="processing">🏭 Chạy đầu ra</Radio.Button>
+          </Radio.Group>
+          <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
+            {dealType === 'purchase' && '→ Giá cố định, thanh toán sau nhập kho. KHÔNG phụ thuộc DRC sản phẩm.'}
+            {dealType === 'processing' && '→ Giá tạm tính. Sau SX + QC final → giá cuối = DRC sản phẩm × đơn giá.'}
+          </div>
+        </Form.Item>
+
         {/* Loại mủ — lock */}
         <Form.Item
           name="product_type"

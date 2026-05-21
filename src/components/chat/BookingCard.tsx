@@ -388,9 +388,16 @@ const BookingCard: React.FC<BookingCardProps> = ({
           <div>
             <Text type="secondary" style={{ fontSize: 11 }}>
               Giá ({price_unit === 'dry' ? 'khô' : 'ướt'})
+              {status === 'negotiating' && counter_price && counter_price !== price_per_kg && (
+                <Tag color="purple" style={{ marginLeft: 4, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>
+                  Vòng {metadata.negotiation_history?.length || 1}
+                </Tag>
+              )}
             </Text>
             <div style={{ fontWeight: 500 }}>
-              {price_per_kg?.toLocaleString('vi-VN') || '—'} đ/kg
+              {/* Live update: khi negotiating, hiện counter_price (giá đề xuất mới
+                  nhất). Khi pending/confirmed/rejected, hiện price_per_kg gốc. */}
+              {(status === 'negotiating' && counter_price ? counter_price : price_per_kg)?.toLocaleString('vi-VN') || '—'} đ/kg
             </div>
           </div>
         </div>
@@ -414,28 +421,10 @@ const BookingCard: React.FC<BookingCardProps> = ({
           </div>
         )}
 
-        {/* Counter price (if negotiating) */}
-        {counter_price && status === 'negotiating' && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: '8px 12px',
-              background: '#e6f7ff',
-              borderRadius: 8,
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: 11 }}>Giá đề xuất hiện tại</Text>
-            <div style={{ fontWeight: 600, color: '#1890ff' }}>
-              {counter_price.toLocaleString('vi-VN')} đ/kg
-            </div>
-            {negotiation_notes && (
-              <Text style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
-                "{negotiation_notes}"
-              </Text>
-            )}
-            {metadata.negotiation_expires_at && (
-              <NegotiationCountdown expiresAt={metadata.negotiation_expires_at} />
-            )}
+        {/* Deadline countdown (nếu có) — sau khi giá đã merge vào card chính */}
+        {status === 'negotiating' && metadata.negotiation_expires_at && (
+          <div style={{ marginTop: 8 }}>
+            <NegotiationCountdown expiresAt={metadata.negotiation_expires_at} />
           </div>
         )}
 
@@ -506,11 +495,21 @@ const BookingCard: React.FC<BookingCardProps> = ({
 
         <Divider style={{ margin: '12px 0 8px' }} />
 
-        {/* Estimated value */}
+        {/* Estimated value — recompute theo giá đề xuất hiện tại nếu negotiating */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text type="secondary" style={{ fontSize: 12 }}>Giá trị ước tính</Text>
           <Text strong style={{ fontSize: 16, color: colors.primary }}>
-            {formatCurrency(estimated_value)}
+            {(() => {
+              const effectivePrice = (status === 'negotiating' && counter_price) ? counter_price : price_per_kg
+              if (status === 'negotiating' && counter_price && quantity_tons && effectivePrice) {
+                // Recompute: wet = qty × 1000 × price; dry = qty × 1000 × DRC × price
+                const isDry = price_unit === 'dry'
+                const drcMul = isDry ? ((drc_percent || 0) / 100) : 1
+                const recomputed = Math.round(quantity_tons * 1000 * drcMul * effectivePrice)
+                return formatCurrency(recomputed)
+              }
+              return formatCurrency(estimated_value)
+            })()}
           </Text>
         </div>
 

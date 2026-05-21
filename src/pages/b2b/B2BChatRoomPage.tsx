@@ -269,10 +269,16 @@ const BookingCard = ({
           <Col span={12}>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>
               Đơn giá ({booking.price_unit === 'dry' ? 'khô' : 'ướt'})
+              {isNegotiating && booking.counter_price && booking.counter_price !== booking.price_per_kg && (
+                <Tag color="purple" style={{ marginLeft: 4, fontSize: 9, padding: '0 4px', lineHeight: '14px', border: 'none' }}>
+                  Vòng {booking.negotiation_history?.length || 1}
+                </Tag>
+              )}
             </Text>
             <br />
             <Text strong style={{ color: '#fff', fontSize: 13 }}>
-              {booking.price_per_kg?.toLocaleString() || '—'} đ/kg
+              {/* Live update: hiện counter_price khi đang negotiating */}
+              {((isNegotiating && booking.counter_price) ? booking.counter_price : booking.price_per_kg)?.toLocaleString() || '—'} đ/kg
             </Text>
           </Col>
         </Row>
@@ -307,24 +313,18 @@ const BookingCard = ({
           <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>Giá trị ước tính</Text>
           <br />
           <Text strong style={{ color: '#ffd700', fontSize: 16 }}>
-            {formatCurrency(booking.estimated_value)}
+            {(() => {
+              // Recompute theo counter_price khi negotiating
+              if (isNegotiating && booking.counter_price && booking.quantity_tons) {
+                const isDry = booking.price_unit === 'dry'
+                const drcMul = isDry ? ((booking.drc_percent || 0) / 100) : 1
+                const recomputed = Math.round(booking.quantity_tons * 1000 * drcMul * booking.counter_price)
+                return formatCurrency(recomputed)
+              }
+              return formatCurrency(booking.estimated_value)
+            })()}
           </Text>
         </div>
-
-        {isNegotiating && booking.counter_price && (
-          <div style={{ marginTop: 8, padding: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 4 }}>
-            <Text style={{ color: '#ffd700', fontSize: 12 }}>
-              💰 Giá đề xuất hiện tại: {booking.counter_price?.toLocaleString()} đ/kg
-            </Text>
-            {booking.negotiation_notes && (
-              <div>
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>
-                  {booking.negotiation_notes}
-                </Text>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Lịch sử thương lượng — luôn hiện expanded khi có ≥1 round.
             KHÔNG giới hạn số vòng. Timeline để cả 2 bên thấy quá trình. */}

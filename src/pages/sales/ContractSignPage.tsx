@@ -80,6 +80,7 @@ export default function ContractSignPage() {
     const email = user?.email?.toLowerCase()
     if (email === 'trunglxh@huyanhrubber.com') return 'Mr. Trung (Trình ký)'
     if (email === 'huylv@huyanhrubber.com') return 'Mr. Huy (Trình ký)'
+    if (email === 'minhld@huyanhrubber.com') return 'Minh LD (Trình ký — test)'
     return user?.email || '—'
   }, [user])
 
@@ -171,22 +172,27 @@ export default function ContractSignPage() {
    *  Không đổi status, không upload PDF — chỉ set timestamp confirm. */
   const handleConfirmReady = () => {
     if (!active) return
+    const displayNo =
+      active.form_data?.contract_no
+      || active.sales_order?.contract_no
+      || '(chưa có số)'
+    const isUpload = active.flow_type === 'upload'
     Modal.confirm({
       title: '✅ Xác nhận HĐ đã duyệt — sẵn sàng in ký',
       content: (
         <div>
           <p style={{ marginBottom: 8 }}>
-            Bạn xác nhận thông tin HĐ <strong>{active.form_data?.contract_no}</strong> đã ĐÚNG
-            (bao gồm bank info Phú LV nhập).
+            Bạn xác nhận thông tin HĐ <strong>{displayNo}</strong> đã ĐÚNG
+            {isUpload ? ' (kiểm bank trong file Word).' : ' (bao gồm bank info Phú LV nhập).'}
           </p>
           <Alert
             type="info"
             showIcon
             message="Sau khi xác nhận"
             description={<>
-              • Có thể tải SC/PI .docx → in ra → ký + đóng dấu (ai cũng làm được, không cần chữ ký số)<br />
-              • Scan PDF có chữ ký HA → upload vào folder <strong>"HĐ HA đã ký"</strong><br />
-              • Khi KH gửi lại bản đã ký 2 bên → upload <strong>"HĐ FINAL ký 2 bên"</strong>
+              • Tải file → in ra → ký + đóng dấu HA (ai cũng làm được, không cần chữ ký số)<br />
+              • Scan PDF có chữ ký HA → upload vào folder <strong>"HĐ HA đã ký"</strong> ở tab Hợp đồng<br />
+              • Khi KH gửi lại bản ký 2 bên → upload <strong>"HĐ FINAL"</strong> bên dưới
             </>}
             style={{ marginTop: 8 }}
           />
@@ -200,7 +206,7 @@ export default function ContractSignPage() {
         setConfirming(true)
         try {
           const updated = await salesContractWorkflowService.confirmReadyToSign(active.id)
-          message.success(`Đã xác nhận HĐ ${active.form_data?.contract_no}`)
+          message.success(`Đã xác nhận HĐ ${displayNo}`)
           setActive(updated)  // refresh drawer với signer_confirmed_at
           void refresh()
         } catch (e: unknown) {
@@ -216,13 +222,17 @@ export default function ContractSignPage() {
   /** Trung/Huy bấm "Trả lại Phú LV" — phát hiện sai (bank/giá/...). */
   const handleSendBack = () => {
     if (!active) return
+    const displayNo =
+      active.form_data?.contract_no
+      || active.sales_order?.contract_no
+      || '(chưa có số)'
     let reason = ''
     Modal.confirm({
       title: '🔁 Trả lại Phú LV để review lại',
       content: (
         <div>
           <p style={{ marginBottom: 8 }}>
-            HĐ <strong>{active.form_data?.contract_no}</strong> sẽ chuyển{' '}
+            HĐ <strong>{displayNo}</strong> sẽ chuyển{' '}
             <Tag color="orange">reviewing</Tag>. Phú LV/Minh LD nhận thông báo + email.
           </p>
           <p style={{ marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
@@ -263,7 +273,7 @@ export default function ContractSignPage() {
   const handleConfirmSigned = async () => {
     if (!active) return
     if (fileList.length === 0) {
-      message.error('Cần upload PDF đã ký + đóng dấu')
+      message.error('Cần upload PDF FINAL (KH ký lại — 2 bên)')
       return
     }
     const file = fileList[0].originFileObj as File | undefined
@@ -271,13 +281,17 @@ export default function ContractSignPage() {
       message.error('Không đọc được file PDF')
       return
     }
+    const displayNo =
+      active.form_data?.contract_no
+      || active.sales_order?.contract_no
+      || '(chưa có số)'
     Modal.confirm({
-      title: 'Xác nhận đã ký + đóng dấu',
+      title: 'Đánh dấu FINAL — HĐ đã ký 2 bên',
       content: (
         <div>
           <div>
-            HĐ <strong>{active.form_data?.contract_no}</strong> sẽ chuyển sang{' '}
-            <Tag color="success">signed</Tag>. File PDF <strong>{file.name}</strong> sẽ được upload và lưu lại.
+            HĐ <strong>{displayNo}</strong> sẽ chuyển sang{' '}
+            <Tag color="success">signed</Tag>. File PDF <strong>{file.name}</strong> sẽ lưu vào folder "HĐ FINAL ký 2 bên".
           </div>
           <Alert
             type="warning"
@@ -287,7 +301,7 @@ export default function ContractSignPage() {
           />
         </div>
       ),
-      okText: 'Xác nhận ký',
+      okText: 'Xác nhận FINAL',
       cancelText: 'Quay lại',
       okButtonProps: { type: 'primary', style: { background: '#1B4D3E' } },
       onOk: async () => {
@@ -301,12 +315,12 @@ export default function ContractSignPage() {
           )
           // 2) markSigned → status='signed' + signer_id + signed_pdf_url
           await salesContractWorkflowService.markSigned(active.id, path)
-          message.success(`Đã ký HĐ ${active.form_data?.contract_no}`)
+          message.success(`Đã đánh dấu FINAL HĐ ${displayNo}`)
           closeSign()
           void refresh()
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e)
-          message.error(`Ký thất bại: ${msg}`)
+          message.error(`Đánh dấu FINAL thất bại: ${msg}`)
         } finally {
           setSigning(false)
         }
@@ -362,10 +376,17 @@ export default function ContractSignPage() {
               title: 'Số HĐ',
               dataIndex: ['form_data', 'contract_no'],
               key: 'contract_no',
-              width: 140,
+              width: 160,
               render: (v: string, r: SalesOrderContract) => (
                 <Space direction="vertical" size={2}>
-                  <Text strong>{v || '—'}</Text>
+                  <Space size={4}>
+                    <Text strong>{v || r.sales_order?.contract_no || '—'}</Text>
+                    {r.flow_type === 'upload' && (
+                      <Tag color="purple" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
+                        📎 Upload
+                      </Tag>
+                    )}
+                  </Space>
                   <Text type="secondary" style={{ fontSize: 11 }}>
                     rev #{r.revision_no}
                   </Text>
@@ -466,7 +487,10 @@ export default function ContractSignPage() {
         title={
           <Space>
             <EditOutlined />
-            <span>Ký HĐ {active?.form_data?.contract_no}</span>
+            <span>Ký HĐ {active?.form_data?.contract_no || active?.sales_order?.contract_no || '(chưa có số)'}</span>
+            {active?.flow_type === 'upload' && (
+              <Tag color="purple" style={{ fontSize: 11, padding: '0 6px' }}>📎 Upload</Tag>
+            )}
             <Tag color="warning">Chờ ký</Tag>
             <Tag>rev #{active?.revision_no}</Tag>
           </Space>
@@ -477,29 +501,29 @@ export default function ContractSignPage() {
         extra={
           active && (
             <Space>
-              {/* Step 1: Chưa xác nhận → 2 nút chọn */}
+              {/* Trả lại Phú LV — luôn hiển thị (kể cả sau khi confirm-ready, để rollback nếu confirm nhầm).
+                  sendBackToReview() service đã reset signer_confirmed_at=null. */}
+              <Button
+                danger
+                icon={<RollbackOutlined />}
+                onClick={handleSendBack}
+                loading={sendingBack}
+              >
+                Trả lại Phú LV
+              </Button>
+              {/* Step 1: Chưa confirm-ready → button "Xác nhận đã duyệt" */}
               {!active.signer_confirmed_at && (
-                <>
-                  <Button
-                    danger
-                    icon={<RollbackOutlined />}
-                    onClick={handleSendBack}
-                    loading={sendingBack}
-                  >
-                    Trả lại Phú LV
-                  </Button>
-                  <Button
-                    type="primary"
-                    icon={<CheckCircleOutlined />}
-                    onClick={handleConfirmReady}
-                    loading={confirming}
-                    style={{ background: '#1B4D3E' }}
-                  >
-                    Xác nhận đã duyệt
-                  </Button>
-                </>
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleConfirmReady}
+                  loading={confirming}
+                  style={{ background: '#1B4D3E' }}
+                >
+                  Xác nhận đã duyệt
+                </Button>
               )}
-              {/* Step 2: Đã xác nhận → nút upload FINAL khi có file */}
+              {/* Step 2: Đã confirm-ready → button "Đánh dấu FINAL" khi có file */}
               {active.signer_confirmed_at && (
                 <Button
                   type="primary"
@@ -554,32 +578,45 @@ export default function ContractSignPage() {
             <Card size="small" style={{ marginBottom: 16 }} title="Tóm tắt HĐ">
               <Descriptions size="small" column={2} bordered>
                 <Descriptions.Item label="Số HĐ">
-                  {active.form_data?.contract_no || '—'}
+                  {active.form_data?.contract_no || active.sales_order?.contract_no || '—'}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày HĐ">
                   {active.form_data?.contract_date || '—'}
                 </Descriptions.Item>
                 <Descriptions.Item label="Buyer" span={2}>
-                  <strong>{active.form_data?.buyer_name}</strong>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    {active.form_data?.buyer_address}
-                  </Text>
+                  <strong>
+                    {active.form_data?.buyer_name
+                      || active.sales_order?.customer?.name
+                      || active.sales_order?.customer?.short_name
+                      || '—'}
+                  </strong>
+                  {active.form_data?.buyer_address && (
+                    <>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        {active.form_data.buyer_address}
+                      </Text>
+                    </>
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Grade">
-                  <Tag color="blue">{active.form_data?.grade}</Tag>
+                  <Tag color="blue">{active.form_data?.grade || active.sales_order?.grade || '—'}</Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Incoterm">
-                  <Tag>{active.form_data?.incoterm}</Tag>
+                  <Tag>{active.form_data?.incoterm || active.sales_order?.incoterm || '—'}</Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Tấn">
-                  {active.form_data?.quantity}
+                  {active.form_data?.quantity || active.sales_order?.quantity_tons || '—'}
                 </Descriptions.Item>
                 <Descriptions.Item label="Giá USD/MT">
-                  {active.form_data?.unit_price}
+                  {active.form_data?.unit_price || active.sales_order?.unit_price || '—'}
                 </Descriptions.Item>
                 <Descriptions.Item label="Tổng USD" span={2}>
-                  <strong>${active.form_data?.amount}</strong>
+                  <strong>
+                    ${active.form_data?.amount
+                      || active.sales_order?.total_value_usd?.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                      || '—'}
+                  </strong>
                 </Descriptions.Item>
                 {active.form_data?.extra_terms && (
                   <Descriptions.Item label="📌 Other Conditions" span={2}>
@@ -591,16 +628,24 @@ export default function ContractSignPage() {
                     </div>
                   </Descriptions.Item>
                 )}
-                <Descriptions.Item label="Bank (Kiểm tra nhập)" span={2}>
-                  <div style={{ fontSize: 12 }}>
-                    {active.form_data?.bank_account_name} —{' '}
-                    {active.form_data?.bank_account_no}
-                    <br />
-                    {active.form_data?.bank_full_name}
-                    <br />
-                    SWIFT {active.form_data?.bank_swift}
-                  </div>
-                </Descriptions.Item>
+                {active.flow_type === 'upload' ? (
+                  <Descriptions.Item label="Bank" span={2}>
+                    <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
+                      📎 Upload flow — bank info Phú đã fill trong file Word (xem file đã upload bên dưới)
+                    </Text>
+                  </Descriptions.Item>
+                ) : (
+                  <Descriptions.Item label="Bank (Kiểm tra nhập)" span={2}>
+                    <div style={{ fontSize: 12 }}>
+                      {active.form_data?.bank_account_name || '—'} —{' '}
+                      {active.form_data?.bank_account_no || '—'}
+                      <br />
+                      {active.form_data?.bank_full_name || '—'}
+                      <br />
+                      SWIFT {active.form_data?.bank_swift || '—'}
+                    </div>
+                  </Descriptions.Item>
+                )}
                 <Descriptions.Item label="Người duyệt" span={2}>
                   {active.reviewer_employee?.full_name || '—'} lúc{' '}
                   {active.reviewed_at

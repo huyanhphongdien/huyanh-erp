@@ -1049,8 +1049,8 @@ export const salesContractWorkflowService = {
       salesOrderId: row.sales_order_id,
       contractNo,
       revisionNo: row.revision_no,
-      title: `✍️ HĐ ${contractNo} đã được ký + đóng dấu`,
-      message: 'HĐ pháp lý sẵn sàng. Sale có thể gửi bản FINAL cho khách.',
+      title: `✍️ HĐ ${contractNo} đã ký FINAL (2 bên)`,
+      message: 'HĐ pháp lý hoàn tất — bản FINAL ký 2 bên đã lưu vào tab Hợp đồng.',
       priority: 'high',
     })
 
@@ -1073,14 +1073,15 @@ export const salesContractWorkflowService = {
       })
     }).catch((e) => console.error('Email signed fail:', e))
 
-    // ─── Auto-copy PDF đã ký vào folder "HĐ HA đã ký" (ha_signed) ───
-    // Trung/Huy upload PDF in + ký + đóng dấu HA → sub_type='ha_signed'.
-    // Folder FINAL (final_signed = ký 2 bên) sẽ do Docs upload sau khi nhận từ KH.
+    // ─── Auto-copy PDF FINAL (KH đã ký lại — 2 bên) vào folder "HĐ FINAL" ───
+    // PDF upload ở ContractSignPage step 2 = bản KH ký lại + đóng dấu (2 bên).
+    // Bản HA-1-bên (Trung/Huy in + ký + đóng dấu trước khi gửi KH) upload riêng
+    // via ContractFileSection vào folder 'ha_signed'.
     if (signedPdfUrl) {
       void _copyContractFileToDocuments({
         salesOrderId: row.sales_order_id,
         filePath: signedPdfUrl,
-        docSubType: 'ha_signed',
+        docSubType: 'final_signed',
         uploadedBy: signerId,
         contractNo,
       })

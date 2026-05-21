@@ -21,10 +21,12 @@ export const SALES_CONFIG = {
   ],
 
   /** Whitelist email được ký HĐ. Đồng bộ với
-   *  docs/migrations/sales_contract_workflow_v3_signers.sql */
+   *  docs/migrations/sales_contract_workflow_v3_signers.sql
+   *  + docs/migrations/sales_contract_workflow_v16_signer_minhld.sql */
   SIGNER_EMAILS: [
     'trunglxh@huyanhrubber.com', // Mr. Trung
-    'huylv@huyanhrubber.com', // Mr. Huy
+    'huylv@huyanhrubber.com',    // Mr. Huy
+    'minhld@huyanhrubber.com',   // Minh LD — thêm để test bước trình ký (2026-05-21)
   ],
 
   /** Whitelist email được xóa file HĐ (hard delete). Đồng bộ với

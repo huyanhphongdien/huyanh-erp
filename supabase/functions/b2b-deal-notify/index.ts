@@ -100,31 +100,74 @@ async function sendEmail(token: string, subject: string, htmlBody: string): Prom
 }
 
 // ── Build HTML ──────────────────────────────────────────────────────────────
-function buildHtml(deal: any, booking: any, partner: any, creator: any): string {
+function buildHtml(
+  deal: any,
+  booking: any,
+  partner: any,
+  creator: any,
+  bookingSentAt?: string,
+  bookingSenderType?: 'factory' | 'partner',
+): string {
   const product = PRODUCT_LABELS[deal.product_code] || deal.product_name || '—'
   const history = (booking?.negotiation_history || []) as Array<any>
-  const isDry = deal.price_unit === 'dry'
-  const unitLabel = isDry ? 'kg khô' : 'kg ướt'
 
-  const historyRows = history.length === 0
-    ? '<tr><td colspan="4" style="padding:8px;color:#999;text-align:center;font-style:italic;">Không có thương lượng — chốt ngay giá đề xuất.</td></tr>'
-    : history.map((h, i) => `
+  // Prepend bước 0 — PCM gốc (nhà máy hoặc đại lý gửi với price_per_kg)
+  const allRows: Array<{
+    isStart: boolean
+    role: 'factory' | 'partner'
+    name: string
+    price: number
+    notes: string
+    ts: string
+  }> = []
+  if (booking?.price_per_kg) {
+    // Bước 0 = bên gửi PCM ban đầu (sender_type của booking message).
+    allRows.push({
+      isStart: true,
+      role: (bookingSenderType === 'partner' ? 'partner' : 'factory'),
+      name: bookingSenderType === 'partner' ? 'Đại lý' : 'Nhà máy',
+      price: booking.price_per_kg,
+      notes: 'Giá đề xuất ban đầu trên phiếu chốt mủ',
+      ts: bookingSentAt || '',
+    })
+  }
+  for (const h of history) {
+    allRows.push({
+      isStart: false,
+      role: h.actor_role,
+      name: h.actor_name || '—',
+      price: h.counter_price,
+      notes: h.notes || '',
+      ts: h.ts,
+    })
+  }
+
+  const historyRows = allRows.length === 0
+    ? '<tr><td colspan="4" style="padding:8px;color:#999;text-align:center;font-style:italic;">Không có dữ liệu.</td></tr>'
+    : allRows.map((h, i) => {
+      const isFactory = h.role === 'factory'
+      const badgeText = h.isStart
+        ? '#0 GỐC'
+        : `#${i} ${isFactory ? 'NHÀ MÁY' : 'ĐẠI LÝ'}`
+      const badgeColor = h.isStart ? '#6b7280' : (isFactory ? '#1B4D3E' : '#fa8c16')
+      return `
       <tr>
         <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;text-align:center;">
-          <span style="background:${h.actor_role === 'factory' ? '#1B4D3E' : '#fa8c16'};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;">
-            #${i + 1} ${h.actor_role === 'factory' ? 'NHÀ MÁY' : 'ĐẠI LÝ'}
+          <span style="background:${badgeColor};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;">
+            ${badgeText}
           </span>
         </td>
-        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;">${h.actor_name || '—'}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;">${h.name}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;font-weight:600;color:#1890ff;text-align:right;">
-          ${h.counter_price.toLocaleString('vi-VN')} đ/${unitLabel}
+          ${h.price.toLocaleString('vi-VN')} đ/kg
         </td>
         <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#666;font-style:italic;">
-          "${h.notes || ''}"<br/>
-          <span style="font-size:10px;color:#999;">${fmtDate(h.ts)}</span>
+          "${h.notes}"<br/>
+          <span style="font-size:10px;color:#999;">${h.ts ? fmtDate(h.ts) : '—'}</span>
         </td>
       </tr>
-    `).join('')
+    `
+    }).join('')
 
   const targetFacility = deal.target_facility_id
     ? `<tr><td style="padding:6px 10px;color:#666;font-size:12px;width:140px;">🏭 Nhà máy đích</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${deal.target_facility_name || deal.target_facility_id}</td></tr>`
@@ -155,7 +198,7 @@ function buildHtml(deal: any, booking: any, partner: any, creator: any): string 
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Sản phẩm</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${product}</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Khối lượng</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${(deal.quantity_kg / 1000).toLocaleString('vi-VN')} tấn (${deal.quantity_kg.toLocaleString('vi-VN')} kg)</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">DRC dự kiến</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${deal.expected_drc || '—'}%</td></tr>
-    <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Đơn giá thoả thuận</td><td style="padding:6px 10px;font-size:13px;font-weight:700;color:#1890ff;">${deal.unit_price?.toLocaleString('vi-VN')} đ/${unitLabel}</td></tr>
+    <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Đơn giá thoả thuận</td><td style="padding:6px 10px;font-size:13px;font-weight:700;color:#1890ff;">${deal.unit_price?.toLocaleString('vi-VN')} đ/kg</td></tr>
     <tr style="background:#f0f9f4;"><td style="padding:8px 10px;color:#1B4D3E;font-size:13px;font-weight:600;">💰 Tổng giá trị</td><td style="padding:8px 10px;font-size:16px;font-weight:700;color:#1B4D3E;">${fmtVnd(deal.total_value_vnd)}</td></tr>
     ${lotCode}
     ${targetFacility}
@@ -165,10 +208,9 @@ function buildHtml(deal: any, booking: any, partner: any, creator: any): string 
 
   <!-- LỊCH SỬ THƯƠNG LƯỢNG -->
   <h2 style="color:#1B4D3E;font-size:14px;margin:20px 0 8px 0;border-bottom:1px solid #e4e4e7;padding-bottom:4px;">
-    📜 Lịch sử thương lượng${history.length > 0 ? ` (${history.length} vòng)` : ''}
+    📜 Lịch sử thương lượng (${allRows.length} bước: 1 gốc${history.length > 0 ? ` + ${history.length} vòng thương lượng` : ''})
   </h2>
   <table style="width:100%;border-collapse:collapse;border:1px solid #e4e4e7;border-radius:6px;overflow:hidden;">
-    ${history.length > 0 ? `
     <thead style="background:#f8f9fa;">
       <tr>
         <th style="padding:8px 10px;text-align:center;font-size:11px;color:#374151;width:120px;">Bên</th>
@@ -176,14 +218,14 @@ function buildHtml(deal: any, booking: any, partner: any, creator: any): string 
         <th style="padding:8px 10px;text-align:right;font-size:11px;color:#374151;width:130px;">Giá</th>
         <th style="padding:8px 10px;text-align:left;font-size:11px;color:#374151;">Lý do · Thời gian</th>
       </tr>
-    </thead>` : ''}
+    </thead>
     <tbody>${historyRows}</tbody>
   </table>
 
   ${booking?.price_per_kg && history.length > 0 ? `
   <div style="margin-top:8px;padding:8px 12px;background:#fffbeb;border-left:3px solid #fa8c16;border-radius:4px;font-size:12px;">
-    <strong>Tóm tắt:</strong> Giá gốc <code>${booking.price_per_kg.toLocaleString('vi-VN')} đ/${unitLabel}</code> →
-    Chốt cuối <code style="color:#1B4D3E;font-weight:700;">${deal.unit_price?.toLocaleString('vi-VN')} đ/${unitLabel}</code>
+    <strong>Tóm tắt:</strong> Giá gốc <code>${booking.price_per_kg.toLocaleString('vi-VN')} đ/kg</code> →
+    Chốt cuối <code style="color:#1B4D3E;font-weight:700;">${deal.unit_price?.toLocaleString('vi-VN')} đ/kg</code>
     (chênh <strong>${((deal.unit_price - booking.price_per_kg) / booking.price_per_kg * 100).toFixed(1)}%</strong>)
   </div>` : ''}
 
@@ -252,16 +294,20 @@ serve(async (req) => {
       }
     }
 
-    // 4) Booking message + negotiation history
+    // 4) Booking message + negotiation history + sent_at + sender_type
     let booking: any = null
+    let bookingSentAt: string | undefined
+    let bookingSenderType: 'factory' | 'partner' | undefined
     if (deal.booking_id) {
       const { data: msg } = await supabase
         .from('b2b_chat_messages')
-        .select('metadata, sender_id')
+        .select('metadata, sender_id, sender_type, sent_at')
         .eq('id', deal.booking_id)
         .maybeSingle()
       const meta = typeof msg?.metadata === 'string' ? JSON.parse(msg.metadata) : msg?.metadata
       booking = meta?.booking || null
+      bookingSentAt = msg?.sent_at
+      bookingSenderType = msg?.sender_type as 'factory' | 'partner' | undefined
     }
 
     // 5) Người tạo deal — query employees từ deal.created_by
@@ -305,7 +351,7 @@ serve(async (req) => {
     }
 
     // 4) Build HTML + gửi
-    const html = buildHtml(deal, booking, partner, creator)
+    const html = buildHtml(deal, booking, partner, creator, bookingSentAt, bookingSenderType)
     const subject = `🤝 Deal mới: ${deal.deal_number} — ${partner?.name || partner?.short_name || 'KH'} ${fmtVnd(deal.total_value_vnd)}`
 
     const token = await getAccessToken()

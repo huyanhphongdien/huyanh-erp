@@ -59,6 +59,33 @@ const PRODUCT_LABELS: Record<string, string> = {
   mu_to: 'Mủ tờ',
 }
 
+const DEAL_TYPE_INFO: Record<string, { label: string; color: string; icon: string; hint: string }> = {
+  purchase: {
+    label: 'Mua đứt · Giá cố định',
+    color: '#1B4D3E',
+    icon: '🛒',
+    hint: 'Nhà máy mua ngay với giá chốt. KHÔNG phụ thuộc DRC sản phẩm. Thanh toán sau khi nhập kho.',
+  },
+  processing: {
+    label: 'Chạy đầu ra · Giá tùy DRC sản phẩm',
+    color: '#7c3aed',
+    icon: '🏭',
+    hint: 'Giá chốt là TẠM TÍNH. Sau khi nhà máy SX + QC final, giá cuối = DRC sản phẩm thực × đơn giá. Thanh toán sau QC.',
+  },
+  sale: {
+    label: 'Bán',
+    color: '#0a72ef',
+    icon: '📤',
+    hint: 'Đại lý bán mủ cho nhà máy. Thanh toán theo phiếu cân thực tế.',
+  },
+  consignment: {
+    label: 'Ký gửi',
+    color: '#fa8c16',
+    icon: '📦',
+    hint: 'Đại lý ký gửi, nhà máy bán giúp. Thanh toán theo giá bán thực - phí.',
+  },
+}
+
 const fmtVnd = (v?: number) => v ? new Intl.NumberFormat('vi-VN').format(v) + ' VNĐ' : '—'
 // Format datetime theo giờ VN (UTC+7). Edge function chạy trên Deno UTC nên
 // toLocaleString mặc định KHÔNG convert — phải ép timeZone Asia/Ho_Chi_Minh.
@@ -200,17 +227,41 @@ function buildHtml(
     <div style="font-size:13px;color:#6b7280;">Mã Deal: <strong style="font-family:monospace;color:#1B4D3E;">${deal.deal_number}</strong></div>
   </div>
 
+  <!-- LOẠI GIAO DỊCH BANNER -->
+  ${(() => {
+    const t = DEAL_TYPE_INFO[deal.deal_type as string] || DEAL_TYPE_INFO.purchase
+    return `<div style="background:${t.color}15;border-left:4px solid ${t.color};padding:10px 14px;border-radius:8px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;color:${t.color};margin-bottom:4px;">
+        ${t.icon} ${t.label}
+      </div>
+      <div style="font-size:12px;color:#374151;line-height:1.5;">${t.hint}</div>
+    </div>`
+  })()}
+
   <!-- THÔNG TIN PARTNER & DEAL -->
   <h2 style="color:#1B4D3E;font-size:14px;margin:16px 0 8px 0;border-bottom:1px solid #e4e4e7;padding-bottom:4px;">
     🏢 Thông tin chính
   </h2>
-  <table style="width:100%;border-collapse:collapse;">
+  ${(() => {
+    // Tổng tiền: nếu DB total_value_vnd null/0 (vd processing service set 0) → tính tạm
+    // = qty_kg × unit_price. Hiển thị label phù hợp theo deal_type.
+    const isProcessing = deal.deal_type === 'processing'
+    const computedTotal = (deal.quantity_kg || 0) * (deal.unit_price || 0)
+    const totalValue = deal.total_value_vnd && deal.total_value_vnd > 0
+      ? deal.total_value_vnd
+      : computedTotal
+    const totalLabel = isProcessing ? '💰 Giá trị tạm tính' : '💰 Tổng giá trị'
+    const totalHint = isProcessing
+      ? '<div style="font-size:10px;font-weight:400;color:#7c3aed;margin-top:2px;">(theo đơn giá chốt — giá thực sẽ tính sau QC final)</div>'
+      : ''
+    return `<table style="width:100%;border-collapse:collapse;">
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;width:140px;">Đại lý</td><td style="padding:6px 10px;font-size:13px;font-weight:600;">${partner?.name || partner?.short_name || '—'} ${partner?.code ? `<span style="color:#999;font-size:11px;font-family:monospace;">(${partner.code})</span>` : ''}</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Sản phẩm</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${product}</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Khối lượng</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${(deal.quantity_kg / 1000).toLocaleString('vi-VN')} tấn (${deal.quantity_kg.toLocaleString('vi-VN')} kg)</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">DRC dự kiến</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${deal.expected_drc || '—'}%</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Đơn giá thoả thuận</td><td style="padding:6px 10px;font-size:13px;font-weight:700;color:#1890ff;">${deal.unit_price?.toLocaleString('vi-VN')} đ/kg</td></tr>
-    <tr style="background:#f0f9f4;"><td style="padding:8px 10px;color:#1B4D3E;font-size:13px;font-weight:600;">💰 Tổng giá trị</td><td style="padding:8px 10px;font-size:16px;font-weight:700;color:#1B4D3E;">${fmtVnd(deal.total_value_vnd)}</td></tr>
+    <tr style="background:#f0f9f4;"><td style="padding:8px 10px;color:#1B4D3E;font-size:13px;font-weight:600;">${totalLabel}</td><td style="padding:8px 10px;font-size:16px;font-weight:700;color:#1B4D3E;">${fmtVnd(totalValue)}${totalHint}</td></tr>`
+  })()}
     ${lotCode}
     ${targetFacility}
     ${deal.delivery_date ? `<tr><td style="padding:6px 10px;color:#666;font-size:12px;">📅 Ngày giao</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${fmtDateShort(deal.delivery_date)}</td></tr>` : ''}

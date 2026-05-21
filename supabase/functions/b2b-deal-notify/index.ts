@@ -32,13 +32,17 @@ const CLIENT_ID = Deno.env.get('AZURE_CLIENT_ID') || 'ee1377e6-b52c-4326-88f2-c1
 const CLIENT_SECRET = Deno.env.get('AZURE_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET') || ''
 const SENDER_EMAIL = Deno.env.get('EMAIL_FROM') || 'huyanhphongdien@huyanhrubber.com'
 
-// ★ PRODUCTION — Gửi cả 4 BGĐ (đã test PASS với Minh 2026-05-21)
+// ★ TEST MODE — chỉ gửi cho Minh (user re-enable để test tiếp 2026-05-21).
+//   Khi rollout lại: swap sang FULL_RECIPIENTS (uncomment block dưới).
 const RECIPIENTS = [
-  { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
-  { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
-  { name: 'Lê Văn Phú', email: 'phulv@huyanhrubber.com' },
   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
 ]
+// const FULL_RECIPIENTS = [
+//   { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
+//   { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
+//   { name: 'Lê Văn Phú', email: 'phulv@huyanhrubber.com' },
+//   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
+// ]
 
 const APP_URL = 'https://huyanhrubber.vn'
 

@@ -596,11 +596,6 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
                       </Descriptions.Item>
                       <Descriptions.Item label="Đơn giá">
                         {deal.unit_price?.toLocaleString() || '-'} đ/kg
-                        {deal.price_unit && (
-                          <Tag color={deal.price_unit === 'dry' ? 'orange' : 'blue'} style={{ marginLeft: 8 }}>
-                            {deal.price_unit === 'dry' ? 'Giá khô' : 'Giá ướt'}
-                          </Tag>
-                        )}
                       </Descriptions.Item>
                       <Descriptions.Item label="Giá chốt">
                         {deal.final_price ? (

@@ -76,24 +76,51 @@ const STATUS_GRADIENT = DEAL_STATUS_GRADIENT
 
 interface DealProgressProps {
   status: DealStatus
+  dealType?: string | null
   stockInCount?: number
   qcStatus?: string
   actualDrc?: number | null
+  productionStartedAt?: string | null
+  finishedProductKg?: number | null
 }
 
-const DealProgress = ({ status, stockInCount, qcStatus, actualDrc }: DealProgressProps) => {
-  // Thứ tự chuẩn (Sprint J business rule):
-  //   Chốt → QC (đo DRC mẫu) → Duyệt (BGĐ) → Nhập kho (sau duyệt) → Quyết toán
-  // Lý do: QC lấy mẫu đo DRC trước, BGĐ dựa DRC quyết định duyệt, sau đó
-  // mới cho cân xe + nhập kho (trigger enforce_*_requires_accepted chặn DB).
-  const hasQc = (actualDrc ?? 0) > 0 || (!!qcStatus && qcStatus !== 'pending')
-  const steps = [
-    { key: 'confirmed', label: 'Chốt',       done: true },
-    { key: 'qc',        label: 'QC',         done: hasQc },
-    { key: 'accepted',  label: 'Duyệt',      done: status === 'accepted' || status === 'settled' },
-    { key: 'stock_in',  label: 'Nhập kho',   done: (stockInCount || 0) > 0 },
-    { key: 'settled',   label: 'Quyết toán', done: status === 'settled' },
-  ]
+const DealProgress = ({
+  status,
+  dealType,
+  stockInCount,
+  qcStatus,
+  actualDrc,
+  productionStartedAt,
+  finishedProductKg,
+}: DealProgressProps) => {
+  // 2 luồng (chốt 2026-05-21):
+  // MUA ĐỨT (purchase): Chốt → Duyệt → Nhập kho → Thanh toán (4 bước)
+  // CHẠY ĐẦU RA (processing/sale/consignment): Chốt → Duyệt → Nhập kho
+  //   → Sản xuất → QC final → Thanh toán (6 bước)
+  // Quyết toán gộp vào Thanh toán (settled status = paid stage).
+  const isAccepted = status === 'accepted' || status === 'settled'
+  const hasStockIn = (stockInCount ?? 0) > 0
+  const hasProduction = !!productionStartedAt || (finishedProductKg ?? 0) > 0
+  const hasQcFinal = qcStatus === 'passed' || (actualDrc ?? 0) > 0
+  const isSettled = status === 'settled'
+
+  const isPurchase = dealType === 'purchase'
+
+  const steps = isPurchase
+    ? [
+        { key: 'confirmed', label: 'Chốt',       done: true },
+        { key: 'accepted',  label: 'Duyệt',      done: isAccepted },
+        { key: 'stock_in',  label: 'Nhập kho',   done: hasStockIn },
+        { key: 'paid',      label: 'Thanh toán', done: isSettled },
+      ]
+    : [
+        { key: 'confirmed',  label: 'Chốt',       done: true },
+        { key: 'accepted',   label: 'Duyệt',      done: isAccepted },
+        { key: 'stock_in',   label: 'Nhập kho',   done: hasStockIn },
+        { key: 'production', label: 'Sản xuất',   done: hasProduction },
+        { key: 'qc',         label: 'QC final',   done: hasQcFinal && hasProduction },
+        { key: 'paid',       label: 'Thanh toán', done: isSettled },
+      ]
 
   return (
     <div
@@ -250,9 +277,12 @@ const DealCard = ({
       {!isCancelled && (
         <DealProgress
           status={status}
+          dealType={metadata.deal_type}
           stockInCount={metadata.stock_in_count}
           qcStatus={metadata.qc_status}
           actualDrc={metadata.actual_drc}
+          productionStartedAt={metadata.production_started_at}
+          finishedProductKg={metadata.finished_product_kg}
         />
       )}
 

@@ -444,6 +444,12 @@ export interface DealCardMetadata {
   settlement_code?: string
   cancel_reason?: string
 
+  // Deal type — chia 2 luồng timeline (Mua đứt vs Chạy đầu ra) 2026-05-21
+  deal_type?: 'purchase' | 'sale' | 'processing' | 'consignment'
+  // Live progress sản xuất (chỉ Chạy đầu ra) — cập nhật từ productionService
+  production_started_at?: string
+  finished_product_kg?: number
+
   // Partner-side state
   // ID của advance mới nhất chưa được partner ack (để hiện nút "Đã nhận")
   pending_ack_advance_id?: string

@@ -347,6 +347,8 @@ export const dealConfirmService = {
       target_facility_name: facilityName,
       total_advanced: totalAdvanced,
       balance_due: estimatedValue - totalAdvanced,
+      // Deal type — chia timeline 4 vs 6 bước
+      deal_type: (formData.deal_type || 'purchase') as 'purchase' | 'sale' | 'processing' | 'consignment',
     }
 
     // ⚠️ supabase-js KHÔNG throw khi RLS/constraint reject — mà trả { data, error }.

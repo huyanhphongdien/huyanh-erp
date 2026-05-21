@@ -206,6 +206,9 @@ export const dealConfirmService = {
         // Notes chỉ chứa ghi chú thực sự
         notes: formData.deal_notes || null,
         booking_id: context.bookingMessageId,
+        // Người chốt Deal — lưu employee_id để edge function notify có data
+        created_by: context.confirmedBy,
+        buyer_user_id: context.confirmedBy,
       })
       .select('*')
       .single()

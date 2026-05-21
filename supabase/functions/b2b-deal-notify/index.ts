@@ -278,6 +278,35 @@ serve(async (req) => {
         .maybeSingle()
       creator = emp
     }
+    // Fallback: deal cũ KHÔNG có created_by (trước bug fix 21/05/2026).
+    // Lookup qua system message gần nhất trong room có sender_type='factory'
+    // + content chứa 'Đồng ý' hoặc DealCard message.
+    if (!creator && deal.booking_id) {
+      const { data: bookingMsg } = await supabase
+        .from('b2b_chat_messages')
+        .select('room_id')
+        .eq('id', deal.booking_id)
+        .maybeSingle()
+      if (bookingMsg?.room_id) {
+        const { data: confirmMsg } = await supabase
+          .from('b2b_chat_messages')
+          .select('sender_id')
+          .eq('room_id', bookingMsg.room_id)
+          .eq('sender_type', 'factory')
+          .not('sender_id', 'is', null)
+          .order('sent_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (confirmMsg?.sender_id) {
+          const { data: emp } = await supabase
+            .from('employees')
+            .select('full_name, email')
+            .eq('id', confirmMsg.sender_id)
+            .maybeSingle()
+          if (emp) creator = emp
+        }
+      }
+    }
 
     // 4) Build HTML + gửi
     const html = buildHtml(deal, booking, partner, creator)

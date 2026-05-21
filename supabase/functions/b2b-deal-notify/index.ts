@@ -56,7 +56,14 @@ const PRODUCT_LABELS: Record<string, string> = {
 }
 
 const fmtVnd = (v?: number) => v ? new Intl.NumberFormat('vi-VN').format(v) + ' VNĐ' : '—'
-const fmtDate = (d?: string) => d ? new Date(d).toLocaleString('vi-VN') : '—'
+// Format datetime theo giờ VN (UTC+7). Edge function chạy trên Deno UTC nên
+// toLocaleString mặc định KHÔNG convert — phải ép timeZone Asia/Ho_Chi_Minh.
+const fmtDate = (d?: string) => d
+  ? new Date(d).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+  : '—'
+const fmtDateShort = (d?: string) => d
+  ? new Date(d).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+  : '—'
 
 // ── Microsoft Graph ─────────────────────────────────────────────────────────
 async function getAccessToken(): Promise<string> {
@@ -202,7 +209,7 @@ function buildHtml(
     <tr style="background:#f0f9f4;"><td style="padding:8px 10px;color:#1B4D3E;font-size:13px;font-weight:600;">💰 Tổng giá trị</td><td style="padding:8px 10px;font-size:16px;font-weight:700;color:#1B4D3E;">${fmtVnd(deal.total_value_vnd)}</td></tr>
     ${lotCode}
     ${targetFacility}
-    ${deal.delivery_date ? `<tr><td style="padding:6px 10px;color:#666;font-size:12px;">📅 Ngày giao</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${new Date(deal.delivery_date).toLocaleDateString('vi-VN')}</td></tr>` : ''}
+    ${deal.delivery_date ? `<tr><td style="padding:6px 10px;color:#666;font-size:12px;">📅 Ngày giao</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${fmtDateShort(deal.delivery_date)}</td></tr>` : ''}
     ${deal.pickup_location_name ? `<tr><td style="padding:6px 10px;color:#666;font-size:12px;">📍 Địa điểm chốt</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${deal.pickup_location_name}</td></tr>` : ''}
   </table>
 
@@ -245,7 +252,7 @@ function buildHtml(
     <a href="${APP_URL}/b2b/deals/${deal.id}" style="color:#1B4D3E;font-weight:600;text-decoration:none;">📂 Mở chi tiết Deal trong ERP →</a>
   </p>
   <p style="text-align:center;font-size:10px;color:#9ca3af;margin:8px 0 0 0;">
-    Email auto-generated · ${new Date().toLocaleString('vi-VN')}
+    Email auto-generated · ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
   </p>
 </div>
 </body></html>

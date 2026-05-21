@@ -96,6 +96,9 @@ export default function ContractReviewPage() {
   const [rejecting, setRejecting] = useState(false)
   const [docLoading, setDocLoading] = useState<'SC' | 'PI' | 'BOTH' | null>(null)
 
+  // Watch contract_no LIVE để Drawer title update ngay khi Phú gõ
+  const watchedContractNo = Form.useWatch('contract_no', bankForm) as string | undefined
+
   // Reject modal state
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectCategories, setRejectCategories] = useState<string[]>([])
@@ -489,7 +492,7 @@ export default function ContractReviewPage() {
         title={
           <Space>
             <BankOutlined />
-            <span>Review HĐ {active?.form_data?.contract_no || active?.sales_order?.contract_no || '(chưa có số)'}</span>
+            <span>Review HĐ {watchedContractNo?.trim() || active?.form_data?.contract_no || active?.sales_order?.contract_no || '(chưa có số)'}</span>
             <Tag color="orange">revision #{active?.revision_no}</Tag>
           </Space>
         }
@@ -906,11 +909,46 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
               <em style={{ color: '#8c8c8c' }}>Bank chưa quyết được? Để trống highlight bank trong PI — duyệt revision sau khi tài vụ chốt TK.</em>
             </div>
             <div><strong>Bước 3:</strong> Upload lại {MAX_FILES} file tối đa (ô ②)</div>
-            <div><strong>Bước 4:</strong> Bấm "Duyệt + Trình ký" ở header</div>
+            <div><strong>Bước 4:</strong> Gõ <strong>Số HĐ</strong> đã fill vào ô 🔢 bên dưới (sync ngược ERP)</div>
+            <div><strong>Bước 5:</strong> Bấm "Duyệt + Trình ký" ở header</div>
           </div>
         }
         style={{ marginBottom: 16 }}
       />
+
+      {/* 🔢 Sync số HĐ vào ERP — đặt ngay sau Alert để Phú thấy + gõ ngay.
+            Bank info vẫn giữ trong file Word, không expand ERP. */}
+      <Card
+        size="small"
+        style={{
+          marginBottom: 16,
+          background: '#fff7e6',
+          border: '1px solid #ffd591',
+        }}
+        title={
+          <Space>
+            <span style={{ fontWeight: 600, color: '#d46b08' }}>
+              🔢 Số HĐ — gõ lại đây để sync ERP
+            </span>
+          </Space>
+        }
+      >
+        <Form form={bankForm} layout="vertical" size="middle">
+          <Form.Item
+            label="Số HĐ anh vừa fill trong Word"
+            name="contract_no"
+            tooltip="Gõ lại số HĐ anh vừa điền vào file Word. ERP sẽ cập nhật queue/sales_orders/reports để hiển thị đúng số. Bank info giữ trong file Word, không cần nhập ở đây."
+            extra={
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                Optional — để trống vẫn duyệt được, queue sẽ hiện "(chưa có số)".
+              </Text>
+            }
+            style={{ marginBottom: 0 }}
+          >
+            <Input placeholder="VD: HA20260062" allowClear />
+          </Form.Item>
+        </Form>
+      </Card>
 
       {/* ① Files Docs upload — list download */}
       <Card size="small" style={{ marginBottom: 12 }} title={
@@ -1052,29 +1090,6 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
         >
           {filledFiles.length > 0 ? `Replace ${files.length} file` : `Upload ${files.length} file đã fill`}
         </Button>
-      </Card>
-
-      {/* ③ Sync metadata ERP — Số HĐ Phú vừa fill trong Word, gõ lại đây để
-            ERP cập nhật queue/sales_orders. Optional, không block duyệt. */}
-      <Card size="small" style={{ marginBottom: 12 }} title={
-        <Space>
-          <span>③ Số HĐ — sync ngược ERP (optional)</span>
-        </Space>
-      }>
-        <Form form={bankForm} layout="vertical" size="middle">
-          <Form.Item
-            label="Số HĐ anh vừa fill trong Word"
-            name="contract_no"
-            tooltip="Gõ lại số HĐ anh vừa điền vào file Word để Drawer/Queue/Reports hiển thị đúng. Bank info giữ trong file Word, không cần nhập ở đây."
-            extra={
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                Để trống nếu chưa quyết số HĐ — duyệt vẫn được, queue sẽ hiện "(chưa có số)".
-              </Text>
-            }
-          >
-            <Input placeholder="VD: HA20260062" allowClear />
-          </Form.Item>
-        </Form>
       </Card>
 
       {/* Read-only context */}

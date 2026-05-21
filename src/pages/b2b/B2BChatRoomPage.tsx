@@ -268,7 +268,7 @@ const BookingCard = ({
           </Col>
           <Col span={12}>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>
-              Đơn giá ({booking.price_unit === 'dry' ? 'khô' : 'ướt'})
+              Đơn giá
               {isNegotiating && booking.counter_price && booking.counter_price !== booking.price_per_kg && (
                 <Tag color="purple" style={{ marginLeft: 4, fontSize: 9, padding: '0 4px', lineHeight: '14px', border: 'none' }}>
                   Vòng {booking.negotiation_history?.length || 1}

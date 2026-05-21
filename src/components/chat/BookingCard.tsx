@@ -387,7 +387,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
           </div>
           <div>
             <Text type="secondary" style={{ fontSize: 11 }}>
-              Giá ({price_unit === 'dry' ? 'khô' : 'ướt'})
+              Đơn giá
               {status === 'negotiating' && counter_price && counter_price !== price_per_kg && (
                 <Tag color="purple" style={{ marginLeft: 4, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>
                   Vòng {metadata.negotiation_history?.length || 1}

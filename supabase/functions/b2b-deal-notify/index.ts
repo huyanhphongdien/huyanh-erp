@@ -155,7 +155,7 @@ function buildHtml(deal: any, booking: any, partner: any, creator: any): string 
     🏢 Thông tin chính
   </h2>
   <table style="width:100%;border-collapse:collapse;">
-    <tr><td style="padding:6px 10px;color:#666;font-size:12px;width:140px;">Đại lý</td><td style="padding:6px 10px;font-size:13px;font-weight:600;">${partner?.partner_name || partner?.name || '—'} ${partner?.code ? `<span style="color:#999;font-size:11px;font-family:monospace;">(${partner.code})</span>` : ''}</td></tr>
+    <tr><td style="padding:6px 10px;color:#666;font-size:12px;width:140px;">Đại lý</td><td style="padding:6px 10px;font-size:13px;font-weight:600;">${partner?.name || partner?.short_name || '—'} ${partner?.code ? `<span style="color:#999;font-size:11px;font-family:monospace;">(${partner.code})</span>` : ''}</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Sản phẩm</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${product}</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">Khối lượng</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${(deal.quantity_kg / 1000).toLocaleString('vi-VN')} tấn (${deal.quantity_kg.toLocaleString('vi-VN')} kg)</td></tr>
     <tr><td style="padding:6px 10px;color:#666;font-size:12px;">DRC dự kiến</td><td style="padding:6px 10px;font-size:12px;font-weight:500;">${deal.expected_drc || '—'}%</td></tr>
@@ -224,26 +224,39 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // 1) Lấy deal
+    // 1) Lấy deal (không JOIN — tránh lỗi FK name mismatch)
     const { data: deal, error: dealErr } = await supabase
       .from('b2b_deals')
-      .select(`
-        *,
-        partner:b2b_partners!b2b_deals_partner_id_fkey(id, code, partner_name, name),
-        target_facility:facilities!b2b_deals_target_facility_id_fkey(id, code, name)
-      `)
+      .select('*')
       .eq('id', deal_id)
       .single()
     if (dealErr || !deal) throw new Error(`Deal not found: ${dealErr?.message}`)
 
-    // Flatten target facility info vào deal
-    const tf = Array.isArray(deal.target_facility) ? deal.target_facility[0] : deal.target_facility
-    if (tf) {
-      deal.target_facility_name = tf.name
-      deal.target_facility_code = tf.code
+    // 2) Partner
+    let partner: any = null
+    if (deal.partner_id) {
+      const { data: p } = await supabase
+        .from('b2b_partners')
+        .select('id, code, name, short_name, phone, email')
+        .eq('id', deal.partner_id)
+        .maybeSingle()
+      partner = p
     }
 
-    // 2) Lấy booking message + negotiation history
+    // 3) Target facility
+    if (deal.target_facility_id) {
+      const { data: f } = await supabase
+        .from('facilities')
+        .select('code, name')
+        .eq('id', deal.target_facility_id)
+        .maybeSingle()
+      if (f) {
+        deal.target_facility_name = f.name
+        deal.target_facility_code = f.code
+      }
+    }
+
+    // 4) Booking message + negotiation history
     let booking: any = null
     if (deal.booking_id) {
       const { data: msg } = await supabase
@@ -251,43 +264,24 @@ serve(async (req) => {
         .select('metadata, sender_id')
         .eq('id', deal.booking_id)
         .maybeSingle()
-      booking = msg?.metadata?.booking || null
+      const meta = typeof msg?.metadata === 'string' ? JSON.parse(msg.metadata) : msg?.metadata
+      booking = meta?.booking || null
     }
 
-    // 3) Người tạo deal (factory employee qua chat sender → employees)
-    // Nếu không tìm được, để creator null — email vẫn render OK.
+    // 5) Người tạo deal — query employees từ deal.created_by
     let creator: any = null
-    try {
-      // Sender_id của booking message là người chốt (factory user qua chat)
-      if (deal.booking_id) {
-        const { data: bMsg } = await supabase
-          .from('b2b_chat_messages')
-          .select(`
-            sender_id,
-            sender_type,
-            metadata
-          `)
-          .eq('id', deal.booking_id)
-          .maybeSingle()
-        // Tìm system message confirm gần nhất trong room (sender_type=factory)
-        if (bMsg?.metadata?.booking?.confirmed_by) {
-          const { data: emp } = await supabase
-            .from('employees')
-            .select('full_name, email')
-            .eq('id', bMsg.metadata.booking.confirmed_by)
-            .maybeSingle()
-          creator = emp
-        }
-      }
-    } catch {
-      // ignore — creator optional
+    if (deal.created_by) {
+      const { data: emp } = await supabase
+        .from('employees')
+        .select('full_name, email')
+        .eq('id', deal.created_by)
+        .maybeSingle()
+      creator = emp
     }
-
-    const partner = Array.isArray(deal.partner) ? deal.partner[0] : deal.partner
 
     // 4) Build HTML + gửi
     const html = buildHtml(deal, booking, partner, creator)
-    const subject = `🤝 Deal mới: ${deal.deal_number} — ${partner?.partner_name || partner?.name || 'KH'} ${fmtVnd(deal.total_value_vnd)}`
+    const subject = `🤝 Deal mới: ${deal.deal_number} — ${partner?.name || partner?.short_name || 'KH'} ${fmtVnd(deal.total_value_vnd)}`
 
     const token = await getAccessToken()
     await sendEmail(token, subject, html)

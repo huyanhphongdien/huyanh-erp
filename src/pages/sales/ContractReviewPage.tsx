@@ -1058,45 +1058,63 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
         </Form>
       </Card>
 
-      {/* ① Files Docs upload — list download */}
+      {/* ① Files Docs upload — list (chỉ hiển thị tên, KHÔNG cho tải về template chưa fill).
+            File gốc có {{token}} chưa thay → tải về Phú thấy lộn xộn, confusing.
+            Sau khi Auto-fill → ô ② có file đầy đủ data, tải về ở đó. */}
       <Card size="small" style={{ marginBottom: 12 }} title={
         <Space>
-          <span>① File Docs upload (gốc)</span>
+          <span>① File Docs upload (gốc — template)</span>
           <Tag color="blue">{saleFiles.length} file</Tag>
         </Space>
       }>
         {saleFiles.length === 0 ? (
           <Text type="secondary" style={{ fontSize: 12 }}>Không có file</Text>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {saleFiles.map((path, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 8px',
-                  border: '1px solid #f0f0f0',
-                  borderRadius: 6,
-                  fontSize: 12,
-                }}
-              >
-                <FileWordOutlined style={{ color: '#1B4D3E', fontSize: 18 }} />
-                <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {idx + 1}. {path.split('/').pop()}
-                </span>
-                <Button
-                  size="small"
-                  icon={<DownloadOutlined />}
-                  loading={downloadingIdx === idx}
-                  onClick={() => handleDownload(idx, path)}
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {saleFiles.map((path, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 8px',
+                    border: '1px solid #f0f0f0',
+                    borderRadius: 6,
+                    fontSize: 12,
+                    background: '#fafafa',
+                  }}
                 >
-                  Tải về
-                </Button>
-              </div>
-            ))}
-          </div>
+                  <FileWordOutlined style={{ color: '#999', fontSize: 18 }} />
+                  <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#666' }}>
+                    {idx + 1}. {path.split('/').pop()}
+                  </span>
+                  {filledFiles.length > 0 ? (
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<DownloadOutlined />}
+                      loading={downloadingIdx === idx}
+                      onClick={() => handleDownload(idx, path)}
+                      style={{ fontSize: 11, color: '#999' }}
+                    >
+                      Tải về (gốc)
+                    </Button>
+                  ) : (
+                    <Text type="secondary" style={{ fontSize: 10, fontStyle: 'italic' }}>
+                      template
+                    </Text>
+                  )}
+                </div>
+              ))}
+            </div>
+            <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic', display: 'block', marginTop: 8 }}>
+              {filledFiles.length === 0
+                ? '💡 File template chứa {{token}} chưa thay. Bấm 🪄 Auto-fill ở trên → file đầy đủ sẽ vào ô ② phía dưới.'
+                : '💡 Sau Auto-fill, dùng file ô ② (đầy đủ data). Ô ① chỉ giữ làm tham khảo gốc.'}
+            </Text>
+          </>
         )}
       </Card>
 

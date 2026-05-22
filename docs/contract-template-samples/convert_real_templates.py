@@ -58,10 +58,11 @@ SAMPLE_CIF = SAMPLE_DEFAULTS
 
 def process_xml(xml: str, sample_data: dict) -> str:
     """Process document.xml content."""
-    # 1. Conditional block markers — bỏ marker, giữ content
-    #    {#has_xxx}...{/has_xxx} → ...
-    xml = re.sub(r'\{#\w+\}', '', xml)
-    xml = re.sub(r'\{/\w+\}', '', xml)
+    # 1. Conditional block markers: {#has_xxx}...{/has_xxx} → {{#has_xxx}}...{{/has_xxx}}
+    #    Giữ structure để docxtemplater xử lý conditional theo flag service truyền.
+    #    Nếu has_xxx=true → render content; nếu false → skip block.
+    xml = re.sub(r'\{(#\w+)\}', r'{{\1}}', xml)
+    xml = re.sub(r'\{(/\w+)\}', r'{{\1}}', xml)
 
     # 2. Đổi 6 ERP token single → double brace
     #    {contract_no} → {{contract_no}}

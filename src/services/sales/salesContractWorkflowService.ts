@@ -648,6 +648,18 @@ export const salesContractWorkflowService = {
     const ts = Date.now()
     const newPaths: string[] = []
     const warnings: string[] = []
+    // Conditional flags cho docxtemplater xử lý block {{#has_xxx}}...{{/has_xxx}}
+    const packingType = (o.packing_type || 'loose_bale').toLowerCase()
+    const hasPallets = ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(packingType)
+    const hasFumigation = packingType === 'wooden_pallet'
+    const paymentTextLower = (o.payment_terms_note || o.payment_terms || '').toLowerCase()
+    const isLcPayment = paymentTextLower.includes('l/c') || paymentTextLower.includes('lc ')
+
+    // Pallets total (chỉ khi có pallet, 36 bales/pallet standard)
+    const palletsTotal = hasPallets && totalBales > 0
+      ? Math.ceil(totalBales / 36).toLocaleString('en-US')
+      : ''
+
     const renderData = {
       // ── Phú nhập ──
       contract_no: values.contract_no || '',
@@ -671,16 +683,24 @@ export const salesContractWorkflowService = {
       incoterm: incoterm,
       pol: formatPortForContract(o.port_of_loading),
       pod: isFOB ? '' : formatPortForContract(o.port_of_destination),
-      packing_desc: ensurePackingDesc(null, o.packing_type || 'loose_bale').replace(
+      packing_desc: ensurePackingDesc(null, packingType).replace(
         /^Loose bales packing/,
         `${baleWeight} kg/bale, Loose bales packing`,
       ),
       bales_total: totalBales ? totalBales.toLocaleString('en-US') : '',
+      pallets_total: palletsTotal,
       containers: containers ? String(containers) : '',
       cont_type: contType,
-      shipment_time: o.shipment_time || (o.delivery_date ? formatDate(o.delivery_date) : ''),
+      shipment_time: o.shipment_time
+        || (o.delivery_date ? formatDate(o.delivery_date) : '')
+        || 'TBD',
       payment: o.payment_terms_note || o.payment_terms || 'LC at sight',
       freight_mark: isFOB ? 'freight Collect' : 'freight prepaid',
+      // ── Conditional flags ──
+      has_pallets: hasPallets,
+      has_fumigation: hasFumigation,
+      is_lc_payment: isLcPayment,
+      has_extra_terms: false,  // upload flow không có extra_terms (Docs custom trong file)
     }
 
     for (let i = 0; i < sourceFiles.length; i++) {

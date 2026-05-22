@@ -213,12 +213,12 @@ function buildEmail(event: ContractEmailEvent, ctx: ContractEmailContext): { sub
             ${_noticeBox({
               type: 'info',
               title: '⚡ Bước tiếp theo của bạn',
-              body: 'Mở queue Kiểm tra → chọn quick-pick ngân hàng (7 banks có sẵn) → bấm "Duyệt + Trình ký".',
+              body: 'Mở queue Kiểm tra → gõ <strong>Số HĐ</strong> + chọn <strong>Bank</strong> (7 banks có sẵn) → bấm <strong>🪄 Auto-fill</strong> → bấm "Duyệt + Trình ký".',
             })}
           `,
           ctaText: 'Mở queue Kiểm tra HĐ',
           ctaUrl: reviewUrl,
-          footerNote: 'Email tự động khi Sale trình HĐ. Nếu HĐ không thuộc về bạn, có thể bỏ qua — Phú LV hoặc Minh LD sẽ xử lý.',
+          footerNote: 'Email tự động khi Sale trình HĐ. Nếu HĐ không thuộc về bạn, có thể bỏ qua — Phú LV / Minh / Liễu / Minh Anh sẽ xử lý.',
         }),
       }
     }
@@ -240,7 +240,7 @@ function buildEmail(event: ContractEmailEvent, ctx: ContractEmailContext): { sub
             ${_noticeBox({
               type: 'info',
               title: 'Lưu ý',
-              body: 'Đây là revision mới — bank info đã reset, bạn cần chọn lại nếu khác lần trước.',
+              body: 'Đây là revision mới — bạn cần Auto-fill lại để render file đúng. File đã fill cũ ở revision trước đã bị xóa.',
             })}
           `,
           ctaText: 'Mở queue Kiểm tra',
@@ -292,7 +292,7 @@ function buildEmail(event: ContractEmailEvent, ctx: ContractEmailContext): { sub
           headerTitle: 'HĐ chờ ký + đóng dấu',
           bodyHtml: `
             <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
-              <strong>${ctx.sender_name}</strong> đã duyệt HĐ + nhập bank info xong.
+              <strong>${ctx.sender_name}</strong> đã duyệt HĐ + Auto-fill file với bank info xong.
               HĐ đang chờ bạn ký + đóng dấu để chuyển trạng thái pháp lý.
             </p>
             ${_summaryCard(ctx)}
@@ -304,7 +304,7 @@ function buildEmail(event: ContractEmailEvent, ctx: ContractEmailContext): { sub
             ${_noticeBox({
               type: 'warning',
               title: '⚡ Bước tiếp theo của bạn',
-              body: 'Mở queue Ký HĐ → tải SC/PI .docx → in giấy → ký + đóng dấu → upload PDF FINAL trở lại ERP.',
+              body: '<strong>Bước 1</strong> Mở queue Ký HĐ → bấm <strong>"Xác nhận đã duyệt"</strong> → tải file Phú đã fill → in ra giấy → ký + đóng dấu HA → upload bản scan vào folder <strong>"HĐ HA đã ký"</strong>.<br><strong>Bước 2</strong> Gửi PDF cho KH duyệt + ký lại → nhận PDF FINAL (2 bên) → upload vào dropzone trong Drawer → bấm <strong>"Đánh dấu FINAL"</strong>.',
             })}
           `,
           ctaText: 'Mở queue Ký HĐ',
@@ -349,7 +349,7 @@ function buildEmail(event: ContractEmailEvent, ctx: ContractEmailContext): { sub
     // ─── 6. SIGNED — Trung/Huy → Sale + Phú LV ──────────────────────────────
     case 'contract_signed': {
       return {
-        subject: `🎉 HĐ ${ctx.contract_no} đã ký + đóng dấu — sẵn sàng gửi KH`,
+        subject: `🎉 HĐ ${ctx.contract_no} đã ký FINAL (2 bên) — sẵn sàng gửi KH`,
         html: _wrap({
           headerBg: PRIMARY,
           headerIcon: '🎉',

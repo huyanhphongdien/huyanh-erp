@@ -244,7 +244,9 @@ async function _logWorkflowEvent(params: {
   }
 }
 
-/** Build email context từ contract row + sender name. Fire-and-forget. */
+/** Build email context từ contract row + sender name. Fire-and-forget.
+ *  Upload flow: form_data rỗng → fallback fetch sales_order + customer để có
+ *  đủ summary (Số HĐ, KH, Grade, Tấn, $/MT, Tổng, Incoterm) cho email card. */
 async function _buildEmailContext(
   row: SalesOrderContract,
   senderId: string | null,
@@ -259,15 +261,47 @@ async function _buildEmailContext(
     senderName = data?.full_name || 'Hệ thống'
   }
   const fd = row.form_data || {}
+
+  // Fetch sales_order + customer fallback (upload flow form_data rỗng)
+  type SoFallback = {
+    contract_no?: string | null
+    grade?: string | null
+    quantity_tons?: number | null
+    unit_price?: number | null
+    total_value_usd?: number | null
+    incoterm?: string | null
+    customer?: { name?: string; short_name?: string } | null
+  }
+  let so: SoFallback | null = null
+  try {
+    const { data } = await supabase
+      .from('sales_orders')
+      .select(`
+        contract_no, grade, quantity_tons, unit_price, total_value_usd, incoterm,
+        customer:sales_customers!customer_id(name, short_name)
+      `)
+      .eq('id', row.sales_order_id)
+      .maybeSingle()
+    so = data as SoFallback | null
+  } catch (e) {
+    console.warn('[_buildEmailContext] sales_order fetch fail:', e)
+  }
+
   return {
-    contract_no: fd.contract_no || row.sales_order_id.slice(0, 8),
+    // Số HĐ: form_data trước → sales_order.contract_no → "(chưa có số)"
+    // KHÔNG fallback UUID slug nữa (làm Phú confused vì hiện "e9a1dd10")
+    contract_no: fd.contract_no || so?.contract_no || '(chưa có số)',
     revision_no: row.revision_no,
-    buyer_name: fd.buyer_name,
-    grade: fd.grade,
-    quantity: fd.quantity,
-    unit_price: fd.unit_price,
-    amount: fd.amount,
-    incoterm: fd.incoterm,
+    buyer_name: fd.buyer_name || so?.customer?.name || so?.customer?.short_name,
+    grade: fd.grade || so?.grade || undefined,
+    quantity: fd.quantity || (so?.quantity_tons ? so.quantity_tons.toFixed(2) : undefined),
+    unit_price: fd.unit_price
+      || (so?.unit_price ? so.unit_price.toLocaleString('en-US') : undefined),
+    amount: fd.amount
+      || (so?.total_value_usd
+        ? so.total_value_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })
+        : undefined),
+    incoterm: fd.incoterm || so?.incoterm || undefined,
     sender_name: senderName,
     sales_order_id: row.sales_order_id,
   }

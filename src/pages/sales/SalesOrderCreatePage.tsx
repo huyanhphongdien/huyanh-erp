@@ -1148,12 +1148,14 @@ function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded 
         message="Hướng dẫn"
         description={
           <div style={{ fontSize: 11, lineHeight: 1.6 }}>
-            <strong>Bước 1:</strong> Sửa file HĐ Word — <strong>highlight VÀNG 2 chỗ</strong>:
-            số HĐ + Bank info (Beneficiary/Bank/Account/SWIFT/Address)
+            <strong>Bước 1:</strong> Mở template Word có sẵn placeholder{' '}
+            <code>{`{{contract_no}}`}</code> + 5 token bank → custom buyer/grade/qty per HĐ → save
             <br />
             <strong>Bước 2:</strong> Kéo thả {MAX_FILES} file .docx tối đa (HĐ chính + phụ lục + packing list…)
             <br />
-            <strong>Bước 3:</strong> Bấm Trình kiểm tra — Phú LV sẽ fill 2 ô highlight rồi reupload
+            <strong>Bước 3:</strong> Bấm Trình kiểm tra — Phú LV gõ Số HĐ + chọn Bank → 🪄 <strong>Auto-fill</strong> → Duyệt
+            <br />
+            <em style={{ color: '#8c8c8c' }}>Docs chưa có template token? Xem hướng dẫn ở docs/HUONG_DAN_DOCS_TEMPLATE_HOP_DONG.docx</em>
           </div>
         }
       />

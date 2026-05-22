@@ -7,6 +7,15 @@
 import { supabase } from '../lib/supabase';
 
 // ============================================================================
+// TEST MODE — Redirect MỌI email notification về Minh LD (debug/test)
+// ============================================================================
+// Khi `true`: mọi recipient bị OVERRIDE → minhld@. Subject prefix [TEST → orig@]
+// Khi test xong: đổi `false` → restore behavior bình thường.
+// ----------------------------------------------------------------------------
+const TEST_MODE_REDIRECT_TO_MINH = true;
+const TEST_MODE_EMAIL = 'minhld@huyanhrubber.com';
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -467,12 +476,23 @@ export async function sendNotificationEmail(input: SendEmailInput): Promise<{ su
     console.log('📧 [emailService] Body length:', content?.length);
     console.log('📧 [emailService] Body preview:', content?.substring(0, 200));
     
+    // ── TEST MODE: redirect email về Minh nếu bật flag ──
+    let actualTo = recipient.email;
+    let actualSubject = subject;
+    if (TEST_MODE_REDIRECT_TO_MINH) {
+      if (recipient.email.toLowerCase() !== TEST_MODE_EMAIL) {
+        actualTo = TEST_MODE_EMAIL;
+        actualSubject = `[TEST → ${recipient.email}] ${subject}`;
+        console.log(`📧 [emailService TEST_MODE] redirect "${recipient.email}" → ${actualTo}`);
+      }
+    }
+
     const payload = {
-      to: recipient.email,
-      subject,
+      to: actualTo,
+      subject: actualSubject,
       body: content,
     };
-    
+
     console.log('📧 [emailService] Full payload:', JSON.stringify(payload, null, 2));
 
     // Gọi Supabase Edge Function để gửi email

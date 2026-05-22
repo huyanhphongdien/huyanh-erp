@@ -1153,89 +1153,104 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
               ))}
             </div>
             <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic', marginTop: 8, display: 'block' }}>
-              💡 Download để verify Auto-fill đúng chưa. Upload lại sẽ REPLACE toàn bộ list trên.
+              💡 Download để verify Auto-fill đúng chưa.
             </Text>
           </div>
         )}
-        <div
-          style={{
-            border: files.length > 0 ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
-            background: files.length > 0 ? '#f6ffed' : '#fafafa',
-            borderRadius: 8,
-            padding: 12,
-            textAlign: 'center',
-            cursor: 'pointer',
-          }}
-          onClick={() => document.getElementById('reviewer-fill-input')?.click()}
-          onDragOver={(e) => { e.preventDefault() }}
-          onDrop={(e) => {
-            e.preventDefault()
-            if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
-          }}
-        >
-          <input
-            id="reviewer-fill-input"
-            type="file"
-            multiple
-            accept=".docx"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              if (e.target.files) addFiles(e.target.files)
-              e.target.value = ''
-            }}
-          />
-          <FileWordOutlined style={{ fontSize: 22, color: files.length > 0 ? '#1B4D3E' : '#bbb' }} />
-          <div style={{ marginTop: 4, fontSize: 12, fontWeight: files.length > 0 ? 600 : 400, color: '#444' }}>
-            {files.length > 0 ? `${files.length}/${MAX_FILES} file đã chọn` : `Kéo thả ${MAX_FILES} file tối đa hoặc bấm chọn`}
-          </div>
-        </div>
+      </Card>
 
-        {files.length > 0 && (
-          <div style={{ marginTop: 8, border: '1px solid #e8e8e8', borderRadius: 6, maxHeight: 160, overflow: 'auto' }}>
-            {files.map((f, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '4px 8px',
-                  borderBottom: idx < files.length - 1 ? '1px solid #f0f0f0' : 'none',
-                  fontSize: 11,
-                }}
-              >
-                <FileWordOutlined style={{ color: '#1B4D3E' }} />
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {idx + 1}. {f.name}
-                </span>
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setFiles((prev) => prev.filter((_, i) => i !== idx))
+      {/* Fallback upload — chỉ hiển thị khi cần override Auto-fill manually
+            (vd template cũ không có placeholder, hoặc Phú muốn upload file đã fill bằng Word). */}
+      <details style={{ marginBottom: 12 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 11, color: '#999', padding: '4px 8px' }}>
+          🛠 Fallback: upload file đã fill thủ công (chỉ khi Auto-fill không dùng được)
+        </summary>
+        <div style={{ marginTop: 8, padding: 12, background: '#fffbe6', borderRadius: 6, border: '1px dashed #ffe58f' }}>
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>
+            Workflow chuẩn dùng Auto-fill ở trên. Chỉ dùng fallback này khi:<br />
+            • Template Docs upload chưa có placeholder <code>{`{{...}}`}</code><br />
+            • Anh muốn override file Auto-fill bằng bản tự sửa Word
+          </Text>
+          <div
+            style={{
+              border: files.length > 0 ? '2px solid #1B4D3E' : '2px dashed #d9d9d9',
+              background: files.length > 0 ? '#f6ffed' : '#fafafa',
+              borderRadius: 8,
+              padding: 12,
+              textAlign: 'center',
+              cursor: 'pointer',
+            }}
+            onClick={() => document.getElementById('reviewer-fill-input')?.click()}
+            onDragOver={(e) => { e.preventDefault() }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files)
+            }}
+          >
+            <input
+              id="reviewer-fill-input"
+              type="file"
+              multiple
+              accept=".docx"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.files) addFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            <FileWordOutlined style={{ fontSize: 22, color: files.length > 0 ? '#1B4D3E' : '#bbb' }} />
+            <div style={{ marginTop: 4, fontSize: 12, fontWeight: files.length > 0 ? 600 : 400, color: '#444' }}>
+              {files.length > 0 ? `${files.length}/${MAX_FILES} file đã chọn` : `Kéo thả ${MAX_FILES} file tối đa hoặc bấm chọn`}
+            </div>
+          </div>
+
+          {files.length > 0 && (
+            <div style={{ marginTop: 8, border: '1px solid #e8e8e8', borderRadius: 6, maxHeight: 160, overflow: 'auto' }}>
+              {files.map((f, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 8px',
+                    borderBottom: idx < files.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    fontSize: 11,
                   }}
                 >
-                  ✕
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+                  <FileWordOutlined style={{ color: '#1B4D3E' }} />
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {idx + 1}. {f.name}
+                  </span>
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setFiles((prev) => prev.filter((_, i) => i !== idx))
+                    }}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
-        <Button
-          type="primary"
-          icon={<CheckCircleOutlined />}
-          block
-          loading={uploading}
-          disabled={files.length === 0}
-          onClick={handleUploadFilled}
-          style={{ marginTop: 8, background: '#1B4D3E' }}
-        >
-          {filledFiles.length > 0 ? `Replace ${files.length} file` : `Upload ${files.length} file đã fill`}
-        </Button>
-      </Card>
+          <Button
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            block
+            loading={uploading}
+            disabled={files.length === 0}
+            onClick={handleUploadFilled}
+            style={{ marginTop: 8, background: '#1B4D3E' }}
+          >
+            {filledFiles.length > 0 ? `Replace ${files.length} file` : `Upload ${files.length} file đã fill`}
+          </Button>
+        </div>
+      </details>
 
       {/* Read-only context — tóm tắt đơn để Phú đối chiếu trước khi duyệt */}
       <Card size="small" title="Tóm tắt đơn (read-only)" style={{ marginBottom: 16 }}>

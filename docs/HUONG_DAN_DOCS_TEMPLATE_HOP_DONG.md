@@ -7,6 +7,28 @@
 
 ---
 
+## ❓ Tại sao 2 ngoặc `{{...}}` thay vì 1 ngoặc `{...}`?
+
+> Nhung/Phương Anh có thể đã thấy các template CŨ trong máy với `{contract_no}`, `{contract_date}`... **1 ngoặc**. Đó là format **compose flow cũ (deprecated)** — ERP tự render TOÀN BỘ HĐ từ form Sale. Workflow đó không còn dùng.
+
+**Workflow MỚI (upload flow)** — Docs upload file, ERP chỉ fill **6 trường** — bắt buộc dùng **2 ngoặc**:
+
+| Format | Ý nghĩa | Khi nào dùng |
+|--------|---------|--------------|
+| `{contract_no}` (1 ngoặc) | ❌ Format CŨ (compose flow deprecated) — ERP cũ tự render full HĐ | Đừng dùng cho HĐ mới |
+| `{{contract_no}}` (2 ngoặc) | ✅ Format MỚI (upload flow) — ERP chỉ fill 6 trường | Dùng cho mọi HĐ từ giờ |
+
+**Lý do dùng 2 ngoặc:** Tránh nhầm với các text bình thường có dấu `{` hoặc `}` trong HĐ (vd: ghi chú, công thức, ký hiệu). 2 ngoặc gần như không bao giờ xuất hiện ngẫu nhiên trong HĐ thực tế.
+
+**Action cho chị Nhung/Phương Anh:**
+1. Nếu template hiện tại có `{contract_no}` (1 ngoặc) → đổi thành `{{contract_no}}` (2 ngoặc) — thêm 1 ngoặc mỗi bên
+2. Áp dụng tương tự cho 5 token bank (xem bảng bên dưới)
+3. Các token CŨ khác (vd: `{buyer_name}`, `{grade}`, `{quantity}`...) → **xóa và gõ giá trị thật** vào per HĐ. Workflow mới Docs custom HĐ theo từng khách, ERP không tự fill các trường này.
+
+> 💡 Quick check: trong Word bấm **Ctrl+F** → tìm `{` (1 ngoặc) → nếu còn token nào dạng 1 ngoặc trong template chính (HĐ chính + PI), sửa hết thành 2 ngoặc cho 6 token chính, hoặc thay bằng giá trị thật cho các token khác.
+
+---
+
 ## 🎯 Vì sao phải đổi?
 
 ### Tình trạng hiện tại

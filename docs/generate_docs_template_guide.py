@@ -194,6 +194,48 @@ def build_doc():
 
     add_cover(doc)
 
+    # ─── 0. Tại sao 2 ngoặc thay vì 1 (giải thích Nhung's confusion) ───
+    add_heading(doc, 'Tại sao 2 ngoặc {{...}} thay vì 1 ngoặc {...}?', level=1, color=ACCENT_RED)
+
+    add_callout(doc,
+        '⚠ Lưu ý quan trọng',
+        'Nhung/Phương Anh có thể đã thấy các template CŨ trong máy với '
+        '{contract_no}, {contract_date}... (1 ngoặc). Đó là format compose flow CŨ '
+        '(deprecated) — ERP cũ tự render TOÀN BỘ HĐ. Workflow đó không còn dùng.',
+        color_hex='FEE2E2',
+        border_color=ACCENT_RED
+    )
+
+    add_para(doc, 'Workflow MỚI (upload flow) — Docs upload file, ERP chỉ fill 6 trường — bắt buộc dùng 2 ngoặc:', bold=True)
+
+    add_table(doc,
+        headers=['Format', 'Ý nghĩa', 'Khi nào dùng'],
+        rows=[
+            ['{contract_no}\n(1 ngoặc)', 'Format CŨ (compose flow deprecated) — ERP cũ tự render full HĐ', 'Đừng dùng cho HĐ mới'],
+            ['{{contract_no}}\n(2 ngoặc)', 'Format MỚI (upload flow) — ERP chỉ fill 6 trường', 'Dùng cho mọi HĐ từ giờ'],
+        ],
+        col_widths=[4, 8, 5]
+    )
+
+    add_heading(doc, 'Lý do dùng 2 ngoặc:', level=3)
+    add_para(doc, 'Tránh nhầm với các text bình thường có dấu { hoặc } trong HĐ (vd: ghi chú, công thức, ký hiệu). 2 ngoặc gần như không bao giờ xuất hiện ngẫu nhiên trong HĐ thực tế.')
+
+    add_heading(doc, 'Action cho chị Nhung/Phương Anh:', level=3)
+    add_numbered(doc, 'Nếu template hiện tại có {contract_no} (1 ngoặc) → đổi thành {{contract_no}} (2 ngoặc) — chỉ cần thêm 1 ngoặc mỗi bên')
+    add_numbered(doc, 'Áp dụng tương tự cho 5 token bank (xem bảng bên dưới)')
+    add_numbered(doc, 'Các token CŨ khác (vd: {buyer_name}, {grade}, {quantity}...) → XÓA và gõ giá trị THẬT vào per HĐ. Workflow mới Docs custom HĐ theo từng khách, ERP không tự fill các trường này.')
+
+    add_callout(doc,
+        '💡 Quick check',
+        'Trong Word bấm Ctrl+F → tìm "{" (1 ngoặc) → nếu còn token nào dạng 1 ngoặc '
+        'trong template chính, sửa hết thành 2 ngoặc cho 6 token chính, hoặc thay '
+        'bằng giá trị thật cho các token khác.',
+        color_hex='E0F2FE',
+        border_color=ACCENT_BLUE
+    )
+
+    doc.add_page_break()
+
     # ─── 1. Vì sao phải đổi ───
     add_heading(doc, 'Vì sao phải đổi?', level=1)
 

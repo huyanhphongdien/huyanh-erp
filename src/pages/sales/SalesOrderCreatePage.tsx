@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
 import {
   Card,
   Form,
@@ -310,16 +311,54 @@ function SalesOrderCreatePage() {
   }
 
   // ── Customer selection ──
+  // Phase 1: khi chọn KH → fetch đơn gần nhất → prefill Incoterm/POL/POD/Packing/Payment
+  // từ đơn cũ. Nếu chưa có đơn nào với KH này → dùng customer default (FOB/USD).
   const handleCustomerChange = useCallback(
-    (customerId: string) => {
+    async (customerId: string) => {
       const cust = customers.find((c) => c.id === customerId) || null
       setSelectedCustomer(cust)
-      if (cust) {
+      if (!cust) return
+
+      // Set ngay defaults từ customer profile (instant feedback)
+      form.setFieldsValue({
+        incoterm: cust.default_incoterm || 'FOB',
+        currency: cust.default_currency || 'USD',
+        payment_terms: cust.payment_terms || undefined,
+      })
+
+      // Fetch last order của KH này để prefill smart defaults
+      try {
+        const orders = await salesOrderService.getByCustomer(customerId)
+        const last = orders[0]  // order_date DESC nên [0] là đơn mới nhất
+        if (!last) return
+        // Prefill Logistics + Packing từ last order (cho phép Sale override)
         form.setFieldsValue({
-          incoterm: cust.default_incoterm || 'FOB',
-          currency: cust.default_currency || 'USD',
-          payment_terms: cust.payment_terms || undefined,
+          incoterm: last.incoterm || cust.default_incoterm || 'FOB',
+          port_of_loading: last.port_of_loading || form.getFieldValue('port_of_loading') || 'DA_NANG',
+          port_of_destination: last.port_of_destination || undefined,
         })
+        // Prefill first item nếu Sale chưa fill (chỉ khi item state vẫn default)
+        setOrderItems((prev) => {
+          const firstItem = prev[0]
+          if (!firstItem || firstItem.grade || firstItem.quantity_tons > 0) return prev
+          return prev.map((it, i) =>
+            i === 0
+              ? {
+                  ...it,
+                  grade: last.grade || '',
+                  bale_weight_kg: last.bale_weight_kg || 35,
+                  bale_weights_kg: [last.bale_weight_kg || 35],
+                  bales_per_container: last.bales_per_container || 576,
+                  packing_type: last.packing_type || 'loose_bale',
+                  payment_terms: last.payment_terms || '',
+                }
+              : it,
+          )
+        })
+        message.success(`Đã prefill từ đơn gần nhất ${last.code} của ${cust.short_name || cust.name}`, 2)
+      } catch (e) {
+        // Không block — chỉ là helper
+        console.warn('[CreatePage] prefill from last order fail:', e)
       }
     },
     [customers, form],
@@ -542,7 +581,7 @@ function SalesOrderCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item label="Ngày HĐ (tuỳ chọn)" name="contract_date">
+              <Form.Item label="Ngày HĐ" name="contract_date">
                 <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
@@ -563,7 +602,9 @@ function SalesOrderCreatePage() {
             <div key={item.key} style={{ background: idx % 2 === 0 ? '#fafafa' : '#fff', padding: '12px', borderRadius: 8, marginBottom: 8, border: '1px solid #f0f0f0' }}>
               <Row gutter={[12, 8]} align="middle">
                 <Col xs={24} sm={6}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Grade</div>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
+                    <span style={{ color: '#ff4d4f' }}>*</span> Grade
+                  </div>
                   <AutoComplete
                     value={item.grade || undefined}
                     placeholder="Chọn hoặc tự nhập (vd SVR10mixture SBR1502 60/40)"
@@ -577,12 +618,16 @@ function SalesOrderCreatePage() {
                   />
                 </Col>
                 <Col xs={12} sm={4}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Tấn</div>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
+                    <span style={{ color: '#ff4d4f' }}>*</span> Tấn
+                  </div>
                   <InputNumber value={item.quantity_tons || undefined} min={0.01} step={1} style={{ width: '100%' }} placeholder="725"
                     onChange={(v) => updateItem(item.key, 'quantity_tons', v || 0)} />
                 </Col>
                 <Col xs={12} sm={4}>
-                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>$/tấn</div>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
+                    <span style={{ color: '#ff4d4f' }}>*</span> $/tấn
+                  </div>
                   <InputNumber value={item.unit_price || undefined} min={0} step={10} style={{ width: '100%' }} placeholder="1,924"
                     onChange={(v) => updateItem(item.key, 'unit_price', v || 0)} />
                 </Col>
@@ -680,14 +725,13 @@ function SalesOrderCreatePage() {
         </Card>
 
         {/* ═══ Logistics ═══
-            Form simplified 2026-05-20: bỏ compose UI (HĐ render từ template).
-            Docs upload file Word trực tiếp → KHÔNG cần fill payment notes,
-            arbitration, claims_days, extra_terms, bank info — đã có trong file. */}
+            Phase 1: POD ẩn khi FOB/EXW (KH lo cước, không cần cảng đích).
+            Hoa hồng chuyển vào Collapse phía dưới (rare use). */}
         <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}
           title={<span style={{ fontSize: 14, fontWeight: 600 }}>🚢 Logistics</span>}>
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item label="Incoterm" name="incoterm" initialValue="FOB">
+              <Form.Item label="Incoterm" name="incoterm">
                 <Select size="large"
                   options={Object.entries(INCOTERM_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
               </Form.Item>
@@ -698,30 +742,17 @@ function SalesOrderCreatePage() {
                   options={PORT_OF_LOADING_OPTIONS.map((p) => ({ value: p.value, label: p.label }))} />
               </Form.Item>
             </Col>
+            {/* POD: chỉ hiện khi không phải FOB/EXW (incoterm yêu cầu HA lo cước → cần cảng đích) */}
+            {!['FOB', 'EXW'].includes((watchIncoterm || '').toUpperCase()) && (
+              <Col xs={24} sm={8}>
+                <Form.Item label="Cảng đích (POD)" name="port_of_destination">
+                  <Input size="large" placeholder="Shanghai, Yokohama..." />
+                </Form.Item>
+              </Col>
+            )}
             <Col xs={24} sm={8}>
-              <Form.Item label="Cảng đích (POD)" name="port_of_destination">
-                <Input size="large" placeholder="Shanghai, Yokohama..." />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Ngày giao dự kiến" name="delivery_date">
+              <Form.Item label="Ngày giao dự kiến (tuỳ chọn)" name="delivery_date">
                 <DatePicker style={{ width: '100%' }} size="large" format="DD/MM/YYYY" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Hoa hồng (%)" name="commission_pct"
-                tooltip="Tuỳ chọn. Dùng % HOẶC USD/MT, không dùng cả hai.">
-                <InputNumber min={0} max={20} step={0.5} size="large" style={{ width: '100%' }} placeholder="2"
-                  disabled={commissionUsdPerMt > 0} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt"
-                tooltip="Tuỳ chọn. Dùng khi môi giới tính theo đô/tấn.">
-                <InputNumber min={0} max={1000} step={1} size="large" style={{ width: '100%' }} placeholder="25"
-                  disabled={commissionPct > 0} />
               </Form.Item>
             </Col>
           </Row>
@@ -747,6 +778,28 @@ function SalesOrderCreatePage() {
                   <Col xs={12} sm={6}><Form.Item label="PRI min" name="pri_min" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
                   <Col xs={12} sm={6}><Form.Item label="Mooney" name="mooney_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={100} step={1} style={{ width: '100%' }} /></Form.Item></Col>
                   <Col xs={12} sm={6}><Form.Item label="Color" name="color_lovibond_max" style={{ marginBottom: 8 }}><InputNumber size="middle" min={0} max={10} step={0.5} style={{ width: '100%' }} /></Form.Item></Col>
+                </Row>
+              ),
+            },
+            {
+              key: 'commission',
+              label: <span style={{ fontSize: 13, fontWeight: 600 }}>💰 Hoa hồng môi giới (mở khi có)</span>,
+              children: (
+                <Row gutter={[12, 4]}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item label="Hoa hồng (%)" name="commission_pct"
+                      tooltip="Dùng % HOẶC USD/MT, không dùng cả hai.">
+                      <InputNumber min={0} max={20} step={0.5} size="middle" style={{ width: '100%' }} placeholder="2"
+                        disabled={commissionUsdPerMt > 0} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt"
+                      tooltip="Dùng khi môi giới tính theo đô/tấn.">
+                      <InputNumber min={0} max={1000} step={1} size="middle" style={{ width: '100%' }} placeholder="25"
+                        disabled={commissionPct > 0} />
+                    </Form.Item>
+                  </Col>
                 </Row>
               ),
             },
@@ -1003,7 +1056,19 @@ function SalesOrderCreatePage() {
       </div>
 
       {/* Form single-page — quy trình upload (2026-05-20): bỏ compose UI */}
-      <Form form={form} layout="vertical" requiredMark preserve>
+      {/* Phase 1: smart defaults — contract_date=hôm nay, incoterm=FOB, POL=Đà Nẵng */}
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark
+        preserve
+        initialValues={{
+          contract_date: dayjs(),
+          incoterm: 'FOB',
+          port_of_loading: 'DA_NANG',
+          currency: 'USD',
+        }}
+      >
         {renderStep1()}
       </Form>
     </div>

@@ -73,6 +73,8 @@ import DealAdvancesTab from '../../../components/b2b/DealAdvancesTab'
 import DealDeliveryTab from '../../../components/b2b/DealDeliveryTab'
 import DealContractTab from '../../../components/b2b/DealContractTab'
 import ProductionProgress from '../../../components/b2b/ProductionProgress'
+import DealLifecycleActions from '../../../components/b2b/DealLifecycleActions'
+import { supabase } from '../../../lib/supabase'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -939,13 +941,16 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
             children: <DealContractTab dealId={deal.id} />,
           },
           // Tab "Sản xuất" — chỉ hiện cho deal flow drc_after_production
-          // (đại lý chạy đầu ra). Các deal khác không có timeline production.
+          // (đại lý chạy đầu ra). Hiển thị timeline + 3 button lifecycle action
+          // (Sample DRC / Bắt đầu SX / Hoàn tất SX) theo state hiện tại.
           ...(deal.purchase_type === 'drc_after_production' ? [{
             key: 'production',
             label: (
               <span><RocketOutlined /> Sản xuất</span>
             ),
-            children: <ProductionProgress dealId={deal.id} />,
+            children: (
+              <ProductionTabContent dealObj={deal} onRefresh={fetchDeal} />
+            ),
           }] : []),
         ]}
       />
@@ -954,3 +959,54 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
 }
 
 export default DealDetailPage
+
+// ============================================================================
+// PRODUCTION TAB WRAPPER — kết hợp timeline + lifecycle actions
+// ============================================================================
+function ProductionTabContent({
+  dealObj,
+  onRefresh,
+}: {
+  dealObj: Deal
+  onRefresh: () => void
+}) {
+  const [hasAdvancePaid, setHasAdvancePaid] = useState(false)
+
+  // Fetch advances to determine if any has acknowledged/paid status
+  useEffect(() => {
+    const fetchAdvances = async () => {
+      const { data } = await supabase
+        .from('b2b_advances')
+        .select('id, status')
+        .eq('deal_id', dealObj.id)
+      const paid = (data || []).some(
+        (a: { status: string }) => ['acknowledged', 'paid'].includes(a.status),
+      )
+      setHasAdvancePaid(paid)
+    }
+    fetchAdvances()
+  }, [dealObj.id, dealObj.status, dealObj.production_started_at])
+
+  return (
+    <div>
+      <ProductionProgress dealId={dealObj.id} />
+      <DealLifecycleActions
+        deal={{
+          id: dealObj.id,
+          deal_number: dealObj.deal_number,
+          status: dealObj.status,
+          purchase_type: dealObj.purchase_type,
+          stock_in_count: (dealObj as { stock_in_count?: number }).stock_in_count,
+          sample_drc: (dealObj as { sample_drc?: number }).sample_drc,
+          actual_drc: dealObj.actual_drc,
+          quantity_kg: dealObj.quantity_kg ?? 0,
+          unit_price: dealObj.unit_price,
+          production_started_at: (dealObj as { production_started_at?: string }).production_started_at,
+          finished_product_kg: (dealObj as { finished_product_kg?: number }).finished_product_kg,
+        }}
+        hasAdvancePaid={hasAdvancePaid}
+        onRefresh={onRefresh}
+      />
+    </div>
+  )
+}

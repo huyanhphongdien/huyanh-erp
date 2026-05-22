@@ -838,11 +838,68 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
   const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const [files, setFiles] = useState<File[]>([])
+  const [autoFilling, setAutoFilling] = useState(false)
 
   const MAX_FILES = 10
 
   const saleFiles = (contract.sale_upload_urls || [])
   const filledFiles = (contract.reviewer_filled_urls || [])
+
+  /** 🪄 Auto-fill: gửi values trong bankForm xuống service → docxtemplater render
+   *  từng file Docs upload → upload kết quả vào reviewer_filled_urls. */
+  const handleAutoFill = async () => {
+    const vals = bankForm.getFieldsValue()
+    const contractNo = (vals.contract_no || '').trim()
+    if (!contractNo) {
+      message.error('Cần nhập Số HĐ trước khi Auto-fill')
+      return
+    }
+    if (saleFiles.length === 0) {
+      message.error('Chưa có file Docs upload — bảo Docs upload trước')
+      return
+    }
+    setAutoFilling(true)
+    try {
+      const { contract: updated, warnings } = await salesContractWorkflowService.autoFillUploadFlow(
+        contract.id,
+        {
+          contract_no: contractNo,
+          bank_account_name: vals.bank_account_name,
+          bank_account_no: vals.bank_account_no,
+          bank_full_name: vals.bank_full_name,
+          bank_address: vals.bank_address,
+          bank_swift: vals.bank_swift,
+        },
+      )
+      onFilled(updated)
+      const filledCount = updated.reviewer_filled_urls?.length || 0
+      if (warnings.length > 0) {
+        Modal.warning({
+          title: `Auto-fill ${filledCount}/${saleFiles.length} file — ${warnings.length} cảnh báo`,
+          content: (
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
+              <Text style={{ fontSize: 12 }}>Các file dưới đây không fill được (có thể template chưa có placeholder hoặc token sai format):</Text>
+              <ul style={{ marginTop: 8, paddingLeft: 18 }}>
+                {warnings.map((w, i) => (
+                  <li key={i} style={{ fontSize: 11, marginBottom: 4 }}>{w}</li>
+                ))}
+              </ul>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                File OK đã upload vào "② File anh đã fill". File lỗi giữ nguyên bản gốc.
+              </Text>
+            </div>
+          ),
+          width: 560,
+        })
+      } else {
+        message.success(`Đã auto-fill ${filledCount} file. Verify rồi bấm "Duyệt + Trình ký".`)
+      }
+    } catch (e: unknown) {
+      message.error(`Auto-fill thất bại: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setAutoFilling(false)
+    }
+  }
 
   const handleDownload = async (idx: number, path: string) => {
     setDownloadingIdx(idx)
@@ -895,29 +952,31 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
       <Alert
         type="info"
         showIcon
-        message="📎 Upload flow — Docs trình file, anh fill highlight + reupload"
+        message="📎 Upload flow — Auto-fill bằng ERP, không cần mở Word"
         description={
           <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-            <div><strong>Bước 1:</strong> Download từng file Docs đã upload (xem ô ①)</div>
-            <div style={{ marginTop: 4 }}>
-              <strong>Bước 2:</strong> Mở từng file Word, fill các ô <strong>highlight vàng</strong> theo loại:
-              <ul style={{ margin: '4px 0 4px 18px', paddingLeft: 0 }}>
-                <li><strong>SC (HĐ chính):</strong> chỉ số HĐ — bank thường ghi "Payment as stated in Commercial Invoice"</li>
-                <li><strong>PI / Commercial Invoice:</strong> số HĐ + bank info (2 ô)</li>
-                <li><strong>Packing List / Phụ lục:</strong> số HĐ nếu template có highlight, không thì skip</li>
-              </ul>
-              <em style={{ color: '#8c8c8c' }}>Bank chưa quyết được? Để trống highlight bank trong PI — duyệt revision sau khi tài vụ chốt TK.</em>
+            <div><strong>Bước 1:</strong> Gõ <strong>Số HĐ</strong> + chọn <strong>Bank</strong> ở Card 🪄 bên dưới</div>
+            <div><strong>Bước 2:</strong> Bấm <strong>"Auto-fill"</strong> → ERP tự thay token <code>{`{{...}}`}</code> trong file Docs upload + upload vào ô ②</div>
+            <div><strong>Bước 3:</strong> (Optional) Download file từ ô ② kiểm tra format đúng chưa</div>
+            <div><strong>Bước 4:</strong> Bấm <strong>"Duyệt + Trình ký"</strong> ở header</div>
+            <div style={{ marginTop: 6 }}>
+              <em style={{ color: '#8c8c8c' }}>
+                Bank chưa quyết được? Để trống Select Bank — token bank render rỗng,
+                duyệt revision sau khi tài vụ chốt TK. Phụ lục không có token → file giữ nguyên.
+              </em>
             </div>
-            <div><strong>Bước 3:</strong> Upload lại {MAX_FILES} file tối đa (ô ②)</div>
-            <div><strong>Bước 4:</strong> Gõ <strong>Số HĐ</strong> đã fill vào ô 🔢 bên dưới (sync ngược ERP)</div>
-            <div><strong>Bước 5:</strong> Bấm "Duyệt + Trình ký" ở header</div>
+            <div style={{ marginTop: 6, fontSize: 11, color: '#8c8c8c' }}>
+              📝 Fallback: nếu template Docs chưa có placeholder, anh có thể download file ở ①
+              → mở Word fill thủ công → upload vào ô ② (REPLACE).
+            </div>
           </div>
         }
         style={{ marginBottom: 16 }}
       />
 
-      {/* 🔢 Sync số HĐ vào ERP — đặt ngay sau Alert để Phú thấy + gõ ngay.
-            Bank info vẫn giữ trong file Word, không expand ERP. */}
+      {/* 🪄 Auto-fill Card — Phú gõ Số HĐ + chọn bank → docxtemplater render
+            file Docs upload + auto-upload vào reviewer_filled_urls. Không cần
+            mở Word manual. Bank dropdown auto-fill 5 field từ BANK_PRESETS. */}
       <Card
         size="small"
         style={{
@@ -928,25 +987,76 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
         title={
           <Space>
             <span style={{ fontWeight: 600, color: '#d46b08' }}>
-              🔢 Số HĐ — gõ lại đây để sync ERP
+              🪄 Auto-fill — gõ Số HĐ + chọn Bank, ERP tự fill vào file
             </span>
           </Space>
         }
       >
         <Form form={bankForm} layout="vertical" size="middle">
-          <Form.Item
-            label="Số HĐ anh vừa fill trong Word"
-            name="contract_no"
-            tooltip="Gõ lại số HĐ anh vừa điền vào file Word. ERP sẽ cập nhật queue/sales_orders/reports để hiển thị đúng số. Bank info giữ trong file Word, không cần nhập ở đây."
-            extra={
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                Optional — để trống vẫn duyệt được, queue sẽ hiện "(chưa có số)".
-              </Text>
-            }
-            style={{ marginBottom: 0 }}
+          <Row gutter={12}>
+            <Col span={10}>
+              <Form.Item
+                label="Số HĐ"
+                name="contract_no"
+                tooltip="Số HĐ sẽ thay {{contract_no}} trong tất cả file Docs upload."
+                rules={[{ required: true, message: 'Cần nhập số HĐ' }]}
+                style={{ marginBottom: 8 }}
+              >
+                <Input placeholder="VD: HA20260062" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={14}>
+              <Form.Item
+                label="Bank nhận tiền"
+                tooltip="Chọn bank → tự fill {{bank_account_name}}, {{bank_account_no}}, {{bank_full_name}}, {{bank_address}}, {{bank_swift}} trong file Word. Để trống nếu HĐ chưa cần bank (SC ghi 'see Commercial Invoice')."
+                style={{ marginBottom: 8 }}
+              >
+                <Select
+                  placeholder="— Chọn để fill 5 field bank — (để trống nếu HĐ chưa cần)"
+                  showSearch
+                  allowClear
+                  optionFilterProp="label"
+                  onChange={(v: string | undefined) => {
+                    const preset = getBankPreset(v || null)
+                    if (preset) {
+                      bankForm.setFieldsValue({
+                        bank_account_name: preset.bank_account_name,
+                        bank_account_no: preset.bank_account_no,
+                        bank_full_name: preset.bank_full_name,
+                        bank_address: preset.bank_address,
+                        bank_swift: preset.bank_swift,
+                      })
+                    } else {
+                      // Clear bank fields
+                      bankForm.setFieldsValue({
+                        bank_account_name: '',
+                        bank_account_no: '',
+                        bank_full_name: '',
+                        bank_address: '',
+                        bank_swift: '',
+                      })
+                    }
+                  }}
+                  options={BANK_PRESETS.map((b) => ({ value: b.value, label: b.label }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Button
+            type="primary"
+            block
+            loading={autoFilling}
+            onClick={handleAutoFill}
+            disabled={saleFiles.length === 0}
+            style={{ background: '#d46b08', borderColor: '#d46b08' }}
+            icon={<span style={{ marginRight: 4 }}>🪄</span>}
           >
-            <Input placeholder="VD: HA20260062" allowClear />
-          </Form.Item>
+            Auto-fill {saleFiles.length} file Docs upload
+          </Button>
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
+            ERP sẽ download → thay token {`{{...}}`} → upload kết quả vào ô ② phía dưới.
+            File template phải có placeholder (Docs đã sửa theo hướng dẫn).
+          </Text>
         </Form>
       </Card>
 

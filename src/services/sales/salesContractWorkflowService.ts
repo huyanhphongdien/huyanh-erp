@@ -16,6 +16,8 @@
 // Đây là workflow sinh HĐ tự động từ template + duyệt.
 // ============================================================================
 
+import PizZip from 'pizzip'
+import Docxtemplater from 'docxtemplater'
 import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
 import { SALES_CONFIG } from '../../config/sales.config'
@@ -535,6 +537,167 @@ export const salesContractWorkflowService = {
     })
 
     return row
+  },
+
+  /** UPLOAD FLOW — Auto-fill các file .docx Docs upload bằng docxtemplater.
+   *  Phú gõ Số HĐ + chọn bank → service tự download từng file Sale upload,
+   *  render với placeholder {{...}} → upload vào reviewer_filled_urls.
+   *
+   *  Phụ thuộc: Docs đã đổi template từ highlight vàng sang token {{contract_no}},
+   *  {{bank_account_name}}, {{bank_account_no}}, {{bank_full_name}},
+   *  {{bank_address}}, {{bank_swift}}.
+   *
+   *  Files không có token → docxtemplater render unchanged (file copy y nguyên).
+   *  File có token sai format → throw → catch + warning, skip file đó.
+   *
+   *  @returns warnings: list lỗi per-file (UI hiển thị Modal warning) */
+  async autoFillUploadFlow(
+    contractId: string,
+    values: {
+      contract_no: string
+      bank_account_name?: string
+      bank_account_no?: string
+      bank_full_name?: string
+      bank_address?: string
+      bank_swift?: string
+    },
+  ): Promise<{ contract: SalesOrderContract; warnings: string[] }> {
+    // ─── A. Fetch + validate ───
+    const { data: existing, error: fetchErr } = await supabase
+      .from('sales_order_contracts')
+      .select('id, sales_order_id, flow_type, status, sale_upload_urls, reviewer_filled_urls, form_data')
+      .eq('id', contractId)
+      .single()
+    if (fetchErr) throw fetchErr
+    if (!existing) throw new Error('Không tìm thấy HĐ')
+    if (existing.flow_type !== 'upload') {
+      throw new Error('Auto-fill chỉ áp dụng cho upload flow')
+    }
+    if (existing.status !== 'reviewing') {
+      throw new Error(`HĐ status='${existing.status}' — chỉ auto-fill khi reviewing`)
+    }
+    const sourceFiles = (existing.sale_upload_urls || []) as string[]
+    if (sourceFiles.length === 0) {
+      throw new Error('Chưa có file Docs upload để fill — bảo Docs upload trước')
+    }
+
+    // ─── B. Loop từng file: download → render → upload ───
+    const ts = Date.now()
+    const newPaths: string[] = []
+    const warnings: string[] = []
+    const renderData = {
+      contract_no: values.contract_no || '',
+      bank_account_name: values.bank_account_name || '',
+      bank_account_no: values.bank_account_no || '',
+      bank_full_name: values.bank_full_name || '',
+      bank_address: values.bank_address || '',
+      bank_swift: values.bank_swift || '',
+    }
+
+    for (let i = 0; i < sourceFiles.length; i++) {
+      const salePath = sourceFiles[i]
+      const baseName = salePath.split('/').pop() || `file_${i + 1}.docx`
+      const displayName = baseName.replace(/^\d+-\d+-sale-/, '')
+
+      try {
+        // Download .docx từ Storage
+        const { data: blob, error: dlErr } = await supabase.storage
+          .from('sales-contracts')
+          .download(salePath)
+        if (dlErr || !blob) throw new Error(`Download fail: ${dlErr?.message || 'no data'}`)
+
+        const arrayBuffer = await blob.arrayBuffer()
+        const zip = new PizZip(arrayBuffer)
+        const docx = new Docxtemplater(zip, {
+          delimiters: { start: '{{', end: '}}' },  // theo guide gửi Docs
+          paragraphLoop: true,
+          linebreaks: true,
+          nullGetter: () => '',  // missing tag → blank
+        })
+
+        // Render — throw nếu invalid token format (vd: {{contract_no} thiếu ngoặc)
+        docx.render(renderData)
+
+        const filledBlob = docx.getZip().generate({
+          type: 'blob',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          compression: 'DEFLATE',
+        })
+
+        // Path mới: giữ tên gốc + prefix filled
+        const safeName = displayName.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const newPath = `${existing.sales_order_id}/upload-flow/${ts}-${i + 1}-filled-${safeName}`
+
+        const { error: upErr } = await supabase.storage
+          .from('sales-contracts')
+          .upload(newPath, filledBlob, {
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            upsert: false,
+          })
+        if (upErr) throw new Error(`Upload fail: ${upErr.message}`)
+
+        newPaths.push(newPath)
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        // docxtemplater throw object có .properties.errors — extract token name
+        const tplErr = (e as { properties?: { errors?: Array<{ message: string }> } })?.properties?.errors
+        const tplMsg = tplErr && tplErr.length > 0
+          ? tplErr.map((er) => er.message).join('; ')
+          : msg
+        warnings.push(`"${displayName}": ${tplMsg}`)
+      }
+    }
+
+    if (newPaths.length === 0) {
+      // Rollback nothing (no new upload thành công)
+      throw new Error(
+        `Auto-fill thất bại tất cả ${sourceFiles.length} file. Kiểm tra placeholder:\n${warnings.join('\n')}`,
+      )
+    }
+
+    // ─── C. Update contract row (form_data + reviewer_filled_urls) ───
+    const updatedFormData: Partial<ContractFormData> = {
+      ...(existing.form_data || {}),
+      contract_no: values.contract_no || (existing.form_data as Partial<ContractFormData> | null)?.contract_no,
+      bank_account_name: values.bank_account_name,
+      bank_account_no: values.bank_account_no,
+      bank_full_name: values.bank_full_name,
+      bank_address: values.bank_address,
+      bank_swift: values.bank_swift,
+    }
+
+    const { data: updated, error: updErr } = await supabase
+      .from('sales_order_contracts')
+      .update({
+        reviewer_filled_urls: newPaths,
+        form_data: updatedFormData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', contractId)
+      .select('*')
+      .single()
+    if (updErr) {
+      // Cleanup file vừa upload nếu update DB fail
+      await supabase.storage.from('sales-contracts').remove(newPaths).catch(() => null)
+      throw updErr
+    }
+
+    // ─── D. Cleanup file fill cũ (nếu Phú auto-fill lần 2+) ───
+    const oldFilled = (existing.reviewer_filled_urls || []) as string[]
+    if (oldFilled.length > 0) {
+      await supabase.storage.from('sales-contracts').remove(oldFilled).catch(() => null)
+    }
+
+    // ─── E. Audit log ───
+    void _logWorkflowEvent({
+      salesOrderId: existing.sales_order_id,
+      contractId,
+      action: 'reviewer_fill',
+      userId: await getCurrentEmployeeId(),
+      notes: `Auto-fill ${newPaths.length}/${sourceFiles.length} file — contract_no=${values.contract_no || '(empty)'}, bank=${values.bank_full_name || '(empty)'}${warnings.length > 0 ? ` — ${warnings.length} warning` : ''}`,
+    })
+
+    return { contract: updated as SalesOrderContract, warnings }
   },
 
   /** UPLOAD FLOW — Phú upload tối đa 10 file .docx đã fill (REPLACE toàn bộ

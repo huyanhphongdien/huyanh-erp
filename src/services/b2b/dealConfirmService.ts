@@ -177,12 +177,23 @@ export const dealConfirmService = {
       }
     } catch (e) { console.error('[dealConfirm] lot_code gen error:', e) }
 
+    // Sync deal_type ↔ purchase_type: chat flow chỉ set deal_type, nhưng
+    // production timeline + tab "Sản xuất" check qua purchase_type.
+    // Mapping: processing → drc_after_production (chạy đầu ra),
+    //          consignment → drc_after_production (ký gửi cũng cần SX),
+    //          purchase/sale → standard.
+    const dealTypeValue = formData.deal_type || 'purchase'
+    const purchaseTypeValue = ['processing', 'consignment'].includes(dealTypeValue)
+      ? 'drc_after_production'
+      : 'standard'
+
     const { data: deal, error: dealError } = await supabase
       .from('b2b_deals')
       .insert({
         deal_number: dealNumber,
         partner_id: context.partnerId,
-        deal_type: formData.deal_type || 'purchase',
+        deal_type: dealTypeValue,
+        purchase_type: purchaseTypeValue,
         product_name: productName,
         product_code: formData.product_type,
         quantity_kg: formData.agreed_quantity_tons * 1000,

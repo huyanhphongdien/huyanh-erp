@@ -839,14 +839,17 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
   const [uploading, setUploading] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [autoFilling, setAutoFilling] = useState(false)
+  // Bank preset chọn — dùng local state thay vì rely vào AntD Form vì 5 bank
+  // field không có Form.Item registered → getFieldsValue() trả undefined.
+  const [selectedBankValue, setSelectedBankValue] = useState<string | undefined>(undefined)
 
   const MAX_FILES = 10
 
   const saleFiles = (contract.sale_upload_urls || [])
   const filledFiles = (contract.reviewer_filled_urls || [])
 
-  /** 🪄 Auto-fill: gửi values trong bankForm xuống service → docxtemplater render
-   *  từng file Docs upload → upload kết quả vào reviewer_filled_urls. */
+  /** 🪄 Auto-fill: gửi values trong bankForm + selectedBank xuống service.
+   *  docxtemplater render từng file Docs upload → upload reviewer_filled_urls. */
   const handleAutoFill = async () => {
     const vals = bankForm.getFieldsValue()
     const contractNo = (vals.contract_no || '').trim()
@@ -858,17 +861,19 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
       message.error('Chưa có file Docs upload — bảo Docs upload trước')
       return
     }
+    // Đọc bank từ preset đã chọn (local state) — không qua AntD Form
+    const bankPreset = getBankPreset(selectedBankValue || null)
     setAutoFilling(true)
     try {
       const { contract: updated, warnings } = await salesContractWorkflowService.autoFillUploadFlow(
         contract.id,
         {
           contract_no: contractNo,
-          bank_account_name: vals.bank_account_name,
-          bank_account_no: vals.bank_account_no,
-          bank_full_name: vals.bank_full_name,
-          bank_address: vals.bank_address,
-          bank_swift: vals.bank_swift,
+          bank_account_name: bankPreset?.bank_account_name,
+          bank_account_no: bankPreset?.bank_account_no,
+          bank_full_name: bankPreset?.bank_full_name,
+          bank_address: bankPreset?.bank_address,
+          bank_swift: bankPreset?.bank_swift,
         },
       )
       onFilled(updated)
@@ -1012,31 +1017,24 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
                 style={{ marginBottom: 8 }}
               >
                 <Select
+                  value={selectedBankValue}
+                  onChange={(v: string | undefined) => {
+                    setSelectedBankValue(v)
+                    // Cũng sync sang bankForm để compose flow + Tóm tắt HĐ phía Trung/Huy
+                    // hiển thị đúng bank info (form_data sẽ chứa values này khi approve)
+                    const preset = getBankPreset(v || null)
+                    bankForm.setFieldsValue({
+                      bank_account_name: preset?.bank_account_name || '',
+                      bank_account_no: preset?.bank_account_no || '',
+                      bank_full_name: preset?.bank_full_name || '',
+                      bank_address: preset?.bank_address || '',
+                      bank_swift: preset?.bank_swift || '',
+                    })
+                  }}
                   placeholder="— Chọn để fill 5 field bank — (để trống nếu HĐ chưa cần)"
                   showSearch
                   allowClear
                   optionFilterProp="label"
-                  onChange={(v: string | undefined) => {
-                    const preset = getBankPreset(v || null)
-                    if (preset) {
-                      bankForm.setFieldsValue({
-                        bank_account_name: preset.bank_account_name,
-                        bank_account_no: preset.bank_account_no,
-                        bank_full_name: preset.bank_full_name,
-                        bank_address: preset.bank_address,
-                        bank_swift: preset.bank_swift,
-                      })
-                    } else {
-                      // Clear bank fields
-                      bankForm.setFieldsValue({
-                        bank_account_name: '',
-                        bank_account_no: '',
-                        bank_full_name: '',
-                        bank_address: '',
-                        bank_swift: '',
-                      })
-                    }
-                  }}
                   options={BANK_PRESETS.map((b) => ({ value: b.value, label: b.label }))}
                 />
               </Form.Item>

@@ -20,6 +20,10 @@ export type B2BNotificationType =
   | 'dispute_raised'
   | 'dispute_resolved'
   | 'advance_paid'
+  // Production lifecycle (drc_after_production flow)
+  | 'sample_drc_recorded'   // Factory ghi sample DRC → Partner
+  | 'production_started'    // Factory bắt đầu SX → Partner
+  | 'production_finished'   // Factory xong SX, có actual_drc + final_value → Partner
 
 export type B2BNotificationAudience = 'staff' | 'partner' | 'both'
 

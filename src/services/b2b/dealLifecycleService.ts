@@ -15,6 +15,17 @@
 
 import { supabase } from '../../lib/supabase'
 import { onProductionFinish } from './intakeProductionService'
+import { b2bNotificationService } from './b2bNotificationService'
+
+// Helper — lookup partner_id from deal for notification routing
+async function _getPartnerId(dealId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('b2b_deals')
+    .select('partner_id, deal_number')
+    .eq('id', dealId)
+    .maybeSingle()
+  return (data as { partner_id?: string })?.partner_id || null
+}
 
 // ============================================================================
 // 1. Set sample DRC (QC sample sau nhập kho)
@@ -54,6 +65,18 @@ export async function setSampleDrc(input: SetSampleDrcInput): Promise<void> {
     .eq('id', input.deal_id)
 
   if (error) throw new Error(`Update sample_drc thất bại: ${error.message}`)
+
+  // Notify Partner (fire-and-forget, không block flow)
+  const partnerId = await _getPartnerId(input.deal_id)
+  void b2bNotificationService.notify({
+    type: 'sample_drc_recorded',
+    audience: 'partner',
+    partner_id: partnerId,
+    deal_id: input.deal_id,
+    title: '🧪 Đã ghi nhận Sample DRC',
+    message: `Nhà máy đã đo sample DRC = ${input.sample_drc.toFixed(2)}% trên lô hàng nhập kho. Đợi BGĐ duyệt Deal.`,
+    link_url: `/portal/deals/${input.deal_id}`,
+  })
 }
 
 // ============================================================================
@@ -96,6 +119,18 @@ export async function startProduction(dealId: string): Promise<void> {
     .eq('id', dealId)
 
   if (error) throw new Error(`Start production thất bại: ${error.message}`)
+
+  // Notify Partner — nhà máy bắt đầu SX, đại lý biết để theo dõi
+  const partnerId = await _getPartnerId(dealId)
+  void b2bNotificationService.notify({
+    type: 'production_started',
+    audience: 'partner',
+    partner_id: partnerId,
+    deal_id: dealId,
+    title: '🏭 Nhà máy đã bắt đầu sản xuất',
+    message: 'Lô hàng của bạn đang được sản xuất. Khi hoàn thành QC final, ERP sẽ ghi giá cuối theo DRC thực tế.',
+    link_url: `/portal/deals/${dealId}`,
+  })
 }
 
 // ============================================================================
@@ -123,11 +158,36 @@ export async function finishProduction(input: FinishProductionInput) {
     throw new Error(`Đã có finished_product_kg=${deal.finished_product_kg} kg. Không finish lại.`)
   }
 
-  return onProductionFinish({
+  const result = await onProductionFinish({
     deal_id: input.deal_id,
     finished_product_kg: input.finished_product_kg,
     actual_drc_override: input.actual_drc_override,
   })
+
+  // Notify Partner — bước quan trọng nhất, có giá cuối + có/không dispute
+  if (result.success) {
+    const partnerId = await _getPartnerId(input.deal_id)
+    const drcStr = result.actual_drc.toFixed(2)
+    const grossStr = result.final_gross_vnd.toLocaleString('vi-VN')
+    const titlePrefix = result.dispute_auto_raised
+      ? '⚠️ Sản xuất xong — variance DRC > 3%'
+      : '✅ Sản xuất xong — giá cuối chốt'
+    const msgBody = result.dispute_auto_raised
+      ? `Actual DRC = ${drcStr}%. Giá cuối tạm tính = ${grossStr}đ. ERP tự raise dispute vì lệch sample > 3% — vui lòng review/khiếu nại nếu cần.`
+      : `Actual DRC = ${drcStr}%. Giá cuối = ${grossStr}đ. Đợi nhà máy quyết toán + thanh toán.`
+
+    void b2bNotificationService.notify({
+      type: 'production_finished',
+      audience: 'partner',
+      partner_id: partnerId,
+      deal_id: input.deal_id,
+      title: titlePrefix,
+      message: msgBody,
+      link_url: `/portal/deals/${input.deal_id}`,
+    })
+  }
+
+  return result
 }
 
 export default { setSampleDrc, startProduction, finishProduction }

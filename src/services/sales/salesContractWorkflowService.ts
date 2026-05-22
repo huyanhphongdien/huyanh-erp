@@ -690,13 +690,13 @@ export const salesContractWorkflowService = {
     const newPaths: string[] = []
     const warnings: string[] = []
     // Conditional flags cho docxtemplater xử lý block {{#has_xxx}}...{{/has_xxx}}
+    // Bỏ is_lc_payment: template đã strip block, Sale gõ FULL payment text trong form.
     const packingType = (o.packing_type || 'loose_bale').toLowerCase()
     const hasPallets = ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(packingType)
     const hasFumigation = packingType === 'wooden_pallet'
-    // Priority: item textbox (Sale gõ) → header note → header default → fallback
+    // Priority: item textbox (Sale gõ FULL text bao gồm điều khoản LC/TT/CAD)
+    //   → header note → header default → fallback
     const paymentText = firstItemPayment || o.payment_terms_note || o.payment_terms || 'LC at sight'
-    const paymentTextLower = paymentText.toLowerCase()
-    const isLcPayment = paymentTextLower.includes('l/c') || paymentTextLower.includes('lc ')
 
     // Pallets total (chỉ khi có pallet, 36 bales/pallet standard)
     const palletsTotal = hasPallets && totalBales > 0
@@ -742,7 +742,6 @@ export const salesContractWorkflowService = {
       // ── Conditional flags ──
       has_pallets: hasPallets,
       has_fumigation: hasFumigation,
-      is_lc_payment: isLcPayment,
       has_extra_terms: false,  // upload flow không có extra_terms (Docs custom trong file)
     }
 

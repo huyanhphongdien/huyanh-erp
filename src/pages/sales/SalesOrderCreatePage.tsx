@@ -678,25 +678,33 @@ function SalesOrderCreatePage() {
                 </Col>
                 <Col xs={24}>
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 4, marginTop: 4 }}>
-                    Phương thức thanh toán (Sale tự nhập — render vào "Term of payment:" của HĐ)
+                    Phương thức thanh toán (Sale gõ FULL text — render thẳng vào "Term of payment:" của HĐ)
                   </div>
-                  <Input
+                  <TextArea
                     value={item.payment_terms || ''}
-                    placeholder="VD: L/C at sight · L/C UPAS 90 days · CAD 5 days · 30% TT trước ETD + 70% sau B/L · 10% cọc + 90% D/P..."
+                    rows={3}
+                    placeholder={`VD đầy đủ điều khoản:\nL/C at sight. The L/C draft must be opened within 5 days from the contract signing date.\nHoặc: T/T 30% advance before ETD + 70% balance within 5 days of B/L copy.\nHoặc: L/C UPAS 90 days. Plus 10% T/T advance before ETD.`}
                     onChange={(e) => updateItem(item.key, 'payment_terms', e.target.value)}
+                    style={{ fontFamily: 'inherit' }}
                   />
                   <div style={{ fontSize: 10, color: '#bfbfbf', marginTop: 4, fontStyle: 'italic' }}>
-                    Gợi ý nhanh:&nbsp;
-                    {['L/C at sight', 'L/C UPAS 90 days', 'CAD 5 days', 'D/P at sight', 'T/T 30/70', 'T/T 100%']
-                      .map((preset, idx, arr) => (
-                        <span key={preset}>
-                          <a
-                            style={{ color: '#1677ff', cursor: 'pointer' }}
-                            onClick={() => updateItem(item.key, 'payment_terms', preset)}
-                          >{preset}</a>
-                          {idx < arr.length - 1 ? ' · ' : ''}
-                        </span>
-                      ))}
+                    Gợi ý nhanh (click để fill — sửa được sau):&nbsp;
+                    {[
+                      { label: 'L/C at sight', value: 'L/C at sight. The L/C draft must be opened within 5 days from the contract signing date.' },
+                      { label: 'L/C UPAS 90', value: 'L/C UPAS 90 days. The L/C draft must be opened within 5 days from the contract signing date.' },
+                      { label: 'CAD 5 days', value: 'Cash Against Documents within 5 days of presentation.' },
+                      { label: 'D/P at sight', value: 'Documents against Payment at sight.' },
+                      { label: 'T/T 30/70', value: 'T/T 30% advance before ETD + 70% balance within 5 days of B/L copy.' },
+                      { label: 'T/T 100%', value: 'T/T 100% advance before ETD.' },
+                    ].map((preset, idx, arr) => (
+                      <span key={preset.label}>
+                        <a
+                          style={{ color: '#1677ff', cursor: 'pointer' }}
+                          onClick={() => updateItem(item.key, 'payment_terms', preset.value)}
+                        >{preset.label}</a>
+                        {idx < arr.length - 1 ? ' · ' : ''}
+                      </span>
+                    ))}
                   </div>
                 </Col>
                 <Col xs={4} sm={1} style={{ textAlign: 'center' }}>

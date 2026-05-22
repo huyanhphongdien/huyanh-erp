@@ -58,9 +58,23 @@ SAMPLE_CIF = SAMPLE_DEFAULTS
 
 def process_xml(xml: str, sample_data: dict) -> str:
     """Process document.xml content."""
-    # 1. Conditional block markers: {#has_xxx}...{/has_xxx} → {{#has_xxx}}...{{/has_xxx}}
+    # 0. Strip block {#is_lc_payment}...{/is_lc_payment} entirely (markers + content).
+    #    Lý do: Sale gõ FULL payment text trong form (vd "L/C at sight. L/C draft
+    #    must be opened within 5 days") → conditional hardcoded "5 days" không
+    #    flex cho HĐ multi-payment (vd T/T + L/C, D/P + LC UPAS 90).
+    #    Workflow mới: text trong textbox = source of truth, render thẳng.
+    #    Xử lý: regex DOTALL match từ {#is_lc_payment} đến {/is_lc_payment} bao
+    #    gồm content + Word XML tags giữa (paragraph, run, text).
+    xml = re.sub(
+        r'\{#is_lc_payment\}.*?\{/is_lc_payment\}',
+        '',
+        xml,
+        flags=re.DOTALL,
+    )
+
+    # 1. Conditional block markers khác (has_pallets, has_fumigation, has_extra_terms):
+    #    {#has_xxx} → {{#has_xxx}}, {/has_xxx} → {{/has_xxx}}
     #    Giữ structure để docxtemplater xử lý conditional theo flag service truyền.
-    #    Nếu has_xxx=true → render content; nếu false → skip block.
     xml = re.sub(r'\{(#\w+)\}', r'{{\1}}', xml)
     xml = re.sub(r'\{(/\w+)\}', r'{{\1}}', xml)
 
@@ -109,9 +123,12 @@ def convert(src_filename: str, dst_filename: str, sample_data: dict):
 def main():
     DST_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Xóa các synthetic samples cũ
+    # Xóa các synthetic samples cũ (skip nếu file đang locked vd Word đang mở)
     for old in DST_DIR.glob('sample_*.docx'):
-        old.unlink()
+        try:
+            old.unlink()
+        except (PermissionError, OSError) as e:
+            print(f'WARN: cant delete {old.name} ({e}) - overwrite anyway')
 
     convert('template_SC_FOB.docx', 'sample_SC_FOB.docx', SAMPLE_DEFAULTS)
     convert('template_PI_FOB.docx', 'sample_PI_FOB.docx', SAMPLE_DEFAULTS)

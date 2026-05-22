@@ -1118,7 +1118,7 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
         )}
       </Card>
 
-      {/* ② Files Phú upload đã fill */}
+      {/* ② Files Phú upload đã fill — có nút Tải về để verify Auto-fill */}
       <Card size="small" style={{ marginBottom: 12 }} title={
         <Space>
           <span>② File anh đã fill</span>
@@ -1126,15 +1126,51 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
         </Space>
       }>
         {filledFiles.length > 0 && (
-          <div style={{ marginBottom: 12, padding: 8, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
-            {filledFiles.map((p, i) => (
-              <div key={i} style={{ fontSize: 12 }}>
-                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
-                {p.split('/').pop()}
-              </div>
-            ))}
-            <Text type="secondary" style={{ fontSize: 10, fontStyle: 'italic', marginTop: 4, display: 'block' }}>
-              Upload lại sẽ REPLACE toàn bộ list trên.
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {filledFiles.map((p, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 10px',
+                    background: '#f6ffed',
+                    border: '1px solid #b7eb8f',
+                    borderRadius: 6,
+                    fontSize: 12,
+                  }}
+                >
+                  <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 16 }} />
+                  <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.split('/').pop()?.replace(/^\d+-\d+-filled-/, '')}
+                  </span>
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<DownloadOutlined />}
+                    loading={downloadingIdx === 1000 + i}
+                    onClick={async () => {
+                      setDownloadingIdx(1000 + i)
+                      try {
+                        const url = await salesContractWorkflowService.getDownloadUrl(p)
+                        window.open(url, '_blank')
+                      } catch (e: unknown) {
+                        message.error(`Tải thất bại: ${e instanceof Error ? e.message : String(e)}`)
+                      } finally {
+                        setDownloadingIdx(null)
+                      }
+                    }}
+                    style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+                  >
+                    Tải về verify
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic', marginTop: 8, display: 'block' }}>
+              💡 Download để verify Auto-fill đúng chưa. Upload lại sẽ REPLACE toàn bộ list trên.
             </Text>
           </div>
         )}

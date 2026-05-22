@@ -72,6 +72,7 @@ const BOD_EMAILS: string[] = [
   'thuyht@huyanhrubber.com',
   'huylv@huyanhrubber.com',
   'trunglxh@huyanhrubber.com',  // Mr. Trung — BGĐ contract view
+  'logistics@huyanhrubber.com', // Trần Thị Minh Anh — toàn quyền Đơn hàng bán (2026-05-22)
 ]
 
 export function isBOD(user: any): boolean {

@@ -1237,13 +1237,55 @@ function UploadFlowReview({ contract, onFilled, bankForm }: UploadFlowReviewProp
         </Button>
       </Card>
 
-      {/* Read-only context */}
+      {/* Read-only context — tóm tắt đơn để Phú đối chiếu trước khi duyệt */}
       <Card size="small" title="Tóm tắt đơn (read-only)" style={{ marginBottom: 16 }}>
         <Descriptions size="small" column={2} bordered>
-          <Descriptions.Item label="Số HĐ (Docs ghi ban đầu)">
-            {contract.form_data?.contract_no || contract.sales_order?.contract_no || '—'}
+          <Descriptions.Item label="Số HĐ" span={1}>
+            <strong>
+              {contract.form_data?.contract_no
+                || contract.sales_order?.contract_no
+                || <Text type="secondary">(chưa có)</Text>}
+            </strong>
           </Descriptions.Item>
-          <Descriptions.Item label="Revision">#{contract.revision_no}</Descriptions.Item>
+          <Descriptions.Item label="Revision" span={1}>#{contract.revision_no}</Descriptions.Item>
+          <Descriptions.Item label="Khách hàng" span={2}>
+            <strong>
+              {contract.sales_order?.customer?.name
+                || contract.sales_order?.customer?.short_name
+                || '—'}
+            </strong>
+            {contract.sales_order?.customer?.code && (
+              <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
+                ({contract.sales_order.customer.code})
+              </Text>
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label="Grade">
+            <Tag color="blue">{contract.sales_order?.grade || '—'}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Incoterm">
+            <Tag>{contract.sales_order?.incoterm || '—'}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Tấn / Cont">
+            {contract.sales_order?.quantity_tons ?? '—'} MT
+            {contract.sales_order?.container_count != null && (
+              <Text type="secondary" style={{ fontSize: 11, marginLeft: 6 }}>
+                / {contract.sales_order.container_count} cont
+              </Text>
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label="Đơn giá USD/MT">
+            {contract.sales_order?.unit_price
+              ? `$${contract.sales_order.unit_price.toLocaleString('en-US')}`
+              : '—'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Tổng USD" span={2}>
+            <strong style={{ color: '#1B4D3E', fontSize: 14 }}>
+              {contract.sales_order?.total_value_usd
+                ? `$${contract.sales_order.total_value_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                : '—'}
+            </strong>
+          </Descriptions.Item>
         </Descriptions>
       </Card>
     </>

@@ -23,56 +23,37 @@ ROOT = Path(__file__).resolve().parents[2]  # huyanh-erp-8/
 SRC_DIR = ROOT / 'public' / 'contract-templates'
 DST_DIR = ROOT / 'docs' / 'contract-template-samples'
 
-# 6 token ERP sẽ auto-fill (chỉ đổi single → double brace, KHÔNG thay value)
+# Phase B: 18 token ERP auto-fill từ sales_order DB (giữ {{double}} brace)
 KEEP_TOKENS = {
+    # User input (Phú nhập)
     'contract_no',
-    'bank_account_name',
-    'bank_account_no',
-    'bank_full_name',
-    'bank_address',
-    'bank_swift',
+    'bank_account_name', 'bank_account_no',
+    'bank_full_name', 'bank_address', 'bank_swift',
+    # Auto từ sales_order
+    'contract_date',
+    'buyer_name', 'buyer_address', 'buyer_phone',
+    'grade', 'quantity', 'unit_price', 'amount', 'amount_words',
+    'incoterm', 'pol', 'pod',
+    'packing_desc', 'bales_total', 'containers', 'cont_type',
+    'shipment_time', 'payment', 'freight_mark',
 }
 
-# Sample value cho các token khác (Docs sẽ thay khi soạn HĐ thật)
-SAMPLE_FOB = {
-    'contract_date': '22 May 2026',
-    'buyer_name': 'APOLLO TYRES LTD',
-    'buyer_address': '3rd Floor, Apollo House, 7 Institutional Area, Sector 32, Gurugram-122001, Haryana, India',
-    'buyer_phone': '+91-124-2383500',
-    'grade': 'SVR3L',
-    'quantity': '42.00',
-    'unit_price': '2,350',
-    'amount': '98,700.00',
-    'amount_words': 'Ninety-Eight Thousand Seven Hundred US Dollars Only',
-    'incoterm': 'FOB',
-    'pol': 'DA NANG PORT, VIETNAM',
-    'pod': '',
-    'packing_desc': '35 kg/bale, Loose bales packing',
-    'bales_total': '1,260',
-    'pallets_total': '',
-    'containers': '3',
-    'cont_type': "20'",
-    'shipment_time': 'June 2026',
+# Sample value chỉ cho TOKEN KHÔNG TRONG render data (vd: partial/trans/claims_days/
+# arbitration/extra_terms — Docs custom khi soạn template thật, không thay đổi
+# theo HĐ. Giữ value default cho mọi file để Phú không cần nhập).
+SAMPLE_DEFAULTS = {
     'partial': 'Allowed',
     'trans': 'Allowed',
-    'payment': 'L/C at sight',
     'payment_extra': '',
     'claims_days': '20',
     'arbitration': 'SICOM Singapore',
-    'freight_mark': 'Freight Collect',
     'extra_terms': '',
+    'pallets_total': '',  # Loose bale không có pallet
 }
 
-SAMPLE_CIF = {
-    **SAMPLE_FOB,
-    'buyer_name': 'PT ALPHEN INTERNASIONAL CORPORINDO',
-    'buyer_address': 'Jl. Industri Raya III Blok AE No. 17, Tangerang, Banten 15710, Indonesia',
-    'buyer_phone': '+62-21-5901234',
-    'incoterm': 'CIF',
-    'pol': 'HO CHI MINH PORT, VIETNAM',
-    'pod': 'BELAWAN PORT, INDONESIA',
-    'freight_mark': 'Freight Prepaid',
-}
+# Backward-compat: 2 biến cũ vẫn được import từ chỗ khác (nếu có)
+SAMPLE_FOB = SAMPLE_DEFAULTS
+SAMPLE_CIF = SAMPLE_DEFAULTS
 
 
 def process_xml(xml: str, sample_data: dict) -> str:
@@ -126,10 +107,10 @@ def main():
     for old in DST_DIR.glob('sample_*.docx'):
         old.unlink()
 
-    convert('template_SC_FOB.docx', 'sample_SC_FOB.docx', SAMPLE_FOB)
-    convert('template_PI_FOB.docx', 'sample_PI_FOB.docx', SAMPLE_FOB)
-    convert('template_SC_CIF.docx', 'sample_SC_CIF.docx', SAMPLE_CIF)
-    convert('template_PI_CIF.docx', 'sample_PI_CIF.docx', SAMPLE_CIF)
+    convert('template_SC_FOB.docx', 'sample_SC_FOB.docx', SAMPLE_DEFAULTS)
+    convert('template_PI_FOB.docx', 'sample_PI_FOB.docx', SAMPLE_DEFAULTS)
+    convert('template_SC_CIF.docx', 'sample_SC_CIF.docx', SAMPLE_DEFAULTS)
+    convert('template_PI_CIF.docx', 'sample_PI_CIF.docx', SAMPLE_DEFAULTS)
 
     print()
     print('=' * 70)

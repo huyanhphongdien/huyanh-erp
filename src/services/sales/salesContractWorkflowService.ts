@@ -20,6 +20,12 @@ import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
+import {
+  amountToWords,
+  formatGradeForContract,
+  formatPortForContract,
+  ensurePackingDesc,
+} from './contractGeneratorService'
 import { SALES_CONFIG } from '../../config/sales.config'
 import { createNotification } from '../notificationService'
 import {
@@ -581,17 +587,100 @@ export const salesContractWorkflowService = {
       throw new Error('Chưa có file Docs upload để fill — bảo Docs upload trước')
     }
 
-    // ─── B. Loop từng file: download → render → upload ───
+    // ─── B. Fetch sales_order + customer để build full token data ───
+    // Phase B: ERP fill TẤT CẢ token (~18) từ sales_order DB, không chỉ 6 (số HĐ + bank).
+    // Docs upload template generic, ERP render đầy đủ. Token nào template không có
+    // → docxtemplater skip (không lỗi).
+    const { data: orderData } = await supabase
+      .from('sales_orders')
+      .select(`
+        contract_date, grade, quantity_tons, unit_price, total_value_usd,
+        incoterm, port_of_loading, port_of_destination,
+        packing_type, bale_weight_kg, bales_per_container,
+        total_bales, container_count, container_type,
+        delivery_date, shipment_time, payment_terms, payment_terms_note,
+        customer:sales_customers!customer_id(name,address,phone)
+      `)
+      .eq('id', existing.sales_order_id)
+      .maybeSingle()
+
+    const o = (orderData || {}) as {
+      contract_date?: string | null
+      grade?: string | null
+      quantity_tons?: number | null
+      unit_price?: number | null
+      total_value_usd?: number | null
+      incoterm?: string | null
+      port_of_loading?: string | null
+      port_of_destination?: string | null
+      packing_type?: string | null
+      bale_weight_kg?: number | null
+      bales_per_container?: number | null
+      total_bales?: number | null
+      container_count?: number | null
+      container_type?: string | null
+      delivery_date?: string | null
+      shipment_time?: string | null
+      payment_terms?: string | null
+      payment_terms_note?: string | null
+      customer?: { name?: string; address?: string; phone?: string } | null
+    }
+
+    const incoterm = (o.incoterm || 'FOB').toUpperCase()
+    const isFOB = ['FOB', 'EXW'].includes(incoterm)
+    const qty = o.quantity_tons || 0
+    const price = o.unit_price || 0
+    const amount = o.total_value_usd || qty * price
+    const baleWeight = o.bale_weight_kg || 35
+    const totalBales = o.total_bales || (qty > 0 ? Math.round((qty * 1000) / baleWeight) : 0)
+    const balesPerCont = o.bales_per_container || 576
+    const containers = o.container_count || (totalBales > 0 ? Math.ceil(totalBales / balesPerCont) : 0)
+    const contType = o.container_type === '40ft' ? "40'" : "20'"
+
+    // Format contract_date: YYYY-MM-DD → DD MMM YYYY (vd "22 May 2026")
+    const formatDate = (iso: string | null | undefined): string => {
+      if (!iso) return ''
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    }
+
     const ts = Date.now()
     const newPaths: string[] = []
     const warnings: string[] = []
     const renderData = {
+      // ── Phú nhập ──
       contract_no: values.contract_no || '',
       bank_account_name: values.bank_account_name || '',
       bank_account_no: values.bank_account_no || '',
       bank_full_name: values.bank_full_name || '',
       bank_address: values.bank_address || '',
       bank_swift: values.bank_swift || '',
+      // ── Auto từ sales_order ──
+      contract_date: formatDate(o.contract_date) || formatDate(new Date().toISOString().slice(0, 10)),
+      buyer_name: o.customer?.name || '',
+      buyer_address: o.customer?.address || '',
+      buyer_phone: o.customer?.phone || '',
+      grade: formatGradeForContract(o.grade),
+      quantity: qty ? qty.toFixed(2) : '',
+      unit_price: price ? price.toLocaleString('en-US') : '',
+      amount: amount
+        ? amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      amount_words: amount > 0 ? amountToWords(amount) : '',
+      incoterm: incoterm,
+      pol: formatPortForContract(o.port_of_loading),
+      pod: isFOB ? '' : formatPortForContract(o.port_of_destination),
+      packing_desc: ensurePackingDesc(null, o.packing_type || 'loose_bale').replace(
+        /^Loose bales packing/,
+        `${baleWeight} kg/bale, Loose bales packing`,
+      ),
+      bales_total: totalBales ? totalBales.toLocaleString('en-US') : '',
+      containers: containers ? String(containers) : '',
+      cont_type: contType,
+      shipment_time: o.shipment_time || (o.delivery_date ? formatDate(o.delivery_date) : ''),
+      payment: o.payment_terms_note || o.payment_terms || 'LC at sight',
+      freight_mark: isFOB ? 'freight Collect' : 'freight prepaid',
     }
 
     for (let i = 0; i < sourceFiles.length; i++) {

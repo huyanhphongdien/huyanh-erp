@@ -24,6 +24,16 @@ import { supabase } from '../../lib/supabase'
 const APP_URL = 'https://huyanhrubber.vn'
 const PRIMARY = '#1B4D3E'
 
+// ============================================================================
+// TEST MODE — chỉ Minh LD nhận tất cả email workflow (debug/test)
+// ============================================================================
+// Khi `true`: mọi recipient (Phú LV, Trung, Huy, Sale) bị OVERRIDE → minhld@.
+// Subject prefix `[TEST → original@]` để Minh biết email gốc gửi cho ai.
+// Khi test xong: đổi `false` → restore behavior bình thường.
+// ----------------------------------------------------------------------------
+const TEST_MODE_REDIRECT_TO_MINH = true
+const TEST_MODE_EMAIL = 'minhld@huyanhrubber.com'
+
 // ----------------------------------------------------------------------------
 // Types
 // ----------------------------------------------------------------------------
@@ -400,11 +410,27 @@ async function _getEmployeesByEmails(emails: string[]): Promise<{ id: string; em
   return data
 }
 
-/** Gọi Edge Function `send-email` — pure HTML body, no template parse. */
+/** Gọi Edge Function `send-email` — pure HTML body, no template parse.
+ *  TEST_MODE: redirect mọi recipient sang minhld@ + prefix [TEST → original@] vào subject.
+ */
 async function _sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  let actualTo = to
+  let actualSubject = subject
+  if (TEST_MODE_REDIRECT_TO_MINH) {
+    if (to.toLowerCase() === TEST_MODE_EMAIL) {
+      // Minh chính là recipient gốc — không tag prefix
+      actualTo = TEST_MODE_EMAIL
+    } else {
+      actualTo = TEST_MODE_EMAIL
+      actualSubject = `[TEST → ${to}] ${subject}`
+    }
+  }
+  if (TEST_MODE_REDIRECT_TO_MINH && actualTo !== to) {
+    console.log(`[salesContractEmail TEST_MODE] redirect "${to}" → ${actualTo}`)
+  }
   try {
     const { error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, body: html },
+      body: { to: actualTo, subject: actualSubject, body: html },
     })
     if (error) {
       console.error('[salesContractEmailService] sendEmail error:', error)

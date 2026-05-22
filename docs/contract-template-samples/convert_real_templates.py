@@ -75,6 +75,11 @@ def process_xml(xml: str, sample_data: dict) -> str:
         v = sample_data[k]
         xml = xml.replace('{' + k + '}', v)
 
+    # 4. Cosmetic fix: 'Ben's Bank' → 'Beneficiary's Bank' (Ben là viết tắt sai)
+    #    Handle cả straight apostrophe và typographic ' (U+2019)
+    xml = xml.replace("Ben's Bank", "Beneficiary's Bank")
+    xml = xml.replace("Ben’s Bank", "Beneficiary’s Bank")
+
     return xml
 
 

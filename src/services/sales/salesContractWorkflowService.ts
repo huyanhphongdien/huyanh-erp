@@ -587,10 +587,10 @@ export const salesContractWorkflowService = {
       throw new Error('Chưa có file Docs upload để fill — bảo Docs upload trước')
     }
 
-    // ─── B. Fetch sales_order + customer để build full token data ───
+    // ─── B. Fetch sales_order + customer + first item để build full token data ───
     // Phase B: ERP fill TẤT CẢ token (~18) từ sales_order DB, không chỉ 6 (số HĐ + bank).
-    // Docs upload template generic, ERP render đầy đủ. Token nào template không có
-    // → docxtemplater skip (không lỗi).
+    // Sale gõ Payment trong textbox item → lưu vào sales_order_items[0].payment_terms,
+    // KHÔNG vào header. Vì vậy ưu tiên đọc payment từ item trước, fallback header.
     const { data: orderData } = await supabase
       .from('sales_orders')
       .select(`
@@ -599,7 +599,8 @@ export const salesContractWorkflowService = {
         packing_type, bale_weight_kg, bales_per_container,
         total_bales, container_count, container_type,
         delivery_date, shipment_time, payment_terms, payment_terms_note,
-        customer:sales_customers!customer_id(name,address,phone)
+        customer:sales_customers!customer_id(name,address,phone),
+        items:sales_order_items(payment_terms, sort_order)
       `)
       .eq('id', existing.sales_order_id)
       .maybeSingle()
@@ -624,7 +625,13 @@ export const salesContractWorkflowService = {
       payment_terms?: string | null
       payment_terms_note?: string | null
       customer?: { name?: string; address?: string; phone?: string } | null
+      items?: Array<{ payment_terms?: string | null; sort_order?: number | null }> | null
     }
+
+    // Lấy payment từ item đầu tiên (Sale gõ ở textbox per-item), fallback header
+    const firstItemPayment = (o.items || [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0]?.payment_terms?.trim()
 
     const incoterm = (o.incoterm || 'FOB').toUpperCase()
     const isFOB = ['FOB', 'EXW'].includes(incoterm)
@@ -652,7 +659,9 @@ export const salesContractWorkflowService = {
     const packingType = (o.packing_type || 'loose_bale').toLowerCase()
     const hasPallets = ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(packingType)
     const hasFumigation = packingType === 'wooden_pallet'
-    const paymentTextLower = (o.payment_terms_note || o.payment_terms || '').toLowerCase()
+    // Priority: item textbox (Sale gõ) → header note → header default → fallback
+    const paymentText = firstItemPayment || o.payment_terms_note || o.payment_terms || 'LC at sight'
+    const paymentTextLower = paymentText.toLowerCase()
     const isLcPayment = paymentTextLower.includes('l/c') || paymentTextLower.includes('lc ')
 
     // Pallets total (chỉ khi có pallet, 36 bales/pallet standard)
@@ -694,7 +703,7 @@ export const salesContractWorkflowService = {
       shipment_time: o.shipment_time
         || (o.delivery_date ? formatDate(o.delivery_date) : '')
         || 'TBD',
-      payment: o.payment_terms_note || o.payment_terms || 'LC at sight',
+      payment: paymentText,
       freight_mark: isFOB ? 'freight Collect' : 'freight prepaid',
       // ── Conditional flags ──
       has_pallets: hasPallets,

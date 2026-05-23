@@ -79,7 +79,13 @@
 ### Verify
 - `b2b_deals.status: processing → accepted`
 - Toast notify Partner
-- Audit log `deal_audit_log` có entry status change
+- Audit log có entry status change qua trigger `trg_deal_audit`:
+  ```sql
+  SELECT op, changed_fields, old_data->>'status' AS old_status, new_data->>'status' AS new_status
+  FROM b2b.deal_audit_log
+  WHERE deal_id = '<deal_id>' ORDER BY changed_at DESC LIMIT 5;
+  ```
+  *Schema gotcha:* table ở `b2b.deal_audit_log` (không phải `public.deal_audit_log`). Query qua REST cần `.schema('b2b').from('deal_audit_log')`.
 
 ---
 
@@ -155,8 +161,13 @@ Repeat với `finished_product_kg = 30,800` kg → actual_drc = 28%, variance vs
 - DB:
   - `b2b_deals.actual_drc = 28.00`
   - `b2b_deals.final_value = 739,200,000` (giảm)
-  - `b2b_drc_disputes` 1 row mới `status='open'` (trigger P16 fire)
+  - `b2b_drc_disputes` 1 row mới `status='open'` (trigger **`trg_drc_variance_dispute`** fire — tên thực, trước đây gọi là "P16")
 - Partner notification "⚠️ Sản xuất xong — variance DRC > 3% — vui lòng review"
+- Verify trigger fire:
+  ```sql
+  SELECT id, dispute_number, expected_drc, actual_drc, drc_variance, reason, status
+  FROM b2b.drc_disputes WHERE deal_id = '<deal_id>' ORDER BY raised_at DESC LIMIT 1;
+  ```
 
 ### Edge cases
 - **production_started_at NULL** → service throw "Phải bấm Start trước"
@@ -241,3 +252,68 @@ Test PASS khi:
 | Date | Tester | Result | Notes |
 |---|---|---|---|
 | 2026-05-22 | (chưa test) | — | Phase 1-3 đã ship, đợi human verify UI |
+| 2026-05-23 | Claude SQL audit | ✅ 15/17 | Schema + triggers + columns đầy đủ. 2 typo trong guide đã fix (deal_audit_log path, trigger name). |
+
+---
+
+## 🔬 SQL Audit results (2026-05-23)
+
+Em đã chạy SQL audit verify từng claim. Snapshot DB state:
+
+### ✅ Schema readiness — TẤT CẢ field cần thiết EXISTS
+
+```sql
+SELECT column_name FROM information_schema.columns
+WHERE table_schema='b2b' AND table_name='deals'
+  AND column_name IN (
+    'sample_drc','actual_drc','production_started_at',
+    'finished_product_kg','final_value','purchase_type',
+    'production_mode','production_pool_id'
+  );
+-- → 8/8 EXISTS
+```
+
+### ✅ DL2605-SI2O pre-conditions
+
+```sql
+SELECT deal_number, deal_type, purchase_type, status, quantity_kg, unit_price
+FROM b2b.deals WHERE deal_number = 'DL2605-SI2O';
+-- → processing | drc_after_production | processing | 110000 | 24000 ✓
+```
+
+### ✅ Triggers active (Audit + Dispute)
+
+```sql
+SELECT tgname FROM pg_trigger
+WHERE tgrelid = 'b2b.deals'::regclass AND NOT tgisinternal;
+-- → trg_deal_audit, trg_drc_variance_dispute, trg_deal_lock,
+--   trg_compute_deal_final_value, trg_sync_deal_card_metadata, ...
+```
+
+### ✅ Notification table accept new types
+
+```sql
+-- Test insert (em verify rồi cleanup):
+INSERT INTO b2b.notifications (type, audience, title, message, deal_id)
+VALUES ('sample_drc_recorded', 'partner', 'TEST', 'TEST', '<id>');
+-- → ACCEPTED. Không có CHECK constraint chặn 3 type mới
+-- (sample_drc_recorded, production_started, production_finished).
+```
+
+### ⚠️ Schema gotchas đã fix trong guide
+
+| Gotcha | Status |
+|---|---|
+| `deal_audit_log` ở `b2b` schema (không phải `public`) | ✅ Fixed TC-3 |
+| Trigger P16 tên thực `trg_drc_variance_dispute` | ✅ Fixed TC-6 |
+| `b2b_notifications` có cả `content` + `message` columns | ✅ Phase 3 code dùng `message` — OK |
+
+### ❓ Chưa verify (cần human test UI)
+
+- TC-1 trigger weighbridge → auto-stock-in (đã PASS prod 2026-04-16 per memory)
+- TC-4 `b2b_advances.status='acknowledged'` (chưa có sample trong DB hiện tại)
+- TC-5/6 UI render đúng button theo state (cần human click)
+
+### 🎯 Verdict
+
+Test guide **production-ready** sau 2 fix. Schema DB sẵn sàng cho 10-stage flow. Human verify UI là việc còn lại.

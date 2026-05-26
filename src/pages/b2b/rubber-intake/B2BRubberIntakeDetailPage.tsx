@@ -9,7 +9,7 @@ import { useOpenDealTab } from '../../../hooks/useB2BTabs'
 import {
   ArrowLeft, FileCheck, Link2, Package, Scale, Droplets, DollarSign,
   Truck, MapPin, Calendar, CheckCircle, XCircle, Clock, AlertTriangle,
-  ExternalLink, ChevronRight,
+  ExternalLink, ChevronRight, Printer,
 } from 'lucide-react'
 import {
   rubberIntakeB2BService,
@@ -161,6 +161,13 @@ export default function B2BRubberIntakeDetailPage() {
               {new Date(item.intake_date).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
             </div>
           </div>
+          <button
+            onClick={() => navigate(`/b2b/rubber-intake/${id}/print`)}
+            className="px-3 py-2 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1.5 min-h-[44px]"
+            title="In Phiếu Nhập Kho (PNK) — 2 liên A4"
+          >
+            <Printer size={16} /> In PNK
+          </button>
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusClass}`}>
             {STATUS_LABELS[item.status]}
           </span>

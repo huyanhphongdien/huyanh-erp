@@ -121,6 +121,13 @@ interface MenuItem {
     key: string;
     componentId: string;
   };
+  /**
+   * Paths bổ sung sẽ làm item này HIGHLIGHT (ngoài exact match path chính).
+   * Dùng cho menu group có nhiều sub-page (vd Đại lý có 3 tab: partners,
+   * partners/requests, bonuses — sidebar "Đại lý" cần sáng cho cả 3).
+   * Match bằng startsWith (giống auto-expand-group logic).
+   */
+  extraActivePaths?: string[];
 }
 
 interface MenuGroup {
@@ -248,9 +255,9 @@ const getMenuGroups = (
     icon: <MessageSquare size={18} />,
     collapsible: true,
     requireB2BPurchaser: true,
-    // 10 items (giảm từ 16) — các page liên quan gom vào tab nội bộ page:
+    // 9 items (giảm từ 16) — các page liên quan gom vào tab nội bộ page:
     // Đại lý: ds + Duyệt đăng ký + Thưởng đại lý (1 menu, 3 tabs)
-    // Lý lịch mủ: ds + Phiếu cân đa NM + Nhập tay (1 menu, 3 tabs)
+    // Nhập kho mủ: ds + Phiếu cân đa NM + Nhập tay (1 menu, 3 tabs)
     // Công nợ: sổ + Báo cáo (1 menu, 2 tabs)
     // Quyết toán: ds + Khiếu nại DRC (1 menu, 2 tabs)
     // Dashboard: Tổng quan + Phân tích B2B (1 menu, 2 tabs)
@@ -261,6 +268,7 @@ const getMenuGroups = (
         icon: <LayoutDashboard size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-dashboard', componentId: 'b2b-dashboard' },
+        extraActivePaths: ['/b2b/analytics'],
       },
       {
         path: '/b2b/chat',
@@ -283,6 +291,8 @@ const getMenuGroups = (
         icon: <Users size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-partner-list', componentId: 'b2b-partner-list' },
+        // Tab section: Danh sách + Chờ duyệt + Thưởng đại lý
+        extraActivePaths: ['/b2b/partners/requests', '/b2b/bonuses'],
       },
       {
         path: '/b2b/deals',
@@ -304,13 +314,8 @@ const getMenuGroups = (
         icon: <FileCheck size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-rubber-intake-list', componentId: 'b2b-rubber-intake-list' },
-      },
-      {
-        path: '/b2b/bonuses',
-        label: 'Thưởng đại lý',
-        icon: <Gift size={18} />,
-        requireB2BPurchaser: true,
-        tab: { key: 'b2b-bonus-list', componentId: 'b2b-bonus-list' },
+        // Tab section: Phiếu nhập (Lý lịch) + Phiếu cân (đa NM) + Nhập tay
+        extraActivePaths: ['/wms/weighbridge/list', '/b2b/intake-manual'],
       },
       {
         path: '/b2b/ledger',
@@ -318,6 +323,8 @@ const getMenuGroups = (
         icon: <BookOpen size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-ledger-overview', componentId: 'b2b-ledger-overview' },
+        // Tab section: Sổ công nợ + Báo cáo
+        extraActivePaths: ['/b2b/reports'],
       },
       {
         path: '/b2b/settlements',
@@ -325,6 +332,8 @@ const getMenuGroups = (
         icon: <ArrowLeftRight size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-settlement-list', componentId: 'b2b-settlement-list' },
+        // Tab section: Quyết toán + Khiếu nại DRC
+        extraActivePaths: ['/b2b/disputes'],
       },
     ],
   },
@@ -693,21 +702,34 @@ export function Sidebar() {
       }
     };
 
+    // Custom isActive: match exact path HOẶC bất kỳ extraActivePaths nào
+    // (dùng để sidebar item "Đại lý" sáng khi user trên /b2b/bonuses qua tab).
+    const computeIsActive = (defaultActive: boolean): boolean => {
+      if (defaultActive) return true;
+      if (!item.extraActivePaths || item.extraActivePaths.length === 0) return false;
+      return item.extraActivePaths.some(p =>
+        location.pathname === p || location.pathname.startsWith(p + '/')
+      );
+    };
+
     return (
       <li key={item.path}>
         <NavLink
           to={item.path}
           end
           onClick={handleClick}
-          className={({ isActive: navIsActive }) =>
-            `relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
+          className={({ isActive }) => {
+            const navIsActive = computeIsActive(isActive);
+            return `relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
               navIsActive
                 ? 'text-[#1B4D3E] bg-[#2D8B6E]/[0.12]'
                 : 'text-[#5A6B63] hover:text-[#1B4D3E] hover:bg-black/[0.03]'
-            }`
-          }
+            }`;
+          }}
         >
-          {({ isActive: navIsActive }) => (
+          {({ isActive }) => {
+            const navIsActive = computeIsActive(isActive);
+            return (
             <>
               {/* Active indicator bar */}
               {navIsActive && (
@@ -725,7 +747,8 @@ export function Sidebar() {
                 </span>
               )}
             </>
-          )}
+            );
+          }}
         </NavLink>
       </li>
     );

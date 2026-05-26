@@ -23,6 +23,7 @@ import type { MonthlyBonus, MonthlyBonusStatus, RubberType } from '../../../type
 import { BonusTierBadge } from '../../../components/b2b/BonusTierBadge'
 import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay'
 import { QuarterlyBatchModal } from './QuarterlyBatchModal'
+import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const CURRENT_QUARTER = Math.ceil((new Date().getMonth() + 1) / 3) as 1 | 2 | 3 | 4
@@ -194,6 +195,9 @@ export function BonusListPage() {
 
   return (
     <div className="p-6 space-y-4">
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={PARTNER_TABS} active="partner-bonuses" />
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>

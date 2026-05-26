@@ -300,6 +300,12 @@ const getMenuGroups = (
         tab: { key: 'b2b-rubber-intake-list', componentId: 'b2b-rubber-intake-list' },
       },
       {
+        path: '/wms/weighbridge/list',
+        label: 'Phiếu cân (đa NM)',
+        icon: <Scale size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
         path: '/b2b/intake-manual',
         label: 'Nhập tay phiếu cân',
         icon: <PackagePlus size={18} />,
@@ -406,7 +412,7 @@ const getMenuGroups = (
       { path: '/wms/stock-in', label: 'Nhập kho', icon: <PackagePlus size={18} /> },
       { path: '/wms/stock-out', label: 'Xuất kho', icon: <PackageMinus size={18} /> },
       { path: '/wms/transfer', label: 'Chuyển kho NM', icon: <PackageMinus size={18} /> },
-      { path: '/wms/weighbridge/list', label: 'Phiếu cân', icon: <Scale size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] },
+      { path: '/wms/weighbridge/list', label: 'Phiếu cân (đa NM)', icon: <Scale size={18} /> },
       { path: '/wms/qc', label: 'QC / DRC', icon: <FlaskConical size={18} /> }, // tabs: dashboard | recheck | quick-scan | standards
       { path: '/wms/reports', label: 'Báo cáo WMS', icon: <BarChart3 size={18} /> }, // tabs: dashboard | stock-movement | supplier-quality | inventory-value | supplier-scoring
       { path: '/wms/config', label: 'Cấu hình', icon: <Settings size={18} />, allowedEmails: ['minhld@huyanhrubber.com'] }, // tabs: materials | warehouses | settings

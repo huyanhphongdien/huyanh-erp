@@ -64,7 +64,7 @@ export default function OutrightWizardPage() {
   const previewAmount = Form.useWatch('quantity_kg', form) * Form.useWatch('unit_price', form) || 0
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Title level={3}>🅰️ Mua đứt (Outright)</Title>
       <Text type="secondary">
         Bypass QC sample + BGĐ duyệt. Chi tiền ngay tại cân. DRC cáp kinh nghiệm.

@@ -135,7 +135,7 @@ export default function B2BAnalyticsDashboard() {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       {/* B2B Section tabs */}
       <B2BSectionTabs tabs={DASHBOARD_TABS} active="analytics" />
 

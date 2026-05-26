@@ -222,7 +222,7 @@ export default function PartnerRequestsPage() {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
           <UserOutlined /> Đại lý chờ duyệt

@@ -121,7 +121,7 @@ export default function DailyPriceListPage() {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Title level={3}><DollarOutlined /> Bảng giá ngày (Daily Price List)</Title>
       <Text type="secondary">
         Admin set giá ngày cho flow walk-in (hộ nông dân) + outright. Giá cũ tự close khi set mới.

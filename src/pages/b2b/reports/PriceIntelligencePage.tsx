@@ -126,7 +126,7 @@ export default function PriceIntelligencePage() {
     : 0
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/b2b/analytics')} />

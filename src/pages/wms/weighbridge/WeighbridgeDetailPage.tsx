@@ -281,7 +281,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
         </div>
       </div>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 24px' }}>
+      <div style={{ padding: '16px 24px' }}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {/* ===== WEIGHT RESULTS ===== */}
           <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>

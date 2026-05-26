@@ -110,7 +110,7 @@ export default function WalkinWizardPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Title level={3}>🅲 Walk-in Hộ Nông Dân</Title>
       <Text type="secondary">
         Hộ nông dân VN chưa đăng ký. QC đo DRC tại cân. Chi tiền mặt ngay.

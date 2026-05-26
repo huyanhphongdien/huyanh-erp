@@ -69,7 +69,7 @@ export default function ProductionWizardPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Title level={3}>🅱️ DRC-after-production (Chạy đầu ra)</Title>
       <Text type="secondary">
         Đại lý tier ≥ silver. QC sample DRC → BGĐ duyệt → SX → actual DRC → quyết toán.

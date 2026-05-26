@@ -179,7 +179,7 @@ const DealListPage = () => {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       {/* B2B Section tabs */}
       <B2BSectionTabs tabs={MUA_HANG_TABS} active="deals" />
 

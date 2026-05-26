@@ -11,9 +11,12 @@ const { Text } = Typography
 
 type PaperSize = 'a4' | 'a5' | '80mm' | '58mm'
 
+// width tính theo px @96dpi để khớp khổ giấy thực (đã trừ margin in)
+// A4 = 210mm - 14mm margin (2×7mm) ≈ 740px
+// A5 = 148mm - 12mm margin (2×6mm) ≈ 514px
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
-  a4: { label: 'A4 (210mm)', width: 800, fontSize: 13 },
-  a5: { label: 'A5 (148mm)', width: 560, fontSize: 12 },
+  a4: { label: 'A4 (210mm)', width: 740, fontSize: 15 },
+  a5: { label: 'A5 (148mm)', width: 514, fontSize: 13 },
   '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
   '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
 }
@@ -200,8 +203,8 @@ export default function PrintPage() {
             ${isThermal
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : paperSize === 'a5'
-                ? 'size: A5; margin: 8mm;'
-                : 'size: A4; margin: 10mm;'
+                ? 'size: A5; margin: 6mm;'
+                : 'size: A4; margin: 7mm;'
             }
           }
         }
@@ -246,21 +249,21 @@ export default function PrintPage() {
             </table>
           </div>
         ) : (
-          // A4: full header
+          // A4 / A5: full header — font scale theo cfg.fontSize
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, paddingBottom: 10, borderBottom: '2px solid #1B4D3E' }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>CAO SU HUY ANH PHONG ĐIỀN</div>
-                <div style={{ fontSize: 11, color: '#666' }}>Khe Mạ, Phường Phong Điền, TP Huế, Việt Nam</div>
-                <div style={{ fontSize: 11, color: '#666' }}>MST: 3301549896</div>
+                <div style={{ fontSize: fs, fontWeight: 600, color: '#374151' }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
+                <div style={{ fontSize: fs + 4, fontWeight: 800, color: '#1B4D3E', letterSpacing: 0.5 }}>CAO SU HUY ANH PHONG ĐIỀN</div>
+                <div style={{ fontSize: fs - 2, color: '#4B5563', marginTop: 2 }}>Khe Mạ, Phường Phong Điền, TP Huế</div>
+                <div style={{ fontSize: fs - 2, color: '#4B5563' }}>MST: 3301549896</div>
               </div>
-              <QRCodeImg data={qrData} size={90} />
+              <QRCodeImg data={qrData} size={paperSize === 'a5' ? 80 : 100} />
             </div>
-            <div style={{ textAlign: 'center', margin: '16px 0' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 2 }}>PHIẾU CÂN XE</div>
-              <div style={{ fontSize: 13, color: '#666' }}>Số: {ticket!.code}</div>
-              <div style={{ fontSize: 12, color: '#999' }}>{fmtDateTime(ticket!.created_at)}</div>
+            <div style={{ textAlign: 'center', margin: '14px 0 16px' }}>
+              <div style={{ fontSize: fs + 12, fontWeight: 800, letterSpacing: 3, color: '#111827' }}>PHIẾU CÂN XE</div>
+              <div style={{ fontSize: fs + 1, color: '#374151', fontWeight: 600, marginTop: 4 }}>Số: {ticket!.code}</div>
+              <div style={{ fontSize: fs - 1, color: '#6B7280' }}>{fmtDateTime(ticket!.created_at)}</div>
             </div>
           </>
         )}
@@ -279,27 +282,27 @@ export default function PrintPage() {
             {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 14, border: '1px solid #D1D5DB' }}>
             <tbody>
               <tr>
                 <td style={tdLabel}>Biển số xe</td>
-                <td style={tdValue}><strong>{ticket!.vehicle_plate}</strong></td>
+                <td style={{ ...tdValue, fontSize: fs + 3, fontWeight: 800, color: '#111827' }}>{ticket!.vehicle_plate}</td>
                 <td style={tdLabel}>Tài xế</td>
-                <td style={tdValue}>{ticket!.driver_name || '—'}</td>
+                <td style={{ ...tdValue, fontSize: fs, fontWeight: 600 }}>{ticket!.driver_name || '—'}</td>
               </tr>
               {ext.deal_id && (
                 <tr>
                   <td style={tdLabel}>Deal</td>
-                  <td style={tdValue}>{dealInfo?.deal_number || ext.deal_id}</td>
+                  <td style={{ ...tdValue, fontWeight: 600 }}>{dealInfo?.deal_number || ext.deal_id}</td>
                   <td style={tdLabel}>Đại lý</td>
-                  <td style={tdValue}>{dealInfo?.partner_name || ext.supplier_name || '—'}</td>
+                  <td style={{ ...tdValue, fontWeight: 600 }}>{dealInfo?.partner_name || ext.supplier_name || '—'}</td>
                 </tr>
               )}
               <tr>
                 <td style={tdLabel}>Loại mủ</td>
-                <td style={tdValue}>{rubberLabel}</td>
+                <td style={{ ...tdValue, fontWeight: 600 }}>{rubberLabel}</td>
                 <td style={tdLabel}>Loại cân</td>
-                <td style={tdValue}>{ticket!.ticket_type === 'in' ? 'Xe vào (Nhập)' : 'Xe ra (Xuất)'}</td>
+                <td style={{ ...tdValue, fontWeight: 600 }}>{ticket!.ticket_type === 'in' ? 'Xe vào (Nhập)' : 'Xe ra (Xuất)'}</td>
               </tr>
             </tbody>
           </table>
@@ -332,41 +335,41 @@ export default function PrintPage() {
             )}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16, border: '2px solid #333' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 14, border: '2px solid #1B4D3E' }}>
             <thead>
-              <tr style={{ background: '#f0f0f0' }}>
-                <th style={thStyle}>Hạng mục</th>
-                <th style={thStyle}>Trọng lượng (kg)</th>
-                <th style={thStyle}>Thời gian</th>
+              <tr style={{ background: '#1B4D3E', color: '#fff' }}>
+                <th style={{ ...thStyle, color: '#fff', fontSize: fs }}>Hạng mục</th>
+                <th style={{ ...thStyle, color: '#fff', fontSize: fs }}>Trọng lượng (kg)</th>
+                <th style={{ ...thStyle, color: '#fff', fontSize: fs }}>Thời gian cân</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td style={tdCenter}>Cân lần 1 (Gross)</td>
-                <td style={{ ...tdCenter, fontSize: 16, fontWeight: 700, fontFamily: mono }}>{fmt(ticket!.gross_weight)}</td>
-                <td style={tdCenter}>{ticket!.gross_weighed_at ? fmtDateTime(ticket!.gross_weighed_at) : '—'}</td>
+                <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Cân lần 1 (Gross)</td>
+                <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(ticket!.gross_weight)}</td>
+                <td style={{ ...tdCenter, fontSize: fs }}>{ticket!.gross_weighed_at ? fmtDateTime(ticket!.gross_weighed_at) : '—'}</td>
               </tr>
               <tr>
-                <td style={tdCenter}>Cân lần 2 (Tare)</td>
-                <td style={{ ...tdCenter, fontSize: 16, fontWeight: 700, fontFamily: mono }}>{fmt(ticket!.tare_weight)}</td>
-                <td style={tdCenter}>{ticket!.tare_weighed_at ? fmtDateTime(ticket!.tare_weighed_at) : '—'}</td>
+                <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Cân lần 2 (Tare)</td>
+                <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(ticket!.tare_weight)}</td>
+                <td style={{ ...tdCenter, fontSize: fs }}>{ticket!.tare_weighed_at ? fmtDateTime(ticket!.tare_weighed_at) : '—'}</td>
               </tr>
-              <tr style={{ background: '#f0fdf4' }}>
-                <td style={{ ...tdCenter, fontWeight: 700 }}>NET</td>
-                <td style={{ ...tdCenter, fontSize: 20, fontWeight: 700, color: '#15803D', fontFamily: mono }}>{fmt(ticket!.net_weight)}</td>
+              <tr style={{ background: '#DCFCE7' }}>
+                <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>NET</td>
+                <td style={{ ...tdCenter, fontSize: fs + 11, fontWeight: 800, color: '#15803D', fontFamily: mono, letterSpacing: 1 }}>{fmt(ticket!.net_weight)}</td>
                 <td style={tdCenter}></td>
               </tr>
               {deduction > 0 && (
                 <tr>
-                  <td style={tdCenter}>Tạp chất / Giảm trừ</td>
-                  <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono }}>- {fmt(deduction)}</td>
+                  <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Tạp chất / Giảm trừ</td>
+                  <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 3, fontWeight: 700 }}>- {fmt(deduction)}</td>
                   <td style={tdCenter}></td>
                 </tr>
               )}
               {actualNet != null && deduction > 0 && (
-                <tr style={{ background: '#fefce8' }}>
-                  <td style={{ ...tdCenter, fontWeight: 700 }}>KL Thực</td>
-                  <td style={{ ...tdCenter, fontSize: 16, fontWeight: 700, fontFamily: mono }}>{fmt(actualNet)}</td>
+                <tr style={{ background: '#FEF3C7' }}>
+                  <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 1 }}>KL Thực</td>
+                  <td style={{ ...tdCenter, fontSize: fs + 7, fontWeight: 800, fontFamily: mono, color: '#92400E' }}>{fmt(actualNet)}</td>
                   <td style={tdCenter}></td>
                 </tr>
               )}
@@ -388,42 +391,42 @@ export default function PrintPage() {
               {consolidationCode && <Row2 l="Mã LLM" r={consolidationCode} />}
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16, border: '1px solid #333' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 14, border: '2px solid #15803D' }}>
               <thead>
-                <tr style={{ background: '#f0fdf4' }}>
-                  <th style={thStyle} colSpan={4}>🧪 Đo DRC tại cân</th>
+                <tr style={{ background: '#15803D', color: '#fff' }}>
+                  <th style={{ ...thStyle, color: '#fff', fontSize: fs + 1 }} colSpan={4}>ĐO DRC TẠI CÂN</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td style={tdLabel}>ĐỐT (metrolac)</td>
-                  <td style={{ ...tdValue, fontFamily: mono, fontWeight: 700, fontSize: 14 }}>
+                  <td style={{ ...tdLabel, fontSize: fs - 1 }}>ĐỐT (metrolac)</td>
+                  <td style={{ ...tdValue, fontFamily: mono, fontWeight: 700, fontSize: fs + 3 }}>
                     {dotReading != null ? dotReading : '—'}
                   </td>
-                  <td style={tdLabel}>DRC kỳ vọng</td>
-                  <td style={tdValue}>{ext.expected_drc != null ? `${ext.expected_drc}%` : '—'}</td>
+                  <td style={{ ...tdLabel, fontSize: fs - 1 }}>DRC kỳ vọng</td>
+                  <td style={{ ...tdValue, fontSize: fs + 1, fontWeight: 600 }}>{ext.expected_drc != null ? `${ext.expected_drc}%` : '—'}</td>
                 </tr>
                 <tr>
-                  <td style={tdLabel}>DRC thực (đo tại cân)</td>
-                  <td style={{ ...tdValue, fontWeight: 700, color: '#15803D', fontSize: 14 }}>
+                  <td style={{ ...tdLabel, fontSize: fs - 1 }}>DRC thực (đo tại cân)</td>
+                  <td style={{ ...tdValue, fontWeight: 800, color: '#15803D', fontSize: fs + 4 }}>
                     {actualDrc != null ? `${actualDrc}%` : '—'}
                   </td>
-                  <td style={tdLabel}>KL khô quy đổi</td>
-                  <td style={{ ...tdValue, fontFamily: mono, fontWeight: 700, color: '#15803D', fontSize: 14 }}>
+                  <td style={{ ...tdLabel, fontSize: fs - 1 }}>KL khô quy đổi</td>
+                  <td style={{ ...tdValue, fontFamily: mono, fontWeight: 800, color: '#15803D', fontSize: fs + 4 }}>
                     {dryWeight != null
                       ? `${dryWeight.toLocaleString()} kg`
                       : '—'}
                     {dryWeight != null && actualNet && drcForCalc && (
-                      <span style={{ fontSize: 10, color: '#999', marginLeft: 6, fontFamily: 'inherit' }}>
+                      <div style={{ fontSize: fs - 3, color: '#6B7280', marginTop: 2, fontFamily: 'inherit', fontWeight: 400 }}>
                         = {actualNet.toLocaleString()} × {drcForCalc}% / 100
-                      </span>
+                      </div>
                     )}
                   </td>
                 </tr>
                 {consolidationCode && (
                   <tr>
-                    <td style={tdLabel}>Mã LLM (gộp xe)</td>
-                    <td style={tdValue} colSpan={3}>
+                    <td style={{ ...tdLabel, fontSize: fs - 1 }}>Mã LLM (gộp xe)</td>
+                    <td style={{ ...tdValue, fontSize: fs + 1 }} colSpan={3}>
                       <strong>{consolidationCode}</strong>
                     </td>
                   </tr>
@@ -435,8 +438,16 @@ export default function PrintPage() {
 
         {/* ===== NOTES ===== */}
         {ticket!.notes && (
-          <div style={{ marginBottom: isThermal ? 2 : 16, fontSize: fs - 1, color: '#666' }}>
-            <strong>GC:</strong> {ticket!.notes}
+          <div style={{
+            marginBottom: isThermal ? 2 : 14,
+            fontSize: isThermal ? fs - 1 : fs,
+            color: '#374151',
+            padding: isThermal ? 0 : '8px 12px',
+            background: isThermal ? 'transparent' : '#F9FAFB',
+            border: isThermal ? 'none' : '1px solid #E5E7EB',
+            borderLeft: isThermal ? 'none' : '4px solid #1B4D3E',
+          }}>
+            <strong>Ghi chú:</strong> {ticket!.notes}
           </div>
         )}
 
@@ -490,21 +501,21 @@ export default function PrintPage() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32, fontSize: 12, textAlign: 'center' }}>
-              <div style={{ width: '30%' }}>
-                <div style={{ fontWeight: 600, marginBottom: 48 }}>Nhân viên cân</div>
-                <div style={{ borderTop: '1px dotted #999', paddingTop: 4 }}>(Ký, ghi rõ họ tên)</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: paperSize === 'a5' ? 24 : 36, fontSize: fs, textAlign: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 40 : 56, fontSize: fs + 1 }}>Nhân viên cân</div>
+                <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
-              <div style={{ width: '30%' }}>
-                <div style={{ fontWeight: 600, marginBottom: 48 }}>Tài xế</div>
-                <div style={{ borderTop: '1px dotted #999', paddingTop: 4 }}>(Ký, ghi rõ họ tên)</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 40 : 56, fontSize: fs + 1 }}>Tài xế</div>
+                <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
-              <div style={{ width: '30%' }}>
-                <div style={{ fontWeight: 600, marginBottom: 48 }}>Xác nhận</div>
-                <div style={{ borderTop: '1px dotted #999', paddingTop: 4 }}>(Ký, ghi rõ họ tên)</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 40 : 56, fontSize: fs + 1 }}>Xác nhận</div>
+                <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
             </div>
-            <div style={{ marginTop: 24, textAlign: 'center', fontSize: 10, color: '#aaa' }}>
+            <div style={{ marginTop: 16, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
               Phiếu được in từ hệ thống Trạm Cân — Cao Su Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
             </div>
           </>
@@ -536,16 +547,19 @@ function Row2({ l, r }: { l: React.ReactNode; r: React.ReactNode }) {
 // ============================================================================
 
 const tdLabel: React.CSSProperties = {
-  padding: '6px 10px', fontWeight: 600, color: '#666',
-  borderBottom: '1px solid #eee', width: '20%', fontSize: 12,
+  padding: '8px 12px', fontWeight: 600, color: '#374151',
+  borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB',
+  width: '20%', background: '#F9FAFB',
 }
 const tdValue: React.CSSProperties = {
-  padding: '6px 10px', borderBottom: '1px solid #eee', width: '30%',
+  padding: '8px 12px', borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB',
+  width: '30%', color: '#111827',
 }
 const thStyle: React.CSSProperties = {
-  padding: '8px 10px', fontWeight: 600, borderBottom: '2px solid #333',
-  textAlign: 'center', fontSize: 12,
+  padding: '10px 12px', fontWeight: 700,
+  textAlign: 'center', letterSpacing: 0.3,
 }
 const tdCenter: React.CSSProperties = {
-  padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #ddd',
+  padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #D1D5DB',
+  borderRight: '1px solid #D1D5DB',
 }

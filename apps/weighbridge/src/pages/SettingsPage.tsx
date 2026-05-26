@@ -7,7 +7,8 @@ import {
 import {
   ArrowLeftOutlined, SettingOutlined, WifiOutlined, DisconnectOutlined,
   CameraOutlined, PrinterOutlined, SaveOutlined, ReloadOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, UserOutlined,
+  CheckCircleOutlined, CloseCircleOutlined, UserOutlined, ExperimentOutlined,
+  RightOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import { useKeliScale } from '@erp/hooks/useKeliScale'
@@ -431,6 +432,32 @@ export default function SettingsPage() {
                 </div>
               }
             />
+          </Card>
+
+          {/* ================================================================ */}
+          {/* DRC LOOKUP ADMIN */}
+          {/* ================================================================ */}
+          <Card
+            style={{ borderRadius: 12, cursor: 'pointer' }}
+            styles={{ body: { padding: 16 } }}
+            hoverable
+            onClick={() => navigate('/settings/drc-lookup')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 10, background: '#F0F9F4',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <ExperimentOutlined style={{ color: PRIMARY, fontSize: 22 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Text strong style={{ fontSize: 15 }}>Bảng quy đổi DRC từ Metrolac (ĐỐT)</Text>
+                <div style={{ fontSize: 12, color: '#666' }}>
+                  QC sửa bảng tra DRC — áp dụng ngay cho cân mới
+                </div>
+              </div>
+              <RightOutlined style={{ color: '#999' }} />
+            </div>
           </Card>
 
           {/* ================================================================ */}

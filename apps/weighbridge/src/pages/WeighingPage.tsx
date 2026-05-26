@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrentFacility } from '@/stores/facilityStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
+import drcLookupService, { type DrcLookupRow } from '@erp/services/wms/drcLookupService'
 import stockInService from '@erp/services/wms/stockInService'
 import stockOutService from '@erp/services/wms/stockOutService'
 import transferService, { type InterFacilityTransfer } from '@erp/services/wms/transferService'
@@ -125,9 +126,11 @@ export default function WeighingPage() {
   const [priceUnit, setPriceUnit] = useState<'wet' | 'dry'>('wet')
 
   // F2 Tân Lâm — quy trình mủ nước: đo ĐỐT + DRC tại cân lần 2 (sau lấy mẫu + đốt)
-  // DRC% = ĐỐT × 0.2 − 3.4 (vd ĐỐT 213 → 39.2%). Operator có thể override.
+  // DRC% tra từ bảng drc_lookup (QC sửa được qua /settings/drc-lookup).
+  // Operator có thể override.
   const [dotReading, setDotReading] = useState<number | null>(null)
   const [actualDrc, setActualDrc] = useState<number | null>(null)
+  const [drcLookupRows, setDrcLookupRows] = useState<DrcLookupRow[]>([])
   const [consolidationCode, setConsolidationCode] = useState<string>('')
   const [destination, setDestination] = useState<string>('bai_mu')
   const [deductionKg, setDeductionKg] = useState<number>(0)
@@ -153,6 +156,8 @@ export default function WeighingPage() {
       .then((d) => { console.log('Deals loaded (facility=', currentFacility?.code, '):', d); setDeals(d) })
       .catch((err) => console.error('Deal load error:', err))
     getRubberSuppliers().then((s) => setSuppliers(s.map((x: any) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {})
+    // Load bảng tra DRC (cache 5 phút trong service)
+    drcLookupService.getAll().then(setDrcLookupRows).catch((err) => console.warn('drc_lookup load error:', err))
   }, [currentFacility?.id, currentFacility?.code])
 
   // S3 OUT: Load active sales orders khi user chuyển sang OUT
@@ -1295,11 +1300,14 @@ export default function WeighingPage() {
                       onChange={(v) => {
                         const n = typeof v === 'number' ? v : null
                         setDotReading(n)
-                        // Auto-suggest DRC% = ĐỐT × 0.2 − 3.4 (vd 213 → 39.2%)
-                        // Chỉ auto-fill nếu user CHƯA nhập actualDrc (override OK)
-                        if (n != null && actualDrc == null) {
-                          const suggested = Math.max(0, Math.round((n * 0.2 - 3.4) * 100) / 100)
-                          setActualDrc(suggested)
+                        // Mỗi lần ĐỐT đổi → cập nhật lại DRC từ bảng drc_lookup.
+                        // QC vẫn có thể override sau bằng cách sửa trực tiếp ô DRC.
+                        // Clear ĐỐT (n=null) → clear DRC luôn.
+                        if (n == null) {
+                          setActualDrc(null)
+                        } else {
+                          const suggested = drcLookupService.lookupSync(drcLookupRows, n)
+                          if (suggested != null) setActualDrc(suggested)
                         }
                       }}
                       style={{ width: '100%' }}
@@ -1354,7 +1362,7 @@ export default function WeighingPage() {
                   <Col span={24}>
                     <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>
                       💡 Nhập ĐỐT + DRC TRƯỚC khi bấm "Cân lần 2". Khi cân tare, hệ thống tự lưu kèm.
-                      Auto-suggest DRC dùng công thức HAQT: DRC% = ĐỐT × 0.2 − 3.4 (vd ĐỐT 213 → 39.2%).
+                      Auto-suggest DRC dùng <strong>bảng quy đổi HAQT</strong> ({drcLookupRows.length} dòng) — QC sửa được ở Cài đặt → Bảng quy đổi DRC.
                     </Text>
                   </Col>
                 </Row>

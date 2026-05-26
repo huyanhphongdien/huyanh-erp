@@ -5,6 +5,7 @@ import HomePage from '@/pages/HomePage'
 import WeighingPage from '@/pages/WeighingPage'
 import PrintPage from '@/pages/PrintPage'
 import SettingsPage from '@/pages/SettingsPage'
+import DrcLookupAdminPage from '@/pages/DrcLookupAdminPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const operator = useAuthStore((s) => s.operator)
@@ -54,6 +55,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/drc-lookup"
+          element={
+            <ProtectedRoute>
+              <DrcLookupAdminPage />
             </ProtectedRoute>
           }
         />

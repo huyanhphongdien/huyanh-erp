@@ -40,6 +40,7 @@ export { rubberGradeService } from './rubberGradeService'
 // ===== Phase 7: Cân xe =====
 export { weighbridgeService } from './weighbridgeService'
 export { weighbridgeImageService } from './weighbridgeImageService'
+export { default as drcLookupService, type DrcLookupRow } from './drcLookupService'
 
 // ===== Phase 8: Lệnh SX & BOM =====
 export { productionService } from './productionService'

@@ -12,7 +12,7 @@ import {
 import {
   CheckCircleOutlined, CloseCircleOutlined, ArrowLeftOutlined,
   UserOutlined, PhoneOutlined, BankOutlined, EnvironmentOutlined,
-  WarningOutlined,
+  WarningOutlined, CopyOutlined, KeyOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
@@ -28,6 +28,9 @@ export default function PartnerRequestsPage() {
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [detailPartner, setDetailPartner] = useState<any>(null)
+  const [credentialModal, setCredentialModal] = useState<null | {
+    partner_name: string; partner_code: string; phone: string; email: string; temp_password: string
+  }>(null)
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['partner-requests'],
@@ -76,20 +79,30 @@ export default function PartnerRequestsPage() {
 
   const approveMutation = useMutation({
     mutationFn: async (partnerId: string) => {
-      const { error } = await supabase
-        .from('b2b_partners')
-        .update({
-          status: 'active',
-          is_active: true,
-          verified_at: new Date().toISOString(),
-          verified_by: user?.employee_id || null,
-        })
-        .eq('id', partnerId)
-      if (error) throw error
+      // Gọi Edge Function tạo auth.users + partner_users + update status
+      const { data, error } = await supabase.functions.invoke('create-partner-auth', {
+        body: {
+          partner_id: partnerId,
+          verified_by_employee_id: user?.employee_id || null,
+        },
+      })
+      if (error) throw new Error(error.message || 'Edge function lỗi')
+      if (!data?.ok) throw new Error(data?.error || 'Không tạo được tài khoản')
+      return data as {
+        ok: true; auth_user_id: string; email: string; temp_password: string;
+        partner_code: string; partner_name: string; phone: string
+      }
     },
-    onSuccess: () => {
-      message.success('Đã duyệt đại lý')
+    onSuccess: (res) => {
+      message.success('Đã duyệt đại lý + tạo tài khoản')
       queryClient.invalidateQueries({ queryKey: ['partner-requests'] })
+      setCredentialModal({
+        partner_name: res.partner_name,
+        partner_code: res.partner_code,
+        phone: res.phone,
+        email: res.email,
+        temp_password: res.temp_password,
+      })
     },
     onError: (err: Error) => message.error(err.message),
   })
@@ -257,6 +270,108 @@ export default function PartnerRequestsPage() {
           rows={3}
           placeholder="Lý do từ chối..."
         />
+      </Modal>
+
+      {/* Credential Modal — hiển thị password tạm sau khi duyệt */}
+      <Modal
+        open={!!credentialModal}
+        title={
+          <Space>
+            <KeyOutlined style={{ color: '#16A34A' }} />
+            <span>Tài khoản đại lý đã sẵn sàng</span>
+          </Space>
+        }
+        footer={
+          <Button type="primary" onClick={() => setCredentialModal(null)} style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}>
+            Đóng
+          </Button>
+        }
+        onCancel={() => setCredentialModal(null)}
+        width={560}
+        maskClosable={false}
+      >
+        {credentialModal && (() => {
+          const zaloMessage = `Chào ${credentialModal.partner_name},
+Tài khoản B2B Portal của bạn đã được duyệt.
+Đăng nhập tại: https://b2b.huyanhrubber.vn
+Email: ${credentialModal.email}
+Mật khẩu tạm: ${credentialModal.temp_password}
+(Hệ thống sẽ yêu cầu đổi mật khẩu sau lần đăng nhập đầu tiên)
+— Đội Thu mua Huy Anh Rubber`
+          return (
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <Alert
+                type="success"
+                message="Đã tạo auth.users + link partner_users. Đại lý có thể đăng nhập ngay."
+                showIcon
+              />
+              <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item label="Đại lý">{credentialModal.partner_name} ({credentialModal.partner_code})</Descriptions.Item>
+                <Descriptions.Item label="SĐT">{credentialModal.phone}</Descriptions.Item>
+                <Descriptions.Item label="Email đăng nhập">
+                  <Space>
+                    <Text code style={{ fontSize: 13 }}>{credentialModal.email}</Text>
+                    <Button
+                      size="small"
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(credentialModal.email)
+                        message.success('Đã copy email')
+                      }}
+                    />
+                  </Space>
+                </Descriptions.Item>
+                <Descriptions.Item label="Mật khẩu tạm">
+                  <Space>
+                    <Text code style={{ fontSize: 16, fontWeight: 700, color: '#DC2626', letterSpacing: 2 }}>
+                      {credentialModal.temp_password}
+                    </Text>
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(credentialModal.temp_password)
+                        message.success('Đã copy password')
+                      }}
+                      style={{ background: '#DC2626', borderColor: '#DC2626' }}
+                    >
+                      Copy
+                    </Button>
+                  </Space>
+                </Descriptions.Item>
+              </Descriptions>
+              <div>
+                <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
+                  Tin nhắn gửi đại lý qua Zalo / SMS:
+                </Text>
+                <Input.TextArea
+                  value={zaloMessage}
+                  readOnly
+                  rows={6}
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
+                <Button
+                  block
+                  type="default"
+                  icon={<CopyOutlined />}
+                  onClick={() => {
+                    navigator.clipboard.writeText(zaloMessage)
+                    message.success('Đã copy tin nhắn')
+                  }}
+                  style={{ marginTop: 8 }}
+                >
+                  Copy tin nhắn
+                </Button>
+              </div>
+              <Alert
+                type="warning"
+                message="Sau khi đóng modal này, KHÔNG xem lại được mật khẩu tạm. Vui lòng copy + gửi ngay."
+                showIcon
+              />
+            </Space>
+          )
+        })()}
       </Modal>
 
       {/* Detail Modal */}

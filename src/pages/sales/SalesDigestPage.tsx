@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SalesDigestPage — preview daily digest
 // File: src/pages/sales/SalesDigestPage.tsx
 // Sprint 2 D7 (Sales Tracking & Control)
@@ -83,7 +83,7 @@ export default function SalesDigestPage() {
   }
 
   return (
-    <div style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Card
         title={
           <span style={{ color: '#1B4D3E', fontSize: 16 }}>

@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SAFETY SIGNS PAGE — Biển hiệu an toàn nhà máy
 // File: src/pages/production/SafetySignsPage.tsx
 // ============================================================================
@@ -92,7 +92,7 @@ export default function SafetySignsPage() {
   )
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
         <Text strong style={{ fontSize: 18, color: '#1B4D3E' }}>⚠️ Biển hiệu an toàn</Text>

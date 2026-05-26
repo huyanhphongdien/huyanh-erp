@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // CONTRACT REVIEW PAGE (Phú LV — Kiểm tra)
 // File: src/pages/sales/ContractReviewPage.tsx
 //
@@ -320,7 +320,7 @@ export default function ContractReviewPage() {
   }, [user])
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Breadcrumb
         items={[
           { href: '/', title: <HomeOutlined /> },

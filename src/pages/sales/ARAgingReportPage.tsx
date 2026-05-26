@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // A/R AGING REPORT — Báo cáo nợ phải thu theo tuổi nợ
 // File: src/pages/sales/ARAgingReportPage.tsx
 // ============================================================================
@@ -250,7 +250,7 @@ export default function ARAgingReportPage() {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <Title level={4} style={{ margin: 0 }}>

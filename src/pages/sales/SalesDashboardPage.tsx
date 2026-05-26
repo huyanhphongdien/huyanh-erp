@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SALES DASHBOARD PAGE — Bento overview (v2)
 // File: src/pages/sales/SalesDashboardPage.tsx
 //
@@ -201,7 +201,7 @@ export default function SalesDashboardPage() {
   const totalWorkflow = Object.values(data.workflowCounts).reduce((a, b) => a + b, 0)
 
   return (
-    <div style={{ padding: '20px 24px 48px', maxWidth: 1600, margin: '0 auto', background: '#f5f6f8' }}>
+    <div style={{ padding: '20px 24px 48px', background: '#f5f6f8' }}>
 
       {/* ═══ TOPBAR ═══ */}
       <div style={topbar}>

@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // CONTRACT SIGN PAGE (Trung / Huy — Trình ký)
 // File: src/pages/sales/ContractSignPage.tsx
 //
@@ -329,7 +329,7 @@ export default function ContractSignPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Breadcrumb
         items={[
           { href: '/', title: <HomeOutlined /> },

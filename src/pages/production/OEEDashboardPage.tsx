@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // OEE DASHBOARD — Overall Equipment Effectiveness
 // File: src/pages/production/OEEDashboardPage.tsx
 // OEE = Availability × Performance × Quality
@@ -81,7 +81,7 @@ export default function OEEDashboardPage() {
   const oeeColor = (v: number) => v >= 85 ? '#52c41a' : v >= 60 ? '#fa8c16' : '#ef4444'
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

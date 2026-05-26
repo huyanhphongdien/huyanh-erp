@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SOP LIST PAGE — Standard Operating Procedures
 // File: src/pages/production/SOPListPage.tsx
 // ============================================================================
@@ -86,7 +86,7 @@ export default function SOPListPage() {
   )
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />

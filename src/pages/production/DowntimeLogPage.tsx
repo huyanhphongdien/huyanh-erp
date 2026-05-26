@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // DOWNTIME LOG PAGE — Sự cố / dừng máy
 // File: src/pages/production/DowntimeLogPage.tsx
 // ============================================================================
@@ -43,7 +43,7 @@ export default function DowntimeLogPage() {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
         <Text strong style={{ fontSize: 18, color: '#1B4D3E' }}>🔧 Downtime / Sự cố</Text>

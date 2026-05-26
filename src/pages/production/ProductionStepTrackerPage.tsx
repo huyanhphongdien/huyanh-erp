@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // PRODUCTION STEP TRACKER — Operator View (10 bước SVR)
 // File: src/pages/production/ProductionStepTrackerPage.tsx
 // Touch-friendly, timeline dọc, form thông số theo bước
@@ -146,7 +146,7 @@ export default function ProductionStepTrackerPage() {
   const progress = steps.length > 0 ? Math.round(completedCount / steps.length * 100) : 0
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
+    <div style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />

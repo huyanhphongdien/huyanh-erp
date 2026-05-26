@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // CASH FLOW + LC MANAGEMENT — Dòng tiền + Quản lý LC
 // File: src/pages/sales/CashFlowPage.tsx
 // ============================================================================
@@ -220,7 +220,7 @@ export default function CashFlowPage() {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Title level={4} style={{ marginBottom: 24 }}>
         <DollarOutlined style={{ marginRight: 8 }} />
         Dòng tiền & Quản lý LC

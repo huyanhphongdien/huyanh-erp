@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SHIFT REPORT PAGE — Báo cáo ca sản xuất
 // File: src/pages/production/ShiftReportPage.tsx
 // ============================================================================
@@ -80,7 +80,7 @@ export default function ShiftReportPage() {
   )
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
         <Text strong style={{ fontSize: 18, color: '#1B4D3E' }}>⏱️ Báo cáo ca sản xuất</Text>

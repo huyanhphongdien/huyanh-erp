@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // EXECUTIVE DASHBOARD PAGE — Tổng quan điều hành (BGĐ)
 // File: src/pages/sales/ExecutiveDashboardPage.tsx
 // Module Bán hàng quốc tế — Huy Anh Rubber ERP
@@ -294,7 +294,7 @@ export default function ExecutiveDashboardPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       {/* ═══ HEADER ═══ */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <Title level={3} style={{ margin: 0, color: PRIMARY }}>

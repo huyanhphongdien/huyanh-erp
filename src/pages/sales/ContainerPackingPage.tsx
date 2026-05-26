@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // CONTAINER PACKING PAGE — Trang quản lý đóng gói container
 // File: src/pages/sales/ContainerPackingPage.tsx
 // Module Bán hàng quốc tế — Huy Anh Rubber ERP
@@ -491,7 +491,7 @@ function ContainerPackingPage() {
   // ══════════════════════════════════════════════════════════════
 
   return (
-    <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       {/* Breadcrumb */}
       <Breadcrumb
         style={{ marginBottom: 16 }}

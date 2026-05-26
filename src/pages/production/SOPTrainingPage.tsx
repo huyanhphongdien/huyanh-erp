@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SOP TRAINING PAGE — Huấn luyện SOP
 // File: src/pages/production/SOPTrainingPage.tsx
 // ============================================================================
@@ -76,7 +76,7 @@ export default function SOPTrainingPage() {
   const overdue = assignments.filter(a => a.status === 'overdue' || (a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed')).length
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
         <Text strong style={{ fontSize: 18, color: '#1B4D3E' }}>🎓 Huấn luyện SOP</Text>

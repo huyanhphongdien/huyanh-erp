@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SALES ORDER DETAIL PAGE — Chi tiết Đơn hàng bán quốc tế
 // File: src/pages/sales/SalesOrderDetailPage.tsx
 // ============================================================================
@@ -1436,7 +1436,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   // ══════════════════════════════════════════════════════════════
 
   return (
-    <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       {/* Breadcrumb */}
       <Breadcrumb
         style={{ marginBottom: 16 }}

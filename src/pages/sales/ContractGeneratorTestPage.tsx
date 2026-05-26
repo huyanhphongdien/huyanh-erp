@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // CONTRACT GENERATOR TEST PAGE
 // File: src/pages/sales/ContractGeneratorTestPage.tsx
 //
@@ -230,7 +230,7 @@ export default function ContractGeneratorTestPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       <Breadcrumb
         items={[
           { href: '/', title: <HomeOutlined /> },

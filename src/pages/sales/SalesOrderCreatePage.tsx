@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // SALES ORDER CREATE PAGE — Tạo đơn hàng bán quốc tế (Multi-step)
 // File: src/pages/sales/SalesOrderCreatePage.tsx
 // ============================================================================
@@ -1039,7 +1039,7 @@ function SalesOrderCreatePage() {
   // ══════════════════════════════════════════════════════════════
 
   return (
-    <div style={{ padding: '16px 24px', maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: '16px 24px' }}>
       {/* Breadcrumb */}
       <Breadcrumb
         style={{ marginBottom: 12 }}

@@ -17,6 +17,8 @@ export interface B2BRubberIntake {
   source_type: 'vietnam' | 'lao_direct' | 'lao_agent'
   intake_date: string
   product_code: string
+  /** Loại mủ (HAC bonus): 'tap' = mủ tạp, 'nuoc' = mủ nước. NULL = chưa phân loại → bonus = 0. */
+  rubber_type: 'tap' | 'nuoc' | null
   // Weights
   gross_weight_kg: number | null
   net_weight_kg: number | null
@@ -246,6 +248,8 @@ export const rubberIntakeB2BService = {
     lot_description?: string
     source_type?: 'vietnam' | 'lao_direct' | 'lao_agent'
     product_code?: string
+    /** Loại mủ — bắt buộc nếu muốn batch này tính bonus đại lý (quy chế T1/2026 tạp + T6/2026 nước). */
+    rubber_type?: 'tap' | 'nuoc' | null
     quantity_kg: number
     drc_percent?: number
     unit_price: number
@@ -273,6 +277,7 @@ export const rubberIntakeB2BService = {
           lot_code: params.lot_code || null,
           source_type: params.source_type || 'vietnam',
           product_code: params.product_code || 'MU_CAO_SU',
+          rubber_type: params.rubber_type ?? null,
           intake_date: params.intake_date || new Date().toISOString().split('T')[0],
           net_weight_kg: params.quantity_kg,
           gross_weight_kg: params.quantity_kg,

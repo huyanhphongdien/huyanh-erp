@@ -119,39 +119,11 @@ export const TIER_ICONS: Record<PartnerTier, string> = {
 export const partnerService = {
 
   /**
-   * Tạo mã NCC theo quy tắc: [Vùng 2 chữ][Tên 2 chữ][Số 2 số]
-   * VD: TEHG01 = Thừa Thiên Huế + Hữu Giới + lần 01
-   * Ref: docs/Cách đặt mã NCC NGUYÊN LIỆU CHÍNH.pdf
-   */
-  async generatePartnerCode(name: string, regionCode: string): Promise<string> {
-    const { generateNameCode } = await import('../../constants/supplierCodes')
-    const nameCode = generateNameCode(name)
-    const prefix = `${regionCode}${nameCode}`
-
-    // Tìm số thứ tự tiếp theo
-    const { data: existing } = await supabase
-      .from('b2b_partners')
-      .select('code')
-      .ilike('code', `${prefix}%`)
-      .order('code', { ascending: false })
-      .limit(1)
-
-    let nextSeq = 1
-    if (existing && existing.length > 0) {
-      const lastCode = existing[0].code
-      const lastSeq = parseInt(lastCode.slice(4), 10)
-      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1
-    }
-
-    return `${prefix}${String(nextSeq).padStart(2, '0')}`
-  },
-
-  /**
-   * Tạo mã lô tiếp theo cho NCC: [Mã NCC]-[YYMM]-[Số]
-   * VD: QIGI01-2604-01, QIGI01-2604-02...
+   * Tạo mã lô tiếp theo cho NCC: [Mã NCC HAC-13]-[YYMM]-[Số]
+   * VD: 8999100012346-2604-01, 8999100012346-2604-02...
+   * (Phase 7+: partnerCode giờ là mã HAC-13 13 chữ số — đồng bộ với business_partners.)
    */
   async generateNextLotCode(partnerCode: string): Promise<string> {
-    const { generateLotCode } = await import('../../constants/supplierCodes')
     const now = new Date()
     const yy = String(now.getFullYear()).slice(-2)
     const mm = String(now.getMonth() + 1).padStart(2, '0')
@@ -184,18 +156,7 @@ export const partnerService = {
       if (!isNaN(offerSeq) && offerSeq >= nextSeq) nextSeq = offerSeq + 1
     }
 
-    return generateLotCode(partnerCode, nextSeq, now)
-  },
-
-  /**
-   * Preview mã NCC (không lưu DB)
-   */
-  async previewPartnerCode(name: string, address: string): Promise<{ code: string; regionCode: string; regionName: string }> {
-    const { detectRegionFromAddress, REGION_CODE_MAP } = await import('../../constants/supplierCodes')
-    const regionCode = detectRegionFromAddress(address) || 'TE' // Default: Thừa Thiên Huế
-    const code = await this.generatePartnerCode(name, regionCode)
-    const region = REGION_CODE_MAP[regionCode]
-    return { code, regionCode, regionName: region?.name || regionCode }
+    return `${prefix}${String(nextSeq).padStart(2, '0')}`
   },
 
   // ============================================
@@ -242,9 +203,26 @@ export const partnerService = {
       query = query.eq('partner_type', partner_type)
     }
 
-    // Search
+    // Search — hỗ trợ cả TEHG01 (legacy) và HAC-13 (8999-1-XXXXXXX-X)
     if (search) {
-      query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+      const { normalizeHac13 } = await import('../../lib/hac13')
+      const normalized = normalizeHac13(search)
+      if (/^\d{13}$/.test(normalized)) {
+        // Tìm BP có hac13_code này → bp_id → b2b_partners WHERE bp_id = ...
+        const { data: bp } = await supabase
+          .from('business_partners')
+          .select('id')
+          .eq('hac13_code', normalized)
+          .maybeSingle()
+        if (bp) {
+          query = query.eq('bp_id', bp.id)
+        } else {
+          // Không match HAC-13 → fallback tìm theo legacy code
+          query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+        }
+      } else {
+        query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+      }
     }
 
     // Sorting

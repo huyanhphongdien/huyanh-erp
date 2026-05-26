@@ -33,6 +33,9 @@ export interface ContractFormData {
   buyer_name: string
   buyer_address: string
   buyer_phone?: string
+  /** Mã định danh HAC-13 của KH (Phase 5+). Optional — chỉ render nếu template có
+   *  placeholder `{buyer_code}`. Có thể format dạng `8999-1-0001234-6` cho dễ đọc. */
+  buyer_code?: string
 
   grade: string               // SVR3L, RSS3, ...
   quantity: string            // "20.16"
@@ -314,7 +317,7 @@ export async function enrichFormDataWithCustomer(
         packing_type,
         port_of_loading,
         port_of_destination,
-        customer:sales_customers!customer_id(name,address,phone)
+        customer:sales_customers!customer_id(name,address,phone,code)
       `)
       .eq('id', salesOrderId)
       .maybeSingle()
@@ -323,12 +326,20 @@ export async function enrichFormDataWithCustomer(
       packing_type?: string | null
       port_of_loading?: string | null
       port_of_destination?: string | null
-      customer?: { name?: string; address?: string; phone?: string } | null
+      customer?: { name?: string; address?: string; phone?: string; code?: string } | null
     }
     if (o.customer) {
       if (!fd.buyer_name) fd.buyer_name = o.customer.name || ''
       if (!fd.buyer_address) fd.buyer_address = o.customer.address || ''
       if (!fd.buyer_phone) fd.buyer_phone = o.customer.phone || ''
+      // HAC-13: customer.code đã sync với hac13_code sau Phase 3.
+      // Format đẹp `8999-1-0001234-6` cho placeholder {buyer_code} trong template.
+      if (!fd.buyer_code && o.customer.code) {
+        const { formatHac13Display } = await import('../../lib/hac13')
+        fd.buyer_code = o.customer.code.length === 13 && o.customer.code.startsWith('8999')
+          ? formatHac13Display(o.customer.code)
+          : o.customer.code
+      }
     }
     if (!fd.packing_type && o.packing_type) fd.packing_type = o.packing_type
     if (!fd.pol && o.port_of_loading) fd.pol = o.port_of_loading

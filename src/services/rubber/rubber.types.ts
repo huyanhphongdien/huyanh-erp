@@ -49,6 +49,8 @@ export interface RubberIntakeBatch {
   supplier_id?: string
   supplier?: RubberSupplier
   product_code?: string
+  /** Loại mủ: 'tap' (mủ tạp) | 'nuoc' (mủ nước). Bắt buộc để tính bonus đại lý B2B. */
+  rubber_type?: 'tap' | 'nuoc' | null
 
   // Mủ Việt: chốt theo tấn
   settled_qty_ton?: number
@@ -89,6 +91,7 @@ export interface RubberIntakeBatchFormData {
   intake_date: string
   supplier_id?: string
   product_code?: string
+  rubber_type?: 'tap' | 'nuoc' | null
   settled_qty_ton?: number
   settled_price_per_ton?: number
   purchase_qty_kg?: number

@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { businessPartnerService } from '../businessPartnerService'
 
 // ============================================================================
 // TYPES
@@ -118,27 +119,28 @@ const SUPPLIER_LIST_SELECT = `
 `
 
 // ============================================================================
-// HELPERS
+// HELPERS — Sau Phase 4 (HAC-13 v10): mã rubber_supplier sinh tự động bởi
+// business_partners.hac13_code (trigger sync_role_table_code_with_bp). Hàm
+// generateCode() cũ trả về dạng MU-XXX đã bỏ.
 // ============================================================================
 
-async function generateCode(): Promise<string> {
-  const { data, error } = await supabase
-    .from('rubber_suppliers')
-    .select('code')
-    .like('code', 'MU-%')
-    .order('code', { ascending: false })
-    .limit(1)
-
-  if (error) throw error
-
-  let seq = 1
-  if (data && data.length > 0) {
-    const lastCode = data[0].code
-    const lastSeq = parseInt(lastCode.replace('MU-', ''), 10)
-    if (!isNaN(lastSeq)) seq = lastSeq + 1
+/** Trích role_data jsonb cho role RUBBER_SUPPLIER từ form. */
+function rubberRoleData(f: RubberSupplierFormData): Record<string, unknown> {
+  return {
+    supplier_type: f.supplier_type,
+    plantation_area_ha: f.plantation_area_ha,
+    rubber_variety: f.rubber_variety,
+    tree_age_years: f.tree_age_years,
+    tapping_system: f.tapping_system,
+    geo_latitude: f.geo_latitude,
+    geo_longitude: f.geo_longitude,
+    eudr_compliant: f.eudr_compliant,
+    eudr_cert_expiry: f.eudr_cert_expiry,
+    payment_method: f.payment_method,
+    quality_rating: f.quality_rating,
+    commune: f.commune,
+    province_text: f.province,
   }
-
-  return `MU-${String(seq).padStart(3, '0')}`
 }
 
 // ============================================================================
@@ -146,7 +148,6 @@ async function generateCode(): Promise<string> {
 // ============================================================================
 
 export const rubberSupplierService = {
-  generateCode,
 
   // --------------------------------------------------------------------------
   // GET ALL — DS NCC mủ, phân trang, filter
@@ -230,13 +231,47 @@ export const rubberSupplierService = {
   },
 
   // --------------------------------------------------------------------------
-  // CREATE
+  // CREATE — Tạo BP master trước (detect MST/CCCD trùng), rồi insert
+  // rubber_suppliers với bp_id. Trigger DB tự sync code = hac13_code.
   // --------------------------------------------------------------------------
   async create(formData: RubberSupplierFormData): Promise<RubberSupplier> {
-    const code = await generateCode()
+    // Detect overlap với BP đã có (NCC mủ có thể đồng thời là NCC general)
+    let bpId: string | null = null
+    if (formData.tax_code) {
+      const existing = await businessPartnerService.findByTaxCode(formData.tax_code)
+      if (existing) bpId = existing.id
+    }
+    if (!bpId && formData.cccd) {
+      // findByCccd qua searchByKey
+      const matches = await businessPartnerService.searchByKey(formData.cccd)
+      const exact = matches.find((bp) => bp.cccd === formData.cccd)
+      if (exact) bpId = exact.id
+    }
 
+    if (bpId) {
+      await businessPartnerService
+        .addRole(bpId, 'RUBBER_SUPPLIER', rubberRoleData(formData), false)
+        .catch((e: Error) => {
+          if (!/duplicate|unique/i.test(e.message)) throw e
+        })
+    } else {
+      const bp = await businessPartnerService.create({
+        legal_name: formData.name,
+        country_iso: 'VN',
+        tax_code: formData.tax_code,
+        cccd: formData.cccd,
+        address_line: formData.address,
+        phone: formData.phone,
+        roles: [
+          { role_type: 'RUBBER_SUPPLIER', is_primary: true, role_data: rubberRoleData(formData) },
+        ],
+      })
+      bpId = bp.id
+    }
+
+    // Insert rubber_suppliers row; trigger fill code = hac13_code
     const insertData = {
-      code,
+      bp_id: bpId,
       name: formData.name,
       supplier_type: formData.supplier_type,
       phone: formData.phone || null,

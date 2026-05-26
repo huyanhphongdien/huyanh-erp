@@ -8,6 +8,8 @@
 // ============================================
 
 import { supabase } from '../lib/supabase';
+import { businessPartnerService } from './businessPartnerService';
+import { normalizeHac13 } from '../lib/hac13';
 
 // ============================================
 // TYPES
@@ -199,6 +201,25 @@ async function getCurrentEmployeeId(): Promise<string | null> {
   }
 }
 
+/**
+ * Trích role_data jsonb cho role SUPPLIER_GENERAL từ SupplierFormData.
+ * Các field "general" (name, tax_code, address, bank_*) đã đẩy vào BP master —
+ * role_data chỉ chứa attribute riêng của vai trò.
+ */
+function supplierRoleData(supplier: SupplierFormData): Record<string, unknown> {
+  return {
+    supplier_type: supplier.supplier_type,
+    supplier_group: supplier.supplier_group,
+    payment_terms_days: supplier.payment_terms,
+    credit_limit_vnd: supplier.credit_limit,
+    contact_name: supplier.contact_name,
+    contact_phone: supplier.contact_phone,
+    contact_email: supplier.contact_email,
+    contact_position: supplier.contact_position,
+    province_text: supplier.province,
+  };
+}
+
 
 // ============================================
 // SUPPLIER SERVICE
@@ -245,9 +266,12 @@ export const supplierService = {
       query = query.eq('province', province);
     }
 
-    // Tìm kiếm theo tên, mã, MST
+    // Tìm kiếm theo tên, mã (code = hac13_code đã sync), MST.
+    // Cho phép paste HAC-13 dạng "8999-1-0001234-6".
     if (search) {
-      query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%,short_name.ilike.%${search}%,tax_code.ilike.%${search}%`);
+      const normalized = normalizeHac13(search);
+      const candidate = /^\d{13}$/.test(normalized) ? normalized : search;
+      query = query.or(`name.ilike.%${candidate}%,code.ilike.%${candidate}%,short_name.ilike.%${candidate}%,tax_code.ilike.%${candidate}%`);
     }
 
     // Sắp xếp
@@ -321,23 +345,66 @@ export const supplierService = {
   },
 
   /**
-   * Tạo NCC mới
-   * FIX: Lấy employee_id thay vì user_id cho created_by
+   * Tạo NCC mới.
+   *
+   * Flow HAC-13 v10 (Phase 3+):
+   *   1) Tạo Business Partner master (qua BP service) với role SUPPLIER_GENERAL.
+   *      Nếu MST trùng BP đã tồn tại → BP service trả về BP cũ + attach role.
+   *   2) Insert suppliers với bp_id; trigger DB tự sync code = bp.hac13_code.
+   *
+   * FIX: Lấy employee_id thay vì user_id cho created_by.
    */
   async create(supplier: SupplierFormData): Promise<Supplier> {
-    // Lấy employee_id của user hiện tại
     const employeeId = await getCurrentEmployeeId();
-    
-    // Chuẩn bị data để insert
-    const insertData: Record<string, unknown> = {
-      ...supplier
-    };
 
-    // Chỉ thêm created_by nếu có employee_id hợp lệ
-    if (employeeId) {
-      insertData.created_by = employeeId;
+    // Bước 1: nếu MST đã có BP → attach role; nếu chưa → tạo BP mới.
+    let bpId: string;
+    if (supplier.tax_code) {
+      const existingBp = await businessPartnerService.findByTaxCode(supplier.tax_code);
+      if (existingBp) {
+        bpId = existingBp.id;
+        // Attach role SUPPLIER_GENERAL nếu chưa có (lỗi UNIQUE nếu đã có — bắt lỗi)
+        await businessPartnerService
+          .addRole(bpId, 'SUPPLIER_GENERAL', supplierRoleData(supplier), true)
+          .catch((e: Error) => {
+            if (!/duplicate|unique/i.test(e.message)) throw e;
+          });
+      } else {
+        const bp = await businessPartnerService.create({
+          legal_name: supplier.name,
+          short_name: supplier.short_name,
+          country_iso: 'VN',
+          tax_code: supplier.tax_code,
+          address_line: supplier.address,
+          phone: supplier.phone,
+          email: supplier.email,
+          roles: [
+            { role_type: 'SUPPLIER_GENERAL', is_primary: true, role_data: supplierRoleData(supplier) },
+          ],
+        });
+        bpId = bp.id;
+      }
+    } else {
+      const bp = await businessPartnerService.create({
+        legal_name: supplier.name,
+        short_name: supplier.short_name,
+        country_iso: 'VN',
+        address_line: supplier.address,
+        phone: supplier.phone,
+        email: supplier.email,
+        roles: [
+          { role_type: 'SUPPLIER_GENERAL', is_primary: true, role_data: supplierRoleData(supplier) },
+        ],
+      });
+      bpId = bp.id;
     }
-    // Nếu không có employee_id, không thêm created_by (để null)
+
+    // Bước 2: insert suppliers row với bp_id; trigger fill code.
+    const insertData: Record<string, unknown> = {
+      ...supplier,
+      bp_id: bpId,
+    };
+    if (employeeId) insertData.created_by = employeeId;
 
     const { data, error } = await supabase
       .from('suppliers')
@@ -353,9 +420,41 @@ export const supplierService = {
   },
 
   /**
-   * Cập nhật NCC
+   * Cập nhật NCC.
+   *
+   * Đồng thời sync các field "general" về business_partners master.
    */
   async update(id: string, supplier: Partial<SupplierFormData>): Promise<Supplier> {
+    // Lấy bp_id để sync
+    const { data: existing } = await supabase
+      .from('suppliers')
+      .select('bp_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (existing?.bp_id) {
+      const bpPatch: Record<string, unknown> = {};
+      if (supplier.name !== undefined) bpPatch.legal_name = supplier.name;
+      if (supplier.short_name !== undefined) bpPatch.short_name = supplier.short_name || null;
+      if (supplier.tax_code !== undefined) bpPatch.tax_code = supplier.tax_code || null;
+      if (supplier.address !== undefined) bpPatch.address_line = supplier.address || null;
+      if (supplier.district !== undefined) bpPatch.district = supplier.district || null;
+      if (supplier.ward !== undefined) bpPatch.ward = supplier.ward || null;
+      if (supplier.phone !== undefined) bpPatch.phone = supplier.phone || null;
+      if (supplier.email !== undefined) bpPatch.email = supplier.email || null;
+      if (supplier.website !== undefined) bpPatch.website = supplier.website || null;
+      if (supplier.bank_name !== undefined) bpPatch.bank_name = supplier.bank_name || null;
+      if (supplier.bank_account !== undefined) bpPatch.bank_account = supplier.bank_account || null;
+      if (supplier.bank_holder !== undefined) bpPatch.bank_holder = supplier.bank_holder || null;
+      if (supplier.bank_branch !== undefined) bpPatch.bank_branch = supplier.bank_branch || null;
+      if (supplier.status) bpPatch.status = supplier.status;
+      if (Object.keys(bpPatch).length > 0) {
+        await businessPartnerService.update(existing.bp_id, bpPatch).catch((e: Error) => {
+          console.error('[supplierService.update] BP sync failed:', e);
+        });
+      }
+    }
+
     const { data, error } = await supabase
       .from('suppliers')
       .update(supplier)

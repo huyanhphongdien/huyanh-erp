@@ -136,6 +136,9 @@ export type Gender = 'male' | 'female' | 'other'
 
 export interface Employee {
   id: string
+  /** Mã định danh HAC-13 (13 chữ số, tự sinh). Source of truth từ Phase 2. */
+  hac13_code: string
+  /** Mã NV legacy. Phase 2 đã sync = hac13_code. Sẽ DROP COLUMN ở phase 5. */
   code: string
   full_name: string
   email?: string | null

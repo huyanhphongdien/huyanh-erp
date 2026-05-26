@@ -4,6 +4,7 @@ import { employeeService, departmentService } from '../../services'
 import { Card, Button, Input, Select, DataTable, Pagination, Modal, ConfirmDialog } from '../../components/ui'
 import { EmployeeForm } from './EmployeeForm'
 import { Lock } from 'lucide-react'
+import { formatHac13Display } from '../../lib/hac13'
 import type { Employee } from '../../types'
 
 // ============================================================================
@@ -47,7 +48,15 @@ export function EmployeeListPage() {
   })
 
   const columns = [
-    { key: 'code', title: 'Mã NV' },
+    {
+      key: 'hac13_code',
+      title: 'Mã NV (HAC-13)',
+      render: (item: Employee) => (
+        <span className="font-mono text-sm">
+          {item.hac13_code ? formatHac13Display(item.hac13_code) : item.code || '—'}
+        </span>
+      ),
+    },
     { key: 'full_name', title: 'Họ và tên' },
     {
       key: 'department',
@@ -156,7 +165,7 @@ export function EmployeeListPage() {
         {/* Filters */}
         <div className="flex gap-4 mb-4">
           <Input
-            placeholder="Tìm kiếm theo mã, tên, email..."
+            placeholder="Tìm theo mã HAC-13, tên, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-md"

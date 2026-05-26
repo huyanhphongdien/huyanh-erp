@@ -1,13 +1,13 @@
-import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { employeeService, departmentService, positionService } from '../../services'
 import { Button, Input, Select } from '../../components/ui'
+import { formatHac13Display } from '../../lib/hac13'
 import type { Employee } from '../../types'
 
 // Define EmployeeFormData inline - match với employeeService
+// Lưu ý: mã NV (hac13_code) do DB tự sinh — không có trong form.
 interface EmployeeFormData {
-  code?: string
   full_name: string
   date_of_birth?: string
   gender?: 'male' | 'female' | 'other'
@@ -29,7 +29,6 @@ interface EmployeeFormProps {
 function toFormData(employee: Employee | null | undefined): EmployeeFormData {
   if (!employee) {
     return {
-      code: '',
       full_name: '',
       date_of_birth: '',
       gender: 'male',
@@ -41,14 +40,13 @@ function toFormData(employee: Employee | null | undefined): EmployeeFormData {
       status: 'active'
     }
   }
-  
+
   // Cast gender to valid union type
-  const validGender = (employee.gender === 'male' || employee.gender === 'female' || employee.gender === 'other') 
-    ? employee.gender 
+  const validGender = (employee.gender === 'male' || employee.gender === 'female' || employee.gender === 'other')
+    ? employee.gender
     : 'male'
-  
+
   return {
-    code: employee.code ?? '',
     full_name: employee.full_name ?? '',
     date_of_birth: employee.date_of_birth ?? '',
     gender: validGender,
@@ -64,7 +62,7 @@ function toFormData(employee: Employee | null | undefined): EmployeeFormData {
 export function EmployeeForm({ employee, onSuccess, onCancel }: EmployeeFormProps) {
   const isEdit = !!employee
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<EmployeeFormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<EmployeeFormData>({
     defaultValues: toFormData(employee)
   })
 
@@ -78,13 +76,6 @@ export function EmployeeForm({ employee, onSuccess, onCancel }: EmployeeFormProp
     queryKey: ['positions-active'],
     queryFn: positionService.getAllActive
   })
-
-  // Tự động sinh mã NV nếu thêm mới
-  useEffect(() => {
-    if (!isEdit) {
-      employeeService.generateCode().then(code => setValue('code', code))
-    }
-  }, [isEdit, setValue])
 
   const mutation = useMutation({
     mutationFn: (data: EmployeeFormData) => 
@@ -100,19 +91,24 @@ export function EmployeeForm({ employee, onSuccess, onCancel }: EmployeeFormProp
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <Input
-          label="Mã nhân viên *"
-          {...register('code', { required: 'Vui lòng nhập mã' })}
-          error={errors.code?.message}
-          disabled={isEdit}
-        />
-        <Input
-          label="Họ và tên *"
-          {...register('full_name', { required: 'Vui lòng nhập họ tên' })}
-          error={errors.full_name?.message}
-        />
-      </div>
+      {isEdit && employee?.hac13_code && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <span className="font-medium">Mã NV (HAC-13):</span>{' '}
+          <span className="font-mono">{formatHac13Display(employee.hac13_code)}</span>
+          <span className="ml-2 text-xs text-blue-700">(tự sinh, không sửa được)</span>
+        </div>
+      )}
+      {!isEdit && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Mã nhân viên HAC-13 sẽ được hệ thống tự sinh sau khi bấm "Thêm mới".
+        </div>
+      )}
+
+      <Input
+        label="Họ và tên *"
+        {...register('full_name', { required: 'Vui lòng nhập họ tên' })}
+        error={errors.full_name?.message}
+      />
 
       <div className="grid grid-cols-2 gap-4">
         <Input

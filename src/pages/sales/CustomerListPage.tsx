@@ -38,6 +38,7 @@ import {
   CrownOutlined,
 } from '@ant-design/icons'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
+import { Hac13CodeDisplay } from '../../components/master-data/Hac13CodeDisplay'
 import {
   type SalesCustomer,
   type CreateCustomerData,
@@ -291,14 +292,14 @@ const CustomerListPage = () => {
 
   const columns: ColumnsType<SalesCustomer> = [
     {
-      title: 'Mã KH',
+      title: 'Mã KH (HAC-13)',
       dataIndex: 'code',
       key: 'code',
-      width: 110,
+      width: 200,
       render: (code: string) => (
-        <Text code style={{ fontFamily: 'monospace', fontSize: 13 }}>
-          {code}
-        </Text>
+        code && code.length === 13 && code.startsWith('8999')
+          ? <Hac13CodeDisplay code={code} variant="badge" showCopy={false} />
+          : <Text code style={{ fontFamily: 'monospace', fontSize: 13 }}>{code}</Text>
       ),
     },
     {

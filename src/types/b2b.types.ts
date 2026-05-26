@@ -26,6 +26,65 @@ export type BookingStatus = 'pending' | 'confirmed' | 'negotiating' | 'rejected'
 //   cancelled  — Đã hủy
 export type DealStatus = 'pending' | 'processing' | 'accepted' | 'settled' | 'cancelled'
 
+// ─── Bonus system (Quy chế thưởng đại lý theo sản lượng) ─────────────────────
+export type RubberType = 'tap' | 'nuoc'
+export type MonthlyBonusStatus = 'draft' | 'pending_approval' | 'approved' | 'paid' | 'cancelled'
+
+export interface BonusRule {
+  id: string
+  rubber_type: RubberType
+  tier_label: string                  // 'Tier 4' | 'Kim Cương' | 'Vàng' | …
+  threshold_min_tons: number          // exclusive lower bound
+  threshold_max_tons: number | null   // inclusive upper bound; null = ∞
+  bonus_per_ton_vnd: number
+  effective_from: string              // ISO date
+  effective_to: string | null
+  sort_order: number
+  notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface MonthlyBonus {
+  id: string
+  partner_id: string
+  bp_id: string | null
+  year: number
+  month: number
+  rubber_type: RubberType
+  total_volume_kg: number
+  volume_tons: number                  // generated column
+  matched_rule_id: string | null
+  tier_applied: string | null
+  bonus_per_ton: number | null
+  total_bonus_vnd: number
+  batch_ids: string[]
+  status: MonthlyBonusStatus
+  computed_at: string
+  approved_at: string | null
+  approved_by: string | null
+  paid_settlement_id: string | null
+  paid_at: string | null
+  cancel_reason: string | null
+  notes: string | null
+}
+
+/** Output của view v_b2b_partner_bonus_progress — bonus tháng hiện tại + next tier. */
+export interface PartnerBonusProgress {
+  year: number
+  month: number
+  partner_id: string
+  rubber_type: RubberType
+  total_volume_kg: number
+  volume_tons: number
+  current_tier: string | null
+  current_bonus_per_ton: number | null
+  estimated_bonus_vnd: number
+  next_tier: string | null
+  next_threshold_tons: number | null
+  tons_to_next_tier: number
+}
+
 // ============================================================================
 // PARTNER INTERFACES
 // ============================================================================

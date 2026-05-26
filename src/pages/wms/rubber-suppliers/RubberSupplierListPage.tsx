@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import rubberSupplierService from '../../../services/rubber/rubberSupplierService'
+import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay'
 
 // ============================================================================
 // TYPES (match rubber_suppliers table)
@@ -194,8 +195,10 @@ const SupplierCard: React.FC<{
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 font-medium">Ngưng</span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-mono text-gray-400">{supplier.code}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {supplier.code && supplier.code.length === 13 && supplier.code.startsWith('8999')
+                  ? <Hac13CodeDisplay code={supplier.code} variant="badge" showCopy={false} />
+                  : <span className="text-[12px] font-mono text-gray-400">{supplier.code}</span>}
                 <TypeBadge type={supplier.supplier_type} />
               </div>
             </div>

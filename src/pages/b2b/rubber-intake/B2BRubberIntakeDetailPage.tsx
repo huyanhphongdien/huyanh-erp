@@ -226,6 +226,9 @@ export default function B2BRubberIntakeDetailPage() {
           <DRCGauge value={item.drc_percent} />
         </div>
 
+        {/* ═══ Loại mủ (bonus đại lý) ═══ */}
+        <RubberTypePicker intake={item} onChange={(rt) => setItem({ ...item, rubber_type: rt })} />
+
         {/* ═══ Thông tin chi tiết ═══ */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Chi tiết</h3>
@@ -350,6 +353,93 @@ export default function B2BRubberIntakeDetailPage() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// RUBBER TYPE PICKER — inline editor cho `rubber_type` (bonus đại lý)
+// ============================================================================
+function RubberTypePicker({
+  intake,
+  onChange,
+}: {
+  intake: B2BRubberIntake
+  onChange: (rt: 'tap' | 'nuoc' | null) => void
+}) {
+  const [saving, setSaving] = useState(false)
+
+  const RAW_OPTIONS: Array<{ value: 'mu_nuoc' | 'mu_tap' | 'mu_dong' | 'mu_chen' | 'mu_to'; label: string; icon: string }> = [
+    { value: 'mu_nuoc', label: 'Mủ nước', icon: '💧' },
+    { value: 'mu_tap',  label: 'Mủ tạp',  icon: '🪨' },
+    { value: 'mu_dong', label: 'Mủ đông', icon: '🧊' },
+    { value: 'mu_chen', label: 'Mủ chén', icon: '🥣' },
+    { value: 'mu_to',   label: 'Mủ tờ',   icon: '📄' },
+  ]
+
+  const intakeRaw = (intake as unknown as { raw_rubber_type?: string }).raw_rubber_type ?? null
+
+  const setRawType = async (rawType: typeof RAW_OPTIONS[number]['value']) => {
+    if (intakeRaw === rawType) return
+    setSaving(true)
+    try {
+      // Set raw_rubber_type — DB trigger tự derive rubber_type (2 loại bonus)
+      const { error } = await supabase
+        .from('rubber_intake_batches')
+        .update({ raw_rubber_type: rawType })
+        .eq('id', intake.id)
+      if (error) throw error
+      const bonusType: 'tap' | 'nuoc' = rawType === 'mu_nuoc' ? 'nuoc' : 'tap'
+      onChange(bonusType)
+    } catch (e) {
+      alert(`Lỗi: ${(e as Error).message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const isB2B = Boolean(intake.b2b_partner_id)
+  const bonusGroup = intake.rubber_type === 'nuoc' ? 'Mủ nước' : intake.rubber_type === 'tap' ? 'Mủ tạp' : null
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4">
+      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+        Loại mủ chi tiết {isB2B && <span className="text-emerald-600 normal-case">(để tính bonus đại lý)</span>}
+      </h3>
+      {!isB2B && intakeRaw == null && (
+        <p className="text-xs text-gray-500 mb-2">
+          Phiếu này không gắn đại lý B2B — không cần phân loại để tính bonus. Có thể bỏ qua.
+        </p>
+      )}
+      <div className="grid grid-cols-5 gap-1">
+        {RAW_OPTIONS.map((opt) => {
+          const isActive = intakeRaw === opt.value
+          const isNuoc = opt.value === 'mu_nuoc'
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={saving}
+              onClick={() => setRawType(opt.value)}
+              className={`px-2 py-2 rounded-lg border text-xs font-medium ${
+                isActive
+                  ? isNuoc
+                    ? 'bg-blue-50 border-blue-300 text-blue-800'
+                    : 'bg-amber-50 border-amber-300 text-amber-800'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {opt.icon} {opt.label}
+            </button>
+          )
+        })}
+      </div>
+      {bonusGroup && (
+        <p className="text-xs text-gray-500 mt-2">
+          ⇒ Nhóm bonus: <strong className={intake.rubber_type === 'nuoc' ? 'text-blue-700' : 'text-amber-700'}>{bonusGroup}</strong>
+        </p>
+      )}
+      {saving && <p className="text-xs text-gray-400 mt-1">Đang lưu…</p>}
     </div>
   )
 }

@@ -214,6 +214,11 @@ const DealPrintPage = lazy(() => import('./pages/b2b/deals/DealPrintPage'));
 const PartnerListPage = lazy(() => import('./pages/b2b/partners/PartnerListPage'));
 const PartnerRequestsPage = lazy(() => import('./pages/b2b/partners/PartnerRequestsPage'));
 const PartnerDetailPage = lazy(() => import('./pages/b2b/partners/PartnerDetailPage'));
+// Bonuses (Quy chế thưởng đại lý)
+const BonusListPage = lazy(() => import('./pages/b2b/bonuses/BonusListPage'));
+const BonusRulesPage = lazy(() => import('./pages/b2b/bonuses/BonusRulesPage'));
+// Intake manual entry — tạm thời cho admin nhập tay phiếu cân
+const ManualEntryPage = lazy(() => import('./pages/b2b/intake-manual/ManualEntryPage'));
 // Phase E5: Công nợ & Quyết toán
 const LedgerOverviewPage = lazy(() => import('./pages/b2b/ledger/LedgerOverviewPage'));
 const PartnerLedgerPage = lazy(() => import('./pages/b2b/ledger/PartnerLedgerPage'));
@@ -236,6 +241,10 @@ const ProductionWizardPage = lazy(() => import('./pages/b2b/intake/ProductionWiz
 const DailyPriceListPage = lazy(() => import('./pages/b2b/settings/DailyPriceListPage'));
 const DemandCreatePage = lazy(() => import('./pages/b2b/demands/DemandCreatePage'));
 const DemandDetailPage = lazy(() => import('./pages/b2b/demands/DemandDetailPage'))
+
+// ===== MASTER DATA — BUSINESS PARTNER (HAC-13 v10) =====
+const BusinessPartnerListPage = lazy(() => import('./pages/master-data/BusinessPartnerListPage'))
+const BusinessPartnerDetailPage = lazy(() => import('./pages/master-data/BusinessPartnerDetailPage'))
 
 // ===== SALES MODULE =====
 const CustomerListPage = lazy(() => import('./pages/sales/CustomerListPage'))
@@ -356,6 +365,10 @@ function App() {
                 <Route path="deals/new" element={<Suspense fallback={<LoadingSpinner />}><DealCreatePage /></Suspense>} />
                 <Route path="deals/:id" element={<Suspense fallback={<LoadingSpinner />}><DealDetailPage /></Suspense>} />
                 <Route path="deals/:id/print" element={<Suspense fallback={<LoadingSpinner />}><DealPrintPage /></Suspense>} />
+                {/* B2B Bonuses — Quy chế thưởng đại lý (mủ tạp + mủ nước) */}
+                <Route path="bonuses" element={<Suspense fallback={<LoadingSpinner />}><BonusListPage /></Suspense>} />
+                <Route path="bonus-rules" element={<Suspense fallback={<LoadingSpinner />}><BonusRulesPage /></Suspense>} />
+                <Route path="intake-manual" element={<Suspense fallback={<LoadingSpinner />}><ManualEntryPage /></Suspense>} />
                 {/* B2B Ledger (Phase E5) */}
                 <Route path="ledger" element={<Suspense fallback={<LoadingSpinner />}><LedgerOverviewPage /></Suspense>} />
                 <Route path="ledger/:partnerId" element={<Suspense fallback={<LoadingSpinner />}><PartnerLedgerPage /></Suspense>} />
@@ -393,6 +406,10 @@ function App() {
               <Route path="sales/dashboard" element={<Suspense fallback={<LoadingSpinner />}><SalesDashboardPage /></Suspense>} />
               <Route path="sales/customers" element={<Suspense fallback={<LoadingSpinner />}><CustomerListPage /></Suspense>} />
               <Route path="sales/customers/:customerId" element={<Suspense fallback={<LoadingSpinner />}><CustomerDetailPage /></Suspense>} />
+
+              {/* HAC-13 Master Data — Business Partner */}
+              <Route path="master-data/business-partners" element={<Suspense fallback={<LoadingSpinner />}><BusinessPartnerListPage /></Suspense>} />
+              <Route path="master-data/business-partners/:id" element={<Suspense fallback={<LoadingSpinner />}><BusinessPartnerDetailPage /></Suspense>} />
               <Route path="sales/orders" element={<Suspense fallback={<LoadingSpinner />}><SalesOrderListPage /></Suspense>} />
               <Route path="sales/kanban" element={<Suspense fallback={<LoadingSpinner />}><SalesKanbanPage /></Suspense>} />
               <Route path="admin/audit-log" element={<Suspense fallback={<LoadingSpinner />}><AuditLogPage /></Suspense>} />

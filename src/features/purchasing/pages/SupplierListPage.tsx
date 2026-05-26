@@ -35,12 +35,13 @@ import {
 // File: src/features/purchasing/pages/SupplierListPage.tsx
 // Service: src/services/supplierService.ts
 // Path: 3 cấp lên (../../../)
-import { 
-  supplierService, 
-  type Supplier, 
-  type SupplierListItem, 
-  type SupplierFilterParams 
+import {
+  supplierService,
+  type Supplier,
+  type SupplierListItem,
+  type SupplierFilterParams,
 } from '../../../services/supplierService';
+import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay';
 
 // ============================================================================
 // TYPES
@@ -393,8 +394,10 @@ export const SupplierListPage: React.FC = () => {
                           <button onClick={() => handleView(supplier.id)} className="font-medium text-blue-600 hover:text-blue-800 text-left">
                             {supplier.name}
                           </button>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-gray-500">{supplier.code}</span>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {supplier.code && supplier.code.length === 13 && supplier.code.startsWith('8999')
+                              ? <Hac13CodeDisplay code={supplier.code} variant="badge" showCopy={false} />
+                              : <span className="text-xs text-gray-500">{supplier.code}</span>}
                             {supplier.tax_code && (<><span className="text-gray-300">•</span><span className="text-xs text-gray-500">MST: {supplier.tax_code}</span></>)}
                           </div>
                           {supplier.rating > 0 && <div className="mt-1"><RatingStars rating={supplier.rating} /></div>}

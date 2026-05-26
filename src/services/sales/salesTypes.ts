@@ -25,6 +25,10 @@ export type PaymentStatus = 'unpaid' | 'partial' | 'paid'
 export interface SalesCustomer {
   id: string
   code: string
+  /** FK → business_partners.id (Phase 3+). NULL nếu data legacy chưa migrate. */
+  bp_id?: string | null
+  /** Mã HAC-13 lấy từ BP master (join). Read-only. */
+  hac13_code?: string
   name: string
   short_name?: string
   country?: string

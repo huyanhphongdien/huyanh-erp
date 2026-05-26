@@ -138,6 +138,7 @@ export const rubberIntakeBatchService = {
       intake_date: formData.intake_date,
       supplier_id: formData.supplier_id || null,
       product_code: formData.product_code || null,
+      rubber_type: formData.rubber_type || null,  // 'tap' | 'nuoc' — bắt buộc để tính bonus
       // Mủ Việt
       settled_qty_ton: formData.settled_qty_ton ?? null,
       settled_price_per_ton: formData.settled_price_per_ton ?? null,

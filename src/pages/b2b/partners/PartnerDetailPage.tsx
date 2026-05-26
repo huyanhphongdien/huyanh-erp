@@ -104,48 +104,8 @@ const InfoTab = ({ partner, stats }: InfoTabProps) => {
       <Col xs={24} lg={16}>
         <Card title="Thông tin chi tiết" style={{ marginBottom: 24 }}>
           <Descriptions bordered column={{ xs: 1, sm: 2 }}>
-            <Descriptions.Item label="Mã đại lý">
-              <Space>
-                <Text strong style={{ fontFamily: 'monospace', fontSize: 14 }}>{partner.code}</Text>
-                {partner.region_code && (
-                  <Tag color="blue" style={{ fontSize: 10 }}>Vùng: {partner.region_code}</Tag>
-                )}
-                <Tooltip title="Tạo mã NCC theo quy tắc [Vùng][Tên][Số]">
-                  <Button
-                    size="small"
-                    type="link"
-                    icon={<EditOutlined />}
-                    onClick={async () => {
-                      try {
-                        const result = await partnerService.previewPartnerCode(partner.name, partner.address || '')
-                        const confirmed = window.confirm(`Mã mới: ${result.code}\nVùng: ${result.regionName} (${result.regionCode})\n\nĐổi mã đại lý?`)
-                        if (confirmed) {
-                          const { generateNameCode } = await import('../../../constants/supplierCodes')
-                          // b2b_partners là VIEW → update bảng gốc b2b.partners
-                          const { error: updateErr } = await supabase.rpc('update_partner_code', {
-                            p_id: partner.id,
-                            p_code: result.code,
-                            p_region_code: result.regionCode,
-                            p_name_code: generateNameCode(partner.name),
-                          })
-                          if (updateErr) {
-                            // Fallback: thử update trực tiếp qua view
-                            await supabase.from('b2b_partners').update({
-                              code: result.code,
-                              region_code: result.regionCode,
-                              supplier_name_code: generateNameCode(partner.name),
-                            }).eq('id', partner.id)
-                          }
-                          message.success(`Đã đổi mã: ${result.code}`)
-                          window.location.reload()
-                        }
-                      } catch (e) { message.error('Lỗi tạo mã') }
-                    }}
-                  >
-                    Tạo mã NCC
-                  </Button>
-                </Tooltip>
-              </Space>
+            <Descriptions.Item label="Mã đại lý (HAC-13)">
+              <Text strong style={{ fontFamily: 'monospace', fontSize: 14 }}>{partner.code}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="Tên đại lý">{partner.name}</Descriptions.Item>
             <Descriptions.Item label="Loại">

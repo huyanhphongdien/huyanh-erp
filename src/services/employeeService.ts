@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase'
 import type { Employee, PaginatedResponse } from '../types'
 
 // Define EmployeeFormData inline
+// Lưu ý: mã NV (hac13_code) do DB tự sinh qua DEFAULT generate_hac13(3) — không nhập tay.
 interface EmployeeFormData {
-  code?: string
   full_name: string
   email?: string
   phone?: string
@@ -54,7 +54,10 @@ export const employeeService = {
     }
 
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,code.ilike.%${search}%,email.ilike.%${search}%`)
+      // Search trên full_name, email, hac13_code và code (cột legacy đã sync với hac13)
+      query = query.or(
+        `full_name.ilike.%${search}%,code.ilike.%${search}%,hac13_code.ilike.%${search}%,email.ilike.%${search}%`,
+      )
     }
 
     const { data, error, count } = await query
@@ -119,36 +122,17 @@ export const employeeService = {
     if (error) throw error
   },
 
-  // Kiểm tra mã đã tồn tại
-  async checkCodeExists(code: string, excludeId?: string): Promise<boolean> {
-    let query = supabase
+  // Tìm theo HAC-13 code (hỗ trợ cả dạng có dash và không dash).
+  async findByHac13Code(code: string): Promise<Employee | null> {
+    const normalized = code.replace(/[\s-]/g, '')
+    const { data, error } = await supabase
       .from('employees')
-      .select('id', { count: 'exact', head: true })  // FIXED: Thêm head: true
-      .eq('code', code)
-
-    if (excludeId) {
-      query = query.neq('id', excludeId)
-    }
-
-    const { count } = await query  // FIXED: Dùng count thay vì data
-    return (count || 0) > 0
+      .select('*')
+      .eq('hac13_code', normalized)
+      .maybeSingle()
+    if (error) throw error
+    return data
   },
-
-  // Tạo mã nhân viên tự động
-  async generateCode(): Promise<string> {
-    const { data } = await supabase
-      .from('employees')
-      .select('code')
-      .order('code', { ascending: false })
-      .limit(1)
-      .maybeSingle()  // FIXED: Dùng maybeSingle() thay vì single()
-
-    if (data?.code) {
-      const num = parseInt(data.code.replace('NV', '')) + 1
-      return `NV${num.toString().padStart(3, '0')}`
-    }
-    return 'NV001'
-  }
 }
 
 export default employeeService

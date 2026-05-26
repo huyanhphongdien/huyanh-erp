@@ -2,7 +2,65 @@
 
 **Date**: 2026-05-26
 **Mục đích**: phân tích ĐẦY ĐỦ từ schema thực tế ERP + 76 phiếu Excel TL, lên plan có thể execute từng bước không sai.
-**Trạng thái**: 📋 **Plan only — chưa code**. User review + chốt decision trước khi triển khai.
+**Trạng thái**: ✅ **Decisions LOCKED** (user confirm 2026-05-26). Bắt đầu Sprint 1.
+
+---
+
+## 🔒 Decisions ĐÃ CHỐT (lock-in)
+
+| D | Decision | Impact |
+|---|---|---|
+| **D1** | `drc_percent` lưu **percent (39.2)** | Công thức `dry_weight_kg = net × drc / 100` đúng |
+| **D2** | Bonus tính **KL KHÔ** (`dry_weight_kg`) | Update `compute_monthly_bonus()` SUM dry_weight_kg |
+| **D3** | Weighbridge **reuse `qc_actual_drc`** | Đổi nghĩa: "DRC đo tại cân lần 2" |
+| **D5** | `pnk_number` **int sequential per (facility_id, năm)** | Trigger advisory_lock |
+| **D7** | DROP VIEW CASCADE **OK** (đang test, dev mode) | Recreate sạch + RLS |
+| **D8** | Workflow ĐNTT/BGĐ duyệt: **post go-live** | Out of scope Sprint 1-5 |
+| **Proxy partner** | Đại lý đầu mối là `partner_type='dealer'` + flag `is_payment_proxy=true` | KHÔNG tạo type mới |
+| **Import data** | **YES** import 76 phiếu Excel vào DB | Sprint 4, script Python |
+
+---
+
+## 🚜 Quy trình thực tế TL — Mủ nước (CRITICAL FOR UX)
+
+User confirm 2026-05-26:
+
+```
+Step 1: Vào cân (gross)         ──→ Lưu gross_weight (xe + mủ)
+                                    Operator click "Cân lần 1"
+        ↓ Đại lý đến nhà máy
+Step 2: Lấy mẫu mủ              ──→ Lấy ~50ml mẫu từ thùng xe
+                                    (manual, không digital)
+        ↓ Mẫu đem đi đo
+Step 3: Đốt mẫu / Đo metrolac    ──→ Đốt mẫu (~20-30 phút) HOẶC
+                                    Đo metrolac → ĐỐT số đọc
+                                    (operator giữ giấy)
+        ↓ Trong lúc đốt: xe vẫn ở nhà máy
+Step 4: Xã mủ vào bể chứa        ──→ Xả mủ xuống bể tank nhà máy
+                                    (manual, không digital)
+        ↓ Xe trống
+Step 5: Cân lần 2 (tare)        ──→ Cân xe rỗng (còn dính ít mủ)
+                                    INPUT đồng thời:
+                                      • ĐỐT (số đo từ Step 3)
+                                      • DRC % (tự tính hoặc nhập tay)
+                                    Auto tính:
+                                      • Net = gross − tare
+                                      • Dry = net × drc / 100
+Step 6: Hoàn tất                  ──→ status='completed'
+                                    Bridge tự tạo rubber_intake_batches
+                                    + tính bonus (sau Sprint 1.3)
+```
+
+### Hệ luỵ thiết kế UX
+
+- **Form cân TL có gap 20-30 phút** giữa Step 1 (gross) và Step 5 (tare + DRC).
+- Operator có thể đóng/mở app nhiều lần trong gap → **state phải persist** ở `weighbridge_tickets` status='weighing_tare'.
+- Card "Đo DRC" hiển thị khi ticket status='weighing_tare' (sau gross, trước tare).
+- 2 input cùng card: ĐỐT (NumberInput) + DRC (auto-suggest từ ĐỐT, override OK).
+- Click "Cân lần 2" → request weight từ scale + save ĐỐT/DRC cùng lúc.
+- Click "Hoàn tất" → status='completed' → trigger bridge.
+
+Khác với pattern cũ (DRC nhập ở QC riêng sau khi mủ vào bể): TL **chốt DRC ngay tại cân**.
 
 ---
 

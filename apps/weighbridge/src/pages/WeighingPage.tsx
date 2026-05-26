@@ -123,6 +123,12 @@ export default function WeighingPage() {
   const [expectedDrc, setExpectedDrc] = useState<number | null>(null)
   const [unitPrice, setUnitPrice] = useState<number | null>(null)
   const [priceUnit, setPriceUnit] = useState<'wet' | 'dry'>('wet')
+
+  // F2 Tân Lâm — quy trình mủ nước: đo ĐỐT + DRC tại cân lần 2 (sau lấy mẫu + đốt)
+  // DRC% = ĐỐT × 0.2 − 3.4 (vd ĐỐT 213 → 39.2%). Operator có thể override.
+  const [dotReading, setDotReading] = useState<number | null>(null)
+  const [actualDrc, setActualDrc] = useState<number | null>(null)
+  const [consolidationCode, setConsolidationCode] = useState<string>('')
   const [destination, setDestination] = useState<string>('bai_mu')
   const [deductionKg, setDeductionKg] = useState<number>(0)
   const [notes, setNotes] = useState('')
@@ -233,6 +239,10 @@ export default function WeighingPage() {
         if (ext.price_unit) setPriceUnit(ext.price_unit)
         if (ext.destination) setDestination(ext.destination)
         if (ext.deduction_kg) setDeductionKg(ext.deduction_kg)
+        // F2 TL: restore ĐỐT + DRC thực + consolidation_code nếu đã save trước đó
+        if (ext.field_dot_reading != null) setDotReading(ext.field_dot_reading)
+        if (ext.qc_actual_drc != null) setActualDrc(ext.qc_actual_drc)
+        if (ext.consolidation_code) setConsolidationCode(ext.consolidation_code)
         // Calculate if both weights exist
         if (t.gross_weight != null && t.tare_weight != null) {
           recalculate(t.gross_weight, t.tare_weight, ext.deduction_kg || 0, ext.expected_drc, ext.unit_price, ext.price_unit)
@@ -489,11 +499,22 @@ export default function WeighingPage() {
           cameraCaptureRef.current('L1').catch(() => {})
         }
       } else {
-        updated = await weighbridgeService.updateTareWeight(ticket.id, weight, operator?.id)
+        // F2 TL: nếu là mủ nước + có ĐỐT/DRC nhập → save kèm tare weight
+        // (quy trình: cân gross → lấy mẫu → đốt → xã mủ → cân tare + ĐỐT/DRC)
+        const drcExtras = (rubberType === 'mu_nuoc' || dotReading != null || actualDrc != null)
+          ? {
+              field_dot_reading: dotReading,
+              qc_actual_drc: actualDrc,
+              consolidation_code: consolidationCode.trim() || null,
+            }
+          : undefined
+        updated = await weighbridgeService.updateTareWeight(ticket.id, weight, operator?.id, drcExtras)
         setTicket(updated)
+        // Recalculate với DRC thực nếu có (override expectedDrc)
+        const drcForCalc = actualDrc ?? expectedDrc
         const c = recalculate(
           updated.gross_weight!, weight, deductionKg,
-          expectedDrc, unitPrice, priceUnit,
+          drcForCalc, unitPrice, priceUnit,
         )
         setSuccess(`Cân lần 2 (Tare): ${weight.toLocaleString()} kg — NET: ${c.net_weight.toLocaleString()} kg`)
         setManualWeight(null)
@@ -1245,6 +1266,96 @@ export default function WeighingPage() {
                     <Text type="secondary" style={{ fontSize: 12 }}>Ghi chú</Text>
                     <Input.TextArea value={notes} onChange={(e) => setNotes(e.target.value)}
                       rows={2} placeholder="Ghi chú..." disabled={isCompleted} />
+                  </Col>
+                </Row>
+              </Card>
+              )}
+
+              {/* F2 Tân Lâm — Card "Đo DRC tại cân" cho mủ nước
+                  Hiển thị khi: ticket existing + IN + mủ nước (auto-detect TL flow)
+                  Quy trình: gross → lấy mẫu → đốt → xã mủ → cân tare + nhập ĐỐT/DRC */}
+              {ticket && ticketDirection === 'in' && (rubberType === 'mu_nuoc' || dotReading != null) && (
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <span style={{ fontSize: 16 }}>🧪</span>
+                    <Text strong style={{ color: PRIMARY }}>Đo DRC tại cân (Tân Lâm)</Text>
+                  </Space>
+                }
+                style={{ borderRadius: 12, borderColor: PRIMARY, borderWidth: 2 }}
+              >
+                <Row gutter={[12, 12]}>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      ĐỐT <span style={{ color: '#999' }}>(metrolac)</span>
+                    </Text>
+                    <InputNumber
+                      value={dotReading}
+                      onChange={(v) => {
+                        const n = typeof v === 'number' ? v : null
+                        setDotReading(n)
+                        // Auto-suggest DRC% = ĐỐT × 0.2 − 3.4 (vd 213 → 39.2%)
+                        // Chỉ auto-fill nếu user CHƯA nhập actualDrc (override OK)
+                        if (n != null && actualDrc == null) {
+                          const suggested = Math.max(0, Math.round((n * 0.2 - 3.4) * 100) / 100)
+                          setActualDrc(suggested)
+                        }
+                      }}
+                      style={{ width: '100%' }}
+                      min={100}
+                      max={350}
+                      placeholder="180-241"
+                      disabled={isCompleted}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      DRC thực (%) <span style={{ color: '#999' }}>tự tính từ ĐỐT</span>
+                    </Text>
+                    <InputNumber
+                      value={actualDrc}
+                      onChange={(v) => setActualDrc(typeof v === 'number' ? v : null)}
+                      style={{ width: '100%' }}
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      placeholder="0-100"
+                      disabled={isCompleted}
+                    />
+                  </Col>
+                  {/* Preview KL khô khi có đủ data */}
+                  {ticket?.net_weight && actualDrc && (
+                    <Col span={24}>
+                      <div style={{
+                        background: '#F0F9F4', border: '1px solid #b7eb8f',
+                        borderRadius: 8, padding: '8px 12px',
+                      }}>
+                        <Text style={{ fontSize: 12 }}>
+                          📊 KL khô = {ticket.net_weight.toLocaleString()} kg × {actualDrc}% = {' '}
+                          <Text strong style={{ color: PRIMARY, fontSize: 14 }}>
+                            {(ticket.net_weight * actualDrc / 100).toFixed(1).toLocaleString()} kg
+                          </Text>
+                        </Text>
+                      </div>
+                    </Col>
+                  )}
+                  <Col span={24}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Mã LLM (gộp xe) <span style={{ color: '#999' }}>tùy chọn</span>
+                    </Text>
+                    <Input
+                      value={consolidationCode}
+                      onChange={(e) => setConsolidationCode(e.target.value)}
+                      placeholder="VD: TMMN-07 XE 1 (19/05)"
+                      disabled={isCompleted}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>
+                      💡 Nhập ĐỐT + DRC TRƯỚC khi bấm "Cân lần 2". Khi cân tare, hệ thống tự lưu kèm.
+                      Auto-suggest DRC dùng công thức HAQT: DRC% = ĐỐT × 0.2 − 3.4 (vd ĐỐT 213 → 39.2%).
+                    </Text>
                   </Col>
                 </Row>
               </Card>

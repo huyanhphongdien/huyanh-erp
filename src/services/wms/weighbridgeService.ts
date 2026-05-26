@@ -153,13 +153,22 @@ async function updateGrossWeight(
 }
 
 /**
- * Cập nhật Tare weight (cân lần 2) + tính Net
+ * Cập nhật Tare weight (cân lần 2) + tính Net + (optional) ĐỐT/DRC đo tại cân
  * → KHÔNG chuyển status (chờ complete)
+ *
+ * extras (F2 Tân Lâm 2026-05-26): quy trình TL mủ nước nhập ĐỐT + DRC ngay
+ * khi cân lần 2. Nếu pass kèm, save luôn vào ticket → bridge sẽ copy sang
+ * rubber_intake_batches khi completed.
  */
 async function updateTareWeight(
   id: string,
   weight: number,
-  userId?: string
+  userId?: string,
+  extras?: {
+    field_dot_reading?: number | null
+    qc_actual_drc?: number | null
+    consolidation_code?: string | null
+  }
 ): Promise<WeighbridgeTicket> {
   // Lấy gross trước để tính net
   const { data: ticket, error: fetchError } = await supabase
@@ -173,14 +182,19 @@ async function updateTareWeight(
 
   const netWeight = Math.abs(ticket.gross_weight - weight)
 
+  const updatePayload: Record<string, any> = {
+    tare_weight: weight,
+    net_weight: netWeight,
+    tare_weighed_at: new Date().toISOString(),
+    tare_weighed_by: userId || null,
+  }
+  if (extras?.field_dot_reading !== undefined) updatePayload.field_dot_reading = extras.field_dot_reading
+  if (extras?.qc_actual_drc !== undefined) updatePayload.qc_actual_drc = extras.qc_actual_drc
+  if (extras?.consolidation_code !== undefined) updatePayload.consolidation_code = extras.consolidation_code
+
   const { data, error } = await supabase
     .from('weighbridge_tickets')
-    .update({
-      tare_weight: weight,
-      net_weight: netWeight,
-      tare_weighed_at: new Date().toISOString(),
-      tare_weighed_by: userId || null,
-    })
+    .update(updatePayload)
     .eq('id', id)
     .eq('status', 'weighing_tare')
     .select(TICKET_SELECT)

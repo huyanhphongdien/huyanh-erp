@@ -78,10 +78,13 @@ export const INTAKE_TABS: SectionTab[] = [
   { key: 'manual-entry',  label: 'Nhập tay phiếu cân',   path: '/b2b/intake-manual' },
 ]
 
+// PARTNER_TABS — chỉ 2 tab (Danh sách + Chờ duyệt).
+// "Thưởng đại lý" KHÔNG nằm trong tab này vì đó là workflow tài chính theo
+// quý (chốt bonus, gọi compute_monthly_bonus, batch chi tiền) — giữ làm
+// sidebar item riêng để tránh duplicate access point.
 export const PARTNER_TABS: SectionTab[] = [
   { key: 'partner-list',     label: 'Danh sách đại lý', path: '/b2b/partners' },
   { key: 'partner-requests', label: 'Chờ duyệt',        path: '/b2b/partners/requests' },
-  { key: 'partner-bonuses',  label: 'Thưởng đại lý',    path: '/b2b/bonuses' },
 ]
 
 export const LEDGER_TABS: SectionTab[] = [

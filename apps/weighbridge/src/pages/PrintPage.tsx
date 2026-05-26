@@ -9,10 +9,11 @@ import type { WeighbridgeTicket, WeighbridgeImage } from '@erp/services/wms/wms.
 
 const { Text } = Typography
 
-type PaperSize = 'a4' | '80mm' | '58mm'
+type PaperSize = 'a4' | 'a5' | '80mm' | '58mm'
 
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
   a4: { label: 'A4 (210mm)', width: 800, fontSize: 13 },
+  a5: { label: 'A5 (148mm)', width: 560, fontSize: 12 },
   '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
   '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
 }
@@ -94,7 +95,8 @@ export default function PrintPage() {
 
   const ext = ticket as any
   const cfg = PAPER_CONFIGS[paperSize]
-  const isThermal = paperSize !== 'a4'
+  // Thermal printer = giấy nhiệt (80mm / 58mm). A4 + A5 đều là laser/inkjet, layout giống nhau.
+  const isThermal = paperSize === '80mm' || paperSize === '58mm'
   const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString() : '---'
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('vi-VN')
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
@@ -149,6 +151,7 @@ export default function PrintPage() {
           size="small"
         >
           <Radio.Button value="a4">A4</Radio.Button>
+          <Radio.Button value="a5">A5</Radio.Button>
           <Radio.Button value="80mm">80mm</Radio.Button>
           <Radio.Button value="58mm">58mm</Radio.Button>
         </Radio.Group>
@@ -196,7 +199,9 @@ export default function PrintPage() {
           @page {
             ${isThermal
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
-              : 'size: A4; margin: 10mm;'
+              : paperSize === 'a5'
+                ? 'size: A5; margin: 8mm;'
+                : 'size: A4; margin: 10mm;'
             }
           }
         }

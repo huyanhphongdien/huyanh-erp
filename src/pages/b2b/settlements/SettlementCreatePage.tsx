@@ -730,7 +730,7 @@ const SettlementCreatePage: React.FC = () => {
   ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <Breadcrumb
         style={{ marginBottom: 16 }}
         items={[

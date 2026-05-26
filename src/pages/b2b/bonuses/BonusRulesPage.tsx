@@ -36,7 +36,7 @@ export function BonusRulesPage() {
   })
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-4">
+    <div style={{ padding: 24 }} className="space-y-4">
       <button
         onClick={() => navigate('/b2b/bonuses')}
         className="text-sm text-emerald-700 hover:underline flex items-center gap-1"

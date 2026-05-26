@@ -27,7 +27,7 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Đã hủy' },
 ]
 
-const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
+const formatDate = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
 
 export default function POListPage() {
   const navigate = useNavigate()
@@ -35,7 +35,7 @@ export default function POListPage() {
   const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ['purchase-orders-all'],
     queryFn: async () => {
-      const result = await purchaseOrderService.getList({ page: 1, pageSize: 500 })
+      const result = await purchaseOrderService.getAll(1, 500)
       return result.data
     },
     staleTime: 60000,

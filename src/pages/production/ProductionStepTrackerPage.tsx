@@ -127,7 +127,7 @@ export default function ProductionStepTrackerPage() {
         production_order_id: orderId,
         reason_category: downtimeCategory,
         reason_detail: downtimeDetail || undefined,
-        reported_by: user?.employee_id,
+        reported_by: user?.employee_id ?? undefined,
       })
     },
     onSuccess: () => {

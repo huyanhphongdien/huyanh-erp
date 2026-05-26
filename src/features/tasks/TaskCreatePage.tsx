@@ -242,7 +242,7 @@ export const TaskCreatePage: React.FC = () => {
         dbData.assignee_id = formData.assignee_id || null;
         dbData.assigner_id = user?.employee_id || null;
         dbData.is_self_assigned = false;
-        (dbData as any).task_source = formData.project_id ? 'project' : 'assigned';
+        (dbData as any).task_source = (formData as any).project_id ? 'project' : 'assigned';
       }
 
       const { data, error: insertError } = await supabase

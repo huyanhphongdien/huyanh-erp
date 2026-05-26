@@ -25,7 +25,7 @@ export default function SOPListPage() {
 
   const statusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await sopService.updateStatus(id, status, user?.employee_id)
+      await sopService.updateStatus(id, status, user?.employee_id ?? undefined)
     },
     onSuccess: () => { message.success('Đã cập nhật'); queryClient.invalidateQueries({ queryKey: ['sop-documents'] }) },
     onError: (e: Error) => message.error(e.message),

@@ -128,7 +128,8 @@ export default function QRCheckInPage() {
               const { Html5Qrcode } = await import('html5-qrcode')
               const blob = await new Promise<Blob>((resolve) => canvas.toBlob(b => resolve(b!), 'image/png'))
               const file = new File([blob], 'frame.png', { type: 'image/png' })
-              const result = await Html5Qrcode.scanFile(file, false)
+              // scanFile is static but missing from older type defs — cast for compat
+              const result = await (Html5Qrcode as any).scanFile(file, false)
               if (result.startsWith(QR_PREFIX)) {
                 processingRef.current = true
                 await handleQRScanned(result)

@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card, Button, Input, Select, Typography, Space, Row, Col, Alert, Divider,
-  Tag, InputNumber, message, Modal, AutoComplete,
+  Tag, InputNumber, message, Modal, AutoComplete, Radio,
 } from 'antd'
+import B2BPartnerPicker from '@/components/B2BPartnerPicker'
 import {
   ArrowLeftOutlined, SaveOutlined, PrinterOutlined, CheckOutlined,
   CameraOutlined, ThunderboltOutlined,
@@ -108,7 +109,10 @@ export default function WeighingPage() {
   const [selectedDealId, setSelectedDealId] = useState<string>('')
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
-  const [sourceType, setSourceType] = useState<'deal' | 'supplier'>('deal')
+  const [sourceType, setSourceType] = useState<'deal' | 'supplier' | 'partner_direct'>('deal')
+  // partner_direct: cân không có deal — chọn đại lý B2B trực tiếp + rubber_type
+  const [directPartnerId, setDirectPartnerId] = useState<string | null>(null)
+  const [directRawRubberType, setDirectRawRubberType] = useState<'mu_nuoc'|'mu_tap'|'mu_dong'|'mu_chen'|'mu_to'>('mu_tap')
 
   // Delivery plans (xe đã khai báo trước ở tab "Thông tin giao hàng")
   const [deliveryPlans, setDeliveryPlans] = useState<any[]>([])
@@ -403,6 +407,10 @@ export default function WeighingPage() {
         const sup = suppliers.find((s) => s.id === selectedSupplierId)
         rubberData.supplier_id = selectedSupplierId
         rubberData.supplier_name = sup?.name
+      } else if (sourceType === 'partner_direct' && directPartnerId) {
+        // Cân không có deal: chọn đại lý B2B trực tiếp + chọn loại mủ
+        rubberData.partner_id = directPartnerId
+        rubberData.rubber_type = directRawRubberType  // mu_* — sẽ trigger bridge → intake
       }
       await saveRubberFields(t.id, rubberData)
 
@@ -1027,6 +1035,14 @@ export default function WeighingPage() {
                     >
                       Theo NCC
                     </Button>
+                    <Button
+                      type={sourceType === 'partner_direct' ? 'primary' : 'default'}
+                      onClick={() => setSourceType('partner_direct')}
+                      style={sourceType === 'partner_direct' ? { background: PRIMARY, borderColor: PRIMARY } : {}}
+                      disabled={isCompleted}
+                    >
+                      Đại lý B2B (không deal)
+                    </Button>
                   </div>
 
                   {sourceType === 'deal' ? (
@@ -1096,7 +1112,7 @@ export default function WeighingPage() {
                         </div>
                       )}
                     </div>
-                  ) : (
+                  ) : sourceType === 'supplier' ? (
                     <div>
                       <Text type="secondary" style={{ fontSize: 12 }}>Chọn NCC mủ</Text>
                       <Select
@@ -1113,6 +1129,41 @@ export default function WeighingPage() {
                           label: `${s.code} — ${s.name}`,
                         }))}
                       />
+                    </div>
+                  ) : (
+                    /* partner_direct: chọn đại lý B2B + loại mủ trực tiếp */
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+                        Đại lý B2B (tìm hoặc tạo mới)
+                      </Text>
+                      <B2BPartnerPicker
+                        value={directPartnerId}
+                        onChange={(id) => setDirectPartnerId(id)}
+                        disabled={isCompleted}
+                      />
+                      <div style={{ marginTop: 12 }}>
+                        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+                          Loại mủ chi tiết (cho bonus đại lý)
+                        </Text>
+                        <Radio.Group
+                          value={directRawRubberType}
+                          onChange={(e) => setDirectRawRubberType(e.target.value)}
+                          disabled={isCompleted}
+                          buttonStyle="solid"
+                          style={{ width: '100%' }}
+                        >
+                          <Radio.Button value="mu_nuoc">💧 Mủ nước</Radio.Button>
+                          <Radio.Button value="mu_tap">🪨 Mủ tạp</Radio.Button>
+                          <Radio.Button value="mu_dong">🧊 Mủ đông</Radio.Button>
+                          <Radio.Button value="mu_chen">🥣 Mủ chén</Radio.Button>
+                          <Radio.Button value="mu_to">📄 Mủ tờ</Radio.Button>
+                        </Radio.Group>
+                        <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
+                          ⇒ Nhóm bonus: <strong style={{ color: directRawRubberType === 'mu_nuoc' ? '#1677ff' : '#d97706' }}>
+                            {directRawRubberType === 'mu_nuoc' ? 'Mủ nước' : 'Mủ tạp'}
+                          </strong>
+                        </Text>
+                      </div>
                     </div>
                   )}
                 </Space>

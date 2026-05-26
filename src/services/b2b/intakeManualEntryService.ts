@@ -64,6 +64,10 @@ export interface ManualIntakeInput {
   buyer_name?: string
   notes?: string
   weighbridge_image_urls?: string[]
+  // Sprint 1.4 (TL flow): ĐỐT + mã LLM gộp xe
+  field_dot_reading?: number              // Metrolac reading (integer 100-350)
+  consolidation_code?: string             // Mã LLM gộp xe
+  facility_id?: string                    // optional — gán phiếu vào nhà máy
 }
 
 export interface CsvRow {
@@ -153,6 +157,10 @@ export const intakeManualEntryService = {
         notes: input.notes ?? 'Nhập tay qua manual entry',
         status: 'draft',
         weighbridge_image_urls: input.weighbridge_image_urls ?? [],
+        // Sprint 1.4 (TL flow): ĐỐT + mã LLM + facility
+        field_dot_reading: input.field_dot_reading ?? null,
+        consolidation_code: input.consolidation_code ?? null,
+        facility_id: input.facility_id ?? null,
       })
       .select('id, code')
       .single()

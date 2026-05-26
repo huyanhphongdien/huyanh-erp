@@ -3,7 +3,7 @@
 // File: src/pages/b2b/intake-manual/ManualEntryPage.tsx
 // ============================================================================
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -28,6 +28,8 @@ import {
   mapRawToBonusType,
 } from '../../../services/b2b/intakeManualEntryService'
 import { B2BPartnerSelector } from '../../../components/b2b/B2BPartnerSelector'
+import drcLookupService, { type DrcLookupRow } from '../../../services/wms/drcLookupService'
+import { facilityService, type Facility } from '../../../services/wms/facilityService'
 
 const TABS = [
   { key: 'single', label: 'Nhập 1 phiếu', icon: <FileText className="w-4 h-4" /> },
@@ -94,6 +96,29 @@ function SingleEntryForm() {
   const [notes, setNotes] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  // Sprint 1.4 (TL flow) — ĐỐT + LLM + facility + DRC lookup
+  const [dotReading, setDotReading] = useState<number | undefined>(undefined)
+  const [consolidationCode, setConsolidationCode] = useState('')
+  const [facilityId, setFacilityId] = useState<string | undefined>(undefined)
+  const [facilities, setFacilities] = useState<Facility[]>([])
+  const [drcLookupRows, setDrcLookupRows] = useState<DrcLookupRow[]>([])
+
+  useEffect(() => {
+    facilityService.getAllActive().then(setFacilities).catch(() => setFacilities([]))
+    drcLookupService.getAll().then(setDrcLookupRows).catch(() => setDrcLookupRows([]))
+  }, [])
+
+  // ĐỐT thay đổi → re-fill DRC từ bảng tra
+  const handleDotChange = (v: string | number) => {
+    const n = v === '' || v == null ? undefined : Number(v)
+    setDotReading(n)
+    if (n == null || !Number.isFinite(n)) {
+      setDrc(undefined)
+    } else {
+      const suggested = drcLookupService.lookupSync(drcLookupRows, n)
+      if (suggested != null) setDrc(suggested)
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -109,6 +134,9 @@ function SingleEntryForm() {
         vehicle_plate: vehiclePlate || undefined,
         invoice_no: invoiceNo || undefined,
         notes: notes || undefined,
+        field_dot_reading: dotReading,
+        consolidation_code: consolidationCode.trim() || undefined,
+        facility_id: facilityId,
       }
       return intakeManualEntryService.createSingle(input, files)
     },
@@ -125,6 +153,8 @@ function SingleEntryForm() {
       setInvoiceNo('')
       setNotes('')
       setFiles([])
+      setDotReading(undefined)
+      setConsolidationCode('')
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
       qc.invalidateQueries({ queryKey: ['b2b-bonus-dashboard'] })
     },
@@ -199,9 +229,65 @@ function SingleEntryForm() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <NumberInput label="Net weight (kg) *" value={netWeight} onChange={(v) => setNetWeight(Number(v) || 0)} required />
         <NumberInput label="Gross weight (kg)" value={grossWeight ?? ''} onChange={(v) => setGrossWeight(v === '' ? undefined : Number(v))} />
-        <NumberInput label="DRC (%)" value={drc ?? ''} onChange={(v) => setDrc(v === '' ? undefined : Number(v))} step={0.1} />
-        <NumberInput label="Đơn giá (đ/kg)" value={unitPrice ?? ''} onChange={(v) => setUnitPrice(v === '' ? undefined : Number(v))} />
+        <NumberInput
+          label={`ĐỐT (metrolac)${rawRubberType === 'mu_nuoc' ? ' — Tân Lâm' : ''}`}
+          value={dotReading ?? ''}
+          onChange={handleDotChange}
+        />
+        <NumberInput
+          label={`DRC (%) ${dotReading != null ? '— tra từ bảng' : ''}`}
+          value={drc ?? ''}
+          onChange={(v) => setDrc(v === '' ? undefined : Number(v))}
+          step={0.1}
+        />
       </div>
+
+      {/* KL khô preview + đơn giá + facility + LLM */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <NumberInput
+          label="Đơn giá (đ/kg)"
+          value={unitPrice ?? ''}
+          onChange={(v) => setUnitPrice(v === '' ? undefined : Number(v))}
+        />
+        <div>
+          <label className="block text-xs text-slate-600 mb-1 font-medium">Nhà máy</label>
+          <select
+            value={facilityId || ''}
+            onChange={(e) => setFacilityId(e.target.value || undefined)}
+            className="w-full px-3 py-2 border rounded text-sm bg-white"
+          >
+            <option value="">— Không gán —</option>
+            {facilities.map((f) => (
+              <option key={f.id} value={f.id}>{f.code} — {f.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-xs text-slate-600 mb-1 font-medium">
+            Mã LLM (gộp xe) <span className="text-slate-400">— tuỳ chọn</span>
+          </label>
+          <input
+            type="text"
+            value={consolidationCode}
+            onChange={(e) => setConsolidationCode(e.target.value)}
+            placeholder="VD: TMMN-07 XE 1 (19/05)"
+            className="w-full px-3 py-2 border rounded text-sm"
+          />
+        </div>
+      </div>
+
+      {/* KL khô preview khi đủ net + DRC */}
+      {netWeight > 0 && drc != null && drc > 0 && (
+        <div className="bg-teal-50 border border-teal-200 rounded px-3 py-2 text-sm">
+          📊 KL khô ≈ {netWeight.toLocaleString('vi-VN')} kg × {drc}% ={' '}
+          <strong className="text-teal-800">
+            {(netWeight * drc / 100).toFixed(1)} kg
+          </strong>{' '}
+          <span className="text-xs text-teal-600">
+            ({((netWeight * drc / 100) / 1000).toFixed(2)} T)
+          </span>
+        </div>
+      )}
 
       {/* Tham chiếu */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

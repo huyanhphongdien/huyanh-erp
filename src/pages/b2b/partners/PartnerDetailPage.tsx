@@ -28,6 +28,11 @@ import {
   Tooltip,
   message,
   Breadcrumb,
+  Modal,
+  Select,
+  Input,
+  Switch,
+  Alert,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -96,9 +101,10 @@ const formatDate = (dateStr: string | null): string => {
 interface InfoTabProps {
   partner: Partner
   stats: PartnerStats | null
+  proxyName: string | null
 }
 
-const InfoTab = ({ partner, stats }: InfoTabProps) => {
+const InfoTab = ({ partner, stats, proxyName }: InfoTabProps) => {
   return (
     <Row gutter={24}>
       <Col xs={24} lg={16}>
@@ -107,9 +113,23 @@ const InfoTab = ({ partner, stats }: InfoTabProps) => {
             <Descriptions.Item label="Mã đại lý (HAC-13)">
               <Text strong style={{ fontFamily: 'monospace', fontSize: 14 }}>{partner.code}</Text>
             </Descriptions.Item>
-            <Descriptions.Item label="Tên đại lý">{partner.name}</Descriptions.Item>
+            <Descriptions.Item label="Tên đại lý">
+              <Space direction="vertical" size={2}>
+                <Text>{partner.name}</Text>
+                {partner.contact_alias_name && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    ➜ Biệt danh: <Text strong>{partner.contact_alias_name}</Text>
+                  </Text>
+                )}
+              </Space>
+            </Descriptions.Item>
             <Descriptions.Item label="Loại">
-              {PARTNER_TYPE_LABELS[partner.partner_type]}
+              <Space>
+                {PARTNER_TYPE_LABELS[partner.partner_type]}
+                {partner.is_payment_proxy && (
+                  <Tag color="purple">💼 Nhận tiền hộ</Tag>
+                )}
+              </Space>
             </Descriptions.Item>
             <Descriptions.Item label="Hạng">
               <Tag color={TIER_COLORS[partner.tier]}>
@@ -141,6 +161,20 @@ const InfoTab = ({ partner, stats }: InfoTabProps) => {
                 <EnvironmentOutlined />
                 {partner.address || '-'}
               </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="Đại lý nhận tiền hộ" span={2}>
+              {partner.payment_proxy_partner_id ? (
+                <Space>
+                  <Tag color="purple" icon={<UserOutlined />}>
+                    {proxyName || partner.payment_proxy_partner_id.slice(0, 8)}
+                  </Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Tiền của đại lý này sẽ trả qua đại lý đầu mối ở trên
+                  </Text>
+                </Space>
+              ) : (
+                <Text type="secondary">Trả trực tiếp (không qua đầu mối)</Text>
+              )}
             </Descriptions.Item>
           </Descriptions>
         </Card>
@@ -441,6 +475,15 @@ const PartnerDetailPage = () => {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('info')
 
+  // Sprint 1.1 (TL) — proxy + alias edit
+  const [editOpen, setEditOpen] = useState(false)
+  const [editProxyId, setEditProxyId] = useState<string | null>(null)
+  const [editAlias, setEditAlias] = useState<string>('')
+  const [editIsProxy, setEditIsProxy] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
+  const [allPartners, setAllPartners] = useState<Partner[]>([])
+  const [proxyName, setProxyName] = useState<string | null>(null)
+
   // ============================================
   // DATA FETCHING
   // ============================================
@@ -456,6 +499,13 @@ const PartnerDetailPage = () => {
       ])
       setPartner(partnerData)
       setStats(statsData)
+      // Sprint 1.1 — resolve proxy name
+      if (partnerData?.payment_proxy_partner_id) {
+        const proxy = await partnerService.getPartnerById(partnerData.payment_proxy_partner_id)
+        setProxyName(proxy?.name || null)
+      } else {
+        setProxyName(null)
+      }
     } catch (error) {
       console.error('Error fetching partner:', error)
       message.error('Không thể tải thông tin đại lý')
@@ -467,6 +517,45 @@ const PartnerDetailPage = () => {
   useEffect(() => {
     fetchPartner()
   }, [fetchPartner])
+
+  // Lazy-load partner list for proxy picker khi mở edit modal
+  useEffect(() => {
+    if (editOpen && allPartners.length === 0) {
+      partnerService.getAllActive().then(setAllPartners).catch(() => setAllPartners([]))
+    }
+  }, [editOpen, allPartners.length])
+
+  // Sprint 1.1 handlers
+  const openEditModal = () => {
+    if (!partner) return
+    setEditProxyId(partner.payment_proxy_partner_id ?? null)
+    setEditAlias(partner.contact_alias_name ?? '')
+    setEditIsProxy(!!partner.is_payment_proxy)
+    setEditOpen(true)
+  }
+
+  const handleSaveExtras = async () => {
+    if (!partner) return
+    if (editProxyId === partner.id) {
+      message.error('Đại lý không thể nhận tiền qua chính nó')
+      return
+    }
+    setEditSaving(true)
+    try {
+      await partnerService.updateProxyAndAlias(partner.id, {
+        payment_proxy_partner_id: editProxyId,
+        contact_alias_name: editAlias.trim() || null,
+        is_payment_proxy: editIsProxy,
+      })
+      message.success('Đã cập nhật')
+      setEditOpen(false)
+      await fetchPartner()
+    } catch (e: any) {
+      message.error('Lỗi cập nhật: ' + (e?.message || e))
+    } finally {
+      setEditSaving(false)
+    }
+  }
 
   // ============================================
   // HANDLERS
@@ -524,7 +613,7 @@ const PartnerDetailPage = () => {
           Thông tin
         </span>
       ),
-      children: <InfoTab partner={partner} stats={stats} />,
+      children: <InfoTab partner={partner} stats={stats} proxyName={proxyName} />,
     },
     {
       key: 'chat',
@@ -618,7 +707,7 @@ const PartnerDetailPage = () => {
           </Col>
           <Col>
             <Space>
-              <Button icon={<EditOutlined />}>Chỉnh sửa</Button>
+              <Button icon={<EditOutlined />} onClick={openEditModal}>Chỉnh sửa</Button>
               <Button icon={<MessageOutlined />} onClick={handleOpenChat}>
                 Mở Chat
               </Button>
@@ -638,6 +727,72 @@ const PartnerDetailPage = () => {
           items={tabItems}
         />
       </Card>
+
+      {/* Sprint 1.1 (TL): Edit proxy + alias modal */}
+      <Modal
+        title={`Chỉnh sửa thông tin — ${partner.name}`}
+        open={editOpen}
+        onCancel={() => setEditOpen(false)}
+        onOk={handleSaveExtras}
+        confirmLoading={editSaving}
+        okText="Lưu"
+        cancelText="Huỷ"
+        width={560}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size={16}>
+          <div>
+            <Text strong style={{ display: 'block', marginBottom: 6 }}>Biệt danh / tên thân mật</Text>
+            <Input
+              value={editAlias}
+              onChange={(e) => setEditAlias(e.target.value)}
+              placeholder='VD: "Anh Thạo Mỹ Hoà" — operator dễ nhận diện hơn tên chính thức'
+              maxLength={120}
+            />
+          </div>
+
+          <div>
+            <Text strong style={{ display: 'block', marginBottom: 6 }}>Đại lý nhận tiền hộ (đầu mối)</Text>
+            <Select
+              value={editProxyId}
+              onChange={(v) => setEditProxyId(v || null)}
+              placeholder="Chọn đại lý đầu mối (để trống = trả trực tiếp)"
+              showSearch
+              allowClear
+              optionFilterProp="label"
+              style={{ width: '100%' }}
+              options={allPartners
+                .filter((p) => p.id !== partner.id)
+                .map((p) => ({
+                  value: p.id,
+                  label: `${p.code} — ${p.name}${p.is_payment_proxy ? ' 💼' : ''}`,
+                }))}
+            />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Khi quyết toán, tiền của đại lý này sẽ chi trả qua đại lý đầu mối ở trên.
+            </Text>
+          </div>
+
+          <div style={{ background: '#FAFAFA', border: '1px solid #F0F0F0', borderRadius: 8, padding: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <Text strong>Đại lý này nhận tiền hộ người khác?</Text>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                  Bật cờ để đánh dấu đại lý đầu mối (xuất hiện sẵn ở dropdown trên cho người khác chọn).
+                </div>
+              </div>
+              <Switch checked={editIsProxy} onChange={setEditIsProxy} />
+            </div>
+          </div>
+
+          {editProxyId === partner.id && (
+            <Alert
+              type="error"
+              showIcon
+              message="Đại lý không thể tự nhận tiền hộ chính nó"
+            />
+          )}
+        </Space>
+      </Modal>
     </div>
   )
 }

@@ -19,10 +19,21 @@ export interface B2BRubberIntake {
   product_code: string
   /** Loại mủ (HAC bonus): 'tap' = mủ tạp, 'nuoc' = mủ nước. NULL = chưa phân loại → bonus = 0. */
   rubber_type: 'tap' | 'nuoc' | null
+  /** Loại mủ thô (5 loại chi tiết): mu_nuoc, mu_tap, mu_dong, mu_chen, mu_to. */
+  raw_rubber_type: 'mu_nuoc' | 'mu_tap' | 'mu_dong' | 'mu_chen' | 'mu_to' | null
+  facility_id: string | null
   // Weights
   gross_weight_kg: number | null
   net_weight_kg: number | null
   drc_percent: number | null
+  /** KL khô = net × drc/100. Generated column trong DB (sprint1_04). */
+  dry_weight_kg: number | null
+  /** Số đo metrolac/lactometer tại cân lần 2 (Tân Lâm flow). */
+  field_dot_reading: number | null
+  /** Mã LLM gộp xe (vd "TMMN-07 XE 1 (19/05)"). */
+  consolidation_code: string | null
+  /** Số PNK auto-sequence per (facility, year). */
+  pnk_number: number | null
   finished_product_ton: number | null
   // Vietnam pricing
   settled_qty_ton: number | null
@@ -54,6 +65,7 @@ export interface B2BRubberIntake {
   supplier?: { id: string; name: string; code: string; supplier_type: string } | null
   deal?: { id: string; deal_number: string; status: string; partner_id: string } | null
   partner?: { id: string; name: string; code: string; tier: string } | null
+  facility?: { id: string; code: string; name: string } | null
   // Timestamps
   created_at: string
   updated_at: string
@@ -65,6 +77,9 @@ export interface RubberIntakeFilter {
   source_type?: string
   has_deal?: boolean // true = linked to deal, false = standalone
   partner_id?: string
+  facility_id?: string
+  raw_rubber_type?: 'mu_nuoc' | 'mu_tap' | 'mu_dong' | 'mu_chen' | 'mu_to'
+  consolidation_code?: string
   date_from?: string
   date_to?: string
   page?: number
@@ -79,6 +94,7 @@ export interface RubberIntakeStats {
   with_deal: number
   without_deal: number
   total_weight_kg: number
+  total_dry_weight_kg: number
   total_amount: number
 }
 
@@ -132,13 +148,16 @@ export const rubberIntakeB2BService = {
     if (filter.status) query = query.eq('status', filter.status)
     if (filter.source_type) query = query.eq('source_type', filter.source_type)
     if (filter.partner_id) query = query.eq('b2b_partner_id', filter.partner_id)
+    if (filter.facility_id) query = query.eq('facility_id', filter.facility_id)
+    if (filter.raw_rubber_type) query = query.eq('raw_rubber_type', filter.raw_rubber_type)
+    if (filter.consolidation_code) query = query.eq('consolidation_code', filter.consolidation_code)
     if (filter.date_from) query = query.gte('intake_date', filter.date_from)
     if (filter.date_to) query = query.lte('intake_date', filter.date_to)
     if (filter.has_deal === true) query = query.not('deal_id', 'is', null)
     if (filter.has_deal === false) query = query.is('deal_id', null)
 
     if (filter.search) {
-      query = query.or(`product_code.ilike.%${filter.search}%,invoice_no.ilike.%${filter.search}%,vehicle_plate.ilike.%${filter.search}%,lot_code.ilike.%${filter.search}%`)
+      query = query.or(`product_code.ilike.%${filter.search}%,invoice_no.ilike.%${filter.search}%,vehicle_plate.ilike.%${filter.search}%,lot_code.ilike.%${filter.search}%,consolidation_code.ilike.%${filter.search}%`)
     }
 
     const { data, error, count } = await query
@@ -192,11 +211,25 @@ export const rubberIntakeB2BService = {
       }
     }
 
+    // Fetch facility info
+    const facilityIds = [...new Set(items.filter(i => i.facility_id).map(i => i.facility_id))]
+    let facilityMap: Record<string, any> = {}
+    if (facilityIds.length > 0) {
+      const { data: facilities } = await supabase
+        .from('facilities')
+        .select('id, code, name')
+        .in('id', facilityIds)
+      if (facilities) {
+        facilities.forEach(f => { facilityMap[f.id] = f })
+      }
+    }
+
     const enriched: B2BRubberIntake[] = items.map(item => ({
       ...item,
       partner: item.b2b_partner_id ? partnerMap[item.b2b_partner_id] || null : null,
       deal: item.deal_id ? dealMap[item.deal_id] || null : null,
       supplier: item.supplier_id ? supplierMap[item.supplier_id] || null : null,
+      facility: item.facility_id ? facilityMap[item.facility_id] || null : null,
     }))
 
     return { data: enriched, total: count || 0 }
@@ -238,13 +271,15 @@ export const rubberIntakeB2BService = {
   },
 
   /** Thống kê */
-  async getStats(filter?: { date_from?: string; date_to?: string }): Promise<RubberIntakeStats> {
-    let query = supabase.from('rubber_intake_batches').select('id, status, deal_id, net_weight_kg, total_amount')
+  async getStats(filter?: { date_from?: string; date_to?: string; facility_id?: string; raw_rubber_type?: string }): Promise<RubberIntakeStats> {
+    let query = supabase.from('rubber_intake_batches').select('id, status, deal_id, net_weight_kg, dry_weight_kg, total_amount')
     if (filter?.date_from) query = query.gte('intake_date', filter.date_from)
     if (filter?.date_to) query = query.lte('intake_date', filter.date_to)
+    if (filter?.facility_id) query = query.eq('facility_id', filter.facility_id)
+    if (filter?.raw_rubber_type) query = query.eq('raw_rubber_type', filter.raw_rubber_type)
 
     const { data } = await query
-    const items = data || []
+    const items = (data || []) as any[]
 
     return {
       total: items.length,
@@ -254,6 +289,7 @@ export const rubberIntakeB2BService = {
       with_deal: items.filter(i => i.deal_id).length,
       without_deal: items.filter(i => !i.deal_id).length,
       total_weight_kg: items.reduce((s, i) => s + (i.net_weight_kg || 0), 0),
+      total_dry_weight_kg: items.reduce((s, i) => s + (i.dry_weight_kg || 0), 0),
       total_amount: items.reduce((s, i) => s + (i.total_amount || 0), 0),
     }
   },

@@ -29,6 +29,13 @@ export interface Partner {
   supplier_name_code: string | null
   created_at: string
   updated_at: string | null
+  // Sprint 1.1 (TL): proxy partner — đại lý đầu mối nhận tiền hộ
+  /** ID đại lý đầu mối nhận tiền hộ. NULL = trả trực tiếp partner này. */
+  payment_proxy_partner_id?: string | null
+  /** Tên gọi khác (vd biệt danh) — operator dễ nhận diện. */
+  contact_alias_name?: string | null
+  /** Cờ "đại lý này đứng tên nhận tiền hộ người khác". */
+  is_payment_proxy?: boolean | null
   // Computed stats
   unread_count?: number
   deals_count?: number
@@ -471,6 +478,29 @@ export const partnerService = {
     const { data, error } = await supabase
       .from('b2b_partners')
       .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', partnerId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data as Partner
+  },
+
+  /**
+   * Sprint 1.1 (TL): Cập nhật proxy partner + biệt danh + cờ proxy.
+   * Cho phép null hoá tất cả 3 field (set về NULL/false).
+   */
+  async updateProxyAndAlias(
+    partnerId: string,
+    patch: {
+      payment_proxy_partner_id?: string | null
+      contact_alias_name?: string | null
+      is_payment_proxy?: boolean
+    },
+  ): Promise<Partner> {
+    const { data, error } = await supabase
+      .from('b2b_partners')
+      .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('id', partnerId)
       .select()
       .single()

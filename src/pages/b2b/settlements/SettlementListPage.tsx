@@ -13,6 +13,7 @@ import {
   SETTLEMENT_TYPE_LABELS, SETTLEMENT_TYPE_COLORS,
 } from '../../../services/b2b/settlementService'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
+import { B2BSectionTabs, SETTLEMENT_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const { Text } = Typography
 
@@ -114,6 +115,9 @@ export default function SettlementListPage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={SETTLEMENT_TABS} active="settlement-list" />
+
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}

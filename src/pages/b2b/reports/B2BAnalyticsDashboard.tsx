@@ -16,6 +16,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { Button } from 'antd'
 import { supabase } from '../../../lib/supabase'
+import { B2BSectionTabs, DASHBOARD_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const { Title, Text } = Typography
 
@@ -135,14 +136,14 @@ export default function B2BAnalyticsDashboard() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={DASHBOARD_TABS} active="analytics" />
+
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/b2b')} />
-          <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-            <BarChartOutlined /> Báo cáo B2B
-          </Title>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
+          <BarChartOutlined /> Phân tích B2B
+        </Title>
         <Select value={year} onChange={setYear} style={{ width: 100 }}
           options={[2024, 2025, 2026, 2027].map(y => ({ value: y, label: `${y}` }))} />
       </div>

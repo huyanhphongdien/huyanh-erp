@@ -28,6 +28,7 @@ import {
   type DisputeStatus,
 } from '../../../services/b2b/drcDisputeService'
 import DisputeDetailDrawer from '../../../components/b2b/DisputeDetailDrawer'
+import { B2BSectionTabs, SETTLEMENT_TABS } from '../../../components/b2b/B2BSectionTabs'
 import { useAuthStore } from '../../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -147,6 +148,9 @@ const DisputeListPage = () => {
 
   return (
     <div style={{ padding: 16 }}>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={SETTLEMENT_TABS} active="dispute-list" />
+
       <Space align="center" style={{ marginBottom: 16 }}>
         <WarningOutlined style={{ fontSize: 20, color: '#f59e0b' }} />
         <Title level={4} style={{ margin: 0 }}>Khiếu nại DRC</Title>

@@ -40,6 +40,8 @@ import type { Facility } from '../../../services/wms/facilityService'
 import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import type { WeighbridgeTicket, TicketType, WeighbridgeStatus, PaginatedResponse } from '../../../services/wms/wms.types'
 import dayjs from 'dayjs'
+import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { useIsB2BPurchaser } from '../../../hooks/useIsB2BPurchaser'
 
 // Màu tag theo facility code — giống convention multi-facility các nơi khác
 const FACILITY_TAG_COLOR: Record<string, string> = {
@@ -85,6 +87,7 @@ const PRIMARY_COLOR = '#1B4D3E'
 export default function WeighbridgeListPage() {
   const navigate = useNavigate()
   const openTab = useOpenTab()
+  const isB2BPurchaser = useIsB2BPurchaser()
 
   // State
   const [data, setData] = useState<PaginatedResponse<WeighbridgeTicket> | null>(null)
@@ -350,6 +353,10 @@ export default function WeighbridgeListPage() {
       </div>
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '16px' }}>
+        {/* B2B Section Tabs — chỉ render cho B2B Thu Mua */}
+        {isB2BPurchaser && (
+          <B2BSectionTabs tabs={INTAKE_TABS} active="weighbridge" />
+        )}
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {/* Stats cards */}
           {stats && (

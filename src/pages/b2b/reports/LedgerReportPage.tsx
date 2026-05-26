@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { ledgerService, AgingItem, BalanceSummary } from '../../../services/b2b/ledgerService'
 import { exportLedgerReport } from '../../../utils/b2bLedgerExportExcel'
+import { B2BSectionTabs, LEDGER_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const { Title, Text } = Typography
 
@@ -138,6 +139,9 @@ const LedgerReportPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={LEDGER_TABS} active="ledger-report" />
+
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
           <Title level={3} style={{ margin: 0 }}>

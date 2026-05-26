@@ -18,6 +18,7 @@ import {
 } from '../../../services/b2b/rubberIntakeB2BService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
 import { RAW_RUBBER_TYPE_LABELS, type RawRubberType } from '../../../services/b2b/intakeManualEntryService'
+import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 // ============================================================================
 // INTAKE CARD
@@ -228,20 +229,23 @@ export default function B2BRubberIntakePage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
             <FileCheck className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Lý lịch mủ</h1>
-            <p className="text-xs text-gray-500">Quản lý lý lịch mủ — Tích hợp B2B Thu mua</p>
+            <h1 className="text-xl font-bold text-gray-900">Nhập kho mủ</h1>
+            <p className="text-xs text-gray-500">Lý lịch mủ, phiếu cân, nhập tay — gom 1 chỗ</p>
           </div>
         </div>
         <button onClick={fetchData} className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      {/* Section tabs — switch giữa 3 page intake */}
+      <B2BSectionTabs tabs={INTAKE_TABS} active="intake-list" />
 
       {/* Stats */}
       {stats && (

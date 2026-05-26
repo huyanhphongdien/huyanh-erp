@@ -4,7 +4,6 @@
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Upload,
@@ -15,7 +14,6 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
-  ChevronLeft,
 } from 'lucide-react'
 import { saveAs } from 'file-saver'
 
@@ -30,6 +28,7 @@ import {
 import { B2BPartnerSelector } from '../../../components/b2b/B2BPartnerSelector'
 import drcLookupService, { type DrcLookupRow } from '../../../services/wms/drcLookupService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
+import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const TABS = [
   { key: 'single', label: 'Nhập 1 phiếu', icon: <FileText className="w-4 h-4" /> },
@@ -37,25 +36,19 @@ const TABS = [
 ] as const
 
 export function ManualEntryPage() {
-  const navigate = useNavigate()
   const [tab, setTab] = useState<'single' | 'bulk'>('single')
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-4">
-      <button
-        onClick={() => navigate('/b2b/bonuses')}
-        className="text-sm text-emerald-700 hover:underline flex items-center gap-1"
-      >
-        <ChevronLeft className="w-4 h-4" /> Quay lại Bonus
-      </button>
-
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Nhập tay phiếu cân</h1>
         <p className="text-sm text-slate-500">
-          Tạm thời cho admin nhập tay khi 3 wizard B2B intake (Outright/Walkin/Production) chưa wire-up.
-          Bonus sẽ tự recompute sau insert (qua trigger DB).
+          Dùng khi data về sau cân (vd phiếu giấy cũ, phiếu Excel) — bonus sẽ tự recompute sau insert.
         </p>
       </div>
+
+      {/* B2B Section Tabs — gom chung với Lý lịch mủ + Phiếu cân (đa NM) */}
+      <B2BSectionTabs tabs={INTAKE_TABS} active="manual-entry" />
 
       <div className="flex border-b">
         {TABS.map((t) => (

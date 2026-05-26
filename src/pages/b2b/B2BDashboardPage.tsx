@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenChatTab } from '../../hooks/useB2BTabs'
+import { B2BSectionTabs, DASHBOARD_TABS } from '../../components/b2b/B2BSectionTabs'
 import {
   Card,
   Row,
@@ -332,8 +333,11 @@ const B2BDashboardPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={DASHBOARD_TABS} active="dashboard" />
+
       {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>B2B Dashboard</Title>
           <Text type="secondary">Tổng quan hoạt động B2B</Text>

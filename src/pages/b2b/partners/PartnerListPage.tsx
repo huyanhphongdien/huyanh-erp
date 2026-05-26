@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenChatTab } from '../../../hooks/useB2BTabs'
+import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
 import {
   Card,
   Row,
@@ -299,7 +300,7 @@ const PartnerListPage = () => {
   return (
     <div style={{ padding: 24 }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 16 }}>
         <Row justify="space-between" align="middle">
           <Col>
             <Title level={3} style={{ margin: 0 }}>Quản lý Đại lý</Title>
@@ -317,6 +318,9 @@ const PartnerListPage = () => {
           </Col>
         </Row>
       </div>
+
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={PARTNER_TABS} active="partner-list" />
 
       {/* Filters (E4.2.5) */}
       <Card style={{ marginBottom: 24, borderRadius: 12 }}>

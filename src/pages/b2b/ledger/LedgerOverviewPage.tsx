@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { B2BSectionTabs, LEDGER_TABS } from '../../../components/b2b/B2BSectionTabs'
 import {
   Card,
   Table,
@@ -236,8 +237,11 @@ const LedgerOverviewPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={LEDGER_TABS} active="ledger-overview" />
+
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 16 }}>
         <Row justify="space-between" align="middle">
           <Col>
             <Title level={3} style={{ margin: 0 }}>Sổ Công Nợ</Title>

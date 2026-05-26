@@ -10,19 +10,18 @@ import {
   Card, Table, Tag, Button, Space, Typography, Empty, Modal, Input, message, Descriptions, Spin, Alert,
 } from 'antd'
 import {
-  CheckCircleOutlined, CloseCircleOutlined, ArrowLeftOutlined,
+  CheckCircleOutlined, CloseCircleOutlined,
   UserOutlined, PhoneOutlined, BankOutlined, EnvironmentOutlined,
   WarningOutlined, CopyOutlined, KeyOutlined,
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { useAuthStore } from '../../../stores/authStore'
+import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
 
 export default function PartnerRequestsPage() {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const [rejectId, setRejectId] = useState<string | null>(null)
@@ -224,13 +223,15 @@ export default function PartnerRequestsPage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/b2b/partners')} />
+      <div style={{ marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
           <UserOutlined /> Đại lý chờ duyệt
           {requests.length > 0 && <Tag color="red" style={{ marginLeft: 8 }}>{requests.length}</Tag>}
         </Title>
       </div>
+
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={PARTNER_TABS} active="partner-requests" />
 
       {duplicates.length > 0 && (
         <Alert

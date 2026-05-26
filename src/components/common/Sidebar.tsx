@@ -248,6 +248,12 @@ const getMenuGroups = (
     icon: <MessageSquare size={18} />,
     collapsible: true,
     requireB2BPurchaser: true,
+    // 10 items (giảm từ 16) — các page liên quan gom vào tab nội bộ page:
+    // Đại lý: ds + Duyệt đăng ký + Thưởng đại lý (1 menu, 3 tabs)
+    // Lý lịch mủ: ds + Phiếu cân đa NM + Nhập tay (1 menu, 3 tabs)
+    // Công nợ: sổ + Báo cáo (1 menu, 2 tabs)
+    // Quyết toán: ds + Khiếu nại DRC (1 menu, 2 tabs)
+    // Dashboard: Tổng quan + Phân tích B2B (1 menu, 2 tabs)
     items: [
       {
         path: '/b2b',
@@ -279,12 +285,6 @@ const getMenuGroups = (
         tab: { key: 'b2b-partner-list', componentId: 'b2b-partner-list' },
       },
       {
-        path: '/b2b/partners/requests',
-        label: 'Duyệt đăng ký',
-        icon: <UserCheck size={18} />,
-        requireB2BPurchaser: true,
-      },
-      {
         path: '/b2b/deals',
         label: 'Deals',
         icon: <Handshake size={18} />,
@@ -300,23 +300,10 @@ const getMenuGroups = (
       },
       {
         path: '/b2b/rubber-intake',
-        label: 'Lý lịch mủ',
+        label: 'Nhập kho mủ',
         icon: <FileCheck size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-rubber-intake-list', componentId: 'b2b-rubber-intake-list' },
-      },
-      {
-        path: '/wms/weighbridge/list',
-        label: 'Phiếu cân (đa NM)',
-        icon: <Scale size={18} />,
-        requireB2BPurchaser: true,
-      },
-      {
-        path: '/b2b/intake-manual',
-        label: 'Nhập tay phiếu cân',
-        icon: <PackagePlus size={18} />,
-        requireB2BPurchaser: true,
-        tab: { key: 'b2b-intake-manual', componentId: 'b2b-intake-manual' },
       },
       {
         path: '/b2b/bonuses',
@@ -338,27 +325,6 @@ const getMenuGroups = (
         icon: <ArrowLeftRight size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-settlement-list', componentId: 'b2b-settlement-list' },
-      },
-      {
-        path: '/b2b/disputes',
-        label: 'Khiếu nại DRC',
-        icon: <AlertTriangle size={18} />,
-        requireB2BPurchaser: true,
-        tab: { key: 'b2b-dispute-list', componentId: 'b2b-dispute-list' },
-      },
-      {
-        path: '/b2b/analytics',
-        label: 'Phân tích B2B',
-        icon: <TrendingUp size={18} />,
-        requireB2BPurchaser: true,
-        tab: { key: 'b2b-analytics', componentId: 'b2b-analytics' },
-      },
-      {
-        path: '/b2b/reports',
-        label: 'Báo cáo công nợ',
-        icon: <BarChart3 size={18} />,
-        requireB2BPurchaser: true,
-        tab: { key: 'b2b-ledger-report', componentId: 'b2b-ledger-report' },
       },
     ],
   },

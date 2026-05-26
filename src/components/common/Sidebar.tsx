@@ -84,6 +84,8 @@ import {
   LayoutGrid,
   Ship,
   Activity,
+  Gift,
+  IdCard,
 } from 'lucide-react';
 
 // ============================================================
@@ -296,6 +298,20 @@ const getMenuGroups = (
         icon: <FileCheck size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-rubber-intake-list', componentId: 'b2b-rubber-intake-list' },
+      },
+      {
+        path: '/b2b/intake-manual',
+        label: 'Nhập tay phiếu cân',
+        icon: <PackagePlus size={18} />,
+        requireB2BPurchaser: true,
+        tab: { key: 'b2b-intake-manual', componentId: 'b2b-intake-manual' },
+      },
+      {
+        path: '/b2b/bonuses',
+        label: 'Thưởng đại lý',
+        icon: <Gift size={18} />,
+        requireB2BPurchaser: true,
+        tab: { key: 'b2b-bonus-list', componentId: 'b2b-bonus-list' },
       },
       {
         path: '/b2b/ledger',

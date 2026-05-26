@@ -92,6 +92,17 @@ registerTabComponent('b2b-auction-list', AuctionListPage)
 const B2BRubberIntakePage = lazy(() => import('../pages/b2b/rubber-intake/B2BRubberIntakePage'))
 registerTabComponent('b2b-rubber-intake-list', B2BRubberIntakePage)
 
+// ===== B2B — Bonus + Manual Intake (Quy chế thưởng SL 2026) =====
+
+const ManualEntryPage = lazy(() => import('../pages/b2b/intake-manual/ManualEntryPage'))
+registerTabComponent('b2b-intake-manual', ManualEntryPage)
+
+const BonusListPage = lazy(() => import('../pages/b2b/bonuses/BonusListPage'))
+registerTabComponent('b2b-bonus-list', BonusListPage)
+
+const BonusRulesPage = lazy(() => import('../pages/b2b/bonuses/BonusRulesPage'))
+registerTabComponent('b2b-bonus-rules', BonusRulesPage)
+
 const LedgerOverviewPage = lazy(() => import('../pages/b2b/ledger/LedgerOverviewPage'))
 registerTabComponent('b2b-ledger-overview', LedgerOverviewPage)
 

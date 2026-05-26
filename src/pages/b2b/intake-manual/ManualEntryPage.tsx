@@ -29,6 +29,9 @@ import { B2BPartnerSelector } from '../../../components/b2b/B2BPartnerSelector'
 import drcLookupService, { type DrcLookupRow } from '../../../services/wms/drcLookupService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
 import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { Typography } from 'antd'
+
+const { Title, Text } = Typography
 
 const TABS = [
   { key: 'single', label: 'Nhập 1 phiếu', icon: <FileText className="w-4 h-4" /> },
@@ -39,16 +42,16 @@ export function ManualEntryPage() {
   const [tab, setTab] = useState<'single' | 'bulk'>('single')
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Nhập tay phiếu cân</h1>
-        <p className="text-sm text-slate-500">
-          Dùng khi data về sau cân (vd phiếu giấy cũ, phiếu Excel) — bonus sẽ tự recompute sau insert.
-        </p>
-      </div>
-
+    <div style={{ padding: 24 }} className="space-y-4">
       {/* B2B Section Tabs — gom chung với Lý lịch mủ + Phiếu cân (đa NM) */}
       <B2BSectionTabs tabs={INTAKE_TABS} active="manual-entry" />
+
+      <div>
+        <Title level={3} style={{ margin: 0 }}>Nhập tay phiếu cân</Title>
+        <Text type="secondary">
+          Dùng khi data về sau cân (vd phiếu giấy cũ, phiếu Excel) — bonus sẽ tự recompute sau insert.
+        </Text>
+      </div>
 
       <div className="flex border-b">
         {TABS.map((t) => (

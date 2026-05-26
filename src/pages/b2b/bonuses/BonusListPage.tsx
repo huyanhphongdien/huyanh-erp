@@ -24,6 +24,9 @@ import { BonusTierBadge } from '../../../components/b2b/BonusTierBadge'
 import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay'
 import { QuarterlyBatchModal } from './QuarterlyBatchModal'
 import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { Typography } from 'antd'
+
+const { Title, Text } = Typography
 
 const CURRENT_YEAR = new Date().getFullYear()
 const CURRENT_QUARTER = Math.ceil((new Date().getMonth() + 1) / 3) as 1 | 2 | 3 | 4
@@ -194,17 +197,17 @@ export function BonusListPage() {
   }, [rows])
 
   return (
-    <div className="p-6 space-y-4">
+    <div style={{ padding: 24 }} className="space-y-4">
       {/* B2B Section tabs */}
       <B2BSectionTabs tabs={PARTNER_TABS} active="partner-bonuses" />
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Thưởng đại lý B2B</h1>
-          <p className="text-sm text-slate-500">
+          <Title level={3} style={{ margin: 0 }}>Thưởng đại lý B2B</Title>
+          <Text type="secondary">
             Quy chế thưởng SL mủ tạp (T1/2026+) và mủ nước (T6/2026+). Chốt cuối quý, chi trước 15 tháng đầu quý kế.
-          </p>
+          </Text>
         </div>
         <div className="flex gap-2">
           <button

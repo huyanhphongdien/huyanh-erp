@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { useNavigate, useLocation } from 'react-router-dom'
+import { Tabs, Badge } from 'antd'
 
 export interface SectionTab {
   key: string
@@ -38,33 +39,35 @@ export function B2BSectionTabs({ tabs, active }: Props) {
     return prefix?.key ?? tabs[0]?.key
   })()
 
+  const items = tabs.map(t => ({
+    key: t.key,
+    label: (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        {t.icon}
+        <span>{t.label}</span>
+        {t.badge != null && t.badge !== 0 && (
+          <Badge
+            count={t.badge}
+            size="small"
+            style={{ backgroundColor: '#1B4D3E' }}
+          />
+        )}
+      </span>
+    ),
+  }))
+
   return (
-    <div className="flex flex-wrap gap-1 mb-4 border-b border-gray-200">
-      {tabs.map(t => {
-        const isActive = t.key === detectedActive
-        return (
-          <button
-            key={t.key}
-            onClick={() => navigate(t.path)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 transition-colors min-h-[44px] ${
-              isActive
-                ? 'border-emerald-600 text-emerald-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
-            }`}
-          >
-            {t.icon}
-            {t.label}
-            {t.badge != null && t.badge !== 0 && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
-              }`}>
-                {t.badge}
-              </span>
-            )}
-          </button>
-        )
-      })}
-    </div>
+    <Tabs
+      activeKey={detectedActive}
+      onChange={(key) => {
+        const tab = tabs.find(t => t.key === key)
+        if (tab) navigate(tab.path)
+      }}
+      items={items}
+      size="middle"
+      style={{ marginBottom: 16 }}
+      tabBarStyle={{ marginBottom: 0 }}
+    />
   )
 }
 

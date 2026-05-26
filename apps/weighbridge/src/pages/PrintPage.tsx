@@ -114,7 +114,14 @@ export default function PrintPage() {
 
   const deduction = ext.deduction_kg || 0
   const actualNet = ticket.net_weight ? ticket.net_weight - deduction : null
-  const dryWeight = actualNet && ext.expected_drc ? Math.round(actualNet * ext.expected_drc / 100 * 100) / 100 : null
+  // F2 TL: ưu tiên DRC thực (qc_actual_drc) đo tại cân, fallback DRC kỳ vọng
+  const dotReading = ext.field_dot_reading as number | null | undefined
+  const actualDrc = ext.qc_actual_drc as number | null | undefined
+  const drcForCalc = actualDrc ?? ext.expected_drc
+  const dryWeight = actualNet && drcForCalc
+    ? Math.round(actualNet * drcForCalc / 100 * 100) / 100
+    : null
+  const consolidationCode = ext.consolidation_code as string | null | undefined
   const estimatedValue = ext.estimated_value || (
     ext.unit_price && actualNet
       ? ext.price_unit === 'dry' && dryWeight
@@ -362,24 +369,62 @@ export default function PrintPage() {
           </table>
         )}
 
-        {/* ===== DRC (ẩn KL Khô ước / Đơn giá / Thành tiền trên phiếu cân) ===== */}
-        {ext.expected_drc && (
+        {/* ===== DRC measurement (ĐỐT + DRC thực + KL khô) — TL flow ===== */}
+        {(dotReading != null || actualDrc != null || ext.expected_drc != null || consolidationCode) && (
           isThermal ? (
             <div style={{ marginBottom: 4 }}>
               <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
-              <Row2 l={`DRC kỳ vọng: ${ext.expected_drc}%`} r="" />
+              {dotReading != null && <Row2 l="ĐỐT (metrolac)" r={<strong>{dotReading}</strong>} />}
+              {actualDrc != null && <Row2 l="DRC thực" r={<strong>{actualDrc}%</strong>} />}
+              {actualDrc == null && ext.expected_drc != null && <Row2 l="DRC kỳ vọng" r={`${ext.expected_drc}%`} />}
+              {dryWeight != null && (
+                <Row2 l="KL khô" r={<span style={{ fontFamily: mono, fontWeight: 700, color: '#15803D' }}>{dryWeight.toLocaleString()} kg</span>} />
+              )}
+              {consolidationCode && <Row2 l="Mã LLM" r={consolidationCode} />}
             </div>
           ) : (
-            ext.expected_drc && (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16, border: '1px solid #ddd' }}>
-                <tbody>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: 16, border: '1px solid #333' }}>
+              <thead>
+                <tr style={{ background: '#f0fdf4' }}>
+                  <th style={thStyle} colSpan={4}>🧪 Đo DRC tại cân</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={tdLabel}>ĐỐT (metrolac)</td>
+                  <td style={{ ...tdValue, fontFamily: mono, fontWeight: 700, fontSize: 14 }}>
+                    {dotReading != null ? dotReading : '—'}
+                  </td>
+                  <td style={tdLabel}>DRC kỳ vọng</td>
+                  <td style={tdValue}>{ext.expected_drc != null ? `${ext.expected_drc}%` : '—'}</td>
+                </tr>
+                <tr>
+                  <td style={tdLabel}>DRC thực (đo tại cân)</td>
+                  <td style={{ ...tdValue, fontWeight: 700, color: '#15803D', fontSize: 14 }}>
+                    {actualDrc != null ? `${actualDrc}%` : '—'}
+                  </td>
+                  <td style={tdLabel}>KL khô quy đổi</td>
+                  <td style={{ ...tdValue, fontFamily: mono, fontWeight: 700, color: '#15803D', fontSize: 14 }}>
+                    {dryWeight != null
+                      ? `${dryWeight.toLocaleString()} kg`
+                      : '—'}
+                    {dryWeight != null && actualNet && drcForCalc && (
+                      <span style={{ fontSize: 10, color: '#999', marginLeft: 6, fontFamily: 'inherit' }}>
+                        = {actualNet.toLocaleString()} × {drcForCalc}% / 100
+                      </span>
+                    )}
+                  </td>
+                </tr>
+                {consolidationCode && (
                   <tr>
-                    <td style={tdLabel}>DRC kỳ vọng</td>
-                    <td style={tdValue} colSpan={3}>{ext.expected_drc}%</td>
+                    <td style={tdLabel}>Mã LLM (gộp xe)</td>
+                    <td style={tdValue} colSpan={3}>
+                      <strong>{consolidationCode}</strong>
+                    </td>
                   </tr>
-                </tbody>
-              </table>
-            )
+                )}
+              </tbody>
+            </table>
           )
         )}
 

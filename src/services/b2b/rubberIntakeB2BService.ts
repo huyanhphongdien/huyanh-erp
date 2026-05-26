@@ -110,10 +110,10 @@ export const STATUS_COLORS: Record<string, string> = {
 // SERVICE
 // ============================================================================
 
-const SELECT_FIELDS = `
-  *,
-  supplier:rubber_suppliers(id, name, code, supplier_type)
-`
+// Không dùng PostgREST embedded supplier join: rubber_suppliers có thể không tồn tại
+// trong mọi môi trường (mig hac13_06 là CONDITIONAL). Fetch supplier riêng — đồng nhất
+// với partner + deal — để tránh silent fail nuốt toàn bộ list khi join lỗi.
+const SELECT_FIELDS = '*'
 
 export const rubberIntakeB2BService = {
   /** Lấy danh sách lý lịch mủ với filter */
@@ -145,14 +145,10 @@ export const rubberIntakeB2BService = {
 
     if (error) {
       console.error('[rubberIntakeB2B] getAll error:', error)
-      return { data: [], total: 0 }
+      throw new Error(`Không tải được lý lịch mủ: ${error.message}`)
     }
 
-    // Enrich with partner info if has b2b_partner_id
-    const items = (data || []).map((item: any) => ({
-      ...item,
-      supplier: Array.isArray(item.supplier) ? item.supplier[0] : item.supplier,
-    }))
+    const items = (data || []) as any[]
 
     // Fetch partner info for items with b2b_partner_id
     const partnerIds = [...new Set(items.filter(i => i.b2b_partner_id).map(i => i.b2b_partner_id))]
@@ -180,10 +176,27 @@ export const rubberIntakeB2BService = {
       }
     }
 
+    // Fetch supplier info for items with supplier_id (best-effort: bảng có thể không tồn tại)
+    const supplierIds = [...new Set(items.filter(i => i.supplier_id).map(i => i.supplier_id))]
+    let supplierMap: Record<string, any> = {}
+    if (supplierIds.length > 0) {
+      const { data: suppliers, error: supErr } = await supabase
+        .from('rubber_suppliers')
+        .select('id, name, code, supplier_type')
+        .in('id', supplierIds)
+      if (supErr) {
+        // Bảng có thể không tồn tại trong môi trường — bỏ qua, không vỡ list
+        console.warn('[rubberIntakeB2B] supplier fetch skipped:', supErr.message)
+      } else if (suppliers) {
+        suppliers.forEach(s => { supplierMap[s.id] = s })
+      }
+    }
+
     const enriched: B2BRubberIntake[] = items.map(item => ({
       ...item,
       partner: item.b2b_partner_id ? partnerMap[item.b2b_partner_id] || null : null,
       deal: item.deal_id ? dealMap[item.deal_id] || null : null,
+      supplier: item.supplier_id ? supplierMap[item.supplier_id] || null : null,
     }))
 
     return { data: enriched, total: count || 0 }
@@ -193,27 +206,32 @@ export const rubberIntakeB2BService = {
   async getById(id: string): Promise<B2BRubberIntake | null> {
     const { data, error } = await supabase
       .from('rubber_intake_batches')
-      .select(SELECT_FIELDS)
+      .select('*')
       .eq('id', id)
       .single()
 
     if (error || !data) return null
 
-    const item: any = {
-      ...data,
-      supplier: Array.isArray(data.supplier) ? data.supplier[0] : data.supplier,
-    }
+    const item: any = { ...data }
 
-    // Fetch partner
     if (item.b2b_partner_id) {
       const { data: partner } = await supabase.from('b2b_partners').select('id, name, code, tier').eq('id', item.b2b_partner_id).single()
       item.partner = partner
     }
 
-    // Fetch deal
     if (item.deal_id) {
       const { data: deal } = await supabase.from('b2b_deals').select('id, deal_number, status, partner_id').eq('id', item.deal_id).single()
       item.deal = deal
+    }
+
+    if (item.supplier_id) {
+      const { data: supplier, error: supErr } = await supabase
+        .from('rubber_suppliers')
+        .select('id, name, code, supplier_type')
+        .eq('id', item.supplier_id)
+        .maybeSingle()
+      if (supErr) console.warn('[rubberIntakeB2B] supplier fetch skipped:', supErr.message)
+      else item.supplier = supplier
     }
 
     return item

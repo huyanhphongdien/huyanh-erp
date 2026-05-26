@@ -129,6 +129,7 @@ export default function B2BRubberIntakePage() {
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState<RubberIntakeStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Filters
   const [search, setSearch] = useState('')
@@ -138,6 +139,7 @@ export default function B2BRubberIntakePage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
+    setError(null)
     const filter: RubberIntakeFilter = {
       search: search || undefined,
       status: statusFilter || undefined,
@@ -145,14 +147,21 @@ export default function B2BRubberIntakePage() {
       has_deal: dealFilter === 'linked' ? true : dealFilter === 'standalone' ? false : undefined,
       pageSize: 100,
     }
-    const [result, statsResult] = await Promise.all([
-      rubberIntakeB2BService.getAll(filter),
-      rubberIntakeB2BService.getStats(),
-    ])
-    setItems(result.data)
-    setTotal(result.total)
-    setStats(statsResult)
-    setLoading(false)
+    try {
+      const [result, statsResult] = await Promise.all([
+        rubberIntakeB2BService.getAll(filter),
+        rubberIntakeB2BService.getStats(),
+      ])
+      setItems(result.data)
+      setTotal(result.total)
+      setStats(statsResult)
+    } catch (e: any) {
+      setError(e?.message || 'Lỗi không xác định khi tải lý lịch mủ')
+      setItems([])
+      setTotal(0)
+    } finally {
+      setLoading(false)
+    }
   }, [search, statusFilter, sourceFilter, dealFilter])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -239,6 +248,14 @@ export default function B2BRubberIntakePage() {
           ))}
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-sm text-red-700">
+          <div className="font-semibold mb-1">Không tải được danh sách</div>
+          <div className="text-xs text-red-600">{error}</div>
+        </div>
+      )}
 
       {/* List */}
       {loading ? (

@@ -279,6 +279,12 @@ const getMenuGroups = (
         tab: { key: 'b2b-partner-list', componentId: 'b2b-partner-list' },
       },
       {
+        path: '/b2b/partners/requests',
+        label: 'Duyệt đăng ký',
+        icon: <UserCheck size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
         path: '/b2b/deals',
         label: 'Deals',
         icon: <Handshake size={18} />,

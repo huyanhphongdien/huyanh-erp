@@ -4,14 +4,15 @@
 // Admin xem danh sách đại lý pending → duyệt / từ chối
 // ============================================================================
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Card, Table, Tag, Button, Space, Typography, Empty, Modal, Input, message, Descriptions, Spin,
+  Card, Table, Tag, Button, Space, Typography, Empty, Modal, Input, message, Descriptions, Spin, Alert,
 } from 'antd'
 import {
   CheckCircleOutlined, CloseCircleOutlined, ArrowLeftOutlined,
   UserOutlined, PhoneOutlined, BankOutlined, EnvironmentOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
@@ -40,6 +41,38 @@ export default function PartnerRequestsPage() {
       return data || []
     },
   })
+
+  // Duplicate detection — fetch active partners có cùng SĐT với requests pending
+  const pendingPhones = useMemo(
+    () => requests.map((r: any) => r.phone).filter(Boolean),
+    [requests],
+  )
+
+  const { data: duplicates = [] } = useQuery({
+    queryKey: ['partner-requests-duplicates', pendingPhones],
+    queryFn: async () => {
+      if (pendingPhones.length === 0) return []
+      const { data, error } = await supabase
+        .from('b2b_partners')
+        .select('id, code, name, phone, tier, status')
+        .in('phone', pendingPhones)
+        .neq('status', 'pending')
+      if (error) throw error
+      return data || []
+    },
+    enabled: pendingPhones.length > 0,
+  })
+
+  // Map phone → list partner đã tồn tại
+  const duplicatesByPhone = useMemo(() => {
+    const map: Record<string, any[]> = {}
+    for (const p of duplicates) {
+      if (!p.phone) continue
+      if (!map[p.phone]) map[p.phone] = []
+      map[p.phone].push(p)
+    }
+    return map
+  }, [duplicates])
 
   const approveMutation = useMutation({
     mutationFn: async (partnerId: string) => {
@@ -99,12 +132,27 @@ export default function PartnerRequestsPage() {
     {
       title: 'Liên hệ',
       key: 'contact',
-      render: (_: any, r: any) => (
-        <div style={{ fontSize: 12 }}>
-          {r.phone && <div><PhoneOutlined /> {r.phone}</div>}
-          {r.email && <div>{r.email}</div>}
-        </div>
-      ),
+      render: (_: any, r: any) => {
+        const dupes = (r.phone && duplicatesByPhone[r.phone]) || []
+        return (
+          <div style={{ fontSize: 12 }}>
+            {r.phone && <div><PhoneOutlined /> {r.phone}</div>}
+            {r.email && <div>{r.email}</div>}
+            {dupes.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                <Tag color="orange" icon={<WarningOutlined />} style={{ fontSize: 10 }}>
+                  SĐT trùng {dupes.length} đại lý cũ
+                </Tag>
+                {dupes.slice(0, 2).map((d: any) => (
+                  <div key={d.id} style={{ fontSize: 10, color: '#d97706' }}>
+                    → {d.code} · {d.name} <Tag color="default" style={{ fontSize: 9, margin: 0 }}>{d.status}</Tag>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      },
     },
     {
       title: 'Địa chỉ',
@@ -170,6 +218,16 @@ export default function PartnerRequestsPage() {
           {requests.length > 0 && <Tag color="red" style={{ marginLeft: 8 }}>{requests.length}</Tag>}
         </Title>
       </div>
+
+      {duplicates.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          message={`${duplicates.length} đại lý đã tồn tại có SĐT trùng với đăng ký mới`}
+          description="Kiểm tra cột 'Liên hệ' — nếu thực sự là đại lý cũ đăng ký lại, gọi xác nhận rồi 'Từ chối' (giữ partner cũ). Nếu là chi nhánh / hộ kinh doanh khác → 'Duyệt' bình thường."
+          style={{ marginBottom: 12, borderRadius: 8 }}
+        />
+      )}
 
       <Card style={{ borderRadius: 12 }}>
         <Table

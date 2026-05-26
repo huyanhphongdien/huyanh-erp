@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { B2BSectionTabs, MUA_HANG_TABS } from '../../../components/b2b/B2BSectionTabs'
 import {
   Card,
   Table,
@@ -323,8 +324,11 @@ const DemandListPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={MUA_HANG_TABS} active="demands" />
+
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 16 }}>
         <Row justify="space-between" align="middle">
           <Col>
             <Title level={3} style={{ margin: 0 }}>Nhu cầu mua</Title>

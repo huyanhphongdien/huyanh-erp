@@ -255,7 +255,8 @@ const getMenuGroups = (
     icon: <MessageSquare size={18} />,
     collapsible: true,
     requireB2BPurchaser: true,
-    // 9 items (giảm từ 16) — các page liên quan gom vào tab nội bộ page:
+    // 7 items (giảm từ 16) — các page liên quan gom vào tab nội bộ page:
+    // Mua hàng: Nhu cầu mua + Deals + Đấu giá (1 menu, 3 tabs)
     // Đại lý: ds + Duyệt đăng ký + Thưởng đại lý (1 menu, 3 tabs)
     // Nhập kho mủ: ds + Phiếu cân đa NM + Nhập tay (1 menu, 3 tabs)
     // Công nợ: sổ + Báo cáo (1 menu, 2 tabs)
@@ -280,10 +281,12 @@ const getMenuGroups = (
       },
       {
         path: '/b2b/demands',
-        label: 'Nhu cầu mua',
+        label: 'Mua hàng',
         icon: <ShoppingCart size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-demand-list', componentId: 'b2b-demand-list' },
+        // Tab section: Nhu cầu mua + Deals + Đấu giá
+        extraActivePaths: ['/b2b/deals', '/b2b/auctions'],
       },
       {
         path: '/b2b/partners',
@@ -293,20 +296,6 @@ const getMenuGroups = (
         tab: { key: 'b2b-partner-list', componentId: 'b2b-partner-list' },
         // Tab section: Danh sách + Chờ duyệt + Thưởng đại lý
         extraActivePaths: ['/b2b/partners/requests', '/b2b/bonuses'],
-      },
-      {
-        path: '/b2b/deals',
-        label: 'Deals',
-        icon: <Handshake size={18} />,
-        requireB2BPurchaser: true,
-        tab: { key: 'b2b-deal-list', componentId: 'b2b-deal-list' },
-      },
-      {
-        path: '/b2b/auctions',
-        label: 'Đấu giá',
-        icon: <Timer size={18} />,
-        requireB2BPurchaser: true,
-        tab: { key: 'b2b-auction-list', componentId: 'b2b-auction-list' },
       },
       {
         path: '/b2b/rubber-intake',

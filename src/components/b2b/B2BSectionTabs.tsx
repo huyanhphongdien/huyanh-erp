@@ -78,6 +78,13 @@ export const INTAKE_TABS: SectionTab[] = [
   { key: 'manual-entry',  label: 'Nhập tay phiếu cân',   path: '/b2b/intake-manual' },
 ]
 
+// Section "Mua hàng" — 3 kênh sourcing chính
+export const MUA_HANG_TABS: SectionTab[] = [
+  { key: 'demands',  label: 'Nhu cầu mua', path: '/b2b/demands' },
+  { key: 'deals',    label: 'Deals',       path: '/b2b/deals' },
+  { key: 'auctions', label: 'Đấu giá',     path: '/b2b/auctions' },
+]
+
 export const PARTNER_TABS: SectionTab[] = [
   { key: 'partner-list',     label: 'Danh sách đại lý', path: '/b2b/partners' },
   { key: 'partner-requests', label: 'Chờ duyệt',        path: '/b2b/partners/requests' },

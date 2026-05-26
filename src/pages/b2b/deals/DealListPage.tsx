@@ -17,6 +17,7 @@ import {
 } from '../../../services/b2b/dealService'
 import AdvancedDataTable, { type ColumnDef } from '../../../components/common/AdvancedDataTable'
 import { useOpenTab } from '../../../hooks/useOpenTab'
+import { B2BSectionTabs, MUA_HANG_TABS } from '../../../components/b2b/B2BSectionTabs'
 // DealInlineDetail bỏ — click row thay vì expand inline
 
 const { Text } = Typography
@@ -179,7 +180,10 @@ const DealListPage = () => {
 
   return (
     <div style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}>
-      {/* Tabs */}
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={MUA_HANG_TABS} active="deals" />
+
+      {/* Status tabs (Nháp / Tất cả / ...) */}
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}

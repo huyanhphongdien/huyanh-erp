@@ -20,6 +20,7 @@ import {
   ArrowLeftOutlined,
 } from '@ant-design/icons'
 import { supabase } from '../../../lib/supabase'
+import { B2BSectionTabs, MUA_HANG_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const { Title, Text } = Typography
 
@@ -161,13 +162,13 @@ export default function AuctionListPage() {
 
   return (
     <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/b2b')} />
-          <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-            <ThunderboltOutlined /> Đấu giá B2B
-          </Title>
-        </div>
+      {/* B2B Section tabs */}
+      <B2BSectionTabs tabs={MUA_HANG_TABS} active="auctions" />
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
+          <ThunderboltOutlined /> Đấu giá B2B
+        </Title>
       </div>
 
       {/* KPI Cards */}

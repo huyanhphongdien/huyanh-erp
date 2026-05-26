@@ -463,6 +463,9 @@ export interface WeighbridgeTicket {
   created_at: string
   updated_at?: string
   images?: WeighbridgeImage[]
+  // F2 multi-facility — nhà máy phát sinh phiếu (PD/TL/LAO)
+  facility_id?: string | null
+  facility?: { id: string; code: string; name: string } | null
 }
 
 export interface WeighbridgeImage {

@@ -32,7 +32,9 @@ const TICKET_LIST_SELECT = `
   deal_id, partner_id, supplier_name, rubber_type,
   status, notes, created_by,
   gross_weighed_at, tare_weighed_at,
-  completed_at, created_at, updated_at
+  completed_at, created_at, updated_at,
+  facility_id,
+  facility:facilities!facility_id(id, code, name)
 `
 
 // ============================================================================
@@ -296,8 +298,13 @@ async function getAll(params: WMSPaginationParams & {
   if (error) throw error
 
   const total = count || 0
+  // PostgREST trả embedded facility dạng array dù FK 1-1 → normalize về object
+  const normalized = (data || []).map((row: any) => ({
+    ...row,
+    facility: Array.isArray(row.facility) ? row.facility[0] || null : row.facility,
+  })) as WeighbridgeTicket[]
   return {
-    data: data || [],
+    data: normalized,
     total,
     page,
     pageSize,
@@ -384,7 +391,11 @@ async function getRecentByPlate(plate: string, limit = 5): Promise<WeighbridgeTi
     .limit(limit)
 
   if (error) throw error
-  return data || []
+  const normalized = (data || []).map((row: any) => ({
+    ...row,
+    facility: Array.isArray(row.facility) ? row.facility[0] || null : row.facility,
+  })) as WeighbridgeTicket[]
+  return normalized
 }
 
 /**
@@ -490,6 +501,82 @@ async function getStats(fromDate?: string, toDate?: string, facilityId?: string 
 }
 
 /**
+ * F2 multi-facility — Stats hôm nay break-down theo từng nhà máy.
+ * Trả về 1 row per facility (PD/TL/LAO + UNKNOWN nếu facility_id NULL).
+ * Dùng cho card cross-facility trên WeighbridgeListPage.
+ */
+async function getStatsByFacility(date?: string): Promise<Array<{
+  facility_id: string | null
+  facility_code: string
+  facility_name: string
+  completedToday: number
+  inProgress: number
+  totalNetWeight: number
+}>> {
+  const today = date || new Date().toISOString().split('T')[0]
+
+  // Load tất cả facilities active để hiện đầy đủ ngay cả khi 0 ticket
+  const { data: facilities } = await supabase
+    .from('facilities')
+    .select('id, code, name')
+    .eq('is_active', true)
+    .order('code')
+
+  // Tickets hoàn tất hôm nay
+  const { data: todayRows } = await supabase
+    .from('weighbridge_tickets')
+    .select('facility_id, net_weight')
+    .eq('status', 'completed')
+    .gte('completed_at', `${today}T00:00:00.000Z`)
+    .lte('completed_at', `${today}T23:59:59.999Z`)
+
+  // Tickets đang cân (in-progress)
+  const { data: inProgressRows } = await supabase
+    .from('weighbridge_tickets')
+    .select('facility_id')
+    .in('status', ['weighing_gross', 'weighing_tare'])
+
+  // Aggregate per facility_id
+  const todayMap = new Map<string, { count: number; net: number }>()
+  for (const r of todayRows || []) {
+    const key = r.facility_id || '__null__'
+    const cur = todayMap.get(key) || { count: 0, net: 0 }
+    cur.count += 1
+    cur.net += r.net_weight || 0
+    todayMap.set(key, cur)
+  }
+
+  const inProgressMap = new Map<string, number>()
+  for (const r of inProgressRows || []) {
+    const key = r.facility_id || '__null__'
+    inProgressMap.set(key, (inProgressMap.get(key) || 0) + 1)
+  }
+
+  const rows = (facilities || []).map(f => ({
+    facility_id: f.id,
+    facility_code: f.code,
+    facility_name: f.name,
+    completedToday: todayMap.get(f.id)?.count || 0,
+    inProgress: inProgressMap.get(f.id) || 0,
+    totalNetWeight: Math.round((todayMap.get(f.id)?.net || 0) * 100) / 100,
+  }))
+
+  // Nếu có ticket facility_id NULL → push row Chưa rõ
+  if (todayMap.has('__null__') || inProgressMap.has('__null__')) {
+    rows.push({
+      facility_id: null,
+      facility_code: '?',
+      facility_name: 'Chưa rõ',
+      completedToday: todayMap.get('__null__')?.count || 0,
+      inProgress: inProgressMap.get('__null__') || 0,
+      totalNetWeight: Math.round((todayMap.get('__null__')?.net || 0) * 100) / 100,
+    })
+  }
+
+  return rows
+}
+
+/**
  * Lấy phiếu cân theo reference — kiểm tra phiếu nhập/xuất đã có cân chưa
  */
 async function getByReference(
@@ -545,6 +632,7 @@ export const weighbridgeService = {
   getSuggestedTare,
   getPlateHistory,
   getStats,
+  getStatsByFacility,
   getByReference,
   updateNotes,
 }

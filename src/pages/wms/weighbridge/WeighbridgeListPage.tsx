@@ -35,9 +35,18 @@ import {
 } from '@ant-design/icons'
 import weighbridgeService from '../../../services/wms/weighbridgeService'
 import { dealWmsService } from '../../../services/b2b/dealWmsService'
+import facilityService from '../../../services/wms/facilityService'
+import type { Facility } from '../../../services/wms/facilityService'
 import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import type { WeighbridgeTicket, TicketType, WeighbridgeStatus, PaginatedResponse } from '../../../services/wms/wms.types'
 import dayjs from 'dayjs'
+
+// Màu tag theo facility code — giống convention multi-facility các nơi khác
+const FACILITY_TAG_COLOR: Record<string, string> = {
+  PD: 'green',
+  TL: 'blue',
+  LAO: 'volcano',
+}
 
 const { Title, Text } = Typography
 
@@ -96,6 +105,10 @@ export default function WeighbridgeListPage() {
   const [activeDeals, setActiveDeals] = useState<ActiveDealForStockIn[]>([])
   const [dealStockInIds, setDealStockInIds] = useState<string[] | null>(null)
 
+  // F2 multi-facility filter
+  const [facilityFilter, setFacilityFilter] = useState<string>('')
+  const [facilities, setFacilities] = useState<Facility[]>([])
+
   // Stats
   const [stats, setStats] = useState<{
     totalTickets: number
@@ -103,10 +116,23 @@ export default function WeighbridgeListPage() {
     inProgress: number
     totalNetWeight: number
   } | null>(null)
+  const [facilityStats, setFacilityStats] = useState<Array<{
+    facility_id: string | null
+    facility_code: string
+    facility_name: string
+    completedToday: number
+    inProgress: number
+    totalNetWeight: number
+  }>>([])
 
   // Phase 4: Load active deals for filter dropdown
   useEffect(() => {
     dealWmsService.getActiveDealsForStockIn().then(setActiveDeals).catch(() => {})
+  }, [])
+
+  // F2: Load facilities cho filter dropdown
+  useEffect(() => {
+    facilityService.getAllActive().then(setFacilities).catch(() => {})
   }, [])
 
   // Phase 4: When deal filter changes, resolve stock_in_ids
@@ -138,6 +164,7 @@ export default function WeighbridgeListPage() {
         from_date: fromDate || undefined,
         to_date: toDate || undefined,
         ticket_type: (typeFilter as TicketType) || undefined,
+        facility_id: facilityFilter || undefined,
       })
       setData(result)
     } catch (err) {
@@ -145,14 +172,18 @@ export default function WeighbridgeListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, statusFilter, typeFilter, fromDate, toDate])
+  }, [page, search, statusFilter, typeFilter, fromDate, toDate, facilityFilter])
 
   const loadStats = useCallback(async () => {
     try {
-      const s = await weighbridgeService.getStats()
+      const [s, byFacility] = await Promise.all([
+        weighbridgeService.getStats(undefined, undefined, facilityFilter || undefined),
+        weighbridgeService.getStatsByFacility(),
+      ])
       setStats(s)
+      setFacilityStats(byFacility)
     } catch { /* ignore */ }
-  }, [])
+  }, [facilityFilter])
 
   useEffect(() => {
     loadData()
@@ -160,7 +191,7 @@ export default function WeighbridgeListPage() {
 
   useEffect(() => {
     loadStats()
-  }, [])
+  }, [loadStats])
 
   function handleSearch() {
     setPage(1)
@@ -172,12 +203,13 @@ export default function WeighbridgeListPage() {
     setStatusFilter('')
     setTypeFilter('')
     setDealFilter('')
+    setFacilityFilter('')
     setFromDate('')
     setToDate('')
     setPage(1)
   }
 
-  const hasFilters = !!(search || statusFilter || typeFilter || dealFilter || fromDate || toDate)
+  const hasFilters = !!(search || statusFilter || typeFilter || dealFilter || facilityFilter || fromDate || toDate)
 
   // ============================================================================
   // TABLE COLUMNS
@@ -189,6 +221,17 @@ export default function WeighbridgeListPage() {
     : data?.data
 
   const columns: ColumnsType<WeighbridgeTicket> = [
+    {
+      title: 'NM',
+      dataIndex: 'facility',
+      key: 'facility',
+      width: 70,
+      render: (_: any, record) => {
+        const code = record.facility?.code || (record.facility_id ? '—' : '?')
+        const color = FACILITY_TAG_COLOR[code] || 'default'
+        return <Tag color={color} style={{ fontWeight: 600, margin: 0 }}>{code}</Tag>
+      },
+    },
     {
       title: 'Biển số',
       dataIndex: 'vehicle_plate',
@@ -352,6 +395,69 @@ export default function WeighbridgeListPage() {
             </Row>
           )}
 
+          {/* F2 multi-facility — break-down hôm nay theo nhà máy */}
+          {facilityStats.length > 0 && (
+            <Card size="small" style={{ borderRadius: 12 }} title={
+              <Space>
+                <Text strong>Hôm nay theo nhà máy</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>{dayjs().format('DD/MM/YYYY')}</Text>
+              </Space>
+            }>
+              <Row gutter={[8, 8]}>
+                {facilityStats.map(fs => {
+                  const tons = fs.totalNetWeight / 1000
+                  const isActive = facilityFilter === fs.facility_id
+                  return (
+                    <Col xs={12} sm={8} lg={6} key={fs.facility_id || 'null'}>
+                      <Card
+                        size="small"
+                        hoverable
+                        onClick={() => {
+                          if (fs.facility_id) {
+                            setFacilityFilter(isActive ? '' : fs.facility_id)
+                            setPage(1)
+                          }
+                        }}
+                        style={{
+                          borderRadius: 10,
+                          cursor: fs.facility_id ? 'pointer' : 'default',
+                          borderColor: isActive ? PRIMARY_COLOR : undefined,
+                          borderWidth: isActive ? 2 : 1,
+                          background: isActive ? '#F0F9F4' : '#fff',
+                        }}
+                      >
+                        <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                          <Space>
+                            <Tag
+                              color={FACILITY_TAG_COLOR[fs.facility_code] || 'default'}
+                              style={{ margin: 0, fontWeight: 600 }}
+                            >
+                              {fs.facility_code}
+                            </Tag>
+                            <Text style={{ fontSize: 12 }} ellipsis>{fs.facility_name}</Text>
+                          </Space>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+                            <Text style={{ fontSize: 11, color: '#666' }}>Tấn nay</Text>
+                            <Text strong style={{ ...MONO_FONT, fontSize: 16, color: PRIMARY_COLOR }}>
+                              {tons >= 1 ? tons.toFixed(1) + 't' : fs.totalNetWeight + 'kg'}
+                            </Text>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888' }}>
+                            <span>{fs.completedToday} xe</span>
+                            {fs.inProgress > 0 && <Tag color="processing" style={{ margin: 0, fontSize: 10 }}>{fs.inProgress} đang cân</Tag>}
+                          </div>
+                        </Space>
+                      </Card>
+                    </Col>
+                  )
+                })}
+              </Row>
+              <div style={{ marginTop: 8, fontSize: 11, color: '#999' }}>
+                💡 Click card để filter danh sách theo nhà máy. Click lại để bỏ filter.
+              </div>
+            </Card>
+          )}
+
           {/* Search & Filter */}
           <Card size="small" style={{ borderRadius: 12 }}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -380,6 +486,18 @@ export default function WeighbridgeListPage() {
               {showFilters && (
                 <div>
                   <Row gutter={[12, 12]}>
+                    <Col xs={12} sm={6}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Nhà máy</Text>
+                      <Select
+                        value={facilityFilter}
+                        onChange={(v) => { setFacilityFilter(v); setPage(1) }}
+                        style={{ width: '100%' }}
+                        options={[
+                          { value: '', label: 'Tất cả nhà máy' },
+                          ...facilities.map(f => ({ value: f.id, label: `${f.code} — ${f.name}` })),
+                        ]}
+                      />
+                    </Col>
                     <Col xs={12} sm={6}>
                       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Trạng thái</Text>
                       <Select

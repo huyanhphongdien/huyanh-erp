@@ -12,11 +12,11 @@ const { Text } = Typography
 type PaperSize = 'a4' | 'a5' | '80mm' | '58mm'
 
 // width tính theo px @96dpi để khớp khổ giấy thực (đã trừ margin in)
-// A4 = 210mm - 14mm margin (2×7mm) ≈ 740px
-// A5 = 148mm - 12mm margin (2×6mm) ≈ 514px
+// A4 dọc: 210mm - 14mm margin (2×7mm) ≈ 740px
+// A5 NGANG (landscape, mặc định): 210mm - 12mm margin ≈ 750px (rộng = A4 dọc)
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
   a4: { label: 'A4 (210mm)', width: 740, fontSize: 15 },
-  a5: { label: 'A5 (148mm)', width: 514, fontSize: 13 },
+  a5: { label: 'A5 ngang (210mm)', width: 750, fontSize: 13 },
   '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
   '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
 }
@@ -203,7 +203,7 @@ export default function PrintPage() {
             ${isThermal
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : paperSize === 'a5'
-                ? 'size: A5; margin: 6mm;'
+                ? 'size: A5 landscape; margin: 6mm;'
                 : 'size: A4; margin: 7mm;'
             }
           }

@@ -148,7 +148,7 @@ export default function B2BRubberIntakeDetailPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate('/b2b/rubber-intake')} className="p-2 hover:bg-gray-100 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center">
             <ArrowLeft size={20} />
           </button>
@@ -174,7 +174,7 @@ export default function B2BRubberIntakeDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
         {/* ═══ Partner / Supplier ═══ */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Nhà cung cấp</h3>

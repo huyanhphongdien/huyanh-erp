@@ -337,7 +337,7 @@ const B2BChatListPage = () => {
   // ============================================
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: 24 }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>

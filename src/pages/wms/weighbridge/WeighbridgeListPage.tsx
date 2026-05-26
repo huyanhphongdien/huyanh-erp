@@ -352,7 +352,7 @@ export default function WeighbridgeListPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '16px' }}>
+      <div style={{ padding: '16px 24px' }}>
         {/* B2B Section Tabs — chỉ render cho B2B Thu Mua */}
         {isB2BPurchaser && (
           <B2BSectionTabs tabs={INTAKE_TABS} active="weighbridge" />

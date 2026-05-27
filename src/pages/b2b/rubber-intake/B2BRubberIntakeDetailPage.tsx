@@ -9,7 +9,7 @@ import { useOpenDealTab } from '../../../hooks/useB2BTabs'
 import {
   ArrowLeft, FileCheck, Link2, Package, Scale, Droplets, DollarSign,
   Truck, MapPin, Calendar, CheckCircle, XCircle, Clock, AlertTriangle,
-  ExternalLink, ChevronRight, Printer,
+  ExternalLink, Printer, Factory, Hash, Flame, FileText,
 } from 'lucide-react'
 import {
   rubberIntakeB2BService,
@@ -34,36 +34,41 @@ interface StockInInfo {
 // INFO ROW
 // ============================================================================
 
-function InfoRow({ icon, label, value, accent, onClick }: {
-  icon: React.ReactNode; label: string; value: React.ReactNode; accent?: boolean; onClick?: () => void
+// ============================================================================
+// META FIELD — 1 trường trong grid Định danh
+// ============================================================================
+
+function MetaField({ icon, label, value, colSpan }: {
+  icon: React.ReactNode; label: string; value: React.ReactNode; colSpan?: 1 | 2
 }) {
-  const Comp = onClick ? 'button' : 'div'
   return (
-    <Comp onClick={onClick} className={`flex items-start gap-3 py-3 ${onClick ? 'hover:bg-gray-50 cursor-pointer w-full text-left rounded-lg px-2 -mx-2' : ''}`}>
-      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">{icon}</div>
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-        <div className={`text-sm font-medium ${accent ? 'text-blue-600' : 'text-gray-800'}`}>{value || <span className="text-gray-300">—</span>}</div>
-      </div>
-      {onClick && <ChevronRight size={16} className="text-gray-300 mt-2" />}
-    </Comp>
+    <div className={colSpan === 2 ? 'col-span-2' : ''}>
+      <div className="text-xs text-gray-500 mb-0.5 flex items-center gap-1">{icon} {label}</div>
+      <div className="font-semibold text-gray-800 break-words">{value}</div>
+    </div>
   )
 }
 
 // ============================================================================
-// DRC GAUGE
+// STAT BOX — 1 ô số trong quy trình cân
 // ============================================================================
 
-function DRCGauge({ value }: { value: number | null }) {
-  if (!value) return <span className="text-gray-300">—</span>
-  const pct = Math.min(Math.max((value - 30) / 50 * 100, 0), 100)
-  const color = value >= 50 ? 'bg-emerald-500' : value >= 40 ? 'bg-amber-500' : 'bg-red-500'
+function StatBox({ icon, label, sub, value, unit, tone = 'gray' }: {
+  icon: React.ReactNode; label: string; sub?: string; value: React.ReactNode; unit?: string;
+  tone?: 'gray' | 'orange' | 'blue'
+}) {
+  const tones = {
+    gray:   { bg: 'bg-gray-50',    label: 'text-gray-500',    value: 'text-gray-800',    sub: 'text-gray-400'  },
+    orange: { bg: 'bg-orange-50',  label: 'text-orange-600',  value: 'text-orange-700',  sub: 'text-orange-400'},
+    blue:   { bg: 'bg-blue-50',    label: 'text-blue-600',    value: 'text-blue-700',    sub: 'text-blue-400'  },
+  }[tone]
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+    <div className={`${tones.bg} rounded-lg p-3 text-center`}>
+      <div className={`text-xs ${tones.label} mb-1 flex items-center justify-center gap-1 font-medium`}>{icon} {label}</div>
+      <div className={`text-base font-bold ${tones.value}`}>
+        {value}{unit && <span className="text-xs font-normal ml-0.5">{unit}</span>}
       </div>
-      <span className="text-lg font-bold text-gray-800">{value}%</span>
+      {sub && <div className={`text-[10px] ${tones.sub} mt-0.5`}>{sub}</div>}
     </div>
   )
 }
@@ -225,31 +230,89 @@ export default function B2BRubberIntakeDetailPage() {
           </div>
         )}
 
-        {/* ═══ DRC ═══ */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1">
-            <Droplets size={12} /> Hàm lượng DRC
-          </h3>
-          <DRCGauge value={item.drc_percent} />
-        </div>
-
         {/* ═══ Loại mủ (bonus đại lý) ═══ */}
         <RubberTypePicker intake={item} onChange={(rt) => setItem({ ...item, rubber_type: rt })} />
 
-        {/* ═══ Thông tin chi tiết ═══ */}
+        {/* ═══ Định danh phiếu ═══ */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Chi tiết</h3>
-          <div className="divide-y divide-gray-50">
-            <InfoRow icon={<Scale size={16} />} label="Khối lượng tươi" value={`${(item.gross_weight_kg || 0).toLocaleString('vi-VN')} kg`} />
-            <InfoRow icon={<Scale size={16} />} label="Khối lượng nhập" value={`${(item.net_weight_kg || 0).toLocaleString('vi-VN')} kg`} />
-            <InfoRow icon={<Package size={16} />} label="Thành phẩm" value={item.finished_product_ton ? `${item.finished_product_ton.toFixed(2)} tấn` : null} />
-            <InfoRow icon={<DollarSign size={16} />} label="Đơn giá" value={price ? `${price.toLocaleString('vi-VN')} đ/${item.settled_price_per_ton ? 'tấn' : 'kg'}` : null} />
-            <InfoRow icon={<DollarSign size={16} />} label="Tổng giá trị" value={amount ? `${amount.toLocaleString('vi-VN')} đ` : null} accent />
-            <InfoRow icon={<MapPin size={16} />} label="Nguồn gốc" value={`${SOURCE_LABELS[item.source_type]} ${item.location_name ? `• ${item.location_name}` : ''}`} />
-            {item.vehicle_plate && <InfoRow icon={<Truck size={16} />} label="Xe vận chuyển" value={`${item.vehicle_plate} ${item.vehicle_label ? `(${item.vehicle_label})` : ''}`} />}
-            {item.invoice_no && <InfoRow icon={<FileCheck size={16} />} label="Số hóa đơn" value={item.invoice_no} />}
-            {item.buyer_name && <InfoRow icon={<Package size={16} />} label="Người mua" value={item.buyer_name} />}
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Định danh phiếu</h3>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            {item.facility && (
+              <MetaField icon={<Factory size={12} />} label="Cơ sở" value={`${item.facility.code} — ${item.facility.name}`} />
+            )}
+            {item.pnk_number != null && (
+              <MetaField icon={<Hash size={12} />} label="Số PNK" value={`#${item.pnk_number}`} />
+            )}
+            {item.consolidation_code && (
+              <MetaField icon={<FileText size={12} />} label="Mã chốt số (LLM)" value={item.consolidation_code} colSpan={2} />
+            )}
+            <MetaField icon={<MapPin size={12} />} label="Nguồn gốc" value={`${SOURCE_LABELS[item.source_type]}${item.location_name ? ` • ${item.location_name}` : ''}`} />
+            {item.vehicle_plate && (
+              <MetaField icon={<Truck size={12} />} label="Xe vận chuyển" value={`${item.vehicle_plate}${item.vehicle_label ? ` (${item.vehicle_label})` : ''}`} />
+            )}
+            {item.invoice_no && (
+              <MetaField icon={<FileCheck size={12} />} label="Hóa đơn" value={item.invoice_no} />
+            )}
+            {item.buyer_name && (
+              <MetaField icon={<Package size={12} />} label="Người mua" value={item.buyer_name} />
+            )}
           </div>
+        </div>
+
+        {/* ═══ Cân & chất lượng ═══ */}
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1">
+            <Scale size={12} /> Cân & chất lượng
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+            <StatBox icon={<Scale size={12} />} label="GROSS" sub="xe + mủ" value={item.gross_weight_kg != null ? item.gross_weight_kg.toLocaleString('vi-VN') : '—'} unit="kg" />
+            <StatBox icon={<Scale size={12} />} label="NET" sub="mủ tươi" value={item.net_weight_kg != null ? item.net_weight_kg.toLocaleString('vi-VN') : '—'} unit="kg" />
+            <StatBox icon={<Flame size={12} />} label="ĐỐT" sub="metrolac" value={item.field_dot_reading ?? '—'} tone="orange" />
+            <StatBox icon={<Droplets size={12} />} label="DRC" sub="hàm lượng" value={item.drc_percent != null ? `${item.drc_percent}` : '—'} unit="%" tone="blue" />
+          </div>
+          {item.dry_weight_kg != null && (
+            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Package size={18} className="text-amber-700" />
+                <div>
+                  <div className="text-sm font-semibold text-amber-900">Khối lượng khô</div>
+                  <div className="text-xs text-amber-700">NET × DRC ÷ 100</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-amber-800">
+                  {item.dry_weight_kg.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-base font-medium text-amber-700 ml-1">kg</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ═══ Tài chính ═══ */}
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1">
+            <DollarSign size={12} /> Tài chính
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-xs text-gray-500 mb-1">Đơn giá</div>
+              <div className="text-base font-bold text-gray-800">
+                {price ? `${price.toLocaleString('vi-VN')} đ/${item.settled_price_per_ton ? 'tấn' : 'kg'}` : <span className="text-gray-300 font-normal">Chưa có giá</span>}
+              </div>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+              <div className="text-xs text-emerald-600 mb-1">Tổng giá trị</div>
+              <div className="text-base font-bold text-emerald-700">
+                {amount ? `${amount.toLocaleString('vi-VN')} đ` : <span className="text-emerald-300 font-normal">—</span>}
+              </div>
+            </div>
+          </div>
+          {item.finished_product_ton && (
+            <div className="mt-3 text-xs text-gray-500 flex items-center gap-1">
+              <Package size={12} /> Thành phẩm dự kiến: <strong className="text-gray-700">{item.finished_product_ton.toFixed(2)} tấn</strong>
+            </div>
+          )}
         </div>
 
         {/* ═══ Thanh toán ═══ */}

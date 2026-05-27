@@ -267,6 +267,11 @@ export const rubberIntakeB2BService = {
       else item.supplier = supplier
     }
 
+    if (item.facility_id) {
+      const { data: facility } = await supabase.from('facilities').select('id, code, name').eq('id', item.facility_id).single()
+      item.facility = facility
+    }
+
     return item
   },
 

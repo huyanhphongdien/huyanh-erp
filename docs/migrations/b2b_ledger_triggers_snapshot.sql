@@ -12,9 +12,12 @@
 -- (function = nguyên văn từ DB; trigger = dựng lại idempotent, khớp introspection).
 --
 -- Cơ chế công nợ (entry vào b2b.partner_ledger):
---   - Duyệt quyết toán (settlements.status → approved) → DEBIT 'settlement_receivable'
---   - Thanh toán quyết toán (settlements.status → paid)  → CREDIT 'payment_paid'
---   - Chi tạm ứng (advances.status → paid)               → CREDIT 'advance_paid'
+--   - Duyệt quyết toán (settlements.status → approved) → DEBIT 'settlement_receivable' (trigger)
+--   - Chi tạm ứng (advances.status → paid)               → CREDIT 'advance_paid' (trigger)
+--   - Thanh toán quyết toán → CREDIT 'payment_paid' do APP ghi per-đợt
+--     (paymentService.createPayment, reference_code <code>-PAY-<paymentId>).
+--     ⚠️ Trigger on_settlement_paid đã BỎ — xem b2b_payment_installment_ledger.sql.
+--     KHÔNG tái tạo on_settlement_paid (sẽ double-count với app).
 --   - Mọi INSERT vào partner_ledger → tự tính running_balance (số dư lũy kế)
 --   Idempotency: dựa unique_violation EXCEPTION (reference_code unique) → chạy lại an toàn.
 --
@@ -68,13 +71,8 @@ BEGIN
 END;
 $function$;
 
--- 3) Thanh toán quyết toán (settlements.status → paid) → CREDIT 'payment_paid'
-CREATE OR REPLACE FUNCTION b2b.on_settlement_paid()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'b2b', 'public', 'pg_temp'
-AS $function$ DECLARE v_amount NUMERIC; BEGIN IF NEW.status = 'paid' AND (OLD.status IS NULL OR OLD.status != 'paid') THEN v_amount := COALESCE(NEW.paid_amount, NEW.remaining_amount, 0); IF v_amount > 0 THEN BEGIN INSERT INTO b2b.partner_ledger (partner_id, entry_type, debit, credit, settlement_id, reference_code, description, entry_date, created_by) VALUES (NEW.partner_id, 'payment_paid', 0, v_amount, NEW.id, NEW.code || '-PAY', 'Thanh toan quyet toan ' || NEW.code || COALESCE(' (' || NEW.payment_method || ')', ''), COALESCE(NEW.paid_at::DATE, NOW()::DATE), COALESCE(NEW.paid_by, NEW.approved_by)); EXCEPTION WHEN unique_violation THEN NULL; END; END IF; END IF; RETURN NEW; END; $function$;
+-- 3) [ĐÃ BỎ] on_settlement_paid — thanh toán giờ do app ghi ledger per-đợt.
+--    Xem docs/migrations/b2b_payment_installment_ledger.sql. KHÔNG tái tạo function này.
 
 -- 4) Duyệt quyết toán (settlements.status → approved) → DEBIT 'settlement_receivable'
 CREATE OR REPLACE FUNCTION b2b.on_settlement_approved()
@@ -130,9 +128,7 @@ CREATE TRIGGER trg_settlement_approved
   AFTER UPDATE ON b2b.settlements
   FOR EACH ROW EXECUTE FUNCTION b2b.on_settlement_approved();
 
-DROP TRIGGER IF EXISTS trg_settlement_paid ON b2b.settlements;
-CREATE TRIGGER trg_settlement_paid
-  AFTER UPDATE OF status ON b2b.settlements
-  FOR EACH ROW EXECUTE FUNCTION b2b.on_settlement_paid();
+-- [ĐÃ BỎ] trg_settlement_paid — thanh toán do app ghi ledger per-đợt.
+-- Xem docs/migrations/b2b_payment_installment_ledger.sql. KHÔNG tái tạo.
 
 COMMIT;

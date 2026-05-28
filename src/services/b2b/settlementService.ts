@@ -701,6 +701,11 @@ export const settlementService = {
     return { ...data, partner: Array.isArray(data.partner) ? data.partner[0] : data.partner } as Settlement
   },
 
+  /**
+   * @deprecated KHÔNG dùng. Thanh toán giờ qua paymentService.createPayment (per-đợt,
+   * tự ghi ledger + tự set partial_paid/paid). Hàm này set thẳng status='paid' + ghi
+   * ledger 1 cục (reference_code <code>-PAY) → sẽ GHI TRÙNG nếu dùng lẫn với createPayment.
+   */
   async markAsPaid(id: string, paymentData: { payment_method: string; bank_reference?: string; paid_by?: string }): Promise<Settlement> {
     const current = await this.getSettlementById(id)
     if (!current) throw new Error('Phiếu quyết toán không tồn tại')

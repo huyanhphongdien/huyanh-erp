@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Alert, Card, Descriptions, Tag, Button, Space, Typography, Row, Col, Table, Divider, Spin, Empty, Modal, Form, Input, Select, Statistic, message, Breadcrumb, Popconfirm, InputNumber } from 'antd'
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, PrinterOutlined, EditOutlined, SendOutlined, PlusOutlined } from '@ant-design/icons'
 import { settlementService, Settlement, SettlementStatus, SETTLEMENT_STATUS_LABELS, SETTLEMENT_STATUS_COLORS, SETTLEMENT_TYPE_LABELS } from '../../../services/b2b/settlementService'
+import { paymentService } from '../../../services/b2b/paymentService'
 import PaymentForm from '../../../components/b2b/PaymentForm'
 import ApprovalTimeline from '../../../components/b2b/ApprovalTimeline'
 import { SettlementStatusTag } from '../../../components/ui/StatusTag'
@@ -123,21 +124,30 @@ const SettlementDetailPage = () => {
   }
 
   const handleMarkAsPaid = async () => {
-    if (!id) return
+    if (!id || !settlement) return
     try {
       setActionLoading(true)
       const values = await markPaidForm.validateFields()
-      await settlementService.markAsPaid(id, {
+      const remaining = settlement.remaining_amount || 0
+      if (remaining <= 0) {
+        message.warning('Phiếu đã thanh toán đủ')
+        setMarkPaidModalOpen(false)
+        return
+      }
+      // Trả hết phần còn lại = 1 đợt thanh toán (createPayment ghi công nợ + tự set 'paid')
+      await paymentService.createPayment({
+        settlement_id: id,
+        amount: remaining,
         payment_method: values.payment_method,
-        bank_reference: values.bank_reference,
-        paid_by: values.paid_by,
+        notes: values.bank_reference ? `Ref: ${values.bank_reference}` : undefined,
+        created_by: user?.employee_id || '',
       })
-      message.success('Đã cập nhật trạng thái thanh toán')
+      message.success('Đã ghi nhận thanh toán toàn bộ')
       setMarkPaidModalOpen(false)
       markPaidForm.resetFields()
       fetchSettlement()
-    } catch (err) {
-      message.error('Cập nhật trạng thái thất bại')
+    } catch (err: any) {
+      message.error(err?.message || 'Cập nhật trạng thái thất bại')
     } finally {
       setActionLoading(false)
     }
@@ -296,10 +306,11 @@ const SettlementDetailPage = () => {
       )
     }
 
-    if (settlement.status === 'approved') {
+    // approved (chưa trả) hoặc partial_paid (đã trả 1 phần) → vẫn cho thanh toán tiếp
+    if (settlement.status === 'approved' || settlement.status === 'partial_paid') {
       buttons.push(
         <Button key="markpaid" type="primary" icon={<DollarOutlined />} onClick={() => setMarkPaidModalOpen(true)}>
-          Đã thanh toán
+          Trả hết còn lại
         </Button>,
         <Button key="payment" icon={<DollarOutlined />} onClick={() => setPaymentModalOpen(true)}>
           Ghi nhận thanh toán

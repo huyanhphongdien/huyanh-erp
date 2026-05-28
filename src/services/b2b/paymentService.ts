@@ -205,11 +205,42 @@ export const paymentService = {
       .single()
 
     if (error) throw error
+    const payment = data as SettlementPayment
 
-    // Update settlement total_paid_post and remaining_amount
+    // Ghi bút toán CÔNG NỢ cho ĐỢT thanh toán này (CREDIT, trừ nợ).
+    // Mỗi đợt = 1 entry riêng (reference_code = <code>-PAY-<paymentId>) → idempotent,
+    // hỗ trợ trả nhiều đợt. Thay cho trigger on_settlement_paid (đã drop ở
+    // migration b2b_payment_installment_ledger.sql để tránh double-count).
+    if (paymentData.amount > 0) {
+      try {
+        const { data: st } = await supabase
+          .from('b2b_settlements')
+          .select('partner_id, code')
+          .eq('id', paymentData.settlement_id)
+          .single()
+        if (st?.partner_id) {
+          const methodLabel = PAYMENT_METHOD_LABELS[(paymentData.payment_method || 'bank_transfer') as PaymentMethod] || ''
+          const { ledgerService } = await import('./ledgerService')
+          await ledgerService.createManualEntry({
+            partner_id: st.partner_id,
+            entry_type: 'payment_paid',
+            debit: 0,
+            credit: paymentData.amount,
+            reference_code: `${st.code}-PAY-${payment.id}`,
+            description: `Thanh toán quyết toán ${st.code} (${methodLabel})`,
+            entry_date: payment.payment_date,
+            created_by: paymentData.created_by,
+          })
+        }
+      } catch (err) {
+        console.error('Ghi ledger credit khi thanh toán từng đợt thất bại:', err)
+      }
+    }
+
+    // Cập nhật total_paid_post + status (approved/partial_paid/paid)
     await this._recalcSettlementPaid(paymentData.settlement_id)
 
-    return data as SettlementPayment
+    return payment
   },
 
   // ============================================
@@ -217,6 +248,24 @@ export const paymentService = {
   // ============================================
 
   async deletePayment(id: string, settlementId: string): Promise<void> {
+    // Reverse bút toán công nợ của đợt này (xóa entry payment_paid theo reference_code)
+    try {
+      const { data: st } = await supabase
+        .from('b2b_settlements')
+        .select('code')
+        .eq('id', settlementId)
+        .single()
+      if (st?.code) {
+        await supabase
+          .from('b2b_partner_ledger')
+          .delete()
+          .eq('reference_code', `${st.code}-PAY-${id}`)
+          .eq('entry_type', 'payment_paid')
+      }
+    } catch (err) {
+      console.error('Reverse ledger khi xóa đợt thanh toán thất bại:', err)
+    }
+
     const { error } = await supabase
       .from('b2b_settlement_payments')
       .delete()
@@ -239,20 +288,37 @@ export const paymentService = {
 
     const totalPaid = (data || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
 
-    // Get settlement to calc remaining
+    // Get settlement để tính net phải trả + xác định status mới
     const { data: settlement } = await supabase
       .from('b2b_settlements')
-      .select('gross_amount, total_advance')
+      .select('gross_amount, total_advance, status')
       .eq('id', settlementId)
       .single()
+
+    const update: Record<string, any> = {
+      total_paid_post: totalPaid,
+      updated_at: new Date().toISOString(),
+    }
+
+    // Tự chuyển status trong vòng đời thanh toán: approved → partial_paid → paid.
+    // Net phải trả đại lý = gross - tạm ứng. KHÔNG đụng các status khác (draft/cancelled/...).
+    if (settlement && ['approved', 'partial_paid', 'paid'].includes(settlement.status)) {
+      const netPayable = (settlement.gross_amount || 0) - (settlement.total_advance || 0)
+      let nextStatus = settlement.status
+      if (totalPaid <= 0) nextStatus = 'approved'
+      else if (totalPaid >= netPayable) nextStatus = 'paid'
+      else nextStatus = 'partial_paid'
+
+      if (nextStatus !== settlement.status) {
+        update.status = nextStatus
+        if (nextStatus === 'paid') update.paid_at = new Date().toISOString()
+      }
+    }
 
     // remaining_amount là GENERATED column — DB tự compute, bỏ UPDATE
     await supabase
       .from('b2b_settlements')
-      .update({
-        total_paid_post: totalPaid,
-        updated_at: new Date().toISOString(),
-      })
+      .update(update)
       .eq('id', settlementId)
   },
 

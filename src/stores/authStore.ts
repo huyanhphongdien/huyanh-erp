@@ -107,6 +107,29 @@ async function getEmployeeByUserId(userId: string): Promise<EmployeeWithDepartme
 }
 
 // ==========================================
+// HELPER: Tài khoản này có phải đại lý (B2B partner) không?
+// ERP là hệ thống nội bộ — đại lý phải đăng nhập tại cổng b2b.huyanhrubber.vn.
+// Chỉ trả về true khi CHẮC CHẮN tìm thấy partner_user active (tránh khoá nhầm NV).
+// ==========================================
+async function isPartnerAccount(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('partner_users')
+      .select('id')
+      .eq('auth_user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (error) return false
+    return !!data
+  } catch {
+    return false
+  }
+}
+
+const PARTNER_BLOCK_MESSAGE =
+  'Đây là tài khoản đại lý, không đăng nhập tại đây. Vui lòng dùng Cổng đại lý: b2b.huyanhrubber.vn'
+
+// ==========================================
 // HELPER: Xác định role của user
 // ==========================================
 type UserRole = 'admin' | 'manager' | 'employee'
@@ -178,6 +201,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
       if (error) {
         throw error
+      }
+
+      // Chặn tài khoản đại lý đăng nhập vào ERP nội bộ
+      if (await isPartnerAccount(data.user.id)) {
+        await supabase.auth.signOut()
+        set({ error: PARTNER_BLOCK_MESSAGE, isLoading: false, isAuthenticated: false, user: null })
+        return false
       }
 
       // Lấy thông tin employee
@@ -291,6 +321,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const { data: { session } } = await supabase.auth.getSession()
 
       if (session?.user) {
+        // Đại lý không được phép giữ session trong ERP nội bộ
+        if (await isPartnerAccount(session.user.id)) {
+          await supabase.auth.signOut()
+          set({ user: null, isAuthenticated: false, isLoading: false })
+          return
+        }
+
         const employee = await getEmployeeByUserId(session.user.id)
         const role = determineUserRole(session.user.user_metadata, employee)
 

@@ -279,7 +279,7 @@ const PartnerLedgerPage: React.FC = () => {
         <Table
           dataSource={entries}
           columns={columns}
-          rowKey={(record) => record.id || record.reference_code || Math.random().toString()}
+          rowKey={(record) => record.id || `${record.reference_code ?? 'r'}-${record.created_at ?? ''}`}
           loading={loading}
           pagination={{
             current: pagination.current,

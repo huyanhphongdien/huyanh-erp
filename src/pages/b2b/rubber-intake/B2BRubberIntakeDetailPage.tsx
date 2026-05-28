@@ -17,6 +17,7 @@ import {
   SOURCE_LABELS, STATUS_LABELS, STATUS_COLORS,
 } from '../../../services/b2b/rubberIntakeB2BService'
 import { supabase } from '../../../lib/supabase'
+import { message } from 'antd'
 
 // ============================================================================
 // TYPES
@@ -462,7 +463,7 @@ function RubberTypePicker({
       const bonusType: 'tap' | 'nuoc' = rawType === 'mu_nuoc' ? 'nuoc' : 'tap'
       onChange(bonusType)
     } catch (e) {
-      alert(`Lỗi: ${(e as Error).message}`)
+      message.error(`Lỗi: ${(e as Error).message}`)
     } finally {
       setSaving(false)
     }

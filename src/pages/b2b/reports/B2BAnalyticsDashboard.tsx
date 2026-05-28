@@ -59,6 +59,7 @@ export default function B2BAnalyticsDashboard() {
 
       return Object.entries(agg)
         .map(([id, stats]) => ({
+          id,
           partner: partnerMap.get(id),
           ...stats,
           avgDrc: stats.drcCount > 0 ? Math.round(stats.drcSum / stats.drcCount * 10) / 10 : null,
@@ -215,7 +216,7 @@ export default function B2BAnalyticsDashboard() {
           <Card size="small" title={<><TrophyOutlined /> Top đại lý ({year})</>} style={{ borderRadius: 12 }}>
             <Table
               dataSource={topPartners}
-              rowKey={(r: any) => r.partner?.id || Math.random()}
+              rowKey={(r: any) => r.id || r.partner?.id}
               loading={loadingPartners}
               pagination={false}
               size="small"

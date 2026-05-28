@@ -21,6 +21,8 @@ import {
   Button,
   Tooltip,
   Switch,
+  Modal,
+  Select,
   message,
 } from 'antd'
 import {
@@ -37,6 +39,8 @@ import {
   TIER_LABELS,
   TIER_COLORS,
 } from '../../services/b2b/chatRoomService'
+import { partnerAssignmentService } from '../../services/b2b/partnerAssignmentService'
+import { partnerService, type Partner } from '../../services/b2b/partnerService'
 import { useAuthStore } from '../../stores/authStore'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
@@ -243,6 +247,11 @@ const B2BChatListPage = () => {
   const [totalUnread, setTotalUnread] = useState(0)
   /** sprint1_08: admin/manager bật để xem rooms của TẤT CẢ NV; mặc định chỉ rooms của mình */
   const [viewAll, setViewAll] = useState(false)
+  // Modal tạo cuộc trò chuyện mới (#12)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createPartners, setCreatePartners] = useState<Pick<Partner, 'id' | 'name' | 'code'>[]>([])
+  const [createPartnerId, setCreatePartnerId] = useState<string>('')
+  const [creating, setCreating] = useState(false)
 
   // ============================================
   // DATA FETCHING
@@ -297,16 +306,14 @@ const B2BChatListPage = () => {
   // Realtime subscription (E1.1.6)
   useEffect(() => {
     // Subscribe to new messages
-    const messagesChannel = chatRoomService.subscribeToMessages((payload) => {
-      console.log('New message received:', payload)
+    const messagesChannel = chatRoomService.subscribeToMessages(() => {
       // Refresh rooms list khi có tin mới
       fetchRooms(false)
       fetchTotalUnread()
     })
 
     // Subscribe to room updates
-    const roomsChannel = chatRoomService.subscribeToRooms((payload) => {
-      console.log('Room updated:', payload)
+    const roomsChannel = chatRoomService.subscribeToRooms(() => {
       fetchRooms(false)
     })
 
@@ -340,9 +347,49 @@ const B2BChatListPage = () => {
     fetchTotalUnread()
   }
 
-  const handleCreateRoom = () => {
-    // TODO: Mở modal chọn partner để tạo room mới
-    message.info('Tính năng đang phát triển')
+  // Mở modal + nạp danh sách đại lý có thể chat:
+  // - Manager: tất cả đại lý active
+  // - NV thường: chỉ đại lý mình được phân công (partner_assignments)
+  const handleCreateRoom = async () => {
+    setCreateOpen(true)
+    setCreatePartnerId('')
+    try {
+      if (isManager) {
+        const all = await partnerService.getAllActive()
+        setCreatePartners(all.map(p => ({ id: p.id, name: p.name, code: p.code })))
+      } else if (user?.id) {
+        const [assignments, all] = await Promise.all([
+          partnerAssignmentService.getByUser(user.id),
+          partnerService.getAllActive(),
+        ])
+        const allowed = new Set(assignments.map(a => a.partner_id))
+        setCreatePartners(all.filter(p => allowed.has(p.id)).map(p => ({ id: p.id, name: p.name, code: p.code })))
+      }
+    } catch (e: any) {
+      message.error('Không tải được danh sách đại lý: ' + (e?.message || ''))
+    }
+  }
+
+  const handleConfirmCreate = async () => {
+    if (!createPartnerId || !user?.id) {
+      message.warning('Chọn đại lý')
+      return
+    }
+    setCreating(true)
+    try {
+      const partner = createPartners.find(p => p.id === createPartnerId)
+      const room = await chatRoomService.getOrCreate(createPartnerId, user.id, {
+        room_type: 'general',
+        room_name: partner?.name,
+      })
+      setCreateOpen(false)
+      openChatTab({ id: room.id, partner_name: partner?.name })
+      fetchRooms(false)
+    } catch (e: any) {
+      message.error('Không thể tạo cuộc trò chuyện: ' + (e?.message || ''))
+    } finally {
+      setCreating(false)
+    }
   }
 
   // ============================================
@@ -487,6 +534,33 @@ const B2BChatListPage = () => {
           </div>
         )}
       </Card>
+
+      {/* Modal tạo cuộc trò chuyện mới (#12) */}
+      <Modal
+        title="Tạo cuộc trò chuyện"
+        open={createOpen}
+        onCancel={() => setCreateOpen(false)}
+        onOk={handleConfirmCreate}
+        confirmLoading={creating}
+        okText="Mở chat"
+        cancelText="Hủy"
+      >
+        <div style={{ marginTop: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {isManager ? 'Chọn đại lý để mở phòng chat.' : 'Chọn đại lý bạn phụ trách.'}
+          </Text>
+          <Select
+            value={createPartnerId || undefined}
+            onChange={setCreatePartnerId}
+            placeholder="Chọn đại lý..."
+            showSearch
+            optionFilterProp="label"
+            style={{ width: '100%', marginTop: 8 }}
+            notFoundContent={isManager ? 'Không có đại lý' : 'Bạn chưa được phân công đại lý nào'}
+            options={createPartners.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))}
+          />
+        </div>
+      </Modal>
 
       {/* Custom Styles */}
       <style>{`

@@ -24,7 +24,7 @@ import { BonusTierBadge } from '../../../components/b2b/BonusTierBadge'
 import { Hac13CodeDisplay } from '../../../components/master-data/Hac13CodeDisplay'
 import { QuarterlyBatchModal } from './QuarterlyBatchModal'
 import { B2BSectionTabs, PARTNER_TABS } from '../../../components/b2b/B2BSectionTabs'
-import { Typography } from 'antd'
+import { Typography, message } from 'antd'
 
 const { Title, Text } = Typography
 
@@ -132,32 +132,32 @@ export function BonusListPage() {
   const recomputeMutation = useMutation({
     mutationFn: () => monthlyBonusService.recomputeQuarter(year, quarter === 'all' ? CURRENT_QUARTER : quarter),
     onSuccess: (r) => {
-      alert(`Đã tính lại ${r.row_count} dòng bonus cho Q${quarter === 'all' ? CURRENT_QUARTER : quarter}/${year}.`)
+      message.success(`Đã tính lại ${r.row_count} dòng bonus cho Q${quarter === 'all' ? CURRENT_QUARTER : quarter}/${year}.`)
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
       qc.invalidateQueries({ queryKey: ['b2b-bonus-dashboard'] })
     },
-    onError: (e: Error) => alert(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
   })
 
   const submitMutation = useMutation({
     mutationFn: (ids: string[]) => monthlyBonusService.submitForApproval(ids),
     onSuccess: (count) => {
-      alert(`Đã submit ${count} bonus → chờ duyệt.`)
+      message.success(`Đã submit ${count} bonus → chờ duyệt.`)
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
     },
-    onError: (e: Error) => alert(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
   })
 
   const approveMutation = useMutation({
     mutationFn: (ids: string[]) => monthlyBonusService.approve(ids),
     onSuccess: (count) => {
-      alert(`Đã duyệt ${count} bonus.`)
+      message.success(`Đã duyệt ${count} bonus.`)
       setSelected(new Set())
       qc.invalidateQueries({ queryKey: ['b2b-bonus-list'] })
       qc.invalidateQueries({ queryKey: ['b2b-bonus-pending-actions'] })
     },
-    onError: (e: Error) => alert(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
   })
 
   // ─── Selection helpers ──────────────────────────────────────────────────

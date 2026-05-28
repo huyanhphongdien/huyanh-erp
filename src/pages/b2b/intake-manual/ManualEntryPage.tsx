@@ -29,7 +29,7 @@ import { B2BPartnerSelector } from '../../../components/b2b/B2BPartnerSelector'
 import drcLookupService, { type DrcLookupRow } from '../../../services/wms/drcLookupService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
 import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
-import { Typography } from 'antd'
+import { Typography, message } from 'antd'
 
 const { Title, Text } = Typography
 
@@ -138,7 +138,7 @@ function SingleEntryForm() {
     },
     onSuccess: (result) => {
       const bonusGroup = result.rubber_type === 'tap' ? 'mủ tạp (bonus)' : result.rubber_type === 'nuoc' ? 'mủ nước (bonus)' : 'không tính bonus'
-      alert(`Tạo phiếu thành công.\nNet weight: ${result.net_weight_kg.toLocaleString('vi-VN')}kg\nLoại chi tiết: ${RAW_RUBBER_TYPE_LABELS[result.raw_rubber_type]}\nNhóm bonus: ${bonusGroup}\nBonus sẽ tự cập nhật.`)
+      message.success(`Tạo phiếu thành công — Net ${result.net_weight_kg.toLocaleString('vi-VN')}kg · ${RAW_RUBBER_TYPE_LABELS[result.raw_rubber_type]} · ${bonusGroup}`)
       // Reset form
       setPartnerId(null)
       setNetWeight(0)
@@ -430,7 +430,7 @@ function BulkImportPanel() {
       await intakeManualEntryService.resolvePartnerCodes(parsed)
       setRows(parsed)
     } catch (err) {
-      alert(`Parse fail: ${(err as Error).message}`)
+      message.error(`Đọc file thất bại: ${(err as Error).message}`)
     } finally {
       setParsing(false)
     }
@@ -450,7 +450,7 @@ function BulkImportPanel() {
         qc.invalidateQueries({ queryKey: ['b2b-bonus-dashboard'] })
       }
     },
-    onError: (e: Error) => alert(`Lỗi import: ${e.message}`),
+    onError: (e: Error) => message.error(`Lỗi import: ${e.message}`),
   })
 
   const okCount = rows.filter((r) => r.ok).length

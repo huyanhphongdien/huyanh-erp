@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Trash2, Save, X } from 'lucide-react'
+import { message } from 'antd'
 
 import { bonusRulesService } from '../../../services/b2b/bonusRulesService'
 import type { BonusRule, RubberType } from '../../../types/b2b.types'
@@ -32,7 +33,7 @@ export function BonusRulesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bonus-rules'] })
     },
-    onError: (e: Error) => alert(`Lỗi xoá: ${e.message}`),
+    onError: (e: Error) => message.error(`Lỗi xoá: ${e.message}`),
   })
 
   return (
@@ -188,7 +189,7 @@ function AddRuleForm({
         notes: notes.trim() || null,
       }),
     onSuccess: () => onSaved(),
-    onError: (e: Error) => alert(`Lỗi: ${e.message}`),
+    onError: (e: Error) => message.error(`Lỗi: ${e.message}`),
   })
 
   return (

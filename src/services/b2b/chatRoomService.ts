@@ -169,21 +169,52 @@ export const chatRoomService = {
 
     if (error) throw error
 
-    // Lấy unread count cho mỗi room
-    const roomsWithUnread = await Promise.all(
-      (data || []).map(async (room) => {
-        const unreadCount = await this.getUnreadCountByRoom(room.id)
-        const lastMessage = await this.getLastMessage(room.id)
-        
-        return {
-          ...room,
-          // Supabase join trả về array, extract first element
-          partner: Array.isArray(room.partner) ? room.partner[0] : room.partner,
-          unread_count: unreadCount,
-          last_message: lastMessage,
-        } as ChatRoom
-      })
-    )
+    const rooms = data || []
+    const roomIds = rooms.map(r => r.id)
+
+    // sprint1_08 perf (#16): batch unread + last message thay vì 2 query/room (N+1).
+    // 2 query cho cả trang thay vì 2×N round-trip.
+    const unreadMap = new Map<string, number>()
+    const lastMsgMap = new Map<string, ChatRoom['last_message']>()
+    if (roomIds.length > 0) {
+      // (1) Unread: tất cả tin partner chưa đọc trong các room → đếm client-side
+      const { data: unreadRows } = await supabase
+        .from('b2b_chat_messages')
+        .select('room_id')
+        .in('room_id', roomIds)
+        .eq('sender_type', 'partner')
+        .is('read_at', null)
+        .is('deleted_at', null)
+      for (const m of unreadRows || []) {
+        unreadMap.set(m.room_id, (unreadMap.get(m.room_id) || 0) + 1)
+      }
+
+      // (2) Last message: lấy tin mới nhất mỗi room (order desc → first-per-room)
+      const { data: msgRows } = await supabase
+        .from('b2b_chat_messages')
+        .select('room_id, content, sender_type, sent_at, message_type')
+        .in('room_id', roomIds)
+        .is('deleted_at', null)
+        .order('sent_at', { ascending: false })
+      for (const m of msgRows || []) {
+        if (!lastMsgMap.has(m.room_id)) {
+          lastMsgMap.set(m.room_id, {
+            content: m.content,
+            sender_type: m.sender_type as 'factory' | 'partner' | 'system',
+            sent_at: m.sent_at,
+            message_type: m.message_type,
+          })
+        }
+      }
+    }
+
+    const roomsWithUnread = rooms.map((room) => ({
+      ...room,
+      // Supabase join trả về array, extract first element
+      partner: Array.isArray(room.partner) ? room.partner[0] : room.partner,
+      unread_count: unreadMap.get(room.id) || 0,
+      last_message: lastMsgMap.get(room.id) || null,
+    } as ChatRoom))
 
     // Nếu filter = 'unread', chỉ giữ rooms có tin chưa đọc
     let filteredRooms = roomsWithUnread

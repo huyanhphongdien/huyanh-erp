@@ -39,20 +39,30 @@ async function validateAdvanceTierLimit(input: {
   const tier = (partner as any)?.tier || 'new'
   const maxPct = ADVANCE_MAX_PERCENT_BY_TIER[tier] ?? ADVANCE_MAX_PERCENT_BY_TIER.new
 
-  // Lookup deal.final_value
+  // Lookup deal value — ưu tiên final_value → total_value_vnd → ước tính qty×giá
   const { data: deal } = await supabase
     .from('b2b_deals')
-    .select('final_value, deal_number, total_value_vnd')
+    .select('final_value, deal_number, total_value_vnd, quantity_kg, unit_price, price_unit, expected_drc')
     .eq('id', input.deal_id)
     .maybeSingle()
 
-  const finalValue = Number((deal as any)?.final_value || (deal as any)?.total_value_vnd || 0)
-  if (finalValue <= 0) {
-    // Không có final_value → bypass (deal mới tạo chưa tính)
+  let baseValue = Number((deal as any)?.final_value || (deal as any)?.total_value_vnd || 0)
+  if (baseValue <= 0 && deal) {
+    // Fallback: ước tính giá trị từ khối lượng × đơn giá để VẪN áp hạn mức tier
+    // (tránh deal chưa tính final_value bị ứng vô hạn).
+    const qty = Number((deal as any).quantity_kg || 0)
+    const price = Number((deal as any).unit_price || 0)
+    const drc = Number((deal as any).expected_drc || 0)
+    baseValue = (deal as any).price_unit === 'dry' && drc > 0
+      ? qty * (drc / 100) * price
+      : qty * price
+  }
+  if (baseValue <= 0) {
+    // Thực sự không tính được giá trị (thiếu cả qty/giá) → bypass
     return
   }
 
-  const maxAllowed = finalValue * maxPct
+  const maxAllowed = baseValue * maxPct
 
   // Lookup tổng advance đã acknowledged/paid cho deal
   const { data: existing } = await supabase
@@ -72,7 +82,7 @@ async function validateAdvanceTierLimit(input: {
     const fmt = (n: number) => n.toLocaleString('vi-VN')
     throw new Error(
       `Vượt hạn mức tạm ứng tier ${tier.toUpperCase()} (${Math.round(maxPct * 100)}%): ` +
-      `Deal ${(deal as any)?.deal_number} final_value=${fmt(finalValue)} → ` +
+      `Deal ${(deal as any)?.deal_number} giá trị=${fmt(baseValue)} → ` +
       `max=${fmt(maxAllowed)} VND. Đã ứng ${fmt(existingTotal)}, ` +
       `muốn thêm ${fmt(newAmount)} → tổng ${fmt(combinedTotal)} vượt hạn.`
     )
@@ -485,6 +495,18 @@ export const advanceService = {
   },
 
   async rejectAdvance(id: string): Promise<Advance> {
+    // Chặn reject phiếu đã 'paid': lúc paid trigger on_advance_paid đã ghi CREDIT
+    // vào công nợ. Reject mà không reverse ledger → công nợ lệch. Phiếu đã chi tiền
+    // phải xử lý qua luồng hoàn ứng riêng, không reject.
+    const current = await this.getAdvanceById(id)
+    if (!current) throw new Error('Phiếu tạm ứng không tồn tại')
+    if (current.status === 'paid') {
+      throw new Error('Không thể từ chối phiếu tạm ứng ĐÃ CHI (đã ghi công nợ). Cần xử lý hoàn ứng riêng.')
+    }
+    if (current.status === 'rejected') {
+      throw new Error('Phiếu đã bị từ chối trước đó')
+    }
+
     const { data, error } = await supabase
       .from('b2b_advances')
       .update({

@@ -242,6 +242,36 @@ export const dealConfirmService = {
       },
     }
 
+    // === Step 1b: Auto-tạo rubber_intake_batch (Lý lịch mủ) — mirror acceptOffer ===
+    // Booking = đại lý bán mủ về nhà máy → cần lý lịch mủ. Bỏ qua 'sale' (nhà máy bán ra).
+    if (formData.deal_type !== 'sale') {
+      try {
+        const { rubberIntakeB2BService } = await import('./rubberIntakeB2BService')
+        const intakeId = await rubberIntakeB2BService.createFromDeal({
+          deal_id: deal.id,
+          partner_id: context.partnerId,
+          lot_code: deal.lot_code || dealNumber,
+          lot_description: formData.deal_notes || undefined,
+          product_code: formData.product_type || 'MU_CAO_SU',
+          quantity_kg: formData.agreed_quantity_tons * 1000,
+          drc_percent: formData.expected_drc || undefined,
+          unit_price: formData.agreed_price,
+          source_region: formData.pickup_location || undefined,
+          intake_date: formData.delivery_date || undefined,
+          rubber_region: context.rubberRegion || undefined,
+          rubber_region_lat: context.rubberRegionLat,
+          rubber_region_lng: context.rubberRegionLng,
+        })
+        if (intakeId) {
+          await supabase.from('b2b_deals').update({ rubber_intake_id: intakeId }).eq('id', deal.id)
+        } else {
+          console.warn('[dealConfirm] rubber intake created but returned null id for deal:', deal.id)
+        }
+      } catch (e) {
+        console.error('[dealConfirm] auto-create rubber intake error:', e)
+      }
+    }
+
     let totalAdvanced = 0
 
     // === Step 2: Tạo Advance (nếu có) ===

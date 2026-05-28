@@ -381,6 +381,21 @@ export const qcService = {
           )
         } catch { /* non-blocking */ }
       }
+
+      // #7: Cân xong + QC passed → tự tạo DRAFT quyết toán (bỏ bước bấm tay).
+      // An toàn: draft vẫn phải duyệt tay trước khi ghi công nợ; idempotent (bỏ qua
+      // nếu đã có settlement); non-blocking (thiếu cân/giá/có dispute → skip, user tạo tay).
+      if (result && result.actual_drc != null && result.qc_status === 'passed') {
+        try {
+          const { autoSettlementService } = await import('../b2b/autoSettlementService')
+          const existing = await autoSettlementService.getExistingSettlement(stockIn.deal_id)
+          if (!existing) {
+            await autoSettlementService.createAutoSettlement(stockIn.deal_id)
+          }
+        } catch (e) {
+          console.warn('[qcService] auto-settlement skipped:', (e as any)?.message)
+        }
+      }
     } catch (err) {
       console.warn('[qcService.syncDealDrcFromBatch] failed:', err)
     }

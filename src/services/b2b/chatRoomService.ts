@@ -435,9 +435,38 @@ export const chatRoomService = {
   },
 
   /**
-   * Tổng tin nhắn chưa đọc (tất cả rooms)
+   * Tổng tin nhắn chưa đọc.
+   * sprint1_08: nếu truyền assignedUserId → chỉ đếm trong rooms NV đó phụ trách
+   * (khớp với danh sách room NV thấy). Bỏ trống = toàn hệ thống (manager/global).
    */
-  async getTotalUnreadCount(): Promise<number> {
+  async getTotalUnreadCount(assignedUserId?: string): Promise<number> {
+    if (assignedUserId) {
+      const { data: rooms, error: roomErr } = await supabase
+        .from('b2b_chat_rooms')
+        .select('id')
+        .eq('assigned_user_id', assignedUserId)
+        .eq('is_active', true)
+      if (roomErr) {
+        console.error('Error fetching user rooms for unread:', roomErr)
+        return 0
+      }
+      const roomIds = (rooms || []).map(r => r.id)
+      if (roomIds.length === 0) return 0
+
+      const { count, error } = await supabase
+        .from('b2b_chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .in('room_id', roomIds)
+        .eq('sender_type', 'partner')
+        .is('read_at', null)
+        .is('deleted_at', null)
+      if (error) {
+        console.error('Error counting user unread:', error)
+        return 0
+      }
+      return count || 0
+    }
+
     const { count, error } = await supabase
       .from('b2b_chat_messages')
       .select('id', { count: 'exact', head: true })

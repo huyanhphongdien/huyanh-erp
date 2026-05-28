@@ -275,12 +275,14 @@ const B2BChatListPage = () => {
 
   const fetchTotalUnread = useCallback(async () => {
     try {
-      const count = await chatRoomService.getTotalUnreadCount()
+      // sprint1_08: badge khớp danh sách room NV thấy (manager bật viewAll = toàn hệ thống)
+      const assignedFilter = (!viewAll && user?.id) ? user.id : undefined
+      const count = await chatRoomService.getTotalUnreadCount(assignedFilter)
       setTotalUnread(count)
     } catch (error) {
       console.error('Error fetching unread count:', error)
     }
-  }, [])
+  }, [viewAll, user?.id])
 
   // ============================================
   // EFFECTS

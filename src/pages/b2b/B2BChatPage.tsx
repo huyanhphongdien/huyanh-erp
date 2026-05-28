@@ -234,8 +234,11 @@ export default function B2BChatPage() {
   }, [searchText, filter, isManager, user?.id])
 
   const fetchUnread = useCallback(async () => {
-    try { setTotalUnread(await chatRoomService.getTotalUnreadCount()) } catch {}
-  }, [])
+    try {
+      const assignedFilter = !isManager && user?.id ? user.id : undefined
+      setTotalUnread(await chatRoomService.getTotalUnreadCount(assignedFilter))
+    } catch (e) { console.error('Error fetching unread count:', e) }
+  }, [isManager, user?.id])
 
   useEffect(() => { fetchRooms(); fetchUnread() }, [fetchRooms, fetchUnread])
 

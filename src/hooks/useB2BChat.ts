@@ -224,15 +224,19 @@ export function useB2BChatRoom(roomId: string | null) {
 
 export function useB2BUnreadCount() {
   const [unreadCount, setUnreadCount] = useState(0);
+  const { user } = useAuthStore();
+  const isManager = user?.is_manager ?? false;
 
   const fetchCount = useCallback(async () => {
     try {
-      const count = await chatRoomService.getTotalUnreadCount();
+      // sprint1_08: NV thường chỉ đếm room mình phụ trách; manager đếm toàn hệ thống
+      const assignedFilter = !isManager && user?.id ? user.id : undefined;
+      const count = await chatRoomService.getTotalUnreadCount(assignedFilter);
       setUnreadCount(count);
     } catch (err) {
       console.error('Error fetching unread count:', err);
     }
-  }, []);
+  }, [isManager, user?.id]);
 
   useEffect(() => {
     fetchCount();

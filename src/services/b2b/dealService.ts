@@ -783,21 +783,6 @@ export const dealService = {
     return data
   },
 
-  /**
-   * Lấy chat room của partner (general room)
-   */
-  async getChatRoomByPartner(partnerId: string): Promise<{ id: string } | null> {
-    const { data, error } = await supabase
-      .from('b2b_chat_rooms')
-      .select('id')
-      .eq('partner_id', partnerId)
-      .eq('room_type', 'general')
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (error) throw error
-    return data
-  },
 }
 
 export default dealService

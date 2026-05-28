@@ -1,9 +1,10 @@
 // ============================================================================
-// B2B RUBBER INTAKE STATS PAGE — Tab "Thống kê" trên /b2b/rubber-intake
+// B2B STATS PAGE — Tab "Thống kê" cạnh Dashboard (/b2b/stats)
 // File: src/pages/b2b/rubber-intake/B2BRubberIntakeStatsPage.tsx
 // ============================================================================
-// Thống kê thông minh mủ mua được: 1 ngày / 1 tuần / 1 tháng / tùy chọn
-// KPIs + biểu đồ theo ngày + pie loại mủ + top đại lý + top vùng + xuất Excel
+// Thống kê mủ mua được: Hôm nay / Tuần / Tháng / Quý / Năm / Tùy chọn
+// Gom theo Ngày/Tuần/Tháng (áp cho chart + Excel)
+// KPIs + biểu đồ + pie loại mủ + top đại lý + top vùng + xuất Excel
 // ============================================================================
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -34,12 +35,72 @@ import { facilityService, type Facility } from '../../../services/wms/facilitySe
 import { partnerService } from '../../../services/b2b/partnerService'
 import type { Partner } from '../../../services/b2b/partnerService'
 import { RAW_RUBBER_TYPE_LABELS, type RawRubberType } from '../../../services/b2b/intakeManualEntryService'
-import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
+import { B2BSectionTabs, DASHBOARD_TABS } from '../../../components/b2b/B2BSectionTabs'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
-type TimeRange = 'today' | '7d' | '30d' | 'custom'
+type TimeRange = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
+type Grouping = 'day' | 'week' | 'month'
+
+const GROUPING_LABEL: Record<Grouping, string> = { day: 'Ngày', week: 'Tuần', month: 'Tháng' }
+
+/** Quý hiện tại: start = tháng đầu quý, end = hôm nay */
+function quarterStart(d: dayjs.Dayjs): dayjs.Dayjs {
+  const qStartMonth = Math.floor(d.month() / 3) * 3
+  return d.month(qStartMonth).startOf('month')
+}
+
+/** Thứ Hai của tuần chứa ngày d (ISO-ish, tuần bắt đầu T2). */
+function mondayOf(d: dayjs.Dayjs): dayjs.Dayjs {
+  const dow = (d.day() + 6) % 7 // 0 = Monday
+  return d.subtract(dow, 'day').startOf('day')
+}
+
+/** Key + label gom nhóm 1 ngày theo grouping. */
+function bucketOf(dateStr: string, g: Grouping): { key: string; label: string } {
+  const d = dayjs(dateStr)
+  if (g === 'month') return { key: d.format('YYYY-MM'), label: d.format('MM/YYYY') }
+  if (g === 'week') {
+    const mon = mondayOf(d)
+    return { key: mon.format('YYYY-MM-DD'), label: `Tuần ${mon.format('DD/MM')}` }
+  }
+  return { key: d.format('YYYY-MM-DD'), label: d.format('DD/MM') }
+}
+
+export interface GroupedPoint {
+  key: string
+  label: string
+  count: number
+  net_kg: number
+  dry_kg: number
+  amount: number
+  avg_drc: number | null
+}
+
+/** Gom các điểm ngày (từ service) thành bucket Ngày/Tuần/Tháng. DRC TB = trung bình có trọng số theo số phiếu. */
+function buildGroupedSeries(
+  daily: { date: string; count: number; net_kg: number; dry_kg: number; amount: number; avg_drc: number | null }[],
+  g: Grouping,
+): GroupedPoint[] {
+  const map = new Map<string, GroupedPoint & { _drcW: number; _drcN: number }>()
+  for (const d of daily) {
+    const { key, label } = bucketOf(d.date, g)
+    const slot = map.get(key) || { key, label, count: 0, net_kg: 0, dry_kg: 0, amount: 0, avg_drc: null, _drcW: 0, _drcN: 0 }
+    slot.count += d.count
+    slot.net_kg += d.net_kg
+    slot.dry_kg += d.dry_kg
+    slot.amount += d.amount
+    if (d.avg_drc != null) { slot._drcW += d.avg_drc * d.count; slot._drcN += d.count }
+    map.set(key, slot)
+  }
+  return [...map.values()]
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(({ _drcW, _drcN, ...rest }) => ({
+      ...rest,
+      avg_drc: _drcN > 0 ? _drcW / _drcN : null,
+    }))
+}
 
 const RAW_TYPE_COLOR: Record<string, string> = {
   mu_nuoc: '#3B82F6',
@@ -67,8 +128,9 @@ export default function B2BRubberIntakeStatsPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Filters
-  const [timeRange, setTimeRange] = useState<TimeRange>('30d')
-  const [customRange, setCustomRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(30, 'day'), dayjs()])
+  const [timeRange, setTimeRange] = useState<TimeRange>('month')
+  const [customRange, setCustomRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('month'), dayjs()])
+  const [grouping, setGrouping] = useState<Grouping>('day')
   const [facilityFilter, setFacilityFilter] = useState<string>('')
   const [rawTypeFilter, setRawTypeFilter] = useState<RawRubberType | ''>('')
   const [partnerFilter, setPartnerFilter] = useState<string>('')
@@ -79,16 +141,23 @@ export default function B2BRubberIntakeStatsPage() {
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
 
-  // ── Resolved date range
+  // ── Resolved date range (preset "kỳ này" → từ đầu kỳ đến hôm nay)
   const dateRange = useMemo<[string, string]>(() => {
-    if (timeRange === 'today') {
-      const t = dayjs().format('YYYY-MM-DD')
-      return [t, t]
-    }
-    if (timeRange === '7d') return [dayjs().subtract(6, 'day').format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD')]
-    if (timeRange === '30d') return [dayjs().subtract(29, 'day').format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD')]
+    const today = dayjs().format('YYYY-MM-DD')
+    if (timeRange === 'today') return [today, today]
+    if (timeRange === 'week') return [mondayOf(dayjs()).format('YYYY-MM-DD'), today]
+    if (timeRange === 'month') return [dayjs().startOf('month').format('YYYY-MM-DD'), today]
+    if (timeRange === 'quarter') return [quarterStart(dayjs()).format('YYYY-MM-DD'), today]
+    if (timeRange === 'year') return [dayjs().startOf('year').format('YYYY-MM-DD'), today]
     return [customRange[0].format('YYYY-MM-DD'), customRange[1].format('YYYY-MM-DD')]
   }, [timeRange, customRange])
+
+  // ── Auto-set grouping mặc định hợp lý khi đổi kỳ (user vẫn override được)
+  useEffect(() => {
+    if (timeRange === 'today' || timeRange === 'week' || timeRange === 'month') setGrouping('day')
+    else if (timeRange === 'quarter') setGrouping('week')
+    else if (timeRange === 'year') setGrouping('month')
+  }, [timeRange])
 
   // Load reference data
   useEffect(() => {
@@ -151,11 +220,13 @@ export default function B2BRubberIntakeStatsPage() {
       ]
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(overview), 'Tổng quan')
 
-      // Sheet 2: Theo ngày
-      const dailyRows = [
-        ['Ngày', 'Số phiếu', 'KL tươi (kg)', 'KL khô (kg)', 'DRC TB (%)', 'Giá trị (đ)'],
-        ...data.daily.map(d => [
-          d.date,
+      // Sheet 2: Theo kỳ (gom theo Ngày/Tuần/Tháng tùy chọn)
+      const grouped = buildGroupedSeries(data.daily, grouping)
+      const periodCol = GROUPING_LABEL[grouping]
+      const periodRows = [
+        [periodCol, 'Số phiếu', 'KL tươi (kg)', 'KL khô (kg)', 'DRC TB (%)', 'Giá trị (đ)'],
+        ...grouped.map(d => [
+          d.label,
           d.count,
           Math.round(d.net_kg),
           Math.round(d.dry_kg),
@@ -163,7 +234,7 @@ export default function B2BRubberIntakeStatsPage() {
           Math.round(d.amount),
         ]),
       ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dailyRows), 'Theo ngày')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(periodRows), `Theo ${periodCol}`)
 
       // Sheet 3: Top đại lý
       const partnerRows = [
@@ -205,16 +276,16 @@ export default function B2BRubberIntakeStatsPage() {
     }
   }
 
-  // ── Chart data ──
+  // ── Chart data (gom theo Ngày/Tuần/Tháng) ──
   const chartData = useMemo(() => {
     if (!data) return []
-    return data.daily.map(d => ({
-      date: dayjs(d.date).format('DD/MM'),
+    return buildGroupedSeries(data.daily, grouping).map(d => ({
+      date: d.label,
       count: d.count,
       dry: Math.round(d.dry_kg / 100) / 10, // tấn 1 chữ số
       amount: Math.round(d.amount / 1_000_000), // triệu
     }))
-  }, [data])
+  }, [data, grouping])
 
   const pieData = useMemo(() => {
     if (!data) return []
@@ -267,7 +338,7 @@ export default function B2BRubberIntakeStatsPage() {
   // ── RENDER ──
   return (
     <div style={{ padding: 24 }}>
-      <B2BSectionTabs tabs={INTAKE_TABS} active="intake-stats" />
+      <B2BSectionTabs tabs={DASHBOARD_TABS} active="stats" />
 
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
@@ -302,8 +373,10 @@ export default function B2BRubberIntakeStatsPage() {
                 onChange={(v) => setTimeRange(v)}
                 options={[
                   { label: 'Hôm nay', value: 'today' },
-                  { label: '7 ngày', value: '7d' },
-                  { label: '30 ngày', value: '30d' },
+                  { label: 'Tuần này', value: 'week' },
+                  { label: 'Tháng này', value: 'month' },
+                  { label: 'Quý này', value: 'quarter' },
+                  { label: 'Năm nay', value: 'year' },
                   { label: 'Tùy chọn', value: 'custom' },
                 ]}
               />
@@ -318,6 +391,21 @@ export default function B2BRubberIntakeStatsPage() {
                 />
               </Col>
             )}
+            <Col>
+              <Space size={4}>
+                <Text type="secondary" style={{ fontSize: 12 }}>GOM THEO:</Text>
+                <Segmented<Grouping>
+                  size="small"
+                  value={grouping}
+                  onChange={(v) => setGrouping(v)}
+                  options={[
+                    { label: 'Ngày', value: 'day' },
+                    { label: 'Tuần', value: 'week' },
+                    { label: 'Tháng', value: 'month' },
+                  ]}
+                />
+              </Space>
+            </Col>
             <Col flex="auto" />
             <Col>
               <Input
@@ -452,7 +540,7 @@ export default function B2BRubberIntakeStatsPage() {
                   style={{ borderRadius: 12 }}
                   title={
                     <Space>
-                      <Text strong>Biểu đồ theo ngày</Text>
+                      <Text strong>Biểu đồ theo {GROUPING_LABEL[grouping].toLowerCase()}</Text>
                       <Segmented
                         size="small"
                         value={chartMetric}

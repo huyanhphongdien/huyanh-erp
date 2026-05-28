@@ -62,6 +62,7 @@ import {
   DEAL_TYPE_LABELS,
 } from '../../../services/b2b/dealService'
 import { autoSettlementService } from '../../../services/b2b/autoSettlementService'
+import { chatRoomService } from '../../../services/b2b/chatRoomService'
 import { useOpenTab } from '../../../hooks/useOpenTab'
 import { useOpenChatTab } from '../../../hooks/useB2BTabs'
 import { format } from 'date-fns'
@@ -344,6 +345,7 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
   const navigate = useNavigate()
   const openTab = useOpenTab()
   const openChatTab = useOpenChatTab()
+  const { user } = useAuthStore()
 
   // State
   const [deal, setDeal] = useState<Deal | null>(null)
@@ -417,16 +419,20 @@ const DealDetailPage = ({ id: propId }: DealDetailPageProps = {}) => {
 
   const handleOpenChat = async () => {
     if (!deal) return
-
+    if (!user?.id) {
+      message.warning('Vui lòng đăng nhập lại')
+      return
+    }
     try {
-      const room = await dealService.getChatRoomByPartner(deal.partner_id)
-      if (room) {
-        openChatTab({ id: room.id, partner_name: deal.partner?.name })
-      } else {
-        message.info('Chưa có phòng chat với đại lý này')
-      }
-    } catch (error) {
-      message.error('Không thể mở chat')
+      // sprint1_08: mở/tạo room riêng cho cặp (NV đang login × đại lý của deal)
+      const room = await chatRoomService.getOrCreate(deal.partner_id, user.id, {
+        room_type: 'general',
+        room_name: deal.partner?.name,
+      })
+      openChatTab({ id: room.id, partner_name: deal.partner?.name })
+    } catch (error: any) {
+      console.error('handleOpenChat error:', error)
+      message.error('Không thể mở chat: ' + (error?.message || ''))
     }
   }
 

@@ -397,8 +397,8 @@ function App() {
                 <Route path="intake/production" element={<Suspense fallback={<LoadingSpinner />}><ProductionWizardPage /></Suspense>} />
                 <Route path="settings/daily-prices" element={<Suspense fallback={<LoadingSpinner />}><DailyPriceListPage /></Suspense>} />
                 {/* B2B Rubber Intake (Lý lịch mủ) */}
+                <Route path="stats" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakeStatsPage /></Suspense>} />
                 <Route path="rubber-intake" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakePage /></Suspense>} />
-                <Route path="rubber-intake/stats" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakeStatsPage /></Suspense>} />
                 <Route path="rubber-intake/:id" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakeDetailPage /></Suspense>} />
                 <Route path="rubber-intake/:id/print" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakePrintPage /></Suspense>} />
                 {/* B2B Auctions (Phase B1) */}

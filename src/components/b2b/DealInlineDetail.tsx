@@ -12,8 +12,11 @@ import {
   MessageOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { message } from 'antd'
 import { useOpenChatTab } from '../../hooks/useB2BTabs'
 import { DEAL_STATUS_LABELS, DEAL_STATUS_COLORS } from '../../services/b2b/dealService'
+import { chatRoomService } from '../../services/b2b/chatRoomService'
+import { useAuthStore } from '../../stores/authStore'
 
 // Lazy load tab components (same as DealDetailPage)
 const DealWmsTab = lazy(() => import('./DealWmsTab'))
@@ -40,6 +43,7 @@ interface Props {
 export default function DealInlineDetail({ deal }: Props) {
   const navigate = useNavigate()
   const openChatTab = useOpenChatTab()
+  const { user } = useAuthStore()
 
   const tabItems = [
     {
@@ -86,16 +90,17 @@ export default function DealInlineDetail({ deal }: Props) {
           <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
             <Button type="link" icon={<MessageOutlined />} onClick={async () => {
               if (!deal.partner_id) return
+              if (!user?.id) { message.warning('Vui lòng đăng nhập lại'); return }
               try {
-                const { data: room } = await (await import('../../lib/supabase')).supabase
-                  .from('b2b_chat_rooms')
-                  .select('id')
-                  .eq('partner_id', deal.partner_id)
-                  .limit(1)
-                  .maybeSingle()
-                if (room) openChatTab({ id: room.id, partner_name: deal.partner?.name })
-                else navigate('/b2b/chat')
-              } catch { navigate('/b2b/chat') }
+                // sprint1_08: mở/tạo room riêng cho cặp (NV đang login × đại lý)
+                const room = await chatRoomService.getOrCreate(deal.partner_id, user.id, {
+                  room_type: 'general',
+                  room_name: deal.partner?.name,
+                })
+                openChatTab({ id: room.id, partner_name: deal.partner?.name })
+              } catch (e: any) {
+                message.error('Không thể mở chat: ' + (e?.message || ''))
+              }
             }}>Mở chat đại lý</Button>
           </div>
         </div>

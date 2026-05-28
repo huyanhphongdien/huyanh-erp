@@ -77,6 +77,7 @@ export function B2BSectionTabs({ tabs, active }: Props) {
 
 export const INTAKE_TABS: SectionTab[] = [
   { key: 'intake-list',   label: 'Phiếu nhập (Lý lịch)', path: '/b2b/rubber-intake' },
+  { key: 'intake-stats',  label: 'Thống kê',             path: '/b2b/rubber-intake/stats' },
   { key: 'weighbridge',   label: 'Phiếu cân (đa NM)',    path: '/wms/weighbridge/list' },
   { key: 'manual-entry',  label: 'Nhập tay phiếu cân',   path: '/b2b/intake-manual' },
 ]

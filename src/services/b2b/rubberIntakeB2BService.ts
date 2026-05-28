@@ -99,6 +99,62 @@ export interface RubberIntakeStats {
 }
 
 // ============================================================================
+// AGGREGATED STATS — Tab "Thống kê" trên /b2b/rubber-intake
+// ============================================================================
+
+export interface DailyIntakePoint {
+  date: string // YYYY-MM-DD
+  count: number
+  net_kg: number
+  dry_kg: number
+  amount: number
+  avg_drc: number | null
+}
+
+export interface PartnerAggregate {
+  partner_id: string
+  name: string
+  code: string
+  tier: string | null
+  count: number
+  net_kg: number
+  dry_kg: number
+  amount: number
+  avg_drc: number | null
+}
+
+export interface RegionAggregate {
+  name: string // location_name hoặc 'Không xác định'
+  count: number
+  net_kg: number
+  dry_kg: number
+  amount: number
+}
+
+export interface RawTypeAggregate {
+  type: string // mu_nuoc | mu_tap | mu_dong | mu_chen | mu_to | unclassified
+  count: number
+  net_kg: number
+  dry_kg: number
+  amount: number
+}
+
+export interface AggregatedIntakeStats {
+  totals: {
+    count: number
+    net_kg: number
+    dry_kg: number
+    amount: number
+    avg_drc: number | null
+    avg_price_per_dry_kg: number | null
+  }
+  daily: DailyIntakePoint[]
+  byPartner: PartnerAggregate[]
+  byRegion: RegionAggregate[]
+  byRawType: RawTypeAggregate[]
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -296,6 +352,173 @@ export const rubberIntakeB2BService = {
       total_weight_kg: items.reduce((s, i) => s + (i.net_weight_kg || 0), 0),
       total_dry_weight_kg: items.reduce((s, i) => s + (i.dry_weight_kg || 0), 0),
       total_amount: items.reduce((s, i) => s + (i.total_amount || 0), 0),
+    }
+  },
+
+  /**
+   * Thống kê tổng hợp cho tab "Thống kê" — gom theo ngày / đại lý / vùng / loại mủ.
+   * Fetch tất cả batches trong date range (limit 5000), aggregate client-side.
+   */
+  async getAggregatedStats(filter: {
+    date_from: string
+    date_to: string
+    facility_id?: string
+    raw_rubber_type?: 'mu_nuoc' | 'mu_tap' | 'mu_dong' | 'mu_chen' | 'mu_to'
+    partner_id?: string
+    search?: string
+  }): Promise<AggregatedIntakeStats> {
+    let query = supabase
+      .from('rubber_intake_batches')
+      .select('id, intake_date, b2b_partner_id, location_name, raw_rubber_type, net_weight_kg, dry_weight_kg, drc_percent, total_amount, lot_code, product_code, invoice_no, vehicle_plate, consolidation_code')
+      .gte('intake_date', filter.date_from)
+      .lte('intake_date', filter.date_to)
+      .limit(5000)
+
+    if (filter.facility_id) query = query.eq('facility_id', filter.facility_id)
+    if (filter.raw_rubber_type) query = query.eq('raw_rubber_type', filter.raw_rubber_type)
+    if (filter.partner_id) query = query.eq('b2b_partner_id', filter.partner_id)
+    if (filter.search) {
+      query = query.or(`product_code.ilike.%${filter.search}%,invoice_no.ilike.%${filter.search}%,vehicle_plate.ilike.%${filter.search}%,lot_code.ilike.%${filter.search}%,consolidation_code.ilike.%${filter.search}%,location_name.ilike.%${filter.search}%`)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      console.error('[rubberIntakeB2B] getAggregatedStats error:', error)
+      throw new Error(`Không tải được thống kê: ${error.message}`)
+    }
+
+    const items = (data || []) as any[]
+
+    // Fetch partner info batch
+    const partnerIds = [...new Set(items.filter(i => i.b2b_partner_id).map(i => i.b2b_partner_id))]
+    const partnerMap: Record<string, { id: string; name: string; code: string; tier: string | null }> = {}
+    if (partnerIds.length > 0) {
+      const { data: partners } = await supabase
+        .from('b2b_partners')
+        .select('id, name, code, tier')
+        .in('id', partnerIds)
+      if (partners) partners.forEach(p => { partnerMap[p.id] = p as any })
+    }
+
+    // Helper: dry weight (fallback compute từ net × drc nếu DB chưa generate)
+    const dryOf = (item: any): number => {
+      if (item.dry_weight_kg != null) return Number(item.dry_weight_kg) || 0
+      if (item.net_weight_kg != null && item.drc_percent != null) {
+        return (Number(item.net_weight_kg) || 0) * (Number(item.drc_percent) || 0) / 100
+      }
+      return 0
+    }
+
+    // Totals
+    let totalNet = 0, totalDry = 0, totalAmount = 0
+    let drcSum = 0, drcCount = 0
+    for (const it of items) {
+      totalNet += Number(it.net_weight_kg) || 0
+      totalDry += dryOf(it)
+      totalAmount += Number(it.total_amount) || 0
+      if (it.drc_percent != null) {
+        drcSum += Number(it.drc_percent) || 0
+        drcCount++
+      }
+    }
+    const avgDrc = drcCount > 0 ? drcSum / drcCount : null
+    const avgPricePerDryKg = totalDry > 0 ? totalAmount / totalDry : null
+
+    // Daily aggregation
+    const dailyMap = new Map<string, { count: number; net: number; dry: number; amount: number; drcSum: number; drcCount: number }>()
+    for (const it of items) {
+      const d = (it.intake_date as string).slice(0, 10)
+      const slot = dailyMap.get(d) || { count: 0, net: 0, dry: 0, amount: 0, drcSum: 0, drcCount: 0 }
+      slot.count++
+      slot.net += Number(it.net_weight_kg) || 0
+      slot.dry += dryOf(it)
+      slot.amount += Number(it.total_amount) || 0
+      if (it.drc_percent != null) { slot.drcSum += Number(it.drc_percent) || 0; slot.drcCount++ }
+      dailyMap.set(d, slot)
+    }
+    const daily: DailyIntakePoint[] = [...dailyMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, s]) => ({
+        date,
+        count: s.count,
+        net_kg: s.net,
+        dry_kg: s.dry,
+        amount: s.amount,
+        avg_drc: s.drcCount > 0 ? s.drcSum / s.drcCount : null,
+      }))
+
+    // Partner aggregation
+    const partnerAggMap = new Map<string, { count: number; net: number; dry: number; amount: number; drcSum: number; drcCount: number }>()
+    for (const it of items) {
+      if (!it.b2b_partner_id) continue
+      const slot = partnerAggMap.get(it.b2b_partner_id) || { count: 0, net: 0, dry: 0, amount: 0, drcSum: 0, drcCount: 0 }
+      slot.count++
+      slot.net += Number(it.net_weight_kg) || 0
+      slot.dry += dryOf(it)
+      slot.amount += Number(it.total_amount) || 0
+      if (it.drc_percent != null) { slot.drcSum += Number(it.drc_percent) || 0; slot.drcCount++ }
+      partnerAggMap.set(it.b2b_partner_id, slot)
+    }
+    const byPartner: PartnerAggregate[] = [...partnerAggMap.entries()]
+      .map(([pid, s]) => {
+        const p = partnerMap[pid] || { id: pid, name: '(Không rõ)', code: '', tier: null }
+        return {
+          partner_id: pid,
+          name: p.name,
+          code: p.code,
+          tier: p.tier,
+          count: s.count,
+          net_kg: s.net,
+          dry_kg: s.dry,
+          amount: s.amount,
+          avg_drc: s.drcCount > 0 ? s.drcSum / s.drcCount : null,
+        }
+      })
+      .sort((a, b) => b.dry_kg - a.dry_kg)
+
+    // Region aggregation (theo location_name)
+    const regionMap = new Map<string, { count: number; net: number; dry: number; amount: number }>()
+    for (const it of items) {
+      const name = (it.location_name as string)?.trim() || 'Không xác định'
+      const slot = regionMap.get(name) || { count: 0, net: 0, dry: 0, amount: 0 }
+      slot.count++
+      slot.net += Number(it.net_weight_kg) || 0
+      slot.dry += dryOf(it)
+      slot.amount += Number(it.total_amount) || 0
+      regionMap.set(name, slot)
+    }
+    const byRegion: RegionAggregate[] = [...regionMap.entries()]
+      .map(([name, s]) => ({ name, count: s.count, net_kg: s.net, dry_kg: s.dry, amount: s.amount }))
+      .sort((a, b) => b.dry_kg - a.dry_kg)
+
+    // Raw type aggregation
+    const rawMap = new Map<string, { count: number; net: number; dry: number; amount: number }>()
+    for (const it of items) {
+      const t = (it.raw_rubber_type as string) || 'unclassified'
+      const slot = rawMap.get(t) || { count: 0, net: 0, dry: 0, amount: 0 }
+      slot.count++
+      slot.net += Number(it.net_weight_kg) || 0
+      slot.dry += dryOf(it)
+      slot.amount += Number(it.total_amount) || 0
+      rawMap.set(t, slot)
+    }
+    const byRawType: RawTypeAggregate[] = [...rawMap.entries()]
+      .map(([type, s]) => ({ type, count: s.count, net_kg: s.net, dry_kg: s.dry, amount: s.amount }))
+      .sort((a, b) => b.dry_kg - a.dry_kg)
+
+    return {
+      totals: {
+        count: items.length,
+        net_kg: totalNet,
+        dry_kg: totalDry,
+        amount: totalAmount,
+        avg_drc: avgDrc,
+        avg_price_per_dry_kg: avgPricePerDryKg,
+      },
+      daily,
+      byPartner,
+      byRegion,
+      byRawType,
     }
   },
 

@@ -26,6 +26,8 @@ import {
   Row,
   Col,
   Image,
+  Drawer,
+  List,
 } from 'antd'
 import type { MenuProps } from 'antd'
 import {
@@ -804,6 +806,9 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   const [inputValue, setInputValue] = useState('')
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null)
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null)
+  // Panel ⋮: Tìm kiếm / Tin đã ghim / File đã gửi
+  const [infoPanel, setInfoPanel] = useState<null | 'search' | 'pinned' | 'files'>(null)
+  const [panelSearch, setPanelSearch] = useState('')
   
   // Upload & Voice states
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -1631,6 +1636,10 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
                   { key: 'pinned', icon: <PushpinOutlined />, label: 'Tin đã ghim' },
                   { key: 'files', icon: <FileOutlined />, label: 'File đã gửi' },
                 ],
+                onClick: ({ key }) => {
+                  setPanelSearch('')
+                  setInfoPanel(key as 'search' | 'pinned' | 'files')
+                },
               }}
               trigger={['click']}
             >
@@ -1893,6 +1902,94 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
           )
         })()}
       </Modal>
+
+      {/* Panel ⋮: Tìm kiếm / Tin đã ghim / File đã gửi */}
+      <Drawer
+        open={infoPanel !== null}
+        onClose={() => setInfoPanel(null)}
+        width={360}
+        title={infoPanel === 'search' ? 'Tìm kiếm tin nhắn' : infoPanel === 'pinned' ? 'Tin đã ghim' : 'File đã gửi'}
+      >
+        {infoPanel === 'search' && (
+          <Input.Search
+            placeholder="Nhập từ khóa..."
+            allowClear
+            autoFocus
+            value={panelSearch}
+            onChange={(e) => setPanelSearch(e.target.value)}
+            style={{ marginBottom: 12 }}
+          />
+        )}
+        {(() => {
+          if (infoPanel === null) return null
+          let list: ChatMessage[] = []
+          if (infoPanel === 'search') {
+            const kw = panelSearch.trim().toLowerCase()
+            list = kw ? messages.filter(m => (m.content || '').toLowerCase().includes(kw)) : []
+          } else if (infoPanel === 'pinned') {
+            list = messages.filter(m => m.metadata?.pinned)
+          } else {
+            list = messages.filter(m =>
+              ['image', 'file', 'audio'].includes(m.message_type) || (m.attachments && m.attachments.length > 0)
+            )
+          }
+
+          if (infoPanel === 'search' && !panelSearch.trim()) {
+            return <Empty description="Nhập từ khóa để tìm" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          }
+          if (list.length === 0) {
+            return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={infoPanel === 'pinned' ? 'Chưa ghim tin nào' : infoPanel === 'files' ? 'Chưa có file/ảnh' : 'Không tìm thấy'} />
+          }
+
+          const whoOf = (m: ChatMessage) =>
+            m.sender_type === 'partner' ? (room?.partner?.name || 'Đại lý')
+              : m.sender_type === 'system' ? 'Hệ thống' : 'Nhà máy'
+          const timeOf = (m: ChatMessage) => {
+            try { return format(new Date(m.sent_at), 'dd/MM HH:mm', { locale: vi }) } catch { return '' }
+          }
+          const previewOf = (m: ChatMessage) =>
+            m.content || (m.message_type === 'image' ? '📷 Ảnh' : m.message_type === 'file' ? '📎 Tệp'
+              : m.message_type === 'audio' ? '🎤 Voice' : m.message_type === 'booking' ? '📋 Phiếu chốt'
+              : m.message_type === 'deal' ? '🤝 Deal' : '(không có nội dung)')
+
+          return (
+            <List
+              dataSource={list}
+              renderItem={(m) => {
+                if (infoPanel === 'files') {
+                  return (
+                    <List.Item style={{ display: 'block' }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>{whoOf(m)} · {timeOf(m)}</Text>
+                      <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {(m.attachments || []).map((att, i) => (
+                          m.message_type === 'image' ? (
+                            <Image key={i} src={att.url} width={56} height={56}
+                              style={{ objectFit: 'cover', borderRadius: 6 }} />
+                          ) : (
+                            <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <FileOutlined /> <span>{att.fileName || 'Tệp'}</span>
+                            </a>
+                          )
+                        ))}
+                      </div>
+                    </List.Item>
+                  )
+                }
+                return (
+                  <List.Item>
+                    <List.Item.Meta
+                      title={<Text style={{ fontSize: 12 }}>{whoOf(m)} · {timeOf(m)}</Text>}
+                      description={<Text style={{ fontSize: 13 }}>{previewOf(m)}</Text>}
+                    />
+                  </List.Item>
+                )
+              }}
+            />
+          )
+        })()}
+      </Drawer>
     </div>
   )
 }

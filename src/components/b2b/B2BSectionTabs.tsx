@@ -90,9 +90,10 @@ export const MUA_HANG_TABS: SectionTab[] = [
 ]
 
 export const PARTNER_TABS: SectionTab[] = [
-  { key: 'partner-list',     label: 'Danh sách đại lý', path: '/b2b/partners' },
-  { key: 'partner-requests', label: 'Chờ duyệt',        path: '/b2b/partners/requests' },
-  { key: 'partner-bonuses',  label: 'Thưởng đại lý',    path: '/b2b/bonuses' },
+  { key: 'partner-list',        label: 'Danh sách đại lý', path: '/b2b/partners' },
+  { key: 'partner-requests',    label: 'Chờ duyệt',        path: '/b2b/partners/requests' },
+  { key: 'partner-assignments', label: 'Phân công NV',     path: '/b2b/partners/assignments' },
+  { key: 'partner-bonuses',     label: 'Thưởng đại lý',    path: '/b2b/bonuses' },
 ]
 
 export const LEDGER_TABS: SectionTab[] = [

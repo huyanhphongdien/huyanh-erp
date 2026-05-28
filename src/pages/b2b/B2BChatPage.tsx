@@ -18,6 +18,7 @@ import {
   type PartnerTier,
   TIER_LABELS,
 } from '../../services/b2b/chatRoomService'
+import { useAuthStore } from '../../stores/authStore'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -215,15 +216,22 @@ export default function B2BChatPage() {
     })
   }, [])
 
-  // Fetch rooms
+  // Fetch rooms — sprint1_08: NV chỉ thấy room mình phụ trách (trừ khi là manager)
+  const { user } = useAuthStore()
+  const isManager = user?.is_manager ?? false
   const fetchRooms = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true)
-      const response = await chatRoomService.getRooms({ search: searchText || undefined, filter, pageSize: 50 })
+      const response = await chatRoomService.getRooms({
+        search: searchText || undefined,
+        filter,
+        assigned_user_id: !isManager && user?.id ? user.id : undefined,
+        pageSize: 50,
+      })
       setRooms(response.data)
     } catch (e) { console.error('Error fetching rooms:', e) }
     finally { setLoading(false) }
-  }, [searchText, filter])
+  }, [searchText, filter, isManager, user?.id])
 
   const fetchUnread = useCallback(async () => {
     try { setTotalUnread(await chatRoomService.getTotalUnreadCount()) } catch {}

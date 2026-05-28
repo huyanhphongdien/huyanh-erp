@@ -61,6 +61,8 @@ import {
   PARTNER_STATUS_COLORS,
   PARTNER_TYPE_LABELS,
 } from '../../../services/b2b/partnerService'
+import { chatRoomService } from '../../../services/b2b/chatRoomService'
+import { useAuthStore } from '../../../stores/authStore'
 import {
   dealService,
   Deal,
@@ -468,6 +470,7 @@ const PartnerDetailPage = () => {
   const navigate = useNavigate()
   const openChatTab = useOpenChatTab()
   const openDealCreateTab = useOpenDealCreateTab()
+  const { user } = useAuthStore()
 
   // State
   const [partner, setPartner] = useState<Partner | null>(null)
@@ -563,16 +566,20 @@ const PartnerDetailPage = () => {
 
   const handleOpenChat = async () => {
     if (!partner) return
-
+    if (!user?.id) {
+      message.warning('Vui lòng đăng nhập lại')
+      return
+    }
     try {
-      const room = await partnerService.getChatRoom(partner.id)
-      if (room) {
-        openChatTab({ id: room.id, partner_name: partner.name })
-      } else {
-        message.info('Chưa có phòng chat với đại lý này')
-      }
-    } catch (error) {
-      message.error('Không thể mở chat')
+      // sprint1_08: tạo/mở room riêng cho cặp (NV đang login × đại lý này)
+      const room = await chatRoomService.getOrCreate(partner.id, user.id, {
+        room_type: 'general',
+        room_name: partner.name,
+      })
+      openChatTab({ id: room.id, partner_name: partner.name })
+    } catch (error: any) {
+      console.error('handleOpenChat error:', error)
+      message.error('Không thể mở chat: ' + (error?.message || ''))
     }
   }
 

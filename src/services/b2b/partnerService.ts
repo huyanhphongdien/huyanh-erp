@@ -413,7 +413,9 @@ export const partnerService = {
   // ============================================
 
   /**
-   * Lấy chat room của partner
+   * @deprecated sprint1_08: dùng chatRoomService.getOrCreate(partnerId, userId) để
+   * mở/tạo room cho NV đang login. Hàm này trả room ĐẦU TIÊN bất kể assigned_user_id,
+   * dễ gây nhầm vì 1 partner giờ có thể có nhiều rooms (mỗi NV 1 cái).
    */
   async getChatRoom(partnerId: string): Promise<{ id: string } | null> {
     const { data, error } = await supabase
@@ -422,6 +424,8 @@ export const partnerService = {
       .eq('partner_id', partnerId)
       .eq('room_type', 'general')
       .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
     if (error) return null

@@ -213,6 +213,7 @@ const DealPrintPage = lazy(() => import('./pages/b2b/deals/DealPrintPage'));
 // Partners
 const PartnerListPage = lazy(() => import('./pages/b2b/partners/PartnerListPage'));
 const PartnerRequestsPage = lazy(() => import('./pages/b2b/partners/PartnerRequestsPage'));
+const PartnerAssignmentsPage = lazy(() => import('./pages/b2b/partners/PartnerAssignmentsPage'));
 const PartnerDetailPage = lazy(() => import('./pages/b2b/partners/PartnerDetailPage'));
 // Bonuses (Quy chế thưởng đại lý)
 const BonusListPage = lazy(() => import('./pages/b2b/bonuses/BonusListPage'));
@@ -361,6 +362,7 @@ function App() {
                 {/* B2B Partners */}
                 <Route path="partners" element={<Suspense fallback={<LoadingSpinner />}><PartnerListPage /></Suspense>} />
                 <Route path="partners/requests" element={<Suspense fallback={<LoadingSpinner />}><PartnerRequestsPage /></Suspense>} />
+                <Route path="partners/assignments" element={<Suspense fallback={<LoadingSpinner />}><PartnerAssignmentsPage /></Suspense>} />
                 <Route path="partners/:id" element={<Suspense fallback={<LoadingSpinner />}><PartnerDetailPage /></Suspense>} />
                 {/* B2B Deals */}
                 <Route path="deals" element={<Suspense fallback={<LoadingSpinner />}><DealListPage /></Suspense>} />

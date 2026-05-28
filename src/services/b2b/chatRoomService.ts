@@ -25,6 +25,8 @@ export interface ChatRoom {
   last_message_at: string | null
   message_count: number
   created_by: string | null
+  /** sprint1_08: NV phụ trách room này. NULL = legacy/admin room. */
+  assigned_user_id: string | null
   created_at: string
   // Joined fields
   partner?: {
@@ -51,6 +53,8 @@ export interface ChatRoomListParams {
   search?: string
   filter?: 'all' | 'unread' | PartnerTier
   room_type?: RoomType | 'all'
+  /** sprint1_08: nếu set → chỉ trả rooms của NV này (assigned_user_id = userId). */
+  assigned_user_id?: string
 }
 
 export interface PaginatedChatRoomResponse {
@@ -68,6 +72,8 @@ export interface ChatRoomCreateData {
   room_type: RoomType
   room_name?: string
   created_by: string
+  /** sprint1_08: NV sở hữu room — bắt buộc cho mọi room mới. */
+  assigned_user_id: string
 }
 
 // ============================================
@@ -114,7 +120,7 @@ export const chatRoomService = {
   async getRooms(params: ChatRoomListParams = {}): Promise<PaginatedChatRoomResponse> {
     const page = params.page || 1
     const pageSize = params.pageSize || 20
-    const { search, filter, room_type } = params
+    const { search, filter, room_type, assigned_user_id } = params
 
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
@@ -134,6 +140,11 @@ export const chatRoomService = {
         )
       `, { count: 'exact' })
       .eq('is_active', true)
+
+    // sprint1_08: filter theo NV phụ trách (mỗi NV chỉ thấy room mình tạo)
+    if (assigned_user_id) {
+      query = query.eq('assigned_user_id', assigned_user_id)
+    }
 
     // Filter theo room_type
     if (room_type && room_type !== 'all') {
@@ -250,7 +261,8 @@ export const chatRoomService = {
   },
 
   /**
-   * Lấy room theo partner_id (general room)
+   * @deprecated sprint1_08: thay bằng getByPartnerAndUser(partnerId, userId).
+   * Giữ lại để backward-compat — trả room ĐẦU TIÊN (bất kể assigned_user_id).
    */
   async getByPartnerId(partnerId: string): Promise<ChatRoom | null> {
     const { data, error } = await supabase
@@ -269,6 +281,8 @@ export const chatRoomService = {
       .eq('partner_id', partnerId)
       .eq('room_type', 'general')
       .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
     if (error) throw error
@@ -281,15 +295,45 @@ export const chatRoomService = {
   },
 
   /**
-   * Tạo phòng chat mới
+   * sprint1_08: Lấy room general của cặp (NV × ĐL). Mỗi cặp duy nhất 1 room.
+   */
+  async getByPartnerAndUser(partnerId: string, userId: string): Promise<ChatRoom | null> {
+    const { data, error } = await supabase
+      .from('b2b_chat_rooms')
+      .select(`
+        *,
+        partner:b2b_partners!partner_id (
+          id,
+          code,
+          name,
+          tier,
+          phone,
+          email
+        )
+      `)
+      .eq('partner_id', partnerId)
+      .eq('assigned_user_id', userId)
+      .eq('room_type', 'general')
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) return null
+
+    return {
+      ...data,
+      partner: Array.isArray(data.partner) ? data.partner[0] : data.partner,
+    } as ChatRoom
+  },
+
+  /**
+   * Tạo phòng chat mới — yêu cầu assigned_user_id (sprint1_08).
+   * Nếu đã có general room cho cặp (partner × NV) → trả room cũ (idempotent).
    */
   async create(roomData: ChatRoomCreateData): Promise<ChatRoom> {
-    // Kiểm tra đã có room general với partner này chưa
     if (roomData.room_type === 'general') {
-      const existing = await this.getByPartnerId(roomData.partner_id)
-      if (existing) {
-        return existing
-      }
+      const existing = await this.getByPartnerAndUser(roomData.partner_id, roomData.assigned_user_id)
+      if (existing) return existing
     }
 
     const { data, error } = await supabase
@@ -319,6 +363,27 @@ export const chatRoomService = {
       ...data,
       partner: Array.isArray(data.partner) ? data.partner[0] : data.partner,
     } as ChatRoom
+  },
+
+  /**
+   * Helper: mở chat với 1 đại lý dưới danh nghĩa NV đang login.
+   * Tạo room nếu chưa có. Yêu cầu user_id (auth UUID) — gate ở client với auth store.
+   */
+  async getOrCreate(partnerId: string, userId: string, opts?: {
+    room_type?: RoomType
+    room_name?: string
+    deal_id?: string
+    demand_id?: string
+  }): Promise<ChatRoom> {
+    return this.create({
+      partner_id: partnerId,
+      assigned_user_id: userId,
+      created_by: userId,
+      room_type: opts?.room_type ?? 'general',
+      room_name: opts?.room_name,
+      deal_id: opts?.deal_id,
+      demand_id: opts?.demand_id,
+    })
   },
 
   /**

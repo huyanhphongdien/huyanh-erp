@@ -20,6 +20,7 @@ import {
   Empty,
   Button,
   Tooltip,
+  Switch,
   message,
 } from 'antd'
 import {
@@ -29,13 +30,14 @@ import {
   ReloadOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import { 
-  chatRoomService, 
-  ChatRoom, 
+import {
+  chatRoomService,
+  ChatRoom,
   PartnerTier,
   TIER_LABELS,
   TIER_COLORS,
 } from '../../services/b2b/chatRoomService'
+import { useAuthStore } from '../../stores/authStore'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
@@ -229,7 +231,9 @@ const ChatRoomSkeleton = () => (
 
 const B2BChatListPage = () => {
   const openChatTab = useOpenChatTab()
-  
+  const { user } = useAuthStore()
+  const isManager = user?.is_manager ?? false
+
   // State
   const [rooms, setRooms] = useState<ChatRoom[]>([])
   const [loading, setLoading] = useState(true)
@@ -237,6 +241,8 @@ const B2BChatListPage = () => {
   const [searchText, setSearchText] = useState('')
   const [filter, setFilter] = useState<FilterType>('all')
   const [totalUnread, setTotalUnread] = useState(0)
+  /** sprint1_08: admin/manager bật để xem rooms của TẤT CẢ NV; mặc định chỉ rooms của mình */
+  const [viewAll, setViewAll] = useState(false)
 
   // ============================================
   // DATA FETCHING
@@ -245,13 +251,18 @@ const B2BChatListPage = () => {
   const fetchRooms = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true)
-      
+
+      // sprint1_08: NV thường chỉ thấy room mình phụ trách.
+      // Manager/admin bật toggle "Xem tất cả" thì bỏ filter.
+      const assignedFilter = (!viewAll && user?.id) ? user.id : undefined
+
       const response = await chatRoomService.getRooms({
         search: searchText || undefined,
         filter: filter,
-        pageSize: 50, // Lấy nhiều rooms
+        assigned_user_id: assignedFilter,
+        pageSize: 50,
       })
-      
+
       setRooms(response.data)
     } catch (error) {
       console.error('Error fetching rooms:', error)
@@ -260,7 +271,7 @@ const B2BChatListPage = () => {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [searchText, filter])
+  }, [searchText, filter, viewAll, user?.id])
 
   const fetchTotalUnread = useCallback(async () => {
     try {
@@ -355,14 +366,22 @@ const B2BChatListPage = () => {
             )}
           </Space>
           <Space>
+            {isManager && (
+              <Tooltip title={viewAll ? 'Đang xem rooms của TẤT CẢ NV' : 'Chỉ xem rooms của tôi'}>
+                <Space size={6}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Xem tất cả NV</Text>
+                  <Switch size="small" checked={viewAll} onChange={setViewAll} />
+                </Space>
+              </Tooltip>
+            )}
             <Tooltip title="Làm mới">
-              <Button 
-                icon={<ReloadOutlined spin={refreshing} />} 
+              <Button
+                icon={<ReloadOutlined spin={refreshing} />}
                 onClick={handleRefresh}
               />
             </Tooltip>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               icon={<PlusOutlined />}
               onClick={handleCreateRoom}
             >

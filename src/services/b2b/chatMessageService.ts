@@ -657,8 +657,8 @@ export const chatMessageService = {
    * Base table là b2b.chat_messages (public.b2b_chat_messages chỉ là VIEW
    * không publish realtime được). Subscription phải trỏ vào base table
    * với schema:'b2b'. Migration đi kèm add b2b.chat_messages vào
-   * supabase_realtime publication:
-   *   docs/migrations/b2b_chat_realtime_publication.sql
+   * supabase_realtime publication (+ REPLICA IDENTITY FULL + RLS):
+   *   docs/migrations/b2b_chat_realtime_fix.sql
    *
    * Trả về subscription object với .unsubscribe() thay vì channel trực tiếp.
    * Tự động reconnect khi mất kết nối (exponential backoff, max 30s).

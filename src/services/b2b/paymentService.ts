@@ -94,6 +94,32 @@ export const PAYMENT_METHOD_COLORS: Record<PaymentMethod, string> = {
 }
 
 // ============================================
+// PA1 GUARD — deal mua mủ thanh toán qua "Đề nghị thanh toán" (WMS), KHÔNG tại settlement
+// ============================================
+// Quyết định PA1: đề nghị thanh toán (gom phiếu cân) là cửa chi tiền DUY NHẤT cho mủ
+// mua về. Quyết toán B2B của deal mua = chỉ đối soát. Chặn ghi payment_paid tại đây để
+// tránh trả trùng. Các loại deal khác (bán/gia công/ký gửi) vẫn thanh toán bình thường.
+async function assertNotPurchaseDeal(settlementId: string): Promise<void> {
+  const { data: st } = await supabase
+    .from('b2b_settlements')
+    .select('deal_id')
+    .eq('id', settlementId)
+    .maybeSingle()
+  if (!st?.deal_id) return
+  const { data: deal } = await supabase
+    .from('b2b_deals')
+    .select('deal_type')
+    .eq('id', st.deal_id)
+    .maybeSingle()
+  if (deal?.deal_type === 'purchase') {
+    throw new Error(
+      'Deal mua mủ thanh toán qua "Đề nghị thanh toán" (Lý lịch mủ → Đề nghị thanh toán), ' +
+      'không ghi thanh toán tại quyết toán để tránh trả trùng.'
+    )
+  }
+}
+
+// ============================================
 // SERVICE
 // ============================================
 
@@ -183,6 +209,8 @@ export const paymentService = {
   // ============================================
 
   async createPayment(paymentData: PaymentCreateData): Promise<SettlementPayment> {
+    await assertNotPurchaseDeal(paymentData.settlement_id)  // PA1: chặn trả trùng deal mua mủ
+
     const { data, error } = await supabase
       .from('b2b_settlement_payments')
       .insert({

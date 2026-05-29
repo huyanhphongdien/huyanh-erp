@@ -469,6 +469,112 @@ async function remove(id: string): Promise<void> {
 }
 
 // ============================================================================
+// WORKFLOW DUYỆT (ĐỢT 2) — draft → submitted → approved → paid (+ cancelled)
+// ============================================================================
+
+async function _setStatus(
+  id: string,
+  next: PaymentRequestStatus,
+  fromStatuses: PaymentRequestStatus[],
+  extra: Record<string, any> = {}
+): Promise<PaymentRequest> {
+  let q = supabase
+    .from('payment_requests')
+    .update({ status: next, ...extra })
+    .eq('id', id)
+  if (fromStatuses.length) q = q.in('status', fromStatuses)
+  const { data, error } = await q.select(REQUEST_SELECT).single()
+  if (error) throw error
+  if (!data) throw new Error('Không thể chuyển trạng thái (sai trạng thái nguồn?)')
+  return normalizeRequest(data)
+}
+
+async function submit(id: string): Promise<PaymentRequest> {
+  return _setStatus(id, 'submitted', ['draft'], { submitted_at: new Date().toISOString() })
+}
+
+async function approve(id: string, userId?: string | null): Promise<PaymentRequest> {
+  return _setStatus(id, 'approved', ['submitted'], {
+    approved_at: new Date().toISOString(),
+    approved_by: userId || null,
+  })
+}
+
+async function revertToDraft(id: string): Promise<PaymentRequest> {
+  return _setStatus(id, 'draft', ['submitted', 'approved'], {
+    submitted_at: null, approved_at: null, approved_by: null,
+  })
+}
+
+async function cancel(id: string): Promise<PaymentRequest> {
+  return _setStatus(id, 'cancelled', ['draft', 'submitted', 'approved'])
+}
+
+/**
+ * Đánh dấu ĐÃ CHI + ghi sổ công nợ (PA1 — đây là cửa chi tiền duy nhất).
+ *  - Dòng deal/partner → bút toán b2b_partner_ledger 'payment_paid' (credit), gộp theo partner.
+ *  - Dòng mua lẻ (supplier) → cập nhật rubber_intake_batches.paid_amount/payment_status (best-effort qua ticket).
+ * Idempotent: ledger theo reference_code; gọi lại an toàn.
+ */
+async function markPaid(id: string, userId?: string | null): Promise<PaymentRequest> {
+  const res = await getById(id)
+  if (!res) throw new Error('Không tìm thấy đề nghị')
+  const { request, lines } = res
+  if (request.status === 'paid') return request
+  if (request.status !== 'approved') throw new Error('Chỉ chi khi phiếu ở trạng thái "Đã duyệt"')
+
+  // 1) Ledger payment_paid cho dòng deal/partner — gộp theo partner
+  const partnerSums = new Map<string, number>()
+  for (const l of lines) {
+    if (l.source_type === 'deal' && l.partner_id && (l.amount || 0) > 0) {
+      partnerSums.set(l.partner_id, (partnerSums.get(l.partner_id) || 0) + l.amount)
+    }
+  }
+  if (partnerSums.size > 0) {
+    const { ledgerService } = await import('../b2b/ledgerService')
+    for (const [partnerId, amount] of partnerSums) {
+      await ledgerService.createManualEntry({
+        partner_id: partnerId,
+        entry_type: 'payment_paid',
+        debit: 0,
+        credit: amount,
+        reference_code: `${request.code}-PR-${partnerId}`,
+        description: `Chi theo đề nghị thanh toán ${request.code}`,
+        entry_date: request.request_date,
+        created_by: userId || undefined,
+      })
+    }
+  }
+
+  // 2) Mua lẻ → đánh dấu lô đã trả (best-effort, no-op nếu không có batch liên kết)
+  const supplierTicketIds = lines
+    .filter(l => l.source_type === 'supplier' && l.ticket_id)
+    .map(l => l.ticket_id as string)
+  if (supplierTicketIds.length > 0) {
+    const { data: batches } = await supabase
+      .from('rubber_intake_batches')
+      .select('id, total_amount')
+      .in('weighbridge_ticket_id', supplierTicketIds)
+    for (const b of (batches || []) as Array<{ id: string; total_amount: number | null }>) {
+      await supabase
+        .from('rubber_intake_batches')
+        .update({ paid_amount: b.total_amount ?? 0, payment_status: 'paid' })
+        .eq('id', b.id)
+    }
+  }
+
+  // 3) Set paid
+  const { data, error } = await supabase
+    .from('payment_requests')
+    .update({ status: 'paid', paid_at: new Date().toISOString(), paid_by: userId || null })
+    .eq('id', id)
+    .select(REQUEST_SELECT)
+    .single()
+  if (error) throw error
+  return normalizeRequest(data)
+}
+
+// ============================================================================
 // NORMALIZE
 // ============================================================================
 
@@ -498,6 +604,11 @@ export const paymentRequestService = {
   addLine,
   removeLine,
   remove,
+  submit,
+  approve,
+  revertToDraft,
+  cancel,
+  markPaid,
 }
 
 export default paymentRequestService

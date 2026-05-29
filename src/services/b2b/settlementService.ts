@@ -653,6 +653,14 @@ export const settlementService = {
     if (current.status !== 'approved') {
       throw new Error('Chỉ có thể thanh toán phiếu ở trạng thái "Đã duyệt"')
     }
+    // PA1: deal mua mủ thanh toán qua "Đề nghị thanh toán" (WMS), không tại đây → tránh trả trùng.
+    if (current.deal_id) {
+      const { data: deal } = await supabase
+        .from('b2b_deals').select('deal_type').eq('id', current.deal_id).maybeSingle()
+      if (deal?.deal_type === 'purchase') {
+        throw new Error('Deal mua mủ thanh toán qua "Đề nghị thanh toán" (Lý lịch mủ), không ghi tại quyết toán để tránh trả trùng.')
+      }
+    }
 
     const { data, error } = await supabase
       .from('b2b_settlements')

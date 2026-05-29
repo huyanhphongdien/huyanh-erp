@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Check, Scale, Truck, Tag, Search, CheckSquare, Square,
 } from 'lucide-react'
-import { paymentRequestService, type AvailableTicket } from '../../../services/wms/paymentRequestService'
+import { paymentRequestService, type AvailableTicket, type PaymentCurrency } from '../../../services/wms/paymentRequestService'
 import { facilityService, type Facility } from '../../../services/wms/facilityService'
 import { useAuthStore } from '../../../stores/authStore'
 
@@ -50,6 +50,7 @@ const PaymentRequestCreatePage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [title, setTitle] = useState('')
+  const [currency, setCurrency] = useState<PaymentCurrency>('VND')
 
   useEffect(() => {
     facilityService.getAllActive().then(setFacilities).catch(() => {})
@@ -99,6 +100,7 @@ const PaymentRequestCreatePage: React.FC = () => {
         request_date: dateTo || today(),
         rubber_type: rubberType || null,
         title: title.trim() || null,
+        currency,
         created_by: user?.id || null,
         lines: paymentRequestService.ticketsToLines(chosen),
       })
@@ -156,10 +158,23 @@ const PaymentRequestCreatePage: React.FC = () => {
           </button>
         </div>
 
-        {/* Title optional */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-          <label className="text-[11px] text-gray-400 font-medium">Tiêu đề phiếu (tuỳ chọn)</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="VD: Mủ nước Tân Lâm 29/05" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 text-[13.5px]" />
+        {/* Title + currency */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-2.5">
+          <div>
+            <label className="text-[11px] text-gray-400 font-medium">Tiêu đề phiếu (tuỳ chọn)</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="VD: Mủ nước Tân Lâm 29/05" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 text-[13.5px]" />
+          </div>
+          <div>
+            <label className="text-[11px] text-gray-400 font-medium">Tiền tệ</label>
+            <div className="mt-1 flex gap-1.5">
+              {(['VND', 'KIP', 'THB'] as PaymentCurrency[]).map(c => (
+                <button key={c} type="button" onClick={() => setCurrency(c)}
+                  className={`px-4 py-2 rounded-xl text-[13px] font-semibold transition ${currency === c ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

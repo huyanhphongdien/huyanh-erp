@@ -9,16 +9,20 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Save, Plus, Trash2, Printer, Calendar, Building2, Scale,
+  Send, CheckCircle2, Banknote, Undo2, XCircle,
 } from 'lucide-react'
 import {
   paymentRequestService,
   type PaymentRequest,
   type PaymentRequestLine,
   type PaymentRequestStatus,
+  type PaymentCurrency,
 } from '../../../services/wms/paymentRequestService'
+import { useAuthStore } from '../../../stores/authStore'
 
-function fmtVnd(a?: number | null): string {
-  return (a || 0).toLocaleString('vi-VN') + 'đ'
+const CCY_SUFFIX: Record<PaymentCurrency, string> = { VND: 'đ', KIP: ' ₭', THB: ' ฿' }
+function fmtCur(a?: number | null, ccy: PaymentCurrency = 'VND'): string {
+  return (a || 0).toLocaleString('vi-VN') + CCY_SUFFIX[ccy]
 }
 function fmtDate(s?: string | null): string {
   if (!s) return '–'
@@ -40,10 +44,12 @@ const PaymentRequestDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
 
+  const user = useAuthStore(s => s.user)
   const [req, setReq] = useState<PaymentRequest | null>(null)
   const [lines, setLines] = useState<EditLine[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [acting, setActing] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -137,6 +143,22 @@ const PaymentRequestDetailPage: React.FC = () => {
     }
   }
 
+  const runAction = async (fn: () => Promise<unknown>, confirmMsg?: string) => {
+    if (confirmMsg && !confirm(confirmMsg)) return
+    setActing(true)
+    try { await fn(); await load() }
+    catch (e: any) { alert(e?.message || 'Thao tác thất bại') }
+    setActing(false)
+  }
+  const handleSubmit = () => req && runAction(() => paymentRequestService.submit(req.id))
+  const handleApprove = () => req && runAction(() => paymentRequestService.approve(req.id, user?.id))
+  const handleRevert = () => req && runAction(() => paymentRequestService.revertToDraft(req.id))
+  const handleCancel = () => req && runAction(() => paymentRequestService.cancel(req.id), `Huỷ đề nghị ${req.code}?`)
+  const handleMarkPaid = () => req && runAction(
+    () => paymentRequestService.markPaid(req.id, user?.id),
+    `Xác nhận ĐÃ CHI ${fmtCur(liveTotalAmount, req.currency)}? Hệ thống sẽ ghi công nợ và không cho sửa nữa.`,
+  )
+
   const liveTotalAmount = lines.reduce((s, l) => s + (l.amount || 0), 0)
   const liveTotalWeight = lines.reduce((s, l) => s + (l.weight || 0), 0)
   const hasDirty = lines.some(l => l._dirty)
@@ -183,11 +205,50 @@ const PaymentRequestDetailPage: React.FC = () => {
             <span className="flex items-center gap-1.5"><Scale className="w-4 h-4" />{liveTotalWeight.toLocaleString('vi-VN')} kg</span>
           </div>
           <div className="mt-2 pt-2 border-t border-gray-50 flex items-center justify-between">
-            <span className="text-[13px] text-gray-400">Tổng chi ({lines.length} dòng)</span>
-            <span className="text-[22px] font-bold text-emerald-600 font-mono">{fmtVnd(liveTotalAmount)}</span>
+            <span className="text-[13px] text-gray-400">Tổng chi ({lines.length} dòng · {req.currency})</span>
+            <span className="text-[22px] font-bold text-emerald-600 font-mono">{fmtCur(liveTotalAmount, req.currency)}</span>
           </div>
         </div>
       </div>
+
+      {/* Workflow actions */}
+      {req.status !== 'cancelled' && (
+        <div className="px-4 pb-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            {req.status === 'draft' && (
+              <button onClick={handleSubmit} disabled={acting || lines.length === 0} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 text-white text-[13.5px] font-semibold active:scale-95 transition disabled:opacity-50">
+                <Send className="w-4 h-4" /> Gửi duyệt
+              </button>
+            )}
+            {req.status === 'submitted' && (
+              <button onClick={handleApprove} disabled={acting} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[13.5px] font-semibold active:scale-95 transition disabled:opacity-50">
+                <CheckCircle2 className="w-4 h-4" /> Duyệt
+              </button>
+            )}
+            {req.status === 'approved' && (
+              <button onClick={handleMarkPaid} disabled={acting} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-[13.5px] font-semibold active:scale-95 transition disabled:opacity-50">
+                <Banknote className="w-4 h-4" /> Đánh dấu đã chi
+              </button>
+            )}
+            {(req.status === 'submitted' || req.status === 'approved') && (
+              <button onClick={handleRevert} disabled={acting} className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-[13.5px] font-medium active:scale-95 transition disabled:opacity-50">
+                <Undo2 className="w-4 h-4" /> Trả về nháp
+              </button>
+            )}
+            {req.status !== 'paid' && (
+              <button onClick={handleCancel} disabled={acting} className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-red-500 text-[13.5px] font-medium active:scale-95 transition disabled:opacity-50 ml-auto">
+                <XCircle className="w-4 h-4" /> Huỷ
+              </button>
+            )}
+            {acting && <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />}
+          </div>
+          {req.status === 'paid' && req.paid_at && (
+            <p className="mt-2 text-[12px] text-emerald-600 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Đã chi ngày {fmtDate(req.paid_at)} — đã ghi công nợ (PA1).
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Lines */}
       <div className="px-4 space-y-2.5">

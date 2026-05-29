@@ -1,0 +1,211 @@
+// ============================================================================
+// FILE: src/utils/paymentRequestExportExcel.ts
+// MODULE: WMS / Nhập kho mủ — Xuất Đề nghị thanh toán ra Excel
+// Theo form "ĐNTT" (BÁO CÁO KHỐI LƯỢNG HẰNG NGÀY MỦ NƯỚC TÂN LÂM.xlsx):
+//   STT | Nội dung | ĐVT | Số lượng | Đơn giá | Thành tiền | Ghi chú
+// ============================================================================
+
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
+import type { PaymentRequest, PaymentRequestLine } from '../services/wms/paymentRequestService'
+
+const RUBBER_LABELS: Record<string, string> = {
+  mu_nuoc: 'mủ nước', mu_tap: 'mủ tạp', mu_dong: 'mủ đông', mu_chen: 'mủ chén', mu_to: 'mủ tờ',
+}
+const CCY_LABEL: Record<string, string> = { VND: 'VND', KIP: 'KIP', THB: 'THB' }
+
+// ── Đọc số tiền bằng chữ (tiếng Việt) ──
+function readVietnameseNumber(num: number): string {
+  if (!num || num <= 0) return 'Không'
+  const ds = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
+  const readTriple = (n: number, full: boolean): string => {
+    const tr = Math.floor(n / 100), ch = Math.floor((n % 100) / 10), dv = n % 10
+    let s = ''
+    if (full || tr > 0) s += ds[tr] + ' trăm'
+    if (ch === 0) { if (dv > 0) s += (s ? ' lẻ ' : '') + ds[dv] }
+    else {
+      s += (s ? ' ' : '') + (ch === 1 ? 'mười' : ds[ch] + ' mươi')
+      if (dv === 1 && ch > 1) s += ' mốt'
+      else if (dv === 5 && ch > 0) s += ' lăm'
+      else if (dv > 0) s += ' ' + ds[dv]
+    }
+    return s.trim()
+  }
+  const units = ['', ' nghìn', ' triệu', ' tỷ']
+  const groups: number[] = []
+  let n = Math.round(num)
+  while (n > 0) { groups.push(n % 1000); n = Math.floor(n / 1000) }
+  let out = ''
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i] === 0 && i !== 0) continue
+    out += readTriple(groups[i], i < groups.length - 1) + units[i]
+  }
+  out = out.trim().replace(/\s+/g, ' ')
+  return out.charAt(0).toUpperCase() + out.slice(1)
+}
+
+const BORDER: Partial<ExcelJS.Borders> = {
+  top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' },
+}
+
+export interface ExportOpts {
+  preparedBy?: string | null   // Người đề nghị
+}
+
+export async function exportPaymentRequestExcel(
+  req: PaymentRequest,
+  lines: PaymentRequestLine[],
+  opts: ExportOpts = {},
+): Promise<void> {
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'Huy Anh Rubber ERP'
+  wb.created = new Date()
+  const ws = wb.addWorksheet('ĐNTT', {
+    pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } },
+  })
+  ws.columns = [
+    { width: 5 },   // A STT
+    { width: 40 },  // B Nội dung
+    { width: 6 },   // C ĐVT
+    { width: 12 },  // D Số lượng
+    { width: 12 },  // E Đơn giá
+    { width: 16 },  // F Thành tiền
+    { width: 30 },  // G Ghi chú
+  ]
+
+  const ccy = CCY_LABEL[req.currency] || 'VND'
+  const numFmt = '#,##0'
+  const d = new Date(req.request_date)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+
+  let r = 1
+  const merge = (range: string) => ws.mergeCells(range)
+
+  // ─ Company header ─
+  merge(`A${r}:G${r}`)
+  ws.getCell(`A${r}`).value = 'CÔNG TY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN'
+  ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 12, bold: true }
+  ws.getCell(`A${r}`).alignment = { horizontal: 'left' }
+  r++
+  merge(`A${r}:G${r}`)
+  ws.getCell(`A${r}`).value = 'MST: 3301549896 · Khe Mạ, Phường Phong Điền, TP Huế'
+  ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 9, italic: true, color: { argb: 'FF666666' } }
+  r++; r++
+
+  // ─ Title ─
+  merge(`A${r}:G${r}`)
+  ws.getCell(`A${r}`).value = 'ĐỀ NGHỊ THANH TOÁN'
+  ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 16, bold: true }
+  ws.getCell(`A${r}`).alignment = { horizontal: 'center' }
+  r++
+  merge(`A${r}:G${r}`)
+  ws.getCell(`A${r}`).value = `Ngày ${dd} tháng ${mm} năm ${yyyy}`
+  ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 11, italic: true }
+  ws.getCell(`A${r}`).alignment = { horizontal: 'center' }
+  r++
+
+  // ─ Meta rows ─
+  const metaFont: Partial<ExcelJS.Font> = { name: 'Times New Roman', size: 11 }
+  const putMeta = (label: string) => {
+    merge(`A${r}:G${r}`)
+    ws.getCell(`A${r}`).value = label
+    ws.getCell(`A${r}`).font = metaFont
+    r++
+  }
+  putMeta(`Số phiếu: ${req.code}        Tiền tệ: ${ccy}`)
+  putMeta('Kính gửi: Ban Giám đốc, Kế toán trưởng')
+  if (opts.preparedBy) putMeta(`Người đề nghị: ${opts.preparedBy}`)
+  putMeta(`Lý do: ${req.title || 'Thanh toán tiền mua mủ nguyên liệu'}`)
+  putMeta('Hình thức nhận tiền: Chuyển khoản — Tên tài khoản: theo cột Ghi chú')
+  r++
+
+  // ─ Table header ─
+  const headerRowIdx = r
+  const headers = ['STT', 'Nội dung', 'ĐVT', 'Số lượng', 'Đơn giá', `Thành tiền (${ccy})`, 'Ghi chú']
+  headers.forEach((h, i) => {
+    const cell = ws.getCell(headerRowIdx, i + 1)
+    cell.value = h
+    cell.font = { name: 'Times New Roman', size: 10, bold: true }
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } }
+    cell.border = BORDER
+  })
+  r++
+
+  // ─ Data rows ─
+  let totalAmount = 0
+  let totalWeight = 0
+  lines.forEach((l, idx) => {
+    const rubber = l.rubber_type ? (RUBBER_LABELS[l.rubber_type] || l.rubber_type) : ''
+    const noiDung =
+      `Thanh toán tiền mua mủ${rubber ? ' ' + rubber : ''}` +
+      (l.vehicle_plate ? ` — xe ${l.vehicle_plate}` : '') +
+      (l.deal_number ? ` (Deal #${l.deal_number})` : '')
+    const ghiChu = [l.payee_name, l.payee_note].filter(Boolean).join(' — ')
+    const vals = [idx + 1, noiDung, 'kg', l.weight || 0, l.unit_price || 0, l.amount || 0, ghiChu]
+    vals.forEach((v, i) => {
+      const cell = ws.getCell(r, i + 1)
+      cell.value = v as any
+      cell.font = { name: 'Times New Roman', size: 10 }
+      cell.border = BORDER
+      if (i === 0) cell.alignment = { horizontal: 'center', vertical: 'top' }
+      else if (i === 2) cell.alignment = { horizontal: 'center', vertical: 'top' }
+      else if (i >= 3 && i <= 5) { cell.numFmt = numFmt; cell.alignment = { horizontal: 'right', vertical: 'top' } }
+      else cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }
+    })
+    totalAmount += l.amount || 0
+    totalWeight += l.weight || 0
+    r++
+  })
+
+  // ─ Total row ─
+  merge(`A${r}:C${r}`)
+  ws.getCell(`A${r}`).value = 'TỔNG CỘNG'
+  ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 10, bold: true }
+  ws.getCell(`A${r}`).alignment = { horizontal: 'center' }
+  ws.getCell(`A${r}`).border = BORDER
+  // D = tổng kg
+  ws.getCell(r, 4).value = totalWeight
+  ws.getCell(r, 4).numFmt = numFmt
+  ws.getCell(r, 4).font = { name: 'Times New Roman', size: 10, bold: true }
+  ws.getCell(r, 4).alignment = { horizontal: 'right' }
+  ws.getCell(r, 4).border = BORDER
+  ws.getCell(r, 5).border = BORDER
+  // F = tổng tiền
+  ws.getCell(r, 6).value = totalAmount
+  ws.getCell(r, 6).numFmt = numFmt
+  ws.getCell(r, 6).font = { name: 'Times New Roman', size: 11, bold: true }
+  ws.getCell(r, 6).alignment = { horizontal: 'right' }
+  ws.getCell(r, 6).border = BORDER
+  ws.getCell(r, 7).border = BORDER
+  for (let c = 1; c <= 7; c++) ws.getCell(r, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8E1' } }
+  r++
+
+  // ─ Số tiền bằng chữ ─
+  merge(`A${r}:G${r}`)
+  const ccyWord = ccy === 'VND' ? 'đồng' : ccy === 'KIP' ? 'kíp' : 'baht'
+  ws.getCell(`A${r}`).value = `Số tiền bằng chữ: ${readVietnameseNumber(totalAmount)} ${ccyWord}.`
+  ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 11, italic: true, bold: true }
+  r++; r++
+
+  // ─ Chữ ký ─
+  const signRow = r
+  const signs = [
+    { col: 'A', label: 'Người đề nghị' },
+    { col: 'C', label: 'Kế toán trưởng' },
+    { col: 'F', label: 'Giám đốc' },
+  ]
+  signs.forEach(s => {
+    ws.getCell(`${s.col}${signRow}`).value = s.label
+    ws.getCell(`${s.col}${signRow}`).font = { name: 'Times New Roman', size: 11, bold: true }
+    ws.getCell(`${s.col}${signRow}`).alignment = { horizontal: 'center' }
+    ws.getCell(`${s.col}${signRow + 1}`).value = '(Ký, ghi rõ họ tên)'
+    ws.getCell(`${s.col}${signRow + 1}`).font = { name: 'Times New Roman', size: 9, italic: true, color: { argb: 'FF888888' } }
+    ws.getCell(`${s.col}${signRow + 1}`).alignment = { horizontal: 'center' }
+  })
+
+  const buf = await wb.xlsx.writeBuffer()
+  saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `DNTT_${req.code}.xlsx`)
+}

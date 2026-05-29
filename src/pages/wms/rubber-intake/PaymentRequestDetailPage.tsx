@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Save, Plus, Trash2, Printer, Calendar, Building2, Scale,
-  Send, CheckCircle2, Banknote, Undo2, XCircle,
+  Send, CheckCircle2, Banknote, Undo2, XCircle, FileSpreadsheet,
 } from 'lucide-react'
 import {
   paymentRequestService,
@@ -158,6 +158,13 @@ const PaymentRequestDetailPage: React.FC = () => {
     () => paymentRequestService.markPaid(req.id, user?.id),
     `Xác nhận ĐÃ CHI ${fmtCur(liveTotalAmount, req.currency)}? Hệ thống sẽ ghi công nợ và không cho sửa nữa.`,
   )
+  const handleExportExcel = async () => {
+    if (!req) return
+    try {
+      const { exportPaymentRequestExcel } = await import('../../../utils/paymentRequestExportExcel')
+      await exportPaymentRequestExcel(req, lines, { preparedBy: user?.full_name })
+    } catch (e: any) { alert('Xuất Excel thất bại: ' + (e?.message || 'lỗi')) }
+  }
 
   const liveTotalAmount = lines.reduce((s, l) => s + (l.amount || 0), 0)
   const liveTotalWeight = lines.reduce((s, l) => s + (l.weight || 0), 0)
@@ -190,6 +197,9 @@ const PaymentRequestDetailPage: React.FC = () => {
             {req.title && <p className="text-[12px] text-gray-400 truncate">{req.title}</p>}
           </div>
           <span className={`px-2.5 py-1 rounded-full text-[11.5px] font-semibold ${st.cls}`}>{st.label}</span>
+          <button onClick={handleExportExcel} className="p-2 rounded-lg hover:bg-gray-100" title="Xuất Excel (form ĐNTT)">
+            <FileSpreadsheet className="w-4.5 h-4.5 text-emerald-600" />
+          </button>
           <button onClick={() => navigate(`/rubber/payment-requests/${req.id}/print`)} className="p-2 rounded-lg hover:bg-gray-100" title="In phiếu">
             <Printer className="w-4.5 h-4.5 text-gray-500" />
           </button>

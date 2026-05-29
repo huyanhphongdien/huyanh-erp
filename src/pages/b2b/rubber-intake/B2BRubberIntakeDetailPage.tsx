@@ -170,9 +170,16 @@ export default function B2BRubberIntakeDetailPage() {
           <button
             onClick={() => navigate(`/b2b/rubber-intake/${id}/print`)}
             className="px-3 py-2 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-1.5 min-h-[44px]"
-            title="In Phiếu Nhập Kho (PNK) — 2 liên A4"
+            title="In Phiếu Nhập Kho (PNK) — bản lưu nội bộ"
           >
             <Printer size={16} /> In PNK
+          </button>
+          <button
+            onClick={() => navigate(`/b2b/rubber-intake/${id}/print?lien=2`)}
+            className="px-3 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1.5 min-h-[44px]"
+            title="In Xác nhận khối lượng & thanh toán — Liên 2 giao khách hàng"
+          >
+            <FileText size={16} /> In Liên 2
           </button>
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusClass}`}>
             {STATUS_LABELS[item.status]}

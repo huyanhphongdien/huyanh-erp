@@ -298,6 +298,12 @@ const getMenuGroups = (
         extraActivePaths: ['/b2b/partners/requests', '/b2b/bonuses'],
       },
       {
+        path: '/b2b/price-lock',
+        label: 'Phiếu chốt giá',
+        icon: <Tag size={18} />,
+        requireB2BPurchaser: true,
+      },
+      {
         path: '/b2b/rubber-intake',
         label: 'Nhập kho mủ',
         icon: <FileCheck size={18} />,

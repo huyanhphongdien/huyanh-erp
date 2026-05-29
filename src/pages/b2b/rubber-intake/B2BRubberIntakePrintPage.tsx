@@ -7,16 +7,20 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
+import logoImg from '../../../assets/logo.png'
 import { rubberIntakeB2BService, type B2BRubberIntake } from '../../../services/b2b/rubberIntakeB2BService'
-import { partnerService } from '../../../services/b2b/partnerService'
+import { partnerService, type Partner } from '../../../services/b2b/partnerService'
 import { RAW_RUBBER_TYPE_LABELS, type RawRubberType } from '../../../services/b2b/intakeManualEntryService'
 
 export default function B2BRubberIntakePrintPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const lien2 = searchParams.get('lien') === '2'   // Liên 2 — giao khách hàng
   const [item, setItem] = useState<B2BRubberIntake | null>(null)
+  const [partner, setPartner] = useState<Partner | null>(null)
   const [proxyName, setProxyName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -26,9 +30,10 @@ export default function B2BRubberIntakePrintPage() {
     rubberIntakeB2BService.getById(id).then(async (data) => {
       setItem(data)
       if (data?.b2b_partner_id) {
-        const partner = await partnerService.getPartnerById(data.b2b_partner_id)
-        if (partner?.payment_proxy_partner_id) {
-          const proxy = await partnerService.getPartnerById(partner.payment_proxy_partner_id)
+        const p = await partnerService.getPartnerById(data.b2b_partner_id)
+        setPartner(p || null)
+        if (p?.payment_proxy_partner_id) {
+          const proxy = await partnerService.getPartnerById(p.payment_proxy_partner_id)
           setProxyName(proxy?.name || null)
         }
       }
@@ -61,7 +66,9 @@ export default function B2BRubberIntakePrintPage() {
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1 text-sm font-medium">
-          PNK {item.pnk_number != null ? `#${item.pnk_number}` : ''} · Bản lưu nội bộ
+          {lien2
+            ? `Phiếu thanh toán (Liên 2 — giao khách)${item.pnk_number != null ? ` · Số ${item.pnk_number}` : ''}`
+            : `PNK ${item.pnk_number != null ? `#${item.pnk_number}` : ''} · Bản lưu nội bộ`}
         </div>
         <button
           onClick={() => window.print()}
@@ -74,13 +81,13 @@ export default function B2BRubberIntakePrintPage() {
       {/* Preview area — 1 trang A4 */}
       <div className="no-print bg-gray-200 min-h-[calc(100vh-56px)] py-6 px-4 flex flex-col items-center">
         <div className="bg-white shadow-md" style={{ width: '210mm', minHeight: '297mm', padding: '14mm 14mm' }}>
-          <PnkSheet item={item} proxyName={proxyName} />
+          {lien2 ? <CustomerSlip item={item} partner={partner} proxyName={proxyName} /> : <PnkSheet item={item} proxyName={proxyName} />}
         </div>
       </div>
 
       {/* Print-only content */}
       <div className="print-only">
-        <PnkSheet item={item} proxyName={proxyName} />
+        {lien2 ? <CustomerSlip item={item} partner={partner} proxyName={proxyName} /> : <PnkSheet item={item} proxyName={proxyName} />}
       </div>
 
       <style>{`
@@ -301,6 +308,134 @@ function PnkSheet({ item, proxyName }: { item: B2BRubberIntake; proxyName: strin
 
       <div style={{ marginTop: 14, paddingTop: 6, borderTop: '1px solid #E5E7EB', textAlign: 'center', fontSize: 10, color: '#9CA3AF' }}>
         In từ hệ thống ERP — Cao su Huy Anh Phong Điền · {new Date().toLocaleString('vi-VN')}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// CUSTOMER SLIP — Liên 2 "XÁC NHẬN KHỐI LƯỢNG NHẬP MỦ VÀ THANH TOÁN" (giao khách)
+// Khớp mẫu Excel "PNK & TT" của HAQT/Tân Lâm. 1 phiếu nhập = 1 liên giao người bán.
+// ============================================================================
+
+function CustomerSlip({ item, partner, proxyName }: { item: B2BRubberIntake; partner: Partner | null; proxyName: string | null }) {
+  const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('vi-VN') : '—'
+  const d = new Date(item.intake_date)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+
+  const netKg = item.net_weight_kg || 0
+  const drc = item.drc_percent
+  const dot = item.field_dot_reading
+  const pricePerKg = item.unit_price ?? (item.settled_price_per_ton ? Math.round(item.settled_price_per_ton / 1000) : null)
+  const amount = item.total_amount || 0
+  const rawLabel = item.raw_rubber_type ? (RAW_RUBBER_TYPE_LABELS[item.raw_rubber_type as RawRubberType] || 'Mủ nước') : 'Mủ nước'
+
+  // "Số hiệu" = mã lô bỏ hậu tố xe (TMMN-07-01 → TMMN-07); fallback mã LLM gộp xe.
+  const soHieu = item.lot_code ? item.lot_code.replace(/-\d+$/, '') : (item.consolidation_code || '—')
+  const diemThuMua = item.facility?.name || item.facility?.code || item.location_name || '—'
+  const sellerBase = partner?.name || item.partner?.name || item.supplier?.name || '—'
+  const alias = partner?.contact_alias_name || undefined
+  const sellerName = alias && !sellerBase.includes(alias) ? `${sellerBase} ( ${alias} )` : sellerBase
+  const address = partner?.address || '—'
+  const phone = partner?.phone || ''
+
+  const bd = '1px solid #000'
+  const cTh: React.CSSProperties = { border: bd, padding: '3px 4px', fontSize: 11.5, fontWeight: 700, textAlign: 'center' }
+  const cTd: React.CSSProperties = { border: bd, padding: '5px', fontSize: 12.5 }
+
+  return (
+    <div style={{ fontFamily: "'Times New Roman', serif", fontSize: 13.5, color: '#000', maxWidth: 640, margin: '0 auto' }}>
+      {/* Company header */}
+      <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <img src={logoImg} alt="Huy Anh" style={{ height: 46, width: 'auto', objectFit: 'contain' }} />
+        <div style={{ lineHeight: 1.4 }}>
+          <div style={{ fontWeight: 700 }}>CTY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN</div>
+          <div>Mã số thuế : 3301549896</div>
+          <div>Khe Mạ, Phường Phong Điền, Thành Phố Huế</div>
+          <div>ĐT: 0963.504.688</div>
+        </div>
+      </div>
+
+      {/* Title */}
+      <div style={{ textAlign: 'center', margin: '10px 0 4px' }}>
+        <div style={{ fontSize: 16.5, fontWeight: 700 }}>XÁC NHẬN KHỐI LƯỢNG NHẬP MỦ VÀ THANH TOÁN</div>
+        <div style={{ fontStyle: 'italic' }}>( Liên 2 : Giao cho khách hàng )</div>
+      </div>
+
+      {/* Số phiếu + ngày */}
+      <div style={{ textAlign: 'right' }}>Số phiếu : <strong>{item.pnk_number ?? '…'}</strong></div>
+      <div style={{ textAlign: 'center', marginBottom: 10 }}>Ngày {dd} tháng {mm} năm {yyyy}</div>
+
+      {/* Identity block */}
+      <div style={{ lineHeight: 1.85, marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>Điểm thu mua : <strong>{diemThuMua}</strong></span>
+          <span>Số hiệu : <strong>{soHieu}</strong></span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+          <span>Họ và tên người bán : <strong>{sellerName}</strong></span>
+          <span style={{ whiteSpace: 'nowrap' }}>ĐT : {phone}</span>
+        </div>
+        <div>Địa chỉ : {address}</div>
+        <div>CMND: …...........................Ngày cấp : ….............. Nơi cấp: ….........................</div>
+        <div>Hình thức thanh toán : Chuyển khoản quỹ</div>
+      </div>
+
+      {/* Table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={{ ...cTh, width: 32 }} rowSpan={2}>STT</th>
+            <th style={cTh} rowSpan={2}>Tên mủ</th>
+            <th style={{ ...cTh, width: 56 }} rowSpan={2}>Số xe</th>
+            <th style={{ ...cTh, width: 78 }} rowSpan={2}>Khối lượng</th>
+            <th style={cTh} colSpan={2}>Hàm lượng</th>
+            <th style={{ ...cTh, width: 66 }} rowSpan={2}>Đơn giá</th>
+            <th style={{ ...cTh, width: 96 }} rowSpan={2}>Thành tiền</th>
+            <th style={{ ...cTh, width: 90 }} rowSpan={2}>Ghi chú</th>
+          </tr>
+          <tr>
+            <th style={{ ...cTh, width: 52 }}>Độ đốt</th>
+            <th style={{ ...cTh, width: 52 }}>DRC</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ ...cTd, textAlign: 'center' }}>1</td>
+            <td style={cTd}>{rawLabel}</td>
+            <td style={{ ...cTd, textAlign: 'center' }}>{item.vehicle_plate || ''}</td>
+            <td style={{ ...cTd, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(netKg)}</td>
+            <td style={{ ...cTd, textAlign: 'center' }}>{dot ?? ''}</td>
+            <td style={{ ...cTd, textAlign: 'center' }}>{drc != null ? `${drc}%` : ''}</td>
+            <td style={{ ...cTd, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(pricePerKg)}</td>
+            <td style={{ ...cTd, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{fmt(amount)}</td>
+            <td style={cTd}>{proxyName ? `Trả hộ: ${proxyName}` : ''}</td>
+          </tr>
+          <tr style={{ fontWeight: 700, background: '#F3F4F6' }}>
+            <td style={{ ...cTd, textAlign: 'center' }} colSpan={3}>TỔNG</td>
+            <td style={{ ...cTd, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(netKg)}</td>
+            <td style={{ ...cTd, textAlign: 'center' }}>X</td>
+            <td style={{ ...cTd, textAlign: 'center' }}>X</td>
+            <td style={{ ...cTd, textAlign: 'center' }}>X</td>
+            <td style={{ ...cTd, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(amount)}</td>
+            <td style={cTd}></td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Signatures */}
+      <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', marginTop: 20, fontWeight: 700 }}>
+        <div>KCS</div>
+        <div>Thanh toán</div>
+        <div>Khách hàng</div>
+      </div>
+      <div style={{ height: 56 }} />
+
+      {/* Note */}
+      <div style={{ fontStyle: 'italic', fontSize: 12.5 }}>
+        Lưu ý : Khi đi thanh toán nhớ mang theo chứng minh nhân dân
       </div>
     </div>
   )

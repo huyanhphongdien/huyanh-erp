@@ -91,6 +91,7 @@ export interface RubberIntakeFilter {
   status?: string
   source_type?: string
   has_deal?: boolean // true = linked to deal, false = standalone
+  unpriced?: boolean // bộc phát chưa chốt giá: deal_id null + total_amount null/0
   partner_id?: string
   facility_id?: string
   raw_rubber_type?: 'mu_nuoc' | 'mu_tap' | 'mu_dong' | 'mu_chen' | 'mu_to'
@@ -231,6 +232,7 @@ export const rubberIntakeB2BService = {
     if (filter.date_to) query = query.lte('intake_date', filter.date_to)
     if (filter.has_deal === true) query = query.not('deal_id', 'is', null)
     if (filter.has_deal === false) query = query.is('deal_id', null)
+    if (filter.unpriced) query = query.is('deal_id', null).or('total_amount.is.null,total_amount.eq.0')
 
     if (filter.search) {
       query = query.or(`product_code.ilike.%${filter.search}%,invoice_no.ilike.%${filter.search}%,vehicle_plate.ilike.%${filter.search}%,lot_code.ilike.%${filter.search}%,consolidation_code.ilike.%${filter.search}%`)
@@ -309,6 +311,33 @@ export const rubberIntakeB2BService = {
     }))
 
     return { data: enriched, total: count || 0 }
+  },
+
+  /**
+   * Áp giá hàng loạt cho phiếu bộc phát chưa chốt giá (chốt giá cuối ngày).
+   * pricePerKg = đơn giá theo kg KHÔ (đ/kg). total = KL khô × giá, làm tròn nghìn.
+   * Đặt status='confirmed' (nếu đang draft) → gán PNK + vào luồng thanh toán.
+   */
+  async applyPrice(ids: string[], pricePerKg: number): Promise<void> {
+    if (!ids.length || !pricePerKg) return
+    const { data, error } = await supabase
+      .from('rubber_intake_batches')
+      .select('id, net_weight_kg, dry_weight_kg, drc_percent, status')
+      .in('id', ids)
+    if (error) throw new Error(error.message)
+    for (const row of (data || []) as any[]) {
+      const dry = row.dry_weight_kg ?? (row.drc_percent != null && row.net_weight_kg ? row.net_weight_kg * row.drc_percent / 100 : null)
+      const billable = dry ?? row.net_weight_kg ?? 0
+      const total = Math.round(billable * pricePerKg / 1000) * 1000
+      const patch: any = {
+        unit_price: pricePerKg,
+        settled_price_per_ton: pricePerKg * 1000,
+        total_amount: total,
+      }
+      if (row.status === 'draft') patch.status = 'confirmed'
+      const { error: upErr } = await supabase.from('rubber_intake_batches').update(patch).eq('id', row.id)
+      if (upErr) throw new Error(upErr.message)
+    }
   },
 
   /** Lấy chi tiết 1 lý lịch mủ */

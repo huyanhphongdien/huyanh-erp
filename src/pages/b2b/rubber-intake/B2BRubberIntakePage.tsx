@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Typography, Card, Input, Button, Tag, Table, Statistic, Row, Col, Space,
-  Empty, Segmented,
+  Empty, Segmented, Modal, InputNumber, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -66,12 +66,18 @@ export default function B2BRubberIntakePage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [dealFilter, setDealFilter] = useState<'all' | 'linked' | 'standalone'>('all')
+  const [priceFilter, setPriceFilter] = useState<'all' | 'unpriced'>('all')
   const [facilityFilter, setFacilityFilter] = useState<string>('')
   const [rawTypeFilter, setRawTypeFilter] = useState<RawRubberType | ''>('')
   const [facilities, setFacilities] = useState<Facility[]>([])
   // View mode
   const [viewMode, setViewMode] = useState<'list' | 'llm'>('list')
   const [llmExpanded, setLlmExpanded] = useState<Record<string, boolean>>({})
+  // Bulk apply price (chốt giá cuối ngày cho phiếu bộc phát)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([])
+  const [applyOpen, setApplyOpen] = useState(false)
+  const [applyPriceVal, setApplyPriceVal] = useState<number | null>(null)
+  const [applying, setApplying] = useState(false)
 
   useEffect(() => {
     facilityService.getAllActive().then(setFacilities).catch(() => setFacilities([]))
@@ -87,6 +93,7 @@ export default function B2BRubberIntakePage() {
       facility_id: facilityFilter || undefined,
       raw_rubber_type: rawTypeFilter || undefined,
       has_deal: dealFilter === 'linked' ? true : dealFilter === 'standalone' ? false : undefined,
+      unpriced: priceFilter === 'unpriced' ? true : undefined,
       pageSize: 200,
     }
     try {
@@ -107,7 +114,7 @@ export default function B2BRubberIntakePage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, sourceFilter, dealFilter, facilityFilter, rawTypeFilter])
+  }, [search, statusFilter, sourceFilter, dealFilter, priceFilter, facilityFilter, rawTypeFilter])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -116,6 +123,23 @@ export default function B2BRubberIntakePage() {
     const t = setTimeout(fetchData, 300)
     return () => clearTimeout(t)
   }, [search])
+
+  async function handleApplyPrice() {
+    if (!applyPriceVal || applyPriceVal <= 0) { message.warning('Nhập đơn giá hợp lệ'); return }
+    setApplying(true)
+    try {
+      await rubberIntakeB2BService.applyPrice(selectedRowKeys, applyPriceVal)
+      message.success(`Đã chốt giá ${selectedRowKeys.length} phiếu`)
+      setApplyOpen(false)
+      setSelectedRowKeys([])
+      setApplyPriceVal(null)
+      fetchData()
+    } catch (e: any) {
+      message.error('Chốt giá thất bại: ' + (e?.message || e))
+    } finally {
+      setApplying(false)
+    }
+  }
 
   // ── Columns ──
   const columns: ColumnsType<B2BRubberIntake> = useMemo(() => [
@@ -252,13 +276,13 @@ export default function B2BRubberIntakePage() {
     {
       title: 'Giá trị (đ)',
       dataIndex: 'total_amount',
-      width: 110,
+      width: 120,
       align: 'right',
-      render: (v) => v ? (
-        <span style={{ fontFamily: 'monospace', color: '#92400E' }}>
-          {(v / 1_000_000).toFixed(1)}M
-        </span>
-      ) : <Text type="secondary">—</Text>,
+      render: (v, r) => {
+        if (v) return <span style={{ fontFamily: 'monospace', color: '#92400E' }}>{(v / 1_000_000).toFixed(1)}M</span>
+        if (!r.deal_id) return <Tag color="warning" style={{ margin: 0 }}>⏳ Chưa chốt giá</Tag>
+        return <Text type="secondary">—</Text>
+      },
       sorter: (a, b) => (a.total_amount || 0) - (b.total_amount || 0),
     },
     {
@@ -420,6 +444,23 @@ export default function B2BRubberIntakePage() {
                 ))}
               </Space>
             </Col>
+            <Col>
+              <Space size={4}>
+                <Text type="secondary" style={{ fontSize: 11 }}>GIÁ:</Text>
+                {[
+                  { key: 'all', label: 'Tất cả' },
+                  { key: 'unpriced', label: '⏳ Chưa chốt giá' },
+                ].map(f => (
+                  <Tag.CheckableTag
+                    key={f.key}
+                    checked={priceFilter === f.key}
+                    onChange={() => setPriceFilter(f.key as any)}
+                  >
+                    {f.label}
+                  </Tag.CheckableTag>
+                ))}
+              </Space>
+            </Col>
           </Row>
         </Space>
       </Card>
@@ -434,33 +475,50 @@ export default function B2BRubberIntakePage() {
 
       {/* Body: list (Table) or grouped by LLM */}
       {viewMode === 'list' ? (
-        <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
-          <Table<B2BRubberIntake>
-            dataSource={items}
-            columns={columns}
-            rowKey="id"
-            loading={loading}
-            size="small"
-            pagination={{
-              pageSize: 30,
-              showSizeChanger: false,
-              showTotal: (t) => `${t} phiếu`,
-            }}
-            scroll={{ x: 1400 }}
-            onRow={(record) => ({
-              onClick: () => navigate(`/b2b/rubber-intake/${record.id}`),
-              style: { cursor: 'pointer' },
-            })}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="Chưa có lý lịch mủ — tự tạo khi chấp nhận báo giá lô hoặc khi cân xong"
-                />
-              ),
-            }}
-          />
-        </Card>
+        <>
+          {selectedRowKeys.length > 0 && (
+            <div style={{ marginBottom: 8, padding: '8px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Text strong>Đã chọn {selectedRowKeys.length} phiếu</Text>
+              <Button type="primary" size="small" style={{ background: '#D97706', borderColor: '#D97706' }}
+                onClick={() => { setApplyPriceVal(null); setApplyOpen(true) }}>
+                Chốt giá hàng loạt
+              </Button>
+              <Button size="small" type="text" onClick={() => setSelectedRowKeys([])}>Bỏ chọn</Button>
+            </div>
+          )}
+          <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
+            <Table<B2BRubberIntake>
+              dataSource={items}
+              columns={columns}
+              rowKey="id"
+              loading={loading}
+              size="small"
+              rowSelection={{
+                selectedRowKeys,
+                onChange: (keys) => setSelectedRowKeys(keys as string[]),
+                getCheckboxProps: (r) => ({ disabled: !!r.deal_id }), // chỉ chốt giá phiếu bộc phát (không thuộc deal)
+              }}
+              pagination={{
+                pageSize: 30,
+                showSizeChanger: false,
+                showTotal: (t) => `${t} phiếu`,
+              }}
+              scroll={{ x: 1500 }}
+              onRow={(record) => ({
+                onClick: () => navigate(`/b2b/rubber-intake/${record.id}`),
+                style: { cursor: 'pointer' },
+              })}
+              locale={{
+                emptyText: (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="Chưa có lý lịch mủ — tự tạo khi chấp nhận báo giá lô hoặc khi cân xong"
+                  />
+                ),
+              }}
+            />
+          </Card>
+        </>
       ) : (
         <LlmGroupView
           items={items}
@@ -469,6 +527,35 @@ export default function B2BRubberIntakePage() {
           onClickItem={(id) => navigate(`/b2b/rubber-intake/${id}`)}
         />
       )}
+
+      {/* Chốt giá hàng loạt cho phiếu bộc phát chưa chốt */}
+      <Modal
+        title="Chốt giá hàng loạt"
+        open={applyOpen}
+        onOk={handleApplyPrice}
+        confirmLoading={applying}
+        onCancel={() => setApplyOpen(false)}
+        okText="Áp giá"
+        cancelText="Huỷ"
+      >
+        <p style={{ color: '#64748B', fontSize: 13 }}>
+          Áp <strong>1 đơn giá</strong> cho <strong>{selectedRowKeys.length}</strong> phiếu đã chọn.
+          Thành tiền = KL khô × đơn giá (làm tròn nghìn). Phiếu draft sẽ chuyển sang <strong>Đã xác nhận</strong> và được cấp số PNK.
+        </p>
+        <Space align="center">
+          <Text>Đơn giá (đ/kg khô):</Text>
+          <InputNumber
+            autoFocus
+            value={applyPriceVal}
+            onChange={(v) => setApplyPriceVal(v)}
+            min={0}
+            step={500}
+            style={{ width: 200 }}
+            formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+            parser={(v) => Number((v || '').replace(/,/g, ''))}
+          />
+        </Space>
+      </Modal>
     </div>
   )
 }

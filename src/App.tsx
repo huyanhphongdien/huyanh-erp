@@ -237,6 +237,9 @@ const B2BRubberIntakePage = lazy(() => import('./pages/b2b/rubber-intake/B2BRubb
 const B2BRubberIntakeStatsPage = lazy(() => import('./pages/b2b/rubber-intake/B2BRubberIntakeStatsPage'));
 const B2BRubberIntakeDetailPage = lazy(() => import('./pages/b2b/rubber-intake/B2BRubberIntakeDetailPage'));
 const B2BRubberIntakePrintPage = lazy(() => import('./pages/b2b/rubber-intake/B2BRubberIntakePrintPage'));
+const PriceLockListPage = lazy(() => import('./pages/b2b/price-lock/PriceLockListPage'));
+const PriceLockFormPage = lazy(() => import('./pages/b2b/price-lock/PriceLockFormPage'));
+const PriceLockPrintPage = lazy(() => import('./pages/b2b/price-lock/PriceLockPrintPage'));
 // B2B Demands
 const DemandListPage = lazy(() => import('./pages/b2b/demands/DemandListPage'));
 // B2B Intake v4 — 3 flow wizards + daily price admin
@@ -401,6 +404,11 @@ function App() {
                 <Route path="rubber-intake" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakePage /></Suspense>} />
                 <Route path="rubber-intake/:id" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakeDetailPage /></Suspense>} />
                 <Route path="rubber-intake/:id/print" element={<Suspense fallback={<LoadingSpinner />}><B2BRubberIntakePrintPage /></Suspense>} />
+                {/* Phiếu chốt giá (Thu mua) */}
+                <Route path="price-lock" element={<Suspense fallback={<LoadingSpinner />}><PriceLockListPage /></Suspense>} />
+                <Route path="price-lock/new" element={<Suspense fallback={<LoadingSpinner />}><PriceLockFormPage /></Suspense>} />
+                <Route path="price-lock/:id" element={<Suspense fallback={<LoadingSpinner />}><PriceLockFormPage /></Suspense>} />
+                <Route path="price-lock/:id/print" element={<Suspense fallback={<LoadingSpinner />}><PriceLockPrintPage /></Suspense>} />
                 {/* B2B Auctions (Phase B1) */}
                 <Route path="auctions" element={<Suspense fallback={<LoadingSpinner />}><AuctionListPage /></Suspense>} />
                 <Route path="auctions/:id" element={<Suspense fallback={<LoadingSpinner />}><AuctionDetailPage /></Suspense>} />

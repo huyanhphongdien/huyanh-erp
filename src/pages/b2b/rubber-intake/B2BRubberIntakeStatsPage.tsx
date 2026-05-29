@@ -136,23 +136,54 @@ interface SheetCol {
 /** Thêm 1 sheet có header công ty + tiêu đề + meta lọc + bảng style + dòng TỔNG. */
 function addReportSheet(
   wb: any,
-  opts: { name: string; subtitle: string; meta: string[]; columns: SheetCol[]; rows: (string | number)[][] },
+  opts: {
+    name: string
+    subtitle: string
+    meta: string[]
+    columns: SheetCol[]
+    rows: (string | number)[][]
+    colWidths?: number[]   // override độ rộng cột (vd sheet KPI cần cột rộng)
+    noFilter?: boolean     // bỏ auto-filter (sheet KPI tổng quan)
+  },
 ) {
   const ws = wb.addWorksheet(opts.name)
   const colCount = opts.columns.length
 
-  // ── Khối tiêu đề (công ty / tiêu đề / meta) — gộp ô ngang toàn bảng ──
+  // ── 1. Độ rộng cột (tính trước để biết bề ngang banner) ──
+  const widths = opts.columns.map((c, i) => {
+    if (opts.colWidths?.[i]) return opts.colWidths[i]
+    const lens = opts.rows.map(r => {
+      const v = r[i]
+      return typeof v === 'number' ? Math.round(v).toLocaleString('vi-VN').length : String(v ?? '').length
+    })
+    const maxLen = Math.max(c.title?.length || 10, ...lens, 0)
+    return Math.min(46, Math.max(12, maxLen + 2))
+  })
+  widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
+
+  // ── 2. Vùng gộp banner — nới đủ rộng cho dòng dài nhất (công ty/tiêu đề/meta) ──
+  const longest = Math.max(COMPANY_NAME.length, opts.subtitle.length, ...opts.meta.map(m => m.length))
+  let span = colCount
+  let acc = widths.reduce((a, b) => a + b, 0)
+  while (acc < longest + 2 && span < colCount + 8) {
+    span++
+    ws.getColumn(span).width = 14
+    acc += 14
+  }
+
+  // ── 3. Khối tiêu đề (công ty / tiêu đề / meta) — gộp ngang theo span ──
   const titleRows = [
-    { text: COMPANY_NAME, font: { bold: true, size: 14, color: { argb: EXCEL_DARK } } },
-    { text: opts.subtitle, font: { bold: true, size: 12, color: { argb: 'FF111111' } } },
-    ...opts.meta.map(m => ({ text: m, font: { italic: true, size: 10, color: { argb: 'FF555555' } } })),
+    { text: COMPANY_NAME, font: { bold: true, size: 14, color: { argb: EXCEL_DARK } }, h: 24 },
+    { text: opts.subtitle, font: { bold: true, size: 12, color: { argb: 'FF111111' } }, h: 18 },
+    ...opts.meta.map(m => ({ text: m, font: { italic: true, size: 10, color: { argb: 'FF555555' } }, h: 16 })),
   ]
   titleRows.forEach((tr, i) => {
-    ws.addRow([tr.text])
-    ws.mergeCells(i + 1, 1, i + 1, colCount)
+    const row = ws.addRow([tr.text])
+    ws.mergeCells(i + 1, 1, i + 1, span)
     const cell = ws.getCell(i + 1, 1)
     cell.font = tr.font
-    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    row.height = tr.h
   })
   ws.addRow([]) // dòng trống ngăn cách
   const headerRowIdx = titleRows.length + 2
@@ -206,19 +237,11 @@ function addReportSheet(
     })
   }
 
-  // ── Độ rộng cột ──
-  ws.columns.forEach((col: any, i: number) => {
-    const lens = opts.rows.map(r => {
-      const v = r[i]
-      return typeof v === 'number' ? Math.round(v).toLocaleString('vi-VN').length : String(v ?? '').length
-    })
-    const maxLen = Math.max(opts.columns[i]?.title?.length || 10, ...lens, 0)
-    col.width = Math.min(46, Math.max(12, maxLen + 2))
-  })
-
   // ── Đông cứng tiêu đề + auto-filter ──
   ws.views = [{ state: 'frozen', ySplit: headerRowIdx }]
-  ws.autoFilter = { from: { row: headerRowIdx, column: 1 }, to: { row: headerRowIdx, column: colCount } }
+  if (!opts.noFilter) {
+    ws.autoFilter = { from: { row: headerRowIdx, column: 1 }, to: { row: headerRowIdx, column: colCount } }
+  }
   return ws
 }
 
@@ -309,8 +332,8 @@ export default function B2BRubberIntakeStatsPage() {
       const rtLabel = rawTypeFilter ? RAW_RUBBER_TYPE_LABELS[rawTypeFilter] : 'Tất cả'
       const pnLabel = partnerFilter ? (partners.find(p => p.id === partnerFilter)?.name || '') : 'Tất cả'
       const meta = [
-        `Kỳ: ${dayjs(dateRange[0]).format('DD/MM/YYYY')} → ${dayjs(dateRange[1]).format('DD/MM/YYYY')}  ·  Gom theo: ${GROUPING_LABEL[grouping]}`,
-        `Nhà máy: ${facLabel}   ·   Loại mủ: ${rtLabel}   ·   Đại lý: ${pnLabel}`,
+        `Kỳ: ${dayjs(dateRange[0]).format('DD/MM/YYYY')} → ${dayjs(dateRange[1]).format('DD/MM/YYYY')} · Gom theo: ${GROUPING_LABEL[grouping]}`,
+        `Nhà máy: ${facLabel} · Loại mủ: ${rtLabel} · Đại lý: ${pnLabel}`,
       ]
       const fmtInt = (n: number) => Math.round(n).toLocaleString('vi-VN')
 
@@ -319,6 +342,8 @@ export default function B2BRubberIntakeStatsPage() {
         name: 'Tổng quan',
         subtitle: 'THỐNG KÊ MỦ MUA',
         meta,
+        colWidths: [30, 24],
+        noFilter: true,
         columns: [{ title: 'Chỉ tiêu' }, { title: 'Giá trị', align: 'right' }],
         rows: [
           ['Số phiếu', fmtInt(data.totals.count)],

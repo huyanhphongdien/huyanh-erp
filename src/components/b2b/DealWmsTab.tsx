@@ -49,6 +49,16 @@ const formatWeight = (kg: number): string => {
   return `${kg.toLocaleString()} kg`
 }
 
+const fmtMoney = (v: number | null): string => (v ? v.toLocaleString('vi-VN') : '0')
+
+// Ô thống kê nhỏ trong dải stats
+const StatChip = ({ label, value }: { label: string; value: string }) => (
+  <div style={{ minWidth: 96 }}>
+    <div style={{ fontSize: 11, color: '#8c8c8c' }}>{label}</div>
+    <div style={{ fontSize: 15, fontWeight: 700, color: '#1B4D3E' }}>{value}</div>
+  </div>
+)
+
 const STATUS_COLORS: Record<string, string> = {
   draft: 'default',
   confirmed: 'green',
@@ -227,52 +237,69 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
         style={{ marginBottom: 24 }}
       />
 
-      {/* Weighbridge Table */}
-      {weighbridges.length > 0 && (
-        <>
-          <Divider />
-          <Text strong style={{ fontSize: 15, marginBottom: 12, display: 'block' }}>
-            <CarOutlined style={{ marginRight: 8 }} />
-            Phiếu cân xe
-          </Text>
-          <Table
-            dataSource={weighbridges}
-            rowKey="ticket_id"
-            columns={[
-              {
-                title: 'Mã cân',
-                dataIndex: 'code',
-              },
-              {
-                title: 'Biển số xe',
-                dataIndex: 'vehicle_plate',
-              },
-              {
-                title: 'Tịnh (kg)',
-                dataIndex: 'net_weight',
-                align: 'right' as const,
-                render: (v: number | null) => v ? v.toLocaleString() : '-',
-              },
-              {
-                title: 'Trạng thái',
-                dataIndex: 'status',
-                render: (s: string) => (
-                  <Tag color={STATUS_COLORS[s] || 'default'}>
-                    {STATUS_LABELS[s] || s}
-                  </Tag>
-                ),
-              },
-              {
-                title: 'Hoàn thành',
-                dataIndex: 'completed_at',
-                render: (d: string | null) => formatDate(d),
-              },
-            ]}
-            size="small"
-            pagination={false}
-          />
-        </>
-      )}
+      {/* Phiếu cân chi tiết + thống kê + cộng dồn */}
+      {weighbridges.length > 0 && (() => {
+        const totalNet = weighbridges.reduce((s, w) => s + (w.net_weight || 0), 0)
+        const totalDry = weighbridges.reduce((s, w) => s + (w.dry_weight || 0), 0)
+        const totalValue = weighbridges.reduce((s, w) => s + (w.amount || 0), 0)
+        const netForDrc = weighbridges.filter(w => w.drc != null).reduce((s, w) => s + (w.net_weight || 0), 0)
+        const drcWeighted = weighbridges.filter(w => w.drc != null).reduce((s, w) => s + ((w.drc || 0) * (w.net_weight || 0)), 0)
+        const avgDrc = netForDrc > 0 ? Math.round((drcWeighted / netForDrc) * 10) / 10 : null
+        let cum = 0
+        const rows: any[] = weighbridges.map(w => { cum += (w.net_weight || 0); return { ...w, _cum: cum } })
+
+        return (
+          <>
+            <Divider />
+            <Text strong style={{ fontSize: 15, marginBottom: 10, display: 'block' }}>
+              <CarOutlined style={{ marginRight: 8 }} />
+              Chi tiết phiếu cân ({weighbridges.length})
+            </Text>
+
+            {/* Dải thống kê */}
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12, padding: '10px 14px', background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+              <StatChip label="Số phiếu" value={String(weighbridges.length)} />
+              <StatChip label="Tổng Net" value={`${(totalNet / 1000).toFixed(2)} T`} />
+              <StatChip label="Tổng khô" value={`${(totalDry / 1000).toFixed(2)} T`} />
+              <StatChip label="DRC bình quân" value={avgDrc != null ? `${avgDrc}%` : '—'} />
+              <StatChip label="Tổng giá trị" value={`${fmtMoney(totalValue)} đ`} />
+            </div>
+
+            <Table
+              dataSource={rows}
+              rowKey="ticket_id"
+              size="small"
+              pagination={false}
+              scroll={{ x: 'max-content' }}
+              columns={[
+                { title: '#', width: 40, align: 'center' as const, render: (_: any, __: any, i: number) => i + 1 },
+                { title: 'Ngày', dataIndex: 'completed_at', width: 95, render: (d: string | null, r: any) => formatDate(d || r.created_at) },
+                { title: 'Mã cân', dataIndex: 'code', width: 130 },
+                { title: 'Xe', dataIndex: 'vehicle_plate', width: 90 },
+                { title: 'Net (kg)', dataIndex: 'net_weight', align: 'right' as const, render: (v: number | null) => v ? v.toLocaleString() : '-' },
+                { title: 'DRC', dataIndex: 'drc', align: 'center' as const, width: 60, render: (v: number | null) => v != null ? `${v}%` : '-' },
+                { title: 'KL khô (kg)', dataIndex: 'dry_weight', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString() : '-' },
+                { title: 'Thành tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number | null) => v != null ? v.toLocaleString() : '-' },
+                { title: 'Cộng dồn (kg)', dataIndex: '_cum', align: 'right' as const, render: (v: number) => <Text type="secondary">{v.toLocaleString()}</Text> },
+                { title: 'TT', dataIndex: 'status', width: 100, render: (s: string) => (<Tag color={STATUS_COLORS[s] || 'default'}>{STATUS_LABELS[s] || s}</Tag>) },
+              ]}
+              summary={() => (
+                <Table.Summary fixed>
+                  <Table.Summary.Row style={{ background: '#FFFBEB' }}>
+                    <Table.Summary.Cell index={0} colSpan={4}><Text strong>TỔNG CỘNG</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={4} align="right"><Text strong>{totalNet.toLocaleString()}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={5} />
+                    <Table.Summary.Cell index={6} align="right"><Text strong>{totalDry.toLocaleString()}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={7} align="right"><Text strong style={{ color: '#92400E' }}>{totalValue.toLocaleString()}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={8} />
+                    <Table.Summary.Cell index={9} />
+                  </Table.Summary.Row>
+                </Table.Summary>
+              )}
+            />
+          </>
+        )
+      })()}
       </>)}
     </div>
   )

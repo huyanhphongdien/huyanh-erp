@@ -38,9 +38,18 @@ export interface DealWeighbridgeSummary {
   ticket_id: string
   code: string
   vehicle_plate: string
+  gross_weight: number | null
+  tare_weight: number | null
   net_weight: number | null
+  drc: number | null            // qc_actual_drc (%)
+  dry_weight: number | null     // net × DRC (mủ nước)
+  unit_price: number | null
+  price_unit: string | null
+  amount: number | null         // ước tính: KL tính tiền × giá (làm tròn nghìn)
+  supplier_name: string | null
   status: string
   completed_at: string | null
+  created_at: string | null
 }
 
 export interface DealWmsOverview {
@@ -167,31 +176,66 @@ export const dealWmsService = {
    * Lấy phiếu cân liên quan đến Deal (qua stock_in reference)
    */
   async getWeighbridgeByDeal(dealId: string): Promise<DealWeighbridgeSummary[]> {
-    // Lấy stock_in_ids thuộc deal
+    const SELECT = `
+      id, code, vehicle_plate, gross_weight, tare_weight, net_weight,
+      qc_actual_drc, unit_price, price_unit, supplier_name, status, completed_at, created_at
+    `
+    const byId = new Map<string, any>()
+
+    // Nguồn 1: phiếu cân gắn TRỰC TIẾP deal_id (cách app cân + đề nghị thanh toán dùng)
+    const { data: direct } = await supabase
+      .from('weighbridge_tickets')
+      .select(SELECT)
+      .eq('deal_id', dealId)
+      .neq('status', 'cancelled')
+    for (const t of (direct || []) as any[]) byId.set(t.id, t)
+
+    // Nguồn 2: phiếu cân liên kết qua phiếu nhập kho của deal
     const { data: stockIns } = await supabase
       .from('stock_in_orders')
       .select('id')
       .eq('deal_id', dealId)
-
     const stockInIds = (stockIns || []).map((s: any) => s.id)
-    if (stockInIds.length === 0) return []
+    if (stockInIds.length > 0) {
+      const { data: viaSi } = await supabase
+        .from('weighbridge_tickets')
+        .select(SELECT)
+        .eq('reference_type', 'stock_in')
+        .in('reference_id', stockInIds)
+        .neq('status', 'cancelled')
+      for (const t of (viaSi || []) as any[]) byId.set(t.id, t)
+    }
 
-    // Lấy weighbridge tickets linked tới các stock-in này
-    const { data: tickets } = await supabase
-      .from('weighbridge_tickets')
-      .select('id, code, vehicle_plate, net_weight, status, completed_at')
-      .eq('reference_type', 'stock_in')
-      .in('reference_id', stockInIds)
-      .order('created_at', { ascending: false })
+    // Sắp xếp theo thời gian tăng dần (để cộng dồn theo trình tự giao)
+    const rows = [...byId.values()].sort((a, b) =>
+      String(a.created_at || '').localeCompare(String(b.created_at || ''))
+    )
 
-    return (tickets || []).map((t: any) => ({
-      ticket_id: t.id,
-      code: t.code,
-      vehicle_plate: t.vehicle_plate,
-      net_weight: t.net_weight,
-      status: t.status,
-      completed_at: t.completed_at,
-    }))
+    return rows.map((t: any): DealWeighbridgeSummary => {
+      const net = t.net_weight != null ? Number(t.net_weight) : null
+      const drc = t.qc_actual_drc != null ? Number(t.qc_actual_drc) : null
+      const dry = (net != null && drc) ? Math.round((net * drc) / 100 * 10) / 10 : null
+      const price = t.unit_price != null ? Number(t.unit_price) : null
+      const billable = (t.price_unit === 'dry' && dry != null) ? dry : net
+      const amount = (price != null && billable != null) ? Math.round((billable * price) / 1000) * 1000 : null
+      return {
+        ticket_id: t.id,
+        code: t.code,
+        vehicle_plate: t.vehicle_plate,
+        gross_weight: t.gross_weight != null ? Number(t.gross_weight) : null,
+        tare_weight: t.tare_weight != null ? Number(t.tare_weight) : null,
+        net_weight: net,
+        drc,
+        dry_weight: dry,
+        unit_price: price,
+        price_unit: t.price_unit ?? null,
+        amount,
+        supplier_name: t.supplier_name ?? null,
+        status: t.status,
+        completed_at: t.completed_at ?? null,
+        created_at: t.created_at ?? null,
+      }
+    })
   },
 
   /**

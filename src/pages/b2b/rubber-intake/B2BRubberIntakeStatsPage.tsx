@@ -22,7 +22,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import * as XLSX from 'xlsx'
 import dayjs, { type Dayjs } from 'dayjs'
 
 import {
@@ -121,6 +120,107 @@ const RAW_TYPE_ICON: Record<string, string> = {
 }
 
 // ============================================================================
+// EXCEL EXPORT — header công ty + định dạng đẹp (ExcelJS)
+// ============================================================================
+
+const COMPANY_NAME = 'CÔNG TY CAO SU HUY ANH – PHONG ĐIỀN'
+const EXCEL_DARK = 'FF1B4D3E'
+
+interface SheetCol {
+  title: string
+  numFmt?: string
+  total?: 'sum' | 'avg'
+  align?: 'left' | 'center' | 'right'
+}
+
+/** Thêm 1 sheet có header công ty + tiêu đề + meta lọc + bảng style + dòng TỔNG. */
+function addReportSheet(
+  wb: any,
+  opts: { name: string; subtitle: string; meta: string[]; columns: SheetCol[]; rows: (string | number)[][] },
+) {
+  const ws = wb.addWorksheet(opts.name)
+  const colCount = opts.columns.length
+
+  // ── Khối tiêu đề (công ty / tiêu đề / meta) — gộp ô ngang toàn bảng ──
+  const titleRows = [
+    { text: COMPANY_NAME, font: { bold: true, size: 14, color: { argb: EXCEL_DARK } } },
+    { text: opts.subtitle, font: { bold: true, size: 12, color: { argb: 'FF111111' } } },
+    ...opts.meta.map(m => ({ text: m, font: { italic: true, size: 10, color: { argb: 'FF555555' } } })),
+  ]
+  titleRows.forEach((tr, i) => {
+    ws.addRow([tr.text])
+    ws.mergeCells(i + 1, 1, i + 1, colCount)
+    const cell = ws.getCell(i + 1, 1)
+    cell.font = tr.font
+    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+  })
+  ws.addRow([]) // dòng trống ngăn cách
+  const headerRowIdx = titleRows.length + 2
+
+  // ── Header bảng ──
+  const hr = ws.addRow(opts.columns.map(c => c.title))
+  hr.height = 18
+  hr.eachCell((cell: any, col: number) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_DARK } }
+    cell.alignment = { horizontal: opts.columns[col - 1]?.align || 'center', vertical: 'middle', wrapText: true }
+    cell.border = { bottom: { style: 'thin', color: { argb: 'FF14402F' } } }
+  })
+
+  // ── Data rows ──
+  opts.rows.forEach((row, idx) => {
+    const dr = ws.addRow(row)
+    dr.eachCell((cell: any, col: number) => {
+      const c = opts.columns[col - 1]
+      if (typeof cell.value === 'number') {
+        cell.numFmt = c?.numFmt || '#,##0'
+        cell.alignment = { horizontal: 'right' }
+      } else if (c?.align) {
+        cell.alignment = { horizontal: c.align }
+      }
+      if (idx % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F7F5' } }
+      cell.border = { bottom: { style: 'hair', color: { argb: 'FFE6E6E6' } } }
+    })
+  })
+
+  // ── Dòng TỔNG ──
+  if (opts.columns.some(c => c.total) && opts.rows.length > 0) {
+    const totals: (string | number)[] = opts.columns.map((c, i) => {
+      if (!c.total) return ''
+      const nums = opts.rows.map(r => r[i]).filter((v): v is number => typeof v === 'number')
+      if (!nums.length) return ''
+      const sum = nums.reduce((a, b) => a + b, 0)
+      return c.total === 'avg' ? sum / nums.length : sum
+    })
+    const labelIdx = opts.columns.findIndex(c => !c.total)
+    if (labelIdx >= 0 && totals[labelIdx] === '') totals[labelIdx] = `TỔNG (${opts.rows.length})`
+    const tr = ws.addRow(totals)
+    tr.eachCell((cell: any, col: number) => {
+      cell.font = { bold: true, color: { argb: EXCEL_DARK } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCEAE3' } }
+      cell.border = { top: { style: 'double', color: { argb: EXCEL_DARK } } }
+      if (typeof cell.value === 'number') {
+        cell.numFmt = opts.columns[col - 1]?.numFmt || '#,##0'
+        cell.alignment = { horizontal: 'right' }
+      }
+    })
+  }
+
+  // ── Độ rộng cột ──
+  ws.columns.forEach((col: any, i: number) => {
+    const lens = opts.rows.map(r => {
+      const v = r[i]
+      return typeof v === 'number' ? Math.round(v).toLocaleString('vi-VN').length : String(v ?? '').length
+    })
+    const maxLen = Math.max(opts.columns[i]?.title?.length || 10, ...lens, 0)
+    col.width = Math.min(46, Math.max(12, maxLen + 2))
+  })
+
+  // ── Đông cứng tiêu đề + auto-filter ──
+  ws.views = [{ state: 'frozen', ySplit: headerRowIdx }]
+  ws.autoFilter = { from: { row: headerRowIdx, column: 1 }, to: { row: headerRowIdx, column: colCount } }
+  return ws
+}
 
 export default function B2BRubberIntakeStatsPage() {
   const [data, setData] = useState<AggregatedIntakeStats | null>(null)
@@ -194,82 +294,128 @@ export default function B2BRubberIntakeStatsPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  // ── Export Excel ──
-  const handleExport = () => {
+  // ── Export Excel (ExcelJS — header công ty + định dạng số + dòng tổng) ──
+  const handleExport = async () => {
     if (!data) {
       message.warning('Chưa có dữ liệu để xuất')
       return
     }
     try {
-      const wb = XLSX.utils.book_new()
-      const rangeLabel = `${dateRange[0]} đến ${dateRange[1]}`
+      const ExcelJS = (await import('exceljs')).default
+      const wb = new ExcelJS.Workbook()
+      wb.creator = 'Huy Anh ERP'
 
-      // Sheet 1: Tổng quan
-      const overview = [
-        ['Khoảng thời gian', rangeLabel],
-        ['Nhà máy', facilityFilter ? facilities.find(f => f.id === facilityFilter)?.code || '' : 'Tất cả'],
-        ['Loại mủ', rawTypeFilter ? RAW_RUBBER_TYPE_LABELS[rawTypeFilter] : 'Tất cả'],
-        ['Đại lý', partnerFilter ? partners.find(p => p.id === partnerFilter)?.name || '' : 'Tất cả'],
-        [],
-        ['Số phiếu', data.totals.count],
-        ['Tổng KL tươi (kg)', Math.round(data.totals.net_kg)],
-        ['Tổng KL khô (kg)', Math.round(data.totals.dry_kg)],
-        ['DRC trung bình (%)', data.totals.avg_drc != null ? Number(data.totals.avg_drc.toFixed(2)) : ''],
-        ['Tổng giá trị (đ)', Math.round(data.totals.amount)],
-        ['Giá TB / kg khô (đ)', data.totals.avg_price_per_dry_kg != null ? Math.round(data.totals.avg_price_per_dry_kg) : ''],
+      const facLabel = facilityFilter ? (facilities.find(f => f.id === facilityFilter)?.code || facilityFilter) : 'Tất cả'
+      const rtLabel = rawTypeFilter ? RAW_RUBBER_TYPE_LABELS[rawTypeFilter] : 'Tất cả'
+      const pnLabel = partnerFilter ? (partners.find(p => p.id === partnerFilter)?.name || '') : 'Tất cả'
+      const meta = [
+        `Kỳ: ${dayjs(dateRange[0]).format('DD/MM/YYYY')} → ${dayjs(dateRange[1]).format('DD/MM/YYYY')}  ·  Gom theo: ${GROUPING_LABEL[grouping]}`,
+        `Nhà máy: ${facLabel}   ·   Loại mủ: ${rtLabel}   ·   Đại lý: ${pnLabel}`,
       ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(overview), 'Tổng quan')
+      const fmtInt = (n: number) => Math.round(n).toLocaleString('vi-VN')
 
-      // Sheet 2: Theo kỳ (gom theo Ngày/Tuần/Tháng tùy chọn)
+      // Sheet 1: Tổng quan (KPI — giá trị dạng chuỗi có đơn vị cho dễ đọc)
+      addReportSheet(wb, {
+        name: 'Tổng quan',
+        subtitle: 'THỐNG KÊ MỦ MUA',
+        meta,
+        columns: [{ title: 'Chỉ tiêu' }, { title: 'Giá trị', align: 'right' }],
+        rows: [
+          ['Số phiếu', fmtInt(data.totals.count)],
+          ['Tổng KL tươi', `${fmtInt(data.totals.net_kg)} kg`],
+          ['Tổng KL khô', `${fmtInt(data.totals.dry_kg)} kg`],
+          ['DRC trung bình', data.totals.avg_drc != null ? `${data.totals.avg_drc.toFixed(2)} %` : '—'],
+          ['Tổng giá trị', `${fmtInt(data.totals.amount)} đ`],
+          ['Giá TB / kg khô', data.totals.avg_price_per_dry_kg != null ? `${fmtInt(data.totals.avg_price_per_dry_kg)} đ` : '—'],
+        ],
+      })
+
+      // Sheet 2: Theo kỳ
       const grouped = buildGroupedSeries(data.daily, grouping)
       const periodCol = GROUPING_LABEL[grouping]
-      const periodRows = [
-        [periodCol, 'Số phiếu', 'KL tươi (kg)', 'KL khô (kg)', 'DRC TB (%)', 'Giá trị (đ)'],
-        ...grouped.map(d => [
-          d.label,
-          d.count,
-          Math.round(d.net_kg),
-          Math.round(d.dry_kg),
-          d.avg_drc != null ? Number(d.avg_drc.toFixed(2)) : '',
-          Math.round(d.amount),
+      addReportSheet(wb, {
+        name: `Theo ${periodCol}`,
+        subtitle: 'THỐNG KÊ MỦ MUA',
+        meta,
+        columns: [
+          { title: periodCol },
+          { title: 'Số phiếu', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL tươi (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL khô (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'DRC TB (%)', numFmt: '0.0', align: 'right' },
+          { title: 'Giá trị (đ)', numFmt: '#,##0', total: 'sum', align: 'right' },
+        ],
+        rows: grouped.map(d => [
+          d.label, d.count, Math.round(d.net_kg), Math.round(d.dry_kg),
+          d.avg_drc != null ? Number(d.avg_drc.toFixed(2)) : '', Math.round(d.amount),
         ]),
-      ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(periodRows), `Theo ${periodCol}`)
+      })
 
       // Sheet 3: Top đại lý
-      const partnerRows = [
-        ['Mã đại lý', 'Tên đại lý', 'Hạng', 'Số phiếu', 'KL tươi (kg)', 'KL khô (kg)', 'DRC TB (%)', 'Giá trị (đ)'],
-        ...data.byPartner.map(p => [
-          p.code, p.name, p.tier || '', p.count,
-          Math.round(p.net_kg), Math.round(p.dry_kg),
-          p.avg_drc != null ? Number(p.avg_drc.toFixed(2)) : '',
-          Math.round(p.amount),
+      addReportSheet(wb, {
+        name: 'Top đại lý',
+        subtitle: 'THỐNG KÊ MỦ MUA',
+        meta,
+        columns: [
+          { title: 'Mã đại lý' }, { title: 'Tên đại lý' }, { title: 'Hạng', align: 'center' },
+          { title: 'Số phiếu', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL tươi (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL khô (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'DRC TB (%)', numFmt: '0.0', align: 'right' },
+          { title: 'Giá trị (đ)', numFmt: '#,##0', total: 'sum', align: 'right' },
+        ],
+        rows: data.byPartner.map(p => [
+          p.code, p.name, p.tier || '', p.count, Math.round(p.net_kg), Math.round(p.dry_kg),
+          p.avg_drc != null ? Number(p.avg_drc.toFixed(2)) : '', Math.round(p.amount),
         ]),
-      ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(partnerRows), 'Top đại lý')
+      })
 
       // Sheet 4: Top vùng
-      const regionRows = [
-        ['Vùng nguyên liệu', 'Số phiếu', 'KL tươi (kg)', 'KL khô (kg)', 'Giá trị (đ)'],
-        ...data.byRegion.map(r => [
-          r.name, r.count,
-          Math.round(r.net_kg), Math.round(r.dry_kg), Math.round(r.amount),
+      addReportSheet(wb, {
+        name: 'Top vùng',
+        subtitle: 'THỐNG KÊ MỦ MUA',
+        meta,
+        columns: [
+          { title: 'Vùng nguyên liệu' },
+          { title: 'Số phiếu', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL tươi (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL khô (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'Giá trị (đ)', numFmt: '#,##0', total: 'sum', align: 'right' },
+        ],
+        rows: data.byRegion.map(r => [
+          r.name, r.count, Math.round(r.net_kg), Math.round(r.dry_kg), Math.round(r.amount),
         ]),
-      ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(regionRows), 'Top vùng')
+      })
 
       // Sheet 5: Loại mủ
-      const rawRows = [
-        ['Loại mủ', 'Số phiếu', 'KL tươi (kg)', 'KL khô (kg)', 'Giá trị (đ)'],
-        ...data.byRawType.map(r => [
+      addReportSheet(wb, {
+        name: 'Loại mủ',
+        subtitle: 'THỐNG KÊ MỦ MUA',
+        meta,
+        columns: [
+          { title: 'Loại mủ' },
+          { title: 'Số phiếu', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL tươi (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'KL khô (kg)', numFmt: '#,##0', total: 'sum', align: 'right' },
+          { title: 'Giá trị (đ)', numFmt: '#,##0', total: 'sum', align: 'right' },
+        ],
+        rows: data.byRawType.map(r => [
           r.type === 'unclassified' ? 'Chưa phân loại' : (RAW_RUBBER_TYPE_LABELS[r.type as RawRubberType] || r.type),
           r.count, Math.round(r.net_kg), Math.round(r.dry_kg), Math.round(r.amount),
         ]),
-      ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rawRows), 'Loại mủ')
+      })
 
-      const fileName = `thong-ke-mu-mua_${dateRange[0]}_${dateRange[1]}.xlsx`
-      XLSX.writeFile(wb, fileName)
+      const fileName = `Thong-ke-mu-mua_${dateRange[0]}_${dateRange[1]}.xlsx`
+      const buffer = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
       message.success(`Đã xuất ${fileName}`)
     } catch (e: any) {
       message.error('Xuất Excel thất bại: ' + (e?.message || ''))

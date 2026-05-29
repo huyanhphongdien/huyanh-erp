@@ -509,7 +509,13 @@ async function revertToDraft(id: string): Promise<PaymentRequest> {
 }
 
 async function cancel(id: string): Promise<PaymentRequest> {
-  return _setStatus(id, 'cancelled', ['draft', 'submitted', 'approved'])
+  const result = await _setStatus(id, 'cancelled', ['draft', 'submitted', 'approved'])
+  // Giải phóng phiếu cân đã gom → có thể đưa vào đề nghị khác
+  await supabase
+    .from('weighbridge_tickets')
+    .update({ payment_request_id: null })
+    .eq('payment_request_id', id)
+  return result
 }
 
 /**

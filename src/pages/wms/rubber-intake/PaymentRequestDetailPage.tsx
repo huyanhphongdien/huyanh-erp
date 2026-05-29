@@ -326,7 +326,7 @@ const PaymentRequestDetailPage: React.FC = () => {
           </button>
         )}
 
-        {editable && (
+        {(req.status === 'draft' || req.status === 'cancelled') && (
           <button onClick={handleDelete} className="w-full flex items-center justify-center gap-1.5 py-2.5 text-red-500 text-[13px] font-medium">
             <Trash2 className="w-4 h-4" /> Xoá đề nghị này
           </button>

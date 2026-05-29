@@ -519,7 +519,7 @@ export const dealService = {
       if (wantsFinalPrice) {
         throw new Error(
           `Deal ${current.deal_number} đã ở trạng thái "${current.status}" — không thể sửa ` +
-          `đơn giá cuối (final_price). Nếu cần điều chỉnh, hãy hủy deal hoặc tạo khiếu nại DRC.`,
+          `đơn giá cuối (final_price). Nếu cần điều chỉnh, hãy hủy deal hoặc ghi bút toán điều chỉnh.`,
         )
       }
       if (updateData.status) {

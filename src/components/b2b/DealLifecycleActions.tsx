@@ -110,11 +110,7 @@ export default function DealLifecycleActions({
       })
       const drcStr = res.actual_drc.toFixed(2)
       const grossStr = res.final_gross_vnd.toLocaleString('vi-VN')
-      if (res.dispute_auto_raised) {
-        message.warning(`SX xong: actual DRC=${drcStr}%, giá cuối=${grossStr}đ. ⚠️ Variance > 3% → auto-raise dispute!`)
-      } else {
-        message.success(`SX xong: actual DRC=${drcStr}%, giá cuối=${grossStr}đ`)
-      }
+      message.success(`SX xong: actual DRC=${drcStr}%, giá cuối=${grossStr}đ`)
       setOpenFinish(false)
       finishForm.resetFields()
       onRefresh?.()
@@ -272,7 +268,7 @@ export default function DealLifecycleActions({
               { required: true, message: 'Nhập KL thành phẩm' },
               { type: 'number', min: 0.01, message: 'KL phải > 0' },
             ]}
-            tooltip="Đo TP sau khi SX xong. ERP tự compute actual DRC = finished / NL × 100, giá cuối = NL × actual_drc × đơn giá. Nếu lệch sample > 3% → auto-raise dispute để đại lý phản hồi."
+            tooltip="Đo TP sau khi SX xong. ERP tự compute actual DRC = finished / NL × 100, giá cuối = NL × actual_drc × đơn giá."
           >
             <InputNumber
               style={{ width: '100%' }}
@@ -301,7 +297,7 @@ export default function DealLifecycleActions({
                       {preview.sampleVariance && (
                         <span>
                           Variance vs Sample: <strong>{preview.sampleVariance}%</strong>
-                          {isVariant && ' ⚠️ > 3% → auto-raise dispute'}
+                          {isVariant && ' ⚠️ > 3%'}
                         </span>
                       )}
                       <span>

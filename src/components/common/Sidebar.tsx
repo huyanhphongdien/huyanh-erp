@@ -260,7 +260,6 @@ const getMenuGroups = (
     // Đại lý: ds + Duyệt đăng ký + Thưởng đại lý (1 menu, 3 tabs)
     // Nhập kho mủ: ds + Phiếu cân đa NM + Nhập tay (1 menu, 3 tabs)
     // Công nợ: sổ + Báo cáo (1 menu, 2 tabs)
-    // Quyết toán: ds + Khiếu nại DRC (1 menu, 2 tabs)
     // Dashboard: Tổng quan + Phân tích B2B (1 menu, 2 tabs)
     items: [
       {
@@ -321,8 +320,6 @@ const getMenuGroups = (
         icon: <ArrowLeftRight size={18} />,
         requireB2BPurchaser: true,
         tab: { key: 'b2b-settlement-list', componentId: 'b2b-settlement-list' },
-        // Tab section: Quyết toán + Khiếu nại DRC
-        extraActivePaths: ['/b2b/disputes'],
       },
     ],
   },

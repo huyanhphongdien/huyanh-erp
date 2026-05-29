@@ -11,7 +11,6 @@
 // ============================================================================
 
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { notification } from 'antd'
 import { supabase } from '../lib/supabase'
 import { DEAL_STATUS_LABELS } from '../types/b2b.constants'
@@ -29,11 +28,10 @@ interface DealRow {
 }
 
 /**
- * Bật global toast cho b2b_deals UPDATE events + b2b_drc_disputes INSERT events.
+ * Bật global toast cho b2b_deals UPDATE events.
  * Gọi 1 lần ở AppLayout (hoặc root component) — idempotent.
  */
 export function useB2BDealToasts(enabled: boolean = true) {
-  const navigate = useNavigate()
   const openDealTab = useOpenDealTab()
   const channelRef = useRef<RealtimeChannel | null>(null)
 
@@ -57,25 +55,6 @@ export function useB2BDealToasts(enabled: boolean = true) {
           handleDealChange(oldRow, newRow, openDealTab)
         },
       )
-      .on(
-        'postgres_changes' as any,
-        {
-          event: 'INSERT',
-          schema: 'b2b',
-          table: 'drc_disputes',
-        },
-        (payload: any) => {
-          const d = payload.new as { id: string; dispute_number: string; deal_id: string; actual_drc: number; expected_drc: number }
-          notification.warning({
-            key: `dispute-new-${d.id}`,
-            message: `Khiếu nại DRC mới — ${d.dispute_number}`,
-            description: `DRC thực ${d.actual_drc}% vs dự kiến ${d.expected_drc}%. Click để xử lý.`,
-            placement: 'bottomRight',
-            duration: 6,
-            onClick: () => navigate(`/b2b/disputes`),
-          })
-        },
-      )
       .subscribe()
 
     channelRef.current = channel
@@ -86,7 +65,7 @@ export function useB2BDealToasts(enabled: boolean = true) {
         channelRef.current = null
       }
     }
-  }, [enabled, navigate, openDealTab])
+  }, [enabled, openDealTab])
 }
 
 function handleDealChange(

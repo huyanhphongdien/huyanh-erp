@@ -50,9 +50,6 @@ export interface Settlement {
   submitted_at: string | null
   notes: string | null
   internal_notes: string | null
-  // Sprint 2 Cross #2 — tạm khoá khi có dispute
-  locked_by_dispute: boolean | null
-  locked_dispute_id: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -488,14 +485,6 @@ export const settlementService = {
       }
     }
 
-    // ─── Sprint 2 Cross #2: Không cho sửa khi bị lock bởi dispute ───
-    if ((current as any).locked_by_dispute) {
-      throw new Error(
-        `Phiếu quyết toán ${current.code} đang bị tạm khoá do có khiếu nại DRC chưa giải quyết. ` +
-        `Vui lòng xử lý khiếu nại trước.`,
-      )
-    }
-
     const updates: any = {
       ...updateData,
       updated_at: new Date().toISOString(),
@@ -535,31 +524,6 @@ export const settlementService = {
       throw new Error('Chỉ có thể gửi duyệt phiếu ở trạng thái "Nháp" hoặc "Từ chối"')
     }
 
-    // ─── Sprint 2 Cross #2: Phiếu đang bị khoá bởi dispute ───
-    if ((current as any).locked_by_dispute) {
-      throw new Error(
-        `Phiếu ${current.code} đang tạm khoá do có khiếu nại DRC chưa giải quyết. ` +
-        `Vui lòng xử lý khiếu nại trước khi gửi duyệt.`,
-      )
-    }
-
-    // ─── Gap #3: Chặn submit khi deal có active dispute ───
-    if (current.deal_id) {
-      const { data: activeDisputes } = await supabase
-        .from('b2b_drc_disputes')
-        .select('id, dispute_number, status')
-        .eq('deal_id', current.deal_id)
-        .in('status', ['open', 'investigating'])
-        .limit(1)
-      if (activeDisputes && activeDisputes.length > 0) {
-        const d = activeDisputes[0]
-        throw new Error(
-          `Deal đang có khiếu nại ${d.dispute_number} chưa giải quyết (${d.status}). ` +
-          `Phải xử lý khiếu nại trước khi gửi duyệt phiếu quyết toán.`,
-        )
-      }
-    }
-
     const { data, error } = await supabase
       .from('b2b_settlements')
       .update({
@@ -584,29 +548,6 @@ export const settlementService = {
     if (!current) throw new Error('Phiếu quyết toán không tồn tại')
     if (current.status !== 'pending_approval') {
       throw new Error('Chỉ có thể duyệt phiếu ở trạng thái "Chờ duyệt"')
-    }
-
-    // ─── Sprint 2 Cross #2: Lock flag do dispute ───
-    if ((current as any).locked_by_dispute) {
-      throw new Error(
-        `Phiếu ${current.code} đang bị khoá do có khiếu nại DRC chưa giải quyết. Không thể duyệt.`,
-      )
-    }
-
-    // ─── Gap #3: Double-check dispute tại thời điểm duyệt ───
-    if (current.deal_id) {
-      const { data: activeDisputes } = await supabase
-        .from('b2b_drc_disputes')
-        .select('id, dispute_number, status')
-        .eq('deal_id', current.deal_id)
-        .in('status', ['open', 'investigating'])
-        .limit(1)
-      if (activeDisputes && activeDisputes.length > 0) {
-        const d = activeDisputes[0]
-        throw new Error(
-          `Deal đang có khiếu nại ${d.dispute_number} chưa giải quyết. Không thể duyệt phiếu quyết toán.`,
-        )
-      }
     }
 
     // ─── Gap #5: Chặn duyệt khi advance > gross_amount (balance âm) ───

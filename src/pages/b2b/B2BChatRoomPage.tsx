@@ -83,8 +83,6 @@ import ConfirmDealModal from '../../components/b2b/ConfirmDealModal'
 import AddAdvanceModal from '../../components/b2b/AddAdvanceModal'
 import RecordDeliveryModal from '../../components/b2b/RecordDeliveryModal'
 import DealCard from '../../components/b2b/DealCard'
-import RaiseDisputeModal from '../../components/b2b/RaiseDisputeModal'
-import DisputeDetailDrawer from '../../components/b2b/DisputeDetailDrawer'
 import EmojiPickerPopover from '../../components/b2b/EmojiPickerPopover'
 import { chatAttachmentService } from '../../services/b2b/chatAttachmentService'
 import { dealChatActionsService } from '../../services/b2b/dealChatActionsService'
@@ -509,7 +507,7 @@ interface MessageBubbleProps {
   showAvatar: boolean
   onContextMenu: (message: ChatMessage, action: string) => void
   onBookingAction: (messageId: string, action: 'confirm' | 'reject' | 'negotiate') => void
-  onDealAction: (dealId: string, action: 'add_advance' | 'delivery' | 'view_details' | 'accept_deal' | 'create_settlement' | 'view_settlement' | 'raise_dispute' | 'view_dispute') => void
+  onDealAction: (dealId: string, action: 'add_advance' | 'delivery' | 'view_details' | 'accept_deal' | 'create_settlement' | 'view_settlement') => void
 }
 
 const MessageBubble = ({
@@ -568,8 +566,6 @@ const MessageBubble = ({
             onAcceptDeal={() => onDealAction(dealMeta?.deal_id, 'accept_deal')}
             onCreateSettlement={() => onDealAction(dealMeta?.deal_id, 'create_settlement')}
             onViewSettlement={() => onDealAction(dealMeta?.deal_id, 'view_settlement')}
-            onRaiseDispute={() => onDealAction(dealMeta?.deal_id, 'raise_dispute')}
-            onViewDispute={() => onDealAction(dealMeta?.deal_id, 'view_dispute')}
           />
         )
 
@@ -838,18 +834,6 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
     deal: DealCardMetadata | null
   }>({ visible: false, deal: null })
   const [deliveryLoading, setDeliveryLoading] = useState(false)
-
-  // Raise Dispute Modal state
-  const [raiseDisputeModal, setRaiseDisputeModal] = useState<{
-    visible: boolean
-    deal: DealCardMetadata | null
-  }>({ visible: false, deal: null })
-
-  // View Dispute Drawer state
-  const [disputeDrawer, setDisputeDrawer] = useState<{
-    open: boolean
-    disputeId: string | null
-  }>({ open: false, disputeId: null })
 
   // Negotiate modal
   const [negotiateModal, setNegotiateModal] = useState<{ visible: boolean; messageId: string | null }>({
@@ -1334,7 +1318,7 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
   // Xử lý actions trên DealCard
   const handleDealAction = async (
     dealId: string,
-    action: 'add_advance' | 'delivery' | 'view_details' | 'accept_deal' | 'create_settlement' | 'view_settlement' | 'raise_dispute' | 'view_dispute',
+    action: 'add_advance' | 'delivery' | 'view_details' | 'accept_deal' | 'create_settlement' | 'view_settlement',
   ) => {
     if (action === 'view_details') {
       openDealTab({ id: dealId })
@@ -1389,25 +1373,6 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
       setAddAdvanceModal({ visible: true, deal: dealMeta })
     } else if (action === 'delivery') {
       setDeliveryModal({ visible: true, deal: dealMeta })
-    } else if (action === 'raise_dispute') {
-      setRaiseDisputeModal({ visible: true, deal: dealMeta })
-    } else if (action === 'view_dispute') {
-      if (dealMeta.active_dispute_id) {
-        setDisputeDrawer({ open: true, disputeId: dealMeta.active_dispute_id })
-      } else {
-        // Fallback: tìm dispute active mới nhất cho deal
-        try {
-          const { drcDisputeService } = await import('../../services/b2b/drcDisputeService')
-          const found = await drcDisputeService.getActiveDisputeByDeal(dealId)
-          if (found) {
-            setDisputeDrawer({ open: true, disputeId: found.id })
-          } else {
-            message.info('Không có khiếu nại đang mở cho deal này')
-          }
-        } catch (err: any) {
-          message.error(err?.message || 'Không thể tải khiếu nại')
-        }
-      }
     }
   }
 
@@ -1801,30 +1766,6 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
         loading={deliveryLoading}
         deal={deliveryModal.deal}
         partnerName={room?.partner?.name}
-      />
-
-      {/* Raise Dispute Modal — ở ERP thường Factory KHÔNG raise nhưng để đây
-          support future portal copy. Khi factory view = ẩn tự động ở DealCard. */}
-      {raiseDisputeModal.deal && (
-        <RaiseDisputeModal
-          open={raiseDisputeModal.visible}
-          onClose={() => setRaiseDisputeModal({ visible: false, deal: null })}
-          dealId={raiseDisputeModal.deal.deal_id}
-          dealNumber={raiseDisputeModal.deal.deal_number}
-          expectedDrc={raiseDisputeModal.deal.expected_drc}
-          actualDrc={raiseDisputeModal.deal.actual_drc || 0}
-          onSuccess={() => fetchMessages()}
-        />
-      )}
-
-      {/* Dispute Detail Drawer — factory resolve / partner xem */}
-      <DisputeDetailDrawer
-        open={disputeDrawer.open}
-        onClose={() => setDisputeDrawer({ open: false, disputeId: null })}
-        disputeId={disputeDrawer.disputeId}
-        viewerType="factory"
-        actionBy={user?.employee_id ?? undefined}
-        onChanged={() => fetchMessages()}
       />
 
       {/* Negotiate Modal */}

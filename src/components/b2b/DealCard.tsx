@@ -55,8 +55,6 @@ interface DealCardProps {
   onViewSettlement?: () => void
   // Partner-only
   onAcknowledgeAdvance?: () => void  // Partner xác nhận đã nhận tạm ứng
-  onRaiseDispute?: () => void         // Partner khiếu nại DRC variance
-  onViewDispute?: () => void          // Xem dispute đang mở (cả 2 bên)
 }
 
 // ============================================
@@ -192,8 +190,6 @@ const DealCard = ({
   onCreateSettlement,
   onViewSettlement,
   onAcknowledgeAdvance,
-  onRaiseDispute,
-  onViewDispute,
 }: DealCardProps) => {
   if (!metadata) {
     return (
@@ -409,34 +405,25 @@ const DealCard = ({
         </div>
       </div>
 
-      {/* DRC Variance Warning + active dispute info */}
+      {/* DRC Variance Warning */}
       {showDrcVariance && (
         <div
           style={{
-            background: metadata.active_dispute_id
-              ? 'rgba(239, 68, 68, 0.2)'
-              : 'rgba(254, 215, 170, 0.2)',
-            border: `1px solid ${metadata.active_dispute_id ? 'rgba(239,68,68,0.6)' : 'rgba(251,146,60,0.5)'}`,
+            background: 'rgba(254, 215, 170, 0.2)',
+            border: '1px solid rgba(251,146,60,0.5)',
             borderRadius: 8,
             padding: '8px 10px',
             marginBottom: 10,
             display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
+            alignItems: 'center',
+            gap: 8,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <WarningOutlined style={{ color: metadata.active_dispute_id ? '#fca5a5' : '#fb923c', fontSize: 16 }} />
-            <Text style={{ color: '#fff', fontSize: 12, flex: 1 }}>
-              DRC thực <b>{metadata.actual_drc}%</b> {drcDiff < 0 ? 'thấp hơn' : 'cao hơn'} dự kiến{' '}
-              <b>{metadata.expected_drc}%</b> ({drcDiff > 0 ? '+' : ''}{drcDiff.toFixed(1)}%)
-            </Text>
-          </div>
-          {metadata.active_dispute_id && (
-            <Text style={{ color: '#fecaca', fontSize: 11, marginLeft: 24 }}>
-              ⚠ Có khiếu nại đang {metadata.active_dispute_status === 'investigating' ? 'xác minh' : 'mở'}
-            </Text>
-          )}
+          <WarningOutlined style={{ color: '#fb923c', fontSize: 16 }} />
+          <Text style={{ color: '#fff', fontSize: 12, flex: 1 }}>
+            DRC thực <b>{metadata.actual_drc}%</b> {drcDiff < 0 ? 'thấp hơn' : 'cao hơn'} dự kiến{' '}
+            <b>{metadata.expected_drc}%</b> ({drcDiff > 0 ? '+' : ''}{drcDiff.toFixed(1)}%)
+          </Text>
         </div>
       )}
 
@@ -580,41 +567,6 @@ const DealCard = ({
             onClick={onViewSettlement}
           >
             Phiếu quyết toán
-          </Button>
-        )}
-
-        {/* 5a. Partner: Khiếu nại DRC (khi có variance + chưa có dispute mở) */}
-        {viewerType === 'partner'
-          && showDrcVariance
-          && !metadata.active_dispute_id
-          && !isSettled
-          && !isCancelled
-          && onRaiseDispute && (
-          <Button
-            size="small"
-            danger
-            icon={<WarningOutlined />}
-            style={{
-              ...btnStyle,
-              background: 'rgba(239,68,68,0.25)',
-              borderColor: 'rgba(239,68,68,0.5)',
-              color: '#fff',
-            }}
-            onClick={onRaiseDispute}
-          >
-            Khiếu nại DRC
-          </Button>
-        )}
-
-        {/* 5b. Xem khiếu nại (cả 2 bên, khi có active dispute) */}
-        {metadata.active_dispute_id && onViewDispute && (
-          <Button
-            size="small"
-            icon={<WarningOutlined />}
-            style={btnStyle}
-            onClick={onViewDispute}
-          >
-            Xem khiếu nại
           </Button>
         )}
 

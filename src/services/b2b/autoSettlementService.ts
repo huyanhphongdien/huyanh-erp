@@ -52,21 +52,6 @@ export const autoSettlementService = {
    * - Tạo settlement draft + settlement items
    */
   async createAutoSettlement(dealId: string): Promise<AutoSettlementResult> {
-    // ─── Gap #3: Chặn tạo settlement khi có active dispute ───
-    const { data: activeDisputes, error: disputeErr } = await supabase
-      .from('b2b_drc_disputes')
-      .select('id, dispute_number, status')
-      .eq('deal_id', dealId)
-      .in('status', ['open', 'investigating'])
-      .limit(1)
-    if (disputeErr) throw new Error(`Không thể kiểm tra khiếu nại: ${disputeErr.message}`)
-    if (activeDisputes && activeDisputes.length > 0) {
-      const d = activeDisputes[0]
-      throw new Error(
-        `Deal đang có khiếu nại ${d.dispute_number} chưa giải quyết (${d.status}). Phải xử lý khiếu nại trước khi quyết toán.`,
-      )
-    }
-
     // ─── 1. Lấy thông tin Deal ───
     const { data: deal, error: dealError } = await supabase
       .from('b2b_deals')

@@ -128,7 +128,7 @@ export default function ProductionWizardPage() {
                 </Col>
               </Row>
 
-              <Alert type="warning" message="Lưu ý: actual DRC sau SX có thể khác sample — variance > 3% tự raise dispute" />
+              <Alert type="warning" message="Lưu ý: actual DRC sau SX có thể khác sample" />
 
               <Space style={{ marginTop: 16 }}>
                 <Button type="primary" onClick={() => setStep(1)}>Tiếp theo</Button>
@@ -240,7 +240,7 @@ export default function ProductionWizardPage() {
                   <Text>Advance max: <strong>{result.advance_max_allowed_vnd.toLocaleString('vi-VN')} VNĐ</strong></Text>
                   <Text type="secondary">
                     Sau khi BGĐ duyệt → status=accepted → có thể tạo advance.
-                    Sau khi SX xong → onProductionFinish → actual DRC + dispute auto nếu lệch &gt; 3%.
+                    Sau khi SX xong → onProductionFinish → actual DRC + giá cuối.
                   </Text>
                 </Space>
               }

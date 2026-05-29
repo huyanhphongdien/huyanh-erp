@@ -17,8 +17,6 @@ export type B2BNotificationType =
   | 'settlement_submitted'
   | 'settlement_approved'
   | 'settlement_paid'
-  | 'dispute_raised'
-  | 'dispute_resolved'
   | 'advance_paid'
   // Production lifecycle (drc_after_production flow)
   | 'sample_drc_recorded'   // Factory ghi sample DRC → Partner

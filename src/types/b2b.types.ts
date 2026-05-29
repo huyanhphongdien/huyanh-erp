@@ -514,9 +514,6 @@ export interface DealCardMetadata {
   pending_ack_advance_id?: string
   pending_ack_advance_number?: string
   pending_ack_advance_amount?: number
-  // Active dispute info (nếu có, partner/factory đều thấy)
-  active_dispute_id?: string
-  active_dispute_status?: 'open' | 'investigating'
 }
 
 export interface ConfirmDealResult {

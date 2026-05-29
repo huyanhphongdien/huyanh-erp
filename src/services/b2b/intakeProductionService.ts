@@ -209,14 +209,12 @@ export interface ProductionFinishResult {
   deal_id: string
   actual_drc: number
   final_gross_vnd: number
-  dispute_auto_raised: boolean
   success: boolean
   error?: string
 }
 
 /**
- * Gọi khi production xong — compute actual_drc + update deal + trigger
- * auto_raise_drc_dispute (P16) sẽ fire nếu variance > 3%.
+ * Gọi khi production xong — compute actual_drc + update deal.
  */
 export async function onProductionFinish(
   input: ProductionFinishInput
@@ -251,7 +249,7 @@ export async function onProductionFinish(
   // Compute final gross
   const finalGross = Math.round(d.quantity_kg * (actualDrc / 100) * d.unit_price)
 
-  // Update deal — trigger P16 (auto_raise_drc_dispute) sẽ fire
+  // Update deal
   const { error } = await supabase
     .from('b2b_deals')
     .update({
@@ -266,25 +264,15 @@ export async function onProductionFinish(
       deal_id: input.deal_id,
       actual_drc: actualDrc,
       final_gross_vnd: finalGross,
-      dispute_auto_raised: false,
       success: false,
       error: `Update failed: ${error.message}`,
     }
   }
 
-  // Check dispute auto-raised
-  const { data: disputes } = await supabase
-    .from('b2b_drc_disputes')
-    .select('id')
-    .eq('deal_id', input.deal_id)
-    .eq('status', 'open')
-  const disputeRaised = (disputes || []).length > 0
-
   return {
     deal_id: input.deal_id,
     actual_drc: Number(actualDrc.toFixed(2)),
     final_gross_vnd: finalGross,
-    dispute_auto_raised: disputeRaised,
     success: true,
   }
 }

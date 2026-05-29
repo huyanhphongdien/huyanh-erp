@@ -109,9 +109,6 @@ registerTabComponent('b2b-ledger-overview', LedgerOverviewPage)
 const SettlementListPage = lazy(() => import('../pages/b2b/settlements/SettlementListPage'))
 registerTabComponent('b2b-settlement-list', SettlementListPage)
 
-const DisputeListPage = lazy(() => import('../pages/b2b/disputes/DisputeListPage'))
-registerTabComponent('b2b-dispute-list', DisputeListPage)
-
 const B2BAnalyticsDashboard = lazy(() => import('../pages/b2b/reports/B2BAnalyticsDashboard'))
 registerTabComponent('b2b-analytics', B2BAnalyticsDashboard)
 

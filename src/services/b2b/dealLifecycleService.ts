@@ -7,7 +7,7 @@
 //   2. startProduction(dealId) — Bắt đầu sản xuất (step 6/10)
 //   3. finishProduction(dealId, finishedKg) — Ra TP + auto-compute actual_drc
 //      (delegates sang onProductionFinish ở intakeProductionService — có
-//       sẵn logic compute + trigger P16 auto_raise_drc_dispute)
+//       sẵn logic compute giá cuối)
 //
 // 3 hooks chỉ dùng cho deal `purchase_type='drc_after_production'`.
 // Khác với `dealProductionService.ts` (link sang WMS production_orders).
@@ -164,25 +164,19 @@ export async function finishProduction(input: FinishProductionInput) {
     actual_drc_override: input.actual_drc_override,
   })
 
-  // Notify Partner — bước quan trọng nhất, có giá cuối + có/không dispute
+  // Notify Partner — bước quan trọng nhất, có giá cuối
   if (result.success) {
     const partnerId = await _getPartnerId(input.deal_id)
     const drcStr = result.actual_drc.toFixed(2)
     const grossStr = result.final_gross_vnd.toLocaleString('vi-VN')
-    const titlePrefix = result.dispute_auto_raised
-      ? '⚠️ Sản xuất xong — variance DRC > 3%'
-      : '✅ Sản xuất xong — giá cuối chốt'
-    const msgBody = result.dispute_auto_raised
-      ? `Actual DRC = ${drcStr}%. Giá cuối tạm tính = ${grossStr}đ. ERP tự raise dispute vì lệch sample > 3% — vui lòng review/khiếu nại nếu cần.`
-      : `Actual DRC = ${drcStr}%. Giá cuối = ${grossStr}đ. Đợi nhà máy quyết toán + thanh toán.`
 
     void b2bNotificationService.notify({
       type: 'production_finished',
       audience: 'partner',
       partner_id: partnerId,
       deal_id: input.deal_id,
-      title: titlePrefix,
-      message: msgBody,
+      title: '✅ Sản xuất xong — giá cuối chốt',
+      message: `Actual DRC = ${drcStr}%. Giá cuối = ${grossStr}đ. Đợi nhà máy quyết toán + thanh toán.`,
       link_url: `/portal/deals/${input.deal_id}`,
     })
   }

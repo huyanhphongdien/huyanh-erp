@@ -102,7 +102,6 @@ export const LEDGER_TABS: SectionTab[] = [
 
 export const SETTLEMENT_TABS: SectionTab[] = [
   { key: 'settlement-list', label: 'Quyết toán',   path: '/b2b/settlements' },
-  { key: 'dispute-list',    label: 'Khiếu nại DRC', path: '/b2b/disputes' },
 ]
 
 export const DASHBOARD_TABS: SectionTab[] = [

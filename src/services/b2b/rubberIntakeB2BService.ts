@@ -136,6 +136,11 @@ export interface PartnerAggregate {
   dry_kg: number
   amount: number
   avg_drc: number | null
+  // Tách nguồn: deal (lô gắn deal) vs bộc phát (lô không deal)
+  deal_net_kg: number
+  deal_dry_kg: number
+  adhoc_net_kg: number
+  adhoc_dry_kg: number
 }
 
 export interface RegionAggregate {
@@ -384,7 +389,7 @@ export const rubberIntakeB2BService = {
   }): Promise<AggregatedIntakeStats> {
     let query = supabase
       .from('rubber_intake_batches')
-      .select('id, intake_date, b2b_partner_id, location_name, rubber_region, raw_rubber_type, net_weight_kg, dry_weight_kg, drc_percent, total_amount, lot_code, product_code, invoice_no, vehicle_plate, consolidation_code')
+      .select('id, intake_date, b2b_partner_id, deal_id, location_name, rubber_region, raw_rubber_type, net_weight_kg, dry_weight_kg, drc_percent, total_amount, lot_code, product_code, invoice_no, vehicle_plate, consolidation_code')
       .gte('intake_date', filter.date_from)
       .lte('intake_date', filter.date_to)
       .limit(5000)
@@ -463,15 +468,19 @@ export const rubberIntakeB2BService = {
       }))
 
     // Partner aggregation
-    const partnerAggMap = new Map<string, { count: number; net: number; dry: number; amount: number; drcSum: number; drcCount: number }>()
+    const partnerAggMap = new Map<string, { count: number; net: number; dry: number; amount: number; drcSum: number; drcCount: number; dealNet: number; dealDry: number; adhocNet: number; adhocDry: number }>()
     for (const it of items) {
       if (!it.b2b_partner_id) continue
-      const slot = partnerAggMap.get(it.b2b_partner_id) || { count: 0, net: 0, dry: 0, amount: 0, drcSum: 0, drcCount: 0 }
+      const slot = partnerAggMap.get(it.b2b_partner_id) || { count: 0, net: 0, dry: 0, amount: 0, drcSum: 0, drcCount: 0, dealNet: 0, dealDry: 0, adhocNet: 0, adhocDry: 0 }
+      const n = Number(it.net_weight_kg) || 0
+      const dk = dryOf(it)
       slot.count++
-      slot.net += Number(it.net_weight_kg) || 0
-      slot.dry += dryOf(it)
+      slot.net += n
+      slot.dry += dk
       slot.amount += Number(it.total_amount) || 0
       if (it.drc_percent != null) { slot.drcSum += Number(it.drc_percent) || 0; slot.drcCount++ }
+      // Tách deal (có deal_id) vs bộc phát (không deal_id)
+      if (it.deal_id) { slot.dealNet += n; slot.dealDry += dk } else { slot.adhocNet += n; slot.adhocDry += dk }
       partnerAggMap.set(it.b2b_partner_id, slot)
     }
     const byPartner: PartnerAggregate[] = [...partnerAggMap.entries()]
@@ -487,6 +496,10 @@ export const rubberIntakeB2BService = {
           dry_kg: s.dry,
           amount: s.amount,
           avg_drc: s.drcCount > 0 ? s.drcSum / s.drcCount : null,
+          deal_net_kg: s.dealNet,
+          deal_dry_kg: s.dealDry,
+          adhoc_net_kg: s.adhocNet,
+          adhoc_dry_kg: s.adhocDry,
         }
       })
       .sort((a, b) => b.dry_kg - a.dry_kg)

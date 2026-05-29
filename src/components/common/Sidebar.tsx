@@ -279,13 +279,13 @@ const getMenuGroups = (
         tab: { key: 'b2b-chat-list', componentId: 'b2b-chat-list' },
       },
       {
-        path: '/b2b/demands',
-        label: 'Mua hàng',
+        path: '/b2b/deals',
+        label: 'Deals (Mua hàng)',
         icon: <ShoppingCart size={18} />,
         requireB2BPurchaser: true,
-        tab: { key: 'b2b-demand-list', componentId: 'b2b-demand-list' },
-        // Tab section: Nhu cầu mua + Deals + Đấu giá
-        extraActivePaths: ['/b2b/deals', '/b2b/auctions'],
+        tab: { key: 'b2b-deal-list', componentId: 'b2b-deal-list' },
+        // Đã ẩn Nhu cầu mua + Đấu giá (2026-05) — chỉ còn Deals.
+        extraActivePaths: ['/b2b/demands', '/b2b/auctions'],
       },
       {
         path: '/b2b/partners',

@@ -81,11 +81,10 @@ export const INTAKE_TABS: SectionTab[] = [
   { key: 'manual-entry',  label: 'Nhập tay phiếu cân',   path: '/b2b/intake-manual' },
 ]
 
-// Section "Mua hàng" — 3 kênh sourcing chính
+// Section "Mua hàng" — ẩn Nhu cầu mua + Đấu giá (2026-05), chỉ còn Deals.
+// Route /b2b/demands, /b2b/auctions vẫn giữ (chỉ ẩn khỏi menu/tab) để bật lại dễ.
 export const MUA_HANG_TABS: SectionTab[] = [
-  { key: 'demands',  label: 'Nhu cầu mua', path: '/b2b/demands' },
   { key: 'deals',    label: 'Deals',       path: '/b2b/deals' },
-  { key: 'auctions', label: 'Đấu giá',     path: '/b2b/auctions' },
 ]
 
 export const PARTNER_TABS: SectionTab[] = [

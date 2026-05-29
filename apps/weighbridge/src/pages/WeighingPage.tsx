@@ -367,6 +367,12 @@ export default function WeighingPage() {
       setError('Nhập biển số xe')
       return
     }
+    // Phiếu nhập mủ phải gắn NGUỒN để không "vô chủ" (mủ bộc phát phải gắn đại lý → tính thưởng)
+    if (ticketDirection === 'in') {
+      if (sourceType === 'deal' && !selectedDealId) { setError('Vui lòng chọn Deal nguồn'); return }
+      if (sourceType === 'supplier' && !selectedSupplierId) { setError('Vui lòng chọn nhà cung cấp'); return }
+      if (sourceType === 'partner_direct' && !directPartnerId) { setError('Mủ bộc phát phải gắn đại lý (để gom & tính thưởng) — vui lòng chọn đại lý'); return }
+    }
     setLoading(true)
     setError('')
     try {

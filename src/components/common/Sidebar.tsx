@@ -321,6 +321,12 @@ const getMenuGroups = (
         requireB2BPurchaser: true,
         tab: { key: 'b2b-settlement-list', componentId: 'b2b-settlement-list' },
       },
+      {
+        path: '/rubber/payment-requests',
+        label: 'Đề nghị thanh toán',
+        icon: <Receipt size={18} />,
+        requireB2BPurchaser: true,
+      },
     ],
   },
 

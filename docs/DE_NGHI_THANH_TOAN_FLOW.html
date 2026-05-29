@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đề nghị thanh toán — Luồng 3 App | Cao su Huy Anh Phong Điền</title>
+<style>
+  :root{
+    --erp:#15803d; --erp-bg:#dcfce7;
+    --can:#1d4ed8; --can-bg:#dbeafe;
+    --portal:#7c3aed; --portal-bg:#ede9fe;
+    --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+    --warn:#b45309; --warn-bg:#fef3c7;
+    --ok:#15803d; --ok-bg:#dcfce7;
+    --bad:#b91c1c; --bad-bg:#fee2e2;
+    --card:#ffffff; --bg:#f8fafc;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  header.hero{background:linear-gradient(135deg,#064e3b,#15803d);color:#fff;padding:48px 0 40px}
+  header.hero .wrap{display:flex;flex-direction:column;gap:6px}
+  .brand{font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.85}
+  h1{margin:6px 0 4px;font-size:30px;font-weight:800}
+  .sub{font-size:16px;opacity:.92;max-width:760px}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .chip{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);
+        padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600}
+  .dot{width:10px;height:10px;border-radius:50%}
+  nav.toc{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  nav.toc .wrap{display:flex;gap:6px;flex-wrap:wrap;padding:10px 20px}
+  nav.toc a{font-size:13px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:8px;font-weight:600}
+  nav.toc a:hover{background:var(--bg);color:var(--ink)}
+  section{padding:38px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:22px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+  h2 .num{display:inline-flex;width:30px;height:30px;border-radius:8px;background:var(--erp-bg);color:var(--erp);
+          align-items:center;justify-content:center;font-size:15px;font-weight:800}
+  .lead{color:var(--muted);margin:0 0 20px;font-size:15px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card h3{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .card .role{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .card ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:#334155}
+  .card ul li{margin:3px 0}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+  .tag.can{background:var(--can-bg);color:var(--can)}
+  .tag.erp{background:var(--erp-bg);color:var(--erp)}
+  .tag.portal{background:var(--portal-bg);color:var(--portal)}
+  .b-can{border-top:4px solid var(--can)}
+  .b-erp{border-top:4px solid var(--erp)}
+  .b-portal{border-top:4px solid var(--portal)}
+  /* flow */
+  .flow{display:flex;flex-direction:column;gap:0}
+  .step{display:grid;grid-template-columns:54px 1fr;gap:16px;position:relative;padding-bottom:22px}
+  .step:not(:last-child)::before{content:"";position:absolute;left:26px;top:48px;bottom:-2px;width:2px;background:var(--line)}
+  .step .badge{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+        font-size:18px;font-weight:800;color:#fff;z-index:1}
+  .step.can .badge{background:var(--can)} .step.erp .badge{background:var(--erp)} .step.portal .badge{background:var(--portal)}
+  .step .body{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .step .body h4{margin:0 0 4px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .step .body p{margin:4px 0 0;font-size:14px;color:#475569}
+  code{background:#f1f5f9;padding:1px 6px;border-radius:5px;font-size:13px;font-family:"Cascadia Code",Consolas,monospace;color:#0f172a}
+  /* split cases */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .case{border-radius:14px;padding:18px;border:1px solid var(--line);background:#fff}
+  .case.deal{border-left:5px solid var(--erp)}
+  .case.lone{border-left:5px solid var(--can)}
+  .case h3{margin:0 0 8px;font-size:16px}
+  .kv{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:none}
+  .kv b{color:var(--ink)} .kv span{color:var(--muted)}
+  /* callout */
+  .callout{border-radius:14px;padding:18px 20px;margin:14px 0}
+  .callout.warn{background:var(--warn-bg);border:1px solid #fcd34d}
+  .callout.ok{background:var(--ok-bg);border:1px solid #86efac}
+  .callout h4{margin:0 0 6px;font-size:15px}
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+  .ba .box{border-radius:12px;padding:16px;font-size:14px}
+  .ba .before{background:var(--bad-bg);border:1px solid #fca5a5}
+  .ba .after{background:var(--ok-bg);border:1px solid #86efac}
+  .ba .box h4{margin:0 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{background:#f1f5f9;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  .phase{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .phase .p{border:1px solid var(--line);border-radius:14px;padding:18px;background:#fff}
+  .phase .p .pill{font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px;background:var(--erp-bg);color:var(--erp)}
+  .phase .p.two .pill{background:var(--portal-bg);color:var(--portal)}
+  .phase ul{margin:10px 0 0;padding-left:18px;font-size:14px;color:#334155}
+  footer{padding:30px 0;color:var(--muted);font-size:13px;text-align:center}
+  .arrow{color:var(--muted);font-weight:700}
+  @media(max-width:820px){.cards,.split,.ba,.phase{grid-template-columns:1fr}}
+  @media print{nav.toc{display:none}header.hero{padding:24px 0}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">Cao su Huy Anh Phong Điền — Tài liệu nội bộ</div>
+    <h1>Đề nghị thanh toán mủ — Luồng vận hành qua 3 App</h1>
+    <div class="sub">Cuối ngày, nhân viên gom các phiếu cân thành <b>một Đề nghị thanh toán</b> để chi tiền cho người bán.
+    Tài liệu mô tả tình huống chạy xuyên suốt <b>App Cân → ERP → B2B Portal</b>, và cách xử lý linh hoạt lô <b>trong deal</b> hay <b>ngoài deal</b>.</div>
+    <div class="legend">
+      <span class="chip"><span class="dot" style="background:#60a5fa"></span> App Cân (Weighbridge)</span>
+      <span class="chip"><span class="dot" style="background:#4ade80"></span> ERP (huyanhrubber.vn)</span>
+      <span class="chip"><span class="dot" style="background:#a78bfa"></span> B2B Portal (b2b.huyanhrubber.vn)</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#boicanh">Bối cảnh</a>
+  <a href="#apps">3 App &amp; vai trò</a>
+  <a href="#data">Mô hình dữ liệu</a>
+  <a href="#luong">Luồng tổng</a>
+  <a href="#cases">Trong deal / Ngoài deal</a>
+  <a href="#pa1">Quyết định PA1</a>
+  <a href="#dot">2 Đợt triển khai</a>
+</div></nav>
+
+<!-- 1 -->
+<section id="boicanh"><div class="wrap">
+  <h2><span class="num">1</span> Bối cảnh — vì sao cần "Đề nghị thanh toán"?</h2>
+  <p class="lead">Mủ về nhà máy được cân từng xe → mỗi xe là một <b>phiếu cân</b>. Cuối ngày kế toán/thủ kho phải tổng hợp tất cả phiếu cân của ngày để làm <b>một đề nghị chi tiền</b> trình duyệt (giống mẫu giấy đang dùng tay).</p>
+  <div class="cards">
+    <div class="card b-can">
+      <h3>🧾 Hiện tại (thủ công)</h3>
+      <ul>
+        <li>Phiếu cân in ra giấy</li>
+        <li>Cuối ngày cộng tay vào 1 phiếu đề nghị</li>
+        <li>Gõ lại đơn giá, khối lượng, thành tiền</li>
+        <li>Dễ sai số, khó đối soát với công nợ</li>
+      </ul>
+    </div>
+    <div class="card b-erp">
+      <h3>🎯 Mục tiêu</h3>
+      <ul>
+        <li>ERP tự gom phiếu cân → 1 đề nghị thanh toán</li>
+        <li>Tính sẵn khối lượng × đơn giá = thành tiền</li>
+        <li>In đúng mẫu phiếu giấy hiện hành</li>
+        <li>Duyệt xong → tự ghi sổ công nợ</li>
+      </ul>
+    </div>
+    <div class="card b-portal">
+      <h3>🔗 Cái khó</h3>
+      <ul>
+        <li>Liên quan <b>cả 3 app</b> cùng lúc</li>
+        <li>Mủ có thể <b>nằm trong deal</b> (đại lý B2B) hoặc <b>mua lẻ</b> (không deal)</li>
+        <li>Phải tránh <b>chi trùng</b> với quyết toán B2B</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- 2 -->
+<section id="apps"><div class="wrap">
+  <h2><span class="num">2</span> 3 App &amp; vai trò trong luồng này</h2>
+  <p class="lead">Mỗi app giữ một khúc của quy trình. Màu sắc bên dưới được dùng xuyên suốt sơ đồ để biết bước nào xảy ra ở app nào.</p>
+  <div class="cards">
+    <div class="card b-can">
+      <span class="tag can">APP CÂN</span>
+      <h3 style="margin-top:8px">Weighbridge</h3>
+      <div class="role" style="color:var(--can)">Sinh dữ liệu gốc</div>
+      <ul>
+        <li>Cân từng xe mủ tại nhà máy (Tân Lâm…)</li>
+        <li>Mỗi lần cân → 1 <code>weighbridge_tickets</code></li>
+        <li>Chọn nguồn: <b>Deal</b> hay <b>Mua lẻ (NCC)</b></li>
+        <li>Ghi: khối lượng, loại mủ, đơn giá, biển số</li>
+      </ul>
+    </div>
+    <div class="card b-erp">
+      <span class="tag erp">ERP NỘI BỘ</span>
+      <h3 style="margin-top:8px">huyanhrubber.vn</h3>
+      <div class="role" style="color:var(--erp)">Tổng hợp · Duyệt · Ghi sổ</div>
+      <ul>
+        <li>Gom phiếu cân → <b>Đề nghị thanh toán</b></li>
+        <li>Kế toán/QL duyệt → chi tiền</li>
+        <li>Ghi bút toán công nợ (<code>payment_paid</code>)</li>
+        <li>In phiếu đúng mẫu giấy</li>
+      </ul>
+    </div>
+    <div class="card b-portal">
+      <span class="tag portal">B2B PORTAL</span>
+      <h3 style="margin-top:8px">b2b.huyanhrubber.vn</h3>
+      <div class="role" style="color:var(--portal)">Đại lý xem &amp; đối soát</div>
+      <ul>
+        <li>Đại lý B2B tạo &amp; theo dõi deal</li>
+        <li>Xem công nợ, tạm ứng, quyết toán</li>
+        <li>Quyết toán = <b>chốt giá trị / đối soát</b></li>
+        <li>Không phải là đường chi tiền</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- 3 -->
+<section id="data"><div class="wrap">
+  <h2><span class="num">3</span> Mô hình dữ liệu — điểm gom chung là phiếu cân</h2>
+  <p class="lead">Mọi luồng đều đi qua <code>weighbridge_tickets</code>. Một phiếu cân <b>hoặc</b> gắn deal (<code>deal_id</code>) <b>hoặc</b> gắn nhà cung cấp (<code>supplier_id</code>) — chính chỗ này tạo ra "trong deal / ngoài deal".</p>
+  <table>
+    <tr><th>Bảng</th><th>Vai trò</th><th>Cột quan trọng</th><th>Trạng thái</th></tr>
+    <tr><td><code>weighbridge_tickets</code></td><td>Phiếu cân gốc (1 xe = 1 dòng)</td><td><code>deal_id</code> · <code>supplier_id</code> · <code>partner_id</code> · <code>rubber_type</code> · <code>net_weight</code> · <code>unit_price</code> · <code>status</code></td><td>✅ Đã có</td></tr>
+    <tr><td><code>payment_requests</code></td><td>Đề nghị thanh toán (1 phiếu/ngày/NM)</td><td><code>code</code> (TMMN-YYMM-seq) · <code>facility</code> · <code>request_date</code> · <code>status</code> · <code>total_amount</code></td><td>🆕 Đợt 1 tạo</td></tr>
+    <tr><td><code>payment_request_lines</code></td><td>Dòng chi tiết (1 phiếu cân/nhóm = 1 dòng)</td><td><code>payment_request_id</code> · <code>ticket_id</code> · <code>payee_name</code> · <code>weight</code> · <code>unit_price</code> · <code>amount</code> · <code>note</code></td><td>🆕 Đợt 1 tạo</td></tr>
+    <tr><td><code>weighbridge_tickets.payment_request_id</code></td><td>Đánh dấu phiếu cân đã vào đề nghị nào (chống gom trùng)</td><td>cột mới, nullable</td><td>🆕 Đợt 1 thêm</td></tr>
+    <tr><td><code>b2b_partner_ledger</code></td><td>Sổ công nợ — ghi khi chi</td><td><code>entry_type='payment_paid'</code> (credit) · <code>debit</code>/<code>credit</code></td><td>✅ Đã có (trigger prod)</td></tr>
+  </table>
+</div></section>
+
+<!-- 4 -->
+<section id="luong"><div class="wrap">
+  <h2><span class="num">4</span> Luồng tổng — từ cân đến ghi sổ</h2>
+  <p class="lead">5 bước, đi qua 3 app. Để ý badge màu: 🟦 App Cân · 🟩 ERP · 🟪 Portal.</p>
+  <div class="flow">
+    <div class="step can">
+      <div class="badge">1</div>
+      <div class="body">
+        <h4><span class="tag can">APP CÂN</span> Cân mủ → tạo phiếu cân</h4>
+        <p>Nhân viên cân từng xe. Khi cân chọn <b>nguồn</b>: <code>Deal</code> (đại lý B2B / hộ ND walk-in) → set <code>deal_id</code>+<code>partner_id</code>; hoặc <code>Mua lẻ</code> → set <code>supplier_id</code>. Phiếu lưu khối lượng, loại mủ, đơn giá.</p>
+      </div>
+    </div>
+    <div class="step erp">
+      <div class="badge">2</div>
+      <div class="body">
+        <h4><span class="tag erp">ERP</span> Cuối ngày: gom phiếu cân</h4>
+        <p>Vào <b>WMS / Nhập kho mủ</b>, lọc phiếu cân theo <b>nhà máy + ngày + loại mủ</b> với điều kiện <code>status='completed'</code> và <code>payment_request_id IS NULL</code>. Chọn các phiếu → tạo <b>1 Đề nghị thanh toán</b> nhiều dòng.</p>
+      </div>
+    </div>
+    <div class="step erp">
+      <div class="badge">3</div>
+      <div class="body">
+        <h4><span class="tag erp">ERP</span> Hoàn thiện dòng &amp; in phiếu</h4>
+        <p>Mỗi dòng prefill <b>người nhận tiền</b> (đại lý/NCC), khối lượng, đơn giá, thành tiền — đều <b>sửa/gõ tay được</b> (thực tế trả vào TK người thân). In đúng mẫu phiếu giấy; mã phiếu <code>TMMN-{YYMM}-{seq}</code>.</p>
+      </div>
+    </div>
+    <div class="step erp">
+      <div class="badge">4</div>
+      <div class="body">
+        <h4><span class="tag erp">ERP</span> Duyệt → chi tiền → ghi sổ</h4>
+        <p>Kế toán/QL duyệt. Khi <code>status → paid</code>: sinh bút toán ledger <code>payment_paid</code> cho từng người nhận → công nợ giảm. <b>Đây là cửa chi tiền duy nhất</b> (xem §6).</p>
+      </div>
+    </div>
+    <div class="step portal">
+      <div class="badge">5</div>
+      <div class="body">
+        <h4><span class="tag portal">PORTAL</span> Đại lý đối soát</h4>
+        <p>Với lô trong deal, đại lý vào Portal thấy <b>công nợ giảm</b> tương ứng. Quyết toán B2B dùng để <b>chốt giá trị / đối soát</b>, không phát sinh chi tiền lần nữa.</p>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 5 -->
+<section id="cases"><div class="wrap">
+  <h2><span class="num">5</span> Linh hoạt: lô <em>trong deal</em> vs <em>ngoài deal</em></h2>
+  <p class="lead">Cả hai loại phiếu cân cùng chảy vào <b>một</b> đề nghị thanh toán. Khác nhau chỉ ở cách truy nguồn &amp; nhãn hiển thị.</p>
+  <div class="split">
+    <div class="case deal">
+      <h3>🟩 Lô TRONG deal</h3>
+      <div class="kv"><span>Gắn ở phiếu cân</span><b><code>deal_id</code> + <code>partner_id</code></b></div>
+      <div class="kv"><span>Người nhận (prefill)</span><b>Tên đại lý / partner</b></div>
+      <div class="kv"><span>Đơn giá</span><b>Kế thừa từ deal</b></div>
+      <div class="kv"><span>Nhãn dòng</span><b>“Deal #1234 · Đại lý A”</b></div>
+      <div class="kv"><span>Ảnh hưởng</span><b>Giảm công nợ đại lý trên Portal</b></div>
+      <div class="kv"><span>Gồm cả</span><b>Hộ ND walk-in (deal <code>farmer_walkin</code>)</b></div>
+    </div>
+    <div class="case lone">
+      <h3>🟦 Lô NGOÀI deal (mua lẻ)</h3>
+      <div class="kv"><span>Gắn ở phiếu cân</span><b><code>supplier_id</code> (không deal)</b></div>
+      <div class="kv"><span>Người nhận (prefill)</span><b>Tên NCC / người dân</b></div>
+      <div class="kv"><span>Đơn giá</span><b>Nhập khi cân</b></div>
+      <div class="kv"><span>Nhãn dòng</span><b>“Mua lẻ · NCC B”</b></div>
+      <div class="kv"><span>Ảnh hưởng</span><b>Chi tiền trực tiếp, không lên Portal</b></div>
+      <div class="kv"><span>Gồm cả</span><b>Mủ trôi nổi, vãng lai</b></div>
+    </div>
+  </div>
+  <div class="callout ok" style="margin-top:16px">
+    <h4>✅ Vì sao tự nhiên linh hoạt?</h4>
+    Bộ lọc gom phiếu <b>không phân biệt</b> có deal hay không — chỉ cần <code>completed</code> và chưa thuộc đề nghị nào. Mỗi dòng tự đọc <code>deal_id</code>/<code>supplier_id</code> để hiện nhãn &amp; prefill người nhận. Khi tạo deal, lô gắn deal; khi không, lô gắn NCC — cùng một phiếu đề nghị xử lý được cả hai.
+  </div>
+</div></section>
+
+<!-- 6 -->
+<section id="pa1"><div class="wrap">
+  <h2><span class="num">6</span> Quyết định đã chốt: PA1 — một cửa chi tiền duy nhất</h2>
+  <p class="lead">Lô có deal có thể bị chi tiền theo <b>2 đường</b> → rủi ro trả trùng. Đã chốt <b>PA1</b>.</p>
+  <div class="ba">
+    <div class="box before">
+      <h4>⚠️ Rủi ro nếu để 2 đường</h4>
+      <p>Lô trong deal có thể được chi qua:</p>
+      <ol style="margin:6px 0 0;padding-left:18px">
+        <li>Đề nghị thanh toán (phiếu cân) <span class="arrow">→</span> <code>payment_paid</code></li>
+        <li>Quyết toán B2B (settlement) <span class="arrow">→</span> <code>payment_paid</code></li>
+      </ol>
+      <p style="margin-top:8px"><b>Hệ quả:</b> cùng một lô bị ghi chi 2 lần → công nợ sai, trả dư tiền.</p>
+    </div>
+    <div class="box after">
+      <h4>✅ PA1 — đã chọn</h4>
+      <p><b>Đề nghị thanh toán là cửa chi tiền DUY NHẤT</b> cho mọi mủ mua về (cả deal lẫn lẻ).</p>
+      <ul style="margin:6px 0 0;padding-left:18px">
+        <li>Chỉ đề nghị thanh toán mới sinh <code>payment_paid</code></li>
+        <li>Quyết toán/settlement chỉ <b>chốt giá trị / đối soát</b></li>
+        <li>Đợt 2: <b>gỡ/tắt</b> đường app ghi <code>payment_paid</code> từ settlement</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- 7 -->
+<section id="dot"><div class="wrap">
+  <h2><span class="num">7</span> Kế hoạch 2 Đợt triển khai</h2>
+  <p class="lead">Chi tiết kỹ thuật xem file <code>docs/KE_HOACH_DE_NGHI_THANH_TOAN.md</code>.</p>
+  <div class="phase">
+    <div class="p">
+      <span class="pill">ĐỢT 1 — Tạo &amp; In phiếu</span>
+      <ul>
+        <li>Migration <code>wms_payment_request.sql</code>: 2 bảng + cột <code>payment_request_id</code></li>
+        <li><code>paymentRequestService.ts</code> (gom phiếu cân, CRUD)</li>
+        <li>3 trang trong <b>WMS / Nhập kho mủ</b>: danh sách · tạo từ phiếu cân · chi tiết</li>
+        <li>Mẫu in khớp phiếu giấy; mã <code>TMMN-{YYMM}-{seq}</code></li>
+        <li>Người nhận gõ tay; chỉ VNĐ</li>
+      </ul>
+    </div>
+    <div class="p two">
+      <span class="pill">ĐỢT 2 — Duyệt &amp; Ghi sổ</span>
+      <ul>
+        <li>Workflow duyệt (nháp → chờ duyệt → đã duyệt → đã chi)</li>
+        <li>Ghi ledger <code>payment_paid</code> khi <code>paid</code></li>
+        <li><b>Gỡ</b> đường chi từ settlement (theo PA1) — tránh trả trùng</li>
+        <li>Đa tiền tệ KIP / THB</li>
+        <li>Phí (vận chuyển…) xử lý dòng riêng</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<footer>
+  <div class="wrap">
+    Cao su Huy Anh Phong Điền · Tài liệu nội bộ — Đề nghị thanh toán mủ ·
+    Cập nhật: 2026-05-29 · Liên quan: App Cân, ERP, B2B Portal
+  </div>
+</footer>
+
+</body>
+</html>

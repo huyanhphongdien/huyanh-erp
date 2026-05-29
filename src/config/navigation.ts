@@ -115,6 +115,7 @@ export const navigationGroups: NavGroup[] = [
       { label: 'NCC Mủ', href: '/rubber/suppliers', icon: Users },
       { label: 'Phiếu nhập mủ', href: '/rubber/intake', icon: ClipboardList },
       { label: 'Báo cáo ngày', href: '/rubber/daily-report', icon: FileBarChart },
+      { label: 'Đề nghị thanh toán', href: '/rubber/payment-requests', icon: Receipt },
       { label: 'Công nợ NCC mủ', href: '/rubber/debt', icon: Wallet },
     ],
   },

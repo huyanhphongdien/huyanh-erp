@@ -158,6 +158,10 @@ const RubberIntakeListPage = lazy(() => import('./pages/wms/rubber-intake/Rubber
 const RubberIntakeDetailPage = lazy(() => import('./pages/wms/rubber-intake/RubberIntakeDetailPage'));
 const RubberDailyReportPage = lazy(() => import('./pages/wms/rubber-intake/RubberDailyReportPage'));
 const RubberDebtPage = lazy(() => import('./pages/wms/rubber-intake/RubberDebtPage'));
+const PaymentRequestListPage = lazy(() => import('./pages/wms/rubber-intake/PaymentRequestListPage'));
+const PaymentRequestCreatePage = lazy(() => import('./pages/wms/rubber-intake/PaymentRequestCreatePage'));
+const PaymentRequestDetailPage = lazy(() => import('./pages/wms/rubber-intake/PaymentRequestDetailPage'));
+const PaymentRequestPrintPage = lazy(() => import('./pages/wms/rubber-intake/PaymentRequestPrintPage'));
 const VnBatchListPage = lazy(() => import('./pages/rubber/vn/VnBatchListPage'));
 const LaoTransferPage = lazy(() => import('./pages/rubber/lao/LaoTransferPage'));
 const LaoPurchasePage = lazy(() => import('./pages/rubber/lao/LaoPurchasePage'));
@@ -503,6 +507,10 @@ function App() {
                 <Route path="intake/:id" element={<RubberIntakeDetailPage />} />
                 <Route path="daily-report" element={<RubberDailyReportPage />} />
                 <Route path="debt" element={<RubberDebtPage />} />
+                <Route path="payment-requests" element={<PaymentRequestListPage />} />
+                <Route path="payment-requests/new" element={<PaymentRequestCreatePage />} />
+                <Route path="payment-requests/:id" element={<PaymentRequestDetailPage />} />
+                <Route path="payment-requests/:id/print" element={<PaymentRequestPrintPage />} />
                 <Route path="vn/batches" element={<VnBatchListPage />} />
                 <Route path="lao/transfers" element={<LaoTransferPage />} />
                 <Route path="lao/purchases" element={<LaoPurchasePage />} />

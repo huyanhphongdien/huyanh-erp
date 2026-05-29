@@ -45,6 +45,7 @@ export interface DealWeighbridgeSummary {
 
 export interface DealWmsOverview {
   deal_id: string
+  deal_quantity_kg: number | null   // số lượng hợp đồng (để so "đủ hàng")
   stock_in_count: number
   total_received_kg: number
   batch_count: number
@@ -197,10 +198,11 @@ export const dealWmsService = {
    * Tổng hợp WMS data cho 1 Deal
    */
   async getDealWmsOverview(dealId: string): Promise<DealWmsOverview> {
-    const [stockIns, batches, weighbridges] = await Promise.all([
+    const [stockIns, batches, weighbridges, dealRow] = await Promise.all([
       this.getStockInsByDeal(dealId),
       this.getBatchesByDeal(dealId),
       this.getWeighbridgeByDeal(dealId),
+      supabase.from('b2b_deals').select('quantity_kg').eq('id', dealId).maybeSingle(),
     ])
 
     const confirmedStockIns = stockIns.filter(si => si.status === 'confirmed')
@@ -227,6 +229,7 @@ export const dealWmsService = {
 
     return {
       deal_id: dealId,
+      deal_quantity_kg: (dealRow.data as any)?.quantity_kg ?? null,
       stock_in_count: stockIns.length,
       total_received_kg: totalReceivedKg,
       batch_count: batches.length,

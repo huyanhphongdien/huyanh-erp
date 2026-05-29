@@ -16,6 +16,7 @@ import {
   Spin,
   Empty,
   Typography,
+  Progress,
 } from 'antd'
 import {
   InboxOutlined,
@@ -106,13 +107,46 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
     return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
   }
 
-  if (!overview || (stockIns.length === 0 && weighbridges.length === 0)) {
-    return <Empty description="Chưa có phiếu nhập kho nào liên kết với Deal này" />
+  if (!overview) {
+    return <Empty description="Chưa có dữ liệu nhập kho cho Deal này" />
   }
+
+  // ── Tiến độ "đủ hàng": đã cân (tổng phiếu cân) vs số lượng hợp đồng ──
+  const targetKg = overview.deal_quantity_kg || 0
+  const deliveredKg = overview.total_weighed_kg || overview.total_received_kg || 0
+  const pct = targetKg > 0 ? Math.round((deliveredKg / targetKg) * 100) : 0
+  const remainingKg = targetKg - deliveredKg
+  const isEnough = targetKg > 0 && deliveredKg >= targetKg
+  const isOver = targetKg > 0 && deliveredKg > targetKg * 1.001
+  const fmtT = (kg: number) => (kg / 1000).toFixed(2)
+  const progressTag = isOver
+    ? { color: 'orange', label: `Vượt ${fmtT(-remainingKg)} T` }
+    : isEnough
+      ? { color: 'green', label: 'Đủ hàng' }
+      : { color: 'red', label: `Còn thiếu ${fmtT(remainingKg)} T` }
+  const noWms = stockIns.length === 0 && weighbridges.length === 0
 
   return (
     <div>
+      {/* Tiến độ giao đủ hàng */}
+      {targetKg > 0 && (
+        <div style={{ background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 8, padding: '12px 16px', marginBottom: 20 }}>
+          <Row justify="space-between" align="middle" style={{ marginBottom: 6 }}>
+            <Text strong style={{ fontSize: 14 }}>Tiến độ giao hàng (theo cân)</Text>
+            <Tag color={progressTag.color}>{progressTag.label}</Tag>
+          </Row>
+          <Progress percent={Math.min(100, pct)} status={isEnough ? 'success' : 'active'} format={() => `${pct}%`} />
+          <Text type="secondary" style={{ fontSize: 12.5 }}>
+            Đã giao <Text strong>{fmtT(deliveredKg)}</Text> / HĐ <Text strong>{fmtT(targetKg)}</Text> tấn
+            {' '}— theo tổng phiếu cân ({overview.weighbridge_count} phiếu). Đơn vị: kg cân thực tế.
+          </Text>
+        </div>
+      )}
+
+      {noWms && <Empty description="Chưa có phiếu nhập/cân nào — Deal chưa giao hàng" style={{ margin: '12px 0' }} />}
+
       {/* Overview Stats */}
+      {!noWms && (<>
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={6}>
           <Statistic
@@ -239,6 +273,7 @@ const DealWmsTab = ({ dealId }: DealWmsTabProps) => {
           />
         </>
       )}
+      </>)}
     </div>
   )
 }

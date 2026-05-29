@@ -120,6 +120,34 @@ const DealListPage = () => {
       summary: 'sum',
     },
     {
+      key: 'fulfillment',
+      title: 'Đã giao / HĐ',
+      dataIndex: 'actual_weight_kg',
+      width: 120,
+      align: 'right',
+      render: (_, r) => {
+        const target = r.quantity_kg || 0
+        const done = r.actual_weight_kg || 0
+        if (target <= 0) return '—'
+        const pct = Math.round((done / target) * 100)
+        const enough = done >= target
+        const color = enough ? '#16a34a' : pct >= 60 ? '#d97706' : '#dc2626'
+        return (
+          <div>
+            <Text strong style={{ color, fontSize: 12.5 }}>
+              {(done / 1000).toFixed(1)}/{(target / 1000).toFixed(1)} T
+            </Text>
+            <div style={{ fontSize: 10, color }}>{pct}%{enough ? ' ✓ đủ' : ''}</div>
+          </div>
+        )
+      },
+      exportRender: (_, r) => {
+        const target = r.quantity_kg || 0
+        const done = r.actual_weight_kg || 0
+        return target > 0 ? `${(done / 1000).toFixed(1)}/${(target / 1000).toFixed(1)} T (${Math.round((done / target) * 100)}%)` : ''
+      },
+    },
+    {
       key: 'unit_price',
       title: 'Đơn giá',
       dataIndex: 'unit_price',

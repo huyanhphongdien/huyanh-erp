@@ -937,7 +937,7 @@ export function Sidebar() {
       <aside
         onMouseEnter={() => { if (collapsed) setSidebarHovered(true); }}
         onMouseLeave={() => setSidebarHovered(false)}
-        className={`hidden lg:flex ${desktopExpanded ? 'w-64' : 'w-20'} bg-white/70 backdrop-blur-xl border-r border-black/[0.05] text-gray-800 flex-col min-h-screen fixed left-0 top-0 bottom-0 z-30 transition-[width] duration-200 ${collapsed && sidebarHovered ? 'shadow-2xl' : ''}`}
+        className={`hidden lg:flex ${desktopExpanded ? 'w-64' : 'w-20'} bg-white/70 backdrop-blur-xl border-r border-black/[0.05] text-gray-800 flex-col min-h-screen fixed left-0 top-0 bottom-0 z-30 transition-[width] duration-500 ease-in-out ${collapsed && sidebarHovered ? 'shadow-2xl' : ''}`}
       >
         {renderSidebarContent(desktopExpanded)}
         {/* Toggle thu gọn / mở rộng */}
@@ -959,8 +959,8 @@ export function Sidebar() {
         {renderSidebarContent(true)}
       </aside>
 
-      {/* ─── DESKTOP SPACER ─── (giữ chỗ theo rail; hover bung thì panel nổi đè) */}
-      <div className={`hidden lg:block ${collapsed ? 'w-20' : 'w-64'} flex-shrink-0 transition-[width] duration-200`} />
+      {/* ─── DESKTOP SPACER ─── (giãn đồng bộ với sidebar → đẩy nội dung, KHÔNG đè) */}
+      <div className={`hidden lg:block ${desktopExpanded ? 'w-64' : 'w-20'} flex-shrink-0 transition-[width] duration-500 ease-in-out`} />
     </>
   );
 }

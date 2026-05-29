@@ -11,6 +11,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
+import { useB2BChatSound } from '../../hooks/useB2BChatSound'
 import { Bell, CheckCheck, X, ChevronRight } from 'lucide-react'
 import {
   notificationService,
@@ -29,6 +30,9 @@ export function NotificationBell() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
   const employeeId = user?.employee_id
+
+  // Âm thanh chat B2B — chỉ kêu khi đại lý nhắn vào phòng của đúng NV này
+  useB2BChatSound(user?.id)
 
   // Query: Đếm số chưa đọc
   const { data: unreadCount = 0 } = useQuery({

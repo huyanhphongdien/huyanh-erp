@@ -7,6 +7,7 @@
 
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
+import logoUrl from '../assets/logo.png'
 import type { PaymentRequest, PaymentRequestLine } from '../services/wms/paymentRequestService'
 
 const RUBBER_LABELS: Record<string, string> = {
@@ -86,15 +87,26 @@ export async function exportPaymentRequestExcel(
   let r = 1
   const merge = (range: string) => ws.mergeCells(range)
 
-  // ─ Company header ─
+  // ─ Logo (góc trái) — float trên ô, không chiếm cell ─
+  try {
+    const resp = await fetch(logoUrl)
+    const buf = await resp.arrayBuffer()
+    const imgId = wb.addImage({ buffer: buf, extension: 'png' })
+    ws.addImage(imgId, { tl: { col: 0, row: 0 }, ext: { width: 130, height: 46 } })
+  } catch { /* logo optional — bỏ qua nếu fetch lỗi */ }
+  ws.getRow(1).height = 24
+  ws.getRow(2).height = 18
+
+  // ─ Company header (canh giữa để không đè logo trái) ─
   merge(`A${r}:G${r}`)
   ws.getCell(`A${r}`).value = 'CÔNG TY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN'
   ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 12, bold: true }
-  ws.getCell(`A${r}`).alignment = { horizontal: 'left' }
+  ws.getCell(`A${r}`).alignment = { horizontal: 'center' }
   r++
   merge(`A${r}:G${r}`)
   ws.getCell(`A${r}`).value = 'MST: 3301549896 · Khe Mạ, Phường Phong Điền, TP Huế'
   ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 9, italic: true, color: { argb: 'FF666666' } }
+  ws.getCell(`A${r}`).alignment = { horizontal: 'center' }
   r++; r++
 
   // ─ Title ─
@@ -157,7 +169,7 @@ export async function exportPaymentRequestExcel(
   lines.forEach((l, idx) => {
     const rubber = l.rubber_type ? (RUBBER_LABELS[l.rubber_type] || l.rubber_type) : ''
     const slip = l.note ? ` số phiếu ${l.note}` : ''
-    const noiDung = `Thanh toán tiền mua mủ${rubber ? ' ' + rubber : ''}${slip}`
+    const noiDung = `Thanh toán tiền mua ${rubber || 'mủ'}${slip}`
     const ghiChu = [l.payee_name, l.payee_note].filter(Boolean).join(' — ')
     const vals = [idx + 1, noiDung, 'kg', l.weight || 0, l.unit_price || 0, l.amount || 0, ghiChu]
     vals.forEach((v, i) => {
@@ -205,21 +217,23 @@ export async function exportPaymentRequestExcel(
   ws.getCell(`A${r}`).font = { name: 'Times New Roman', size: 11, italic: true, bold: true }
   r++; r++
 
-  // ─ Chữ ký ─
+  // ─ Chữ ký — merge mỗi ô ký để nhãn không bị cắt ─
   const signRow = r
-  const signs = [
-    { col: 'A', label: 'Người đề nghị' },
-    { col: 'C', label: 'Kế toán trưởng' },
-    { col: 'F', label: 'Giám đốc' },
+  const blocks = [
+    { cell: `A${signRow}`,   range: `A${signRow}:B${signRow}`,   sub: `A${signRow + 1}:B${signRow + 1}`, subCell: `A${signRow + 1}`, label: 'Người đề nghị' },
+    { cell: `C${signRow}`,   range: `C${signRow}:E${signRow}`,   sub: `C${signRow + 1}:E${signRow + 1}`, subCell: `C${signRow + 1}`, label: 'Kế toán trưởng' },
+    { cell: `F${signRow}`,   range: `F${signRow}:G${signRow}`,   sub: `F${signRow + 1}:G${signRow + 1}`, subCell: `F${signRow + 1}`, label: 'Giám đốc' },
   ]
-  signs.forEach(s => {
-    ws.getCell(`${s.col}${signRow}`).value = s.label
-    ws.getCell(`${s.col}${signRow}`).font = { name: 'Times New Roman', size: 11, bold: true }
-    ws.getCell(`${s.col}${signRow}`).alignment = { horizontal: 'center' }
-    ws.getCell(`${s.col}${signRow + 1}`).value = '(Ký, ghi rõ họ tên)'
-    ws.getCell(`${s.col}${signRow + 1}`).font = { name: 'Times New Roman', size: 9, italic: true, color: { argb: 'FF888888' } }
-    ws.getCell(`${s.col}${signRow + 1}`).alignment = { horizontal: 'center' }
-  })
+  for (const b of blocks) {
+    merge(b.range)
+    ws.getCell(b.cell).value = b.label
+    ws.getCell(b.cell).font = { name: 'Times New Roman', size: 11, bold: true }
+    ws.getCell(b.cell).alignment = { horizontal: 'center' }
+    merge(b.sub)
+    ws.getCell(b.subCell).value = '(Ký, ghi rõ họ tên)'
+    ws.getCell(b.subCell).font = { name: 'Times New Roman', size: 9, italic: true, color: { argb: 'FF888888' } }
+    ws.getCell(b.subCell).alignment = { horizontal: 'center' }
+  }
 
   const buf = await wb.xlsx.writeBuffer()
   saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `DNTT_${req.code}.xlsx`)

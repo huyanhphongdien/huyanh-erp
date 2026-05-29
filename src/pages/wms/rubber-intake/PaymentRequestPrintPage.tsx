@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
+import logoImg from '../../../assets/logo.png'
 import {
   paymentRequestService,
   type PaymentRequest,
@@ -131,10 +132,13 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
   return (
     <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 12.5, color: '#111' }}>
       {/* Header */}
-      <div style={{ borderBottom: '2px solid #1B4D3E', paddingBottom: 8, marginBottom: 10 }}>
-        <div style={{ fontSize: 12, fontWeight: 600 }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
-        <div style={{ fontSize: 16, fontWeight: 800, color: '#1B4D3E' }}>CAO SU HUY ANH PHONG ĐIỀN</div>
-        <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Khe Mạ, Phường Phong Điền, TP Huế · MST: 3301549896</div>
+      <div style={{ borderBottom: '2px solid #1B4D3E', paddingBottom: 8, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <img src={logoImg} alt="Huy Anh" style={{ height: 48, width: 'auto', objectFit: 'contain' }} />
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600 }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#1B4D3E' }}>CAO SU HUY ANH PHONG ĐIỀN</div>
+          <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Khe Mạ, Phường Phong Điền, TP Huế · MST: 3301549896</div>
+        </div>
       </div>
 
       {/* Title */}
@@ -176,7 +180,7 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
         <tbody>
           {lines.map((l, i) => {
             const rb = l.rubber_type ? (RUBBER_LABELS[l.rubber_type] || l.rubber_type) : ''
-            const noiDung = `Thanh toán tiền mua mủ${rb ? ' ' + rb : ''}${l.note ? ' số phiếu ' + l.note : ''}`
+            const noiDung = `Thanh toán tiền mua ${(rb || 'mủ').toLowerCase()}${l.note ? ' số phiếu ' + l.note : ''}`
             const ghiChu = [l.payee_name, l.payee_note].filter(Boolean).join(' — ') + (l.deal_number ? ` (Deal #${l.deal_number})` : '')
             return (
               <tr key={l.id}>

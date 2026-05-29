@@ -122,6 +122,11 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
   const ccy = CCY_SUFFIX[req.currency] || 'đồng'
   const totalAmount = lines.reduce((s, l) => s + (l.amount || 0), 0)
   const totalWeight = lines.reduce((s, l) => s + (l.weight || 0), 0)
+  const rubberKey = req.rubber_type || lines.find(l => l.rubber_type)?.rubber_type || ''
+  const rubberLbl = rubberKey ? (RUBBER_LABELS[rubberKey] || rubberKey) : 'nguyên liệu'
+  const reason = (req.title && req.title.trim())
+    ? req.title.trim()
+    : `Đề nghị thanh toán tiền mua mủ ${rubberLbl}${req.facility ? ' tại nhà máy ' + req.facility.name : ''} mua ngày ${date.toLocaleDateString('vi-VN')}`
 
   return (
     <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 12.5, color: '#111' }}>
@@ -147,44 +152,54 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
         </div>
       </div>
 
+      {/* Meta block */}
+      <div style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
+        <div>Kính gửi: <strong>Ban Giám đốc, Kế toán trưởng</strong></div>
+        <div>Lý do thanh toán: {reason}</div>
+        <div>Hình thức nhận tiền:&nbsp;&nbsp;☐ Chuyển khoản Cty&nbsp;&nbsp;&nbsp;☑ Chuyển khoản quỹ&nbsp;&nbsp;&nbsp;☐ Tiền mặt</div>
+        <div>Tên tài khoản: theo danh sách cột Ghi chú</div>
+      </div>
+
       {/* Table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr style={{ background: '#1B4D3E', color: '#fff' }}>
-            <th style={{ ...th, width: 30 }}>STT</th>
-            <th style={{ ...th, textAlign: 'left' }}>Người nhận tiền</th>
-            <th style={{ ...th, width: 70 }}>Biển số</th>
-            <th style={{ ...th, width: 60 }}>Loại mủ</th>
-            <th style={{ ...th, width: 64 }}>KL (kg)</th>
-            <th style={{ ...th, width: 72 }}>Đơn giá</th>
-            <th style={{ ...th, width: 90 }}>Thành tiền</th>
+            <th style={{ ...th, width: 28 }}>STT</th>
+            <th style={{ ...th, textAlign: 'left' }}>Nội dung</th>
+            <th style={{ ...th, width: 34 }}>ĐVT</th>
+            <th style={{ ...th, width: 64 }}>Số lượng</th>
+            <th style={{ ...th, width: 70 }}>Đơn giá</th>
+            <th style={{ ...th, width: 92 }}>Thành tiền ({req.currency})</th>
+            <th style={{ ...th, textAlign: 'left', width: 150 }}>Ghi chú</th>
           </tr>
         </thead>
         <tbody>
-          {lines.map((l, i) => (
-            <tr key={l.id}>
-              <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
-              <td style={td}>
-                <div style={{ fontWeight: 600 }}>{l.payee_name || '—'}</div>
-                {l.payee_note && <div style={{ fontSize: 10.5, color: '#6B7280' }}>{l.payee_note}</div>}
-                {l.deal_number && <div style={{ fontSize: 10, color: '#15803d' }}>Deal #{l.deal_number}</div>}
-              </td>
-              <td style={{ ...td, textAlign: 'center' }}>{l.vehicle_plate || '—'}</td>
-              <td style={{ ...td, textAlign: 'center' }}>{l.rubber_type ? (RUBBER_LABELS[l.rubber_type] || l.rubber_type) : '—'}</td>
-              <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.weight)}</td>
-              <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.unit_price)}</td>
-              <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmt(l.amount)}</td>
-            </tr>
-          ))}
+          {lines.map((l, i) => {
+            const rb = l.rubber_type ? (RUBBER_LABELS[l.rubber_type] || l.rubber_type) : ''
+            const noiDung = `Thanh toán tiền mua mủ${rb ? ' ' + rb : ''}${l.note ? ' số phiếu ' + l.note : ''}`
+            const ghiChu = [l.payee_name, l.payee_note].filter(Boolean).join(' — ') + (l.deal_number ? ` (Deal #${l.deal_number})` : '')
+            return (
+              <tr key={l.id}>
+                <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
+                <td style={td}>{noiDung}</td>
+                <td style={{ ...td, textAlign: 'center' }}>kg</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.weight)}</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.unit_price)}</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmt(l.amount)}</td>
+                <td style={td}>{ghiChu || '—'}</td>
+              </tr>
+            )
+          })}
           {lines.length === 0 && (
             <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={7}>(Chưa có dòng nào)</td></tr>
           )}
           {/* Total */}
           <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
-            <td style={{ ...td, textAlign: 'right' }} colSpan={4}>TỔNG CỘNG</td>
+            <td style={{ ...td, textAlign: 'right' }} colSpan={3}>TỔNG CỘNG</td>
             <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(totalWeight)}</td>
             <td style={td}></td>
             <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E', fontSize: 13 }}>{fmt(totalAmount)}</td>
+            <td style={td}></td>
           </tr>
         </tbody>
       </table>

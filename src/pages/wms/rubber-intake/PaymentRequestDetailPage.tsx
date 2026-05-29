@@ -74,9 +74,9 @@ const PaymentRequestDetailPage: React.FC = () => {
     setLines(prev => prev.map(l => {
       if (l.id !== lineId) return l
       const next = { ...l, ...patch, _dirty: true }
-      // tự tính lại thành tiền khi đổi kg / đơn giá (vẫn cho gõ đè amount riêng)
+      // tự tính lại thành tiền khi đổi kg / đơn giá — làm tròn nghìn (khớp mẫu ĐNTT)
       if (('weight' in patch) || ('unit_price' in patch)) {
-        next.amount = Math.round((next.weight || 0) * (next.unit_price || 0))
+        next.amount = Math.round((next.weight || 0) * (next.unit_price || 0) / 1000) * 1000
       }
       return next
     }))

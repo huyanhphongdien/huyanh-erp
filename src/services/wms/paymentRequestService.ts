@@ -66,7 +66,9 @@ export interface AvailableTicket {
   code: string
   vehicle_plate: string | null
   rubber_type: string | null
-  net_weight: number
+  net_weight: number          // cân tươi thực tế
+  drc: number | null          // DRC % (mủ nước)
+  billable_weight: number     // KL tính tiền: mủ nước = tươi×DRC; còn lại = tươi
   unit_price: number
   price_unit: 'wet' | 'dry' | null
   deal_id: string | null
@@ -78,8 +80,9 @@ export interface AvailableTicket {
   // resolved:
   source_type: PaymentLineSource
   payee_name: string
+  payee_note: string          // STK/NH auto (NCC mua lẻ)
   deal_number: string | null
-  suggested_amount: number
+  suggested_amount: number    // billable_weight × giá, làm tròn nghìn
 }
 
 export interface ListAvailableParams {
@@ -162,6 +165,35 @@ function deriveSource(t: { deal_id?: string | null; supplier_id?: string | null 
   return 'manual'
 }
 
+/** Làm tròn đến nghìn (giống ROUND(x,-3) trên mẫu ĐNTT). */
+function roundThousand(n: number): number {
+  return Math.round((n || 0) / 1000) * 1000
+}
+
+/** KL tính tiền: mủ nước (price_unit='dry') = cân tươi × DRC%; còn lại = cân tươi. */
+function billableWeight(net: number, priceUnit: string | null, drc: number | null): number {
+  if (priceUnit === 'dry' && drc && drc > 0) return Math.round((net * drc) / 100 * 10) / 10
+  return net
+}
+
+/** Batch lấy TK ngân hàng NCC mủ lẻ từ rubber_suppliers. */
+async function fetchSupplierBanks(ids: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  const unique = [...new Set(ids.filter(Boolean))]
+  if (unique.length === 0) return map
+  const { data } = await supabase
+    .from('rubber_suppliers')
+    .select('id, bank_account, bank_name')
+    .in('id', unique)
+  for (const r of (data || []) as Array<{ id: string; bank_account: string | null; bank_name: string | null }>) {
+    const parts: string[] = []
+    if (r.bank_account) parts.push(`STK: ${r.bank_account}`)
+    if (r.bank_name) parts.push(r.bank_name)
+    map.set(r.id, parts.join(', '))
+  }
+  return map
+}
+
 // ============================================================================
 // SINH MÃ PHIẾU — {PREFIX}-{YYMM}-{seq}
 // ============================================================================
@@ -198,7 +230,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
   let q = supabase
     .from('weighbridge_tickets')
     .select(`
-      id, code, vehicle_plate, rubber_type, net_weight, unit_price, price_unit,
+      id, code, vehicle_plate, rubber_type, net_weight, unit_price, price_unit, qc_actual_drc,
       deal_id, partner_id, supplier_id, supplier_name, completed_at, created_at, facility_id
     `)
     .eq('status', 'completed')
@@ -216,11 +248,14 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
 
   const partnerNames = await fetchPartnerNames(rows.map(r => r.partner_id).filter(Boolean))
   const dealNumbers = await fetchDealNumbers(rows.map(r => r.deal_id).filter(Boolean))
+  const supplierBanks = await fetchSupplierBanks(rows.map(r => r.supplier_id).filter(Boolean))
 
   return rows.map((r): AvailableTicket => {
     const source = deriveSource(r)
-    const weight = Number(r.net_weight) || 0
+    const net = Number(r.net_weight) || 0
     const price = Number(r.unit_price) || 0
+    const drc = r.qc_actual_drc != null ? Number(r.qc_actual_drc) : null
+    const bw = billableWeight(net, r.price_unit, drc)
     const payee =
       source === 'deal'
         ? (r.partner_id ? partnerNames.get(r.partner_id) || '' : '')
@@ -232,7 +267,9 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       code: r.code,
       vehicle_plate: r.vehicle_plate ?? null,
       rubber_type: r.rubber_type ?? null,
-      net_weight: weight,
+      net_weight: net,
+      drc,
+      billable_weight: bw,
       unit_price: price,
       price_unit: r.price_unit ?? null,
       deal_id: r.deal_id ?? null,
@@ -243,8 +280,9 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       facility_id: r.facility_id ?? null,
       source_type: source,
       payee_name: payee,
+      payee_note: source === 'supplier' && r.supplier_id ? (supplierBanks.get(r.supplier_id) || '') : '',
       deal_number: r.deal_id ? dealNumbers.get(r.deal_id) || null : null,
-      suggested_amount: Math.round(weight * price),
+      suggested_amount: roundThousand(bw * price),
     }
   })
 }
@@ -258,11 +296,13 @@ function ticketsToLines(tickets: AvailableTicket[]): LineInput[] {
     partner_id: t.partner_id,
     supplier_id: t.supplier_id,
     payee_name: t.payee_name,
+    payee_note: t.payee_note || null,
     rubber_type: t.rubber_type,
     vehicle_plate: t.vehicle_plate,
-    weight: t.net_weight,
+    weight: t.billable_weight,        // KL khô cho mủ nước
     unit_price: t.unit_price,
-    amount: t.suggested_amount,
+    amount: t.suggested_amount,       // đã làm tròn nghìn
+    note: t.code,                     // mã phiếu cân → "số phiếu" trên mẫu
     sort_order: i,
   }))
 }

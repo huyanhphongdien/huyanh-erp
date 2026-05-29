@@ -49,7 +49,10 @@ const BORDER: Partial<ExcelJS.Borders> = {
 }
 
 export interface ExportOpts {
-  preparedBy?: string | null   // Người đề nghị
+  preparedBy?: string | null              // Người đề nghị
+  department?: string | null              // Bộ phận (mặc định HCTH)
+  msnv?: string | null                    // Mã số nhân viên
+  paymentMethod?: 'ck_cty' | 'ck_quy' | 'cash'  // Hình thức nhận tiền (mặc định ck_quy)
 }
 
 export async function exportPaymentRequestExcel(
@@ -114,11 +117,25 @@ export async function exportPaymentRequestExcel(
     ws.getCell(`A${r}`).font = metaFont
     r++
   }
+  // Lý do tự sinh (ưu tiên tiêu đề người dùng nhập)
+  const rubberKey = req.rubber_type || lines.find(l => l.rubber_type)?.rubber_type || ''
+  const rubberLbl = rubberKey ? (RUBBER_LABELS[rubberKey] || rubberKey) : 'nguyên liệu'
+  const facName = req.facility?.name ? ` tại nhà máy ${req.facility.name}` : ''
+  const reason = (req.title && req.title.trim())
+    ? req.title.trim()
+    : `Đề nghị thanh toán tiền mua mủ ${rubberLbl}${facName} mua ngày ${dd}/${mm}/${yyyy}`
+
+  // Hình thức nhận tiền — 3 ô tick (mặc định CK quỹ)
+  const tick = (on: boolean) => (on ? '☑' : '☐')
+  const pm = opts.paymentMethod || 'ck_quy'
+  const hinhThuc = `Hình thức nhận tiền:   ${tick(pm === 'ck_cty')} Chuyển khoản Cty     ${tick(pm === 'ck_quy')} Chuyển khoản quỹ     ${tick(pm === 'cash')} Tiền mặt`
+
   putMeta(`Số phiếu: ${req.code}        Tiền tệ: ${ccy}`)
   putMeta('Kính gửi: Ban Giám đốc, Kế toán trưởng')
-  if (opts.preparedBy) putMeta(`Người đề nghị: ${opts.preparedBy}`)
-  putMeta(`Lý do: ${req.title || 'Thanh toán tiền mua mủ nguyên liệu'}`)
-  putMeta('Hình thức nhận tiền: Chuyển khoản — Tên tài khoản: theo cột Ghi chú')
+  putMeta(`Người đề nghị: ${opts.preparedBy || '..............'}        Bộ phận: ${opts.department || 'HCTH'}        MSNV: ${opts.msnv || '............'}`)
+  putMeta(`Lý do thanh toán: ${reason}`)
+  putMeta(hinhThuc)
+  putMeta('Tên tài khoản: theo danh sách cột Ghi chú')
   r++
 
   // ─ Table header ─
@@ -139,10 +156,8 @@ export async function exportPaymentRequestExcel(
   let totalWeight = 0
   lines.forEach((l, idx) => {
     const rubber = l.rubber_type ? (RUBBER_LABELS[l.rubber_type] || l.rubber_type) : ''
-    const noiDung =
-      `Thanh toán tiền mua mủ${rubber ? ' ' + rubber : ''}` +
-      (l.vehicle_plate ? ` — xe ${l.vehicle_plate}` : '') +
-      (l.deal_number ? ` (Deal #${l.deal_number})` : '')
+    const slip = l.note ? ` số phiếu ${l.note}` : ''
+    const noiDung = `Thanh toán tiền mua mủ${rubber ? ' ' + rubber : ''}${slip}`
     const ghiChu = [l.payee_name, l.payee_note].filter(Boolean).join(' — ')
     const vals = [idx + 1, noiDung, 'kg', l.weight || 0, l.unit_price || 0, l.amount || 0, ghiChu]
     vals.forEach((v, i) => {

@@ -89,7 +89,7 @@ const PaymentRequestCreatePage: React.FC = () => {
 
   const chosen = tickets.filter(t => selected.has(t.id))
   const totalAmount = chosen.reduce((s, t) => s + t.suggested_amount, 0)
-  const totalWeight = chosen.reduce((s, t) => s + t.net_weight, 0)
+  const totalWeight = chosen.reduce((s, t) => s + t.billable_weight, 0)
 
   const handleCreate = async () => {
     if (chosen.length === 0) return
@@ -219,7 +219,11 @@ const PaymentRequestCreatePage: React.FC = () => {
                       <p className="text-[13.5px] font-medium text-gray-800 truncate">{t.payee_name || <span className="text-gray-400 italic">Chưa rõ người nhận</span>}</p>
                       <div className="flex items-center gap-3 text-[11.5px] text-gray-400 mt-1 flex-wrap">
                         {t.vehicle_plate && <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" />{t.vehicle_plate}</span>}
-                        <span className="flex items-center gap-1"><Scale className="w-3.5 h-3.5" />{t.net_weight.toLocaleString('vi-VN')} kg</span>
+                        <span className="flex items-center gap-1">
+                          <Scale className="w-3.5 h-3.5" />
+                          {t.billable_weight.toLocaleString('vi-VN')} kg
+                          {t.drc != null && t.price_unit === 'dry' && <span className="text-gray-300">(khô, DRC {t.drc}%)</span>}
+                        </span>
                         <span className="flex items-center gap-1"><Tag className="w-3.5 h-3.5" />{fmtVnd(t.unit_price)}/kg</span>
                       </div>
                     </div>

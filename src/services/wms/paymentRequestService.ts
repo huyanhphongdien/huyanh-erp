@@ -193,20 +193,22 @@ async function generateCode(prefix = 'TMMN', when = new Date()): Promise<string>
 // ============================================================================
 
 async function listAvailableTickets(params: ListAvailableParams = {}): Promise<AvailableTicket[]> {
+  // Lọc theo created_at để KHỚP với "Ngày giờ" của trang Phiếu cân (WeighbridgeListPage
+  // dùng created_at). Phiếu demo "Hoàn tất" có thể completed_at null → tránh lọc trượt.
   let q = supabase
     .from('weighbridge_tickets')
     .select(`
       id, code, vehicle_plate, rubber_type, net_weight, unit_price, price_unit,
-      deal_id, partner_id, supplier_id, supplier_name, completed_at, facility_id
+      deal_id, partner_id, supplier_id, supplier_name, completed_at, created_at, facility_id
     `)
     .eq('status', 'completed')
     .is('payment_request_id', null)
-    .order('completed_at', { ascending: true })
+    .order('created_at', { ascending: true })
 
   if (params.facility_id) q = q.eq('facility_id', params.facility_id)
   if (params.rubber_type) q = q.eq('rubber_type', params.rubber_type)
-  if (params.date_from) q = q.gte('completed_at', `${params.date_from}T00:00:00.000Z`)
-  if (params.date_to) q = q.lte('completed_at', `${params.date_to}T23:59:59.999Z`)
+  if (params.date_from) q = q.gte('created_at', params.date_from)
+  if (params.date_to) q = q.lte('created_at', `${params.date_to}T23:59:59.999Z`)
 
   const { data, error } = await q
   if (error) throw error

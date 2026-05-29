@@ -163,7 +163,11 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
     const pricePerKg = deal.final_price || deal.unit_price || 0
     const actualWeight = deal.actual_weight_kg || 0
     const actualDrc = deal.actual_drc || 0
-    const finalValue = Math.round(actualWeight * (actualDrc / 100) * pricePerKg)
+    const isDry = deal.price_unit === 'dry'
+    // Giá ướt (mua đứt/bán) = khối lượng × đơn giá. Giá khô = × DRC.
+    const finalValue = isDry
+      ? Math.round(actualWeight * (actualDrc / 100) * pricePerKg)
+      : Math.round(actualWeight * pricePerKg)
 
     Modal.confirm({
       title: 'Tạo phiếu Quyết toán',
@@ -172,8 +176,8 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
           <p>Hệ thống sẽ tự động tạo phiếu quyết toán (nháp) cho Deal <strong>{deal.deal_number}</strong> với thông tin:</p>
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0' }}>
             <li>Trọng lượng thực: <strong>{actualWeight.toLocaleString()} kg</strong></li>
-            <li>DRC thực tế: <strong>{actualDrc}%</strong></li>
-            <li>Đơn giá: <strong>{pricePerKg.toLocaleString()} đ/kg</strong></li>
+            {isDry && <li>DRC thực tế: <strong>{actualDrc}%</strong></li>}
+            <li>Đơn giá: <strong>{pricePerKg.toLocaleString()} đ/kg ({isDry ? 'khô' : 'ướt'})</strong></li>
             <li>Giá trị ước tính: <strong>{finalValue.toLocaleString()} VNĐ</strong></li>
           </ul>
           <p>Phiếu quyết toán sẽ ở trạng thái <strong>Nháp</strong>. Bạn có thể chỉnh sửa trước khi duyệt.</p>
@@ -240,8 +244,9 @@ const StatusActions = ({ deal, onUpdateStatus, onSettleDeal, loading, settleLoad
           )
         })()}
 
-        {/* Accepted -> Auto Settlement (chỉ manager/admin) */}
-        {deal.status === 'accepted' && deal.actual_drc != null && deal.actual_drc > 0 && deal.actual_weight_kg != null && deal.actual_weight_kg > 0 && (
+        {/* Accepted -> Auto Settlement (chỉ manager/admin).
+            Cần đã cân (actual_weight_kg > 0). DRC chỉ bắt buộc với giá khô. */}
+        {deal.status === 'accepted' && deal.actual_weight_kg != null && deal.actual_weight_kg > 0 && (deal.price_unit !== 'dry' || (deal.actual_drc != null && deal.actual_drc > 0)) && (
           canApprove ? (
             <Button
               type="primary"

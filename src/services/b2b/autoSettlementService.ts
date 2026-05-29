@@ -71,10 +71,9 @@ export const autoSettlementService = {
     const actualDrc = deal.actual_drc
     const actualWeightKg = deal.actual_weight_kg || 0
 
-    if (!actualDrc) {
-      throw new Error('Deal chưa có dữ liệu DRC thực tế. Vui lòng kiểm tra QC trước khi quyết toán.')
-    }
-
+    // DRC chỉ dùng khi tính theo giá khô (price_unit='dry'). Mua đứt/Bán giá
+    // ướt → quyết toán theo khối lượng cân thực tế, không cần DRC (check ở
+    // nhánh tính tiền bên dưới). Ở đây chỉ bắt buộc có trọng lượng.
     if (actualWeightKg <= 0) {
       throw new Error('Deal chưa có trọng lượng thực tế. Vui lòng kiểm tra phiếu nhập kho.')
     }
@@ -114,13 +113,20 @@ export const autoSettlementService = {
       finalValue = outputValue > 0 ? outputValue - Math.round(processingFee) : Math.round(-processingFee)
       settlementNotes = `Gia công: NVL ${(actualWeightKg/1000).toFixed(1)}T → TP ~${(estimatedOutputKg/1000).toFixed(1)}T (${expectedOutputRate}%). Phí GC: ${processingFee.toLocaleString()} VNĐ`
     } else {
-      // Mua đứt: Tính từ khối lượng NVL
+      // Mua đứt / Bán: Tính từ khối lượng NVL
       if (pricePerKg <= 0) {
         throw new Error('Deal chưa có đơn giá. Vui lòng kiểm tra đơn giá trước khi quyết toán.')
       }
-      finalValue = priceUnit === 'dry'
-        ? Math.round(actualWeightKg * (actualDrc / 100) * pricePerKg)
-        : Math.round(actualWeightKg * pricePerKg)
+      if (priceUnit === 'dry') {
+        // Giá khô → cần DRC thực tế
+        if (!actualDrc) {
+          throw new Error('Deal tính giá theo DRC khô nhưng chưa có DRC thực tế. Vui lòng kiểm tra QC.')
+        }
+        finalValue = Math.round(actualWeightKg * (actualDrc / 100) * pricePerKg)
+      } else {
+        // Giá ướt → theo khối lượng cân thực tế, KHÔNG nhân DRC
+        finalValue = Math.round(actualWeightKg * pricePerKg)
+      }
     }
 
     // ─── 4. Lấy tạm ứng đã chi (paid) cho Deal ───

@@ -139,7 +139,7 @@ export interface PartnerAggregate {
 }
 
 export interface RegionAggregate {
-  name: string // location_name hoặc 'Không xác định'
+  name: string // rubber_region (vùng mủ) → fallback location_name → 'Không xác định'
   count: number
   net_kg: number
   dry_kg: number
@@ -384,7 +384,7 @@ export const rubberIntakeB2BService = {
   }): Promise<AggregatedIntakeStats> {
     let query = supabase
       .from('rubber_intake_batches')
-      .select('id, intake_date, b2b_partner_id, location_name, raw_rubber_type, net_weight_kg, dry_weight_kg, drc_percent, total_amount, lot_code, product_code, invoice_no, vehicle_plate, consolidation_code')
+      .select('id, intake_date, b2b_partner_id, location_name, rubber_region, raw_rubber_type, net_weight_kg, dry_weight_kg, drc_percent, total_amount, lot_code, product_code, invoice_no, vehicle_plate, consolidation_code')
       .gte('intake_date', filter.date_from)
       .lte('intake_date', filter.date_to)
       .limit(5000)
@@ -393,7 +393,7 @@ export const rubberIntakeB2BService = {
     if (filter.raw_rubber_type) query = query.eq('raw_rubber_type', filter.raw_rubber_type)
     if (filter.partner_id) query = query.eq('b2b_partner_id', filter.partner_id)
     if (filter.search) {
-      query = query.or(`product_code.ilike.%${filter.search}%,invoice_no.ilike.%${filter.search}%,vehicle_plate.ilike.%${filter.search}%,lot_code.ilike.%${filter.search}%,consolidation_code.ilike.%${filter.search}%,location_name.ilike.%${filter.search}%`)
+      query = query.or(`product_code.ilike.%${filter.search}%,invoice_no.ilike.%${filter.search}%,vehicle_plate.ilike.%${filter.search}%,lot_code.ilike.%${filter.search}%,consolidation_code.ilike.%${filter.search}%,location_name.ilike.%${filter.search}%,rubber_region.ilike.%${filter.search}%`)
     }
 
     const { data, error } = await query
@@ -491,10 +491,11 @@ export const rubberIntakeB2BService = {
       })
       .sort((a, b) => b.dry_kg - a.dry_kg)
 
-    // Region aggregation (theo location_name)
+    // Region aggregation — vùng nguyên liệu = rubber_region (vùng mủ lấy từ Deal/booking),
+    // fallback location_name (địa điểm chốt) nếu chưa có.
     const regionMap = new Map<string, { count: number; net: number; dry: number; amount: number }>()
     for (const it of items) {
-      const name = (it.location_name as string)?.trim() || 'Không xác định'
+      const name = (it.rubber_region as string)?.trim() || (it.location_name as string)?.trim() || 'Không xác định'
       const slot = regionMap.get(name) || { count: 0, net: 0, dry: 0, amount: 0 }
       slot.count++
       slot.net += Number(it.net_weight_kg) || 0

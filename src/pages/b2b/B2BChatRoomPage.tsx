@@ -903,6 +903,9 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
                     confirmedBy: user.employee_id,
                     confirmerType: 'factory',
                     bookingCode: booking.code,
+                    rubberRegion: booking.rubber_region,
+                    rubberRegionLat: booking.rubber_region_lat,
+                    rubberRegionLng: booking.rubber_region_lng,
                   },
                 )
                 // Reload messages to show the new DealCard
@@ -1000,6 +1003,9 @@ const B2BChatRoomPage = ({ embedded, onBack, roomIdProp }: { embedded?: boolean;
                   confirmedBy: user.employee_id,
                   confirmerType: 'factory',
                   bookingCode: booking.code,
+                  rubberRegion: booking.rubber_region,
+                  rubberRegionLat: booking.rubber_region_lat,
+                  rubberRegionLng: booking.rubber_region_lng,
                 },
               )
               message.success(`Đại lý đã xác nhận! Deal ${result.deal.deal_number} được tạo`)

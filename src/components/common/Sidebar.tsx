@@ -26,7 +26,7 @@ import { overtimeRequestService } from '../../services/overtimeRequestService';
 import { leaveRequestService } from '../../services/leaveRequestService';
 import logoImg from '../../assets/logo.png';
 import {
-  Menu, X, ChevronDown, ChevronRight,
+  Menu, X, ChevronDown, ChevronRight, ChevronLeft,
   LayoutDashboard, Building2, Briefcase, Users,
   FileText, ScrollText, Palmtree, CalendarClock, Clock,
   Wallet, Calendar, Receipt,
@@ -436,6 +436,19 @@ export function Sidebar() {
     'CÀI ĐẶT': true,
   });
 
+  // Sidebar thu gọn icon-only (desktop) — nhớ lựa chọn; hover bung tạm thời
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('erp_sidebar_collapsed') === '1' } catch { return false }
+  });
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const toggleCollapsed = () => setCollapsed(prev => {
+    const next = !prev;
+    try { localStorage.setItem('erp_sidebar_collapsed', next ? '1' : '0') } catch { /* ignore */ }
+    if (next) setSidebarHovered(false);
+    return next;
+  });
+  const desktopExpanded = !collapsed || sidebarHovered;
+
   // ★ Purchase access state
   const [hasPurchaseAccess, setHasPurchaseAccess] = useState(false);
   const [loadingPurchaseAccess, setLoadingPurchaseAccess] = useState(false);
@@ -670,7 +683,7 @@ export function Sidebar() {
   // RENDER MENU ITEM — NEW DESIGN
   // ══════════════════════════════════════════════════════════
 
-  const renderMenuItem = (item: MenuItem) => {
+  const renderMenuItem = (item: MenuItem, expanded: boolean = true) => {
     if (!isItemVisible(item)) return null;
 
     const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -704,9 +717,10 @@ export function Sidebar() {
           to={item.path}
           end
           onClick={handleClick}
+          title={!expanded ? item.label : undefined}
           className={({ isActive }) => {
             const navIsActive = computeIsActive(isActive);
-            return `relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
+            return `relative flex items-center ${expanded ? 'justify-between gap-3 px-3' : 'justify-center px-0'} py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
               navIsActive
                 ? 'text-[#1B4D3E] bg-[#2D8B6E]/[0.12]'
                 : 'text-[#5A6B63] hover:text-[#1B4D3E] hover:bg-black/[0.03]'
@@ -721,15 +735,26 @@ export function Sidebar() {
               {navIsActive && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[#1B4D3E]" />
               )}
-              <div className="flex items-center gap-3">
-                <span className={`transition-colors ${navIsActive ? 'text-[#2D8B6E]' : 'text-[#94A3A8]'}`}>
+              {expanded ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <span className={`transition-colors ${navIsActive ? 'text-[#2D8B6E]' : 'text-[#94A3A8]'}`}>
+                      {item.icon}
+                    </span>
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge && item.badge > 0 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[20px] text-center leading-tight">
+                      {item.badge}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className={`relative transition-colors ${navIsActive ? 'text-[#2D8B6E]' : 'text-[#94A3A8]'}`}>
                   {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </div>
-              {item.badge && item.badge > 0 && (
-                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[20px] text-center leading-tight">
-                  {item.badge}
+                  {item.badge && item.badge > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
+                  )}
                 </span>
               )}
             </>
@@ -744,42 +769,47 @@ export function Sidebar() {
   // SIDEBAR CONTENT — NEW DESIGN
   // ══════════════════════════════════════════════════════════
 
-  const sidebarContent = (
+  const renderSidebarContent = (expanded: boolean) => (
     <>
       {/* ─── LOGO / COMPANY ─── */}
       <div className="p-4 pb-3 border-b border-black/[0.06]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className={`flex items-center ${expanded ? 'justify-between' : 'justify-center'}`}>
+          <div className={`flex items-center ${expanded ? 'gap-3' : ''} min-w-0`}>
             <img
               src={logoImg}
               alt="Huy Anh Logo"
               className="h-9 w-auto flex-shrink-0 object-contain"
             />
-            <div className="min-w-0">
-              <h1 className="text-[13px] font-bold tracking-tight leading-tight" style={{ color: BRAND.primary }}>
-                Công ty TNHH MTV
-              </h1>
-              <p className="text-[11px] text-[#94A3A8] leading-tight truncate">
-                Cao su Huy Anh Phong Điền
-              </p>
-            </div>
+            {expanded && (
+              <div className="min-w-0">
+                <h1 className="text-[13px] font-bold tracking-tight leading-tight" style={{ color: BRAND.primary }}>
+                  Công ty TNHH MTV
+                </h1>
+                <p className="text-[11px] text-[#94A3A8] leading-tight truncate">
+                  Cao su Huy Anh Phong Điền
+                </p>
+              </div>
+            )}
           </div>
           {/* Mobile close */}
-          <button
-            onClick={() => setIsMobileOpen(false)}
-            className="lg:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#94A3A8] hover:text-[#5A6B63] hover:bg-black/[0.04] rounded-lg transition-colors"
-          >
-            <X size={20} />
-          </button>
+          {expanded && (
+            <button
+              onClick={() => setIsMobileOpen(false)}
+              className="lg:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#94A3A8] hover:text-[#5A6B63] hover:bg-black/[0.04] rounded-lg transition-colors"
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* ─── USER INFO ─── */}
-      <div className="px-4 py-3 border-b border-black/[0.06]">
+      <div className={`${expanded ? 'px-4' : 'px-2'} py-3 border-b border-black/[0.06]`}>
         <NavLink
           to="/settings"
           onClick={() => setIsMobileOpen(false)}
-          className="flex items-center gap-3 group"
+          title={!expanded ? (user?.full_name || 'Cài đặt') : undefined}
+          className={`flex items-center ${expanded ? 'gap-3' : 'justify-center'} group`}
         >
           {avatarUrl ? (
             <img
@@ -795,23 +825,27 @@ export function Sidebar() {
               {user?.full_name?.charAt(0) || user?.email?.charAt(0) || '?'}
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-gray-800 truncate group-hover:text-[#1B4D3E] transition-colors">
-              {user?.full_name || user?.email}
-            </p>
-            <p className="text-[11px] text-[#94A3A8] truncate">
-              {user?.position_name || (
-                user?.role === 'admin' ? 'Quản trị viên' :
-                isManager ? 'Quản lý' : 'Nhân viên'
-              )}
-            </p>
-          </div>
-          <Settings size={15} className="text-[#C8D0CC] group-hover:text-[#2D8B6E] transition-colors flex-shrink-0" />
+          {expanded && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-gray-800 truncate group-hover:text-[#1B4D3E] transition-colors">
+                  {user?.full_name || user?.email}
+                </p>
+                <p className="text-[11px] text-[#94A3A8] truncate">
+                  {user?.position_name || (
+                    user?.role === 'admin' ? 'Quản trị viên' :
+                    isManager ? 'Quản lý' : 'Nhân viên'
+                  )}
+                </p>
+              </div>
+              <Settings size={15} className="text-[#C8D0CC] group-hover:text-[#2D8B6E] transition-colors flex-shrink-0" />
+            </>
+          )}
         </NavLink>
       </div>
 
       {/* ─── NAVIGATION ─── */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+      <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${expanded ? 'px-2.5' : 'px-2'}`}>
         {menuGroups.map((group) => {
           if (!isGroupVisible(group)) return null;
 
@@ -822,26 +856,31 @@ export function Sidebar() {
 
           return (
             <div key={group.title} className="mb-1.5">
-              {group.collapsible ? (
-                <button
-                  onClick={() => toggleGroup(group.title)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-[#B0B8B4] uppercase tracking-[0.08em] hover:text-[#7A8A82] transition-colors rounded-lg"
-                >
-                  <span>{group.title}</span>
-                  {isCollapsed
-                    ? <ChevronRight size={13} className="text-[#C8D0CC]" />
-                    : <ChevronDown size={13} className="text-[#C8D0CC]" />
-                  }
-                </button>
+              {/* Tiêu đề group chỉ hiện khi mở rộng; thu gọn dùng đường kẻ mảnh */}
+              {expanded ? (
+                group.collapsible ? (
+                  <button
+                    onClick={() => toggleGroup(group.title)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-[#B0B8B4] uppercase tracking-[0.08em] hover:text-[#7A8A82] transition-colors rounded-lg"
+                  >
+                    <span>{group.title}</span>
+                    {isCollapsed
+                      ? <ChevronRight size={13} className="text-[#C8D0CC]" />
+                      : <ChevronDown size={13} className="text-[#C8D0CC]" />
+                    }
+                  </button>
+                ) : (
+                  <p className="px-3 py-2 text-[10px] font-semibold text-[#B0B8B4] uppercase tracking-[0.08em]">
+                    {group.title}
+                  </p>
+                )
               ) : (
-                <p className="px-3 py-2 text-[10px] font-semibold text-[#B0B8B4] uppercase tracking-[0.08em]">
-                  {group.title}
-                </p>
+                <div className="mx-2 my-1.5 border-t border-black/[0.05]" />
               )}
 
-              {!isCollapsed && (
+              {(!isCollapsed || !expanded) && (
                 <ul className="space-y-0.5">
-                  {filteredItems.map(renderMenuItem)}
+                  {filteredItems.map((it) => renderMenuItem(it, expanded))}
                 </ul>
               )}
             </div>
@@ -850,16 +889,17 @@ export function Sidebar() {
       </nav>
 
       {/* ─── LOGOUT ─── */}
-      <div className="p-3 border-t border-black/[0.06]">
+      <div className={`${expanded ? 'p-3' : 'p-2'} border-t border-black/[0.06]`}>
         <button
           onClick={() => {
             logout();
             setIsMobileOpen(false);
           }}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-[#94A3A8] hover:text-red-500 hover:bg-red-50 rounded-xl transition-all font-medium"
+          title={!expanded ? 'Đăng xuất' : undefined}
+          className={`w-full flex items-center justify-center gap-2 ${expanded ? 'px-4' : 'px-0'} py-2.5 text-sm text-[#94A3A8] hover:text-red-500 hover:bg-red-50 rounded-xl transition-all font-medium`}
         >
           <LogOut size={17} />
-          <span>Đăng xuất</span>
+          {expanded && <span>Đăng xuất</span>}
         </button>
       </div>
     </>
@@ -893,9 +933,21 @@ export function Sidebar() {
         />
       )}
 
-      {/* ─── DESKTOP SIDEBAR ─── */}
-      <aside className="hidden lg:flex w-64 bg-white/70 backdrop-blur-xl border-r border-black/[0.05] text-gray-800 flex-col min-h-screen fixed left-0 top-0 bottom-0 z-30">
-        {sidebarContent}
+      {/* ─── DESKTOP SIDEBAR (thu gọn icon-only + hover bung) ─── */}
+      <aside
+        onMouseEnter={() => { if (collapsed) setSidebarHovered(true); }}
+        onMouseLeave={() => setSidebarHovered(false)}
+        className={`hidden lg:flex ${desktopExpanded ? 'w-64' : 'w-20'} bg-white/70 backdrop-blur-xl border-r border-black/[0.05] text-gray-800 flex-col min-h-screen fixed left-0 top-0 bottom-0 z-30 transition-[width] duration-200 ${collapsed && sidebarHovered ? 'shadow-2xl' : ''}`}
+      >
+        {renderSidebarContent(desktopExpanded)}
+        {/* Toggle thu gọn / mở rộng */}
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+          className="absolute top-4 -right-3 w-6 h-6 rounded-full bg-white border border-black/10 shadow flex items-center justify-center text-[#5A6B63] hover:text-[#1B4D3E] hover:border-[#2D8B6E]/40 transition-colors z-10"
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
       </aside>
 
       {/* ─── MOBILE SIDEBAR (slide-in) ─── */}
@@ -904,11 +956,11 @@ export function Sidebar() {
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {sidebarContent}
+        {renderSidebarContent(true)}
       </aside>
 
-      {/* ─── DESKTOP SPACER ─── */}
-      <div className="hidden lg:block w-64 flex-shrink-0" />
+      {/* ─── DESKTOP SPACER ─── (giữ chỗ theo rail; hover bung thì panel nổi đè) */}
+      <div className={`hidden lg:block ${collapsed ? 'w-20' : 'w-64'} flex-shrink-0 transition-[width] duration-200`} />
     </>
   );
 }

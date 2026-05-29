@@ -7,6 +7,21 @@
 
 import { supabase } from '../../lib/supabase'
 
+// Map loại mủ chi tiết → loại gộp cho bonus (mirror DB function map_raw_to_bonus_type).
+// mu_nuoc → nuoc; mu_tap/mu_dong/mu_chen/mu_to → tap; còn lại → null (không tính bonus).
+function mapRawToBonusType(raw: string | null | undefined): 'tap' | 'nuoc' | null {
+  switch (raw) {
+    case 'mu_nuoc': return 'nuoc'
+    case 'mu_tap':
+    case 'mu_dong':
+    case 'mu_chen':
+    case 'mu_to':
+      return 'tap'
+    default:
+      return null
+  }
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -530,7 +545,9 @@ export const rubberIntakeB2BService = {
     lot_description?: string
     source_type?: 'vietnam' | 'lao_direct' | 'lao_agent'
     product_code?: string
-    /** Loại mủ — bắt buộc nếu muốn batch này tính bonus đại lý (quy chế T1/2026 tạp + T6/2026 nước). */
+    /** Loại mủ chi tiết (mu_nuoc/mu_tap/mu_dong/mu_chen/mu_to) — để hiển thị + trigger DB suy ra rubber_type. */
+    raw_rubber_type?: string | null
+    /** Loại mủ gộp (tap/nuoc) cho bonus. Nếu bỏ trống sẽ suy từ raw_rubber_type. */
     rubber_type?: 'tap' | 'nuoc' | null
     quantity_kg: number
     drc_percent?: number
@@ -559,7 +576,8 @@ export const rubberIntakeB2BService = {
           lot_code: params.lot_code || null,
           source_type: params.source_type || 'vietnam',
           product_code: params.product_code || 'MU_CAO_SU',
-          rubber_type: params.rubber_type ?? null,
+          raw_rubber_type: params.raw_rubber_type ?? null,
+          rubber_type: params.rubber_type ?? mapRawToBonusType(params.raw_rubber_type) ?? null,
           intake_date: params.intake_date || new Date().toISOString().split('T')[0],
           net_weight_kg: params.quantity_kg,
           gross_weight_kg: params.quantity_kg,

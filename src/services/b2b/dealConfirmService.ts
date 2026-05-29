@@ -253,6 +253,8 @@ export const dealConfirmService = {
           lot_code: deal.lot_code || dealNumber,
           lot_description: formData.deal_notes || undefined,
           product_code: formData.product_type || 'MU_CAO_SU',
+          // Phân loại mủ để batch tính bonus đại lý (createFromDeal suy rubber_type từ raw).
+          raw_rubber_type: formData.product_type || undefined,
           quantity_kg: formData.agreed_quantity_tons * 1000,
           drc_percent: formData.expected_drc || undefined,
           unit_price: formData.agreed_price,

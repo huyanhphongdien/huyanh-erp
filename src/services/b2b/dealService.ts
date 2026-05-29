@@ -599,10 +599,14 @@ export const dealService = {
    * Dùng cho UI để disable nút + hiển thị lý do thiếu.
    *
    * Business rule (theo BGĐ Huy Anh):
-   *   - Mua đứt / Bán (giá cố định, không theo DRC sản phẩm): chỉ cần
-   *     status='processing' → BGĐ duyệt được ngay, KHÔNG cần đo DRC.
-   *   - Chạy đầu ra / Ký gửi (giá theo DRC sản phẩm): cần QC đã đo
-   *     actual_drc > 0 → đủ cơ sở để BGĐ quyết định.
+   *   - Mua đứt / Bán: DRC đã ĐO TỪ TRƯỚC khi deal (expected_drc/sample) và
+   *     đã chốt vào giá. Mua theo số lượng + giá đã deal; khi hàng về chỉ CÂN,
+   *     tính tiền = khối lượng thực tế đem về nhà máy × giá đã chốt. Vì DRC
+   *     chốt trước nên duyệt KHÔNG cần đo lại DRC sau QC → chỉ cần
+   *     status='processing'.
+   *   - Chạy đầu ra / Ký gửi (purchase_type='drc_after_production'): giá phụ
+   *     thuộc DRC sản phẩm đo SAU sản xuất → cần actual_drc > 0 mới đủ cơ sở
+   *     để BGĐ quyết định.
    *   Không bắt buộc stock-in / actual_weight / qc_status='passed' vì:
    *     - Deal có thể duyệt từ mẫu QC sớm trước khi toàn bộ hàng nhập kho
    *     - BGĐ có context ngoài hệ thống (đàm phán giá, quan hệ đại lý, etc.)
@@ -613,9 +617,9 @@ export const dealService = {
     if (deal.status !== 'processing') {
       missing.push(`Deal phải ở trạng thái "Đang xử lý" (hiện: ${deal.status})`)
     }
-    // DRC sản phẩm chỉ ảnh hưởng giá ở deal "Chạy đầu ra"/"Ký gửi"
-    // (purchase_type='drc_after_production'). Mua đứt / Bán = giá cố định/theo
-    // cân → KHÔNG cần QC đo DRC để duyệt.
+    // Mua đứt/Bán: DRC chốt từ trước, tính tiền theo khối lượng cân thực tế →
+    // duyệt không cần đo DRC lại. Chỉ "Chạy đầu ra"/"Ký gửi" (giá theo DRC sản
+    // phẩm đo sau SX) mới cần actual_drc.
     const needsDrc =
       deal.purchase_type === 'drc_after_production' ||
       deal.deal_type === 'processing' ||

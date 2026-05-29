@@ -280,7 +280,7 @@ const ConfirmDealModal = ({
           label={
             <Space size={4}>
               <span>Loại giao dịch</span>
-              <Tooltip title="Mua đứt: nhà máy mua ngay với giá chốt, không phụ thuộc DRC sản phẩm. Chạy đầu ra: giá tạm tính, sau khi SX + QC mới ra giá cuối theo DRC sản phẩm thực.">
+              <Tooltip title="Mua đứt: DRC đã đo & chốt từ trước, mua theo số lượng + giá đã deal; thanh toán theo khối lượng cân thực tế đem về × giá chốt. Chạy đầu ra: giá tạm tính, sau khi SX + QC mới ra giá cuối theo DRC sản phẩm thực.">
                 <InfoCircleOutlined style={{ color: '#faad14' }} />
               </Tooltip>
             </Space>
@@ -297,7 +297,7 @@ const ConfirmDealModal = ({
             <Radio.Button value="processing">🏭 Chạy đầu ra</Radio.Button>
           </Radio.Group>
           <div style={{ marginTop: 6, fontSize: 11, color: '#666' }}>
-            {dealType === 'purchase' && '→ Giá cố định, thanh toán sau nhập kho. KHÔNG phụ thuộc DRC sản phẩm.'}
+            {dealType === 'purchase' && '→ DRC đã đo & chốt từ trước. Thanh toán theo khối lượng cân thực tế đem về × giá chốt.'}
             {dealType === 'processing' && '→ Giá tạm tính. Sau SX + QC final → giá cuối = DRC sản phẩm × đơn giá.'}
           </div>
         </Form.Item>

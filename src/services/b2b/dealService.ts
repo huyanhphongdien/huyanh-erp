@@ -599,8 +599,10 @@ export const dealService = {
    * Dùng cho UI để disable nút + hiển thị lý do thiếu.
    *
    * Business rule (theo BGĐ Huy Anh):
-   *   Chỉ cần QC đã đo DRC thực tế (actual_drc > 0) → báo Ban giám đốc.
-   *   BGĐ tự quyết định duyệt hay hủy deal dựa trên DRC + tình huống thực tế.
+   *   - Mua đứt / Bán (giá cố định, không theo DRC sản phẩm): chỉ cần
+   *     status='processing' → BGĐ duyệt được ngay, KHÔNG cần đo DRC.
+   *   - Chạy đầu ra / Ký gửi (giá theo DRC sản phẩm): cần QC đã đo
+   *     actual_drc > 0 → đủ cơ sở để BGĐ quyết định.
    *   Không bắt buộc stock-in / actual_weight / qc_status='passed' vì:
    *     - Deal có thể duyệt từ mẫu QC sớm trước khi toàn bộ hàng nhập kho
    *     - BGĐ có context ngoài hệ thống (đàm phán giá, quan hệ đại lý, etc.)
@@ -611,7 +613,14 @@ export const dealService = {
     if (deal.status !== 'processing') {
       missing.push(`Deal phải ở trạng thái "Đang xử lý" (hiện: ${deal.status})`)
     }
-    if (!deal.actual_drc || deal.actual_drc <= 0) {
+    // DRC sản phẩm chỉ ảnh hưởng giá ở deal "Chạy đầu ra"/"Ký gửi"
+    // (purchase_type='drc_after_production'). Mua đứt / Bán = giá cố định/theo
+    // cân → KHÔNG cần QC đo DRC để duyệt.
+    const needsDrc =
+      deal.purchase_type === 'drc_after_production' ||
+      deal.deal_type === 'processing' ||
+      deal.deal_type === 'consignment'
+    if (needsDrc && (!deal.actual_drc || deal.actual_drc <= 0)) {
       missing.push('QC chưa đo DRC thực tế — chưa đủ cơ sở để Ban giám đốc quyết định')
     }
 
@@ -619,9 +628,9 @@ export const dealService = {
   },
 
   /**
-   * Duyệt deal — CẦN điều kiện tối thiểu (BGĐ quyết định):
+   * Duyệt deal — điều kiện tối thiểu (xem checkAcceptConditions):
    *  - status = 'processing'
-   *  - actual_drc > 0 (QC đã báo DRC thực tế cho BGĐ)
+   *  - actual_drc > 0 CHỈ với deal chạy đầu ra/ký gửi (giá theo DRC sản phẩm)
    */
   async acceptDeal(id: string, finalPrice?: number): Promise<Deal> {
     const deal = await this.getDealById(id)

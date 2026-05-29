@@ -116,6 +116,8 @@ const DealListPage = () => {
       sortable: true,
       render: (v) => v ? <Text strong>{v.toFixed(1)}</Text> : '—',
       exportRender: (v) => v || 0,
+      exportNumFmt: '#,##0.0',
+      summary: 'sum',
     },
     {
       key: 'unit_price',
@@ -126,6 +128,7 @@ const DealListPage = () => {
       sortable: true,
       render: (v) => v ? `${Number(v).toLocaleString('vi-VN')}` : '—',
       exportRender: (v) => v || 0,
+      exportNumFmt: '#,##0',
     },
     {
       key: 'total_value',
@@ -136,6 +139,8 @@ const DealListPage = () => {
       sortable: true,
       render: (v) => <Text strong style={{ color: '#1B4D3E' }}>{formatCurrency(v)}</Text>,
       exportRender: (v) => v || 0,
+      exportNumFmt: '#,##0',
+      summary: 'sum',
     },
     {
       key: 'expected_drc',
@@ -148,6 +153,7 @@ const DealListPage = () => {
         return v ? `${v}%` : '—'
       },
       exportRender: (_, r) => r.actual_drc || r.expected_drc || '',
+      exportNumFmt: '0"%"',
     },
     {
       key: 'status',

@@ -33,6 +33,8 @@ export interface ColumnDef<T = any> {
   filterOptions?: { value: string; label: string }[]
   render?: (value: any, record: T, index: number) => React.ReactNode
   exportRender?: (value: any, record: T) => string | number  // plain text for Excel
+  exportNumFmt?: string       // Excel number format cho cột số (vd '#,##0'); auto nếu bỏ trống
+  summary?: 'sum' | 'avg'     // hiện tổng/trung bình ở dòng TỔNG cuối file export
   align?: 'left' | 'center' | 'right'
   ellipsis?: boolean
 }
@@ -155,36 +157,99 @@ export default function AdvancedDataTable<T extends Record<string, any>>({
   const handleExport = useCallback(async () => {
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
-    const ws = wb.addWorksheet(title || 'Data')
+    wb.creator = 'Huy Anh ERP'
+    // Freeze title (row 1) + header (row 2)
+    const ws = wb.addWorksheet(title || 'Data', { views: [{ state: 'frozen', ySplit: 2 }] })
 
-    // Header row
-    const headers = columns.map(c => c.title)
-    const headerRow = ws.addRow(headers)
-    headerRow.eachCell(cell => {
+    const colCount = columns.length
+    const DARK = 'FF1B4D3E'
+
+    // Pre-compute exported cell values (1 lần) để vừa render vừa detect kiểu số.
+    const cellAt = (row: T, col: ColumnDef<T>) =>
+      col.exportRender
+        ? col.exportRender(getNestedValue(row, col.dataIndex || col.key), row)
+        : (getNestedValue(row, col.dataIndex || col.key) ?? '')
+    const exportRows = filteredData.map(row => columns.map(col => cellAt(row, col)))
+
+    // Cột số = mọi giá trị non-empty đều là number.
+    const isNumeric = columns.map((_, i) =>
+      exportRows.some(r => typeof r[i] === 'number') &&
+      exportRows.every(r => r[i] === '' || r[i] == null || typeof r[i] === 'number'),
+    )
+    const numFmtFor = (i: number) => columns[i]?.exportNumFmt || '#,##0.##'
+
+    // ── Row 1: Tiêu đề + meta (gộp ô) ──
+    ws.addRow([`${title || exportFileName} — ${filteredData.length} dòng · ${dayjs().format('DD/MM/YYYY HH:mm')}`])
+    ws.mergeCells(1, 1, 1, colCount)
+    const titleCell = ws.getCell(1, 1)
+    titleCell.font = { bold: true, size: 13, color: { argb: DARK } }
+    titleCell.alignment = { horizontal: 'left', vertical: 'middle' }
+    ws.getRow(1).height = 22
+
+    // ── Row 2: Header ──
+    const headerRow = ws.addRow(columns.map(c => c.title))
+    headerRow.height = 18
+    headerRow.eachCell((cell, col) => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B4D3E' } }
-      cell.alignment = { horizontal: 'center', vertical: 'middle' }
-      cell.border = { bottom: { style: 'thin' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DARK } }
+      cell.alignment = { horizontal: columns[col - 1]?.align || 'center', vertical: 'middle', wrapText: true }
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FF14402F' } } }
     })
 
-    // Data rows
-    filteredData.forEach(row => {
-      const values = columns.map(col => {
-        if (col.exportRender) return col.exportRender(getNestedValue(row, col.dataIndex || col.key), row)
-        const val = getNestedValue(row, col.dataIndex || col.key)
-        if (val == null) return ''
-        return val
+    // ── Data rows ──
+    exportRows.forEach((vals, idx) => {
+      const r = ws.addRow(vals)
+      r.eachCell((cell, col) => {
+        const c = columns[col - 1]
+        if (isNumeric[col - 1]) {
+          cell.numFmt = numFmtFor(col - 1)
+          cell.alignment = { horizontal: 'right' }
+        } else if (c?.align) {
+          cell.alignment = { horizontal: c.align }
+        }
+        if (idx % 2 === 1) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F7F5' } }
+        }
+        cell.border = { bottom: { style: 'hair', color: { argb: 'FFE6E6E6' } } }
       })
-      ws.addRow(values)
     })
 
-    // Auto-width
+    // ── Dòng TỔNG (nếu có cột summary) ──
+    const hasSummary = columns.some(c => c.summary)
+    if (hasSummary && exportRows.length > 0) {
+      const totalVals: (string | number)[] = columns.map((c, i) => {
+        if (!c.summary || !isNumeric[i]) return ''
+        const nums = exportRows.map(r => r[i]).filter((v): v is number => typeof v === 'number')
+        if (nums.length === 0) return ''
+        const sum = nums.reduce((a, b) => a + b, 0)
+        return c.summary === 'avg' ? sum / nums.length : sum
+      })
+      // Nhãn "TỔNG" đặt ở cột đầu tiên không phải summary
+      const labelIdx = columns.findIndex(c => !c.summary)
+      if (labelIdx >= 0 && totalVals[labelIdx] === '') totalVals[labelIdx] = `TỔNG (${exportRows.length} dòng)`
+      const totalRow = ws.addRow(totalVals)
+      totalRow.eachCell((cell, col) => {
+        cell.font = { bold: true, color: { argb: DARK } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCEAE3' } }
+        cell.border = { top: { style: 'double', color: { argb: DARK } } }
+        if (isNumeric[col - 1]) {
+          cell.numFmt = numFmtFor(col - 1)
+          cell.alignment = { horizontal: 'right' }
+        }
+      })
+    }
+
+    // ── AutoFilter trên header (row 2) ──
+    ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: colCount } }
+
+    // ── Auto-width (cân nhắc cả số đã format dấu phẩy) ──
     ws.columns.forEach((col, i) => {
-      const maxLen = Math.max(headers[i]?.length || 10, ...filteredData.slice(0, 50).map(row => {
-        const val = getNestedValue(row, columns[i]?.dataIndex || columns[i]?.key)
-        return String(val || '').length
-      }))
-      col.width = Math.min(40, Math.max(12, maxLen + 2))
+      const lens = exportRows.map(r => {
+        const v = r[i]
+        return typeof v === 'number' ? Math.round(v).toLocaleString('vi-VN').length : String(v ?? '').length
+      })
+      const maxLen = Math.max(columns[i]?.title?.length || 10, ...lens, 0)
+      col.width = Math.min(42, Math.max(12, maxLen + 2))
     })
 
     // Download

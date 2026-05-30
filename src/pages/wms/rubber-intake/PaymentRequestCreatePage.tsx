@@ -41,7 +41,6 @@ const PRICE_SRC: Record<string, { label: string; cls: string }> = {
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
-const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10)
 
 const PaymentRequestCreatePage: React.FC = () => {
   const navigate = useNavigate()
@@ -49,7 +48,8 @@ const PaymentRequestCreatePage: React.FC = () => {
 
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [facilityId, setFacilityId] = useState<string>('')
-  const [dateFrom, setDateFrom] = useState(daysAgo(7))
+  // Mặc định 1 ngày (hôm nay) — 1 ngày có nhiều phiếu cân là đủ. Anh kéo dài range khi cần.
+  const [dateFrom, setDateFrom] = useState(today())
   const [dateTo, setDateTo] = useState(today())
   const [rubberType, setRubberType] = useState('')
 

@@ -53,52 +53,34 @@ END $$;
 -- Code prefix 'TLM-' (Tân Lâm Mủ). is_demo=true. Trigger sẽ overwrite code
 -- bằng hac13_code; legacy TLM-XXX lưu vào bp_search_keys.ALIAS để tra cứu.
 -- ════════════════════════════════════════════════════════════════════════════
+-- NOTE: b2b.partners KHÔNG có cột bank_account/bank_name/bank_holder.
+-- Bank info đại lý cần lưu ở bảng riêng hoặc thêm cột — sẽ audit ở Phase 2.
 INSERT INTO b2b.partners (code, name, partner_type, status, tier, is_active, phone,
-                          bank_account, bank_name, bank_holder, contact_alias_name, is_demo)
+                          contact_alias_name, is_demo)
 VALUES
   -- ─── PROXY hubs (nhận tiền hộ) ────────────────────────────────────────
-  ('TLM-NHN', 'Nguyễn Hồng Nhung',     'dealer', 'verified', 'silver',  true, '0900100001',
-   '3900205248772', 'Agribank', 'NGUYỄN HỒNG NHUNG', NULL, true),
-  ('TLM-TMH', 'Trần Thị Mỹ Hoà',       'dealer', 'verified', 'gold',    true, '0900100002',
-   '3905205089190', 'Agribank', 'TRẦN THỊ MỸ HOÀ',   NULL, true),
-  ('TLM-HTC', 'Hồ Thị Cúc',            'dealer', 'verified', 'silver',  true, '0900100003',
-   '3905205347818', 'Agribank', 'HỒ THỊ CÚC',        NULL, true),
-  ('TLM-NVQ', 'Nguyễn Văn Quý',        'dealer', 'verified', 'bronze',  true, '0900100004',
-   '3905205184603', 'Agribank', 'NGUYỄN VĂN QUÝ',    NULL, true),
-  ('TLM-NNH', 'Nguyễn Ngọc Hoa',       'dealer', 'verified', 'bronze',  true, '0900100005',
-   '3907205101928', 'Agribank', 'NGUYỄN NGỌC HOA',   NULL, true),
+  ('TLM-NHN',    'Nguyễn Hồng Nhung',         'dealer', 'verified', 'silver', true, '0900100001', NULL,               true),
+  ('TLM-TMH',    'Trần Thị Mỹ Hoà',           'dealer', 'verified', 'gold',   true, '0900100002', NULL,               true),
+  ('TLM-HTC',    'Hồ Thị Cúc',                'dealer', 'verified', 'silver', true, '0900100003', NULL,               true),
+  ('TLM-NVQ',    'Nguyễn Văn Quý',            'dealer', 'verified', 'bronze', true, '0900100004', NULL,               true),
+  ('TLM-NNH',    'Nguyễn Ngọc Hoa',           'dealer', 'verified', 'bronze', true, '0900100005', NULL,               true),
 
   -- ─── SELLERS (15 đại lý giao mủ tại Tân Lâm) ──────────────────────────
-  ('TLM-DBL', 'Dương Bá Lê',                    'dealer', 'verified', 'gold',    true, '0900200001',
-   '3905205036',    'Agribank', 'DƯƠNG BÁ LÊ',       'Hoàng Thị Chính', true),
-  ('TLM-LVT', 'Lê Văn Thạo',                    'dealer', 'verified', 'gold',    true, '0900200002',
-   '3905205185296', 'Agribank', 'LÊ VĂN THẠO',       NULL, true),
-  ('TLM-NTH', 'Nguyễn Thị Hiền (Đông Hà)',      'dealer', 'verified', 'silver',  true, '0900200003',
-   NULL, NULL, NULL, NULL, true),
-  ('TLM-NTT', 'Nguyễn Thị Thanh (Hiệu)',        'dealer', 'verified', 'silver',  true, '0900200004',
-   '3904205207982', 'Agribank', 'NGUYỄN THỊ THANH',  'Hiệu', true),
-  ('TLM-NTHG','Nguyễn Thị Hương',                'dealer', 'verified', 'silver',  true, '0900200005',
-   NULL, NULL, NULL, 'Trân Thị Mỹ Hoà', true),
-  ('TLM-HNT', 'Hà Ngọc Thành',                  'dealer', 'verified', 'silver',  true, '0900200006',
-   NULL, NULL, NULL, 'Hồ Thị Cúc', true),
-  ('TLM-NTHTAM','Nguyễn Thị Hồng (Tâm)',          'dealer', 'verified', 'bronze',  true, '0900200007',
-   '3905205218770', 'Agribank', 'NGUYỄN THỊ HỒNG',   'Tâm', true),
-  ('TLM-NTO', 'Nguyễn Thị Oanh',                'dealer', 'verified', 'bronze',  true, '0900200008',
-   '0704594221',    'LPBank',   'NGUYỄN THỊ OANH',   NULL, true),
-  ('TLM-LTG', 'Lê Thị Gấm',                     'dealer', 'verified', 'bronze',  true, '0900200009',
-   NULL, NULL, NULL, NULL, true),
-  ('TLM-HTT', 'Hoàng Thị Thu',                  'dealer', 'verified', 'bronze',  true, '0900200010',
-   '02032364501',   'Agribank', 'HOÀNG THỊ THU',     NULL, true),
-  ('TLM-TTY', 'Trần Thị Yến',                   'dealer', 'verified', 'silver',  true, '0900200011',
-   '0818175123',    'VPBank',   'TRẦN THỊ YẾN',      'Hoàng Khánh', true),
-  ('TLM-NTHADOI','Nguyễn Thị Hồng (A Dơi)',       'dealer', 'verified', 'bronze',  true, '0900200012',
-   NULL, NULL, NULL, 'A Dơi', true),
-  ('TLM-NTN', 'Nguyễn Thị Nguyệt',              'dealer', 'verified', 'bronze',  true, '0900200013',
-   '3907205099615', 'Agribank', 'NGUYỄN THỊ NGUYỆT', NULL, true),
-  ('TLM-HTCH','Hoàng Thị Chính',                 'dealer', 'verified', 'bronze',  true, '0900200014',
-   '3905205058246', 'Agribank', 'HOÀNG THỊ CHÍNH',   NULL, true),
-  ('TLM-NTHX','Nguyễn Thị Hồng',                 'dealer', 'verified', 'bronze',  true, '0900200015',
-   NULL, NULL, NULL, NULL, true)
+  ('TLM-DBL',    'Dương Bá Lê',               'dealer', 'verified', 'gold',   true, '0900200001', 'Hoàng Thị Chính',  true),
+  ('TLM-LVT',    'Lê Văn Thạo',               'dealer', 'verified', 'gold',   true, '0900200002', NULL,               true),
+  ('TLM-NTH',    'Nguyễn Thị Hiền (Đông Hà)', 'dealer', 'verified', 'silver', true, '0900200003', NULL,               true),
+  ('TLM-NTT',    'Nguyễn Thị Thanh (Hiệu)',   'dealer', 'verified', 'silver', true, '0900200004', 'Hiệu',             true),
+  ('TLM-NTHG',   'Nguyễn Thị Hương',          'dealer', 'verified', 'silver', true, '0900200005', 'Trân Thị Mỹ Hoà',  true),
+  ('TLM-HNT',    'Hà Ngọc Thành',             'dealer', 'verified', 'silver', true, '0900200006', 'Hồ Thị Cúc',       true),
+  ('TLM-NTHTAM', 'Nguyễn Thị Hồng (Tâm)',     'dealer', 'verified', 'bronze', true, '0900200007', 'Tâm',              true),
+  ('TLM-NTO',    'Nguyễn Thị Oanh',           'dealer', 'verified', 'bronze', true, '0900200008', NULL,               true),
+  ('TLM-LTG',    'Lê Thị Gấm',                'dealer', 'verified', 'bronze', true, '0900200009', NULL,               true),
+  ('TLM-HTT',    'Hoàng Thị Thu',             'dealer', 'verified', 'bronze', true, '0900200010', NULL,               true),
+  ('TLM-TTY',    'Trần Thị Yến',              'dealer', 'verified', 'silver', true, '0900200011', 'Hoàng Khánh',      true),
+  ('TLM-NTHADOI','Nguyễn Thị Hồng (A Dơi)',   'dealer', 'verified', 'bronze', true, '0900200012', 'A Dơi',            true),
+  ('TLM-NTN',    'Nguyễn Thị Nguyệt',         'dealer', 'verified', 'bronze', true, '0900200013', NULL,               true),
+  ('TLM-HTCH',   'Hoàng Thị Chính',           'dealer', 'verified', 'bronze', true, '0900200014', NULL,               true),
+  ('TLM-NTHX',   'Nguyễn Thị Hồng',           'dealer', 'verified', 'bronze', true, '0900200015', NULL,               true)
 ON CONFLICT DO NOTHING;
 
 -- ════════════════════════════════════════════════════════════════════════════

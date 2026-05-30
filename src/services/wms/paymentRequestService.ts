@@ -812,6 +812,18 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
   if (request.status === 'paid') return request
   if (request.status !== 'approved') throw new Error('Chỉ chi khi phiếu ở trạng thái "Đã duyệt"')
 
+  // Resolve auth.uid → employees.id (FK target cho ledger.created_by + payment_requests.paid_by).
+  // Nếu user chưa liên kết employee → để NULL, không chặn nghiệp vụ chi tiền.
+  let employeeId: string | null = null
+  if (userId) {
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle()
+    employeeId = emp?.id || null
+  }
+
   // 1) Ledger payment_paid cho dòng có partner (deal + bộc phát) — gộp theo partner.
   //    Loại trừ 'supplier' (đi qua nhánh batch) và dòng phí không có partner_id.
   const partnerSums = new Map<string, number>()
@@ -832,7 +844,7 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
         reference_code: `${request.code}-PR`,
         description: `Chi theo đề nghị thanh toán ${request.code}`,
         entry_date: request.request_date,
-        created_by: userId || undefined,
+        created_by: employeeId || undefined,
       })
     }
   }
@@ -857,7 +869,7 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
   // 3) Set paid
   const { data, error } = await supabase
     .from('payment_requests')
-    .update({ status: 'paid', paid_at: new Date().toISOString(), paid_by: userId || null })
+    .update({ status: 'paid', paid_at: new Date().toISOString(), paid_by: employeeId })
     .eq('id', id)
     .select(REQUEST_SELECT)
     .single()

@@ -111,29 +111,31 @@ export default function PriceLockFormPage() {
   const fees = form.fees || []
   const setFee = (i: number, patch: Partial<PriceLockFee>) =>
     set('fees', fees.map((fee, idx) => (idx === i ? { ...fee, ...patch } : fee)))
-  const addFee = (basis: 'ton' | 'lot') => set('fees', [...fees, { label: '', basis, amount: 0 }])
   const removeFee = (i: number) => set('fees', fees.filter((_, idx) => idx !== i))
 
-  // Tick/untick checkbox "Các phí phải chi" → tự thêm/xoá dòng phí tương ứng.
-  const toggleFlag = (key: string) => {
+  // 8 phí "chuẩn" trên mẫu — checkbox = chính dòng phí (tick là enable luôn basis + giá).
+  const STANDARD_FEE_LABELS = new Set(Object.values(FEE_FLAG_LABELS))
+  const toggleStandardFee = (key: string) => {
     const label = FEE_FLAG_LABELS[key]
     setForm((f) => {
-      const flags = f.fee_flags || {}
-      const nextOn = !flags[key]
-      const newFlags = { ...flags, [key]: nextOn }
-      const currentFees = f.fees || []
-      let newFees: PriceLockFee[]
-      if (nextOn) {
-        const exists = currentFees.some((x) => x.label === label)
-        newFees = exists
-          ? currentFees
-          : [...currentFees, { label, basis: FEE_FLAG_DEFAULT_BASIS[key] || 'ton', amount: 0 }]
-      } else {
-        newFees = currentFees.filter((x) => x.label !== label)
+      const cur = f.fees || []
+      const exists = cur.some((x) => x.label === label)
+      return {
+        ...f,
+        fees: exists
+          ? cur.filter((x) => x.label !== label)
+          : [...cur, { label, basis: FEE_FLAG_DEFAULT_BASIS[key] || 'ton', amount: 0 }],
       }
-      return { ...f, fee_flags: newFlags, fees: newFees }
     })
   }
+  const updateStandardFee = (label: string, patch: Partial<PriceLockFee>) =>
+    set('fees', fees.map((f) => (f.label === label ? { ...f, ...patch } : f)))
+
+  // Phí "khác" (label tự nhập, không nằm trong 8 loại chuẩn).
+  const customEntries = fees
+    .map((fee, idx) => ({ fee, idx }))
+    .filter(({ fee }) => !STANDARD_FEE_LABELS.has(fee.label))
+  const addCustomFee = () => set('fees', [...fees, { label: '', basis: 'ton', amount: 0 }])
 
   async function save(thenPrint: boolean) {
     setSaving(true)
@@ -266,29 +268,88 @@ export default function PriceLockFormPage() {
 
         {/* Phí */}
         <Card title="Các phí phải chi">
-          <div className="flex flex-wrap gap-x-5 gap-y-2 mb-4">
-            {Object.entries(FEE_FLAG_LABELS).map(([k, v]) => (
-              <label key={k} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" checked={!!(form.fee_flags || {})[k]} onChange={() => toggleFlag(k)} /> {v}
-              </label>
-            ))}
+          <p className="text-xs text-gray-400 mb-3">Tick để áp dụng phí, chọn theo tấn/lô và nhập giá ngay trên cùng 1 dòng.</p>
+          <div className="space-y-1.5">
+            {(Object.entries(FEE_FLAG_LABELS) as [string, string][]).map(([key, label]) => {
+              const fee = fees.find((x) => x.label === label)
+              const checked = !!fee
+              return (
+                <div
+                  key={key}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition ${
+                    checked ? 'border-emerald-300 bg-emerald-50/50' : 'border-gray-100 bg-gray-50/30'
+                  }`}
+                >
+                  <label className="flex items-center gap-2 cursor-pointer min-w-[180px] flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleStandardFee(key)}
+                      className="w-4 h-4 accent-emerald-600 cursor-pointer"
+                    />
+                    <span className={`text-sm font-medium ${checked ? 'text-gray-800' : 'text-gray-500'}`}>{label}</span>
+                  </label>
+                  <select
+                    value={fee?.basis || FEE_FLAG_DEFAULT_BASIS[key] || 'ton'}
+                    onChange={(e) => updateStandardFee(label, { basis: e.target.value as 'ton' | 'lot' })}
+                    disabled={!checked}
+                    className={`${inputCls} w-32 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
+                  >
+                    <option value="ton">Theo tấn</option><option value="lot">Theo lô</option>
+                  </select>
+                  <input
+                    type="number"
+                    value={fee?.amount ?? 0}
+                    onChange={(e) => updateStandardFee(label, { amount: Number(e.target.value) || 0 })}
+                    disabled={!checked}
+                    placeholder="Nhập giá"
+                    className={`${inputCls} flex-1 text-right font-mono disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
+                  />
+                  <span className="text-xs text-gray-400 w-4">đ</span>
+                </div>
+              )
+            })}
           </div>
-          <div className="space-y-2">
-            {fees.map((fee, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input value={fee.label} onChange={(e) => setFee(i, { label: e.target.value })} placeholder="Loại chi phí" className={`${inputCls} flex-1`} />
-                <select value={fee.basis} onChange={(e) => setFee(i, { basis: e.target.value as 'ton' | 'lot' })} className={`${inputCls} w-28`}>
-                  <option value="ton">Theo tấn</option><option value="lot">Theo lô</option>
-                </select>
-                <input type="number" value={fee.amount} onChange={(e) => setFee(i, { amount: Number(e.target.value) || 0 })} placeholder="Giá" className={`${inputCls} w-36 text-right font-mono`} />
-                <button onClick={() => removeFee(i)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
+
+          {customEntries.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <p className="text-xs font-medium text-gray-500 mb-1.5">Phí khác (tự nhập)</p>
+              <div className="space-y-1.5">
+                {customEntries.map(({ fee, idx }) => (
+                  <div key={idx} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200">
+                    <input
+                      value={fee.label}
+                      onChange={(e) => setFee(idx, { label: e.target.value })}
+                      placeholder="Tên loại phí"
+                      className={`${inputCls} min-w-[180px] flex-shrink-0`}
+                    />
+                    <select
+                      value={fee.basis}
+                      onChange={(e) => setFee(idx, { basis: e.target.value as 'ton' | 'lot' })}
+                      className={`${inputCls} w-32`}
+                    >
+                      <option value="ton">Theo tấn</option><option value="lot">Theo lô</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={fee.amount}
+                      onChange={(e) => setFee(idx, { amount: Number(e.target.value) || 0 })}
+                      placeholder="Nhập giá"
+                      className={`${inputCls} flex-1 text-right font-mono`}
+                    />
+                    <span className="text-xs text-gray-400 w-4">đ</span>
+                    <button onClick={() => removeFee(idx)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xoá">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button onClick={() => addFee('ton')} className="text-sm text-emerald-600 flex items-center gap-1"><Plus size={14} /> Phí theo tấn</button>
-            <button onClick={() => addFee('lot')} className="text-sm text-emerald-600 flex items-center gap-1"><Plus size={14} /> Phí theo lô</button>
-          </div>
+            </div>
+          )}
+
+          <button onClick={addCustomFee} className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5">
+            <Plus size={15} /> Thêm phí khác
+          </button>
         </Card>
 
         {/* Thời gian & ký */}

@@ -110,27 +110,27 @@ BEGIN
   -- Link sellers → proxies
   UPDATE b2b.partners p SET payment_proxy_partner_id = v_nhn
    WHERE p.payment_proxy_partner_id IS NULL
-     AND p.id = (SELECT id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
+     AND p.id = (SELECT x.id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
                  WHERE k.key_type='ALIAS' AND k.key_value='TLM-NTH' LIMIT 1);
 
   UPDATE b2b.partners p SET payment_proxy_partner_id = v_tmh
    WHERE p.payment_proxy_partner_id IS NULL
-     AND p.id = (SELECT id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
+     AND p.id = (SELECT x.id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
                  WHERE k.key_type='ALIAS' AND k.key_value='TLM-NTHG' LIMIT 1);
 
   UPDATE b2b.partners p SET payment_proxy_partner_id = v_htc
    WHERE p.payment_proxy_partner_id IS NULL
-     AND p.id = (SELECT id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
+     AND p.id = (SELECT x.id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
                  WHERE k.key_type='ALIAS' AND k.key_value='TLM-HNT' LIMIT 1);
 
   UPDATE b2b.partners p SET payment_proxy_partner_id = v_nvq
    WHERE p.payment_proxy_partner_id IS NULL
-     AND p.id = (SELECT id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
+     AND p.id = (SELECT x.id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
                  WHERE k.key_type='ALIAS' AND k.key_value='TLM-LTG' LIMIT 1);
 
   UPDATE b2b.partners p SET payment_proxy_partner_id = v_nnh
    WHERE p.payment_proxy_partner_id IS NULL
-     AND p.id = (SELECT id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
+     AND p.id = (SELECT x.id FROM b2b.partners x JOIN public.bp_search_keys k ON k.bp_id=x.bp_id
                  WHERE k.key_type='ALIAS' AND k.key_value='TLM-NTHADOI' LIMIT 1);
 
   RAISE NOTICE 'STEP 3: payment_proxy_partner_id linked for 5 sellers';

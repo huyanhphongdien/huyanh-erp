@@ -280,7 +280,7 @@ export default function PriceLockFormPage() {
                     checked ? 'border-emerald-300 bg-emerald-50/50' : 'border-gray-100 bg-gray-50/30'
                   }`}
                 >
-                  <label className="flex items-center gap-2 cursor-pointer min-w-[180px] flex-shrink-0">
+                  <label className="flex items-center gap-2 cursor-pointer" style={{ width: 200, flexShrink: 0 }}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -293,7 +293,8 @@ export default function PriceLockFormPage() {
                     value={fee?.basis || FEE_FLAG_DEFAULT_BASIS[key] || 'ton'}
                     onChange={(e) => updateStandardFee(label, { basis: e.target.value as 'ton' | 'lot' })}
                     disabled={!checked}
-                    className={`${inputCls} w-32 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
+                    style={{ width: 130, flexShrink: 0 }}
+                    className={feeCls}
                   >
                     <option value="ton">Theo tấn</option><option value="lot">Theo lô</option>
                   </select>
@@ -303,9 +304,10 @@ export default function PriceLockFormPage() {
                     onChange={(e) => updateStandardFee(label, { amount: Number(e.target.value) || 0 })}
                     disabled={!checked}
                     placeholder="Nhập giá"
-                    className={`${inputCls} flex-1 text-right font-mono disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
+                    style={{ flex: '1 1 0', minWidth: 0 }}
+                    className={`${feeCls} text-right font-mono`}
                   />
-                  <span className="text-xs text-gray-400 w-4">đ</span>
+                  <span className="text-xs text-gray-400 flex-shrink-0" style={{ width: 10 }}>đ</span>
                 </div>
               )
             })}
@@ -321,12 +323,14 @@ export default function PriceLockFormPage() {
                       value={fee.label}
                       onChange={(e) => setFee(idx, { label: e.target.value })}
                       placeholder="Tên loại phí"
-                      className={`${inputCls} min-w-[180px] flex-shrink-0`}
+                      style={{ width: 200, flexShrink: 0 }}
+                      className={feeCls}
                     />
                     <select
                       value={fee.basis}
                       onChange={(e) => setFee(idx, { basis: e.target.value as 'ton' | 'lot' })}
-                      className={`${inputCls} w-32`}
+                      style={{ width: 130, flexShrink: 0 }}
+                      className={feeCls}
                     >
                       <option value="ton">Theo tấn</option><option value="lot">Theo lô</option>
                     </select>
@@ -335,10 +339,11 @@ export default function PriceLockFormPage() {
                       value={fee.amount}
                       onChange={(e) => setFee(idx, { amount: Number(e.target.value) || 0 })}
                       placeholder="Nhập giá"
-                      className={`${inputCls} flex-1 text-right font-mono`}
+                      style={{ flex: '1 1 0', minWidth: 0 }}
+                      className={`${feeCls} text-right font-mono`}
                     />
-                    <span className="text-xs text-gray-400 w-4">đ</span>
-                    <button onClick={() => removeFee(idx)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xoá">
+                    <span className="text-xs text-gray-400 flex-shrink-0" style={{ width: 10 }}>đ</span>
+                    <button onClick={() => removeFee(idx)} className="p-1.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0" title="Xoá">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -374,6 +379,9 @@ export default function PriceLockFormPage() {
 }
 
 const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500'
+
+// Không có w-full → cho phép inline style={width: ...} điều khiển bề rộng (tránh Tailwind utility conflict).
+const feeCls = 'px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed'
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (

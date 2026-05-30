@@ -22,6 +22,7 @@ export type B2BNotificationType =
   | 'sample_drc_recorded'   // Factory ghi sample DRC → Partner
   | 'production_started'    // Factory bắt đầu SX → Partner
   | 'production_finished'   // Factory xong SX, có actual_drc + final_value → Partner
+  | 'completion_cert_pending' // Factory lập + ký Phiếu chốt thành phẩm → Partner ký
 
 export type B2BNotificationAudience = 'staff' | 'partner' | 'both'
 

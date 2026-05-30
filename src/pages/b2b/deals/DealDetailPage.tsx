@@ -75,6 +75,7 @@ import DealDeliveryTab from '../../../components/b2b/DealDeliveryTab'
 import DealContractTab from '../../../components/b2b/DealContractTab'
 import ProductionProgress from '../../../components/b2b/ProductionProgress'
 import DealLifecycleActions from '../../../components/b2b/DealLifecycleActions'
+import CompletionCertSection from '../../../components/b2b/CompletionCertSection'
 import { supabase } from '../../../lib/supabase'
 
 const { Title, Text, Paragraph } = Typography
@@ -1018,6 +1019,9 @@ function ProductionTabContent({
         hasAdvancePaid={hasAdvancePaid}
         onRefresh={onRefresh}
       />
+      <div style={{ marginTop: 16 }}>
+        <CompletionCertSection dealId={dealObj.id} />
+      </div>
     </div>
   )
 }

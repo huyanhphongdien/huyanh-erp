@@ -322,9 +322,10 @@ export const rubberIntakeB2BService = {
     if (!ids.length || !pricePerKg) return
     const { data, error } = await supabase
       .from('rubber_intake_batches')
-      .select('id, net_weight_kg, dry_weight_kg, drc_percent, status')
+      .select('id, net_weight_kg, dry_weight_kg, drc_percent, status, intake_date')
       .in('id', ids)
     if (error) throw new Error(error.message)
+    const affectedQuarters = new Set<string>()
     for (const row of (data || []) as any[]) {
       const dry = row.dry_weight_kg ?? (row.drc_percent != null && row.net_weight_kg ? row.net_weight_kg * row.drc_percent / 100 : null)
       const billable = dry ?? row.net_weight_kg ?? 0
@@ -334,9 +335,29 @@ export const rubberIntakeB2BService = {
         settled_price_per_ton: pricePerKg * 1000,
         total_amount: total,
       }
-      if (row.status === 'draft') patch.status = 'confirmed'
+      const willConfirm = row.status === 'draft'
+      if (willConfirm) patch.status = 'confirmed'
       const { error: upErr } = await supabase.from('rubber_intake_batches').update(patch).eq('id', row.id)
       if (upErr) throw new Error(upErr.message)
+      // G-5: ghi nhớ (year, quarter) bị ảnh hưởng để recompute thưởng sau.
+      if (willConfirm && row.intake_date) {
+        const d = new Date(row.intake_date)
+        const q = Math.ceil((d.getUTCMonth() + 1) / 3) as 1 | 2 | 3 | 4
+        affectedQuarters.add(`${d.getUTCFullYear()}-${q}`)
+      }
+    }
+    // G-5: bulk applyPrice → status='confirmed' không tự kích trigger recompute bonus.
+    // Gọi RPC recompute cho từng quý có batch vừa confirmed. Best-effort (không throw).
+    if (affectedQuarters.size > 0) {
+      try {
+        const { monthlyBonusService } = await import('./monthlyBonusService')
+        for (const key of affectedQuarters) {
+          const [year, quarter] = key.split('-').map(Number)
+          await monthlyBonusService.recomputeQuarter(year, quarter as 1 | 2 | 3 | 4)
+        }
+      } catch (err) {
+        console.warn('G-5: recompute bonus sau applyPrice thất bại (non-fatal):', err)
+      }
     }
   },
 

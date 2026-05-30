@@ -829,7 +829,7 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
         entry_type: 'payment_paid',
         debit: 0,
         credit: amount,
-        reference_code: `${request.code}-PR-${partnerId}`,
+        reference_code: `${request.code}-PR`,
         description: `Chi theo đề nghị thanh toán ${request.code}`,
         entry_date: request.request_date,
         created_by: userId || undefined,

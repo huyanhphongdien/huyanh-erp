@@ -79,6 +79,8 @@ export default function WeighingPage() {
   const [driverPhone, setDriverPhone] = useState('')
   const [plateHistory, setPlateHistory] = useState<string[]>([])
   const [tareSuggestion, setTareSuggestion] = useState<{ avgTare: number | null; lastTare: number | null; count: number } | null>(null)
+  // G-7: cảnh báo cùng biển số cân lần 2 trong ngày (có thể là cân lại hoặc 2 chuyến)
+  const [dupPlateWarning, setDupPlateWarning] = useState<{ count: number; codes: string[] } | null>(null)
   // S3: Loại phiếu cân — IN (cân 2 lần gross/tare) | OUT (cân 1 lần net trực tiếp)
   const [ticketDirection, setTicketDirection] = useState<'in' | 'out'>('in')
 
@@ -130,6 +132,8 @@ export default function WeighingPage() {
   // Operator có thể override.
   const [dotReading, setDotReading] = useState<number | null>(null)
   const [actualDrc, setActualDrc] = useState<number | null>(null)
+  // G-6: track nguồn DRC (lookup từ bảng drc_lookup vs operator nhập tay)
+  const [drcSource, setDrcSource] = useState<'lookup' | 'manual' | null>(null)
   const [drcLookupRows, setDrcLookupRows] = useState<DrcLookupRow[]>([])
   const [consolidationCode, setConsolidationCode] = useState<string>('')
   const [destination, setDestination] = useState<string>('bai_mu')
@@ -244,6 +248,9 @@ export default function WeighingPage() {
         // F2 TL: restore ĐỐT + DRC thực + consolidation_code nếu đã save trước đó
         if (ext.field_dot_reading != null) setDotReading(ext.field_dot_reading)
         if (ext.qc_actual_drc != null) setActualDrc(ext.qc_actual_drc)
+        if (ext.qc_drc_source === 'lookup' || ext.qc_drc_source === 'manual') {
+          setDrcSource(ext.qc_drc_source)
+        }
         if (ext.consolidation_code) setConsolidationCode(ext.consolidation_code)
         // Calculate if both weights exist
         if (t.gross_weight != null && t.tare_weight != null) {
@@ -267,6 +274,24 @@ export default function WeighingPage() {
       const history = await weighbridgeService.getPlateHistory(search)
       setPlateHistory(history)
     }
+  }
+
+  // G-7: check cùng biển số đã có phiếu cân hôm nay chưa.
+  // Chạy khi plate dài đủ (full plate) — không bắn warning khi typing dở.
+  async function checkPlateDupToday(plate: string) {
+    const trimmed = plate.trim().toUpperCase()
+    if (trimmed.length < 5) { setDupPlateWarning(null); return }
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+    let q = supabase
+      .from('weighbridge_tickets')
+      .select('code, status')
+      .eq('vehicle_plate', trimmed)
+      .gte('created_at', todayStart.toISOString())
+      .neq('status', 'cancelled')
+    if (ticket?.id) q = q.neq('id', ticket.id)
+    const { data } = await q
+    const codes = (data || []).map((r: any) => r.code).filter(Boolean)
+    setDupPlateWarning(codes.length > 0 ? { count: codes.length, codes } : null)
   }
 
   async function handlePlateSelect(plate: string) {
@@ -512,6 +537,7 @@ export default function WeighingPage() {
           ? {
               field_dot_reading: dotReading,
               qc_actual_drc: actualDrc,
+              qc_drc_source: drcSource,
               consolidation_code: consolidationCode.trim() || null,
             }
           : undefined
@@ -1208,13 +1234,27 @@ export default function WeighingPage() {
                         const upper = (v || '').toUpperCase()
                         setVehiclePlate(upper)
                         if (upper.length >= 2) handlePlateSearch(upper)
+                        checkPlateDupToday(upper)
                       }}
-                      onSelect={(v) => handlePlateSelect(v)}
+                      onSelect={(v) => { handlePlateSelect(v); checkPlateDupToday(v) }}
+                      onBlur={() => checkPlateDupToday(vehiclePlate)}
                       placeholder="VD: 43C-123.45"
                       style={{ width: '100%' }}
                       disabled={isCompleted}
                       options={plateHistory.map((p) => ({ value: p, label: p }))}
                     />
+                    {dupPlateWarning && dupPlateWarning.count > 0 && (
+                      <div style={{
+                        marginTop: 6, padding: '6px 10px', borderRadius: 6,
+                        background: '#FFF7E6', border: '1px solid #FFD591',
+                        fontSize: 12, color: '#D46B08',
+                      }}>
+                        ⚠ Biển <b>{vehiclePlate}</b> đã có {dupPlateWarning.count} phiếu cân hôm nay
+                        ({dupPlateWarning.codes.slice(0,3).join(', ')}
+                        {dupPlateWarning.codes.length > 3 ? '...' : ''}).
+                        Kiểm tra trước khi tạo phiếu mới (cân lại? 2 chuyến?).
+                      </div>
+                    )}
                     {tareSuggestion && tareSuggestion.count > 0 && (
                       <Text type="secondary" style={{ fontSize: 11 }}>
                         💡 Tare TB {tareSuggestion.count} lần: {tareSuggestion.avgTare?.toLocaleString()} kg
@@ -1309,9 +1349,13 @@ export default function WeighingPage() {
                         // Clear ĐỐT (n=null) → clear DRC luôn.
                         if (n == null) {
                           setActualDrc(null)
+                          setDrcSource(null)
                         } else {
                           const suggested = drcLookupService.lookupSync(drcLookupRows, n)
-                          if (suggested != null) setActualDrc(suggested)
+                          if (suggested != null) {
+                            setActualDrc(suggested)
+                            setDrcSource('lookup')
+                          }
                         }
                       }}
                       style={{ width: '100%' }}
@@ -1323,11 +1367,26 @@ export default function WeighingPage() {
                   </Col>
                   <Col span={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      DRC thực (%) <span style={{ color: '#999' }}>tự tính từ ĐỐT</span>
+                      DRC thực (%){' '}
+                      {drcSource === 'lookup' && (
+                        <span style={{ color: '#52c41a' }}>· auto từ bảng</span>
+                      )}
+                      {drcSource === 'manual' && (
+                        <span style={{ color: '#fa8c16' }}>· nhập tay</span>
+                      )}
+                      {drcSource == null && (
+                        <span style={{ color: '#999' }}>tự tính từ ĐỐT</span>
+                      )}
                     </Text>
                     <InputNumber
                       value={actualDrc}
-                      onChange={(v) => setActualDrc(typeof v === 'number' ? v : null)}
+                      onChange={(v) => {
+                        const n = typeof v === 'number' ? v : null
+                        setActualDrc(n)
+                        // Operator chỉnh tay → override source thành 'manual'.
+                        // Nếu clear → reset source.
+                        setDrcSource(n == null ? null : 'manual')
+                      }}
                       style={{ width: '100%' }}
                       min={0}
                       max={100}

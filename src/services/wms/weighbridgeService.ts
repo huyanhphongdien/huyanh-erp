@@ -167,6 +167,7 @@ async function updateTareWeight(
   extras?: {
     field_dot_reading?: number | null
     qc_actual_drc?: number | null
+    qc_drc_source?: 'lookup' | 'manual' | null
     consolidation_code?: string | null
   }
 ): Promise<WeighbridgeTicket> {
@@ -190,6 +191,7 @@ async function updateTareWeight(
   }
   if (extras?.field_dot_reading !== undefined) updatePayload.field_dot_reading = extras.field_dot_reading
   if (extras?.qc_actual_drc !== undefined) updatePayload.qc_actual_drc = extras.qc_actual_drc
+  if (extras?.qc_drc_source !== undefined) updatePayload.qc_drc_source = extras.qc_drc_source
   if (extras?.consolidation_code !== undefined) updatePayload.consolidation_code = extras.consolidation_code
 
   const { data, error } = await supabase

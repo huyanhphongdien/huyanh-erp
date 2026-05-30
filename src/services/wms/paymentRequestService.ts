@@ -824,18 +824,42 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
     employeeId = emp?.id || null
   }
 
-  // 1) Ledger payment_paid cho dòng có partner (deal + bộc phát) — gộp theo partner.
+  // 1) Ledger entries cho dòng có partner (deal + bộc phát) — gộp theo partner.
   //    Loại trừ 'supplier' (đi qua nhánh batch) và dòng phí không có partner_id.
-  const partnerSums = new Map<string, number>()
+  //    - Deal: chỉ CREDIT (DEBIT đã do trigger on_settlement_approved tạo từ settlement_receivable).
+  //    - Bộc phát (manual): cả DEBIT (giao mủ — nghĩa vụ phải trả) + CREDIT (chi tiền) → balance = 0.
+  const dealSums = new Map<string, number>()
+  const manualSums = new Map<string, number>()
   for (const l of lines) {
     if (l.source_type === 'supplier') continue
-    if (l.partner_id && (l.amount || 0) > 0) {
-      partnerSums.set(l.partner_id, (partnerSums.get(l.partner_id) || 0) + l.amount)
+    if (!l.partner_id || (l.amount || 0) <= 0) continue
+    if (l.source_type === 'manual') {
+      manualSums.set(l.partner_id, (manualSums.get(l.partner_id) || 0) + l.amount)
+    } else if (l.source_type === 'deal') {
+      dealSums.set(l.partner_id, (dealSums.get(l.partner_id) || 0) + l.amount)
     }
   }
-  if (partnerSums.size > 0) {
+
+  if (dealSums.size > 0 || manualSums.size > 0) {
     const { ledgerService } = await import('../b2b/ledgerService')
-    for (const [partnerId, amount] of partnerSums) {
+
+    // Bộc phát: ghi DEBIT (giao mủ) trước, rồi CREDIT (chi tiền) — net = 0.
+    for (const [partnerId, amount] of manualSums) {
+      await ledgerService.createManualEntry({
+        partner_id: partnerId,
+        entry_type: 'adjustment_debit',
+        debit: amount,
+        credit: 0,
+        reference_code: `${request.code}-OBL`,
+        description: `Giao mủ bộc phát theo ĐNTT ${request.code}`,
+        entry_date: request.request_date,
+        created_by: employeeId || undefined,
+      })
+    }
+
+    // CREDIT payment_paid cho cả deal + bộc phát (gộp lại).
+    const allCreditSums = new Map<string, number>([...dealSums, ...manualSums])
+    for (const [partnerId, amount] of allCreditSums) {
       await ledgerService.createManualEntry({
         partner_id: partnerId,
         entry_type: 'payment_paid',

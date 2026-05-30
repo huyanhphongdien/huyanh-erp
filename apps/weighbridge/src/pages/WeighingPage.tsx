@@ -407,11 +407,13 @@ export default function WeighingPage() {
       setTicket(t)
 
       // Save rubber fields. Không lưu đơn giá / DRC kỳ vọng — giải tại ĐNTT.
+      // source_type lưu thẳng từ UI để khỏi đoán qua FK (Commit C - audit fix).
       const rubberData: RubberWeighData = {
         rubber_type: rubberType,
         price_unit: priceUnit,
         destination: destination || undefined,
         deduction_kg: deductionKg,
+        source_type: ticketDirection === 'in' ? sourceType : 'transfer',
       }
       if (sourceType === 'deal' && selectedDealId) {
         const deal = deals.find((d) => d.id === selectedDealId)
@@ -1254,6 +1256,20 @@ export default function WeighingPage() {
                     <Select value={destination || undefined} onChange={setDestination}
                       style={{ width: '100%' }} options={DESTINATIONS} allowClear
                       placeholder="Chọn..." disabled={isCompleted} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Tạp chất / Giảm trừ <span style={{ color: '#999' }}>(kg)</span>
+                    </Text>
+                    <InputNumber
+                      value={deductionKg}
+                      onChange={(v) => setDeductionKg(typeof v === 'number' ? v : 0)}
+                      style={{ width: '100%' }}
+                      min={0}
+                      disabled={isCompleted}
+                      placeholder="0"
+                      formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    />
                   </Col>
                   <Col span={24}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Ghi chú</Text>

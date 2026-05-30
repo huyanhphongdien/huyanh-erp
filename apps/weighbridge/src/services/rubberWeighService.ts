@@ -17,6 +17,7 @@ export interface RubberWeighData {
   vehicle_type?: string
   destination?: string
   deduction_kg?: number
+  source_type?: 'deal' | 'supplier' | 'partner_direct' | 'transfer'
 }
 
 export interface WeightCalculation {
@@ -76,6 +77,7 @@ export async function saveRubberFields(ticketId: string, data: RubberWeighData) 
   if (data.vehicle_type) updateData.vehicle_type = data.vehicle_type
   if (data.destination) updateData.destination = data.destination
   if (data.deduction_kg != null) updateData.deduction_kg = data.deduction_kg
+  if (data.source_type) updateData.source_type = data.source_type
 
   if (Object.keys(updateData).length === 0) return
 

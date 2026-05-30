@@ -91,6 +91,8 @@ export interface AvailableTicket {
   // PCG đã match (nếu có) — để create() group + insert dòng "Phí" + markUsed sau khi insert.
   applied_pcg_id?: string | null
   applied_pcg_fees?: PriceLockFee[]
+  // Cảnh báo: price_unit='dry' nhưng thiếu DRC → bw=0, kế toán cần nhập giá tay.
+  drc_missing?: boolean
 }
 
 export interface ListAvailableParams {
@@ -182,10 +184,19 @@ function roundThousand(n: number): number {
   return Math.round((n || 0) / 1000) * 1000
 }
 
-/** KL tính tiền: mủ nước (price_unit='dry') = cân tươi × DRC%; còn lại = cân tươi. */
+/** KL tính tiền: mủ nước (price_unit='dry') = cân tươi × DRC%; còn lại = cân tươi.
+ *  Khi price_unit='dry' nhưng thiếu DRC → trả 0 (cần kế toán nhập tay). */
 function billableWeight(net: number, priceUnit: string | null, drc: number | null): number {
-  if (priceUnit === 'dry' && drc && drc > 0) return Math.round((net * drc) / 100 * 10) / 10
+  if (priceUnit === 'dry') {
+    if (!drc || drc <= 0) return 0
+    return Math.round((net * drc) / 100 * 10) / 10
+  }
   return net
+}
+
+/** Cảnh báo: price_unit='dry' nhưng không có DRC → không tính được KL khô → kế toán cần nhập tay. */
+function drcMissingForDryPricing(priceUnit: string | null, drc: number | null): boolean {
+  return priceUnit === 'dry' && (!drc || drc <= 0)
 }
 
 /** Batch lấy TK ngân hàng NCC mủ lẻ từ rubber_suppliers. */
@@ -337,6 +348,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
     const source = deriveSource(r)
     const net = Number(r.net_weight) || 0
     const drc = r.qc_actual_drc != null ? Number(r.qc_actual_drc) : null
+    const drcMissing = drcMissingForDryPricing(r.price_unit, drc)
     const bw = billableWeight(net, r.price_unit, drc)
 
     // Giá KHÔNG lấy từ phiếu cân: deal → b2b_deals.unit_price; bộc phát → PCG; còn lại → tự nhập.
@@ -399,11 +411,12 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       payee_name: payee,
       payee_note: payeeNote,
       deal_number: r.deal_id ? dealNumbers.get(r.deal_id) || null : null,
-      suggested_amount: roundThousand(bw * price),
-      price_source: priceSource,
-      price_source_ref: priceRef,
-      applied_pcg_id: appliedPcgId,
-      applied_pcg_fees: appliedPcgFees,
+      suggested_amount: drcMissing ? 0 : roundThousand(bw * price),
+      price_source: drcMissing ? 'manual' : priceSource,
+      price_source_ref: drcMissing ? null : priceRef,
+      applied_pcg_id: drcMissing ? null : appliedPcgId,
+      applied_pcg_fees: drcMissing ? undefined : appliedPcgFees,
+      drc_missing: drcMissing,
     }
   })
 }
@@ -523,7 +536,10 @@ async function create(input: CreatePaymentRequestInput): Promise<PaymentRequest>
 
   if (reqErr) throw reqErr
 
+  // Best-effort atomicity: nếu lines/update/markUsed lỗi → DELETE header để khỏi
+  // orphan. Supabase JS không có transaction → catch + rollback thủ công.
   if (input.lines.length > 0) {
+   try {
     const normalPayload = input.lines.map((l, i) => ({
       payment_request_id: req.id,
       ticket_id: l.ticket_id || null,
@@ -580,6 +596,11 @@ async function create(input: CreatePaymentRequestInput): Promise<PaymentRequest>
     for (const pcgId of usedPcgIds) {
       try { await priceLockService.markUsed(pcgId) } catch (e) { console.warn('[paymentRequest] markUsed PCG failed:', pcgId, e) }
     }
+   } catch (err) {
+    // Rollback: xoá header đã tạo để khỏi orphan, rồi rethrow.
+    await supabase.from('payment_requests').delete().eq('id', req.id)
+    throw err
+   }
   }
 
   // Đọc lại để có totals (trigger đã cập nhật)

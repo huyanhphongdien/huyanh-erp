@@ -235,6 +235,11 @@ const PaymentRequestCreatePage: React.FC = () => {
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${PRICE_SRC[t.price_source].cls}`}>
                           {PRICE_SRC[t.price_source].label}{t.price_source === 'pcg' && t.price_source_ref ? ` ${t.price_source_ref}` : ''}
                         </span>
+                        {t.drc_missing && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            ⚠ Thiếu DRC — nhập giá tay
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">

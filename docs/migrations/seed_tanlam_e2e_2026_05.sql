@@ -207,13 +207,15 @@ BEGIN
         CONTINUE;
       END IF;
 
+      -- source 'partner_direct' (bộc phát) = chỉ set partner_id, không có deal_id/supplier_id.
+      -- App tự derive source qua deriveSource(deal_id, supplier_id) → 'manual' khi cả hai null.
       INSERT INTO public.weighbridge_tickets (
         code, ticket_type, status,
         vehicle_plate, driver_name,
         rubber_type, price_unit,
         gross_weight, tare_weight, net_weight,
         qc_actual_drc, field_dot_reading,
-        source_type, partner_id, facility_id,
+        partner_id, facility_id,
         gross_weighed_at, tare_weighed_at, completed_at, created_at,
         notes
       ) VALUES (
@@ -222,7 +224,7 @@ BEGIN
         'mu_nuoc', 'dry',
         v_net * 1.5, v_net * 0.5, v_net,
         v_drc, v_dot,
-        'partner_direct', v_partner_id, v_tl_id,
+        v_partner_id, v_tl_id,
         v_date::timestamptz + interval '7 hours' + (v_idx * interval '30 minutes'),
         v_date::timestamptz + interval '8 hours' + (v_idx * interval '30 minutes'),
         v_date::timestamptz + interval '8 hours 5 minutes' + (v_idx * interval '30 minutes'),

@@ -12,6 +12,7 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
 import { rubberIntakeB2BService, type B2BRubberIntake } from '../../../services/b2b/rubberIntakeB2BService'
 import { partnerService, type Partner } from '../../../services/b2b/partnerService'
+import { partnerBankService, type EffectiveBank } from '../../../services/b2b/partnerBankService'
 import { RAW_RUBBER_TYPE_LABELS, type RawRubberType } from '../../../services/b2b/intakeManualEntryService'
 
 export default function B2BRubberIntakePrintPage() {
@@ -22,6 +23,7 @@ export default function B2BRubberIntakePrintPage() {
   const [item, setItem] = useState<B2BRubberIntake | null>(null)
   const [partner, setPartner] = useState<Partner | null>(null)
   const [proxyName, setProxyName] = useState<string | null>(null)
+  const [effectiveBank, setEffectiveBank] = useState<EffectiveBank | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,6 +38,9 @@ export default function B2BRubberIntakePrintPage() {
           const proxy = await partnerService.getPartnerById(p.payment_proxy_partner_id)
           setProxyName(proxy?.name || null)
         }
+        // Effective bank (theo proxy chain) cho Liên 2
+        const eb = await partnerBankService.getEffectiveBank(data.b2b_partner_id).catch(() => null)
+        setEffectiveBank(eb)
       }
       setLoading(false)
     })
@@ -81,13 +86,13 @@ export default function B2BRubberIntakePrintPage() {
       {/* Preview area — 1 trang A4 */}
       <div className="no-print bg-gray-200 min-h-[calc(100vh-56px)] py-6 px-4 flex flex-col items-center">
         <div className="bg-white shadow-md" style={{ width: '210mm', minHeight: '297mm', padding: '14mm 14mm' }}>
-          {lien2 ? <CustomerSlip item={item} partner={partner} proxyName={proxyName} /> : <PnkSheet item={item} proxyName={proxyName} />}
+          {lien2 ? <CustomerSlip item={item} partner={partner} proxyName={proxyName} effectiveBank={effectiveBank} /> : <PnkSheet item={item} proxyName={proxyName} effectiveBank={effectiveBank} />}
         </div>
       </div>
 
       {/* Print-only content */}
       <div className="print-only">
-        {lien2 ? <CustomerSlip item={item} partner={partner} proxyName={proxyName} /> : <PnkSheet item={item} proxyName={proxyName} />}
+        {lien2 ? <CustomerSlip item={item} partner={partner} proxyName={proxyName} effectiveBank={effectiveBank} /> : <PnkSheet item={item} proxyName={proxyName} effectiveBank={effectiveBank} />}
       </div>
 
       <style>{`
@@ -107,7 +112,7 @@ export default function B2BRubberIntakePrintPage() {
 // PNK SHEET — 1 trang A4 nội bộ
 // ============================================================================
 
-function PnkSheet({ item, proxyName }: { item: B2BRubberIntake; proxyName: string | null }) {
+function PnkSheet({ item, proxyName, effectiveBank }: { item: B2BRubberIntake; proxyName: string | null; effectiveBank?: EffectiveBank | null }) {
   const netKg = item.net_weight_kg || 0
   const dryKg = item.dry_weight_kg ?? (item.drc_percent != null && netKg ? Math.round(netKg * item.drc_percent / 100 * 100) / 100 : null)
   const amount = item.total_amount || (item.settled_qty_ton && item.settled_price_per_ton ? item.settled_qty_ton * item.settled_price_per_ton : 0)
@@ -190,12 +195,25 @@ function PnkSheet({ item, proxyName }: { item: B2BRubberIntake; proxyName: strin
               )}
             </td>
           </tr>
-          {proxyName && (
+          {(effectiveBank || proxyName) && (
             <tr>
-              <td style={tdLabel}>Trả tiền hộ qua</td>
-              <td style={{ ...tdValue, color: '#9333EA' }} colSpan={3}>
-                <strong>{proxyName}</strong>
-                <span style={{ marginLeft: 6, fontSize: 11, color: '#6B7280' }}>(đại lý đầu mối)</span>
+              <td style={tdLabel}>Tài khoản nhận</td>
+              <td style={{ ...tdValue, fontWeight: 600 }} colSpan={3}>
+                {effectiveBank ? (
+                  <>
+                    <span style={{ fontFamily: 'monospace' }}>{partnerBankService.formatBankLine(effectiveBank)}</span>
+                    {effectiveBank.via === 'proxy' && effectiveBank.proxy_partner_name && (
+                      <span style={{ marginLeft: 6, color: '#9333EA', fontSize: 11 }}>
+                        (chuyển hộ qua <strong>{effectiveBank.proxy_partner_name}</strong>)
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ color: '#9333EA' }}>
+                    Trả qua: <strong>{proxyName}</strong>
+                    <span style={{ marginLeft: 6, fontSize: 11, color: '#6B7280' }}>(chưa khai TK — cần khai báo)</span>
+                  </span>
+                )}
               </td>
             </tr>
           )}
@@ -318,7 +336,7 @@ function PnkSheet({ item, proxyName }: { item: B2BRubberIntake; proxyName: strin
 // Khớp mẫu Excel "PNK & TT" của HAQT/Tân Lâm. 1 phiếu nhập = 1 liên giao người bán.
 // ============================================================================
 
-function CustomerSlip({ item, partner, proxyName }: { item: B2BRubberIntake; partner: Partner | null; proxyName: string | null }) {
+function CustomerSlip({ item, partner, proxyName, effectiveBank }: { item: B2BRubberIntake; partner: Partner | null; proxyName: string | null; effectiveBank?: EffectiveBank | null }) {
   const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('vi-VN') : '—'
   const d = new Date(item.intake_date)
   const dd = String(d.getDate()).padStart(2, '0')
@@ -381,6 +399,14 @@ function CustomerSlip({ item, partner, proxyName }: { item: B2BRubberIntake; par
         <div>Địa chỉ : {address}</div>
         <div>CMND: …...........................Ngày cấp : ….............. Nơi cấp: ….........................</div>
         <div>Hình thức thanh toán : Chuyển khoản quỹ</div>
+        {effectiveBank && (
+          <div>
+            Tài khoản nhận: <strong>{partnerBankService.formatBankLine(effectiveBank)}</strong>
+            {effectiveBank.via === 'proxy' && effectiveBank.proxy_partner_name && (
+              <em style={{ fontSize: 11.5, marginLeft: 6 }}>(chuyển hộ qua {effectiveBank.proxy_partner_name})</em>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}

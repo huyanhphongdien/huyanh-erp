@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { partnerBankService } from '../b2b/partnerBankService'
 
 export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled'
 export type PaymentLineSource = 'deal' | 'supplier' | 'manual'
@@ -312,6 +313,8 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
   const dealNumbers = await fetchDealNumbers(rows.map(r => r.deal_id).filter(Boolean))
   const dealPrices = await fetchDealUnitPrices(rows.map(r => r.deal_id).filter(Boolean))
   const supplierBanks = await fetchSupplierBanks(rows.map(r => r.supplier_id).filter(Boolean))
+  // B2B partner banks (theo proxy chain nếu có payment_proxy_partner_id)
+  const partnerBanks = await partnerBankService.getEffectiveBanksBatch(rows.map(r => r.partner_id).filter(Boolean))
   const pcgMap = await resolvePcgForTickets(rows)
 
   return rows.map((r): AvailableTicket => {
@@ -341,6 +344,21 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       }
     }
 
+    // Resolve bank → payee_note. Supplier: rubber_suppliers; còn lại (deal/bộc phát):
+    // b2b_partner_banks theo proxy chain. Có note "chuyển hộ qua X" khi via proxy.
+    let payeeNote = ''
+    if (source === 'supplier' && r.supplier_id) {
+      payeeNote = supplierBanks.get(r.supplier_id) || ''
+    } else if (r.partner_id) {
+      const eb = partnerBanks.get(r.partner_id)
+      if (eb) {
+        payeeNote = partnerBankService.formatBankLine(eb)
+        if (eb.via === 'proxy' && eb.proxy_partner_name) {
+          payeeNote += ` (chuyển hộ qua ${eb.proxy_partner_name})`
+        }
+      }
+    }
+
     return {
       id: r.id,
       code: r.code,
@@ -359,7 +377,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       facility_id: r.facility_id ?? null,
       source_type: source,
       payee_name: payee,
-      payee_note: source === 'supplier' && r.supplier_id ? (supplierBanks.get(r.supplier_id) || '') : '',
+      payee_note: payeeNote,
       deal_number: r.deal_id ? dealNumbers.get(r.deal_id) || null : null,
       suggested_amount: roundThousand(bw * price),
       price_source: priceSource,

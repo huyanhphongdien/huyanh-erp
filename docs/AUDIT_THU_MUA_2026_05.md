@@ -58,6 +58,15 @@
 - **Vấn đề**: PrintPage render `deduction` (dòng "Tạp chất - X kg") nhưng giá trị luôn = 0 vì không nhập được. Nghiệp vụ tạp chất hoàn toàn không hoạt động.
 - **Fix direction**: Thêm InputNumber "Tạp chất (kg)" vào card "Thông tin mủ" hoặc card riêng "Giảm trừ". Recalculate net khi đổi.
 
+### B-8. 🔴 **CRITICAL — `markPaid` BỎ QUA dòng bộc phát khi ghi ledger (banner báo "đã ghi" nhưng DB rỗng)**
+- **Vị trí**: [paymentRequestService.ts markPaid line 814-820](src/services/wms/paymentRequestService.ts#L814-L820).
+- **Vấn đề**: Điều kiện cũ `if (l.source_type === 'deal' && l.partner_id && ...)` chỉ ghi `b2b.partner_ledger` cho dòng **deal** (Luồng A — chat ra deal). Toàn bộ Luồng B (bộc phát qua PCG) có `source_type='manual'` → bị skip. Banner UI vẫn báo "Đã chi — đã ghi công nợ (PA1)" vì hàm trả về thành công, nhưng `b2b.partner_ledger` rỗng. Phát hiện qua E2E test 30/05/2026 trên TMMN-SEED-001 (2 dòng bộc phát NTT + NTHG): banner xanh nhưng `SELECT FROM b2b.partner_ledger WHERE payment_id=...` trả 0 rows. Vì ~80% giao dịch thực tế ở Tân Lâm là bộc phát, **công nợ đại lý sẽ sai vĩnh viễn**, BGĐ tổng hợp tài chính dựa trên ledger sẽ thiếu đầu credit của hầu hết partners.
+- **Fix applied (commit này)**: Đổi điều kiện thành `if (l.source_type !== 'supplier' && l.partner_id && l.amount > 0)`. Cách này:
+  - Bao luôn `deal` + `manual` (bộc phát) qua một guard duy nhất theo `partner_id`.
+  - Loại `supplier` (đã có nhánh riêng update `rubber_intake_batches.paid_amount`).
+  - Loại dòng phí PCG (vì có `partner_id=null` + `amount < 0`).
+- **Cần làm tiếp**: chạy lại E2E test → verify 2 ledger entries cho NTT + NTHG (credit ở partner-side, không phải proxy). Thêm UNIQUE constraint trên `(partner_id, reference_code)` để fix luôn G-4.
+
 ---
 
 ## 🟡 GAP (thiếu chức năng, chặn E2E)

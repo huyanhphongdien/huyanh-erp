@@ -800,8 +800,9 @@ async function cancel(id: string): Promise<PaymentRequest> {
 
 /**
  * Đánh dấu ĐÃ CHI + ghi sổ công nợ (PA1 — đây là cửa chi tiền duy nhất).
- *  - Dòng deal/partner → bút toán b2b_partner_ledger 'payment_paid' (credit), gộp theo partner.
+ *  - Dòng partner (deal hoặc bộc phát qua PCG) → bút toán b2b_partner_ledger 'payment_paid' (credit), gộp theo partner.
  *  - Dòng mua lẻ (supplier) → cập nhật rubber_intake_batches.paid_amount/payment_status (best-effort qua ticket).
+ *  - Dòng phí (fee) không có partner_id → bỏ qua.
  * Idempotent: ledger theo reference_code; gọi lại an toàn.
  */
 async function markPaid(id: string, userId?: string | null): Promise<PaymentRequest> {
@@ -811,10 +812,12 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
   if (request.status === 'paid') return request
   if (request.status !== 'approved') throw new Error('Chỉ chi khi phiếu ở trạng thái "Đã duyệt"')
 
-  // 1) Ledger payment_paid cho dòng deal/partner — gộp theo partner
+  // 1) Ledger payment_paid cho dòng có partner (deal + bộc phát) — gộp theo partner.
+  //    Loại trừ 'supplier' (đi qua nhánh batch) và dòng phí không có partner_id.
   const partnerSums = new Map<string, number>()
   for (const l of lines) {
-    if (l.source_type === 'deal' && l.partner_id && (l.amount || 0) > 0) {
+    if (l.source_type === 'supplier') continue
+    if (l.partner_id && (l.amount || 0) > 0) {
       partnerSums.set(l.partner_id, (partnerSums.get(l.partner_id) || 0) + l.amount)
     }
   }

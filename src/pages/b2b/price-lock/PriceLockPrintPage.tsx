@@ -78,16 +78,21 @@ function Sheet({ t }: { t: PriceLockTicket }) {
 
   return (
     <div style={{ fontFamily: "'Times New Roman', serif", fontSize: 12.5, color: '#000' }}>
-      {/* Top band: logo · title · form code */}
-      <div style={{ display: 'flex', alignItems: 'stretch', border: bd }}>
-        <div style={{ ...cell, width: 150, display: 'flex', alignItems: 'center', gap: 6, borderRight: bd }}>
-          <img src={logoImg} alt="Huy Anh" style={{ height: 34 }} />
-          <span style={{ fontWeight: 700, fontSize: 11 }}>HUY ANH<br />Natural Rubber</span>
+      {/* Company header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 10px', border: bd }}>
+        <img src={logoImg} alt="Huy Anh" style={{ height: 48, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+        <div style={{ lineHeight: 1.4, flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 13.5 }}>CÔNG TY TNHH MỘT THÀNH VIÊN CAO SU HUY ANH PHONG ĐIỀN</div>
+          <div style={{ fontSize: 11.5, color: '#222' }}>MST: 3301549896 · Khe Mạ, Phường Phong Điền, TP Huế · ĐT: 0963.504.688</div>
         </div>
-        <div style={{ ...cell, flex: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, fontWeight: 800, letterSpacing: 1, borderRight: bd }}>
+      </div>
+
+      {/* Title + form code band */}
+      <div style={{ display: 'flex', border: bd, borderTop: 'none', minHeight: 56 }}>
+        <div style={{ ...cell, flex: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, letterSpacing: 1, borderRight: bd }}>
           PHIẾU CHỐT GIÁ
         </div>
-        <div style={{ ...cell, width: 180, fontSize: 10.5, lineHeight: 1.5 }}>
+        <div style={{ ...cell, width: 200, fontSize: 11, lineHeight: 1.7 }}>
           <div>BM: CL.BMQT.KH.01.01</div>
           <div>Ngày ban hành: 29/04/2025</div>
           <div>Số phiếu: <strong>{t.code || '…'}</strong></div>
@@ -133,7 +138,11 @@ function Sheet({ t }: { t: PriceLockTicket }) {
         </thead>
         <tbody>
           {dealers.length === 0 && (
-            <tr><td style={feeTd} colSpan={6}>&nbsp;</td></tr>
+            <tr>
+              <td style={{ ...feeTd, textAlign: 'center', color: '#888', fontStyle: 'italic', padding: '12px 6px' }} colSpan={6}>
+                (Chưa nhập đại lý)
+              </td>
+            </tr>
           )}
           {dealers.map((d, i) => (
             <tr key={i}>
@@ -156,13 +165,14 @@ function Sheet({ t }: { t: PriceLockTicket }) {
         <span>Cao: <strong>{fmt(t.price_high_per_ton) || '…'}</strong></span>
       </div>
 
-      {/* CÁC PHÍ PHẢI CHI */}
+      {/* CÁC PHÍ PHẢI CHI — checkbox tick nếu fee_flags hoặc có dòng fee với label đó */}
       <div style={{ border: bd, borderTop: 'none' }}>
         <div style={secHead}>CÁC PHÍ PHẢI CHI</div>
         <div style={{ padding: '5px 6px' }}>
-          {Object.entries(FEE_FLAG_LABELS).map(([k, v]) => (
-            <Chk key={k} on={!!(t.fee_flags || {})[k]} label={v} />
-          ))}
+          {Object.entries(FEE_FLAG_LABELS).map(([k, label]) => {
+            const isApplied = !!(t.fee_flags || {})[k] || (t.fees || []).some((f) => f.label === label)
+            return <Chk key={k} on={isApplied} label={label} />
+          })}
         </div>
       </div>
 

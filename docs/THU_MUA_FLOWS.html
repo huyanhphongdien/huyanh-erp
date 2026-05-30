@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Module Thu Mua — Sơ đồ chi tiết các luồng nghiệp vụ</title>
+<style>
+  :root {
+    --primary: #1B4D3E;
+    --primary-light: #DCFCE7;
+    --accent: #D97706;
+    --deal: #15803D;
+    --pcg: #B45309;
+    --manual: #DC2626;
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-400: #9CA3AF;
+    --gray-600: #4B5563;
+    --gray-800: #1F2937;
+    --gray-900: #111827;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    line-height: 1.6;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+  }
+  nav.toc {
+    background: var(--gray-900);
+    color: #fff;
+    padding: 24px 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav.toc h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+    color: #fff;
+  }
+  nav.toc .sub {
+    font-size: 11.5px;
+    color: var(--gray-400);
+    margin-bottom: 20px;
+  }
+  nav.toc ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13.5px;
+  }
+  nav.toc ol li { margin: 4px 0; }
+  nav.toc a {
+    color: #D1D5DB;
+    text-decoration: none;
+    display: block;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  nav.toc a:hover { background: rgba(255,255,255,0.06); color: #fff; }
+
+  main { padding: 32px 48px; max-width: 980px; }
+  section { margin-bottom: 64px; scroll-margin-top: 24px; }
+  h2 {
+    font-size: 26px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--primary);
+    padding-bottom: 8px;
+    margin-top: 0;
+    margin-bottom: 20px;
+  }
+  h3 { color: var(--gray-900); font-size: 18px; margin-top: 28px; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    margin: 0 2px;
+  }
+  .b-deal { background: #DCFCE7; color: var(--deal); }
+  .b-pcg { background: #FEF3C7; color: var(--pcg); }
+  .b-manual { background: #FEE2E2; color: var(--manual); }
+  .b-info { background: #DBEAFE; color: #1E40AF; }
+  .b-warn { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 16px 8px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid var(--gray-200);
+    margin: 16px 0;
+  }
+  .flow .step {
+    min-width: 140px;
+    flex: 0 0 auto;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--primary-light);
+    border: 2px solid var(--primary);
+    text-align: center;
+    font-size: 13px;
+    position: relative;
+  }
+  .flow .step.deal { background: #DCFCE7; border-color: var(--deal); }
+  .flow .step.pcg { background: #FEF3C7; border-color: var(--pcg); }
+  .flow .step.action { background: #FEE2E2; border-color: var(--manual); }
+  .flow .step.print { background: #DBEAFE; border-color: #1E40AF; }
+  .flow .step b { display: block; font-size: 12px; color: var(--gray-900); }
+  .flow .step small { display: block; font-size: 10.5px; color: var(--gray-600); margin-top: 4px; }
+  .flow .arrow {
+    align-self: center;
+    color: var(--primary);
+    font-size: 22px;
+    flex: 0 0 auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+  }
+  th { background: var(--primary); color: #fff; text-align: left; padding: 10px 12px; font-size: 13px; }
+  td { padding: 9px 12px; border-top: 1px solid var(--gray-200); font-size: 13.5px; }
+  tr:nth-child(even) td { background: var(--gray-50); }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-left: 4px solid var(--primary);
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin: 12px 0;
+  }
+  .panel.warn { border-left-color: var(--accent); background: #FFFBEB; }
+  .panel.danger { border-left-color: var(--manual); background: #FEF2F2; }
+  .panel h4 { margin: 0 0 6px; font-size: 14px; color: var(--gray-900); }
+  .panel p { margin: 4px 0; font-size: 13px; }
+  code {
+    background: var(--gray-100);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--primary);
+  }
+  pre {
+    background: var(--gray-900);
+    color: #E5E7EB;
+    padding: 14px 18px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+
+  /* Role lanes */
+  .lanes {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 1px;
+    background: var(--gray-200);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+    margin: 16px 0;
+  }
+  .lane-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .lane-body {
+    background: #fff;
+    padding: 12px;
+    font-size: 13.5px;
+  }
+  .lane-body ol { margin: 0; padding-left: 18px; }
+  .lane-body li { margin: 4px 0; }
+
+  /* Print */
+  @media print {
+    nav.toc { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    main { padding: 16px; max-width: 100%; }
+    section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc">
+  <h1>Module Thu Mua</h1>
+  <div class="sub">Sơ đồ luồng chi tiết<br>Cao Su Huy Anh — 2026-05</div>
+  <ol>
+    <li><a href="#overview">1. Tổng quan</a></li>
+    <li><a href="#flows">2. 4 luồng nghiệp vụ</a></li>
+    <li><a href="#weighing">3. Cân (Weighbridge)</a></li>
+    <li><a href="#pcg">4. Phiếu chốt giá</a></li>
+    <li><a href="#dntt">5. Đề nghị thanh toán</a></li>
+    <li><a href="#lien2">6. Liên 2 giao khách</a></li>
+    <li><a href="#bank">7. TK ngân hàng + proxy</a></li>
+    <li><a href="#stats">8. Thống kê + Thưởng</a></li>
+    <li><a href="#errors">9. Sự cố thường gặp</a></li>
+    <li><a href="#ids">Phụ lục: Mã định danh</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="overview">
+  <h2>1. Tổng quan module Thu Mua</h2>
+  <p>Module Thu Mua quản lý toàn bộ luồng mua mủ cao su từ đại lý / NCC, gồm 3 phần mềm liên thông:</p>
+  <table>
+    <tr><th>Hệ thống</th><th>URL</th><th>Người dùng chính</th></tr>
+    <tr><td>App Cân</td><td><code>/wb</code> (sub-app)</td><td>Nhân viên trạm cân</td></tr>
+    <tr><td>ERP Thu Mua</td><td>huyanhrubber.vn</td><td>Kế toán, BGĐ, Thu mua</td></tr>
+    <tr><td>Portal B2B</td><td>b2b.huyanhrubber.vn</td><td>Đại lý (tự xem deal, công nợ)</td></tr>
+  </table>
+  <p>Module trả lời <b>4 câu hỏi</b>:</p>
+  <ol>
+    <li><b>Cân gì?</b> — Phiếu cân (<code>weighbridge_tickets</code>): xe nào, KL bao nhiêu, DRC bao nhiêu.</li>
+    <li><b>Giá gì?</b> — Từ <span class="badge b-deal">Deal</span> hoặc <span class="badge b-pcg">PCG</span>, fallback <span class="badge b-manual">Thủ công</span>.</li>
+    <li><b>Trả ai?</b> — TK ngân hàng đại lý (có thể qua proxy).</li>
+    <li><b>Trả bao nhiêu?</b> — ĐNTT gom phiếu cân + tính KL khô × giá - phí.</li>
+  </ol>
+</section>
+
+<section id="flows">
+  <h2>2. 4 luồng nghiệp vụ</h2>
+
+  <h3>2.1 Luồng A — Deal có kế hoạch (qua chat B2B)</h3>
+  <div class="flow">
+    <div class="step deal"><b>Chat B2B</b><small>Đại lý + Sale thoả thuận</small></div>
+    <span class="arrow">→</span>
+    <div class="step deal"><b>Confirm Deal</b><small>Giá + KL chốt</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Cân</b><small>Nguồn = Deal</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Auto Intake</b><small>Bridge tự tạo</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>ĐNTT</b><small>Giá lấy từ deal</small></div>
+    <span class="arrow">→</span>
+    <div class="step action"><b>BGĐ duyệt</b><small>+ Chuyển khoản</small></div>
+  </div>
+
+  <h3>2.2 Luồng B — Bộc phát (đại lý đến đột xuất) — Phổ biến nhất ~80%</h3>
+  <div class="flow">
+    <div class="step pcg"><b>Đại lý đến</b><small>KHÔNG có deal</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Cân</b><small>Nguồn = Bộc phát<br>+ chọn đại lý</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Auto Intake</b><small>"Chưa chốt giá"</small></div>
+    <span class="arrow">→</span>
+    <div class="step pcg"><b>Cuối ngày</b><small>Thu mua lập PCG</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>ĐNTT</b><small>Resolver: PCG → giá</small></div>
+    <span class="arrow">→</span>
+    <div class="step action"><b>BGĐ duyệt</b><small>+ Chuyển khoản</small></div>
+  </div>
+
+  <h3>2.3 Luồng C — NCC lẻ / Mủ Lào</h3>
+  <div class="flow">
+    <div class="step"><b>NCC đến</b><small>Đã thoả thuận giá</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Cân</b><small>Nguồn = NCC</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Auto Intake</b><small>source = lao/vietnam</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>ĐNTT</b><small>Giá NCC mua lẻ</small></div>
+    <span class="arrow">→</span>
+    <div class="step action"><b>Chuyển khoản</b></div>
+  </div>
+
+  <h3>2.4 Luồng D — Chuyển kho nội bộ</h3>
+  <div class="flow">
+    <div class="step"><b>Xe nội bộ</b><small>Chở giữa các cơ sở</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Cân</b><small>source_type = transfer</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>Cập nhật tồn kho</b><small>Không tạo ĐNTT</small></div>
+  </div>
+</section>
+
+<section id="weighing">
+  <h2>3. Quy trình cân (App Cân)</h2>
+
+  <h3>3.1 Trình tự 3 bước</h3>
+  <div class="flow">
+    <div class="step"><b>1. Cân Gross</b><small>Xe + mủ vào cân<br>Chụp ảnh L1</small></div>
+    <span class="arrow">→</span>
+    <div class="step pcg"><b>2. Đo DRC</b><small>(chỉ mủ nước)<br>ĐỐT → DRC lookup</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>3. Cân Tare</b><small>Xe rỗng<br>Chụp ảnh L2<br>+ status='completed'</small></div>
+    <span class="arrow">→</span>
+    <div class="step deal"><b>Bridge auto</b><small>Tạo rubber_intake_batches</small></div>
+  </div>
+
+  <div class="panel">
+    <h4>Tính toán tự động</h4>
+    <p><code>NET = Gross - Tare - Tạp chất</code></p>
+    <p><code>KL khô = NET × DRC% / 100</code> (chỉ mủ nước)</p>
+    <p><b>price_unit</b> tự suy: <code>mu_nuoc → dry</code>, các loại khác → <code>wet</code>.</p>
+  </div>
+
+  <h3>3.2 Khổ giấy in</h3>
+  <table>
+    <tr><th>Khổ</th><th>Dùng cho</th><th>Font</th></tr>
+    <tr><td>A4</td><td>Chứng từ chính thức</td><td>Times New Roman (serif)</td></tr>
+    <tr><td>A5 ngang</td><td>Tiết kiệm giấy</td><td>Times New Roman (compact)</td></tr>
+    <tr><td>Nhiệt 80mm</td><td>Phiếu nhanh tại cân</td><td>Be Vietnam Pro (sans)</td></tr>
+    <tr><td>Nhiệt 58mm</td><td>Phiếu mini</td><td>Be Vietnam Pro (sans)</td></tr>
+  </table>
+
+  <h3>3.3 Vai trò trên app cân</h3>
+  <div class="lanes">
+    <div class="lane-header">Operator cân</div>
+    <div class="lane-body"><ol>
+      <li>Tạo phiếu mới, nhập xe + tài xế</li>
+      <li>Chọn nguồn (Deal / NCC / Bộc phát) + đại lý</li>
+      <li>Bấm Cân lần 1 → đọc gross + chụp ảnh</li>
+      <li>Đo metrolac, nhập ĐỐT</li>
+      <li>Bấm Cân lần 2 → đọc tare + chụp ảnh</li>
+      <li>In phiếu cân giao tài xế</li>
+    </ol></div>
+    <div class="lane-header">QC</div>
+    <div class="lane-body">Kiểm tra DRC định kỳ. Khi <code>drc_lookup</code> thay đổi, operator được thông báo refresh cache.</div>
+    <div class="lane-header">Bảo vệ</div>
+    <div class="lane-body">Kiểm tra biển số xe khớp với phiếu. Cảnh báo nếu biển số đã cân lần khác cùng ngày.</div>
+  </div>
+</section>
+
+<section id="pcg">
+  <h2>4. Phiếu chốt giá (PCG)</h2>
+  <p><b>Chỉ áp dụng cho luồng B (bộc phát)</b>. Cuối ngày Thu mua lập PCG cho toàn bộ đại lý đã giao mủ.</p>
+
+  <h3>4.1 Cấu trúc 1 PCG</h3>
+  <table>
+    <tr><th>Phần</th><th>Nội dung</th></tr>
+    <tr><td>Header</td><td>Mã PCG-YYYY-NNNN, Ngày chốt, Cơ sở, Hình thức mua</td></tr>
+    <tr><td>Danh sách đại lý + giá áp</td><td><b>1 phiếu = nhiều đại lý</b>. Mỗi dòng: đại lý + KL/DRC dự kiến + <b>giá áp (đ/tấn)</b></td></tr>
+    <tr><td>Bảng giá tham chiếu</td><td>Sàn / Trung / Cao (đ/tấn)</td></tr>
+    <tr><td>Loại tiền + tỷ giá</td><td>VNĐ / KIP / THB</td></tr>
+    <tr><td>Các phí phải chi</td><td>Tick checkbox + nhập giá (theo tấn / theo lô)</td></tr>
+    <tr><td>Thời gian</td><td>Ngày cân (từ - đến) — phạm vi match phiếu cân</td></tr>
+    <tr><td>Người chốt giá</td><td>Lê Thì / Nguyễn Nhật Tân</td></tr>
+  </table>
+
+  <h3>4.2 State machine</h3>
+  <div class="flow">
+    <div class="step"><b>draft</b><small>Soạn thảo</small></div>
+    <span class="arrow">→</span>
+    <div class="step deal"><b>locked</b><small>Đã chốt, sẵn sàng match</small></div>
+    <span class="arrow">→</span>
+    <div class="step pcg"><b>used</b><small>Đã match vào ĐNTT<br>(auto sau create ĐNTT)</small></div>
+    <span class="arrow">↓</span>
+    <div class="step action"><b>cancelled</b><small>Huỷ thủ công</small></div>
+  </div>
+
+  <div class="panel warn">
+    <h4>Quy tắc resolver PCG (paymentRequestService.resolvePcgForTickets)</h4>
+    <p>Khi dựng ĐNTT, mỗi phiếu cân bộc phát được match PCG theo:</p>
+    <ol>
+      <li>Cùng <code>facility_id</code></li>
+      <li>Ngày cân ∈ <code>[weigh_from, weigh_to]</code> (nếu có) hoặc <code>lock_date</code> trùng ngày</li>
+      <li>PCG có dòng đại lý khớp <code>partner_id</code> và <code>price_per_ton</code> &gt; 0</li>
+      <li>Status <code>locked</code></li>
+      <li>Nhiều PCG khớp → lấy <code>lock_date</code> mới nhất</li>
+    </ol>
+  </div>
+</section>
+
+<section id="dntt">
+  <h2>5. Đề nghị thanh toán (ĐNTT)</h2>
+
+  <h3>5.1 Resolver giá ở ĐNTT</h3>
+  <div class="flow">
+    <div class="step"><b>Phiếu cân</b><small>weight + DRC</small></div>
+    <span class="arrow">→</span>
+    <div class="step deal"><b>Có deal_id?</b><small>→ deal.unit_price</small></div>
+    <span class="arrow">↓</span>
+    <div class="step pcg"><b>Match PCG?</b><small>→ price_per_ton / 1000</small></div>
+    <span class="arrow">↓</span>
+    <div class="step action"><b>Thủ công</b><small>amount = 0<br>kế toán nhập tay</small></div>
+  </div>
+
+  <h3>5.2 Badge "Nguồn giá" trên màn tạo ĐNTT</h3>
+  <p>Mỗi phiếu cân hiện 1 trong các badge:</p>
+  <ul>
+    <li><span class="badge b-deal">Giá deal</span> — giá từ Deal (Luồng A)</li>
+    <li><span class="badge b-pcg">Giá PCG-XXXX</span> — match PCG (Luồng B)</li>
+    <li><span class="badge b-manual">⚠ Chưa có giá</span> — không match → nhập tay</li>
+    <li><span class="badge b-warn">⚠ Thiếu DRC</span> — mủ nước thiếu DRC → amount=0, nhập tay</li>
+  </ul>
+
+  <h3>5.3 Cấu trúc dòng ĐNTT</h3>
+  <table>
+    <tr><th>Loại dòng</th><th>amount</th><th>Ghi chú</th></tr>
+    <tr><td>Phiếu cân thường</td><td>KL khô × đơn giá (làm tròn nghìn)</td><td>Từ deal/PCG/thủ công</td></tr>
+    <tr><td><b>Phí áp dụng (PCG XXX)</b></td><td><b>ÂM</b> = -(per-ton fee × tổng KL khô + per-lot fee 1 lần)</td><td>BGĐ thấy rõ phí trừ</td></tr>
+  </table>
+
+  <h3>5.4 Workflow trạng thái</h3>
+  <div class="flow">
+    <div class="step"><b>draft</b><small>Soạn thảo</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>submitted</b><small>Trình duyệt</small></div>
+    <span class="arrow">→</span>
+    <div class="step deal"><b>approved</b><small>BGĐ duyệt</small></div>
+    <span class="arrow">→</span>
+    <div class="step pcg"><b>paid</b><small>Kế toán chi tiền</small></div>
+  </div>
+
+  <div class="panel">
+    <h4>Atomic create (Commit D)</h4>
+    <p>Logic <code>paymentRequestService.create()</code>: bọc INSERT lines + UPDATE tickets + markUsed PCG trong try/catch. Nếu lỗi giữa chừng → DELETE header → không orphan.</p>
+  </div>
+</section>
+
+<section id="lien2">
+  <h2>6. Liên 2 — Xác nhận khối lượng & thanh toán</h2>
+
+  <p>Bản giấy <b>giao đại lý</b> sau khi cân — để đại lý đến thanh toán mang theo.</p>
+
+  <h3>6.1 Nội dung trên Liên 2</h3>
+  <div class="panel">
+    <h4>Header công ty</h4>
+    <p>CTY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN · MST · Địa chỉ · ĐT</p>
+    <h4>Thông tin phiếu</h4>
+    <p>Số phiếu (PNK), Ngày, Điểm thu mua, Số hiệu (TMMN-XX)</p>
+    <h4>Người bán</h4>
+    <p>Họ tên + ĐT + Địa chỉ + CMND</p>
+    <h4>Tài khoản nhận</h4>
+    <p>STK + Tên chủ TK + Ngân hàng. <b>Nếu có proxy</b>: ghi "(chuyển hộ qua X)"</p>
+    <h4>Bảng KL + giá</h4>
+    <p>Loại mủ | Số xe | Khối lượng | Hàm lượng (ĐỐT + DRC) | Đơn giá | Thành tiền</p>
+    <h4>Ký</h4>
+    <p>KCS / Thanh toán / Khách hàng</p>
+  </div>
+
+  <h3>6.2 Cách in</h3>
+  <pre>B2B THU MUA → Nhập kho mủ → [Mở phiếu] → "In Liên 2"</pre>
+</section>
+
+<section id="bank">
+  <h2>7. Quản lý đại lý + TK ngân hàng</h2>
+
+  <h3>7.1 Mô hình proxy (đại lý đầu mối nhận tiền hộ)</h3>
+  <div class="flow">
+    <div class="step"><b>Nguyễn Thị Hiền</b><small>Đại lý bán mủ</small></div>
+    <span class="arrow">→</span>
+    <div class="step pcg"><b>payment_proxy_partner_id</b><small>→ Trần Thị Mỹ Hoà</small></div>
+    <span class="arrow">→</span>
+    <div class="step deal"><b>Trần Thị Mỹ Hoà</b><small>Có TK Agribank<br>is_payment_proxy=true</small></div>
+    <span class="arrow">→</span>
+    <div class="step"><b>ĐNTT in TK Mỹ Hoà</b><small>+ "chuyển hộ qua TM Hoà"</small></div>
+  </div>
+
+  <h3>7.2 Resolver TK chuyển tiền</h3>
+  <ol>
+    <li>Nếu partner có <code>payment_proxy_partner_id</code> → lấy TK default của <b>proxy</b>.</li>
+    <li>Else → TK default của <b>chính partner</b>.</li>
+    <li>Else → null → kế toán nhập tay.</li>
+  </ol>
+
+  <h3>7.3 Bảng b2b_partner_banks (multi TK)</h3>
+  <p>Mỗi đại lý có thể có nhiều TK. 1 TK đặt <code>is_default=true</code> → in mặc định. Khi khách yêu cầu chuyển TK khác → tạo TK mới, set default mới, TK cũ giữ lịch sử.</p>
+</section>
+
+<section id="stats">
+  <h2>8. Thống kê + Thưởng đại lý</h2>
+
+  <h3>8.1 Thống kê tách Deal vs Bộc phát</h3>
+  <p>Trang <code>B2BRubberIntakeStatsPage</code> — bảng theo đại lý có cột:</p>
+  <table>
+    <tr><th>Đại lý</th><th>Phiếu</th><th>Khô từ Deal (T)</th><th>Khô bộc phát (T)</th><th>Tổng giá trị</th></tr>
+    <tr><td>Trần Thị Yến</td><td>7</td><td>4.2</td><td>2.4</td><td>425M</td></tr>
+    <tr><td>Lê Văn Thạo</td><td>8</td><td>0</td><td>4.8</td><td>285M</td></tr>
+  </table>
+
+  <h3>8.2 Quy chế thưởng 2026</h3>
+  <ul>
+    <li>Bonus tính theo <b>KL khô</b> (<code>dry_weight_kg</code>) — KHÔNG phải KL tươi.</li>
+    <li>Tier áp dụng: bronze / silver / gold / diamond → mức thưởng/tấn khác nhau.</li>
+    <li>Tier càng cao càng được thưởng cao + lợi tức.</li>
+    <li>Quy tắc "lấy mức cao nhất × toàn bộ" (không cộng dồn như 2025).</li>
+  </ul>
+
+  <h3>8.3 Quyết toán cuối quý</h3>
+  <p>Trang Quyết toán tổng hợp: công nợ + thưởng + advance đã chi → số cuối kỳ chuyển khoản.</p>
+</section>
+
+<section id="errors">
+  <h2>9. Sự cố thường gặp</h2>
+  <table>
+    <tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+    <tr><td>ĐNTT hiện "⚠ Chưa có giá"</td><td>Phiếu bộc phát, chưa có PCG khớp</td><td>Tạo PCG cho đại lý + ngày đó, hoặc nhập đơn giá tay</td></tr>
+    <tr><td>Liên 2 không có TK</td><td>Đại lý chưa khai TK</td><td>PartnerDetailPage → khai TK → set default</td></tr>
+    <tr><td>Bridge không tạo intake</td><td>Phiếu cân không có partner/supplier</td><td>Mở phiếu cân → chọn nguồn → save lại</td></tr>
+    <tr><td>PCG không match phiếu cân</td><td>Ngày cân ngoài range, hoặc partner sai</td><td>Sửa PCG (nếu draft) hoặc tạo PCG mới</td></tr>
+    <tr><td>"⚠ Thiếu DRC" + amount=0</td><td>Operator quên đo DRC mủ nước</td><td>Quay app cân update DRC, hoặc kế toán nhập tay</td></tr>
+    <tr><td>Thưởng tính sai</td><td>Intake không có hoặc dry_weight=0</td><td>Verify rubber_intake_batches có row, DRC &gt; 0</td></tr>
+  </table>
+</section>
+
+<section id="ids">
+  <h2>Phụ lục: Mã định danh</h2>
+  <table>
+    <tr><th>Loại</th><th>Cấu trúc</th><th>Ví dụ</th></tr>
+    <tr><td>Phiếu cân</td><td><code>CX-YYYYMMDD-NNN</code></td><td>CX-20260526-001</td></tr>
+    <tr><td>PNK (intake)</td><td>int seq per (cơ sở, năm)</td><td>73</td></tr>
+    <tr><td>PCG</td><td><code>PCG-YYYY-NNNN</code></td><td>PCG-2026-0001</td></tr>
+    <tr><td>ĐNTT</td><td><code>TMMN-YYMM-NNN</code></td><td>TMMN-2605-001</td></tr>
+    <tr><td>Đại lý</td><td>HAC-13 (13 chữ số)</td><td>8999100012346</td></tr>
+  </table>
+</section>
+
+<footer style="margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--gray-200); color: var(--gray-400); font-size: 12px;">
+  Tài liệu cập nhật theo audit Phase 3 (commits A→D). Cao Su Huy Anh — 2026-05-30.
+</footer>
+
+</main>
+</div>
+</body>
+</html>

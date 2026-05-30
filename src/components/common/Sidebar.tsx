@@ -262,15 +262,14 @@ const getMenuGroups = (
     // Công nợ: sổ + Báo cáo (1 menu, 2 tabs)
     // Dashboard: Tổng quan + Phân tích B2B (1 menu, 2 tabs)
     items: [
-      // Ẩn Dashboard (phân tích B2B) khỏi menu — 2026-05. Route /b2b vẫn còn.
-      // {
-      //   path: '/b2b',
-      //   label: 'Dashboard',
-      //   icon: <LayoutDashboard size={18} />,
-      //   requireB2BPurchaser: true,
-      //   tab: { key: 'b2b-dashboard', componentId: 'b2b-dashboard' },
-      //   extraActivePaths: ['/b2b/analytics'],
-      // },
+      {
+        path: '/b2b',
+        label: 'Dashboard',
+        icon: <LayoutDashboard size={18} />,
+        requireB2BPurchaser: true,
+        tab: { key: 'b2b-dashboard', componentId: 'b2b-dashboard' },
+        extraActivePaths: ['/b2b/analytics'],
+      },
       {
         path: '/b2b/chat',
         label: 'Chat Đại lý',

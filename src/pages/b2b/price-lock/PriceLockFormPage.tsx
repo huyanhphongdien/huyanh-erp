@@ -22,6 +22,9 @@ import {
   type PriceLockStatus,
 } from '../../../services/b2b/priceLockService'
 
+/** Danh sách Người chốt giá (cố định). */
+const SIGNER_LOCKER_OPTIONS = ['Lê Thì', 'Nguyễn Nhật Tân']
+
 /** Basis mặc định khi tick checkbox "Các phí phải chi" (theo form HAQT). */
 const FEE_FLAG_DEFAULT_BASIS: Record<string, 'ton' | 'lot'> = {
   boc_xep: 'ton',
@@ -227,9 +230,9 @@ export default function PriceLockFormPage() {
                         <input value={d.dealer_name} onChange={(e) => setDealer(i, { dealer_name: e.target.value })} placeholder="Tên đại lý" className={`${inputCls} mt-1`} />
                       )}
                     </td>
-                    <td className="px-2 py-1.5"><input type="number" value={d.expected_weight_kg ?? ''} onChange={(e) => setDealer(i, { expected_weight_kg: num(e.target.value) })} className={`${inputCls} text-right`} /></td>
+                    <td className="px-2 py-1.5"><NumInput value={d.expected_weight_kg} onChange={(v) => setDealer(i, { expected_weight_kg: v })} className={`${inputCls} text-right`} /></td>
                     <td className="px-2 py-1.5"><input type="number" step="0.1" value={d.expected_drc_percent ?? ''} onChange={(e) => setDealer(i, { expected_drc_percent: num(e.target.value) })} className={`${inputCls} text-right`} /></td>
-                    <td className="px-2 py-1.5"><input type="number" value={d.price_per_ton ?? ''} onChange={(e) => setDealer(i, { price_per_ton: num(e.target.value) })} className={`${inputCls} text-right font-mono`} /></td>
+                    <td className="px-2 py-1.5"><NumInput value={d.price_per_ton} onChange={(v) => setDealer(i, { price_per_ton: v })} className={`${inputCls} text-right font-mono`} /></td>
                     <td className="px-2 py-1.5"><input value={d.note ?? ''} onChange={(e) => setDealer(i, { note: e.target.value })} className={inputCls} /></td>
                     <td className="px-2 py-1.5 text-center">
                       <button onClick={() => removeDealer(i)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xoá dòng"><Trash2 size={15} /></button>
@@ -245,9 +248,9 @@ export default function PriceLockFormPage() {
         {/* Bảng giá tham chiếu & tiền tệ */}
         <Card title="Bảng giá cao su tham chiếu & loại tiền">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Field label="Giá cao su SÀN (đ/tấn)"><input type="number" value={form.price_floor_per_ton ?? ''} onChange={(e) => set('price_floor_per_ton', num(e.target.value))} className={inputCls} /></Field>
-            <Field label="Giá cao su TRUNG (đ/tấn)"><input type="number" value={form.price_mid_per_ton ?? ''} onChange={(e) => set('price_mid_per_ton', num(e.target.value))} className={inputCls} /></Field>
-            <Field label="Giá cao su CAO (đ/tấn)"><input type="number" value={form.price_high_per_ton ?? ''} onChange={(e) => set('price_high_per_ton', num(e.target.value))} className={inputCls} /></Field>
+            <Field label="Giá cao su SÀN (đ/tấn)"><NumInput value={form.price_floor_per_ton} onChange={(v) => set('price_floor_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su TRUNG (đ/tấn)"><NumInput value={form.price_mid_per_ton} onChange={(v) => set('price_mid_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su CAO (đ/tấn)"><NumInput value={form.price_high_per_ton} onChange={(v) => set('price_high_per_ton', v)} className={inputCls} /></Field>
             <Field label="Loại tiền">
               <select value={form.currency} onChange={(e) => set('currency', e.target.value as PriceLockCurrency)} className={inputCls}>
                 <option value="VND">VNĐ</option><option value="KIP">KIP</option><option value="THB">THB</option><option value="OTHER">Khác</option>
@@ -298,10 +301,9 @@ export default function PriceLockFormPage() {
                   >
                     <option value="ton">Theo tấn</option><option value="lot">Theo lô</option>
                   </select>
-                  <input
-                    type="number"
-                    value={fee?.amount ?? 0}
-                    onChange={(e) => updateStandardFee(label, { amount: Number(e.target.value) || 0 })}
+                  <NumInput
+                    value={fee?.amount ?? null}
+                    onChange={(v) => updateStandardFee(label, { amount: v ?? 0 })}
                     disabled={!checked}
                     placeholder="Nhập giá"
                     style={{ flex: '1 1 0', minWidth: 0 }}
@@ -334,10 +336,9 @@ export default function PriceLockFormPage() {
                     >
                       <option value="ton">Theo tấn</option><option value="lot">Theo lô</option>
                     </select>
-                    <input
-                      type="number"
+                    <NumInput
                       value={fee.amount}
-                      onChange={(e) => setFee(idx, { amount: Number(e.target.value) || 0 })}
+                      onChange={(v) => setFee(idx, { amount: v ?? 0 })}
                       placeholder="Nhập giá"
                       style={{ flex: '1 1 0', minWidth: 0 }}
                       className={`${feeCls} text-right font-mono`}
@@ -362,7 +363,12 @@ export default function PriceLockFormPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Field label="Ngày cân (từ)"><input type="date" value={form.weigh_from || ''} onChange={(e) => set('weigh_from', e.target.value || null)} className={inputCls} /></Field>
             <Field label="Ngày cân (đến)"><input type="date" value={form.weigh_to || ''} onChange={(e) => set('weigh_to', e.target.value || null)} className={inputCls} /></Field>
-            <Field label="Người chốt giá"><input value={form.signer_locker || ''} onChange={(e) => set('signer_locker', e.target.value)} className={inputCls} /></Field>
+            <Field label="Người chốt giá">
+              <select value={form.signer_locker || ''} onChange={(e) => set('signer_locker', e.target.value || null)} className={inputCls}>
+                <option value="">— Chọn —</option>
+                {SIGNER_LOCKER_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
             <Field label="Trạng thái">
               <select value={form.status} onChange={(e) => set('status', e.target.value as PriceLockStatus)} className={inputCls}>
                 {Object.entries(PRICE_LOCK_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -398,5 +404,34 @@ function Field({ label, children, className = '' }: { label: string; children: R
       <span className="block text-xs font-medium text-gray-500 mb-1">{label}</span>
       {children}
     </label>
+  )
+}
+
+/** Input số nguyên có dấu phân cách hàng nghìn theo locale vi-VN (10.000.000). */
+function NumInput({
+  value, onChange, className, style, placeholder, disabled,
+}: {
+  value: number | null | undefined
+  onChange: (v: number | null) => void
+  className?: string
+  style?: React.CSSProperties
+  placeholder?: string
+  disabled?: boolean
+}) {
+  const display = value == null || Number.isNaN(value) ? '' : (value as number).toLocaleString('vi-VN')
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={display}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={className}
+      style={style}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^\d]/g, '')
+        onChange(raw === '' ? null : Number(raw))
+      }}
+    />
   )
 }

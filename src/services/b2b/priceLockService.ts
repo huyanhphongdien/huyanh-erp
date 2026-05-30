@@ -26,6 +26,15 @@ export const PRICE_LOCK_STATUS_LABELS: Record<PriceLockStatus, string> = {
   cancelled: 'Đã huỷ',
 }
 
+/** State machine: từ trạng thái nào → đi được sang trạng thái nào.
+ *  draft → locked/cancelled. locked → used/cancelled. used → cancelled (terminal warning). */
+export const VALID_STATUS_TRANSITIONS: Record<PriceLockStatus, PriceLockStatus[]> = {
+  draft: ['locked', 'cancelled'],
+  locked: ['used', 'cancelled'],
+  used: ['cancelled'],
+  cancelled: [],
+}
+
 /** Checkbox "CÁC PHÍ PHẢI CHI" trên phiếu chốt giá. */
 export const FEE_FLAG_LABELS: Record<string, string> = {
   boc_xep: 'Bốc xếp',
@@ -159,9 +168,32 @@ export const priceLockService = {
   },
 
   async update(id: string, input: PriceLockInput): Promise<PriceLockTicket> {
+    // State machine: nếu đổi status, validate transition hợp lệ.
+    if (input.status) {
+      const current = await this.getById(id)
+      if (current && current.status !== input.status) {
+        const allowed = VALID_STATUS_TRANSITIONS[current.status] || []
+        if (!allowed.includes(input.status)) {
+          throw new Error(
+            `Không thể chuyển trạng thái ${PRICE_LOCK_STATUS_LABELS[current.status]} → ${PRICE_LOCK_STATUS_LABELS[input.status]}`
+          )
+        }
+      }
+    }
     const { data, error } = await supabase.from(TABLE).update(input).eq('id', id).select('*').single()
     if (error) throw error
     return normalize(data)
+  },
+
+  /** Đánh dấu PCG = 'used' sau khi resolver match thành công vào 1 ĐNTT.
+   *  Không throw nếu PCG đã 'used' (idempotent). */
+  async markUsed(id: string): Promise<void> {
+    const { error } = await supabase
+      .from(TABLE)
+      .update({ status: 'used' })
+      .eq('id', id)
+      .eq('status', 'locked')   // chỉ chuyển nếu hiện đang locked
+    if (error) throw error
   },
 
   async remove(id: string): Promise<void> {

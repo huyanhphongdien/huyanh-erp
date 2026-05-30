@@ -9,6 +9,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { partnerBankService } from '../b2b/partnerBankService'
+import { priceLockService, type PriceLockFee } from '../b2b/priceLockService'
 
 export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled'
 export type PaymentLineSource = 'deal' | 'supplier' | 'manual'
@@ -87,6 +88,9 @@ export interface AvailableTicket {
   // Nguồn giá: deal (b2b_deals.unit_price) | pcg (phiếu chốt giá) | manual (tự nhập)
   price_source: 'deal' | 'pcg' | 'manual'
   price_source_ref: string | null   // số deal hoặc mã PCG
+  // PCG đã match (nếu có) — để create() group + insert dòng "Phí" + markUsed sau khi insert.
+  applied_pcg_id?: string | null
+  applied_pcg_fees?: PriceLockFee[]
 }
 
 export interface ListAvailableParams {
@@ -111,6 +115,10 @@ export interface LineInput {
   amount: number
   note?: string | null
   sort_order?: number
+  // PCG hint (không lưu DB, chỉ dùng trong create() để gom dòng "Phí" + markUsed)
+  applied_pcg_id?: string | null
+  applied_pcg_code?: string | null
+  applied_pcg_fees?: PriceLockFee[]
 }
 
 export interface CreatePaymentRequestInput {
@@ -214,12 +222,13 @@ async function fetchDealUnitPrices(ids: string[]): Promise<Map<string, number>> 
  * Giải giá hàng BỘC PHÁT (không deal) từ Phiếu chốt giá.
  * Khớp: cùng cơ sở + ngày cân nằm trong [weigh_from, weigh_to] (nếu có) hoặc trùng lock_date,
  * + dealer_lines có partner_id khớp & có price_per_ton. Nhiều PCG → lấy lock_date mới nhất.
- * Trả Map<ticket_id, { pricePerKg (đ/kg = price_per_ton/1000), code }>. Chỉ PCG status='locked'.
+ * Trả Map<ticket_id, { pricePerKg, code, pcgId, fees }>. Chỉ PCG status='locked'.
+ * Fees gồm cả per-ton lẫn per-lot — sẽ tính tổng và trừ ra dòng "Phí" trên ĐNTT.
  */
 async function resolvePcgForTickets(
   rows: Array<{ id: string; deal_id?: string | null; partner_id?: string | null; facility_id?: string | null; created_at?: string | null }>
-): Promise<Map<string, { pricePerKg: number; code: string }>> {
-  const result = new Map<string, { pricePerKg: number; code: string }>()
+): Promise<Map<string, { pricePerKg: number; code: string; pcgId: string; fees: PriceLockFee[] }>> {
+  const result = new Map<string, { pricePerKg: number; code: string; pcgId: string; fees: PriceLockFee[] }>()
   const bocphat = rows.filter(r => !r.deal_id && r.partner_id && r.facility_id)
   if (bocphat.length === 0) return result
 
@@ -230,7 +239,7 @@ async function resolvePcgForTickets(
 
   let q = supabase
     .from('b2b_price_lock_tickets')
-    .select('code, facility_id, lock_date, weigh_from, weigh_to, dealer_lines')
+    .select('id, code, facility_id, lock_date, weigh_from, weigh_to, dealer_lines, fees')
     .eq('status', 'locked')
     .lte('lock_date', maxDate)
     .in('facility_id', facilities)
@@ -252,7 +261,14 @@ async function resolvePcgForTickets(
     candidates.sort((a, b) => String(b.lock_date || '').localeCompare(String(a.lock_date || '')))
     const best = candidates[0]
     const line = best.dealer_lines.find((d: any) => d.partner_id === r.partner_id && d.price_per_ton != null)
-    if (line) result.set(r.id, { pricePerKg: Number(line.price_per_ton) / 1000, code: best.code })
+    if (line) {
+      result.set(r.id, {
+        pricePerKg: Number(line.price_per_ton) / 1000,
+        code: best.code,
+        pcgId: best.id,
+        fees: Array.isArray(best.fees) ? best.fees : [],
+      })
+    }
   }
   return result
 }
@@ -330,6 +346,8 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
     let priceRef: string | null = null
     let payee = partnerName || (r.supplier_name || '')
 
+    let appliedPcgId: string | null = null
+    let appliedPcgFees: PriceLockFee[] | undefined = undefined
     if (r.deal_id) {
       price = dealPrices.get(r.deal_id) ?? 0
       priceSource = 'deal'
@@ -341,6 +359,8 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
         price = pcg.pricePerKg
         priceSource = 'pcg'
         priceRef = pcg.code
+        appliedPcgId = pcg.pcgId
+        appliedPcgFees = pcg.fees
       }
     }
 
@@ -382,6 +402,8 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       suggested_amount: roundThousand(bw * price),
       price_source: priceSource,
       price_source_ref: priceRef,
+      applied_pcg_id: appliedPcgId,
+      applied_pcg_fees: appliedPcgFees,
     }
   })
 }
@@ -403,7 +425,77 @@ function ticketsToLines(tickets: AvailableTicket[]): LineInput[] {
     amount: t.suggested_amount,       // đã làm tròn nghìn
     note: t.code,                     // mã phiếu cân → "số phiếu" trên mẫu
     sort_order: i,
+    applied_pcg_id: t.applied_pcg_id,
+    applied_pcg_code: t.price_source === 'pcg' ? t.price_source_ref : null,
+    applied_pcg_fees: t.applied_pcg_fees,
   }))
+}
+
+/**
+ * Gom phí theo PCG để chèn 1 dòng "Phí" (-X đ) cho mỗi PCG đã match trong ĐNTT.
+ * - Per-ton fee: nhân với tổng KL khô (kg→tấn) của các phiếu trong PCG đó.
+ * - Per-lot fee: cộng một lần (không nhân khối lượng).
+ * Tổng fee làm tròn nghìn, amount âm.
+ */
+function aggregatePcgFeeLines(lines: LineInput[], startSortOrder: number): {
+  feeLines: Array<{
+    source_type: PaymentLineSource
+    payee_name: string
+    weight: number
+    unit_price: number
+    amount: number
+    note: string
+    sort_order: number
+  }>
+  usedPcgIds: string[]
+} {
+  const groups = new Map<string, { fees: PriceLockFee[]; totalKg: number; pcgCode: string }>()
+  for (const l of lines) {
+    if (!l.applied_pcg_id || !l.applied_pcg_fees || l.applied_pcg_fees.length === 0) continue
+    const existing = groups.get(l.applied_pcg_id)
+    if (existing) {
+      existing.totalKg += l.weight || 0
+    } else {
+      groups.set(l.applied_pcg_id, {
+        fees: l.applied_pcg_fees,
+        totalKg: l.weight || 0,
+        pcgCode: l.applied_pcg_code || '',
+      })
+    }
+  }
+
+  const feeLines: ReturnType<typeof aggregatePcgFeeLines>['feeLines'] = []
+  let sort = startSortOrder
+  for (const [, group] of groups.entries()) {
+    const totalTons = (group.totalKg || 0) / 1000
+    let perTon = 0
+    let perLot = 0
+    const partsDesc: string[] = []
+    for (const f of group.fees) {
+      if (!f.amount || f.amount === 0) continue
+      if (f.basis === 'ton') {
+        perTon += f.amount
+        partsDesc.push(`${f.label}: ${f.amount.toLocaleString('vi-VN')}/T`)
+      } else {
+        perLot += f.amount
+        partsDesc.push(`${f.label}: ${f.amount.toLocaleString('vi-VN')}/lô`)
+      }
+    }
+    const totalFee = perTon * totalTons + perLot
+    const rounded = roundThousand(totalFee)
+    if (rounded > 0) {
+      feeLines.push({
+        source_type: 'manual',
+        payee_name: `Phí áp dụng (PCG ${group.pcgCode})`,
+        weight: 0,
+        unit_price: 0,
+        amount: -rounded,
+        note: partsDesc.join(' · ') + ` · KL khô tổng ${totalTons.toFixed(2)} tấn`,
+        sort_order: sort++,
+      })
+    }
+  }
+  return { feeLines, usedPcgIds: [...groups.keys()] }
 }
 
 // ============================================================================
@@ -432,7 +524,7 @@ async function create(input: CreatePaymentRequestInput): Promise<PaymentRequest>
   if (reqErr) throw reqErr
 
   if (input.lines.length > 0) {
-    const payload = input.lines.map((l, i) => ({
+    const normalPayload = input.lines.map((l, i) => ({
       payment_request_id: req.id,
       ticket_id: l.ticket_id || null,
       source_type: l.source_type || (l.ticket_id ? 'supplier' : 'manual'),
@@ -449,7 +541,30 @@ async function create(input: CreatePaymentRequestInput): Promise<PaymentRequest>
       note: l.note || null,
       sort_order: l.sort_order ?? i,
     }))
-    const { error: lineErr } = await supabase.from('payment_request_lines').insert(payload)
+
+    // Gom dòng "Phí áp dụng" theo PCG (1 dòng/PCG, amount âm).
+    const { feeLines, usedPcgIds } = aggregatePcgFeeLines(input.lines, normalPayload.length)
+    const feePayload = feeLines.map(f => ({
+      payment_request_id: req.id,
+      ticket_id: null,
+      source_type: f.source_type,
+      deal_id: null,
+      partner_id: null,
+      supplier_id: null,
+      payee_name: f.payee_name,
+      payee_note: null,
+      rubber_type: null,
+      vehicle_plate: null,
+      weight: f.weight,
+      unit_price: f.unit_price,
+      amount: f.amount,
+      note: f.note,
+      sort_order: f.sort_order,
+    }))
+
+    const { error: lineErr } = await supabase
+      .from('payment_request_lines')
+      .insert([...normalPayload, ...feePayload])
     if (lineErr) throw lineErr
 
     // Đánh dấu phiếu cân đã gom (chống gom trùng)
@@ -459,6 +574,11 @@ async function create(input: CreatePaymentRequestInput): Promise<PaymentRequest>
         .from('weighbridge_tickets')
         .update({ payment_request_id: req.id })
         .in('id', ticketIds)
+    }
+
+    // Đánh dấu PCG đã dùng (best-effort, không fail nếu lỗi)
+    for (const pcgId of usedPcgIds) {
+      try { await priceLockService.markUsed(pcgId) } catch (e) { console.warn('[paymentRequest] markUsed PCG failed:', pcgId, e) }
     }
   }
 

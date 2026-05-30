@@ -121,9 +121,9 @@ export default function WeighingPage() {
 
   // Rubber fields
   const [rubberType, setRubberType] = useState<string>('mu_dong')
-  const [expectedDrc, setExpectedDrc] = useState<number | null>(null)
-  const [unitPrice, setUnitPrice] = useState<number | null>(null)
-  const [priceUnit, setPriceUnit] = useState<'wet' | 'dry'>('wet')
+  // Phiếu cân KHÔNG nhập giá / DRC kỳ vọng. Giá giải tại Đề nghị thanh toán
+  // (deal hoặc Phiếu chốt giá); price_unit suy từ loại mủ (mủ nước = giá khô).
+  const priceUnit: 'wet' | 'dry' = rubberType === 'mu_nuoc' ? 'dry' : 'wet'
 
   // F2 Tân Lâm — quy trình mủ nước: đo ĐỐT + DRC tại cân lần 2 (sau lấy mẫu + đốt)
   // DRC% tra từ bảng drc_lookup (QC sửa được qua /settings/drc-lookup).
@@ -239,9 +239,6 @@ export default function WeighingPage() {
         if (ext.deal_id) { setSelectedDealId(ext.deal_id); setSourceType('deal') }
         if (ext.supplier_id) { setSelectedSupplierId(ext.supplier_id); setSourceType('supplier') }
         if (ext.rubber_type) setRubberType(ext.rubber_type)
-        if (ext.expected_drc) setExpectedDrc(ext.expected_drc)
-        if (ext.unit_price) setUnitPrice(ext.unit_price)
-        if (ext.price_unit) setPriceUnit(ext.price_unit)
         if (ext.destination) setDestination(ext.destination)
         if (ext.deduction_kg) setDeductionKg(ext.deduction_kg)
         // F2 TL: restore ĐỐT + DRC thực + consolidation_code nếu đã save trước đó
@@ -250,7 +247,7 @@ export default function WeighingPage() {
         if (ext.consolidation_code) setConsolidationCode(ext.consolidation_code)
         // Calculate if both weights exist
         if (t.gross_weight != null && t.tare_weight != null) {
-          recalculate(t.gross_weight, t.tare_weight, ext.deduction_kg || 0, ext.expected_drc, ext.unit_price, ext.price_unit)
+          recalculate(t.gross_weight, t.tare_weight, ext.deduction_kg || 0, undefined, undefined, ext.price_unit)
         }
       }
     } catch (err: any) {
@@ -321,9 +318,7 @@ export default function WeighingPage() {
       else if (lower.includes('tạp') || lower.includes('tap')) setRubberType('mu_tap')
       else if (lower.includes('svr')) setRubberType('svr')
     }
-    if (ext.expected_drc) setExpectedDrc(ext.expected_drc)
-    if (ext.unit_price) setUnitPrice(ext.unit_price)
-    if (ext.price_unit === 'wet' || ext.price_unit === 'dry') setPriceUnit(ext.price_unit)
+    // Giá / DRC kỳ vọng / price_unit: KHÔNG auto-fill từ deal nữa — giá giải tại ĐNTT.
 
     // Biển số + tài xế: operator chọn từ dropdown "Xe đã khai báo" (các
     // plan status='pending') hoặc tự nhập nếu xe chưa khai báo.
@@ -411,11 +406,9 @@ export default function WeighingPage() {
       }
       setTicket(t)
 
-      // Save rubber fields
+      // Save rubber fields. Không lưu đơn giá / DRC kỳ vọng — giải tại ĐNTT.
       const rubberData: RubberWeighData = {
         rubber_type: rubberType,
-        expected_drc: expectedDrc ?? undefined,
-        unit_price: unitPrice ?? undefined,
         price_unit: priceUnit,
         destination: destination || undefined,
         deduction_kg: deductionKg,
@@ -492,7 +485,7 @@ export default function WeighingPage() {
         updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
         updated = await weighbridgeService.updateTareWeight(ticket.id, tareKg, operator?.id)
         setTicket(updated)
-        const c = recalculate(weight, tareKg, deductionKg, expectedDrc, unitPrice, priceUnit)
+        const c = recalculate(weight, tareKg, deductionKg, undefined, undefined, priceUnit)
         setSuccess(`Cân OUT: gross ${weight.toLocaleString()} kg | ${ctxLabel} → NET ${c.net_weight.toLocaleString('vi-VN')} kg`)
         setManualWeight(null)
         if (cameraCaptureRef.current) {
@@ -522,11 +515,10 @@ export default function WeighingPage() {
           : undefined
         updated = await weighbridgeService.updateTareWeight(ticket.id, weight, operator?.id, drcExtras)
         setTicket(updated)
-        // Recalculate với DRC thực nếu có (override expectedDrc)
-        const drcForCalc = actualDrc ?? expectedDrc
+        // Recalculate với DRC thực đo tại cân (không còn fallback expectedDrc).
         const c = recalculate(
           updated.gross_weight!, weight, deductionKg,
-          drcForCalc, unitPrice, priceUnit,
+          actualDrc, undefined, priceUnit,
         )
         setSuccess(`Cân lần 2 (Tare): ${weight.toLocaleString()} kg — NET: ${c.net_weight.toLocaleString()} kg`)
         setManualWeight(null)
@@ -1256,17 +1248,6 @@ export default function WeighingPage() {
                     <Text type="secondary" style={{ fontSize: 12 }}>Loại mủ</Text>
                     <Select value={rubberType} onChange={setRubberType} style={{ width: '100%' }}
                       disabled={isCompleted} options={RUBBER_TYPES} />
-                  </Col>
-                  <Col span={12}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>DRC kỳ vọng (%)</Text>
-                    <InputNumber value={expectedDrc} onChange={(v) => setExpectedDrc(v)}
-                      style={{ width: '100%' }} min={0} max={100} disabled={isCompleted} />
-                  </Col>
-                  <Col span={12}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Đơn giá (đ/kg)</Text>
-                    <InputNumber value={unitPrice} onChange={(v) => setUnitPrice(v)}
-                      style={{ width: '100%' }} min={0} disabled={isCompleted}
-                      formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
                   </Col>
                   <Col span={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Vị trí dỡ</Text>

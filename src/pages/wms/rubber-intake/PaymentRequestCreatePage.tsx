@@ -33,6 +33,13 @@ const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
   manual:   { label: 'Khác',    cls: 'bg-gray-100 text-gray-600' },
 }
 
+// Nguồn giá: deal (giá deal) | pcg (phiếu chốt giá) | manual (chưa có giá → kế toán nhập)
+const PRICE_SRC: Record<string, { label: string; cls: string }> = {
+  deal:   { label: 'Giá deal',       cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  pcg:    { label: 'Giá PCG',        cls: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  manual: { label: '⚠ Chưa có giá',  cls: 'bg-red-50 text-red-600 border border-red-200' },
+}
+
 const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10)
 
@@ -225,6 +232,9 @@ const PaymentRequestCreatePage: React.FC = () => {
                           {t.drc != null && t.price_unit === 'dry' && <span className="text-gray-300">(khô, DRC {t.drc}%)</span>}
                         </span>
                         <span className="flex items-center gap-1"><Tag className="w-3.5 h-3.5" />{fmtVnd(t.unit_price)}/kg</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${PRICE_SRC[t.price_source].cls}`}>
+                          {PRICE_SRC[t.price_source].label}{t.price_source === 'pcg' && t.price_source_ref ? ` ${t.price_source_ref}` : ''}
+                        </span>
                       </div>
                     </div>
                     <div className="text-right shrink-0">

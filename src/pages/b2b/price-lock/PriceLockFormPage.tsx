@@ -13,7 +13,6 @@ import {
   PURCHASE_METHOD_LABELS,
   PRICE_LOCK_STATUS_LABELS,
   FEE_FLAG_LABELS,
-  DEFAULT_FEES,
   EMPTY_DEALER,
   type PriceLockInput,
   type PriceLockFee,
@@ -22,6 +21,18 @@ import {
   type PurchaseMethod,
   type PriceLockStatus,
 } from '../../../services/b2b/priceLockService'
+
+/** Basis mặc định khi tick checkbox "Các phí phải chi" (theo form HAQT). */
+const FEE_FLAG_DEFAULT_BASIS: Record<string, 'ton' | 'lot'> = {
+  boc_xep: 'ton',
+  ben_bai: 'lot',
+  thue_xa_ban: 'lot',
+  giay_to_di_duong: 'lot',
+  hoa_hong: 'ton',
+  bo_hang: 'ton',
+  thue_xe_van_tai: 'ton',
+  khac: 'ton',
+}
 
 interface FacilityOpt { id: string; code: string | null; name: string }
 
@@ -37,7 +48,7 @@ function emptyForm(): PriceLockInput {
     rate_thb_kip: null, rate_kip_vnd: null, rate_thb_vnd: null,
     purchase_method: 'dai_ly',
     price_floor_per_ton: null, price_mid_per_ton: null, price_high_per_ton: null,
-    fees: DEFAULT_FEES(),
+    fees: [],
     fee_flags: {},
     lock_date: todayISO(), weigh_from: null, weigh_to: null,
     signer_locker: '', note: '',
@@ -103,8 +114,26 @@ export default function PriceLockFormPage() {
   const addFee = (basis: 'ton' | 'lot') => set('fees', [...fees, { label: '', basis, amount: 0 }])
   const removeFee = (i: number) => set('fees', fees.filter((_, idx) => idx !== i))
 
-  const toggleFlag = (key: string) =>
-    set('fee_flags', { ...(form.fee_flags || {}), [key]: !(form.fee_flags || {})[key] })
+  // Tick/untick checkbox "Các phí phải chi" → tự thêm/xoá dòng phí tương ứng.
+  const toggleFlag = (key: string) => {
+    const label = FEE_FLAG_LABELS[key]
+    setForm((f) => {
+      const flags = f.fee_flags || {}
+      const nextOn = !flags[key]
+      const newFlags = { ...flags, [key]: nextOn }
+      const currentFees = f.fees || []
+      let newFees: PriceLockFee[]
+      if (nextOn) {
+        const exists = currentFees.some((x) => x.label === label)
+        newFees = exists
+          ? currentFees
+          : [...currentFees, { label, basis: FEE_FLAG_DEFAULT_BASIS[key] || 'ton', amount: 0 }]
+      } else {
+        newFees = currentFees.filter((x) => x.label !== label)
+      }
+      return { ...f, fee_flags: newFlags, fees: newFees }
+    })
+  }
 
   async function save(thenPrint: boolean) {
     setSaving(true)

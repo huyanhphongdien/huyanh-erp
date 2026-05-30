@@ -83,6 +83,9 @@ export interface AvailableTicket {
   payee_note: string          // STK/NH auto (NCC mua lẻ)
   deal_number: string | null
   suggested_amount: number    // billable_weight × giá, làm tròn nghìn
+  // Nguồn giá: deal (b2b_deals.unit_price) | pcg (phiếu chốt giá) | manual (tự nhập)
+  price_source: 'deal' | 'pcg' | 'manual'
+  price_source_ref: string | null   // số deal hoặc mã PCG
 }
 
 export interface ListAvailableParams {
@@ -194,6 +197,65 @@ async function fetchSupplierBanks(ids: string[]): Promise<Map<string, string>> {
   return map
 }
 
+/** Lấy đơn giá đã chốt của deal (b2b_deals.unit_price, đ/kg). */
+async function fetchDealUnitPrices(ids: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  const unique = [...new Set(ids.filter(Boolean))]
+  if (unique.length === 0) return map
+  const { data } = await supabase.from('b2b_deals').select('id, unit_price').in('id', unique)
+  for (const r of (data || []) as Array<{ id: string; unit_price: number | null }>) {
+    if (r.unit_price != null) map.set(r.id, Number(r.unit_price))
+  }
+  return map
+}
+
+/**
+ * Giải giá hàng BỘC PHÁT (không deal) từ Phiếu chốt giá.
+ * Khớp: cùng cơ sở + ngày cân nằm trong [weigh_from, weigh_to] (nếu có) hoặc trùng lock_date,
+ * + dealer_lines có partner_id khớp & có price_per_ton. Nhiều PCG → lấy lock_date mới nhất.
+ * Trả Map<ticket_id, { pricePerKg (đ/kg = price_per_ton/1000), code }>. Chỉ PCG status='locked'.
+ */
+async function resolvePcgForTickets(
+  rows: Array<{ id: string; deal_id?: string | null; partner_id?: string | null; facility_id?: string | null; created_at?: string | null }>
+): Promise<Map<string, { pricePerKg: number; code: string }>> {
+  const result = new Map<string, { pricePerKg: number; code: string }>()
+  const bocphat = rows.filter(r => !r.deal_id && r.partner_id && r.facility_id)
+  if (bocphat.length === 0) return result
+
+  const facilities = [...new Set(bocphat.map(r => r.facility_id as string))]
+  const dates = bocphat.map(r => (r.created_at || '').slice(0, 10)).filter(Boolean)
+  if (dates.length === 0) return result
+  const maxDate = dates.reduce((a, b) => (a > b ? a : b))
+
+  let q = supabase
+    .from('b2b_price_lock_tickets')
+    .select('code, facility_id, lock_date, weigh_from, weigh_to, dealer_lines')
+    .eq('status', 'locked')
+    .lte('lock_date', maxDate)
+    .in('facility_id', facilities)
+  const { data: pcgs, error } = await q
+  if (error || !pcgs) return result
+
+  for (const r of bocphat) {
+    const tdate = (r.created_at || '').slice(0, 10)
+    const candidates = (pcgs as any[]).filter(p => {
+      if (p.facility_id !== r.facility_id) return false
+      const inRange = (p.weigh_from && p.weigh_to)
+        ? (tdate >= p.weigh_from && tdate <= p.weigh_to)
+        : (p.lock_date === tdate)
+      if (!inRange) return false
+      return Array.isArray(p.dealer_lines)
+        && p.dealer_lines.some((d: any) => d.partner_id === r.partner_id && d.price_per_ton != null)
+    })
+    if (candidates.length === 0) continue
+    candidates.sort((a, b) => String(b.lock_date || '').localeCompare(String(a.lock_date || '')))
+    const best = candidates[0]
+    const line = best.dealer_lines.find((d: any) => d.partner_id === r.partner_id && d.price_per_ton != null)
+    if (line) result.set(r.id, { pricePerKg: Number(line.price_per_ton) / 1000, code: best.code })
+  }
+  return result
+}
+
 // ============================================================================
 // SINH MÃ PHIẾU — {PREFIX}-{YYMM}-{seq}
 // ============================================================================
@@ -248,20 +310,37 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
 
   const partnerNames = await fetchPartnerNames(rows.map(r => r.partner_id).filter(Boolean))
   const dealNumbers = await fetchDealNumbers(rows.map(r => r.deal_id).filter(Boolean))
+  const dealPrices = await fetchDealUnitPrices(rows.map(r => r.deal_id).filter(Boolean))
   const supplierBanks = await fetchSupplierBanks(rows.map(r => r.supplier_id).filter(Boolean))
+  const pcgMap = await resolvePcgForTickets(rows)
 
   return rows.map((r): AvailableTicket => {
     const source = deriveSource(r)
     const net = Number(r.net_weight) || 0
-    const price = Number(r.unit_price) || 0
     const drc = r.qc_actual_drc != null ? Number(r.qc_actual_drc) : null
     const bw = billableWeight(net, r.price_unit, drc)
-    const payee =
-      source === 'deal'
-        ? (r.partner_id ? partnerNames.get(r.partner_id) || '' : '')
-        : source === 'supplier'
-          ? (r.supplier_name || '')
-          : ''
+
+    // Giá KHÔNG lấy từ phiếu cân: deal → b2b_deals.unit_price; bộc phát → PCG; còn lại → tự nhập.
+    const partnerName = r.partner_id ? (partnerNames.get(r.partner_id) || '') : ''
+    let price = 0
+    let priceSource: 'deal' | 'pcg' | 'manual' = 'manual'
+    let priceRef: string | null = null
+    let payee = partnerName || (r.supplier_name || '')
+
+    if (r.deal_id) {
+      price = dealPrices.get(r.deal_id) ?? 0
+      priceSource = 'deal'
+      priceRef = dealNumbers.get(r.deal_id) || null
+      payee = partnerName
+    } else {
+      const pcg = pcgMap.get(r.id)
+      if (pcg) {
+        price = pcg.pricePerKg
+        priceSource = 'pcg'
+        priceRef = pcg.code
+      }
+    }
+
     return {
       id: r.id,
       code: r.code,
@@ -283,6 +362,8 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       payee_note: source === 'supplier' && r.supplier_id ? (supplierBanks.get(r.supplier_id) || '') : '',
       deal_number: r.deal_id ? dealNumbers.get(r.deal_id) || null : null,
       suggested_amount: roundThousand(bw * price),
+      price_source: priceSource,
+      price_source_ref: priceRef,
     }
   })
 }

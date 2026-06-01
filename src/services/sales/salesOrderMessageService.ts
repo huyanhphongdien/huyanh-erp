@@ -82,7 +82,7 @@ async function getCurrentEmployee(): Promise<{ id: string; full_name?: string; e
 function roleFromEmail(email?: string | null): MessageAuthorRole {
   const e = (email || '').toLowerCase()
   if (e === 'sales@huyanhrubber.com') return 'sale'
-  if (e === 'phulv@huyanhrubber.com') return 'review'
+  if (['phulv@huyanhrubber.com', 'yendt@huyanhrubber.com'].includes(e)) return 'review'
   if (['trunglxh@huyanhrubber.com', 'huylv@huyanhrubber.com'].includes(e)) return 'sign'
   if (['logistics@huyanhrubber.com', 'anhlp@huyanhrubber.com', 'nhungtt@huyanhrubber.com'].includes(e))
     return 'logistics'

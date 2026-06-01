@@ -315,6 +315,7 @@ export default function ContractReviewPage() {
   const reviewerLabel = useMemo(() => {
     const email = user?.email?.toLowerCase()
     if (email === 'phulv@huyanhrubber.com') return 'Phú LV (Kế toán — Kiểm tra)'
+    if (email === 'yendt@huyanhrubber.com') return 'Đỗ Thị Yến (Kế toán — Kiểm tra)'
     if (email === 'minhld@huyanhrubber.com') return 'Minh LD (Admin — Kiểm tra)'
     return user?.email || '—'
   }, [user])

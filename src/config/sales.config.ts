@@ -14,12 +14,14 @@ export const SALES_CONFIG = {
   /** Whitelist email được duyệt/trả lại HĐ. Đồng bộ với
    *  docs/migrations/sales_contract_workflow_v2_reviewers.sql
    *  + docs/migrations/sales_contract_workflow_v11_add_reviewer_sale.sql
-   *  + docs/migrations/sales_contract_workflow_v17_add_minhanh.sql */
+   *  + docs/migrations/sales_contract_workflow_v17_add_minhanh.sql
+   *  + docs/migrations/sales_contract_workflow_v18_add_yen.sql */
   REVIEWER_EMAILS: [
     'phulv@huyanhrubber.com',     // Phú LV — Kế toán (default reviewer)
     'minhld@huyanhrubber.com',    // Minh LD — Admin (backup reviewer)
     'sales@huyanhrubber.com',     // Hồ Thị Liễu — chuyển từ Sale sang Kiểm tra (2026-05-17)
     'logistics@huyanhrubber.com', // Trần Thị Minh Anh — toàn quyền Đơn hàng bán (2026-05-22)
+    'yendt@huyanhrubber.com',     // Đỗ Thị Yến — Kiểm tra HĐ, ngang quyền Phú (2026-06-01)
   ],
 
   /** Whitelist email được ký HĐ. Đồng bộ với

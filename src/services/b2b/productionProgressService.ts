@@ -82,7 +82,7 @@ async function buildDrcAfterTimeline(d: any): Promise<ProductionTimeline> {
     supabase.from('b2b_advances')
       .select('created_at, status').eq('deal_id', d.id),
     supabase.from('b2b_settlements')
-      .select('created_at, confirmed_at, paid_at, status')
+      .select('created_at, approved_at, paid_at, status')
       .eq('deal_id', d.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
@@ -99,7 +99,7 @@ async function buildDrcAfterTimeline(d: any): Promise<ProductionTimeline> {
   const hasProductionStart = !!d.production_started_at
   const hasActualDrc = d.actual_drc != null && d.actual_drc > 0
   const hasFinishedProduct = d.finished_product_kg != null && d.finished_product_kg > 0
-  const hasSettlement = !!sett?.confirmed_at
+  const hasSettlement = !!sett?.approved_at
   const isSettled = sett?.status === 'paid' || d.status === 'settled'
 
   const stages: TimelineStage[] = [
@@ -150,7 +150,7 @@ async function buildDrcAfterTimeline(d: any): Promise<ProductionTimeline> {
     {
       key: 'settlement', label: 'Quyết toán',
       status: hasSettlement ? 'done' : (hasActualDrc ? 'current' : 'pending'),
-      timestamp: sett?.confirmed_at || null,
+      timestamp: sett?.approved_at || null,
     },
     {
       key: 'paid', label: 'Thanh toán',
@@ -184,7 +184,7 @@ async function buildStandardTimeline(d: any): Promise<ProductionTimeline> {
     supabase.from('b2b_advances')
       .select('created_at, status').eq('deal_id', d.id),
     supabase.from('b2b_settlements')
-      .select('confirmed_at, paid_at, status').eq('deal_id', d.id).limit(1).maybeSingle(),
+      .select('approved_at, paid_at, status').eq('deal_id', d.id).limit(1).maybeSingle(),
   ])
 
   const hasWeighed = !!(weighbridge.data as any)?.completed_at
@@ -193,7 +193,7 @@ async function buildStandardTimeline(d: any): Promise<ProductionTimeline> {
   const isAccepted = ['accepted', 'settled'].includes(d.status)
   const hasAdvance = (advances.data || []).some((a: any) => ['acknowledged', 'paid'].includes(a.status))
   const hasActualDrc = d.actual_drc != null
-  const hasSettlement = !!(settlement.data as any)?.confirmed_at
+  const hasSettlement = !!(settlement.data as any)?.approved_at
   const isSettled = d.status === 'settled' || (settlement.data as any)?.status === 'paid'
 
   const stages: TimelineStage[] = [
@@ -204,7 +204,7 @@ async function buildStandardTimeline(d: any): Promise<ProductionTimeline> {
     { key: 'stock_in', label: 'Đã nhập kho', status: hasStockIn ? 'done' : (hasWeighed ? 'current' : 'pending'), timestamp: (stockIn.data as any)?.confirmed_at },
     { key: 'advance', label: 'Tạm ứng', status: hasAdvance ? 'done' : 'pending', timestamp: null },
     { key: 'qc_actual', label: 'QC actual DRC', status: hasActualDrc ? 'done' : 'pending', timestamp: null },
-    { key: 'settlement', label: 'Quyết toán', status: hasSettlement ? 'done' : (hasActualDrc ? 'current' : 'pending'), timestamp: (settlement.data as any)?.confirmed_at },
+    { key: 'settlement', label: 'Quyết toán', status: hasSettlement ? 'done' : (hasActualDrc ? 'current' : 'pending'), timestamp: (settlement.data as any)?.approved_at },
     { key: 'paid', label: 'Thanh toán', status: isSettled ? 'done' : (hasSettlement ? 'current' : 'pending'), timestamp: (settlement.data as any)?.paid_at },
   ]
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card, Button, Input, Select, Typography, Space, Row, Col, Alert, Divider,
-  Tag, InputNumber, message, Modal, AutoComplete, Radio,
+  Tag, InputNumber, message, Modal, AutoComplete, Radio, Steps,
 } from 'antd'
 import B2BPartnerPicker from '@/components/B2BPartnerPicker'
 import {
@@ -562,8 +562,28 @@ export default function WeighingPage() {
     }
   }
 
-  async function handleComplete() {
+  async function handleComplete(skipDrcCheck = false) {
     if (!ticket) return
+    // Guard Tân Lâm: phiếu mủ nước IN cần ĐỐT + DRC để tính KL khô. Hoàn tất mà
+    // thiếu DRC → mất dữ liệu quan trọng. Cảnh báo trước, cho phép vẫn hoàn tất.
+    if (!skipDrcCheck) {
+      const missingDrc =
+        ticket.ticket_type === 'in' &&
+        (rubberType === 'mu_nuoc' || dotReading != null) &&
+        actualDrc == null
+      if (missingDrc) {
+        Modal.confirm({
+          title: 'Chưa nhập DRC cho mủ nước',
+          content:
+            'Phiếu mủ nước cần ĐỐT + DRC để tính khối lượng khô. Hoàn tất khi chưa có DRC sẽ thiếu dữ liệu quyết toán. Vẫn hoàn tất?',
+          okText: 'Vẫn hoàn tất',
+          okButtonProps: { danger: true },
+          cancelText: 'Quay lại nhập DRC',
+          onOk: () => handleComplete(true),
+        })
+        return
+      }
+    }
     setLoading(true)
     setError('')
     try {
@@ -875,6 +895,28 @@ export default function WeighingPage() {
         {error && <Alert type="error" message={error} showIcon closable onClose={() => setError('')} style={{ marginBottom: 12 }} />}
         {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess('')} style={{ marginBottom: 12 }} />}
         {facilityError && <Alert type="warning" message={`Lỗi facility: ${facilityError}`} showIcon style={{ marginBottom: 12 }} />}
+
+        {/* Thanh tiến trình — chỉ luồng IN (cân 2 lần). Giúp operator luôn biết
+            đang ở bước nào: Tạo phiếu → Cân L1 → Cân L2 (+DRC mủ nước) → Hoàn tất */}
+        {ticketDirection === 'in' && (
+          <Card size="small" style={{ borderRadius: 12, marginBottom: 12 }}>
+            <Steps
+              size="small"
+              current={isCompleted ? 3 : isWeighingTare ? 2 : isWeighingGross ? 1 : 0}
+              items={[
+                { title: 'Tạo phiếu' },
+                { title: 'Cân lần 1', description: 'Gross' },
+                {
+                  title: 'Cân lần 2',
+                  description: (rubberType === 'mu_nuoc' || dotReading != null)
+                    ? 'Lấy mẫu · đốt · DRC · tare'
+                    : 'Tare',
+                },
+                { title: 'Hoàn tất' },
+              ]}
+            />
+          </Card>
+        )}
 
         <Row gutter={16}>
           {/* LEFT: Form */}
@@ -1405,7 +1447,7 @@ export default function WeighingPage() {
                         <Text style={{ fontSize: 12 }}>
                           📊 KL khô = {ticket.net_weight.toLocaleString()} kg × {actualDrc}% = {' '}
                           <Text strong style={{ color: PRIMARY, fontSize: 14 }}>
-                            {(ticket.net_weight * actualDrc / 100).toFixed(1).toLocaleString()} kg
+                            {(ticket.net_weight * actualDrc / 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg
                           </Text>
                         </Text>
                       </div>
@@ -1584,7 +1626,7 @@ export default function WeighingPage() {
                       <Button
                         type="primary" size="large" block
                         icon={<CheckOutlined />}
-                        onClick={handleComplete}
+                        onClick={() => handleComplete()}
                         loading={loading}
                         style={{ height: 48, background: '#16A34A', borderColor: '#16A34A' }}
                       >
@@ -1622,7 +1664,7 @@ export default function WeighingPage() {
               {/* Keyboard shortcuts hint */}
               <Card size="small" style={{ borderRadius: 12, background: '#FAFAFA' }}>
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  Trạm Cân — Cao Su Huy Anh Phong Điền
+                  Trạm Cân — {currentFacility?.name ?? 'Cao Su Huy Anh'}
                 </Text>
               </Card>
             </Space>

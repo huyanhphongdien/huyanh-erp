@@ -226,7 +226,7 @@ function SingleEntryForm() {
         <NumberInput label="Net weight (kg) *" value={netWeight} onChange={(v) => setNetWeight(Number(v) || 0)} required />
         <NumberInput label="Gross weight (kg)" value={grossWeight ?? ''} onChange={(v) => setGrossWeight(v === '' ? undefined : Number(v))} />
         <NumberInput
-          label={`ĐỐT (metrolac)${rawRubberType === 'mu_nuoc' ? ' — Tân Lâm' : ''}`}
+          label={`ĐỐT (metrolac)${rawRubberType === 'mu_nuoc' ? ' — Quảng Trị' : ''}`}
           value={dotReading ?? ''}
           onChange={handleDotChange}
         />

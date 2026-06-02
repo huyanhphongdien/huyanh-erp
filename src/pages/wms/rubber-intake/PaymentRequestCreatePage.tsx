@@ -170,7 +170,7 @@ const PaymentRequestCreatePage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-2.5">
           <div>
             <label className="text-[11px] text-gray-400 font-medium">Tiêu đề phiếu (tuỳ chọn)</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="VD: Mủ nước Tân Lâm 29/05" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 text-[13.5px]" />
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="VD: Mủ nước Quảng Trị 29/05" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 text-[13.5px]" />
           </div>
           <div>
             <label className="text-[11px] text-gray-400 font-medium">Tiền tệ</label>

@@ -37,7 +37,7 @@ const PAPER_OPTIONS = [
 
 const KELI_MODELS = [
   { label: 'XK3118T1-A3 (Huy Anh)', baudRate: 2400 },
-  { label: 'XK3118K8 (Tân Lâm)', baudRate: 9600 },
+  { label: 'XK3118K8 (Quảng Trị)', baudRate: 9600 },
   { label: 'D2008FA', baudRate: 9600 },
   { label: 'XK3190-A9', baudRate: 9600 },
   { label: 'XK3190-A12', baudRate: 2400 },
@@ -302,7 +302,7 @@ export default function SettingsPage() {
               description={
                 <div style={{ fontSize: 12 }}>
                   <div>1. Cắm cáp USB-to-RS232 từ đầu cân vào máy tính</div>
-                  <div>2. Chọn đúng đời cân ở trên (vd Tân Lâm = <strong>XK3118K8</strong>)</div>
+                  <div>2. Chọn đúng đời cân ở trên (vd Quảng Trị = <strong>XK3118K8</strong>)</div>
                   <div>3. Nhấn <strong>"Kết nối cổng COM"</strong> → chọn đúng cổng COM trong dialog</div>
                   <div>4. Nếu lỗi "Failed to open" → bấm <strong>"Quên cổng đã lưu"</strong> rồi kết nối lại</div>
                   <div>5. Dùng Chrome hoặc Edge (Web Serial API)</div>

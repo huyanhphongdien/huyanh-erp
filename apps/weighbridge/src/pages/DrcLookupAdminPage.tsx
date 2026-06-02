@@ -203,7 +203,7 @@ export default function DrcLookupAdminPage() {
               type="warning"
               showIcon
               message={`Phát hiện ${outlierKeys.size} dòng lệch trend (${[...outlierKeys].join(', ')})`}
-              description="Các giá trị bôi vàng dưới đây lệch >0.5% so với xu hướng linear của neighbors. Hãy xác minh với QC/Tân Lâm — có thể là typo từ bảng gốc."
+              description="Các giá trị bôi vàng dưới đây lệch >0.5% so với xu hướng linear của neighbors. Hãy xác minh với QC/Quảng Trị — có thể là typo từ bảng gốc."
               style={{ borderRadius: 8 }}
             />
           )}

@@ -414,7 +414,7 @@ const ConfirmDealModal = ({
             placeholder="Chọn nhà máy nhận hàng"
             options={[
               { value: '755ae776-3be6-47b8-b1d0-d15b61789f24', label: '🏭 PD — Phong Điền (HQ)' },
-              { value: '9bc1467c-0cbe-4982-abc1-192c61ef7dca', label: '🏭 TL — Tân Lâm' },
+              { value: '9bc1467c-0cbe-4982-abc1-192c61ef7dca', label: '🏭 TL — Huy Anh Quảng Trị' },
               { value: '67b45068-6e7c-4888-b8b3-49721bb9cb96', label: '🏭 LAO — Lào' },
             ]}
           />

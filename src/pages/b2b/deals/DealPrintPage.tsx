@@ -20,7 +20,7 @@ const FACILITY_MAP: Record<string, { code: string; name: string; address: string
   },
   '9bc1467c-0cbe-4982-abc1-192c61ef7dca': {
     code: 'TL',
-    name: 'Nhà máy Tân Lâm',
+    name: 'Nhà máy Huy Anh Quảng Trị',
     address: 'Cam Lộ, Quảng Trị',
   },
   '67b45068-6e7c-4888-b8b3-49721bb9cb96': {

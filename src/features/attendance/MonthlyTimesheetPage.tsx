@@ -53,9 +53,15 @@ const COL_NAME = 164
 const COL_NAME_LEFT = COL_STT
 
 // ── Ẩn 1 số NV trên bảng công của phòng QLSX (managers/admin không chấm công)
-//    Lê Vang HA-0045, Phạm Bá Lượng HA-0071, Trần Văn Hiền HA-0070, Lê Duy Minh HA-0059
+//    Mã NV đã đổi sang dạng số (8999…) — cập nhật 2026-06-02 vì mã HA-XXXX cũ
+//    không còn khớp nên các NV này lại hiện ra trên bảng/Excel.
 const QLSX_DEPT_ID = 'd0000000-0000-0000-0000-000000000002'
-const QLSX_HIDDEN_EMPLOYEE_CODES = new Set(['HA-0045', 'HA-0071', 'HA-0070', 'HA-0059'])
+const QLSX_HIDDEN_EMPLOYEE_CODES = new Set([
+  '8999300000181', // Lê Vang
+  '8999300000570', // Phạm Bá Lượng
+  '8999300000563', // Trần Văn Hiền
+  '8999300000419', // Lê Duy Minh
+])
 
 // Symbol có nghĩa "đi làm" — dùng để check NV có làm việc thật vào ngày lễ không.
 // Loại trừ L/P/X/—/'': nghỉ lễ / phép / vắng / chưa tới / trống.

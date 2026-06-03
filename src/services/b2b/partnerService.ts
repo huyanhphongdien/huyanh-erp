@@ -225,10 +225,10 @@ export const partnerService = {
           query = query.eq('bp_id', bp.id)
         } else {
           // Không match HAC-13 → fallback tìm theo legacy code
-          query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+          query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%,phone.ilike.%${search}%,national_id.ilike.%${search}%`)
         }
       } else {
-        query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+        query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%,phone.ilike.%${search}%,national_id.ilike.%${search}%`)
       }
     }
 

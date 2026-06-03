@@ -68,9 +68,9 @@ export function validateTaxCode(mst: string): { valid: boolean; reason?: string 
 
 export const b2bPartnerCreateService = {
   /**
-   * Tìm partner đã có theo CCCD hoặc MST trước khi tạo mới (de-dup).
+   * Tìm partner đã có theo CCCD / MST / SĐT trước khi tạo mới (de-dup).
    */
-  async findExisting(input: { national_id?: string; tax_code?: string }): Promise<CreatedPartner | null> {
+  async findExisting(input: { national_id?: string; tax_code?: string; phone?: string }): Promise<CreatedPartner | null> {
     if (input.national_id) {
       const clean = input.national_id.trim().replace(/\s+/g, '')
       const { data } = await supabase
@@ -79,6 +79,16 @@ export const b2bPartnerCreateService = {
         .eq('national_id', clean)
         .maybeSingle()
       if (data) return { ...(data as Omit<CreatedPartner, 'is_new'>), is_new: false }
+    }
+    // Chống trùng SĐT — cùng số điện thoại = cùng đối tác (match SĐT trùng)
+    if (input.phone) {
+      const cleanPhone = input.phone.trim().replace(/\s|-/g, '')
+      const { data } = await supabase
+        .from('b2b_partners')
+        .select('id, code, name, partner_type, tier')
+        .eq('phone', cleanPhone)
+        .limit(1)
+      if (data && data.length > 0) return { ...(data[0] as Omit<CreatedPartner, 'is_new'>), is_new: false }
     }
     if (input.tax_code) {
       // Tax code lookup qua bp_search_keys (nếu BP đã có)
@@ -98,6 +108,21 @@ export const b2bPartnerCreateService = {
       }
     }
     return null
+  },
+
+  /**
+   * Tìm đại lý TRÙNG TÊN (so khớp chính xác, không phân biệt hoa thường).
+   * Dùng để CẢNH BÁO mềm — KHÔNG chặn cứng (trùng tên là hợp lệ, người khác nhau).
+   */
+  async findByName(name: string): Promise<{ code: string; name: string; phone: string | null }[]> {
+    const clean = name.trim()
+    if (clean.length < 2) return []
+    const { data } = await supabase
+      .from('b2b_partners')
+      .select('code, name, phone')
+      .ilike('name', clean)
+      .limit(5)
+    return (data as { code: string; name: string; phone: string | null }[]) || []
   },
 
   /**
@@ -129,6 +154,7 @@ export const b2bPartnerCreateService = {
     const existing = await this.findExisting({
       national_id: input.national_id,
       tax_code: input.tax_code,
+      phone: input.phone,
     })
     if (existing) return existing
 

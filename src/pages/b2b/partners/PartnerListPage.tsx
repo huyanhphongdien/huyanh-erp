@@ -26,8 +26,10 @@ import {
   Empty,
   Pagination,
   Statistic,
+  Table,
   message,
 } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import {
   SearchOutlined,
   MessageOutlined,
@@ -46,11 +48,13 @@ import {
   TIER_LABELS,
   TIER_COLORS,
   TIER_ICONS,
+  PARTNER_TYPE_LABELS,
   PARTNER_STATUS_LABELS,
   PARTNER_STATUS_COLORS,
 } from '../../../services/b2b/partnerService'
 import { chatRoomService } from '../../../services/b2b/chatRoomService'
 import { useAuthStore } from '../../../stores/authStore'
+import PartnerCreateModal from './PartnerCreateModal'
 
 const { Title, Text } = Typography
 
@@ -66,6 +70,12 @@ const TIER_OPTIONS = [
   { label: '🥉 Đồng', value: 'bronze' },
   { label: '🆕 Mới', value: 'new' },
 ]
+
+// Nhãn loại đối tác — gộp cả type của partnerService (dealer/supplier/both) lẫn
+// create service (household/processor) để bảng hiển thị đủ.
+const PARTNER_TYPE_LABEL_ALL: Record<string, string> = {
+  household: 'Hộ ND', dealer: 'Đại lý', supplier: 'NCC', processor: 'Gia công', both: 'ĐL & NCC',
+}
 
 // ============================================
 // PARTNER CARD COMPONENT (E4.2.1)
@@ -200,7 +210,10 @@ const PartnerListPage = () => {
   const [total, setTotal] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [tierFilter, setTierFilter] = useState<string>('all')
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 12 })
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  // Chỉ admin được tạo đại lý (1 đầu mối, tránh trùng)
+  const isAdmin = user?.role === 'admin'
 
   // ============================================
   // DATA FETCHING
@@ -319,9 +332,11 @@ const PartnerListPage = () => {
               <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
                 Làm mới
               </Button>
-              <Button type="primary" icon={<PlusOutlined />}>
-                Thêm Đại lý
-              </Button>
+              {isAdmin && (
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
+                  Thêm Đại lý
+                </Button>
+              )}
             </Space>
           </Col>
         </Row>
@@ -335,12 +350,13 @@ const PartnerListPage = () => {
         <Row gutter={16} align="middle">
           <Col flex="auto">
             <Input
-              placeholder="Tìm theo tên hoặc mã đại lý..."
+              size="large"
+              placeholder="Tìm: tên · mã (8999…) · SĐT · CCCD..."
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
               value={searchText}
               onChange={(e) => handleSearch(e.target.value)}
               allowClear
-              style={{ maxWidth: 350 }}
+              style={{ maxWidth: 480 }}
             />
           </Col>
           <Col>
@@ -356,48 +372,94 @@ const PartnerListPage = () => {
         </Row>
       </Card>
 
-      {/* Partner Cards Grid */}
-      <Spin spinning={loading}>
-        {partners.length > 0 ? (
-          <>
-            <Row gutter={[16, 16]}>
-              {partners.map((partner) => (
-                <Col xs={24} sm={12} md={8} lg={6} key={partner.id}>
-                  <PartnerCard
-                    partner={partner}
-                    onView={() => handleViewPartner(partner)}
-                    onChat={() => handleOpenChat(partner)}
-                    onDeals={() => handleViewDeals(partner)}
-                  />
-                </Col>
-              ))}
-            </Row>
+      {/* Bảng đại lý — dễ quan sát, quét nhanh */}
+      <Card style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
+        <Table<Partner>
+          rowKey="id"
+          loading={loading}
+          dataSource={partners}
+          size="middle"
+          scroll={{ x: 900 }}
+          onRow={(record) => ({
+            onClick: () => handleViewPartner(record),
+            style: { cursor: 'pointer' },
+          })}
+          locale={{ emptyText: searchText || tierFilter !== 'all' ? 'Không tìm thấy đại lý phù hợp' : 'Chưa có đại lý nào' }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total,
+            onChange: handlePageChange,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (t) => `Tổng ${t} đại lý`,
+            pageSizeOptions: ['20', '50', '100'],
+          }}
+          columns={[
+            {
+              title: 'Mã', dataIndex: 'code', key: 'code', width: 150,
+              render: (code: string) => <Text strong style={{ fontFamily: 'monospace', fontSize: 13 }}>{code}</Text>,
+            },
+            {
+              title: 'Tên đại lý', dataIndex: 'name', key: 'name',
+              render: (name: string, r: Partner) => (
+                <Space>
+                  <Avatar size="small" icon={<UserOutlined />} style={{ background: TIER_COLORS[r.tier] }} />
+                  <span style={{ fontWeight: 600 }}>{name}</span>
+                </Space>
+              ),
+            },
+            {
+              title: 'SĐT', dataIndex: 'phone', key: 'phone', width: 140,
+              render: (p: string | null) => p
+                ? <Text copyable={{ text: p }} style={{ fontFamily: 'monospace' }}>{p}</Text>
+                : <Text type="secondary">—</Text>,
+            },
+            {
+              title: 'Loại', dataIndex: 'partner_type', key: 'partner_type', width: 110,
+              render: (t: string) => <Tag>{PARTNER_TYPE_LABEL_ALL[t] || t}</Tag>,
+            },
+            {
+              title: 'Hạng', dataIndex: 'tier', key: 'tier', width: 130,
+              render: (tier: PartnerTier) => <Tag color={TIER_COLORS[tier]}>{TIER_ICONS[tier]} {TIER_LABELS[tier]}</Tag>,
+            },
+            {
+              title: 'Deals', dataIndex: 'deals_count', key: 'deals_count', width: 90, align: 'center',
+              render: (n: number, r: Partner) => (
+                <Space size={4}>
+                  <span>{n || 0}</span>
+                  {(r.deals_processing || 0) > 0 && <Badge count={r.deals_processing} size="small" color="blue" />}
+                </Space>
+              ),
+            },
+            {
+              title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 120,
+              render: (s: string) => <Tag color={PARTNER_STATUS_COLORS[s as keyof typeof PARTNER_STATUS_COLORS]}>{PARTNER_STATUS_LABELS[s as keyof typeof PARTNER_STATUS_LABELS] || s}</Tag>,
+            },
+            {
+              title: '', key: 'actions', width: 100, align: 'right', fixed: 'right',
+              render: (_: unknown, r: Partner) => (
+                <Space size={2} onClick={(e) => e.stopPropagation()}>
+                  <Tooltip title="Chat">
+                    <Badge count={r.unread_count} size="small">
+                      <Button type="text" size="small" icon={<MessageOutlined />} onClick={() => handleOpenChat(r)} />
+                    </Badge>
+                  </Tooltip>
+                  <Tooltip title="Giao dịch">
+                    <Button type="text" size="small" icon={<ShoppingOutlined />} onClick={() => handleViewDeals(r)} />
+                  </Tooltip>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Card>
 
-            {/* Pagination */}
-            <div style={{ marginTop: 24, textAlign: 'center' }}>
-              <Pagination
-                current={pagination.current}
-                pageSize={pagination.pageSize}
-                total={total}
-                onChange={handlePageChange}
-                showSizeChanger
-                showQuickJumper
-                showTotal={(total) => `Tổng ${total} đại lý`}
-              />
-            </div>
-          </>
-        ) : (
-          <Card style={{ borderRadius: 12 }}>
-            <Empty
-              description={
-                searchText || tierFilter !== 'all'
-                  ? 'Không tìm thấy đại lý phù hợp'
-                  : 'Chưa có đại lý nào'
-              }
-            />
-          </Card>
-        )}
-      </Spin>
+      <PartnerCreateModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={fetchPartners}
+      />
     </div>
   )
 }

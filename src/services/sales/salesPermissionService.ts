@@ -11,7 +11,7 @@ export type SalesRole = 'sale' | 'production' | 'logistics' | 'accounting' | 'ad
 // ============================================================================
 const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Sale
-  'sales@huyanhrubber.com': 'sale',
+  'sales@huyanhrubber.com': 'admin',  // Hồ Thị Liễu — nâng admin để sửa được đơn đã lên (2026-06-02)
   // Production
   'nhanlt@huyanhrubber.com': 'production',
   // Mua mủ NVL (raw_material) — owner stage 'raw_material', cấp quyền production để

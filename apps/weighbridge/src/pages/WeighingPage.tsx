@@ -891,7 +891,7 @@ export default function WeighingPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
+      <div style={{ maxWidth: 1500, margin: '0 auto', padding: 16 }}>
         {error && <Alert type="error" message={error} showIcon closable onClose={() => setError('')} style={{ marginBottom: 12 }} />}
         {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess('')} style={{ marginBottom: 12 }} />}
         {facilityError && <Alert type="warning" message={`Lỗi facility: ${facilityError}`} showIcon style={{ marginBottom: 12 }} />}
@@ -919,9 +919,9 @@ export default function WeighingPage() {
         )}
 
         <Row gutter={16}>
-          {/* LEFT: Form */}
-          <Col xs={24} lg={10}>
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          {/* LEFT: Form — 2-column grid trên desktop để đỡ cuộn dài */}
+          <Col xs={24} lg={14}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, alignItems: 'start', width: '100%' }}>
               {/* S3: Loại phiếu — IN (cân 2 lần) | OUT (cân 1 lần) */}
               <Card size="small" title="Loại phiếu cân" style={{ borderRadius: 12 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1491,23 +1491,40 @@ export default function WeighingPage() {
                 />
               )}
 
-              {/* Create button */}
+              {/* Create button — chiếm trọn hàng ngang */}
               {isCreate && (
-                <Button
-                  type="primary" size="large" block
-                  onClick={handleCreate} loading={loading}
-                  disabled={!vehiclePlate.trim()}
-                  style={{ height: 48, background: PRIMARY, borderColor: PRIMARY }}
-                >
-                  Tạo phiếu & Bắt đầu cân
-                </Button>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Button
+                    type="primary" size="large" block
+                    onClick={handleCreate} loading={loading}
+                    disabled={!vehiclePlate.trim()}
+                    style={{ height: 52, fontSize: 16, background: PRIMARY, borderColor: PRIMARY }}
+                  >
+                    Tạo phiếu & Bắt đầu cân
+                  </Button>
+                </div>
               )}
-            </Space>
+            </div>
           </Col>
 
-          {/* RIGHT: Scale + Summary */}
-          <Col xs={24} lg={14}>
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          {/* RIGHT: Scale + Summary — sticky, luôn thấy số cân khi cuộn form */}
+          <Col xs={24} lg={10}>
+            <div style={{ position: 'sticky', top: 80, display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
+              {/* Hướng dẫn khi chưa tạo phiếu — lấp khoảng trống bên phải */}
+              {isCreate && (
+                <Card size="small" style={{ borderRadius: 12, background: '#F0F9F4', border: `1px dashed ${PRIMARY}` }}>
+                  <div style={{ textAlign: 'center', padding: '12px 8px' }}>
+                    <div style={{ fontSize: 44, lineHeight: 1 }}>⚖️</div>
+                    <div style={{ marginTop: 8, fontSize: 16, fontWeight: 700, color: PRIMARY }}>Sẵn sàng cân</div>
+                    <div style={{ marginTop: 8, fontSize: 13, color: '#52708A', lineHeight: 1.7 }}>
+                      ① Nhập <strong>biển số xe</strong> + nguồn mủ<br />
+                      ② Bấm <strong>"Tạo phiếu & Bắt đầu cân"</strong><br />
+                      ③ Ghi <strong>cân lần 1 (Gross)</strong> → lần 2 (Tare)
+                    </div>
+                  </div>
+                </Card>
+              )}
+
               {/* Live Scale Display */}
               {ticket && !isCompleted && canRecord && (
                 <Card size="small" style={{ borderRadius: 12 }}>
@@ -1667,7 +1684,7 @@ export default function WeighingPage() {
                   Trạm Cân — {currentFacility?.name ?? 'Cao Su Huy Anh'}
                 </Text>
               </Card>
-            </Space>
+            </div>
           </Col>
         </Row>
       </div>

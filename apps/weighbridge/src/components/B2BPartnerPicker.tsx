@@ -5,9 +5,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { AutoComplete, Button, Space, Tag, Input } from 'antd'
-import { PlusOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons'
+import { SearchOutlined, UserOutlined } from '@ant-design/icons'
 import { supabase } from '@erp/lib/supabase'
-import QuickCreatePartnerModal from './QuickCreatePartnerModal'
 import type { CreatedPartner } from '@erp/services/b2b/b2bPartnerCreateService'
 
 interface PartnerOption {
@@ -38,7 +37,6 @@ export default function B2BPartnerPicker({ value, onChange, placeholder, disable
   const [options, setOptions] = useState<PartnerOption[]>([])
   const [selected, setSelected] = useState<PartnerOption | null>(null)
   const [loading, setLoading] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Load selected khi prop value đổi
   useEffect(() => {
@@ -187,7 +185,7 @@ export default function B2BPartnerPicker({ value, onChange, placeholder, disable
           notFoundContent={
             query.length >= 2 && !loading
               ? <div style={{ padding: 8, fontSize: 12, color: '#888' }}>
-                  Không tìm thấy. Bấm "+ Tạo mới" để đăng ký đại lý.
+                  Không tìm thấy. Đại lý mới phải được tạo ở ERP (1 đầu mối — tránh trùng), rồi mới cân được.
                 </div>
               : null
           }
@@ -198,35 +196,8 @@ export default function B2BPartnerPicker({ value, onChange, placeholder, disable
             allowClear
           />
         </AutoComplete>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          disabled={disabled}
-          onClick={() => setShowCreateModal(true)}
-        >
-          Tạo mới
-        </Button>
       </Space.Compact>
 
-      <QuickCreatePartnerModal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onCreated={(partner) => {
-          setShowCreateModal(false)
-          const opt: PartnerOption = {
-            id: partner.id,
-            code: partner.code,
-            name: partner.name,
-            tier: partner.tier,
-          }
-          setSelected(opt)
-          onChange(partner.id, opt)
-        }}
-        prefill={{
-          name: /^\d/.test(query) ? undefined : query,
-          phone: /^0\d{9}$/.test(query.replace(/\s/g, '')) ? query : undefined,
-        }}
-      />
     </>
   )
 }

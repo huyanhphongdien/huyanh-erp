@@ -28,7 +28,6 @@ import {
   type RubberWeighData, type WeightCalculation,
 } from '@/services/rubberWeighService'
 import CameraPanel from '@/components/CameraPanel'
-import LiveCameraGrid from '@/components/LiveCameraGrid'
 import ScaleSettings from '@/components/ScaleSettings'
 
 const { Title, Text } = Typography
@@ -1576,10 +1575,6 @@ export default function WeighingPage() {
                   </div>
                 </Card>
               )}
-
-              {/* P5: Camera trực tiếp — ngay dưới số cân/scale, TRÊN tổng kết (theo mock).
-                  Create: số phiếu→camera→tổng kết; cân: số phiếu→scale→camera→tổng kết. */}
-              <LiveCameraGrid facilityCode={currentFacility?.code} />
 
               {/* Weight Summary */}
               <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>

@@ -28,6 +28,7 @@ import {
   type RubberWeighData, type WeightCalculation,
 } from '@/services/rubberWeighService'
 import CameraPanel from '@/components/CameraPanel'
+import LiveCameraGrid from '@/components/LiveCameraGrid'
 import ScaleSettings from '@/components/ScaleSettings'
 
 const { Title, Text } = Typography
@@ -40,6 +41,12 @@ const RUBBER_TYPES = [
   { value: 'mu_tap', label: 'Mủ tạp' },
   { value: 'svr', label: 'SVR' },
 ]
+
+// Nhãn ngắn (có icon) cho panel "Nhập mủ gần đây" — đủ 5 loại mủ thô
+const RUBBER_LABELS: Record<string, string> = {
+  mu_nuoc: '💧 Mủ nước', mu_tap: '🪨 Mủ tạp', mu_dong: '🧊 Mủ đông',
+  mu_chen: '🥣 Mủ chén', mu_to: '📄 Mủ tờ', svr: 'SVR',
+}
 
 const DESTINATIONS = [
   { value: 'cong_1', label: 'Cổng 1' },
@@ -69,6 +76,8 @@ export default function WeighingPage() {
 
   // Ticket state
   const [ticket, setTicket] = useState<WeighbridgeTicket | null>(null)
+  // P4: danh sách nhập mủ gần đây (IN, theo facility) — panel cột phải khi tạo phiếu
+  const [recentTickets, setRecentTickets] = useState<WeighbridgeTicket[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -163,6 +172,25 @@ export default function WeighingPage() {
     // Load bảng tra DRC (cache 5 phút trong service)
     drcLookupService.getAll().then(setDrcLookupRows).catch((err) => console.warn('drc_lookup load error:', err))
   }, [currentFacility?.id, currentFacility?.code])
+
+  // P4: Load nhập mủ gần đây (6 phiếu IN mới nhất tại NM này) — reload sau mỗi lần
+  // tạo/hoàn tất phiếu (ticket?.id đổi) để operator thấy phiếu vừa cân.
+  // Query trực tiếp để lấy thêm qc_actual_drc + created_at (panel hiển thị DRC + giờ).
+  useEffect(() => {
+    if (!currentFacility?.id) return
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('weighbridge_tickets')
+        .select('id, code, vehicle_plate, supplier_name, rubber_type, net_weight, status, created_at, qc_actual_drc')
+        .eq('facility_id', currentFacility.id)
+        .eq('ticket_type', 'in')
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false })
+        .limit(6)
+      if (error) { console.warn('recent tickets load error:', error); return }
+      setRecentTickets((data || []) as any)
+    })()
+  }, [currentFacility?.id, ticket?.id])
 
   // S3 OUT: Load active sales orders khi user chuyển sang OUT
   // CHỈ load ở NM xuất khẩu (PD, can_ship_to_customer=true). TL/LAO không cần.
@@ -452,7 +480,7 @@ export default function WeighingPage() {
       } else if (sourceType === 'partner_direct' && directPartnerId) {
         // Cân không có deal: chọn đại lý B2B trực tiếp + chọn loại mủ
         rubberData.partner_id = directPartnerId
-        rubberData.rubber_type = directRawRubberType  // mu_* — sẽ trigger bridge → intake
+        rubberData.rubber_type = rubberType  // mu_* (từ card "Loại mủ") — trigger bridge → intake
       }
       await saveRubberFields(t.id, rubberData)
 
@@ -830,7 +858,7 @@ export default function WeighingPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
       {/* Header — 3-column layout giống HomePage */}
-      <div style={{ background: PRIMARY, padding: '10px 20px', position: 'sticky', top: 0, zIndex: 20 }}>
+      <div style={{ background: PRIMARY, padding: '6px 20px', position: 'sticky', top: 0, zIndex: 20 }}>
         <div
           style={{
             display: 'grid',
@@ -891,7 +919,7 @@ export default function WeighingPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1500, margin: '0 auto', padding: 16 }}>
+      <div style={{ maxWidth: 1500, margin: '0 auto', padding: '8px 16px 12px' }}>
         {error && <Alert type="error" message={error} showIcon closable onClose={() => setError('')} style={{ marginBottom: 12 }} />}
         {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess('')} style={{ marginBottom: 12 }} />}
         {facilityError && <Alert type="warning" message={`Lỗi facility: ${facilityError}`} showIcon style={{ marginBottom: 12 }} />}
@@ -899,7 +927,7 @@ export default function WeighingPage() {
         {/* Thanh tiến trình — chỉ luồng IN (cân 2 lần). Giúp operator luôn biết
             đang ở bước nào: Tạo phiếu → Cân L1 → Cân L2 (+DRC mủ nước) → Hoàn tất */}
         {ticketDirection === 'in' && (
-          <Card size="small" style={{ borderRadius: 12, marginBottom: 12 }}>
+          <Card size="small" style={{ borderRadius: 12, marginBottom: 8 }} styles={{ body: { padding: '8px 12px' } }}>
             <Steps
               size="small"
               current={isCompleted ? 3 : isWeighingTare ? 2 : isWeighingGross ? 1 : 0}
@@ -919,9 +947,9 @@ export default function WeighingPage() {
         )}
 
         <Row gutter={16}>
-          {/* LEFT: Form — 2-column grid trên desktop để đỡ cuộn dài */}
-          <Col xs={24} lg={14}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, alignItems: 'start', width: '100%' }}>
+          {/* LEFT: Form — xếp dọc 1 cột (theo mock), rộng hơn camera */}
+          <Col xs={24} lg={15}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
               {/* S3: Loại phiếu — IN (cân 2 lần) | OUT (cân 1 lần) */}
               <Card size="small" title="Loại phiếu cân" style={{ borderRadius: 12 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1115,28 +1143,22 @@ export default function WeighingPage() {
                 <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Button
+                      size="large"
                       type={sourceType === 'deal' ? 'primary' : 'default'}
                       onClick={() => setSourceType('deal')}
-                      style={sourceType === 'deal' ? { background: PRIMARY, borderColor: PRIMARY } : {}}
+                      style={sourceType === 'deal' ? { background: PRIMARY, borderColor: PRIMARY, flex: 1 } : { flex: 1 }}
                       disabled={isCompleted}
                     >
-                      Theo Deal
+                      📦 Theo Deal (đã chốt)
                     </Button>
                     <Button
-                      type={sourceType === 'supplier' ? 'primary' : 'default'}
-                      onClick={() => setSourceType('supplier')}
-                      style={sourceType === 'supplier' ? { background: PRIMARY, borderColor: PRIMARY } : {}}
+                      size="large"
+                      type={sourceType !== 'deal' ? 'primary' : 'default'}
+                      onClick={() => { if (sourceType === 'deal') setSourceType('partner_direct') }}
+                      style={sourceType !== 'deal' ? { background: PRIMARY, borderColor: PRIMARY, flex: 1 } : { flex: 1 }}
                       disabled={isCompleted}
                     >
-                      Theo NCC
-                    </Button>
-                    <Button
-                      type={sourceType === 'partner_direct' ? 'primary' : 'default'}
-                      onClick={() => setSourceType('partner_direct')}
-                      style={sourceType === 'partner_direct' ? { background: PRIMARY, borderColor: PRIMARY } : {}}
-                      disabled={isCompleted}
-                    >
-                      Đại lý B2B (không deal)
+                      👤 Đối tác trực tiếp
                     </Button>
                   </div>
 
@@ -1144,6 +1166,7 @@ export default function WeighingPage() {
                     <div>
                       <Text type="secondary" style={{ fontSize: 12 }}>Chọn Deal B2B</Text>
                       <Select
+                        size="large"
                         value={selectedDealId || undefined}
                         onChange={handleDealSelect}
                         placeholder="Chọn Deal..."
@@ -1207,60 +1230,57 @@ export default function WeighingPage() {
                         </div>
                       )}
                     </div>
-                  ) : sourceType === 'supplier' ? (
-                    <div>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Chọn NCC mủ</Text>
-                      <Select
-                        value={selectedSupplierId || undefined}
-                        onChange={(v) => { setSelectedSupplierId(v); setSelectedDealId('') }}
-                        placeholder="Chọn NCC..."
-                        style={{ width: '100%' }}
-                        disabled={isCompleted}
-                        allowClear
-                        showSearch
-                        optionFilterProp="label"
-                        options={suppliers.map((s) => ({
-                          value: s.id,
-                          label: `${s.code} — ${s.name}`,
-                        }))}
-                      />
-                    </div>
                   ) : (
-                    /* partner_direct: chọn đại lý B2B + loại mủ trực tiếp */
+                    /* Đối tác trực tiếp — GỘP đại lý B2B + NCC trong 1 ô search (kết quả có nhãn) */
                     <div>
                       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
-                        Đại lý B2B (tìm hoặc tạo mới)
+                        Tìm đối tác — đại lý B2B hoặc NCC (Lào / NCC Việt)
                       </Text>
                       <B2BPartnerPicker
-                        value={directPartnerId}
-                        onChange={(id) => setDirectPartnerId(id)}
+                        includeSuppliers
+                        value={sourceType === 'supplier' ? (selectedSupplierId || null) : directPartnerId}
+                        onChange={(id, opt) => {
+                          if (!id || !opt) {
+                            setSourceType('partner_direct'); setDirectPartnerId(null); setSelectedSupplierId('')
+                          } else if (opt.kind === 'supplier') {
+                            setSourceType('supplier'); setSelectedSupplierId(id); setDirectPartnerId(null); setSelectedDealId('')
+                          } else {
+                            setSourceType('partner_direct'); setDirectPartnerId(id); setSelectedSupplierId('')
+                          }
+                        }}
                         disabled={isCompleted}
                       />
-                      <div style={{ marginTop: 12 }}>
-                        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
-                          Loại mủ chi tiết (cho bonus đại lý)
-                        </Text>
-                        <Radio.Group
-                          value={directRawRubberType}
-                          onChange={(e) => setDirectRawRubberType(e.target.value)}
-                          disabled={isCompleted}
-                          buttonStyle="solid"
-                          style={{ width: '100%' }}
-                        >
-                          <Radio.Button value="mu_nuoc">💧 Mủ nước</Radio.Button>
-                          <Radio.Button value="mu_tap">🪨 Mủ tạp</Radio.Button>
-                          <Radio.Button value="mu_dong">🧊 Mủ đông</Radio.Button>
-                          <Radio.Button value="mu_chen">🥣 Mủ chén</Radio.Button>
-                          <Radio.Button value="mu_to">📄 Mủ tờ</Radio.Button>
-                        </Radio.Group>
-                        <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
-                          ⇒ Nhóm bonus: <strong style={{ color: directRawRubberType === 'mu_nuoc' ? '#1677ff' : '#d97706' }}>
-                            {directRawRubberType === 'mu_nuoc' ? 'Mủ nước' : 'Mủ tạp'}
-                          </strong>
-                        </Text>
-                      </div>
                     </div>
                   )}
+
+                  {/* Loại mủ — chips gọn nằm TRONG Nguồn mủ (theo mock). Bind rubberType
+                      (lái priceUnit + DRC); partner_direct lưu rubber_type = rubberType. */}
+                  <div>
+                    <Divider style={{ margin: '4px 0 10px' }} />
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
+                      Loại mủ <span style={{ color: '#94a3b8' }}>(1 chạm — dùng cho cả phiếu &amp; gom bonus)</span>
+                    </Text>
+                    <Radio.Group
+                      value={rubberType}
+                      onChange={(e) => setRubberType(e.target.value)}
+                      disabled={isCompleted}
+                      buttonStyle="solid"
+                      style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 8 }}
+                    >
+                      <Radio.Button value="mu_nuoc">💧 Mủ nước</Radio.Button>
+                      <Radio.Button value="mu_tap">🪨 Mủ tạp</Radio.Button>
+                      <Radio.Button value="mu_dong">🧊 Mủ đông</Radio.Button>
+                      <Radio.Button value="mu_chen">🥣 Mủ chén</Radio.Button>
+                      <Radio.Button value="mu_to">📄 Mủ tờ</Radio.Button>
+                    </Radio.Group>
+                    {sourceType === 'partner_direct' && (
+                      <Text type="secondary" style={{ fontSize: 11, marginTop: 8, display: 'block' }}>
+                        ⇒ Nhóm bonus: <strong style={{ color: rubberType === 'mu_nuoc' ? '#1677ff' : '#d97706' }}>
+                          {rubberType === 'mu_nuoc' ? 'Mủ nước' : 'Mủ tạp'}
+                        </strong>
+                      </Text>
+                    )}
+                  </div>
                 </Space>
               </Card>
               )}
@@ -1271,6 +1291,7 @@ export default function WeighingPage() {
                   <Col span={24}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Biển số xe *</Text>
                     <AutoComplete
+                      size="large"
                       value={vehiclePlate}
                       onChange={(v) => {
                         const upper = (v || '').toUpperCase()
@@ -1306,6 +1327,7 @@ export default function WeighingPage() {
                   <Col span={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Tài xế</Text>
                     <Input
+                      size="large"
                       value={driverName}
                       onChange={(e) => setDriverName(e.target.value)}
                       placeholder="Tên tài xế..."
@@ -1315,6 +1337,7 @@ export default function WeighingPage() {
                   <Col span={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>SĐT tài xế</Text>
                     <Input
+                      size="large"
                       value={driverPhone}
                       onChange={(e) => setDriverPhone(e.target.value)}
                       placeholder="0905..."
@@ -1323,44 +1346,6 @@ export default function WeighingPage() {
                   </Col>
                 </Row>
               </Card>
-
-              {/* Rubber fields — IN only (TP xuất không cần loại mủ/DRC/đơn giá/vị trí dỡ/tạp chất) */}
-              {ticketDirection === 'in' && (
-              <Card size="small" title="Thông tin mủ" style={{ borderRadius: 12 }}>
-                <Row gutter={[12, 12]}>
-                  <Col span={12}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Loại mủ</Text>
-                    <Select value={rubberType} onChange={setRubberType} style={{ width: '100%' }}
-                      disabled={isCompleted} options={RUBBER_TYPES} />
-                  </Col>
-                  <Col span={12}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Vị trí dỡ</Text>
-                    <Select value={destination || undefined} onChange={setDestination}
-                      style={{ width: '100%' }} options={DESTINATIONS} allowClear
-                      placeholder="Chọn..." disabled={isCompleted} />
-                  </Col>
-                  <Col span={12}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Tạp chất / Giảm trừ <span style={{ color: '#999' }}>(kg)</span>
-                    </Text>
-                    <InputNumber
-                      value={deductionKg}
-                      onChange={(v) => setDeductionKg(typeof v === 'number' ? v : 0)}
-                      style={{ width: '100%' }}
-                      min={0}
-                      disabled={isCompleted}
-                      placeholder="0"
-                      formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    />
-                  </Col>
-                  <Col span={24}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Ghi chú</Text>
-                    <Input.TextArea value={notes} onChange={(e) => setNotes(e.target.value)}
-                      rows={2} placeholder="Ghi chú..." disabled={isCompleted} />
-                  </Col>
-                </Row>
-              </Card>
-              )}
 
               {/* F2 Tân Lâm — Card "Đo DRC tại cân" cho mủ nước
                   Hiển thị khi: ticket existing + IN + mủ nước (auto-detect TL flow)
@@ -1491,39 +1476,30 @@ export default function WeighingPage() {
                 />
               )}
 
-              {/* Create button — chiếm trọn hàng ngang */}
-              {isCreate && (
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <Button
-                    type="primary" size="large" block
-                    onClick={handleCreate} loading={loading}
-                    disabled={!vehiclePlate.trim()}
-                    style={{ height: 52, fontSize: 16, background: PRIMARY, borderColor: PRIMARY }}
-                  >
-                    Tạo phiếu & Bắt đầu cân
-                  </Button>
-                </div>
-              )}
             </div>
           </Col>
 
           {/* RIGHT: Scale + Summary — sticky, luôn thấy số cân khi cuộn form */}
-          <Col xs={24} lg={10}>
-            <div style={{ position: 'sticky', top: 80, display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
-              {/* Hướng dẫn khi chưa tạo phiếu — lấp khoảng trống bên phải */}
-              {isCreate && (
-                <Card size="small" style={{ borderRadius: 12, background: '#F0F9F4', border: `1px dashed ${PRIMARY}` }}>
-                  <div style={{ textAlign: 'center', padding: '12px 8px' }}>
-                    <div style={{ fontSize: 44, lineHeight: 1 }}>⚖️</div>
-                    <div style={{ marginTop: 8, fontSize: 16, fontWeight: 700, color: PRIMARY }}>Sẵn sàng cân</div>
-                    <div style={{ marginTop: 8, fontSize: 13, color: '#52708A', lineHeight: 1.7 }}>
-                      ① Nhập <strong>biển số xe</strong> + nguồn mủ<br />
-                      ② Bấm <strong>"Tạo phiếu & Bắt đầu cân"</strong><br />
-                      ③ Ghi <strong>cân lần 1 (Gross)</strong> → lần 2 (Tare)
-                    </div>
+          <Col xs={24} lg={9}>
+            <div style={{ position: 'sticky', top: 72, display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+              {/* SỐ PHIẾU CÂN — luôn hiển thị nổi bật */}
+              <Card
+                size="small"
+                style={{ borderRadius: 12, background: PRIMARY, border: 'none' }}
+                styles={{ body: { padding: '7px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }}
+              >
+                <div>
+                  <div style={{ color: 'rgba(255,255,255,.75)', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' }}>Số phiếu cân</div>
+                  <div style={{ ...MONO, color: '#fff', fontSize: 18, fontWeight: 800, letterSpacing: 1 }}>
+                    {ticket?.code || '— tự sinh khi tạo —'}
                   </div>
-                </Card>
-              )}
+                </div>
+                {ticket && (
+                  <Tag color={isCompleted ? 'success' : isWeighingTare ? 'warning' : 'processing'} style={{ margin: 0 }}>
+                    {isCompleted ? '✓ Hoàn tất' : isWeighingTare ? '⏳ Chờ cân L2' : '⏳ Chờ cân L1'}
+                  </Tag>
+                )}
+              </Card>
 
               {/* Live Scale Display */}
               {ticket && !isCompleted && canRecord && (
@@ -1601,32 +1577,106 @@ export default function WeighingPage() {
                 </Card>
               )}
 
+              {/* P5: Camera trực tiếp — ngay dưới số cân/scale, TRÊN tổng kết (theo mock).
+                  Create: số phiếu→camera→tổng kết; cân: số phiếu→scale→camera→tổng kết. */}
+              <LiveCameraGrid facilityCode={currentFacility?.code} />
+
               {/* Weight Summary */}
               <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
                 <Row>
-                  <Col span={8} style={{ textAlign: 'center', padding: 16 }}>
+                  <Col span={8} style={{ textAlign: 'center', padding: '10px 8px' }}>
                     <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Gross</Text>
-                    <div style={{ ...MONO, fontSize: 24, fontWeight: 700 }}>
+                    <div style={{ ...MONO, fontSize: 20, fontWeight: 700 }}>
                       {ticket?.gross_weight != null ? ticket.gross_weight.toLocaleString() : '---'}
                     </div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>kg</Text>
                   </Col>
-                  <Col span={8} style={{ textAlign: 'center', padding: 16, borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
+                  <Col span={8} style={{ textAlign: 'center', padding: '10px 8px', borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
                     <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Tare</Text>
-                    <div style={{ ...MONO, fontSize: 24, fontWeight: 700 }}>
+                    <div style={{ ...MONO, fontSize: 20, fontWeight: 700 }}>
                       {ticket?.tare_weight != null ? ticket.tare_weight.toLocaleString() : '---'}
                     </div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>kg</Text>
                   </Col>
-                  <Col span={8} style={{ textAlign: 'center', padding: 16, background: calc ? '#F0FDF4' : undefined }}>
+                  <Col span={8} style={{ textAlign: 'center', padding: '10px 8px', background: calc ? '#F0FDF4' : undefined }}>
                     <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>NET</Text>
-                    <div style={{ ...MONO, fontSize: 24, fontWeight: 700, color: calc ? '#15803D' : '#141414' }}>
+                    <div style={{ ...MONO, fontSize: 20, fontWeight: 700, color: calc ? '#15803D' : '#141414' }}>
                       {calc ? calc.net_weight.toLocaleString() : (ticket?.net_weight != null ? ticket.net_weight.toLocaleString() : '---')}
                     </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>kg</Text>
                   </Col>
                 </Row>
               </Card>
+
+              {/* P4: Nhập mủ gần đây — dưới tổng kết (theo mock), avatar loại mủ + DRC/Net + link */}
+              {isCreate && (
+                <Card
+                  size="small"
+                  title={<span style={{ fontSize: 13 }}>🧾 Nhập mủ gần đây</span>}
+                  style={{ borderRadius: 12 }}
+                  styles={{ body: { padding: 0 } }}
+                >
+                  {recentTickets.length === 0 ? (
+                    <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+                      Chưa có phiếu nhập nào tại {currentFacility?.name ?? 'nhà máy này'}.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ maxHeight: 150, overflowY: 'auto' }}>
+                        {recentTickets.map((t, idx) => {
+                          const ext = t as any
+                          const who = (ext.supplier_name || t.vehicle_plate || '—') as string
+                          const rt = ext.rubber_type as string | undefined
+                          const drc = ext.qc_actual_drc as number | null | undefined
+                          const plate = t.vehicle_plate || ''
+                          const time = ext.created_at
+                            ? new Date(ext.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                            : ''
+                          const emoji = rt && RUBBER_LABELS[rt] ? RUBBER_LABELS[rt].split(' ')[0] : '🧪'
+                          const rtName = rt && RUBBER_LABELS[rt] ? RUBBER_LABELS[rt].replace(/^\S+\s/, '') : (rt || '')
+                          return (
+                            <div
+                              key={t.id}
+                              onClick={() => navigate(`/weigh/${t.id}`)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                                cursor: 'pointer', borderTop: idx === 0 ? 'none' : '1px solid #f5f5f5',
+                              }}
+                            >
+                              <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#f0f5f3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
+                                {emoji}
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</div>
+                                <div style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {rtName}{plate ? ` · ${plate}` : ''}{time ? ` · ${time}` : ''}
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                <div style={{ ...MONO, fontSize: 14, fontWeight: 700, color: '#1f2937' }}>
+                                  {t.net_weight != null ? t.net_weight.toLocaleString('vi-VN') : '—'}
+                                  <span style={{ fontSize: 10, color: '#999', fontWeight: 400 }}> kg</span>
+                                </div>
+                                <div style={{ fontSize: 10, color: drc != null ? '#2563eb' : '#94a3b8' }}>
+                                  {drc != null
+                                    ? `DRC ${drc}%`
+                                    : t.status === 'completed' ? 'Net' : t.status === 'weighing_tare' ? 'Chờ L2' : 'Chờ L1'}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div
+                        onClick={() => navigate('/')}
+                        style={{ textAlign: 'center', padding: '8px 0', borderTop: '1px solid #f0f0f0', color: PRIMARY, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Xem tất cả phiếu hôm nay →
+                      </div>
+                    </>
+                  )}
+                </Card>
+              )}
 
               {/* Card 'Tính toán' đã bỏ — trạm cân chỉ quan tâm KL, tiền
                   tính sau ở Deal/Quyết toán */}
@@ -1678,14 +1728,22 @@ export default function WeighingPage() {
                 </Row>
               )}
 
-              {/* Keyboard shortcuts hint */}
-              <Card size="small" style={{ borderRadius: 12, background: '#FAFAFA' }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  Trạm Cân — {currentFacility?.name ?? 'Cao Su Huy Anh'}
-                </Text>
-              </Card>
             </div>
           </Col>
+
+          {/* Thanh TẠO PHIẾU — Col full-width DƯỚI cả 2 cột, căn khít theo lưới Row */}
+          {isCreate && (
+            <Col xs={24} style={{ marginTop: 6 }}>
+              <Button
+                type="primary" block
+                onClick={handleCreate} loading={loading}
+                disabled={!vehiclePlate.trim()}
+                style={{ height: 50, fontSize: 17, fontWeight: 700, background: PRIMARY, borderColor: PRIMARY, borderRadius: 12 }}
+              >
+                Tạo phiếu &amp; Bắt đầu cân
+              </Button>
+            </Col>
+          )}
         </Row>
       </div>
     </div>

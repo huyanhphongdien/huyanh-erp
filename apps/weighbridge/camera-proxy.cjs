@@ -150,6 +150,85 @@ function fetchWithDigest(opts, callback) {
   doRequest(null, false)
 }
 
+/**
+ * Stream MJPEG (multipart/x-mixed-replace) từ camera Dahua qua Digest Auth,
+ * pipe thẳng xuống browser <img> để xem LIVE liên tục (không buffer).
+ * Khác fetchWithDigest: KHÔNG gom body, KHÔNG timeout (stream sống lâu).
+ */
+function streamWithDigest(opts, clientReq, clientRes) {
+  const { host, port, path, user, pass } = opts
+  const method = 'GET'
+  let upstream = null
+  let closed = false
+
+  const cleanup = () => {
+    closed = true
+    if (upstream) { try { upstream.destroy() } catch (e) {} }
+  }
+  clientReq.on('close', cleanup)
+
+  const doRequest = (authHeader, isRetry) => {
+    if (closed) return
+    const reqOpts = {
+      host: host, port: port, path: path, method: method,
+      headers: { 'User-Agent': 'CameraProxy/1.0', 'Accept': '*/*' },
+    }
+    if (authHeader) reqOpts.headers['Authorization'] = authHeader
+
+    upstream = http.request(reqOpts, (res) => {
+      // 401 lần đầu → tính digest/basic rồi retry
+      if (res.statusCode === 401 && !isRetry) {
+        const wwwAuth = res.headers['www-authenticate'] || ''
+        res.resume()
+        if (/^Basic/i.test(wwwAuth)) {
+          const basic = 'Basic ' + Buffer.from(user + ':' + pass).toString('base64')
+          doRequest(basic, true)
+          return
+        }
+        if (!/^Digest/i.test(wwwAuth)) {
+          if (!closed) { clientRes.writeHead(502, { 'Content-Type': 'text/plain' }); clientRes.end('Unsupported auth: ' + wwwAuth) }
+          return
+        }
+        const challenge = parseDigestChallenge(wwwAuth)
+        const nc = '00000001'
+        const cnonce = crypto.randomBytes(8).toString('hex')
+        const auth = buildDigestAuth({
+          username: user, password: pass, method: method, uri: path,
+          realm: challenge.realm || '', nonce: challenge.nonce || '',
+          qop: challenge.qop, opaque: challenge.opaque, algorithm: challenge.algorithm,
+          nc: nc, cnonce: cnonce,
+        })
+        doRequest(auth, true)
+        return
+      }
+
+      if (res.statusCode !== 200) {
+        if (!closed) { clientRes.writeHead(502, { 'Content-Type': 'text/plain' }); clientRes.end('Camera HTTP ' + res.statusCode) }
+        res.resume()
+        return
+      }
+
+      // 200 → pipe multipart MJPEG thẳng xuống browser
+      clientRes.writeHead(200, {
+        'Content-Type': res.headers['content-type'] || 'multipart/x-mixed-replace',
+        'Cache-Control': 'no-cache, no-store',
+        'Connection': 'close',
+      })
+      res.pipe(clientRes)
+      res.on('error', cleanup)
+      res.on('end', cleanup)
+    })
+
+    upstream.on('error', (err) => {
+      console.error('MJPEG ' + host + ' error: ' + err.message)
+      if (!closed) { try { clientRes.writeHead(502, { 'Content-Type': 'text/plain' }); clientRes.end('Camera error: ' + err.message) } catch (e) {} }
+    })
+    upstream.end()
+  }
+
+  doRequest(null, false)
+}
+
 // ============================================================
 // HTTP proxy server
 // ============================================================
@@ -213,6 +292,26 @@ const server = http.createServer((req, res) => {
         res.end(data)
       }
     )
+    return
+  }
+
+  // MJPEG live stream (xem camera liên tục trong <img>)
+  if (url.pathname === '/mjpg') {
+    const ip = url.searchParams.get('ip')
+    const port = url.searchParams.get('port') || '80'
+    const channel = url.searchParams.get('channel') || '1'
+    const subtype = url.searchParams.get('subtype') || '1'  // 1 = sub-stream (nhẹ băng thông)
+    const user = url.searchParams.get('user') || 'admin'
+    const pass = url.searchParams.get('pass') || ''
+
+    if (!ip) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' })
+      res.end('Missing ip parameter')
+      return
+    }
+
+    const camPath = '/cgi-bin/mjpg/video.cgi?channel=' + channel + '&subtype=' + subtype
+    streamWithDigest({ host: ip, port: Number(port), path: camPath, user: user, pass: pass }, req, res)
     return
   }
 

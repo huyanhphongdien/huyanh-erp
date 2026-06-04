@@ -6,8 +6,8 @@
 // — tự validate phone/CCCD/MST + de-dup theo CCCD/MST + trigger DB sinh mã HAC-13.
 // ============================================================================
 import { useState } from 'react'
-import { Modal, Form, Input, Select, Segmented, Alert, message } from 'antd'
-import { IdcardOutlined, BankOutlined } from '@ant-design/icons'
+import { Modal, Form, Input, Select, Segmented, Alert, Row, Col, message } from 'antd'
+import { IdcardOutlined, BankOutlined, UserAddOutlined } from '@ant-design/icons'
 import { b2bPartnerCreateService, type B2BPartnerKind } from '../../../services/b2b/b2bPartnerCreateService'
 
 interface Props {
@@ -94,12 +94,19 @@ export default function PartnerCreateModal({ open, onClose, onCreated }: Props) 
   return (
     <Modal
       open={open}
-      title="Tạo đại lý B2B mới"
+      width={640}
+      title={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 16 }}>
+          <UserAddOutlined style={{ color: '#1B4D3E' }} />
+          Tạo đại lý B2B mới
+        </span>
+      }
       onCancel={handleClose}
       onOk={handleSubmit}
       confirmLoading={submitting}
-      okText="Tạo"
+      okText="Tạo đại lý"
       cancelText="Hủy"
+      okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
       destroyOnClose
     >
       <Alert
@@ -127,45 +134,55 @@ export default function PartnerCreateModal({ open, onClose, onCreated }: Props) 
           <Input placeholder="Nguyễn Văn A" allowClear />
         </Form.Item>
 
-        {kind === 'individual' ? (
-          <Form.Item
-            name="national_id"
-            label="CCCD (12 chữ số)"
-            rules={[{ required: true, message: 'Nhập CCCD' }, { pattern: /^\d{12}$/, message: 'CCCD phải đúng 12 chữ số' }]}
-          >
-            <Input placeholder="012345678901" allowClear maxLength={12} />
-          </Form.Item>
-        ) : (
-          <Form.Item
-            name="tax_code"
-            label="MST (10 hoặc 13 chữ số)"
-            rules={[{ required: true, message: 'Nhập MST' }, { pattern: /^\d{10}(\d{3})?$/, message: 'MST phải 10 hoặc 13 chữ số' }]}
-          >
-            <Input placeholder="0101234567" allowClear maxLength={13} />
-          </Form.Item>
-        )}
+        <Row gutter={16}>
+          <Col span={12}>
+            {kind === 'individual' ? (
+              <Form.Item
+                name="national_id"
+                label="CCCD (12 chữ số)"
+                rules={[{ required: true, message: 'Nhập CCCD' }, { pattern: /^\d{12}$/, message: 'CCCD phải đúng 12 chữ số' }]}
+              >
+                <Input placeholder="012345678901" allowClear maxLength={12} />
+              </Form.Item>
+            ) : (
+              <Form.Item
+                name="tax_code"
+                label="MST (10 hoặc 13 chữ số)"
+                rules={[{ required: true, message: 'Nhập MST' }, { pattern: /^\d{10}(\d{3})?$/, message: 'MST phải 10 hoặc 13 chữ số' }]}
+              >
+                <Input placeholder="0101234567" allowClear maxLength={13} />
+              </Form.Item>
+            )}
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="phone"
+              label="Số điện thoại"
+              rules={[{ required: true, message: 'Nhập SĐT' }, { pattern: /^(\+84|0)\d{9}$/, message: 'SĐT: 0xxx (10 số)' }]}
+            >
+              <Input placeholder="0901234567" allowClear />
+            </Form.Item>
+          </Col>
+        </Row>
 
-        <Form.Item
-          name="phone"
-          label="Số điện thoại"
-          rules={[{ required: true, message: 'Nhập SĐT' }, { pattern: /^(\+84|0)\d{9}$/, message: 'SĐT VN: 0xxx (10 số) hoặc +84xxx' }]}
-        >
-          <Input placeholder="0901234567" allowClear />
-        </Form.Item>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item name="partner_type" label="Loại đối tác">
+              <Select options={PARTNER_TYPE_OPTIONS} />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="tier" label="Hạng">
+              <Select options={TIER_OPTIONS} />
+            </Form.Item>
+          </Col>
+        </Row>
 
-        <Form.Item name="partner_type" label="Loại đối tác">
-          <Select options={PARTNER_TYPE_OPTIONS} />
-        </Form.Item>
-
-        <Form.Item name="tier" label="Hạng">
-          <Select options={TIER_OPTIONS} />
-        </Form.Item>
-
-        <Form.Item name="address" label="Địa chỉ (tuỳ chọn)">
+        <Form.Item name="address" label="Địa chỉ (tuỳ chọn)" style={{ marginBottom: 12 }}>
           <Input.TextArea rows={2} placeholder="Số nhà, đường, xã/phường, huyện, tỉnh" />
         </Form.Item>
 
-        <Form.Item name="email" label="Email (tuỳ chọn)" rules={[{ type: 'email', message: 'Email không hợp lệ' }]}>
+        <Form.Item name="email" label="Email (tuỳ chọn)" rules={[{ type: 'email', message: 'Email không hợp lệ' }]} style={{ marginBottom: 0 }}>
           <Input placeholder="email@example.com" allowClear />
         </Form.Item>
       </Form>

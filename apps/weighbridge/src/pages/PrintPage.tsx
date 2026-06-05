@@ -15,7 +15,7 @@ type PaperSize = 'a4' | 'a5' | '80mm' | '58mm'
 // A4 dọc: 210mm - 14mm margin (2×7mm) ≈ 740px
 // A5 NGANG (landscape, mặc định): 210mm - 12mm margin ≈ 750px (rộng = A4 dọc)
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
-  a4: { label: 'A4 (210mm)', width: 740, fontSize: 15 },
+  a4: { label: 'A4 (210mm)', width: 740, fontSize: 13 },
   a5: { label: 'A5 ngang (210mm)', width: 750, fontSize: 11 },
   '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
   '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
@@ -210,11 +210,15 @@ export default function PrintPage() {
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : paperSize === 'a5'
                 ? 'size: A5 landscape; margin: 5mm;'
-                : 'size: A4; margin: 7mm;'
+                : 'size: A4; margin: 6mm;'
             }
           }
           ${paperSize === 'a5' ? `
             .print-only td, .print-only th { padding: 3px 6px !important; }
+          ` : ''}
+          ${paperSize === 'a4' ? `
+            .print-only td, .print-only th { padding: 4px 8px !important; }
+            .print-only img { break-inside: avoid; }
           ` : ''}
         }
       `}</style>
@@ -232,7 +236,7 @@ export default function PrintPage() {
       <div style={{
         width: cfg.width,
         margin: '0 auto',
-        padding: isThermal ? '4px 2px' : (paperSize === 'a5' ? '10px 14px' : '24px 24px'),
+        padding: isThermal ? '4px 2px' : (paperSize === 'a5' ? '10px 14px' : '12px 16px'),
         // A4/A5 = serif (chứng từ chính thức, đồng bộ Liên 2 + PCG); nhiệt = sans (rõ ở size nhỏ).
         fontFamily: isThermal ? "'Be Vietnam Pro', Arial, sans-serif" : "'Times New Roman', Times, serif",
         fontSize: fs,
@@ -261,18 +265,18 @@ export default function PrintPage() {
         ) : (
           // A4 / A5: full header — font scale theo cfg.fontSize
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: paperSize === 'a5' ? 6 : 12, paddingBottom: paperSize === 'a5' ? 5 : 10, borderBottom: '2px solid #1B4D3E' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: paperSize === 'a5' ? 6 : 7, paddingBottom: paperSize === 'a5' ? 5 : 6, borderBottom: '2px solid #1B4D3E' }}>
               <div>
                 <div style={{ fontSize: fs, fontWeight: 600, color: '#374151' }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
                 <div style={{ fontSize: fs + 4, fontWeight: 800, color: '#1B4D3E', letterSpacing: 0.5 }}>CAO SU HUY ANH PHONG ĐIỀN</div>
                 <div style={{ fontSize: fs - 2, color: '#4B5563', marginTop: 2 }}>Khe Mạ, Phường Phong Điền, TP Huế</div>
                 <div style={{ fontSize: fs - 2, color: '#4B5563' }}>MST: 3301549896</div>
               </div>
-              <QRCodeImg data={qrData} size={paperSize === 'a5' ? 80 : 100} />
+              <QRCodeImg data={qrData} size={paperSize === 'a5' ? 80 : 84} />
             </div>
-            <div style={{ textAlign: 'center', margin: paperSize === 'a5' ? '6px 0 8px' : '14px 0 16px' }}>
-              <div style={{ fontSize: fs + 12, fontWeight: 800, letterSpacing: 1.5, color: '#111827' }}>PHIẾU CÂN XE</div>
-              <div style={{ fontSize: fs + 1, color: '#374151', fontWeight: 600, marginTop: 4 }}>Số: {ticket!.code}</div>
+            <div style={{ textAlign: 'center', margin: paperSize === 'a5' ? '6px 0 8px' : '8px 0 8px' }}>
+              <div style={{ fontSize: fs + 10, fontWeight: 800, letterSpacing: 1.5, color: '#111827' }}>PHIẾU CÂN XE</div>
+              <div style={{ fontSize: fs + 1, color: '#374151', fontWeight: 600, marginTop: 2 }}>Số: {ticket!.code}</div>
               <div style={{ fontSize: fs - 1, color: '#6B7280' }}>{fmtDateTime(ticket!.created_at)}</div>
             </div>
           </>
@@ -292,7 +296,7 @@ export default function PrintPage() {
             {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 14, border: '1px solid #D1D5DB' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 10, border: '1px solid #D1D5DB' }}>
             <tbody>
               <tr>
                 <td style={tdLabel}>Biển số xe</td>
@@ -349,7 +353,7 @@ export default function PrintPage() {
             )}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 14, border: '2px solid #1B4D3E' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 10, border: '2px solid #1B4D3E' }}>
             <thead>
               <tr style={{ background: '#1B4D3E', color: '#fff' }}>
                 <th style={{ ...thStyle, color: '#fff', fontSize: fs }}>Hạng mục</th>
@@ -370,7 +374,7 @@ export default function PrintPage() {
               </tr>
               <tr style={{ background: '#DCFCE7' }}>
                 <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>NET</td>
-                <td style={{ ...tdCenter, fontSize: paperSize === 'a5' ? fs + 5 : fs + 11, fontWeight: 800, color: '#15803D', fontFamily: mono, letterSpacing: 1 }}>{fmt(ticket!.net_weight)}</td>
+                <td style={{ ...tdCenter, fontSize: paperSize === 'a5' ? fs + 5 : fs + 7, fontWeight: 800, color: '#15803D', fontFamily: mono, letterSpacing: 1 }}>{fmt(ticket!.net_weight)}</td>
                 <td style={tdCenter}></td>
               </tr>
               {deduction > 0 && (
@@ -404,7 +408,7 @@ export default function PrintPage() {
               {consolidationCode && <Row2 l="Mã LLM" r={consolidationCode} />}
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 14, border: '2px solid #15803D' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 10, border: '2px solid #15803D' }}>
               <thead>
                 <tr style={{ background: '#15803D', color: '#fff' }}>
                   <th style={{ ...thStyle, color: '#fff', fontSize: fs + 1 }} colSpan={4}>ĐO DRC TẠI CÂN</th>
@@ -464,14 +468,14 @@ export default function PrintPage() {
 
         {/* ===== CAMERA IMAGES (A4 only) ===== */}
         {!isThermal && images.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8 }}>
             {l1Images.length > 0 && (
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: '#16A34A' }}>Ảnh cân lần 1</div>
+              <div style={{ marginBottom: 5 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, color: '#16A34A' }}>Ảnh cân lần 1</div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l1Images.map((img) => (
                     <img key={img.id} src={img.image_url} alt={img.capture_type}
-                      style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+                      style={{ width: 150, height: 92, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
                   ))}
                 </div>
               </div>
@@ -482,7 +486,7 @@ export default function PrintPage() {
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l2Images.map((img) => (
                     <img key={img.id} src={img.image_url} alt={img.capture_type}
-                      style={{ width: 180, height: 120, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+                      style={{ width: 150, height: 92, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
                   ))}
                 </div>
               </div>
@@ -512,21 +516,21 @@ export default function PrintPage() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: paperSize === 'a5' ? 12 : 36, fontSize: fs, textAlign: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: paperSize === 'a5' ? 12 : 18, fontSize: fs, textAlign: 'center', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 56, fontSize: fs + 1 }}>Nhân viên cân</div>
+                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 30, fontSize: fs + 1 }}>Nhân viên cân</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 56, fontSize: fs + 1 }}>Tài xế</div>
+                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 30, fontSize: fs + 1 }}>Tài xế</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 56, fontSize: fs + 1 }}>Xác nhận</div>
+                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 30, fontSize: fs + 1 }}>Xác nhận</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
             </div>
-            <div style={{ marginTop: 16, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
+            <div style={{ marginTop: 10, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
               Phiếu được in từ hệ thống Trạm Cân — Cao Su Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
             </div>
           </>

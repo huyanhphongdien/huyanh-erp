@@ -113,8 +113,8 @@ export default function PartnerCreateModal({ open, onClose, onCreated }: Props) 
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="Mã HAC-13 tự sinh"
-        description="Hệ thống tự sinh mã định danh 13 số (8999…) sau khi tạo. Bạn không cần nhập. Trùng CCCD/MST sẽ bị chặn."
+        message="Mã HAC-13 tự sinh · chỉ Tên là bắt buộc"
+        description="Hệ thống tự sinh mã định danh 13 số (8999…). CCCD/SĐT/MST tuỳ chọn — có thể bổ sung sau bằng nút Sửa. Trùng CCCD vẫn bị chặn."
       />
 
       <Form form={form} layout="vertical" initialValues={{ partner_type: 'household', tier: 'new' }}>
@@ -139,28 +139,28 @@ export default function PartnerCreateModal({ open, onClose, onCreated }: Props) 
             {kind === 'individual' ? (
               <Form.Item
                 name="national_id"
-                label="CCCD (12 chữ số)"
-                rules={[{ required: true, message: 'Nhập CCCD' }, { pattern: /^\d{12}$/, message: 'CCCD phải đúng 12 chữ số' }]}
+                label="CCCD (12 chữ số) — tuỳ chọn"
+                rules={[{ pattern: /^\d{12}$/, message: 'CCCD phải đúng 12 chữ số' }]}
               >
-                <Input placeholder="012345678901" allowClear maxLength={12} />
+                <Input placeholder="012345678901 (có thể bổ sung sau)" allowClear maxLength={12} />
               </Form.Item>
             ) : (
               <Form.Item
                 name="tax_code"
-                label="MST (10 hoặc 13 chữ số)"
-                rules={[{ required: true, message: 'Nhập MST' }, { pattern: /^\d{10}(\d{3})?$/, message: 'MST phải 10 hoặc 13 chữ số' }]}
+                label="MST (10 hoặc 13 chữ số) — tuỳ chọn"
+                rules={[{ pattern: /^\d{10}(\d{3})?$/, message: 'MST phải 10 hoặc 13 chữ số' }]}
               >
-                <Input placeholder="0101234567" allowClear maxLength={13} />
+                <Input placeholder="0101234567 (có thể bổ sung sau)" allowClear maxLength={13} />
               </Form.Item>
             )}
           </Col>
           <Col span={12}>
             <Form.Item
               name="phone"
-              label="Số điện thoại"
-              rules={[{ required: true, message: 'Nhập SĐT' }, { pattern: /^(\+84|0)\d{9}$/, message: 'SĐT: 0xxx (10 số)' }]}
+              label="Số điện thoại — tuỳ chọn"
+              rules={[{ pattern: /^(\+84|0)\d{9}$/, message: 'SĐT: 0xxx (10 số)' }]}
             >
-              <Input placeholder="0901234567" allowClear />
+              <Input placeholder="0901234567 (có thể bổ sung sau)" allowClear />
             </Form.Item>
           </Col>
         </Row>

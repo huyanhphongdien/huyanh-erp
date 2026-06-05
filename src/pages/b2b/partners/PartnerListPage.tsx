@@ -39,6 +39,7 @@ import {
   ReloadOutlined,
   PlusOutlined,
   FilterOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
 import {
   partnerService,
@@ -55,6 +56,7 @@ import {
 import { chatRoomService } from '../../../services/b2b/chatRoomService'
 import { useAuthStore } from '../../../stores/authStore'
 import PartnerCreateModal from './PartnerCreateModal'
+import PartnerEditModal from './PartnerEditModal'
 
 const { Title, Text } = Typography
 
@@ -212,7 +214,8 @@ const PartnerListPage = () => {
   const [tierFilter, setTierFilter] = useState<string>('all')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [showCreateModal, setShowCreateModal] = useState(false)
-  // Chỉ admin được tạo đại lý (1 đầu mối, tránh trùng)
+  const [editPartner, setEditPartner] = useState<Partner | null>(null)
+  // Chỉ admin được tạo / sửa đại lý (1 đầu mối, tránh trùng)
   const isAdmin = user?.role === 'admin'
 
   // ============================================
@@ -437,7 +440,7 @@ const PartnerListPage = () => {
               render: (s: string) => <Tag color={PARTNER_STATUS_COLORS[s as keyof typeof PARTNER_STATUS_COLORS]}>{PARTNER_STATUS_LABELS[s as keyof typeof PARTNER_STATUS_LABELS] || s}</Tag>,
             },
             {
-              title: '', key: 'actions', width: 100, align: 'right', fixed: 'right',
+              title: '', key: 'actions', width: 140, align: 'right', fixed: 'right',
               render: (_: unknown, r: Partner) => (
                 <Space size={2} onClick={(e) => e.stopPropagation()}>
                   <Tooltip title="Chat">
@@ -448,6 +451,11 @@ const PartnerListPage = () => {
                   <Tooltip title="Giao dịch">
                     <Button type="text" size="small" icon={<ShoppingOutlined />} onClick={() => handleViewDeals(r)} />
                   </Tooltip>
+                  {isAdmin && (
+                    <Tooltip title="Sửa / bổ sung thông tin">
+                      <Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditPartner(r)} />
+                    </Tooltip>
+                  )}
                 </Space>
               ),
             },
@@ -459,6 +467,13 @@ const PartnerListPage = () => {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={fetchPartners}
+      />
+
+      <PartnerEditModal
+        open={!!editPartner}
+        partner={editPartner}
+        onClose={() => setEditPartner(null)}
+        onSaved={fetchPartners}
       />
     </div>
   )

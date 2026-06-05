@@ -20,7 +20,7 @@ export type B2BPartnerKind = 'individual' | 'company'
 export interface CreateB2BPartnerInput {
   kind: B2BPartnerKind
   name: string                        // bắt buộc
-  phone: string                       // bắt buộc (b2b.partners NOT NULL)
+  phone?: string                      // tuỳ chọn (hộ ND/đại lý nhỏ có thể chưa có)
   national_id?: string                // CCCD — cho individual
   tax_code?: string                   // MST — cho company
   address?: string
@@ -137,17 +137,22 @@ export const b2bPartnerCreateService = {
     if (!input.name?.trim() || input.name.trim().length < 2) {
       throw new Error('Tên đại lý bắt buộc (tối thiểu 2 ký tự)')
     }
-    const phoneCheck = validatePhone(input.phone)
-    if (!phoneCheck.valid) throw new Error(phoneCheck.reason)
-
+    // SĐT / CCCD / MST: KHÔNG bắt buộc — chỉ kiểm format KHI có nhập (hộ ND / đại lý
+    // nhỏ có thể chưa có giấy tờ). Trùng vẫn được chặn (findExisting + UNIQUE CCCD ở DB).
+    if (input.phone?.trim()) {
+      const phoneCheck = validatePhone(input.phone)
+      if (!phoneCheck.valid) throw new Error(phoneCheck.reason)
+    }
     if (input.kind === 'individual') {
-      if (!input.national_id) throw new Error('CCCD bắt buộc cho cá nhân')
-      const cccdCheck = validateCCCD(input.national_id)
-      if (!cccdCheck.valid) throw new Error(cccdCheck.reason)
+      if (input.national_id?.trim()) {
+        const cccdCheck = validateCCCD(input.national_id)
+        if (!cccdCheck.valid) throw new Error(cccdCheck.reason)
+      }
     } else {
-      if (!input.tax_code) throw new Error('MST bắt buộc cho doanh nghiệp')
-      const mstCheck = validateTaxCode(input.tax_code)
-      if (!mstCheck.valid) throw new Error(mstCheck.reason)
+      if (input.tax_code?.trim()) {
+        const mstCheck = validateTaxCode(input.tax_code)
+        if (!mstCheck.valid) throw new Error(mstCheck.reason)
+      }
     }
 
     // De-dup
@@ -168,7 +173,7 @@ export const b2bPartnerCreateService = {
     const insertPayload: Record<string, unknown> = {
       code: placeholderCode,
       name: input.name.trim(),
-      phone: input.phone.trim(),
+      phone: input.phone?.trim() || null,
       partner_type: partnerType,
       tier,
       status: 'verified',

@@ -491,6 +491,35 @@ export const partnerService = {
   },
 
   /**
+   * Bổ sung / sửa THÔNG TIN ĐỊNH DANH của đại lý.
+   * CHỈ field master an toàn (tên, SĐT, CCCD, địa chỉ, email, hạng, loại) —
+   * KHÔNG đụng dữ liệu giao dịch (phiếu cân, công nợ, deal tham chiếu qua id).
+   * Chỉ ghi field được truyền (undefined = bỏ qua) để tránh xoá nhầm dữ liệu.
+   */
+  async updateInfo(partnerId: string, fields: {
+    name?: string
+    phone?: string | null
+    national_id?: string | null
+    address?: string | null
+    email?: string | null
+    tier?: PartnerTier
+    partner_type?: PartnerType
+  }): Promise<Partner> {
+    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    for (const [k, val] of Object.entries(fields)) {
+      if (val !== undefined) payload[k] = val
+    }
+    const { data, error } = await supabase
+      .from('b2b_partners')
+      .update(payload)
+      .eq('id', partnerId)
+      .select()
+      .single()
+    if (error) throw error
+    return data as Partner
+  },
+
+  /**
    * Sprint 1.1 (TL): Cập nhật proxy partner + biệt danh + cờ proxy.
    * Cho phép null hoá tất cả 3 field (set về NULL/false).
    */

@@ -71,6 +71,7 @@ export default function WeighingPage() {
   const { ticketId } = useParams()
   const { operator } = useAuthStore()
   const { facility: currentFacility, error: facilityError } = useCurrentFacility()
+  // useKeliScale: thử cấu hình đã lưu trước + chặn dò trùng (fix kẹt "Chưa kết nối" ở TL 1200/8/None/1)
   const scale = useKeliScale()
 
   // Ticket state

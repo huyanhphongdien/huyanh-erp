@@ -466,6 +466,8 @@ export function useKeliScale(): UseKeliScaleReturn {
   const rawByteBufferRef = useRef<number[]>([])
   // Prevent auto-reconnect after fatal error (ParityError, etc.)
   const fatalErrorRef = useRef(false)
+  // Chặn connect()/auto-reconnect chạy ĐỒNG THỜI (tranh cổng → kết nối không khóa được)
+  const connectingRef = useRef(false)
 
   // Save config
   const setConfig = useCallback((partial: Partial<KeliScaleConfig>) => {
@@ -598,7 +600,29 @@ export function useKeliScale(): UseKeliScaleReturn {
   const autoDetect = useCallback(async (port: SerialPort): Promise<KeliScaleConfig | null> => {
     console.log('[KeliScale] Auto-detecting config...')
 
-    for (const cfg of AUTO_DETECT_CONFIGS) {
+    // Thử cấu hình ĐÃ LƯU trước — kết nối nhanh (tránh dò 14 cấu hình ~50s) +
+    // giảm cửa sổ race với auto-reconnect. Sai thì rơi xuống danh sách dò đầy đủ.
+    let configList: typeof AUTO_DETECT_CONFIGS = AUTO_DETECT_CONFIGS
+    try {
+      const saved = localStorage.getItem(CONFIG_KEY)
+      if (saved) {
+        const s = JSON.parse(saved)
+        if (s && typeof s.baudRate === 'number') {
+          configList = [
+            {
+              baudRate: s.baudRate,
+              parity: (s.parity ?? 'none') as ParityType,
+              dataBits: s.dataBits ?? 8,
+              stopBits: s.stopBits ?? 1,
+              label: `Đã lưu: ${s.baudRate}/${s.dataBits ?? 8}/${s.parity ?? 'none'}/${s.stopBits ?? 1}`,
+            },
+            ...AUTO_DETECT_CONFIGS,
+          ]
+        }
+      }
+    } catch { /* ignore */ }
+
+    for (const cfg of configList) {
       setError(`Đang thử cấu hình ${cfg.label}...`)
       console.log(`[KeliScale] Trying: ${cfg.label}`)
 
@@ -684,6 +708,11 @@ export function useKeliScale(): UseKeliScaleReturn {
       setError('Trình duyệt không hỗ trợ Web Serial API. Dùng Chrome hoặc Edge.')
       return false
     }
+    if (connectingRef.current) {
+      console.log('[KeliScale] Đang kết nối/dò cấu hình — bỏ qua yêu cầu trùng')
+      return false
+    }
+    connectingRef.current = true
 
     try {
       setError(null)
@@ -745,6 +774,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       setError(err.message || 'Không thể kết nối đầu cân')
       setConnected(false)
       return false
+    } finally {
+      connectingRef.current = false
     }
   }, [supported, config, connectWithConfig, autoDetect])
 
@@ -835,6 +866,12 @@ export function useKeliScale(): UseKeliScaleReturn {
     if (!supported || fatalErrorRef.current) return
 
     const tryAutoConnect = async () => {
+      // Bỏ qua nếu đang có connect()/dò khác chạy, hoặc đã mở cổng rồi → tránh
+      // 2 autoDetect tranh cổng làm kết nối không bao giờ khóa được.
+      if (connectingRef.current || portRef.current) {
+        console.log('[KeliScale] Bỏ qua auto-reconnect — đang kết nối hoặc đã mở cổng')
+        return
+      }
       // Gate: chỉ auto-reconnect nếu user đã từng connect thành công.
       // Lần đầu chưa connect → skip, tránh spam DOMException trên port "ma".
       const everConnected = (() => {
@@ -844,6 +881,7 @@ export function useKeliScale(): UseKeliScaleReturn {
         console.log('[KeliScale] Bỏ qua auto-reconnect — chưa có kết nối thành công trước đây. User cần bấm "Kết nối cổng COM".')
         return
       }
+      connectingRef.current = true
       try {
         const ports = await (navigator as any).serial.getPorts()
         if (ports.length > 0 && !portRef.current && !fatalErrorRef.current) {
@@ -874,6 +912,8 @@ export function useKeliScale(): UseKeliScaleReturn {
         }
       } catch {
         // getPorts() may fail
+      } finally {
+        connectingRef.current = false
       }
     }
 

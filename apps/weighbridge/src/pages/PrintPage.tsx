@@ -32,6 +32,8 @@ export default function PrintPage() {
   const [ticket, setTicket] = useState<WeighbridgeTicket | null>(null)
   const [images, setImages] = useState<WeighbridgeImage[]>([])
   const [dealInfo, setDealInfo] = useState<{ deal_number: string; partner_name: string } | null>(null)
+  // Đối tác (mọi nguồn): deal→đại lý, partner_direct→đại lý, supplier→NCC
+  const [partner, setPartner] = useState<{ name: string; label: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [paperSize, setPaperSize] = useState<PaperSize>(() => {
     return (localStorage.getItem('wb_paper_size') as PaperSize) || 'a4'
@@ -55,7 +57,7 @@ export default function PrintPage() {
       ])
       setTicket(t)
       setImages(imgs)
-      // Fetch deal info if linked
+      // Resolve đối tác theo nguồn: deal → đại lý, partner_direct → đại lý, supplier → NCC
       const ext = t as any
       if (ext?.deal_id) {
         const { data: deal } = await supabase
@@ -64,11 +66,22 @@ export default function PrintPage() {
           .eq('id', ext.deal_id)
           .single()
         if (deal) {
-          setDealInfo({
-            deal_number: (deal as any).deal_number || '',
-            partner_name: (deal as any).partner?.name || '',
-          })
+          const pname = (deal as any).partner?.name || ''
+          setDealInfo({ deal_number: (deal as any).deal_number || '', partner_name: pname })
+          if (pname) setPartner({ name: pname, label: 'Đại lý' })
         }
+      } else if (ext?.partner_id) {
+        const { data } = await supabase
+          .from('b2b_partners').select('name').eq('id', ext.partner_id).maybeSingle()
+        if (data?.name) setPartner({ name: (data as any).name, label: 'Đại lý' })
+        else if (ext.supplier_name) setPartner({ name: ext.supplier_name, label: 'Đối tác' })
+      } else if (ext?.supplier_id) {
+        const { data } = await supabase
+          .from('rubber_suppliers').select('name').eq('id', ext.supplier_id).maybeSingle()
+        if (data?.name) setPartner({ name: (data as any).name, label: 'NCC' })
+        else if (ext.supplier_name) setPartner({ name: ext.supplier_name, label: 'NCC' })
+      } else if (ext?.supplier_name) {
+        setPartner({ name: ext.supplier_name, label: 'Đối tác' })
       }
     } catch { /* ignore */ }
     setLoading(false)
@@ -275,7 +288,7 @@ export default function PrintPage() {
               ? <Row2 l="Loại" r={`Xe ra (Xuất)`} />
               : <Row2 l="Mủ" r={rubberLabel} />
             }
-            {(dealInfo?.partner_name || ext.supplier_name) && <Row2 l="ĐL" r={dealInfo?.partner_name || ext.supplier_name} />}
+            {partner && <Row2 l={partner.label === 'NCC' ? 'NCC' : 'ĐL'} r={partner.name} />}
             {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>
         ) : (
@@ -287,12 +300,16 @@ export default function PrintPage() {
                 <td style={tdLabel}>Tài xế</td>
                 <td style={{ ...tdValue, fontSize: fs, fontWeight: 600 }}>{ticket!.driver_name || '—'}</td>
               </tr>
+              {partner && (
+                <tr>
+                  <td style={tdLabel}>{partner.label}</td>
+                  <td style={{ ...tdValue, fontWeight: 700, color: '#111827' }} colSpan={3}>{partner.name}</td>
+                </tr>
+              )}
               {ext.deal_id && (
                 <tr>
                   <td style={tdLabel}>Deal</td>
-                  <td style={{ ...tdValue, fontWeight: 600 }}>{dealInfo?.deal_number || ext.deal_id}</td>
-                  <td style={tdLabel}>Đại lý</td>
-                  <td style={{ ...tdValue, fontWeight: 600 }}>{dealInfo?.partner_name || ext.supplier_name || '—'}</td>
+                  <td style={{ ...tdValue, fontWeight: 600 }} colSpan={3}>{dealInfo?.deal_number || ext.deal_id}</td>
                 </tr>
               )}
               <tr>

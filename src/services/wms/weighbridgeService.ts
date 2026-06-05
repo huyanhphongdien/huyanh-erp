@@ -207,6 +207,61 @@ async function updateTareWeight(
 }
 
 // ============================================================================
+// OUT 2-WEIGH — luồng XUẤT cân 2 lần (đo thực KL hàng)
+// Lần 1 = XE RỖNG (tare) → lần 2 = XE + HÀNG (gross). NET = gross − tare.
+// (Ngược thứ tự với NHẬP: nhập là gross trước, tare sau.)
+// ============================================================================
+
+/**
+ * OUT — cân lần 1 = XE RỖNG (tare). status weighing_gross → weighing_tare.
+ */
+async function updateOutTareFirst(id: string, weight: number, userId?: string): Promise<WeighbridgeTicket> {
+  const { data, error } = await supabase
+    .from('weighbridge_tickets')
+    .update({
+      tare_weight: weight,
+      tare_weighed_at: new Date().toISOString(),
+      tare_weighed_by: userId || null,
+      status: 'weighing_tare' as WeighbridgeStatus,
+    })
+    .eq('id', id)
+    .eq('status', 'weighing_gross')
+    .select(TICKET_SELECT)
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * OUT — cân lần 2 = XE + HÀNG (gross). NET = |gross − tare| (KL hàng đo thực).
+ * Giữ status weighing_tare (chờ complete).
+ */
+async function updateOutGrossSecond(id: string, weight: number, userId?: string): Promise<WeighbridgeTicket> {
+  const { data: ticket, error: fetchError } = await supabase
+    .from('weighbridge_tickets')
+    .select('tare_weight')
+    .eq('id', id)
+    .single()
+  if (fetchError) throw fetchError
+  if (ticket?.tare_weight == null) throw new Error('Chưa có cân xe rỗng (lần 1)')
+  const netWeight = Math.abs(weight - ticket.tare_weight)
+  const { data, error } = await supabase
+    .from('weighbridge_tickets')
+    .update({
+      gross_weight: weight,
+      net_weight: netWeight,
+      gross_weighed_at: new Date().toISOString(),
+      gross_weighed_by: userId || null,
+    })
+    .eq('id', id)
+    .eq('status', 'weighing_tare')
+    .select(TICKET_SELECT)
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ============================================================================
 // STATUS TRANSITIONS
 // ============================================================================
 
@@ -637,6 +692,8 @@ export const weighbridgeService = {
   create,
   updateGrossWeight,
   updateTareWeight,
+  updateOutTareFirst,
+  updateOutGrossSecond,
   updateQC,
   complete,
   cancel,

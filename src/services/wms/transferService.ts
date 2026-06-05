@@ -394,6 +394,12 @@ async function confirmShipped(input: {
   const stockOutCode = `XK-TR-${t.code.replace('TR-', '')}`
   const totalQty = t.items.reduce((s, i) => s + (i.quantity_planned || 0), 0)
   const totalWeight = t.items.reduce((s, i) => s + (i.weight_planned_kg || 0), 0)
+  // Trừ kho theo KL ĐO THỰC lúc cân xuất (gross−tare = weight_out_kg), phân bổ cho
+  // từng item theo tỉ lệ planned (nếu planned=0 → chia đều). Quantity (đếm) giữ theo planned.
+  const measuredTotal = input.weight_out_kg
+  const itemCount = t.items.length
+  const wShareOf = (planned: number) =>
+    Math.round((totalWeight > 0 ? (planned / totalWeight) * measuredTotal : measuredTotal / itemCount) * 100) / 100
 
   const { data: stockOut, error: errSO } = await supabase
     .from('stock_out_orders')
@@ -405,11 +411,11 @@ async function confirmShipped(input: {
       customer_name: `Transfer to ${t.to_facility?.name || t.to_facility_id.slice(0, 8)}`,
       customer_order_ref: t.code,
       total_quantity: totalQty,
-      total_weight: totalWeight,
+      total_weight: measuredTotal,
       weighbridge_ticket_id: input.weighbridge_ticket_id,
       transfer_id: t.id,
       status: 'confirmed',
-      notes: `Auto-tạo từ phiếu chuyển ${t.code}`,
+      notes: `Auto-tạo từ phiếu chuyển ${t.code} (KL đo thực ${measuredTotal} kg)`,
       created_by: input.user_id || null,
       confirmed_by: input.user_id || null,
       confirmed_at: new Date().toISOString(),
@@ -421,6 +427,8 @@ async function confirmShipped(input: {
 
   // 2. Insert stock_out_details + trừ stock_batches/levels (giống stockOutService.confirm)
   for (const item of t.items) {
+    // KL trừ kho = phần đo thực của item này (phân bổ theo tỉ lệ planned)
+    const wOut = wShareOf(item.weight_planned_kg || 0)
     const { error: errDetail } = await supabase
       .from('stock_out_details')
       .insert({
@@ -428,14 +436,14 @@ async function confirmShipped(input: {
         material_id: item.material_id,
         batch_id: item.source_batch_id || null,
         quantity: item.quantity_planned || 0,
-        weight: item.weight_planned_kg || 0,
+        weight: wOut,
         picking_status: 'picked',
         picked_at: new Date().toISOString(),
         picked_by: input.user_id || null,
       })
     if (errDetail) throw errDetail
 
-    // Trừ stock_batches.quantity_remaining (theo COUNT)
+    // Trừ stock_batches: quantity_remaining theo COUNT (planned), current_weight theo KL ĐO THỰC
     if (item.source_batch_id && item.quantity_planned) {
       const { data: batch } = await supabase
         .from('stock_batches')
@@ -444,7 +452,7 @@ async function confirmShipped(input: {
         .single()
       if (batch) {
         const newQty = (batch.quantity_remaining || 0) - item.quantity_planned
-        const newWeight = (batch.current_weight || 0) - (item.weight_planned_kg || 0)
+        const newWeight = (batch.current_weight || 0) - wOut
         await supabase
           .from('stock_batches')
           .update({
@@ -456,7 +464,7 @@ async function confirmShipped(input: {
       }
     }
 
-    // Trừ stock_levels.quantity (theo KG)
+    // Trừ stock_levels.quantity (theo KG đo thực)
     const { data: level } = await supabase
       .from('stock_levels')
       .select('quantity')
@@ -466,18 +474,18 @@ async function confirmShipped(input: {
     if (level) {
       await supabase
         .from('stock_levels')
-        .update({ quantity: Math.max(0, (level.quantity || 0) - (item.weight_planned_kg || 0)) })
+        .update({ quantity: Math.max(0, (level.quantity || 0) - wOut) })
         .eq('warehouse_id', t.from_warehouse_id)
         .eq('material_id', item.material_id)
     }
 
-    // Inventory transaction log
+    // Inventory transaction log (KL đo thực)
     await supabase.from('inventory_transactions').insert({
       type: 'out',
       warehouse_id: t.from_warehouse_id,
       material_id: item.material_id,
       batch_id: item.source_batch_id || null,
-      quantity: -(item.weight_planned_kg || 0),
+      quantity: -wOut,
       reference_type: 'transfer',
       reference_id: t.id,
       notes: `Chuyển kho: ${t.code}`,

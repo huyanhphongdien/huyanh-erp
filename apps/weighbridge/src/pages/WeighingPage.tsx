@@ -54,12 +54,6 @@ const DESTINATIONS = [
   { value: 'bai_mu', label: 'Bãi mủ' },
 ]
 
-// S3: Tare cố định theo loại container (kg) — user decision
-const CONTAINER_TARE_KG: Record<string, number> = {
-  '20ft': 2300,
-  '40ft': 3800,
-}
-
 interface SupplierOption {
   id: string
   code: string
@@ -422,6 +416,11 @@ export default function WeighingPage() {
       if (sourceType === 'supplier' && !selectedSupplierId) { setError('Vui lòng chọn nhà cung cấp'); return }
       if (sourceType === 'partner_direct' && !directPartnerId) { setError('Mủ bộc phát phải gắn đại lý (để gom & tính thưởng) — vui lòng chọn đại lý'); return }
     }
+    // XUẤT ở NM không bán thẳng khách (TL/LAO) → bắt buộc gắn PHIẾU CHUYỂN KHO
+    // (xuất ở đây chỉ là chuyển nội bộ về PD). Tránh cân xuất "vô chủ" ra số sai.
+    if (ticketDirection === 'out' && !currentFacility?.can_ship_to_customer && !selectedTransferId) {
+      setError('Xuất ở nhà máy này phải gắn PHIẾU CHUYỂN KHO — vui lòng chọn phiếu chuyển ở trên'); return
+    }
     setLoading(true)
     setError('')
     try {
@@ -509,42 +508,25 @@ export default function WeighingPage() {
     setError('')
     try {
       let updated: WeighbridgeTicket
-      // S3 + F3: OUT flow — cân 1 lần. weight nhập = TỔNG CÂN (gross). Tare phụ thuộc context:
-      //   • Có Container (SO export) → tare cố định = container_tare (20ft=2300, 40ft=3800)
-      //   • Có Transfer + planned > 0 → TARE xe = GROSS - planned (NET = planned)
-      //     (KL hàng đã biết trước, cân chỉ để xác định tare xe — không bị "trốn")
-      //   • Xuất lẻ hoặc transfer chưa có planned → tare = 0, NET = weight (giả lập đơn giản)
+      // OUT 2-weigh — đo THỰC khối lượng hàng:
+      //   • Lần 1 = XE RỖNG (tare)  → lần 2 = XE + HÀNG (gross)
+      //   • NET hàng = gross − tare (không còn neo theo planned / tare cố định container)
       if (ticket.ticket_type === 'out') {
-        const isContainerShipment = !!selectedContainerId
-        const isTransferWithPlanned = !!selectedTransferId && transferPlannedKg > 0
-        const containerType = selectedContainer?.container_type || '20ft'
-
-        let tareKg = 0
-        let ctxLabel = 'xuất lẻ (NET trực tiếp)'
-
-        if (isContainerShipment) {
-          tareKg = CONTAINER_TARE_KG[containerType] || CONTAINER_TARE_KG['20ft']
-          ctxLabel = `container ${containerType}, tare ${tareKg.toLocaleString()} kg`
-        } else if (isTransferWithPlanned) {
-          // GROSS = weight nhập, NET = planned (KL hàng đã biết), TARE = GROSS - planned
-          tareKg = Math.max(0, Math.round((weight - transferPlannedKg) * 100) / 100)
-          if (weight < transferPlannedKg) {
-            // Edge case: GROSS < planned → fallback NET = GROSS
-            tareKg = 0
-            ctxLabel = `transfer (cân ${weight} < KL dự kiến ${transferPlannedKg}, fallback NET=GROSS)`
-          } else {
-            ctxLabel = `transfer: TARE xe = ${tareKg.toLocaleString('vi-VN')} kg, NET hàng = ${transferPlannedKg.toLocaleString('vi-VN')} kg`
-          }
-        }
-
-        updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
-        updated = await weighbridgeService.updateTareWeight(ticket.id, tareKg, operator?.id)
-        setTicket(updated)
-        const c = recalculate(weight, tareKg, deductionKg, undefined, undefined, priceUnit)
-        setSuccess(`Cân OUT: gross ${weight.toLocaleString()} kg | ${ctxLabel} → NET ${c.net_weight.toLocaleString('vi-VN')} kg`)
-        setManualWeight(null)
-        if (cameraCaptureRef.current) {
-          cameraCaptureRef.current('OUT').catch(() => {})
+        if (ticket.status === 'weighing_gross') {
+          // Lần 1: xe rỗng (tare)
+          updated = await weighbridgeService.updateOutTareFirst(ticket.id, weight, operator?.id)
+          setTicket(updated)
+          setSuccess(`Cân lần 1 (xe rỗng): ${weight.toLocaleString()} kg — chờ xếp hàng rồi cân lần 2`)
+          setManualWeight(null)
+          if (cameraCaptureRef.current) cameraCaptureRef.current('L1').catch(() => {})
+        } else {
+          // Lần 2: xe + hàng (gross) → tính NET hàng
+          updated = await weighbridgeService.updateOutGrossSecond(ticket.id, weight, operator?.id)
+          setTicket(updated)
+          const c = recalculate(weight, updated.tare_weight!, deductionKg, undefined, undefined, priceUnit)
+          setSuccess(`Cân lần 2 (xe + hàng): ${weight.toLocaleString()} kg → NET hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`)
+          setManualWeight(null)
+          if (cameraCaptureRef.current) cameraCaptureRef.current('L2').catch(() => {})
         }
         return
       }
@@ -850,8 +832,15 @@ export default function WeighingPage() {
   const isWeighingGross = ticket?.status === 'weighing_gross'
   const isWeighingTare = ticket?.status === 'weighing_tare'
   const isCompleted = ticket?.status === 'completed'
-  const canRecord = isWeighingGross || (isWeighingTare && ticket?.tare_weight == null)
-  const canComplete = isWeighingTare && ticket?.tare_weight != null
+  const isOut = ticketDirection === 'out'
+  // NHẬP: lần1 gross → lần2 tare (chờ tare==null). XUẤT: lần1 tare → lần2 gross (chờ gross==null).
+  const secondPending = isOut
+    ? (isWeighingTare && ticket?.gross_weight == null)
+    : (isWeighingTare && ticket?.tare_weight == null)
+  const canRecord = isWeighingGross || secondPending
+  const canComplete = isOut
+    ? (isWeighingTare && ticket?.gross_weight != null && ticket?.tare_weight != null)
+    : (isWeighingTare && ticket?.tare_weight != null)
 
   const selectedDeal = deals.find((d) => d.id === selectedDealId)
 
@@ -924,24 +913,32 @@ export default function WeighingPage() {
         {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess('')} style={{ marginBottom: 12 }} />}
         {facilityError && <Alert type="warning" message={`Lỗi facility: ${facilityError}`} showIcon style={{ marginBottom: 12 }} />}
 
-        {/* Thanh tiến trình — chỉ luồng IN (cân 2 lần). Giúp operator luôn biết
-            đang ở bước nào: Tạo phiếu → Cân L1 → Cân L2 (+DRC mủ nước) → Hoàn tất */}
-        {ticketDirection === 'in' && (
+        {/* Thanh tiến trình — cả NHẬP lẫn XUẤT đều cân 2 lần (thứ tự ngược nhau):
+            NHẬP: Gross (xe+hàng) → Tare (xe rỗng). XUẤT: Xe rỗng → Xe + hàng. */}
+        {(ticketDirection === 'in' || ticketDirection === 'out') && (
           <Card size="small" style={{ borderRadius: 12, marginBottom: 8 }} styles={{ body: { padding: '8px 12px' } }}>
             <Steps
               size="small"
               current={isCompleted ? 3 : isWeighingTare ? 2 : isWeighingGross ? 1 : 0}
-              items={[
-                { title: 'Tạo phiếu' },
-                { title: 'Cân lần 1', description: 'Gross' },
-                {
-                  title: 'Cân lần 2',
-                  description: (rubberType === 'mu_nuoc' || dotReading != null)
-                    ? 'Lấy mẫu · đốt · DRC · tare'
-                    : 'Tare',
-                },
-                { title: 'Hoàn tất' },
-              ]}
+              items={ticketDirection === 'out'
+                ? [
+                    { title: 'Tạo phiếu' },
+                    { title: 'Cân lần 1', description: 'Xe rỗng' },
+                    { title: 'Cân lần 2', description: 'Xe + hàng' },
+                    { title: 'Hoàn tất' },
+                  ]
+                : [
+                    { title: 'Tạo phiếu' },
+                    { title: 'Cân lần 1', description: 'Gross' },
+                    {
+                      title: 'Cân lần 2',
+                      description: (rubberType === 'mu_nuoc' || dotReading != null)
+                        ? 'Lấy mẫu · đốt · DRC · tare'
+                        : 'Tare',
+                    },
+                    { title: 'Hoàn tất' },
+                  ]
+              }
             />
           </Card>
         )}
@@ -1038,7 +1035,7 @@ export default function WeighingPage() {
                             {ticketDirection === 'out' && transferPlannedKg > 0 && (
                               <>
                                 <Text type="secondary">|</Text>
-                                <Text>📦 KL hàng: <Text strong style={{ color: '#1B4D3E' }}>{transferPlannedKg.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Text></Text>
+                                <Text>📦 KL dự kiến: <Text strong style={{ color: '#1B4D3E' }}>{transferPlannedKg.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Text> <Text type="secondary">(tham khảo)</Text></Text>
                               </>
                             )}
                             {ticketDirection === 'in' && tr.weight_out_kg && (
@@ -1048,10 +1045,10 @@ export default function WeighingPage() {
                               </>
                             )}
                           </Space>
-                          {ticketDirection === 'out' && transferPlannedKg > 0 && (
+                          {ticketDirection === 'out' && (
                             <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #BBF7D0', color: '#1B4D3E' }}>
-                              💡 Cân scale cho ra <Text strong>tổng</Text> (xe + hàng).
-                              Hệ thống tự tính: <Text code>TARE xe = TỔNG cân − {transferPlannedKg.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</Text>
+                              ⚖️ Cân <Text strong>2 lần</Text>: lần 1 = <Text strong>xe rỗng</Text> → lần 2 = <Text strong>xe + hàng</Text>.
+                              KL hàng thực = lần 2 − lần 1 (trừ kho theo số đo thực này).
                             </div>
                           )}
                         </div>
@@ -1118,7 +1115,7 @@ export default function WeighingPage() {
                         />
                         {selectedContainer && (
                           <div style={{ marginTop: 8, padding: 8, background: '#F0F9FF', borderRadius: 8, fontSize: 12 }}>
-                            <Text strong>Tare cố định:</Text> {(CONTAINER_TARE_KG[selectedContainer.container_type || '20ft'] || 2300).toLocaleString()} kg ({selectedContainer.container_type})
+                            ⚖️ Cân <Text strong>2 lần</Text> đo thực: lần 1 = xe + <Text strong>container RỖNG</Text> → lần 2 = + <Text strong>HÀNG</Text>. NET = hàng (không gồm vỏ container).
                           </div>
                         )}
                       </div>
@@ -1506,7 +1503,9 @@ export default function WeighingPage() {
                 <Card size="small" style={{ borderRadius: 12 }}>
                   <div style={{ textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>
-                      {isWeighingGross ? '⚖️ Cân lần 1 (Gross)' : '⚖️ Cân lần 2 (Tare)'}
+                      {isOut
+                        ? (isWeighingGross ? '⚖️ Cân lần 1 (Xe rỗng)' : '⚖️ Cân lần 2 (Xe + hàng)')
+                        : (isWeighingGross ? '⚖️ Cân lần 1 (Gross)' : '⚖️ Cân lần 2 (Tare)')}
                     </Text>
 
                     {/* Scale reading */}

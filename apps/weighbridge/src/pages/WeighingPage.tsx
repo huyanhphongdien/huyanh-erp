@@ -126,6 +126,8 @@ export default function WeighingPage() {
 
   // Rubber fields
   const [rubberType, setRubberType] = useState<string>('mu_dong')
+  // XUẤT: xe về PD có thể chở NHIỀU loại mủ → chọn nhiều (lưu "mu_dong,mu_nuoc")
+  const [outRubberTypes, setOutRubberTypes] = useState<string[]>([])
   // Phiếu cân KHÔNG nhập giá / DRC kỳ vọng. Giá giải tại Đề nghị thanh toán
   // (deal hoặc Phiếu chốt giá); price_unit suy từ loại mủ (mủ nước = giá khô).
   const priceUnit: 'wet' | 'dry' = rubberType === 'mu_nuoc' ? 'dry' : 'wet'
@@ -264,7 +266,10 @@ export default function WeighingPage() {
         if (ext.container_id) setSelectedContainerId(ext.container_id)
         if (ext.deal_id) { setSelectedDealId(ext.deal_id); setSourceType('deal') }
         if (ext.supplier_id) { setSelectedSupplierId(ext.supplier_id); setSourceType('supplier') }
-        if (ext.rubber_type) setRubberType(ext.rubber_type)
+        if (ext.rubber_type) {
+          setRubberType(ext.rubber_type)
+          if (t.ticket_type === 'out') setOutRubberTypes(String(ext.rubber_type).split(',').map((s) => s.trim()).filter(Boolean))
+        }
         if (ext.destination) setDestination(ext.destination)
         if (ext.deduction_kg) setDeductionKg(ext.deduction_kg)
         // F2 TL: restore ĐỐT + DRC thực + consolidation_code nếu đã save trước đó
@@ -461,7 +466,10 @@ export default function WeighingPage() {
       // Save rubber fields. Không lưu đơn giá / DRC kỳ vọng — giải tại ĐNTT.
       // source_type lưu thẳng từ UI để khỏi đoán qua FK (Commit C - audit fix).
       const rubberData: RubberWeighData = {
-        rubber_type: rubberType,
+        // XUẤT: gộp nhiều loại "mu_dong,mu_nuoc" (chọn tay); NHẬP: 1 loại
+        rubber_type: ticketDirection === 'out'
+          ? (outRubberTypes.length ? outRubberTypes.join(',') : '')
+          : rubberType,
         price_unit: priceUnit,
         destination: destination || undefined,
         deduction_kg: deductionKg,
@@ -1456,6 +1464,40 @@ export default function WeighingPage() {
                   </Col>
                 </Row>
               </Card>
+              )}
+
+              {/* OUT-only: Loại mủ trên xe — CHỌN NHIỀU (xe về PD có thể chở nhiều loại) */}
+              {ticketDirection === 'out' && (
+                <Card size="small" title="Loại mủ trên xe (chọn nhiều)" style={{ borderRadius: 12 }}>
+                  <Space wrap>
+                    {[
+                      { value: 'mu_nuoc', label: '💧 Mủ nước' },
+                      { value: 'mu_tap', label: '🪨 Mủ tạp' },
+                      { value: 'mu_dong', label: '🧊 Mủ đông' },
+                      { value: 'mu_chen', label: '🥣 Mủ chén' },
+                      { value: 'mu_to', label: '📄 Mủ tờ' },
+                    ].map((opt) => {
+                      const active = outRubberTypes.includes(opt.value)
+                      return (
+                        <Button
+                          key={opt.value}
+                          size="large"
+                          type={active ? 'primary' : 'default'}
+                          disabled={isCompleted}
+                          onClick={() => setOutRubberTypes(
+                            active ? outRubberTypes.filter((v) => v !== opt.value) : [...outRubberTypes, opt.value],
+                          )}
+                          style={active ? { background: PRIMARY, borderColor: PRIMARY } : {}}
+                        >
+                          {opt.label}
+                        </Button>
+                      )
+                    })}
+                  </Space>
+                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+                    Chọn tất cả loại mủ đang có trên xe (in lên phiếu). Có thể chọn nhiều.
+                  </Text>
+                </Card>
               )}
 
               {/* OUT-only: Ghi chú đơn giản */}

@@ -141,10 +141,14 @@ export default function PrintPage() {
     : null
   const consolidationCode = ext.consolidation_code as string | null | undefined
 
-  const rubberLabel = ext.rubber_type === 'mu_dong' ? 'Mủ đông' :
-    ext.rubber_type === 'mu_nuoc' ? 'Mủ nước' :
-    ext.rubber_type === 'mu_tap' ? 'Mủ tạp' :
-    ext.rubber_type === 'svr' ? 'SVR' : ext.rubber_type || '—'
+  // Hỗ trợ NHIỀU loại mủ (XUẤT lưu "mu_dong,mu_nuoc") — gộp nhãn
+  const RT_LABELS: Record<string, string> = {
+    mu_nuoc: 'Mủ nước', mu_tap: 'Mủ tạp', mu_dong: 'Mủ đông',
+    mu_chen: 'Mủ chén', mu_to: 'Mủ tờ', svr: 'SVR',
+  }
+  const rubberLabel = ext.rubber_type
+    ? String(ext.rubber_type).split(',').map((s: string) => RT_LABELS[s.trim()] || s.trim()).filter(Boolean).join(', ')
+    : '—'
 
   return (
     <div>

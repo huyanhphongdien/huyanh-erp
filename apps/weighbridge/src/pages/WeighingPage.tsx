@@ -689,6 +689,8 @@ export default function WeighingPage() {
           const whId = tpWh?.[0]?.id
           if (!whId) throw new Error('Không tìm thấy kho TP')
 
+          // Lưu ý: processContainerShipment chỉ tạo detail 'picked' (KHÔNG trừ kho ở đây);
+          // trừ kho 1 lần khi ERP bấm Xác nhận (confirmStockOut) — tránh trừ kép.
           const result = await stockOutService.processContainerShipment({
             sales_order_id: selectedSalesOrderId,
             container_id: selectedContainerId,

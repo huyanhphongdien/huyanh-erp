@@ -1115,9 +1115,10 @@ export const stockOutService = {
 
     if (picks.length === 0) throw new Error('Không pick được batch nào')
 
-    // ── 5. Insert details + trừ kho ──
+    // ── 5. Insert picked details — KHÔNG trừ kho ở đây ──
+    // Trừ kho dồn về confirmStockOut (khi ERP bấm "Xác nhận"), giống luồng xuất lẻ.
+    // Trước đây trừ ở đây + confirm trừ lại = GIẢM TỒN GẤP ĐÔI → đã bỏ.
     for (const pick of picks) {
-      // Detail — xe lên cân = hàng đã lấy → picked
       // "Người lấy" = Lê Thành Nhân (HA-0007) — phụ trách xuất kho ra cảng
       const NGUOI_LAY_ID = 'a320ebc5-34a3-49fd-903e-98a926f6eab0'
       const NGUOI_LAY_NAME = 'Lê Thành Nhân'
@@ -1132,48 +1133,6 @@ export const stockOutService = {
         picked_by: NGUOI_LAY_ID,
         container_id,
         notes: `Container ${container.container_no || ''} — Người lấy: ${NGUOI_LAY_NAME}`,
-      })
-
-      // Trừ stock_batches (quantity = COUNT đơn vị)
-      const { data: batchData } = await supabase
-        .from('stock_batches')
-        .select('quantity_remaining, current_weight')
-        .eq('id', pick.batch_id)
-        .single()
-      if (batchData) {
-        const newQty = Math.max(0, (batchData.quantity_remaining || 0) - pick.qty)
-        const newWeight = Math.max(0, (batchData.current_weight || 0) - pick.weight)
-        await supabase.from('stock_batches').update({
-          quantity_remaining: newQty,
-          current_weight: newWeight,
-          status: newQty <= 0 ? 'depleted' : 'active',
-        }).eq('id', pick.batch_id)
-      }
-
-      // Trừ stock_levels — dùng warehouse_id CỦA BATCH (không phải warehouse_id param)
-      const { data: level } = await supabase
-        .from('stock_levels')
-        .select('quantity')
-        .eq('warehouse_id', pick.batch_warehouse_id)
-        .eq('material_id', pick.material_id)
-        .maybeSingle()
-      if (level) {
-        await supabase.from('stock_levels').update({
-          quantity: Math.max(0, (level.quantity || 0) - pick.weight),
-        }).eq('warehouse_id', pick.batch_warehouse_id).eq('material_id', pick.material_id)
-      }
-
-      // Inventory transaction
-      await supabase.from('inventory_transactions').insert({
-        type: 'out',
-        warehouse_id: pick.batch_warehouse_id,
-        material_id: pick.material_id,
-        batch_id: pick.batch_id,
-        quantity: -pick.weight,
-        reference_type: 'stock_out',
-        reference_id: stockOutId,
-        notes: `Xuất cho ${so.code} cont ${container.container_no || ''}`,
-        created_by: null,
       })
     }
 

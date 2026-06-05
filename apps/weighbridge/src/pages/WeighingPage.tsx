@@ -84,7 +84,7 @@ export default function WeighingPage() {
   const [tareSuggestion, setTareSuggestion] = useState<{ avgTare: number | null; lastTare: number | null; count: number } | null>(null)
   // G-7: cảnh báo cùng biển số cân lần 2 trong ngày (có thể là cân lại hoặc 2 chuyến)
   const [dupPlateWarning, setDupPlateWarning] = useState<{ count: number; codes: string[] } | null>(null)
-  // S3: Loại phiếu cân — IN (cân 2 lần gross/tare) | OUT (cân 1 lần net trực tiếp)
+  // Loại phiếu cân — IN (cân 2 lần: gross→tare) | OUT (cân 2 lần: tare xe rỗng→gross xe+hàng)
   const [ticketDirection, setTicketDirection] = useState<'in' | 'out'>('in')
 
   // S3 OUT: Sales Order + Container picker (optional cho OUT — cho phép xuất lẻ không SO)
@@ -416,11 +416,11 @@ export default function WeighingPage() {
       if (sourceType === 'supplier' && !selectedSupplierId) { setError('Vui lòng chọn nhà cung cấp'); return }
       if (sourceType === 'partner_direct' && !directPartnerId) { setError('Mủ bộc phát phải gắn đại lý (để gom & tính thưởng) — vui lòng chọn đại lý'); return }
     }
-    // XUẤT ở NM không bán thẳng khách (TL/LAO) → bắt buộc gắn PHIẾU CHUYỂN KHO
-    // (xuất ở đây chỉ là chuyển nội bộ về PD). Tránh cân xuất "vô chủ" ra số sai.
-    if (ticketDirection === 'out' && !currentFacility?.can_ship_to_customer && !selectedTransferId) {
-      setError('Xuất ở nhà máy này phải gắn PHIẾU CHUYỂN KHO — vui lòng chọn phiếu chuyển ở trên'); return
-    }
+    // TẠM BỎ ràng buộc gắn phiếu chuyển kho cho XUẤT — đang chốt quy trình cân
+    // xuất 2 lần trước, chưa đụng tới phiếu/trừ kho. Bật lại khi xong quy trình:
+    // if (ticketDirection === 'out' && !currentFacility?.can_ship_to_customer && !selectedTransferId) {
+    //   setError('Xuất ở nhà máy này phải gắn PHIẾU CHUYỂN KHO — vui lòng chọn phiếu chuyển ở trên'); return
+    // }
     setLoading(true)
     setError('')
     try {
@@ -974,7 +974,7 @@ export default function WeighingPage() {
                 <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
                   {ticketDirection === 'in'
                     ? 'Cân 2 lần: Gross (xe + hàng) → Tare (xe rỗng) → Net'
-                    : 'Cân 1 lần: weight = net trực tiếp (xe đã có hàng)'}
+                    : 'Cân 2 lần: Xe rỗng (Tare) → Xe + hàng (Gross) → Net hàng'}
                 </Text>
               </Card>
 

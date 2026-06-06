@@ -88,6 +88,7 @@ function fmt1(n: number): string {
   return `${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`
 }
 const fmtT = (kg: number) => fmt1(kg / 1000)        // kg → tấn (1 chữ số)
+const fmtKg = (kg: number) => String(Math.round(kg)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')  // kg, chấm nghìn
 const esc = (s: string) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!))
 
 // ── Thu thập + tổng hợp dữ liệu ──────────────────────────────────────────────
@@ -201,6 +202,22 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'prevday')
   const topDealers = [...dealerMap.values()].sort((a, b) => b.tuoi - a.tuoi).slice(0, 5)
   const dealerCount = dealerMap.size
 
+  // Chi tiết TỪNG đại lý × loại mủ trong ngày: xe, KL tươi, DRC (bình quân theo KL), KL khô
+  const detMap = new Map<string, { name: string; fac: string; type: string; xe: number; tuoi: number; kho: number; drcW: number }>()
+  for (const t of today) {
+    const name = t.supplier_name || (t.partner_id ? nameById.get(t.partner_id) : '') || 'Không rõ'
+    const rt = (t.rubber_type || 'other').split(',')[0].trim() || 'other'
+    const net = t.net_weight || 0
+    const { drc } = drcOf(t)
+    const key = name + '|' + rt
+    const cur = detMap.get(key) || { name, fac: facCode(t).code, type: rt, xe: 0, tuoi: 0, kho: 0, drcW: 0 }
+    cur.xe++; cur.tuoi += net; cur.kho += net * drc / 100; cur.drcW += drc * net
+    detMap.set(key, cur)
+  }
+  const dealerDetail = [...detMap.values()]
+    .map((x) => ({ ...x, drc: x.tuoi ? x.drcW / x.tuoi : 0 }))
+    .sort((a, b) => b.tuoi - a.tuoi)
+
   // Cảnh báo thiếu DRC
   const missing = today.filter((t) => (t.qc_actual_drc == null || t.qc_actual_drc <= 0) && (t.net_weight || 0) > 0)
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
@@ -215,7 +232,7 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'prevday')
     dateLabel, isToday, cutoff,
     totalTuoi, totalKho, yTuoi, pct, drcTB,
     xeCount: today.length, dealerCount,
-    facilities, types, topDealers,
+    facilities, types, topDealers, dealerDetail,
     missingCount: missing.length, missingKg,
     empty: today.length === 0,
   }
@@ -264,6 +281,22 @@ function renderHtml(d: any): string {
       <td align="center" style="padding:7px 10px;">${esc(p.fac)}</td>
       <td style="padding:7px 10px;">${m ? m.label : '—'}</td>
       <td align="right" style="padding:7px 10px;font-weight:700;color:#1B4D3E;">${fmtT(p.tuoi)}</td>
+    </tr>`
+  }).join('')
+
+  // Chi tiết từng đại lý × loại mủ (KL theo kg)
+  const detailRows = (d.dealerDetail || []).map((p: any, i: number) => {
+    const m = (RUBBER as any)[p.type] || null
+    return `
+    <tr style="border-top:1px solid #eef1f0;${i % 2 ? 'background:#fafcfb;' : ''}">
+      <td style="padding:6px 8px;color:#94a3b8;">${i + 1}</td>
+      <td style="padding:6px 8px;font-weight:600;">${esc(p.name)}</td>
+      <td align="center" style="padding:6px 8px;">${esc(p.fac)}</td>
+      <td style="padding:6px 8px;">${m ? m.icon + ' ' + m.label : esc(p.type)}</td>
+      <td align="center" style="padding:6px 8px;">${p.xe}</td>
+      <td align="right" style="padding:6px 8px;font-weight:700;">${fmtKg(p.tuoi)}</td>
+      <td align="right" style="padding:6px 8px;">${fmt1(p.drc)}%</td>
+      <td align="right" style="padding:6px 8px;font-weight:600;color:#92400E;">${fmtKg(p.kho)}</td>
     </tr>`
   }).join('')
 
@@ -360,6 +393,25 @@ function renderHtml(d: any): string {
         ${dealerRows}
       </table>
       ${d.dealerCount > 5 ? `<div style="font-size:11px;color:#94a3b8;padding:6px 10px 0;">…và ${d.dealerCount - 5} đại lý khác.</div>` : ''}
+    </td></tr>
+
+    <!-- Chi tiết từng đại lý nhập mủ -->
+    <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">📋 Chi tiết đại lý nhập mủ (theo ngày)</div></td></tr>
+    <tr><td style="padding:8px 24px 8px 24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12px;">
+        <tr style="background:#1B4D3E;color:#fff;">
+          <th align="left" style="padding:6px 8px;font-weight:600;">#</th>
+          <th align="left" style="padding:6px 8px;font-weight:600;">Đại lý</th>
+          <th align="center" style="padding:6px 8px;font-weight:600;">NM</th>
+          <th align="left" style="padding:6px 8px;font-weight:600;">Loại mủ</th>
+          <th align="center" style="padding:6px 8px;font-weight:600;">Xe</th>
+          <th align="right" style="padding:6px 8px;font-weight:600;">Tươi (kg)</th>
+          <th align="right" style="padding:6px 8px;font-weight:600;">DRC</th>
+          <th align="right" style="padding:6px 8px;font-weight:600;">Khô (kg)</th>
+        </tr>
+        ${detailRows}
+      </table>
+      <div style="font-size:11px;color:#94a3b8;padding:6px 8px 0;">Mỗi dòng = 1 đại lý × 1 loại mủ. KL theo kg. DRC bình quân theo khối lượng.</div>
     </td></tr>
     ${warnHtml}`
 

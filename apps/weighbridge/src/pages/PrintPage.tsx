@@ -143,6 +143,16 @@ export default function PrintPage() {
   // Mủ nước → luôn hiện phần ĐO DRC (để trống "—" nếu chưa đo, nhắc QC nhập)
   const isMuNuoc = String(ext.rubber_type || '').split(',').map((s: string) => s.trim()).includes('mu_nuoc')
 
+  // XUẤT cân 2 lần: lần 1 = XE RỖNG (tare), lần 2 = XE + HÀNG (gross). NHẬP thì ngược lại.
+  // → bảng cân in theo đúng thứ tự + nhãn + thời gian của từng hướng.
+  const isOutTicket = ticket!.ticket_type === 'out'
+  const w1Label = isOutTicket ? 'Xe rỗng' : 'Gross'
+  const w2Label = isOutTicket ? 'Xe + hàng' : 'Tare'
+  const w1Weight = isOutTicket ? ticket!.tare_weight : ticket!.gross_weight
+  const w1Time = isOutTicket ? ticket!.tare_weighed_at : ticket!.gross_weighed_at
+  const w2Weight = isOutTicket ? ticket!.gross_weight : ticket!.tare_weight
+  const w2Time = isOutTicket ? ticket!.gross_weighed_at : ticket!.tare_weighed_at
+
   // Hỗ trợ NHIỀU loại mủ (XUẤT lưu "mu_dong,mu_nuoc") — gộp nhãn
   const RT_LABELS: Record<string, string> = {
     mu_nuoc: 'Mủ nước', mu_tap: 'Mủ tạp', mu_dong: 'Mủ đông',
@@ -338,8 +348,8 @@ export default function PrintPage() {
         {isThermal ? (
           <div style={{ marginBottom: 4 }}>
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
-            <Row2 l="Gross" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.gross_weight)} kg</span>} />
-            <Row2 l="Tare" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(ticket!.tare_weight)} kg</span>} />
+            <Row2 l={w1Label} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w1Weight)} kg</span>} />
+            <Row2 l={w2Label} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w2Weight)} kg</span>} />
             <div style={{ borderBottom: '1px solid #333', margin: '2px 0' }} />
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
@@ -371,14 +381,14 @@ export default function PrintPage() {
             </thead>
             <tbody>
               <tr>
-                <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Cân lần 1 (Gross)</td>
-                <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(ticket!.gross_weight)}</td>
-                <td style={{ ...tdCenter, fontSize: fs }}>{ticket!.gross_weighed_at ? fmtDateTime(ticket!.gross_weighed_at) : '—'}</td>
+                <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Cân lần 1 ({w1Label})</td>
+                <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(w1Weight)}</td>
+                <td style={{ ...tdCenter, fontSize: fs }}>{w1Time ? fmtDateTime(w1Time) : '—'}</td>
               </tr>
               <tr>
-                <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Cân lần 2 (Tare)</td>
-                <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(ticket!.tare_weight)}</td>
-                <td style={{ ...tdCenter, fontSize: fs }}>{ticket!.tare_weighed_at ? fmtDateTime(ticket!.tare_weighed_at) : '—'}</td>
+                <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Cân lần 2 ({w2Label})</td>
+                <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(w2Weight)}</td>
+                <td style={{ ...tdCenter, fontSize: fs }}>{w2Time ? fmtDateTime(w2Time) : '—'}</td>
               </tr>
               <tr style={{ background: '#DCFCE7' }}>
                 <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>NET</td>

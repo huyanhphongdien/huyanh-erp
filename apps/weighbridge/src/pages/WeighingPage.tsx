@@ -804,6 +804,37 @@ export default function WeighingPage() {
     }
   }
 
+  // Lưu/sửa ĐỐT + DRC độc lập (kể cả khi phiếu ĐÃ hoàn tất) — QC đo đốt xong sau.
+  // Cập nhật cả weighbridge_tickets lẫn lô nhập rubber_intake_batches (nếu đã sinh)
+  // để KL khô (dry_weight_kg GENERATED) + công nợ tính đúng.
+  async function handleSaveDrc() {
+    if (!ticket) return
+    setLoading(true)
+    setError('')
+    try {
+      const cc = consolidationCode.trim() || null
+      const { error: e1 } = await supabase
+        .from('weighbridge_tickets')
+        .update({ field_dot_reading: dotReading, qc_actual_drc: actualDrc, qc_drc_source: drcSource, consolidation_code: cc })
+        .eq('id', ticket.id)
+      if (e1) throw e1
+      // Đồng bộ sang lô nhập (planned_drc_percent = DRC; dry_weight_kg tự tính lại)
+      await supabase
+        .from('rubber_intake_batches')
+        .update({ field_dot_reading: dotReading, planned_drc_percent: actualDrc, consolidation_code: cc })
+        .eq('weighbridge_ticket_id', ticket.id)
+
+      const dry = actualDrc != null && ticket.net_weight ? ticket.net_weight * actualDrc / 100 : null
+      message.success('Đã lưu ĐỐT/DRC' + (dry != null ? ` — KL khô ${dry.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg` : ''))
+      const t = await weighbridgeService.getById(ticket.id)
+      if (t) setTicket(t)
+    } catch (err: any) {
+      message.error('Lưu ĐỐT/DRC lỗi: ' + (err?.message || ''))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleCancel() {
     if (!ticket) return
     Modal.confirm({
@@ -1396,7 +1427,6 @@ export default function WeighingPage() {
                       min={100}
                       max={350}
                       placeholder="180-241"
-                      disabled={isCompleted}
                     />
                   </Col>
                   <Col span={12}>
@@ -1426,7 +1456,6 @@ export default function WeighingPage() {
                       max={100}
                       step={0.1}
                       placeholder="0-100"
-                      disabled={isCompleted}
                     />
                   </Col>
                   {/* Preview KL khô khi có đủ data */}
@@ -1453,14 +1482,21 @@ export default function WeighingPage() {
                       value={consolidationCode}
                       onChange={(e) => setConsolidationCode(e.target.value)}
                       placeholder="VD: TMMN-07 XE 1 (19/05)"
-                      disabled={isCompleted}
                     />
                   </Col>
                   <Col span={24}>
                     <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>
-                      💡 Nhập ĐỐT + DRC TRƯỚC khi bấm "Cân lần 2". Khi cân tare, hệ thống tự lưu kèm.
+                      💡 Nhập ĐỐT + DRC. QC có thể nhập/sửa cả khi phiếu ĐÃ hoàn tất rồi bấm "Lưu ĐỐT/DRC".
                       Auto-suggest DRC dùng <strong>bảng quy đổi HAQT</strong> ({drcLookupRows.length} dòng) — QC sửa được ở Cài đặt → Bảng quy đổi DRC.
                     </Text>
+                  </Col>
+                  <Col span={24}>
+                    <Button
+                      type="primary" block onClick={handleSaveDrc} loading={loading}
+                      style={{ background: PRIMARY, borderColor: PRIMARY }}
+                    >
+                      💾 Lưu ĐỐT/DRC
+                    </Button>
                   </Col>
                 </Row>
               </Card>

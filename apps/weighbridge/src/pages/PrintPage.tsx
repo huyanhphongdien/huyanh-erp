@@ -140,6 +140,8 @@ export default function PrintPage() {
     ? Math.round(actualNet * actualDrc / 100 * 100) / 100
     : null
   const consolidationCode = ext.consolidation_code as string | null | undefined
+  // Mủ nước → luôn hiện phần ĐO DRC (để trống "—" nếu chưa đo, nhắc QC nhập)
+  const isMuNuoc = String(ext.rubber_type || '').split(',').map((s: string) => s.trim()).includes('mu_nuoc')
 
   // Hỗ trợ NHIỀU loại mủ (XUẤT lưu "mu_dong,mu_nuoc") — gộp nhãn
   const RT_LABELS: Record<string, string> = {
@@ -400,7 +402,7 @@ export default function PrintPage() {
         )}
 
         {/* ===== DRC measurement (ĐỐT + DRC thực + KL khô) — TL flow ===== */}
-        {(dotReading != null || actualDrc != null || consolidationCode) && (
+        {(isMuNuoc || dotReading != null || actualDrc != null || consolidationCode) && (
           isThermal ? (
             <div style={{ marginBottom: 4 }}>
               <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />

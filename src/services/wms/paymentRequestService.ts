@@ -325,6 +325,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
     `)
     .eq('status', 'completed')
     .is('payment_request_id', null)
+    .neq('ticket_type', 'gate')   // loại phiếu CỔNG (hàng nội bộ) — không phải mủ mua, không gom chi tiền
     .order('created_at', { ascending: true })
 
   if (params.facility_id) q = q.eq('facility_id', params.facility_id)

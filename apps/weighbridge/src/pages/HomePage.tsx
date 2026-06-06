@@ -150,8 +150,13 @@ export default function HomePage() {
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
-      title: 'Đại lý', key: 'partner', width: 160, ellipsis: true,
+      title: 'Đại lý / Hàng', key: 'partner', width: 160, ellipsis: true,
       render: (_: unknown, t: WeighbridgeTicket) => {
+        // CỔNG: hiện nội dung hàng nội bộ (notes) thay vì đại lý
+        if (t.ticket_type === 'gate') {
+          const cargo = (t as any).notes
+          return <Text>🚪 {cargo || <Text type="secondary">hàng nội bộ</Text>}</Text>
+        }
         const name = partnerNameOf(t)
         return name ? <Text>{name}</Text> : <Text type="secondary">—</Text>
       },
@@ -506,15 +511,15 @@ export default function HomePage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Space size={16}>
                           <Text style={{ ...MONO, fontSize: 12 }}>{t.code}</Text>
-                          <Tag color={t.ticket_type === 'out' ? 'orange' : 'green'} style={{ margin: 0, fontWeight: 600 }}>
-                            {t.ticket_type === 'out' ? '📤 XUẤT (cân ra)' : '📥 NHẬP (cân vô)'}
+                          <Tag color={t.ticket_type === 'gate' ? 'default' : t.ticket_type === 'out' ? 'orange' : 'green'} style={{ margin: 0, fontWeight: 600 }}>
+                            {t.ticket_type === 'gate' ? '🚪 CỔNG (hàng nội bộ)' : t.ticket_type === 'out' ? '📤 XUẤT (cân ra)' : '📥 NHẬP (cân vô)'}
                           </Tag>
                           <Text strong>{t.vehicle_plate}</Text>
-                          <Text type="secondary">{t.driver_name || '—'}</Text>
+                          <Text type="secondary">{t.ticket_type === 'gate' ? ((t as any).notes || '—') : (t.driver_name || '—')}</Text>
                           <Tag color={STATUS_MAP[t.status].color}>
                             {t.status === 'weighing_gross'
-                              ? (t.ticket_type === 'out' ? 'Chờ cân xe rỗng' : 'Chờ cân L1')
-                              : (t.ticket_type === 'out' ? 'Chờ cân xe + hàng' : 'Chờ cân L2')}
+                              ? (t.ticket_type === 'gate' ? 'Chờ cân xe vào' : t.ticket_type === 'out' ? 'Chờ cân xe rỗng' : 'Chờ cân L1')
+                              : (t.ticket_type === 'gate' ? 'Chờ cân xe ra' : t.ticket_type === 'out' ? 'Chờ cân xe + hàng' : 'Chờ cân L2')}
                           </Tag>
                         </Space>
                         <Space>

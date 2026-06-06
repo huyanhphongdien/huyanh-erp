@@ -143,15 +143,17 @@ export default function PrintPage() {
   // Mủ nước → luôn hiện phần ĐO DRC (để trống "—" nếu chưa đo, nhắc QC nhập)
   const isMuNuoc = String(ext.rubber_type || '').split(',').map((s: string) => s.trim()).includes('mu_nuoc')
 
-  // XUẤT cân 2 lần: lần 1 = XE RỖNG (tare), lần 2 = XE + HÀNG (gross). NHẬP thì ngược lại.
-  // → bảng cân in theo đúng thứ tự + nhãn + thời gian của từng hướng.
+  // XUẤT/CỔNG cân 2 lần: lần 1 = tare (xe rỗng / xe vào), lần 2 = gross (xe+hàng / xe ra).
+  // NHẬP thì ngược lại. → bảng cân in theo đúng thứ tự + nhãn + thời gian của từng hướng.
   const isOutTicket = ticket!.ticket_type === 'out'
-  const w1Label = isOutTicket ? 'Xe rỗng' : 'Gross'
-  const w2Label = isOutTicket ? 'Xe + hàng' : 'Tare'
-  const w1Weight = isOutTicket ? ticket!.tare_weight : ticket!.gross_weight
-  const w1Time = isOutTicket ? ticket!.tare_weighed_at : ticket!.gross_weighed_at
-  const w2Weight = isOutTicket ? ticket!.gross_weight : ticket!.tare_weight
-  const w2Time = isOutTicket ? ticket!.gross_weighed_at : ticket!.tare_weighed_at
+  const isGateTicket = ticket!.ticket_type === 'gate'
+  const isReverseTicket = isOutTicket || isGateTicket  // lần1 = tare, lần2 = gross
+  const w1Label = isGateTicket ? 'Xe vào' : isOutTicket ? 'Xe rỗng' : 'Gross'
+  const w2Label = isGateTicket ? 'Xe ra' : isOutTicket ? 'Xe + hàng' : 'Tare'
+  const w1Weight = isReverseTicket ? ticket!.tare_weight : ticket!.gross_weight
+  const w1Time = isReverseTicket ? ticket!.tare_weighed_at : ticket!.gross_weighed_at
+  const w2Weight = isReverseTicket ? ticket!.gross_weight : ticket!.tare_weight
+  const w2Time = isReverseTicket ? ticket!.gross_weighed_at : ticket!.tare_weighed_at
 
   // Hỗ trợ NHIỀU loại mủ (XUẤT lưu "mu_dong,mu_nuoc") — gộp nhãn
   const RT_LABELS: Record<string, string> = {
@@ -306,11 +308,13 @@ export default function PrintPage() {
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
             <Row2 l="BS" r={<strong>{ticket!.vehicle_plate}</strong>} />
             {ticket!.driver_name && <Row2 l="TX" r={ticket!.driver_name} />}
-            {ticket!.ticket_type === 'out'
+            {isGateTicket
+              ? <Row2 l="Hàng" r={ticket!.notes || 'Hàng nội bộ'} />
+              : ticket!.ticket_type === 'out'
               ? <Row2 l="Loại" r={`Xe ra (Xuất)`} />
               : <Row2 l="Mủ" r={rubberLabel} />
             }
-            {partner && <Row2 l={partner.label === 'NCC' ? 'NCC' : 'ĐL'} r={partner.name} />}
+            {!isGateTicket && partner && <Row2 l={partner.label === 'NCC' ? 'NCC' : 'ĐL'} r={partner.name} />}
             {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>
         ) : (
@@ -335,10 +339,10 @@ export default function PrintPage() {
                 </tr>
               )}
               <tr>
-                <td style={tdLabel}>Loại mủ</td>
-                <td style={{ ...tdValue, fontWeight: 600 }}>{rubberLabel}</td>
+                <td style={tdLabel}>{isGateTicket ? 'Nội dung hàng' : 'Loại mủ'}</td>
+                <td style={{ ...tdValue, fontWeight: 600 }}>{isGateTicket ? (ticket!.notes || 'Hàng nội bộ') : rubberLabel}</td>
                 <td style={tdLabel}>Loại cân</td>
-                <td style={{ ...tdValue, fontWeight: 600 }}>{ticket!.ticket_type === 'in' ? 'Xe vào (Nhập)' : 'Xe ra (Xuất)'}</td>
+                <td style={{ ...tdValue, fontWeight: 600 }}>{isGateTicket ? 'Cân cổng (hàng nội bộ)' : ticket!.ticket_type === 'in' ? 'Xe vào (Nhập)' : 'Xe ra (Xuất)'}</td>
               </tr>
             </tbody>
           </table>

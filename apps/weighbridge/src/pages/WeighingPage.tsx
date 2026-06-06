@@ -85,7 +85,8 @@ export default function WeighingPage() {
   // G-7: cảnh báo cùng biển số cân lần 2 trong ngày (có thể là cân lại hoặc 2 chuyến)
   const [dupPlateWarning, setDupPlateWarning] = useState<{ count: number; codes: string[] } | null>(null)
   // Loại phiếu cân — IN (cân 2 lần: gross→tare) | OUT (cân 2 lần: tare xe rỗng→gross xe+hàng)
-  const [ticketDirection, setTicketDirection] = useState<'in' | 'out'>('in')
+  //                  | GATE (cân cổng hàng nội bộ: vào→ra, chênh lệch = hàng — chỉ Phong Điền)
+  const [ticketDirection, setTicketDirection] = useState<'in' | 'out' | 'gate'>('in')
 
   // S3 OUT: Sales Order + Container picker (optional cho OUT — cho phép xuất lẻ không SO)
   const [salesOrders, setSalesOrders] = useState<Array<{
@@ -255,7 +256,7 @@ export default function WeighingPage() {
       if (t) {
         setTicket(t)
         // Sync direction toggle với ticket type từ DB
-        if (t.ticket_type === 'in' || t.ticket_type === 'out') {
+        if (t.ticket_type === 'in' || t.ticket_type === 'out' || t.ticket_type === 'gate') {
           setTicketDirection(t.ticket_type)
         }
         setVehiclePlate(t.vehicle_plate)
@@ -452,6 +453,15 @@ export default function WeighingPage() {
         operator?.id,
       )
 
+      // GATE (cân cổng — hàng nội bộ): KHÔNG gắn nguồn mủ/deal/transfer/SO,
+      // KHÔNG lưu rubber fields (không dính tồn kho/DRC). Chỉ biển số + ghi chú.
+      if (ticketDirection === 'gate') {
+        setTicket(t)
+        setSuccess('Đã tạo phiếu cân cổng — Sẵn sàng cân lần 1 (xe vào)')
+        navigate(`/weigh/${t.id}`, { replace: true })
+        return
+      }
+
       // S3 OUT: link sales_order + container nếu user đã chọn
       if (ticketDirection === 'out' && (selectedSalesOrderId || selectedContainerId)) {
         try {
@@ -530,20 +540,27 @@ export default function WeighingPage() {
       // OUT 2-weigh — đo THỰC khối lượng hàng:
       //   • Lần 1 = XE RỖNG (tare)  → lần 2 = XE + HÀNG (gross)
       //   • NET hàng = gross − tare (không còn neo theo planned / tare cố định container)
-      if (ticket.ticket_type === 'out') {
+      // OUT và GATE dùng chung luồng 2-weigh đo thực (NET hàng = |lần2 − lần1|).
+      // OUT: lần1 = xe rỗng → lần2 = xe + hàng. GATE (cân cổng): lần1 = xe vào → lần2 = xe ra.
+      if (ticket.ticket_type === 'out' || ticket.ticket_type === 'gate') {
+        const isGateTicket = ticket.ticket_type === 'gate'
         if (ticket.status === 'weighing_gross') {
-          // Lần 1: xe rỗng (tare)
+          // Lần 1
           updated = await weighbridgeService.updateOutTareFirst(ticket.id, weight, operator?.id)
           setTicket(updated)
-          setSuccess(`Cân lần 1 (xe rỗng): ${weight.toLocaleString()} kg — chờ xếp hàng rồi cân lần 2`)
+          setSuccess(isGateTicket
+            ? `Cân lần 1 (xe vào): ${weight.toLocaleString()} kg — chờ cân lần 2 (xe ra)`
+            : `Cân lần 1 (xe rỗng): ${weight.toLocaleString()} kg — chờ xếp hàng rồi cân lần 2`)
           setManualWeight(null)
           if (cameraCaptureRef.current) cameraCaptureRef.current('L1').catch(() => {})
         } else {
-          // Lần 2: xe + hàng (gross) → tính NET hàng
+          // Lần 2 → tính NET hàng = |lần2 − lần1|
           updated = await weighbridgeService.updateOutGrossSecond(ticket.id, weight, operator?.id)
           setTicket(updated)
           const c = recalculate(weight, updated.tare_weight!, deductionKg, undefined, undefined, priceUnit)
-          setSuccess(`Cân lần 2 (xe + hàng): ${weight.toLocaleString()} kg → NET hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`)
+          setSuccess(isGateTicket
+            ? `Cân lần 2 (xe ra): ${weight.toLocaleString()} kg → KL hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`
+            : `Cân lần 2 (xe + hàng): ${weight.toLocaleString()} kg → NET hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`)
           setManualWeight(null)
           if (cameraCaptureRef.current) cameraCaptureRef.current('L2').catch(() => {})
         }
@@ -885,12 +902,16 @@ export default function WeighingPage() {
   const isWeighingTare = ticket?.status === 'weighing_tare'
   const isCompleted = ticket?.status === 'completed'
   const isOut = ticketDirection === 'out'
-  // NHẬP: lần1 gross → lần2 tare (chờ tare==null). XUẤT: lần1 tare → lần2 gross (chờ gross==null).
-  const secondPending = isOut
+  const isGate = ticketDirection === 'gate'
+  // GATE cân giống OUT (lần1 = tare, lần2 = gross). PD-only (chỉ NM Phong Điền).
+  const isReverseWeigh = isOut || isGate
+  const canShowGate = currentFacility?.code === 'PD'
+  // NHẬP: lần1 gross → lần2 tare (chờ tare==null). XUẤT/CỔNG: lần1 tare → lần2 gross (chờ gross==null).
+  const secondPending = isReverseWeigh
     ? (isWeighingTare && ticket?.gross_weight == null)
     : (isWeighingTare && ticket?.tare_weight == null)
   const canRecord = isWeighingGross || secondPending
-  const canComplete = isOut
+  const canComplete = isReverseWeigh
     ? (isWeighingTare && ticket?.gross_weight != null && ticket?.tare_weight != null)
     : (isWeighingTare && ticket?.tare_weight != null)
 
@@ -965,14 +986,21 @@ export default function WeighingPage() {
         {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess('')} style={{ marginBottom: 12 }} />}
         {facilityError && <Alert type="warning" message={`Lỗi facility: ${facilityError}`} showIcon style={{ marginBottom: 12 }} />}
 
-        {/* Thanh tiến trình — cả NHẬP lẫn XUẤT đều cân 2 lần (thứ tự ngược nhau):
-            NHẬP: Gross (xe+hàng) → Tare (xe rỗng). XUẤT: Xe rỗng → Xe + hàng. */}
-        {(ticketDirection === 'in' || ticketDirection === 'out') && (
+        {/* Thanh tiến trình — NHẬP / XUẤT / CỔNG đều cân 2 lần (thứ tự ngược nhau):
+            NHẬP: Gross (xe+hàng) → Tare (xe rỗng). XUẤT: Xe rỗng → Xe + hàng. CỔNG: Xe vào → Xe ra. */}
+        {(ticketDirection === 'in' || ticketDirection === 'out' || isGate) && (
           <Card size="small" style={{ borderRadius: 12, marginBottom: 8 }} styles={{ body: { padding: '8px 12px' } }}>
             <Steps
               size="small"
               current={isCompleted ? 3 : isWeighingTare ? 2 : isWeighingGross ? 1 : 0}
-              items={ticketDirection === 'out'
+              items={isGate
+                ? [
+                    { title: 'Tạo phiếu' },
+                    { title: 'Cân lần 1', description: 'Xe vào' },
+                    { title: 'Cân lần 2', description: 'Xe ra' },
+                    { title: 'Hoàn tất' },
+                  ]
+                : ticketDirection === 'out'
                 ? [
                     { title: 'Tạo phiếu' },
                     { title: 'Cân lần 1', description: 'Xe rỗng' },
@@ -1020,13 +1048,43 @@ export default function WeighingPage() {
                   >
                     📤 XUẤT (ra kho)
                   </Button>
+                  {/* CỔNG — cân hàng nội bộ (không phải mủ). Chỉ Phong Điền. */}
+                  {canShowGate && (
+                    <Button
+                      type={ticketDirection === 'gate' ? 'primary' : 'default'}
+                      onClick={() => setTicketDirection('gate')}
+                      style={ticketDirection === 'gate' ? { background: '#6B7280', borderColor: '#6B7280', flex: 1 } : { flex: 1 }}
+                      disabled={!!ticket}
+                      size="large"
+                    >
+                      🚪 CỔNG (hàng nội bộ)
+                    </Button>
+                  )}
                 </div>
                 <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
                   {ticketDirection === 'in'
                     ? 'Cân 2 lần: Gross (xe + hàng) → Tare (xe rỗng) → Net'
+                    : ticketDirection === 'gate'
+                    ? 'Cân hàng nội bộ (không phải mủ) — 2 lần: Xe vào → Xe ra → KL hàng. Không tính tồn kho.'
                     : 'Cân 2 lần: Xe rỗng (Tare) → Xe + hàng (Gross) → Net hàng'}
                 </Text>
               </Card>
+
+              {/* CỔNG: Nội dung hàng nội bộ (→ notes) */}
+              {isGate && (
+                <Card size="small" title="📦 Nội dung hàng (cân cổng)" style={{ borderRadius: 12, borderColor: '#6B7280' }}>
+                  <Input.TextArea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    placeholder="VD: Vật tư - dầu DO, phế liệu sắt, thành phẩm SVR 3L..."
+                    disabled={isCompleted}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
+                    Cân 2 lần: xe vào → xe ra. Chênh lệch = khối lượng hàng. Không liên quan tồn kho mủ / DRC / thanh toán.
+                  </Text>
+                </Card>
+              )}
 
               {/* F3: Transfer picker — hiện cho cả OUT (NM gửi) và IN (NM nhận) khi có pending */}
               {transferOptions.length > 0 && !ticket && (
@@ -1611,12 +1669,32 @@ export default function WeighingPage() {
                 </Card>
               )}
 
+              {/* CỔNG — ghim nội dung hàng + biển số khi đã tạo phiếu */}
+              {ticket && isGate && (
+                <Card
+                  size="small"
+                  style={{ borderRadius: 12, background: '#F3F4F6', border: '1px solid #D1D5DB' }}
+                  styles={{ body: { padding: '10px 14px' } }}
+                >
+                  <div style={{ fontSize: 10, color: '#4B5563', letterSpacing: 1, textTransform: 'uppercase' }}>Cân cổng — hàng nội bộ</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    🚪 {ticket.vehicle_plate}
+                    <Tag color="default" style={{ marginLeft: 8, fontSize: 10 }}>Cổng</Tag>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#374151', marginTop: 2 }}>
+                    Hàng: <strong>{notes || '— chưa nhập nội dung —'}</strong>
+                  </div>
+                </Card>
+              )}
+
               {/* Live Scale Display */}
               {ticket && !isCompleted && canRecord && (
                 <Card size="small" style={{ borderRadius: 12 }}>
                   <div style={{ textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>
-                      {isOut
+                      {isGate
+                        ? (isWeighingGross ? '⚖️ Cân lần 1 (Xe vào)' : '⚖️ Cân lần 2 (Xe ra)')
+                        : isOut
                         ? (isWeighingGross ? '⚖️ Cân lần 1 (Xe rỗng)' : '⚖️ Cân lần 2 (Xe + hàng)')
                         : (isWeighingGross ? '⚖️ Cân lần 1 (Gross)' : '⚖️ Cân lần 2 (Tare)')}
                     </Text>

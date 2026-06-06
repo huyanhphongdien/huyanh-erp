@@ -1,11 +1,12 @@
 // =============================================================================
 // EDGE FUNCTION: daily-rubber-report
-// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi 12:30 giờ VN.
+// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi 00:30 giờ VN, tổng hợp CẢ NGÀY HÔM TRƯỚC.
+// (VD: 00:30 ngày 06/06 → gửi số liệu trọn ngày 05/06.)
 // Nguồn: weighbridge_tickets (NHẬP, completed) + facilities + b2b_partners.
-// Cửa sổ: 00:00 hôm nay (giờ VN) → thời điểm gửi; so với cùng khung hôm qua.
+// Cửa sổ: [hôm qua 00:00, hôm nay 00:00) giờ VN; so với ngày trước nữa.
 //
 // Deploy: npx supabase functions deploy daily-rubber-report --no-verify-jwt
-// Schedule (pg_cron): `30 5 * * *` UTC = 12:30 VN (xem scheduled SQL ở docs).
+// Schedule (pg_cron): `30 17 * * *` UTC = 00:30 VN (xem scheduled SQL ở docs).
 // Test:   curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber-report" \
 //           -H "Authorization: Bearer <SERVICE_ROLE_KEY>" -H "Content-Type: application/json" -d "{}"
 // =============================================================================
@@ -118,17 +119,19 @@ function facCode(t: Ticket): { code: string; name: string } {
 }
 
 async function collectData(supabase: any) {
-  const now = new Date()
+  const DAY = 24 * 3600 * 1000
   const vnNow = new Date(Date.now() + VN_OFFSET)
   const vnMidnightUTC = Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate()) - VN_OFFSET
-  const todayStart = new Date(vnMidnightUTC).toISOString()
-  const yStart = new Date(vnMidnightUTC - 24 * 3600 * 1000).toISOString()
-  const nowISO = now.toISOString()
-  const yNowISO = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  // Chạy 0h30 → báo cáo CẢ NGÀY HÔM QUA (giờ VN): [hôm qua 00:00, hôm nay 00:00).
+  // `today` = ngày được báo cáo (hôm qua theo lịch); `yesterday` = ngày trước nữa (để so sánh).
+  const repStart = new Date(vnMidnightUTC - DAY).toISOString()
+  const repEnd = new Date(vnMidnightUTC).toISOString()
+  const prevStart = new Date(vnMidnightUTC - 2 * DAY).toISOString()
+  const prevEnd = repStart
 
   const [today, yesterday] = await Promise.all([
-    fetchIN(supabase, todayStart, nowISO),
-    fetchIN(supabase, yStart, yNowISO),
+    fetchIN(supabase, repStart, repEnd),
+    fetchIN(supabase, prevStart, prevEnd),
   ])
 
   // DRC trung bình theo loại (từ phiếu có DRC) — để ước KL khô cho phiếu thiếu DRC
@@ -201,11 +204,12 @@ async function collectData(supabase: any) {
   const missing = today.filter((t) => (t.qc_actual_drc == null || t.qc_actual_drc <= 0) && (t.net_weight || 0) > 0)
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
 
-  const dateLabel = `${DAYS_VI[vnNow.getUTCDay()]}, ${String(vnNow.getUTCDate()).padStart(2, '0')}/${String(vnNow.getUTCMonth() + 1).padStart(2, '0')}/${vnNow.getUTCFullYear()}`
-  const cutoff = `${String(vnNow.getUTCHours()).padStart(2, '0')}:${String(vnNow.getUTCMinutes()).padStart(2, '0')}`
+  // Nhãn ngày = NGÀY ĐƯỢC BÁO CÁO (hôm qua theo lịch VN)
+  const repLocal = new Date(vnMidnightUTC - DAY + VN_OFFSET)
+  const dateLabel = `${DAYS_VI[repLocal.getUTCDay()]}, ${String(repLocal.getUTCDate()).padStart(2, '0')}/${String(repLocal.getUTCMonth() + 1).padStart(2, '0')}/${repLocal.getUTCFullYear()}`
 
   return {
-    dateLabel, cutoff,
+    dateLabel,
     totalTuoi, totalKho, yTuoi, pct, drcTB,
     xeCount: today.length, dealerCount,
     facilities, types, topDealers,
@@ -218,7 +222,7 @@ async function collectData(supabase: any) {
 function renderHtml(d: any): string {
   const trendHtml = d.pct == null
     ? `<div style="font-size:12px;color:#94a3b8;margin-top:2px;">Chưa có số hôm qua để so sánh</div>`
-    : `<div style="font-size:12px;color:${d.pct >= 0 ? '#15803d' : '#dc2626'};margin-top:2px;">${d.pct >= 0 ? '▲' : '▼'} ${fmt1(Math.abs(d.pct))}% so với hôm qua (${fmtT(d.yTuoi)} t)</div>`
+    : `<div style="font-size:12px;color:${d.pct >= 0 ? '#15803d' : '#dc2626'};margin-top:2px;">${d.pct >= 0 ? '▲' : '▼'} ${fmt1(Math.abs(d.pct))}% so với hôm trước (${fmtT(d.yTuoi)} t)</div>`
 
   const facRows = d.facilities.map((f: any) => `
     <tr style="border-bottom:1px solid #eef1f0;">
@@ -271,7 +275,7 @@ function renderHtml(d: any): string {
 
   const emptyHtml = d.empty ? `
     <tr><td style="padding:24px;text-align:center;color:#64748b;font-size:14px;">
-      Chưa có phiếu cân NHẬP hoàn tất nào tính đến ${d.cutoff} hôm nay.
+      Không có phiếu cân NHẬP hoàn tất nào trong ngày ${d.dateLabel}.
     </td></tr>` : ''
 
   const body = d.empty ? emptyHtml : `
@@ -358,7 +362,7 @@ function renderHtml(d: any): string {
 
   return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#eef1f0;font-family:Arial,'Helvetica Neue',sans-serif;color:#1f2937;">
-  <div style="display:none;max-height:0;overflow:hidden;color:#eef1f0;">Hôm nay nhập ${fmtT(d.totalTuoi)} tấn mủ tươi (≈${fmtT(d.totalKho)} tấn khô) · ${d.xeCount} xe.</div>
+  <div style="display:none;max-height:0;overflow:hidden;color:#eef1f0;">Ngày ${d.dateLabel}: nhập ${fmtT(d.totalTuoi)} tấn mủ tươi (≈${fmtT(d.totalKho)} tấn khô) · ${d.xeCount} xe.</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f0;padding:18px 10px;"><tr><td align="center">
     <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);">
       <tr><td style="background:#1B4D3E;padding:20px 24px;">
@@ -366,7 +370,7 @@ function renderHtml(d: any): string {
           <td style="vertical-align:middle;">
             <div style="color:#fff;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Cao Su Huy Anh</div>
             <div style="color:#fff;font-size:21px;font-weight:800;margin-top:2px;">BÁO CÁO THU MUA MỦ</div>
-            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; chốt số ${d.cutoff}</div>
+            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; tổng hợp cả ngày</div>
           </td>
           <td style="vertical-align:middle;text-align:right;">
             <div style="display:inline-block;background:#fff;border-radius:8px;padding:8px 12px;"><span style="color:#1B4D3E;font-weight:800;font-size:18px;">HUY ANH</span></div>
@@ -376,8 +380,8 @@ function renderHtml(d: any): string {
       ${body}
       <tr><td style="padding:16px 24px 22px 24px;border-top:1px solid #eef1f0;">
         <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
-          Báo cáo tự động 12:30 hằng ngày từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.<br>
-          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b> từ 00:00 đến ${d.cutoff} hôm nay (giờ VN). KL khô = KL tươi × DRC.<br>
+          Báo cáo tự động lúc 00:30 mỗi sáng cho NGÀY HÔM TRƯỚC, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.<br>
+          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b> trọn ngày (00:00–24:00 giờ VN). KL khô = KL tươi × DRC.<br>
           Mủ chưa có DRC được tạm tính theo DRC trung bình cùng loại.
         </div>
       </td></tr>
@@ -394,7 +398,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const d = await collectData(supabase)
     const html = renderHtml(d)
-    const subject = `[Thu mua 12:30] ${d.dateLabel} — ${fmtT(d.totalTuoi)}t tươi · ${fmtT(d.totalKho)}t khô · ${d.xeCount} xe`
+    const subject = `[Thu mua] ${d.dateLabel} — ${fmtT(d.totalTuoi)}t tươi · ${fmtT(d.totalKho)}t khô · ${d.xeCount} xe`
 
     const token = await getAccessToken()
     await sendEmail(token, REPORT_RECIPIENTS, subject, html)

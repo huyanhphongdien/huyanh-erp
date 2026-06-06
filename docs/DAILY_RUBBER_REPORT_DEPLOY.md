@@ -1,7 +1,8 @@
 # Báo cáo thu mua mủ hằng ngày — Triển khai
 
-Edge function `daily-rubber-report` gửi mail BGĐ lúc **12:30 giờ VN** (số liệu phiếu cân
-NHẬP hoàn tất từ 00:00 → 12:30 hôm nay), bố cục khớp `MAIL_BAO_CAO_THU_MUA_MOCK.html`.
+Edge function `daily-rubber-report` gửi mail BGĐ lúc **00:30 giờ VN**, tổng hợp **CẢ NGÀY
+HÔM TRƯỚC** (VD: 00:30 ngày 06/06 → số liệu trọn ngày 05/06). Bố cục khớp
+`MAIL_BAO_CAO_THU_MUA_MOCK.html`.
 
 ## 1. Deploy function
 ```bash
@@ -18,12 +19,12 @@ curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber
 ```
 → Kiểm hộp thư **minhld@huyanhrubber.com**. Trả về JSON `{ success, sent_to, subject, stats }`.
 
-## 3. Lên lịch tự động 12:30 VN (pg_cron — chạy 1 lần ở Supabase SQL Editor)
-12:30 VN = **05:30 UTC** → cron `30 5 * * *`. Thay `<SERVICE_ROLE_KEY>` bằng key thật.
+## 3. Lên lịch tự động 00:30 VN (pg_cron — chạy 1 lần ở Supabase SQL Editor)
+00:30 VN = **17:30 UTC** (ngày hôm trước) → cron `30 17 * * *`. Thay `<SERVICE_ROLE_KEY>` bằng key thật.
 ```sql
 select cron.schedule(
-  'daily-rubber-report-1230',
-  '30 5 * * *',
+  'daily-rubber-report-0030',
+  '30 17 * * *',
   $$
   select net.http_post(
     url     := 'https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber-report',
@@ -36,8 +37,8 @@ select cron.schedule(
   $$
 );
 ```
-Kiểm lịch: `select jobname, schedule, active from cron.job where jobname='daily-rubber-report-1230';`
-Đổi giờ/huỷ: `select cron.unschedule('daily-rubber-report-1230');` rồi schedule lại.
+Kiểm lịch: `select jobname, schedule, active from cron.job where jobname='daily-rubber-report-0030';`
+Đổi giờ/huỷ: `select cron.unschedule('daily-rubber-report-0030');` rồi schedule lại.
 
 ## 4. Khi test OK → chuyển sang gửi BGĐ đầy đủ
 Sửa `supabase/functions/daily-rubber-report/index.ts`:
@@ -46,6 +47,6 @@ Sửa `supabase/functions/daily-rubber-report/index.ts`:
 - Deploy lại (bước 1).
 
 ## Ghi chú
-- Cửa sổ dữ liệu = 00:00 → thời điểm chạy (giờ VN). So sánh vs cùng khung hôm qua.
+- Cửa sổ dữ liệu = **trọn ngày hôm trước** [00:00, 24:00) giờ VN. So sánh vs ngày trước nữa.
 - KL khô = KL tươi × DRC (qc_actual_drc trên phiếu). Phiếu thiếu DRC → tạm tính theo DRC TB cùng loại + cảnh báo.
 - Không có phiếu nào → mail vẫn gửi, ghi "Chưa có phiếu cân NHẬP hoàn tất".

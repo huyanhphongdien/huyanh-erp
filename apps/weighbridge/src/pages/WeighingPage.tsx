@@ -118,6 +118,8 @@ export default function WeighingPage() {
   const [sourceType, setSourceType] = useState<'deal' | 'supplier' | 'partner_direct'>('deal')
   // partner_direct: cân không có deal — chọn đại lý B2B trực tiếp + rubber_type
   const [directPartnerId, setDirectPartnerId] = useState<string | null>(null)
+  // Tên nguồn (đại lý/NCC/deal) để ghim tóm tắt khi cân lần 2 — đỡ nhầm
+  const [selectedSourceName, setSelectedSourceName] = useState<string>('')
   const [directRawRubberType, setDirectRawRubberType] = useState<'mu_nuoc'|'mu_tap'|'mu_dong'|'mu_chen'|'mu_to'>('mu_tap')
 
   // Delivery plans (xe đã khai báo trước ở tab "Thông tin giao hàng")
@@ -266,6 +268,14 @@ export default function WeighingPage() {
         if (ext.container_id) setSelectedContainerId(ext.container_id)
         if (ext.deal_id) { setSelectedDealId(ext.deal_id); setSourceType('deal') }
         if (ext.supplier_id) { setSelectedSupplierId(ext.supplier_id); setSourceType('supplier') }
+        if (ext.partner_id && !ext.deal_id && !ext.supplier_id) setSourceType('partner_direct')
+        // Tên nguồn để ghim tóm tắt: ưu tiên supplier_name, nếu trống thì tra b2b_partners theo partner_id
+        if (ext.supplier_name) {
+          setSelectedSourceName(ext.supplier_name)
+        } else if (ext.partner_id) {
+          supabase.from('b2b_partners').select('name').eq('id', ext.partner_id).maybeSingle()
+            .then(({ data }) => { if (data?.name) setSelectedSourceName(data.name) })
+        }
         if (ext.rubber_type) {
           setRubberType(ext.rubber_type)
           if (t.ticket_type === 'out') setOutRubberTypes(String(ext.rubber_type).split(',').map((s) => s.trim()).filter(Boolean))
@@ -354,6 +364,7 @@ export default function WeighingPage() {
     setSelectedPlanId('')
     const deal = deals.find((d) => d.id === dealId)
     if (!deal) return
+    setSelectedSourceName(deal.partner_name || '')
 
     // Load xe đã khai báo cho Deal này
     loadDeliveryPlans(dealId)
@@ -1185,7 +1196,7 @@ export default function WeighingPage() {
                       type={sourceType === 'deal' ? 'primary' : 'default'}
                       onClick={() => setSourceType('deal')}
                       style={sourceType === 'deal' ? { background: PRIMARY, borderColor: PRIMARY, flex: 1 } : { flex: 1 }}
-                      disabled={isCompleted}
+                      disabled={!isCreate}
                     >
                       📦 Theo Deal (đã chốt)
                     </Button>
@@ -1194,7 +1205,7 @@ export default function WeighingPage() {
                       type={sourceType !== 'deal' ? 'primary' : 'default'}
                       onClick={() => { if (sourceType === 'deal') setSourceType('partner_direct') }}
                       style={sourceType !== 'deal' ? { background: PRIMARY, borderColor: PRIMARY, flex: 1 } : { flex: 1 }}
-                      disabled={isCompleted}
+                      disabled={!isCreate}
                     >
                       👤 Đối tác trực tiếp
                     </Button>
@@ -1209,7 +1220,7 @@ export default function WeighingPage() {
                         onChange={handleDealSelect}
                         placeholder="Chọn Deal..."
                         style={{ width: '100%' }}
-                        disabled={isCompleted}
+                        disabled={!isCreate}
                         allowClear
                         showSearch
                         optionFilterProp="label"
@@ -1237,7 +1248,7 @@ export default function WeighingPage() {
                             onChange={handlePlanSelect}
                             placeholder="Chọn xe đã khai báo (hoặc bỏ qua nếu xe mới)"
                             style={{ width: '100%' }}
-                            disabled={isCompleted}
+                            disabled={!isCreate}
                             allowClear
                             options={deliveryPlans.map((p) => {
                               const weighed = p.status === 'weighed'
@@ -1285,8 +1296,9 @@ export default function WeighingPage() {
                           } else {
                             setSourceType('partner_direct'); setDirectPartnerId(id); setSelectedSupplierId('')
                           }
+                          setSelectedSourceName(opt?.name || '')
                         }}
-                        disabled={isCompleted}
+                        disabled={!isCreate}
                       />
                     </div>
                   )}
@@ -1301,7 +1313,7 @@ export default function WeighingPage() {
                     <Radio.Group
                       value={rubberType}
                       onChange={(e) => setRubberType(e.target.value)}
-                      disabled={isCompleted}
+                      disabled={!isCreate}
                       buttonStyle="solid"
                       style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 8 }}
                     >
@@ -1577,6 +1589,27 @@ export default function WeighingPage() {
                   </Tag>
                 )}
               </Card>
+
+              {/* ĐANG CÂN CHO — ghim nguồn (đại lý/NCC/deal) + loại mủ khi đã tạo phiếu (IN),
+                  để cân lần 2 không nhầm đại lý/loại */}
+              {ticket && ticketDirection === 'in' && (
+                <Card
+                  size="small"
+                  style={{ borderRadius: 12, background: '#F0F9F4', border: '1px solid #b7eb8f' }}
+                  styles={{ body: { padding: '10px 14px' } }}
+                >
+                  <div style={{ fontSize: 10, color: '#15803d', letterSpacing: 1, textTransform: 'uppercase' }}>Đang cân cho</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#1B4D3E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    👤 {selectedSourceName || '— chưa rõ nguồn —'}
+                    <Tag color={sourceType === 'supplier' ? 'blue' : sourceType === 'deal' ? 'orange' : 'green'} style={{ marginLeft: 8, fontSize: 10 }}>
+                      {sourceType === 'supplier' ? 'NCC' : sourceType === 'deal' ? 'Deal' : 'Đại lý'}
+                    </Tag>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#374151', marginTop: 2 }}>
+                    Loại mủ: <strong>{RUBBER_LABELS[rubberType] || rubberType}</strong>
+                  </div>
+                </Card>
+              )}
 
               {/* Live Scale Display */}
               {ticket && !isCompleted && canRecord && (

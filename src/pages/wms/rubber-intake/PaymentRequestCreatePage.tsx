@@ -65,10 +65,12 @@ const PaymentRequestCreatePage: React.FC = () => {
   }, [])
 
   const search = useCallback(async () => {
+    // BẮT chọn nhà máy: mỗi đề nghị thanh toán chỉ gom 1 cơ sở (tránh lẫn PD/QT/Lào).
+    if (!facilityId) { setTickets([]); setSelected(new Set()); return }
     setLoading(true)
     try {
       const data = await paymentRequestService.listAvailableTickets({
-        facility_id: facilityId || undefined,
+        facility_id: facilityId,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         rubber_type: rubberType || undefined,
@@ -82,7 +84,8 @@ const PaymentRequestCreatePage: React.FC = () => {
     setLoading(false)
   }, [facilityId, dateFrom, dateTo, rubberType])
 
-  useEffect(() => { search() }, []) // load lần đầu (hôm nay)
+  // Tự tìm khi đã chọn nhà máy (đổi NM/ngày/loại → tìm lại)
+  useEffect(() => { search() }, [facilityId])
 
   const toggle = (id: string) => {
     setSelected(prev => {
@@ -100,11 +103,11 @@ const PaymentRequestCreatePage: React.FC = () => {
 
   const handleCreate = async () => {
     if (chosen.length === 0) return
+    if (!facilityId) { alert('Vui lòng chọn nhà máy trước khi tạo đề nghị'); return }
     setCreating(true)
     try {
-      const facForLines = facilityId || chosen[0]?.facility_id || null
       const req = await paymentRequestService.create({
-        facility_id: facForLines,
+        facility_id: facilityId,
         request_date: dateTo || today(),
         rubber_type: rubberType || null,
         title: title.trim() || null,
@@ -139,9 +142,9 @@ const PaymentRequestCreatePage: React.FC = () => {
       <div className="px-4 py-3 space-y-2.5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-2.5">
           <div>
-            <label className="text-[11px] text-gray-400 font-medium">Nhà máy</label>
-            <select value={facilityId} onChange={e => setFacilityId(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 text-[13.5px] bg-white">
-              <option value="">Tất cả nhà máy</option>
+            <label className="text-[11px] text-gray-400 font-medium">Nhà máy <span className="text-red-500">*</span> <span className="text-gray-300">(mỗi đề nghị = 1 cơ sở)</span></label>
+            <select value={facilityId} onChange={e => setFacilityId(e.target.value)} className={`mt-1 w-full px-3 py-2 rounded-xl border text-[13.5px] bg-white ${facilityId ? 'border-gray-200' : 'border-amber-300 bg-amber-50'}`}>
+              <option value="">— Chọn nhà máy —</option>
               {facilities.map(f => <option key={f.id} value={f.id}>{f.name} ({f.code})</option>)}
             </select>
           </div>
@@ -161,8 +164,8 @@ const PaymentRequestCreatePage: React.FC = () => {
               {RUBBER_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </div>
-          <button onClick={search} disabled={loading} className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-gray-900 text-white text-[13.5px] font-semibold active:scale-95 transition disabled:opacity-50">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Tìm phiếu cân
+          <button onClick={search} disabled={loading || !facilityId} className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-gray-900 text-white text-[13.5px] font-semibold active:scale-95 transition disabled:opacity-50">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} {facilityId ? 'Tìm phiếu cân' : 'Chọn nhà máy trước'}
           </button>
         </div>
 
@@ -199,6 +202,8 @@ const PaymentRequestCreatePage: React.FC = () => {
 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 text-emerald-500 animate-spin" /></div>
+        ) : !facilityId ? (
+          <div className="text-center py-12 text-amber-600 text-[13.5px]">↑ Chọn nhà máy để xem phiếu cân (mỗi đề nghị chỉ gom 1 cơ sở)</div>
         ) : tickets.length === 0 ? (
           <div className="text-center py-12 text-gray-400 text-[13.5px]">Không có phiếu cân nào khớp bộ lọc</div>
         ) : (

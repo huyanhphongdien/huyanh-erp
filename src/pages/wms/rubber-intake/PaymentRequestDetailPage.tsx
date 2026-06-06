@@ -260,88 +260,132 @@ const PaymentRequestDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Lines */}
-      <div className="px-4 space-y-2.5">
-        {lines.map((l, i) => (
-          <div key={l.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[12px] font-semibold text-gray-400">
-                #{i + 1}
-                {l.deal_number && <span className="ml-2 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[10.5px]">Deal #{l.deal_number}</span>}
-                {l.source_type === 'supplier' && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10.5px]">Mua lẻ</span>}
-              </span>
-              {editable && (
-                <button onClick={() => handleRemoveLine(l.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Người nhận */}
-            <input
-              value={l.payee_name}
-              onChange={e => patchLine(l.id, { payee_name: e.target.value })}
-              disabled={!editable}
-              placeholder="Người nhận tiền"
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-[13.5px] font-medium mb-1.5 disabled:bg-gray-50"
-            />
-            <input
-              value={l.payee_note || ''}
-              onChange={e => patchLine(l.id, { payee_note: e.target.value })}
-              disabled={!editable}
-              placeholder="Ghi chú người nhận (số TK / người thân...)"
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-[12.5px] mb-2 disabled:bg-gray-50"
-            />
-
-            {/* kg × đơn giá = thành tiền */}
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-[10.5px] text-gray-400">Khối lượng (kg)</label>
-                <input
-                  type="number" inputMode="decimal"
-                  value={l.weight || ''}
-                  onChange={e => patchLine(l.id, { weight: parseFloat(e.target.value) || 0 })}
-                  disabled={!editable}
-                  className="mt-0.5 w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[13px] text-right font-mono disabled:bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="text-[10.5px] text-gray-400">Đơn giá (đ/kg)</label>
-                <input
-                  type="number" inputMode="decimal"
-                  value={l.unit_price || ''}
-                  onChange={e => patchLine(l.id, { unit_price: parseFloat(e.target.value) || 0 })}
-                  disabled={!editable}
-                  placeholder="VD: 60000"
-                  className="mt-0.5 w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[13px] text-right font-mono disabled:bg-gray-50"
-                />
-                {(l.unit_price || 0) > 0 && (l.unit_price || 0) < 1000 && (
-                  <p className="mt-0.5 text-[10px] text-red-500 leading-tight">⚠ Giá &lt; 1.000đ — có thiếu số 0? ({l.unit_price} → {(l.unit_price || 0) * 1000})</p>
-                )}
-              </div>
-              <div>
-                <label className="text-[10.5px] text-gray-400">Thành tiền</label>
-                <input
-                  type="number" inputMode="decimal"
-                  value={l.amount || ''}
-                  onChange={e => patchLine(l.id, { amount: parseFloat(e.target.value) || 0 })}
-                  disabled={!editable}
-                  className="mt-0.5 w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[13px] text-right font-mono font-bold text-emerald-600 disabled:bg-gray-50"
-                />
-              </div>
-            </div>
-            {l.vehicle_plate && <p className="text-[11px] text-gray-400 mt-1.5">Xe: {l.vehicle_plate}</p>}
+      {/* Lines — BẢNG gọn 1 dòng/phiếu (dễ soi, khớp phiếu kế toán làm tay) */}
+      <div className="px-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[12.5px]">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500 text-[10.5px] uppercase tracking-wide">
+                  <th className="px-2 py-2 text-center w-9 font-semibold">#</th>
+                  <th className="px-2 py-2 text-left min-w-[200px] font-semibold">Người nhận / Ghi chú (STK)</th>
+                  <th className="px-2 py-2 text-left w-24 font-semibold">Xe</th>
+                  <th className="px-2 py-2 text-right w-24 font-semibold">KL (kg)</th>
+                  <th className="px-2 py-2 text-right w-28 font-semibold">Đơn giá</th>
+                  <th className="px-2 py-2 text-right w-32 font-semibold">Thành tiền</th>
+                  {editable && <th className="px-1 py-2 w-9" />}
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((l, i) => {
+                  const lowPrice = (l.unit_price || 0) > 0 && (l.unit_price || 0) < 1000
+                  return (
+                    <tr key={l.id} className="border-t border-gray-100 hover:bg-emerald-50/30 align-top">
+                      <td className="px-2 py-2 text-center text-gray-400 font-mono">{i + 1}</td>
+                      {/* Người nhận + ghi chú + badge nguồn */}
+                      <td className="px-2 py-1.5">
+                        {editable ? (
+                          <>
+                            <input
+                              value={l.payee_name}
+                              onChange={e => patchLine(l.id, { payee_name: e.target.value })}
+                              placeholder="Người nhận tiền"
+                              className="w-full px-2 py-1 rounded-md border border-gray-200 text-[12.5px] font-medium mb-1"
+                            />
+                            <input
+                              value={l.payee_note || ''}
+                              onChange={e => patchLine(l.id, { payee_note: e.target.value })}
+                              placeholder="Số TK / người thân..."
+                              className="w-full px-2 py-1 rounded-md border border-gray-200 text-[11.5px] text-gray-500"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-medium text-gray-800">{l.payee_name || <span className="text-gray-300 italic">—</span>}</p>
+                            {l.payee_note && <p className="text-[11.5px] text-gray-400">{l.payee_note}</p>}
+                          </>
+                        )}
+                        <div className="mt-0.5 flex gap-1">
+                          {l.deal_number && <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[10px]">Deal #{l.deal_number}</span>}
+                          {l.source_type === 'supplier' && <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px]">Mua lẻ</span>}
+                        </div>
+                      </td>
+                      {/* Xe (chỉ đọc) */}
+                      <td className="px-2 py-2 text-gray-500 font-mono text-[11.5px]">{l.vehicle_plate || '—'}</td>
+                      {/* KL */}
+                      <td className="px-2 py-1.5 text-right">
+                        {editable ? (
+                          <input
+                            type="number" inputMode="decimal"
+                            value={l.weight || ''}
+                            onChange={e => patchLine(l.id, { weight: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-2 py-1 rounded-md border border-gray-200 text-[12.5px] text-right font-mono"
+                          />
+                        ) : (
+                          <span className="font-mono">{(l.weight || 0).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}</span>
+                        )}
+                      </td>
+                      {/* Đơn giá */}
+                      <td className="px-2 py-1.5 text-right">
+                        {editable ? (
+                          <>
+                            <input
+                              type="number" inputMode="decimal"
+                              value={l.unit_price || ''}
+                              onChange={e => patchLine(l.id, { unit_price: parseFloat(e.target.value) || 0 })}
+                              placeholder="VD: 60000"
+                              className={`w-full px-2 py-1 rounded-md border text-[12.5px] text-right font-mono ${lowPrice ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                            />
+                            {lowPrice && <p className="mt-0.5 text-[9.5px] text-red-500 leading-tight">⚠ &lt;1.000đ — thiếu 0? →{((l.unit_price || 0) * 1000).toLocaleString('vi-VN')}</p>}
+                          </>
+                        ) : (
+                          <span className="font-mono">{(l.unit_price || 0).toLocaleString('vi-VN')}</span>
+                        )}
+                      </td>
+                      {/* Thành tiền */}
+                      <td className="px-2 py-1.5 text-right">
+                        {editable ? (
+                          <input
+                            type="number" inputMode="decimal"
+                            value={l.amount || ''}
+                            onChange={e => patchLine(l.id, { amount: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-2 py-1 rounded-md border border-gray-200 text-[12.5px] text-right font-mono font-bold text-emerald-600"
+                          />
+                        ) : (
+                          <span className="font-mono font-bold text-emerald-600">{fmtCur(l.amount, req.currency)}</span>
+                        )}
+                      </td>
+                      {editable && (
+                        <td className="px-1 py-2 text-center">
+                          <button onClick={() => handleRemoveLine(l.id)} className="p-1 rounded-md hover:bg-red-50 text-red-400">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+                {/* Dòng TỔNG CỘNG */}
+                <tr className="border-t-2 border-gray-200 bg-emerald-50/50 font-semibold">
+                  <td colSpan={3} className="px-2 py-2.5 text-right text-gray-600 text-[12px]">TỔNG CỘNG</td>
+                  <td className="px-2 py-2.5 text-right font-mono">{liveTotalWeight.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}</td>
+                  <td />
+                  <td className="px-2 py-2.5 text-right font-mono text-[13px] text-emerald-700">{fmtCur(liveTotalAmount, req.currency)}</td>
+                  {editable && <td />}
+                </tr>
+              </tbody>
+            </table>
           </div>
-        ))}
+        </div>
 
         {editable && (
-          <button onClick={handleAddLine} className="w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 text-[13.5px] font-medium hover:border-emerald-300 hover:text-emerald-500 transition">
+          <button onClick={handleAddLine} className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 text-[13.5px] font-medium hover:border-emerald-300 hover:text-emerald-500 transition">
             <Plus className="w-4 h-4" /> Thêm dòng thủ công
           </button>
         )}
 
         {(req.status === 'draft' || req.status === 'cancelled') && (
-          <button onClick={handleDelete} className="w-full flex items-center justify-center gap-1.5 py-2.5 text-red-500 text-[13px] font-medium">
+          <button onClick={handleDelete} className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 text-red-500 text-[13px] font-medium">
             <Trash2 className="w-4 h-4" /> Xoá đề nghị này
           </button>
         )}

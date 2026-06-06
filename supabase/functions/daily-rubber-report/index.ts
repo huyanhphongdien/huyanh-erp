@@ -118,16 +118,17 @@ function facCode(t: Ticket): { code: string; name: string } {
   return { code: f?.code || '?', name: f?.name || 'Chưa rõ' }
 }
 
-async function collectData(supabase: any) {
+async function collectData(supabase: any, mode: 'prevday' | 'today' = 'prevday') {
   const DAY = 24 * 3600 * 1000
   const vnNow = new Date(Date.now() + VN_OFFSET)
   const vnMidnightUTC = Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate()) - VN_OFFSET
-  // Chạy 0h30 → báo cáo CẢ NGÀY HÔM QUA (giờ VN): [hôm qua 00:00, hôm nay 00:00).
-  // `today` = ngày được báo cáo (hôm qua theo lịch); `yesterday` = ngày trước nữa (để so sánh).
-  const repStart = new Date(vnMidnightUTC - DAY).toISOString()
-  const repEnd = new Date(vnMidnightUTC).toISOString()
-  const prevStart = new Date(vnMidnightUTC - 2 * DAY).toISOString()
-  const prevEnd = repStart
+  // Mặc định (cron 0h30): CẢ NGÀY HÔM QUA [hôm qua 00:00, hôm nay 00:00).
+  // mode='today' (test): HÔM NAY tới giờ chạy [hôm nay 00:00, now).
+  const isToday = mode === 'today'
+  const repStart = new Date(isToday ? vnMidnightUTC : vnMidnightUTC - DAY).toISOString()
+  const repEnd = isToday ? new Date().toISOString() : new Date(vnMidnightUTC).toISOString()
+  const prevStart = new Date(isToday ? vnMidnightUTC - DAY : vnMidnightUTC - 2 * DAY).toISOString()
+  const prevEnd = isToday ? new Date(Date.now() - DAY).toISOString() : repStart
 
   const [today, yesterday] = await Promise.all([
     fetchIN(supabase, repStart, repEnd),
@@ -204,12 +205,14 @@ async function collectData(supabase: any) {
   const missing = today.filter((t) => (t.qc_actual_drc == null || t.qc_actual_drc <= 0) && (t.net_weight || 0) > 0)
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
 
-  // Nhãn ngày = NGÀY ĐƯỢC BÁO CÁO (hôm qua theo lịch VN)
-  const repLocal = new Date(vnMidnightUTC - DAY + VN_OFFSET)
+  // Nhãn ngày = NGÀY ĐƯỢC BÁO CÁO (hôm qua, hoặc hôm nay nếu mode test)
+  const repLocal = new Date((isToday ? vnMidnightUTC : vnMidnightUTC - DAY) + VN_OFFSET)
+  const cutoff = `${String(vnNow.getUTCHours()).padStart(2, '0')}:${String(vnNow.getUTCMinutes()).padStart(2, '0')}`
   const dateLabel = `${DAYS_VI[repLocal.getUTCDay()]}, ${String(repLocal.getUTCDate()).padStart(2, '0')}/${String(repLocal.getUTCMonth() + 1).padStart(2, '0')}/${repLocal.getUTCFullYear()}`
+    + (isToday ? ` (tới ${cutoff})` : '')
 
   return {
-    dateLabel,
+    dateLabel, isToday, cutoff,
     totalTuoi, totalKho, yTuoi, pct, drcTB,
     xeCount: today.length, dealerCount,
     facilities, types, topDealers,
@@ -370,7 +373,7 @@ function renderHtml(d: any): string {
           <td style="vertical-align:middle;">
             <div style="color:#fff;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Cao Su Huy Anh</div>
             <div style="color:#fff;font-size:21px;font-weight:800;margin-top:2px;">BÁO CÁO THU MUA MỦ</div>
-            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; tổng hợp cả ngày</div>
+            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; ${d.isToday ? 'số liệu tới giờ (TEST)' : 'tổng hợp cả ngày'}</div>
           </td>
           <td style="vertical-align:middle;text-align:right;">
             <div style="display:inline-block;background:#fff;border-radius:8px;padding:8px 12px;"><span style="color:#1B4D3E;font-weight:800;font-size:18px;">HUY ANH</span></div>
@@ -380,8 +383,10 @@ function renderHtml(d: any): string {
       ${body}
       <tr><td style="padding:16px 24px 22px 24px;border-top:1px solid #eef1f0;">
         <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
-          Báo cáo tự động lúc 00:30 mỗi sáng cho NGÀY HÔM TRƯỚC, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.<br>
-          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b> trọn ngày (00:00–24:00 giờ VN). KL khô = KL tươi × DRC.<br>
+          ${d.isToday
+            ? `<b>BẢN TEST</b> — số liệu HÔM NAY (00:00–${d.cutoff} giờ VN). Bản chính thức tự gửi 00:30 mỗi sáng cho ngày hôm trước.`
+            : `Báo cáo tự động lúc 00:30 mỗi sáng cho NGÀY HÔM TRƯỚC, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
+          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN. KL khô = KL tươi × DRC.<br>
           Mủ chưa có DRC được tạm tính theo DRC trung bình cùng loại.
         </div>
       </td></tr>
@@ -395,10 +400,13 @@ function renderHtml(d: any): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
+    // Test: gửi body {"range":"today"} để báo cáo HÔM NAY tới giờ. Mặc định = ngày hôm trước.
+    let mode: 'prevday' | 'today' = 'prevday'
+    try { const b = await req.json(); if (b && (b.range === 'today' || b.today === true)) mode = 'today' } catch { /* no body */ }
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const d = await collectData(supabase)
+    const d = await collectData(supabase, mode)
     const html = renderHtml(d)
-    const subject = `[Thu mua] ${d.dateLabel} — ${fmtT(d.totalTuoi)}t tươi · ${fmtT(d.totalKho)}t khô · ${d.xeCount} xe`
+    const subject = `${d.isToday ? '[Thu mua · TEST]' : '[Thu mua]'} ${d.dateLabel} — ${fmtT(d.totalTuoi)}t tươi · ${fmtT(d.totalKho)}t khô · ${d.xeCount} xe`
 
     const token = await getAccessToken()
     await sendEmail(token, REPORT_RECIPIENTS, subject, html)

@@ -552,10 +552,11 @@ async function getStats(fromDate?: string, toDate?: string, facilityId?: string 
   const totalNetWeight = (todayData || [])
     .reduce((sum, t) => sum + (t.net_weight || 0), 0)
 
-  // Tổng phiếu (theo range nếu có)
+  // Tổng phiếu (theo range nếu có) — KHÔNG tính phiếu đã hủy
   let totalQuery = supabase
     .from('weighbridge_tickets')
     .select('id', { count: 'exact', head: true })
+    .neq('status', 'cancelled')
 
   if (fromDate) totalQuery = totalQuery.gte('created_at', fromDate)
   if (toDate) totalQuery = totalQuery.lte('created_at', toDate + 'T23:59:59.999Z')

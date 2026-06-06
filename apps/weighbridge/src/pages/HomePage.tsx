@@ -70,6 +70,7 @@ export default function HomePage() {
       const facilityId = facility?.id || null
       const [allResult, statsResult] = await Promise.all([
         weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facilityId }),
+        // Tổng phiếu = toàn thời gian, KHÔNG tính phiếu đã hủy (cancelled)
         weighbridgeService.getStats(undefined, undefined, facilityId),
       ])
       const all = allResult.data || []

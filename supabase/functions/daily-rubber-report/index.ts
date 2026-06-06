@@ -104,6 +104,7 @@ async function fetchIN(supabase: any, fromISO: string, toISO: string): Promise<T
     .select(SELECT)
     .eq('ticket_type', 'in')
     .eq('status', 'completed')
+    .is('transfer_id', null)   // CHỈ mua thật từ đại lý; LOẠI xe nhận chuyển kho TL/LAO→PD (đã đếm ở NM gốc)
     .gte('created_at', fromISO)
     .lte('created_at', toISO)
   if (error) throw error

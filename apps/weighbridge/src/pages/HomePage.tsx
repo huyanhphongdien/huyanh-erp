@@ -17,6 +17,7 @@ import ScaleSettings from '@/components/ScaleSettings'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
 import { dealWmsService, type ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
+import { supabase } from '@erp/lib/supabase'
 import type { WeighbridgeTicket, WeighbridgeStatus, WeighbridgeImage } from '@erp/services/wms/wms.types'
 
 const { Title, Text } = Typography
@@ -37,6 +38,8 @@ export default function HomePage() {
   const scale = useKeliScale()
 
   const [allTickets, setAllTickets] = useState<WeighbridgeTicket[]>([])
+  // Tên đại lý tra từ b2b_partners theo partner_id (cho phiếu "đối tác trực tiếp" — supplier_name rỗng)
+  const [dbPartnerNames, setDbPartnerNames] = useState<Record<string, string>>({})
   const [inProgress, setInProgress] = useState<WeighbridgeTicket[]>([])
   const [stats, setStats] = useState<{
     totalTickets: number; completedToday: number; inProgress: number; totalNetWeight: number
@@ -79,6 +82,15 @@ export default function HomePage() {
       setInProgress(inProg)
       setStats(statsResult)
 
+      // Tra tên đại lý từ b2b_partners cho các partner_id chưa có supplier_name
+      const pids = [...new Set(all.map((t) => (t as any).partner_id).filter(Boolean))] as string[]
+      if (pids.length) {
+        const { data: ps } = await supabase.from('b2b_partners').select('id, name').in('id', pids)
+        const map: Record<string, string> = {}
+        for (const p of ps || []) map[p.id] = p.name
+        setDbPartnerNames(map)
+      }
+
       // Load images for all tickets (completed + in-progress)
       const allTicketsForImg = [...all.slice(0, 20), ...inProg]
       const imgMap: Record<string, WeighbridgeImage[]> = {}
@@ -119,7 +131,9 @@ export default function HomePage() {
   }
   const partnerNameOf = (t: WeighbridgeTicket) => {
     const ext = t as any
-    return ext.supplier_name || (ext.partner_id ? partnerNameById.get(ext.partner_id) : '') || ''
+    return ext.supplier_name
+      || (ext.partner_id ? (dbPartnerNames[ext.partner_id] || partnerNameById.get(ext.partner_id)) : '')
+      || ''
   }
 
   const columns: ColumnsType<WeighbridgeTicket> = [

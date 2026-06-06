@@ -1,12 +1,12 @@
 // =============================================================================
 // EDGE FUNCTION: daily-rubber-report
-// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi 00:30 giờ VN, tổng hợp CẢ NGÀY HÔM TRƯỚC.
-// (VD: 00:30 ngày 06/06 → gửi số liệu trọn ngày 05/06.)
+// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi 18:00 giờ VN, tổng hợp NGÀY HÔM NAY (00:00–18:00).
 // Nguồn: weighbridge_tickets (NHẬP, completed) + facilities + b2b_partners.
-// Cửa sổ: [hôm qua 00:00, hôm nay 00:00) giờ VN; so với ngày trước nữa.
+// Cửa sổ mặc định: [hôm nay 00:00, giờ chạy) giờ VN; so với cùng khung hôm qua.
+// (Tùy chọn body {"range":"prevday"} để báo cáo trọn ngày hôm trước.)
 //
 // Deploy: npx supabase functions deploy daily-rubber-report --no-verify-jwt
-// Schedule (pg_cron): `30 17 * * *` UTC = 00:30 VN (xem scheduled SQL ở docs).
+// Schedule (pg_cron): `0 11 * * *` UTC = 18:00 VN (xem scheduled SQL ở docs).
 // Test:   curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber-report" \
 //           -H "Authorization: Bearer <SERVICE_ROLE_KEY>" -H "Content-Type: application/json" -d "{}"
 // =============================================================================
@@ -23,16 +23,12 @@ const CLIENT_ID = Deno.env.get('AZURE_CLIENT_ID') || 'ee1377e6-b52c-4326-88f2-c1
 const CLIENT_SECRET = Deno.env.get('AZURE_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET') || ''
 const SENDER_EMAIL = Deno.env.get('EMAIL_FROM') || 'huyanhphongdien@huyanhrubber.com'
 
-// ★ TEST MODE — chỉ gửi cho Minh trước. Verify OK thì đổi sang BGD_FULL.
+// ★ Gửi BGĐ (đã chốt). Quay lại test riêng: tạm đổi về [{ minhld }].
 const REPORT_RECIPIENTS = [
+  { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
+  { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
 ]
-// ★ FINAL — bỏ comment, gán REPORT_RECIPIENTS = BGD_FULL khi chốt.
-// const BGD_FULL = [
-//   { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
-//   { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
-//   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
-// ]
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,7 +115,7 @@ function facCode(t: Ticket): { code: string; name: string } {
   return { code: f?.code || '?', name: f?.name || 'Chưa rõ' }
 }
 
-async function collectData(supabase: any, mode: 'prevday' | 'today' = 'prevday') {
+async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const DAY = 24 * 3600 * 1000
   const vnNow = new Date(Date.now() + VN_OFFSET)
   const vnMidnightUTC = Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate()) - VN_OFFSET
@@ -425,7 +421,7 @@ function renderHtml(d: any): string {
           <td style="vertical-align:middle;">
             <div style="color:#fff;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Cao Su Huy Anh</div>
             <div style="color:#fff;font-size:21px;font-weight:800;margin-top:2px;">BÁO CÁO THU MUA MỦ</div>
-            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; ${d.isToday ? 'số liệu tới giờ (TEST)' : 'tổng hợp cả ngày'}</div>
+            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; ${d.isToday ? 'số liệu trong ngày' : 'tổng hợp cả ngày'}</div>
           </td>
           <td style="vertical-align:middle;text-align:right;">
             <div style="display:inline-block;background:#fff;border-radius:8px;padding:8px 12px;"><span style="color:#1B4D3E;font-weight:800;font-size:18px;">HUY ANH</span></div>
@@ -436,8 +432,8 @@ function renderHtml(d: any): string {
       <tr><td style="padding:16px 24px 22px 24px;border-top:1px solid #eef1f0;">
         <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
           ${d.isToday
-            ? `<b>BẢN TEST</b> — số liệu HÔM NAY (00:00–${d.cutoff} giờ VN). Bản chính thức tự gửi 00:30 mỗi sáng cho ngày hôm trước.`
-            : `Báo cáo tự động lúc 00:30 mỗi sáng cho NGÀY HÔM TRƯỚC, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
+            ? `Báo cáo tự động lúc <b>18:00 mỗi ngày</b> cho NGÀY HÔM NAY, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
+            : `Báo cáo cho NGÀY HÔM TRƯỚC, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
           Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN. KL khô = KL tươi × DRC.<br>
           Mủ chưa có DRC được tạm tính theo DRC trung bình cùng loại.
         </div>
@@ -452,13 +448,13 @@ function renderHtml(d: any): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    // Test: gửi body {"range":"today"} để báo cáo HÔM NAY tới giờ. Mặc định = ngày hôm trước.
-    let mode: 'prevday' | 'today' = 'prevday'
-    try { const b = await req.json(); if (b && (b.range === 'today' || b.today === true)) mode = 'today' } catch { /* no body */ }
+    // Mặc định: HÔM NAY tới giờ chạy (cron 18:00). Gửi {"range":"prevday"} để báo cáo ngày hôm trước.
+    let mode: 'prevday' | 'today' = 'today'
+    try { const b = await req.json(); if (b && b.range === 'prevday') mode = 'prevday' } catch { /* no body */ }
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const d = await collectData(supabase, mode)
     const html = renderHtml(d)
-    const subject = `${d.isToday ? '[Thu mua · TEST]' : '[Thu mua]'} ${d.dateLabel} — ${fmtT(d.totalTuoi)}t tươi · ${fmtT(d.totalKho)}t khô · ${d.xeCount} xe`
+    const subject = `[Thu mua] ${d.dateLabel} — ${fmtT(d.totalTuoi)}t tươi · ${fmtT(d.totalKho)}t khô · ${d.xeCount} xe`
 
     const token = await getAccessToken()
     await sendEmail(token, REPORT_RECIPIENTS, subject, html)

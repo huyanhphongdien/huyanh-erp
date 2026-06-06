@@ -540,6 +540,9 @@ export default function PrintPage() {
             </div>
             <div style={{ marginTop: 10, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
               Phiếu được in từ hệ thống Trạm Cân — Cao Su Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
+              <div style={{ fontStyle: 'italic', marginTop: 2 }}>
+                Hỗ trợ kỹ thuật: Lê Duy Minh · 0901120167 · minhld@huyanhrubber.com
+              </div>
             </div>
           </div>
         )}

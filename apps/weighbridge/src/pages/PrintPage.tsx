@@ -15,7 +15,7 @@ type PaperSize = 'a4' | 'a5' | '80mm' | '58mm'
 // A4 dọc: 210mm - 14mm margin (2×7mm) ≈ 740px
 // A5 NGANG (landscape, mặc định): 210mm - 12mm margin ≈ 750px (rộng = A4 dọc)
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
-  a4: { label: 'A4 (210mm)', width: 740, fontSize: 13 },
+  a4: { label: 'A4 (210mm)', width: 740, fontSize: 14 },
   a5: { label: 'A5 ngang (210mm)', width: 750, fontSize: 11 },
   '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
   '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
@@ -223,7 +223,7 @@ export default function PrintPage() {
             .print-only td, .print-only th { padding: 3px 6px !important; }
           ` : ''}
           ${paperSize === 'a4' ? `
-            .print-only td, .print-only th { padding: 4px 8px !important; }
+            .print-only td, .print-only th { padding: 6px 9px !important; }
             .print-only img { break-inside: avoid; }
           ` : ''}
         }
@@ -242,10 +242,12 @@ export default function PrintPage() {
       <div style={{
         width: cfg.width,
         margin: '0 auto',
-        padding: isThermal ? '4px 2px' : (paperSize === 'a5' ? '10px 14px' : '12px 16px'),
+        padding: isThermal ? '4px 2px' : (paperSize === 'a5' ? '10px 14px' : '16px 20px'),
         // A4/A5 = serif (chứng từ chính thức, đồng bộ Liên 2 + PCG); nhiệt = sans (rõ ở size nhỏ).
         fontFamily: isThermal ? "'Be Vietnam Pro', Arial, sans-serif" : "'Times New Roman', Times, serif",
         fontSize: fs,
+        // A4: căng chiều cao full trang + flex để đẩy phần ký xuống đáy (hết khoảng trống dưới)
+        ...(paperSize === 'a4' ? { display: 'flex', flexDirection: 'column', minHeight: '272mm', boxSizing: 'border-box' } : {}),
       }}>
         {/* ===== HEADER ===== */}
         {isThermal ? (
@@ -481,7 +483,7 @@ export default function PrintPage() {
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l1Images.map((img) => (
                     <img key={img.id} src={img.image_url} alt={img.capture_type}
-                      style={{ width: 150, height: 92, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+                      style={{ width: 172, height: 108, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
                   ))}
                 </div>
               </div>
@@ -492,7 +494,7 @@ export default function PrintPage() {
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l2Images.map((img) => (
                     <img key={img.id} src={img.image_url} alt={img.capture_type}
-                      style={{ width: 150, height: 92, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+                      style={{ width: 172, height: 108, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
                   ))}
                 </div>
               </div>
@@ -521,8 +523,8 @@ export default function PrintPage() {
             </div>
           </div>
         ) : (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: paperSize === 'a5' ? 12 : 18, fontSize: fs, textAlign: 'center', gap: 12 }}>
+          <div style={{ marginTop: paperSize === 'a4' ? 'auto' : 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: paperSize === 'a5' ? 12 : 24, paddingTop: paperSize === 'a4' ? 14 : 0, fontSize: fs, textAlign: 'center', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 46, fontSize: fs + 1 }}>Nhân viên cân</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
@@ -539,7 +541,7 @@ export default function PrintPage() {
             <div style={{ marginTop: 10, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
               Phiếu được in từ hệ thống Trạm Cân — Cao Su Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
             </div>
-          </>
+          </div>
         )}
       </div>
     )

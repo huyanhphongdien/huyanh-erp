@@ -105,6 +105,22 @@ export default function HomePage() {
     return () => clearInterval(timer)
   }, [load])
 
+  // Map partner_id → tên đại lý (ưu tiên deal, fallback supplier_name trên phiếu)
+  const partnerNameById = new Map<string, string>()
+  for (const d of activeDeals) {
+    const pid = (d as any).partner_id
+    if (pid && d.partner_name && !partnerNameById.has(pid)) partnerNameById.set(pid, d.partner_name)
+  }
+  for (const t of allTickets) {
+    const pid = (t as any).partner_id
+    const name = (t as any).supplier_name
+    if (pid && name && !partnerNameById.has(pid)) partnerNameById.set(pid, name)
+  }
+  const partnerNameOf = (t: WeighbridgeTicket) => {
+    const ext = t as any
+    return ext.supplier_name || (ext.partner_id ? partnerNameById.get(ext.partner_id) : '') || ''
+  }
+
   const columns: ColumnsType<WeighbridgeTicket> = [
     {
       title: '#', key: 'idx', width: 40,
@@ -119,8 +135,11 @@ export default function HomePage() {
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
-      title: 'Tài xế', dataIndex: 'driver_name', width: 120, ellipsis: true,
-      render: (v: string) => v || <Text type="secondary">—</Text>,
+      title: 'Đại lý', key: 'partner', width: 160, ellipsis: true,
+      render: (_: unknown, t: WeighbridgeTicket) => {
+        const name = partnerNameOf(t)
+        return name ? <Text>{name}</Text> : <Text type="secondary">—</Text>
+      },
     },
     {
       title: 'Gross', dataIndex: 'gross_weight', width: 90, align: 'right',
@@ -258,7 +277,7 @@ export default function HomePage() {
     // Search
     if (searchText) {
       const s = searchText.toLowerCase()
-      const match = [t.code, t.vehicle_plate, t.driver_name, (t as any).supplier_name]
+      const match = [t.code, t.vehicle_plate, t.driver_name, partnerNameOf(t)]
         .filter(Boolean)
         .some(v => v!.toLowerCase().includes(s))
       if (!match) return false
@@ -551,7 +570,7 @@ export default function HomePage() {
             {/* Search & Filter Bar */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <Input
-                placeholder="Tìm mã phiếu, biển số, tài xế..."
+                placeholder="Tìm mã phiếu, biển số, đại lý..."
                 prefix={<SearchOutlined style={{ color: '#bbb' }} />}
                 value={searchText}
                 onChange={e => setSearchText(e.target.value)}

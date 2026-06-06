@@ -379,23 +379,7 @@ function renderHtml(d: any): string {
     <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">💧 Theo loại mủ</div></td></tr>
     <tr><td style="padding:10px 24px 6px 24px;">${typeBars}</td></tr>
 
-    <!-- Top đại lý -->
-    <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">🏆 Top đại lý giao nhiều nhất</div></td></tr>
-    <tr><td style="padding:8px 24px 8px 24px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
-        <tr style="color:#64748b;font-size:12px;">
-          <th align="left" style="padding:6px 10px;font-weight:600;">#</th>
-          <th align="left" style="padding:6px 10px;font-weight:600;">Đại lý</th>
-          <th align="center" style="padding:6px 10px;font-weight:600;">NM</th>
-          <th align="left" style="padding:6px 10px;font-weight:600;">Loại</th>
-          <th align="right" style="padding:6px 10px;font-weight:600;">Mủ tươi (t)</th>
-        </tr>
-        ${dealerRows}
-      </table>
-      ${d.dealerCount > 5 ? `<div style="font-size:11px;color:#94a3b8;padding:6px 10px 0;">…và ${d.dealerCount - 5} đại lý khác.</div>` : ''}
-    </td></tr>
-
-    <!-- Chi tiết từng đại lý nhập mủ -->
+    <!-- Chi tiết từng đại lý nhập mủ (đặt TRÊN Top đại lý) -->
     <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">📋 Chi tiết đại lý nhập mủ (theo ngày)</div></td></tr>
     <tr><td style="padding:8px 24px 8px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12px;">
@@ -412,6 +396,22 @@ function renderHtml(d: any): string {
         ${detailRows}
       </table>
       <div style="font-size:11px;color:#94a3b8;padding:6px 8px 0;">Mỗi dòng = 1 đại lý × 1 loại mủ. KL theo kg. DRC bình quân theo khối lượng.</div>
+    </td></tr>
+
+    <!-- Top đại lý -->
+    <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">🏆 Top đại lý giao nhiều nhất</div></td></tr>
+    <tr><td style="padding:8px 24px 8px 24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+        <tr style="color:#64748b;font-size:12px;">
+          <th align="left" style="padding:6px 10px;font-weight:600;">#</th>
+          <th align="left" style="padding:6px 10px;font-weight:600;">Đại lý</th>
+          <th align="center" style="padding:6px 10px;font-weight:600;">NM</th>
+          <th align="left" style="padding:6px 10px;font-weight:600;">Loại</th>
+          <th align="right" style="padding:6px 10px;font-weight:600;">Mủ tươi (t)</th>
+        </tr>
+        ${dealerRows}
+      </table>
+      ${d.dealerCount > 5 ? `<div style="font-size:11px;color:#94a3b8;padding:6px 10px 0;">…và ${d.dealerCount - 5} đại lý khác.</div>` : ''}
     </td></tr>
     ${warnHtml}`
 

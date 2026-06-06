@@ -274,7 +274,9 @@ async function resolvePcgForTickets(
     const line = best.dealer_lines.find((d: any) => d.partner_id === r.partner_id && d.price_per_ton != null)
     if (line) {
       result.set(r.id, {
-        pricePerKg: Number(line.price_per_ton) / 1000,
+        // PCG nhập giá theo ĐỒNG/KG (vd 60.000) — cột tên 'price_per_ton' là di sản,
+        // thực chất là đ/kg. KHÔNG chia 1000 (trước đây chia → ra 60đ/kg, sai 1000 lần).
+        pricePerKg: Number(line.price_per_ton),
         code: best.code,
         pcgId: best.id,
         fees: Array.isArray(best.fees) ? best.fees : [],
@@ -325,7 +327,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
     `)
     .eq('status', 'completed')
     .is('payment_request_id', null)
-    .neq('ticket_type', 'gate')   // loại phiếu CỔNG (hàng nội bộ) — không phải mủ mua, không gom chi tiền
+    .eq('ticket_type', 'in')   // CHỈ phiếu NHẬP (mua mủ) mới gom chi tiền — loại XUẤT & CỔNG (hàng nội bộ)
     .order('created_at', { ascending: true })
 
   if (params.facility_id) q = q.eq('facility_id', params.facility_id)

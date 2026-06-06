@@ -132,7 +132,7 @@ function Sheet({ t }: { t: PriceLockTicket }) {
             <th style={{ ...feeTh, borderLeft: bd, textAlign: 'left' }}>Đại lý</th>
             <th style={{ ...feeTh, borderLeft: bd, width: 110 }}>KL dự kiến (kg)</th>
             <th style={{ ...feeTh, borderLeft: bd, width: 90 }}>DRC dự kiến</th>
-            <th style={{ ...feeTh, borderLeft: bd, width: 120 }}>Giá áp (đ/tấn)</th>
+            <th style={{ ...feeTh, borderLeft: bd, width: 120 }}>Giá áp (đ/kg)</th>
             <th style={{ ...feeTh, borderLeft: bd, textAlign: 'left', width: 140 }}>Ghi chú</th>
           </tr>
         </thead>
@@ -159,7 +159,7 @@ function Sheet({ t }: { t: PriceLockTicket }) {
 
       {/* Bảng giá tham chiếu */}
       <div style={{ border: bd, borderTop: 'none', padding: '5px 6px', display: 'flex', gap: 24 }}>
-        <span style={{ fontWeight: 700 }}>GIÁ CAO SU THAM CHIẾU (đ/tấn):</span>
+        <span style={{ fontWeight: 700 }}>GIÁ CAO SU THAM CHIẾU (đ/kg):</span>
         <span>Sàn: <strong>{fmt(t.price_floor_per_ton) || '…'}</strong></span>
         <span>Trung: <strong>{fmt(t.price_mid_per_ton) || '…'}</strong></span>
         <span>Cao: <strong>{fmt(t.price_high_per_ton) || '…'}</strong></span>

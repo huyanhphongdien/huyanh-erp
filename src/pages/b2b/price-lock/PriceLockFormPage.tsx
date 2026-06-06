@@ -210,7 +210,7 @@ export default function PriceLockFormPage() {
                   <th className="px-2 py-2 font-medium">Đại lý</th>
                   <th className="px-2 py-2 font-medium w-32">KL dự kiến (kg)</th>
                   <th className="px-2 py-2 font-medium w-28">DRC dự kiến (%)</th>
-                  <th className="px-2 py-2 font-medium w-40">Giá áp (đ/tấn)</th>
+                  <th className="px-2 py-2 font-medium w-40">Giá áp (đ/kg)</th>
                   <th className="px-2 py-2 font-medium">Ghi chú</th>
                   <th className="px-2 py-2 w-8" />
                 </tr>
@@ -248,9 +248,9 @@ export default function PriceLockFormPage() {
         {/* Bảng giá tham chiếu & tiền tệ */}
         <Card title="Bảng giá cao su tham chiếu & loại tiền">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Field label="Giá cao su SÀN (đ/tấn)"><NumInput value={form.price_floor_per_ton} onChange={(v) => set('price_floor_per_ton', v)} className={inputCls} /></Field>
-            <Field label="Giá cao su TRUNG (đ/tấn)"><NumInput value={form.price_mid_per_ton} onChange={(v) => set('price_mid_per_ton', v)} className={inputCls} /></Field>
-            <Field label="Giá cao su CAO (đ/tấn)"><NumInput value={form.price_high_per_ton} onChange={(v) => set('price_high_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su SÀN (đ/kg)"><NumInput value={form.price_floor_per_ton} onChange={(v) => set('price_floor_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su TRUNG (đ/kg)"><NumInput value={form.price_mid_per_ton} onChange={(v) => set('price_mid_per_ton', v)} className={inputCls} /></Field>
+            <Field label="Giá cao su CAO (đ/kg)"><NumInput value={form.price_high_per_ton} onChange={(v) => set('price_high_per_ton', v)} className={inputCls} /></Field>
             <Field label="Loại tiền">
               <select value={form.currency} onChange={(e) => set('currency', e.target.value as PriceLockCurrency)} className={inputCls}>
                 <option value="VND">VNĐ</option><option value="KIP">KIP</option><option value="THB">THB</option><option value="OTHER">Khác</option>

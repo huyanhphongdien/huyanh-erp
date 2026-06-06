@@ -79,6 +79,7 @@ export async function exportPaymentRequestExcel(
 
   const ccy = CCY_LABEL[req.currency] || 'VND'
   const numFmt = '#,##0'
+  const wFmt = '#,##0.0'   // số lượng (kg) — giữ 1 số lẻ như phiếu kế toán làm tay
   const d = new Date(req.request_date)
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -179,7 +180,7 @@ export async function exportPaymentRequestExcel(
       cell.border = BORDER
       if (i === 0) cell.alignment = { horizontal: 'center', vertical: 'top' }
       else if (i === 2) cell.alignment = { horizontal: 'center', vertical: 'top' }
-      else if (i >= 3 && i <= 5) { cell.numFmt = numFmt; cell.alignment = { horizontal: 'right', vertical: 'top' } }
+      else if (i >= 3 && i <= 5) { cell.numFmt = (i === 3 ? wFmt : numFmt); cell.alignment = { horizontal: 'right', vertical: 'top' } }
       else cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }
     })
     totalAmount += l.amount || 0
@@ -195,7 +196,7 @@ export async function exportPaymentRequestExcel(
   ws.getCell(`A${r}`).border = BORDER
   // D = tổng kg
   ws.getCell(r, 4).value = totalWeight
-  ws.getCell(r, 4).numFmt = numFmt
+  ws.getCell(r, 4).numFmt = wFmt
   ws.getCell(r, 4).font = { name: 'Times New Roman', size: 10, bold: true }
   ws.getCell(r, 4).alignment = { horizontal: 'right' }
   ws.getCell(r, 4).border = BORDER

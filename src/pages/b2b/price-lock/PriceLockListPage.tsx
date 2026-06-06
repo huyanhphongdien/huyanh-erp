@@ -110,7 +110,7 @@ export default function PriceLockListPage() {
                   <th className="px-3 py-2.5 font-medium">Hình thức</th>
                   <th className="px-3 py-2.5 font-medium text-center">Số đại lý</th>
                   <th className="px-3 py-2.5 font-medium text-right">Tổng KL dự kiến (kg)</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Giá áp (đ/tấn)</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Giá áp (đ/kg)</th>
                   <th className="px-3 py-2.5 font-medium text-center">Trạng thái</th>
                   <th className="px-3 py-2.5 font-medium text-center">In</th>
                 </tr>

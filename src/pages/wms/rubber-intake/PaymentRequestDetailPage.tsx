@@ -306,14 +306,18 @@ const PaymentRequestDetailPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="text-[10.5px] text-gray-400">Đơn giá</label>
+                <label className="text-[10.5px] text-gray-400">Đơn giá (đ/kg)</label>
                 <input
                   type="number" inputMode="decimal"
                   value={l.unit_price || ''}
                   onChange={e => patchLine(l.id, { unit_price: parseFloat(e.target.value) || 0 })}
                   disabled={!editable}
+                  placeholder="VD: 60000"
                   className="mt-0.5 w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[13px] text-right font-mono disabled:bg-gray-50"
                 />
+                {(l.unit_price || 0) > 0 && (l.unit_price || 0) < 1000 && (
+                  <p className="mt-0.5 text-[10px] text-red-500 leading-tight">⚠ Giá &lt; 1.000đ — có thiếu số 0? ({l.unit_price} → {(l.unit_price || 0) * 1000})</p>
+                )}
               </div>
               <div>
                 <label className="text-[10.5px] text-gray-400">Thành tiền</label>

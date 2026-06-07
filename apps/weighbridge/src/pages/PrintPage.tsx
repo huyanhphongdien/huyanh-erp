@@ -524,7 +524,7 @@ export default function PrintPage() {
               <tbody>
                 <tr>
                   <td style={{ fontWeight: 600, padding: '2px 0' }}>NV Cân</td>
-                  <td style={{ fontWeight: 600, padding: '2px 0' }}>Tài xế</td>
+                  <td style={{ fontWeight: 600, padding: '2px 0' }}>Tài xế/Đại lý</td>
                 </tr>
                 <tr style={{ height: 20 }}>
                   <td style={{ borderBottom: '1px dotted #999' }}></td>
@@ -544,7 +544,7 @@ export default function PrintPage() {
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 46, fontSize: fs + 1 }}>Tài xế</div>
+                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 46, fontSize: fs + 1 }}>Tài xế/Đại lý</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
               <div style={{ flex: 1 }}>

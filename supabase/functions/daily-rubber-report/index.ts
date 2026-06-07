@@ -13,6 +13,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { LOGO_B64 } from './logo.ts'
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -26,6 +27,7 @@ const SENDER_EMAIL = Deno.env.get('EMAIL_FROM') || 'huyanhphongdien@huyanhrubber
 // ★ Gửi BGĐ (đã chốt). Quay lại test riêng: tạm đổi về [{ minhld }].
 const REPORT_RECIPIENTS = [
   { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
+  { name: 'Anh Trung', email: 'trunglxh@huyanhrubber.com' },
   { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
 ]
@@ -58,6 +60,15 @@ async function sendEmail(token: string, recipients: Array<{ name: string; email:
         subject,
         body: { contentType: 'HTML', content: html },
         toRecipients: recipients.map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+        // Logo Huy Anh nhúng inline (cid:huyanh-logo) → hiện chắc trên Gmail/Outlook
+        attachments: [{
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: 'logo.png',
+          contentType: 'image/png',
+          contentId: 'huyanh-logo',
+          isInline: true,
+          contentBytes: LOGO_B64,
+        }],
       },
       saveToSentItems: true,
     }),
@@ -424,10 +435,16 @@ function renderHtml(d: any): string {
             <div style="color:#fff;font-size:21px;font-weight:800;margin-top:2px;">BÁO CÁO THU MUA MỦ</div>
             <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; ${d.isToday ? 'số liệu trong ngày' : 'tổng hợp cả ngày'}</div>
           </td>
-          <td style="vertical-align:middle;text-align:right;">
-            <div style="display:inline-block;background:#fff;border-radius:8px;padding:8px 12px;"><span style="color:#1B4D3E;font-weight:800;font-size:18px;">HUY ANH</span></div>
+          <td style="vertical-align:middle;text-align:right;width:128px;">
+            <img src="cid:huyanh-logo" alt="Cao Su Huy Anh" width="112" style="display:inline-block;background:#fff;border-radius:10px;padding:7px 10px;width:112px;height:auto;">
           </td>
         </tr></table>
+      </td></tr>
+      <tr><td style="padding:18px 24px 2px 24px;">
+        <div style="font-size:14px;color:#1f2937;line-height:1.65;">
+          <b>Kính gửi Quý Anh/Chị Ban Giám đốc,</b><br>
+          Hệ thống Trạm cân xin trân trọng gửi <b>Báo cáo thu mua mủ ngày ${d.dateLabel}</b>, với các số liệu tổng hợp như sau:
+        </div>
       </td></tr>
       ${body}
       <tr><td style="padding:16px 24px 22px 24px;border-top:1px solid #eef1f0;">
@@ -455,7 +472,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const d = await collectData(supabase, mode)
     const html = renderHtml(d)
-    const subject = `[Thu mua] ${d.dateLabel} — ${fmtT(d.totalTuoi)}t tươi · ${fmtT(d.totalKho)}t khô · ${d.xeCount} xe`
+    const subject = `Báo cáo thu mua mủ ngày ${d.dateLabel} — ${fmtT(d.totalTuoi)} tấn tươi · ${fmtT(d.totalKho)} tấn khô · ${d.xeCount} xe`
 
     const token = await getAccessToken()
     await sendEmail(token, REPORT_RECIPIENTS, subject, html)

@@ -38,8 +38,9 @@ function readVietnameseNumber(num: number): string {
   while (n > 0) { groups.push(n % 1000); n = Math.floor(n / 1000) }
   let out = ''
   for (let i = groups.length - 1; i >= 0; i--) {
-    if (groups[i] === 0 && i !== 0) continue
-    out += readTriple(groups[i], i < groups.length - 1) + units[i]
+    if (groups[i] === 0) continue   // bỏ nhóm 0 (gồm cả nhóm đơn vị cuối → hết "không trăm" thừa)
+    // Thêm khoảng trắng giữa các nhóm (trước đây dính chữ: "triệubảy", "nghìnkhông")
+    out += (out ? ' ' : '') + readTriple(groups[i], i < groups.length - 1) + units[i]
   }
   out = out.trim().replace(/\s+/g, ' ')
   return out.charAt(0).toUpperCase() + out.slice(1)

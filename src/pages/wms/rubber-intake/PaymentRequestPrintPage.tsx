@@ -47,12 +47,9 @@ function readVietnameseNumber(num: number): string {
   while (n > 0) { groups.push(n % 1000); n = Math.floor(n / 1000) }
   let out = ''
   for (let i = groups.length - 1; i >= 0; i--) {
-    if (groups[i] === 0 && i !== 0) {
-      if (groups.slice(0, i).some(g => g > 0) && out) out += ''
-      continue
-    }
-    const full = i < groups.length - 1
-    out += readTriple(groups[i], full) + units[i]
+    if (groups[i] === 0) continue   // bỏ nhóm 0 (gồm nhóm đơn vị cuối → hết "không trăm" thừa)
+    // Thêm khoảng trắng giữa các nhóm (trước đây dính chữ: "triệubảy", "nghìnkhông")
+    out += (out ? ' ' : '') + readTriple(groups[i], i < groups.length - 1) + units[i]
   }
   out = out.trim().replace(/\s+/g, ' ')
   return out.charAt(0).toUpperCase() + out.slice(1)
@@ -68,8 +65,11 @@ export default function PaymentRequestPrintPage() {
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    paymentRequestService.getById(id).then(res => {
-      if (res) { setReq(res.request); setLines(res.lines) }
+    paymentRequestService.getById(id).then(async res => {
+      if (res) {
+        setReq(res.request)
+        setLines(await paymentRequestService.enrichLinesWithBank(res.lines))
+      }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id])

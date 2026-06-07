@@ -424,6 +424,24 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
   })
 }
 
+/** Bổ sung ngân hàng (STK) vào ghi chú khi xuất/in: dòng nào CHƯA có payee_note mà
+ *  gắn đại lý (partner_id) → lấy NH hiện tại của đại lý. Giữ nguyên ghi chú đã nhập tay. */
+async function enrichLinesWithBank(lines: PaymentRequestLine[]): Promise<PaymentRequestLine[]> {
+  const partnerIds = [...new Set(lines.filter(l => !l.payee_note && l.partner_id).map(l => l.partner_id as string))]
+  if (partnerIds.length === 0) return lines
+  try {
+    const banks = await partnerBankService.getEffectiveBanksBatch(partnerIds)
+    return lines.map(l => {
+      if (l.payee_note || !l.partner_id) return l
+      const eb = banks.get(l.partner_id)
+      if (!eb) return l
+      let note = partnerBankService.formatBankLine(eb)
+      if (eb.via === 'proxy' && eb.proxy_partner_name) note += ` (chuyển hộ qua ${eb.proxy_partner_name})`
+      return { ...l, payee_note: note }
+    })
+  } catch { return lines }
+}
+
 /** Tiện ích: build LineInput[] từ phiếu cân đã chọn (prefill mặc định). */
 function ticketsToLines(tickets: AvailableTicket[]): LineInput[] {
   return tickets.map((t, i): LineInput => ({
@@ -926,6 +944,7 @@ export const paymentRequestService = {
   generateCode,
   listAvailableTickets,
   ticketsToLines,
+  enrichLinesWithBank,
   create,
   list,
   getById,

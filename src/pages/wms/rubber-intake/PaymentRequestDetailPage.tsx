@@ -161,8 +161,9 @@ const PaymentRequestDetailPage: React.FC = () => {
   const handleExportExcel = async () => {
     if (!req) return
     try {
+      const exportLines = await paymentRequestService.enrichLinesWithBank(lines)
       const { exportPaymentRequestExcel } = await import('../../../utils/paymentRequestExportExcel')
-      await exportPaymentRequestExcel(req, lines, { preparedBy: user?.full_name })
+      await exportPaymentRequestExcel(req, exportLines, { preparedBy: user?.full_name })
     } catch (e: any) { alert('Xuất Excel thất bại: ' + (e?.message || 'lỗi')) }
   }
 

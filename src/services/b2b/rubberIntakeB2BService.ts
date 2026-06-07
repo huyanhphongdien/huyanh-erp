@@ -361,6 +361,67 @@ export const rubberIntakeB2BService = {
     }
   },
 
+  /**
+   * TỰ áp giá từ Phiếu Chốt Giá (PCG) cho các lô bộc phát CHƯA chốt giá.
+   * Khớp PCG theo: cùng facility + ngày nhập nằm trong [weigh_from, weigh_to] (hoặc trùng
+   * lock_date) + dealer_lines có partner_id khớp & có price_per_ton (đ/kg). Nhiều PCG → lấy
+   * lock_date mới nhất. Giá = price_per_ton (đ/kg — KHÔNG chia 1000). Mủ nước thiếu DRC →
+   * bỏ qua (sẽ áp khi đã có DRC). Gom theo giá rồi gọi applyPrice (kèm recompute thưởng).
+   * @param ids tuỳ chọn — giới hạn trong các lô này; bỏ trống = mọi lô bộc phát chưa chốt giá.
+   */
+  async autoApplyPcgPrice(ids?: string[]): Promise<{ applied: number; noPcg: number; noDrc: number }> {
+    let q = supabase
+      .from('rubber_intake_batches')
+      .select('id, b2b_partner_id, facility_id, intake_date, net_weight_kg, dry_weight_kg, drc_percent, status, deal_id, total_amount, raw_rubber_type')
+      .is('deal_id', null)
+      .or('total_amount.is.null,total_amount.eq.0')
+    if (ids && ids.length) q = q.in('id', ids)
+    const { data: batches, error } = await q
+    if (error) throw new Error(error.message)
+    const targets = (batches || []).filter((b: any) => b.b2b_partner_id && b.facility_id)
+    if (targets.length === 0) return { applied: 0, noPcg: 0, noDrc: 0 }
+
+    const facilities = [...new Set(targets.map((b: any) => b.facility_id))]
+    const maxDate = targets.map((b: any) => (b.intake_date || '').slice(0, 10)).reduce((a: string, b: string) => (a > b ? a : b), '')
+    const { data: pcgs } = await supabase
+      .from('b2b_price_lock_tickets')
+      .select('id, code, facility_id, lock_date, weigh_from, weigh_to, dealer_lines')
+      .eq('status', 'locked')
+      .in('facility_id', facilities)
+      .lte('lock_date', maxDate)
+
+    const byPrice = new Map<number, string[]>()
+    let noPcg = 0, noDrc = 0
+    for (const b of targets as any[]) {
+      const tdate = (b.intake_date || '').slice(0, 10)
+      const cands = (pcgs || []).filter((p: any) => {
+        if (p.facility_id !== b.facility_id) return false
+        const inRange = (p.weigh_from && p.weigh_to)
+          ? (tdate >= p.weigh_from && tdate <= p.weigh_to)
+          : (p.lock_date === tdate)
+        if (!inRange) return false
+        return Array.isArray(p.dealer_lines)
+          && p.dealer_lines.some((d: any) => d.partner_id === b.b2b_partner_id && d.price_per_ton != null)
+      })
+      if (cands.length === 0) { noPcg++; continue }
+      cands.sort((a: any, b: any) => String(b.lock_date || '').localeCompare(String(a.lock_date || '')))
+      const line = cands[0].dealer_lines.find((d: any) => d.partner_id === b.b2b_partner_id && d.price_per_ton != null)
+      const price = Number(line.price_per_ton)   // đ/kg (PCG lưu đ/kg)
+      if (!price || price <= 0) { noPcg++; continue }
+      // Mủ nước cần DRC để ra KL khô; thiếu cả drc_percent lẫn dry_weight → khoan áp giá.
+      if (b.raw_rubber_type === 'mu_nuoc' && b.drc_percent == null && b.dry_weight_kg == null) { noDrc++; continue }
+      if (!byPrice.has(price)) byPrice.set(price, [])
+      byPrice.get(price)!.push(b.id)
+    }
+
+    let applied = 0
+    for (const [price, batchIds] of byPrice) {
+      await this.applyPrice(batchIds, price)
+      applied += batchIds.length
+    }
+    return { applied, noPcg, noDrc }
+  },
+
   /** Lấy chi tiết 1 lý lịch mủ */
   async getById(id: string): Promise<B2BRubberIntake | null> {
     const { data, error } = await supabase

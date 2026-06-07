@@ -124,6 +124,24 @@ export default function B2BRubberIntakePage() {
     return () => clearTimeout(t)
   }, [search])
 
+  // Tự áp giá từ Phiếu Chốt Giá (PCG) cho phiếu bộc phát chưa chốt — không phải nhập tay.
+  async function handleAutoPcgPrice() {
+    setApplying(true)
+    try {
+      const ids = selectedRowKeys.length ? selectedRowKeys : undefined
+      const r = await rubberIntakeB2BService.autoApplyPcgPrice(ids)
+      if (r.applied > 0) message.success(`Đã áp giá từ PCG cho ${r.applied} phiếu` + (r.noDrc ? ` · ${r.noDrc} phiếu mủ nước chờ DRC` : ''))
+      else if (r.noPcg > 0) message.warning(`Không có PCG khớp (đại lý + nhà máy + ngày). ${r.noDrc ? `${r.noDrc} phiếu chờ DRC.` : ''}`)
+      else message.info('Không có phiếu nào cần áp giá')
+      setSelectedRowKeys([])
+      fetchData()
+    } catch (e: any) {
+      message.error('Áp giá từ PCG thất bại: ' + (e?.message || e))
+    } finally {
+      setApplying(false)
+    }
+  }
+
   async function handleApplyPrice() {
     if (!applyPriceVal || applyPriceVal <= 0) { message.warning('Nhập đơn giá hợp lệ'); return }
     setApplying(true)
@@ -306,7 +324,13 @@ export default function B2BRubberIntakePage() {
           <Text type="secondary">Lý lịch mủ chi tiết — gộp B2B Thu mua + đa nhà máy</Text>
         </Col>
         <Col>
-          <Button icon={<ReloadOutlined spin={loading} />} onClick={fetchData}>Làm mới</Button>
+          <Space>
+            <Button type="primary" ghost loading={applying} onClick={handleAutoPcgPrice}
+              title="Tự lấy giá từ Phiếu Chốt Giá khớp đại lý + nhà máy + ngày (không phải nhập tay)">
+              💰 Áp giá từ PCG{selectedRowKeys.length ? ` (${selectedRowKeys.length})` : ''}
+            </Button>
+            <Button icon={<ReloadOutlined spin={loading} />} onClick={fetchData}>Làm mới</Button>
+          </Space>
         </Col>
       </Row>
 

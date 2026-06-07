@@ -846,10 +846,11 @@ export default function WeighingPage() {
         .update({ field_dot_reading: dotReading, qc_actual_drc: actualDrc, qc_drc_source: drcSource, consolidation_code: cc })
         .eq('id', ticket.id)
       if (e1) throw e1
-      // Đồng bộ sang lô nhập (planned_drc_percent = DRC; dry_weight_kg tự tính lại)
+      // Đồng bộ sang lô nhập: ghi drc_percent (cột THỰC, lái dry_weight_kg GENERATED +
+      // hiển thị list + áp giá). Trước đây ghi nhầm planned_drc_percent → list trống DRC/KL khô.
       await supabase
         .from('rubber_intake_batches')
-        .update({ field_dot_reading: dotReading, planned_drc_percent: actualDrc, consolidation_code: cc })
+        .update({ field_dot_reading: dotReading, drc_percent: actualDrc, consolidation_code: cc })
         .eq('weighbridge_ticket_id', ticket.id)
 
       const dry = actualDrc != null && ticket.net_weight ? ticket.net_weight * actualDrc / 100 : null

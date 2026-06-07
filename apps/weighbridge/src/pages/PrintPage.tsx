@@ -227,7 +227,7 @@ export default function PrintPage() {
             ${isThermal
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : paperSize === 'a5'
-                ? 'size: A5 landscape; margin: 5mm;'
+                ? 'size: 210mm 148mm; margin: 5mm;'  /* A5 NGANG (landscape) — kích thước tường minh, mọi browser/driver đều nhận (keyword "A5 landscape" hay bị bỏ qua → in dọc) */
                 : 'size: A4; margin: 6mm;'
             }
           }

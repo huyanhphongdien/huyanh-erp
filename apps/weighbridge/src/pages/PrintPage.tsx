@@ -118,14 +118,8 @@ export default function PrintPage() {
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
   const fmtDateTime = (d: string) => `${fmtDate(d)} ${fmtTime(d)}`
 
-  const qrData = JSON.stringify({
-    code: ticket.code,
-    plate: ticket.vehicle_plate,
-    gross: ticket.gross_weight,
-    tare: ticket.tare_weight,
-    net: ticket.net_weight,
-    date: ticket.created_at,
-  })
+  // QR trỏ Cổng Đại lý B2B — vừa quảng cáo vừa là kênh đăng nhập (thay JSON thô "chết" trước đây).
+  const qrData = 'https://b2b.huyanhrubber.vn'
 
   const l1Images = images.slice(0, 3)
   const l2Images = images.slice(3, 6)
@@ -292,7 +286,6 @@ export default function PrintPage() {
                 <div style={{ fontSize: fs - 2, color: '#4B5563', marginTop: 2 }}>Khe Mạ, Phường Phong Điền, TP Huế</div>
                 <div style={{ fontSize: fs - 2, color: '#4B5563' }}>MST: 3301549896</div>
               </div>
-              <QRCodeImg data={qrData} size={paperSize === 'a5' ? 80 : 84} />
             </div>
             <div style={{ textAlign: 'center', margin: paperSize === 'a5' ? '6px 0 8px' : '8px 0 8px' }}>
               <div style={{ fontSize: fs + 10, fontWeight: 800, letterSpacing: 1.5, color: '#111827' }}>PHIẾU CÂN XE</div>
@@ -532,6 +525,12 @@ export default function PrintPage() {
                 </tr>
               </tbody>
             </table>
+            {/* Quảng cáo B2B gọn cho phiếu nhiệt */}
+            <div style={{ borderTop: '1px dashed #ccc', marginTop: 3, paddingTop: 3, textAlign: 'center' }}>
+              <QRCodeImg data={qrData} size={46} />
+              <div style={{ fontSize: fs - 2, fontWeight: 700, marginTop: 1 }}>Cổng Đại lý Huy Anh</div>
+              <div style={{ fontSize: fs - 3, color: '#555' }}>Quét QR xem giá mủ &amp; công nợ · b2b.huyanhrubber.vn</div>
+            </div>
             <div style={{ textAlign: 'center', marginTop: 2, fontSize: fs - 3, color: '#bbb' }}>
               HA Phong Điền • {fmtTime(new Date().toISOString())}
             </div>
@@ -552,7 +551,16 @@ export default function PrintPage() {
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
             </div>
-            <div style={{ marginTop: 10, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
+            {/* ===== BANNER QUẢNG CÁO B2B — QR trỏ Cổng Đại lý ===== */}
+            <div style={{ marginTop: 10, border: '1px solid #1B4D3E', borderRadius: 6, background: '#F0F9F4', padding: paperSize === 'a5' ? '6px 10px' : '8px 12px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <QRCodeImg data={qrData} size={paperSize === 'a5' ? 58 : 66} />
+              <div style={{ flex: 1, color: '#1B4D3E', lineHeight: 1.5 }}>
+                <div style={{ fontWeight: 800, fontSize: fs }}>💰 Giá mủ công khai, cập nhật mỗi ngày — minh bạch tuyệt đối.</div>
+                <div style={{ fontSize: fs - 1 }}>Quét QR đăng nhập <b>Cổng Đại lý Huy Anh</b> <span style={{ color: '#4B5563' }}>(tài khoản do Huy Anh cấp)</span> — <b>b2b.huyanhrubber.vn</b></div>
+                <div style={{ fontSize: fs - 2, color: '#15803D' }}>Chưa có tài khoản? Liên hệ Huy Anh để được cấp.</div>
+              </div>
+            </div>
+            <div style={{ marginTop: 8, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
               Phiếu được in từ hệ thống Trạm Cân — Cao Su Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
               <div style={{ fontStyle: 'italic', marginTop: 2 }}>
                 Hỗ trợ kỹ thuật: Lê Duy Minh · 0901120167 · minhld@huyanhrubber.com

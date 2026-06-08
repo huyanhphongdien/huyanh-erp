@@ -80,7 +80,7 @@ export async function exportPaymentRequestExcel(
 
   const ccy = CCY_LABEL[req.currency] || 'VND'
   const numFmt = '#,##0'
-  const wFmt = '#,##0.0'   // số lượng (kg) — giữ 1 số lẻ như phiếu kế toán làm tay
+  const wFmt = '#,##0.00'  // số lượng (kg) — 2 số lẻ, lấy chính xác từ cân (không làm tròn)
   const d = new Date(req.request_date)
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')

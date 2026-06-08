@@ -179,19 +179,20 @@ function deriveSource(t: { deal_id?: string | null; supplier_id?: string | null 
   return 'manual'
 }
 
-/** Làm tròn đến nghìn (giống ROUND(x,-3) trên mẫu ĐNTT). */
-function roundThousand(n: number): number {
-  return Math.round((n || 0) / 1000) * 1000
+/** Tiền: tính tới ĐỒNG (làm tròn đơn vị đồng) — KHÔNG làm tròn nghìn để khỏi lệch. */
+function roundDong(n: number): number {
+  return Math.round(n || 0)
 }
 
-/** KL tính tiền: mủ nước (price_unit='dry') = cân tươi × DRC%; còn lại = cân tươi.
+/** KL tính tiền: mủ nước (price_unit='dry') = cân tươi × DRC%; còn lại = cân tươi (lấy thẳng từ cân).
+ *  Mủ nước: KHÔNG làm tròn về 1 số lẻ (gây lệch tiền) — giữ 2 số lẻ (kg, ~10g) cho sát thực tế.
  *  Khi price_unit='dry' nhưng thiếu DRC → trả 0 (cần kế toán nhập tay). */
 function billableWeight(net: number, priceUnit: string | null, drc: number | null): number {
   if (priceUnit === 'dry') {
     if (!drc || drc <= 0) return 0
-    return Math.round((net * drc) / 100 * 10) / 10
+    return Math.round((net * drc) / 100 * 100) / 100
   }
-  return net
+  return net   // mủ tạp/đông/... = KL cân thực, không làm tròn
 }
 
 /** Cảnh báo: price_unit='dry' nhưng không có DRC → không tính được KL khô → kế toán cần nhập tay. */
@@ -414,7 +415,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       payee_name: payee,
       payee_note: payeeNote,
       deal_number: r.deal_id ? dealNumbers.get(r.deal_id) || null : null,
-      suggested_amount: drcMissing ? 0 : roundThousand(bw * price),
+      suggested_amount: drcMissing ? 0 : roundDong(bw * price),
       price_source: drcMissing ? 'manual' : priceSource,
       price_source_ref: drcMissing ? null : priceRef,
       applied_pcg_id: drcMissing ? null : appliedPcgId,
@@ -516,7 +517,7 @@ function aggregatePcgFeeLines(lines: LineInput[], startSortOrder: number): {
       }
     }
     const totalFee = perTon * totalTons + perLot
-    const rounded = roundThousand(totalFee)
+    const rounded = roundDong(totalFee)
     if (rounded > 0) {
       feeLines.push({
         source_type: 'manual',

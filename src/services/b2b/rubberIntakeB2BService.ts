@@ -329,7 +329,7 @@ export const rubberIntakeB2BService = {
     for (const row of (data || []) as any[]) {
       const dry = row.dry_weight_kg ?? (row.drc_percent != null && row.net_weight_kg ? row.net_weight_kg * row.drc_percent / 100 : null)
       const billable = dry ?? row.net_weight_kg ?? 0
-      const total = Math.round(billable * pricePerKg / 1000) * 1000
+      const total = Math.round(billable * pricePerKg)   // tới ĐỒNG (không làm tròn nghìn → khỏi lệch)
       const patch: any = {
         unit_price: pricePerKg,
         settled_price_per_ton: pricePerKg * 1000,

@@ -196,9 +196,29 @@ export const priceLockService = {
     if (error) throw error
   },
 
+  /** XÓA HẲN — chỉ phiếu NHÁP (chưa chốt). Phiếu đã chốt/đã dùng → dùng cancel(). */
   async remove(id: string): Promise<void> {
-    const { error } = await supabase.from(TABLE).delete().eq('id', id)
-    if (error) throw error
+    const cur = await this.getById(id)
+    if (cur && cur.status !== 'draft') {
+      throw new Error('Chỉ xóa được phiếu NHÁP. Phiếu đã chốt → dùng "Huỷ".')
+    }
+    const { error } = await supabase.from(TABLE).delete().eq('id', id).eq('status', 'draft')
+    if (error) throw new Error(error.message)
+  },
+
+  /** HUỶ (mềm) — chuyển 'cancelled', giữ lịch sử. Chặn phiếu ĐÃ DÙNG (đã vào ĐNTT). */
+  async cancel(id: string): Promise<void> {
+    const cur = await this.getById(id)
+    if (!cur || cur.status === 'cancelled') return
+    if (cur.status === 'used') {
+      throw new Error('Phiếu ĐÃ DÙNG (đã gom vào đề nghị thanh toán) — không thể huỷ. Xử lý ở đề nghị thanh toán trước.')
+    }
+    const { error } = await supabase
+      .from(TABLE)
+      .update({ status: 'cancelled' })
+      .eq('id', id)
+      .in('status', ['draft', 'locked'])
+    if (error) throw new Error(error.message)
   },
 }
 

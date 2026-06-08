@@ -21,6 +21,7 @@ import {
   type PurchaseMethod,
   type PriceLockStatus,
 } from '../../../services/b2b/priceLockService'
+import { useAuthStore } from '../../../stores/authStore'
 
 /** Danh sách Người chốt giá (cố định). */
 const SIGNER_LOCKER_OPTIONS = ['Lê Thì', 'Nguyễn Nhật Tân']
@@ -61,6 +62,7 @@ function emptyForm(): PriceLockInput {
 export default function PriceLockFormPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
   const isEdit = !!id
 
   const [form, setForm] = useState<PriceLockInput>(emptyForm())
@@ -149,7 +151,7 @@ export default function PriceLockFormPage() {
       }
       const row = isEdit
         ? await priceLockService.update(id!, payload)
-        : await priceLockService.create(payload)
+        : await priceLockService.create({ ...payload, created_by: user?.id || null })
       navigate(thenPrint ? `/b2b/price-lock/${row.id}/print` : `/b2b/price-lock/${row.id}`)
     } catch (e: any) {
       alert('Lưu thất bại: ' + (e?.message || e))

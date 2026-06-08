@@ -3,9 +3,9 @@
 // Route: /b2b/price-lock
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Printer, FileSignature, Loader2 } from 'lucide-react'
+import { Plus, Search, Printer, FileSignature, Loader2, Trash2, XCircle } from 'lucide-react'
 import {
   priceLockService,
   PURCHASE_METHOD_LABELS,
@@ -13,6 +13,7 @@ import {
   type PriceLockTicket,
   type PriceLockStatus,
 } from '../../../services/b2b/priceLockService'
+import { useAuthStore } from '../../../stores/authStore'
 
 const STATUS_CLASS: Record<PriceLockStatus, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -25,10 +26,27 @@ const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString('vi-
 
 export default function PriceLockListPage() {
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
+  // Quyền quản lý PCG: admin / quản lý (trưởng thu mua). Người tạo được xóa NHÁP của mình.
+  const canManage = user?.role === 'admin' || user?.role === 'manager'
+  const canDeleteDraft = (r: PriceLockTicket) => canManage || (!!user?.id && r.created_by === user.id)
   const [rows, setRows] = useState<PriceLockTicket[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<PriceLockStatus | ''>('')
+
+  async function handleDelete(e: MouseEvent, r: PriceLockTicket) {
+    e.stopPropagation()
+    if (!confirm(`Xóa HẲN phiếu nháp ${r.code || ''}? Không khôi phục được.`)) return
+    try { await priceLockService.remove(r.id); load() }
+    catch (err: any) { alert('Xóa thất bại: ' + (err?.message || err)) }
+  }
+  async function handleCancel(e: MouseEvent, r: PriceLockTicket) {
+    e.stopPropagation()
+    if (!confirm(`Huỷ phiếu chốt giá ${r.code || ''}? Phiếu sẽ không dùng được nữa (giữ lịch sử).`)) return
+    try { await priceLockService.cancel(r.id); load() }
+    catch (err: any) { alert('Huỷ thất bại: ' + (err?.message || err)) }
+  }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -112,7 +130,7 @@ export default function PriceLockListPage() {
                   <th className="px-3 py-2.5 font-medium text-right">Tổng KL dự kiến (kg)</th>
                   <th className="px-3 py-2.5 font-medium text-right">Giá áp (đ/kg)</th>
                   <th className="px-3 py-2.5 font-medium text-center">Trạng thái</th>
-                  <th className="px-3 py-2.5 font-medium text-center">In</th>
+                  <th className="px-3 py-2.5 font-medium text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -141,7 +159,7 @@ export default function PriceLockListPage() {
                           {PRICE_LOCK_STATUS_LABELS[r.status]}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-center">
+                      <td className="px-3 py-2.5 text-center whitespace-nowrap">
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/b2b/price-lock/${r.id}/print`) }}
                           className="p-1.5 text-amber-600 hover:bg-amber-50 rounded"
@@ -149,6 +167,26 @@ export default function PriceLockListPage() {
                         >
                           <Printer size={16} />
                         </button>
+                        {/* NHÁP → Xóa hẳn (người tạo / admin / quản lý) */}
+                        {r.status === 'draft' && canDeleteDraft(r) && (
+                          <button
+                            onClick={(e) => handleDelete(e, r)}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                            title="Xóa phiếu nháp"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                        {/* ĐÃ CHỐT (chưa dùng) → Huỷ mềm (admin / quản lý) */}
+                        {r.status === 'locked' && canManage && (
+                          <button
+                            onClick={(e) => handleCancel(e, r)}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                            title="Huỷ phiếu chốt giá"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

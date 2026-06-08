@@ -10,6 +10,10 @@
 import { supabase } from '../../lib/supabase'
 import { partnerBankService } from '../b2b/partnerBankService'
 import { priceLockService, type PriceLockFee } from '../b2b/priceLockService'
+// Import TĨNH (không dynamic import) — markPaid là thao tác tiền, tránh lỗi "Failed to
+// fetch dynamically imported module" khi chunk cũ hết hạn sau deploy. ledgerService chỉ
+// phụ thuộc supabase → không vòng lặp.
+import { ledgerService } from '../b2b/ledgerService'
 
 export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled'
 export type PaymentLineSource = 'deal' | 'supplier' | 'manual'
@@ -863,8 +867,6 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
   }
 
   if (dealSums.size > 0 || manualSums.size > 0) {
-    const { ledgerService } = await import('../b2b/ledgerService')
-
     // Bộc phát: ghi DEBIT (giao mủ) trước, rồi CREDIT (chi tiền) — net = 0.
     for (const [partnerId, amount] of manualSums) {
       await ledgerService.createManualEntry({

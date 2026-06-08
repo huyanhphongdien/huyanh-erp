@@ -553,7 +553,6 @@ export default function PrintPage() {
             </div>
             {/* ===== BANNER QUẢNG CÁO B2B — chữ (QR đã ở header) ===== */}
             <div style={{ marginTop: 10, border: '1px solid #1B4D3E', borderRadius: 6, background: '#F0F9F4', padding: paperSize === 'a5' ? '6px 12px' : '8px 14px', color: '#1B4D3E', lineHeight: 1.5, textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: fs }}>💰 Giá mủ công khai, cập nhật mỗi ngày — minh bạch tuyệt đối.</div>
               <div style={{ fontSize: fs - 1 }}>Quét <b>mã QR phía trên</b> vào <b>Cổng Đại lý Huy Anh</b> để xem giá mủ &amp; tra cứu công nợ — <b>b2b.huyanhrubber.vn</b></div>
               <div style={{ fontSize: fs - 2, color: '#15803D' }}>Tài khoản do Huy Anh cấp — chưa có, vui lòng liên hệ Huy Anh để được cấp.</div>
             </div>

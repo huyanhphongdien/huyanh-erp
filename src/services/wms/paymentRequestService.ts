@@ -41,6 +41,9 @@ export interface PaymentRequest {
   created_at: string
   updated_at: string
   facility?: { id: string; code: string; name: string } | null
+  // Computed (không lưu DB): tổng đã LÀM TRÒN nghìn theo TỪNG DÒNG = số thực chi.
+  // total_amount giữ tổng chính xác; total_rounded = số hiển thị ngoài list + chứng từ.
+  total_rounded?: number
 }
 
 export interface PaymentRequestLine {
@@ -653,7 +656,8 @@ async function list(params: {
 } = {}): Promise<PaymentRequest[]> {
   let q = supabase
     .from('payment_requests')
-    .select(REQUEST_SELECT)
+    // Kèm amount các dòng để tính tổng ĐÃ LÀM TRÒN (số thực chi) hiển thị ngoài list.
+    .select(`${REQUEST_SELECT}, payment_request_lines(amount)`)
     .order('created_at', { ascending: false })
     .limit(params.limit ?? 100)
 
@@ -665,7 +669,12 @@ async function list(params: {
 
   const { data, error } = await q
   if (error) throw error
-  return (data || []).map(normalizeRequest)
+  return (data || []).map((row: any) => {
+    const lineRows = (row.payment_request_lines || []) as Array<{ amount: number | null }>
+    const total_rounded = lineRows.reduce((s, l) => s + roundThousand(l.amount || 0), 0)
+    const { payment_request_lines, ...rest } = row
+    return { ...normalizeRequest(rest), total_rounded }
+  })
 }
 
 async function getById(id: string): Promise<{ request: PaymentRequest; lines: PaymentRequestLine[] } | null> {

@@ -52,7 +52,8 @@ const PaymentRequestListPage: React.FC = () => {
 
   useEffect(() => { load() }, [load])
 
-  const totalAmount = rows.reduce((s, r) => s + r.total_amount, 0)
+  // Hiển thị theo số ĐÃ LÀM TRÒN (số thực chi) — khớp chứng từ in/excel + markPaid.
+  const totalAmount = rows.reduce((s, r) => s + (r.total_rounded ?? r.total_amount), 0)
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -136,7 +137,7 @@ const PaymentRequestListPage: React.FC = () => {
                   <span>{r.line_count} dòng</span>
                 </div>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[16px] font-bold text-emerald-600 font-mono">{fmtVnd(r.total_amount)}</span>
+                  <span className="text-[16px] font-bold text-emerald-600 font-mono">{fmtVnd(r.total_rounded ?? r.total_amount)}</span>
                   <ChevronRight className="w-4 h-4 text-gray-300" />
                 </div>
               </button>

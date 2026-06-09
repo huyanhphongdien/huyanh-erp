@@ -1,8 +1,8 @@
 // ============================================================================
 // FILE: src/pages/wms/rubber-intake/PaymentRequestPrintPage.tsx
 // MODULE: WMS / Nhập kho mủ — In Đề nghị thanh toán (ĐỢT 1)
-// 1 trang A4: header công ty + bảng nhiều dòng + số tiền bằng chữ + 4 chữ ký
-// (Người đề nghị · Người lập phiếu · Kế toán · Giám đốc).
+// 1 trang A4: header công ty + bảng nhiều dòng + số tiền bằng chữ + 3 chữ ký
+// (Người đề nghị · Kế toán trưởng · Giám đốc) — khớp file Excel.
 // ============================================================================
 
 import { useState, useEffect } from 'react'
@@ -235,11 +235,7 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
           <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, marginBottom: 52 }}>Người lập phiếu</div>
-          <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, marginBottom: 52 }}>Kế toán</div>
+          <div style={{ fontWeight: 700, marginBottom: 52 }}>Kế toán trưởng</div>
           <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
         </div>
         <div style={{ flex: 1 }}>

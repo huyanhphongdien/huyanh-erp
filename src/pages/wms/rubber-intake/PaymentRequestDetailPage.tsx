@@ -323,7 +323,7 @@ const PaymentRequestDetailPage: React.FC = () => {
                             className="w-full px-2 py-1 rounded-md border border-gray-200 text-[12.5px] text-right font-mono"
                           />
                         ) : (
-                          <span className="font-mono">{(l.weight || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}</span>
+                          <span className="font-mono">{(l.weight || 0).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         )}
                       </td>
                       {/* Đơn giá */}
@@ -369,7 +369,7 @@ const PaymentRequestDetailPage: React.FC = () => {
                 {/* Dòng TỔNG CỘNG */}
                 <tr className="border-t-2 border-gray-200 bg-emerald-50/50 font-semibold">
                   <td colSpan={3} className="px-2 py-2.5 text-right text-gray-600 text-[12px]">TỔNG CỘNG</td>
-                  <td className="px-2 py-2.5 text-right font-mono">{liveTotalWeight.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}</td>
+                  <td className="px-2 py-2.5 text-right font-mono">{liveTotalWeight.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td />
                   <td className="px-2 py-2.5 text-right font-mono text-[13px] text-emerald-700">{fmtCur(liveTotalAmount, req.currency)}</td>
                   {editable && <td />}

@@ -21,6 +21,9 @@ const RUBBER_LABELS: Record<string, string> = {
 const CCY_SUFFIX: Record<string, string> = { VND: 'đồng', KIP: 'kíp', THB: 'baht' }
 
 const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString('vi-VN') : '—')
+// Khối lượng (kg): LUÔN 2 số lẻ, không làm tròn bớt — tránh lệch số khi ra thanh toán.
+const fmtKg = (n: number | null | undefined) =>
+  n != null ? n.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'
 
 // ── Đọc số tiền bằng chữ (tiếng Việt) ──────────────────────────────────────
 function readVietnameseNumber(num: number): string {
@@ -198,7 +201,7 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
                 <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
                 <td style={td}>{noiDung}</td>
                 <td style={{ ...td, textAlign: 'center' }}>kg</td>
-                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.weight)}</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmtKg(l.weight)}</td>
                 <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.unit_price)}</td>
                 <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmt(l.amount)}</td>
                 <td style={td}>{ghiChu || '—'}</td>
@@ -211,7 +214,7 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
           {/* Total */}
           <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
             <td style={{ ...td, textAlign: 'right' }} colSpan={3}>TỔNG CỘNG</td>
-            <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(totalWeight)}</td>
+            <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmtKg(totalWeight)}</td>
             <td style={td}></td>
             <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E', fontSize: 13 }}>{fmt(totalAmount)}</td>
             <td style={td}></td>

@@ -108,8 +108,15 @@ export default function PaymentRequestPrintPage() {
       <style>{`
         .print-only { display: none; }
         @media print {
+          /* Ẩn TOÀN BỘ app shell (thanh tab workspace + header) — chỉ in tài liệu.
+             no-print của riêng trang không đủ vì tab/header là DOM cha. */
+          body * { visibility: hidden !important; }
           .no-print { display: none !important; }
-          .print-only { display: block !important; }
+          .print-only, .print-only * { visibility: visible !important; }
+          .print-only {
+            display: block !important;
+            position: absolute !important; left: 0; top: 0; width: 100%;
+          }
           html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
           @page { size: A4; margin: 12mm; }
         }

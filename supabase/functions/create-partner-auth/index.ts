@@ -119,7 +119,8 @@ serve(async (req) => {
       email: authEmail,
       password: tempPassword,
       email_confirm: true,
-      phone: cleanPhone,
+      // KHÔNG set phone trên auth user: đăng nhập bằng email ẩn, không cần phone-provider.
+      // (Set phone khi provider chưa bật → createUser lỗi.) SĐT đã lưu ở b2b.partners + metadata.
       user_metadata: {
         must_change_password: true,
         partner_id: partner.id,

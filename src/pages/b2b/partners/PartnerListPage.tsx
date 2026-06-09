@@ -230,7 +230,16 @@ const PartnerListPage = () => {
   /** Cấp 1 tài khoản — gọi edge function create-partner-auth. Trả creds hoặc null nếu lỗi. */
   async function provisionOne(p: Partner): Promise<{ email: string; password: string } | null> {
     const { data, error } = await supabase.functions.invoke('create-partner-auth', { body: { partner_id: p.id } })
-    if (error) throw new Error(error.message)
+    if (error) {
+      // FunctionsHttpError: lý do thật nằm trong body response (error.context), không phải error.message
+      let msg = error.message
+      try {
+        const ctx = (error as any).context
+        const body = ctx && typeof ctx.json === 'function' ? await ctx.json() : null
+        if (body?.error) msg = body.error
+      } catch { /* ignore */ }
+      throw new Error(msg)
+    }
     if (!data?.ok) throw new Error(data?.error || 'Tạo tài khoản thất bại')
     setAccountIds(prev => new Set(prev).add(p.id))
     return { email: data.email, password: data.temp_password }

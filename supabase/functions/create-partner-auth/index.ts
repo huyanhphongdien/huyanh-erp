@@ -88,9 +88,18 @@ serve(async (req) => {
       })
     }
 
-    if (partner.status !== 'pending') {
-      return new Response(JSON.stringify({ ok: false, error: `Partner đã ở trạng thái ${partner.status}, không thể duyệt lại` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400,
+    // KHÔNG chặn theo status='pending' nữa — cấp được cho cả đại lý đã 'verified'
+    // (tạo bằng SQL/admin) chưa có login. Chỉ chặn nếu ĐÃ có tài khoản (partner_users link).
+    const { data: existingPu } = await sb
+      .schema('b2b')
+      .from('partner_users')
+      .select('id')
+      .eq('partner_id', partner.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (existingPu) {
+      return new Response(JSON.stringify({ ok: false, error: 'Đại lý này đã có tài khoản đăng nhập.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 409,
       })
     }
 
@@ -116,7 +125,7 @@ serve(async (req) => {
         partner_id: partner.id,
         partner_code: partner.code,
         partner_name: partner.name,
-        created_via: 'partner-self-register',
+        created_via: 'admin-provision',
       },
     })
 

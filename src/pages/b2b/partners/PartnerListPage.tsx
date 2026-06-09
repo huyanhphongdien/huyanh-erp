@@ -27,6 +27,7 @@ import {
   Pagination,
   Statistic,
   Table,
+  Modal,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -40,6 +41,8 @@ import {
   PlusOutlined,
   FilterOutlined,
   EditOutlined,
+  KeyOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import {
   partnerService,
@@ -55,6 +58,7 @@ import {
 } from '../../../services/b2b/partnerService'
 import { chatRoomService } from '../../../services/b2b/chatRoomService'
 import { useAuthStore } from '../../../stores/authStore'
+import { supabase } from '../../../lib/supabase'
 import PartnerCreateModal from './PartnerCreateModal'
 import PartnerEditModal from './PartnerEditModal'
 
@@ -215,8 +219,57 @@ const PartnerListPage = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editPartner, setEditPartner] = useState<Partner | null>(null)
+  // Cấp tài khoản đăng nhập B2B
+  const [accountIds, setAccountIds] = useState<Set<string>>(new Set())
+  const [provisioning, setProvisioning] = useState<string | null>(null)  // partner id hoặc 'bulk'
+  const [cred, setCred] = useState<{ name: string; email: string; password: string } | null>(null)
+  const [bulkText, setBulkText] = useState<string | null>(null)
   // Chỉ admin được tạo / sửa đại lý (1 đầu mối, tránh trùng)
   const isAdmin = user?.role === 'admin'
+
+  /** Cấp 1 tài khoản — gọi edge function create-partner-auth. Trả creds hoặc null nếu lỗi. */
+  async function provisionOne(p: Partner): Promise<{ email: string; password: string } | null> {
+    const { data, error } = await supabase.functions.invoke('create-partner-auth', { body: { partner_id: p.id } })
+    if (error) throw new Error(error.message)
+    if (!data?.ok) throw new Error(data?.error || 'Tạo tài khoản thất bại')
+    setAccountIds(prev => new Set(prev).add(p.id))
+    return { email: data.email, password: data.temp_password }
+  }
+
+  async function handleProvision(p: Partner) {
+    if (!p.phone) { message.warning(`${p.name} chưa có SĐT — bổ sung SĐT trước khi cấp tài khoản`); return }
+    setProvisioning(p.id)
+    try {
+      const r = await provisionOne(p)
+      if (r) setCred({ name: p.name, email: r.email, password: r.password })
+      message.success(`Đã cấp tài khoản cho ${p.name}`)
+    } catch (e: any) {
+      message.error('Cấp tài khoản thất bại: ' + (e?.message || e))
+    } finally { setProvisioning(null) }
+  }
+
+  async function handleProvisionAll() {
+    const targets = partners.filter(p => !accountIds.has(p.id) && p.phone)
+    const noPhone = partners.filter(p => !accountIds.has(p.id) && !p.phone)
+    if (targets.length === 0) {
+      message.info(noPhone.length ? `Các đại lý chưa có TK đều thiếu SĐT (${noPhone.length}) — bổ sung SĐT trước` : 'Mọi đại lý (trang này) đã có tài khoản')
+      return
+    }
+    if (!window.confirm(`Cấp tài khoản cho ${targets.length} đại lý chưa có account (trang này)?` + (noPhone.length ? `\n${noPhone.length} đại lý thiếu SĐT sẽ bỏ qua.` : ''))) return
+    setProvisioning('bulk')
+    const lines: string[] = []
+    let ok = 0
+    for (const p of targets) {
+      try {
+        const r = await provisionOne(p)
+        if (r) { lines.push(`${p.name}\n  Tài khoản: ${r.email}\n  Mật khẩu: ${r.password}`); ok++ }
+      } catch (e: any) { lines.push(`${p.name} — LỖI: ${e?.message || e}`) }
+    }
+    for (const p of noPhone) lines.push(`${p.name} — BỎ QUA (thiếu SĐT)`)
+    setProvisioning(null)
+    setBulkText(lines.join('\n\n'))
+    message.success(`Đã cấp ${ok}/${targets.length} tài khoản`)
+  }
 
   // ============================================
   // DATA FETCHING
@@ -257,6 +310,15 @@ const PartnerListPage = () => {
 
       setPartners(partnersWithStats)
       setTotal(response.total)
+
+      // Đại lý nào đã có tài khoản đăng nhập (b2b_partner_users)
+      const ids = partnersWithStats.map(p => p.id)
+      if (ids.length) {
+        const { data: pu } = await supabase.from('b2b_partner_users').select('partner_id').in('partner_id', ids)
+        setAccountIds(new Set((pu || []).map((x: any) => x.partner_id)))
+      } else {
+        setAccountIds(new Set())
+      }
     } catch (error) {
       console.error('Error fetching partners:', error)
       message.error('Không thể tải danh sách đại lý')
@@ -335,6 +397,11 @@ const PartnerListPage = () => {
               <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
                 Làm mới
               </Button>
+              {isAdmin && (
+                <Button icon={<KeyOutlined />} loading={provisioning === 'bulk'} onClick={handleProvisionAll}>
+                  Cấp TK hàng loạt
+                </Button>
+              )}
               {isAdmin && (
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateModal(true)}>
                   Thêm Đại lý
@@ -456,6 +523,18 @@ const PartnerListPage = () => {
                       <Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditPartner(r)} />
                     </Tooltip>
                   )}
+                  {isAdmin && (
+                    accountIds.has(r.id) ? (
+                      <Tooltip title="Đã có tài khoản đăng nhập B2B">
+                        <CheckCircleOutlined style={{ color: '#16a34a', padding: '0 4px' }} />
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title={r.phone ? 'Cấp tài khoản đăng nhập B2B' : 'Chưa có SĐT — bổ sung trước khi cấp'}>
+                        <Button type="text" size="small" icon={<KeyOutlined />} disabled={!r.phone}
+                          loading={provisioning === r.id} onClick={() => handleProvision(r)} />
+                      </Tooltip>
+                    )
+                  )}
                 </Space>
               ),
             },
@@ -475,6 +554,46 @@ const PartnerListPage = () => {
         onClose={() => setEditPartner(null)}
         onSaved={fetchPartners}
       />
+
+      {/* Credentials — 1 đại lý */}
+      <Modal
+        open={!!cred}
+        onCancel={() => setCred(null)}
+        title="Tài khoản đăng nhập B2B đã cấp"
+        footer={[
+          <Button key="copy" type="primary" onClick={() => {
+            navigator.clipboard.writeText(`Cổng đại lý: https://b2b.huyanhrubber.vn\nTài khoản: ${cred?.email}\nMật khẩu tạm: ${cred?.password}\n(Đăng nhập lần đầu sẽ yêu cầu đổi mật khẩu)`)
+            message.success('Đã copy — gửi Zalo cho đại lý')
+          }}>Copy gửi Zalo</Button>,
+          <Button key="close" onClick={() => setCred(null)}>Đóng</Button>,
+        ]}
+      >
+        {cred && (
+          <div style={{ fontSize: 14, lineHeight: 2 }}>
+            <div><Text type="secondary">Đại lý:</Text> <Text strong>{cred.name}</Text></div>
+            <div><Text type="secondary">Tài khoản:</Text> <Text strong copyable>{cred.email}</Text></div>
+            <div><Text type="secondary">Mật khẩu tạm:</Text> <Text strong copyable style={{ fontFamily: 'monospace' }}>{cred.password}</Text></div>
+            <div style={{ marginTop: 8, color: '#b45309', fontSize: 12 }}>Đăng nhập lần đầu tại <b>b2b.huyanhrubber.vn</b> sẽ buộc đổi mật khẩu.</div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Credentials — hàng loạt */}
+      <Modal
+        open={!!bulkText}
+        onCancel={() => setBulkText(null)}
+        title="Tài khoản đã cấp (hàng loạt)"
+        width={560}
+        footer={[
+          <Button key="copy" type="primary" onClick={() => {
+            navigator.clipboard.writeText(`Cổng đại lý: https://b2b.huyanhrubber.vn\n(Đăng nhập lần đầu sẽ yêu cầu đổi mật khẩu)\n\n${bulkText}`)
+            message.success('Đã copy toàn bộ')
+          }}>Copy tất cả</Button>,
+          <Button key="close" onClick={() => setBulkText(null)}>Đóng</Button>,
+        ]}
+      >
+        <Input.TextArea value={bulkText || ''} readOnly autoSize={{ minRows: 8, maxRows: 18 }} style={{ fontFamily: 'monospace', fontSize: 12 }} />
+      </Modal>
     </div>
   )
 }

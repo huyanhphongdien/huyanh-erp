@@ -222,7 +222,7 @@ const PartnerListPage = () => {
   // Cấp tài khoản đăng nhập B2B
   const [accountIds, setAccountIds] = useState<Set<string>>(new Set())
   const [provisioning, setProvisioning] = useState<string | null>(null)  // partner id hoặc 'bulk'
-  const [cred, setCred] = useState<{ name: string; email: string; password: string } | null>(null)
+  const [cred, setCred] = useState<{ name: string; phone: string; password: string } | null>(null)
   const [bulkText, setBulkText] = useState<string | null>(null)
   // Chỉ admin được tạo / sửa đại lý (1 đầu mối, tránh trùng)
   const isAdmin = user?.role === 'admin'
@@ -250,7 +250,7 @@ const PartnerListPage = () => {
     setProvisioning(p.id)
     try {
       const r = await provisionOne(p)
-      if (r) setCred({ name: p.name, email: r.email, password: r.password })
+      if (r) setCred({ name: p.name, phone: p.phone || '', password: r.password })
       message.success(`Đã cấp tài khoản cho ${p.name}`)
     } catch (e: any) {
       message.error('Cấp tài khoản thất bại: ' + (e?.message || e))
@@ -271,7 +271,7 @@ const PartnerListPage = () => {
     for (const p of targets) {
       try {
         const r = await provisionOne(p)
-        if (r) { lines.push(`${p.name}\n  Tài khoản: ${r.email}\n  Mật khẩu: ${r.password}`); ok++ }
+        if (r) { lines.push(`${p.name}\n  SĐT đăng nhập: ${p.phone || ''}\n  Mật khẩu tạm: ${r.password}`); ok++ }
       } catch (e: any) { lines.push(`${p.name} — LỖI: ${e?.message || e}`) }
     }
     for (const p of noPhone) lines.push(`${p.name} — BỎ QUA (thiếu SĐT)`)
@@ -571,7 +571,15 @@ const PartnerListPage = () => {
         title="Tài khoản đăng nhập B2B đã cấp"
         footer={[
           <Button key="copy" type="primary" onClick={() => {
-            navigator.clipboard.writeText(`Cổng đại lý: https://b2b.huyanhrubber.vn\nTài khoản: ${cred?.email}\nMật khẩu tạm: ${cred?.password}\n(Đăng nhập lần đầu sẽ yêu cầu đổi mật khẩu)`)
+            navigator.clipboard.writeText(
+              `HUY ANH — Cổng Đại lý\n` +
+              `Kính gửi anh/chị ${cred?.name},\n` +
+              `Huy Anh gửi anh/chị tài khoản truy cập Cổng Đại lý:\n` +
+              `• Trang đăng nhập: https://b2b.huyanhrubber.vn\n` +
+              `• Đăng nhập bằng Số điện thoại: ${cred?.phone}\n` +
+              `• Mật khẩu tạm: ${cred?.password}\n` +
+              `(Lần đầu đăng nhập hệ thống sẽ yêu cầu đổi mật khẩu mới.)`
+            )
             message.success('Đã copy — gửi Zalo cho đại lý')
           }}>Copy gửi Zalo</Button>,
           <Button key="close" onClick={() => setCred(null)}>Đóng</Button>,
@@ -580,9 +588,10 @@ const PartnerListPage = () => {
         {cred && (
           <div style={{ fontSize: 14, lineHeight: 2 }}>
             <div><Text type="secondary">Đại lý:</Text> <Text strong>{cred.name}</Text></div>
-            <div><Text type="secondary">Tài khoản:</Text> <Text strong copyable>{cred.email}</Text></div>
+            <div><Text type="secondary">Trang đăng nhập:</Text> <Text strong copyable>https://b2b.huyanhrubber.vn</Text></div>
+            <div><Text type="secondary">Đăng nhập bằng SĐT:</Text> <Text strong copyable style={{ fontFamily: 'monospace' }}>{cred.phone}</Text></div>
             <div><Text type="secondary">Mật khẩu tạm:</Text> <Text strong copyable style={{ fontFamily: 'monospace' }}>{cred.password}</Text></div>
-            <div style={{ marginTop: 8, color: '#b45309', fontSize: 12 }}>Đăng nhập lần đầu tại <b>b2b.huyanhrubber.vn</b> sẽ buộc đổi mật khẩu.</div>
+            <div style={{ marginTop: 8, color: '#b45309', fontSize: 12 }}>Đăng nhập lần đầu sẽ <b>buộc đổi mật khẩu</b>.</div>
           </div>
         )}
       </Modal>
@@ -595,7 +604,7 @@ const PartnerListPage = () => {
         width={560}
         footer={[
           <Button key="copy" type="primary" onClick={() => {
-            navigator.clipboard.writeText(`Cổng đại lý: https://b2b.huyanhrubber.vn\n(Đăng nhập lần đầu sẽ yêu cầu đổi mật khẩu)\n\n${bulkText}`)
+            navigator.clipboard.writeText(`HUY ANH — Cổng Đại lý: https://b2b.huyanhrubber.vn\nĐăng nhập bằng SĐT + mật khẩu tạm dưới đây (lần đầu sẽ yêu cầu đổi mật khẩu).\n\n${bulkText}`)
             message.success('Đã copy toàn bộ')
           }}>Copy tất cả</Button>,
           <Button key="close" onClick={() => setBulkText(null)}>Đóng</Button>,

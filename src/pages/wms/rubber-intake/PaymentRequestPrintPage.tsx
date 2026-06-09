@@ -116,9 +116,12 @@ export default function PaymentRequestPrintPage() {
           .print-only {
             display: block !important;
             position: absolute !important; left: 0; top: 0; width: 100%;
+            padding: 12mm !important; box-sizing: border-box;
           }
           html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
-          @page { size: A4; margin: 12mm; }
+          /* margin:0 → trình duyệt KHÔNG in header/footer (ngày giờ, tiêu đề, URL,
+             số trang). Lề tài liệu trả lại bằng padding của .print-only ở trên. */
+          @page { size: A4; margin: 0; }
         }
       `}</style>
     </div>

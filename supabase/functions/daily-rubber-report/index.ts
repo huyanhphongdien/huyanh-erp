@@ -138,10 +138,14 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const repEnd = isToday ? new Date().toISOString() : new Date(vnMidnightUTC).toISOString()
   const prevStart = new Date(isToday ? vnMidnightUTC - DAY : vnMidnightUTC - 2 * DAY).toISOString()
   const prevEnd = isToday ? new Date(Date.now() - DAY).toISOString() : repStart
+  // LŨY KẾ THÁNG: 01/MM 00:00 (giờ VN) → hết kỳ báo cáo (repEnd).
+  const monthStartUTC = Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), 1) - VN_OFFSET
+  const monthStart = new Date(monthStartUTC).toISOString()
 
-  const [today, yesterday] = await Promise.all([
+  const [today, yesterday, month] = await Promise.all([
     fetchIN(supabase, repStart, repEnd),
     fetchIN(supabase, prevStart, prevEnd),
+    fetchIN(supabase, monthStart, repEnd),
   ])
 
   // DRC trung bình theo loại (từ phiếu có DRC) — để ước KL khô cho phiếu thiếu DRC
@@ -192,8 +196,8 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   }
   const types = [...typeMap.entries()].map(([k, v]) => ({ key: k, tuoi: v })).sort((a, b) => b.tuoi - a.tuoi)
 
-  // Top đại lý (cần tên: supplier_name hoặc tra b2b_partners)
-  const partnerIds = [...new Set(today.map((t) => t.partner_id).filter(Boolean))] as string[]
+  // Top đại lý (cần tên: supplier_name hoặc tra b2b_partners) — gộp id của ngày + lũy kế tháng
+  const partnerIds = [...new Set([...today, ...month].map((t) => t.partner_id).filter(Boolean))] as string[]
   const nameById = new Map<string, string>()
   if (partnerIds.length) {
     const { data: ps } = await supabase.from('b2b_partners').select('id, name').in('id', partnerIds)
@@ -226,6 +230,25 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
     .map((x) => ({ ...x, drc: x.tuoi ? x.drcW / x.tuoi : 0 }))
     .sort((a, b) => b.tuoi - a.tuoi)
 
+  // ── LŨY KẾ TỪ ĐẦU THÁNG (01/MM → hết kỳ báo cáo) ──
+  const mTuoi = sumTuoi(month)
+  const mKho = sumKho(month)
+  const mDrcTB = mTuoi > 0 ? (mKho / mTuoi) * 100 : 0
+  const mDealerMap = new Map<string, { name: string; fac: string; type: string; tuoi: number }>()
+  for (const t of month) {
+    const name = t.supplier_name || (t.partner_id ? nameById.get(t.partner_id) : '') || 'Không rõ'
+    const cur = mDealerMap.get(name) || { name, fac: facCode(t).code, type: t.rubber_type || '', tuoi: 0 }
+    cur.tuoi += t.net_weight || 0
+    mDealerMap.set(name, cur)
+  }
+  const mTopDealers = [...mDealerMap.values()].sort((a, b) => b.tuoi - a.tuoi).slice(0, 5)
+  const mLabelStart = `01/${String(vnNow.getUTCMonth() + 1).padStart(2, '0')}`
+  const monthAgg = {
+    label: `${mLabelStart} → ${String((isToday ? vnNow.getUTCDate() : new Date(vnMidnightUTC - DAY + VN_OFFSET).getUTCDate())).padStart(2, '0')}/${String(vnNow.getUTCMonth() + 1).padStart(2, '0')}`,
+    tuoi: mTuoi, kho: mKho, drcTB: mDrcTB,
+    xeCount: month.length, dealerCount: mDealerMap.size, topDealers: mTopDealers,
+  }
+
   // Cảnh báo thiếu DRC
   const missing = today.filter((t) => (t.qc_actual_drc == null || t.qc_actual_drc <= 0) && (t.net_weight || 0) > 0)
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
@@ -241,6 +264,7 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
     totalTuoi, totalKho, yTuoi, pct, drcTB,
     xeCount: today.length, dealerCount,
     facilities, types, topDealers, dealerDetail,
+    monthAgg,
     missingCount: missing.length, missingKg,
     empty: today.length === 0,
   }
@@ -308,6 +332,63 @@ function renderHtml(d: any): string {
     </tr>`
   }).join('')
 
+  // ── Lũy kế từ đầu tháng ──
+  const m = d.monthAgg || { label: '', tuoi: 0, kho: 0, drcTB: 0, xeCount: 0, dealerCount: 0, topDealers: [] }
+  const mDealerRows = (m.topDealers || []).map((p: any, i: number) => {
+    const rb = (RUBBER as any)[(p.type || '').split(',')[0]] || null
+    return `
+    <tr style="border-top:1px solid #eef1f0;${i % 2 ? 'background:#fafcfb;' : ''}">
+      <td style="padding:7px 10px;color:#94a3b8;">${i + 1}</td>
+      <td style="padding:7px 10px;font-weight:600;">${esc(p.name)}</td>
+      <td align="center" style="padding:7px 10px;">${esc(p.fac)}</td>
+      <td style="padding:7px 10px;">${rb ? rb.label : '—'}</td>
+      <td align="right" style="padding:7px 10px;font-weight:700;color:#1B4D3E;">${fmtT(p.tuoi)}</td>
+    </tr>`
+  }).join('')
+  const monthHtml = `
+    <tr><td style="padding:18px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">📅 Lũy kế từ đầu tháng <span style="color:#64748b;font-weight:600;font-size:13px;">(${esc(m.label)})</span></div></td></tr>
+    <tr><td style="padding:8px 18px 4px 18px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td width="33.33%" style="padding:6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F0F9F4;border:1px solid #cde8d8;border-radius:10px;"><tr><td style="padding:12px;">
+              <div style="font-size:11px;color:#15803d;font-weight:600;">MỦ TƯƠI THÁNG</div>
+              <div style="font-size:24px;font-weight:800;color:#1B4D3E;margin-top:2px;">${fmtT(m.tuoi)} <span style="font-size:13px;font-weight:600;">t</span></div>
+            </td></tr></table>
+          </td>
+          <td width="33.33%" style="padding:6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8EC;border:1px solid #f3e1bd;border-radius:10px;"><tr><td style="padding:12px;">
+              <div style="font-size:11px;color:#B45309;font-weight:600;">KL KHÔ THÁNG</div>
+              <div style="font-size:24px;font-weight:800;color:#92400E;margin-top:2px;">${fmtT(m.kho)} <span style="font-size:13px;font-weight:600;">t</span></div>
+              <div style="font-size:11px;color:#B45309;margin-top:2px;">DRC TB ${fmt1(m.drcTB)}%</div>
+            </td></tr></table>
+          </td>
+          <td width="33.33%" style="padding:6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F7FA;border:1px solid #e2e8f0;border-radius:10px;"><tr><td style="padding:12px;">
+              <div style="font-size:11px;color:#475569;font-weight:600;">CHUYẾN · ĐẠI LÝ</div>
+              <div style="font-size:24px;font-weight:800;color:#1f2937;margin-top:2px;">${m.xeCount} <span style="font-size:13px;font-weight:600;">xe</span></div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">${m.dealerCount} đại lý</div>
+            </td></tr></table>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+    ${(m.topDealers && m.topDealers.length) ? `
+    <tr><td style="padding:6px 24px 8px 24px;">
+      <div style="font-size:12px;color:#475569;font-weight:600;margin-bottom:4px;">🏆 Top đại lý lũy kế tháng</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+        <tr style="color:#64748b;font-size:12px;">
+          <th align="left" style="padding:6px 10px;font-weight:600;">#</th>
+          <th align="left" style="padding:6px 10px;font-weight:600;">Đại lý</th>
+          <th align="center" style="padding:6px 10px;font-weight:600;">NM</th>
+          <th align="left" style="padding:6px 10px;font-weight:600;">Loại</th>
+          <th align="right" style="padding:6px 10px;font-weight:600;">Mủ tươi (t)</th>
+        </tr>
+        ${mDealerRows}
+      </table>
+      ${m.dealerCount > 5 ? `<div style="font-size:11px;color:#94a3b8;padding:6px 10px 0;">…và ${m.dealerCount - 5} đại lý khác.</div>` : ''}
+    </td></tr>` : ''}`
+
   const warnHtml = d.missingCount > 0 ? `
     <tr><td style="padding:10px 24px 4px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF7E6;border:1px solid #FFE08A;border-radius:8px;">
@@ -322,7 +403,7 @@ function renderHtml(d: any): string {
       Không có phiếu cân NHẬP hoàn tất nào trong ngày ${d.dateLabel}.
     </td></tr>` : ''
 
-  const body = d.empty ? emptyHtml : `
+  const body = d.empty ? `${emptyHtml}${monthHtml}` : `
     <!-- KPI -->
     <tr><td style="padding:18px 18px 4px 18px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -360,6 +441,7 @@ function renderHtml(d: any): string {
         </tr>
       </table>
     </td></tr>
+    ${monthHtml}
 
     <!-- Theo nhà máy -->
     <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">🏭 Theo nhà máy</div></td></tr>
@@ -453,6 +535,7 @@ function renderHtml(d: any): string {
             ? `Báo cáo tự động lúc <b>18:00 mỗi ngày</b> cho NGÀY HÔM NAY, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
             : `Báo cáo cho NGÀY HÔM TRƯỚC, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
           Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN. KL khô = KL tươi × DRC.<br>
+          Khối <b>Lũy kế từ đầu tháng</b> = cộng dồn từ ngày 01 đến hết kỳ báo cáo.<br>
           Mủ chưa có DRC được tạm tính theo DRC trung bình cùng loại.
         </div>
       </td></tr>

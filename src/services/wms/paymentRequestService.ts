@@ -188,6 +188,16 @@ function roundDong(n: number): number {
   return Math.round(n || 0)
 }
 
+/**
+ * SỐ THỰC CHI = làm tròn đến NGHÌN (phần lẻ ≥ 500 → lên 1.000, < 500 → về 000).
+ * "Thành tiền" giữ chính xác (weight×giá) để minh bạch; tiền CHI THỰC TẾ + ghi sổ
+ * công nợ dùng số đã làm tròn này (theo yêu cầu kế toán). Làm tròn THEO TỪNG DÒNG
+ * để khớp đúng cột "Làm tròn" hiển thị cho người dùng.
+ */
+function roundThousand(n: number): number {
+  return Math.round((n || 0) / 1000) * 1000
+}
+
 /** KL tính tiền: mủ nước (price_unit='dry') = cân tươi × DRC%; còn lại = cân tươi (lấy thẳng từ cân).
  *  Mủ nước: KHÔNG làm tròn về 1 số lẻ (gây lệch tiền) — giữ 2 số lẻ (kg, ~10g) cho sát thực tế.
  *  Khi price_unit='dry' nhưng thiếu DRC → trả 0 (cần kế toán nhập tay). */
@@ -854,15 +864,17 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
   //    Loại trừ 'supplier' (đi qua nhánh batch) và dòng phí không có partner_id.
   //    - Deal: chỉ CREDIT (DEBIT đã do trigger on_settlement_approved tạo từ settlement_receivable).
   //    - Bộc phát (manual): cả DEBIT (giao mủ — nghĩa vụ phải trả) + CREDIT (chi tiền) → balance = 0.
+  // CHI THỰC TẾ = số ĐÃ LÀM TRÒN tới nghìn (từng dòng), KHÔNG phải "Thành tiền" chính xác.
   const dealSums = new Map<string, number>()
   const manualSums = new Map<string, number>()
   for (const l of lines) {
     if (l.source_type === 'supplier') continue
-    if (!l.partner_id || (l.amount || 0) <= 0) continue
+    const paid = roundThousand(l.amount || 0)
+    if (!l.partner_id || paid <= 0) continue
     if (l.source_type === 'manual') {
-      manualSums.set(l.partner_id, (manualSums.get(l.partner_id) || 0) + l.amount)
+      manualSums.set(l.partner_id, (manualSums.get(l.partner_id) || 0) + paid)
     } else if (l.source_type === 'deal') {
-      dealSums.set(l.partner_id, (dealSums.get(l.partner_id) || 0) + l.amount)
+      dealSums.set(l.partner_id, (dealSums.get(l.partner_id) || 0) + paid)
     }
   }
 
@@ -909,7 +921,7 @@ async function markPaid(id: string, userId?: string | null): Promise<PaymentRequ
     for (const b of (batches || []) as Array<{ id: string; total_amount: number | null }>) {
       await supabase
         .from('rubber_intake_batches')
-        .update({ paid_amount: b.total_amount ?? 0, payment_status: 'paid' })
+        .update({ paid_amount: roundThousand(b.total_amount ?? 0), payment_status: 'paid' })
         .eq('id', b.id)
     }
   }

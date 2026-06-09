@@ -641,6 +641,16 @@ export default function WeighingPage() {
         await saveCalculatedValues(ticket.id, calc)
       }
 
+      // ĐỒNG BỘ ĐỐT/DRC sang lý lịch mủ NGAY khi hoàn tất (mủ nước phải có DRC/ĐỐT).
+      // Bridge tạo batch lúc complete; cập nhật thẳng để không phụ thuộc bridge copy / nút Lưu tay.
+      if (ticket.ticket_type === 'in' && (actualDrc != null || dotReading != null)) {
+        try {
+          await supabase.from('rubber_intake_batches')
+            .update({ drc_percent: actualDrc, field_dot_reading: dotReading })
+            .eq('weighbridge_ticket_id', ticket.id)
+        } catch (e) { console.warn('[complete] sync ĐỐT/DRC sang lý lịch lỗi:', e) }
+      }
+
       // Update deal if linked — chỉ cho IN (deal nhập). OUT không sync ở đây
       // vì stock-out chưa confirmed (chỉ tạo draft, user pick batch + confirm sau).
       if (selectedDealId && updated.net_weight && ticket.ticket_type === 'in') {

@@ -429,7 +429,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       payee_name: payee,
       payee_note: payeeNote,
       deal_number: r.deal_id ? dealNumbers.get(r.deal_id) || null : null,
-      suggested_amount: drcMissing ? 0 : roundDong(bw * price),
+      suggested_amount: drcMissing ? 0 : roundThousand(bw * price),
       price_source: drcMissing ? 'manual' : priceSource,
       price_source_ref: drcMissing ? null : priceRef,
       applied_pcg_id: drcMissing ? null : appliedPcgId,
@@ -531,7 +531,7 @@ function aggregatePcgFeeLines(lines: LineInput[], startSortOrder: number): {
       }
     }
     const totalFee = perTon * totalTons + perLot
-    const rounded = roundDong(totalFee)
+    const rounded = roundThousand(totalFee)
     if (rounded > 0) {
       feeLines.push({
         source_type: 'manual',

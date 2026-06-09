@@ -265,7 +265,7 @@ export default function B2BRubberIntakePage() {
       width: 90,
       align: 'right',
       render: (v) => v ? (
-        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{(v / 1000).toFixed(2)}</span>
+        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{(v / 1000).toFixed(3)}</span>
       ) : <Text type="secondary">—</Text>,
       sorter: (a, b) => (a.net_weight_kg || 0) - (b.net_weight_kg || 0),
     },
@@ -277,7 +277,7 @@ export default function B2BRubberIntakePage() {
       render: (v, r) => {
         const dry = v ?? (r.drc_percent != null && r.net_weight_kg ? r.net_weight_kg * r.drc_percent / 100 : null)
         if (dry == null) return <Text type="secondary">—</Text>
-        return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F766E' }}>{(dry / 1000).toFixed(2)}</span>
+        return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F766E' }}>{(dry / 1000).toFixed(3)}</span>
       },
       sorter: (a, b) => (a.dry_weight_kg || 0) - (b.dry_weight_kg || 0),
     },
@@ -662,10 +662,10 @@ function LlmGroupView({
                 )}
               </div>
               <Space size={16}>
-                <Statistic title="Tươi" value={totalNet / 1000} precision={2} suffix="T"
+                <Statistic title="Tươi" value={totalNet / 1000} precision={3} suffix="T"
                   valueStyle={{ fontSize: 14, color: '#15803D' }} />
                 {totalDry > 0 && (
-                  <Statistic title="Khô" value={totalDry / 1000} precision={2} suffix="T"
+                  <Statistic title="Khô" value={totalDry / 1000} precision={3} suffix="T"
                     valueStyle={{ fontSize: 14, color: '#0F766E' }} />
                 )}
                 {totalAmount > 0 && (
@@ -700,7 +700,7 @@ function LlmGroupView({
                     </Space>
                     <Space size={12}>
                       <span style={{ fontSize: 12, fontFamily: 'monospace' }}>
-                        <strong>{((item.net_weight_kg || 0) / 1000).toFixed(2)}</strong> T
+                        <strong>{((item.net_weight_kg || 0) / 1000).toFixed(3)}</strong> T
                       </span>
                       {item.drc_percent != null && (
                         <span style={{ fontSize: 12, color: '#15803D', fontWeight: 600 }}>{item.drc_percent}%</span>

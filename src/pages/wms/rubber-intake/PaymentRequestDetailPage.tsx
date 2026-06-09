@@ -78,10 +78,9 @@ const PaymentRequestDetailPage: React.FC = () => {
     setLines(prev => prev.map(l => {
       if (l.id !== lineId) return l
       const next = { ...l, ...patch, _dirty: true }
-      // Thành tiền = KL × đơn giá rồi LÀM TRÒN tới NGHÌN (≥500↑1000, <500↓000) —
-      // đây là số thực chi (KL đã chính xác 2 số lẻ nên không lệch).
+      // tự tính lại thành tiền khi đổi kg / đơn giá — tính tới ĐỒNG (không làm tròn nghìn → khỏi lệch)
       if (('weight' in patch) || ('unit_price' in patch)) {
-        next.amount = roundThousand((next.weight || 0) * (next.unit_price || 0))
+        next.amount = Math.round((next.weight || 0) * (next.unit_price || 0))
       }
       return next
     }))
@@ -161,7 +160,7 @@ const PaymentRequestDetailPage: React.FC = () => {
   const handleCancel = () => req && runAction(() => paymentRequestService.cancel(req.id), `Huỷ đề nghị ${req.code}?`)
   const handleMarkPaid = () => req && runAction(
     () => paymentRequestService.markPaid(req.id, user?.id),
-    `Xác nhận ĐÃ CHI ${fmtCur(liveTotalAmount, req.currency)}? Hệ thống sẽ ghi công nợ và không cho sửa nữa.`,
+    `Xác nhận ĐÃ CHI ${fmtCur(liveTotalRounded, req.currency)} (đã làm tròn)? Hệ thống sẽ ghi công nợ và không cho sửa nữa.`,
   )
   const handleExportExcel = async () => {
     if (!req) return
@@ -173,6 +172,7 @@ const PaymentRequestDetailPage: React.FC = () => {
   }
 
   const liveTotalAmount = lines.reduce((s, l) => s + (l.amount || 0), 0)
+  const liveTotalRounded = lines.reduce((s, l) => s + roundThousand(l.amount), 0)
   const liveTotalWeight = lines.reduce((s, l) => s + (l.weight || 0), 0)
   const hasDirty = lines.some(l => l._dirty)
 
@@ -221,8 +221,13 @@ const PaymentRequestDetailPage: React.FC = () => {
             <span className="flex items-center gap-1.5"><Scale className="w-4 h-4" />{liveTotalWeight.toLocaleString('vi-VN')} kg</span>
           </div>
           <div className="mt-2 pt-2 border-t border-gray-50 flex items-center justify-between">
-            <span className="text-[13px] text-gray-400">Tổng chi ({lines.length} dòng · {req.currency})</span>
-            <span className="text-[22px] font-bold text-emerald-600 font-mono">{fmtCur(liveTotalAmount, req.currency)}</span>
+            <span className="text-[13px] text-gray-400">Tổng chi ({lines.length} dòng · {req.currency}) <span className="text-amber-600">· đã làm tròn</span></span>
+            <span className="text-right">
+              <span className="text-[22px] font-bold text-amber-700 font-mono">{fmtCur(liveTotalRounded, req.currency)}</span>
+              {liveTotalRounded !== liveTotalAmount && (
+                <span className="block text-[11px] text-gray-400 font-mono">Chính xác: {fmtCur(liveTotalAmount, req.currency)}</span>
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -279,6 +284,7 @@ const PaymentRequestDetailPage: React.FC = () => {
                   <th className="px-2 py-2 text-right w-24 font-semibold">KL (kg)</th>
                   <th className="px-2 py-2 text-right w-28 font-semibold">Đơn giá</th>
                   <th className="px-2 py-2 text-right w-32 font-semibold">Thành tiền</th>
+                  <th className="px-2 py-2 text-right w-32 font-semibold">Làm tròn</th>
                   {editable && <th className="px-1 py-2 w-9" />}
                 </tr>
               </thead>
@@ -361,6 +367,10 @@ const PaymentRequestDetailPage: React.FC = () => {
                           <span className="font-mono font-bold text-emerald-600">{fmtCur(l.amount, req.currency)}</span>
                         )}
                       </td>
+                      {/* Làm tròn (đến nghìn) — chỉ đọc, tính từ Thành tiền */}
+                      <td className="px-2 py-1.5 text-right">
+                        <span className="font-mono font-bold text-amber-700">{fmtCur(roundThousand(l.amount), req.currency)}</span>
+                      </td>
                       {editable && (
                         <td className="px-1 py-2 text-center">
                           <button onClick={() => handleRemoveLine(l.id)} className="p-1 rounded-md hover:bg-red-50 text-red-400">
@@ -377,6 +387,7 @@ const PaymentRequestDetailPage: React.FC = () => {
                   <td className="px-2 py-2.5 text-right font-mono">{liveTotalWeight.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td />
                   <td className="px-2 py-2.5 text-right font-mono text-[13px] text-emerald-700">{fmtCur(liveTotalAmount, req.currency)}</td>
+                  <td className="px-2 py-2.5 text-right font-mono text-[13px] text-amber-700">{fmtCur(liveTotalRounded, req.currency)}</td>
                   {editable && <td />}
                 </tr>
               </tbody>

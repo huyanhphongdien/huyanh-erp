@@ -895,7 +895,10 @@ export default function WeighingPage() {
   }
 
   function handlePrint() {
-    window.print()
+    // Dùng trang in đẹp /print/:id (giống nút in ở list) thay vì window.print()
+    // in nguyên trang nhập liệu (xấu, lệch khổ).
+    if (ticket?.id) navigate(`/print/${ticket.id}`)
+    else window.print()
   }
 
   // ============================================================================

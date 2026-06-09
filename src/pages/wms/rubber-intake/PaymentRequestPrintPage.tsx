@@ -139,7 +139,6 @@ export default function PaymentRequestPrintPage() {
 function Sheet({ req, lines, preparedBy, msnv }: { req: PaymentRequest; lines: PaymentRequestLine[]; preparedBy?: string | null; msnv?: string | null }) {
   const date = new Date(req.request_date)
   const ccy = CCY_SUFFIX[req.currency] || 'đồng'
-  const totalAmount = lines.reduce((s, l) => s + (l.amount || 0), 0)
   const totalRounded = lines.reduce((s, l) => s + roundThousand(l.amount), 0)
   const totalWeight = lines.reduce((s, l) => s + (l.weight || 0), 0)
   const rubberKey = req.rubber_type || lines.find(l => l.rubber_type)?.rubber_type || ''
@@ -194,8 +193,7 @@ function Sheet({ req, lines, preparedBy, msnv }: { req: PaymentRequest; lines: P
             <th style={{ ...th, width: 64 }}>Số lượng</th>
             <th style={{ ...th, width: 70 }}>Đơn giá</th>
             <th style={{ ...th, width: 92 }}>Thành tiền ({req.currency})</th>
-            <th style={{ ...th, width: 92 }}>Làm tròn</th>
-            <th style={{ ...th, textAlign: 'left', width: 140 }}>Ghi chú</th>
+            <th style={{ ...th, textAlign: 'left', width: 150 }}>Ghi chú</th>
           </tr>
         </thead>
         <tbody>
@@ -210,21 +208,19 @@ function Sheet({ req, lines, preparedBy, msnv }: { req: PaymentRequest; lines: P
                 <td style={{ ...td, textAlign: 'center' }}>kg</td>
                 <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmtKg(l.weight)}</td>
                 <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.unit_price)}</td>
-                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmt(l.amount)}</td>
-                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#92400E' }}>{fmt(roundThousand(l.amount))}</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>{fmt(roundThousand(l.amount))}</td>
                 <td style={td}>{ghiChu || '—'}</td>
               </tr>
             )
           })}
           {lines.length === 0 && (
-            <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={8}>(Chưa có dòng nào)</td></tr>
+            <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={7}>(Chưa có dòng nào)</td></tr>
           )}
           {/* Total */}
           <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
             <td style={{ ...td, textAlign: 'right' }} colSpan={3}>TỔNG CỘNG</td>
             <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmtKg(totalWeight)}</td>
             <td style={td}></td>
-            <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#6B7280', fontSize: 12.5 }}>{fmt(totalAmount)}</td>
             <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E', fontSize: 13 }}>{fmt(totalRounded)}</td>
             <td style={td}></td>
           </tr>

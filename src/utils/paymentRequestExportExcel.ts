@@ -173,7 +173,9 @@ export async function exportPaymentRequestExcel(
     const slip = l.note ? ` số phiếu ${l.note}` : ''
     const noiDung = `Thanh toán tiền mua ${rubber || 'mủ'}${slip}`
     const ghiChu = [l.payee_name, l.payee_note].filter(Boolean).join(' — ')
-    const vals = [idx + 1, noiDung, 'kg', l.weight || 0, l.unit_price || 0, l.amount || 0, ghiChu]
+    // Thành tiền trên file = số ĐÃ LÀM TRÒN NGHÌN (số thực chi), không phải amount chính xác.
+    const paidAmount = Math.round((l.amount || 0) / 1000) * 1000
+    const vals = [idx + 1, noiDung, 'kg', l.weight || 0, l.unit_price || 0, paidAmount, ghiChu]
     vals.forEach((v, i) => {
       const cell = ws.getCell(r, i + 1)
       cell.value = v as any
@@ -184,7 +186,7 @@ export async function exportPaymentRequestExcel(
       else if (i >= 3 && i <= 5) { cell.numFmt = (i === 3 ? wFmt : numFmt); cell.alignment = { horizontal: 'right', vertical: 'top' } }
       else cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }
     })
-    totalAmount += l.amount || 0
+    totalAmount += paidAmount
     totalWeight += l.weight || 0
     r++
   })

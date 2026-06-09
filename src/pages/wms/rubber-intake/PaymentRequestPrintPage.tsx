@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
+import { useAuthStore } from '../../../stores/authStore'
 import {
   paymentRequestService,
   type PaymentRequest,
@@ -62,6 +63,7 @@ function readVietnameseNumber(num: number): string {
 export default function PaymentRequestPrintPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const user = useAuthStore(s => s.user)
   const [req, setReq] = useState<PaymentRequest | null>(null)
   const [lines, setLines] = useState<PaymentRequestLine[]>([])
   const [loading, setLoading] = useState(true)
@@ -102,12 +104,12 @@ export default function PaymentRequestPrintPage() {
       {/* Preview */}
       <div className="no-print bg-gray-200 min-h-[calc(100vh-56px)] py-6 px-4 flex flex-col items-center">
         <div className="bg-white shadow-md" style={{ width: '210mm', minHeight: '297mm', padding: '14mm' }}>
-          <Sheet req={req} lines={lines} />
+          <Sheet req={req} lines={lines} preparedBy={user?.full_name} />
         </div>
       </div>
 
       {/* Print-only */}
-      <div className="print-only"><Sheet req={req} lines={lines} /></div>
+      <div className="print-only"><Sheet req={req} lines={lines} preparedBy={user?.full_name} /></div>
 
       <style>{`
         .print-only { display: none; }
@@ -132,7 +134,7 @@ export default function PaymentRequestPrintPage() {
   )
 }
 
-function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[] }) {
+function Sheet({ req, lines, preparedBy }: { req: PaymentRequest; lines: PaymentRequestLine[]; preparedBy?: string | null }) {
   const date = new Date(req.request_date)
   const ccy = CCY_SUFFIX[req.currency] || 'đồng'
   const totalAmount = lines.reduce((s, l) => s + (l.amount || 0), 0)
@@ -173,6 +175,7 @@ function Sheet({ req, lines }: { req: PaymentRequest; lines: PaymentRequestLine[
       {/* Meta block */}
       <div style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.7 }}>
         <div>Kính gửi: <strong>Ban Giám đốc, Kế toán trưởng</strong></div>
+        <div>Người đề nghị: <strong>{preparedBy || '..............'}</strong>&nbsp;&nbsp;&nbsp;Bộ phận: HCTH&nbsp;&nbsp;&nbsp;MSNV: ............</div>
         <div>Lý do thanh toán: {reason}</div>
         <div>Hình thức nhận tiền:&nbsp;&nbsp;☐ Chuyển khoản Cty&nbsp;&nbsp;&nbsp;☑ Chuyển khoản quỹ&nbsp;&nbsp;&nbsp;☐ Tiền mặt</div>
         <div>Tên tài khoản: theo danh sách cột Ghi chú</div>

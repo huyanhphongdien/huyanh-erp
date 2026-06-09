@@ -155,7 +155,9 @@ serve(async (req) => {
       .insert({
         partner_id: partner.id,
         auth_user_id: authUserId,
-        full_name: partner.name,   // cột NOT NULL trên b2b.partner_users
+        full_name: partner.name,   // NOT NULL
+        phone: cleanPhone,         // NOT NULL
+        email: authEmail,          // set luôn (email ẩn) phòng cột NOT NULL
         role: 'owner',
         is_active: true,
       })

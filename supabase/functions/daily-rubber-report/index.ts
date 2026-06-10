@@ -97,6 +97,9 @@ function fmt1(n: number): string {
 const fmtT = (kg: number) => fmt1(kg / 1000)        // kg → tấn (1 chữ số)
 const fmtKg = (kg: number) => String(Math.round(kg)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')  // kg, chấm nghìn
 const esc = (s: string) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!))
+// Nhãn nhà máy hiển thị trên báo cáo: TL (Tân Lâm/Quảng Trị) → "No2".
+const FAC_LABEL: Record<string, string> = { TL: 'No2' }
+const facLabel = (code: string) => FAC_LABEL[code] || code
 
 // ── Thu thập + tổng hợp dữ liệu ──────────────────────────────────────────────
 interface Ticket {
@@ -278,7 +281,7 @@ function renderHtml(d: any): string {
 
   const facRows = d.facilities.map((f: any) => `
     <tr style="border-bottom:1px solid #eef1f0;">
-      <td style="padding:8px 10px;">${esc(f.name)} <span style="color:#94a3b8;">(${esc(f.code)})</span></td>
+      <td style="padding:8px 10px;">${esc(f.name)} <span style="color:#94a3b8;">(${esc(facLabel(f.code))})</span></td>
       <td align="center" style="padding:8px 10px;">${f.xe}</td>
       <td align="right" style="padding:8px 10px;font-weight:600;">${fmtT(f.tuoi)}</td>
       <td align="right" style="padding:8px 10px;font-weight:600;color:#92400E;">${fmtT(f.kho)}</td>
@@ -310,7 +313,7 @@ function renderHtml(d: any): string {
     <tr style="border-top:1px solid #eef1f0;${i % 2 ? 'background:#fafcfb;' : ''}">
       <td style="padding:7px 10px;color:#94a3b8;">${i + 1}</td>
       <td style="padding:7px 10px;font-weight:600;">${esc(p.name)}</td>
-      <td align="center" style="padding:7px 10px;">${esc(p.fac)}</td>
+      <td align="center" style="padding:7px 10px;">${esc(facLabel(p.fac))}</td>
       <td style="padding:7px 10px;">${m ? m.label : '—'}</td>
       <td align="right" style="padding:7px 10px;font-weight:700;color:#1B4D3E;">${fmtT(p.tuoi)}</td>
     </tr>`
@@ -319,16 +322,18 @@ function renderHtml(d: any): string {
   // Chi tiết từng đại lý × loại mủ (KL theo kg)
   const detailRows = (d.dealerDetail || []).map((p: any, i: number) => {
     const m = (RUBBER as any)[p.type] || null
+    // Mủ tạp: KHÔNG đo DRC → để trống DRC + Khô (tránh số khô ước sai lệch).
+    const isTap = p.type === 'mu_tap'
     return `
     <tr style="border-top:1px solid #eef1f0;${i % 2 ? 'background:#fafcfb;' : ''}">
       <td style="padding:6px 8px;color:#94a3b8;">${i + 1}</td>
       <td style="padding:6px 8px;font-weight:600;">${esc(p.name)}</td>
-      <td align="center" style="padding:6px 8px;">${esc(p.fac)}</td>
+      <td align="center" style="padding:6px 8px;">${esc(facLabel(p.fac))}</td>
       <td style="padding:6px 8px;">${m ? m.icon + ' ' + m.label : esc(p.type)}</td>
       <td align="center" style="padding:6px 8px;">${p.xe}</td>
       <td align="right" style="padding:6px 8px;font-weight:700;">${fmtKg(p.tuoi)}</td>
-      <td align="right" style="padding:6px 8px;">${fmt1(p.drc)}%</td>
-      <td align="right" style="padding:6px 8px;font-weight:600;color:#92400E;">${fmtKg(p.kho)}</td>
+      <td align="right" style="padding:6px 8px;">${isTap ? '—' : fmt1(p.drc) + '%'}</td>
+      <td align="right" style="padding:6px 8px;font-weight:600;color:#92400E;">${isTap ? '—' : fmtKg(p.kho)}</td>
     </tr>`
   }).join('')
 
@@ -340,7 +345,7 @@ function renderHtml(d: any): string {
     <tr style="border-top:1px solid #eef1f0;${i % 2 ? 'background:#fafcfb;' : ''}">
       <td style="padding:7px 10px;color:#94a3b8;">${i + 1}</td>
       <td style="padding:7px 10px;font-weight:600;">${esc(p.name)}</td>
-      <td align="center" style="padding:7px 10px;">${esc(p.fac)}</td>
+      <td align="center" style="padding:7px 10px;">${esc(facLabel(p.fac))}</td>
       <td style="padding:7px 10px;">${rb ? rb.label : '—'}</td>
       <td align="right" style="padding:7px 10px;font-weight:700;color:#1B4D3E;">${fmtT(p.tuoi)}</td>
     </tr>`
@@ -441,7 +446,6 @@ function renderHtml(d: any): string {
         </tr>
       </table>
     </td></tr>
-    ${monthHtml}
 
     <!-- Theo nhà máy -->
     <tr><td style="padding:16px 24px 4px 24px;"><div style="font-size:15px;font-weight:700;color:#1B4D3E;border-bottom:2px solid #1B4D3E;padding-bottom:6px;">🏭 Theo nhà máy</div></td></tr>
@@ -503,6 +507,7 @@ function renderHtml(d: any): string {
       </table>
       ${d.dealerCount > 5 ? `<div style="font-size:11px;color:#94a3b8;padding:6px 10px 0;">…và ${d.dealerCount - 5} đại lý khác.</div>` : ''}
     </td></tr>
+    ${monthHtml}
     ${warnHtml}`
 
   return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>

@@ -222,7 +222,7 @@ export default function PrintPage() {
             ${isThermal
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : paperSize === 'a5'
-                ? 'size: 148mm 210mm; margin: 5mm;'  /* A5 DỌC (portrait) — kích thước tường minh để driver/Chrome không tự xoay. A5 bỏ ảnh camera nên nội dung vừa 1 trang. */
+                ? 'size: auto; margin: 4mm;'  /* A5 LQ-310: KHÔNG ép 148mm (driver hay căn khổ-ảo nhỏ vào giữa tờ rộng → lệch phải). size:auto = dùng đúng khổ driver, + căn trái → bám mép trái tờ giấy thật. */
                 : 'size: A4; margin: 6mm;'
             }
           }

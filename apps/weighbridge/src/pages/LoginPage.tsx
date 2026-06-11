@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, Select, Input, Typography, Space, Alert, Spin } from 'antd'
 import { LoginOutlined, LoadingOutlined } from '@ant-design/icons'
 import { useAuthStore, type ScaleOperator } from '@/stores/authStore'
+import { getFacilityCode } from '@/stores/facilityStore'
 
 const { Title, Text } = Typography
 const PRIMARY = '#1B4D3E'
+
+// Tên công ty đầy đủ theo nhà máy (VITE_FACILITY_CODE) — đồng bộ với dòng cuối phiếu cân.
+const FAC_NAMES: Record<string, string> = {
+  PD: 'Cao su Huy Anh Phong Điền',
+  TL: 'Cao su Huy Anh Quảng Trị',
+  LAO: 'Cao su Huy Anh Lào',
+}
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -63,24 +71,15 @@ export default function LoginPage() {
         styles={{ body: { padding: 32 } }}
       >
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: '50%',
-              background: PRIMARY,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-            }}
-          >
-            <span style={{ fontSize: 28 }}>⚖️</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="Huy Anh Rubber"
+            style={{ height: 64, width: 'auto', display: 'block', margin: '0 auto 14px' }}
+          />
           <Title level={3} style={{ margin: 0, color: PRIMARY }}>
             TRẠM CÂN
           </Title>
-          <Text type="secondary">Cao su Huy Anh Phước</Text>
+          <Text type="secondary">{FAC_NAMES[getFacilityCode()] || 'Cao su Huy Anh'}</Text>
         </div>
 
         {loadingOps ? (

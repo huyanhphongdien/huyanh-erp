@@ -228,6 +228,10 @@ export default function PrintPage() {
           }
           ${paperSize === 'a5' ? `
             .print-only td, .print-only th { padding: 3px 6px !important; }
+            /* Căn SÁT TRÁI: máy in kim LQ-310 dùng khổ rộng hơn 148mm → căn giữa sẽ bị dồn phải. */
+            html, body { text-align: left !important; }
+            .print-only { text-align: left !important; }
+            .print-only > div { margin: 0 !important; }
           ` : ''}
           ${paperSize === 'a4' ? `
             .print-only td, .print-only th { padding: 6px 9px !important; }
@@ -251,7 +255,9 @@ export default function PrintPage() {
     return (
       <div style={{
         width: cfg.width,
-        margin: '0 auto',
+        // A5 (máy in kim LQ-310): căn SÁT TRÁI để không bị dồn phải khi driver dùng khổ rộng
+        // hơn 148mm. A4/nhiệt giữ căn giữa cho đẹp trên màn hình + máy laser.
+        margin: paperSize === 'a5' ? '0' : '0 auto',
         padding: isThermal ? '4px 2px' : (paperSize === 'a5' ? '10px 14px' : '16px 20px'),
         // A4/A5 = serif (chứng từ chính thức, đồng bộ Liên 2 + PCG); nhiệt = sans (rõ ở size nhỏ).
         fontFamily: isThermal ? "'Be Vietnam Pro', Arial, sans-serif" : "'Times New Roman', Times, serif",

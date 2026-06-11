@@ -252,6 +252,12 @@ export default function PrintPage() {
     // Ảnh camera (A4/A5 ngang đủ rộng cho 3 ảnh/hàng cỡ 172px).
     const camW = 172
     const camH = 108
+    // Tên trạm cân theo nhà máy phát sinh phiếu (cho dòng cuối phiếu).
+    const facCode = (ticket as any)?.facility?.code as string | undefined
+    const stationName =
+      facCode === 'TL' ? 'Cao Su Huy Anh Quảng Trị'
+      : facCode === 'LAO' ? 'Cao Su Huy Anh Lào'
+      : 'Cao Su Huy Anh Phong Điền'
     return (
       <div style={{
         width: cfg.width,
@@ -269,9 +275,9 @@ export default function PrintPage() {
         {isThermal ? (
           // Thermal: compact header — use table for thermal printer compatibility
           <div style={{ textAlign: 'center', marginBottom: 4 }}>
-            <div style={{ fontSize: fs - 3, fontWeight: 600 }}>CÔNG TY TNHH MTV</div>
+            <div style={{ fontSize: fs - 3, fontWeight: 600 }}>CÔNG TY TNHH MỘT THÀNH VIÊN</div>
             <div style={{ fontSize: fs + 1, fontWeight: 800, lineHeight: 1.15 }}>CAO SU HUY ANH PHONG ĐIỀN</div>
-            <div style={{ fontSize: fs - 4, color: '#444' }}>Khe Mạ, P. Phong Điền, TP Huế</div>
+            <div style={{ fontSize: fs - 4, color: '#444' }}>Khe Mạ, Phường Phong Điền, TP Huế</div>
             <div style={{ fontSize: fs - 4, color: '#444' }}>MST: 3301549896</div>
             <div style={{ borderBottom: '1px dashed #999', margin: '3px 0' }} />
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -544,8 +550,8 @@ export default function PrintPage() {
               <div style={{ fontSize: fs - 2, fontWeight: 700 }}>Cổng Đại lý Huy Anh</div>
               <div style={{ fontSize: fs - 3, color: '#555' }}>Quét QR đầu phiếu — xem giá mủ &amp; công nợ · b2b.huyanhrubber.vn</div>
             </div>
-            <div style={{ textAlign: 'center', marginTop: 2, fontSize: fs - 3, color: '#bbb' }}>
-              HA Phong Điền • {fmtTime(new Date().toISOString())}
+            <div style={{ textAlign: 'center', marginTop: 2, fontSize: fs - 3, color: '#999' }}>
+              Phiếu được in từ hệ thống Trạm Cân — {stationName} • {fmtDateTime(new Date().toISOString())}
             </div>
           </div>
         ) : (
@@ -570,7 +576,7 @@ export default function PrintPage() {
               <div style={{ fontSize: fs - 2, color: '#15803D' }}>Tài khoản do Huy Anh cấp — chưa có, vui lòng liên hệ Huy Anh để được cấp.</div>
             </div>
             <div style={{ marginTop: 8, textAlign: 'center', fontSize: fs - 3, color: '#9CA3AF', borderTop: '1px solid #E5E7EB', paddingTop: 6 }}>
-              Phiếu được in từ hệ thống Trạm Cân — Cao Su Huy Anh Phong Điền • {fmtDateTime(new Date().toISOString())}
+              Phiếu được in từ hệ thống Trạm Cân — {stationName} • {fmtDateTime(new Date().toISOString())}
               <div style={{ fontStyle: 'italic', marginTop: 2 }}>
                 Hỗ trợ kỹ thuật: Lê Duy Minh · 0901120167 · minhld@huyanhrubber.com
               </div>

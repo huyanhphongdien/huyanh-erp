@@ -116,7 +116,8 @@ export default function WeighingPage() {
   const [selectedDealId, setSelectedDealId] = useState<string>('')
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
-  const [sourceType, setSourceType] = useState<'deal' | 'supplier' | 'partner_direct'>('deal')
+  // Mặc định "Đối tác trực tiếp" (Deal chưa dùng nhiều) → bớt 1 thao tác cho người cân.
+  const [sourceType, setSourceType] = useState<'deal' | 'supplier' | 'partner_direct'>('partner_direct')
   // partner_direct: cân không có deal — chọn đại lý B2B trực tiếp + rubber_type
   const [directPartnerId, setDirectPartnerId] = useState<string | null>(null)
   // Tên nguồn (đại lý/NCC/deal) để ghim tóm tắt khi cân lần 2 — đỡ nhầm

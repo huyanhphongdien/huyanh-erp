@@ -180,10 +180,10 @@ function SingleEntryForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs text-slate-600 mb-1 font-medium">
-            Loại mủ chi tiết * <span className="text-slate-400">(5 loại — DB tự nhóm cho bonus)</span>
+            Loại mủ chi tiết * <span className="text-slate-400">(4 loại — DB tự nhóm cho bonus)</span>
           </label>
-          <div className="grid grid-cols-5 gap-1">
-            {(['mu_nuoc', 'mu_tap', 'mu_dong', 'mu_chen', 'mu_to'] as RawRubberType[]).map((t) => {
+          <div className="grid grid-cols-4 gap-1">
+            {(['mu_nuoc', 'mu_tap', 'mu_chen', 'mu_to'] as RawRubberType[]).map((t) => {
               const isNuoc = t === 'mu_nuoc'
               const isActive = rawRubberType === t
               return (

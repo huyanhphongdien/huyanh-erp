@@ -450,7 +450,6 @@ function RubberTypePicker({
   const RAW_OPTIONS: Array<{ value: 'mu_nuoc' | 'mu_tap' | 'mu_dong' | 'mu_chen' | 'mu_to'; label: string; icon: string }> = [
     { value: 'mu_nuoc', label: 'Mủ nước', icon: '💧' },
     { value: 'mu_tap',  label: 'Mủ tạp',  icon: '🪨' },
-    { value: 'mu_dong', label: 'Mủ đông', icon: '🧊' },
     { value: 'mu_chen', label: 'Mủ chén', icon: '🥣' },
     { value: 'mu_to',   label: 'Mủ tờ',   icon: '📄' },
   ]

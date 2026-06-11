@@ -421,7 +421,7 @@ export default function B2BRubberIntakePage() {
                 <Tag.CheckableTag checked={rawTypeFilter === ''} onChange={() => setRawTypeFilter('')}>
                   Tất cả
                 </Tag.CheckableTag>
-                {(['mu_nuoc', 'mu_tap', 'mu_dong', 'mu_chen', 'mu_to'] as RawRubberType[]).map(rt => (
+                {(['mu_nuoc', 'mu_tap', 'mu_chen', 'mu_to'] as RawRubberType[]).map(rt => (
                   <Tag.CheckableTag
                     key={rt}
                     checked={rawTypeFilter === rt}

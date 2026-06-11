@@ -319,15 +319,15 @@ export default function PrintPage() {
         {isThermal ? (
           <div style={{ marginBottom: 4, fontSize: fs }}>
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
-            <Row2 l="BS" r={<strong>{ticket!.vehicle_plate}</strong>} />
-            {ticket!.driver_name && <Row2 l="TX" r={ticket!.driver_name} />}
+            <Row2 l="Biển số" r={<strong>{ticket!.vehicle_plate}</strong>} />
+            {ticket!.driver_name && <Row2 l="Tài xế" r={ticket!.driver_name} />}
             {isGateTicket
-              ? <Row2 l="Hàng" r={ticket!.notes || 'Hàng nội bộ'} />
+              ? <Row2 l="Nội dung hàng" r={ticket!.notes || 'Hàng nội bộ'} />
               : ticket!.ticket_type === 'out'
-              ? <Row2 l="Loại" r={`Xe ra (Xuất)`} />
-              : <Row2 l="Mủ" r={rubberLabel} />
+              ? <Row2 l="Loại cân" r={`Xe ra (Xuất)`} />
+              : <Row2 l="Loại mủ" r={rubberLabel} />
             }
-            {!isGateTicket && partner && <Row2 l={partner.label === 'NCC' ? 'NCC' : 'ĐL'} r={partner.name} />}
+            {!isGateTicket && partner && <Row2 l={partner.label === 'NCC' ? 'Nhà cung cấp' : 'Đại lý'} r={partner.name} />}
             {dealInfo?.deal_number && <Row2 l="Deal" r={dealInfo.deal_number} />}
           </div>
         ) : (
@@ -365,8 +365,8 @@ export default function PrintPage() {
         {isThermal ? (
           <div style={{ marginBottom: 4 }}>
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
-            <Row2 l={w1Label} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w1Weight)} kg</span>} />
-            <Row2 l={w2Label} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w2Weight)} kg</span>} />
+            <Row2 l={`Cân lần 1 (${w1Label})`} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w1Weight)} kg</span>} />
+            <Row2 l={`Cân lần 2 (${w2Label})`} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w2Weight)} kg</span>} />
             <div style={{ borderBottom: '1px solid #333', margin: '2px 0' }} />
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>

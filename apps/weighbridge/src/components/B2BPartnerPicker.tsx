@@ -134,12 +134,32 @@ export default function B2BPartnerPicker({ value, onChange, placeholder, disable
       const digits = q.replace(/[\s-]/g, '')
       const pool = [...(PARTNER_CACHE || []), ...(includeSuppliers ? (SUPPLIER_CACHE || []) : [])]
 
-      const merged: Record<string, PartnerOption> = {}
+      // Khớp TÊN theo ĐẦU TỪ (word-prefix) + xếp hạng — KHÔNG dùng "chứa chuỗi" cho tên
+      // vì âm tiết tiếng Việt ("an","anh","van"…) trùng khắp nơi → ra cả danh sách.
+      //   gõ "an"  → khớp tên có TỪ bắt đầu "an" (Ân, Anh, An), KHÔNG khớp Thanh/Văn/Hoàng.
+      //   gõ "minh an" → mọi từ phải khớp đầu một từ trong tên (Phạm Minh Ân).
+      const qWords = nq.split(/\s+/).filter(Boolean)
+      const merged: Record<string, PartnerOption & { _rank?: number }> = {}
       for (const p of pool) {
-        const hitName = noAccent(p.name).includes(nq)
+        const nameNorm = noAccent(p.name)
+        const nameWords = nameNorm.split(/\s+/).filter(Boolean)
+        const lastWord = nameWords[nameWords.length - 1] || ''
+        let rank = 0
+        if (qWords.length <= 1) {
+          const w = qWords[0] || nq
+          if (lastWord.startsWith(w)) rank = 100                       // tên gọi (từ cuối) — ưu tiên nhất
+          else if (nameWords.some((nw) => nw.startsWith(w))) rank = 80 // bất kỳ từ nào bắt đầu bằng
+          else if (nameNorm.includes(nq)) rank = 20                    // fallback chứa chuỗi → xếp cuối
+        } else {
+          if (nameNorm.startsWith(nq)) rank = 100                      // khớp đầu cả họ tên
+          else if (qWords.every((w) => nameWords.some((nw) => nw.startsWith(w)))) rank = 80
+          else if (nameNorm.includes(nq)) rank = 20
+        }
+        // Mã / SĐT: khớp chuỗi (đặc trưng, không gây nhiễu)
         const hitCode = !!p.code && p.code.toLowerCase().includes(q.toLowerCase())
         const hitPhone = digits.length >= 3 && !!p.phone && p.phone.replace(/[\s-]/g, '').includes(digits)
-        if (hitName || hitCode || hitPhone) merged[p.id] = p
+        if (hitCode || hitPhone) rank = Math.max(rank, 90)
+        if (rank > 0) merged[p.id] = { ...p, _rank: rank }
       }
 
       // CCCD / MST / alias (số hoặc tên cũ) — tra bp_search_keys (chỉ partner)
@@ -154,11 +174,14 @@ export default function B2BPartnerPicker({ value, onChange, placeholder, disable
         const { data: byBp } = await supabase
           .from('b2b_partners').select('id, code, name, tier, phone, bp_id').in('bp_id', bpIds).limit(10)
         for (const p of (byBp ?? []) as PartnerOption[]) {
-          if (!merged[p.id]) merged[p.id] = { ...p, kind: 'partner' }
+          if (!merged[p.id]) merged[p.id] = { ...p, kind: 'partner', _rank: 70 }  // CCCD/MST/alias
         }
       }
 
-      const result = Object.values(merged).slice(0, 20)
+      // Xếp hạng: tên gọi/khớp đầu trước → chứa chuỗi sau; cùng hạng thì A→Z.
+      const result = Object.values(merged)
+        .sort((a, b) => (b._rank || 0) - (a._rank || 0) || a.name.localeCompare(b.name, 'vi'))
+        .slice(0, 20)
       if (cancelled) return
       setOptions(result)
       setLoading(false)

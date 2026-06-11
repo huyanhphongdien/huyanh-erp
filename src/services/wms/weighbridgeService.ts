@@ -42,15 +42,28 @@ const TICKET_LIST_SELECT = `
 // ============================================================================
 
 /**
- * Tự sinh mã phiếu cân: CX-YYYYMMDD-XXX
- * VD: CX-20260225-001, CX-20260225-002
+ * Tự sinh mã phiếu cân theo TỪNG NHÀ MÁY để KHÔNG trùng giữa các nhà máy:
+ *   CX-<MÃ NM>-YYYYMMDD-XXX  → CX-PD-20260611-001 (Phong Điền) ·
+ *   CX-TL-20260611-001 (Quảng Trị/Tân Lâm) · CX-LAO-20260611-001 (Lào)
+ * Bộ đếm XXX đếm RIÊNG mỗi nhà máy mỗi ngày (lọc theo prefix CÓ mã NM).
+ * Mã NM lấy từ facilityCode (app cân tự truyền theo VITE_FACILITY_CODE); nếu chỉ
+ * có facilityId thì tra bảng facilities. Phiếu CŨ (CX-YYYYMMDD-XXX) không bị ảnh hưởng.
  */
-async function generateCode(): Promise<string> {
+async function generateCode(facilityCode?: string | null, facilityId?: string | null): Promise<string> {
   const now = new Date()
   const yyyy = String(now.getFullYear())
   const mm = String(now.getMonth() + 1).padStart(2, '0')
   const dd = String(now.getDate()).padStart(2, '0')
-  const prefix = `CX-${yyyy}${mm}${dd}-`
+
+  // Mã nhà máy: ưu tiên truyền sẵn; nếu chỉ có id thì tra DB.
+  let fac = (facilityCode || '').toUpperCase().trim()
+  if (!fac && facilityId) {
+    const { data: f } = await supabase.from('facilities').select('code').eq('id', facilityId).maybeSingle()
+    fac = (f?.code || '').toUpperCase().trim()
+  }
+
+  // Prefix có mã NM → 3 nhà máy không bao giờ trùng + đếm độc lập.
+  const prefix = fac ? `CX-${fac}-${yyyy}${mm}${dd}-` : `CX-${yyyy}${mm}${dd}-`
 
   const { data, error } = await supabase
     .from('weighbridge_tickets')
@@ -63,8 +76,7 @@ async function generateCode(): Promise<string> {
 
   let nextNum = 1
   if (data && data.length > 0) {
-    const lastCode = data[0].code
-    const lastNum = parseInt(lastCode.split('-').pop() || '0', 10)
+    const lastNum = parseInt(data[0].code.split('-').pop() || '0', 10)
     nextNum = lastNum + 1
   }
 
@@ -85,6 +97,8 @@ export interface CreateTicketData {
   notes?: string
   /** F2 multi-facility: ID nhà máy phát sinh phiếu (PD/TL/LAO). Sub-app cân tự inject. */
   facility_id?: string | null
+  /** Mã nhà máy (PD/TL/LAO) — để sinh mã phiếu CX-<NM>-... không trùng giữa các nhà máy. */
+  facility_code?: string | null
 }
 
 export interface UpdateTicketQCData {
@@ -98,7 +112,7 @@ export interface UpdateTicketQCData {
  * Tạo phiếu cân mới — status = 'weighing_gross'
  */
 async function create(data: CreateTicketData, userId?: string): Promise<WeighbridgeTicket> {
-  const code = await generateCode()
+  const code = await generateCode(data.facility_code, data.facility_id)
 
   const { data: ticket, error } = await supabase
     .from('weighbridge_tickets')

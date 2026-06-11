@@ -449,6 +449,7 @@ export default function WeighingPage() {
           ticket_type: ticketDirection,
           notes: notes || undefined,
           facility_id: currentFacility?.id || null,
+          facility_code: currentFacility?.code || null,  // → mã CX-<NM>-... không trùng giữa nhà máy
         },
         operator?.id,
       )

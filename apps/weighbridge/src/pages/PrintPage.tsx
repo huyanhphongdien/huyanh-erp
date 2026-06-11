@@ -531,15 +531,15 @@ export default function PrintPage() {
 
         {/* ===== SIGNATURES ===== */}
         {isThermal ? (
-          <div style={{ marginTop: 4 }}>
-            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
+          <div style={{ marginTop: 10 }}>
+            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 4 }} />
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs - 2, textAlign: 'center' }}>
               <tbody>
                 <tr>
                   <td style={{ fontWeight: 600, padding: '2px 0' }}>NV Cân</td>
                   <td style={{ fontWeight: 600, padding: '2px 0' }}>Tài xế/Đại lý</td>
                 </tr>
-                <tr style={{ height: 20 }}>
+                <tr style={{ height: 48 }}>
                   <td style={{ borderBottom: '1px dotted #999' }}></td>
                   <td style={{ borderBottom: '1px dotted #999' }}></td>
                 </tr>

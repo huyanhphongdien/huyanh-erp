@@ -547,17 +547,17 @@ export default function PrintPage() {
           </div>
         ) : (
           <div style={{ marginTop: paperSize === 'a4' ? 'auto' : 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: paperSize === 'a5' ? 12 : 24, paddingTop: paperSize === 'a4' ? 14 : 0, fontSize: fs, textAlign: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: paperSize === 'a5' ? 20 : 24, paddingTop: paperSize === 'a4' ? 14 : 0, fontSize: fs, textAlign: 'center', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 46, fontSize: fs + 1 }}>Nhân viên cân</div>
+                <div style={{ fontWeight: 700, marginBottom: 46, fontSize: fs + 1 }}>Nhân viên cân</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 46, fontSize: fs + 1 }}>Tài xế/Đại lý</div>
+                <div style={{ fontWeight: 700, marginBottom: 46, fontSize: fs + 1 }}>Tài xế/Đại lý</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, marginBottom: paperSize === 'a5' ? 24 : 46, fontSize: fs + 1 }}>Xác nhận</div>
+                <div style={{ fontWeight: 700, marginBottom: 46, fontSize: fs + 1 }}>Xác nhận</div>
                 <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: fs - 2, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
               </div>
             </div>

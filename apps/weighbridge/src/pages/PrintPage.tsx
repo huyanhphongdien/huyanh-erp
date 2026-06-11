@@ -13,10 +13,11 @@ type PaperSize = 'a4' | 'a5' | '80mm' | '58mm'
 
 // width tính theo px @96dpi để khớp khổ giấy thực (đã trừ margin in)
 // A4 dọc: 210mm - 14mm margin (2×7mm) ≈ 740px
-// A5 NGANG (landscape, mặc định): 210mm - 12mm margin ≈ 750px (rộng = A4 dọc)
+// A5 DỌC (portrait): 148mm - 10mm margin ≈ 521px; chừa padding → 490px content.
+//   Vừa vùng in hẹp (~203mm) của máy in kim LQ-310 ở Phong Điền → in 100%, không bị co/cắt mép.
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
   a4: { label: 'A4 (210mm)', width: 740, fontSize: 14 },
-  a5: { label: 'A5 ngang (210mm)', width: 750, fontSize: 11 },
+  a5: { label: 'A5 dọc (148mm)', width: 490, fontSize: 11 },
   '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
   '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
 }
@@ -221,7 +222,7 @@ export default function PrintPage() {
             ${isThermal
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : paperSize === 'a5'
-                ? 'size: 210mm 148mm; margin: 5mm;'  /* A5 NGANG (landscape) — kích thước tường minh, mọi browser/driver đều nhận (keyword "A5 landscape" hay bị bỏ qua → in dọc) */
+                ? 'size: 148mm 210mm; margin: 5mm;'  /* A5 DỌC (portrait) — kích thước tường minh để driver/Chrome không tự xoay/co. Vừa vùng in hẹp ~203mm của máy in kim LQ-310. */
                 : 'size: A4; margin: 6mm;'
             }
           }
@@ -244,6 +245,9 @@ export default function PrintPage() {
   function PrintContent() {
     const fs = cfg.fontSize
     const mono = "'JetBrains Mono', monospace"
+    // Ảnh camera: A5 dọc hẹp (490px) → ảnh nhỏ hơn để 3 ảnh/hàng vừa khổ (3×150+gap < 490).
+    const camW = paperSize === 'a5' ? 150 : 172
+    const camH = paperSize === 'a5' ? 94 : 108
     return (
       <div style={{
         width: cfg.width,
@@ -491,7 +495,7 @@ export default function PrintPage() {
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l1Images.map((img) => (
                     <img key={img.id} src={img.image_url} alt={img.capture_type}
-                      style={{ width: 172, height: 108, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+                      style={{ width: camW, height: camH, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
                   ))}
                 </div>
               </div>
@@ -502,7 +506,7 @@ export default function PrintPage() {
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l2Images.map((img) => (
                     <img key={img.id} src={img.image_url} alt={img.capture_type}
-                      style={{ width: 172, height: 108, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+                      style={{ width: camW, height: camH, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
                   ))}
                 </div>
               </div>

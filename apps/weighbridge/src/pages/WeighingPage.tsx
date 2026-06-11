@@ -129,7 +129,8 @@ export default function WeighingPage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
 
   // Rubber fields
-  const [rubberType, setRubberType] = useState<string>('mu_dong')
+  // Đã gộp còn 4 loại nhập (bỏ Mủ đông → gộp nhóm Mủ tạp); default Mủ tạp.
+  const [rubberType, setRubberType] = useState<string>('mu_tap')
   // XUẤT: xe về PD có thể chở NHIỀU loại mủ → chọn nhiều (lưu "mu_dong,mu_nuoc")
   const [outRubberTypes, setOutRubberTypes] = useState<string[]>([])
   // Phiếu cân KHÔNG nhập giá / DRC kỳ vọng. Giá giải tại Đề nghị thanh toán
@@ -1393,7 +1394,6 @@ export default function WeighingPage() {
                     >
                       <Radio.Button value="mu_nuoc">💧 Mủ nước</Radio.Button>
                       <Radio.Button value="mu_tap">🪨 Mủ tạp</Radio.Button>
-                      <Radio.Button value="mu_dong">🧊 Mủ đông</Radio.Button>
                       <Radio.Button value="mu_chen">🥣 Mủ chén</Radio.Button>
                       <Radio.Button value="mu_to">📄 Mủ tờ</Radio.Button>
                     </Radio.Group>

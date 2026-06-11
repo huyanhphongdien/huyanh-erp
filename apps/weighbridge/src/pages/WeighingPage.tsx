@@ -923,6 +923,14 @@ export default function WeighingPage() {
   // GATE cân giống OUT (lần1 = tare, lần2 = gross). PD-only (chỉ NM Phong Điền).
   const isReverseWeigh = isOut || isGate
   const canShowGate = currentFacility?.code === 'PD'
+  // Panel kết quả: cân CỔNG ghi "Cân lần 1 / Cân lần 2 / KL hàng" thay cho Gross/Tare/NET
+  // (lần 1 = Xe vào = tare; lần 2 = Xe ra = gross) cho hợp lý hàng nội bộ.
+  const isGateView = isGate || ticket?.ticket_type === 'gate'
+  const box1Label = isGateView ? 'Cân lần 1' : 'Gross'
+  const box2Label = isGateView ? 'Cân lần 2' : 'Tare'
+  const box3Label = isGateView ? 'KL hàng' : 'NET'
+  const box1Val = isGateView ? ticket?.tare_weight : ticket?.gross_weight
+  const box2Val = isGateView ? ticket?.gross_weight : ticket?.tare_weight
   // NHẬP: lần1 gross → lần2 tare (chờ tare==null). XUẤT/CỔNG: lần1 tare → lần2 gross (chờ gross==null).
   const secondPending = isReverseWeigh
     ? (isWeighingTare && ticket?.gross_weight == null)
@@ -1787,21 +1795,21 @@ export default function WeighingPage() {
               <Card size="small" style={{ borderRadius: 12 }} styles={{ body: { padding: 0 } }}>
                 <Row>
                   <Col span={8} style={{ textAlign: 'center', padding: '10px 8px' }}>
-                    <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Gross</Text>
+                    <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>{box1Label}</Text>
                     <div style={{ ...MONO, fontSize: 20, fontWeight: 700 }}>
-                      {ticket?.gross_weight != null ? ticket.gross_weight.toLocaleString() : '---'}
+                      {box1Val != null ? box1Val.toLocaleString() : '---'}
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>kg</Text>
                   </Col>
                   <Col span={8} style={{ textAlign: 'center', padding: '10px 8px', borderLeft: '1px solid #f0f0f0', borderRight: '1px solid #f0f0f0' }}>
-                    <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Tare</Text>
+                    <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>{box2Label}</Text>
                     <div style={{ ...MONO, fontSize: 20, fontWeight: 700 }}>
-                      {ticket?.tare_weight != null ? ticket.tare_weight.toLocaleString() : '---'}
+                      {box2Val != null ? box2Val.toLocaleString() : '---'}
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>kg</Text>
                   </Col>
                   <Col span={8} style={{ textAlign: 'center', padding: '10px 8px', background: calc ? '#F0FDF4' : undefined }}>
-                    <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>NET</Text>
+                    <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>{box3Label}</Text>
                     <div style={{ ...MONO, fontSize: 20, fontWeight: 700, color: calc ? '#15803D' : '#141414' }}>
                       {calc ? calc.net_weight.toLocaleString() : (ticket?.net_weight != null ? ticket.net_weight.toLocaleString() : '---')}
                     </div>

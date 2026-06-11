@@ -371,7 +371,7 @@ export default function PrintPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr>
-                  <td style={{ fontWeight: 700, fontSize: fs + 3, padding: '2px 0' }}>NET</td>
+                  <td style={{ fontWeight: 700, fontSize: fs + 3, padding: '2px 0' }}>{isGateTicket ? 'KL hàng' : 'NET'}</td>
                   <td style={{ fontWeight: 700, fontSize: fs + 3, padding: '2px 0', textAlign: 'right', fontFamily: mono }}>{fmt(ticket!.net_weight)} kg</td>
                 </tr>
               </tbody>

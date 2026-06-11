@@ -923,14 +923,16 @@ export default function WeighingPage() {
   // GATE cân giống OUT (lần1 = tare, lần2 = gross). PD-only (chỉ NM Phong Điền).
   const isReverseWeigh = isOut || isGate
   const canShowGate = currentFacility?.code === 'PD'
-  // Panel kết quả: cân CỔNG ghi "Cân lần 1 / Cân lần 2 / KL hàng" thay cho Gross/Tare/NET
-  // (lần 1 = Xe vào = tare; lần 2 = Xe ra = gross) cho hợp lý hàng nội bộ.
+  // Panel kết quả: MỌI loại phiếu ghi "Cân lần 1 / Cân lần 2" theo đúng thứ tự cân.
+  //   NHẬP:      lần 1 = Gross (xe+hàng)        → lần 2 = Tare (xe rỗng)
+  //   XUẤT/CỔNG: lần 1 = Tare (xe rỗng/xe vào)  → lần 2 = Gross (xe+hàng/xe ra)
   const isGateView = isGate || ticket?.ticket_type === 'gate'
-  const box1Label = isGateView ? 'Cân lần 1' : 'Gross'
-  const box2Label = isGateView ? 'Cân lần 2' : 'Tare'
+  const reverseView = isReverseWeigh || ticket?.ticket_type === 'out' || ticket?.ticket_type === 'gate'
+  const box1Label = 'Cân lần 1'
+  const box2Label = 'Cân lần 2'
   const box3Label = isGateView ? 'KL hàng' : 'NET'
-  const box1Val = isGateView ? ticket?.tare_weight : ticket?.gross_weight
-  const box2Val = isGateView ? ticket?.gross_weight : ticket?.tare_weight
+  const box1Val = reverseView ? ticket?.tare_weight : ticket?.gross_weight
+  const box2Val = reverseView ? ticket?.gross_weight : ticket?.tare_weight
   // NHẬP: lần1 gross → lần2 tare (chờ tare==null). XUẤT/CỔNG: lần1 tare → lần2 gross (chờ gross==null).
   const secondPending = isReverseWeigh
     ? (isWeighingTare && ticket?.gross_weight == null)

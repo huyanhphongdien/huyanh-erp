@@ -13,11 +13,11 @@ type PaperSize = 'a4' | 'a5' | '80mm' | '58mm'
 
 // width tính theo px @96dpi để khớp khổ giấy thực (đã trừ margin in)
 // A4 dọc: 210mm - 14mm margin (2×7mm) ≈ 740px
-// A5 NGANG (landscape): 210mm rộng. Máy in kim LQ-310 (Phong Điền) chỉ in được ~203mm,
-//   nên giữ nội dung 720px (≈190mm) + lề 5mm → tổng ≈198mm, VỪA vùng in → in 100% không bị co.
+// A5 DỌC (portrait): 148mm rộng - 10mm lề ≈ 521px; chừa padding → 490px content.
+//   A5 KHÔNG in ảnh camera (xem bên dưới) → nội dung gọn, VỪA 1 trang dọc, hợp máy in kim LQ-310.
 const PAPER_CONFIGS: Record<PaperSize, { label: string; width: number; fontSize: number }> = {
   a4: { label: 'A4 (210mm)', width: 740, fontSize: 14 },
-  a5: { label: 'A5 ngang (210mm)', width: 720, fontSize: 11 },
+  a5: { label: 'A5 dọc (148mm)', width: 490, fontSize: 11 },
   '80mm': { label: 'Nhiệt 80mm (K200L)', width: 290, fontSize: 12 },
   '58mm': { label: 'Nhiệt 58mm', width: 210, fontSize: 10 },
 }
@@ -222,7 +222,7 @@ export default function PrintPage() {
             ${isThermal
               ? `size: ${paperSize === '80mm' ? '72mm 120mm' : '48mm 100mm'}; margin: 0mm;`
               : paperSize === 'a5'
-                ? 'size: 210mm 148mm; margin: 5mm;'  /* A5 NGANG (landscape) — kích thước tường minh (mọi driver nhận); nội dung 720px ≈190mm vừa vùng in ~203mm của LQ-310 → in 100%. */
+                ? 'size: 148mm 210mm; margin: 5mm;'  /* A5 DỌC (portrait) — kích thước tường minh để driver/Chrome không tự xoay. A5 bỏ ảnh camera nên nội dung vừa 1 trang. */
                 : 'size: A4; margin: 6mm;'
             }
           }
@@ -486,8 +486,8 @@ export default function PrintPage() {
           </div>
         )}
 
-        {/* ===== CAMERA IMAGES (A4 only) ===== */}
-        {!isThermal && images.length > 0 && (
+        {/* ===== CAMERA IMAGES — CHỈ A4 (A5 dọc + nhiệt bỏ ảnh: vừa 1 trang + máy in kim/nhiệt in ảnh xấu) ===== */}
+        {paperSize === 'a4' && images.length > 0 && (
           <div style={{ marginBottom: 8 }}>
             {l1Images.length > 0 && (
               <div style={{ marginBottom: 5 }}>

@@ -269,7 +269,10 @@ export default function PrintPage() {
         {isThermal ? (
           // Thermal: compact header — use table for thermal printer compatibility
           <div style={{ textAlign: 'center', marginBottom: 4 }}>
-            <div style={{ fontSize: fs, fontWeight: 700 }}>HUY ANH PHONG ĐIỀN</div>
+            <div style={{ fontSize: fs - 3, fontWeight: 600 }}>CÔNG TY TNHH MTV</div>
+            <div style={{ fontSize: fs + 1, fontWeight: 800, lineHeight: 1.15 }}>CAO SU HUY ANH PHONG ĐIỀN</div>
+            <div style={{ fontSize: fs - 4, color: '#444' }}>Khe Mạ, P. Phong Điền, TP Huế</div>
+            <div style={{ fontSize: fs - 4, color: '#444' }}>MST: 3301549896</div>
             <div style={{ borderBottom: '1px dashed #999', margin: '3px 0' }} />
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>

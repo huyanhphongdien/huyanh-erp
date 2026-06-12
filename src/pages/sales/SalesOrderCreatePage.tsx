@@ -725,7 +725,7 @@ function SalesOrderCreatePage() {
                       {' '}{Math.ceil(Math.round(item.quantity_tons * 1000 / (item.bale_weight_kg || 35)) / (item.bales_per_container || 576))} cont
                     </>
                   )}
-                  {' | '}${(item.quantity_tons * item.unit_price).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  {' | '}${(item.quantity_tons * item.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               )}
             </div>
@@ -875,7 +875,7 @@ function SalesOrderCreatePage() {
             <Col span={24}>
               <div style={{ fontSize: 11, color: '#999' }}>Giá trị {currency}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>
-                ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                ${itemsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </Col>
           </Row>

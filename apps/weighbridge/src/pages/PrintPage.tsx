@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, PrinterOutlined, LoadingOutlined } from '@ant-design
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
 import { supabase } from '@erp/lib/supabase'
+import { getFacilityCode } from '@/stores/facilityStore'
 import type { WeighbridgeTicket, WeighbridgeImage } from '@erp/services/wms/wms.types'
 
 const { Text } = Typography
@@ -37,6 +38,9 @@ export default function PrintPage() {
   const [partner, setPartner] = useState<{ name: string; label: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [paperSize, setPaperSize] = useState<PaperSize>(() => {
+    // Phong Điền: LUÔN mặc định A4 (in laser). Nơi khác (vd Quảng Trị máy in kim A5):
+    // nhớ lựa chọn cuối, fresh = A4.
+    if (getFacilityCode() === 'PD') return 'a4'
     return (localStorage.getItem('wb_paper_size') as PaperSize) || 'a4'
   })
 

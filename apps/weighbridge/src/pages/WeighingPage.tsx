@@ -1632,11 +1632,11 @@ export default function WeighingPage() {
                 </Card>
               )}
 
-              {/* OUT-only: Ghi chú đơn giản */}
-              {ticketDirection === 'out' && (
-                <Card size="small" title="Ghi chú" style={{ borderRadius: 12 }}>
+              {/* NHẬP + XUẤT: Ghi chú (mã hàng, lô hàng…). CỔNG có card "Nội dung hàng" riêng. */}
+              {ticketDirection !== 'gate' && (
+                <Card size="small" title="📝 Ghi chú (mã hàng, lô hàng)" style={{ borderRadius: 12 }}>
                   <Input.TextArea value={notes} onChange={(e) => setNotes(e.target.value)}
-                    rows={2} placeholder="Ghi chú thêm (nếu có)..." disabled={isCompleted} />
+                    rows={2} placeholder="Nhập mã hàng / lô hàng / ghi chú thêm (in lên phiếu)..." disabled={isCompleted} />
                 </Card>
               )}
 

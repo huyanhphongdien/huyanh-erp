@@ -20,7 +20,7 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Logistics (Xuất nhập khẩu) — quyền edit Booking / Container / Shipping only
   'logistics@huyanhrubber.com': 'logistics',
   'anhlp@huyanhrubber.com': 'logistics',
-  'nhungtt@huyanhrubber.com': 'logistics',  // Trương Thị Nhung — TP Logistics (2026-05-05)
+  'nhungtt@huyanhrubber.com': 'admin',  // Trương Thị Nhung — nâng ADMIN, phân quyền đầy đủ module Đơn hàng bán (2026-06-12)
   // Accounting
   'yendt@huyanhrubber.com': 'accounting',
   'phulv@huyanhrubber.com': 'accounting',
@@ -29,7 +29,6 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   'thuyht@huyanhrubber.com': 'admin',
   'huylv@huyanhrubber.com': 'admin',
   'trunglxh@huyanhrubber.com': 'admin', // Mr. Trung — admin toàn quyền (2026-05-14)
-  'nhunglt@huyanhrubber.com': 'admin',  // Chị Nhung (nhunglt) — phân quyền đầy đủ module Đơn hàng bán (2026-06-12)
 }
 
 export function getSalesRole(user: any): SalesRole | null {

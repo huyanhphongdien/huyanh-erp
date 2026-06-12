@@ -1598,8 +1598,11 @@ export default function WeighingPage() {
               </Card>
               )}
 
-              {/* OUT-only: Loại mủ trên xe — CHỌN NHIỀU (xe về PD có thể chở nhiều loại) */}
-              {ticketDirection === 'out' && (
+              {/* XUẤT CHUYỂN KHO mủ thô (TL/LAO → PD): chọn loại mủ thô trên xe.
+                  ẨN ở nhà máy XUẤT BÁN thành phẩm (PD, can_ship_to_customer) — PD xuất bành
+                  SVR/RSS đi cảng, không phải mủ thô; thông tin thành phẩm nhập ở ô Ghi chú.
+                  Vẫn hiện nếu đang gắn phiếu chuyển kho (mủ thô). */}
+              {ticketDirection === 'out' && (!currentFacility?.can_ship_to_customer || !!selectedTransferId) && (
                 <Card size="small" title="Loại mủ trên xe (chọn nhiều)" style={{ borderRadius: 12 }}>
                   <Space wrap>
                     {[

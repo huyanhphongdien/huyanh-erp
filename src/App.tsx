@@ -162,6 +162,13 @@ const PaymentRequestListPage = lazy(() => import('./pages/wms/rubber-intake/Paym
 const PaymentRequestCreatePage = lazy(() => import('./pages/wms/rubber-intake/PaymentRequestCreatePage'));
 const PaymentRequestDetailPage = lazy(() => import('./pages/wms/rubber-intake/PaymentRequestDetailPage'));
 const PaymentRequestPrintPage = lazy(() => import('./pages/wms/rubber-intake/PaymentRequestPrintPage'));
+// ===== LOGISTICS / VẬN TẢI — Lệnh điều động + Đội xe =====
+const FleetVehicleListPage = lazy(() => import('./pages/logistics/fleet/FleetVehicleListPage'));
+const FleetDriverListPage = lazy(() => import('./pages/logistics/fleet/FleetDriverListPage'));
+const DispatchListPage = lazy(() => import('./pages/logistics/dispatch/DispatchListPage'));
+const DispatchCreatePage = lazy(() => import('./pages/logistics/dispatch/DispatchCreatePage'));
+const DispatchDetailPage = lazy(() => import('./pages/logistics/dispatch/DispatchDetailPage'));
+const DispatchPrintPage = lazy(() => import('./pages/logistics/dispatch/DispatchPrintPage'));
 const VnBatchListPage = lazy(() => import('./pages/rubber/vn/VnBatchListPage'));
 const LaoTransferPage = lazy(() => import('./pages/rubber/lao/LaoTransferPage'));
 const LaoPurchasePage = lazy(() => import('./pages/rubber/lao/LaoPurchasePage'));
@@ -526,6 +533,18 @@ function App() {
                 <Route path="profiles" element={<RubberProfilePage />} />
                 <Route path="settlements" element={<SettlementPage />} />
                 <Route path="dashboard" element={<RubberDashboard />} />
+              </Route>
+
+              {/* ===== LOGISTICS / VẬN TẢI — Lệnh điều động + Đội xe ===== */}
+              <Route path="logistics">
+                <Route index element={<Navigate to="/logistics/dispatch" replace />} />
+                <Route path="dispatch" element={<DispatchListPage />} />
+                <Route path="dispatch/new" element={<DispatchCreatePage />} />
+                <Route path="dispatch/:id" element={<DispatchDetailPage />} />
+                <Route path="dispatch/:id/edit" element={<DispatchCreatePage />} />
+                <Route path="dispatch/:id/print" element={<DispatchPrintPage />} />
+                <Route path="fleet/vehicles" element={<FleetVehicleListPage />} />
+                <Route path="fleet/drivers" element={<FleetDriverListPage />} />
               </Route>
 
               {/* ===== PROJECTS MODULE ===== */}

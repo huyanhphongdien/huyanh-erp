@@ -201,6 +201,15 @@ export const navigationGroups: NavGroup[] = [
       { label: 'Báo cáo mua hàng', href: '/purchasing/reports', icon: TrendingUp },
     ],
   },
+  {
+    title: 'VẬN TẢI',
+    defaultOpen: true,
+    items: [
+      { label: 'Lệnh điều động', href: '/logistics/dispatch', icon: ClipboardList },
+      { label: 'Đội xe', href: '/logistics/fleet/vehicles', icon: Truck },
+      { label: 'Tài xế', href: '/logistics/fleet/drivers', icon: UserCheck },
+    ],
+  },
   // ★ ĐÃ ẨN: Group BÁO CÁO (đã tích hợp vào từng module)
   {
     title: 'CÀI ĐẶT',

@@ -1667,6 +1667,7 @@ export default function WeighingPage() {
                   ticketId={ticket.id}
                   disabled={isCompleted}
                   captureRef={cameraCaptureRef}
+                  autoOnly  // ẩn nút chụp tay — ảnh chỉ tự chụp khi bấm Ghi cân (tránh dư ảnh)
                 />
               )}
 

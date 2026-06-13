@@ -33,6 +33,9 @@ interface CameraPanelProps {
   onImageCountChange?: (count: number) => void
   captureRef?: React.MutableRefObject<((weighLabel?: string) => Promise<void>) | null>
   weighLabel?: string  // 'L1' or 'L2' — dùng để tag ảnh theo lần cân
+  // autoOnly: ẩn HẾT nút chụp/lưu tay — ảnh CHỈ tự chụp khi bấm "Ghi cân"
+  // (tránh operator chụp thừa → lưu quá nhiều ảnh). Giữ nút ⚙️ cài đặt + ảnh hiển thị.
+  autoOnly?: boolean
 }
 
 // ============================================================================
@@ -114,7 +117,7 @@ function getDahuaDirectUrl(config: CameraConfig): string {
 // COMPONENT
 // ============================================================================
 
-export default function CameraPanel({ ticketId, disabled, onImageCountChange, captureRef, weighLabel }: CameraPanelProps) {
+export default function CameraPanel({ ticketId, disabled, onImageCountChange, captureRef, weighLabel, autoOnly }: CameraPanelProps) {
   const [cameras, setCameras] = useState<CameraSlot[]>(loadCameraConfig)
   const [snapshots, setSnapshots] = useState<Record<string, string>>({}) // key -> blob URL
   const [savedImages, setSavedImages] = useState<Record<string, string>>({}) // key -> supabase URL
@@ -338,21 +341,25 @@ export default function CameraPanel({ ticketId, disabled, onImageCountChange, ca
           <Tooltip title="Cài đặt camera">
             <Button type="text" size="small" icon={<SettingOutlined />} onClick={openSettings} />
           </Tooltip>
-          <Tooltip title="Chụp tất cả">
-            <Button
-              type="text" size="small" icon={<CameraOutlined />}
-              onClick={captureAll}
-              disabled={disabled || configuredCount === 0}
-            />
-          </Tooltip>
-          {snapshotCount > 0 && ticketId && (
-            <Tooltip title="Lưu tất cả">
-              <Button
-                type="text" size="small" icon={<SaveOutlined />}
-                onClick={saveAll}
-                disabled={disabled}
-              />
-            </Tooltip>
+          {!autoOnly && (
+            <>
+              <Tooltip title="Chụp tất cả">
+                <Button
+                  type="text" size="small" icon={<CameraOutlined />}
+                  onClick={captureAll}
+                  disabled={disabled || configuredCount === 0}
+                />
+              </Tooltip>
+              {snapshotCount > 0 && ticketId && (
+                <Tooltip title="Lưu tất cả">
+                  <Button
+                    type="text" size="small" icon={<SaveOutlined />}
+                    onClick={saveAll}
+                    disabled={disabled}
+                  />
+                </Tooltip>
+              )}
+            </>
           )}
         </Space>
       }
@@ -404,30 +411,32 @@ export default function CameraPanel({ ticketId, disabled, onImageCountChange, ca
                     )}
                   </div>
 
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                    <Button
-                      size="small" block
-                      icon={<CameraOutlined />}
-                      loading={isCapturing}
-                      onClick={() => captureSnapshot(cam)}
-                      disabled={disabled || !cam.config.ip}
-                    >
-                      Chụp
-                    </Button>
-                    {snapshots[cam.key] && ticketId && !isSaved && (
+                  {/* Action buttons (ẩn khi autoOnly — ảnh chỉ tự chụp lúc ghi cân) */}
+                  {!autoOnly && (
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                       <Button
-                        size="small"
-                        icon={<SaveOutlined />}
-                        onClick={() => saveSnapshot(cam)}
-                        disabled={disabled}
-                        type="primary"
-                        style={{ background: '#16A34A', borderColor: '#16A34A' }}
+                        size="small" block
+                        icon={<CameraOutlined />}
+                        loading={isCapturing}
+                        onClick={() => captureSnapshot(cam)}
+                        disabled={disabled || !cam.config.ip}
                       >
-                        Lưu
+                        Chụp
                       </Button>
-                    )}
-                  </div>
+                      {snapshots[cam.key] && ticketId && !isSaved && (
+                        <Button
+                          size="small"
+                          icon={<SaveOutlined />}
+                          onClick={() => saveSnapshot(cam)}
+                          disabled={disabled}
+                          type="primary"
+                          style={{ background: '#16A34A', borderColor: '#16A34A' }}
+                        >
+                          Lưu
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </Col>
             )
@@ -435,8 +444,8 @@ export default function CameraPanel({ ticketId, disabled, onImageCountChange, ca
         </Row>
       )}
 
-      {/* Chụp tất cả + Lưu tất cả */}
-      {configuredCount > 0 && (
+      {/* Chụp tất cả + Lưu tất cả — ẩn khi autoOnly */}
+      {configuredCount > 0 && !autoOnly && (
         <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
           <Button
             block icon={<CameraOutlined />}
@@ -456,6 +465,15 @@ export default function CameraPanel({ ticketId, disabled, onImageCountChange, ca
               Lưu tất cả
             </Button>
           )}
+        </div>
+      )}
+
+      {/* autoOnly: nhắc ảnh tự chụp khi ghi cân (không có nút chụp tay) */}
+      {configuredCount > 0 && autoOnly && (
+        <div style={{ marginTop: 8, textAlign: 'center' }}>
+          <Text type="secondary" style={{ fontSize: 11.5 }}>
+            📸 Ảnh tự chụp khi bấm <strong>“Ghi cân lần 1/2”</strong> — không cần chụp tay.
+          </Text>
         </div>
       )}
 

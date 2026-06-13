@@ -398,6 +398,19 @@ const getMenuGroups = (
     ],
   },
 
+  // ★ VẬN TẢI — Lệnh điều động + Đội xe
+  // ============================================================
+  {
+    title: 'VẬN TẢI',
+    icon: <Truck size={18} />,
+    collapsible: true,
+    items: [
+      { path: '/logistics/dispatch', label: 'Lệnh điều động', icon: <ClipboardList size={18} /> },
+      { path: '/logistics/fleet/vehicles', label: 'Đội xe', icon: <Truck size={18} /> },
+      { path: '/logistics/fleet/drivers', label: 'Tài xế', icon: <UserCheck size={18} /> },
+    ],
+  },
+
   // QUẢN TRỊ: đã gộp vào MUA HÀNG (Phân quyền)
   {
     title: 'BÁO CÁO',
@@ -437,6 +450,7 @@ export function Sidebar() {
     'CHẤM CÔNG': false,
     'ĐƠN HÀNG BÁN': false,
     'KHO (WMS)': false,
+    'VẬN TẢI': false,
     // Mặc định ĐÓNG: module ít dùng hàng ngày
     'QUẢN LÝ SẢN XUẤT': true,
     'QUẢN LÝ CÔNG VIỆC': true,

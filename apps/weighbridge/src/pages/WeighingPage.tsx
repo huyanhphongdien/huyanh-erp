@@ -1103,6 +1103,14 @@ export default function WeighingPage() {
                   <Input.TextArea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    onBlur={() => {
+                      // Lưu ngay nếu phiếu đã tạo (notes chỉ gửi lúc create) — nếu không, in ra bị trống.
+                      if (ticket?.id && !isCompleted) {
+                        supabase.from('weighbridge_tickets')
+                          .update({ notes: notes || null }).eq('id', ticket.id)
+                          .then(({ error }) => { if (error) console.warn('Lưu nội dung hàng thất bại:', error.message) })
+                      }
+                    }}
                     rows={2}
                     placeholder="VD: Vật tư - dầu DO, phế liệu sắt, thành phẩm SVR 3L..."
                     disabled={isCompleted}
@@ -1639,6 +1647,16 @@ export default function WeighingPage() {
               {ticketDirection !== 'gate' && (
                 <Card size="small" title="📝 Ghi chú (mã hàng, lô hàng)" style={{ borderRadius: 12 }}>
                   <Input.TextArea value={notes} onChange={(e) => setNotes(e.target.value)}
+                    onBlur={() => {
+                      // notes chỉ được gửi lúc create(). Nếu phiếu ĐÃ tạo (đang cân) mà
+                      // operator mới nhập/sửa ghi chú → phải UPDATE xuống DB, nếu không phiếu
+                      // in ra (đọc từ DB) sẽ trống dù màn hình có chữ.
+                      if (ticket?.id && !isCompleted) {
+                        supabase.from('weighbridge_tickets')
+                          .update({ notes: notes || null }).eq('id', ticket.id)
+                          .then(({ error }) => { if (error) console.warn('Lưu ghi chú thất bại:', error.message) })
+                      }
+                    }}
                     rows={2} placeholder="Nhập mã hàng / lô hàng / ghi chú thêm (in lên phiếu)..." disabled={isCompleted} />
                 </Card>
               )}

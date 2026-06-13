@@ -61,6 +61,7 @@ import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
 import { containerService } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
+import { LOT_STAGES, buildLotTrackRows, lotOverallStage } from '../../services/sales/lotTracking'
 import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
@@ -1194,6 +1195,28 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   const deliveredCount = containers.filter(c => deliveryMap[c.id] === 'delivered').length
   const dispatchingCount = containers.filter(c => deliveryMap[c.id] === 'dispatching').length
 
+  // Theo dõi lô: gom container theo lô + giai đoạn (dùng util chung).
+  const lotTrackRows = buildLotTrackRows(containers, deliveryMap)
+  const lotCount = lotTrackRows.filter(r => r.lotNo != null).length
+  const lotTrackColumns: ColumnsType<typeof lotTrackRows[number]> = [
+    { title: 'Lô', key: 'lo', width: 96, render: (_: any, r) =>
+        r.lotNo != null ? <Text strong>Lô {r.lotNo}</Text> : <Text type="secondary">Chưa gán</Text> },
+    { title: 'Hạn giao', key: 'hg', width: 104, render: (_: any, r) => r.deadline ? formatDate(r.deadline) : '—' },
+    { title: 'Số cont', key: 'sc', width: 68, align: 'center' as const, render: (_: any, r) => r.total },
+    { title: 'Tiến độ', key: 'td', render: (_: any, r) => (
+        <Space size={[4, 4]} wrap>
+          {LOT_STAGES.filter(s => r.counts[s.key] > 0).map(s => (
+            <Tag key={s.key} color={s.color}>{s.icon} {s.short}: {r.counts[s.key]}</Tag>
+          ))}
+        </Space>
+      ) },
+    { title: 'Trạng thái lô', key: 'tt', width: 150, render: (_: any, r) => {
+        const { allDelivered, stage } = lotOverallStage(r)
+        if (allDelivered) return <Tag color="green">🟢 Đã giao xong</Tag>
+        return stage ? <Tag color={stage.color}>{stage.icon} {stage.label}</Tag> : '—'
+      } },
+  ]
+
   const renderPackingTab = () => (
     <Row gutter={[16, 16]}>
       {/* Container summary stats */}
@@ -1249,29 +1272,18 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         </Col>
       )}
 
-      {/* Tiến độ giao theo lot (derive từ lệnh điều động) */}
+      {/* Theo dõi lô — nhìn là biết: bao nhiêu cont, bao nhiêu lô, đã giao bao nhiêu */}
       {containers.length > 0 && (
         <Col xs={24}>
-          <Card size="small" style={{ background: '#F6FFED', borderColor: '#B7EB8F' }}>
-            <Space size={[8, 8]} wrap>
-              <Text strong>📦 Tiến độ giao:</Text>
-              <Tag color="green">✅ Đã giao {deliveredCount}/{containers.length}</Tag>
-              <Tag color="orange">🚚 Đang điều động {dispatchingCount}</Tag>
-              <Tag>Chưa giao {containers.length - deliveredCount - dispatchingCount}</Tag>
-              <span style={{ borderLeft: '1px solid #d9d9d9', height: 18 }} />
-              {Array.from(new Set(containers.map(c => c.lot_no).filter((v): v is number => v != null)))
-                .sort((a, b) => a - b)
-                .map(lot => {
-                  const ls = containers.filter(c => c.lot_no === lot)
-                  const done = ls.filter(c => deliveryMap[c.id] === 'delivered').length
-                  const dl = ls.find(c => c.lot_deadline)?.lot_deadline
-                  return (
-                    <Tag key={lot} color={done === ls.length ? 'green' : 'blue'}>
-                      Lot {lot}: {done}/{ls.length}{dl ? ` · hạn ${formatDate(dl)}` : ''}
-                    </Tag>
-                  )
-                })}
+          <Card size="small" title="📋 Theo dõi lô giao hàng" style={{ background: '#F6FFED', borderColor: '#B7EB8F' }}>
+            <Space size={[8, 8]} wrap style={{ marginBottom: 10 }}>
+              <Tag color="blue" style={{ fontSize: 13 }}>{containers.length} container</Tag>
+              <Tag color="purple" style={{ fontSize: 13 }}>{lotCount} lô{lotCount === 0 ? ' (chưa chia)' : ''}</Tag>
+              <Tag color="green" style={{ fontSize: 13 }}>✅ Đã giao {deliveredCount}/{containers.length} cont</Tag>
+              <Tag color="orange" style={{ fontSize: 13 }}>🚚 Đang điều {dispatchingCount}</Tag>
+              <Tag style={{ fontSize: 13 }}>Chưa giao {containers.length - deliveredCount - dispatchingCount}</Tag>
             </Space>
+            <Table dataSource={lotTrackRows} columns={lotTrackColumns} rowKey="key" size="small" pagination={false} bordered />
           </Card>
         </Col>
       )}
@@ -1775,9 +1787,6 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           }] : []),
         ]}
       />
-
-      {/* Status timeline */}
-      {renderTimeline()}
 
       {/* Container modal */}
       <Modal

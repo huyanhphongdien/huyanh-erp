@@ -47,6 +47,7 @@ import { salesOrderService } from '../../services/sales/salesOrderService'
 import { containerService } from '../../services/sales/containerService'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
+import { LOT_STAGES, buildLotTrackRows } from '../../services/sales/lotTracking'
 import type {
   SalesOrder,
   SalesOrderContainer,
@@ -71,16 +72,6 @@ const formatNumber = (v: number | null | undefined): string => {
   return v.toLocaleString('vi-VN')
 }
 
-// 5 giai đoạn của 1 container (theo thứ tự tiến triển). Trạng thái LÔ = giai đoạn
-// thấp nhất (mắt xích yếu nhất) trong các container của lô.
-type LotStageKey = 'producing' | 'packing' | 'ready' | 'dispatching' | 'delivered'
-const LOT_STAGES: Array<{ key: LotStageKey; label: string; short: string; icon: string; color: string }> = [
-  { key: 'producing',   label: 'Đang sản xuất',  short: 'SX',        icon: '🏭', color: 'default' },
-  { key: 'packing',     label: 'Đang đóng gói',  short: 'Đóng gói',  icon: '📦', color: 'gold' },
-  { key: 'ready',       label: 'Sẵn sàng giao',  short: 'Sẵn sàng',  icon: '✅', color: 'cyan' },
-  { key: 'dispatching', label: 'Đang điều động', short: 'Điều động', icon: '🚚', color: 'orange' },
-  { key: 'delivered',   label: 'Đã giao',        short: 'Đã giao',   icon: '🟢', color: 'green' },
-]
 
 // ============================================================================
 // COMPONENT
@@ -696,35 +687,8 @@ function ContainerPackingPage() {
   // THEO DÕI LÔ — gộp container theo lô + giai đoạn
   // ══════════════════════════════════════════════════════════════
 
-  // Giai đoạn 1 container: cân xuất rồi → đã giao; trong lệnh chưa cân → điều động;
-  // đã seal → sẵn sàng; có bành/đang đóng → đóng gói; còn lại → đang sản xuất/chờ hàng.
-  const stageOf = (c: SalesOrderContainer): LotStageKey => {
-    const d = deliveryMap[c.id]
-    if (d === 'delivered') return 'delivered'
-    if (d === 'dispatching') return 'dispatching'
-    if (c.status === 'sealed' || c.status === 'shipped') return 'ready'
-    if ((c.items?.length || 0) > 0 || c.status === 'packing') return 'packing'
-    return 'producing'
-  }
-
-  const lotTrackRows = (() => {
-    const m = new Map<string, {
-      key: string; lotNo: number | null; deadline: string | null; total: number
-      counts: Record<LotStageKey, number>
-    }>()
-    for (const c of containers) {
-      const key = c.lot_no != null ? String(c.lot_no) : '__none__'
-      if (!m.has(key)) {
-        m.set(key, { key, lotNo: c.lot_no ?? null, deadline: null, total: 0,
-          counts: { producing: 0, packing: 0, ready: 0, dispatching: 0, delivered: 0 } })
-      }
-      const r = m.get(key)!
-      r.total++
-      if (c.lot_deadline && !r.deadline) r.deadline = c.lot_deadline
-      r.counts[stageOf(c)]++
-    }
-    return [...m.values()].sort((a, b) => (a.lotNo ?? 99999) - (b.lotNo ?? 99999))
-  })()
+  // Theo dõi lô: gom container theo lô + giai đoạn (util chung với tab Đóng gói).
+  const lotTrackRows = buildLotTrackRows(containers, deliveryMap)
 
   const lotTrackColumns: ColumnsType<typeof lotTrackRows[number]> = [
     { title: 'Lô', key: 'lo', width: 110, render: (_: unknown, r) =>

@@ -40,6 +40,8 @@ import {
   LockOutlined,
   ContainerOutlined,
   InboxOutlined,
+  AppstoreAddOutlined,
+  TagsOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { containerService } from '../../services/sales/containerService'
@@ -96,6 +98,13 @@ function ContainerPackingPage() {
   const [addBalesModalOpen, setAddBalesModalOpen] = useState(false)
   const [addBalesContainerId, setAddBalesContainerId] = useState<string | null>(null)
   const [addBalesForm] = Form.useForm()
+
+  // Chia lô: chọn nhiều cont để gán lô (Cách A) + tạo container theo lô (Cách B)
+  const [lotSelectedKeys, setLotSelectedKeys] = useState<string[]>([])
+  const [bulkLotOpen, setBulkLotOpen] = useState(false)
+  const [bulkLotForm] = Form.useForm()
+  const [createLotOpen, setCreateLotOpen] = useState(false)
+  const [createLotForm] = Form.useForm()
   const [availableBatches, setAvailableBatches] = useState<Array<{
     id: string
     batch_no: string
@@ -291,6 +300,52 @@ function ContainerPackingPage() {
       }
     } catch (e: any) {
       message.error('Lỗi lưu lô: ' + (e?.message || e))
+    }
+  }
+
+  // Cách A — gán Lô/Hạn cho nhiều container đã chọn 1 lần.
+  const handleBulkSetLot = async () => {
+    try {
+      const vals = await bulkLotForm.validateFields()
+      const patch: { lot_no?: number | null; lot_deadline?: string | null } = { lot_no: vals.lot_no ?? null }
+      if (vals.lot_deadline) patch.lot_deadline = vals.lot_deadline.format('YYYY-MM-DD')
+      await containerService.bulkSetLot(lotSelectedKeys, patch)
+      message.success(`Đã gán Lô ${vals.lot_no} cho ${lotSelectedKeys.length} container`)
+      setBulkLotOpen(false)
+      setLotSelectedKeys([])
+      bulkLotForm.resetFields()
+      loadData()
+    } catch (err: any) {
+      if (err?.errorFields) return
+      message.error(err?.message || 'Không thể gán lô')
+    }
+  }
+
+  // Cách B — tạo container placeholder theo lô (chưa cần số cont/seal).
+  const handleCreateByLot = async () => {
+    try {
+      const vals = await createLotForm.validateFields()
+      const baleWeight = order?.bale_weight_kg || 35
+      const ctype = (order?.container_type as any) || '20ft'
+      const lots = (vals.lots || [])
+        .filter((l: any) => l && l.count > 0)
+        .map((l: any) => ({
+          lot_no: l.lot_no,
+          count: l.count,
+          lot_deadline: l.deadline ? l.deadline.format('YYYY-MM-DD') : null,
+          container_type: ctype,
+          bale_count: l.bales || null,
+          net_weight_kg: l.bales ? Math.round(l.bales * baleWeight) : null,
+        }))
+      if (lots.length === 0) { message.warning('Chưa khai báo lô nào'); return }
+      const created = await containerService.createPlannedContainers(orderId!, lots)
+      message.success(`Đã tạo ${created} container theo ${lots.length} lô`)
+      setCreateLotOpen(false)
+      createLotForm.resetFields()
+      loadData()
+    } catch (err: any) {
+      if (err?.errorFields) return
+      message.error(err?.message || 'Không thể tạo theo lô')
     }
   }
 
@@ -732,6 +787,18 @@ function ContainerPackingPage() {
           >
             Thêm container
           </Button>
+          <Button
+            icon={<AppstoreAddOutlined />}
+            onClick={() => {
+              createLotForm.setFieldsValue({
+                lots: [{ lot_no: 1, count: order.container_count || undefined, bales: order.bales_per_container || undefined, deadline: undefined }],
+              })
+              setCreateLotOpen(true)
+            }}
+            style={{ color: '#1B4D3E', borderColor: '#1B4D3E' }}
+          >
+            Tạo theo lô
+          </Button>
         </Space>
       </Card>
 
@@ -759,9 +826,33 @@ function ContainerPackingPage() {
               )
             })}
           </Space>
-          <Table dataSource={containers} columns={lotColumns} rowKey="id" size="small" pagination={false} bordered />
+
+          {/* Cách A — gán lô cho nhiều cont đã chọn */}
+          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Button
+              type="primary" size="small" icon={<TagsOutlined />}
+              disabled={lotSelectedKeys.length === 0}
+              onClick={() => { bulkLotForm.resetFields(); setBulkLotOpen(true) }}
+              style={{ background: lotSelectedKeys.length ? '#1B4D3E' : undefined, borderColor: lotSelectedKeys.length ? '#1B4D3E' : undefined }}
+            >
+              Gán Lô cho {lotSelectedKeys.length || ''} cont đã chọn
+            </Button>
+            {lotSelectedKeys.length > 0 && (
+              <Button size="small" type="link" onClick={() => setLotSelectedKeys([])}>Bỏ chọn</Button>
+            )}
+          </div>
+
+          <Table
+            dataSource={containers}
+            columns={lotColumns}
+            rowKey="id"
+            size="small"
+            pagination={false}
+            bordered
+            rowSelection={{ selectedRowKeys: lotSelectedKeys, onChange: (keys) => setLotSelectedKeys(keys as string[]) }}
+          />
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-            Gõ số <b>Lô</b> cho từng container (vd 1, 2, 3 — mỗi số là 1 đợt giao). Đặt <b>Hạn giao</b> 1 container → tự áp cả lô. Cột Giao hàng tự cập nhật khi điều động + cân.
+            Gõ số <b>Lô</b> từng dòng, hoặc tích nhiều dòng → <b>Gán Lô</b> 1 lần. Đặt <b>Hạn giao</b> 1 container → tự áp cả lô. <b>Không cần số cont/seal</b> — điền sau khi có booking. Cột Giao hàng tự cập nhật khi điều động + cân.
           </Text>
         </Card>
       )}
@@ -926,6 +1017,88 @@ function ContainerPackingPage() {
               </Form.Item>
             </Col>
           </Row>
+        </Form>
+      </Modal>
+
+      {/* Cách A — Gán Lô cho nhiều container đã chọn */}
+      <Modal
+        title={<span><TagsOutlined style={{ marginRight: 6 }} />Gán Lô cho {lotSelectedKeys.length} container</span>}
+        open={bulkLotOpen}
+        onOk={handleBulkSetLot}
+        onCancel={() => { setBulkLotOpen(false); bulkLotForm.resetFields() }}
+        okText="Áp dụng"
+        cancelText="Hủy"
+        okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
+      >
+        <Form form={bulkLotForm} layout="vertical">
+          <Form.Item label="Số Lô" name="lot_no" rules={[{ required: true, message: 'Nhập số lô' }]}>
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="Vd: 2" />
+          </Form.Item>
+          <Form.Item label="Hạn giao (tuỳ chọn — bỏ trống thì không đổi)" name="lot_deadline">
+            <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+          </Form.Item>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Áp Lô (và hạn) cho <b>{lotSelectedKeys.length}</b> container đang chọn.
+          </Text>
+        </Form>
+      </Modal>
+
+      {/* Cách B — Tạo container placeholder theo lô (chưa cần số cont/seal) */}
+      <Modal
+        title={<span><AppstoreAddOutlined style={{ marginRight: 6 }} />Tạo container theo lô</span>}
+        open={createLotOpen}
+        onOk={handleCreateByLot}
+        onCancel={() => { setCreateLotOpen(false); createLotForm.resetFields() }}
+        okText="Tạo"
+        cancelText="Hủy"
+        width={680}
+        okButtonProps={{ style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
+      >
+        <Form form={createLotForm} layout="vertical">
+          <Form.List name="lots">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((field, idx) => (
+                  <Row gutter={8} key={field.key} align="middle">
+                    <Col span={4}>
+                      <Form.Item label={idx === 0 ? 'Lô' : undefined} name={[field.name, 'lot_no']} rules={[{ required: true, message: '!' }]}>
+                        <InputNumber min={1} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label={idx === 0 ? 'Số container' : undefined} name={[field.name, 'count']} rules={[{ required: true, message: 'Nhập số' }]}>
+                        <InputNumber min={1} style={{ width: '100%' }} placeholder="vd 5" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label={idx === 0 ? 'Số bành/cont' : undefined} name={[field.name, 'bales']}>
+                        <InputNumber min={0} style={{ width: '100%' }} placeholder="vd 576" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label={idx === 0 ? 'Hạn giao' : undefined} name={[field.name, 'deadline']}>
+                        <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={2} style={{ paddingTop: idx === 0 ? 30 : 0 }}>
+                      {fields.length > 1 && (
+                        <Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
+                      )}
+                    </Col>
+                  </Row>
+                ))}
+                <Button
+                  type="dashed" block icon={<PlusOutlined />}
+                  onClick={() => add({ lot_no: fields.length + 1, count: undefined, bales: order?.bales_per_container || undefined, deadline: undefined })}
+                >
+                  Thêm lô
+                </Button>
+              </>
+            )}
+          </Form.List>
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 10 }}>
+            Mỗi lô sinh ra <b>N container rỗng</b> (chưa số cont/seal) đã gán sẵn <b>Lô + Hạn giao</b>. Số cont/seal điền sau khi có booking hãng tàu.
+          </Text>
         </Form>
       </Modal>
     </div>

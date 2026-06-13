@@ -203,6 +203,72 @@ export const containerService = {
   },
 
   // ==========================================================================
+  // BULK SET LOT — Gán Lô / Hạn giao cho NHIỀU container 1 lần (Cách A)
+  // ==========================================================================
+
+  async bulkSetLot(
+    ids: string[],
+    patch: { lot_no?: number | null; lot_deadline?: string | null },
+  ): Promise<void> {
+    if (ids.length === 0) return
+    const updateData: Record<string, unknown> = {}
+    if (patch.lot_no !== undefined) updateData.lot_no = patch.lot_no
+    if (patch.lot_deadline !== undefined) updateData.lot_deadline = patch.lot_deadline
+    if (Object.keys(updateData).length === 0) return
+
+    const { error } = await supabase
+      .from('sales_order_containers')
+      .update(updateData)
+      .in('id', ids)
+
+    if (error) throw new Error(`Không thể gán lô hàng loạt: ${error.message}`)
+  },
+
+  // ==========================================================================
+  // CREATE PLANNED CONTAINERS — Tạo container placeholder theo LÔ (Cách B)
+  // Tạo trước khi có số cont/seal: mỗi lô sinh N container rỗng, gán sẵn lot_no +
+  // lot_deadline (+ số bành/KL kế hoạch nếu có). Số cont/seal điền sau khi có booking.
+  // ==========================================================================
+
+  async createPlannedContainers(
+    orderId: string,
+    lots: Array<{
+      lot_no: number
+      lot_deadline: string | null
+      count: number
+      container_type?: ContainerType
+      bale_count?: number | null
+      net_weight_kg?: number | null
+    }>,
+  ): Promise<number> {
+    const rows: Record<string, unknown>[] = []
+    for (const lot of lots) {
+      const n = Math.max(0, Math.floor(lot.count || 0))
+      for (let i = 0; i < n; i++) {
+        rows.push({
+          sales_order_id: orderId,
+          container_no: null,
+          seal_no: null,
+          container_type: lot.container_type || '20ft',
+          gross_weight_kg: null,
+          tare_weight_kg: null,
+          net_weight_kg: lot.net_weight_kg ?? null,
+          bale_count: lot.bale_count ?? null,
+          lot_no: lot.lot_no,
+          lot_deadline: lot.lot_deadline,
+          status: 'planning' as ContainerStatus,
+          notes: `Lô ${lot.lot_no} (kế hoạch — chờ nhập số cont/seal)`,
+        })
+      }
+    }
+    if (rows.length === 0) return 0
+
+    const { error } = await supabase.from('sales_order_containers').insert(rows)
+    if (error) throw new Error(`Không thể tạo container theo lô: ${error.message}`)
+    return rows.length
+  },
+
+  // ==========================================================================
   // DELETE CONTAINER — Xóa container (chỉ khi planning)
   // ==========================================================================
 

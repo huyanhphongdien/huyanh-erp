@@ -63,6 +63,7 @@ export default function DispatchCreatePage() {
   // SO picker
   const [soModalOpen, setSoModalOpen] = useState(false)
   const [soOptions, setSoOptions] = useState<SalesOrderOption[]>([])
+  const [selectedSoLabel, setSelectedSoLabel] = useState<string>('')  // nhãn đẹp (mã đơn + khách) — KHÔNG hiện UUID
   const [soSearch, setSoSearch] = useState('')
   const [soLoading, setSoLoading] = useState(false)
 
@@ -106,6 +107,7 @@ export default function DispatchCreatePage() {
           note: order.note,
           sales_order_id: order.sales_order_id,
         })
+        if (order.sales_order) setSelectedSoLabel(`${order.sales_order.code}${order.customer_name ? ' — ' + order.customer_name : ''}`)
         setLines(ls.map(l => ({
           _key: newKey(), id: l.id,
           route: l.route, lot_code: l.lot_code, grade: l.grade, container_no: l.container_no,
@@ -158,6 +160,7 @@ export default function DispatchCreatePage() {
         trip_type: header.trip_type || 'port',
       })
       setLines(soLines.map(l => ({ ...l, _key: newKey() })))
+      setSelectedSoLabel(`${so.code}${so.customer_name ? ' — ' + so.customer_name : ''}`)
       setSoModalOpen(false)
       message.success(`Đã đổ ${soLines.length} container từ ${so.code}`)
     } catch (e: any) {
@@ -277,9 +280,11 @@ export default function DispatchCreatePage() {
             <Col xs={24} sm={8} md={13}>
               <Form.Item label="Đơn hàng bán (tuỳ chọn)">
                 <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item name="sales_order_id" noStyle><Input readOnly placeholder="Chưa gắn đơn hàng" /></Form.Item>
-                  <Button icon={<ImportOutlined />} onClick={openSoPicker}>Tạo từ Đơn hàng bán</Button>
+                  <Input readOnly value={selectedSoLabel} placeholder="Chưa gắn đơn hàng" />
+                  <Button icon={<ImportOutlined />} onClick={openSoPicker}>{selectedSoLabel ? 'Đổi đơn' : 'Tạo từ Đơn hàng bán'}</Button>
                 </Space.Compact>
+                {/* sales_order_id giữ trong form để submit, KHÔNG hiển thị UUID cho người dùng */}
+                <Form.Item name="sales_order_id" hidden><Input /></Form.Item>
               </Form.Item>
             </Col>
           </Row>

@@ -232,6 +232,23 @@ export default function DispatchCreatePage() {
 
   const closePicker = () => { setSoModalOpen(false); setPickerSo(null) }
 
+  // Gom container của đơn theo LÔ → quick-select "Chọn cả Lot X" (máy móc),
+  // vẫn giữ tích từng cont để chỉnh tay (theo ý).
+  const lotGroups = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; ids: string[] }>()
+    for (const c of pickerContainers) {
+      const key = c.lot_code || '__nolot__'
+      if (!map.has(key)) map.set(key, { key, label: c.lot_code || 'Chưa gán lô', ids: [] })
+      map.get(key)!.ids.push(c.sales_order_container_id as string)
+    }
+    return [...map.values()]
+  }, [pickerContainers])
+
+  const toggleLot = (ids: string[], allSelected: boolean) =>
+    setPickerChecked(prev => allSelected
+      ? prev.filter(x => !ids.includes(x))               // đang chọn hết → bỏ chọn cả lô
+      : [...new Set([...prev, ...ids])])                 // chọn cả lô
+
   // Gỡ 1 đơn khỏi lệnh → xoá luôn container của đơn đó khỏi bảng.
   const removeAttachedSo = (soId: string) => {
     const target = attachedSos.find(s => s.id === soId)
@@ -449,6 +466,22 @@ export default function DispatchCreatePage() {
               Tích chọn <b>container đi chuyến này</b> của <b>{pickerSo.code}</b>
               {pickerSo.customer_name ? ` — ${pickerSo.customer_name}` : ''}. Chỉ hiện container <b>chưa điều động</b>.
             </div>
+            {/* Quick-select theo lô: 1 cú chọn cả Lot, vẫn chỉnh tay được bằng checkbox */}
+            <Space size={[8, 8]} wrap style={{ marginBottom: 10 }}>
+              <Button size="small" onClick={() => setPickerChecked(pickerContainers.map(c => c.sales_order_container_id as string))}>Chọn tất cả</Button>
+              <Button size="small" onClick={() => setPickerChecked([])}>Bỏ chọn</Button>
+              {lotGroups.length > 0 && <span style={{ borderLeft: '1px solid #d9d9d9', height: 18 }} />}
+              {lotGroups.map(g => {
+                const sel = g.ids.filter(id => pickerChecked.includes(id)).length
+                const allSel = sel === g.ids.length
+                return (
+                  <Button key={g.key} size="small" type={allSel ? 'primary' : 'default'}
+                    onClick={() => toggleLot(g.ids, allSel)}>
+                    {g.label} · {sel}/{g.ids.length}
+                  </Button>
+                )
+              })}
+            </Space>
             <Table rowKey={(r: DispatchLineInput) => r.sales_order_container_id as string}
               size="small" pagination={false} dataSource={pickerContainers} scroll={{ y: 360 }}
               rowSelection={{ selectedRowKeys: pickerChecked, onChange: (keys) => setPickerChecked(keys as string[]) }}

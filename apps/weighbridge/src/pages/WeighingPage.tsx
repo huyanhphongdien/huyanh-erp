@@ -22,6 +22,7 @@ import { dealWmsService } from '@erp/services/b2b/dealWmsService'
 import type { ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
 import { salesOrderService } from '@erp/services/sales/salesOrderService'
 import type { SalesOrderContainer } from '@erp/services/sales/salesTypes'
+import { dispatchService, type DispatchOrder, type DispatchLine } from '@erp/services/logistics/dispatchService'
 import type { WeighbridgeTicket } from '@erp/services/wms/wms.types'
 import {
   calculateWeights, saveRubberFields, saveCalculatedValues, getRubberSuppliers,
@@ -100,6 +101,13 @@ export default function WeighingPage() {
   const [loadingSO, setLoadingSO] = useState(false)
   const [loadingContainers, setLoadingContainers] = useState(false)
   const [sealNoActual, setSealNoActual] = useState('')
+
+  // ĐỢT 2: Lệnh điều động — cân XUẤT đi cảng chọn lệnh → đồng bộ KL/seal thực về lệnh.
+  const [dispatchOrders, setDispatchOrders] = useState<DispatchOrder[]>([])
+  const [selectedDispatchOrderId, setSelectedDispatchOrderId] = useState<string>('')
+  const [dispatchLines, setDispatchLines] = useState<DispatchLine[]>([])
+  const [selectedDispatchLineId, setSelectedDispatchLineId] = useState<string>('')
+  const [loadingDispatch, setLoadingDispatch] = useState(false)
 
   // F3 Transfer: pending transfers cho NM hiện tại (theo direction)
   // - OUT + facility != PD → transfers đang gửi từ facility này
@@ -244,6 +252,29 @@ export default function WeighingPage() {
     if (selectedContainer?.seal_no) setSealNoActual(selectedContainer.seal_no)
   }, [selectedContainerId])
 
+  // ĐỢT 2: Load lệnh điều động còn hiệu lực khi cân XUẤT đi cảng (NM xuất khẩu = PD).
+  useEffect(() => {
+    if (ticketDirection !== 'out' || !currentFacility?.can_ship_to_customer) return
+    setLoadingDispatch(true)
+    dispatchService.listForWeighing()
+      .then(setDispatchOrders)
+      .catch(e => console.warn('Load dispatch orders failed:', e))
+      .finally(() => setLoadingDispatch(false))
+  }, [ticketDirection, currentFacility?.can_ship_to_customer])
+
+  // Load các dòng (container) của lệnh khi chọn lệnh; tự chọn nếu lệnh chỉ 1 dòng.
+  useEffect(() => {
+    if (!selectedDispatchOrderId) { setDispatchLines([]); setSelectedDispatchLineId(''); return }
+    dispatchService.getById(selectedDispatchOrderId).then(res => {
+      if (!res) return
+      setDispatchLines(res.lines)
+      if (res.lines.length === 1) setSelectedDispatchLineId(res.lines[0].id)
+    }).catch(e => console.warn('Load dispatch lines failed:', e))
+  }, [selectedDispatchOrderId])
+
+  const selectedDispatch = dispatchOrders.find(d => d.id === selectedDispatchOrderId)
+  const selectedDispatchLine = dispatchLines.find(l => l.id === selectedDispatchLineId)
+
   // Load existing ticket if editing
   useEffect(() => {
     if (ticketId) {
@@ -269,6 +300,8 @@ export default function WeighingPage() {
         // Sync SO/container nếu OUT
         if (ext.sales_order_id) setSelectedSalesOrderId(ext.sales_order_id)
         if (ext.container_id) setSelectedContainerId(ext.container_id)
+        // ĐỢT 2: Sync lệnh điều động đã gắn (reference_type='dispatch_order')
+        if (ext.reference_type === 'dispatch_order' && ext.reference_id) setSelectedDispatchOrderId(ext.reference_id)
         if (ext.deal_id) { setSelectedDealId(ext.deal_id); setSourceType('deal') }
         if (ext.supplier_id) { setSelectedSupplierId(ext.supplier_id); setSourceType('supplier') }
         if (ext.partner_id && !ext.deal_id && !ext.supplier_id) setSourceType('partner_direct')
@@ -477,6 +510,18 @@ export default function WeighingPage() {
         }
       }
 
+      // ĐỢT 2: link Lệnh điều động (để báo cáo biết hàng gì + đồng bộ KL khi hoàn tất)
+      if (ticketDirection === 'out' && selectedDispatchOrderId) {
+        try {
+          await supabase.from('weighbridge_tickets').update({
+            reference_type: 'dispatch_order',
+            reference_id: selectedDispatchOrderId,
+          }).eq('id', t.id)
+        } catch (e) {
+          console.warn('Link dispatch order failed:', e)
+        }
+      }
+
       // F3: Link transfer_id nếu user đã chọn phiếu chuyển kho
       if (selectedTransferId) {
         try {
@@ -566,6 +611,16 @@ export default function WeighingPage() {
             : `Cân lần 2 (xe + hàng): ${weight.toLocaleString()} kg → NET hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`)
           setManualWeight(null)
           if (cameraCaptureRef.current) cameraCaptureRef.current('L2').catch(() => {})
+          // ĐỢT 2: ghi KL net + seal thực về lệnh điều động (chỉ XUẤT, không gate)
+          if (selectedDispatchOrderId && !isGateTicket) {
+            dispatchService.syncWeighing({
+              orderId: selectedDispatchOrderId,
+              lineId: selectedDispatchLineId || null,
+              ticketId: ticket.id,
+              netWeight: c.net_weight,
+              sealNo: sealNoActual || null,
+            }).catch(e => console.warn('Sync dispatch weighing failed:', e))
+          }
         }
         return
       }
@@ -1203,11 +1258,76 @@ export default function WeighingPage() {
                 </Card>
               )}
 
+              {/* ĐỢT 2: Lệnh điều động — cân XUẤT đi cảng chọn lệnh để biết HÀNG GÌ + đồng bộ
+                  KL/seal thực về lệnh. Chỉ hiện ở NM xuất khẩu (PD), ẩn khi đã chọn transfer. */}
+              {ticketDirection === 'out' && !selectedTransferId && currentFacility?.can_ship_to_customer && (
+                <Card size="small" title="🚚 Lệnh điều động (xuất đi cảng)" style={{ borderRadius: 12, borderColor: PRIMARY }}>
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Chọn lệnh điều động — để biết hàng gì + ghi KL cân về lệnh</Text>
+                      <Select
+                        value={selectedDispatchOrderId || undefined}
+                        onChange={v => { setSelectedDispatchOrderId(v || ''); setSelectedDispatchLineId('') }}
+                        placeholder="Chọn lệnh điều động..."
+                        style={{ width: '100%' }}
+                        disabled={!!ticket}
+                        allowClear
+                        loading={loadingDispatch}
+                        showSearch
+                        optionFilterProp="label"
+                        options={dispatchOrders.map(d => ({
+                          value: d.id,
+                          label: `${d.code} — ${d.customer_name || '—'} — ${d.destination || '—'} — ${d.total_lines} cont`,
+                        }))}
+                      />
+                      {selectedDispatch && (
+                        <div style={{ marginTop: 8, padding: 8, background: '#ECFDF5', borderRadius: 8 }}>
+                          <Text strong style={{ color: '#065F46' }}>{selectedDispatch.customer_name || '—'}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {selectedDispatch.tractor_plate || '—'}{selectedDispatch.trailer_plate ? ` + ${selectedDispatch.trailer_plate}` : ''}
+                            {selectedDispatch.destination && ` · ${selectedDispatch.destination}`}
+                          </Text>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedDispatchOrderId && dispatchLines.length > 0 && (
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Container của lệnh (1 phiếu cân = 1 container)</Text>
+                        <Select
+                          value={selectedDispatchLineId || undefined}
+                          onChange={v => {
+                            setSelectedDispatchLineId(v || '')
+                            const ln = dispatchLines.find(l => l.id === v)
+                            if (ln?.seal_no) setSealNoActual(ln.seal_no)
+                          }}
+                          placeholder="Chọn container..."
+                          style={{ width: '100%' }}
+                          disabled={!!ticket}
+                          allowClear
+                          options={dispatchLines.map(l => ({
+                            value: l.id,
+                            label: `${l.container_no || '(chưa số)'}${l.grade ? ` · ${l.grade}` : ''}${l.seal_no ? ` · seal ${l.seal_no}` : ''}${l.actual_weight_kg != null ? ` · ✅ đã cân` : ''}`,
+                          }))}
+                        />
+                        {selectedDispatchLine && (
+                          <div style={{ marginTop: 8, padding: 8, background: '#F0FDF4', borderRadius: 8, fontSize: 12 }}>
+                            KL kế hoạch: <Text strong>{(selectedDispatchLine.weight_kg || 0).toLocaleString()} kg</Text>
+                            {' · '}KL cân thực sẽ tự ghi về lệnh khi hoàn tất.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Space>
+                </Card>
+              )}
+
               {/* S3 OUT: Sales Order + Container picker — CHỈ hiện ở NM xuất khẩu (PD).
                   Ẩn ở TL/LAO (can_ship_to_customer=false) vì các NM này không xuất trực tiếp,
                   chỉ làm transfer về PD. Cũng ẨN khi đã chọn transfer (tránh confusion). */}
               {ticketDirection === 'out' && !selectedTransferId && currentFacility?.can_ship_to_customer && (
-                <Card size="small" title="Đơn hàng xuất" style={{ borderRadius: 12, borderColor: '#E8A838' }}>
+                <Card size="small" title="Đơn hàng xuất (tuỳ chọn — trừ kho theo SO)" style={{ borderRadius: 12, borderColor: '#E8A838' }}>
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     <div>
                       <Text type="secondary" style={{ fontSize: 12 }}>Sales Order (tuỳ chọn — bỏ trống nếu xuất lẻ)</Text>

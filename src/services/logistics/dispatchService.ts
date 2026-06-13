@@ -352,6 +352,48 @@ async function setStatus(id: string, next: DispatchStatus): Promise<DispatchOrde
 }
 
 // ============================================================================
+// TÍCH HỢP TRẠM CÂN (ĐỢT 2) — cân XUẤT chọn lệnh → đồng bộ KL/seal thực
+// ============================================================================
+
+/** Danh sách lệnh CÒN HIỆU LỰC để chọn khi cân XUẤT (bỏ completed/cancelled). */
+async function listForWeighing(): Promise<DispatchOrder[]> {
+  const { data, error } = await supabase
+    .from('dispatch_orders')
+    .select(ORDER_SELECT)
+    .not('status', 'in', '(completed,cancelled)')
+    .order('dispatch_date', { ascending: false })
+    .limit(100)
+  if (error) throw error
+  return (data || []).map(normalizeOrder)
+}
+
+/**
+ * Đồng bộ kết quả cân thực tế về lệnh điều động:
+ *  - Ghi KL net + seal thực vào DÒNG (container) đã chọn.
+ *  - Gắn weighbridge_ticket_id vào lệnh (chỉ set nếu còn trống — phiếu cân đầu tiên).
+ * Best-effort: lỗi không chặn nghiệp vụ cân.
+ */
+async function syncWeighing(params: {
+  orderId: string
+  lineId?: string | null
+  ticketId: string
+  netWeight: number
+  sealNo?: string | null
+}): Promise<void> {
+  if (params.lineId) {
+    await supabase
+      .from('dispatch_order_lines')
+      .update({ actual_weight_kg: params.netWeight, actual_seal_no: params.sealNo || null })
+      .eq('id', params.lineId)
+  }
+  await supabase
+    .from('dispatch_orders')
+    .update({ weighbridge_ticket_id: params.ticketId })
+    .eq('id', params.orderId)
+    .is('weighbridge_ticket_id', null)
+}
+
+// ============================================================================
 // TÍCH HỢP ĐƠN HÀNG BÁN
 // ============================================================================
 
@@ -477,6 +519,8 @@ export const dispatchService = {
   setStatus,
   listSalesOrderOptions,
   buildFromSalesOrder,
+  listForWeighing,
+  syncWeighing,
 }
 
 export default dispatchService

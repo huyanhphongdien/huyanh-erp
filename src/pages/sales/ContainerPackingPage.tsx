@@ -24,12 +24,14 @@ import {
   Form,
   Input,
   InputNumber,
+  DatePicker,
   Select,
   Collapse,
   Popconfirm,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
 import {
   ArrowLeftOutlined,
   PlusOutlined,
@@ -42,6 +44,7 @@ import {
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { containerService } from '../../services/sales/containerService'
 import type { ContainerSummary } from '../../services/sales/containerService'
+import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
 import type {
   SalesOrder,
   SalesOrderContainer,
@@ -78,6 +81,7 @@ function ContainerPackingPage() {
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [containers, setContainers] = useState<SalesOrderContainer[]>([])
   const [summary, setSummary] = useState<ContainerSummary | null>(null)
+  const [deliveryMap, setDeliveryMap] = useState<Record<string, DeliveryState>>({})
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -116,6 +120,9 @@ function ContainerPackingPage() {
       setOrder(o)
       setContainers(c)
       setSummary(s)
+      // Trạng thái giao của từng container (theo lệnh điều động) — cho cột Giao hàng + tiến độ lô.
+      try { setDeliveryMap(await dispatchService.getDeliveryStatus(c.map((x) => x.id))) }
+      catch { /* best-effort */ }
     } catch (err) {
       console.error(err)
       message.error('Không thể tải dữ liệu đóng gói')
@@ -260,6 +267,30 @@ function ContainerPackingPage() {
     } catch (err: any) {
       if (err?.errorFields) return
       message.error(err?.message || 'Không thể thêm bành')
+    }
+  }
+
+  // Gán lô / hạn giao cho container (lưu ngay). Đặt hạn 1 cont → tự áp cho cả lô cùng số.
+  const handleSetContainerLot = async (
+    containerId: string,
+    patch: { lot_no?: number | null; lot_deadline?: string | null },
+  ) => {
+    setContainers((prev) => prev.map((c) => (c.id === containerId ? { ...c, ...patch } : c)))
+    try {
+      await containerService.updateContainer(containerId, patch as any)
+      if (patch.lot_deadline !== undefined) {
+        const cur = containers.find((c) => c.id === containerId)
+        const lot = patch.lot_no ?? cur?.lot_no
+        if (lot != null) {
+          const sameLot = containers.filter((c) => c.lot_no === lot && c.id !== containerId)
+          if (sameLot.length) {
+            setContainers((prev) => prev.map((c) => (c.lot_no === lot ? { ...c, lot_deadline: patch.lot_deadline ?? undefined } : c)))
+            for (const c of sameLot) await containerService.updateContainer(c.id, { lot_deadline: patch.lot_deadline } as any)
+          }
+        }
+      }
+    } catch (e: any) {
+      message.error('Lỗi lưu lô: ' + (e?.message || e))
     }
   }
 
@@ -487,6 +518,58 @@ function ContainerPackingPage() {
   })
 
   // ══════════════════════════════════════════════════════════════
+  // CHIA LÔ — cột bảng + tiến độ giao
+  // ══════════════════════════════════════════════════════════════
+
+  const deliveredCount = containers.filter((c) => deliveryMap[c.id] === 'delivered').length
+  const dispatchingCount = containers.filter((c) => deliveryMap[c.id] === 'dispatching').length
+  const lotNumbers = Array.from(
+    new Set(containers.map((c) => c.lot_no).filter((v): v is number => v != null)),
+  ).sort((a, b) => a - b)
+
+  const lotColumns: ColumnsType<SalesOrderContainer> = [
+    {
+      title: 'Container',
+      key: 'c',
+      render: (_: unknown, r, i) => (
+        <span><Text strong>#{i + 1}</Text>{r.container_no ? ` · ${r.container_no}` : ''}</span>
+      ),
+    },
+    { title: 'Số bành', dataIndex: 'bale_count', key: 'bale_count', width: 80, align: 'right' as const, render: (v: number) => v ?? '-' },
+    { title: 'KL (kg)', dataIndex: 'net_weight_kg', key: 'net_weight_kg', width: 100, align: 'right' as const, render: (v: number) => formatNumber(v) },
+    {
+      title: 'Lô',
+      key: 'lot_no',
+      width: 90,
+      render: (_: unknown, r) => (
+        <InputNumber size="small" min={1} value={r.lot_no ?? undefined} placeholder="—" controls={false}
+          style={{ width: 70 }} onChange={(v) => handleSetContainerLot(r.id, { lot_no: (v as number) ?? null })} />
+      ),
+    },
+    {
+      title: 'Hạn giao',
+      key: 'lot_deadline',
+      width: 150,
+      render: (_: unknown, r) => (
+        <DatePicker size="small" value={r.lot_deadline ? dayjs(r.lot_deadline) : undefined} format="DD/MM/YYYY"
+          placeholder="—" style={{ width: 130 }}
+          onChange={(d) => handleSetContainerLot(r.id, { lot_no: r.lot_no ?? null, lot_deadline: d ? d.format('YYYY-MM-DD') : null })} />
+      ),
+    },
+    {
+      title: 'Giao hàng',
+      key: 'delivery',
+      width: 130,
+      render: (_: unknown, r) => {
+        const d = deliveryMap[r.id]
+        if (d === 'delivered') return <Tag color="green">✅ Đã giao</Tag>
+        if (d === 'dispatching') return <Tag color="orange">🚚 Đang điều động</Tag>
+        return <Tag>Chưa giao</Tag>
+      },
+    },
+  ]
+
+  // ══════════════════════════════════════════════════════════════
   // MAIN RENDER
   // ══════════════════════════════════════════════════════════════
 
@@ -651,6 +734,37 @@ function ContainerPackingPage() {
           </Button>
         </Space>
       </Card>
+
+      {/* Chia lô giao hàng */}
+      {containers.length > 0 && (
+        <Card
+          size="small"
+          title={<span><InboxOutlined style={{ marginRight: 6 }} />Chia lô giao hàng</span>}
+          style={{ marginBottom: 16 }}
+        >
+          <Space size={[8, 8]} wrap style={{ marginBottom: 12 }}>
+            <Text strong>📦 Tiến độ:</Text>
+            <Tag color="green">✅ Đã giao {deliveredCount}/{containers.length}</Tag>
+            <Tag color="orange">🚚 Đang điều động {dispatchingCount}</Tag>
+            <Tag>Chưa giao {containers.length - deliveredCount - dispatchingCount}</Tag>
+            {lotNumbers.length > 0 && <span style={{ borderLeft: '1px solid #d9d9d9', height: 18 }} />}
+            {lotNumbers.map((lot) => {
+              const ls = containers.filter((c) => c.lot_no === lot)
+              const done = ls.filter((c) => deliveryMap[c.id] === 'delivered').length
+              const dl = ls.find((c) => c.lot_deadline)?.lot_deadline
+              return (
+                <Tag key={lot} color={done === ls.length ? 'green' : 'blue'}>
+                  Lô {lot}: {done}/{ls.length}{dl ? ` · hạn ${dayjs(dl).format('DD/MM/YYYY')}` : ''}
+                </Tag>
+              )
+            })}
+          </Space>
+          <Table dataSource={containers} columns={lotColumns} rowKey="id" size="small" pagination={false} bordered />
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+            Gõ số <b>Lô</b> cho từng container (vd 1, 2, 3 — mỗi số là 1 đợt giao). Đặt <b>Hạn giao</b> 1 container → tự áp cả lô. Cột Giao hàng tự cập nhật khi điều động + cân.
+          </Text>
+        </Card>
+      )}
 
       {/* Container list */}
       {containers.length > 0 ? (

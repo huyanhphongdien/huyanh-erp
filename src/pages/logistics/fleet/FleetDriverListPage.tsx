@@ -95,7 +95,7 @@ export default function FleetDriverListPage() {
   ]
 
   return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: 20, maxWidth: 1400, margin: '0 auto', fontSize: 15 }}>
       <Breadcrumb style={{ marginBottom: 8 }} items={[
         { title: <a onClick={() => navigate('/logistics/dispatch')}>Vận tải</a> },
         { title: 'Tài xế' },

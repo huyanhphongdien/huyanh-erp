@@ -75,7 +75,7 @@ export default function DispatchDetailPage() {
   }
 
   if (loading || !order) {
-    return <div style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}><Card><Skeleton active /></Card></div>
+    return <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto' }}><Card><Skeleton active /></Card></div>
   }
 
   const lineColumns = [
@@ -96,7 +96,7 @@ export default function DispatchDetailPage() {
   const nexts = NEXT_STATUS[order.status]
 
   return (
-    <div style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto', fontSize: 15 }}>
       <Breadcrumb style={{ marginBottom: 8 }} items={[
         { title: <a onClick={() => navigate('/logistics/dispatch')}>Lệnh điều động</a> },
         { title: order.code },
@@ -133,7 +133,7 @@ export default function DispatchDetailPage() {
           </Space>
         </div>
 
-        <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 16 }}>
+        <Descriptions bordered size="middle" column={{ xs: 1, sm: 2, md: 3 }} labelStyle={{ fontWeight: 600 }} style={{ marginBottom: 20 }}>
           <Descriptions.Item label="Ngày điều động">{dayjs(order.dispatch_date).format('DD/MM/YYYY')}</Descriptions.Item>
           <Descriptions.Item label="Loại chuyến">{TRIP_TYPE_LABELS[order.trip_type]}</Descriptions.Item>
           <Descriptions.Item label="Đơn hàng bán">{order.sales_order ? <a onClick={() => navigate(`/sales/${order.sales_order_id}`)}>{order.sales_order.code}</a> : '–'}</Descriptions.Item>
@@ -149,8 +149,8 @@ export default function DispatchDetailPage() {
           {order.note && <Descriptions.Item label="Ghi chú" span={3}>{order.note}</Descriptions.Item>}
         </Descriptions>
 
-        <Title level={5}>Container ({order.total_lines}) — tổng {order.total_weight.toLocaleString('vi-VN')} kg</Title>
-        <Table rowKey="id" size="small" pagination={false} columns={lineColumns as any} dataSource={lines} scroll={{ x: 900 }} />
+        <Title level={4} style={{ marginTop: 8 }}>Container ({order.total_lines}) — tổng {order.total_weight.toLocaleString('vi-VN')} kg</Title>
+        <Table rowKey="id" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines} scroll={{ x: 900 }} />
       </Card>
     </div>
   )

@@ -5,7 +5,7 @@
 // 1 dòng = 1 container (seal riêng). 1 xe chở nhiều container.
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card, Form, Select, Input, DatePicker, Button, Space, Typography, Row, Col,
@@ -29,6 +29,11 @@ interface LineRow extends DispatchLineInput {
 
 let _keySeq = 1
 const newKey = () => `L${_keySeq++}`
+
+// Định dạng số có dấu chấm ngăn nghìn cho ô KL (gõ "20.160" hay "20160" đều ra 20160).
+const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+const numParse = (v?: string) => (v || '').replace(/\./g, '')
+const BALE_KG = 35 // kg/bành chuẩn SVR — dùng để KL tự nhảy theo số kiện
 
 export default function DispatchCreatePage() {
   const navigate = useNavigate()
@@ -117,10 +122,11 @@ export default function DispatchCreatePage() {
   }
 
   // ---- lines helpers ----
-  const addLine = () => setLines(prev => [...prev, { _key: newKey(), weight_kg: 0 }])
-  const removeLineRow = (key: string) => setLines(prev => prev.filter(l => l._key !== key))
-  const patchLine = (key: string, patch: Partial<LineRow>) =>
-    setLines(prev => prev.map(l => l._key === key ? { ...l, ...patch } : l))
+  // Hàm ổn định (useCallback) → bảng dòng không re-tạo mỗi render → input giữ giá trị/focus ổn định.
+  const addLine = useCallback(() => setLines(prev => [...prev, { _key: newKey() }]), [])
+  const removeLineRow = useCallback((key: string) => setLines(prev => prev.filter(l => l._key !== key)), [])
+  const patchLine = useCallback((key: string, patch: Partial<LineRow>) =>
+    setLines(prev => prev.map(l => l._key === key ? { ...l, ...patch } : l)), [])
 
   // ---- SO picker ----
   const openSoPicker = useCallback(async () => {
@@ -195,23 +201,36 @@ export default function DispatchCreatePage() {
     setSaving(false)
   }
 
-  const lineColumns = [
-    { title: '#', key: 'idx', width: 40, render: (_: any, __: any, i: number) => i + 1 },
-    { title: 'Hành trình', key: 'route', width: 150, render: (_: any, r: LineRow) => <Input value={r.route || ''} placeholder="Kho → Cảng" onChange={e => patchLine(r._key, { route: e.target.value })} /> },
-    { title: 'Lô hàng', key: 'lot', width: 120, render: (_: any, r: LineRow) => <Input value={r.lot_code || ''} onChange={e => patchLine(r._key, { lot_code: e.target.value })} /> },
-    { title: 'Loại hàng', key: 'grade', width: 110, render: (_: any, r: LineRow) => <Input value={r.grade || ''} placeholder="SVR 10" onChange={e => patchLine(r._key, { grade: e.target.value })} /> },
-    { title: 'Số container', key: 'cont', width: 140, render: (_: any, r: LineRow) => <Input value={r.container_no || ''} onChange={e => patchLine(r._key, { container_no: e.target.value })} /> },
-    { title: 'Seal', key: 'seal', width: 120, render: (_: any, r: LineRow) => <Input value={r.seal_no || ''} onChange={e => patchLine(r._key, { seal_no: e.target.value })} /> },
-    { title: 'Số kiện', key: 'pkg', width: 90, render: (_: any, r: LineRow) => <InputNumber value={r.package_count ?? undefined} min={0} style={{ width: '100%' }} onChange={v => patchLine(r._key, { package_count: v as number })} /> },
-    { title: 'KL (kg)', key: 'w', width: 110, render: (_: any, r: LineRow) => <InputNumber value={r.weight_kg ?? 0} min={0} style={{ width: '100%' }} onChange={v => patchLine(r._key, { weight_kg: (v as number) || 0 })} /> },
-    { title: '', key: 'act', width: 44, render: (_: any, r: LineRow) => <Button danger size="small" icon={<DeleteOutlined />} onClick={() => removeLineRow(r._key)} /> },
-  ]
+  const lineColumns = useMemo(() => [
+    { title: '#', key: 'idx', width: 44, render: (_: any, __: any, i: number) => i + 1 },
+    { title: 'Hành trình', key: 'route', width: 170, render: (_: any, r: LineRow) => <Input value={r.route || ''} placeholder="Kho → Cảng" onChange={e => patchLine(r._key, { route: e.target.value })} /> },
+    { title: 'Lô hàng', key: 'lot', width: 130, render: (_: any, r: LineRow) => <Input value={r.lot_code || ''} onChange={e => patchLine(r._key, { lot_code: e.target.value })} /> },
+    { title: 'Loại hàng', key: 'grade', width: 130, render: (_: any, r: LineRow) => <Input value={r.grade || ''} placeholder="SVR 10" onChange={e => patchLine(r._key, { grade: e.target.value })} /> },
+    { title: 'Số container', key: 'cont', width: 160, render: (_: any, r: LineRow) => <Input value={r.container_no || ''} onChange={e => patchLine(r._key, { container_no: e.target.value })} /> },
+    { title: 'Seal', key: 'seal', width: 140, render: (_: any, r: LineRow) => <Input value={r.seal_no || ''} onChange={e => patchLine(r._key, { seal_no: e.target.value })} /> },
+    { title: 'Số kiện', key: 'pkg', width: 110, render: (_: any, r: LineRow) => (
+      <InputNumber value={r.package_count ?? undefined} min={0} controls={false} style={{ width: '100%' }}
+        onChange={v => {
+          const pkg = (v as number) ?? null
+          // KL TỰ NHẢY = số kiện × 35kg (chuẩn SVR) — chỉ khi ô KL còn trống, không đè giá trị đã nhập.
+          const patch: Partial<LineRow> = { package_count: pkg }
+          if (pkg && !r.weight_kg) patch.weight_kg = pkg * BALE_KG
+          patchLine(r._key, patch)
+        }} />
+    ) },
+    { title: 'KL (kg)', key: 'w', width: 140, render: (_: any, r: LineRow) => (
+      <InputNumber value={r.weight_kg || undefined} min={0} controls={false} style={{ width: '100%' }}
+        formatter={numFmt} parser={numParse as any} placeholder="0"
+        onChange={v => patchLine(r._key, { weight_kg: (v as number) || 0 })} />
+    ) },
+    { title: '', key: 'act', width: 50, render: (_: any, r: LineRow) => <Button danger icon={<DeleteOutlined />} onClick={() => removeLineRow(r._key)} /> },
+  ], [patchLine, removeLineRow])
 
   const totalWeight = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
 
   return (
-    <div style={{ padding: 16, maxWidth: 1300, margin: '0 auto' }}>
-      <Breadcrumb style={{ marginBottom: 8 }} items={[
+    <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto', fontSize: 15 }}>
+      <Breadcrumb style={{ marginBottom: 8, fontSize: 14 }} items={[
         { title: <a onClick={() => navigate('/logistics/dispatch')}>Lệnh điều động</a> },
         { title: isEdit ? 'Sửa lệnh' : 'Tạo lệnh' },
       ]} />
@@ -225,7 +244,7 @@ export default function DispatchCreatePage() {
           </Space>
         </div>
 
-        <Form form={form} layout="vertical" initialValues={{ dispatch_date: dayjs(), trip_type: 'port' }}>
+        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port' }}>
           <Row gutter={16}>
             <Col xs={24} sm={8} md={5}>
               <Form.Item name="dispatch_date" label="Ngày điều động" rules={[{ required: true }]}>
@@ -284,8 +303,8 @@ export default function DispatchCreatePage() {
         <Divider titlePlacement="left" style={{ margin: '4px 0 12px' }}>
           Danh sách container ({lines.length}) — tổng {totalWeight.toLocaleString('vi-VN')} kg
         </Divider>
-        <Table rowKey="_key" size="small" pagination={false} columns={lineColumns as any} dataSource={lines}
-          scroll={{ x: 1000 }}
+        <Table rowKey="_key" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines}
+          scroll={{ x: 1180 }}
           locale={{ emptyText: <Empty description="Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" /> }} />
         <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>Thêm dòng container</Button>
       </Card>

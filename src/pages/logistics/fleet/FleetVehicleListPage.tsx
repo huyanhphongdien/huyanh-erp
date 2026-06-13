@@ -136,7 +136,7 @@ export default function FleetVehicleListPage() {
   ], [])
 
   return (
-    <div style={{ padding: 16, maxWidth: 1300, margin: '0 auto' }}>
+    <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto', fontSize: 15 }}>
       <Breadcrumb style={{ marginBottom: 8 }} items={[
         { title: <a onClick={() => navigate('/logistics/dispatch')}>Vận tải</a> },
         { title: 'Đội xe' },

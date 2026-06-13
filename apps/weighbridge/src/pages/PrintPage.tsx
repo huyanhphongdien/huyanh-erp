@@ -97,24 +97,26 @@ export default function PrintPage() {
         setPartner({ name: ext.supplier_name, label: 'Đối tác' })
       }
 
-      // XUẤT hàng: kéo thông tin đơn để in (ưu tiên Lệnh điều động, fallback Đơn hàng bán).
+      // XUẤT hàng: kéo thông tin đơn để in. Link Lệnh điều động đọc theo link NGƯỢC
+      // dispatch_orders.weighbridge_ticket_id (CHECK constraint chặn reference_type='dispatch_order',
+      // nên app cân không lưu được forward-link — chỉ link ngược qua syncWeighing là sống).
       if (t && t.ticket_type === 'out') {
-        if (ext?.reference_type === 'dispatch_order' && ext?.reference_id) {
-          const { data: dord } = await supabase
-            .from('dispatch_orders')
-            .select('code, customer_name, destination, contract_ref, lines:dispatch_order_lines(container_no, seal_no, actual_seal_no)')
-            .eq('id', ext.reference_id)
-            .maybeSingle()
-          if (dord) {
-            const d = dord as any
-            setShipment({
-              dispatchCode: d.code || null,
-              customer: d.customer_name || null,
-              destination: d.destination || null,
-              contractRef: d.contract_ref || null,
-              containers: (d.lines || []).map((l: any) => ({ no: l.container_no, seal: l.actual_seal_no || l.seal_no })),
-            })
-          }
+        const { data: dordRows } = await supabase
+          .from('dispatch_orders')
+          .select('code, customer_name, destination, contract_ref, lines:dispatch_order_lines(container_no, seal_no, actual_seal_no)')
+          .eq('weighbridge_ticket_id', t.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+        const dord = dordRows && dordRows[0]
+        if (dord) {
+          const d = dord as any
+          setShipment({
+            dispatchCode: d.code || null,
+            customer: d.customer_name || null,
+            destination: d.destination || null,
+            contractRef: d.contract_ref || null,
+            containers: (d.lines || []).map((l: any) => ({ no: l.container_no, seal: l.actual_seal_no || l.seal_no })),
+          })
         } else if (ext?.sales_order_id) {
           const { data: so } = await supabase
             .from('sales_orders')

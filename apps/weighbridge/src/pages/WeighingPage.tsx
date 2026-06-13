@@ -105,9 +105,8 @@ export default function WeighingPage() {
   // ĐỢT 2: Lệnh điều động — cân XUẤT đi cảng chọn lệnh → đồng bộ KL/seal thực về lệnh.
   const [dispatchOrders, setDispatchOrders] = useState<DispatchOrder[]>([])
   const [selectedDispatchOrderId, setSelectedDispatchOrderId] = useState<string>('')
+  // 1 lệnh = 1 xe = TẤT CẢ container của lệnh → chọn lệnh là tự áp cho cả xe (không chọn từng cont).
   const [dispatchLines, setDispatchLines] = useState<DispatchLine[]>([])
-  // 1 phiếu cân có thể gồm 1 HOẶC NHIỀU container (1 xe chở nhiều cont, cân chung).
-  const [selectedDispatchLineIds, setSelectedDispatchLineIds] = useState<string[]>([])
   const [loadingDispatch, setLoadingDispatch] = useState(false)
 
   // F3 Transfer: pending transfers cho NM hiện tại (theo direction)
@@ -263,19 +262,16 @@ export default function WeighingPage() {
       .finally(() => setLoadingDispatch(false))
   }, [ticketDirection, currentFacility?.can_ship_to_customer])
 
-  // Load các dòng (container) của lệnh khi chọn lệnh; tự chọn nếu lệnh chỉ 1 dòng.
+  // Load TẤT CẢ container của lệnh khi chọn lệnh (cả xe).
   useEffect(() => {
-    if (!selectedDispatchOrderId) { setDispatchLines([]); setSelectedDispatchLineIds([]); return }
+    if (!selectedDispatchOrderId) { setDispatchLines([]); return }
     dispatchService.getById(selectedDispatchOrderId).then(res => {
-      if (!res) return
-      setDispatchLines(res.lines)
-      setSelectedDispatchLineIds(res.lines.length === 1 ? [res.lines[0].id] : [])
+      if (res) setDispatchLines(res.lines)
     }).catch(e => console.warn('Load dispatch lines failed:', e))
   }, [selectedDispatchOrderId])
 
   const selectedDispatch = dispatchOrders.find(d => d.id === selectedDispatchOrderId)
-  const selectedDispatchLines = dispatchLines.filter(l => selectedDispatchLineIds.includes(l.id))
-  const selectedPlannedKg = selectedDispatchLines.reduce((s, l) => s + (l.weight_kg || 0), 0)
+  const dispatchPlannedKg = dispatchLines.reduce((s, l) => s + (l.weight_kg || 0), 0)
 
   // Load existing ticket if editing
   useEffect(() => {
@@ -613,16 +609,14 @@ export default function WeighingPage() {
             : `Cân lần 2 (xe + hàng): ${weight.toLocaleString()} kg → NET hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`)
           setManualWeight(null)
           if (cameraCaptureRef.current) cameraCaptureRef.current('L2').catch(() => {})
-          // ĐỢT 2: ghi KL net + seal thực về lệnh điều động (chỉ XUẤT, không gate)
-          // 1 phiếu cân có thể gồm nhiều container → chia net theo tỉ lệ kế hoạch.
-          if (selectedDispatchOrderId && selectedDispatchLineIds.length > 0 && !isGateTicket) {
+          // ĐỢT 2: ghi KL net về lệnh điều động (chỉ XUẤT, không gate).
+          // 1 lệnh = cả xe → áp cho TẤT CẢ container của lệnh, chia net theo tỉ lệ kế hoạch.
+          if (selectedDispatchOrderId && dispatchLines.length > 0 && !isGateTicket) {
             dispatchService.syncWeighing({
               orderId: selectedDispatchOrderId,
-              lineIds: selectedDispatchLineIds,
+              lineIds: dispatchLines.map(l => l.id),
               ticketId: ticket.id,
               netWeight: c.net_weight,
-              // seal thực chỉ áp khi đúng 1 container; nhiều cont thì mỗi cont có seal riêng.
-              sealNo: selectedDispatchLineIds.length === 1 ? (sealNoActual || null) : null,
             }).catch(e => console.warn('Sync dispatch weighing failed:', e))
           }
         }
@@ -1271,7 +1265,7 @@ export default function WeighingPage() {
                       <Text type="secondary" style={{ fontSize: 12 }}>Chọn lệnh điều động — để biết hàng gì + ghi KL cân về lệnh</Text>
                       <Select
                         value={selectedDispatchOrderId || undefined}
-                        onChange={v => { setSelectedDispatchOrderId(v || ''); setSelectedDispatchLineIds([]) }}
+                        onChange={v => setSelectedDispatchOrderId(v || '')}
                         placeholder="Chọn lệnh điều động..."
                         style={{ width: '100%' }}
                         disabled={!!ticket}
@@ -1296,44 +1290,22 @@ export default function WeighingPage() {
                       )}
                     </div>
 
+                    {/* Tóm tắt container của lệnh — TỰ áp cho cả xe, không cần chọn từng cont. */}
                     {selectedDispatchOrderId && dispatchLines.length > 0 && (
-                      <div>
-                        <Text type="secondary" style={{ fontSize: 12 }}>Container của lệnh (1 phiếu cân = 1 HOẶC nhiều container)</Text>
-                        <Select
-                          mode="multiple"
-                          value={selectedDispatchLineIds}
-                          onChange={(vals: string[]) => {
-                            setSelectedDispatchLineIds(vals)
-                            // 1 container → tự điền seal; nhiều container thì giữ seal riêng từng cont.
-                            if (vals.length === 1) {
-                              const ln = dispatchLines.find(l => l.id === vals[0])
-                              if (ln?.seal_no) setSealNoActual(ln.seal_no)
-                            }
-                          }}
-                          placeholder="Chọn 1 hoặc nhiều container..."
-                          style={{ width: '100%' }}
-                          disabled={!!ticket}
-                          optionFilterProp="label"
-                          options={dispatchLines.map(l => ({
-                            value: l.id,
-                            label: `${l.container_no || '(chưa số)'}${l.grade ? ` · ${l.grade}` : ''}${l.seal_no ? ` · seal ${l.seal_no}` : ''}${l.actual_weight_kg != null ? ` · ✅ đã cân` : ''}`,
-                          }))}
-                        />
-                        {selectedDispatchLineIds.length > 0 && (
-                          <div style={{ marginTop: 8, padding: 8, background: '#F0FDF4', borderRadius: 8, fontSize: 12 }}>
-                            {selectedDispatchLineIds.length} container · KL kế hoạch tổng: <Text strong>{selectedPlannedKg.toLocaleString()} kg</Text>
-                            {' · '}KL cân thực sẽ tự ghi về lệnh{selectedDispatchLineIds.length > 1 ? ' (chia theo tỉ lệ kế hoạch)' : ''} khi hoàn tất.
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Seal thực tế — chỉ khi đúng 1 container (nhiều cont thì mỗi cont seal riêng). */}
-                    {selectedDispatchLineIds.length === 1 && (
-                      <div>
-                        <Text type="secondary" style={{ fontSize: 12 }}>Số seal thực tế (nếu khác kế hoạch)</Text>
-                        <Input value={sealNoActual} onChange={e => setSealNoActual(e.target.value)}
-                          placeholder="VD: VN0099882" disabled={!!ticket} />
+                      <div style={{ padding: 10, background: '#F0FDF4', borderRadius: 8 }}>
+                        <Text strong style={{ color: '#065F46', fontSize: 13 }}>
+                          {dispatchLines.length} container · tổng KL kế hoạch {dispatchPlannedKg.toLocaleString()} kg
+                        </Text>
+                        <div style={{ marginTop: 6 }}>
+                          {dispatchLines.map(l => (
+                            <Tag key={l.id} color={l.actual_weight_kg != null ? 'green' : 'default'} style={{ marginBottom: 4 }}>
+                              {l.container_no || '(chưa số)'}{l.grade ? ` · ${l.grade}` : ''}{l.actual_weight_kg != null ? ' · ✅ đã cân' : ''}
+                            </Tag>
+                          ))}
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 11.5 }}>
+                          Cân cả xe 1 lần → KL thực tự chia về từng container theo tỉ lệ kế hoạch khi hoàn tất.
+                        </Text>
                       </div>
                     )}
                   </Space>

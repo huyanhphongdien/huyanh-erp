@@ -369,10 +369,10 @@ async function listForWeighing(): Promise<DispatchOrder[]> {
 
 /**
  * Đồng bộ kết quả cân thực tế về lệnh điều động.
- * 1 PHIẾU CÂN có thể gồm 1 HOẶC NHIỀU container (1 xe chở nhiều cont, cân chung).
- *  - 1 container: ghi thẳng net + seal thực vào dòng đó.
- *  - Nhiều container: CHIA net theo tỉ lệ KL kế hoạch của từng dòng (tổng khớp net);
- *    nếu kế hoạch trống → chia đều. Seal giữ theo từng container (không đè).
+ * 1 LỆNH = 1 XE = TẤT CẢ container của lệnh → cân 1 lần (cả xe) → áp cho HẾT các dòng.
+ *  - KL net CHIA theo tỉ lệ KL kế hoạch từng dòng (tổng khớp đúng net; dòng cuối nhận
+ *    phần dư để không lệch do làm tròn). Kế hoạch trống → chia đều.
+ *  - actual_seal_no lấy theo seal kế hoạch của từng container.
  *  - Gắn weighbridge_ticket_id vào lệnh (set nếu còn trống — phiếu cân đầu tiên).
  * Best-effort: lỗi không chặn nghiệp vụ cân.
  */
@@ -381,32 +381,28 @@ async function syncWeighing(params: {
   lineIds: string[]
   ticketId: string
   netWeight: number
-  sealNo?: string | null
 }): Promise<void> {
   const ids = (params.lineIds || []).filter(Boolean)
-  if (ids.length === 1) {
-    await supabase
-      .from('dispatch_order_lines')
-      .update({ actual_weight_kg: params.netWeight, actual_seal_no: params.sealNo || null })
-      .eq('id', ids[0])
-  } else if (ids.length > 1) {
+  if (ids.length > 0) {
     const { data: rows } = await supabase
       .from('dispatch_order_lines')
-      .select('id, weight_kg')
+      .select('id, weight_kg, seal_no')
       .in('id', ids)
-    const lines = (rows || []) as Array<{ id: string; weight_kg: number | null }>
+    const lines = (rows || []) as Array<{ id: string; weight_kg: number | null; seal_no: string | null }>
     const totalPlanned = lines.reduce((s, l) => s + (Number(l.weight_kg) || 0), 0)
     let distributed = 0
     for (let i = 0; i < lines.length; i++) {
       const planned = Number(lines[i].weight_kg) || 0
-      // Dòng cuối nhận phần dư để tổng KHỚP đúng net (tránh lệch do làm tròn).
       const actual = i === lines.length - 1
         ? params.netWeight - distributed
         : (totalPlanned > 0
             ? Math.round(params.netWeight * planned / totalPlanned)
             : Math.round(params.netWeight / lines.length))
       distributed += actual
-      await supabase.from('dispatch_order_lines').update({ actual_weight_kg: actual }).eq('id', lines[i].id)
+      await supabase
+        .from('dispatch_order_lines')
+        .update({ actual_weight_kg: actual, actual_seal_no: lines[i].seal_no || null })
+        .eq('id', lines[i].id)
     }
   }
   await supabase

@@ -292,8 +292,9 @@ export default function PrintPage() {
             .print-only > div { margin: 0 !important; }
           ` : ''}
           ${paperSize === 'a4' ? `
-            .print-only td, .print-only th { padding: 6px 9px !important; }
+            .print-only td, .print-only th { padding: 5px 9px !important; }
             .print-only img { break-inside: avoid; }
+            .print-only table { break-inside: avoid; }
           ` : ''}
         }
       `}</style>
@@ -308,8 +309,9 @@ export default function PrintPage() {
     const fs = cfg.fontSize
     const mono = "'JetBrains Mono', monospace"
     // Ảnh camera (A4/A5 ngang đủ rộng cho 3 ảnh/hàng cỡ 172px).
-    const camW = 172
-    const camH = 108
+    // A4 in 6 ảnh (3 lần 1 + 3 lần 2): thu nhỏ để 2 hàng ảnh + nội dung VỪA 1 trang, không tràn.
+    const camW = 150
+    const camH = 84
     // Tên trạm cân theo nhà máy phát sinh phiếu (cho dòng cuối phiếu).
     const facCode = (ticket as any)?.facility?.code as string | undefined
     const stationName =
@@ -327,7 +329,7 @@ export default function PrintPage() {
         fontFamily: isThermal ? "'Be Vietnam Pro', Arial, sans-serif" : "'Times New Roman', Times, serif",
         fontSize: fs,
         // A4: căng chiều cao full trang + flex để đẩy phần ký xuống đáy (hết khoảng trống dưới)
-        ...(paperSize === 'a4' ? { display: 'flex', flexDirection: 'column', minHeight: '272mm', boxSizing: 'border-box' } : {}),
+        ...(paperSize === 'a4' ? { display: 'flex', flexDirection: 'column', minHeight: '255mm', boxSizing: 'border-box' } : {}),
       }}>
         {/* ===== HEADER ===== */}
         {isThermal ? (
@@ -595,7 +597,7 @@ export default function PrintPage() {
         {paperSize === 'a4' && images.length > 0 && (
           <div style={{ marginBottom: 8 }}>
             {l1Images.length > 0 && (
-              <div style={{ marginBottom: 5 }}>
+              <div style={{ marginBottom: 5, breakInside: 'avoid' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, color: '#16A34A' }}>Ảnh cân lần 1</div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l1Images.map((img) => (
@@ -606,7 +608,7 @@ export default function PrintPage() {
               </div>
             )}
             {l2Images.length > 0 && (
-              <div>
+              <div style={{ breakInside: 'avoid' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: '#2563EB' }}>Ảnh cân lần 2</div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {l2Images.map((img) => (

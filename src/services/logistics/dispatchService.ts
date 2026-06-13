@@ -530,6 +530,54 @@ async function buildFromSalesOrder(soId: string): Promise<{
   }
 }
 
+/** Đơn hàng đã gắn vào lệnh (gồm danh sách container của đơn) — dùng cho thẻ đơn + edit mode. */
+export interface AttachedSalesOrder {
+  id: string
+  code: string
+  customer_name: string | null
+  destination: string | null
+  contract_ref: string | null
+  containerIds: string[]
+}
+
+/**
+ * Dựng lại danh sách đơn (kèm container của từng đơn) từ các container_id.
+ * Dùng khi MỞ LẠI lệnh để sửa — để hiện đúng các thẻ đơn đã gắn + cho gỡ từng đơn.
+ */
+async function ordersFromContainerIds(containerIds: string[]): Promise<AttachedSalesOrder[]> {
+  const ids = [...new Set((containerIds || []).filter(Boolean))]
+  if (ids.length === 0) return []
+  const { data, error } = await supabase
+    .from('sales_order_containers')
+    .select(`
+      id, sales_order_id,
+      so:sales_orders!sales_order_id(
+        id, code, contract_no, port_of_destination,
+        customer:sales_customers!customer_id(name, short_name)
+      )
+    `)
+    .in('id', ids)
+  if (error) throw error
+  const byOrder = new Map<string, AttachedSalesOrder>()
+  for (const row of (data || []) as any[]) {
+    const so = Array.isArray(row.so) ? row.so[0] : row.so
+    if (!so) continue
+    if (!byOrder.has(so.id)) {
+      const cust = Array.isArray(so.customer) ? so.customer[0] : so.customer
+      byOrder.set(so.id, {
+        id: so.id,
+        code: so.code,
+        customer_name: cust?.short_name || cust?.name || null,
+        destination: so.port_of_destination || null,
+        contract_ref: so.contract_no || so.code || null,
+        containerIds: [],
+      })
+    }
+    byOrder.get(so.id)!.containerIds.push(row.id)
+  }
+  return [...byOrder.values()]
+}
+
 // ============================================================================
 // NORMALIZE
 // ============================================================================
@@ -569,6 +617,7 @@ export const dispatchService = {
   setStatus,
   listSalesOrderOptions,
   buildFromSalesOrder,
+  ordersFromContainerIds,
   listForWeighing,
   syncWeighing,
   getDeliveryStatus,

@@ -27,6 +27,16 @@ interface LineRow extends DispatchLineInput {
   id?: string   // có khi đang sửa
 }
 
+// Đơn hàng đã gắn vào lệnh — mỗi đơn 1 thẻ, gỡ được từng đơn (xoá container của đơn đó).
+interface AttachedSo {
+  id: string
+  code: string
+  customer_name: string | null
+  destination: string | null
+  contract_ref: string | null
+  containerIds: string[]
+}
+
 let _keySeq = 1
 const newKey = () => `L${_keySeq++}`
 
@@ -63,7 +73,7 @@ export default function DispatchCreatePage() {
   // SO picker
   const [soModalOpen, setSoModalOpen] = useState(false)
   const [soOptions, setSoOptions] = useState<SalesOrderOption[]>([])
-  const [selectedSoLabel, setSelectedSoLabel] = useState<string>('')  // nhãn đẹp (mã đơn + khách) — KHÔNG hiện UUID
+  const [attachedSos, setAttachedSos] = useState<AttachedSo[]>([])  // các đơn đã gắn (mỗi đơn 1 thẻ)
   const [soSearch, setSoSearch] = useState('')
   const [soLoading, setSoLoading] = useState(false)
 
@@ -107,7 +117,6 @@ export default function DispatchCreatePage() {
           note: order.note,
           sales_order_id: order.sales_order_id,
         })
-        if (order.sales_order) setSelectedSoLabel(`${order.sales_order.code}${order.customer_name ? ' — ' + order.customer_name : ''}`)
         setLines(ls.map(l => ({
           _key: newKey(), id: l.id,
           route: l.route, lot_code: l.lot_code, grade: l.grade, container_no: l.container_no,
@@ -115,6 +124,17 @@ export default function DispatchCreatePage() {
           sales_order_container_id: l.sales_order_container_id, note: l.note,
         })))
         setOrigLineIds(ls.map(l => l.id))
+        // Dựng lại các thẻ đơn từ container đã gắn (để gỡ được từng đơn khi sửa).
+        const cids = ls.map(l => l.sales_order_container_id).filter(Boolean) as string[]
+        if (cids.length > 0) {
+          try { setAttachedSos(await dispatchService.ordersFromContainerIds(cids)) } catch { /* best-effort */ }
+        } else if (order.sales_order) {
+          // Lệnh nhập tay (dòng không gắn container) nhưng có gắn đơn → vẫn hiện 1 thẻ.
+          setAttachedSos([{
+            id: order.sales_order.id, code: order.sales_order.code, customer_name: order.customer_name,
+            destination: order.destination, contract_ref: order.contract_ref, containerIds: [],
+          }])
+        }
       } catch (e: any) {
         message.error('Lỗi tải lệnh: ' + (e?.message || e))
       }
@@ -149,15 +169,31 @@ export default function DispatchCreatePage() {
     setSoLoading(false)
   }, [soSearch])
 
+  // Đồng bộ header (đơn chính/khách/cảng/căn cứ HĐ) theo danh sách đơn đang gắn.
+  // Đơn ĐẦU TIÊN giữ vai khách/cảng; căn cứ HĐ gộp tất cả đơn để in chứng từ.
+  const applyHeaderFromAttached = useCallback((list: AttachedSo[]) => {
+    const first = list[0]
+    form.setFieldsValue({
+      sales_order_id: first?.id ?? null,
+      customer_name: first?.customer_name ?? null,
+      destination: first?.destination ?? null,
+      contract_ref: list.map(s => s.contract_ref).filter(Boolean).join(' + ') || null,
+    })
+  }, [form])
+
   const chooseSo = async (so: SalesOrderOption) => {
     try {
+      if (attachedSos.some(s => s.id === so.id)) {
+        message.info(`${so.code} đã được gắn vào lệnh rồi.`)
+        setSoModalOpen(false)
+        return
+      }
       const { header, lines: soLines } = await dispatchService.buildFromSalesOrder(so.id)
       if (soLines.length === 0) {
         message.warning(`${so.code}: không còn container chưa điều động để thêm.`)
         return
       }
-      // 1 XE CÓ THỂ CHỞ CONT CỦA NHIỀU ĐƠN → GỘP (append), KHÔNG thay thế.
-      // Chống trùng theo container đã có trên lệnh (sales_order_container_id).
+      // 1 XE CÓ THỂ CHỞ CONT CỦA NHIỀU ĐƠN → GỘP (append). Chống trùng theo container đã có.
       const existing = new Set(lines.map(l => l.sales_order_container_id).filter(Boolean) as string[])
       const fresh = soLines.filter(l => !l.sales_order_container_id || !existing.has(l.sales_order_container_id as string))
       if (fresh.length === 0) {
@@ -165,31 +201,35 @@ export default function DispatchCreatePage() {
         setSoModalOpen(false)
         return
       }
-      setLines(prev => [...prev, ...fresh.map(l => ({ ...l, _key: newKey() }))])
-
-      const cur = form.getFieldsValue()
-      if (!cur.sales_order_id) {
-        // Đơn ĐẦU TIÊN → điền header (khách/cảng/căn cứ HĐ).
-        form.setFieldsValue({
-          sales_order_id: header.sales_order_id,
-          customer_name: header.customer_name,
-          destination: header.destination,
-          contract_ref: header.contract_ref,
-          trip_type: header.trip_type || cur.trip_type || 'port',
-        })
-        setSelectedSoLabel(`${so.code}${so.customer_name ? ' — ' + so.customer_name : ''}`)
-      } else {
-        // Đơn THỨ 2+ → chỉ gộp căn cứ HĐ/booking để in; GIỮ khách/cảng của đơn đầu.
-        form.setFieldsValue({
-          contract_ref: [cur.contract_ref, header.contract_ref].filter(Boolean).join(' + '),
-        })
-        setSelectedSoLabel(prev => `${prev}  +  ${so.code}`)
+      const attached: AttachedSo = {
+        id: so.id, code: so.code, customer_name: so.customer_name,
+        destination: header.destination ?? null, contract_ref: header.contract_ref ?? null,
+        containerIds: fresh.map(l => l.sales_order_container_id).filter(Boolean) as string[],
       }
+      const next = [...attachedSos, attached]
+      setAttachedSos(next)
+      setLines(prev => [...prev, ...fresh.map(l => ({ ...l, _key: newKey() }))])
+      if (attachedSos.length === 0 && !form.getFieldValue('trip_type')) {
+        form.setFieldValue('trip_type', header.trip_type || 'port')
+      }
+      applyHeaderFromAttached(next)
       setSoModalOpen(false)
       message.success(`Đã thêm ${fresh.length} container từ ${so.code}`)
     } catch (e: any) {
       message.error('Lỗi đổ container: ' + (e?.message || e))
     }
+  }
+
+  // Gỡ 1 đơn khỏi lệnh → xoá luôn container của đơn đó khỏi bảng.
+  const removeAttachedSo = (soId: string) => {
+    const target = attachedSos.find(s => s.id === soId)
+    if (!target) return
+    const next = attachedSos.filter(s => s.id !== soId)
+    setAttachedSos(next)
+    setLines(prev => prev.filter(l =>
+      !l.sales_order_container_id || !target.containerIds.includes(l.sales_order_container_id as string)))
+    applyHeaderFromAttached(next)
+    message.success(`Đã gỡ đơn ${target.code}${target.containerIds.length ? ` (xoá ${target.containerIds.length} container)` : ''}`)
   }
 
   // ---- save ----
@@ -303,10 +343,20 @@ export default function DispatchCreatePage() {
             </Col>
             <Col xs={24} sm={8} md={13}>
               <Form.Item label="Đơn hàng bán (gộp được nhiều đơn cho 1 xe)">
-                <Space.Compact style={{ width: '100%' }}>
-                  <Input readOnly value={selectedSoLabel} placeholder="Chưa gắn đơn hàng" />
-                  <Button icon={<ImportOutlined />} onClick={openSoPicker}>{selectedSoLabel ? '+ Thêm đơn khác' : 'Tạo từ Đơn hàng bán'}</Button>
-                </Space.Compact>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                  {attachedSos.length === 0 && <Typography.Text type="secondary">Chưa gắn đơn hàng</Typography.Text>}
+                  {attachedSos.map(s => (
+                    <Tag key={s.id} closable color="blue"
+                      onClose={(e) => { e.preventDefault(); removeAttachedSo(s.id) }}
+                      style={{ fontSize: 14, padding: '4px 10px', margin: 0, lineHeight: '22px' }}>
+                      <b>{s.code}</b>{s.customer_name ? ` — ${s.customer_name}` : ''}
+                      {s.containerIds.length > 0 && <span style={{ opacity: 0.7 }}> · {s.containerIds.length} cont</span>}
+                    </Tag>
+                  ))}
+                  <Button size="small" icon={<ImportOutlined />} onClick={openSoPicker}>
+                    {attachedSos.length ? '+ Thêm đơn khác' : 'Tạo từ Đơn hàng bán'}
+                  </Button>
+                </div>
                 {/* sales_order_id giữ trong form để submit, KHÔNG hiển thị UUID cho người dùng */}
                 <Form.Item name="sales_order_id" hidden><Input /></Form.Item>
               </Form.Item>

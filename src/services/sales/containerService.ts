@@ -187,6 +187,8 @@ export const containerService = {
     if (data.net_weight_kg !== undefined) updateData.net_weight_kg = data.net_weight_kg
     if (data.bale_count !== undefined) updateData.bale_count = data.bale_count
     if (data.notes !== undefined) updateData.notes = data.notes
+    if (data.lot_no !== undefined) updateData.lot_no = data.lot_no
+    if (data.lot_deadline !== undefined) updateData.lot_deadline = data.lot_deadline
 
     const { error } = await supabase
       .from('sales_order_containers')

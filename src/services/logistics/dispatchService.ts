@@ -355,6 +355,31 @@ async function setStatus(id: string, next: DispatchStatus): Promise<DispatchOrde
 // TÍCH HỢP TRẠM CÂN (ĐỢT 2) — cân XUẤT chọn lệnh → đồng bộ KL/seal thực
 // ============================================================================
 
+export type DeliveryState = 'delivered' | 'dispatching'
+
+/**
+ * Trạng thái giao của từng container (theo dispatch_order_lines):
+ *  - 'delivered'   = đã cân xuất (dòng lệnh có actual_weight_kg).
+ *  - 'dispatching' = đã vào lệnh nhưng chưa cân.
+ *  - (không có key) = chưa điều động (chưa giao).
+ */
+async function getDeliveryStatus(containerIds: string[]): Promise<Record<string, DeliveryState>> {
+  const map: Record<string, DeliveryState> = {}
+  const ids = [...new Set((containerIds || []).filter(Boolean))]
+  if (ids.length === 0) return map
+  const { data } = await supabase
+    .from('dispatch_order_lines')
+    .select('sales_order_container_id, actual_weight_kg')
+    .in('sales_order_container_id', ids)
+  for (const r of (data || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null }>) {
+    const cid = r.sales_order_container_id
+    if (!cid) continue
+    if (r.actual_weight_kg != null) map[cid] = 'delivered'
+    else if (map[cid] !== 'delivered') map[cid] = 'dispatching'
+  }
+  return map
+}
+
 /** Danh sách lệnh CÒN HIỆU LỰC để chọn khi cân XUẤT (bỏ completed/cancelled). */
 async function listForWeighing(): Promise<DispatchOrder[]> {
   const { data, error } = await supabase
@@ -469,15 +494,21 @@ async function buildFromSalesOrder(soId: string): Promise<{
   // grade nằm ở sales_order_container_items (container không có cột grade riêng)
   const { data: containers, error: cErr } = await supabase
     .from('sales_order_containers')
-    .select('id, container_no, seal_no, net_weight_kg, gross_weight_kg, bale_count, items:sales_order_container_items(grade)')
+    .select('id, container_no, seal_no, net_weight_kg, gross_weight_kg, bale_count, lot_no, items:sales_order_container_items(grade)')
     .eq('sales_order_id', soId)
+    .order('lot_no', { ascending: true, nullsFirst: false })
     .order('container_no', { ascending: true })
   if (cErr) throw cErr
 
-  const lines: DispatchLineInput[] = (containers || []).map((c: any, i: number) => {
+  // CHỈ đổ container CHƯA điều động (tránh điều trùng container đã vào lệnh khác/đã giao).
+  const delivery = await getDeliveryStatus((containers || []).map((c: any) => c.id))
+  const available = (containers || []).filter((c: any) => !delivery[c.id])
+
+  const lines: DispatchLineInput[] = available.map((c: any, i: number) => {
     const itemGrade = Array.isArray(c.items) ? c.items.find((x: any) => x.grade)?.grade : null
     return {
       grade: itemGrade || so.grade || null,
+      lot_code: c.lot_no != null ? `Lot ${c.lot_no}` : null,
       container_no: c.container_no || null,
       seal_no: c.seal_no || null,
       package_count: c.bale_count ?? null,
@@ -540,6 +571,7 @@ export const dispatchService = {
   buildFromSalesOrder,
   listForWeighing,
   syncWeighing,
+  getDeliveryStatus,
 }
 
 export default dispatchService

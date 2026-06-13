@@ -59,6 +59,7 @@ import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
 import { containerService } from '../../services/sales/containerService'
+import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
 import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
@@ -183,6 +184,10 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   // Packing tab state
   const [containerSummary, setContainerSummary] = useState<ContainerSummary | null>(null)
   const [autoCreateLoading, setAutoCreateLoading] = useState(false)
+  // Trạng thái giao theo container (từ lệnh điều động): delivered/dispatching (không có = chưa giao)
+  const [deliveryMap, setDeliveryMap] = useState<Record<string, DeliveryState>>({})
+  // Quyền sửa container/lot (sale/logistics/admin/production quản lý đóng gói + chia lot)
+  const canEditPacking = salesRole ? (salesPermissions.canEditOrder(salesRole) || salesPermissions.canEditProduction(salesRole)) : false
 
   // ── Load data ──
   const loadOrder = useCallback(async () => {
@@ -197,6 +202,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
       setOrder(o)
       setContainers(c)
       setContainerSummary(cs)
+      dispatchService.getDeliveryStatus(c.map(x => x.id)).then(setDeliveryMap).catch(() => {})
       if (o?.grade) {
         const std = await rubberGradeService.getByGrade(o.grade as any)
         setGradeStandard(std)
@@ -1066,6 +1072,35 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
       render: (v) => (v ? v.toLocaleString() : '-'),
     },
     {
+      title: 'Lot',
+      key: 'lot_no',
+      width: 80,
+      render: (_: any, r: SalesOrderContainer) => canEditPacking
+        ? <InputNumber size="small" min={1} value={r.lot_no ?? undefined} placeholder="—" controls={false} style={{ width: 60 }}
+            onChange={v => handleSetContainerLot(r.id, { lot_no: (v as number) ?? null })} />
+        : (r.lot_no != null ? `Lot ${r.lot_no}` : '-'),
+    },
+    {
+      title: 'Hạn giao',
+      key: 'lot_deadline',
+      width: 140,
+      render: (_: any, r: SalesOrderContainer) => canEditPacking
+        ? <DatePicker size="small" value={r.lot_deadline ? dayjs(r.lot_deadline) : undefined} format="DD/MM/YYYY" style={{ width: 128 }} placeholder="—"
+            onChange={d => handleSetContainerLot(r.id, { lot_no: r.lot_no ?? null, lot_deadline: d ? d.format('YYYY-MM-DD') : null })} />
+        : formatDate(r.lot_deadline),
+    },
+    {
+      title: 'Giao hàng',
+      key: 'delivery',
+      width: 130,
+      render: (_: any, r: SalesOrderContainer) => {
+        const d = deliveryMap[r.id]
+        if (d === 'delivered') return <Tag color="green">✅ Đã giao</Tag>
+        if (d === 'dispatching') return <Tag color="orange">🚚 Đang điều động</Tag>
+        return <Tag>Chưa giao</Tag>
+      },
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
@@ -1088,6 +1123,31 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
       setAutoCreateLoading(false)
     }
   }
+
+  // Gán lot / hạn giao cho container (lưu ngay + cập nhật cục bộ). Hạn giao tự áp cho cả lot.
+  const handleSetContainerLot = async (containerId: string, patch: { lot_no?: number | null; lot_deadline?: string | null }) => {
+    setContainers(prev => prev.map(c => c.id === containerId ? { ...c, ...patch } : c))
+    try {
+      await containerService.updateContainer(containerId, patch as any)
+      if (patch.lot_deadline !== undefined) {
+        const cur = containers.find(c => c.id === containerId)
+        const lot = patch.lot_no ?? cur?.lot_no
+        if (lot != null) {
+          const sameLot = containers.filter(c => c.lot_no === lot && c.id !== containerId)
+          if (sameLot.length) {
+            setContainers(prev => prev.map(c => c.lot_no === lot ? { ...c, lot_deadline: patch.lot_deadline ?? undefined } : c))
+            for (const c of sameLot) await containerService.updateContainer(c.id, { lot_deadline: patch.lot_deadline } as any)
+          }
+        }
+      }
+    } catch (e: any) {
+      message.error('Lỗi lưu lot: ' + (e?.message || e))
+    }
+  }
+
+  // Tiến độ giao (derive): đã giao / đang điều động / chưa giao theo deliveryMap.
+  const deliveredCount = containers.filter(c => deliveryMap[c.id] === 'delivered').length
+  const dispatchingCount = containers.filter(c => deliveryMap[c.id] === 'dispatching').length
 
   const renderPackingTab = () => (
     <Row gutter={[16, 16]}>
@@ -1140,6 +1200,33 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 />
               </Col>
             </Row>
+          </Card>
+        </Col>
+      )}
+
+      {/* Tiến độ giao theo lot (derive từ lệnh điều động) */}
+      {containers.length > 0 && (
+        <Col xs={24}>
+          <Card size="small" style={{ background: '#F6FFED', borderColor: '#B7EB8F' }}>
+            <Space size={[8, 8]} wrap>
+              <Text strong>📦 Tiến độ giao:</Text>
+              <Tag color="green">✅ Đã giao {deliveredCount}/{containers.length}</Tag>
+              <Tag color="orange">🚚 Đang điều động {dispatchingCount}</Tag>
+              <Tag>Chưa giao {containers.length - deliveredCount - dispatchingCount}</Tag>
+              <span style={{ borderLeft: '1px solid #d9d9d9', height: 18 }} />
+              {Array.from(new Set(containers.map(c => c.lot_no).filter((v): v is number => v != null)))
+                .sort((a, b) => a - b)
+                .map(lot => {
+                  const ls = containers.filter(c => c.lot_no === lot)
+                  const done = ls.filter(c => deliveryMap[c.id] === 'delivered').length
+                  const dl = ls.find(c => c.lot_deadline)?.lot_deadline
+                  return (
+                    <Tag key={lot} color={done === ls.length ? 'green' : 'blue'}>
+                      Lot {lot}: {done}/{ls.length}{dl ? ` · hạn ${formatDate(dl)}` : ''}
+                    </Tag>
+                  )
+                })}
+            </Space>
           </Card>
         </Col>
       )}

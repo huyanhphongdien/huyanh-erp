@@ -286,6 +286,10 @@ export interface SalesOrderContainer {
   notes?: string
   created_at: string
 
+  // Chia lot / đợt giao (mỗi container thuộc 1 lot; lot = các container cùng lot_no)
+  lot_no?: number | null
+  lot_deadline?: string | null   // hạn giao của lot (YYYY-MM-DD)
+
   // Joined
   items?: SalesOrderContainerItem[]
 }

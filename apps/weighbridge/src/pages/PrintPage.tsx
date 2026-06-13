@@ -419,14 +419,11 @@ export default function PrintPage() {
           </table>
         )}
 
-        {/* ===== SHIPMENT INFO (phiếu XUẤT gắn lệnh/đơn) ===== */}
+        {/* ===== SHIPMENT INFO (phiếu XUẤT gắn lệnh) — CHỈ Lệnh điều động + Container/Seal ===== */}
         {shipment && (isThermal ? (
           <div style={{ marginBottom: 4, fontSize: fs }}>
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
             {shipment.dispatchCode && <Row2 l="Lệnh ĐĐ" r={<strong>{shipment.dispatchCode}</strong>} />}
-            {shipment.customer && <Row2 l="Khách" r={shipment.customer} />}
-            {shipment.destination && <Row2 l="Cảng đến" r={shipment.destination} />}
-            {shipment.contractRef && <Row2 l="Căn cứ HĐ" r={shipment.contractRef} />}
             {shipment.containers.map((c, i) => (
               <Row2 key={i} l={i === 0 ? 'Cont/Seal' : ''} r={`${c.no || '—'}${c.seal ? ` · ${c.seal}` : ''}`} />
             ))}
@@ -436,15 +433,7 @@ export default function PrintPage() {
             <tbody>
               <tr>
                 <td style={tdLabel}>Lệnh điều động</td>
-                <td style={{ ...tdValue, fontWeight: 700 }}>{shipment.dispatchCode || '—'}</td>
-                <td style={tdLabel}>Khách hàng</td>
-                <td style={{ ...tdValue, fontWeight: 700 }}>{shipment.customer || '—'}</td>
-              </tr>
-              <tr>
-                <td style={tdLabel}>Cảng đến</td>
-                <td style={tdValue}>{shipment.destination || '—'}</td>
-                <td style={tdLabel}>Căn cứ HĐ / Booking</td>
-                <td style={tdValue}>{shipment.contractRef || '—'}</td>
+                <td style={{ ...tdValue, width: 'auto', fontWeight: 700 }} colSpan={3}>{shipment.dispatchCode || '—'}</td>
               </tr>
               {shipment.containers.length > 0 && (
                 <tr>

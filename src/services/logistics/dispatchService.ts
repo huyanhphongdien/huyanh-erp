@@ -380,6 +380,69 @@ async function getDeliveryStatus(containerIds: string[]): Promise<Record<string,
   return map
 }
 
+/** Tiến độ lô của 1 đơn — cho danh sách (3 view): bao nhiêu cont/lô, đã giao bao nhiêu. */
+export interface LotProgress {
+  contsTotal: number
+  contsDelivered: number
+  lotsTotal: number
+  lotsDelivered: number
+}
+
+/**
+ * Tiến độ lô CHO NHIỀU ĐƠN cùng lúc (2 query batch) — dùng ở list/kanban/split.
+ *  - đã giao container = có dòng lệnh điều động với actual_weight_kg.
+ *  - 1 lô "đã giao" khi mọi container của lô đã giao.
+ */
+async function getLotProgressForOrders(orderIds: string[]): Promise<Record<string, LotProgress>> {
+  const out: Record<string, LotProgress> = {}
+  const ids = [...new Set((orderIds || []).filter(Boolean))]
+  if (ids.length === 0) return out
+
+  const { data: conts } = await supabase
+    .from('sales_order_containers')
+    .select('id, sales_order_id, lot_no')
+    .in('sales_order_id', ids)
+  const rows = (conts || []) as Array<{ id: string; sales_order_id: string; lot_no: number | null }>
+  if (rows.length === 0) return out
+
+  // container đã giao — chunk IN tránh URL quá dài
+  const contIds = rows.map((r) => r.id)
+  const deliveredSet = new Set<string>()
+  for (let i = 0; i < contIds.length; i += 120) {
+    const chunk = contIds.slice(i, i + 120)
+    const { data: lines } = await supabase
+      .from('dispatch_order_lines')
+      .select('sales_order_container_id, actual_weight_kg')
+      .in('sales_order_container_id', chunk)
+    for (const l of (lines || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null }>) {
+      if (l.actual_weight_kg != null && l.sales_order_container_id) deliveredSet.add(l.sales_order_container_id)
+    }
+  }
+
+  const byOrder = new Map<string, Array<{ id: string; lot: number | null }>>()
+  for (const r of rows) {
+    if (!byOrder.has(r.sales_order_id)) byOrder.set(r.sales_order_id, [])
+    byOrder.get(r.sales_order_id)!.push({ id: r.id, lot: r.lot_no })
+  }
+  for (const [oid, cs] of byOrder) {
+    const lots = new Map<number, { total: number; delivered: number }>()
+    for (const c of cs) {
+      if (c.lot == null) continue
+      if (!lots.has(c.lot)) lots.set(c.lot, { total: 0, delivered: 0 })
+      const L = lots.get(c.lot)!
+      L.total++
+      if (deliveredSet.has(c.id)) L.delivered++
+    }
+    out[oid] = {
+      contsTotal: cs.length,
+      contsDelivered: cs.filter((c) => deliveredSet.has(c.id)).length,
+      lotsTotal: lots.size,
+      lotsDelivered: [...lots.values()].filter((L) => L.total > 0 && L.delivered === L.total).length,
+    }
+  }
+  return out
+}
+
 /** Danh sách lệnh CÒN HIỆU LỰC để chọn khi cân XUẤT (bỏ completed/cancelled). */
 async function listForWeighing(): Promise<DispatchOrder[]> {
   const { data, error } = await supabase
@@ -621,6 +684,7 @@ export const dispatchService = {
   listForWeighing,
   syncWeighing,
   getDeliveryStatus,
+  getLotProgressForOrders,
 }
 
 export default dispatchService

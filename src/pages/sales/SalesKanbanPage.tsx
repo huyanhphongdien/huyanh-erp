@@ -28,6 +28,7 @@ const STAGE_RANK: Record<SalesStage, number> = {
   delivered: 7,
 }
 import KanbanCard, { type KanbanOrder } from './components/KanbanCard'
+import { dispatchService, type LotProgress } from '../../services/logistics/dispatchService'
 
 // ============================================================================
 // MAIN PAGE
@@ -36,6 +37,7 @@ import KanbanCard, { type KanbanOrder } from './components/KanbanCard'
 export default function SalesKanbanPage() {
   const user = useAuthStore(s => s.user)
   const [orders, setOrders] = useState<KanbanOrder[]>([])
+  const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterEtd, setFilterEtd] = useState<'all' | '7d' | '14d' | '30d'>('all')
@@ -91,6 +93,9 @@ export default function SalesKanbanPage() {
       }
     })
     setOrders(mapped)
+    // Tiến độ lô cho card kanban (best-effort)
+    dispatchService.getLotProgressForOrders(mapped.map((o) => o.id))
+      .then(setLotProgress).catch(() => {})
   }
 
   useEffect(() => { fetchOrders() }, [])
@@ -318,6 +323,7 @@ export default function SalesKanbanPage() {
                       <KanbanCard
                         key={o.id}
                         order={o}
+                        lp={lotProgress[o.id]}
                         onDragStart={() => {}}
                         onDragEnd={() => {}}
                       />

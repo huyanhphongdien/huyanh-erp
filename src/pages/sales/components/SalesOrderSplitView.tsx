@@ -14,6 +14,8 @@ import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../../services/sale
 import SalesOrderDetailPanel from './SalesOrderDetailPanel'
 import { getSLAStatus } from '../../../services/sales/salesStages'
 import type { SalesStage } from '../../../services/sales/salesStages'
+import type { LotProgress } from '../../../services/logistics/dispatchService'
+import LotProgressBadge from '../../../components/sales/LotProgressBadge'
 
 const PRIMARY = '#1B4D3E'
 const PRIMARY_BG = '#f0f9f4'
@@ -56,9 +58,10 @@ interface Props {
   orders: SalesOrder[]
   loading?: boolean
   onOrderUpdated?: () => void
+  lotProgress?: Record<string, LotProgress>
 }
 
-export default function SalesOrderSplitView({ orders, loading, onOrderUpdated }: Props) {
+export default function SalesOrderSplitView({ orders, loading, onOrderUpdated, lotProgress }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -130,6 +133,7 @@ export default function SalesOrderSplitView({ orders, loading, onOrderUpdated }:
                 order={order}
                 selected={order.id === selectedId}
                 onClick={() => setSelectedId(order.id)}
+                lp={lotProgress?.[order.id]}
               />
             ))
           )}
@@ -178,10 +182,11 @@ export default function SalesOrderSplitView({ orders, loading, onOrderUpdated }:
 
 // ─── Order list item ─────────────────────────────────────────────────
 
-function OrderItem({ order, selected, onClick }: {
+function OrderItem({ order, selected, onClick, lp }: {
   order: SalesOrder
   selected: boolean
   onClick: () => void
+  lp?: LotProgress
 }) {
   const country = (order.customer?.country || '').toUpperCase()
   const slaStatus = getSLAStatus(
@@ -277,6 +282,7 @@ function OrderItem({ order, selected, onClick }: {
           >
             {ORDER_STATUS_LABELS[order.status as SalesOrderStatus] || order.status}
           </Tag>
+          <LotProgressBadge p={lp} small />
           {daysOver !== null && daysOver > 0 && (
             <Tag
               color="error"

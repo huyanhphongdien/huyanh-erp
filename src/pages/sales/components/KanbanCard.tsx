@@ -10,6 +10,8 @@ import {
   formatDwell,
   SLA_PILL_COLORS,
 } from '../../../services/sales/salesStages'
+import type { LotProgress } from '../../../services/logistics/dispatchService'
+import LotProgressBadge from '../../../components/sales/LotProgressBadge'
 
 export interface KanbanOrder {
   id: string
@@ -31,9 +33,10 @@ interface KanbanCardProps {
   order: KanbanOrder
   onDragStart: (orderId: string) => void
   onDragEnd: () => void
+  lp?: LotProgress
 }
 
-export default function KanbanCard({ order, onDragStart, onDragEnd }: KanbanCardProps) {
+export default function KanbanCard({ order, onDragStart, onDragEnd, lp }: KanbanCardProps) {
   const navigate = useNavigate()
 
   const elapsedHours = order.stage_started_at
@@ -103,6 +106,11 @@ export default function KanbanCard({ order, onDragStart, onDragEnd }: KanbanCard
         <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
           👤 {order.current_owner_name}
         </div>
+      )}
+
+      {/* Tiến độ lô */}
+      {lp && lp.contsTotal > 0 && (
+        <div style={{ marginTop: 6 }}><LotProgressBadge p={lp} small /></div>
       )}
 
       {/* Footer: dwell + ETD countdown */}

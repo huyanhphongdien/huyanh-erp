@@ -46,6 +46,8 @@ import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams } from '../../services/sales/salesOrderService'
+import { dispatchService, type LotProgress } from '../../services/logistics/dispatchService'
+import LotProgressBadge from '../../components/sales/LotProgressBadge'
 import StagePill from '../../components/common/StagePill'
 import type { SalesStage } from '../../services/sales/salesStages'
 import { getSLAStatus } from '../../services/sales/salesStages'
@@ -209,6 +211,7 @@ const SalesOrderListPage = () => {
 
   // State
   const [orders, setOrders] = useState<SalesOrder[]>([])
+  const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})  // tiến độ lô từng đơn
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState<SalesOrderStats>({
@@ -555,6 +558,9 @@ const SalesOrderListPage = () => {
       const response = await salesOrderService.getList(params)
       setOrders(response.data)
       setTotal(response.total)
+      // Tiến độ lô cho 3 view (best-effort, không chặn list)
+      dispatchService.getLotProgressForOrders(response.data.map((o) => o.id))
+        .then(setLotProgress).catch(() => {})
     } catch (error) {
       console.error('Error fetching orders:', error)
       message.error('Không thể tải danh sách đơn hàng')
@@ -1044,6 +1050,15 @@ const SalesOrderListPage = () => {
       sorter: true,
       sortOrder: sortedColumn('lot'),
       render: (v: string) => v ? <span style={{ fontSize: 11, fontFamily: 'monospace' }}>{v}</span> : gray(null),
+    },
+    {
+      title: hdr('Tiến độ lô'),
+      key: 'lot_progress',
+      width: 108,
+      render: (_: unknown, r: SalesOrder) => {
+        const p = lotProgress[r.id]
+        return p && p.contsTotal > 0 ? <LotProgressBadge p={p} /> : gray(null)
+      },
     },
     {
       title: hdr('SL (tấn)'),
@@ -1614,6 +1629,7 @@ const SalesOrderListPage = () => {
           orders={orders}
           loading={loading}
           onOrderUpdated={fetchOrders}
+          lotProgress={lotProgress}
         />
       ) : (
       <Card style={{ borderRadius: 8 }}>

@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  Card, Form, Select, Input, DatePicker, Button, Space, Typography, Row, Col,
+  Card, Form, Select, Input, AutoComplete, DatePicker, Button, Space, Typography, Row, Col,
   Table, InputNumber, message, Breadcrumb, Divider, Tag, Modal, Empty,
 } from 'antd'
 import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ImportOutlined, TruckOutlined, CarOutlined } from '@ant-design/icons'
@@ -34,6 +34,16 @@ const newKey = () => `L${_keySeq++}`
 const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 const numParse = (v?: string) => (v || '').replace(/\./g, '')
 const BALE_KG = 35 // kg/bành chuẩn SVR — dùng để KL tự nhảy theo số kiện
+
+// Gợi ý chọn nhanh (vẫn gõ tự do được — AutoComplete)
+const ROUTE_PRESETS = [
+  'Kho Phong Điền → Cảng Tiên Sa',
+  'Kho Phong Điền → Cảng Đà Nẵng',
+  'Kho Quảng Trị → Cảng Tiên Sa',
+  'Kho Quảng Trị → Kho Phong Điền',
+].map(v => ({ value: v }))
+const GRADE_PRESETS = ['SVR 10', 'SVR 3L', 'SVR L', 'SVR 5', 'SVR 20', 'SVR CV50', 'SVR CV60', 'RSS 1', 'RSS 3', 'Latex 60'].map(v => ({ value: v }))
+const acFilter = (input: string, opt?: { value: string }) => (opt?.value || '').toLowerCase().includes(input.toLowerCase())
 
 export default function DispatchCreatePage() {
   const navigate = useNavigate()
@@ -203,9 +213,17 @@ export default function DispatchCreatePage() {
 
   const lineColumns = useMemo(() => [
     { title: '#', key: 'idx', width: 44, render: (_: any, __: any, i: number) => i + 1 },
-    { title: 'Hành trình', key: 'route', width: 170, render: (_: any, r: LineRow) => <Input value={r.route || ''} placeholder="Kho → Cảng" onChange={e => patchLine(r._key, { route: e.target.value })} /> },
+    { title: 'Hành trình', key: 'route', width: 210, render: (_: any, r: LineRow) => (
+      <AutoComplete value={r.route || ''} style={{ width: '100%' }} options={ROUTE_PRESETS}
+        placeholder="Chọn / gõ tuyến…" filterOption={acFilter as any}
+        onChange={v => patchLine(r._key, { route: v })} />
+    ) },
     { title: 'Lô hàng', key: 'lot', width: 130, render: (_: any, r: LineRow) => <Input value={r.lot_code || ''} onChange={e => patchLine(r._key, { lot_code: e.target.value })} /> },
-    { title: 'Loại hàng', key: 'grade', width: 130, render: (_: any, r: LineRow) => <Input value={r.grade || ''} placeholder="SVR 10" onChange={e => patchLine(r._key, { grade: e.target.value })} /> },
+    { title: 'Loại hàng', key: 'grade', width: 140, render: (_: any, r: LineRow) => (
+      <AutoComplete value={r.grade || ''} style={{ width: '100%' }} options={GRADE_PRESETS}
+        placeholder="SVR 10…" filterOption={acFilter as any}
+        onChange={v => patchLine(r._key, { grade: v })} />
+    ) },
     { title: 'Số container', key: 'cont', width: 160, render: (_: any, r: LineRow) => <Input value={r.container_no || ''} onChange={e => patchLine(r._key, { container_no: e.target.value })} /> },
     { title: 'Seal', key: 'seal', width: 140, render: (_: any, r: LineRow) => <Input value={r.seal_no || ''} onChange={e => patchLine(r._key, { seal_no: e.target.value })} /> },
     { title: 'Số kiện', key: 'pkg', width: 110, render: (_: any, r: LineRow) => (

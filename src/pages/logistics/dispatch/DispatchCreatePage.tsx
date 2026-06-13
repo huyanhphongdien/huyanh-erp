@@ -152,17 +152,41 @@ export default function DispatchCreatePage() {
   const chooseSo = async (so: SalesOrderOption) => {
     try {
       const { header, lines: soLines } = await dispatchService.buildFromSalesOrder(so.id)
-      form.setFieldsValue({
-        sales_order_id: header.sales_order_id,
-        customer_name: header.customer_name,
-        destination: header.destination,
-        contract_ref: header.contract_ref,
-        trip_type: header.trip_type || 'port',
-      })
-      setLines(soLines.map(l => ({ ...l, _key: newKey() })))
-      setSelectedSoLabel(`${so.code}${so.customer_name ? ' — ' + so.customer_name : ''}`)
+      if (soLines.length === 0) {
+        message.warning(`${so.code}: không còn container chưa điều động để thêm.`)
+        return
+      }
+      // 1 XE CÓ THỂ CHỞ CONT CỦA NHIỀU ĐƠN → GỘP (append), KHÔNG thay thế.
+      // Chống trùng theo container đã có trên lệnh (sales_order_container_id).
+      const existing = new Set(lines.map(l => l.sales_order_container_id).filter(Boolean) as string[])
+      const fresh = soLines.filter(l => !l.sales_order_container_id || !existing.has(l.sales_order_container_id as string))
+      if (fresh.length === 0) {
+        message.info(`${so.code}: các container đã có trong lệnh rồi.`)
+        setSoModalOpen(false)
+        return
+      }
+      setLines(prev => [...prev, ...fresh.map(l => ({ ...l, _key: newKey() }))])
+
+      const cur = form.getFieldsValue()
+      if (!cur.sales_order_id) {
+        // Đơn ĐẦU TIÊN → điền header (khách/cảng/căn cứ HĐ).
+        form.setFieldsValue({
+          sales_order_id: header.sales_order_id,
+          customer_name: header.customer_name,
+          destination: header.destination,
+          contract_ref: header.contract_ref,
+          trip_type: header.trip_type || cur.trip_type || 'port',
+        })
+        setSelectedSoLabel(`${so.code}${so.customer_name ? ' — ' + so.customer_name : ''}`)
+      } else {
+        // Đơn THỨ 2+ → chỉ gộp căn cứ HĐ/booking để in; GIỮ khách/cảng của đơn đầu.
+        form.setFieldsValue({
+          contract_ref: [cur.contract_ref, header.contract_ref].filter(Boolean).join(' + '),
+        })
+        setSelectedSoLabel(prev => `${prev}  +  ${so.code}`)
+      }
       setSoModalOpen(false)
-      message.success(`Đã đổ ${soLines.length} container từ ${so.code}`)
+      message.success(`Đã thêm ${fresh.length} container từ ${so.code}`)
     } catch (e: any) {
       message.error('Lỗi đổ container: ' + (e?.message || e))
     }
@@ -278,10 +302,10 @@ export default function DispatchCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={8} md={13}>
-              <Form.Item label="Đơn hàng bán (tuỳ chọn)">
+              <Form.Item label="Đơn hàng bán (gộp được nhiều đơn cho 1 xe)">
                 <Space.Compact style={{ width: '100%' }}>
                   <Input readOnly value={selectedSoLabel} placeholder="Chưa gắn đơn hàng" />
-                  <Button icon={<ImportOutlined />} onClick={openSoPicker}>{selectedSoLabel ? 'Đổi đơn' : 'Tạo từ Đơn hàng bán'}</Button>
+                  <Button icon={<ImportOutlined />} onClick={openSoPicker}>{selectedSoLabel ? '+ Thêm đơn khác' : 'Tạo từ Đơn hàng bán'}</Button>
                 </Space.Compact>
                 {/* sales_order_id giữ trong form để submit, KHÔNG hiển thị UUID cho người dùng */}
                 <Form.Item name="sales_order_id" hidden><Input /></Form.Item>

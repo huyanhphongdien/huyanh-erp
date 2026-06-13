@@ -36,6 +36,14 @@ export default function PrintPage() {
   const [dealInfo, setDealInfo] = useState<{ deal_number: string; partner_name: string } | null>(null)
   // Đối tác (mọi nguồn): deal→đại lý, partner_direct→đại lý, supplier→NCC
   const [partner, setPartner] = useState<{ name: string; label: string } | null>(null)
+  // Thông tin xuất hàng (phiếu XUẤT gắn Lệnh điều động / Đơn hàng bán) — để in kèm.
+  const [shipment, setShipment] = useState<{
+    dispatchCode?: string | null
+    customer?: string | null
+    destination?: string | null
+    contractRef?: string | null
+    containers: Array<{ no: string | null; seal: string | null }>
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [paperSize, setPaperSize] = useState<PaperSize>(() => {
     // Phong Điền: LUÔN mặc định A4 (in laser). Nơi khác (vd Quảng Trị máy in kim A5):
@@ -87,6 +95,50 @@ export default function PrintPage() {
         else if (ext.supplier_name) setPartner({ name: ext.supplier_name, label: 'NCC' })
       } else if (ext?.supplier_name) {
         setPartner({ name: ext.supplier_name, label: 'Đối tác' })
+      }
+
+      // XUẤT hàng: kéo thông tin đơn để in (ưu tiên Lệnh điều động, fallback Đơn hàng bán).
+      if (t && t.ticket_type === 'out') {
+        if (ext?.reference_type === 'dispatch_order' && ext?.reference_id) {
+          const { data: dord } = await supabase
+            .from('dispatch_orders')
+            .select('code, customer_name, destination, contract_ref, lines:dispatch_order_lines(container_no, seal_no, actual_seal_no)')
+            .eq('id', ext.reference_id)
+            .maybeSingle()
+          if (dord) {
+            const d = dord as any
+            setShipment({
+              dispatchCode: d.code || null,
+              customer: d.customer_name || null,
+              destination: d.destination || null,
+              contractRef: d.contract_ref || null,
+              containers: (d.lines || []).map((l: any) => ({ no: l.container_no, seal: l.actual_seal_no || l.seal_no })),
+            })
+          }
+        } else if (ext?.sales_order_id) {
+          const { data: so } = await supabase
+            .from('sales_orders')
+            .select('code, contract_no, port_of_destination, customer:sales_customers!customer_id(name, short_name)')
+            .eq('id', ext.sales_order_id)
+            .maybeSingle()
+          let cont: any = null
+          if (ext?.container_id) {
+            const { data: c } = await supabase
+              .from('sales_order_containers').select('container_no, seal_no').eq('id', ext.container_id).maybeSingle()
+            cont = c
+          }
+          if (so) {
+            const s = so as any
+            const cust = Array.isArray(s.customer) ? s.customer[0] : s.customer
+            setShipment({
+              dispatchCode: null,
+              customer: cust?.short_name || cust?.name || null,
+              destination: s.port_of_destination || null,
+              contractRef: s.contract_no || s.code || null,
+              containers: cont ? [{ no: cont.container_no, seal: cont.seal_no }] : [],
+            })
+          }
+        }
       }
     } catch { /* ignore */ }
     setLoading(false)
@@ -364,6 +416,49 @@ export default function PrintPage() {
             </tbody>
           </table>
         )}
+
+        {/* ===== SHIPMENT INFO (phiếu XUẤT gắn lệnh/đơn) ===== */}
+        {shipment && (isThermal ? (
+          <div style={{ marginBottom: 4, fontSize: fs }}>
+            <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
+            {shipment.dispatchCode && <Row2 l="Lệnh ĐĐ" r={<strong>{shipment.dispatchCode}</strong>} />}
+            {shipment.customer && <Row2 l="Khách" r={shipment.customer} />}
+            {shipment.destination && <Row2 l="Cảng đến" r={shipment.destination} />}
+            {shipment.contractRef && <Row2 l="Căn cứ HĐ" r={shipment.contractRef} />}
+            {shipment.containers.map((c, i) => (
+              <Row2 key={i} l={i === 0 ? 'Cont/Seal' : ''} r={`${c.no || '—'}${c.seal ? ` · ${c.seal}` : ''}`} />
+            ))}
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 10, border: '1px solid #D1D5DB' }}>
+            <tbody>
+              <tr>
+                <td style={tdLabel}>Lệnh điều động</td>
+                <td style={{ ...tdValue, fontWeight: 700 }}>{shipment.dispatchCode || '—'}</td>
+                <td style={tdLabel}>Khách hàng</td>
+                <td style={{ ...tdValue, fontWeight: 700 }}>{shipment.customer || '—'}</td>
+              </tr>
+              <tr>
+                <td style={tdLabel}>Cảng đến</td>
+                <td style={tdValue}>{shipment.destination || '—'}</td>
+                <td style={tdLabel}>Căn cứ HĐ / Booking</td>
+                <td style={tdValue}>{shipment.contractRef || '—'}</td>
+              </tr>
+              {shipment.containers.length > 0 && (
+                <tr>
+                  <td style={tdLabel}>Container / Seal</td>
+                  <td style={{ ...tdValue, width: 'auto' }} colSpan={3}>
+                    {shipment.containers.map((c, i) => (
+                      <span key={i} style={{ marginRight: 12, whiteSpace: 'nowrap', display: 'inline-block' }}>
+                        <strong>{c.no || '—'}</strong>{c.seal ? <span style={{ color: '#6B7280' }}> · seal {c.seal}</span> : ''}
+                      </span>
+                    ))}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        ))}
 
         {/* ===== WEIGHTS ===== */}
         {isThermal ? (

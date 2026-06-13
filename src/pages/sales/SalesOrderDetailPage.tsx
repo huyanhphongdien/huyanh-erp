@@ -61,7 +61,7 @@ import { salesOrderService } from '../../services/sales/salesOrderService'
 import { salesProductionService } from '../../services/sales/salesProductionService'
 import { containerService } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
-import { LOT_STAGES, buildLotTrackRows, lotOverallStage } from '../../services/sales/lotTracking'
+import { LOT_STAGES, buildLotTrackRows, lotOverallStage, lotDeliveryStats } from '../../services/sales/lotTracking'
 import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
@@ -1198,6 +1198,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   // Theo dõi lô: gom container theo lô + giai đoạn (dùng util chung).
   const lotTrackRows = buildLotTrackRows(containers, deliveryMap)
   const lotCount = lotTrackRows.filter(r => r.lotNo != null).length
+  const { lotsTotal, lotsDelivered } = lotDeliveryStats(lotTrackRows)
   const lotTrackColumns: ColumnsType<typeof lotTrackRows[number]> = [
     { title: 'Lô', key: 'lo', width: 96, render: (_: any, r) =>
         r.lotNo != null ? <Text strong>Lô {r.lotNo}</Text> : <Text type="secondary">Chưa gán</Text> },
@@ -1226,9 +1227,12 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             <Row gutter={16}>
               <Col xs={12} sm={4}>
                 <Statistic
-                  title="Tổng container"
-                  value={containerSummary.total_containers}
+                  title="Tổng container (đơn)"
+                  value={order.container_count || containerSummary.total_containers}
                   valueStyle={{ color: '#1B4D3E' }}
+                  suffix={order.container_count && order.container_count !== containerSummary.total_containers
+                    ? <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400 }}>· đã tạo {containerSummary.total_containers}</span>
+                    : undefined}
                 />
               </Col>
               <Col xs={12} sm={5}>
@@ -1277,9 +1281,10 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         <Col xs={24}>
           <Card size="small" title="📋 Theo dõi lô giao hàng" style={{ background: '#F6FFED', borderColor: '#B7EB8F' }}>
             <Space size={[8, 8]} wrap style={{ marginBottom: 10 }}>
-              <Tag color="blue" style={{ fontSize: 13 }}>{containers.length} container</Tag>
+              <Tag color="blue" style={{ fontSize: 13 }}>{containers.length} cont (đã tạo)</Tag>
               <Tag color="purple" style={{ fontSize: 13 }}>{lotCount} lô{lotCount === 0 ? ' (chưa chia)' : ''}</Tag>
-              <Tag color="green" style={{ fontSize: 13 }}>✅ Đã giao {deliveredCount}/{containers.length} cont</Tag>
+              {lotsTotal > 0 && <Tag color="green" style={{ fontSize: 13, fontWeight: 600 }}>🟢 Đã giao {lotsDelivered}/{lotsTotal} lô</Tag>}
+              <Tag color="green" style={{ fontSize: 13 }}>✅ {deliveredCount}/{containers.length} cont đã giao</Tag>
               <Tag color="orange" style={{ fontSize: 13 }}>🚚 Đang điều {dispatchingCount}</Tag>
               <Tag style={{ fontSize: 13 }}>Chưa giao {containers.length - deliveredCount - dispatchingCount}</Tag>
             </Space>

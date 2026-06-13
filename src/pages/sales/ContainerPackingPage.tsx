@@ -47,7 +47,7 @@ import { salesOrderService } from '../../services/sales/salesOrderService'
 import { containerService } from '../../services/sales/containerService'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
-import { LOT_STAGES, buildLotTrackRows } from '../../services/sales/lotTracking'
+import { LOT_STAGES, buildLotTrackRows, lotDeliveryStats } from '../../services/sales/lotTracking'
 import type {
   SalesOrder,
   SalesOrderContainer,
@@ -689,6 +689,7 @@ function ContainerPackingPage() {
 
   // Theo dõi lô: gom container theo lô + giai đoạn (util chung với tab Đóng gói).
   const lotTrackRows = buildLotTrackRows(containers, deliveryMap)
+  const { lotsTotal, lotsDelivered } = lotDeliveryStats(lotTrackRows)
 
   const lotTrackColumns: ColumnsType<typeof lotTrackRows[number]> = [
     { title: 'Lô', key: 'lo', width: 110, render: (_: unknown, r) =>
@@ -918,7 +919,8 @@ function ContainerPackingPage() {
         >
           <Space size={[8, 8]} wrap style={{ marginBottom: 12 }}>
             <Text strong>📦 Tiến độ:</Text>
-            <Tag color="green">✅ Đã giao {deliveredCount}/{containers.length}</Tag>
+            {lotsTotal > 0 && <Tag color="green" style={{ fontWeight: 600 }}>🟢 Đã giao {lotsDelivered}/{lotsTotal} lô</Tag>}
+            <Tag color="green">✅ {deliveredCount}/{containers.length} cont đã giao</Tag>
             <Tag color="orange">🚚 Đang điều động {dispatchingCount}</Tag>
             <Tag>Chưa giao {containers.length - deliveredCount - dispatchingCount}</Tag>
             {lotNumbers.length > 0 && <span style={{ borderLeft: '1px solid #d9d9d9', height: 18 }} />}

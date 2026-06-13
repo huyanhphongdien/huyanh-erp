@@ -70,3 +70,12 @@ export function lotOverallStage(row: LotTrackRow): { allDelivered: boolean; stag
   const stage = LOT_STAGES.find((s) => row.counts[s.key] > 0)
   return { allDelivered, stage }
 }
+
+/** 1 lô "đã giao" khi MỌI container của lô đã giao. Đếm số lô đã giao / tổng số lô (đã gán). */
+export function lotDeliveryStats(rows: LotTrackRow[]): { lotsTotal: number; lotsDelivered: number } {
+  const real = rows.filter((r) => r.lotNo != null)
+  return {
+    lotsTotal: real.length,
+    lotsDelivered: real.filter((r) => r.total > 0 && r.counts.delivered === r.total).length,
+  }
+}

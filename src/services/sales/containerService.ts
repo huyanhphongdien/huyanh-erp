@@ -117,7 +117,9 @@ export const containerService = {
       const netKg = Math.round(bales * baleWeightKg * 100) / 100
       return {
         sales_order_id: orderId,
-        container_no: `CONT-${soCode}-${String(i + 1).padStart(2, '0')}`,
+        // KHÔNG tự đặt số container (placeholder dễ nhầm là số thật) — để trống cho
+        // Logistics nhập số thật từ hãng tàu sau. Giữ soCode tham chiếu trong notes.
+        container_no: null,
         seal_no: null,
         container_type: containerType,
         gross_weight_kg: null,
@@ -125,7 +127,7 @@ export const containerService = {
         net_weight_kg: netKg > 0 ? netKg : null,
         bale_count: bales > 0 ? bales : null,
         status: 'planning' as ContainerStatus,
-        notes: `Container ${i + 1}/${containerCount} — Tạo tự động`,
+        notes: `${soCode} — Container ${i + 1}/${containerCount} (tạo tự động, chờ nhập số thật)`,
       }
     })
 

@@ -53,6 +53,7 @@ import {
   ThunderboltOutlined,
   LinkOutlined,
   LoadingOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
@@ -1042,15 +1043,23 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
   const containerColumns: ColumnsType<SalesOrderContainer> = [
     {
       title: 'Container No.',
-      dataIndex: 'container_no',
       key: 'container_no',
-      render: (v) => v || <Text type="secondary">Chưa có</Text>,
+      width: 180,
+      render: (_: any, r: SalesOrderContainer) => canEditPacking
+        ? <Input size="small" value={r.container_no || ''} placeholder="Số thật (hãng tàu)"
+            onChange={e => setContainers(prev => prev.map(c => c.id === r.id ? { ...c, container_no: e.target.value } : c))}
+            onBlur={e => handleContainerFieldBlur(r.id, 'container_no', e.target.value)} />
+        : (r.container_no || <Text type="secondary">Chưa có</Text>),
     },
     {
       title: 'Seal No.',
-      dataIndex: 'seal_no',
       key: 'seal_no',
-      render: (v) => v || '-',
+      width: 150,
+      render: (_: any, r: SalesOrderContainer) => canEditPacking
+        ? <Input size="small" value={r.seal_no || ''} placeholder="Seal thật"
+            onChange={e => setContainers(prev => prev.map(c => c.id === r.id ? { ...c, seal_no: e.target.value } : c))}
+            onBlur={e => handleContainerFieldBlur(r.id, 'seal_no', e.target.value)} />
+        : (r.seal_no || '-'),
     },
     {
       title: 'Loại',
@@ -1108,6 +1117,18 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         <Tag color={CONTAINER_STATUS_COLORS[s]}>{CONTAINER_STATUS_LABELS[s]}</Tag>
       ),
     },
+    {
+      title: '',
+      key: 'actions',
+      width: 48,
+      render: (_: any, r: SalesOrderContainer) => canEditPacking && r.status === 'planning'
+        ? (
+          <Popconfirm title="Xóa container này?" onConfirm={() => handleDeleteContainer(r.id)} okText="Xóa" cancelText="Hủy">
+            <Button danger size="small" icon={<DeleteOutlined />} />
+          </Popconfirm>
+        )
+        : null,
+    },
   ]
 
   const handleAutoCreateContainers = async () => {
@@ -1143,6 +1164,30 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     } catch (e: any) {
       message.error('Lỗi lưu lot: ' + (e?.message || e))
     }
+  }
+
+  // Sửa field container (số cont/seal…) — cập nhật cục bộ onChange, lưu DB onBlur (tránh ghi/keystroke).
+  const handleContainerFieldBlur = async (id: string, field: 'container_no' | 'seal_no', value: string) => {
+    const v = value.trim() || null
+    try { await containerService.updateContainer(id, { [field]: v } as any) }
+    catch (e: any) { message.error('Lỗi lưu: ' + (e?.message || e)) }
+  }
+
+  // Xóa 1 container (chỉ khi nháp/planning — service tự chặn nếu đã đóng/seal).
+  const handleDeleteContainer = async (id: string) => {
+    try { await containerService.deleteContainer(id); message.success('Đã xóa container'); loadOrder() }
+    catch (e: any) { message.error(e?.message || 'Không thể xóa container') }
+  }
+
+  // Xóa tất cả container đang nháp (để tạo lại) — bỏ qua container đã đóng/seal.
+  const handleDeleteAllContainers = async () => {
+    const planning = containers.filter(c => c.status === 'planning')
+    if (planning.length === 0) { message.info('Không có container nháp nào để xóa'); return }
+    try {
+      for (const c of planning) await containerService.deleteContainer(c.id)
+      message.success(`Đã xóa ${planning.length} container`)
+      loadOrder()
+    } catch (e: any) { message.error(e?.message || 'Không thể xóa') }
   }
 
   // Tiến độ giao (derive): đã giao / đang điều động / chưa giao theo deliveryMap.
@@ -1265,6 +1310,16 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
               >
                 Thêm container
               </Button>
+              {canEditPacking && containers.some(c => c.status === 'planning') && (
+                <Popconfirm
+                  title="Xóa tất cả container nháp?"
+                  description="Chỉ xóa container chưa đóng/seal (planning)."
+                  onConfirm={handleDeleteAllContainers}
+                  okText="Xóa hết" cancelText="Hủy"
+                >
+                  <Button danger size="small" icon={<DeleteOutlined />}>Xóa tất cả</Button>
+                </Popconfirm>
+              )}
             </Space>
           }
         >

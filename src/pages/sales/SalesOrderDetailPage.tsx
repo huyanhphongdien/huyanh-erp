@@ -1691,7 +1691,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             ),
             children: renderPackingTab(),
           }] : []),
-          ...(visibleTabs.includes('packing') ? [{
+          ...(visibleTabs.includes('shipping') ? [{
             key: 'shipping',
             label: (
               <span>

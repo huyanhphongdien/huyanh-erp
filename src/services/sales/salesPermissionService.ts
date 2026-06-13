@@ -143,7 +143,7 @@ export function getVisibleTabs(role: SalesRole | null): string[] {
   if (!role) return ['contract']
   const tabs = ['contract'] // ai cũng thấy tab HĐ
 
-  if (['production', 'sale', 'logistics', 'admin'].includes(role)) tabs.push('production')
+  if (['production', 'sale', 'logistics', 'admin'].includes(role)) { tabs.push('production'); tabs.push('packing') }
   if (['logistics', 'sale', 'accounting', 'admin'].includes(role)) tabs.push('shipping')
   // tabs.push('documents') // tạm ẩn tab chứng từ
   if (salesPermissions.canViewFinance(role)) tabs.push('finance')

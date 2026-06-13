@@ -200,7 +200,7 @@
     <li><b>Chia lô khi CHƯA có số container/seal</b> — chia lô là việc lập kế hoạch, làm trước; số container/seal điền sau khi có booking hãng tàu.</li>
     <li><b>Tạo theo lô</b>: khai <i>Lô 1: 5 cont – hạn 20/06</i>, <i>Lô 2: 5 cont – hạn 30/06</i> → hệ thống tạo sẵn các container trống đã gắn lô + hạn.</li>
     <li><b>Gán lô nhiều container cùng lúc</b>: tích nhiều dòng → 1 nút gán cùng lô; vẫn sửa tay từng dòng.</li>
-    <li>Sửa <b>số container / seal / số bành / khối lượng / lô / hạn</b> tại chỗ + <b>xóa</b> từng container (container đã niêm phong/giao thì khoá), và <b>lưu lại lịch sử chỉnh sửa</b>.</li>
+    <li>Sửa <b>số container / seal / số bành / khối lượng / lô / hạn</b> tại chỗ + <b>xóa</b> từng container (container đã niêm phong/giao thì <b>khoá</b>, không xoá nhầm được).</li>
     <li>Khu <b>"Tiến độ giao"</b>: tổng đã giao / đang điều xe / chưa đi + từng lô (vd <i>Lô 1: 5/5 · hạn 20/06</i>).</li>
   </ul>
 
@@ -305,7 +305,7 @@
   <ol class="steps">
     <li>Tạo phiếu cân <b>XUẤT</b> tại trạm cân (Phong Điền) như thường lệ.</li>
     <li>Ở ô <b>🚚 Lệnh điều động</b>, chọn đúng lệnh của xe đang cân → container tự hiện ra.</li>
-    <li>Cân lần 1 (xe + hàng) và lần 2 (xe rỗng) như quy trình.</li>
+    <li>Cân lần 1 (xe rỗng) và lần 2 (xe + hàng) như quy trình.</li>
     <li>Lưu phiếu → khối lượng tự chia cho các container, seal &amp; khối lượng thực ghi về lệnh.</li>
     <li>Quay lại <b>Đơn hàng bán</b> → khu Tiến độ giao của lô đó chuyển <span class="pill g">✅ đã giao</span>.</li>
   </ol>
@@ -361,12 +361,19 @@
     <b>🚦 Đơn hàng tự chuyển "Đã giao" khi TẤT CẢ lô đã giao</b>
     <ul class="feat" style="margin-bottom:0">
       <li>Mỗi lô <b>"đã giao"</b> khi mọi container của lô đã cân xuất.</li>
-      <li>Khi <b>tất cả container (mọi lô)</b> của đơn đã cân xuất → trạng thái đơn tự chuyển <span class="pill g">Đã giao</span> — không cần ai bấm tay.</li>
-      <li>Hệ thống tự cập nhật <b>ngay khi cân xong</b>, dù không ai mở đơn lên xem.</li>
+      <li>Tiến độ từng lô <b>tự cập nhật</b> theo khối lượng cân thực — không phải nhập tay.</li>
+      <li>Khi <b>tất cả container (mọi lô)</b> của đơn đã cân xuất → trạng thái đơn chuyển <span class="pill g">Đã giao</span> tự động, không cần bấm tay.</li>
     </ul>
   </div>
 
   <p><b>Xem ở đâu:</b> Đơn hàng → tab <span class="kbd">Đóng gói</span> → khu <b>"📋 Theo dõi lô giao hàng"</b> (đầu tab). Cũng có trong trang <span class="kbd">Quản lý đóng gói →</span>.</p>
+
+  <div class="card blue">
+    <b>👀 Theo dõi lô ngay ở danh sách đơn — cả 3 dạng xem</b>
+    <p style="margin:6px 0 0">Không cần mở từng đơn: <b>danh sách Đơn hàng bán</b> hiện <b>badge tiến độ lô</b>
+       trên mỗi đơn ở cả <b>3 dạng xem</b> — <b>Bảng</b> (cột "Tiến độ lô"), <b>Split</b> (2 cột), <b>Kanban</b> (trên thẻ).
+       Vd <span class="pill g">📦 1/2 lô</span> = đã giao 1 trong 2 lô; chưa chia lô thì hiện theo container.</p>
+  </div>
 
   <!-- ===================== LỢI ÍCH ===================== -->
   <h2>⑥ Tác dụng nổi bật</h2>
@@ -377,7 +384,7 @@
       <li><b>So kế hoạch với thực tế</b> — khối lượng dự kiến vs khối lượng cân; seal dự kiến vs seal thực.</li>
       <li><b>1 xe chở nhiều đơn / nhiều khách</b> vẫn quản lý &amp; in chứng từ đúng từng khách.</li>
       <li><b>Chứng từ in tự động</b> — Lệnh điều động + Biên bản bàn giao khổ A4, bỏ thao tác gõ Word tay.</li>
-      <li><b>Minh bạch &amp; an toàn</b> — không điều trùng 1 container 2 lần; mọi chỉnh sửa số cont/seal đều <b>lưu lịch sử</b>.</li>
+      <li><b>Minh bạch &amp; an toàn</b> — không điều trùng 1 container 2 lần; container đã giao/niêm phong không xoá nhầm được.</li>
       <li><b>Nền cho báo cáo trạm cân</b> — biết "hàng gì, của ai, đi cảng nào" vì phiếu cân gắn lệnh.</li>
     </ul>
   </div>

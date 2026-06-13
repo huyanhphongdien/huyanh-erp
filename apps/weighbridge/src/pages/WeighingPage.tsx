@@ -1327,14 +1327,23 @@ export default function WeighingPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Seal thực tế — chỉ khi đúng 1 container (nhiều cont thì mỗi cont seal riêng). */}
+                    {selectedDispatchLineIds.length === 1 && (
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Số seal thực tế (nếu khác kế hoạch)</Text>
+                        <Input value={sealNoActual} onChange={e => setSealNoActual(e.target.value)}
+                          placeholder="VD: VN0099882" disabled={!!ticket} />
+                      </div>
+                    )}
                   </Space>
                 </Card>
               )}
 
               {/* S3 OUT: Sales Order + Container picker — CHỈ hiện ở NM xuất khẩu (PD).
-                  Ẩn ở TL/LAO (can_ship_to_customer=false) vì các NM này không xuất trực tiếp,
-                  chỉ làm transfer về PD. Cũng ẨN khi đã chọn transfer (tránh confusion). */}
-              {ticketDirection === 'out' && !selectedTransferId && currentFacility?.can_ship_to_customer && (
+                  Ẩn ở TL/LAO (can_ship_to_customer=false), khi đã chọn transfer, HOẶC
+                  khi ĐÃ CHỌN LỆNH ĐIỀU ĐỘNG (lệnh đã có đủ thông tin hàng → SO card thừa). */}
+              {ticketDirection === 'out' && !selectedTransferId && !selectedDispatchOrderId && currentFacility?.can_ship_to_customer && (
                 <Card size="small" title="Đơn hàng xuất (tuỳ chọn — trừ kho theo SO)" style={{ borderRadius: 12, borderColor: '#E8A838' }}>
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     <div>

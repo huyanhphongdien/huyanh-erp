@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tổng kết &amp; Hướng dẫn — Đơn hàng bán · Lệnh điều động · Trạm cân</title>
+<style>
+  :root{
+    --green:#1B4D3E; --green2:#2E7D5B; --gold:#92400E; --gold-bg:#FFFBEB;
+    --line:#E5E7EB; --soft:#F6FFED; --soft-bd:#B7EB8F; --ink:#1F2937; --mut:#6B7280;
+    --blue:#1d4ed8; --blue-bg:#EFF6FF;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Be Vietnam Pro','Segoe UI',Arial,sans-serif;color:var(--ink);
+       background:#F3F4F6;line-height:1.6;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:0 18px 64px}
+  /* HERO */
+  .hero{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;
+        padding:40px 32px;border-radius:0 0 18px 18px;margin-bottom:8px;box-shadow:0 6px 24px rgba(27,77,62,.25)}
+  .hero h1{margin:0 0 8px;font-size:28px;font-weight:800;letter-spacing:.3px}
+  .hero .sub{font-size:15px;opacity:.92}
+  .hero .badge{display:inline-block;margin-top:14px;background:rgba(255,255,255,.15);
+        border:1px solid rgba(255,255,255,.35);padding:6px 14px;border-radius:20px;font-size:13px}
+  /* SECTION */
+  h2{font-size:21px;color:var(--green);border-left:5px solid var(--green);
+     padding:4px 0 4px 12px;margin:38px 0 14px}
+  h3{font-size:16px;margin:20px 0 8px;color:var(--ink)}
+  p{margin:8px 0}
+  .lead{font-size:16px;color:#374151}
+  /* CARD */
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 22px;
+        margin:14px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card.green{border-color:var(--soft-bd);background:var(--soft)}
+  .card.gold{border-color:#FDE68A;background:var(--gold-bg)}
+  .card.blue{border-color:#BFDBFE;background:var(--blue-bg)}
+  /* FLOW DIAGRAM */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:18px 0}
+  .flow .node{flex:1;min-width:210px;background:#fff;border:2px solid var(--green);border-radius:12px;
+        padding:16px;text-align:center;position:relative}
+  .flow .node .ic{font-size:30px;line-height:1}
+  .flow .node .nm{font-weight:800;color:var(--green);margin:6px 0 4px;font-size:15px}
+  .flow .node small{color:var(--mut);font-size:12.5px;display:block}
+  .flow .arrow{display:flex;align-items:center;justify-content:center;color:var(--green2);
+        font-size:26px;font-weight:800;padding:0 6px}
+  .loopback{margin:6px 0 0;text-align:center;background:var(--gold-bg);border:1px dashed #FBBF24;
+        border-radius:10px;padding:10px 14px;color:var(--gold);font-weight:600;font-size:13.5px}
+  /* STEPS */
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:10px 0}
+  ol.steps li{position:relative;padding:8px 0 8px 42px;border-bottom:1px dashed var(--line)}
+  ol.steps li:last-child{border-bottom:0}
+  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:8px;
+        width:28px;height:28px;background:var(--green);color:#fff;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  /* FEATURE LIST */
+  ul.feat{list-style:none;padding:0;margin:10px 0}
+  ul.feat li{padding:6px 0 6px 28px;position:relative}
+  ul.feat li::before{content:"✓";position:absolute;left:0;top:6px;color:var(--green2);font-weight:800}
+  /* IMAGE PLACEHOLDER */
+  .img{border:2px dashed #9CA3AF;border-radius:10px;background:#FAFAFA;color:var(--mut);
+       text-align:center;padding:26px 16px;margin:14px 0;font-size:13.5px}
+  .img b{color:#374151;display:block;font-size:14px;margin-bottom:4px}
+  .img .tag{display:inline-block;background:var(--green);color:#fff;border-radius:6px;
+       padding:2px 10px;font-size:12px;font-weight:700;margin-bottom:8px}
+  figure.img{margin:14px 0}
+  .img img{max-width:100%;border-radius:8px;border:1px solid var(--line);display:block;margin:10px auto 0}
+  .img img.missing{display:none}
+  .img.has-img{border-style:solid;border-color:var(--line);background:#fff;padding:12px}
+  .img figcaption{margin-top:8px;line-height:1.5}
+  .img figcaption b{display:block;color:#374151;font-size:14px;margin-bottom:2px}
+  /* TABLE */
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:var(--green);color:#fff;font-weight:700;font-size:13.5px}
+  tr:nth-child(even) td{background:#FAFAFA}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700}
+  .pill.g{background:#DCFCE7;color:#166534}.pill.o{background:#FFEDD5;color:#9A3412}
+  .pill.b{background:#DBEAFE;color:#1E40AF}.pill.x{background:#F3F4F6;color:#6B7280}
+  .kbd{background:#111827;color:#fff;border-radius:5px;padding:1px 8px;font-size:12.5px;font-weight:600}
+  code{background:#1118270d;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:12.5px;font-family:'Consolas',monospace}
+  .tagbtn{display:inline-block;background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;
+       border-radius:6px;padding:2px 10px;font-size:12.5px;font-weight:600;margin:2px}
+  .note{font-size:13.5px;color:var(--mut);font-style:italic}
+  .foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--mut);
+       font-size:12.5px;text-align:center}
+  /* ===== ĐIỆN THOẠI (mobile-first ưu tiên) ===== */
+  @media (max-width:640px){
+    body{font-size:14px}
+    .wrap{padding:0 12px 48px}
+    .hero{padding:24px 16px;border-radius:0 0 12px 12px}
+    .hero h1{font-size:20px;line-height:1.3}
+    .hero .sub{font-size:13px}
+    .hero .badge{font-size:12px;margin-top:10px}
+    h2{font-size:18px;margin:26px 0 10px;padding-left:10px}
+    h3{font-size:15px}
+    .lead{font-size:15px}
+    .card{padding:14px}
+    /* Bảng: cuộn ngang gọn trên điện thoại, không vỡ trang */
+    table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:normal}
+    th,td{padding:8px 10px;font-size:13px}
+    /* Sơ đồ liên kết: xếp DỌC, mũi tên xoay xuống */
+    .flow{flex-direction:column;gap:0}
+    .flow .node{min-width:0;width:100%}
+    .flow .arrow{transform:rotate(90deg);padding:6px 0;font-size:22px}
+    .loopback{font-size:12.5px;text-align:left}
+    ol.steps li{padding-left:36px}
+    ol.steps li::before{width:24px;height:24px;font-size:12px;top:9px}
+    ul.feat li{padding-left:24px}
+    .img{padding:12px 8px}
+    .img figcaption{font-size:13px}
+    .kbd,.tagbtn,code{white-space:normal;word-break:break-word}
+  }
+  @media print{body{background:#fff}.hero{box-shadow:none}.card{box-shadow:none}}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap" style="padding:0">
+    <h1>3 Module liên kết — Quy trình giao hàng khép kín</h1>
+    <div class="sub">Đơn hàng bán &nbsp;·&nbsp; Lệnh điều động (Vận tải) &nbsp;·&nbsp; Trạm cân</div>
+    <div class="badge">Tổng kết &amp; Hướng dẫn — cập nhật 13/06/2026</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <p class="lead">
+    Chiều nay 3 module được nối thành <b>một dây chuyền khép kín</b>: kế hoạch giao hàng lập ở
+    <b>Đơn hàng bán</b> → điều xe ở <b>Lệnh điều động</b> → cân thực tế ở <b>Trạm cân</b> →
+    kết quả tự chảy ngược về Đơn hàng bán cập nhật tiến độ. Khai báo <b>một lần</b>, dùng cho cả
+    ba khâu, không nhập lại — và luôn đối chiếu được <b>kế hoạch vs thực tế</b>.
+  </p>
+
+  <!-- ===================== SƠ ĐỒ LIÊN KẾT ===================== -->
+  <h2>① Sơ đồ liên kết tổng quan</h2>
+  <div class="flow">
+    <div class="node">
+      <div class="ic">📦</div>
+      <div class="nm">ĐƠN HÀNG BÁN</div>
+      <small>Chia <b>lô (lot)</b> + hạn giao<br>Khai số container / seal</small>
+    </div>
+    <div class="arrow">▶</div>
+    <div class="node">
+      <div class="ic">🚚</div>
+      <div class="nm">LỆNH ĐIỀU ĐỘNG</div>
+      <small>Chọn cont theo lô<br>Điều xe + in chứng từ</small>
+    </div>
+    <div class="arrow">▶</div>
+    <div class="node">
+      <div class="ic">⚖️</div>
+      <div class="nm">TRẠM CÂN</div>
+      <small>Cân xuất <b>theo lệnh</b><br>KL + seal thực tế</small>
+    </div>
+  </div>
+  <div class="loopback">
+    ↩ &nbsp; Khối lượng &amp; seal thực tế chảy ngược về Đơn hàng bán →
+    tiến độ lô tự đổi sang <span class="pill g">✅ đã giao</span>
+  </div>
+
+  <div class="card blue">
+    <b>Vì sao nối liền nhau lại quan trọng?</b>
+    <ul class="feat" style="margin-bottom:0">
+      <li><b>Nhập 1 lần dùng 3 nơi</b>: số container / seal nhập ở Đơn hàng bán tự sang Lệnh điều động và phiếu cân — không gõ lại, không sai lệch.</li>
+      <li><b>So được kế hoạch với thực tế</b>: khối lượng dự kiến (ở đơn) và khối lượng cân thật (ở trạm cân) hiện cùng chỗ.</li>
+      <li><b>Thấy tiến độ ngay</b>: lô nào đã giao / đang đi / chưa đi — cập nhật ngay sau khi cân.</li>
+    </ul>
+  </div>
+
+  <div class="card gold">
+    <b>👥 Ai làm việc gì?</b>
+    <table style="margin:6px 0 0">
+      <thead><tr><th style="width:240px">Bộ phận</th><th>Làm gì trong quy trình này</th></tr></thead>
+      <tbody>
+        <tr><td><b>📦 Xuất nhập khẩu (Logistics)</b></td><td><b>Chia lô giao hàng</b> · <b>nhập số container + số seal</b> (lấy từ booking hãng tàu) · theo dõi tiến độ từng lô</td></tr>
+        <tr><td><b>🚚 Vận tải (đội xe)</b></td><td>Lập <b>lệnh điều động</b> · chọn container theo lô · điều xe · in chứng từ vận chuyển</td></tr>
+        <tr><td><b>⚖️ Trạm cân (Phong Điền)</b></td><td><b>Cân xuất</b> theo lệnh điều động → ghi khối lượng &amp; seal thực tế</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card green" style="border-width:2px">
+    <b style="font-size:16px">✍️ Số container / seal chỉ NHẬP 1 LẦN — tránh sai sót nhập liệu</b>
+    <p style="margin:8px 0 0">Logistics nhập số container + số seal <b>một lần duy nhất</b> ở Đơn hàng bán.
+       Số này <b>tự chảy sang</b> Lệnh điều động và Phiếu cân — <b>không ai phải gõ lại</b> ở 3 nơi.</p>
+    <ul class="feat" style="margin:8px 0 0">
+      <li>Tránh mỗi nơi gõ một kiểu, <b>sai 1 ký tự</b>, <b>lệch số seal</b> giữa các chứng từ.</li>
+      <li>Người điều xe &amp; người cân <b>chỉ chọn lại</b>, không nhập lại → ít thao tác, ít lỗi.</li>
+      <li>Số trên phiếu cân, lệnh điều động, biên bản bàn giao <b>luôn khớp nhau</b> vì cùng một nguồn.</li>
+    </ul>
+  </div>
+
+  <!-- ===================== MODULE 1 ===================== -->
+  <h2>② Đơn hàng bán — Chia lô &amp; nhập số container <span style="font-size:14px;font-weight:600;color:#6B7280">(việc của Logistics)</span></h2>
+  <p>1 đơn xuất khẩu thường nhiều container, giao làm <b>nhiều đợt (lô)</b>. Bộ phận <b>Xuất nhập khẩu (Logistics)</b>
+     chia lô rõ ràng ngay trên hệ thống, thay vì ghi chú tay.</p>
+
+  <h3>Làm được gì</h3>
+  <ul class="feat">
+    <li>Mỗi container đặt <b>số Lô</b> + <b>Hạn giao</b> ngay trong khu "Chia lô giao hàng". Đặt hạn 1 container → <b>tự áp cho cả lô</b>.</li>
+    <li><b>Chia lô khi CHƯA có số container/seal</b> — chia lô là việc lập kế hoạch, làm trước; số container/seal điền sau khi có booking hãng tàu.</li>
+    <li><b>Tạo theo lô</b>: khai <i>Lô 1: 5 cont – hạn 20/06</i>, <i>Lô 2: 5 cont – hạn 30/06</i> → hệ thống tạo sẵn các container trống đã gắn lô + hạn.</li>
+    <li><b>Gán lô nhiều container cùng lúc</b>: tích nhiều dòng → 1 nút gán cùng lô; vẫn sửa tay từng dòng.</li>
+    <li>Sửa <b>số container / seal / số bành / khối lượng / lô / hạn</b> tại chỗ + <b>xóa</b> từng container (container đã niêm phong/giao thì khoá), và <b>lưu lại lịch sử chỉnh sửa</b>.</li>
+    <li>Khu <b>"Tiến độ giao"</b>: tổng đã giao / đang điều xe / chưa đi + từng lô (vd <i>Lô 1: 5/5 · hạn 20/06</i>).</li>
+  </ul>
+
+  <figure class="img">
+    <span class="tag">ẢNH 1</span>
+    <img src="images/01_dong_goi_chia_lo.png" alt="Trang Đóng gói + Chia lô giao hàng"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>Trang "Quản lý đóng gói" + khu Chia lô giao hàng</b>
+       Bảng sửa Số container / Seal / Bành / KL / Lô / Hạn giao tại chỗ + dải Tiến độ giao theo lô (đã giao / đang điều động / chưa giao).</figcaption>
+  </figure>
+
+  <h3>Cách làm — chia lô ở đâu?</h3>
+  <p>Vào đơn hàng → bấm nút xanh <span class="kbd">Quản lý đóng gói →</span> → khu <b>"📦 Chia lô giao hàng"</b>
+     (hoặc tab <b>Đóng gói</b> trong trang đơn → cột <b>Lot</b> ở bảng container). Cả 2 chỗ đều chia lô được.</p>
+
+  <figure class="img">
+    <span class="tag">ẢNH 1b</span>
+    <img src="images/01b_tab_dong_goi.png" alt="Tab Đóng gói trong đơn + nút Quản lý đóng gói"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>Đường vào: tab "Đóng gói" trong đơn → nút "Quản lý đóng gói →"</b>
+       Mở khu Chia lô giao hàng (Ảnh 1) để gán lô + điền số cont/seal.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Nếu chưa có container, bấm <span class="kbd">Tạo container tự động</span> (theo số kiện) hoặc <span class="kbd">+ Thêm container</span>.</li>
+    <li>Nhập <b>Số container</b> + <b>Số seal</b> thật (từ booking hãng tàu).</li>
+    <li>Tại khu <b>Chia lô giao hàng</b>, gõ số <b>Lô</b> cho từng cont theo kế hoạch (vd 5 cont đầu = Lô 1, 5 cont sau = Lô 2).</li>
+    <li>Đặt <b>Hạn giao</b> cho 1 cont của lô → hệ thống tự điền hạn cho cả lô đó.</li>
+    <li>Xem dải <b>Tiến độ</b> (đã giao / đang điều động / chưa giao + từng lô) để biết lô nào chưa đi, sắp tới hạn.</li>
+  </ol>
+  <p class="note">Lưu ý: chia lô do bộ phận <b>Logistics (Xuất nhập khẩu)</b> chủ động làm — hệ thống không tự chia. Container chưa đặt lô sẽ nằm nhóm "Chưa gán lô".</p>
+
+  <!-- ===================== MODULE 2 ===================== -->
+  <h2>③ Lệnh điều động — Điều xe theo lô</h2>
+  <p>Thay cho làm tay trên Word/giấy, hệ thống tạo "Lệnh điều động xe" + "Biên bản bàn giao vận chuyển" — <b>lấy sẵn số container/seal</b> từ Đơn hàng bán, không gõ lại.</p>
+
+  <h3>Làm được gì</h3>
+  <ul class="feat">
+    <li>Chọn <b>đầu kéo</b> → tài xế tự điền; chọn <b>rơ-moóc</b> (đổi theo chuyến) — danh mục đội xe có sẵn.</li>
+    <li><b>Tạo từ Đơn hàng bán</b>: chọn đơn → <b>tích đúng container đi hôm nay</b> (theo số cont/seal/lô), không đổ hết.</li>
+    <li><b>Chọn nhanh cả lô</b>: bấm nút <span class="tagbtn">Lô 2 · 5/5</span> tích cả lô 1 cú — vẫn chỉnh tay từng cont được.</li>
+    <li><b>1 xe chở nhiều đơn</b>: gắn nhiều đơn vào 1 lệnh, mỗi đơn 1 thẻ <span class="tagbtn">SO-2026-0064 — ASIMCO · 5 cont ✕</span> bấm ✕ để gỡ.</li>
+    <li><b>2 khách khác nhau</b>: phần đầu phiếu tự gộp khách + cảng; bản in thêm cột "Khách hàng" cho từng container.</li>
+    <li><b>Chống điều trùng</b>: container đã đi lệnh khác (hoặc đã giao) tự ẩn, không chọn lại được.</li>
+    <li>In <b>Lệnh điều động</b> + <b>Biên bản bàn giao</b> khổ A4 — khỏi gõ Word tay.</li>
+  </ul>
+
+  <figure class="img">
+    <span class="tag">ẢNH 2</span>
+    <img src="images/02_picker_chon_cont.png" alt="Picker chọn container đi hôm nay"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>Bảng chọn đơn hàng bán (bước 1)</b>
+       Chọn đơn (kèm số container có sẵn) → bước 2 tích đúng container đi hôm nay (theo lô).</figcaption>
+  </figure>
+  <figure class="img">
+    <span class="tag">ẢNH 3</span>
+    <img src="images/03_lenh_2_khach.png" alt="Danh sách lệnh — 1 xe chở 2 khách"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>1 xe chở hàng của 2 khách khác nhau</b>
+       Lệnh LDD-2606-001: ASIMCO + Yoong Do → SHANGHAI + INCHEON · 2 cont · gộp trong 1 lệnh.</figcaption>
+  </figure>
+
+  <h3>Cách làm</h3>
+  <ol class="steps">
+    <li>Vào <b>Vận tải → Lệnh điều động → Tạo lệnh</b>.</li>
+    <li>Chọn <b>đầu kéo</b> (tài xế tự điền) + <b>rơ-moóc</b> cho chuyến.</li>
+    <li>Bấm <span class="kbd">Tạo từ Đơn hàng bán</span> → chọn đơn → <span class="kbd">Chọn →</span>.</li>
+    <li>Bấm nút <b>Lot</b> cần đi (vd <i>Lot 2</i>) để tích cả lô, hoặc tích tay từng container → <span class="kbd">Thêm … container</span>.</li>
+    <li>(Tuỳ chọn) bấm <b>＋ Thêm đơn khác</b> nếu xe chở thêm container của đơn/khách khác.</li>
+    <li>Lưu lệnh (mã <b>LDD-…</b>) → vào chi tiết <b>In Lệnh điều động</b> / <b>In Biên bản bàn giao</b>.</li>
+  </ol>
+
+  <figure class="img">
+    <span class="tag">ẢNH 5</span>
+    <img src="images/05_ban_in_khach.png" alt="Bản in Lệnh điều động có cột Khách hàng"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>Bản in "Lệnh điều động xe" — xe chở 2 khách</b>
+       Phần đầu phiếu gộp Khách hàng + Cảng + Căn cứ HĐ của cả 2 đơn; bảng có cột <b>Khách hàng</b> cho từng container (chỉ hiện khi ≥2 khách).</figcaption>
+  </figure>
+
+  <!-- ===================== MODULE 3 ===================== -->
+  <h2>④ Trạm cân — Cân xuất theo lệnh</h2>
+  <p>Khi xe ra trạm cân xuất hàng, người cân chỉ cần <b>chọn lệnh điều động</b> — mọi container + seal của lệnh tự hiện ra, <b>khỏi nhập lại</b>.</p>
+
+  <h3>Làm được gì</h3>
+  <ul class="feat">
+    <li>Phiếu cân XUẤT có ô <b>"🚚 Lệnh điều động"</b> → chọn lệnh → tự hiện toàn bộ container của xe (không gõ lại số cont/seal).</li>
+    <li><b>1 lệnh = 1 xe = cân 1 lần cho cả xe</b>: khối lượng tự <b>chia theo tỉ lệ kế hoạch</b> cho từng container (tổng khớp đúng).</li>
+    <li>Seal thực tế ghi về từng container; phiếu cân gắn vào lệnh để <b>tra ngược</b> khi cần.</li>
+    <li><b>Phiếu cân XUẤT in kèm "Thông tin xuất hàng"</b>: Lệnh điều động + Container/Seal — nhìn phiếu là biết xe chở hàng nào.</li>
+    <li>Sau khi cân: lệnh điều động có khối lượng thực, và <b>tiến độ lô ở Đơn hàng bán tự chuyển "đã giao"</b>.</li>
+  </ul>
+
+  <figure class="img">
+    <span class="tag">ẢNH 4</span>
+    <img src="images/04_app_can_lenh.png" alt="App Trạm cân — card Lệnh điều động"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>App Trạm cân — phiếu cân XUẤT</b>
+       Ô "🚚 Lệnh điều động" đã chọn 1 lệnh, hiển thị tóm tắt các container của xe.</figcaption>
+  </figure>
+
+  <h3>Cách làm</h3>
+  <ol class="steps">
+    <li>Tạo phiếu cân <b>XUẤT</b> tại trạm cân (Phong Điền) như thường lệ.</li>
+    <li>Ở ô <b>🚚 Lệnh điều động</b>, chọn đúng lệnh của xe đang cân → container tự hiện ra.</li>
+    <li>Cân lần 1 (xe + hàng) và lần 2 (xe rỗng) như quy trình.</li>
+    <li>Lưu phiếu → khối lượng tự chia cho các container, seal &amp; khối lượng thực ghi về lệnh.</li>
+    <li>Quay lại <b>Đơn hàng bán</b> → khu Tiến độ giao của lô đó chuyển <span class="pill g">✅ đã giao</span>.</li>
+  </ol>
+
+  <figure class="img">
+    <span class="tag">ẢNH 7</span>
+    <img src="images/07_phieu_can_xuat.png" alt="Phiếu cân xuất in kèm thông tin đơn hàng"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>Phiếu cân XUẤT in ra (A4, gọn 1 trang)</b>
+       Khối "Thông tin xuất hàng" — <b>Lệnh điều động</b> + <b>Container/Seal</b> — nằm ngay dưới ô biển số/tài xế.</figcaption>
+  </figure>
+
+  <!-- ===================== THEO DÕI LÔ ===================== -->
+  <h2>⑤ Theo dõi từng lô — lô nào đã giao, đang giao, đang sản xuất</h2>
+  <p>1 đơn 17 container chia 2 lô đi 2 đợt (vd <i>Lô 1 trước 20/06, Lô 2 trước 30/06</i>) — làm sao biết
+     <b>lô nào tới đâu</b>? Ngay <b>tab Đóng gói</b> của đơn (và trang Quản lý đóng gói) có bảng <b>"📋 Theo dõi lô"</b>:
+     gom container theo lô, tự xếp mỗi cont vào 1 trong <b>5 giai đoạn</b>, rồi kết luận trạng thái cả lô.
+     Hệ thống <b>tự tính</b> — không ai phải cập nhật thủ công.</p>
+  <p>Dòng tóm tắt phía trên bảng trả lời ngay 3 câu: <b>đơn này mấy container · mấy lô · đã giao mấy lô (mấy cont)</b> —
+     vd <span class="pill b">17 cont (đơn)</span> <span class="pill b">2 lô</span>
+     <span class="pill g">🟢 Đã giao 1/2 lô</span> <span class="pill g">✅ 5/17 cont đã giao</span>.</p>
+
+  <figure class="img">
+    <span class="tag">ẢNH 8</span>
+    <img src="images/08_theo_doi_lo.png" alt="Bảng Theo dõi lô"
+         onerror="this.classList.add('missing')" onload="this.closest('figure').classList.add('has-img')">
+    <figcaption><b>Khu "📋 Theo dõi lô giao hàng" (đầu tab Đóng gói)</b>
+       Dòng tóm tắt (cont · lô · đã giao mấy lô) + bảng mỗi lô 1 dòng: hạn giao · số cont · tiến độ từng giai đoạn · trạng thái lô.</figcaption>
+  </figure>
+
+  <h3>5 giai đoạn của mỗi container</h3>
+  <table>
+    <thead><tr><th style="width:190px">Giai đoạn</th><th>Khi nào</th></tr></thead>
+    <tbody>
+      <tr><td>🏭 <b>Đang sản xuất</b></td><td>Container chưa có bành gán vào (đang gom hàng / sản xuất)</td></tr>
+      <tr><td>📦 <b>Đang đóng gói</b></td><td>Đã có bành gán vào / đang đóng</td></tr>
+      <tr><td>✅ <b>Sẵn sàng giao</b></td><td>Container đã <b>seal</b> (đóng xong, chờ điều xe)</td></tr>
+      <tr><td>🚚 <b>Đang điều động</b></td><td>Đã vào lệnh điều động, chưa cân xuất</td></tr>
+      <tr><td>🟢 <b>Đã giao</b></td><td>Đã cân xuất (có KL thực tế)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card blue">
+    <b>Trạng thái cả lô = mắt xích yếu nhất</b>
+    <ul class="feat" style="margin-bottom:0">
+      <li>Lô còn 1 cont <b>đang sản xuất</b> → cả lô tính là <b>"🏭 Đang sản xuất"</b> (chưa sẵn sàng đi).</li>
+      <li>Tất cả cont của lô đã cân xuất → <b>"🟢 Đã giao xong"</b>.</li>
+      <li>Cột <b>Tiến độ</b> vẫn hiện chi tiết: mỗi giai đoạn có bao nhiêu cont (vd <i>🟢 Đã giao: 2 · 🚚 Điều động: 1 · 🏭 SX: 2</i>).</li>
+    </ul>
+  </div>
+
+  <div class="card green">
+    <b>🚦 Đơn hàng tự chuyển "Đã giao" khi TẤT CẢ lô đã giao</b>
+    <ul class="feat" style="margin-bottom:0">
+      <li>Mỗi lô <b>"đã giao"</b> khi mọi container của lô đã cân xuất.</li>
+      <li>Khi <b>tất cả container (mọi lô)</b> của đơn đã cân xuất → trạng thái đơn tự chuyển <span class="pill g">Đã giao</span> — không cần ai bấm tay.</li>
+      <li>Hệ thống tự cập nhật <b>ngay khi cân xong</b>, dù không ai mở đơn lên xem.</li>
+    </ul>
+  </div>
+
+  <p><b>Xem ở đâu:</b> Đơn hàng → tab <span class="kbd">Đóng gói</span> → khu <b>"📋 Theo dõi lô giao hàng"</b> (đầu tab). Cũng có trong trang <span class="kbd">Quản lý đóng gói →</span>.</p>
+
+  <!-- ===================== LỢI ÍCH ===================== -->
+  <h2>⑥ Tác dụng nổi bật</h2>
+  <div class="card green">
+    <ul class="feat" style="margin:0">
+      <li><b>Nhập số container/seal 1 lần — tránh sai sót</b>: khai ở đơn (Logistics), tự chảy sang lệnh &amp; phiếu cân, không gõ lại nên không lệch số.</li>
+      <li><b>Giao nhiều đợt rõ ràng</b> — chia lô + hạn giao, điều xe theo lô bằng 1 nút.</li>
+      <li><b>So kế hoạch với thực tế</b> — khối lượng dự kiến vs khối lượng cân; seal dự kiến vs seal thực.</li>
+      <li><b>1 xe chở nhiều đơn / nhiều khách</b> vẫn quản lý &amp; in chứng từ đúng từng khách.</li>
+      <li><b>Chứng từ in tự động</b> — Lệnh điều động + Biên bản bàn giao khổ A4, bỏ thao tác gõ Word tay.</li>
+      <li><b>Minh bạch &amp; an toàn</b> — không điều trùng 1 container 2 lần; mọi chỉnh sửa số cont/seal đều <b>lưu lịch sử</b>.</li>
+      <li><b>Nền cho báo cáo trạm cân</b> — biết "hàng gì, của ai, đi cảng nào" vì phiếu cân gắn lệnh.</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    Hệ thống ERP — Cao su Huy Anh Phong Điền · Tài liệu nội bộ · 13/06/2026
+  </div>
+
+</div>
+</body>
+</html>

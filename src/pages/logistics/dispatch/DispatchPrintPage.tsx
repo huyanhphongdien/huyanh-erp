@@ -27,12 +27,27 @@ export default function DispatchPrintPage() {
   const [order, setOrder] = useState<DispatchOrder | null>(null)
   const [lines, setLines] = useState<DispatchLine[]>([])
   const [loading, setLoading] = useState(true)
+  // Khách hàng theo từng container (chỉ dùng khi 1 lệnh chở hàng của ≥2 khách khác nhau).
+  const [lineCustomer, setLineCustomer] = useState<Record<string, string>>({})
+  const [multiCustomer, setMultiCustomer] = useState(false)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    dispatchService.getById(id).then(res => {
-      if (res) { setOrder(res.order); setLines(res.lines) }
+    dispatchService.getById(id).then(async res => {
+      if (res) {
+        setOrder(res.order); setLines(res.lines)
+        const cids = res.lines.map(l => l.sales_order_container_id).filter(Boolean) as string[]
+        if (cids.length > 0) {
+          try {
+            const orders = await dispatchService.ordersFromContainerIds(cids)
+            const map: Record<string, string> = {}
+            for (const o of orders) for (const cid of o.containerIds) map[cid] = o.customer_name || o.code
+            setLineCustomer(map)
+            setMultiCustomer(new Set(orders.map(o => o.customer_name || o.code)).size >= 2)
+          } catch { /* best-effort — thiếu thì in như cũ */ }
+        }
+      }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id])
@@ -62,11 +77,11 @@ export default function DispatchPrintPage() {
 
       <div className="no-print bg-gray-200 min-h-[calc(100vh-56px)] py-6 px-4 flex flex-col items-center">
         <div className="bg-white shadow-md" style={{ width: '210mm', minHeight: '297mm', padding: '14mm' }}>
-          <Sheet order={order} lines={lines} />
+          <Sheet order={order} lines={lines} lineCustomer={lineCustomer} multiCustomer={multiCustomer} />
         </div>
       </div>
 
-      <div className="print-only"><Sheet order={order} lines={lines} /></div>
+      <div className="print-only"><Sheet order={order} lines={lines} lineCustomer={lineCustomer} multiCustomer={multiCustomer} /></div>
 
       <style>{`
         .print-only { display: none; }
@@ -101,10 +116,17 @@ function CompanyHeader() {
   )
 }
 
+type SheetProps = {
+  order: DispatchOrder
+  lines: DispatchLine[]
+  lineCustomer: Record<string, string>  // container_id → tên khách (chỉ dùng khi ≥2 khách)
+  multiCustomer: boolean
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // MẪU 1: LỆNH ĐIỀU ĐỘNG XE
 // ════════════════════════════════════════════════════════════════════════════
-function OrderSheet({ order, lines }: { order: DispatchOrder; lines: DispatchLine[] }) {
+function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   const totalW = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
   const totalPkg = lines.reduce((s, l) => s + (l.package_count || 0), 0)
   return (
@@ -149,6 +171,7 @@ function OrderSheet({ order, lines }: { order: DispatchOrder; lines: DispatchLin
         <thead>
           <tr style={{ background: '#1B4D3E', color: '#fff' }}>
             <th style={{ ...th, width: 30 }}>STT</th>
+            {multiCustomer && <th style={th}>Khách hàng</th>}
             <th style={th}>Lô hàng</th>
             <th style={th}>Loại hàng</th>
             <th style={th}>Số container</th>
@@ -161,6 +184,7 @@ function OrderSheet({ order, lines }: { order: DispatchOrder; lines: DispatchLin
           {lines.map((l, i) => (
             <tr key={l.id}>
               <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
+              {multiCustomer && <td style={td}>{lineCustomer[l.sales_order_container_id || ''] || ''}</td>}
               <td style={td}>{l.lot_code || ''}</td>
               <td style={td}>{l.grade || ''}</td>
               <td style={{ ...td, fontWeight: 600 }}>{l.container_no || ''}</td>
@@ -169,9 +193,9 @@ function OrderSheet({ order, lines }: { order: DispatchOrder; lines: DispatchLin
               <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.weight_kg)}</td>
             </tr>
           ))}
-          {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={7}>(Chưa có container)</td></tr>}
+          {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={multiCustomer ? 8 : 7}>(Chưa có container)</td></tr>}
           <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
-            <td style={{ ...td, textAlign: 'right' }} colSpan={5}>TỔNG CỘNG</td>
+            <td style={{ ...td, textAlign: 'right' }} colSpan={multiCustomer ? 6 : 5}>TỔNG CỘNG</td>
             <td style={{ ...td, textAlign: 'right' }}>{totalPkg || ''}</td>
             <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E' }}>{fmt(totalW)}</td>
           </tr>
@@ -204,7 +228,7 @@ function OrderSheet({ order, lines }: { order: DispatchOrder; lines: DispatchLin
 // ════════════════════════════════════════════════════════════════════════════
 // MẪU 2: BIÊN BẢN GIAO CAO SU ĐỂ VẬN CHUYỂN (theo file mẫu V1)
 // ════════════════════════════════════════════════════════════════════════════
-function HandoverSheet({ order, lines }: { order: DispatchOrder; lines: DispatchLine[] }) {
+function HandoverSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   const totalW = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
   return (
     <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 12.5, color: '#111', lineHeight: 1.6 }}>
@@ -239,6 +263,7 @@ function HandoverSheet({ order, lines }: { order: DispatchOrder; lines: Dispatch
         <thead>
           <tr style={{ background: '#1B4D3E', color: '#fff' }}>
             <th style={{ ...th, width: 30 }}>Stt</th>
+            {multiCustomer && <th style={th}>Khách hàng</th>}
             <th style={th}>Lô hàng</th>
             <th style={th}>Chủng loại cao su</th>
             <th style={{ ...th, width: 56 }}>Số kiện</th>
@@ -252,6 +277,7 @@ function HandoverSheet({ order, lines }: { order: DispatchOrder; lines: Dispatch
           {lines.map((l, i) => (
             <tr key={l.id}>
               <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
+              {multiCustomer && <td style={td}>{lineCustomer[l.sales_order_container_id || ''] || ''}</td>}
               <td style={td}>{l.lot_code || ''}</td>
               <td style={td}>{l.grade || ''}</td>
               <td style={{ ...td, textAlign: 'right' }}>{l.package_count ?? ''}</td>
@@ -261,9 +287,9 @@ function HandoverSheet({ order, lines }: { order: DispatchOrder; lines: Dispatch
               <td style={td}>{l.note || ''}</td>
             </tr>
           ))}
-          {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={8}>(Chưa có hàng)</td></tr>}
+          {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={multiCustomer ? 9 : 8}>(Chưa có hàng)</td></tr>}
           <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
-            <td style={{ ...td, textAlign: 'right' }} colSpan={6}>TỔNG CỘNG</td>
+            <td style={{ ...td, textAlign: 'right' }} colSpan={multiCustomer ? 7 : 6}>TỔNG CỘNG</td>
             <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E' }}>{fmt(totalW)}</td>
             <td style={td}></td>
           </tr>

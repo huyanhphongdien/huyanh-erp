@@ -76,6 +76,11 @@ export default function DispatchCreatePage() {
   const [attachedSos, setAttachedSos] = useState<AttachedSo[]>([])  // các đơn đã gắn (mỗi đơn 1 thẻ)
   const [soSearch, setSoSearch] = useState('')
   const [soLoading, setSoLoading] = useState(false)
+  // Picker BƯỚC 2: tích container cụ thể của 1 đơn để đi chuyến hôm nay (không đổ hết).
+  const [pickerSo, setPickerSo] = useState<SalesOrderOption | null>(null)
+  const [pickerContainers, setPickerContainers] = useState<DispatchLineInput[]>([])
+  const [pickerChecked, setPickerChecked] = useState<string[]>([])
+  const [pickerHeader, setPickerHeader] = useState<{ destination: string | null; contract_ref: string | null }>({ destination: null, contract_ref: null })
 
   // ---- load danh mục xe/tài xế ----
   useEffect(() => {
@@ -163,62 +168,69 @@ export default function DispatchCreatePage() {
   // ---- SO picker ----
   const openSoPicker = useCallback(async () => {
     setSoModalOpen(true)
+    setPickerSo(null)   // mở ở bước 1 (danh sách đơn)
     setSoLoading(true)
     try { setSoOptions(await dispatchService.listSalesOrderOptions(soSearch || undefined)) }
     catch (e: any) { message.error('Lỗi tải đơn hàng: ' + (e?.message || e)) }
     setSoLoading(false)
   }, [soSearch])
 
-  // Đồng bộ header (đơn chính/khách/cảng/căn cứ HĐ) theo danh sách đơn đang gắn.
-  // Đơn ĐẦU TIÊN giữ vai khách/cảng; căn cứ HĐ gộp tất cả đơn để in chứng từ.
+  // Đồng bộ header theo danh sách đơn đang gắn. NHIỀU khách/cảng/HĐ → GỘP (distinct)
+  // để chứng từ không sót khách thứ 2. sales_order_id giữ đơn đầu làm tham chiếu chính.
   const applyHeaderFromAttached = useCallback((list: AttachedSo[]) => {
-    const first = list[0]
+    const uniq = (arr: (string | null)[]) => [...new Set(arr.filter(Boolean) as string[])]
     form.setFieldsValue({
-      sales_order_id: first?.id ?? null,
-      customer_name: first?.customer_name ?? null,
-      destination: first?.destination ?? null,
-      contract_ref: list.map(s => s.contract_ref).filter(Boolean).join(' + ') || null,
+      sales_order_id: list[0]?.id ?? null,
+      customer_name: uniq(list.map(s => s.customer_name)).join(' + ') || null,
+      destination: uniq(list.map(s => s.destination)).join(' + ') || null,
+      contract_ref: uniq(list.map(s => s.contract_ref)).join(' + ') || null,
     })
   }, [form])
 
-  const chooseSo = async (so: SalesOrderOption) => {
+  // BƯỚC 2: chọn 1 đơn → tải container CHƯA điều động để người dùng tích đúng cont/seal
+  // đi chuyến HÔM NAY (thay vì đổ hết mọi container của đơn).
+  const pickSo = async (so: SalesOrderOption) => {
     try {
-      if (attachedSos.some(s => s.id === so.id)) {
-        message.info(`${so.code} đã được gắn vào lệnh rồi.`)
-        setSoModalOpen(false)
-        return
-      }
       const { header, lines: soLines } = await dispatchService.buildFromSalesOrder(so.id)
-      if (soLines.length === 0) {
-        message.warning(`${so.code}: không còn container chưa điều động để thêm.`)
+      const already = new Set(lines.map(l => l.sales_order_container_id).filter(Boolean) as string[])
+      const avail = soLines.filter(l => l.sales_order_container_id && !already.has(l.sales_order_container_id as string))
+      if (avail.length === 0) {
+        message.info(`${so.code}: không còn container chưa điều động (đã giao / đã thêm hết).`)
         return
       }
-      // 1 XE CÓ THỂ CHỞ CONT CỦA NHIỀU ĐƠN → GỘP (append). Chống trùng theo container đã có.
-      const existing = new Set(lines.map(l => l.sales_order_container_id).filter(Boolean) as string[])
-      const fresh = soLines.filter(l => !l.sales_order_container_id || !existing.has(l.sales_order_container_id as string))
-      if (fresh.length === 0) {
-        message.info(`${so.code}: các container đã có trong lệnh rồi.`)
-        setSoModalOpen(false)
-        return
-      }
-      const attached: AttachedSo = {
-        id: so.id, code: so.code, customer_name: so.customer_name,
-        destination: header.destination ?? null, contract_ref: header.contract_ref ?? null,
-        containerIds: fresh.map(l => l.sales_order_container_id).filter(Boolean) as string[],
-      }
-      const next = [...attachedSos, attached]
-      setAttachedSos(next)
-      setLines(prev => [...prev, ...fresh.map(l => ({ ...l, _key: newKey() }))])
-      if (attachedSos.length === 0 && !form.getFieldValue('trip_type')) {
-        form.setFieldValue('trip_type', header.trip_type || 'port')
-      }
-      applyHeaderFromAttached(next)
-      setSoModalOpen(false)
-      message.success(`Đã thêm ${fresh.length} container từ ${so.code}`)
+      setPickerHeader({ destination: header.destination ?? null, contract_ref: header.contract_ref ?? null })
+      setPickerContainers(avail)
+      setPickerChecked([])         // mặc định KHÔNG tích — user tự chọn cont đi hôm nay
+      setPickerSo(so)
     } catch (e: any) {
-      message.error('Lỗi đổ container: ' + (e?.message || e))
+      message.error('Lỗi tải container: ' + (e?.message || e))
     }
   }
+
+  // Thêm/gộp 1 đơn vào danh sách thẻ + đồng bộ header.
+  const upsertAttached = (so: SalesOrderOption, header: { destination: string | null; contract_ref: string | null }, containerIds: string[]) => {
+    const exist = attachedSos.find(s => s.id === so.id)
+    const next: AttachedSo[] = exist
+      ? attachedSos.map(s => s.id === so.id ? { ...s, containerIds: [...new Set([...s.containerIds, ...containerIds])] } : s)
+      : [...attachedSos, { id: so.id, code: so.code, customer_name: so.customer_name, destination: header.destination, contract_ref: header.contract_ref, containerIds }]
+    setAttachedSos(next)
+    applyHeaderFromAttached(next)
+  }
+
+  // Xác nhận các container đã tích → thêm vào bảng dòng lệnh.
+  const confirmPicked = () => {
+    if (!pickerSo) return
+    const chosen = pickerContainers.filter(c => pickerChecked.includes(c.sales_order_container_id as string))
+    if (chosen.length === 0) { message.warning('Chưa tích container nào để thêm'); return }
+    if (attachedSos.length === 0 && !form.getFieldValue('trip_type')) form.setFieldValue('trip_type', 'port')
+    setLines(prev => [...prev, ...chosen.map(c => ({ ...c, _key: newKey() }))])
+    upsertAttached(pickerSo, pickerHeader, chosen.map(c => c.sales_order_container_id as string))
+    message.success(`Đã thêm ${chosen.length} container từ ${pickerSo.code}`)
+    setSoModalOpen(false)
+    setPickerSo(null)
+  }
+
+  const closePicker = () => { setSoModalOpen(false); setPickerSo(null) }
 
   // Gỡ 1 đơn khỏi lệnh → xoá luôn container của đơn đó khỏi bảng.
   const removeAttachedSo = (soId: string) => {
@@ -406,19 +418,51 @@ export default function DispatchCreatePage() {
         <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>Thêm dòng container</Button>
       </Card>
 
-      {/* SO picker modal */}
-      <Modal title="Chọn đơn hàng bán" open={soModalOpen} onCancel={() => setSoModalOpen(false)} footer={null} width={820}>
-        <Input.Search placeholder="Tìm mã đơn / số HĐ / grade" allowClear style={{ marginBottom: 12 }}
-          onSearch={(val) => { setSoSearch(val); openSoPicker() }} />
-        <Table rowKey="id" size="small" loading={soLoading} dataSource={soOptions} pagination={{ pageSize: 8 }}
-          columns={[
-            { title: 'Mã đơn', dataIndex: 'code', render: (v: string, r: SalesOrderOption) => <span><b>{v}</b>{r.contract_no && <Tag style={{ marginLeft: 6 }}>{r.contract_no}</Tag>}</span> },
-            { title: 'Khách', dataIndex: 'customer_name', render: (v: string) => v || '–' },
-            { title: 'Grade', dataIndex: 'grade', width: 90, render: (v: string) => v || '–' },
-            { title: 'Cảng đến', dataIndex: 'port_of_destination', render: (v: string) => v || '–' },
-            { title: 'Cont', dataIndex: 'container_count', width: 60, align: 'center' as const },
-            { title: '', width: 90, render: (_: any, r: SalesOrderOption) => <Button size="small" type="primary" onClick={() => chooseSo(r)}>Chọn</Button> },
-          ] as any} />
+      {/* SO picker — 2 BƯỚC: (1) chọn đơn → (2) tích container đi chuyến hôm nay */}
+      <Modal
+        title={pickerSo ? `Chọn container đi chuyến này — ${pickerSo.code}` : 'Chọn đơn hàng bán'}
+        open={soModalOpen} onCancel={closePicker} width={860}
+        footer={pickerSo ? [
+          <Button key="back" onClick={() => setPickerSo(null)}>← Danh sách đơn</Button>,
+          <Button key="add" type="primary" disabled={pickerChecked.length === 0} onClick={confirmPicked}>
+            Thêm {pickerChecked.length || ''} container đã chọn
+          </Button>,
+        ] : null}
+      >
+        {!pickerSo ? (
+          <>
+            <Input.Search placeholder="Tìm mã đơn / số HĐ / grade" allowClear style={{ marginBottom: 12 }}
+              onSearch={(val) => { setSoSearch(val); openSoPicker() }} />
+            <Table rowKey="id" size="small" loading={soLoading} dataSource={soOptions} pagination={{ pageSize: 8 }}
+              columns={[
+                { title: 'Mã đơn', dataIndex: 'code', render: (v: string, r: SalesOrderOption) => <span><b>{v}</b>{r.contract_no && <Tag style={{ marginLeft: 6 }}>{r.contract_no}</Tag>}</span> },
+                { title: 'Khách', dataIndex: 'customer_name', render: (v: string) => v || '–' },
+                { title: 'Grade', dataIndex: 'grade', width: 90, render: (v: string) => v || '–' },
+                { title: 'Cảng đến', dataIndex: 'port_of_destination', render: (v: string) => v || '–' },
+                { title: 'Cont', dataIndex: 'container_count', width: 60, align: 'center' as const },
+                { title: '', width: 96, render: (_: any, r: SalesOrderOption) => <Button size="small" type="primary" onClick={() => pickSo(r)}>Chọn →</Button> },
+              ] as any} />
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: 10, fontSize: 13, color: '#555' }}>
+              Tích chọn <b>container đi chuyến này</b> của <b>{pickerSo.code}</b>
+              {pickerSo.customer_name ? ` — ${pickerSo.customer_name}` : ''}. Chỉ hiện container <b>chưa điều động</b>.
+            </div>
+            <Table rowKey={(r: DispatchLineInput) => r.sales_order_container_id as string}
+              size="small" pagination={false} dataSource={pickerContainers} scroll={{ y: 360 }}
+              rowSelection={{ selectedRowKeys: pickerChecked, onChange: (keys) => setPickerChecked(keys as string[]) }}
+              columns={[
+                { title: 'Lô', dataIndex: 'lot_code', width: 64, render: (v: string) => v || '–' },
+                { title: 'Số container', dataIndex: 'container_no', render: (v: string) => v ? <b>{v}</b> : <Typography.Text type="warning">(chưa nhập số)</Typography.Text> },
+                { title: 'Số seal', dataIndex: 'seal_no', render: (v: string) => v || '–' },
+                { title: 'Loại hàng', dataIndex: 'grade', width: 108, render: (v: string) => v || '–' },
+                { title: 'Số kiện', dataIndex: 'package_count', width: 70, align: 'right' as const, render: (v: number) => v ?? '–' },
+                { title: 'KL (kg)', dataIndex: 'weight_kg', width: 92, align: 'right' as const, render: (v: number) => v ? v.toLocaleString('vi-VN') : '–' },
+              ] as any} />
+            <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>Đã chọn {pickerChecked.length}/{pickerContainers.length} container.</div>
+          </>
+        )}
       </Modal>
     </div>
   )

@@ -582,45 +582,102 @@ function ContainerPackingPage() {
     new Set(containers.map((c) => c.lot_no).filter((v): v is number => v != null)),
   ).sort((a, b) => a - b)
 
+  // Lưu 1 field container ra DB (số cont/seal/bành/KL). Cập nhật cục bộ onChange, lưu onBlur.
+  const persistField = async (id: string, patch: Record<string, any>) => {
+    try { await containerService.updateContainer(id, patch as any) }
+    catch (e: any) { message.error('Lỗi lưu: ' + (e?.message || e)) }
+  }
+  const patchLocal = (id: string, patch: Record<string, any>) =>
+    setContainers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+
   const lotColumns: ColumnsType<SalesOrderContainer> = [
+    { title: '#', key: 'idx', width: 40, render: (_: unknown, __: unknown, i: number) => <Text strong>#{i + 1}</Text> },
     {
-      title: 'Container',
-      key: 'c',
-      render: (_: unknown, r, i) => (
-        <span><Text strong>#{i + 1}</Text>{r.container_no ? ` · ${r.container_no}` : ''}</span>
+      title: 'Số container',
+      key: 'container_no',
+      width: 150,
+      render: (_: unknown, r) => (
+        <Input size="small" value={r.container_no ?? ''} placeholder="(chưa có)"
+          onChange={(e) => patchLocal(r.id, { container_no: e.target.value })}
+          onBlur={(e) => persistField(r.id, { container_no: e.target.value.trim() || null })} />
       ),
     },
-    { title: 'Số bành', dataIndex: 'bale_count', key: 'bale_count', width: 80, align: 'right' as const, render: (v: number) => v ?? '-' },
-    { title: 'KL (kg)', dataIndex: 'net_weight_kg', key: 'net_weight_kg', width: 100, align: 'right' as const, render: (v: number) => formatNumber(v) },
+    {
+      title: 'Số seal',
+      key: 'seal_no',
+      width: 140,
+      render: (_: unknown, r) => (
+        <Input size="small" value={r.seal_no ?? ''} placeholder="(chưa có)"
+          onChange={(e) => patchLocal(r.id, { seal_no: e.target.value })}
+          onBlur={(e) => persistField(r.id, { seal_no: e.target.value.trim() || null })} />
+      ),
+    },
+    {
+      title: 'Số bành',
+      key: 'bale_count',
+      width: 86,
+      align: 'right' as const,
+      render: (_: unknown, r) => (
+        <InputNumber size="small" min={0} controls={false} style={{ width: 72 }} placeholder="—"
+          value={r.bale_count ?? undefined}
+          onChange={(v) => patchLocal(r.id, { bale_count: (v as number) ?? null })}
+          onBlur={() => { const c = containers.find((x) => x.id === r.id); persistField(r.id, { bale_count: c?.bale_count ?? null }) }} />
+      ),
+    },
+    {
+      title: 'KL (kg)',
+      key: 'net_weight_kg',
+      width: 100,
+      align: 'right' as const,
+      render: (_: unknown, r) => (
+        <InputNumber size="small" min={0} controls={false} style={{ width: 86 }} placeholder="—"
+          value={r.net_weight_kg ?? undefined}
+          onChange={(v) => patchLocal(r.id, { net_weight_kg: (v as number) ?? null })}
+          onBlur={() => { const c = containers.find((x) => x.id === r.id); persistField(r.id, { net_weight_kg: c?.net_weight_kg ?? null }) }} />
+      ),
+    },
     {
       title: 'Lô',
       key: 'lot_no',
-      width: 90,
+      width: 80,
       render: (_: unknown, r) => (
         <InputNumber size="small" min={1} value={r.lot_no ?? undefined} placeholder="—" controls={false}
-          style={{ width: 70 }} onChange={(v) => handleSetContainerLot(r.id, { lot_no: (v as number) ?? null })} />
+          style={{ width: 66 }} onChange={(v) => handleSetContainerLot(r.id, { lot_no: (v as number) ?? null })} />
       ),
     },
     {
       title: 'Hạn giao',
       key: 'lot_deadline',
-      width: 150,
+      width: 140,
       render: (_: unknown, r) => (
         <DatePicker size="small" value={r.lot_deadline ? dayjs(r.lot_deadline) : undefined} format="DD/MM/YYYY"
-          placeholder="—" style={{ width: 130 }}
+          placeholder="—" style={{ width: 124 }}
           onChange={(d) => handleSetContainerLot(r.id, { lot_no: r.lot_no ?? null, lot_deadline: d ? d.format('YYYY-MM-DD') : null })} />
       ),
     },
     {
       title: 'Giao hàng',
       key: 'delivery',
-      width: 130,
+      width: 120,
       render: (_: unknown, r) => {
         const d = deliveryMap[r.id]
         if (d === 'delivered') return <Tag color="green">✅ Đã giao</Tag>
         if (d === 'dispatching') return <Tag color="orange">🚚 Đang điều động</Tag>
         return <Tag>Chưa giao</Tag>
       },
+    },
+    {
+      title: '',
+      key: 'del',
+      width: 44,
+      render: (_: unknown, r) => r.status === 'planning'
+        ? (
+          <Popconfirm title="Xóa container này?" description="Bành trong cont (nếu có) sẽ bị xóa theo."
+            onConfirm={() => handleDeleteContainer(r.id)} okText="Xóa" cancelText="Hủy">
+            <Button danger type="text" size="small" icon={<DeleteOutlined />} />
+          </Popconfirm>
+        )
+        : <Tag color="default" style={{ fontSize: 11 }}>khoá</Tag>,
     },
   ]
 
@@ -849,10 +906,11 @@ function ContainerPackingPage() {
             size="small"
             pagination={false}
             bordered
+            scroll={{ x: 980 }}
             rowSelection={{ selectedRowKeys: lotSelectedKeys, onChange: (keys) => setLotSelectedKeys(keys as string[]) }}
           />
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-            Gõ số <b>Lô</b> từng dòng, hoặc tích nhiều dòng → <b>Gán Lô</b> 1 lần. Đặt <b>Hạn giao</b> 1 container → tự áp cả lô. <b>Không cần số cont/seal</b> — điền sau khi có booking. Cột Giao hàng tự cập nhật khi điều động + cân.
+            <b>Sửa</b>: gõ thẳng Số container / Seal / Bành / KL / Lô / Hạn vào ô (tự lưu khi rời ô). <b>Xóa</b>: nút 🗑 cuối dòng (chỉ cont đang lên kế hoạch; cont đã seal/giao thì <i>khoá</i>). Tích nhiều dòng → <b>Gán Lô</b> 1 lần. <b>Không cần số cont/seal để chia lô</b> — điền sau khi có booking. Cột Giao hàng tự cập nhật khi điều động + cân.
           </Text>
         </Card>
       )}

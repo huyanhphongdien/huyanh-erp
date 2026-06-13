@@ -71,6 +71,17 @@ const formatNumber = (v: number | null | undefined): string => {
   return v.toLocaleString('vi-VN')
 }
 
+// 5 giai đoạn của 1 container (theo thứ tự tiến triển). Trạng thái LÔ = giai đoạn
+// thấp nhất (mắt xích yếu nhất) trong các container của lô.
+type LotStageKey = 'producing' | 'packing' | 'ready' | 'dispatching' | 'delivered'
+const LOT_STAGES: Array<{ key: LotStageKey; label: string; short: string; icon: string; color: string }> = [
+  { key: 'producing',   label: 'Đang sản xuất',  short: 'SX',        icon: '🏭', color: 'default' },
+  { key: 'packing',     label: 'Đang đóng gói',  short: 'Đóng gói',  icon: '📦', color: 'gold' },
+  { key: 'ready',       label: 'Sẵn sàng giao',  short: 'Sẵn sàng',  icon: '✅', color: 'cyan' },
+  { key: 'dispatching', label: 'Đang điều động', short: 'Điều động', icon: '🚚', color: 'orange' },
+  { key: 'delivered',   label: 'Đã giao',        short: 'Đã giao',   icon: '🟢', color: 'green' },
+]
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -682,6 +693,60 @@ function ContainerPackingPage() {
   ]
 
   // ══════════════════════════════════════════════════════════════
+  // THEO DÕI LÔ — gộp container theo lô + giai đoạn
+  // ══════════════════════════════════════════════════════════════
+
+  // Giai đoạn 1 container: cân xuất rồi → đã giao; trong lệnh chưa cân → điều động;
+  // đã seal → sẵn sàng; có bành/đang đóng → đóng gói; còn lại → đang sản xuất/chờ hàng.
+  const stageOf = (c: SalesOrderContainer): LotStageKey => {
+    const d = deliveryMap[c.id]
+    if (d === 'delivered') return 'delivered'
+    if (d === 'dispatching') return 'dispatching'
+    if (c.status === 'sealed' || c.status === 'shipped') return 'ready'
+    if ((c.items?.length || 0) > 0 || c.status === 'packing') return 'packing'
+    return 'producing'
+  }
+
+  const lotTrackRows = (() => {
+    const m = new Map<string, {
+      key: string; lotNo: number | null; deadline: string | null; total: number
+      counts: Record<LotStageKey, number>
+    }>()
+    for (const c of containers) {
+      const key = c.lot_no != null ? String(c.lot_no) : '__none__'
+      if (!m.has(key)) {
+        m.set(key, { key, lotNo: c.lot_no ?? null, deadline: null, total: 0,
+          counts: { producing: 0, packing: 0, ready: 0, dispatching: 0, delivered: 0 } })
+      }
+      const r = m.get(key)!
+      r.total++
+      if (c.lot_deadline && !r.deadline) r.deadline = c.lot_deadline
+      r.counts[stageOf(c)]++
+    }
+    return [...m.values()].sort((a, b) => (a.lotNo ?? 99999) - (b.lotNo ?? 99999))
+  })()
+
+  const lotTrackColumns: ColumnsType<typeof lotTrackRows[number]> = [
+    { title: 'Lô', key: 'lo', width: 110, render: (_: unknown, r) =>
+        r.lotNo != null ? <Text strong>Lô {r.lotNo}</Text> : <Text type="secondary">Chưa gán lô</Text> },
+    { title: 'Hạn giao', key: 'hg', width: 110, render: (_: unknown, r) =>
+        r.deadline ? dayjs(r.deadline).format('DD/MM/YYYY') : '—' },
+    { title: 'Số cont', key: 'sc', width: 70, align: 'center' as const, render: (_: unknown, r) => r.total },
+    { title: 'Tiến độ', key: 'td', render: (_: unknown, r) => (
+        <Space size={[4, 4]} wrap>
+          {LOT_STAGES.filter((s) => r.counts[s.key] > 0).map((s) => (
+            <Tag key={s.key} color={s.color}>{s.icon} {s.short}: {r.counts[s.key]}</Tag>
+          ))}
+        </Space>
+      ) },
+    { title: 'Trạng thái lô', key: 'tt', width: 160, render: (_: unknown, r) => {
+        if (r.counts.delivered === r.total) return <Tag color="green">🟢 Đã giao xong</Tag>
+        const ov = LOT_STAGES.find((s) => r.counts[s.key] > 0)
+        return ov ? <Tag color={ov.color}>{ov.icon} {ov.label}</Tag> : '—'
+      } },
+  ]
+
+  // ══════════════════════════════════════════════════════════════
   // MAIN RENDER
   // ══════════════════════════════════════════════════════════════
 
@@ -858,6 +923,27 @@ function ContainerPackingPage() {
           </Button>
         </Space>
       </Card>
+
+      {/* Theo dõi lô — giai đoạn từng lô */}
+      {containers.length > 0 && lotTrackRows.length > 0 && (
+        <Card
+          size="small"
+          title={<span>📋 Theo dõi lô — đến đâu rồi?</span>}
+          style={{ marginBottom: 16 }}
+        >
+          <Table
+            dataSource={lotTrackRows}
+            columns={lotTrackColumns}
+            rowKey="key"
+            size="small"
+            pagination={false}
+            bordered
+          />
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+            <b>Trạng thái lô</b> = giai đoạn thấp nhất trong lô (còn 1 cont đang sản xuất → cả lô tính là "đang sản xuất"). Giai đoạn: 🏭 SX → 📦 Đóng gói → ✅ Sẵn sàng → 🚚 Điều động → 🟢 Đã giao.
+          </Text>
+        </Card>
+      )}
 
       {/* Chia lô giao hàng */}
       {containers.length > 0 && (

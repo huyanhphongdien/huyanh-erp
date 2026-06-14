@@ -11,6 +11,7 @@ import {
   UnlockOutlined,
   FileTextOutlined,
   ToolOutlined,
+  InboxOutlined,
   CarOutlined,
   DollarOutlined,
   FolderOpenOutlined,
@@ -38,6 +39,7 @@ import {
 } from '../../../services/sales/salesPermissionService'
 import { useAuthStore } from '../../../stores/authStore'
 import ContractTab from './ContractTab'
+import PackingTabPanel from './PackingTabPanel'
 import ProductionTab from './ProductionTab'
 import ShippingTab from './ShippingTab'
 import FinanceTabV4 from './FinanceTabV4'
@@ -71,6 +73,7 @@ interface Props {
 const TAB_META: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   contract: { icon: <FileTextOutlined />, label: 'Hợp đồng', color: '#1B4D3E' },
   production: { icon: <ToolOutlined />, label: 'Sản xuất', color: '#1677ff' },
+  packing: { icon: <InboxOutlined />, label: 'Đóng gói', color: '#1B4D3E' },
   shipping: { icon: <CarOutlined />, label: 'Vận chuyển', color: '#d48806' },
   // documents: { icon: <FolderOpenOutlined />, label: 'Chứng từ', color: '#722ed1' }, // tạm ẩn
   finance: { icon: <DollarOutlined />, label: 'Tài chính', color: '#cf1322' },
@@ -474,6 +477,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             onSaved={handleSaved}
           />
         )
+      case 'packing':
+        return <PackingTabPanel orderId={order.id} />
       case 'shipping':
         return (
           <ShippingTab

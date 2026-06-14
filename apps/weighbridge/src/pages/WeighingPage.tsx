@@ -1265,7 +1265,16 @@ export default function WeighingPage() {
                       <Text type="secondary" style={{ fontSize: 12 }}>Chọn lệnh điều động — để biết hàng gì + ghi KL cân về lệnh</Text>
                       <Select
                         value={selectedDispatchOrderId || undefined}
-                        onChange={v => setSelectedDispatchOrderId(v || '')}
+                        onChange={v => {
+                          setSelectedDispatchOrderId(v || '')
+                          // Chọn lệnh → tự điền Biển số xe + Tài xế + SĐT từ lệnh.
+                          const d = v ? dispatchOrders.find(o => o.id === v) : null
+                          if (d) {
+                            if (d.tractor_plate) setVehiclePlate(d.tractor_plate.toUpperCase())
+                            if (d.driver_name) setDriverName(d.driver_name)
+                            if (d.driver_phone) setDriverPhone(d.driver_phone)
+                          }
+                        }}
                         placeholder="Chọn lệnh điều động..."
                         style={{ width: '100%' }}
                         disabled={!!ticket}
@@ -1273,9 +1282,10 @@ export default function WeighingPage() {
                         loading={loadingDispatch}
                         showSearch
                         optionFilterProp="label"
+                        // Nhãn gọn: Mã lệnh · Số xe (đầu kéo) · Tài xế. Danh sách đã sort theo ngày (mới nhất trên).
                         options={dispatchOrders.map(d => ({
                           value: d.id,
-                          label: `${d.code} — ${d.customer_name || '—'} — ${d.destination || '—'} — ${d.total_lines} cont`,
+                          label: `${d.code} · ${d.tractor_plate || 'chưa gán xe'}${d.driver_name ? ` · ${d.driver_name}` : ''}`,
                         }))}
                       />
                       {selectedDispatch && (
@@ -1283,8 +1293,9 @@ export default function WeighingPage() {
                           <Text strong style={{ color: '#065F46' }}>{selectedDispatch.customer_name || '—'}</Text>
                           <br />
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            {selectedDispatch.tractor_plate || '—'}{selectedDispatch.trailer_plate ? ` + ${selectedDispatch.trailer_plate}` : ''}
-                            {selectedDispatch.destination && ` · ${selectedDispatch.destination}`}
+                            🚛 {selectedDispatch.tractor_plate || '—'}{selectedDispatch.trailer_plate ? ` + ${selectedDispatch.trailer_plate}` : ''}
+                            {selectedDispatch.driver_name ? ` · 👤 ${selectedDispatch.driver_name}` : ''}
+                            {selectedDispatch.destination ? ` · ${selectedDispatch.destination}` : ''}
                           </Text>
                         </div>
                       )}

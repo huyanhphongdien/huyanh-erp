@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Drawer, Tabs, Tag, Space, Button, Spin, message, Popconfirm, Tooltip, Dropdown, Modal, Input } from 'antd'
 import type { MenuProps } from 'antd'
 import {
@@ -21,6 +22,7 @@ import {
   FolderOutlined,
   StopOutlined,
   PrinterOutlined,
+  ExpandAltOutlined,
   DownOutlined,
   ThunderboltOutlined,
   ShareAltOutlined,
@@ -85,8 +87,18 @@ const TAB_META: Record<string, { icon: React.ReactNode; label: string; color: st
 
 export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderUpdated, inline = false }: Props) {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const salesRole = getSalesRole(user)
   const visibleTabs = getVisibleTabs(salesRole)
+
+  // Drawer rộng (Kiểu A): ~78% màn hình desktop, full trên điện thoại.
+  const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280)
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const drawerWidth = vw < 768 ? '100%' : Math.min(1200, Math.round(vw * 0.78))
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(false)
@@ -720,7 +732,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     <Drawer
       open={open}
       onClose={onClose}
-      width={760}
+      width={drawerWidth}
       destroyOnClose
       closeIcon={<CloseOutlined />}
       styles={{ body: { padding: 0 } }}
@@ -728,6 +740,11 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         order ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, fontSize: 16 }}>{order.code}</span>
+            {order.contract_no && (
+              <span style={{ fontSize: 13, color: '#8c8c8c', fontFamily: 'JetBrains Mono, monospace' }}>
+                HĐ: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{order.contract_no}</span>
+              </span>
+            )}
             <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
               {ORDER_STATUS_LABELS[order.status] || order.status}
             </Tag>
@@ -745,6 +762,13 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
               </span>
             )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+              {/* Mở rộng → trang chi tiết đầy đủ */}
+              <Tooltip title="Mở trang chi tiết đầy đủ">
+                <Button size="small" icon={<ExpandAltOutlined />}
+                        onClick={() => { onClose?.(); navigate(`/sales/orders/${order.id}`) }}>
+                  Mở rộng
+                </Button>
+              </Tooltip>
               {/* Copy link — chuẩn hoá với inline mode */}
               <Tooltip title="Copy URL đơn vào clipboard">
                 <Button size="small" icon={<ShareAltOutlined />} onClick={handleCopyLink}>

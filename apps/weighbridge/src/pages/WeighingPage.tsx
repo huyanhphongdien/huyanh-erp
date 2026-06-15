@@ -270,6 +270,23 @@ export default function WeighingPage() {
     }).catch(e => console.warn('Load dispatch lines failed:', e))
   }, [selectedDispatchOrderId])
 
+  // Cân XUẤT: TỰ khớp lệnh điều động theo BIỂN SỐ đầu kéo — operator quên chọn lệnh
+  // thì vẫn link để ghi KL thực về lệnh. Chỉ tự chọn khi đúng 1 lệnh khớp + chưa chọn + chưa tạo phiếu.
+  useEffect(() => {
+    if (ticket || ticketDirection !== 'out' || selectedDispatchOrderId) return
+    const norm = (s?: string | null) => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const plate = norm(vehiclePlate)
+    if (!plate) return
+    const matches = dispatchOrders.filter(d => norm(d.tractor_plate) === plate)
+    if (matches.length === 1) {
+      const d = matches[0]
+      setSelectedDispatchOrderId(d.id)
+      if (!driverName && d.driver_name) setDriverName(d.driver_name)
+      if (!driverPhone && d.driver_phone) setDriverPhone(d.driver_phone)
+      message.info(`Đã tự khớp lệnh ${d.code} theo biển số ${vehiclePlate}`)
+    }
+  }, [vehiclePlate, dispatchOrders, ticket, ticketDirection, selectedDispatchOrderId])
+
   const selectedDispatch = dispatchOrders.find(d => d.id === selectedDispatchOrderId)
   const dispatchPlannedKg = dispatchLines.reduce((s, l) => s + (l.weight_kg || 0), 0)
 

@@ -510,19 +510,32 @@ async function syncWeighing(params: {
 async function markWeighed(orderId: string): Promise<number> {
   const { data: rows } = await supabase
     .from('dispatch_order_lines')
-    .select('id, weight_kg, seal_no, actual_weight_kg')
+    .select('id, weight_kg, seal_no, actual_weight_kg, sales_order_container_id')
     .eq('dispatch_order_id', orderId)
   const lines = (rows || []) as Array<{
-    id: string; weight_kg: number | null; seal_no: string | null; actual_weight_kg: number | null
+    id: string; weight_kg: number | null; seal_no: string | null
+    actual_weight_kg: number | null; sales_order_container_id: string | null
   }>
   let marked = 0
+  const containerIds: string[] = []
   for (const l of lines) {
+    if (l.sales_order_container_id) containerIds.push(l.sales_order_container_id)
     if (l.actual_weight_kg != null) continue // đã cân rồi → giữ nguyên
     await supabase
       .from('dispatch_order_lines')
       .update({ actual_weight_kg: l.weight_kg ?? 0, actual_seal_no: l.seal_no || null })
       .eq('id', l.id)
     marked++
+  }
+  // Container liên kết → đánh dấu "Đã xuất" (shipped) cho khớp với "đã giao",
+  // tránh đơn hiện GIAO HÀNG=Đã giao mà TRẠNG THÁI vẫn "Đang lên kế hoạch".
+  const uniq = [...new Set(containerIds)]
+  if (uniq.length > 0) {
+    await supabase
+      .from('sales_order_containers')
+      .update({ status: 'shipped' })
+      .in('id', uniq)
+      .neq('status', 'shipped')
   }
   return marked
 }

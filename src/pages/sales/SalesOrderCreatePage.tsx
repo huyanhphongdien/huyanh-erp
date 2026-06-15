@@ -892,34 +892,41 @@ function SalesOrderCreatePage() {
               type="success"
               showIcon
               style={{ borderRadius: 8, fontSize: 12 }}
-              message="Điền form bên trái → chọn 1 trong 2 cách ra hợp đồng"
-              description="Hợp đồng tự hiện ở khung xem trước. Chưa xong thì bấm “Lưu nháp đơn” để lưu lại, làm tiếp sau."
+              message="2 bước: ① Tạo đơn hàng → ② Ra hợp đồng"
+              description="Điền form bên trái (hợp đồng tự hiện ở khung xem trước) → bấm “Tạo đơn hàng” để lưu. Sau đó ra hợp đồng bằng Cách 1 hoặc Cách 2 bên dưới."
             />
 
+            {/* ── BƯỚC 1: tạo (lưu) đơn hàng ── */}
+            <Divider style={{ margin: '4px 0' }}>
+              <Tag color="green" style={{ fontSize: 11 }}>① Tạo đơn hàng</Tag>
+            </Divider>
             <Button
-              type="default"
+              type="primary"
               icon={<SaveOutlined />}
               block
               size="large"
               loading={loading}
               disabled={submittingReview}
               onClick={() => handleSubmit(true)}
+              style={{ background: '#1B4D3E', borderColor: '#1B4D3E', fontWeight: 600 }}
             >
-              Lưu nháp đơn (chưa trình HĐ)
+              Tạo đơn hàng
             </Button>
+            <div style={{ fontSize: 11, color: '#8c8c8c', textAlign: 'center' }}>
+              Lưu đơn ở dạng nháp (chưa trình hợp đồng). Lưu xong vẫn sửa + ra HĐ được.
+            </div>
 
-            {/* ── CÁCH 1: máy tự điền HĐ (Nấc 1) ── */}
+            {/* ── BƯỚC 2 · Cách 1: máy tự điền HĐ (Nấc 1) ── */}
             <Divider style={{ margin: '4px 0' }}>
-              <Tag color="green" style={{ fontSize: 11 }}>✅ Cách 1 — Máy tự tạo HĐ</Tag>
+              <Tag color="blue" style={{ fontSize: 11 }}>② Ra HĐ · Cách 1 — Máy tự điền</Tag>
             </Divider>
             <Button
-              type="primary"
+              type="default"
               icon={<DownloadOutlined />}
               block
               size="large"
               loading={docLoading === 'BOTH'}
               onClick={() => handleDownloadDoc('BOTH')}
-              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
             >
               Tải HĐ máy điền sẵn (SC + PI)
             </Button>
@@ -930,7 +937,7 @@ function SalesOrderCreatePage() {
 
             {/* ── CÁCH 2: nộp Word vào hệ thống để duyệt + ký ── */}
             <Divider style={{ margin: '4px 0' }}>
-              <Tag color="purple" style={{ fontSize: 11 }}>📎 Cách 2 — Nộp HĐ để duyệt + ký</Tag>
+              <Tag color="purple" style={{ fontSize: 11 }}>② Ra HĐ · Cách 2 — Nộp để duyệt + ký</Tag>
             </Divider>
             <UploadFlowAction
               contractNoHint={contractData.contract_no}

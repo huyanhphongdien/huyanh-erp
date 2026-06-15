@@ -68,7 +68,53 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
   // Khi gửi, lấy mentioned_ids từ map này (chính xác, không phải regex)
   const [pickedMentions, setPickedMentions] = useState<Record<string, { id: string; full_name: string }>>({})
 
+  // Ảnh đang chờ gửi (chọn từ máy HOẶC dán Ctrl+V) — preview trước khi gửi
+  const [pendingImages, setPendingImages] = useState<{ id: string; file: File; preview: string }[]>([])
+  const [uploading, setUploading] = useState(false)
+
   const messagesRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Thêm ảnh vào hàng chờ (lọc image, giới hạn 10MB) ──
+  const addFiles = (files: File[]) => {
+    const imgs = files.filter((f) => f.type.startsWith('image/'))
+    if (imgs.length === 0) return
+    const ok = imgs.filter((f) => f.size <= 10 * 1024 * 1024)
+    if (ok.length < imgs.length) antMessage.warning('Bỏ qua ảnh > 10MB')
+    setPendingImages((prev) => [
+      ...prev,
+      ...ok.map((f) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        file: f,
+        preview: URL.createObjectURL(f),
+      })),
+    ])
+  }
+
+  const removePending = (id: string) => {
+    setPendingImages((prev) => {
+      const t = prev.find((p) => p.id === id)
+      if (t) URL.revokeObjectURL(t.preview)
+      return prev.filter((p) => p.id !== id)
+    })
+  }
+
+  // ── Dán ảnh từ clipboard (Ctrl+V) — chụp màn hình paste thẳng, nhiều ảnh ──
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    const files: File[] = []
+    for (const it of Array.from(items)) {
+      if (it.type.startsWith('image/')) {
+        const f = it.getAsFile()
+        if (f) files.push(f)
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault()
+      addFiles(files)
+    }
+  }
 
   // ── Load + subscribe realtime ──
   useEffect(() => {
@@ -98,6 +144,13 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
           return [...prev, msg]
         })
         setTimeout(scrollToBottom, 100)
+        // Payload realtime thiếu join (author/attachment) → tin có đính kèm sẽ
+        // hiện trắng. Fetch bù bản đầy đủ rồi thay vào.
+        if (msg.attachment_doc_id && !msg.attachment) {
+          salesOrderMessageService.getMessageById(msg.id).then((full) => {
+            if (full) setMessages((prev) => prev.map((m) => (m.id === full.id ? full : m)))
+          })
+        }
       } else if (event === 'UPDATE') {
         // Xóa mềm = UPDATE is_deleted=true (KHÔNG phải DELETE event) → tự gỡ khỏi list
         if (msg.is_deleted) {
@@ -157,7 +210,7 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
 
   const handleSend = async () => {
     const text = input.trim()
-    if (!text) return
+    if (!text && pendingImages.length === 0) return
     setSending(true)
     try {
       // Resolve mentions: từ pickedMentions (chính xác) + fallback regex match
@@ -181,11 +234,28 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
         if (found) mentionedIdSet.add(found.id)
       }
 
-      await salesOrderMessageService.sendMessage({
-        salesOrderId,
-        content: text,
-        mentionedIds: Array.from(mentionedIdSet),
-      })
+      if (pendingImages.length > 0) {
+        // Mỗi ảnh = 1 tin (schema 1 attachment/tin). Text + mention gắn vào tin ảnh đầu.
+        setUploading(true)
+        const imgs = pendingImages
+        for (let i = 0; i < imgs.length; i++) {
+          const docId = await salesOrderMessageService.uploadChatImage(salesOrderId, imgs[i].file)
+          await salesOrderMessageService.sendMessage({
+            salesOrderId,
+            content: i === 0 ? text : '',
+            mentionedIds: i === 0 ? Array.from(mentionedIdSet) : [],
+            attachmentDocId: docId,
+          })
+        }
+        imgs.forEach((p) => URL.revokeObjectURL(p.preview))
+        setPendingImages([])
+      } else {
+        await salesOrderMessageService.sendMessage({
+          salesOrderId,
+          content: text,
+          mentionedIds: Array.from(mentionedIdSet),
+        })
+      }
       setInput('')
       setPickedMentions({})
       // Realtime sẽ tự thêm tin vào list
@@ -193,6 +263,7 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
       antMessage.error('Gửi tin thất bại: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setSending(false)
+      setUploading(false)
     }
   }
 
@@ -359,23 +430,43 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
                       <span style={{ fontSize: 10, color: '#bfbfbf' }}>{fmtRelTime(msg.created_at)}</span>
                       {msg.is_pinned && <span style={{ color: '#d46b08' }}>📌</span>}
                     </div>
-                    <div style={{
-                      ...msgContent,
-                      background: isMe ? PRIMARY : '#fafafa',
-                      color: isMe ? '#fff' : 'rgba(0,0,0,0.88)',
-                    }}>
-                      {renderContentWithMentions(msg.content, isMe)}
-                    </div>
+                    {msg.content?.trim() && (
+                      <div style={{
+                        ...msgContent,
+                        background: isMe ? PRIMARY : '#fafafa',
+                        color: isMe ? '#fff' : 'rgba(0,0,0,0.88)',
+                      }}>
+                        {renderContentWithMentions(msg.content, isMe)}
+                      </div>
+                    )}
                     {msg.attachment && (
-                      <div style={{ ...attachCard, marginLeft: isMe ? 'auto' : 0 }}>
-                        <div style={attachIcon}>PDF</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600 }}>{msg.attachment.file_name}</div>
-                          <div style={{ fontSize: 10, color: '#8c8c8c' }}>
-                            {msg.attachment.file_size ? `${Math.round(msg.attachment.file_size / 1024)} KB` : ''}
+                      isImageAttachment(msg.attachment) ? (
+                        <a
+                          href={msg.attachment.file_url || '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ display: 'block', marginTop: 6, marginLeft: isMe ? 'auto' : 0, width: 'fit-content' }}
+                        >
+                          <img
+                            src={msg.attachment.file_url || ''}
+                            alt={msg.attachment.file_name || 'image'}
+                            style={{
+                              maxWidth: 260, maxHeight: 260, borderRadius: 8,
+                              border: '1px solid #e8e8e8', objectFit: 'cover', cursor: 'zoom-in', display: 'block',
+                            }}
+                          />
+                        </a>
+                      ) : (
+                        <div style={{ ...attachCard, marginLeft: isMe ? 'auto' : 0 }}>
+                          <div style={attachIcon}>PDF</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600 }}>{msg.attachment.file_name}</div>
+                            <div style={{ fontSize: 10, color: '#8c8c8c' }}>
+                              {msg.attachment.file_size ? `${Math.round(msg.attachment.file_size / 1024)} KB` : ''}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )
                     )}
                     <div style={{ ...msgActionsRow, justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
                       <Tooltip title={msg.is_pinned ? 'Bỏ ghim' : 'Ghim tin'}>
@@ -460,15 +551,57 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
                 })}
               </div>
             )}
+            {/* Dải ảnh chờ gửi (chọn file hoặc dán Ctrl+V) */}
+            {pendingImages.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                {pendingImages.map((p) => (
+                  <div key={p.id} style={{ position: 'relative' }}>
+                    <img
+                      src={p.preview}
+                      alt="preview"
+                      style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid #e8e8e8' }}
+                    />
+                    <button
+                      onClick={() => removePending(p.id)}
+                      title="Bỏ ảnh"
+                      style={{
+                        position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%',
+                        border: 'none', background: '#cf1322', color: '#fff', fontSize: 12, lineHeight: '18px',
+                        padding: 0, cursor: 'pointer',
+                      }}
+                    >×</button>
+                  </div>
+                ))}
+                {uploading && (
+                  <span style={{ alignSelf: 'center', fontSize: 11, color: '#8c8c8c' }}>
+                    <Spin size="small" /> đang tải ảnh lên...
+                  </span>
+                )}
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => { if (e.target.files) addFiles(Array.from(e.target.files)); e.target.value = '' }}
+            />
             <div style={chatInputBar}>
-              <Tooltip title="Đính kèm file (sắp ra mắt)">
-                <Button type="text" size="small" icon={<PaperClipOutlined />} disabled />
+              <Tooltip title="Đính kèm ảnh (hoặc dán Ctrl+V)">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<PaperClipOutlined />}
+                  onClick={() => fileInputRef.current?.click()}
+                />
               </Tooltip>
               <Input.TextArea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleInputKeyDown}
-                placeholder={`Gõ tin... gõ @ để mention · vai trò bạn: ${myRole ? ROLE_META[myRole]?.label : '—'}`}
+                onPaste={handlePaste}
+                placeholder={`Gõ tin... @ để mention · dán ảnh (Ctrl+V) · vai trò: ${myRole ? ROLE_META[myRole]?.label : '—'}`}
                 autoSize={{ minRows: 1, maxRows: 4 }}
                 style={{ border: 'none', boxShadow: 'none', resize: 'none' }}
               />
@@ -478,8 +611,8 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
                 shape="circle"
                 icon={<SendOutlined />}
                 onClick={handleSend}
-                loading={sending}
-                disabled={!input.trim()}
+                loading={sending || uploading}
+                disabled={!input.trim() && pendingImages.length === 0}
                 style={{ background: PRIMARY }}
               />
             </div>
@@ -548,8 +681,22 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
             <div style={{ fontSize: 11, color: '#bfbfbf' }}>Chưa có file nào</div>
           ) : (
             sharedFiles.map((m) => (
-              <div key={m.id} style={actorRow}>
-                <div style={attachIcon}>PDF</div>
+              <a
+                key={m.id}
+                href={m.attachment?.file_url || '#'}
+                target="_blank"
+                rel="noreferrer"
+                style={{ ...actorRow, color: 'inherit', textDecoration: 'none' }}
+              >
+                {m.attachment && isImageAttachment(m.attachment) ? (
+                  <img
+                    src={m.attachment.file_url || ''}
+                    alt=""
+                    style={{ width: 32, height: 32, borderRadius: 5, objectFit: 'cover', flexShrink: 0, border: '1px solid #eee' }}
+                  />
+                ) : (
+                  <div style={attachIcon}>PDF</div>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {m.attachment?.file_name || '—'}
@@ -558,13 +705,20 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
                     {m.author?.full_name || '—'} · {fmtRelTime(m.created_at)}
                   </div>
                 </div>
-              </div>
+              </a>
             ))
           )}
         </div>
       </div>
     </div>
   )
+}
+
+// ─── Phát hiện attachment là ảnh ─────────────────────────────────────
+function isImageAttachment(a: { file_name?: string | null; file_url?: string | null; doc_type?: string | null }): boolean {
+  if (a.doc_type === 'chat_image') return true
+  const s = (a.file_name || a.file_url || '').toLowerCase()
+  return /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)(\?|$)/.test(s)
 }
 
 // ─── Render content với @mentions highlight ─────────────────────────

@@ -159,6 +159,22 @@ export const salesOrderMessageService = {
     return (data as unknown as SalesOrderMessage[]) || []
   },
 
+  /** Lấy 1 tin kèm join author + attachment (dùng để bù sau realtime INSERT,
+   *  vì payload realtime chỉ có row thô, thiếu join → ảnh/avatar không hiện). */
+  async getMessageById(id: string): Promise<SalesOrderMessage | null> {
+    const { data, error } = await supabase
+      .from('sales_order_messages')
+      .select(`
+        *,
+        author:employees!sales_order_messages_author_id_fkey(id, full_name, email),
+        attachment:sales_order_documents!sales_order_messages_attachment_doc_id_fkey(id, file_name, file_size, file_url, doc_type)
+      `)
+      .eq('id', id)
+      .maybeSingle()
+    if (error) return null
+    return (data as unknown as SalesOrderMessage) || null
+  },
+
   /** Gửi tin user. Tự gửi notification cho mỗi người được @mention. */
   async sendMessage(params: {
     salesOrderId: string
@@ -249,6 +265,51 @@ export const salesOrderMessageService = {
     }
 
     return data as SalesOrderMessage
+  },
+
+  /** Upload 1 ảnh cho chat → trả về doc_id (sales_order_documents) để gắn vào tin.
+   *  Lưu ở bucket 'sales-documents' (path chat/<orderId>/...). */
+  async uploadChatImage(salesOrderId: string, file: File): Promise<string> {
+    const me = await getCurrentEmployee()
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
+    const rand = Math.random().toString(36).slice(2, 8)
+    // Giữ dưới prefix orders/<id>/ giống upload chứng từ (phòng storage policy giới hạn path)
+    const path = `orders/${salesOrderId}/chat_${Date.now()}_${rand}.${ext}`
+
+    const { error: upErr } = await supabase.storage
+      .from('sales-documents')
+      .upload(path, file, { cacheControl: '3600', upsert: false })
+    if (upErr) throw upErr
+
+    const { data: { publicUrl } } = supabase.storage.from('sales-documents').getPublicUrl(path)
+
+    const base = {
+      sales_order_id: salesOrderId,
+      doc_name: file.name || 'image',
+      file_url: publicUrl,
+      file_name: file.name || `image.${ext}`,
+      file_size: file.size,
+      is_received: true,
+      received_at: new Date().toISOString(),
+      uploaded_by: me?.id || null,
+      sort_order: 100,
+    }
+    // Ưu tiên doc_type='chat_image' (không lẫn vào checklist chứng từ);
+    // nếu cột bị CHECK constraint thì fallback 'other'.
+    const ins = await supabase
+      .from('sales_order_documents')
+      .insert({ ...base, doc_type: 'chat_image' })
+      .select('id')
+      .single()
+    if (!ins.error && ins.data) return ins.data.id as string
+
+    const ins2 = await supabase
+      .from('sales_order_documents')
+      .insert({ ...base, doc_type: 'other', notes: 'chat_image' })
+      .select('id')
+      .single()
+    if (ins2.error) throw ins2.error
+    return ins2.data.id as string
   },
 
   /** Edit tin của mình. */

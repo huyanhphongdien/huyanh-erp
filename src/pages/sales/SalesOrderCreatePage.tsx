@@ -283,24 +283,22 @@ function SalesOrderCreatePage() {
 
   // ── Sinh HĐ .docx ──
   const handleDownloadDoc = async (type: 'SC' | 'PI' | 'BOTH') => {
-    if (!contractData.contract_no) {
-      message.error('Cần nhập "Số hợp đồng" trước khi sinh HĐ')
-      return
-    }
+    // Số HĐ KHÔNG bắt buộc — Phú LV điền khi duyệt. Chỉ cần có khách hàng.
     if (!contractData.buyer_name) {
-      message.error('Cần chọn khách hàng trước khi sinh HĐ')
+      message.error('Hãy chọn Khách hàng trước khi tải HĐ')
       return
     }
+    const noLabel = contractData.contract_no || 'HD-moi'
     setDocLoading(type)
     try {
       if (type === 'BOTH') {
-        await downloadContract(deriveKind(contractData.incoterm || 'FOB', 'SC'), contractData, `${contractData.contract_no}_SC.docx`)
-        await downloadContract(deriveKind(contractData.incoterm || 'FOB', 'PI'), contractData, `${contractData.contract_no}_PI.docx`)
-        message.success(`Đã sinh SC + PI cho ${contractData.contract_no}`)
+        await downloadContract(deriveKind(contractData.incoterm || 'FOB', 'SC'), contractData, `${noLabel}_SC.docx`)
+        await downloadContract(deriveKind(contractData.incoterm || 'FOB', 'PI'), contractData, `${noLabel}_PI.docx`)
+        message.success('Đã tải HĐ máy điền sẵn (SC + PI) — Số HĐ để Phú LV điền khi duyệt')
       } else {
         const kind = deriveKind(contractData.incoterm || 'FOB', type)
-        await downloadContract(kind, contractData, `${contractData.contract_no}_${type}.docx`)
-        message.success(`Đã sinh ${type} (${kind})`)
+        await downloadContract(kind, contractData, `${noLabel}_${type}.docx`)
+        message.success(`Đã tải ${type} (${kind})`)
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)

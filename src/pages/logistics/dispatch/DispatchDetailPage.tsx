@@ -88,8 +88,16 @@ export default function DispatchDetailPage() {
     { title: 'Số kiện', dataIndex: 'package_count', width: 80, align: 'right' as const, render: (v: number) => v ?? '–' },
     { title: 'KL kế hoạch', dataIndex: 'weight_kg', width: 120, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
     {
-      title: 'KL thực tế (cân)', dataIndex: 'actual_weight_kg', width: 130, align: 'right' as const,
-      render: (v: number | null) => v != null ? <Tag color="green">{v.toLocaleString('vi-VN')} kg</Tag> : <span style={{ color: '#bbb' }}>chưa cân</span>,
+      // Chỉ cần đánh dấu "Đã cân" — số cân (gồm pallet/bao bì) để nhỏ tham khảo, KHÔNG so với kế hoạch.
+      title: 'Cân hàng', dataIndex: 'actual_weight_kg', width: 130, align: 'right' as const,
+      render: (v: number | null) => v != null
+        ? (
+          <div style={{ textAlign: 'right' }}>
+            <Tag color="green" style={{ margin: 0 }}>✅ Đã cân</Tag>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{v.toLocaleString('vi-VN')} kg (gồm bì)</div>
+          </div>
+        )
+        : <span style={{ color: '#bbb' }}>chưa cân</span>,
     },
   ]
 

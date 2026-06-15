@@ -39,6 +39,7 @@ export default function DispatchDetailPage() {
   const [order, setOrder] = useState<DispatchOrder | null>(null)
   const [lines, setLines] = useState<DispatchLine[]>([])
   const [loading, setLoading] = useState(true)
+  const [weighing, setWeighing] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -71,6 +72,21 @@ export default function DispatchDetailPage() {
       navigate('/logistics/dispatch')
     } catch (e: any) {
       message.error('Lỗi xoá: ' + (e?.message || e))
+    }
+  }
+
+  const doMarkWeighed = async () => {
+    setWeighing(true)
+    try {
+      const n = await dispatchService.markWeighed(id!)
+      message.success(n > 0
+        ? `Đã đánh dấu cân ${n} container — Đơn hàng bán tự cập nhật giao hàng`
+        : 'Tất cả container đã được đánh dấu cân rồi')
+      load()
+    } catch (e: any) {
+      message.error('Lỗi đánh dấu: ' + (e?.message || e))
+    } finally {
+      setWeighing(false)
     }
   }
 
@@ -118,6 +134,16 @@ export default function DispatchDetailPage() {
             <Tag color={STATUS_COLOR[order.status]}>{DISPATCH_STATUS_LABELS[order.status]}</Tag>
           </Space>
           <Space wrap>
+            {lines.some(l => l.actual_weight_kg == null) && (
+              <Popconfirm
+                title="Đánh dấu lệnh này đã cân?"
+                description="Các container chưa cân sẽ được đánh dấu Đã cân → Đơn hàng bán tự cập nhật giao hàng."
+                okText="Đã cân" cancelText="Huỷ"
+                onConfirm={doMarkWeighed}
+              >
+                <Button type="primary" ghost loading={weighing} icon={<CheckCircleOutlined />}>Đánh dấu đã cân</Button>
+              </Popconfirm>
+            )}
             <Button icon={<PrinterOutlined />} onClick={() => window.open(`/logistics/dispatch/${id}/print?doc=order`, '_blank')}>In lệnh điều động</Button>
             <Button icon={<FileTextOutlined />} onClick={() => window.open(`/logistics/dispatch/${id}/print?doc=handover`, '_blank')}>In biên bản bàn giao</Button>
             {order.status !== 'completed' && (

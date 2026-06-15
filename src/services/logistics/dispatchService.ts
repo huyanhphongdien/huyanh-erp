@@ -500,6 +500,33 @@ async function syncWeighing(params: {
     .is('weighbridge_ticket_id', null)
 }
 
+/**
+ * Đánh dấu thủ công lệnh "đã cân" (khi trạm cân đã cân thực tế nhưng không nối
+ * lệnh, hoặc cân trước khi có tính năng nối). Theo nguyên tắc "đã cân là được"
+ * (KHÔNG so KL): set actual_weight_kg = KL kế hoạch cho các dòng CHƯA cân, để
+ * Đơn hàng bán tự suy ra "đã giao" (getDeliveryStatus/lot badges đọc cột này).
+ * Trả về số dòng vừa đánh dấu.
+ */
+async function markWeighed(orderId: string): Promise<number> {
+  const { data: rows } = await supabase
+    .from('dispatch_order_lines')
+    .select('id, weight_kg, seal_no, actual_weight_kg')
+    .eq('dispatch_order_id', orderId)
+  const lines = (rows || []) as Array<{
+    id: string; weight_kg: number | null; seal_no: string | null; actual_weight_kg: number | null
+  }>
+  let marked = 0
+  for (const l of lines) {
+    if (l.actual_weight_kg != null) continue // đã cân rồi → giữ nguyên
+    await supabase
+      .from('dispatch_order_lines')
+      .update({ actual_weight_kg: l.weight_kg ?? 0, actual_seal_no: l.seal_no || null })
+      .eq('id', l.id)
+    marked++
+  }
+  return marked
+}
+
 // ============================================================================
 // TÍCH HỢP ĐƠN HÀNG BÁN
 // ============================================================================
@@ -683,6 +710,7 @@ export const dispatchService = {
   ordersFromContainerIds,
   listForWeighing,
   syncWeighing,
+  markWeighed,
   getDeliveryStatus,
   getLotProgressForOrders,
 }

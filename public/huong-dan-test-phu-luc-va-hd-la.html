@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Hướng dẫn test: Phụ lục HĐ + Đèn báo HĐ lạ</title>
+<title>Test bằng 1 hợp đồng thật — HA20260053</title>
 <style>
   :root{--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#1B4D3E;--brand2:#246a52;
     --green:#059669;--green-bg:#ecfdf5;--amber:#d97706;--amber-bg:#fffbeb;--red:#dc2626;--red-bg:#fef2f2;--blue:#2563eb;--blue-bg:#eff6ff;}
@@ -13,19 +13,18 @@
   header{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:26px 16px 22px;text-align:center}
   header h1{margin:0 0 6px;font-size:21px}
   header p{margin:0;color:#cdeede;font-size:13.5px}
-  h2{font-size:18px;margin:26px 0 8px;display:flex;align-items:center;gap:9px}
+  h2{font-size:18px;margin:26px 0 8px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
   .pill{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:999px}
   .p-green{background:var(--green-bg);color:#065f46}.p-amber{background:var(--amber-bg);color:#92400e}.p-blue{background:var(--blue-bg);color:#1e40af}
-  .step{display:grid;grid-template-columns:34px 1fr;gap:12px;margin:14px 0}
-  .step .n{width:34px;height:34px;border-radius:50%;color:#fff;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .n1{background:var(--brand)}.n2{background:var(--green)}.n4{background:var(--amber)}
-  .step .b h3{margin:0 0 3px;font-size:15.5px}.step .b p{margin:3px 0 0;font-size:14px;color:#374151}
+  .step{display:grid;grid-template-columns:32px 1fr;gap:11px;margin:13px 0}
+  .step .n{width:32px;height:32px;border-radius:50%;color:#fff;font-size:14.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .n1{background:var(--brand)}.n2{background:var(--green)}.n4{background:var(--amber)}.n0{background:#475569}
+  .step .b h3{margin:0 0 3px;font-size:15px}.step .b p{margin:3px 0 0;font-size:14px;color:#374151}
   table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px;background:#fff}
   th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
-  th{background:#f9fafb;font-weight:700;font-size:12.5px;width:42%}
+  th{background:#f9fafb;font-weight:700;font-size:12.5px;width:44%}
   td b{color:var(--brand)}
-  .data{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13.5px}
   .ok{background:var(--green-bg);border:1px solid #a7f3d0;border-radius:10px;padding:11px 13px;font-size:14px;color:#065f46;margin-top:12px}
   .warn{background:var(--amber-bg);border:1px solid #fde68a;border-radius:10px;padding:11px 13px;font-size:13.5px;color:#92400e;margin-top:12px}
   .red{background:var(--red-bg);border:1px solid #fecaca;border-radius:10px;padding:11px 13px;font-size:13.5px;color:#991b1b;margin-top:12px}
@@ -38,105 +37,94 @@
 </head>
 <body>
 <header>
-  <h1>Hướng dẫn test 2 tính năng mới</h1>
-  <p>① Tạo phụ lục hợp đồng tự động &nbsp;·&nbsp; ② Đèn báo "HĐ lạ" + 2 làn duyệt</p>
+  <h1>Test 3 tính năng bằng 1 hợp đồng THẬT</h1>
+  <p>HĐ HA20260053 (Philippine Rubber) — tạo đơn → tạo HĐ → phụ lục → đèn báo lạ → xóa</p>
 </header>
 
 <div class="wrap">
 
   <div class="card" style="border-top:4px solid var(--brand)">
-    <b>Trước khi test:</b>
+    <b>Ý tưởng:</b> ta tạo 1 đơn test bằng số liệu của 1 HĐ thật đã ký (HA20260053), chạy thử cả 3 tính năng mới, rồi <b>xóa đơn test</b>. Không ảnh hưởng data thật.
     <ul>
-      <li>Mở web <code>huyanhrubber.vn</code> → đăng nhập → vào <b>Đơn hàng bán</b>.</li>
-      <li>Phần ② cần đã chạy migration <code>v19</code> trên Supabase (báo IT nếu chưa). Phần ① thì không cần.</li>
-      <li>Test xong xóa dữ liệu test (mục cuối) để không lẫn data thật.</li>
+      <li>Đăng nhập <code>huyanhrubber.vn</code> → <b>Đơn hàng bán</b>.</li>
+      <li>Bài ③ (đèn báo lạ) cần migration <code>v19</code> đã chạy (báo IT nếu chưa).</li>
+      <li><b>Ghi nhớ mã đơn test</b> (vd SO-2026-xxxx) để xóa ở bước cuối.</li>
     </ul>
   </div>
 
-  <!-- ====================== TEST 1: PHỤ LỤC ====================== -->
-  <h2>① <span>Tạo phụ lục (Annex)</span> <span class="pill p-green">Nấc 2</span></h2>
-  <p style="margin:4px 0 0;color:#374151">Mục tiêu: bấm nút → máy điền sẵn → ra file Word phụ lục <b>khớp mẫu thật</b>. (Không động vào HĐ gốc — chỉ tải file về.)</p>
-
-  <div class="card">
-    <div class="step"><div class="n n1">1</div><div class="b"><h3>Mở một đơn hàng</h3>
-      <p>Vào danh sách → mở 1 đơn bất kỳ (gợi ý đơn đã có số HĐ). Mở tab <b>Hợp đồng</b>.</p></div></div>
-    <div class="step"><div class="n n1">2</div><div class="b"><h3>Bấm "Tạo phụ lục"</h3>
-      <p>Nút <b>Tạo phụ lục</b> ở góc phải thanh trên cùng của tab Hợp đồng → hiện form.</p></div></div>
-    <div class="step"><div class="n n1">3</div><div class="b"><h3>Điền theo bộ số mẫu</h3>
-      <p>Máy điền sẵn từ đơn; bạn sửa theo bảng dưới để ra <b>đúng</b> mẫu thật HA20260053/PH:</p></div></div>
-  </div>
-
+  <!-- ============ BỘ THÔNG SỐ HĐ THẬT ============ -->
+  <h2>📋 Bộ thông số HĐ thật <span class="pill p-blue">HA20260053</span></h2>
   <table>
-    <tr><th>Ô trong form</th><td>Giá trị nhập</td></tr>
-    <tr><th>Loại phụ lục</th><td><b>Đổi số hợp đồng</b></td></tr>
-    <tr><th>Số HĐ gốc</th><td>HA20260053</td></tr>
-    <tr><th>Ngày HĐ gốc (EN)</th><td>11 May 2026</td></tr>
-    <tr><th>Số HĐ MỚI</th><td><b>HA20260053/ PH</b></td></tr>
-    <tr><th>Ngày phụ lục (EN)</th><td>1st June 2026</td></tr>
-    <tr><th>Số thứ tự (AC.n)</th><td>1</td></tr>
-    <tr><th>Khách hàng (Buyer)</th><td>PHILIPPINE RUBBER TRADE SOLUTION CORPORATION</td></tr>
+    <tr><th>Khách hàng (Buyer)</th><td><b>PHILIPPINE RUBBER TRADE SOLUTION CORPORATION</b></td></tr>
     <tr><th>Địa chỉ Buyer</th><td>LEVEL 10-1, ONE GLOBAL PLACE 5TH AVE. & 25TH ST., FORT BONIFACIO, TAGUIG CITY, 4 DISTRICT, NCR, 1630, PHILIPPINES</td></tr>
     <tr><th>Registration No.</th><td>2025050202017-02</td></tr>
     <tr><th>Managing Director</th><td>GABRIEL E IGOT</td></tr>
+    <tr><th>Loại mủ (Grade)</th><td><b>SVR 3L</b></td></tr>
+    <tr><th>Số lượng</th><td><b>80.64</b> tấn</td></tr>
+    <tr><th>Đơn giá</th><td><b>2,365</b> USD/tấn</td></tr>
+    <tr><th>Thành tiền</th><td>190,713.60 USD</td></tr>
+    <tr><th>Incoterm</th><td><b>FOB</b> — Any Port, Viet Nam</td></tr>
+    <tr><th>Đóng gói</th><td>35 kg/bành · 576 bành/cont · pallet nhựa · 4 × 20'</td></tr>
+    <tr><th>Thời gian giao</th><td>End May, 2026 · Partial: Not Allowed · Transshipment: Allowed</td></tr>
+    <tr><th>Thanh toán</th><td>TTR 100% in advance, 03 ngày sau ký (hạn 15 May 2026)</td></tr>
+    <tr><th>Ngày HĐ</th><td>11 May 2026</td></tr>
+    <tr><th>Ngân hàng (Kiểm tra nhập)</th><td><b>Agribank Huế</b> · TK 4000201014000 · SWIFT VBAAVNVX540</td></tr>
   </table>
+  <div class="warn">💡 Bank của HĐ này là <b>Agribank</b> — KHÁC ngân hàng mặc định (Vietinbank). Vì vậy khi Kiểm tra nhập bank này, HĐ sẽ <b>tự bị gắn cờ "lạ"</b> → dùng luôn để test bài ③.</div>
 
-  <div class="card" style="margin-top:12px">
-    <div class="step"><div class="n n1">4</div><div class="b"><h3>Bấm "Tạo phụ lục (.docx)"</h3>
-      <p>Máy tải về 1 file Word. Mở ra kiểm tra.</p></div></div>
-  </div>
-
-  <div class="ok">✔ <b>Đạt khi:</b> file Word có <b>logo + khung + chữ ký</b> giống mẫu thật; tiêu đề <i>"TO CHANGE THE CONTRACT NUMBER from HA20260053 to HA20260053/ PH"</i>; phần Buyer + 4 điều khoản đúng. So với bản đã ký <code>SIGNED ANNEX CONTRACT HA20260053 PH.pdf</code> → khớp.</div>
-
-  <a class="btn" href="/mau-phu-luc-test.docx">⬇ Tải bản phụ lục MẪU (kỳ vọng) để đối chiếu</a>
-
-  <div class="warn">💡 <b>Lưu ý:</b> "Registration No." và "Managing Director" hiện chưa lưu ở hồ sơ khách nên phải gõ tay. Nếu hay dùng, báo để lưu vào hồ sơ khách cho tự điền. Bản v1 mới làm loại <b>đổi số HĐ</b>; các loại đổi lượng/giá/thời gian giao sẽ thêm sau.</div>
-
-  <!-- ====================== TEST 2: HĐ LẠ ====================== -->
-  <h2>② <span>Đèn báo "HĐ lạ" + 2 làn duyệt</span> <span class="pill p-amber">Nấc 4</span></h2>
-  <p style="margin:4px 0 0;color:#374151">Mục tiêu: HĐ "khác chuẩn" tự gắn cờ đỏ; Kiểm tra thấy ngay; và <b>không ký được</b> tới khi Trung/Huy duyệt điểm lạ.</p>
-
-  <div class="data">
-    <b>HĐ bị coi là "lạ" khi có 1 trong các dấu hiệu:</b>
-    <ul>
-      <li>Có <b>điều khoản gõ tay thêm</b> (Other Conditions).</li>
-      <li><b>Ngân hàng nhận tiền khác mặc định</b> (mặc định: Vietinbank Huế).</li>
-      <li><b>Thanh toán khác chuẩn</b> (không phải LC/TT/CAD… quen thuộc).</li>
-      <li>File HĐ upload bị <b>lỗi tự điền</b>.</li>
-    </ul>
-  </div>
-
+  <!-- ============ BÀI 1: TẠO ĐƠN + TẠO HĐ ============ -->
+  <h2>① Tạo đơn + Tạo HĐ tự điền <span class="pill p-green">Nấc 1</span></h2>
   <div class="card">
-    <div class="step"><div class="n n4">1</div><div class="b"><h3>Tạo / gửi 1 HĐ có dấu hiệu lạ</h3>
-      <p>Sale lên 1 HĐ test và cố tình cho 1 dấu hiệu lạ — dễ nhất: thêm <b>điều khoản gõ tay</b> hoặc để <b>thanh toán lạ</b> (xem bộ số dưới).</p></div></div>
-    <div class="step"><div class="n n4">2</div><div class="b"><h3>Kiểm tra (Phú/Yến) mở hàng đợi duyệt</h3>
-      <p>Vào <code>/sales/contracts/review</code>. HĐ lạ có <span class="tag-red">⚠ HĐ LẠ</span> đỏ ở cột Số HĐ, mở ra có ô vàng liệt kê lý do. Nếu cho bank <b>khác mặc định</b> khi duyệt → cờ đỏ bật sau khi bấm Duyệt.</p></div></div>
-    <div class="step"><div class="n n4">3</div><div class="b"><h3>Trung / Huy mở hàng đợi Ký</h3>
-      <p>Vào <code>/sales/contracts/sign</code>, mở HĐ lạ → có <b>banner đỏ</b> "⚠ HĐ LẠ" + lý do.</p></div></div>
-    <div class="step"><div class="n n4">4</div><div class="b"><h3>Thử KÝ khi chưa duyệt → bị chặn</h3>
-      <p>Bấm thẳng "Đánh dấu FINAL" mà chưa "Xác nhận sẵn sàng ký" → báo lỗi <i>"cần Duyệt HĐ lạ trước khi ký"</i>.</p></div></div>
+    <div class="step"><div class="n n1">1</div><div class="b"><h3>Tạo đơn hàng test</h3>
+      <p>Bấm <b>+ Tạo đơn hàng</b> → nhập theo bảng trên (khách Philippine Rubber, SVR 3L, 80.64 tấn, 2,365, FOB). Lưu. <b>Ghi nhớ mã đơn</b>.</p></div></div>
+    <div class="step"><div class="n n1">2</div><div class="b"><h3>Mở tab Hợp đồng → "Tạo hợp đồng tự động"</h3>
+      <p>Máy điền sẵn số HĐ, khách, grade, số lượng, tiền (đổi chữ), CIF/FOB. Tải file Word về.</p></div></div>
+  </div>
+  <div class="ok">✔ <b>Đạt khi:</b> file HĐ tự điền có số liệu khớp bảng (80.64 tấn × 2,365 = 190,713.60 USD), chọn đúng mẫu FOB.</div>
+
+  <!-- ============ BÀI 2: PHỤ LỤC ============ -->
+  <h2>② Tạo phụ lục (Annex) <span class="pill p-green">Nấc 2</span></h2>
+  <div class="card">
+    <div class="step"><div class="n n2">1</div><div class="b"><h3>Tab Hợp đồng → "Tạo phụ lục"</h3>
+      <p>Form điền sẵn từ đơn. Sửa cho khớp mẫu thật:</p></div></div>
+  </div>
+  <table>
+    <tr><th>Ô</th><td>Giá trị</td></tr>
+    <tr><th>Loại phụ lục</th><td><b>Đổi số hợp đồng</b></td></tr>
+    <tr><th>Số HĐ gốc / Ngày</th><td>HA20260053 / 11 May 2026</td></tr>
+    <tr><th>Số HĐ MỚI</th><td><b>HA20260053/ PH</b></td></tr>
+    <tr><th>Ngày phụ lục</th><td>1st June 2026</td></tr>
+    <tr><th>AC.n</th><td>1</td></tr>
+    <tr><th>Buyer / Reg / MD</th><td>(điền sẵn từ bảng trên)</td></tr>
+  </table>
+  <div class="ok">✔ <b>Đạt khi:</b> file phụ lục có logo + khung + chữ ký giống mẫu thật; tiêu đề "TO CHANGE THE CONTRACT NUMBER from HA20260053 to HA20260053/ PH".</div>
+  <a class="btn" href="/mau-phu-luc-test.docx">⬇ Tải phụ lục MẪU (kỳ vọng) để đối chiếu</a>
+
+  <!-- ============ BÀI 3: HĐ LẠ ============ -->
+  <h2>③ Đèn báo "HĐ lạ" + 2 làn duyệt <span class="pill p-amber">Nấc 4</span></h2>
+  <p style="margin:4px 0 0;color:#374151">Tận dụng chính HĐ trên: bank Agribank ≠ mặc định → sẽ bị gắn cờ.</p>
+  <div class="card">
+    <div class="step"><div class="n n4">1</div><div class="b"><h3>(Sale) Gửi HĐ đi duyệt</h3>
+      <p>Ở tab Hợp đồng, trình HĐ cho Kiểm tra (như quy trình thường). Mẹo cho chắc bị gắn cờ: thêm 1 <b>điều khoản gõ tay</b> (vd "Buyer to inspect at loading port").</p></div></div>
+    <div class="step"><div class="n n4">2</div><div class="b"><h3>(Phú/Yến) Mở hàng đợi duyệt</h3>
+      <p>Vào <code>/sales/contracts/review</code>. Nhập <b>bank Agribank</b> (TK 4000201014000, SWIFT VBAAVNVX540) → Duyệt. Quan sát: HĐ có <span class="tag-red">⚠ HĐ LẠ</span> đỏ + ô vàng ghi lý do (bank khác mặc định / điều khoản thêm).</p></div></div>
+    <div class="step"><div class="n n4">3</div><div class="b"><h3>(Trung/Huy) Mở hàng đợi Ký</h3>
+      <p>Vào <code>/sales/contracts/sign</code>, mở HĐ → có <b>banner đỏ "⚠ HĐ LẠ"</b> + lý do.</p></div></div>
+    <div class="step"><div class="n n4">4</div><div class="b"><h3>Thử ký khi chưa duyệt → bị chặn</h3>
+      <p>Bấm "Đánh dấu FINAL" mà chưa "Xác nhận sẵn sàng ký" → báo lỗi <i>"cần Duyệt HĐ lạ trước khi ký"</i>.</p></div></div>
     <div class="step"><div class="n n4">5</div><div class="b"><h3>Bấm "Duyệt HĐ lạ & xác nhận"</h3>
-      <p>Nút xác nhận (đỏ) → ghi nhận đã duyệt làn 2 → giờ mới ký FINAL được.</p></div></div>
+      <p>Nút đỏ → ghi nhận đã duyệt làn 2 → giờ mới ký FINAL được.</p></div></div>
   </div>
+  <div class="ok">✔ <b>Đạt khi:</b> HĐ chuẩn → không cờ, đi như cũ; HĐ này (bank lạ) → cờ đỏ + <b>chặn ký</b> tới khi Trung/Huy duyệt.</div>
 
-  <div class="data">
-    <b>Bộ số mẫu cho HĐ "lạ":</b>
-    <ul>
-      <li><b>Điều khoản thêm</b>: <i>"Buyer has the right to inspect goods at loading port before shipment."</i></li>
-      <li><b>Ngân hàng</b> (Kiểm tra nhập khi duyệt): chọn <i>Agribank</i> (khác Vietinbank mặc định).</li>
-      <li><b>Thanh toán</b>: <i>"50% deposit, 50% on copy of B/L"</i> (khác chuẩn).</li>
-    </ul>
-  </div>
-
-  <div class="ok">✔ <b>Đạt khi:</b> HĐ chuẩn → không cờ, đi như cũ. HĐ lạ → cờ đỏ ở Kiểm tra + banner đỏ ở Ký + <b>chặn ký</b> tới khi Trung/Huy bấm duyệt.</div>
-
-  <!-- ====================== DỌN ====================== -->
-  <h2>🧹 Dọn dữ liệu test</h2>
+  <!-- ============ DỌN ============ -->
+  <h2>🧹 Xóa dữ liệu test</h2>
   <div class="card">
-    <p style="margin:0">Phần ① chỉ tải file Word — <b>không tạo dữ liệu</b>, không cần dọn.</p>
-    <p style="margin:8px 0 0">Phần ② nếu tạo HĐ test thật → báo IT xóa HĐ test (có sẵn lệnh xóa). Đừng để lẫn với HĐ thật.</p>
+    <div class="step"><div class="n n0">1</div><div class="b"><h3>Phụ lục/HĐ tải về</h3><p>Chỉ là file Word trên máy bạn — xóa file là xong, không đụng hệ thống.</p></div></div>
+    <div class="step"><div class="n n0">2</div><div class="b"><h3>Đơn test + HĐ workflow</h3><p>Nhớ <b>mã đơn test</b> đã ghi → báo IT xóa hẳn (có lệnh xóa đơn sẵn), hoặc mở đơn → <b>Hành động → Hủy</b>. Đừng để lẫn với đơn thật.</p></div></div>
   </div>
 
-  <div class="foot">Cao su Huy Anh · Đơn hàng bán — hướng dẫn test Nấc 2 + Nấc 4.</div>
+  <div class="foot">Cao su Huy Anh · Đơn hàng bán — test E2E bằng HĐ thật HA20260053.</div>
 </div>
 </body>
 </html>

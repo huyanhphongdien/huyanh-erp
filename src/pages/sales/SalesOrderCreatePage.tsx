@@ -888,6 +888,14 @@ function SalesOrderCreatePage() {
             ContractReviewPage (backward compat). */}
         <Card size="small" style={{ marginTop: 12, borderRadius: 12 }}>
           <Space direction="vertical" style={{ width: '100%' }} size={8}>
+            <Alert
+              type="success"
+              showIcon
+              style={{ borderRadius: 8, fontSize: 12 }}
+              message="Điền form bên trái → chọn 1 trong 2 cách ra hợp đồng"
+              description="Hợp đồng tự hiện ở khung xem trước. Chưa xong thì bấm “Lưu nháp đơn” để lưu lại, làm tiếp sau."
+            />
+
             <Button
               type="default"
               icon={<SaveOutlined />}
@@ -899,8 +907,30 @@ function SalesOrderCreatePage() {
             >
               Lưu nháp đơn (chưa trình HĐ)
             </Button>
+
+            {/* ── CÁCH 1: máy tự điền HĐ (Nấc 1) ── */}
             <Divider style={{ margin: '4px 0' }}>
-              <Tag color="purple" style={{ fontSize: 11 }}>📎 Trình HĐ Workflow</Tag>
+              <Tag color="green" style={{ fontSize: 11 }}>✅ Cách 1 — Máy tự tạo HĐ</Tag>
+            </Divider>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              block
+              size="large"
+              loading={docLoading === 'BOTH'}
+              onClick={() => handleDownloadDoc('BOTH')}
+              style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
+            >
+              Tải HĐ máy điền sẵn (SC + PI)
+            </Button>
+            <div style={{ fontSize: 11, color: '#8c8c8c', textAlign: 'center', lineHeight: 1.5 }}>
+              Máy lấy số liệu form điền vào mẫu Word — <b>bạn không phải tự gõ</b>. Mở file ra xem/sửa/in.
+              <br />Số HĐ + ngân hàng do Phú LV điền khi duyệt.
+            </div>
+
+            {/* ── CÁCH 2: nộp Word vào hệ thống để duyệt + ký ── */}
+            <Divider style={{ margin: '4px 0' }}>
+              <Tag color="purple" style={{ fontSize: 11 }}>📎 Cách 2 — Nộp HĐ để duyệt + ký</Tag>
             </Divider>
             <UploadFlowAction
               contractNoHint={contractData.contract_no}
@@ -1153,17 +1183,14 @@ function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded 
         type="info"
         showIcon
         style={{ borderRadius: 6, fontSize: 12 }}
-        message="Hướng dẫn"
+        message="3 bước nộp HĐ vào hệ thống"
         description={
-          <div style={{ fontSize: 11, lineHeight: 1.6 }}>
-            <strong>Bước 1:</strong> Mở template Word có sẵn placeholder{' '}
-            <code>{`{{contract_no}}`}</code> + 5 token bank → custom buyer/grade/qty per HĐ → save
+          <div style={{ fontSize: 11.5, lineHeight: 1.7 }}>
+            <strong>Bước 1:</strong> Đã có file Word HĐ — <b>bản "Cách 1" máy điền sẵn</b> ở trên, hoặc file bạn tự soạn.
             <br />
-            <strong>Bước 2:</strong> Kéo thả {MAX_FILES} file .docx tối đa (HĐ chính + phụ lục + packing list…)
+            <strong>Bước 2:</strong> Kéo thả file <code>.docx</code> vào ô dưới (tối đa {MAX_FILES} file: HĐ chính + phụ lục + packing list…).
             <br />
-            <strong>Bước 3:</strong> Bấm Trình kiểm tra — Phú LV gõ Số HĐ + chọn Bank → 🪄 <strong>Auto-fill</strong> → Duyệt
-            <br />
-            <em style={{ color: '#8c8c8c' }}>Docs chưa có template token? Xem hướng dẫn ở docs/HUONG_DAN_DOCS_TEMPLATE_HOP_DONG.docx</em>
+            <strong>Bước 3:</strong> Bấm <b>“Upload + Trình Kiểm tra”</b> → Phú LV điền Số HĐ + Ngân hàng → duyệt → Trung/Huy ký.
           </div>
         }
       />

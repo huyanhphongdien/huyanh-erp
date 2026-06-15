@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase';
 // Khi `true`: mọi recipient bị OVERRIDE → minhld@. Subject prefix [TEST → orig@]
 // Khi test xong: đổi `false` → restore behavior bình thường.
 // ----------------------------------------------------------------------------
-const TEST_MODE_REDIRECT_TO_MINH = true;
+const TEST_MODE_REDIRECT_TO_MINH = false;
 const TEST_MODE_EMAIL = 'minhld@huyanhrubber.com';
 
 // ============================================================================

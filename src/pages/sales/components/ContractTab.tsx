@@ -17,8 +17,10 @@ import {
   Space,
   message,
   AutoComplete,
+  Modal,
+  Alert,
 } from 'antd'
-import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { EditOutlined, SaveOutlined, CloseOutlined, LockOutlined, PlusOutlined, DeleteOutlined, FileWordOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { supabase } from '../../../lib/supabase'
@@ -39,6 +41,9 @@ import ContractFileSection from './ContractFileSection'
 import ContractWorkflowSection from './ContractWorkflowSection'
 import DraftContractPreview from './DraftContractPreview'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
+import {
+  generateAnnexDocx, downloadAnnex, formatAnnexDate, ANNEX_TYPE_LABELS, type AnnexType,
+} from '../../../services/sales/contractAnnexService'
 
 type EditItem = {
   id?: string
@@ -85,6 +90,58 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
   const [saving, setSaving] = useState(false)
   const [editItems, setEditItems] = useState<EditItem[]>([])
   const [form] = Form.useForm()
+
+  // ── Nấc 2: Tạo phụ lục (Annex) ──
+  const [annexOpen, setAnnexOpen] = useState(false)
+  const [annexGenerating, setAnnexGenerating] = useState(false)
+  const [annexForm] = Form.useForm()
+
+  const fmtEnDate = (d?: string | null) =>
+    d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : ''
+
+  const openAnnex = () => {
+    const origNo = order.contract_no || order.code
+    annexForm.setFieldsValue({
+      type: 'contract_no' as AnnexType,
+      annex_date: formatAnnexDate(),
+      seq: 1,
+      orig_contract_no: origNo,
+      orig_contract_date: fmtEnDate(order.contract_date),
+      buyer_name: order.customer?.name || '',
+      buyer_address: (order.customer as { address?: string } | undefined)?.address || '',
+      buyer_registration: '',
+      buyer_md: '',
+      new_contract_no: `${origNo}/ `,
+    })
+    setAnnexOpen(true)
+  }
+
+  const handleGenerateAnnex = async () => {
+    try {
+      const v = await annexForm.validateFields()
+      setAnnexGenerating(true)
+      const blob = await generateAnnexDocx({
+        type: v.type,
+        origContractNo: (v.orig_contract_no || '').trim(),
+        origContractDate: (v.orig_contract_date || '').trim(),
+        buyerName: v.buyer_name,
+        buyerAddress: v.buyer_address,
+        buyerRegistration: v.buyer_registration,
+        buyerMd: v.buyer_md,
+        annexDate: (v.annex_date || '').trim(),
+        seq: Number(v.seq) || 1,
+        newContractNo: (v.new_contract_no || '').trim(),
+      })
+      downloadAnnex(blob, `ANNEX ${(v.new_contract_no || order.contract_no || '').trim()}_AC${v.seq}`)
+      message.success('Đã tạo phụ lục .docx — tải Word về kiểm + ký')
+      setAnnexOpen(false)
+    } catch (e: unknown) {
+      if ((e as { errorFields?: unknown }).errorFields) return
+      message.error('Tạo phụ lục thất bại: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setAnnexGenerating(false)
+    }
+  }
 
   // Cut-over (phương án A): detect đơn này dùng workflow mới hay HĐ cũ.
   // - hasWorkflow=true (có row trong sales_order_contracts) → render ContractWorkflowSection
@@ -547,6 +604,9 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
         <OrderActionButtons order={order} salesRole={salesRole} onSaved={onSaved} tab="contract" size="small" />
         <div style={{ display: 'flex', gap: 8 }}>
+          <Button size="small" icon={<FileWordOutlined />} onClick={openAnnex}>
+            Tạo phụ lục
+          </Button>
           {canEdit ? (
             <Button
               type="primary"
@@ -566,6 +626,70 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
             <Tag icon={<LockOutlined />} color="default">Đã khóa</Tag>
           ) : null}
         </div>
+      {/* ── Nấc 2: Modal Tạo phụ lục (Annex) ── */}
+      <Modal
+        title="Tạo phụ lục hợp đồng (Annex)"
+        open={annexOpen}
+        onCancel={() => setAnnexOpen(false)}
+        onOk={handleGenerateAnnex}
+        okText="Tạo phụ lục (.docx)"
+        cancelText="Hủy"
+        confirmLoading={annexGenerating}
+        okButtonProps={{ icon: <FileWordOutlined />, style: { background: '#1B4D3E', borderColor: '#1B4D3E' } }}
+        width={620}
+        destroyOnClose
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Phụ lục giữ đúng mẫu thật (letterhead + chữ ký)."
+          description="Máy điền sẵn từ HĐ gốc. Tải Word về → in → ký + đóng dấu (như HĐ chính)."
+        />
+        <Form form={annexForm} layout="vertical" size="small">
+          <Form.Item name="type" label="Loại phụ lục" rules={[{ required: true }]}>
+            <Select options={Object.entries(ANNEX_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
+          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Form.Item name="orig_contract_no" label="Số HĐ gốc" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="orig_contract_date" label="Ngày HĐ gốc (EN)" tooltip="vd: 11 May 2026">
+              <Input placeholder="11 May 2026" />
+            </Form.Item>
+          </div>
+          <Form.Item
+            name="new_contract_no"
+            label="Số HĐ MỚI (sau khi đổi)"
+            rules={[{ required: true, message: 'Nhập số HĐ mới' }]}
+            tooltip="vd: HA20260053/ PH"
+          >
+            <Input placeholder="HA20260053/ PH" />
+          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Form.Item name="annex_date" label="Ngày phụ lục (EN)" rules={[{ required: true }]}>
+              <Input placeholder="1st June 2026" />
+            </Form.Item>
+            <Form.Item name="seq" label="Số thứ tự (AC.n)" rules={[{ required: true }]}>
+              <InputNumber min={1} style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
+          <Form.Item name="buyer_name" label="Khách hàng (Buyer)" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="buyer_address" label="Địa chỉ Buyer (EN)">
+            <Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} />
+          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Form.Item name="buyer_registration" label="Registration No. (nếu có)">
+              <Input placeholder="2025050202017-02" />
+            </Form.Item>
+            <Form.Item name="buyer_md" label="Managing Director (nếu có)">
+              <Input placeholder="GABRIEL E IGOT" />
+            </Form.Item>
+          </div>
+        </Form>
+      </Modal>
       </div>
 
       {/* ═══ Section: Hợp đồng ═══

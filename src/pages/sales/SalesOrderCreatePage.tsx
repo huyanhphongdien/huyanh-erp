@@ -890,11 +890,16 @@ function SalesOrderCreatePage() {
               type="success"
               showIcon
               style={{ borderRadius: 8, fontSize: 12 }}
-              message="2 bước: ① Tạo đơn hàng → ② Ra hợp đồng"
-              description="Điền form bên trái (hợp đồng tự hiện ở khung xem trước) → bấm “Tạo đơn hàng” để lưu. Sau đó ra hợp đồng bằng Cách 1 hoặc Cách 2 bên dưới."
+              message="Làm hợp đồng — 3 bước nối tiếp"
+              description={
+                <div style={{ fontSize: 12, lineHeight: 1.7 }}>
+                  <b>①</b> Tạo đơn hàng (lưu) → <b>②</b> Lấy file Word HĐ → <b>③</b> Nộp để Phú duyệt + Trung/Huy ký.
+                  <br /><span style={{ color: '#52803f' }}>Làm <b>lần lượt từ trên xuống</b> — không phải chọn 1 trong 2.</span>
+                </div>
+              }
             />
 
-            {/* ── BƯỚC 1: tạo (lưu) đơn hàng ── */}
+            {/* ── BƯỚC ① tạo (lưu) đơn hàng ── */}
             <Divider style={{ margin: '4px 0' }}>
               <Tag color="green" style={{ fontSize: 11 }}>① Tạo đơn hàng</Tag>
             </Divider>
@@ -911,12 +916,12 @@ function SalesOrderCreatePage() {
               Tạo đơn hàng
             </Button>
             <div style={{ fontSize: 11, color: '#8c8c8c', textAlign: 'center' }}>
-              Lưu đơn ở dạng nháp (chưa trình hợp đồng). Lưu xong vẫn sửa + ra HĐ được.
+              Lưu đơn (dạng nháp). Lưu xong vẫn sửa được. Xong bước này → xuống ②.
             </div>
 
-            {/* ── BƯỚC 2 · Cách 1: máy tự điền HĐ (Nấc 1) ── */}
+            {/* ── BƯỚC ② lấy file Word HĐ (máy điền — Nấc 1) ── */}
             <Divider style={{ margin: '4px 0' }}>
-              <Tag color="blue" style={{ fontSize: 11 }}>② Ra HĐ · Cách 1 — Máy tự điền</Tag>
+              <Tag color="blue" style={{ fontSize: 11 }}>② Lấy file Word HĐ</Tag>
             </Divider>
             <Button
               type="default"
@@ -929,13 +934,13 @@ function SalesOrderCreatePage() {
               Tải HĐ máy điền sẵn (SC + PI)
             </Button>
             <div style={{ fontSize: 11, color: '#8c8c8c', textAlign: 'center', lineHeight: 1.5 }}>
-              Máy lấy số liệu form điền vào mẫu Word — <b>bạn không phải tự gõ</b>. Mở file ra xem/sửa/in.
-              <br />Số HĐ + ngân hàng do Phú LV điền khi duyệt.
+              Máy lấy số liệu form điền vào mẫu Word — <b>bạn không phải tự gõ</b>. Mở file xem/sửa/in.
+              <br />(Hoặc dùng file Word bạn tự soạn.) <b>Rồi nộp file này ở bước ③ ngay dưới.</b>
             </div>
 
-            {/* ── CÁCH 2: nộp Word vào hệ thống để duyệt + ký ── */}
+            {/* ── BƯỚC ③ nộp Word vào hệ thống để duyệt + ký ── */}
             <Divider style={{ margin: '4px 0' }}>
-              <Tag color="purple" style={{ fontSize: 11 }}>② Ra HĐ · Cách 2 — Nộp để duyệt + ký</Tag>
+              <Tag color="purple" style={{ fontSize: 11 }}>③ Nộp HĐ để duyệt + ký</Tag>
             </Divider>
             <UploadFlowAction
               contractNoHint={contractData.contract_no}
@@ -1188,14 +1193,12 @@ function UploadFlowAction({ contractNoHint, loading, onBeforeSubmit, onUploaded 
         type="info"
         showIcon
         style={{ borderRadius: 6, fontSize: 12 }}
-        message="3 bước nộp HĐ vào hệ thống"
+        message="Nộp file Word vào hệ thống"
         description={
           <div style={{ fontSize: 11.5, lineHeight: 1.7 }}>
-            <strong>Bước 1:</strong> Đã có file Word HĐ — <b>bản "Cách 1" máy điền sẵn</b> ở trên, hoặc file bạn tự soạn.
+            <b>a.</b> Kéo thả file <code>.docx</code> vào ô dưới — dùng <b>file ở bước ② (máy điền)</b> hoặc file bạn tự soạn. Được tối đa {MAX_FILES} file (HĐ chính + phụ lục + packing list…).
             <br />
-            <strong>Bước 2:</strong> Kéo thả file <code>.docx</code> vào ô dưới (tối đa {MAX_FILES} file: HĐ chính + phụ lục + packing list…).
-            <br />
-            <strong>Bước 3:</strong> Bấm <b>“Upload + Trình Kiểm tra”</b> → Phú LV điền Số HĐ + Ngân hàng → duyệt → Trung/Huy ký.
+            <b>b.</b> Bấm <b>“Upload + Trình Kiểm tra”</b> → Phú LV điền Số HĐ + Ngân hàng, duyệt → Trung/Huy ký.
           </div>
         }
       />

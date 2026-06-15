@@ -54,6 +54,8 @@ import {
   LinkOutlined,
   LoadingOutlined,
   DeleteOutlined,
+  SolutionOutlined,
+  MessageOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
@@ -62,12 +64,15 @@ import { salesProductionService } from '../../services/sales/salesProductionServ
 import { containerService } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
 import { LOT_STAGES, buildLotTrackRows, lotOverallStage, lotDeliveryStats } from '../../services/sales/lotTracking'
-import { getSalesRole, salesPermissions, getVisibleTabs } from '../../services/sales/salesPermissionService'
+import { getSalesRole, salesPermissions, getVisibleTabs, isTabEditable } from '../../services/sales/salesPermissionService'
 import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
 import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
 import StageOwnershipCard from './components/StageOwnershipCard'
 import HandoffTimeline from './components/HandoffTimeline'
+import ContractTab from './components/ContractTab'
+import SalesOrderChat from './components/SalesOrderChat'
+import OrderProgressDashboard from './components/OrderProgressDashboard'
 import { useAuthStore } from '../../stores/authStore'
 import type { ContainerSummary } from '../../services/sales/containerService'
 import type { NvlAvailability, ProductionProgress } from '../../services/sales/salesProductionService'
@@ -1703,53 +1708,22 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             ),
             children: renderInfoTab(),
           },
-          {
-            key: 'progress',
+          ...(visibleTabs.includes('contract') ? [{
+            key: 'contract',
             label: (
               <span>
-                🏉 Tiến độ
+                <SolutionOutlined /> Hợp đồng
               </span>
             ),
             children: (
-              <div style={{ padding: '8px 0' }}>
-                <StageOwnershipCard
-                  orderId={order.id}
-                  orderCode={order.code}
-                  currentStage={(order.current_stage as any) || 'sales'}
-                  currentOwnerId={order.current_owner_id || null}
-                  currentOwnerName={(order as any).current_owner?.full_name || null}
-                  stageStartedAt={order.stage_started_at || null}
-                  stageSlaHours={order.stage_sla_hours || null}
-                  onChanged={loadOrder}
-                />
-              </div>
-            ),
-          },
-          {
-            key: 'history',
-            label: (
-              <span>
-                🕒 Lịch sử
-              </span>
-            ),
-            children: (
-              <HandoffTimeline
-                orderId={order.id}
-                orderCode={order.code}
-                currentStage={(order.current_stage as any) || 'sales'}
-                stageStartedAt={order.stage_started_at || null}
+              <ContractTab
+                order={order}
+                salesRole={salesRole}
+                editable={!!salesRole && isTabEditable(salesRole, 'contract', order.status as SalesOrderStatus, !!order.is_locked)}
+                onSaved={loadOrder}
               />
             ),
-          },
-          {
-            key: 'quality',
-            label: (
-              <span>
-                <ExperimentOutlined /> Chất lượng
-              </span>
-            ),
-            children: renderQualityTab(),
-          },
+          }] : []),
           ...(visibleTabs.includes('production') ? [{
             key: 'production',
             label: (
@@ -1759,6 +1733,15 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             ),
             children: renderProductionTab(),
           }] : []),
+          {
+            key: 'quality',
+            label: (
+              <span>
+                <ExperimentOutlined /> Chất lượng
+              </span>
+            ),
+            children: renderQualityTab(),
+          },
           ...(visibleTabs.includes('packing') ? [{
             key: 'packing',
             label: (
@@ -1795,6 +1778,44 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             ),
             children: <FinanceTab order={order} readOnly={!salesRole || !salesPermissions.canEditFinance(salesRole)} onUpdate={loadOrder} />,
           }] : []),
+          {
+            key: 'progress',
+            label: (
+              <span>
+                🏉 Tiến độ
+              </span>
+            ),
+            children: (
+              <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <OrderProgressDashboard order={order} onChanged={loadOrder} onNavigateTab={handleTabChange} />
+                <StageOwnershipCard
+                  orderId={order.id}
+                  orderCode={order.code}
+                  currentStage={(order.current_stage as any) || 'sales'}
+                  currentOwnerId={order.current_owner_id || null}
+                  currentOwnerName={(order as any).current_owner?.full_name || null}
+                  stageStartedAt={order.stage_started_at || null}
+                  stageSlaHours={order.stage_sla_hours || null}
+                  onChanged={loadOrder}
+                />
+                <HandoffTimeline
+                  orderId={order.id}
+                  orderCode={order.code}
+                  currentStage={(order.current_stage as any) || 'sales'}
+                  stageStartedAt={order.stage_started_at || null}
+                />
+              </div>
+            ),
+          },
+          {
+            key: 'chat',
+            label: (
+              <span>
+                <MessageOutlined /> Trao đổi
+              </span>
+            ),
+            children: <SalesOrderChat salesOrderId={order.id} />,
+          },
         ]}
       />
 

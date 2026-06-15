@@ -475,7 +475,7 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
               💡 Gõ <b>@</b> chọn từ dropdown · <b>Enter</b> gửi · <b>Shift+Enter</b> xuống dòng
               {Object.keys(pickedMentions).length > 0 && (
                 <span style={{ marginLeft: 8, color: PRIMARY }}>
-                  · Đã mention: {Object.values(pickedMentions).map((m) => m.full_name).join(', ')} (sẽ thông báo ERP)
+                  · Đã mention: {Object.values(pickedMentions).map((m) => m.full_name).join(', ')} (báo chuông ERP + email)
                 </span>
               )}
             </span>

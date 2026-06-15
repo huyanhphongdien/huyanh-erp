@@ -516,6 +516,41 @@ export async function sendNotificationEmail(input: SendEmailInput): Promise<{ su
   }
 }
 
+/**
+ * Gửi 1 email HTML tùy ý (subject + body tự build sẵn).
+ * Dùng cho các thông báo KHÔNG theo template task (vd: mention trong chat đơn hàng).
+ * Vẫn tôn trọng TEST_MODE_REDIRECT_TO_MINH như sendNotificationEmail.
+ */
+export async function sendSimpleEmail(params: {
+  to: string;
+  toName?: string;
+  subject: string;
+  html: string;
+}): Promise<{ success: boolean; error: Error | null }> {
+  try {
+    if (!params.to) throw new Error('Thiếu địa chỉ người nhận');
+
+    let actualTo = params.to;
+    let actualSubject = params.subject;
+    if (TEST_MODE_REDIRECT_TO_MINH && params.to.toLowerCase() !== TEST_MODE_EMAIL) {
+      actualTo = TEST_MODE_EMAIL;
+      actualSubject = `[TEST → ${params.to}] ${params.subject}`;
+      console.log(`📧 [emailService TEST_MODE] redirect "${params.to}" → ${actualTo}`);
+    }
+
+    const { error } = await supabase.functions.invoke('send-email', {
+      body: { to: actualTo, subject: actualSubject, body: params.html },
+    });
+    if (error) throw error;
+
+    console.log('✅ [emailService] sendSimpleEmail sent to:', actualTo);
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('❌ [emailService] sendSimpleEmail error:', error);
+    return { success: false, error: error as Error };
+  }
+}
+
 // ============================================================================
 // NOTIFICATION TRIGGERS
 // ============================================================================
@@ -843,6 +878,7 @@ export async function notifyDeadlineReminder(
 
 export const emailService = {
   sendNotificationEmail,
+  sendSimpleEmail,
   notifyTaskAssigned,
   notifyTaskCompletedReminder,
   notifySelfEvaluationSubmitted,

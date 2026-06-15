@@ -9,7 +9,54 @@
 import { supabase } from '../../lib/supabase'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createNotification } from '../notificationService'
+import { sendSimpleEmail } from '../emailService'
 import { SALES_PARTICIPANT_EMAILS } from './salesPermissionService'
+
+const APP_URL = 'https://huyanhrubber.vn'
+
+/** Escape HTML để chèn nội dung tin nhắn an toàn vào email. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/** Build email HTML báo "bạn được nhắc trong đơn". */
+function buildMentionEmailHtml(p: {
+  recipientName: string
+  senderName: string
+  orderRef: string
+  excerpt: string
+  link: string
+}): string {
+  return `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;">
+    <div style="background:linear-gradient(135deg,#1B4D3E,#2D8B6E);padding:20px 28px;border-radius:12px 12px 0 0;">
+      <h2 style="color:#fff;margin:0;font-size:18px;">💬 Bạn được nhắc trong trao đổi đơn hàng</h2>
+    </div>
+    <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px 28px;">
+      <p style="color:#374151;font-size:14px;margin:0 0 16px;">
+        Kính gửi <strong>${escapeHtml(p.recipientName || 'bạn')}</strong>,
+      </p>
+      <p style="color:#374151;font-size:14px;margin:0 0 16px;">
+        <strong>${escapeHtml(p.senderName)}</strong> vừa nhắc (@mention) bạn trong phần trao đổi của đơn hàng
+        <strong style="color:#1B4D3E;">${escapeHtml(p.orderRef)}</strong>:
+      </p>
+      <div style="background:#f8f9fa;border-left:4px solid #1B4D3E;padding:14px 16px;border-radius:6px;margin:0 0 20px;color:#374151;font-size:14px;font-style:italic;">
+        "${escapeHtml(p.excerpt)}"
+      </div>
+      <a href="${p.link}" style="display:inline-block;background:#1B4D3E;color:#fff;padding:12px 26px;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">
+        Mở trao đổi đơn hàng
+      </a>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 14px;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">
+        Email tự động từ hệ thống Huy Anh ERP — bạn nhận vì được nhắc tên trong đơn hàng.
+      </p>
+    </div>
+  </div>`
+}
 
 export type MessageType = 'user' | 'system' | 'event'
 export type MessageAuthorRole =
@@ -142,7 +189,7 @@ export const salesOrderMessageService = {
       .single()
     if (error) throw error
 
-    // ─── Notify mỗi người được mention (chuông góc trên ERP) ───
+    // ─── Thông báo cho mỗi người được mention ───
     if (mentionedIds.length > 0) {
       const { data: order } = await supabase
         .from('sales_orders')
@@ -151,9 +198,11 @@ export const salesOrderMessageService = {
         .maybeSingle()
       const orderRef = order?.contract_no || order?.code || params.salesOrderId.slice(0, 8)
       const senderName = me.full_name || me.email || 'Một ai đó'
-      const excerpt = params.content.trim().slice(0, 120)
+      const fullText = params.content.trim()
+      const excerpt = fullText.slice(0, 120)
+      const chatLink = `/sales/orders/${params.salesOrderId}?tab=chat`
 
-      // Gửi song song (không await để không block reply)
+      // 1) Chuông ERP (góc trên) — gửi song song, không block reply
       void Promise.all(
         mentionedIds.map((recipientId) =>
           createNotification({
@@ -165,7 +214,7 @@ export const salesOrderMessageService = {
             message: excerpt,
             reference_id: params.salesOrderId,
             reference_type: 'sales_order_chat',
-            reference_url: `/sales/orders/${params.salesOrderId}?tab=chat`,
+            reference_url: chatLink,
             priority: 'normal',
             metadata: {
               chat_message_id: data.id,
@@ -174,6 +223,29 @@ export const salesOrderMessageService = {
           }),
         ),
       ).catch((e) => console.error('Notification gửi thất bại:', e))
+
+      // 2) Email cho người được mention — lấy email từ employees rồi gửi qua send-email
+      void (async () => {
+        const { data: recipients } = await supabase
+          .from('employees')
+          .select('id, full_name, email')
+          .in('id', mentionedIds)
+        for (const r of recipients || []) {
+          if (!r?.email) continue
+          await sendSimpleEmail({
+            to: r.email,
+            toName: r.full_name || undefined,
+            subject: `💬 ${senderName} nhắc bạn trong đơn ${orderRef}`,
+            html: buildMentionEmailHtml({
+              recipientName: r.full_name || '',
+              senderName,
+              orderRef,
+              excerpt: fullText.slice(0, 500),
+              link: `${APP_URL}${chatLink}`,
+            }),
+          })
+        }
+      })().catch((e) => console.error('Email mention gửi thất bại:', e))
     }
 
     return data as SalesOrderMessage

@@ -12,14 +12,9 @@ import {
   Tag,
   Button,
   Space,
-  Table,
   Progress,
   Steps,
   DatePicker,
-  InputNumber,
-  Input,
-  Form,
-  Popconfirm,
   Descriptions,
   Spin,
   Empty,
@@ -28,45 +23,20 @@ import {
   message,
 } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import type { ColumnsType } from 'antd/es/table'
 import {
-  PlusOutlined,
   SaveOutlined,
   CheckCircleOutlined,
   LinkOutlined,
-  DeleteOutlined,
-  EditOutlined,
   ThunderboltOutlined,
   ArrowRightOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { salesProductionService, type ProductionProgress } from '../../../services/sales/salesProductionService'
-import { containerService } from '../../../services/sales/containerService'
-import type { ContainerSummary } from '../../../services/sales/containerService'
-import type { SalesOrder, SalesOrderContainer, ContainerStatus } from '../../../services/sales/salesTypes'
-import { CONTAINER_TYPE_LABELS } from '../../../services/sales/salesTypes'
+import type { SalesOrder } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
 import StockPickerSection from './StockPickerSection'
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const CONTAINER_STATUS_LABELS: Record<string, string> = {
-  planning: 'Lên kế hoạch',
-  packing: 'Đang đóng',
-  sealed: 'Đã seal',
-  shipped: 'Đã xuất',
-}
-
-const CONTAINER_STATUS_COLORS: Record<string, string> = {
-  planning: 'default',
-  packing: 'processing',
-  sealed: 'success',
-  shipped: 'blue',
-}
 
 // ============================================================================
 // TYPES
@@ -87,16 +57,10 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
   const navigate = useNavigate()
   const [productionProgress, setProductionProgress] = useState<ProductionProgress | null>(null)
   const [progressLoading, setProgressLoading] = useState(false)
-  const [containers, setContainers] = useState<SalesOrderContainer[]>([])
-  const [containerSummary, setContainerSummary] = useState<ContainerSummary | null>(null)
-  const [containersLoading, setContainersLoading] = useState(false)
   const [readyDate, setReadyDate] = useState<dayjs.Dayjs | null>(
     order.ready_date ? dayjs(order.ready_date) : null,
   )
   const [savingReadyDate, setSavingReadyDate] = useState(false)
-  const [addingContainer, setAddingContainer] = useState(false)
-  const [editingContainerId, setEditingContainerId] = useState<string | null>(null)
-  const [form] = Form.useForm()
 
   const canEdit = editable && (salesRole === 'production' || salesRole === 'admin')
 
@@ -114,45 +78,9 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
     }
   }, [order.id, order.production_order_id])
 
-  // ── Load containers ──
-  const loadContainers = useCallback(async () => {
-    setContainersLoading(true)
-    try {
-      const [ctrs, summary] = await Promise.all([
-        containerService.getContainers(order.id),
-        containerService.getContainerSummary(order.id),
-      ])
-      setContainers(ctrs)
-      setContainerSummary(summary)
-    } catch {
-      // silent
-    } finally {
-      setContainersLoading(false)
-    }
-  }, [order.id])
-
   useEffect(() => {
     loadProgress()
-    loadContainers()
-  }, [loadProgress, loadContainers])
-
-  // Auto-fill Bành + KL inline form = phần CÒN LẠI chưa assign vào container nào
-  // Re-compute khi containers thay đổi (thêm/xóa container)
-  useEffect(() => {
-    const totalBales = order.total_bales || 0
-    const balesAssigned = containers.reduce((s, c) => s + (c.bale_count || 0), 0)
-    const balesRemaining = Math.max(0, totalBales - balesAssigned)
-    const balesPerCont = order.bales_per_container || totalBales || 0
-    const autoFillBales = balesRemaining > 0 ? Math.min(balesPerCont, balesRemaining) : 0
-    const wpu = order.bale_weight_kg || (order.quantity_kg && totalBales ? order.quantity_kg / totalBales : 35)
-    const autoFillKg = Math.round(autoFillBales * wpu * 100) / 100
-    form.setFieldsValue({
-      container_no: undefined,
-      seal_no: undefined,
-      bale_count: autoFillBales > 0 ? autoFillBales : undefined,
-      net_weight_kg: autoFillKg > 0 ? autoFillKg : undefined,
-    })
-  }, [containers, order, form])
+  }, [loadProgress])
 
   // ── Save ready date ──
   const handleSaveReadyDate = async () => {
@@ -167,55 +95,6 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
       message.error(e.message)
     } finally {
       setSavingReadyDate(false)
-    }
-  }
-
-  // ── Add container ──
-  const handleAddContainer = async () => {
-    try {
-      const vals = await form.validateFields()
-      setAddingContainer(true)
-      await salesOrderService.addContainer(order.id, {
-        container_no: vals.container_no || null,
-        seal_no: vals.seal_no || null,
-        container_type: order.container_type || '20ft',
-        bale_count: vals.bale_count || null,
-        net_weight_kg: vals.net_weight_kg || null,
-      })
-      message.success('Đã thêm container')
-      form.resetFields()
-      loadContainers()
-      onSaved()
-    } catch (e: any) {
-      if (e.errorFields) return
-      message.error(e.message)
-    } finally {
-      setAddingContainer(false)
-    }
-  }
-
-  // ── Update container inline ──
-  const handleUpdateContainer = async (container: SalesOrderContainer, vals: any) => {
-    try {
-      await containerService.updateContainer(container.id, vals)
-      message.success('Đã cập nhật container')
-      // KHÔNG setEditingContainerId(null) — giữ edit mode để user sửa tiếp
-      // field khác (vd seal_no sau container_no). User tự thoát bằng click ✏️.
-      loadContainers()
-    } catch (e: any) {
-      message.error(e.message)
-    }
-  }
-
-  // ── Delete container ──
-  const handleDeleteContainer = async (id: string) => {
-    try {
-      await containerService.deleteContainer(id)
-      message.success('Đã xóa container')
-      loadContainers()
-      onSaved()
-    } catch (e: any) {
-      message.error(e.message)
     }
   }
 
@@ -403,182 +282,29 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
   )
 
   // ══════════════════════════════════════════════════════════════
-  // CONTAINERS TABLE
+  // ĐÓNG GÓI — chuyển sang tab Đóng gói (tránh trùng nhập cont/seal)
   // ══════════════════════════════════════════════════════════════
+  // Trước đây tab này cũng cho thêm/sửa/xóa container + "Tạo tự động",
+  // trùng hệt với tab Đóng gói (chia lô + nhập cont/seal). Để 1 chỗ nhập
+  // duy nhất (giảm sai sót), việc đó dồn về tab Đóng gói; ở đây chỉ còn lối tắt.
 
-  const containerColumns: ColumnsType<SalesOrderContainer> = [
-    {
-      title: '#',
-      key: 'index',
-      width: 40,
-      render: (_, __, idx) => idx + 1,
-    },
-    {
-      title: 'Container No.',
-      dataIndex: 'container_no',
-      key: 'container_no',
-      width: 140,
-      render: (v, record) => {
-        if (editingContainerId === record.id) {
-          return (
-            <Input
-              size="small"
-              defaultValue={v}
-              placeholder="ABCU1234567"
-              onBlur={(e) => handleUpdateContainer(record, { container_no: e.target.value })}
-              onPressEnter={(e) => handleUpdateContainer(record, { container_no: (e.target as any).value })}
-              autoFocus
-            />
-          )
-        }
-        return v || <span style={{ color: '#ccc' }}>—</span>
-      },
-    },
-    {
-      title: 'Seal No.',
-      dataIndex: 'seal_no',
-      key: 'seal_no',
-      width: 120,
-      render: (v, record) => {
-        if (editingContainerId === record.id) {
-          return (
-            <Input
-              size="small"
-              defaultValue={v}
-              onBlur={(e) => handleUpdateContainer(record, { seal_no: e.target.value })}
-              onPressEnter={(e) => handleUpdateContainer(record, { seal_no: (e.target as any).value })}
-            />
-          )
-        }
-        return v || <span style={{ color: '#ccc' }}>—</span>
-      },
-    },
-    {
-      title: 'Bành',
-      dataIndex: 'bale_count',
-      key: 'bale_count',
-      width: 70,
-      align: 'right',
-      render: (v) => v ?? '—',
-    },
-    {
-      title: 'KL (kg)',
-      dataIndex: 'net_weight_kg',
-      key: 'net_weight_kg',
-      width: 90,
-      align: 'right',
-      render: (v) => v ? v.toLocaleString() : '—',
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (s: ContainerStatus) => (
-        <Tag color={CONTAINER_STATUS_COLORS[s]}>{CONTAINER_STATUS_LABELS[s] || s}</Tag>
-      ),
-    },
-    ...(canEdit ? [{
-      title: '',
-      key: 'actions',
-      width: 70,
-      render: (_: unknown, record: SalesOrderContainer) => (
-        <Space size={4}>
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => setEditingContainerId(editingContainerId === record.id ? null : record.id)}
-          />
-          <Popconfirm title="Xóa container?" onConfirm={() => handleDeleteContainer(record.id)}>
-            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-          </Popconfirm>
-        </Space>
-      ),
-    }] : []),
-  ]
-
-  const renderContainers = () => (
-    <Card
-      size="small"
-      title={
+  const renderPackingLink = () => (
+    <Card size="small" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <Space>
-          <span>Container</span>
-          {containerSummary && (
-            <Tag>{containerSummary.total_containers} / {containerCount}</Tag>
-          )}
-          {containerSummary && containerSummary.sealed > 0 && (
-            <Tag color="green">{containerSummary.sealed} sealed</Tag>
-          )}
+          <Tag color="blue">Container {containerCount} × {order.container_type || '20ft'}</Tag>
+          <span style={{ color: '#6b7280', fontSize: 13 }}>
+            Chia lô · nhập số container / seal đã chuyển sang tab <b>Đóng gói</b> (nhập 1 chỗ, tránh sai sót).
+          </span>
         </Space>
-      }
-      extra={
-        canEdit && (
-          <Space>
-            <Popconfirm
-              title="Tạo container tự động?"
-              description={`Sẽ tạo ${containerCount} container theo đơn hàng`}
-              onConfirm={async () => {
-                try {
-                  await containerService.autoCreateContainers(order.id)
-                  message.success('Đã tạo container tự động')
-                  loadContainers()
-                  onSaved()
-                } catch (e: any) {
-                  message.error(e.message)
-                }
-              }}
-            >
-              <Button size="small" type="dashed">Tạo tự động</Button>
-            </Popconfirm>
-          </Space>
-        )
-      }
-    >
-      <Table
-        rowKey="id"
-        columns={containerColumns as any}
-        dataSource={containers}
-        loading={containersLoading}
-        size="small"
-        pagination={false}
-        scroll={{ x: 600 }}
-        locale={{ emptyText: 'Chưa có container' }}
-      />
-
-      {/* Add container form — Bành + KL auto-fill = phần CÒN LẠI chưa assign */}
-      {canEdit && (
-        <Form
-          form={form}
-          layout="inline"
-          size="small"
-          style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}
+        <Button
+          icon={<ArrowRightOutlined />}
+          onClick={() => navigate(`/sales/orders/${order.id}/packing`)}
+          style={{ borderColor: '#1B4D3E', color: '#1B4D3E' }}
         >
-          <Form.Item name="container_no">
-            <Input placeholder="Container No." style={{ width: 140 }} />
-          </Form.Item>
-          <Form.Item name="seal_no">
-            <Input placeholder="Seal No." style={{ width: 120 }} />
-          </Form.Item>
-          <Form.Item name="bale_count">
-            <InputNumber placeholder="Bành" min={0} style={{ width: 80 }} />
-          </Form.Item>
-          <Form.Item name="net_weight_kg">
-            <InputNumber placeholder="KL (kg)" min={0} style={{ width: 100 }} />
-          </Form.Item>
-          <Form.Item>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              loading={addingContainer}
-              onClick={handleAddContainer}
-              style={{ background: '#1677ff' }}
-            >
-              Thêm
-            </Button>
-          </Form.Item>
-        </Form>
-      )}
+          Mở Đóng gói
+        </Button>
+      </div>
     </Card>
   )
 
@@ -671,7 +397,7 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
     <div style={{ padding: '8px 0' }}>
       {renderSimpleHeader()}
       {renderReadyDate()}
-      {renderContainers()}
+      {renderPackingLink()}
 
       {/* Chi tiết SX + StockPicker — collapsed, không clutter view chính */}
       <Collapse

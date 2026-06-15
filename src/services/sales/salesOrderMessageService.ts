@@ -267,8 +267,12 @@ export const salesOrderMessageService = {
     return data as SalesOrderMessage
   },
 
-  /** Xóa mềm (is_deleted=true). */
+  /** Xóa mềm (is_deleted=true) — CHỈ Admin. */
   async deleteMessage(id: string): Promise<void> {
+    const me = await getCurrentEmployee()
+    if (roleFromEmail(me?.email) !== 'admin') {
+      throw new Error('Chỉ Admin mới được xóa tin nhắn')
+    }
     const { error } = await supabase
       .from('sales_order_messages')
       .update({ is_deleted: true })

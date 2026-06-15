@@ -99,6 +99,12 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
         })
         setTimeout(scrollToBottom, 100)
       } else if (event === 'UPDATE') {
+        // Xóa mềm = UPDATE is_deleted=true (KHÔNG phải DELETE event) → tự gỡ khỏi list
+        if (msg.is_deleted) {
+          setMessages((prev) => prev.filter((m) => m.id !== msg.id))
+          setPinned((prev) => prev.filter((m) => m.id !== msg.id))
+          return
+        }
         setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, ...msg } : m))
         // Reload pinned nếu pin status đổi
         if (msg.is_pinned !== messages.find((m) => m.id === msg.id)?.is_pinned) {
@@ -201,9 +207,17 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
   }
 
   const handleDelete = async (msg: SalesOrderMessage) => {
+    if (myRole !== 'admin') {
+      antMessage.warning('Chỉ Admin mới được xóa tin nhắn')
+      return
+    }
     if (!confirm('Xóa tin này?')) return
     try {
       await salesOrderMessageService.deleteMessage(msg.id)
+      // Gỡ ngay khỏi UI (không đợi realtime) — soft-delete là UPDATE nên phải tự lọc
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id))
+      setPinned((prev) => prev.filter((m) => m.id !== msg.id))
+      antMessage.success('Đã xóa tin')
     } catch (e: unknown) {
       antMessage.error('Xóa thất bại: ' + (e instanceof Error ? e.message : String(e)))
     }
@@ -369,8 +383,8 @@ export default function SalesOrderChat({ salesOrderId }: Props) {
                           <PushpinOutlined style={{ color: msg.is_pinned ? '#d46b08' : '#bfbfbf' }} />
                         </button>
                       </Tooltip>
-                      {isMe && (
-                        <Tooltip title="Xóa tin">
+                      {myRole === 'admin' && (
+                        <Tooltip title="Xóa tin (chỉ Admin)">
                           <button style={msgActionBtn} onClick={() => handleDelete(msg)}>
                             <DeleteOutlined style={{ color: '#cf1322' }} />
                           </button>

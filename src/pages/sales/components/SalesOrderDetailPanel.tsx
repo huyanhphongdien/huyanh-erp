@@ -580,6 +580,11 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                 }}>
                   {order.code}
                 </span>
+                {order.contract_no && (
+                  <span style={{ fontSize: 13, color: '#8c8c8c', fontFamily: 'JetBrains Mono, monospace' }}>
+                    HĐ: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{order.contract_no}</span>
+                  </span>
+                )}
                 <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
                   {ORDER_STATUS_LABELS[order.status] || order.status}
                 </Tag>

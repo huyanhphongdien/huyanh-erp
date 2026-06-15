@@ -1604,7 +1604,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           {
             title: <a onClick={() => navigate('/sales/orders')}>Danh sách</a>,
           },
-          { title: order.code },
+          { title: `${order.code}${(order as any).contract_no ? ` · HĐ ${(order as any).contract_no}` : ''}` },
         ]}
       />
 
@@ -1623,6 +1623,11 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/sales/orders')} />
           <Title level={4} style={{ margin: 0 }}>
             {order.code}
+            {(order as any).contract_no && (
+              <span style={{ fontSize: 16, fontWeight: 400, color: '#8c8c8c', marginLeft: 10 }}>
+                · Số HĐ: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{(order as any).contract_no}</span>
+              </span>
+            )}
           </Title>
           <Tag
             color={ORDER_STATUS_COLORS[order.status]}

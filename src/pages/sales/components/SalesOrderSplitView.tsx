@@ -62,8 +62,17 @@ interface Props {
 }
 
 export default function SalesOrderSplitView({ orders, loading, onOrderUpdated, lotProgress }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    try { return localStorage.getItem('sales-orders-split-selected') } catch { return null }
+  })
   const listRef = useRef<HTMLDivElement>(null)
+
+  // Giữ đơn đang chọn khi F5
+  useEffect(() => {
+    if (selectedId) {
+      try { localStorage.setItem('sales-orders-split-selected', selectedId) } catch { /* ignore */ }
+    }
+  }, [selectedId])
 
   // Auto select first order if nothing selected
   useEffect(() => {

@@ -234,7 +234,13 @@ const SalesOrderListPage = () => {
 
   // Filters
   const [searchText, setSearchText] = useState('')
-  const [statusTab, setStatusTab] = useState<string>('all')
+  const [statusTab, setStatusTab] = useState<string>(() => {
+    try { return localStorage.getItem('sales-orders-status-tab') || 'all' } catch { return 'all' }
+  })
+  // Giữ tab lọc trạng thái khi F5
+  useEffect(() => {
+    try { localStorage.setItem('sales-orders-status-tab', statusTab) } catch { /* ignore */ }
+  }, [statusTab])
   const [customerFilter, setCustomerFilter] = useState<string | undefined>(undefined)
   const [gradeFilter, setGradeFilter] = useState<string | undefined>(undefined)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)

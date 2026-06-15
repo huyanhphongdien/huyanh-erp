@@ -103,7 +103,13 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('info')
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem('sales-order-panel-tab') || 'info' } catch { return 'info' }
+  })
+  // Giữ tab con đang xem khi F5 / chuyển đơn (sticky)
+  useEffect(() => {
+    try { localStorage.setItem('sales-order-panel-tab', activeTab) } catch { /* ignore */ }
+  }, [activeTab])
   const [lockLoading, setLockLoading] = useState(false)
   /** True = đơn dùng workflow mới (có row sales_order_contracts) → ẩn "Khóa HĐ"
    *  vì workflow tự lock khi status='signed'/'archived'. */
@@ -134,7 +140,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   useEffect(() => {
     if (open && orderId) {
       loadOrder()
-      setActiveTab('progress')
+      // Khôi phục tab đã lưu (sticky) thay vì luôn ép về 'progress'
+      try { setActiveTab(localStorage.getItem('sales-order-panel-tab') || 'info') } catch { setActiveTab('info') }
     } else {
       setOrder(null)
     }
@@ -462,6 +469,9 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
 
   // Thứ tự thống nhất: Thông tin · [Hợp đồng · Sản xuất · Đóng gói · Vận chuyển · Tài chính] · Tiến độ · Trao đổi
   const tabItems = [...infoTabItem, ...legacyTabItems, ...progressTabItem, ...chatTabItem]
+  // Nếu tab đã lưu không có trong bộ tab của đơn/role này (vd máy dùng chung, đổi user)
+  // → fallback về tab đầu để tránh nội dung trắng.
+  const safeActiveTab = tabItems.some((t) => t.key === activeTab) ? activeTab : (tabItems[0]?.key as string) || 'info'
 
   function renderTabContent(tabKey: string) {
     if (!order) return null
@@ -543,7 +553,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     </div>
   ) : order ? (
     <Tabs
-      activeKey={activeTab}
+      activeKey={safeActiveTab}
       onChange={setActiveTab}
       items={tabItems}
       style={{ padding: '0 16px' }}
@@ -833,7 +843,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         </div>
       ) : order ? (
         <Tabs
-          activeKey={activeTab}
+          activeKey={safeActiveTab}
           onChange={setActiveTab}
           items={tabItems}
           style={{ padding: '0 16px' }}

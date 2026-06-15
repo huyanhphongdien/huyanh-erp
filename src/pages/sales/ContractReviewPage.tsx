@@ -31,6 +31,7 @@ import {
   Alert,
   Divider,
   Select,
+  Tooltip,
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -53,6 +54,7 @@ import {
   type ContractFormData,
 } from '../../services/sales/contractGeneratorService'
 import { BANK_PRESETS, getBankPreset } from '../../config/sales.config'
+import { riskReasonText } from '../../services/sales/contractRisk'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -373,12 +375,19 @@ export default function ContractReviewPage() {
               width: 160,
               render: (v: string, r: SalesOrderContract) => (
                 <Space direction="vertical" size={2}>
-                  <Space size={4}>
+                  <Space size={4} wrap>
                     <Text strong>{v || r.sales_order?.contract_no || '—'}</Text>
                     {r.flow_type === 'upload' && (
                       <Tag color="purple" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
                         📎 Upload
                       </Tag>
+                    )}
+                    {r.risk_level === 'unusual' && (
+                      <Tooltip title={riskReasonText(r.risk_reasons).map((t) => `• ${t}`).join('\n') || 'HĐ khác chuẩn — cần soát kỹ'}>
+                        <Tag color="red" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
+                          ⚠ HĐ LẠ
+                        </Tag>
+                      </Tooltip>
                     )}
                   </Space>
                   <Text type="secondary" style={{ fontSize: 11 }}>
@@ -522,6 +531,19 @@ export default function ContractReviewPage() {
           </Space>
         }
       >
+        {active?.risk_level === 'unusual' && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="⚠ HĐ LẠ — soát kỹ trước khi duyệt (sẽ cần Trung/Huy duyệt lần 2)"
+            description={
+              <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                {riskReasonText(active.risk_reasons).map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+            }
+          />
+        )}
         {active && active.flow_type === 'upload' && (
           <UploadFlowReview
             contract={active}

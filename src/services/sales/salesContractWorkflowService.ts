@@ -20,6 +20,7 @@ import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
+import { computeContractRisk } from './contractRisk'
 import {
   amountToWords,
   formatGradeForContract,
@@ -79,6 +80,12 @@ export interface SalesOrderContract {
 
   rejected_at?: string | null
   rejected_reason?: string | null
+
+  // ── Nấc 4: đèn báo "HĐ lạ" + 2 làn duyệt (migration v19) ──
+  risk_level?: 'standard' | 'unusual' | null
+  risk_reasons?: string[] | null
+  risk_ack_by?: string | null
+  risk_ack_at?: string | null
 
   updated_at: string
 
@@ -313,6 +320,52 @@ function _bankSummary(fd: Partial<ContractFormData>): string | undefined {
   return `${fd.bank_account_name} — TK: ${fd.bank_account_no}<br>${fd.bank_full_name}<br>SWIFT: ${fd.bank_swift}`
 }
 
+// ── Nấc 4: chấm cờ "HĐ lạ" ──────────────────────────────────────────────────
+
+/** Lấy text thanh toán của đơn (ưu tiên item textbox, fallback header) — để chấm cờ. */
+async function _fetchPaymentText(salesOrderId: string): Promise<string> {
+  const { data } = await supabase
+    .from('sales_orders')
+    .select('payment_terms, payment_terms_note, items:sales_order_items(payment_terms, sort_order)')
+    .eq('id', salesOrderId)
+    .maybeSingle()
+  const o = (data || {}) as {
+    payment_terms?: string | null
+    payment_terms_note?: string | null
+    items?: Array<{ payment_terms?: string | null; sort_order?: number | null }> | null
+  }
+  const firstItem = (o.items || [])
+    .slice()
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0]?.payment_terms?.trim()
+  return firstItem || o.payment_terms_note || o.payment_terms || ''
+}
+
+/** Chấm "HĐ lạ" + lưu risk_level/risk_reasons. Best-effort (KHÔNG throw, không chặn nghiệp vụ). */
+async function _scoreAndStoreRisk(
+  contractId: string,
+  salesOrderId: string,
+  formData: (Partial<ContractFormData> & { _autofill_warning?: boolean }) | null | undefined,
+): Promise<{ level: 'standard' | 'unusual'; reasons: string[] } | null> {
+  try {
+    const fd = (formData || {}) as Partial<ContractFormData> & { _autofill_warning?: boolean }
+    const paymentText = await _fetchPaymentText(salesOrderId)
+    const risk = computeContractRisk({
+      extraTerms: fd.extra_terms,
+      bankAccountNo: fd.bank_account_no,
+      paymentText,
+      autofillWarning: !!fd._autofill_warning,
+    })
+    await supabase
+      .from('sales_order_contracts')
+      .update({ risk_level: risk.level, risk_reasons: risk.reasons })
+      .eq('id', contractId)
+    return risk
+  } catch (e) {
+    console.error('Risk scoring fail:', e)
+    return null
+  }
+}
+
 /** Helper notify — fire-and-forget (không block workflow nếu noti fail). */
 function _notifyContractEvent(params: {
   recipientIds: (string | null | undefined)[]
@@ -416,6 +469,11 @@ export const salesContractWorkflowService = {
       .single()
     if (error) throw error
     const row = data as SalesOrderContract
+
+    // ─── Nấc 4: chấm cờ "HĐ lạ" sơ bộ (extra_terms + payment + bank nếu có) để
+    // Kiểm tra thấy đèn báo NGAY ở queue review (sẽ chấm lại đầy đủ lúc approve). ───
+    const prelimRisk = await _scoreAndStoreRisk(row.id, salesOrderId, formData)
+    if (prelimRisk) { row.risk_level = prelimRisk.level; row.risk_reasons = prelimRisk.reasons }
 
     // ─── B. Notify cả 2 reviewer (Phú LV + Minh LD) — ai vào queue trước thì duyệt ───
     const reviewerIds = await Promise.all(
@@ -807,7 +865,7 @@ export const salesContractWorkflowService = {
     }
 
     // ─── C. Update contract row (form_data + reviewer_filled_urls) ───
-    const updatedFormData: Partial<ContractFormData> = {
+    const updatedFormData: Partial<ContractFormData> & { _autofill_warning?: boolean } = {
       ...(existing.form_data || {}),
       contract_no: values.contract_no || (existing.form_data as Partial<ContractFormData> | null)?.contract_no,
       bank_account_name: values.bank_account_name,
@@ -815,6 +873,8 @@ export const salesContractWorkflowService = {
       bank_full_name: values.bank_full_name,
       bank_address: values.bank_address,
       bank_swift: values.bank_swift,
+      // Nấc 4 — cờ #4: có file lỗi tự điền (token sai/skip) → đánh dấu để chấm "HĐ lạ".
+      _autofill_warning: warnings.length > 0,
     }
 
     const { data: updated, error: updErr } = await supabase
@@ -1062,6 +1122,11 @@ export const salesContractWorkflowService = {
     if (error) throw error
     const row = data as SalesOrderContract
 
+    // ─── Nấc 4: chấm cờ "HĐ lạ" CHỐT (đủ extra_terms + bank + payment + autofill).
+    // Đây là mức quyết định cổng ký (Trung/Huy phải duyệt nếu unusual). ───
+    const finalRisk = await _scoreAndStoreRisk(row.id, row.sales_order_id, row.form_data as any)
+    if (finalRisk) { row.risk_level = finalRisk.level; row.risk_reasons = finalRisk.reasons }
+
     // ─── Sync ngược sales_orders.contract_no nếu Phú nhập mới ở upload flow ───
     // (compose flow đã sync từ lúc Sale submit; upload flow trước đó form_data trống).
     const newContractNo = updatedFormData?.contract_no?.trim()
@@ -1247,6 +1312,9 @@ export const salesContractWorkflowService = {
         signer_confirmed_by: senderId,
         // signer_id = current để identify ai confirm; sẽ overwrite khi markSigned
         signer_id: senderId,
+        // Nấc 4: Trung/Huy xác nhận sẵn sàng ký = đồng thời DUYỆT điểm lạ (làn 2).
+        risk_ack_by: senderId,
+        risk_ack_at: new Date().toISOString(),
       })
       .eq('id', id)
       .select('*')
@@ -1358,6 +1426,18 @@ export const salesContractWorkflowService = {
     const signerId = await getCurrentEmployeeId()
     if (!signerId) throw new Error('Không xác định được nhân viên hiện tại')
     if (!signedPdfUrl) throw new Error('Cần upload PDF đã ký trước')
+
+    // ─── Nấc 4 — CỔNG LÀN 2: HĐ "lạ" phải được Trung/Huy duyệt điểm lạ
+    // (risk_ack qua bước "Xác nhận sẵn sàng ký") trước khi ký FINAL. ───
+    const { data: cur } = await supabase
+      .from('sales_order_contracts')
+      .select('risk_level, risk_ack_at')
+      .eq('id', id)
+      .maybeSingle()
+    if (cur?.risk_level === 'unusual' && !cur?.risk_ack_at) {
+      throw new Error('HĐ được đánh dấu "lạ" — cần bấm "Duyệt HĐ lạ / Xác nhận sẵn sàng ký" trước khi ký FINAL.')
+    }
+
     const { data, error } = await supabase
       .from('sales_order_contracts')
       .update({

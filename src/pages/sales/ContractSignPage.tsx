@@ -53,6 +53,7 @@ import {
   downloadContract,
   deriveKind,
 } from '../../services/sales/contractGeneratorService'
+import { riskReasonText } from '../../services/sales/contractRisk'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -177,10 +178,27 @@ export default function ContractSignPage() {
       || active.sales_order?.contract_no
       || '(chưa có số)'
     const isUpload = active.flow_type === 'upload'
+    const isUnusual = active.risk_level === 'unusual'
+    const riskReasons = riskReasonText(active.risk_reasons)
     Modal.confirm({
-      title: '✅ Xác nhận HĐ đã duyệt — sẵn sàng in ký',
+      title: isUnusual
+        ? '⚠ HĐ LẠ — Duyệt điểm lạ & xác nhận sẵn sàng ký'
+        : '✅ Xác nhận HĐ đã duyệt — sẵn sàng in ký',
       content: (
         <div>
+          {isUnusual && (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: 10 }}
+              message="HĐ này khác chuẩn — bạn đang DUYỆT (làn 2) các điểm sau:"
+              description={
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                  {riskReasons.map((t, i) => <li key={i}>{t}</li>)}
+                </ul>
+              }
+            />
+          )}
           <p style={{ marginBottom: 8 }}>
             Bạn xác nhận thông tin HĐ <strong>{displayNo}</strong> đã ĐÚNG
             {isUpload ? ' (kiểm bank trong file Word).' : ' (bao gồm bank info Phú LV nhập).'}
@@ -198,9 +216,9 @@ export default function ContractSignPage() {
           />
         </div>
       ),
-      okText: 'Xác nhận đã duyệt',
+      okText: isUnusual ? 'Duyệt HĐ lạ & xác nhận' : 'Xác nhận đã duyệt',
       cancelText: 'Quay lại',
-      okButtonProps: { type: 'primary', style: { background: '#1B4D3E' } },
+      okButtonProps: { type: 'primary', style: { background: isUnusual ? '#cf1322' : '#1B4D3E' } },
       width: 520,
       onOk: async () => {
         setConfirming(true)
@@ -542,6 +560,29 @@ export default function ContractSignPage() {
       >
         {active && (
           <>
+            {/* Nấc 4 — đèn báo HĐ lạ (làn 2): Trung/Huy phải duyệt điểm lạ trước khi ký */}
+            {active.risk_level === 'unusual' && (
+              <Alert
+                type={active.risk_ack_at ? 'success' : 'error'}
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={active.risk_ack_at
+                  ? '⚠ HĐ LẠ — đã duyệt điểm lạ (làn 2)'
+                  : '⚠ HĐ LẠ — cần bạn DUYỆT điểm lạ trước khi ký'}
+                description={
+                  <>
+                    <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                      {riskReasonText(active.risk_reasons).map((t, i) => <li key={i}>{t}</li>)}
+                    </ul>
+                    {!active.risk_ack_at && (
+                      <div style={{ marginTop: 6, fontSize: 12 }}>
+                        Bấm <strong>"Xác nhận đã duyệt"</strong> bên dưới = bạn đã duyệt các điểm lạ này. Chưa duyệt thì <strong>không ký FINAL được</strong>.
+                      </div>
+                    )}
+                  </>
+                }
+              />
+            )}
             {/* Step 1: Quy trình review */}
             {!active.signer_confirmed_at ? (
               <Alert

@@ -179,6 +179,7 @@ const STATUS_TABS: { key: string; label: string }[] = [
   { key: 'confirmed', label: 'Đã xác nhận' },
   { key: 'producing', label: 'Đang SX' },
   { key: 'ready', label: 'Sẵn sàng' },
+  { key: 'packing', label: '📦 Đóng gói' },
   { key: 'shipped', label: 'Đã xuất' },
   { key: 'delivered', label: 'Đã giao' },
   { key: 'invoiced', label: 'Đã lập HĐ' },
@@ -220,7 +221,11 @@ const SalesOrderListPage = () => {
     confirmed: 0,
     producing: 0,
     ready: 0,
+    packing: 0,
     shipped: 0,
+    delivered: 0,
+    invoiced: 0,
+    paid: 0,
     overdue_etd: 0,
     total_value_usd_month: 0,
     orders_this_month: 0,
@@ -1443,7 +1448,11 @@ const SalesOrderListPage = () => {
               : tab.key === 'confirmed' ? stats.confirmed
               : tab.key === 'producing' ? stats.producing
               : tab.key === 'ready' ? stats.ready
+              : tab.key === 'packing' ? stats.packing
               : tab.key === 'shipped' ? stats.shipped
+              : tab.key === 'delivered' ? stats.delivered
+              : tab.key === 'invoiced' ? stats.invoiced
+              : tab.key === 'paid' ? stats.paid
               : 0
             return {
               key: tab.key,

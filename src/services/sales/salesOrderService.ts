@@ -132,7 +132,11 @@ export interface SalesOrderStats {
   confirmed: number
   producing: number
   ready: number
+  packing: number
   shipped: number
+  delivered: number
+  invoiced: number
+  paid: number
   overdue_etd: number          // đơn active chưa giao mà ETD đã qua
   total_value_usd_month: number
   orders_this_month: number
@@ -754,12 +758,16 @@ export const salesOrderService = {
       return count || 0
     }
 
-    const [draft, confirmed, producing, ready, shipped] = await Promise.all([
+    const [draft, confirmed, producing, ready, packing, shipped, delivered, invoiced, paid] = await Promise.all([
       statusCounts('draft'),
       statusCounts('confirmed'),
       statusCounts('producing'),
       statusCounts('ready'),
+      statusCounts('packing'),
       statusCounts('shipped'),
+      statusCounts('delivered'),
+      statusCounts('invoiced'),
+      statusCounts('paid'),
     ])
 
     // Đơn quá ETD: ETD < today, chưa delivered/paid/cancelled
@@ -800,7 +808,11 @@ export const salesOrderService = {
       confirmed,
       producing,
       ready,
+      packing,
       shipped,
+      delivered,
+      invoiced,
+      paid,
       overdue_etd: overdueEtd || 0,
       total_value_usd_month: totalValueUsdMonth,
       orders_this_month: ordersThisMonth || 0,

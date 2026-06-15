@@ -42,6 +42,7 @@ import {
 import { useAuthStore } from '../../../stores/authStore'
 import ContractTab from './ContractTab'
 import PackingTabPanel from './PackingTabPanel'
+import OrderInfoTab from './OrderInfoTab'
 import ProductionTab from './ProductionTab'
 import ShippingTab from './ShippingTab'
 import FinanceTabV4 from './FinanceTabV4'
@@ -102,7 +103,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
 
   const [order, setOrder] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('progress')
+  const [activeTab, setActiveTab] = useState('info')
   const [lockLoading, setLockLoading] = useState(false)
   /** True = đơn dùng workflow mới (có row sales_order_contracts) → ẩn "Khóa HĐ"
    *  vì workflow tự lock khi status='signed'/'archived'. */
@@ -391,53 +392,46 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   const canLock = salesRole === 'sale' || salesRole === 'admin'
   const canUnlock = salesRole === 'admin'
 
-  // Tabs core (Tiến độ + Lịch sử) — luôn hiển thị, không filter qua role
-  const coreTabItems = order ? [
-    {
-      key: 'progress',
-      label: <span>📈 Tiến độ</span>,
-      children: (
+  // Tab Thông tin — đầu tiên (trước đây panel KHÔNG có, phải mở trang riêng).
+  const infoTabItem = order ? [{
+    key: 'info',
+    label: <span>📄 Thông tin</span>,
+    children: <OrderInfoTab order={order} />,
+  }] : []
+
+  // Tab Tiến độ — GỘP 3 cái cũ: tổng quan tiến độ + Bộ phận/SLA + Lịch sử giao nhận.
+  const progressTabItem = order ? [{
+    key: 'progress',
+    label: <span>📈 Tiến độ</span>,
+    children: (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '4px 2px' }}>
         <OrderProgressDashboard order={order} onChanged={handleSaved} onNavigateTab={handleNavigateTab} />
-      ),
-    },
-    {
-      key: 'chat',
-      label: <span>💬 Trao đổi</span>,
-      children: (
-        <SalesOrderChat salesOrderId={order.id} />
-      ),
-    },
-    {
-      key: 'progress-legacy',
-      label: <span>🏉 Bộ phận / SLA</span>,
-      children: (
-        <div style={{ padding: '12px 4px' }}>
-          <StageOwnershipCard
-            orderId={order.id}
-            orderCode={order.code}
-            currentStage={(order.current_stage as SalesStage) || 'sales'}
-            currentOwnerId={order.current_owner_id || null}
-            currentOwnerName={order.current_owner?.full_name || null}
-            stageStartedAt={order.stage_started_at || null}
-            stageSlaHours={order.stage_sla_hours || null}
-            onChanged={handleSaved}
-          />
-        </div>
-      ),
-    },
-    {
-      key: 'history',
-      label: <span>🕒 Lịch sử</span>,
-      children: (
+        <StageOwnershipCard
+          orderId={order.id}
+          orderCode={order.code}
+          currentStage={(order.current_stage as SalesStage) || 'sales'}
+          currentOwnerId={order.current_owner_id || null}
+          currentOwnerName={order.current_owner?.full_name || null}
+          stageStartedAt={order.stage_started_at || null}
+          stageSlaHours={order.stage_sla_hours || null}
+          onChanged={handleSaved}
+        />
         <HandoffTimeline
           orderId={order.id}
           orderCode={order.code}
           currentStage={(order.current_stage as SalesStage) || 'sales'}
           stageStartedAt={order.stage_started_at || null}
         />
-      ),
-    },
-  ] : []
+      </div>
+    ),
+  }] : []
+
+  // Tab Trao đổi (chat) — cuối.
+  const chatTabItem = order ? [{
+    key: 'chat',
+    label: <span>💬 Trao đổi</span>,
+    children: <SalesOrderChat salesOrderId={order.id} />,
+  }] : []
 
   const legacyTabItems = visibleTabs
     .filter((t) => TAB_META[t])
@@ -466,7 +460,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       }
     })
 
-  const tabItems = [...coreTabItems, ...legacyTabItems]
+  // Thứ tự thống nhất: Thông tin · [Hợp đồng · Sản xuất · Đóng gói · Vận chuyển · Tài chính] · Tiến độ · Trao đổi
+  const tabItems = [...infoTabItem, ...legacyTabItems, ...progressTabItem, ...chatTabItem]
 
   function renderTabContent(tabKey: string) {
     if (!order) return null

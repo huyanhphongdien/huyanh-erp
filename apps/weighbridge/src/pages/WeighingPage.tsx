@@ -1308,11 +1308,17 @@ export default function WeighingPage() {
                         loading={loadingDispatch}
                         showSearch
                         optionFilterProp="label"
-                        // Nhãn gọn: Mã lệnh · Số xe (đầu kéo) · Tài xế. Danh sách đã sort theo ngày (mới nhất trên).
-                        options={dispatchOrders.map(d => ({
-                          value: d.id,
-                          label: `${d.code} · ${d.tractor_plate || 'chưa gán xe'}${d.driver_name ? ` · ${d.driver_name}` : ''}`,
-                        }))}
+                        // Nhãn: NGÀY · Mã lệnh · Số xe (đầu kéo) · Tài xế.
+                        // Danh sách sort theo ngày điều động (mới nhất trên cùng); ngày hiện ở đầu nhãn để dễ tìm.
+                        options={dispatchOrders.map(d => {
+                          const ng = d.dispatch_date
+                            ? new Date(d.dispatch_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+                            : '—'
+                          return {
+                            value: d.id,
+                            label: `${ng} · ${d.code} · ${d.tractor_plate || 'chưa gán xe'}${d.driver_name ? ` · ${d.driver_name}` : ''}`,
+                          }
+                        })}
                       />
                       {selectedDispatch && (
                         <div style={{ marginTop: 8, padding: 8, background: '#ECFDF5', borderRadius: 8 }}>

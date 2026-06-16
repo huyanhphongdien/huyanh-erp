@@ -1282,7 +1282,7 @@ export default function WeighingPage() {
                       <Text type="secondary" style={{ fontSize: 12 }}>Chọn lệnh điều động — để biết hàng gì + ghi KL cân về lệnh</Text>
                       <Select
                         value={selectedDispatchOrderId || undefined}
-                        onChange={v => {
+                        onChange={async v => {
                           setSelectedDispatchOrderId(v || '')
                           // Chọn lệnh → tự điền Biển số xe + Tài xế + SĐT từ lệnh.
                           const d = v ? dispatchOrders.find(o => o.id === v) : null
@@ -1291,10 +1291,19 @@ export default function WeighingPage() {
                             if (d.driver_name) setDriverName(d.driver_name)
                             if (d.driver_phone) setDriverPhone(d.driver_phone)
                           }
+                          // Phiếu ĐÃ TẠO (đang cân dở) → chọn lệnh sau khi cân lần 1: lưu link
+                          // ngay (best-effort) để khi hoàn tất đồng bộ KL về đúng lệnh.
+                          if (ticket && v) {
+                            try {
+                              await supabase.from('weighbridge_tickets')
+                                .update({ reference_type: 'dispatch_order', reference_id: v })
+                                .eq('id', ticket.id)
+                            } catch (e) { console.warn('Link dispatch (phiếu đang dở) failed:', e) }
+                          }
                         }}
                         placeholder="Chọn lệnh điều động..."
                         style={{ width: '100%' }}
-                        disabled={!!ticket}
+                        disabled={isCompleted}
                         allowClear
                         loading={loadingDispatch}
                         showSearch

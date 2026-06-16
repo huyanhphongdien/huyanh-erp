@@ -449,12 +449,14 @@ async function listForWeighing(): Promise<DispatchOrder[]> {
     .from('dispatch_orders')
     .select(ORDER_SELECT)
     .not('status', 'in', '(completed,cancelled)')
-    // Ẩn lệnh ĐÃ CÂN XONG (đã gắn phiếu cân ở lần hoàn tất) cho đỡ rối danh sách.
-    .is('weighbridge_ticket_id', null)
     .order('dispatch_date', { ascending: false })
     .limit(100)
   if (error) throw error
-  return (data || []).map(normalizeOrder)
+  // Ẩn lệnh ĐÃ CÂN XONG (đã gắn phiếu cân) cho đỡ rối — lọc Ở JS để TUYỆT ĐỐI
+  // không làm vỡ/rỗng query nếu cột weighbridge_ticket_id vắng/giá trị lạ.
+  return (data || [])
+    .filter((r: { weighbridge_ticket_id?: string | null }) => !r.weighbridge_ticket_id)
+    .map(normalizeOrder)
 }
 
 /**

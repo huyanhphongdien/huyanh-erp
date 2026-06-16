@@ -43,65 +43,73 @@ function imageBox(label, height = 2400) {
 }
 
 // ── Nội dung hướng dẫn ──
+const tname = (t) => para([run(t, { b: true, sz: 24, color: '1B4D3E' })], { after: 30, left: 120 })
 const body = [
   title('HƯỚNG DẪN CÂN'),
   subtitle('Trạm cân Huy Anh — Phong Điền  ·  Dành cho nhân viên trạm cân  ·  In khổ A4'),
 
   h2('Chuẩn bị'),
   note('Mở App Cân trên máy tính của trạm cân (đã đăng nhập tài khoản nhân viên trạm).'),
-  note('Mỗi xe vào = 1 phiếu cân. Cân 2 lần: lần 1 xe chở hàng, lần 2 xe rỗng.'),
+  note('Mỗi xe = 1 phiếu cân. Chọn ĐÚNG loại phiếu ngay từ đầu (xem 3 loại dưới).'),
   imageBox('📷 Hình 1 — Màn hình chính App Cân (sau khi đăng nhập)'),
 
-  h2('A. Cân NHẬP mủ (xe chở mủ vào)'),
+  h2('3 loại phiếu cân — chọn đúng ngay từ đầu'),
+  imageBox('📷 Hình 2 — Thanh chọn loại phiếu: NHẬP · XUẤT · CỔNG', 1500),
 
-  step(1, 'Tạo phiếu cân mới'),
-  note('Bấm nút tạo phiếu mới → chọn loại: Cân nhập.'),
-  imageBox('📷 Hình 2 — Nút tạo phiếu + chọn Cân nhập'),
+  tname('① NHẬP (vào kho) — cân mủ từ nhà cung cấp / đại lý vào kho'),
+  note('Cân 2 lần: Gross (xe + hàng) vào  →  Tare (xe rỗng) ra  →  Net = Gross − Tare = khối lượng mủ.'),
+  note('Có gắn nguồn mủ + loại mủ; riêng Mủ nước nhập thêm DRC để ra khối lượng khô.'),
+
+  tname('② XUẤT (ra kho) — cân hàng xuất đi cảng / khách'),
+  note('Cân 2 lần NGƯỢC với nhập: Tare (xe rỗng) vào  →  Gross (xe + hàng) ra  →  Net = Gross − Tare.'),
+  note('Gắn Đơn hàng bán / Container / Lệnh điều động. Xe chở nhiều loại mủ → chọn nhiều loại.'),
+  note('"Đã cân là được" — số cân gồm cả pallet / bao bì, KHÔNG so với kế hoạch.'),
+
+  tname('③ CỔNG (hàng nội bộ) — cân cổng cho hàng đi nội bộ'),
+  note('Cân vào  →  ra, chênh lệch = hàng. KHÔNG gắn nguồn mủ / deal / đơn hàng. (Chỉ dùng ở Phong Điền.)'),
+
+  h2('A. Các bước cân NHẬP (chi tiết)'),
+  step(1, 'Chọn loại phiếu = NHẬP (vào kho)'),
+  imageBox('📷 Hình 3 — đã chọn NHẬP', 1500),
 
   step(2, 'Chọn nguồn mủ'),
-  note('Chọn 1 trong: theo Deal đã chốt / Đại lý trực tiếp / Nhà cung cấp.'),
-  imageBox('📷 Hình 3 — Màn hình chọn nguồn mủ'),
+  note('1 trong: Deal đã chốt / Đại lý trực tiếp / Nhà cung cấp.'),
+  imageBox('📷 Hình 4 — Màn hình chọn nguồn mủ'),
 
   step(3, 'Chọn loại mủ'),
-  note('Bấm 1 chạm: 💧 Mủ nước · 🪨 Mủ tạp · 🥣 Mủ chén · 📄 Mủ tờ · 🟫 Mủ RSS3.'),
-  note('Mủ nước tính theo DRC (giá khô); các loại còn lại tính theo cân thực tế.'),
-  imageBox('📷 Hình 4 — Thanh chọn loại mủ (các nút)'),
+  note('💧 Mủ nước · 🪨 Mủ tạp · 🥣 Mủ chén · 📄 Mủ tờ · 🟫 Mủ RSS3.'),
+  imageBox('📷 Hình 5 — Thanh chọn loại mủ'),
 
-  step(4, 'Nhập thông tin xe'),
-  note('Nhập Biển số xe + Tên tài xế. App tự gợi ý biển số đã có.'),
-  imageBox('📷 Hình 5 — Ô nhập biển số xe + tài xế'),
+  step(4, 'Nhập biển số xe + tài xế'),
+  imageBox('📷 Hình 6 — Ô nhập biển số xe + tài xế'),
 
-  step(5, 'Cân lần 1 — xe chở hàng (Gross) + chụp ảnh'),
-  note('Xe lên bàn cân → bấm Lấy số cân lần 1 (ghi khối lượng xe + hàng).'),
-  note('Chụp đủ 3 ảnh: Trước xe · Sau xe · Tài xế (theo nút chụp trên màn hình).'),
-  imageBox('📷 Hình 6 — Nút cân lần 1 + khu vực chụp 3 ảnh', 2800),
+  step(5, 'Cân lần 1 — Gross (xe + hàng) + chụp 3 ảnh'),
+  note('Xe chở hàng lên cân → bấm Lấy số cân lần 1. Chụp đủ: Trước · Sau · Tài xế.'),
+  imageBox('📷 Hình 7 — Cân lần 1 + khu vực chụp 3 ảnh', 2800),
 
-  step(6, 'Cân lần 2 — xe rỗng (Tare)'),
-  note('Sau khi đổ hàng, xe rỗng lên cân → bấm Lấy số cân lần 2.'),
-  note('Hệ thống tự tính: Khối lượng hàng (Net) = Cân lần 1 − Cân lần 2.'),
-  imageBox('📷 Hình 7 — Màn hình cân lần 2 + kết quả Net'),
+  step(6, 'Cân lần 2 — Tare (xe rỗng)'),
+  note('Đổ hàng xong, xe rỗng lên cân → bấm Lấy số cân lần 2. Net = Lần 1 − Lần 2.'),
+  imageBox('📷 Hình 8 — Cân lần 2 + kết quả Net'),
 
   step(7, '(Chỉ Mủ nước) Nhập DRC'),
-  note('Với mủ nước: nhập/tra DRC% để ra khối lượng khô + thành tiền.'),
-  imageBox('📷 Hình 8 — Ô nhập DRC (chỉ hiện với mủ nước)'),
+  imageBox('📷 Hình 9 — Ô nhập DRC'),
 
-  step(8, 'Xác nhận / Hoàn tất phiếu'),
-  note('Kiểm lại loại mủ, biển số, số cân, ảnh → bấm Hoàn tất.'),
-  imageBox('📷 Hình 9 — Nút xác nhận/hoàn tất phiếu'),
+  step(8, 'Hoàn tất + In phiếu'),
+  note('Kiểm lại loại mủ / biển số / số cân / ảnh → Hoàn tất → In (giao tài xế 1 bản).'),
+  imageBox('📷 Hình 10 — Phiếu cân in ra (mẫu)', 3000),
 
-  step(9, 'In phiếu cân'),
-  note('Bấm In → ra phiếu cân (có QR Cổng Đại lý). Giao 1 bản cho tài xế.'),
-  imageBox('📷 Hình 10 — Phiếu cân in ra (mẫu)', 3200),
+  h2('B. Cân XUẤT đi cảng (tóm tắt)'),
+  note('Chọn XUẤT → chọn Lệnh điều động (Mã · Xe · Tài xế) → app tự điền xe/tài xế.'),
+  note('Cân Tare (xe rỗng) → Gross (xe + hàng) → xác nhận "Đã cân". Số cân đồng bộ về Lệnh + Đơn hàng.'),
+  imageBox('📷 Hình 11 — Cân xuất + chọn Lệnh điều động'),
 
-  h2('B. Cân XUẤT hàng (xe chở hàng đi cảng)'),
-  note('Chọn Cân xuất → chọn Lệnh điều động (Mã · Xe · Tài xế) → app tự điền xe/tài xế.'),
-  note('Cân tổng cả xe 1 lần → xác nhận "Đã cân". Số cân đồng bộ về Lệnh điều động + Đơn hàng.'),
-  imageBox('📷 Hình 11 — Màn hình cân xuất + chọn Lệnh điều động'),
+  h2('C. Cân CỔNG nội bộ (tóm tắt)'),
+  note('Chọn CỔNG → cân vào → cân ra → chênh lệch = hàng. Không gắn đơn / nguồn mủ.'),
+  imageBox('📷 Hình 12 — Cân cổng nội bộ'),
 
   h2('Lưu ý chung'),
-  note('Chọn đúng loại mủ ngay từ đầu — sau khi tạo phiếu KHÔNG sửa loại mủ trên app được (phải báo IT).'),
-  note('Chụp ảnh rõ biển số. Phiếu đang cân dở nằm ở mục "Phiếu đang cân dở", bấm "Tiếp tục" để cân tiếp.'),
-  note('Cân xuất: "Đã cân là được" — số cân gồm cả pallet/bao bì, không so với kế hoạch.'),
+  note('Chọn đúng loại mủ ngay từ đầu — tạo phiếu rồi KHÔNG sửa loại mủ trên app được (báo IT).'),
+  note('Phiếu cân dở nằm ở mục "Phiếu đang cân dở" → bấm "Tiếp tục" để cân lần 2.'),
   para([run('— Hết —', { i: true, color: '999999' })], { center: true, after: 0 }),
 ].join('')
 

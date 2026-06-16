@@ -41,6 +41,7 @@ import {
   deriveKind,
   DEFAULT_BANK,
   amountToWords,
+  formatContractDate,
   type ContractFormData,
 } from '../../services/sales/contractGeneratorService'
 import { salesContractWorkflowService } from '../../services/sales/salesContractWorkflowService'
@@ -195,7 +196,7 @@ function SalesOrderCreatePage() {
     const isFOB = ['FOB', 'EXW'].includes((watchIncoterm || '').toUpperCase())
     return {
       contract_no: watchContractNo || '',
-      contract_date: watchContractDate ? watchContractDate.format('DD MMM YYYY') : '',
+      contract_date: watchContractDate ? formatContractDate(watchContractDate.toDate()) : '',
       buyer_name: selectedCustomer?.name || '',
       buyer_address: selectedCustomer?.address || '',
       buyer_phone: selectedCustomer?.phone || '',

@@ -90,6 +90,18 @@ export const DEFAULT_BANK: Pick<
   'bank_account_name' | 'bank_account_no' | 'bank_full_name' | 'bank_address' | 'bank_swift'
 > = SALES_CONFIG.DEFAULT_BANK
 
+/** Format ngày HĐ theo đúng HĐ thật đã ký: "15th June 2026"
+ *  (ngày + đuôi ordinal st/nd/rd/th + tháng ĐẦY ĐỦ + năm). */
+export function formatContractDate(input: Date | string | null | undefined): string {
+  if (!input) return ''
+  const d = input instanceof Date ? input : new Date(input)
+  if (isNaN(d.getTime())) return ''
+  const day = d.getDate()
+  const j = day % 10, k = day % 100
+  const suf = (j === 1 && k !== 11) ? 'st' : (j === 2 && k !== 12) ? 'nd' : (j === 3 && k !== 13) ? 'rd' : 'th'
+  return `${day}${suf} ${d.toLocaleDateString('en-GB', { month: 'long' })} ${d.getFullYear()}`
+}
+
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------

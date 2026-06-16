@@ -20,6 +20,7 @@ import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { supabase } from '../../lib/supabase'
 import type { ContractFormData } from './contractGeneratorService'
+import { formatContractDate } from './contractGeneratorService'
 import { computeContractRisk } from './contractRisk'
 import {
   amountToWords,
@@ -770,7 +771,8 @@ export const salesContractWorkflowService = {
       bank_address: values.bank_address || '',
       bank_swift: values.bank_swift || '',
       // ── Auto từ sales_order ──
-      contract_date: formatDate(o.contract_date) || formatDate(new Date().toISOString().slice(0, 10)),
+      // Ngày HĐ theo chuẩn HĐ thật: "15th June 2026" (ordinal + tháng đầy đủ).
+      contract_date: formatContractDate(o.contract_date) || formatContractDate(new Date()),
       buyer_name: o.customer?.name || '',
       buyer_address: o.customer?.address || '',
       buyer_phone: o.customer?.phone || '',

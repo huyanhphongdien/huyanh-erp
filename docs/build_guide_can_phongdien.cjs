@@ -76,6 +76,9 @@ const F = {
   createBtn: 'Screenshot 2026-06-16 084722.png',
   done: 'Screenshot 2026-06-16 090209.png',
   out: 'Screenshot 2026-06-16 084842.png',
+  weigh1: 'hinh can lan 1.png',
+  drc: 'DRC mu nuoc.png',
+  gate: 'can noi bo.png',
 }
 
 // ── Nội dung ──
@@ -117,14 +120,14 @@ const body = [
   pic('Nút Tạo phiếu & Bắt đầu cân', F.createBtn, 900),
   step(7, 'Cân lần 1 — Gross (xe + hàng) + chụp 3 ảnh'),
   note('Xe chở hàng lên bàn cân → lấy số cân lần 1. Chụp đủ 3 ảnh: Trước xe · Sau xe · Tài xế.'),
-  pic('Màn hình cân lần 1 (Gross) + chụp ảnh', null, 2600),
+  pic('Màn hình cân — Cân lần 1 (Gross) xong, sang Cân lần 2', F.weigh1),
   step(8, 'Cân lần 2 — Tare (xe rỗng) → Net → Hoàn tất → IN PHIẾU'),
   note('Đổ hàng xong, xe rỗng lên cân → lấy số cân lần 2. Hệ thống ra NET = Lần 1 − Lần 2.'),
   note('Kiểm lại → bấm Hoàn tất → bấm IN PHIẾU (giao tài xế 1 bản).'),
   pic('Phiếu hoàn tất — Net + 3 ảnh + nút IN PHIẾU', F.done),
   step(9, '(Chỉ Mủ nước) Nhập DRC'),
   note('Với mủ nước: nhập/tra DRC% để ra khối lượng khô + thành tiền.'),
-  pic('Ô nhập DRC (chỉ hiện với Mủ nước)', null, 1400),
+  pic('Ô đo DRC tại cân (chỉ hiện với Mủ nước)', F.drc),
 
   h2('B. Cân XUẤT đi cảng'),
   note('Chọn loại phiếu = XUẤT → chọn Lệnh điều động (Mã · Xe · Tài xế) → app TỰ ĐIỀN xe/tài xế + hiện container của lệnh.'),
@@ -132,8 +135,8 @@ const body = [
   pic('Cân XUẤT — chọn Lệnh điều động (auto-fill xe + container)', F.out),
 
   h2('C. Cân CỔNG nội bộ'),
-  note('Chọn loại phiếu = CỔNG → cân vào → cân ra → chênh lệch = hàng. Không gắn đơn / nguồn mủ.'),
-  pic('Màn hình cân CỔNG nội bộ', null, 2000),
+  note('Chọn loại phiếu = CỔNG → ghi Nội dung hàng (vật tư, phế liệu, thành phẩm nội bộ…) → cân vào → cân ra → chênh lệch = hàng. Không gắn đơn / nguồn mủ.'),
+  pic('Màn hình cân CỔNG nội bộ', F.gate),
 
   h2('Lưu ý chung'),
   note('Chọn đúng loại mủ ngay từ đầu — tạo phiếu rồi KHÔNG sửa loại mủ trên app được (báo IT).'),

@@ -49,6 +49,7 @@ const BALE_KG = 35 // kg/bành chuẩn SVR — dùng để KL tự nhảy theo s
 const ROUTE_PRESETS = [
   'Kho Phong Điền → Cảng Tiên Sa',
   'Kho Phong Điền → Cảng Đà Nẵng',
+  'Kho Phong Điền → Cảng Chu Lai',
   'Kho Quảng Trị → Cảng Tiên Sa',
   'Kho Quảng Trị → Kho Phong Điền',
 ].map(v => ({ value: v }))

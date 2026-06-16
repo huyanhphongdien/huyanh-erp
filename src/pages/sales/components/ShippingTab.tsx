@@ -31,6 +31,7 @@ import type { SalesOrder } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import { isFieldEditableV4 } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
+import ShippingDocsSection from './ShippingDocsSection'
 
 // ============================================================================
 // HELPERS
@@ -350,6 +351,9 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         <Descriptions.Item label="ETA">{fmtDate(order.eta)}</Descriptions.Item>
         <Descriptions.Item label="Cutoff">{fmtDate(order.cutoff_date)}</Descriptions.Item>
       </Descriptions>
+
+      {/* Tài liệu vận chuyển (Booking / B/L / SI…) — đính kèm file ngay tại đây */}
+      <ShippingDocsSection orderId={order.id} canEdit={canEditLogistics} />
 
       {/* DHL */}
       {order.dhl_number && (

@@ -266,7 +266,8 @@ export default function DispatchCreatePage() {
   const onSave = async () => {
     try {
       const v = await form.validateFields()
-      if (lines.length === 0) { message.warning('Cần ít nhất 1 dòng container'); return }
+      // Đi cảng bắt buộc có container; chuyến thường (đón khách…) cho phép 0 dòng.
+      if (isPort && lines.length === 0) { message.warning('Cần ít nhất 1 dòng container'); return }
       setSaving(true)
       const payload = {
         dispatch_date: dayjs(v.dispatch_date).format('YYYY-MM-DD'),
@@ -322,9 +323,9 @@ export default function DispatchCreatePage() {
           onChange={v => patchLine(r._key, { route: v })} />
       ) },
       lot: { title: 'Lô hàng', key: 'lot', width: 130, render: (_: any, r: LineRow) => <Input value={r.lot_code || ''} onChange={e => patchLine(r._key, { lot_code: e.target.value })} /> },
-      grade: { title: 'Loại hàng', key: 'grade', width: 150, render: (_: any, r: LineRow) => (
+      grade: { title: isPort ? 'Loại hàng' : 'Nội dung / hàng hóa', key: 'grade', width: 180, render: (_: any, r: LineRow) => (
         <AutoComplete value={r.grade || ''} style={{ width: '100%' }} options={GRADE_PRESETS}
-          placeholder="SVR 10 / Mủ tờ…" filterOption={acFilter as any}
+          placeholder={isPort ? 'SVR 10 / Mủ tờ…' : 'Đón khách / Mủ tờ / Vật tư…'} filterOption={acFilter as any}
           onChange={v => patchLine(r._key, { grade: v })} />
       ) },
       cont: { title: 'Số container', key: 'cont', width: 160, render: (_: any, r: LineRow) => <Input value={r.container_no || ''} onChange={e => patchLine(r._key, { container_no: e.target.value })} /> },
@@ -405,7 +406,9 @@ export default function DispatchCreatePage() {
               ) : (
                 <Form.Item label="Loại chuyến này">
                   <Typography.Text type="secondary">
-                    Chuyến thường (chở mủ / vật tư / nội bộ) — không gắn Đơn hàng bán. Nhập hành trình + loại hàng + KL ở bảng dưới.
+                    Chuyến nội bộ/thường — không gắn Đơn hàng bán.<br />
+                    • <b>Đón khách / công tác:</b> chỉ cần Lý do + Điểm đến (bảng dưới bỏ trống).<br />
+                    • <b>Chở hàng:</b> bấm "Thêm dòng" khai Hành trình + Nội dung + KL.
                   </Typography.Text>
                 </Form.Item>
               )}
@@ -453,7 +456,7 @@ export default function DispatchCreatePage() {
         </Divider>
         <Table rowKey="_key" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines}
           scroll={{ x: isPort ? 1180 : 760 }}
-          locale={{ emptyText: <Empty description={isPort ? "Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" : "Chưa có dòng — bấm 'Thêm dòng' để khai hành trình + loại hàng"} /> }} />
+          locale={{ emptyText: <Empty description={isPort ? "Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" : "Đón khách thì bỏ trống cũng được; chở hàng thì bấm 'Thêm dòng'"} /> }} />
         <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>{isPort ? 'Thêm dòng container' : 'Thêm dòng'}</Button>
       </Card>
 

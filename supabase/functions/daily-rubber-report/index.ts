@@ -85,9 +85,17 @@ const RUBBER = {
   mu_dong: { label: 'Mủ đông', icon: '🧊', bg: 'e9f5ee', bar: '1B4D3E' },
   mu_tap:  { label: 'Mủ tạp',  icon: '🪨', bg: 'f4eee2', bar: 'b45309' },
   mu_chen: { label: 'Mủ chén', icon: '🥣', bg: 'eee9f5', bar: '6d28d9' },
-  mu_to:   { label: 'Mủ tờ',   icon: '📄', bg: 'eee9f5', bar: '6d28d9' },
+  mu_to:   { label: 'Mủ RSS-3', icon: '🟫', bg: 'eee9f5', bar: '6d28d9' }, // alias cũ → gộp về RSS-3
+  mu_rss3: { label: 'Mủ RSS-3', icon: '🟫', bg: 'eee9f5', bar: '6d28d9' },
   svr:     { label: 'SVR',     icon: '📦', bg: 'eef2f7', bar: '475569' },
 } as const
+
+// Gom "mủ tờ" (mu_to, tên cũ) vào "Mủ RSS-3" (mu_rss3) trong mọi thống kê — cùng 1 mặt hàng.
+const RT_ALIAS: Record<string, string> = { mu_to: 'mu_rss3' }
+const normRt = (rt?: string | null): string => {
+  const k = (rt || 'other').split(',')[0].trim() || 'other'
+  return RT_ALIAS[k] || k
+}
 
 function fmt1(n: number): string {
   const s = (Math.round(n * 10) / 10).toFixed(1)
@@ -196,7 +204,7 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   // Theo loại mủ
   const typeMap = new Map<string, number>()
   for (const t of today) {
-    const rt = (t.rubber_type || 'other').split(',')[0].trim() || 'other'
+    const rt = normRt(t.rubber_type)
     typeMap.set(rt, (typeMap.get(rt) || 0) + (t.net_weight || 0))
   }
   const types = [...typeMap.entries()].map(([k, v]) => ({ key: k, tuoi: v })).sort((a, b) => b.tuoi - a.tuoi)
@@ -212,7 +220,7 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   for (const t of today) {
     const name = t.supplier_name || (t.partner_id ? nameById.get(t.partner_id) : '') || 'Không rõ'
     const key = name
-    const cur = dealerMap.get(key) || { name, fac: facCode(t).code, type: t.rubber_type || '', tuoi: 0 }
+    const cur = dealerMap.get(key) || { name, fac: facCode(t).code, type: normRt(t.rubber_type), tuoi: 0 }
     cur.tuoi += t.net_weight || 0
     dealerMap.set(key, cur)
   }
@@ -223,7 +231,7 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const detMap = new Map<string, { name: string; fac: string; type: string; xe: number; tuoi: number; kho: number; drcW: number }>()
   for (const t of today) {
     const name = t.supplier_name || (t.partner_id ? nameById.get(t.partner_id) : '') || 'Không rõ'
-    const rt = (t.rubber_type || 'other').split(',')[0].trim() || 'other'
+    const rt = normRt(t.rubber_type)
     const net = t.net_weight || 0
     const { drc } = drcOf(t)
     const key = name + '|' + rt
@@ -242,7 +250,7 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const mDealerMap = new Map<string, { name: string; fac: string; type: string; tuoi: number }>()
   for (const t of month) {
     const name = t.supplier_name || (t.partner_id ? nameById.get(t.partner_id) : '') || 'Không rõ'
-    const cur = mDealerMap.get(name) || { name, fac: facCode(t).code, type: t.rubber_type || '', tuoi: 0 }
+    const cur = mDealerMap.get(name) || { name, fac: facCode(t).code, type: normRt(t.rubber_type), tuoi: 0 }
     cur.tuoi += t.net_weight || 0
     mDealerMap.set(name, cur)
   }

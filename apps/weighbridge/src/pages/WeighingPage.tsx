@@ -45,7 +45,7 @@ const RUBBER_TYPES = [
 // Nhãn ngắn (có icon) cho panel "Nhập mủ gần đây" — đủ 5 loại mủ thô
 const RUBBER_LABELS: Record<string, string> = {
   mu_nuoc: '💧 Mủ nước', mu_tap: '🪨 Mủ tạp', mu_dong: '🧊 Mủ đông',
-  mu_chen: '🥣 Mủ chén', mu_to: '📄 Mủ tờ', mu_rss3: '🟫 Mủ RSS3', svr: 'SVR',
+  mu_chen: '🥣 Mủ chén', mu_to: '🟫 Mủ RSS3', mu_rss3: '🟫 Mủ RSS3', svr: 'SVR',
 }
 
 const DESTINATIONS = [
@@ -1565,7 +1565,6 @@ export default function WeighingPage() {
                       <Radio.Button value="mu_nuoc">💧 Mủ nước</Radio.Button>
                       <Radio.Button value="mu_tap">🪨 Mủ tạp</Radio.Button>
                       <Radio.Button value="mu_chen">🥣 Mủ chén</Radio.Button>
-                      <Radio.Button value="mu_to">📄 Mủ tờ</Radio.Button>
                       <Radio.Button value="mu_rss3">🟫 Mủ RSS3</Radio.Button>
                     </Radio.Group>
                     {sourceType === 'partner_direct' && (
@@ -1771,7 +1770,7 @@ export default function WeighingPage() {
                       { value: 'mu_tap', label: '🪨 Mủ tạp' },
                       { value: 'mu_dong', label: '🧊 Mủ đông' },
                       { value: 'mu_chen', label: '🥣 Mủ chén' },
-                      { value: 'mu_to', label: '📄 Mủ tờ' },
+                      { value: 'mu_rss3', label: '🟫 Mủ RSS3' },
                     ].map((opt) => {
                       const active = outRubberTypes.includes(opt.value)
                       return (

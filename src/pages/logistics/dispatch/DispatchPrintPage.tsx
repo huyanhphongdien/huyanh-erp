@@ -274,20 +274,23 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
 
       {order.note && <div style={{ marginTop: 8, fontSize: 12 }}>Ghi chú: {order.note}</div>}
 
-      {/* Signatures */}
-      <div style={{ marginTop: 36, display: 'flex', justifyContent: 'space-between', gap: 12, textAlign: 'center', fontSize: 12.5 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, marginBottom: 56 }}>Lái xe</div>
-          <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, marginBottom: 56 }}>Phụ trách điều động</div>
-          <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, marginBottom: 56 }}>Giám đốc</div>
-          <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 11, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
-        </div>
+      {/* Bảo vệ ghi khi xe qua cổng (viết tay) */}
+      <div style={{ marginTop: 14, fontSize: 12, border: '1px dashed #9CA3AF', borderRadius: 4, padding: '7px 10px', background: '#FAFAFA' }}>
+        <span style={{ fontWeight: 700, color: '#374151' }}>Bảo vệ ghi khi xe qua cổng:</span>
+        &nbsp; Giờ ra cổng: <strong>…………</strong>
+        &nbsp;·&nbsp; Giờ về: <strong>…………</strong>
+        &nbsp;·&nbsp; Số km đầu: <strong>…………</strong>
+        &nbsp;·&nbsp; Số km cuối: <strong>…………</strong>
+      </div>
+
+      {/* Signatures — 4 ô: Lái xe · Phụ trách điều động · Bảo vệ · Giám đốc */}
+      <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', gap: 10, textAlign: 'center', fontSize: 12 }}>
+        {['Lái xe', 'Phụ trách điều động', 'Bảo vệ', 'Giám đốc'].map((role) => (
+          <div key={role} style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, marginBottom: 52 }}>{role}</div>
+            <div style={{ borderTop: '1px solid #374151', paddingTop: 4, fontSize: 10.5, color: '#6B7280' }}>(Ký, ghi rõ họ tên)</div>
+          </div>
+        ))}
       </div>
 
       <PrintFooter />

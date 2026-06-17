@@ -32,6 +32,7 @@ import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import { isFieldEditableV4 } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
 import ShippingDocsSection from './ShippingDocsSection'
+import BookingTableSection from './BookingTableSection'
 
 // ============================================================================
 // HELPERS
@@ -321,13 +322,16 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         </div>
       </div>
 
-      {/* Booking & Tàu */}
-      <SectionHeader title="Booking & Tàu" color="#d48806" />
+      {/* Booking & Tàu — booking CHÍNH (cho dashboard ETD) */}
+      <SectionHeader title="Booking & Tàu (chính)" color="#d48806" />
       <Descriptions column={2} size="small" bordered>
         <Descriptions.Item label="Hãng tàu">{order.shipping_line || '—'}</Descriptions.Item>
         <Descriptions.Item label="Booking Ref">{order.booking_reference || '—'}</Descriptions.Item>
         <Descriptions.Item label="Tàu / Chuyến">{order.vessel_name || '—'}</Descriptions.Item>
       </Descriptions>
+
+      {/* Mức 2: bảng nhiều booking/lô (đơn đi nhiều booking) */}
+      <BookingTableSection orderId={order.id} canEdit={canEditLogistics} />
 
       <Divider style={{ margin: '12px 0' }} />
 

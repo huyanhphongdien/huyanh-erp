@@ -132,7 +132,7 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   // Đi cảng = mẫu container/seal đầy đủ. Chuyến nội bộ/thường = mẫu gọn có cột Hành trình.
   const isPort = order.trip_type === 'port'
   return (
-    <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 12.5, color: '#111' }}>
+    <div style={{ fontFamily: "'Be Vietnam Pro', 'Segoe UI', Tahoma, Arial, sans-serif", fontSize: 12.5, color: '#111' }}>
       <CompanyHeader />
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -168,27 +168,40 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
             </tr>
           </tbody>
         </table>
-      ) : (
-        <table style={{ width: '100%', fontSize: 12.5, marginBottom: 12, lineHeight: 1.9 }}>
-          <tbody>
-            <tr>
-              <td style={{ width: '50%' }}>Họ tên lái xe: <strong>{order.driver_name || '..............................'}</strong></td>
-              <td>SĐT: <strong>{order.driver_phone || '..................'}</strong></td>
-            </tr>
-            <tr>
-              <td>Biển số xe: <strong>{order.tractor_plate || '..................'}</strong></td>
-              <td>Rơ-moóc (nếu có): <strong>{order.trailer_plate || '—'}</strong></td>
-            </tr>
-            <tr>
-              <td>Điểm đến / Nơi nhận: <strong>{order.destination || '..............................'}</strong></td>
-              <td>Người nhận: <strong>{order.recipient_name || '..................'}</strong>{order.recipient_phone ? ` · ${order.recipient_phone}` : ''}</td>
-            </tr>
-            <tr>
-              <td colSpan={2}>Lý do điều động: <strong>{order.reason || '..............................'}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      )}
+      ) : (() => {
+        // Chuyến thường: ẩn trường thừa. Rơ-moóc/Người nhận chỉ hiện khi có; Điểm đến chỉ
+        // cần khi KHÔNG có dòng hành trình (đón khách) — vì cột "Hành trình" đã thể hiện nơi đến.
+        const showTrailer = !!order.trailer_plate
+        const showRecipient = !!order.recipient_name
+        const showDest = lines.length === 0 && !!order.destination
+        const rightOf2 = showTrailer
+          ? <>Rơ-moóc: <strong>{order.trailer_plate}</strong></>
+          : showDest ? <>Điểm đến: <strong>{order.destination}</strong></> : null
+        const showRow3 = showRecipient || (showDest && showTrailer)
+        return (
+          <table style={{ width: '100%', fontSize: 12.5, marginBottom: 12, lineHeight: 1.9 }}>
+            <tbody>
+              <tr>
+                <td style={{ width: '50%' }}>Họ tên lái xe: <strong>{order.driver_name || '..............................'}</strong></td>
+                <td>SĐT: <strong>{order.driver_phone || '..................'}</strong></td>
+              </tr>
+              <tr>
+                <td>Biển số xe: <strong>{order.tractor_plate || '..................'}</strong></td>
+                <td>{rightOf2}</td>
+              </tr>
+              {showRow3 && (
+                <tr>
+                  <td>{showDest && showTrailer ? <>Điểm đến: <strong>{order.destination}</strong></> : null}</td>
+                  <td>{showRecipient ? <>Người nhận: <strong>{order.recipient_name}</strong>{order.recipient_phone ? ` · ${order.recipient_phone}` : ''}</> : null}</td>
+                </tr>
+              )}
+              <tr>
+                <td colSpan={2}>Lý do điều động: <strong>{order.reason || '..............................'}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        )
+      })()}
 
       {/* Bảng chi tiết — đi cảng: container/seal; chuyến thường: hành trình/nội dung */}
       {isPort ? (
@@ -288,7 +301,7 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
 function HandoverSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   const totalW = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
   return (
-    <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 12.5, color: '#111', lineHeight: 1.6 }}>
+    <div style={{ fontFamily: "'Be Vietnam Pro', 'Segoe UI', Tahoma, Arial, sans-serif", fontSize: 12.5, color: '#111', lineHeight: 1.6 }}>
       <CompanyHeader />
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>

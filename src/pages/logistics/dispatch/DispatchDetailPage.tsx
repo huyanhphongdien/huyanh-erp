@@ -94,28 +94,39 @@ export default function DispatchDetailPage() {
     return <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto' }}><Card><Skeleton active /></Card></div>
   }
 
-  const lineColumns = [
-    { title: '#', key: 'idx', width: 40, render: (_: any, __: any, i: number) => i + 1 },
-    { title: 'Hành trình', dataIndex: 'route', render: (v: string) => v || '–' },
-    { title: 'Lô', dataIndex: 'lot_code', render: (v: string) => v || '–' },
-    { title: 'Loại hàng', dataIndex: 'grade', render: (v: string) => v || '–' },
-    { title: 'Số container', dataIndex: 'container_no', render: (v: string) => v ? <b>{v}</b> : '–' },
-    { title: 'Seal', dataIndex: 'seal_no', render: (v: string) => v || '–' },
-    { title: 'Số kiện', dataIndex: 'package_count', width: 80, align: 'right' as const, render: (v: number) => v ?? '–' },
-    { title: 'KL kế hoạch', dataIndex: 'weight_kg', width: 120, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
-    {
-      // Chỉ cần đánh dấu "Đã cân" — số cân (gồm pallet/bao bì) để nhỏ tham khảo, KHÔNG so với kế hoạch.
-      title: 'Cân hàng', dataIndex: 'actual_weight_kg', width: 130, align: 'right' as const,
-      render: (v: number | null) => v != null
-        ? (
-          <div style={{ textAlign: 'right' }}>
-            <Tag color="green" style={{ margin: 0 }}>✅ Đã cân</Tag>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{v.toLocaleString('vi-VN')} kg (gồm bì)</div>
-          </div>
-        )
-        : <span style={{ color: '#bbb' }}>chưa cân</span>,
-    },
-  ]
+  // Đi cảng = bảng container đầy đủ. Chuyến nội bộ/thường = bảng gọn (hành trình · nội dung · KL · ghi chú).
+  const isPort = order.trip_type === 'port'
+  const colWeighed = {
+    // Chỉ cần đánh dấu "Đã cân" — số cân (gồm pallet/bao bì) để nhỏ tham khảo, KHÔNG so với kế hoạch.
+    title: 'Cân hàng', dataIndex: 'actual_weight_kg', width: 130, align: 'right' as const,
+    render: (v: number | null) => v != null
+      ? (
+        <div style={{ textAlign: 'right' }}>
+          <Tag color="green" style={{ margin: 0 }}>✅ Đã cân</Tag>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{v.toLocaleString('vi-VN')} kg (gồm bì)</div>
+        </div>
+      )
+      : <span style={{ color: '#bbb' }}>chưa cân</span>,
+  }
+  const lineColumns = isPort
+    ? [
+        { title: '#', key: 'idx', width: 40, render: (_: any, __: any, i: number) => i + 1 },
+        { title: 'Hành trình', dataIndex: 'route', render: (v: string) => v || '–' },
+        { title: 'Lô', dataIndex: 'lot_code', render: (v: string) => v || '–' },
+        { title: 'Loại hàng', dataIndex: 'grade', render: (v: string) => v || '–' },
+        { title: 'Số container', dataIndex: 'container_no', render: (v: string) => v ? <b>{v}</b> : '–' },
+        { title: 'Seal', dataIndex: 'seal_no', render: (v: string) => v || '–' },
+        { title: 'Số kiện', dataIndex: 'package_count', width: 80, align: 'right' as const, render: (v: number) => v ?? '–' },
+        { title: 'KL kế hoạch', dataIndex: 'weight_kg', width: 120, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
+        colWeighed,
+      ]
+    : [
+        { title: '#', key: 'idx', width: 40, render: (_: any, __: any, i: number) => i + 1 },
+        { title: 'Hành trình', dataIndex: 'route', render: (v: string) => v || '–' },
+        { title: 'Nội dung / hàng hóa', dataIndex: 'grade', render: (v: string) => v || '–' },
+        { title: 'KL (kg)', dataIndex: 'weight_kg', width: 120, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
+        { title: 'Ghi chú', dataIndex: 'note', render: (v: string) => v || '–' },
+      ]
 
   const nexts = NEXT_STATUS[order.status]
 
@@ -175,7 +186,7 @@ export default function DispatchDetailPage() {
           <Descriptions.Item label="Rơ-moóc">{order.trailer_plate ? <Tag icon={<CarOutlined />} color="gold">{order.trailer_plate}</Tag> : '–'}</Descriptions.Item>
           <Descriptions.Item label="Tài xế">{order.driver_name ? <Space size={4}><IdcardOutlined />{order.driver_name}{order.driver_phone && <Text type="secondary">· {order.driver_phone}</Text>}</Space> : '–'}</Descriptions.Item>
           <Descriptions.Item label="Khách hàng">{order.customer_name || '–'}</Descriptions.Item>
-          <Descriptions.Item label="Điểm giao / Cảng">{order.destination || '–'}</Descriptions.Item>
+          <Descriptions.Item label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}>{order.destination || '–'}</Descriptions.Item>
           <Descriptions.Item label="Căn cứ HĐ / Booking">{order.contract_ref || '–'}</Descriptions.Item>
           <Descriptions.Item label="Người nhận">{order.recipient_name || '–'}</Descriptions.Item>
           <Descriptions.Item label="SĐT người nhận">{order.recipient_phone || '–'}</Descriptions.Item>
@@ -183,8 +194,10 @@ export default function DispatchDetailPage() {
           {order.note && <Descriptions.Item label="Ghi chú" span={3}>{order.note}</Descriptions.Item>}
         </Descriptions>
 
-        <Title level={4} style={{ marginTop: 8 }}>Container ({order.total_lines}) — tổng {order.total_weight.toLocaleString('vi-VN')} kg</Title>
-        <Table rowKey="id" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines} scroll={{ x: 900 }} />
+        <Title level={4} style={{ marginTop: 8 }}>{isPort ? 'Container' : 'Chi tiết chuyến'} ({order.total_lines}) — tổng {order.total_weight.toLocaleString('vi-VN')} kg</Title>
+        <Table rowKey="id" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines}
+          scroll={{ x: isPort ? 900 : 600 }}
+          locale={{ emptyText: isPort ? 'Chưa có container' : 'Chuyến không có hàng (vd: đón khách) — bỏ trống là bình thường' }} />
       </Card>
     </div>
   )

@@ -324,16 +324,17 @@ export default function DispatchCreatePage() {
   const watchedTripType = Form.useWatch('trip_type', form) as TripType | undefined
   const isPort = (watchedTripType ?? 'port') === 'port'
 
-  // Ô xe chính: đi cảng = chỉ đầu kéo; chuyến khác = gộp đầu kéo + xe con/bán tải/khách
-  // (để đón khách / chở hàng nội bộ chọn được mọi xe). Rơ-moóc tách riêng, tùy chọn.
-  const primaryVehicleOptions = useMemo(() => (
-    isPort
-      ? tractors.map(t => ({ value: t.id, label: vehicleLabel(t) }))
-      : [
-          { label: '🚛 Đầu kéo', options: tractors.map(t => ({ value: t.id, label: vehicleLabel(t) })) },
-          { label: '🚗 Xe con / bán tải / khách', options: others.map(t => ({ value: t.id, label: vehicleLabel(t) })) },
-        ].filter(g => g.options.length > 0)
-  ), [isPort, tractors, others])
+  // Ô xe chính LỌC THEO LOẠI CHUYẾN (phiếu):
+  //   • Xuất hàng đi cảng → chỉ Đầu kéo (kéo container).
+  //   • Đi Lào → Đầu kéo trước (chở hàng), rồi Xe con/khách (đi công tác).
+  //   • Nội bộ / Khác → Xe con/bán tải/khách trước (đón khách, việc vặt), rồi Đầu kéo.
+  const primaryVehicleOptions = useMemo(() => {
+    const tractorGrp = { label: '🚛 Đầu kéo', options: tractors.map(t => ({ value: t.id, label: vehicleLabel(t) })) }
+    const otherGrp = { label: '🚗 Xe con / bán tải / khách', options: others.map(t => ({ value: t.id, label: vehicleLabel(t) })) }
+    if (isPort) return tractorGrp.options
+    const leadOther = watchedTripType === 'internal' || watchedTripType === 'other'
+    return (leadOther ? [otherGrp, tractorGrp] : [tractorGrp, otherGrp]).filter(g => g.options.length > 0)
+  }, [isPort, watchedTripType, tractors, others])
 
   const lineColumns = useMemo(() => {
     const col: Record<string, any> = {

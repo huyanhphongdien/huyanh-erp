@@ -129,6 +129,8 @@ type SheetProps = {
 function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   const totalW = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
   const totalPkg = lines.reduce((s, l) => s + (l.package_count || 0), 0)
+  // Đi cảng = mẫu container/seal đầy đủ. Chuyến nội bộ/thường = mẫu gọn có cột Hành trình.
+  const isPort = order.trip_type === 'port'
   return (
     <div style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 12.5, color: '#111' }}>
       <CompanyHeader />
@@ -145,62 +147,117 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
       </div>
 
       {/* Info block */}
-      <table style={{ width: '100%', fontSize: 12.5, marginBottom: 12, lineHeight: 1.9 }}>
-        <tbody>
-          <tr>
-            <td style={{ width: '50%' }}>Họ tên lái xe: <strong>{order.driver_name || '..............................'}</strong></td>
-            <td>SĐT: <strong>{order.driver_phone || '..................'}</strong></td>
-          </tr>
-          <tr>
-            <td>Biển số đầu kéo: <strong>{order.tractor_plate || '..................'}</strong></td>
-            <td>Biển số rơ-moóc: <strong>{order.trailer_plate || '..................'}</strong></td>
-          </tr>
-          <tr>
-            <td>Khách hàng: <strong>{order.customer_name || '..............................'}</strong></td>
-            <td>Điểm giao / Cảng: <strong>{order.destination || '..............................'}</strong></td>
-          </tr>
-          <tr>
-            <td>Căn cứ HĐ / Booking: <strong>{order.contract_ref || '..............................'}</strong></td>
-            <td>Lý do điều động: {order.reason || '..............................'}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* Container table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-        <thead>
-          <tr style={{ background: '#1B4D3E', color: '#fff' }}>
-            <th style={{ ...th, width: 30 }}>STT</th>
-            {multiCustomer && <th style={th}>Khách hàng</th>}
-            <th style={th}>Lô hàng</th>
-            <th style={th}>Loại hàng</th>
-            <th style={th}>Số container</th>
-            <th style={th}>Số seal</th>
-            <th style={{ ...th, width: 60 }}>Số kiện</th>
-            <th style={{ ...th, width: 90 }}>Khối lượng (kg)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((l, i) => (
-            <tr key={l.id}>
-              <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
-              {multiCustomer && <td style={td}>{lineCustomer[l.sales_order_container_id || ''] || ''}</td>}
-              <td style={td}>{l.lot_code || ''}</td>
-              <td style={td}>{l.grade || ''}</td>
-              <td style={{ ...td, fontWeight: 600 }}>{l.container_no || ''}</td>
-              <td style={td}>{l.seal_no || ''}</td>
-              <td style={{ ...td, textAlign: 'right' }}>{l.package_count ?? ''}</td>
-              <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.weight_kg)}</td>
+      {isPort ? (
+        <table style={{ width: '100%', fontSize: 12.5, marginBottom: 12, lineHeight: 1.9 }}>
+          <tbody>
+            <tr>
+              <td style={{ width: '50%' }}>Họ tên lái xe: <strong>{order.driver_name || '..............................'}</strong></td>
+              <td>SĐT: <strong>{order.driver_phone || '..................'}</strong></td>
             </tr>
-          ))}
-          {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={multiCustomer ? 8 : 7}>(Chưa có container)</td></tr>}
-          <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
-            <td style={{ ...td, textAlign: 'right' }} colSpan={multiCustomer ? 6 : 5}>TỔNG CỘNG</td>
-            <td style={{ ...td, textAlign: 'right' }}>{totalPkg || ''}</td>
-            <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E' }}>{fmt(totalW)}</td>
-          </tr>
-        </tbody>
-      </table>
+            <tr>
+              <td>Biển số đầu kéo: <strong>{order.tractor_plate || '..................'}</strong></td>
+              <td>Biển số rơ-moóc: <strong>{order.trailer_plate || '..................'}</strong></td>
+            </tr>
+            <tr>
+              <td>Khách hàng: <strong>{order.customer_name || '..............................'}</strong></td>
+              <td>Điểm giao / Cảng: <strong>{order.destination || '..............................'}</strong></td>
+            </tr>
+            <tr>
+              <td>Căn cứ HĐ / Booking: <strong>{order.contract_ref || '..............................'}</strong></td>
+              <td>Lý do điều động: {order.reason || '..............................'}</td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <table style={{ width: '100%', fontSize: 12.5, marginBottom: 12, lineHeight: 1.9 }}>
+          <tbody>
+            <tr>
+              <td style={{ width: '50%' }}>Họ tên lái xe: <strong>{order.driver_name || '..............................'}</strong></td>
+              <td>SĐT: <strong>{order.driver_phone || '..................'}</strong></td>
+            </tr>
+            <tr>
+              <td>Biển số xe: <strong>{order.tractor_plate || '..................'}</strong></td>
+              <td>Rơ-moóc (nếu có): <strong>{order.trailer_plate || '—'}</strong></td>
+            </tr>
+            <tr>
+              <td>Điểm đến / Nơi nhận: <strong>{order.destination || '..............................'}</strong></td>
+              <td>Người nhận: <strong>{order.recipient_name || '..................'}</strong>{order.recipient_phone ? ` · ${order.recipient_phone}` : ''}</td>
+            </tr>
+            <tr>
+              <td colSpan={2}>Lý do điều động: <strong>{order.reason || '..............................'}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* Bảng chi tiết — đi cảng: container/seal; chuyến thường: hành trình/nội dung */}
+      {isPort ? (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: '#1B4D3E', color: '#fff' }}>
+              <th style={{ ...th, width: 30 }}>STT</th>
+              {multiCustomer && <th style={th}>Khách hàng</th>}
+              <th style={th}>Lô hàng</th>
+              <th style={th}>Loại hàng</th>
+              <th style={th}>Số container</th>
+              <th style={th}>Số seal</th>
+              <th style={{ ...th, width: 60 }}>Số kiện</th>
+              <th style={{ ...th, width: 90 }}>Khối lượng (kg)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((l, i) => (
+              <tr key={l.id}>
+                <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
+                {multiCustomer && <td style={td}>{lineCustomer[l.sales_order_container_id || ''] || ''}</td>}
+                <td style={td}>{l.lot_code || ''}</td>
+                <td style={td}>{l.grade || ''}</td>
+                <td style={{ ...td, fontWeight: 600 }}>{l.container_no || ''}</td>
+                <td style={td}>{l.seal_no || ''}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{l.package_count ?? ''}</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.weight_kg)}</td>
+              </tr>
+            ))}
+            {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={multiCustomer ? 8 : 7}>(Chưa có container)</td></tr>}
+            <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
+              <td style={{ ...td, textAlign: 'right' }} colSpan={multiCustomer ? 6 : 5}>TỔNG CỘNG</td>
+              <td style={{ ...td, textAlign: 'right' }}>{totalPkg || ''}</td>
+              <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E' }}>{fmt(totalW)}</td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: '#1B4D3E', color: '#fff' }}>
+              <th style={{ ...th, width: 30 }}>STT</th>
+              <th style={th}>Hành trình</th>
+              <th style={th}>Nội dung / hàng hóa</th>
+              <th style={{ ...th, width: 110 }}>Khối lượng (kg)</th>
+              <th style={{ ...th, width: 150 }}>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((l, i) => (
+              <tr key={l.id}>
+                <td style={{ ...td, textAlign: 'center' }}>{i + 1}</td>
+                <td style={td}>{l.route || ''}</td>
+                <td style={td}>{l.grade || ''}</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{l.weight_kg ? fmt(l.weight_kg) : ''}</td>
+                <td style={td}>{l.note || ''}</td>
+              </tr>
+            ))}
+            {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={5}>(Chuyến không có hàng — vd: đón khách / công tác)</td></tr>}
+            {totalW > 0 && (
+              <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
+                <td style={{ ...td, textAlign: 'right' }} colSpan={3}>TỔNG CỘNG</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E' }}>{fmt(totalW)}</td>
+                <td style={td}></td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
 
       {order.note && <div style={{ marginTop: 8, fontSize: 12 }}>Ghi chú: {order.note}</div>}
 

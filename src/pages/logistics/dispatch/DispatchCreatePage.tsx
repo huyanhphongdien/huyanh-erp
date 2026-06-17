@@ -56,6 +56,13 @@ const ROUTE_PRESETS = [
 const GRADE_PRESETS = ['SVR 10', 'SVR 3L', 'SVR L', 'SVR 5', 'SVR 20', 'SVR CV50', 'SVR CV60', 'RSS 1', 'RSS 3', 'Latex 60'].map(v => ({ value: v }))
 const acFilter = (input: string, opt?: { value: string }) => (opt?.value || '').toLowerCase().includes(input.toLowerCase())
 
+// Nhãn 1 xe trong dropdown: biển số · tài xế mặc định · tải/ghế.
+const vehicleLabel = (v: FleetVehicle) => {
+  const drv = v.default_driver ? ` · ${v.default_driver.full_name}` : ''
+  const cap = v.capacity_note ? ` · ${v.capacity_note}` : (v.capacity_kg ? ` · ${v.capacity_kg.toLocaleString('vi-VN')}kg` : '')
+  return `${v.plate}${drv}${cap}`
+}
+
 export default function DispatchCreatePage() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -65,6 +72,7 @@ export default function DispatchCreatePage() {
 
   const [tractors, setTractors] = useState<FleetVehicle[]>([])
   const [trailers, setTrailers] = useState<FleetVehicle[]>([])
+  const [others, setOthers] = useState<FleetVehicle[]>([])   // xe con / bán tải / khách (kind='other')
   const [drivers, setDrivers] = useState<FleetDriver[]>([])
   const [lines, setLines] = useState<LineRow[]>([])
   const [origLineIds, setOrigLineIds] = useState<string[]>([])
@@ -87,12 +95,13 @@ export default function DispatchCreatePage() {
   useEffect(() => {
     (async () => {
       try {
-        const [t, tr, d] = await Promise.all([
+        const [t, tr, ot, d] = await Promise.all([
           fleetService.listVehicles({ kind: 'tractor', active: true }),
           fleetService.listVehicles({ kind: 'trailer', active: true }),
+          fleetService.listVehicles({ kind: 'other', active: true }),
           fleetService.listDrivers({ active: true }),
         ])
-        setTractors(t); setTrailers(tr); setDrivers(d)
+        setTractors(t); setTrailers(tr); setOthers(ot); setDrivers(d)
       } catch (e: any) {
         message.error('Lỗi tải đội xe: ' + (e?.message || e))
       }
@@ -148,9 +157,10 @@ export default function DispatchCreatePage() {
     })()
   }, [id])
 
-  // ---- chọn đầu kéo → auto điền tài xế cố định ----
+  // ---- chọn xe (đầu kéo / xe con) → auto điền tài xế cố định nếu có ----
+  const allDriveable = useMemo(() => [...tractors, ...others], [tractors, others])
   const onTractorChange = (vid: string) => {
-    const t = tractors.find(x => x.id === vid)
+    const t = allDriveable.find(x => x.id === vid)
     if (t?.default_driver_id) {
       form.setFieldValue('driver_id', t.default_driver_id)
       if (!drivers.find(d => d.id === t.default_driver_id) && t.default_driver) {
@@ -314,6 +324,17 @@ export default function DispatchCreatePage() {
   const watchedTripType = Form.useWatch('trip_type', form) as TripType | undefined
   const isPort = (watchedTripType ?? 'port') === 'port'
 
+  // Ô xe chính: đi cảng = chỉ đầu kéo; chuyến khác = gộp đầu kéo + xe con/bán tải/khách
+  // (để đón khách / chở hàng nội bộ chọn được mọi xe). Rơ-moóc tách riêng, tùy chọn.
+  const primaryVehicleOptions = useMemo(() => (
+    isPort
+      ? tractors.map(t => ({ value: t.id, label: vehicleLabel(t) }))
+      : [
+          { label: '🚛 Đầu kéo', options: tractors.map(t => ({ value: t.id, label: vehicleLabel(t) })) },
+          { label: '🚗 Xe con / bán tải / khách', options: others.map(t => ({ value: t.id, label: vehicleLabel(t) })) },
+        ].filter(g => g.options.length > 0)
+  ), [isPort, tractors, others])
+
   const lineColumns = useMemo(() => {
     const col: Record<string, any> = {
       idx: { title: '#', key: 'idx', width: 44, render: (_: any, __: any, i: number) => i + 1 },
@@ -420,15 +441,16 @@ export default function DispatchCreatePage() {
           <Divider titlePlacement="left" style={{ margin: '4px 0 16px' }}>Phương tiện &amp; tài xế</Divider>
           <Row gutter={16}>
             <Col xs={24} sm={8}>
-              <Form.Item name="tractor_vehicle_id" label={<><TruckOutlined /> Đầu kéo</>}>
-                <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn đầu kéo" onChange={onTractorChange}
-                  options={tractors.map(t => ({ value: t.id, label: `${t.plate}${t.default_driver ? ` · ${t.default_driver.full_name}` : ''}` }))} />
+              <Form.Item name="tractor_vehicle_id" label={isPort ? <><TruckOutlined /> Đầu kéo</> : <><CarOutlined /> Xe (đầu kéo / xe con / khách)</>}>
+                <Select allowClear showSearch optionFilterProp="label"
+                  placeholder={isPort ? 'Chọn đầu kéo' : 'Chọn xe'} onChange={onTractorChange}
+                  options={primaryVehicleOptions} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
-              <Form.Item name="trailer_vehicle_id" label={<><CarOutlined /> Rơ-moóc (đổi theo chuyến)</>}>
+              <Form.Item name="trailer_vehicle_id" label={isPort ? <><CarOutlined /> Rơ-moóc (đổi theo chuyến)</> : <><CarOutlined /> Rơ-moóc (nếu kéo theo)</>}>
                 <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn rơ-moóc"
-                  options={trailers.map(t => ({ value: t.id, label: `${t.plate}${t.capacity_kg ? ` · ${t.capacity_kg.toLocaleString('vi-VN')}kg` : ''}` }))} />
+                  options={trailers.map(t => ({ value: t.id, label: vehicleLabel(t) }))} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>

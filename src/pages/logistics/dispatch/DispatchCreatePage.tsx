@@ -308,38 +308,51 @@ export default function DispatchCreatePage() {
     setSaving(false)
   }
 
-  const lineColumns = useMemo(() => [
-    { title: '#', key: 'idx', width: 44, render: (_: any, __: any, i: number) => i + 1 },
-    { title: 'Hành trình', key: 'route', width: 210, render: (_: any, r: LineRow) => (
-      <AutoComplete value={r.route || ''} style={{ width: '100%' }} options={ROUTE_PRESETS}
-        placeholder="Chọn / gõ tuyến…" filterOption={acFilter as any}
-        onChange={v => patchLine(r._key, { route: v })} />
-    ) },
-    { title: 'Lô hàng', key: 'lot', width: 130, render: (_: any, r: LineRow) => <Input value={r.lot_code || ''} onChange={e => patchLine(r._key, { lot_code: e.target.value })} /> },
-    { title: 'Loại hàng', key: 'grade', width: 140, render: (_: any, r: LineRow) => (
-      <AutoComplete value={r.grade || ''} style={{ width: '100%' }} options={GRADE_PRESETS}
-        placeholder="SVR 10…" filterOption={acFilter as any}
-        onChange={v => patchLine(r._key, { grade: v })} />
-    ) },
-    { title: 'Số container', key: 'cont', width: 160, render: (_: any, r: LineRow) => <Input value={r.container_no || ''} onChange={e => patchLine(r._key, { container_no: e.target.value })} /> },
-    { title: 'Seal', key: 'seal', width: 140, render: (_: any, r: LineRow) => <Input value={r.seal_no || ''} onChange={e => patchLine(r._key, { seal_no: e.target.value })} /> },
-    { title: 'Số kiện', key: 'pkg', width: 110, render: (_: any, r: LineRow) => (
-      <InputNumber value={r.package_count ?? undefined} min={0} controls={false} style={{ width: '100%' }}
-        onChange={v => {
-          const pkg = (v as number) ?? null
-          // KL TỰ NHẢY = số kiện × 35kg (chuẩn SVR) — chỉ khi ô KL còn trống, không đè giá trị đã nhập.
-          const patch: Partial<LineRow> = { package_count: pkg }
-          if (pkg && !r.weight_kg) patch.weight_kg = pkg * BALE_KG
-          patchLine(r._key, patch)
-        }} />
-    ) },
-    { title: 'KL (kg)', key: 'w', width: 140, render: (_: any, r: LineRow) => (
-      <InputNumber value={r.weight_kg || undefined} min={0} controls={false} style={{ width: '100%' }}
-        formatter={numFmt} parser={numParse as any} placeholder="0"
-        onChange={v => patchLine(r._key, { weight_kg: (v as number) || 0 })} />
-    ) },
-    { title: '', key: 'act', width: 50, render: (_: any, r: LineRow) => <Button danger icon={<DeleteOutlined />} onClick={() => removeLineRow(r._key)} /> },
-  ], [patchLine, removeLineRow])
+  // Loại chuyến: 'port' = đi cảng (đủ cột container/seal + gắn Đơn hàng bán).
+  // Khác (lao/internal/other) = chuyến thường (chở mủ, vật tư, nội bộ) → bảng GỌN.
+  const watchedTripType = Form.useWatch('trip_type', form) as TripType | undefined
+  const isPort = (watchedTripType ?? 'port') === 'port'
+
+  const lineColumns = useMemo(() => {
+    const col: Record<string, any> = {
+      idx: { title: '#', key: 'idx', width: 44, render: (_: any, __: any, i: number) => i + 1 },
+      route: { title: 'Hành trình', key: 'route', width: 210, render: (_: any, r: LineRow) => (
+        <AutoComplete value={r.route || ''} style={{ width: '100%' }} options={ROUTE_PRESETS}
+          placeholder="Chọn / gõ tuyến…" filterOption={acFilter as any}
+          onChange={v => patchLine(r._key, { route: v })} />
+      ) },
+      lot: { title: 'Lô hàng', key: 'lot', width: 130, render: (_: any, r: LineRow) => <Input value={r.lot_code || ''} onChange={e => patchLine(r._key, { lot_code: e.target.value })} /> },
+      grade: { title: 'Loại hàng', key: 'grade', width: 150, render: (_: any, r: LineRow) => (
+        <AutoComplete value={r.grade || ''} style={{ width: '100%' }} options={GRADE_PRESETS}
+          placeholder="SVR 10 / Mủ tờ…" filterOption={acFilter as any}
+          onChange={v => patchLine(r._key, { grade: v })} />
+      ) },
+      cont: { title: 'Số container', key: 'cont', width: 160, render: (_: any, r: LineRow) => <Input value={r.container_no || ''} onChange={e => patchLine(r._key, { container_no: e.target.value })} /> },
+      seal: { title: 'Seal', key: 'seal', width: 140, render: (_: any, r: LineRow) => <Input value={r.seal_no || ''} onChange={e => patchLine(r._key, { seal_no: e.target.value })} /> },
+      pkg: { title: 'Số kiện', key: 'pkg', width: 110, render: (_: any, r: LineRow) => (
+        <InputNumber value={r.package_count ?? undefined} min={0} controls={false} style={{ width: '100%' }}
+          onChange={v => {
+            const pkg = (v as number) ?? null
+            const patch: Partial<LineRow> = { package_count: pkg }
+            if (pkg && !r.weight_kg) patch.weight_kg = pkg * BALE_KG
+            patchLine(r._key, patch)
+          }} />
+      ) },
+      w: { title: 'KL (kg)', key: 'w', width: 140, render: (_: any, r: LineRow) => (
+        <InputNumber value={r.weight_kg || undefined} min={0} controls={false} style={{ width: '100%' }}
+          formatter={numFmt} parser={numParse as any} placeholder="0"
+          onChange={v => patchLine(r._key, { weight_kg: (v as number) || 0 })} />
+      ) },
+      note: { title: 'Ghi chú', key: 'note', width: 200, render: (_: any, r: LineRow) => (
+        <Input value={r.note || ''} placeholder="vd: chở mủ tờ" onChange={e => patchLine(r._key, { note: e.target.value })} />
+      ) },
+      act: { title: '', key: 'act', width: 50, render: (_: any, r: LineRow) => <Button danger icon={<DeleteOutlined />} onClick={() => removeLineRow(r._key)} /> },
+    }
+    // Đi cảng: đủ cột container/seal. Chuyến thường: gọn (hành trình · loại hàng · KL · ghi chú).
+    return isPort
+      ? [col.idx, col.route, col.lot, col.grade, col.cont, col.seal, col.pkg, col.w, col.act]
+      : [col.idx, col.route, col.grade, col.w, col.note, col.act]
+  }, [isPort, patchLine, removeLineRow])
 
   const totalWeight = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
 
@@ -372,24 +385,32 @@ export default function DispatchCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={8} md={13}>
-              <Form.Item label="Đơn hàng bán (gộp được nhiều đơn cho 1 xe)">
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  {attachedSos.length === 0 && <Typography.Text type="secondary">Chưa gắn đơn hàng</Typography.Text>}
-                  {attachedSos.map(s => (
-                    <Tag key={s.id} closable color="blue"
-                      onClose={(e) => { e.preventDefault(); removeAttachedSo(s.id) }}
-                      style={{ fontSize: 14, padding: '4px 10px', margin: 0, lineHeight: '22px' }}>
-                      <b>{s.code}</b>{s.customer_name ? ` — ${s.customer_name}` : ''}
-                      {s.containerIds.length > 0 && <span style={{ opacity: 0.7 }}> · {s.containerIds.length} cont</span>}
-                    </Tag>
-                  ))}
-                  <Button size="small" icon={<ImportOutlined />} onClick={openSoPicker}>
-                    {attachedSos.length ? '+ Thêm đơn khác' : 'Tạo từ Đơn hàng bán'}
-                  </Button>
-                </div>
-                {/* sales_order_id giữ trong form để submit, KHÔNG hiển thị UUID cho người dùng */}
-                <Form.Item name="sales_order_id" hidden><Input /></Form.Item>
-              </Form.Item>
+              {isPort ? (
+                <Form.Item label="Đơn hàng bán (gộp được nhiều đơn cho 1 xe)">
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                    {attachedSos.length === 0 && <Typography.Text type="secondary">Chưa gắn đơn hàng</Typography.Text>}
+                    {attachedSos.map(s => (
+                      <Tag key={s.id} closable color="blue"
+                        onClose={(e) => { e.preventDefault(); removeAttachedSo(s.id) }}
+                        style={{ fontSize: 14, padding: '4px 10px', margin: 0, lineHeight: '22px' }}>
+                        <b>{s.code}</b>{s.customer_name ? ` — ${s.customer_name}` : ''}
+                        {s.containerIds.length > 0 && <span style={{ opacity: 0.7 }}> · {s.containerIds.length} cont</span>}
+                      </Tag>
+                    ))}
+                    <Button size="small" icon={<ImportOutlined />} onClick={openSoPicker}>
+                      {attachedSos.length ? '+ Thêm đơn khác' : 'Tạo từ Đơn hàng bán'}
+                    </Button>
+                  </div>
+                </Form.Item>
+              ) : (
+                <Form.Item label="Loại chuyến này">
+                  <Typography.Text type="secondary">
+                    Chuyến thường (chở mủ / vật tư / nội bộ) — không gắn Đơn hàng bán. Nhập hành trình + loại hàng + KL ở bảng dưới.
+                  </Typography.Text>
+                </Form.Item>
+              )}
+              {/* sales_order_id giữ trong form để submit, KHÔNG hiển thị UUID cho người dùng */}
+              <Form.Item name="sales_order_id" hidden><Input /></Form.Item>
             </Col>
           </Row>
 
@@ -418,7 +439,7 @@ export default function DispatchCreatePage() {
           <Divider titlePlacement="left" style={{ margin: '4px 0 16px' }}>Thông tin chuyến</Divider>
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}><Form.Item name="customer_name" label="Khách hàng"><Input /></Form.Item></Col>
-            <Col xs={24} sm={12} md={8}><Form.Item name="destination" label="Điểm giao / Cảng"><Input placeholder="Cảng Tiên Sa" /></Form.Item></Col>
+            <Col xs={24} sm={12} md={8}><Form.Item name="destination" label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}><Input placeholder={isPort ? 'Cảng Tiên Sa' : 'vd: Gio Linh / Kho Quảng Trị'} /></Form.Item></Col>
             <Col xs={24} sm={12} md={8}><Form.Item name="contract_ref" label="Căn cứ HĐ / Booking"><Input /></Form.Item></Col>
             <Col xs={24} sm={12} md={8}><Form.Item name="recipient_name" label="Người nhận"><Input /></Form.Item></Col>
             <Col xs={24} sm={12} md={8}><Form.Item name="recipient_phone" label="SĐT người nhận"><Input /></Form.Item></Col>
@@ -428,12 +449,12 @@ export default function DispatchCreatePage() {
         </Form>
 
         <Divider titlePlacement="left" style={{ margin: '4px 0 12px' }}>
-          Danh sách container ({lines.length}) — tổng {totalWeight.toLocaleString('vi-VN')} kg
+          {isPort ? 'Danh sách container' : 'Chi tiết chuyến'} ({lines.length}) — tổng {totalWeight.toLocaleString('vi-VN')} kg
         </Divider>
         <Table rowKey="_key" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines}
-          scroll={{ x: 1180 }}
-          locale={{ emptyText: <Empty description="Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" /> }} />
-        <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>Thêm dòng container</Button>
+          scroll={{ x: isPort ? 1180 : 760 }}
+          locale={{ emptyText: <Empty description={isPort ? "Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" : "Chưa có dòng — bấm 'Thêm dòng' để khai hành trình + loại hàng"} /> }} />
+        <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>{isPort ? 'Thêm dòng container' : 'Thêm dòng'}</Button>
       </Card>
 
       {/* SO picker — 2 BƯỚC: (1) chọn đơn → (2) tích container đi chuyến hôm nay */}

@@ -1,11 +1,11 @@
 # Báo cáo thu mua mủ hằng ngày — Triển khai
 
-Edge function `daily-rubber-report` gửi mail BGĐ lúc **~00:05 giờ VN (đầu ngày)**, tổng hợp
+Edge function `daily-rubber-report` gửi mail BGĐ lúc **~00:01 giờ VN (đầu ngày)**, tổng hợp
 **TRỌN NGÀY HÔM TRƯỚC** (số liệu 00:00–24:00). Bố cục khớp `MAIL_BAO_CAO_THU_MUA_MOCK.html`.
 
 > **Vì sao chạy đầu ngày, không phải 18:00?** Bản cũ chạy 18:00 chỉ gom được 00:00–18:00 nên
 > **miss các phiếu cân buổi tối**. Chạy ngay sau nửa đêm + chế độ `prevday` đảm bảo gom đủ cả
-> ngày vừa kết thúc.
+> ngày vừa kết thúc. VD: báo cáo NGÀY 17 = trọn ngày 17, gửi lúc ~00:01 ngày 18.
 
 **Người nhận (đã chốt):** Lê Văn Huy (huylv), Anh Trung (trunglxh), Hồ Thị Thủy (thuyht), Lê Duy Minh (minhld).
 
@@ -25,16 +25,16 @@ curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber
 > ⚠ Để test riêng cho minhld (khỏi gửi BGĐ), tạm sửa `REPORT_RECIPIENTS` trong code về `[{ minhld }]` rồi deploy lại.
 > Tùy chọn body `{"range":"today"}` → xem nhanh số liệu HÔM NAY tới giờ gọi (chưa trọn ngày).
 
-## 3. Lên lịch tự động 00:05 VN (pg_cron — chạy 1 lần ở Supabase SQL Editor)
-00:05 VN = **17:05 UTC** (hôm trước) → cron `5 17 * * *`. Thay `<SERVICE_ROLE_KEY>` bằng key thật.
+## 3. Lên lịch tự động 00:01 VN (pg_cron — chạy 1 lần ở Supabase SQL Editor)
+00:01 VN = **17:01 UTC** (hôm trước) → cron `1 17 * * *`. Thay `<SERVICE_ROLE_KEY>` bằng key thật.
 ```sql
 -- Huỷ job 18:00 cũ (nếu đang chạy)
 select cron.unschedule('daily-rubber-report-1800');
 
--- Lên lịch mới: 00:05 VN, báo cáo TRỌN NGÀY HÔM TRƯỚC (prevday)
+-- Lên lịch mới: 00:01 VN, báo cáo TRỌN NGÀY HÔM TRƯỚC (prevday)
 select cron.schedule(
-  'daily-rubber-report-0005',
-  '5 17 * * *',
+  'daily-rubber-report-0001',
+  '1 17 * * *',
   $$
   select net.http_post(
     url     := 'https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber-report',
@@ -48,7 +48,7 @@ select cron.schedule(
 );
 ```
 Kiểm lịch: `select jobname, schedule, active from cron.job where jobname like 'daily-rubber-report%';`
-Đổi giờ/huỷ: `select cron.unschedule('daily-rubber-report-0005');` rồi schedule lại.
+Đổi giờ/huỷ: `select cron.unschedule('daily-rubber-report-0001');` rồi schedule lại.
 > Body gửi `{"range":"prevday"}` để chắc chắn trọn ngày kể cả trước khi deploy bản code mới.
 
 ## Ghi chú

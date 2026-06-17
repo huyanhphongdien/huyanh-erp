@@ -1,12 +1,12 @@
 // =============================================================================
 // EDGE FUNCTION: daily-rubber-report
-// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi ~00:05 giờ VN, tổng hợp TRỌN NGÀY HÔM TRƯỚC (00:00–24:00).
+// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi ~00:01 giờ VN (đầu ngày), tổng hợp TRỌN NGÀY HÔM TRƯỚC (00:00–24:00).
 // Nguồn: weighbridge_tickets (NHẬP, completed) + facilities + b2b_partners.
 // Cửa sổ mặc định (prevday): [hôm qua 00:00, hôm nay 00:00) giờ VN; so với ngày trước đó.
 // (Tùy chọn body {"range":"today"} để xem nhanh HÔM NAY tới giờ gọi — KHÔNG trọn ngày.)
 //
 // Deploy: npx supabase functions deploy daily-rubber-report --no-verify-jwt
-// Schedule (pg_cron): `5 17 * * *` UTC = 00:05 VN, body {"range":"prevday"} (xem scheduled SQL ở docs).
+// Schedule (pg_cron): `1 17 * * *` UTC = 00:01 VN, body {"range":"prevday"} (xem scheduled SQL ở docs).
 // Test:   curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber-report" \
 //           -H "Authorization: Bearer <SERVICE_ROLE_KEY>" -H "Content-Type: application/json" -d "{}"
 // =============================================================================
@@ -543,7 +543,7 @@ function renderHtml(d: any): string {
         <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
           ${d.isToday
             ? `Báo cáo nhanh số liệu <b>HÔM NAY tới giờ gọi</b> (chưa trọn ngày), từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
-            : `Báo cáo tự động <b>đầu ngày (~00:05)</b> cho <b>TRỌN NGÀY HÔM TRƯỚC</b>, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
+            : `Báo cáo tự động <b>đầu ngày (~00:01)</b> cho <b>TRỌN NGÀY HÔM TRƯỚC</b>, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
           Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN. KL khô = KL tươi × DRC.<br>
           Khối <b>Lũy kế từ đầu tháng</b> = cộng dồn từ ngày 01 đến hết kỳ báo cáo.<br>
           Mủ chưa có DRC được tạm tính theo DRC trung bình cùng loại.

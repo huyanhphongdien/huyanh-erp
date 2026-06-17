@@ -24,13 +24,16 @@ const CLIENT_ID = Deno.env.get('AZURE_CLIENT_ID') || 'ee1377e6-b52c-4326-88f2-c1
 const CLIENT_SECRET = Deno.env.get('AZURE_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET') || ''
 const SENDER_EMAIL = Deno.env.get('EMAIL_FROM') || 'huyanhphongdien@huyanhrubber.com'
 
-// ★ Gửi BGĐ (đã chốt). Quay lại test riêng: tạm đổi về [{ minhld }].
+// ⚠ ĐANG TEST: chỉ gửi minhld. Khôi phục BGĐ → bỏ comment khối dưới.
 const REPORT_RECIPIENTS = [
-  { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
-  { name: 'Anh Trung', email: 'trunglxh@huyanhrubber.com' },
-  { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
 ]
+// const REPORT_RECIPIENTS = [
+//   { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
+//   { name: 'Anh Trung', email: 'trunglxh@huyanhrubber.com' },
+//   { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
+//   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
+// ]
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

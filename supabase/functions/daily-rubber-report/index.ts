@@ -1,12 +1,12 @@
 // =============================================================================
 // EDGE FUNCTION: daily-rubber-report
-// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi 18:00 giờ VN, tổng hợp NGÀY HÔM NAY (00:00–18:00).
+// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi ~00:05 giờ VN, tổng hợp TRỌN NGÀY HÔM TRƯỚC (00:00–24:00).
 // Nguồn: weighbridge_tickets (NHẬP, completed) + facilities + b2b_partners.
-// Cửa sổ mặc định: [hôm nay 00:00, giờ chạy) giờ VN; so với cùng khung hôm qua.
-// (Tùy chọn body {"range":"prevday"} để báo cáo trọn ngày hôm trước.)
+// Cửa sổ mặc định (prevday): [hôm qua 00:00, hôm nay 00:00) giờ VN; so với ngày trước đó.
+// (Tùy chọn body {"range":"today"} để xem nhanh HÔM NAY tới giờ gọi — KHÔNG trọn ngày.)
 //
 // Deploy: npx supabase functions deploy daily-rubber-report --no-verify-jwt
-// Schedule (pg_cron): `0 11 * * *` UTC = 18:00 VN (xem scheduled SQL ở docs).
+// Schedule (pg_cron): `5 17 * * *` UTC = 00:05 VN, body {"range":"prevday"} (xem scheduled SQL ở docs).
 // Test:   curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber-report" \
 //           -H "Authorization: Bearer <SERVICE_ROLE_KEY>" -H "Content-Type: application/json" -d "{}"
 // =============================================================================
@@ -141,8 +141,10 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const repEnd = isToday ? new Date().toISOString() : new Date(vnMidnightUTC).toISOString()
   const prevStart = new Date(isToday ? vnMidnightUTC - DAY : vnMidnightUTC - 2 * DAY).toISOString()
   const prevEnd = isToday ? new Date(Date.now() - DAY).toISOString() : repStart
-  // LŨY KẾ THÁNG: 01/MM 00:00 (giờ VN) → hết kỳ báo cáo (repEnd).
-  const monthStartUTC = Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), 1) - VN_OFFSET
+  // NGÀY ĐƯỢC BÁO CÁO (prevday = hôm qua). Tháng/nhãn bám theo ngày này để mùng 1 vẫn ra tháng trước.
+  const reportedVn = new Date((isToday ? vnMidnightUTC : vnMidnightUTC - DAY) + VN_OFFSET)
+  // LŨY KẾ THÁNG: 01/MM 00:00 (giờ VN) của THÁNG NGÀY BÁO CÁO → hết kỳ báo cáo (repEnd).
+  const monthStartUTC = Date.UTC(reportedVn.getUTCFullYear(), reportedVn.getUTCMonth(), 1) - VN_OFFSET
   const monthStart = new Date(monthStartUTC).toISOString()
 
   const [today, yesterday, month] = await Promise.all([
@@ -245,9 +247,9 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
     mDealerMap.set(name, cur)
   }
   const mTopDealers = [...mDealerMap.values()].sort((a, b) => b.tuoi - a.tuoi).slice(0, 5)
-  const mLabelStart = `01/${String(vnNow.getUTCMonth() + 1).padStart(2, '0')}`
+  const mLabelStart = `01/${String(reportedVn.getUTCMonth() + 1).padStart(2, '0')}`
   const monthAgg = {
-    label: `${mLabelStart} → ${String((isToday ? vnNow.getUTCDate() : new Date(vnMidnightUTC - DAY + VN_OFFSET).getUTCDate())).padStart(2, '0')}/${String(vnNow.getUTCMonth() + 1).padStart(2, '0')}`,
+    label: `${mLabelStart} → ${String(reportedVn.getUTCDate()).padStart(2, '0')}/${String(reportedVn.getUTCMonth() + 1).padStart(2, '0')}`,
     tuoi: mTuoi, kho: mKho, drcTB: mDrcTB,
     xeCount: month.length, dealerCount: mDealerMap.size, topDealers: mTopDealers,
   }
@@ -257,7 +259,7 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
 
   // Nhãn ngày = NGÀY ĐƯỢC BÁO CÁO (hôm qua, hoặc hôm nay nếu mode test)
-  const repLocal = new Date((isToday ? vnMidnightUTC : vnMidnightUTC - DAY) + VN_OFFSET)
+  const repLocal = reportedVn
   const cutoff = `${String(vnNow.getUTCHours()).padStart(2, '0')}:${String(vnNow.getUTCMinutes()).padStart(2, '0')}`
   const dateLabel = `${DAYS_VI[repLocal.getUTCDay()]}, ${String(repLocal.getUTCDate()).padStart(2, '0')}/${String(repLocal.getUTCMonth() + 1).padStart(2, '0')}/${repLocal.getUTCFullYear()}`
     + (isToday ? ` (tới ${cutoff})` : '')
@@ -537,8 +539,8 @@ function renderHtml(d: any): string {
       <tr><td style="padding:16px 24px 22px 24px;border-top:1px solid #eef1f0;">
         <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
           ${d.isToday
-            ? `Báo cáo tự động lúc <b>18:00 mỗi ngày</b> cho NGÀY HÔM NAY, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
-            : `Báo cáo cho NGÀY HÔM TRƯỚC, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
+            ? `Báo cáo nhanh số liệu <b>HÔM NAY tới giờ gọi</b> (chưa trọn ngày), từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
+            : `Báo cáo tự động <b>đầu ngày (~00:05)</b> cho <b>TRỌN NGÀY HÔM TRƯỚC</b>, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
           Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN. KL khô = KL tươi × DRC.<br>
           Khối <b>Lũy kế từ đầu tháng</b> = cộng dồn từ ngày 01 đến hết kỳ báo cáo.<br>
           Mủ chưa có DRC được tạm tính theo DRC trung bình cùng loại.
@@ -554,9 +556,9 @@ function renderHtml(d: any): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    // Mặc định: HÔM NAY tới giờ chạy (cron 18:00). Gửi {"range":"prevday"} để báo cáo ngày hôm trước.
-    let mode: 'prevday' | 'today' = 'today'
-    try { const b = await req.json(); if (b && b.range === 'prevday') mode = 'prevday' } catch { /* no body */ }
+    // Mặc định: TRỌN NGÀY HÔM TRƯỚC (cron đầu ngày). Gửi {"range":"today"} để xem nhanh hôm nay tới giờ gọi.
+    let mode: 'prevday' | 'today' = 'prevday'
+    try { const b = await req.json(); if (b && b.range === 'today') mode = 'today' } catch { /* no body */ }
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const d = await collectData(supabase, mode)
     const html = renderHtml(d)

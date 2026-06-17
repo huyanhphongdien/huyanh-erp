@@ -28,8 +28,9 @@ curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber
 ## 3. Lên lịch tự động 00:01 VN (pg_cron — chạy 1 lần ở Supabase SQL Editor)
 00:01 VN = **17:01 UTC** (hôm trước) → cron `1 17 * * *`. Thay `<SERVICE_ROLE_KEY>` bằng key thật.
 ```sql
--- Huỷ job 18:00 cũ (nếu đang chạy)
-select cron.unschedule('daily-rubber-report-1800');
+-- Huỷ mọi job cũ NẾU tồn tại (no-op nếu không có → tránh lỗi rollback cả khối)
+select cron.unschedule(jobid) from cron.job
+where jobname in ('daily-rubber-report-1800','daily-rubber-report-0005');
 
 -- Lên lịch mới: 00:01 VN, báo cáo TRỌN NGÀY HÔM TRƯỚC (prevday)
 select cron.schedule(

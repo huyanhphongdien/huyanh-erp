@@ -57,8 +57,12 @@ export default function DispatchListPage() {
         </Space>
       ),
     },
-    { title: 'Khách / Điểm giao', key: 'cust', render: (_: any, r: DispatchOrder) => <span>{[r.customer_name, r.destination].filter(Boolean).join(' → ') || '–'}</span> },
-    { title: 'Cont', dataIndex: 'total_lines', key: 'lines', width: 70, align: 'center' as const },
+    { title: 'Khách / Điểm đến', key: 'cust', render: (_: any, r: DispatchOrder) => <span>{[r.customer_name, r.destination].filter(Boolean).join(' → ') || '–'}</span> },
+    {
+      // Đi cảng: số container. Chuyến khác: số dòng hành trình → nhãn trung tính.
+      title: 'Cont/Dòng', dataIndex: 'total_lines', key: 'lines', width: 80, align: 'center' as const,
+      render: (v: number, r: DispatchOrder) => (r.trip_type === 'port' ? (v || 0) : (v ? v : '–')),
+    },
     { title: 'KL (kg)', dataIndex: 'total_weight', key: 'w', width: 110, align: 'right' as const, render: (v: number) => v ? v.toLocaleString('vi-VN') : '–' },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130, render: (s: DispatchStatus) => <Tag color={STATUS_COLOR[s]}>{DISPATCH_STATUS_LABELS[s]}</Tag> },
   ]

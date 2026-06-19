@@ -63,6 +63,8 @@ function salesOrderToContractData(order: SalesOrder): Partial<ContractFormData> 
     const map: Record<string, string> = {
       loose_bale: 'Loose bales packing',
       sw_pallet: 'SW Pallet packing',
+      sw_plastic_pallet: 'Shrink Wrapped plastic pallets',
+      sw_wooden_pallet: 'Shrink Wrapped wooden pallets',
       wooden_pallet: 'Wooden pallets (fumigated)',
       plastic_pallet: 'Plastic pallets',
       metal_box: 'Metal box packing',
@@ -71,7 +73,7 @@ function salesOrderToContractData(order: SalesOrder): Partial<ContractFormData> 
   })()
 
   const pt = firstItem?.packing_type || order.packing_type || ''
-  const pallets_total = ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(pt) && itemsTotalBales > 0
+  const pallets_total = ['wooden_pallet', 'sw_pallet', 'sw_plastic_pallet', 'sw_wooden_pallet', 'plastic_pallet'].includes(pt) && itemsTotalBales > 0
     ? String(Math.ceil(itemsTotalBales / 36))
     : ''
 

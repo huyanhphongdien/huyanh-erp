@@ -59,6 +59,8 @@ import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
   SVR_GRADE_OPTIONS,
+  PACKING_TYPE_LABELS,
+  type PackingType,
 } from '../../services/sales/salesTypes'
 import GradeBadge from '../../components/wms/GradeBadge'
 import { useAuthStore } from '../../stores/authStore'
@@ -1684,7 +1686,7 @@ const SalesOrderListPage = () => {
                           <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.total_bales?.toLocaleString()}</td>
                           <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{item.container_count}</td>
                           <td style={{ padding: '6px 12px' }}>{item.bale_weight_kg} kg</td>
-                          <td style={{ padding: '6px 12px', fontSize: 11 }}>{item.packing_type === 'sw_pallet' ? 'SW Pallet' : item.packing_type === 'wooden_pallet' ? 'Wooden Pallet' : item.packing_type === 'metal_box' ? 'Metal Box' : 'Loose Bale'}</td>
+                          <td style={{ padding: '6px 12px', fontSize: 11 }}>{PACKING_TYPE_LABELS[item.packing_type as PackingType] || 'Loose Bale'}</td>
                           <td style={{ padding: '6px 12px', fontSize: 11 }}>{item.payment_terms ? item.payment_terms.split(',').map((pt: string) => pt.replace(/_/g, ' ')).join(' + ') : '—'}</td>
                         </tr>
                       ))}

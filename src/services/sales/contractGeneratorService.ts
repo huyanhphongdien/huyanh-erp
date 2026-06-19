@@ -196,6 +196,8 @@ export function formatPortForContract(port: string | null | undefined): string {
 const PACKING_TYPE_LABEL: Record<string, string> = {
   loose_bale: 'Loose bales packing',
   sw_pallet: 'SW Pallet packing',
+  sw_plastic_pallet: 'Shrink Wrapped plastic pallets',
+  sw_wooden_pallet: 'Shrink Wrapped wooden pallets',
   wooden_pallet: 'Wooden pallets (fumigated)',
   plastic_pallet: 'Plastic pallets',
   metal_box: 'Metal box packing',
@@ -259,10 +261,11 @@ export async function generateContractBlob(
   const packingDesc = (data.packing_desc || '').toLowerCase()
   const hasFumigation =
     data.packing_type === 'wooden_pallet' ||
+    data.packing_type === 'sw_wooden_pallet' ||
     (packingDesc.includes('wooden pallet') && !packingDesc.includes('loose'))
   // has_pallets: ẩn segment "X Wooden pallets /" khi loose_bale (không có pallet)
   const hasPallets =
-    ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(data.packing_type || '') ||
+    ['wooden_pallet', 'sw_pallet', 'sw_plastic_pallet', 'sw_wooden_pallet', 'plastic_pallet'].includes(data.packing_type || '') ||
     (!!data.pallets_total && data.pallets_total !== '' && data.pallets_total !== '0')
   // is_lc_payment: ẩn câu "The L/C draft must be opened..." khi không phải L/C
   const paymentLower = (data.payment || '').toLowerCase()

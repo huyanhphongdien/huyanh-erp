@@ -11,7 +11,7 @@ export type CustomerTier = 'standard' | 'premium' | 'strategic'
 export type PaymentTerms = 'LC_30' | 'LC_60' | 'LC_90' | 'TT_10' | 'TT_30' | 'TT_60' | 'TT_100' | 'CAD' | 'DP'
 export type Incoterm = 'FOB' | 'CIF' | 'CNF' | 'DDP' | 'EXW'
 export type QualityStandard = 'TCVN_3769' | 'ISO_2000' | 'CUSTOM'
-export type PackingType = 'loose_bale' | 'sw_pallet' | 'wooden_pallet' | 'plastic_pallet' | 'metal_box'
+export type PackingType = 'loose_bale' | 'sw_pallet' | 'sw_plastic_pallet' | 'sw_wooden_pallet' | 'wooden_pallet' | 'plastic_pallet' | 'metal_box'
 export type ContainerType = '20ft' | '40ft'
 export type SalesCurrency = 'USD' | 'EUR' | 'JPY' | 'CNY'
 
@@ -483,11 +483,23 @@ export const CONTAINER_STATUS_COLORS: Record<ContainerStatus, string> = {
 // -- Loại đóng gói --
 export const PACKING_TYPE_LABELS: Record<PackingType, string> = {
   loose_bale: 'Loose Bale',
-  sw_pallet: 'SW Pallet (Shrink Wrap)',
-  wooden_pallet: 'Wooden Pallet',
+  sw_plastic_pallet: 'Shrink Wrapped plastic pallets',
+  sw_wooden_pallet: 'Shrink Wrapped wooden pallets',
   plastic_pallet: 'Plastic Pallet',
+  wooden_pallet: 'Wooden Pallet',
   metal_box: 'Metal Box',
+  sw_pallet: 'SW Pallet (Shrink Wrap)', // LEGACY — đã tách thành 2 loại SW, giữ để hiển thị đơn cũ
 }
+
+// Danh sách CHO CHỌN trên dropdown (bỏ sw_pallet cũ — khách yêu cầu tách plastic/wooden).
+export const PACKING_TYPE_OPTIONS: { value: PackingType; label: string }[] = [
+  { value: 'loose_bale', label: 'Loose Bale' },
+  { value: 'sw_plastic_pallet', label: 'Shrink Wrapped plastic pallets' },
+  { value: 'sw_wooden_pallet', label: 'Shrink Wrapped wooden pallets' },
+  { value: 'plastic_pallet', label: 'Plastic Pallet' },
+  { value: 'wooden_pallet', label: 'Wooden Pallet' },
+  { value: 'metal_box', label: 'Metal Box' },
+]
 
 // -- Trạng thái hóa đơn --
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {

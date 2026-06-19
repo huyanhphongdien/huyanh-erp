@@ -29,6 +29,7 @@ import {
   INCOTERM_LABELS,
   PAYMENT_TERMS_LABELS,
   PACKING_TYPE_LABELS,
+  PACKING_TYPE_OPTIONS,
   PORT_OF_LOADING_OPTIONS,
   SVR_GRADE_OPTIONS,
   type Incoterm,
@@ -490,7 +491,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
                           onChange={(v) => {
                             const next = [...editItems]; next[idx] = { ...it, packing_type: v }; setEditItems(next)
                           }}
-                          options={Object.entries(PACKING_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                          options={PACKING_TYPE_OPTIONS}
                         />
                       </td>
                       <td style={{ padding: '4px 6px' }}>

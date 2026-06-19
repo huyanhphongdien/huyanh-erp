@@ -219,6 +219,8 @@ function SalesOrderCreatePage() {
           const map: Record<string, string> = {
             loose_bale: 'Loose bales packing',
             sw_pallet: 'SW Pallet packing',
+            sw_plastic_pallet: 'Shrink Wrapped plastic pallets',
+            sw_wooden_pallet: 'Shrink Wrapped wooden pallets',
             wooden_pallet: 'Wooden pallets (fumigated)',
             plastic_pallet: 'Plastic pallets',
             metal_box: 'Metal box packing',
@@ -227,11 +229,11 @@ function SalesOrderCreatePage() {
           return `${kg} kg/bale, ${human}`
         })(),
       bales_total: itemsTotalBales ? itemsTotalBales.toLocaleString('en-US') : '',
-      // pallets_total: chỉ tính khi packing dùng pallet (wooden_pallet/sw_pallet/plastic_pallet),
+      // pallets_total: chỉ tính khi packing dùng pallet (mọi loại pallet),
       // standard 36 bales/pallet (16 pallets x 36 = 576 bales/20DC). Khác thì để rỗng.
       pallets_total: (() => {
         const pt = firstItem.packing_type || ''
-        if (!['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(pt)) return ''
+        if (!['wooden_pallet', 'sw_pallet', 'sw_plastic_pallet', 'sw_wooden_pallet', 'plastic_pallet'].includes(pt)) return ''
         const balesPerPallet = 36
         return itemsTotalBales > 0 ? String(Math.ceil(itemsTotalBales / balesPerPallet)) : ''
       })(),
@@ -660,9 +662,10 @@ function SalesOrderCreatePage() {
                     popupMatchSelectWidth={false}
                     options={[
                       { value: 'loose_bale', label: 'Loose Bale' },
-                      { value: 'sw_pallet', label: 'SW Pallet' },
-                      { value: 'wooden_pallet', label: 'Wooden Pallet' },
+                      { value: 'sw_plastic_pallet', label: 'Shrink Wrapped plastic pallets' },
+                      { value: 'sw_wooden_pallet', label: 'Shrink Wrapped wooden pallets' },
                       { value: 'plastic_pallet', label: 'Plastic Pallet' },
+                      { value: 'wooden_pallet', label: 'Wooden Pallet' },
                       { value: 'metal_box', label: 'Metal Box' },
                     ]}
                     onChange={(v) => updateItem(item.key, 'packing_type', v)} />

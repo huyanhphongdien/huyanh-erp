@@ -751,8 +751,8 @@ export const salesContractWorkflowService = {
     // Conditional flags cho docxtemplater xử lý block {{#has_xxx}}...{{/has_xxx}}
     // Bỏ is_lc_payment: template đã strip block, Sale gõ FULL payment text trong form.
     const packingType = (o.packing_type || 'loose_bale').toLowerCase()
-    const hasPallets = ['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(packingType)
-    const hasFumigation = packingType === 'wooden_pallet'
+    const hasPallets = ['wooden_pallet', 'sw_pallet', 'sw_plastic_pallet', 'sw_wooden_pallet', 'plastic_pallet'].includes(packingType)
+    const hasFumigation = packingType === 'wooden_pallet' || packingType === 'sw_wooden_pallet'
     // Priority: item textbox (Sale gõ FULL text bao gồm điều khoản LC/TT/CAD)
     //   → header note → header default → fallback
     const paymentText = firstItemPayment || o.payment_terms_note || o.payment_terms || 'LC at sight'

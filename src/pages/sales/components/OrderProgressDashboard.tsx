@@ -95,6 +95,8 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
         const map: Record<string, string> = {
           loose_bale: 'Loose bales packing',
           sw_pallet: 'SW Pallet packing',
+          sw_plastic_pallet: 'Shrink Wrapped plastic pallets',
+          sw_wooden_pallet: 'Shrink Wrapped wooden pallets',
           wooden_pallet: 'Wooden pallets (fumigated)',
           plastic_pallet: 'Plastic pallets',
           metal_box: 'Metal box packing',
@@ -106,7 +108,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
       // pallets_total: chỉ tính khi pallet packing, standard 36 bales/pallet
       pallets_total: (() => {
         const pt = o.packing_type || ''
-        if (!['wooden_pallet', 'sw_pallet', 'plastic_pallet'].includes(pt)) return ''
+        if (!['wooden_pallet', 'sw_pallet', 'sw_plastic_pallet', 'sw_wooden_pallet', 'plastic_pallet'].includes(pt)) return ''
         return bales > 0 ? String(Math.ceil(bales / 36)) : ''
       })(),
       containers: String(o.container_count || ''),
@@ -359,7 +361,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
                       <td style={td}>{(item.quantity_tons || 0).toFixed(2)}</td>
                       <td style={td}>${(item.unit_price || 0).toLocaleString()}</td>
                       <td style={td}>{bales.toLocaleString()}</td>
-                      <td style={td}>{(item.packing_type || '—').replace('_', ' ')}</td>
+                      <td style={td}>{(item.packing_type || '—').replace(/_/g, ' ')}</td>
                       <td style={td}>{item.payment_terms || '—'}</td>
                       <td style={{ ...td, textAlign: 'right', paddingRight: 16 }}>
                         <strong>{fmtFull(total)}</strong>

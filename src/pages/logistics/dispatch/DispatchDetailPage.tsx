@@ -117,7 +117,8 @@ export default function DispatchDetailPage() {
         { title: 'Số container', dataIndex: 'container_no', render: (v: string) => v ? <b>{v}</b> : '–' },
         { title: 'Seal', dataIndex: 'seal_no', render: (v: string) => v || '–' },
         { title: 'Số kiện', dataIndex: 'package_count', width: 80, align: 'right' as const, render: (v: number) => v ?? '–' },
-        { title: 'KL kế hoạch', dataIndex: 'weight_kg', width: 120, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
+        { title: 'KL net (KH)', dataIndex: 'weight_kg', width: 110, align: 'right' as const, render: (v: number) => v ? `${v.toLocaleString('vi-VN')} kg` : '–' },
+        { title: 'GW (gross)', dataIndex: 'gross_weight_kg', width: 110, align: 'right' as const, render: (v: number | null) => v != null ? <b style={{ color: '#92400E' }}>{v.toLocaleString('vi-VN')} kg</b> : <span style={{ color: '#bbb' }}>—</span> },
         colWeighed,
       ]
     : [

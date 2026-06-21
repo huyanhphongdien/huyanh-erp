@@ -128,6 +128,7 @@ type SheetProps = {
 // ════════════════════════════════════════════════════════════════════════════
 function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   const totalW = lines.reduce((s, l) => s + (l.weight_kg || 0), 0)
+  const totalGW = lines.reduce((s, l) => s + (l.gross_weight_kg || 0), 0)
   const totalPkg = lines.reduce((s, l) => s + (l.package_count || 0), 0)
   // Đi cảng = mẫu container/seal đầy đủ. Chuyến nội bộ/thường = mẫu gọn có cột Hành trình.
   const isPort = order.trip_type === 'port'
@@ -214,8 +215,9 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
               <th style={th}>Loại hàng</th>
               <th style={th}>Số container</th>
               <th style={th}>Số seal</th>
-              <th style={{ ...th, width: 60 }}>Số kiện</th>
-              <th style={{ ...th, width: 90 }}>Khối lượng (kg)</th>
+              <th style={{ ...th, width: 56 }}>Số kiện</th>
+              <th style={{ ...th, width: 88 }}>Net (kg)</th>
+              <th style={{ ...th, width: 88 }}>GW (kg)</th>
             </tr>
           </thead>
           <tbody>
@@ -229,13 +231,15 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
                 <td style={td}>{l.seal_no || ''}</td>
                 <td style={{ ...td, textAlign: 'right' }}>{l.package_count ?? ''}</td>
                 <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{fmt(l.weight_kg)}</td>
+                <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>{l.gross_weight_kg != null ? fmt(l.gross_weight_kg) : ''}</td>
               </tr>
             ))}
-            {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={multiCustomer ? 8 : 7}>(Chưa có container)</td></tr>}
+            {lines.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9CA3AF' }} colSpan={multiCustomer ? 9 : 8}>(Chưa có container)</td></tr>}
             <tr style={{ background: '#FFFBEB', fontWeight: 700 }}>
               <td style={{ ...td, textAlign: 'right' }} colSpan={multiCustomer ? 6 : 5}>TỔNG CỘNG</td>
               <td style={{ ...td, textAlign: 'right' }}>{totalPkg || ''}</td>
               <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E' }}>{fmt(totalW)}</td>
+              <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', color: '#92400E' }}>{totalGW > 0 ? fmt(totalGW) : ''}</td>
             </tr>
           </tbody>
         </table>

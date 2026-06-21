@@ -136,6 +136,7 @@ export default function DispatchCreatePage() {
           _key: newKey(), id: l.id,
           route: l.route, lot_code: l.lot_code, grade: l.grade, container_no: l.container_no,
           seal_no: l.seal_no, package_count: l.package_count, weight_kg: l.weight_kg,
+          gross_weight_kg: l.gross_weight_kg,
           sales_order_container_id: l.sales_order_container_id, note: l.note,
         })))
         setOrigLineIds(ls.map(l => l.id))
@@ -297,6 +298,7 @@ export default function DispatchCreatePage() {
       const lineInputs: DispatchLineInput[] = lines.map((l, i) => ({
         route: l.route, lot_code: l.lot_code, grade: l.grade, container_no: l.container_no,
         seal_no: l.seal_no, package_count: l.package_count, weight_kg: l.weight_kg || 0,
+        gross_weight_kg: l.gross_weight_kg ?? null,
         sales_order_container_id: l.sales_order_container_id, note: l.note, sort_order: i,
       }))
 
@@ -361,10 +363,15 @@ export default function DispatchCreatePage() {
             patchLine(r._key, patch)
           }} />
       ) },
-      w: { title: 'KL (kg)', key: 'w', width: 140, render: (_: any, r: LineRow) => (
+      w: { title: 'KL net (kg)', key: 'w', width: 130, render: (_: any, r: LineRow) => (
         <InputNumber value={r.weight_kg || undefined} min={0} controls={false} style={{ width: '100%' }}
           formatter={numFmt} parser={numParse as any} placeholder="0"
           onChange={v => patchLine(r._key, { weight_kg: (v as number) || 0 })} />
+      ) },
+      gw: { title: 'GW (kg)', key: 'gw', width: 130, render: (_: any, r: LineRow) => (
+        <InputNumber value={r.gross_weight_kg ?? undefined} min={0} controls={false} style={{ width: '100%' }}
+          formatter={numFmt} parser={numParse as any} placeholder="net + bì"
+          onChange={v => patchLine(r._key, { gross_weight_kg: (v as number) ?? null })} />
       ) },
       note: { title: 'Ghi chú', key: 'note', width: 200, render: (_: any, r: LineRow) => (
         <Input value={r.note || ''} placeholder="vd: chở mủ tờ" onChange={e => patchLine(r._key, { note: e.target.value })} />
@@ -373,7 +380,7 @@ export default function DispatchCreatePage() {
     }
     // Đi cảng: đủ cột container/seal. Chuyến thường: gọn (hành trình · loại hàng · KL · ghi chú).
     return isPort
-      ? [col.idx, col.route, col.lot, col.grade, col.cont, col.seal, col.pkg, col.w, col.act]
+      ? [col.idx, col.route, col.lot, col.grade, col.cont, col.seal, col.pkg, col.w, col.gw, col.act]
       : [col.idx, col.route, col.grade, col.w, col.note, col.act]
   }, [isPort, patchLine, removeLineRow])
 
@@ -478,7 +485,7 @@ export default function DispatchCreatePage() {
           {isPort ? 'Danh sách container' : 'Chi tiết chuyến'} ({lines.length}) — tổng {totalWeight.toLocaleString('vi-VN')} kg
         </Divider>
         <Table rowKey="_key" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines}
-          scroll={{ x: isPort ? 1180 : 760 }}
+          scroll={{ x: isPort ? 1320 : 760 }}
           locale={{ emptyText: <Empty description={isPort ? "Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" : "Đón khách thì bỏ trống cũng được; chở hàng thì bấm 'Thêm dòng'"} /> }} />
         <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>{isPort ? 'Thêm dòng container' : 'Thêm dòng'}</Button>
       </Card>

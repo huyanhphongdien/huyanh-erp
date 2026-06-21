@@ -72,7 +72,8 @@ export interface DispatchLine {
   container_no: string | null
   seal_no: string | null
   package_count: number | null
-  weight_kg: number
+  weight_kg: number            // KL net (kế hoạch) — từ sales_order_containers.net_weight_kg
+  gross_weight_kg: number | null  // KL gross (GW) — người ra lệnh nhập, ghi ngược về container
   sales_order_container_id: string | null
   actual_weight_kg: number | null
   actual_seal_no: string | null
@@ -88,6 +89,7 @@ export interface DispatchLineInput {
   seal_no?: string | null
   package_count?: number | null
   weight_kg?: number
+  gross_weight_kg?: number | null
   sales_order_container_id?: string | null
   note?: string | null
   sort_order?: number
@@ -258,6 +260,8 @@ async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
       const payload = input.lines.map((l, i) => lineToRow(order.id, l, i))
       const { error: lineErr } = await supabase.from('dispatch_order_lines').insert(payload)
       if (lineErr) throw lineErr
+      // GW nhập lúc tạo → ghi ngược về container cho Packing List
+      for (const l of input.lines) await pushGrossToContainer(l)
     } catch (err) {
       await supabase.from('dispatch_orders').delete().eq('id', order.id)
       throw err
@@ -310,26 +314,40 @@ function lineToRow(orderId: string, l: DispatchLineInput, i: number): Record<str
     seal_no: l.seal_no || null,
     package_count: l.package_count ?? null,
     weight_kg: l.weight_kg || 0,
+    gross_weight_kg: l.gross_weight_kg ?? null,
     sales_order_container_id: l.sales_order_container_id || null,
     note: l.note || null,
     sort_order: l.sort_order ?? i,
   }
 }
 
+// GW người ra lệnh nhập → ghi ngược về container của đơn hàng (để Packing List/B/L dùng đúng).
+// Best-effort: lỗi không làm hỏng việc lưu lệnh.
+async function pushGrossToContainer(l: DispatchLineInput): Promise<void> {
+  if (!l.sales_order_container_id || l.gross_weight_kg == null) return
+  try {
+    await supabase.from('sales_order_containers')
+      .update({ gross_weight_kg: l.gross_weight_kg })
+      .eq('id', l.sales_order_container_id)
+  } catch { /* best-effort */ }
+}
+
 async function addLine(orderId: string, line: DispatchLineInput): Promise<DispatchLine> {
   const { data, error } = await supabase.from('dispatch_order_lines').insert(lineToRow(orderId, line, 9999)).select('*').single()
   if (error) throw error
+  await pushGrossToContainer(line)
   return normalizeLine(data)
 }
 
 async function updateLine(lineId: string, patch: DispatchLineInput): Promise<DispatchLine> {
   const out: Record<string, any> = {}
-  const keys = ['route', 'lot_code', 'grade', 'container_no', 'seal_no', 'package_count', 'weight_kg', 'note', 'sort_order'] as const
+  const keys = ['route', 'lot_code', 'grade', 'container_no', 'seal_no', 'package_count', 'weight_kg', 'gross_weight_kg', 'note', 'sort_order'] as const
   for (const k of keys) {
     if ((patch as any)[k] !== undefined) out[k] = (patch as any)[k] === '' ? null : (patch as any)[k]
   }
   const { data, error } = await supabase.from('dispatch_order_lines').update(out).eq('id', lineId).select('*').single()
   if (error) throw error
+  await pushGrossToContainer(patch)
   return normalizeLine(data)
 }
 
@@ -620,6 +638,7 @@ async function buildFromSalesOrder(soId: string): Promise<{
       seal_no: c.seal_no || null,
       package_count: c.bale_count ?? null,
       weight_kg: Number(c.net_weight_kg) || Number(c.gross_weight_kg) || 0,
+      gross_weight_kg: c.gross_weight_kg != null ? Number(c.gross_weight_kg) : null, // prefill nếu container đã có GW
       sales_order_container_id: c.id,
       sort_order: i,
     }
@@ -702,6 +721,7 @@ function normalizeLine(row: any): DispatchLine {
   return {
     ...row,
     weight_kg: Number(row.weight_kg) || 0,
+    gross_weight_kg: row.gross_weight_kg != null ? Number(row.gross_weight_kg) : null,
     actual_weight_kg: row.actual_weight_kg != null ? Number(row.actual_weight_kg) : null,
     package_count: row.package_count != null ? Number(row.package_count) : null,
   } as DispatchLine

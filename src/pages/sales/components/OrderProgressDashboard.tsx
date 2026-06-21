@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Tag, Spin, Modal, message } from 'antd'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
+import { soDisplayCode } from '../../../services/sales/salesTypes'
 import {
   salesContractWorkflowService,
   type SalesOrderContract,
@@ -132,7 +133,7 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
         <div style={{ fontSize: 13 }}>
           <p>Hệ thống sẽ tạo HĐ workflow từ data của đơn hàng:</p>
           <ul style={{ paddingLeft: 20, marginTop: 8 }}>
-            <li>Số HĐ: <strong>{order.contract_no || order.code}</strong></li>
+            <li>Số HĐ: <strong>{soDisplayCode(order)}</strong></li>
             <li>Khách hàng: <strong>{order.customer?.name || '—'}</strong></li>
             <li>Tấn: <strong>{order.quantity_tons}</strong> · Grade: <strong>{order.grade}</strong></li>
           </ul>

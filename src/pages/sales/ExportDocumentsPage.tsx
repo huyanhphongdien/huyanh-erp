@@ -39,7 +39,7 @@ import { salesOrderService } from '../../services/sales/salesOrderService'
 import { documentService } from '../../services/sales/documentService'
 import type { COAData, PackingListData, InvoiceData } from '../../services/sales/documentService'
 import type { SalesOrder } from '../../services/sales/salesTypes'
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../services/sales/salesTypes'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -644,7 +644,7 @@ const ExportDocumentsPage = () => {
           items={[
             { title: 'Sales' },
             { title: <a onClick={() => navigate('/sales/orders')}>Orders</a> },
-            { title: <a onClick={() => navigate(`/sales/orders/${orderId}`)}>{order.code}</a> },
+            { title: <a onClick={() => navigate(`/sales/orders/${orderId}`)}>{soDisplayCode(order)}</a> },
             { title: 'Export Documents' },
           ]}
         />
@@ -657,7 +657,7 @@ const ExportDocumentsPage = () => {
                 Back
               </Button>
               <Title level={4} style={{ margin: 0 }}>
-                Export Documents - {order.code}
+                Export Documents - {soDisplayCode(order)}
               </Title>
               <Tag color={ORDER_STATUS_COLORS[order.status]}>
                 {ORDER_STATUS_LABELS[order.status]}

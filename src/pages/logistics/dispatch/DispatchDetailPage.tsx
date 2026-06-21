@@ -18,6 +18,7 @@ import {
   dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS,
   type DispatchOrder, type DispatchLine, type DispatchStatus,
 } from '../../../services/logistics/dispatchService'
+import { soDisplayCode } from '../../../services/sales/salesTypes'
 
 const { Title, Text } = Typography
 
@@ -182,7 +183,7 @@ export default function DispatchDetailPage() {
         <Descriptions bordered size="middle" column={{ xs: 1, sm: 2, md: 3 }} labelStyle={{ fontWeight: 600 }} style={{ marginBottom: 20 }}>
           <Descriptions.Item label="Ngày điều động">{dayjs(order.dispatch_date).format('DD/MM/YYYY')}</Descriptions.Item>
           <Descriptions.Item label="Loại chuyến">{TRIP_TYPE_LABELS[order.trip_type]}</Descriptions.Item>
-          <Descriptions.Item label="Đơn hàng bán">{order.sales_order ? <a onClick={() => navigate(`/sales/${order.sales_order_id}`)}>{order.sales_order.code}</a> : '–'}</Descriptions.Item>
+          <Descriptions.Item label="Đơn hàng bán">{order.sales_order ? <a onClick={() => navigate(`/sales/${order.sales_order_id}`)}>{soDisplayCode(order.sales_order)}</a> : '–'}</Descriptions.Item>
           <Descriptions.Item label="Đầu kéo">{order.tractor_plate ? <Tag icon={<TruckOutlined />} color="blue">{order.tractor_plate}</Tag> : '–'}</Descriptions.Item>
           <Descriptions.Item label="Rơ-moóc">{order.trailer_plate ? <Tag icon={<CarOutlined />} color="gold">{order.trailer_plate}</Tag> : '–'}</Descriptions.Item>
           <Descriptions.Item label="Tài xế">{order.driver_name ? <Space size={4}><IdcardOutlined />{order.driver_name}{order.driver_phone && <Text type="secondary">· {order.driver_phone}</Text>}</Space> : '–'}</Descriptions.Item>

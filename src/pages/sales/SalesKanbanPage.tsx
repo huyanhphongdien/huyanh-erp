@@ -29,6 +29,7 @@ const STAGE_RANK: Record<SalesStage, number> = {
 }
 import KanbanCard, { type KanbanOrder } from './components/KanbanCard'
 import { dispatchService, type LotProgress } from '../../services/logistics/dispatchService'
+import { soDisplayCode } from '../../services/sales/salesTypes'
 
 // ============================================================================
 // MAIN PAGE
@@ -185,7 +186,7 @@ export default function SalesKanbanPage() {
 
     setConfirmTransition({
       orderId,
-      orderCode: order.code,
+      orderCode: soDisplayCode(order),
       fromStage: order.current_stage,
       toStage,
     })

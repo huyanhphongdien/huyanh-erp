@@ -59,6 +59,7 @@ import {
   CONTAINER_STATUS_COLORS,
   CONTAINER_TYPE_LABELS,
   SVR_GRADE_OPTIONS,
+  soDisplayCode,
 } from '../../services/sales/salesTypes'
 
 const { Title, Text } = Typography
@@ -722,7 +723,7 @@ function ContainerPackingPage() {
         style={{ marginBottom: 16 }}
         items={[
           { title: <a onClick={() => navigate('/sales/orders')}>Đơn hàng</a> },
-          { title: <a onClick={() => navigate(`/sales/orders/${orderId}`)}>{order.code}</a> },
+          { title: <a onClick={() => navigate(`/sales/orders/${orderId}`)}>{soDisplayCode(order)}</a> },
           { title: 'Đóng gói' },
         ]}
       />
@@ -745,7 +746,7 @@ function ContainerPackingPage() {
           />
           <Title level={4} style={{ margin: 0 }}>
             <ContainerOutlined style={{ marginRight: 8 }} />
-            Đóng gói — {order.code}
+            Đóng gói — {soDisplayCode(order)}
           </Title>
         </Space>
       </div>

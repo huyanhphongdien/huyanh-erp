@@ -98,6 +98,7 @@ import {
   COUNTRY_OPTIONS,
   CUSTOMER_TIER_LABELS,
   CUSTOMER_TIER_COLORS,
+  soDisplayCode,
 } from '../../services/sales/salesTypes'
 import type { Incoterm, PaymentTerms, PackingType } from '../../services/sales/salesTypes'
 
@@ -322,7 +323,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
       <Col xs={24} lg={14}>
         <Card title="Thông tin đơn hàng" size="small">
           <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-            <Descriptions.Item label="Mã đơn">{order.code}</Descriptions.Item>
+            <Descriptions.Item label="Mã đơn">{soDisplayCode(order)}</Descriptions.Item>
             <Descriptions.Item label="Trạng thái">
               <Tag color={ORDER_STATUS_COLORS[order.status]}>
                 {ORDER_STATUS_LABELS[order.status]}
@@ -1005,7 +1006,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                   </Text>
                   <Popconfirm
                     title="Tạo lệnh sản xuất?"
-                    description={`Sẽ tạo lệnh SX cho đơn hàng ${order.code} với ${selectedBatchIds.length} lô NVL đã chọn.`}
+                    description={`Sẽ tạo lệnh SX cho đơn hàng ${soDisplayCode(order)} với ${selectedBatchIds.length} lô NVL đã chọn.`}
                     onConfirm={handleCreateProduction}
                     okText="Tạo lệnh SX"
                     cancelText="Hủy"
@@ -1525,7 +1526,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         {/* ★ Upload + Checklist chứng từ gốc */}
         <DocumentChecklistTab
           orderId={order.id}
-          orderCode={order.code}
+          orderCode={soDisplayCode(order)}
           readonly={!['shipped', 'delivered', 'invoiced', 'paid'].includes(order.status)}
         />
       </div>
@@ -1609,7 +1610,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           {
             title: <a onClick={() => navigate('/sales/orders')}>Danh sách</a>,
           },
-          { title: `${order.code}${(order as any).contract_no ? ` · HĐ ${(order as any).contract_no}` : ''}` },
+          { title: soDisplayCode(order) },
         ]}
       />
 
@@ -1627,10 +1628,10 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/sales/orders')} />
           <Title level={4} style={{ margin: 0 }}>
-            {order.code}
-            {(order as any).contract_no && (
+            {soDisplayCode(order)}
+            {(order as any).contract_no && (order as any).code && (
               <span style={{ fontSize: 16, fontWeight: 400, color: '#8c8c8c', marginLeft: 10 }}>
-                · Số HĐ: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{(order as any).contract_no}</span>
+                · Mã đơn: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{(order as any).code}</span>
               </span>
             )}
           </Title>
@@ -1790,7 +1791,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 <OrderProgressDashboard order={order} onChanged={loadOrder} onNavigateTab={handleTabChange} />
                 <StageOwnershipCard
                   orderId={order.id}
-                  orderCode={order.code}
+                  orderCode={soDisplayCode(order)}
                   currentStage={(order.current_stage as any) || 'sales'}
                   currentOwnerId={order.current_owner_id || null}
                   currentOwnerName={(order as any).current_owner?.full_name || null}
@@ -1800,7 +1801,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 />
                 <HandoffTimeline
                   orderId={order.id}
-                  orderCode={order.code}
+                  orderCode={soDisplayCode(order)}
                   currentStage={(order.current_stage as any) || 'sales'}
                   stageStartedAt={order.stage_started_at || null}
                 />

@@ -31,7 +31,7 @@ import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
 import { supabase } from '../../../lib/supabase'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../../services/sales/salesTypes'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../../services/sales/salesTypes'
 import {
   getSalesRole,
   getVisibleTabs,
@@ -306,7 +306,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       content: (
         <div>
           <p style={{ marginBottom: 12 }}>
-            Đơn <strong>{order.code}</strong> sẽ chuyển sang{' '}
+            Đơn <strong>{soDisplayCode(order)}</strong> sẽ chuyển sang{' '}
             <Tag color="default">Đã hủy</Tag>. Hành động này không undo được.
           </p>
           <Input.TextArea
@@ -415,7 +415,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         <OrderProgressDashboard order={order} onChanged={handleSaved} onNavigateTab={handleNavigateTab} />
         <StageOwnershipCard
           orderId={order.id}
-          orderCode={order.code}
+          orderCode={soDisplayCode(order)}
           currentStage={(order.current_stage as SalesStage) || 'sales'}
           currentOwnerId={order.current_owner_id || null}
           currentOwnerName={order.current_owner?.full_name || null}
@@ -425,7 +425,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         />
         <HandoffTimeline
           orderId={order.id}
-          orderCode={order.code}
+          orderCode={soDisplayCode(order)}
           currentStage={(order.current_stage as SalesStage) || 'sales'}
           stageStartedAt={order.stage_started_at || null}
         />
@@ -509,7 +509,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         return (
           <DocumentChecklistTab
             orderId={order.id}
-            orderCode={order.code}
+            orderCode={soDisplayCode(order)}
           />
         )
       case 'finance':
@@ -529,7 +529,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
   // Title content shared giữa Drawer mode + inline mode
   const titleContent = order ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <span style={{ fontWeight: 700, fontSize: 16 }}>{order.code}</span>
+      <span style={{ fontWeight: 700, fontSize: 16 }}>{soDisplayCode(order)}</span>
       <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
         {ORDER_STATUS_LABELS[order.status] || order.status}
       </Tag>
@@ -595,11 +595,11 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                   fontWeight: 700, fontSize: 18, color: '#1B4D3E',
                   fontFamily: 'JetBrains Mono, monospace',
                 }}>
-                  {order.code}
+                  {soDisplayCode(order)}
                 </span>
-                {order.contract_no && (
+                {order.contract_no && order.code && (
                   <span style={{ fontSize: 13, color: '#8c8c8c', fontFamily: 'JetBrains Mono, monospace' }}>
-                    HĐ: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{order.contract_no}</span>
+                    Mã đơn: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{order.code}</span>
                   </span>
                 )}
                 <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>
@@ -694,7 +694,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
                   fontSize: 11, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4,
                   fontFamily: 'JetBrains Mono, monospace',
                 }}>
-                  {order.code} <span style={{ opacity: 0.4, marginLeft: 4 }}>●</span>
+                  {soDisplayCode(order)} <span style={{ opacity: 0.4, marginLeft: 4 }}>●</span>
                 </span>
                 <span style={{ color: '#bfbfbf', fontSize: 11 }}>+ Mở tab khác (sắp ra mắt)</span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
@@ -744,10 +744,10 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       title={
         order ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: 16 }}>{order.code}</span>
-            {order.contract_no && (
+            <span style={{ fontWeight: 700, fontSize: 16 }}>{soDisplayCode(order)}</span>
+            {order.contract_no && order.code && (
               <span style={{ fontSize: 13, color: '#8c8c8c', fontFamily: 'JetBrains Mono, monospace' }}>
-                HĐ: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{order.contract_no}</span>
+                Mã đơn: <span style={{ color: '#1B4D3E', fontWeight: 600 }}>{order.code}</span>
               </span>
             )}
             <Tag color={ORDER_STATUS_COLORS[order.status] || 'default'}>

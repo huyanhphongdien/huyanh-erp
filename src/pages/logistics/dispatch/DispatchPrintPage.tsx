@@ -15,6 +15,7 @@ import {
   dispatchService, TRIP_TYPE_LABELS,
   type DispatchOrder, type DispatchLine,
 } from '../../../services/logistics/dispatchService'
+import { soDisplayCode } from '../../../services/sales/salesTypes'
 
 const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString('vi-VN') : '')
 const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('vi-VN') : '')
@@ -42,9 +43,9 @@ export default function DispatchPrintPage() {
           try {
             const orders = await dispatchService.ordersFromContainerIds(cids)
             const map: Record<string, string> = {}
-            for (const o of orders) for (const cid of o.containerIds) map[cid] = o.customer_name || o.code
+            for (const o of orders) for (const cid of o.containerIds) map[cid] = o.customer_name || soDisplayCode(o)
             setLineCustomer(map)
-            setMultiCustomer(new Set(orders.map(o => o.customer_name || o.code)).size >= 2)
+            setMultiCustomer(new Set(orders.map(o => o.customer_name || soDisplayCode(o))).size >= 2)
           } catch { /* best-effort — thiếu thì in như cũ */ }
         }
       }

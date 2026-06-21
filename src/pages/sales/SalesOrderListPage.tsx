@@ -61,6 +61,7 @@ import {
   SVR_GRADE_OPTIONS,
   PACKING_TYPE_LABELS,
   type PackingType,
+  soDisplayCode,
 } from '../../services/sales/salesTypes'
 import GradeBadge from '../../components/wms/GradeBadge'
 import { useAuthStore } from '../../stores/authStore'
@@ -202,7 +203,7 @@ const SalesOrderListPage = () => {
 
   // Mở chi tiết đơn thành tab (full editing) — phân biệt với row click (slide panel preview)
   const openOrderTab = (record: SalesOrder) => {
-    const contractNo = (record as any).contract_no || record.code
+    const contractNo = soDisplayCode(record)
     openTab({
       key: `sales-order-${record.id}`,
       title: `Đơn ${contractNo}`,
@@ -500,7 +501,7 @@ const SalesOrderListPage = () => {
       selectedOrders.forEach((o: any, idx) => {
         ws.addRow([
           idx + 1,
-          o.contract_no || o.code,
+          soDisplayCode(o),
           o.customer?.name || '',
           o.grade || '',
           o.customer_po || '',
@@ -1021,7 +1022,7 @@ const SalesOrderListPage = () => {
       fixed: 'left',
       sorter: true,
       sortOrder: sortedColumn('contract_no'),
-      render: (_: string, r: SalesOrder) => mono(<strong>{(r as any).contract_no || r.code}</strong>),
+      render: (_: string, r: SalesOrder) => mono(<strong>{soDisplayCode(r)}</strong>),
     },
     {
       title: hdr('Người mua'),
@@ -1255,7 +1256,7 @@ const SalesOrderListPage = () => {
           </Tooltip>
           {canDelete && (
             <Popconfirm
-              title={`Xóa ${(record as any).contract_no || record.code}?`}
+              title={`Xóa ${soDisplayCode(record)}?`}
               description={record.status === 'draft' ? 'Đơn nháp — sẽ xóa vĩnh viễn' : 'Sẽ xóa kèm tất cả items / containers / docs'}
               onConfirm={() => handleDelete(record)}
               okText="Xóa"
@@ -1621,7 +1622,7 @@ const SalesOrderListPage = () => {
           <span style={{ color: '#666' }}>·</span>
           <Button size="small" onClick={() => setSelectedRowKeys([])}>Bỏ chọn</Button>
           <Button size="small" onClick={() => {
-            const codes = selectedOrders.map((o: SalesOrder) => (o as any).contract_no || o.code).join(', ')
+            const codes = selectedOrders.map((o: SalesOrder) => soDisplayCode(o)).join(', ')
             message.info(`Đã copy ${selectedOrders.length} mã đơn: ${codes}`)
             navigator.clipboard?.writeText(codes)
           }}>📋 Copy mã đơn</Button>

@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { supabase } from '../../lib/supabase'
+import { soDisplayCode } from './salesTypes'
 
 // ============================================================================
 // INTERFACES
@@ -239,7 +240,7 @@ export const documentService = {
     const customer = order.customer as { name?: string } | null
 
     return {
-      order_code: order.code,
+      order_code: soDisplayCode(order),
       customer_name: customer?.name || '',
       grade: order.grade,
       quantity_tons: order.quantity_tons,
@@ -309,7 +310,7 @@ export const documentService = {
     const customer = order.customer as { name?: string; address?: string } | null
 
     return {
-      order_code: order.code,
+      order_code: soDisplayCode(order),
       customer_name: customer?.name || '',
       customer_address: customer?.address || '',
       grade: order.grade,
@@ -359,7 +360,7 @@ export const documentService = {
 
     return {
       invoice_code: invoice?.code || `INV-${order.code}`,
-      order_code: order.code,
+      order_code: soDisplayCode(order),
       customer: {
         name: customer?.name || '',
         address: customer?.address || '',

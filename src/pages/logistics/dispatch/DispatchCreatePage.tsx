@@ -18,6 +18,7 @@ import {
   dispatchService, TRIP_TYPE_LABELS,
   type TripType, type DispatchLineInput, type SalesOrderOption,
 } from '../../../services/logistics/dispatchService'
+import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { useAuthStore } from '../../../stores/authStore'
 
 const { Title } = Typography
@@ -31,6 +32,7 @@ interface LineRow extends DispatchLineInput {
 interface AttachedSo {
   id: string
   code: string
+  contract_no: string | null
   customer_name: string | null
   destination: string | null
   contract_ref: string | null
@@ -147,7 +149,8 @@ export default function DispatchCreatePage() {
         } else if (order.sales_order) {
           // Lệnh nhập tay (dòng không gắn container) nhưng có gắn đơn → vẫn hiện 1 thẻ.
           setAttachedSos([{
-            id: order.sales_order.id, code: order.sales_order.code, customer_name: order.customer_name,
+            id: order.sales_order.id, code: order.sales_order.code, contract_no: order.sales_order.contract_no,
+            customer_name: order.customer_name,
             destination: order.destination, contract_ref: order.contract_ref, containerIds: [],
           }])
         }
@@ -224,7 +227,7 @@ export default function DispatchCreatePage() {
     const exist = attachedSos.find(s => s.id === so.id)
     const next: AttachedSo[] = exist
       ? attachedSos.map(s => s.id === so.id ? { ...s, containerIds: [...new Set([...s.containerIds, ...containerIds])] } : s)
-      : [...attachedSos, { id: so.id, code: so.code, customer_name: so.customer_name, destination: header.destination, contract_ref: header.contract_ref, containerIds }]
+      : [...attachedSos, { id: so.id, code: so.code, contract_no: so.contract_no, customer_name: so.customer_name, destination: header.destination, contract_ref: header.contract_ref, containerIds }]
     setAttachedSos(next)
     applyHeaderFromAttached(next)
   }
@@ -423,7 +426,7 @@ export default function DispatchCreatePage() {
                       <Tag key={s.id} closable color="blue"
                         onClose={(e) => { e.preventDefault(); removeAttachedSo(s.id) }}
                         style={{ fontSize: 14, padding: '4px 10px', margin: 0, lineHeight: '22px' }}>
-                        <b>{s.code}</b>{s.customer_name ? ` — ${s.customer_name}` : ''}
+                        <b>{soDisplayCode(s)}</b>{s.customer_name ? ` — ${s.customer_name}` : ''}
                         {s.containerIds.length > 0 && <span style={{ opacity: 0.7 }}> · {s.containerIds.length} cont</span>}
                       </Tag>
                     ))}
@@ -492,7 +495,7 @@ export default function DispatchCreatePage() {
 
       {/* SO picker — 2 BƯỚC: (1) chọn đơn → (2) tích container đi chuyến hôm nay */}
       <Modal
-        title={pickerSo ? `Chọn container đi chuyến này — ${pickerSo.code}` : 'Chọn đơn hàng bán'}
+        title={pickerSo ? `Chọn container đi chuyến này — ${soDisplayCode(pickerSo)}` : 'Chọn đơn hàng bán'}
         open={soModalOpen} onCancel={closePicker} width={860}
         footer={pickerSo ? [
           <Button key="back" onClick={() => setPickerSo(null)}>← Danh sách đơn</Button>,
@@ -507,7 +510,7 @@ export default function DispatchCreatePage() {
               onSearch={(val) => { setSoSearch(val); openSoPicker() }} />
             <Table rowKey="id" size="small" loading={soLoading} dataSource={soOptions} pagination={{ pageSize: 8 }}
               columns={[
-                { title: 'Mã đơn', dataIndex: 'code', render: (v: string, r: SalesOrderOption) => <span><b>{v}</b>{r.contract_no && <Tag style={{ marginLeft: 6 }}>{r.contract_no}</Tag>}</span> },
+                { title: 'Mã đơn', dataIndex: 'code', render: (_v: string, r: SalesOrderOption) => <span><b>{soDisplayCode(r)}</b>{r.contract_no && r.code && <Tag style={{ marginLeft: 6 }}>{r.code}</Tag>}</span> },
                 { title: 'Khách', dataIndex: 'customer_name', render: (v: string) => v || '–' },
                 { title: 'Grade', dataIndex: 'grade', width: 90, render: (v: string) => v || '–' },
                 { title: 'Cảng đến', dataIndex: 'port_of_destination', render: (v: string) => v || '–' },
@@ -518,7 +521,7 @@ export default function DispatchCreatePage() {
         ) : (
           <>
             <div style={{ marginBottom: 10, fontSize: 13, color: '#555' }}>
-              Tích chọn <b>container đi chuyến này</b> của <b>{pickerSo.code}</b>
+              Tích chọn <b>container đi chuyến này</b> của <b>{soDisplayCode(pickerSo)}</b>
               {pickerSo.customer_name ? ` — ${pickerSo.customer_name}` : ''}. Chỉ hiện container <b>chưa điều động</b>.
             </div>
             {/* Quick-select theo lô: 1 cú chọn cả Lot, vẫn chỉnh tay được bằng checkbox */}

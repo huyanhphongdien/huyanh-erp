@@ -9,6 +9,7 @@ import {
   ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
   INCOTERM_LABELS, CONTAINER_TYPE_LABELS, PACKING_TYPE_LABELS, PAYMENT_TERMS_LABELS,
   CUSTOMER_TIER_COLORS, CUSTOMER_TIER_LABELS, SVR_GRADE_OPTIONS,
+  soDisplayCode,
 } from '../../../services/sales/salesTypes'
 
 const fDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('vi-VN') : '-')
@@ -24,7 +25,7 @@ export default function OrderInfoTab({ order }: { order: SalesOrder }) {
       <Col xs={24} lg={15}>
         <Card title="Thông tin đơn hàng" size="small">
           <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-            <Descriptions.Item label="Mã đơn">{order.code}</Descriptions.Item>
+            <Descriptions.Item label="Mã đơn">{soDisplayCode(order)}</Descriptions.Item>
             <Descriptions.Item label="Số HĐ">{(order as any).contract_no || '-'}</Descriptions.Item>
             <Descriptions.Item label="Trạng thái">
               <Tag color={ORDER_STATUS_COLORS[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Tag>

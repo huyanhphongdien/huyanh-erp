@@ -660,6 +660,7 @@ async function buildFromSalesOrder(soId: string): Promise<{
 export interface AttachedSalesOrder {
   id: string
   code: string
+  contract_no: string | null
   customer_name: string | null
   destination: string | null
   contract_ref: string | null
@@ -693,6 +694,7 @@ async function ordersFromContainerIds(containerIds: string[]): Promise<AttachedS
       byOrder.set(so.id, {
         id: so.id,
         code: so.code,
+        contract_no: so.contract_no || null,
         customer_name: cust?.short_name || cust?.name || null,
         destination: so.port_of_destination || null,
         contract_ref: so.contract_no || so.code || null,

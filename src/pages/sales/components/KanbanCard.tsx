@@ -12,6 +12,7 @@ import {
 } from '../../../services/sales/salesStages'
 import type { LotProgress } from '../../../services/logistics/dispatchService'
 import LotProgressBadge from '../../../components/sales/LotProgressBadge'
+import { soDisplayCode } from '../../../services/sales/salesTypes'
 
 export interface KanbanOrder {
   id: string
@@ -86,7 +87,7 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp }: Kanban
       {/* Top row: code + value */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: '#111111', fontFamily: 'JetBrains Mono, monospace' }}>
-          {order.code}
+          {soDisplayCode(order)}
         </span>
         {order.total_value_usd != null && (
           <span style={{ fontSize: 10, color: '#6b7280' }}>

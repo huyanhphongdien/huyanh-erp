@@ -481,6 +481,15 @@ export const CONTAINER_STATUS_COLORS: Record<ContainerStatus, string> = {
 }
 
 // -- Loại đóng gói --
+/**
+ * Hiển thị 1 đơn hàng bán theo SỐ HỢP ĐỒNG (contract_no) — Logistics/khách dùng số này.
+ * Đơn chưa gán HĐ (Sale mới tạo, chưa duyệt) thì fallback về mã SO nội bộ.
+ * Dùng THỐNG NHẤT mọi nơi đang hiện SO-XXXX-XXXX.
+ */
+export const soDisplayCode = (
+  o?: { contract_no?: string | null; code?: string | null } | null,
+): string => (o?.contract_no || o?.code || '—')
+
 export const PACKING_TYPE_LABELS: Record<PackingType, string> = {
   loose_bale: 'Loose Bale',
   sw_plastic_pallet: 'Shrink Wrapped plastic pallets',

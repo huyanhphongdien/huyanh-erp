@@ -35,6 +35,7 @@ import {
   type Incoterm,
   type PaymentTerms,
   type PackingType,
+  soDisplayCode,
 } from '../../../services/sales/salesTypes'
 import type { SalesRole } from '../../../services/sales/salesPermissionService'
 import OrderActionButtons from './OrderActionButtons'
@@ -724,7 +725,7 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
       <SectionHeader title="Hợp đồng" color="#1B4D3E" />
       <Descriptions column={2} size="small" bordered>
         <Descriptions.Item label="Số HĐ (Contract No.)">
-          <strong>{order.contract_no || order.code}</strong>
+          <strong>{soDisplayCode(order)}</strong>
         </Descriptions.Item>
         <Descriptions.Item label="Ngày HĐ">{fmtDate(order.contract_date || order.order_date)}</Descriptions.Item>
         <Descriptions.Item label="Khách hàng" span={2}>

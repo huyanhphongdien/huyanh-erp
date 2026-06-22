@@ -422,6 +422,7 @@ const getMenuGroups = (
     items: [
       { path: '/finance/overview', label: 'Tổng quan vốn vay', icon: <LayoutDashboard size={18} /> },
       { path: '/finance/loans', label: 'Khoản vay', icon: <ClipboardList size={18} /> },
+      { path: '/finance/deposits', label: 'Tiền gửi (HĐTG)', icon: <Wallet size={18} /> },
     ],
   },
 

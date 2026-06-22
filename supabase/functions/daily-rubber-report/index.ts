@@ -365,9 +365,9 @@ function renderHtml(d: any): string {
           </td>
           <td width="33.33%" style="padding:6px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8EC;border:1px solid #f3e1bd;border-radius:10px;"><tr><td style="padding:12px;">
-              <div style="font-size:11px;color:#B45309;font-weight:600;">KL KHÔ THÁNG</div>
+              <div style="font-size:11px;color:#B45309;font-weight:600;">KL KHÔ THÁNG <span style="font-weight:400;">— chỉ mủ nước</span></div>
               <div style="font-size:24px;font-weight:800;color:#92400E;margin-top:2px;">${fmtT(m.kho)} <span style="font-size:13px;font-weight:600;">t</span></div>
-              <div style="font-size:11px;color:#B45309;margin-top:2px;">DRC TB ${fmt1(m.drcTB)}%</div>
+              <div style="font-size:11px;color:#B45309;margin-top:2px;">DRC TB (mủ nước) ${fmt1(m.drcTB)}%</div>
             </td></tr></table>
           </td>
           <td width="33.33%" style="padding:6px;">
@@ -424,9 +424,9 @@ function renderHtml(d: any): string {
           </td>
           <td width="50%" style="padding:6px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8EC;border:1px solid #f3e1bd;border-radius:10px;"><tr><td style="padding:14px;">
-              <div style="font-size:12px;color:#B45309;font-weight:600;">KL KHÔ QUY ĐỔI (DRC)</div>
+              <div style="font-size:12px;color:#B45309;font-weight:600;">KL KHÔ QUY ĐỔI (DRC) <span style="font-weight:400;">— chỉ mủ nước</span></div>
               <div style="font-size:28px;font-weight:800;color:#92400E;margin-top:2px;">${fmtT(d.totalKho)} <span style="font-size:14px;font-weight:600;">tấn</span></div>
-              <div style="font-size:12px;color:#B45309;margin-top:2px;">DRC trung bình ${fmt1(d.drcTB)}%</div>
+              <div style="font-size:12px;color:#B45309;margin-top:2px;">DRC TB (mủ nước) ${fmt1(d.drcTB)}%</div>
             </td></tr></table>
           </td>
         </tr>

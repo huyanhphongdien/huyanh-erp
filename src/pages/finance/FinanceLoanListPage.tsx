@@ -22,6 +22,7 @@ import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
 const fmtVnd = (n?: number | null) => (n || 0).toLocaleString('vi-VN')
+const fmtTy = (n: number) => `${((n || 0) / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`
 const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
 const numFmt = (v?: number | string) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 const numParse = (v?: string) => (v || '').replace(/\./g, '')
@@ -168,7 +169,7 @@ export default function FinanceLoanListPage() {
     { title: 'Đảm bảo bởi (HĐTG)', key: 'secured', width: 160, render: (_: any, r: FinLoanComputed) => {
       const s = securedBy.get(r.id)
       return s
-        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto' }} onClick={() => setLinkLoan(r)}>🔒 {s.count} HĐ · {fmtVnd(s.total)} <RightOutlined style={{ fontSize: 10 }} /></Button>
+        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => setLinkLoan(r)}>🔒 {s.count} HĐ · <b>{fmtTy(s.total)}</b> <RightOutlined style={{ fontSize: 10 }} /></Button>
         : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
     } },
     { title: '', key: 'act', width: 120, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (

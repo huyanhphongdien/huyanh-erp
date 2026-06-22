@@ -125,11 +125,11 @@ export default function FinanceDepositListPage() {
     { title: 'Đáo hạn', dataIndex: 'effective_maturity', width: 110, align: 'center' as const, render: (v: string, r: FinDepositComputed) => (
       <span>{fDate(v)}{r.extended_to ? <div style={{ fontSize: 10, color: '#16a34a' }}>(gia hạn)</div> : null}</span>) },
     { title: 'Mục đích', dataIndex: 'purpose', width: 110, render: (v: string) => v === 'dam_bao_vay' ? <Tag color="blue">Đảm bảo vay</Tag> : <Tag>Thường</Tag> },
-    { title: 'Đảm bảo cho khoản vay', key: 'secured', width: 190, render: (_: any, r: FinDepositComputed) => {
+    { title: 'Đảm bảo cho khoản vay', key: 'secured', width: 170, render: (_: any, r: FinDepositComputed) => {
       const ln = r.secured_loan_id ? loanMap.get(r.secured_loan_id) : null
       return ln
-        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', textAlign: 'left' }} onClick={() => { setLinkLoan(ln); setHighlightDep(r.id) }}>
-            🔗 <b>{ln.bank}</b> · {fmtVnd(ln.principal)}<div style={{ fontSize: 11, color: '#9ca3af' }}>đến hạn {fDate(ln.due_date)} · xem liên kết ›</div>
+        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => { setLinkLoan(ln); setHighlightDep(r.id) }}>
+            🔗 {ln.bank} · <b>{fmtTy(ln.principal)}</b> <span style={{ color: '#9ca3af' }}>· xem ›</span>
           </Button>
         : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },

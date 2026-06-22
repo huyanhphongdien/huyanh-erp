@@ -8,6 +8,7 @@ import { Card, Row, Col, Statistic, Table, Tag, Button, Typography, Empty, Spin,
 import { ReloadOutlined, BankOutlined, WarningFilled, RightOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { loanService, CIC_LABEL, CIC_COLOR, CIC_BG, type FinLoanComputed } from '../../services/finance/loanService'
+import { depositService, ALERT_LABEL, ALERT_COLOR, type FinDepositComputed } from '../../services/finance/depositService'
 
 const { Title, Text } = Typography
 
@@ -18,11 +19,15 @@ const fDate = (s?: string | null) => (s ? dayjs(s).format('DD/MM/YYYY') : '—')
 export default function FinanceLoanDashboard() {
   const navigate = useNavigate()
   const [loans, setLoans] = useState<FinLoanComputed[]>([])
+  const [deposits, setDeposits] = useState<FinDepositComputed[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setLoans(await loanService.list()) } catch { /* ignore */ }
+    try {
+      const [l, d] = await Promise.all([loanService.list(), depositService.list()])
+      setLoans(l); setDeposits(d)
+    } catch { /* ignore */ }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -51,6 +56,20 @@ export default function FinanceLoanDashboard() {
         .sort((a, b) => b.overdue_days - a.overdue_days).slice(0, 12),
     }
   }, [loans])
+
+  const dep = useMemo(() => {
+    const active = deposits.filter((d) => d.status !== 'closed')
+    const sum = (arr: FinDepositComputed[]) => arr.reduce((s, d) => s + (d.amount || 0), 0)
+    const urgent = active.filter((d) => d.alert === 'due' || d.alert === 'overdue')
+      .sort((a, b) => (a.days_to_maturity ?? 9999) - (b.days_to_maturity ?? 9999))
+    return {
+      total: sum(active),
+      secure: sum(active.filter((d) => d.purpose === 'dam_bao_vay')),
+      urgentCount: urgent.length,
+      nearCount: active.filter((d) => d.alert === 'soon' || d.alert === 'due' || d.alert === 'overdue').length,
+      urgent,
+    }
+  }, [deposits])
 
   const cicTag = (l: FinLoanComputed) => (
     <Tag color={CIC_COLOR[l.cic]} style={{ color: '#fff', border: 'none', fontWeight: 600 }}>
@@ -138,6 +157,32 @@ export default function FinanceLoanDashboard() {
           </Card>
         </Col>
       </Row>
+
+      {/* ── TIỀN GỬI (HĐTG) ── */}
+      <div style={{ marginTop: 22, marginBottom: 8, fontWeight: 700, color: '#1B4D3E', fontSize: 16 }}>
+        💰 Tiền gửi (HĐTG)
+        <Button type="link" size="small" onClick={() => navigate('/finance/deposits')}>Quản lý <RightOutlined /></Button>
+      </div>
+      <Row gutter={[12, 12]}>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Tổng tiền gửi" value={fmtTy(dep.total)} valueStyle={{ color: '#1B4D3E', fontWeight: 800 }} /><Text type="secondary" style={{ fontSize: 12 }}>{fmtVnd(dep.total)} đ</Text></Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Đảm bảo khoản vay" value={fmtTy(dep.secure)} valueStyle={{ color: '#1677ff', fontWeight: 800 }} /></Card></Col>
+        <Col xs={12} md={6}><Card size="small" style={{ background: dep.urgentCount ? '#fff7ed' : undefined }}><Statistic title="Cần tái tục gấp" value={dep.urgentCount} suffix="HĐ" valueStyle={{ color: dep.urgentCount ? '#dc2626' : '#16a34a', fontWeight: 800 }} /></Card></Col>
+        <Col xs={12} md={6}><Card size="small"><Statistic title="Sắp đáo hạn ≤30d" value={dep.nearCount} suffix="HĐ" valueStyle={{ color: '#ca8a04', fontWeight: 800 }} /></Card></Col>
+      </Row>
+      {dep.urgent.length > 0 && (
+        <Card size="small" style={{ marginTop: 12, borderColor: '#fed7aa' }}
+          title={<span style={{ color: '#ea580c', fontWeight: 700 }}><WarningFilled /> HĐTG cần tái tục gấp — quên là bị tất toán ép</span>}
+          extra={<Button size="small" onClick={() => navigate('/finance/deposits')}>Xem tất cả <RightOutlined /></Button>}>
+          <Table rowKey="id" size="small" pagination={false} dataSource={dep.urgent.slice(0, 8)}
+            onRow={() => ({ onClick: () => navigate('/finance/deposits'), style: { cursor: 'pointer' } })}
+            columns={[
+              { title: 'Ngân hàng', dataIndex: 'bank', render: (v, r) => <span><b>{v}</b>{r.holder ? <Text type="secondary"> · {r.holder}</Text> : ''}</span> },
+              { title: 'Số tiền', dataIndex: 'amount', align: 'right', render: (v) => <b>{fmtVnd(v)}</b> },
+              { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center', render: (v, r) => <span>{fDate(v)} <Text type="secondary" style={{ fontSize: 11 }}>({(r.days_to_maturity ?? 0) >= 0 ? `còn ${r.days_to_maturity}d` : `quá ${-(r.days_to_maturity ?? 0)}d`})</Text></span> },
+              { title: '', key: 'al', align: 'center', render: (_, r) => <Tag color={ALERT_COLOR[r.alert]} style={{ color: '#fff', border: 'none', fontWeight: 600 }}>{ALERT_LABEL[r.alert]}</Tag> },
+            ] as any} />
+        </Card>
+      )}
     </div>
   )
 }

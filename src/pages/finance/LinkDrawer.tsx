@@ -20,13 +20,14 @@ const pill = (bg: string, txt: string) => (
 )
 
 export default function LinkDrawer({
-  loan, deposits, open, onClose, highlightDepositId,
+  loan, deposits, open, onClose, highlightDepositId, from,
 }: {
   loan: FinLoanComputed | null
   deposits: FinDepositComputed[]
   open: boolean
   onClose: () => void
   highlightDepositId?: string | null
+  from?: 'loans' | 'deposits'
 }) {
   const navigate = useNavigate()
   const secured = loan ? deposits.filter((d) => d.secured_loan_id === loan.id && d.status !== 'closed') : []
@@ -34,14 +35,14 @@ export default function LinkDrawer({
   const coverage = loan && loan.remaining > 0 ? Math.round((total / loan.remaining) * 100) : 0
 
   return (
-    <Drawer open={open} onClose={onClose} width={640}
+    <Drawer open={open} onClose={onClose} width={720}
       title={<span><span style={{ color: '#1B4D3E' }}>🔗 Liên kết</span> Khoản vay ↔ Tiền gửi đảm bảo</span>}>
       {!loan ? <Empty /> : (
         <>
           {/* Khoản vay */}
           <Card size="small" style={{ borderColor: '#cde8d8' }}
             title={<span style={{ color: '#1B4D3E' }}><BankOutlined /> Khoản vay</span>}
-            extra={<Button size="small" type="link" onClick={() => { onClose(); navigate(`/finance/loans?focus=${loan.id}`) }}>Mở <RightOutlined /></Button>}>
+            extra={from !== 'loans' ? <Button size="small" type="link" onClick={() => { onClose(); navigate(`/finance/loans?focus=${loan.id}`) }}>Mở khoản vay <RightOutlined /></Button> : null}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{loan.bank} {loan.loan_no ? <Text type="secondary">· {loan.loan_no}</Text> : ''}</div>
@@ -82,8 +83,10 @@ export default function LinkDrawer({
                   { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center' as const, render: (v: string) => fDate(v) },
                   { title: 'Trạng thái', key: 'al', align: 'center' as const, render: (_: any, r: FinDepositComputed) => pill(ALERT_COLOR[r.alert], ALERT_LABEL[r.alert]) },
                 ] as any} />}
-          <div style={{ marginTop: 12, textAlign: 'right' }}>
-            <Button size="small" onClick={() => { onClose(); navigate('/finance/deposits') }}>Sang trang Tiền gửi <RightOutlined /></Button>
+          <div style={{ marginTop: 14, textAlign: 'right' }}>
+            {from === 'deposits'
+              ? <Button onClick={() => { onClose(); navigate(`/finance/loans?focus=${loan.id}`) }}>🏦 Mở khoản vay trong danh sách <RightOutlined /></Button>
+              : <Button onClick={() => { onClose(); navigate('/finance/deposits') }}>💰 Quản lý Tiền gửi <RightOutlined /></Button>}
           </div>
         </>
       )}

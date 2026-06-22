@@ -144,7 +144,7 @@ export default function FinanceDepositListPage() {
   ]
 
   return (
-    <div style={{ padding: 20, maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><SafetyCertificateOutlined /> Hợp đồng tiền gửi (HĐTG)</Title>
         <Space>
@@ -215,7 +215,7 @@ export default function FinanceDepositListPage() {
       </Modal>
 
       <LinkDrawer loan={linkLoan} deposits={rows} open={!!linkLoan}
-        onClose={() => { setLinkLoan(null); setHighlightDep(null) }} highlightDepositId={highlightDep} />
+        onClose={() => { setLinkLoan(null); setHighlightDep(null) }} highlightDepositId={highlightDep} from="deposits" />
     </div>
   )
 }

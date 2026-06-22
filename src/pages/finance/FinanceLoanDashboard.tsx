@@ -81,7 +81,7 @@ export default function FinanceLoanDashboard() {
   if (loading) return <div style={{ padding: 60, textAlign: 'center' }}><Spin size="large" /></div>
 
   return (
-    <div style={{ padding: 20, maxWidth: 1500, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px', maxWidth: 1760, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><BankOutlined /> Vốn vay ngân hàng — Tổng quan</Title>
         <div>

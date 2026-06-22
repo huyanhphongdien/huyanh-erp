@@ -183,7 +183,7 @@ export default function FinanceLoanListPage() {
   ]
 
   return (
-    <div style={{ padding: 20, maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><BankOutlined /> Khoản vay ngân hàng</Title>
         <Space>
@@ -269,7 +269,7 @@ export default function FinanceLoanListPage() {
         )}
       </Drawer>
 
-      <LinkDrawer loan={linkLoan} deposits={deposits} open={!!linkLoan} onClose={() => setLinkLoan(null)} />
+      <LinkDrawer loan={linkLoan} deposits={deposits} open={!!linkLoan} onClose={() => setLinkLoan(null)} from="loans" />
     </div>
   )
 }

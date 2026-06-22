@@ -16,6 +16,7 @@ import { useAuthStore } from './stores/authStore';
 
 // Layout
 import { MainLayout } from './components/common/MainLayout';
+import AdminGate from './components/common/AdminGate';
 
 // Auth
 import { LoginPage } from './features/auth/LoginPage';
@@ -169,6 +170,8 @@ const DispatchListPage = lazy(() => import('./pages/logistics/dispatch/DispatchL
 const DispatchCreatePage = lazy(() => import('./pages/logistics/dispatch/DispatchCreatePage'));
 const DispatchDetailPage = lazy(() => import('./pages/logistics/dispatch/DispatchDetailPage'));
 const DispatchPrintPage = lazy(() => import('./pages/logistics/dispatch/DispatchPrintPage'));
+const FinanceLoanDashboard = lazy(() => import('./pages/finance/FinanceLoanDashboard'));
+const FinanceLoanListPage = lazy(() => import('./pages/finance/FinanceLoanListPage'));
 const VnBatchListPage = lazy(() => import('./pages/rubber/vn/VnBatchListPage'));
 const LaoTransferPage = lazy(() => import('./pages/rubber/lao/LaoTransferPage'));
 const LaoPurchasePage = lazy(() => import('./pages/rubber/lao/LaoPurchasePage'));
@@ -545,6 +548,13 @@ function App() {
                 <Route path="dispatch/:id/print" element={<DispatchPrintPage />} />
                 <Route path="fleet/vehicles" element={<FleetVehicleListPage />} />
                 <Route path="fleet/drivers" element={<FleetDriverListPage />} />
+              </Route>
+
+              {/* ===== VỐN VAY NGÂN HÀNG (Admin only) ===== */}
+              <Route path="finance">
+                <Route index element={<Navigate to="/finance/overview" replace />} />
+                <Route path="overview" element={<AdminGate><FinanceLoanDashboard /></AdminGate>} />
+                <Route path="loans" element={<AdminGate><FinanceLoanListPage /></AdminGate>} />
               </Route>
 
               {/* ===== PROJECTS MODULE ===== */}

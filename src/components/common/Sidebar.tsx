@@ -142,6 +142,7 @@ interface MenuGroup {
   hiddenByDefault?: boolean;
   allowedEmails?: string[];
   requireSalesRole?: boolean; // true = check getSalesRole
+  adminOnly?: boolean;        // CHỈ Admin (vd Vốn vay — dữ liệu tài chính nhạy cảm)
 }
 
 // ============================================================
@@ -408,6 +409,19 @@ const getMenuGroups = (
       { path: '/logistics/dispatch', label: 'Lệnh điều động', icon: <ClipboardList size={18} /> },
       { path: '/logistics/fleet/vehicles', label: 'Đội xe', icon: <Truck size={18} /> },
       { path: '/logistics/fleet/drivers', label: 'Tài xế', icon: <UserCheck size={18} /> },
+    ],
+  },
+
+  // ★ VỐN VAY NGÂN HÀNG — chỉ Admin
+  // ============================================================
+  {
+    title: 'VỐN VAY',
+    icon: <Building2 size={18} />,
+    collapsible: true,
+    adminOnly: true,
+    items: [
+      { path: '/finance/overview', label: 'Tổng quan vốn vay', icon: <LayoutDashboard size={18} /> },
+      { path: '/finance/loans', label: 'Khoản vay', icon: <ClipboardList size={18} /> },
     ],
   },
 
@@ -682,6 +696,7 @@ export function Sidebar() {
   };
 
   const isGroupVisible = (group: MenuGroup): boolean => {
+    if (group.adminOnly && !isAdmin) return false;
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
     if (group.managerLevelOnly && !isManagerLevel) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;

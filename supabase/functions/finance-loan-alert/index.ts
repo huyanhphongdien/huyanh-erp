@@ -248,15 +248,15 @@ function renderHtml(d: any): string {
     </td></tr>` : ''
 
   return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#eef1f0;font-family:Arial,'Helvetica Neue',sans-serif;color:#1f2937;">
+<body style="margin:0;padding:0;background:#eef1f0;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#1f2937;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f0;padding:18px 10px;"><tr><td align="center">
     <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);">
-      <tr><td style="background:#7f1d1d;padding:20px 24px;">
+      <tr><td style="background:#1B4D3E;padding:20px 24px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
           <td style="vertical-align:middle;">
             <div style="color:#fff;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.85;">Cao Su Huy Anh · Tài chính</div>
-            <div style="color:#fff;font-size:21px;font-weight:800;margin-top:2px;">CẢNH BÁO VỐN VAY — ĐẦU NGÀY</div>
-            <div style="color:#FCA5A5;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel}</div>
+            <div style="color:#fff;font-size:21px;font-weight:800;margin-top:2px;">TÌNH TRẠNG VỐN VAY ĐẦU NGÀY</div>
+            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel}</div>
           </td>
           <td style="vertical-align:middle;text-align:right;width:128px;">
             <img src="cid:huyanh-logo" alt="Cao Su Huy Anh" width="112" style="display:inline-block;background:#fff;border-radius:10px;padding:7px 10px;width:112px;height:auto;">
@@ -302,8 +302,8 @@ serve(async (req) => {
     const html = renderHtml(d)
     const n = d.critical.length + d.dueSoon.length + d.depRows.length + d.underSecured.length
     const subject = d.hasAlert
-      ? `⚠ Cảnh báo vốn vay ${d.dateLabel}: ${d.critical.length} nhảy nhóm · ${d.dueSoon.length} đến hạn · ${d.depRows.length} HĐTG tái tục`
-      : `✅ Vốn vay ${d.dateLabel}: không có cảnh báo`
+      ? `Tình trạng vốn vay ${d.dateLabel}: ${d.critical.length} nhảy nhóm · ${d.dueSoon.length} đến hạn · ${d.depRows.length} HĐTG tái tục`
+      : `Tình trạng vốn vay ${d.dateLabel}: không có cảnh báo ✅`
 
     const token = await getAccessToken()
     await sendEmail(token, REPORT_RECIPIENTS, subject, html)

@@ -465,13 +465,13 @@ function SalesOrderCreatePage() {
       const values = await form.validateFields()
       setSubmittingReview(true)
 
-      // Check trùng số HĐ
-      const isTaken = await salesContractWorkflowService.isContractNoTaken(
+      // Check trùng số HĐ — theo GỐC số (chặn cả 'HA20260053 PH' trùng 'HA20260053')
+      const conflict = await salesContractWorkflowService.findContractNoConflict(
         contractData.contract_no,
       )
-      if (isTaken) {
+      if (conflict) {
         message.error(
-          `Số HĐ "${contractData.contract_no}" đã tồn tại — vui lòng chọn số khác`,
+          `Số HĐ "${contractData.contract_no}" TRÙNG gốc với đơn ${conflict.code} (HĐ "${conflict.contract_no}"). Số hợp đồng KHÔNG được trùng — vui lòng dùng số khác.`,
         )
         setSubmittingReview(false)
         return

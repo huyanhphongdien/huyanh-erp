@@ -407,6 +407,33 @@ function _notifyContractEvent(params: {
 }
 
 // ----------------------------------------------------------------------------
+// Chống TRÙNG SỐ HỢP ĐỒNG — so theo GỐC (token đầu) để bắt cả near-dup
+// ('HA20260053' vs 'HA20260053 PH' vs 'HA20260053 ' vs 'ha20260053').
+// ----------------------------------------------------------------------------
+function contractBase(s: string | null | undefined): string {
+  return (s || '').trim().toUpperCase().split(/\s+/)[0] || ''
+}
+
+/** Tìm đơn ACTIVE khác đang dùng CÙNG GỐC số HĐ. Trả về đơn trùng (hoặc null). */
+async function findContractConflictCore(
+  contractNo: string,
+  excludeSalesOrderId?: string,
+): Promise<{ code: string; contract_no: string } | null> {
+  const base = contractBase(contractNo)
+  if (!base) return null
+  const { data, error } = await supabase
+    .from('sales_orders')
+    .select('id, code, contract_no, status')
+    .neq('status', 'cancelled')
+    .ilike('contract_no', `${base}%`)   // bắt cả 'HA20260053 PH', lọc gốc ở dưới
+  if (error) { console.error('findContractConflict error:', error); return null }
+  const hit = (data || []).find(
+    (r: any) => r.id !== excludeSalesOrderId && contractBase(r.contract_no) === base,
+  )
+  return hit ? { code: hit.code, contract_no: hit.contract_no } : null
+}
+
+// ----------------------------------------------------------------------------
 // Service
 // ----------------------------------------------------------------------------
 
@@ -421,24 +448,19 @@ export const salesContractWorkflowService = {
 
   /** Check số HĐ đã tồn tại chưa (bỏ qua sales_order_id hiện tại nếu đang edit).
    *  Trả về true nếu trùng → caller hiển thị error. */
+  /** Đơn active khác đang dùng CÙNG GỐC số HĐ (để báo trùng rõ đơn nào). */
+  async findContractNoConflict(
+    contractNo: string,
+    excludeSalesOrderId?: string,
+  ): Promise<{ code: string; contract_no: string } | null> {
+    return findContractConflictCore(contractNo, excludeSalesOrderId)
+  },
+
   async isContractNoTaken(
     contractNo: string,
     excludeSalesOrderId?: string,
   ): Promise<boolean> {
-    if (!contractNo || !contractNo.trim()) return false
-    let query = supabase
-      .from('sales_orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('contract_no', contractNo.trim())
-    if (excludeSalesOrderId) {
-      query = query.neq('id', excludeSalesOrderId)
-    }
-    const { count, error } = await query
-    if (error) {
-      console.error('isContractNoTaken error:', error)
-      return false
-    }
-    return (count || 0) > 0
+    return (await findContractConflictCore(contractNo, excludeSalesOrderId)) != null
   },
 
   /** Sale tạo HĐ draft + submit thẳng cho Phú LV review.

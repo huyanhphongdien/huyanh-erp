@@ -237,17 +237,13 @@ export default function ContractTab({ order, salesRole, editable, onSaved }: Pro
         return
       }
 
-      // Validate contract_no không trùng với đơn active khác
+      // Validate contract_no không trùng GỐC với đơn active khác (chặn cả 'HA20260053 PH')
       if (vals.contract_no && vals.contract_no.trim()) {
-        const { data: dups } = await supabase
-          .from('sales_orders')
-          .select('code')
-          .eq('contract_no', vals.contract_no.trim())
-          .neq('id', order.id)
-          .neq('status', 'cancelled')
-          .limit(1)
-        if (dups && dups.length > 0) {
-          message.error(`Số HĐ "${vals.contract_no}" đã tồn tại ở đơn ${dups[0].code}. Vui lòng dùng số khác.`)
+        const conflict = await salesContractWorkflowService.findContractNoConflict(
+          vals.contract_no, order.id,
+        )
+        if (conflict) {
+          message.error(`Số HĐ "${vals.contract_no}" TRÙNG gốc với đơn ${conflict.code} (HĐ "${conflict.contract_no}"). Số HĐ không được trùng — dùng số khác.`)
           setSaving(false)
           return
         }

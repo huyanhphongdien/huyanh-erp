@@ -441,8 +441,8 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     children: <SalesOrderChat salesOrderId={order.id} />,
   }] : []
 
-  // Tab Lịch sử đổi trạng thái (ai/khi/từ→tới) — cho admin truy vết.
-  const historyTabItem = order ? [{
+  // Tab Lịch sử đổi trạng thái (ai/khi/từ→tới) — CHỈ admin xem (truy vết).
+  const historyTabItem = order && salesRole === 'admin' ? [{
     key: 'history',
     label: <span>🕓 Lịch sử</span>,
     children: <StatusHistoryTab orderId={order.id} />,

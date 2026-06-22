@@ -16,6 +16,7 @@ import {
   loanService, CIC_LABEL, CIC_COLOR, CIC_BG, BANKS,
   type FinLoanComputed, type FinRepayment,
 } from '../../services/finance/loanService'
+import { depositService, type FinDepositComputed } from '../../services/finance/depositService'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -31,6 +32,7 @@ export default function FinanceLoanListPage() {
   const focusId = sp.get('focus')
 
   const [loans, setLoans] = useState<FinLoanComputed[]>([])
+  const [deposits, setDeposits] = useState<FinDepositComputed[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
 
@@ -46,10 +48,26 @@ export default function FinanceLoanListPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setLoans(await loanService.list()) } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    try {
+      const [l, d] = await Promise.all([loanService.list(), depositService.list()])
+      setLoans(l); setDeposits(d)
+    } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+
+  // HĐTG đang đảm bảo cho từng khoản vay (chiều ngược) — loanId → {count, total}
+  const securedBy = useMemo(() => {
+    const m = new Map<string, { count: number; total: number }>()
+    deposits.forEach((d) => {
+      if (d.secured_loan_id && d.status !== 'closed') {
+        const cur = m.get(d.secured_loan_id) || { count: 0, total: 0 }
+        cur.count++; cur.total += d.amount || 0
+        m.set(d.secured_loan_id, cur)
+      }
+    })
+    return m
+  }, [deposits])
 
   const rows = useMemo(() => {
     if (filter === 'all') return loans
@@ -144,6 +162,10 @@ export default function FinanceLoanListPage() {
     { title: 'Nhảy nhóm', dataIndex: 'jump_date', width: 110, align: 'center' as const, render: (v: string, r: FinLoanComputed) =>
       r.cic === 'paid' ? '—' : <Tooltip title="Quá hạn ≥10 ngày → CIC nhóm 2"><Text type="danger">{fDate(v)}</Text></Tooltip> },
     { title: 'Trạng thái', key: 'cic', width: 150, render: (_: any, r: FinLoanComputed) => cicTag(r) },
+    { title: 'Đảm bảo bởi (HĐTG)', key: 'secured', width: 150, render: (_: any, r: FinLoanComputed) => {
+      const s = securedBy.get(r.id)
+      return s ? <span style={{ fontSize: 12 }}>🔒 {s.count} HĐ · <b>{fmtVnd(s.total)}</b></span> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+    } },
     { title: '', key: 'act', width: 120, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (
       <Space size={2}>
         <Tooltip title="Ghi trả nợ"><Button type="text" size="small" icon={<DollarOutlined style={{ color: '#16a34a' }} />} onClick={() => openPay(r)} /></Tooltip>
@@ -174,7 +196,7 @@ export default function FinanceLoanListPage() {
 
       <Card size="small" styles={{ body: { padding: 0 } }}>
         <Table rowKey="id" size="small" loading={loading} columns={columns as any} dataSource={rows}
-          pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1200 }}
+          pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1380 }}
           rowClassName={(r) => (r.id === focusId ? 'ant-table-row-selected' : '')}
           onRow={(r) => ({ style: { background: r.id === focusId ? '#fffbe6' : CIC_BG[r.cic] } })} />
       </Card>

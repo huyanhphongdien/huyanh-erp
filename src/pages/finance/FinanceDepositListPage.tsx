@@ -13,7 +13,7 @@ import {
   depositService, ALERT_LABEL, ALERT_COLOR, ALERT_BG,
   type FinDepositComputed,
 } from '../../services/finance/depositService'
-import { BANKS } from '../../services/finance/loanService'
+import { loanService, BANKS, type FinLoanComputed } from '../../services/finance/loanService'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -27,6 +27,7 @@ export default function FinanceDepositListPage() {
   const user = useAuthStore((s) => s.user)
   const actorId = user?.employee_id || user?.id || null
   const [rows, setRows] = useState<FinDepositComputed[]>([])
+  const [loans, setLoans] = useState<FinLoanComputed[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState(false)
@@ -36,10 +37,17 @@ export default function FinanceDepositListPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setRows(await depositService.list()) } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
+    try {
+      const [d, l] = await Promise.all([depositService.list(), loanService.list()])
+      setRows(d); setLoans(l)
+    } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+
+  const loanMap = useMemo(() => new Map(loans.map((l) => [l.id, l])), [loans])
+  const loanOptions = useMemo(() => loans.filter((l) => l.status !== 'paid')
+    .map((l) => ({ value: l.id, label: `${l.bank} · ${fmtVnd(l.principal)} · đến hạn ${fDate(l.due_date)}` })), [loans])
 
   const k = useMemo(() => {
     const active = rows.filter((d) => d.status !== 'closed')
@@ -80,6 +88,7 @@ export default function FinanceDepositListPage() {
         extended_to: v.extended_to ? v.extended_to.format('YYYY-MM-DD') : null,
         interest_rate: v.interest_rate ?? null, term: v.term || null,
         expected_interest: v.expected_interest ?? null, purpose: v.purpose || 'dam_bao_vay',
+        secured_loan_id: v.secured_loan_id || null,
         status: v.status || 'active', note: v.note || null,
       }
       if (editing) await depositService.update(editing.id, payload)
@@ -111,7 +120,13 @@ export default function FinanceDepositListPage() {
     { title: 'Ngày gửi', dataIndex: 'deposit_date', width: 100, align: 'center' as const, render: fDate },
     { title: 'Đáo hạn', dataIndex: 'effective_maturity', width: 110, align: 'center' as const, render: (v: string, r: FinDepositComputed) => (
       <span>{fDate(v)}{r.extended_to ? <div style={{ fontSize: 10, color: '#16a34a' }}>(gia hạn)</div> : null}</span>) },
-    { title: 'Mục đích', dataIndex: 'purpose', width: 120, render: (v: string) => v === 'dam_bao_vay' ? <Tag color="blue">Đảm bảo vay</Tag> : <Tag>Thường</Tag> },
+    { title: 'Mục đích', dataIndex: 'purpose', width: 110, render: (v: string) => v === 'dam_bao_vay' ? <Tag color="blue">Đảm bảo vay</Tag> : <Tag>Thường</Tag> },
+    { title: 'Đảm bảo cho khoản vay', key: 'secured', width: 180, render: (_: any, r: FinDepositComputed) => {
+      const ln = r.secured_loan_id ? loanMap.get(r.secured_loan_id) : null
+      return ln
+        ? <span style={{ fontSize: 12 }}>🔗 <b>{ln.bank}</b> · {fmtVnd(ln.principal)}<div style={{ fontSize: 11, color: '#9ca3af' }}>đến hạn {fDate(ln.due_date)}</div></span>
+        : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
+    } },
     { title: 'Trạng thái', key: 'alert', width: 160, render: (_: any, r: FinDepositComputed) => alertTag(r) },
     { title: '', key: 'act', width: 70, fixed: 'right' as const, render: (_: any, r: FinDepositComputed) => (
       <Space size={2}>
@@ -154,7 +169,7 @@ export default function FinanceDepositListPage() {
 
       <Card size="small" styles={{ body: { padding: 0 } }}>
         <Table rowKey="id" size="small" loading={loading} columns={columns as any} dataSource={view}
-          pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1200 }}
+          pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1380 }}
           onRow={(r) => ({ style: { background: ALERT_BG[r.alert] } })} />
       </Card>
 
@@ -177,6 +192,12 @@ export default function FinanceDepositListPage() {
             <Form.Item name="expected_interest" label="Lãi cuối kỳ dự kiến"><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
             <Form.Item name="purpose" label="Mục đích">
               <Select options={[{ value: 'dam_bao_vay', label: 'Đảm bảo khoản vay' }, { value: 'thuong', label: 'Tiền gửi thường' }]} />
+            </Form.Item>
+            <Form.Item name="secured_loan_id" label="🔗 Đảm bảo cho khoản vay" style={{ gridColumn: '1 / -1' }}
+              tooltip="HĐTG này cầm cố bảo lãnh cho khoản vay nào — để thấy rõ cái nào chống lưng cái nào">
+              <Select allowClear showSearch optionFilterProp="label"
+                placeholder={loanOptions.length ? 'Chọn khoản vay được đảm bảo…' : 'Chưa có khoản vay — thêm ở tab Khoản vay trước'}
+                options={loanOptions} notFoundContent="Chưa có khoản vay" />
             </Form.Item>
             <Form.Item name="status" label="Trạng thái">
               <Select options={[{ value: 'active', label: 'Đang gửi' }, { value: 'closed', label: 'Đã tất toán' }]} />

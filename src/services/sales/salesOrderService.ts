@@ -14,6 +14,7 @@ import type {
   Incoterm,
   PackingType,
   PaymentTerms,
+  SalesOrderStatusLog,
 } from './salesTypes'
 
 // ============================================================================
@@ -608,7 +609,7 @@ export const salesOrderService = {
   async updateStatus(
     id: string,
     newStatus: SalesOrderStatus,
-    data?: { confirmed_by?: string; shipped_at?: string; reason?: string },
+    data?: { confirmed_by?: string; shipped_at?: string; reason?: string; actor?: { id?: string | null; name?: string | null } },
   ): Promise<void> {
     const existing = await salesOrderService.getById(id)
     if (!existing) {
@@ -641,6 +642,13 @@ export const salesOrderService = {
       updateData.shipped_at = data?.shipped_at || new Date().toISOString()
     }
 
+    // Ai đổi trạng thái → trigger trg_log_sales_status ghi vào sales_order_status_log
+    if (data?.actor) {
+      updateData.last_status_changed_by_id = data.actor.id ?? null
+      updateData.last_status_changed_by_name = data.actor.name ?? null
+    }
+    if (data?.reason) updateData.last_status_change_reason = data.reason
+
     const { error } = await supabase
       .from('sales_orders')
       .update(updateData)
@@ -670,7 +678,7 @@ export const salesOrderService = {
   /**
    * Hủy đơn hàng — yêu cầu lý do hủy
    */
-  async cancelOrder(id: string, reason: string): Promise<void> {
+  async cancelOrder(id: string, reason: string, actor?: { id?: string | null; name?: string | null }): Promise<void> {
     if (!reason || reason.trim().length === 0) {
       throw new Error('Vui lòng nhập lý do hủy đơn hàng')
     }
@@ -698,6 +706,9 @@ export const salesOrderService = {
         internal_notes: existing.internal_notes
           ? `${existing.internal_notes}\n[HỦY] ${reason}`
           : `[HỦY] ${reason}`,
+        last_status_changed_by_id: actor?.id ?? null,
+        last_status_changed_by_name: actor?.name ?? null,
+        last_status_change_reason: `Hủy đơn: ${reason}`,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -717,6 +728,17 @@ export const salesOrderService = {
       console.error('[cancelOrder] Failed to release allocations:', e)
       // Không throw — đơn đã cancelled, allocations không release được cần xử lý riêng
     }
+  },
+
+  /** Lịch sử đổi TRẠNG THÁI đơn (ai · khi nào · từ→tới) — cho tab Lịch sử (admin). */
+  async getStatusLog(orderId: string): Promise<SalesOrderStatusLog[]> {
+    const { data, error } = await supabase
+      .from('sales_order_status_log')
+      .select('*')
+      .eq('sales_order_id', orderId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data as SalesOrderStatusLog[]) || []
   },
 
   // ==========================================================================

@@ -9,6 +9,7 @@
 
 import { useState } from 'react'
 import { Button, Popconfirm, Space, message } from 'antd'
+import { useAuthStore } from '../../../stores/authStore'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -119,14 +120,16 @@ interface Props {
 
 export default function OrderActionButtons({ order, salesRole, onSaved, size = 'middle', tab }: Props) {
   const [loading, setLoading] = useState(false)
+  const user = useAuthStore(s => s.user)
+  const actor = { id: user?.employee_id || user?.id || null, name: user?.full_name || user?.email || null }
 
   const handleStatus = async (newStatus: SalesOrderStatus) => {
     try {
       setLoading(true)
       if (newStatus === 'cancelled') {
-        await salesOrderService.cancelOrder(order.id, 'Hủy bởi người dùng')
+        await salesOrderService.cancelOrder(order.id, 'Hủy bởi người dùng', actor)
       } else {
-        await salesOrderService.updateStatus(order.id, newStatus)
+        await salesOrderService.updateStatus(order.id, newStatus, { actor })
       }
       message.success('Đã cập nhật trạng thái')
       onSaved()

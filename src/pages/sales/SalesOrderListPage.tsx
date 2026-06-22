@@ -698,9 +698,11 @@ const SalesOrderListPage = () => {
     }
   }
 
+  const actor = { id: user?.employee_id || user?.id || null, name: user?.full_name || user?.email || null }
+
   const handleConfirm = async (order: SalesOrder) => {
     try {
-      await salesOrderService.updateStatus(order.id, 'confirmed')
+      await salesOrderService.updateStatus(order.id, 'confirmed', { actor })
       message.success(`Đã xác nhận đơn hàng ${order.code}`)
       fetchOrders()
       fetchStats()
@@ -712,7 +714,7 @@ const SalesOrderListPage = () => {
 
   const handleCancel = async (order: SalesOrder) => {
     try {
-      await salesOrderService.cancelOrder(order.id, 'Hủy từ danh sách')
+      await salesOrderService.cancelOrder(order.id, 'Hủy từ danh sách', actor)
       message.success(`Đã hủy đơn hàng ${order.code}`)
       fetchOrders()
       fetchStats()
@@ -930,7 +932,7 @@ const SalesOrderListPage = () => {
           open
           onChange={async (val) => {
             try {
-              await salesOrderService.updateStatus(order.id, val as SalesOrderStatus)
+              await salesOrderService.updateStatus(order.id, val as SalesOrderStatus, { actor })
               message.success(`Đã chuyển trạng thái → ${ORDER_STATUS_LABELS[val as SalesOrderStatus]}`)
               setEditingCell(null)
               fetchOrders()

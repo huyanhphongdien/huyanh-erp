@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { useAuthStore } from '../../stores/authStore'
 import {
   Card,
   Form,
@@ -72,6 +73,7 @@ const { TextArea } = Input
 
 function SalesOrderCreatePage() {
   const navigate = useNavigate()
+  const user = useAuthStore(s => s.user)
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [submittingReview, setSubmittingReview] = useState(false)
@@ -423,7 +425,7 @@ function SalesOrderCreatePage() {
       // If not draft, confirm immediately
       if (!asDraft && created.id) {
         try {
-          await salesOrderService.updateStatus(created.id, 'confirmed')
+          await salesOrderService.updateStatus(created.id, 'confirmed', { actor: { id: user?.employee_id || user?.id || null, name: user?.full_name || user?.email || null } })
         } catch {
           // Order created as draft, but confirmation failed — still navigate
         }

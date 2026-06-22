@@ -51,6 +51,7 @@ import StageOwnershipCard from './StageOwnershipCard'
 import HandoffTimeline from './HandoffTimeline'
 import OrderProgressDashboard from './OrderProgressDashboard'
 import SalesOrderChat from './SalesOrderChat'
+import StatusHistoryTab from './StatusHistoryTab'
 import StagePill from '../../../components/common/StagePill'
 import {
   SALES_STAGES,
@@ -440,6 +441,13 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     children: <SalesOrderChat salesOrderId={order.id} />,
   }] : []
 
+  // Tab Lịch sử đổi trạng thái (ai/khi/từ→tới) — cho admin truy vết.
+  const historyTabItem = order ? [{
+    key: 'history',
+    label: <span>🕓 Lịch sử</span>,
+    children: <StatusHistoryTab orderId={order.id} />,
+  }] : []
+
   const legacyTabItems = visibleTabs
     .filter((t) => TAB_META[t])
     .map((tabKey) => {
@@ -468,7 +476,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
     })
 
   // Thứ tự thống nhất: Thông tin · [Hợp đồng · Sản xuất · Đóng gói · Vận chuyển · Tài chính] · Tiến độ · Trao đổi
-  const tabItems = [...infoTabItem, ...legacyTabItems, ...progressTabItem, ...chatTabItem]
+  const tabItems = [...infoTabItem, ...legacyTabItems, ...progressTabItem, ...chatTabItem, ...historyTabItem]
   // Nếu tab đã lưu không có trong bộ tab của đơn/role này (vd máy dùng chung, đổi user)
   // → fallback về tab đầu để tránh nội dung trắng.
   const safeActiveTab = tabItems.some((t) => t.key === activeTab) ? activeTab : (tabItems[0]?.key as string) || 'info'

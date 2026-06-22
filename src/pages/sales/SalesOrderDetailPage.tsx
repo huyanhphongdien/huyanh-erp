@@ -232,10 +232,11 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     if (!order) return
     try {
       setActionLoading(true)
+      const actor = { id: user?.employee_id || user?.id || null, name: user?.full_name || user?.email || null }
       if (newStatus === 'cancelled') {
-        await salesOrderService.cancelOrder(order.id, 'Hủy bởi người dùng')
+        await salesOrderService.cancelOrder(order.id, 'Hủy bởi người dùng', actor)
       } else {
-        await salesOrderService.updateStatus(order.id, newStatus)
+        await salesOrderService.updateStatus(order.id, newStatus, { actor })
       }
       message.success(`Đã cập nhật trạng thái: ${ORDER_STATUS_LABELS[newStatus]}`)
       loadOrder()
@@ -588,7 +589,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     if (!order) return
     try {
       setActionLoading(true)
-      await salesOrderService.updateStatus(order.id, 'ready')
+      await salesOrderService.updateStatus(order.id, 'ready', { actor: { id: user?.employee_id || user?.id || null, name: user?.full_name || user?.email || null } })
       message.success('Đã chuyển trạng thái: Sẵn sàng giao hàng')
       loadOrder()
     } catch (err: any) {

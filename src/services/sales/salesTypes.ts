@@ -481,6 +481,19 @@ export const CONTAINER_STATUS_COLORS: Record<ContainerStatus, string> = {
 }
 
 // -- Loại đóng gói --
+/** 1 dòng lịch sử đổi trạng thái đơn hàng bán (bảng sales_order_status_log). */
+export interface SalesOrderStatusLog {
+  id: string
+  sales_order_id: string
+  from_status: string | null
+  to_status: string
+  changed_by_id: string | null
+  changed_by_name: string | null
+  reason: string | null
+  source: string | null   // 'app' | 'system'
+  created_at: string
+}
+
 /**
  * Hiển thị 1 đơn hàng bán theo SỐ HỢP ĐỒNG (contract_no) — Logistics/khách dùng số này.
  * Đơn chưa gán HĐ (Sale mới tạo, chưa duyệt) thì fallback về mã SO nội bộ.

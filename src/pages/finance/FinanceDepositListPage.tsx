@@ -13,8 +13,9 @@ import {
   depositService, ALERT_LABEL, ALERT_COLOR, ALERT_BG,
   type FinDepositComputed,
 } from '../../services/finance/depositService'
-import { loanService, BANKS, type FinLoanComputed } from '../../services/finance/loanService'
-import LinkDrawer from './LinkDrawer'
+import { BANKS } from '../../services/finance/loanService'
+import { creditLineService, type FinCreditLineComputed } from '../../services/finance/creditLineService'
+import FacilityDrawer from './FacilityDrawer'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -28,30 +29,28 @@ export default function FinanceDepositListPage() {
   const user = useAuthStore((s) => s.user)
   const actorId = user?.employee_id || user?.id || null
   const [rows, setRows] = useState<FinDepositComputed[]>([])
-  const [loans, setLoans] = useState<FinLoanComputed[]>([])
+  const [lines, setLines] = useState<FinCreditLineComputed[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<FinDepositComputed | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-  // Drawer liên kết
-  const [linkLoan, setLinkLoan] = useState<FinLoanComputed | null>(null)
-  const [highlightDep, setHighlightDep] = useState<string | null>(null)
+  const [drawerLine, setDrawerLine] = useState<FinCreditLineComputed | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [d, l] = await Promise.all([depositService.list(), loanService.list()])
-      setRows(d); setLoans(l)
+      const [d, l] = await Promise.all([depositService.list(), creditLineService.listComputed()])
+      setRows(d); setLines(l)
     } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
 
-  const loanMap = useMemo(() => new Map(loans.map((l) => [l.id, l])), [loans])
-  const loanOptions = useMemo(() => loans.filter((l) => l.status !== 'paid')
-    .map((l) => ({ value: l.id, label: `${l.bank} · ${fmtVnd(l.principal)} · đến hạn ${fDate(l.due_date)}` })), [loans])
+  const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines])
+  const lineOptions = useMemo(() => lines.filter((l) => l.status === 'active')
+    .map((l) => ({ value: l.id, label: `${l.bank}${l.contract_no ? ' · ' + l.contract_no : ''} · HM ${fmtTy(l.limit_amount || 0)}` })), [lines])
 
   const k = useMemo(() => {
     const active = rows.filter((d) => d.status !== 'closed')
@@ -92,7 +91,7 @@ export default function FinanceDepositListPage() {
         extended_to: v.extended_to ? v.extended_to.format('YYYY-MM-DD') : null,
         interest_rate: v.interest_rate ?? null, term: v.term || null,
         expected_interest: v.expected_interest ?? null, purpose: v.purpose || 'dam_bao_vay',
-        secured_loan_id: v.secured_loan_id || null,
+        secured_credit_line_id: v.secured_credit_line_id || null,
         status: v.status || 'active', note: v.note || null,
       }
       if (editing) await depositService.update(editing.id, payload)
@@ -125,11 +124,11 @@ export default function FinanceDepositListPage() {
     { title: 'Đáo hạn', dataIndex: 'effective_maturity', width: 110, align: 'center' as const, render: (v: string, r: FinDepositComputed) => (
       <span>{fDate(v)}{r.extended_to ? <div style={{ fontSize: 10, color: '#16a34a' }}>(gia hạn)</div> : null}</span>) },
     { title: 'Mục đích', dataIndex: 'purpose', width: 110, render: (v: string) => v === 'dam_bao_vay' ? <Tag color="blue">Đảm bảo vay</Tag> : <Tag>Thường</Tag> },
-    { title: 'Đảm bảo cho khoản vay', key: 'secured', width: 170, render: (_: any, r: FinDepositComputed) => {
-      const ln = r.secured_loan_id ? loanMap.get(r.secured_loan_id) : null
-      return ln
-        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => { setLinkLoan(ln); setHighlightDep(r.id) }}>
-            🔗 {ln.bank} · <b>{fmtTy(ln.principal)}</b> <span style={{ color: '#9ca3af' }}>· xem ›</span>
+    { title: 'Đảm bảo cho hạn mức', key: 'secured', width: 185, render: (_: any, r: FinDepositComputed) => {
+      const cl = r.secured_credit_line_id ? lineMap.get(r.secured_credit_line_id) : null
+      return cl
+        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => setDrawerLine(cl)}>
+            🔗 {cl.bank} · HM <b>{fmtTy(cl.limit_amount || 0)}</b> <span style={{ color: '#9ca3af' }}>· xem ›</span>
           </Button>
         : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },
@@ -199,11 +198,11 @@ export default function FinanceDepositListPage() {
             <Form.Item name="purpose" label="Mục đích">
               <Select options={[{ value: 'dam_bao_vay', label: 'Đảm bảo khoản vay' }, { value: 'thuong', label: 'Tiền gửi thường' }]} />
             </Form.Item>
-            <Form.Item name="secured_loan_id" label="🔗 Đảm bảo cho khoản vay" style={{ gridColumn: '1 / -1' }}
-              tooltip="HĐTG này cầm cố bảo lãnh cho khoản vay nào — để thấy rõ cái nào chống lưng cái nào">
+            <Form.Item name="secured_credit_line_id" label="🔗 Đảm bảo cho HẠN MỨC" style={{ gridColumn: '1 / -1' }}
+              tooltip="HĐTG này cầm cố bảo lãnh cho hạn mức (facility) nào — đúng bản chất, 1 hạn mức gồm nhiều khoản vay">
               <Select allowClear showSearch optionFilterProp="label"
-                placeholder={loanOptions.length ? 'Chọn khoản vay được đảm bảo…' : 'Chưa có khoản vay — thêm ở tab Khoản vay trước'}
-                options={loanOptions} notFoundContent="Chưa có khoản vay" />
+                placeholder={lineOptions.length ? 'Chọn hạn mức được đảm bảo…' : 'Chưa có hạn mức — thêm ở tab Hạn mức trước'}
+                options={lineOptions} notFoundContent="Chưa có hạn mức" />
             </Form.Item>
             <Form.Item name="status" label="Trạng thái">
               <Select options={[{ value: 'active', label: 'Đang gửi' }, { value: 'closed', label: 'Đã tất toán' }]} />
@@ -214,8 +213,7 @@ export default function FinanceDepositListPage() {
         </Form>
       </Modal>
 
-      <LinkDrawer loan={linkLoan} deposits={rows} open={!!linkLoan}
-        onClose={() => { setLinkLoan(null); setHighlightDep(null) }} highlightDepositId={highlightDep} from="deposits" />
+      <FacilityDrawer line={drawerLine} open={!!drawerLine} onClose={() => setDrawerLine(null)} />
     </div>
   )
 }

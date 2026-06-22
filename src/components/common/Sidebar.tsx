@@ -421,6 +421,7 @@ const getMenuGroups = (
     adminOnly: true,
     items: [
       { path: '/finance/overview', label: 'Tổng quan vốn vay', icon: <LayoutDashboard size={18} /> },
+      { path: '/finance/credit-lines', label: 'Hạn mức (HĐTD)', icon: <CreditCard size={18} /> },
       { path: '/finance/loans', label: 'Khoản vay', icon: <ClipboardList size={18} /> },
       { path: '/finance/deposits', label: 'Tiền gửi (HĐTG)', icon: <Wallet size={18} /> },
     ],

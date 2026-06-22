@@ -16,8 +16,8 @@ import {
   loanService, CIC_LABEL, CIC_COLOR, CIC_BG, BANKS,
   type FinLoanComputed, type FinRepayment,
 } from '../../services/finance/loanService'
-import { depositService, type FinDepositComputed } from '../../services/finance/depositService'
-import LinkDrawer from './LinkDrawer'
+import { creditLineService, type FinCreditLineComputed } from '../../services/finance/creditLineService'
+import FacilityDrawer from './FacilityDrawer'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -34,7 +34,7 @@ export default function FinanceLoanListPage() {
   const focusId = sp.get('focus')
 
   const [loans, setLoans] = useState<FinLoanComputed[]>([])
-  const [deposits, setDeposits] = useState<FinDepositComputed[]>([])
+  const [lines, setLines] = useState<FinCreditLineComputed[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
 
@@ -47,31 +47,22 @@ export default function FinanceLoanListPage() {
   const [payLoan, setPayLoan] = useState<FinLoanComputed | null>(null)
   const [repays, setRepays] = useState<FinRepayment[]>([])
   const [payForm] = Form.useForm()
-  // Drawer liên kết (xem HĐTG đảm bảo)
-  const [linkLoan, setLinkLoan] = useState<FinLoanComputed | null>(null)
+  // Drawer hạn mức
+  const [drawerLine, setDrawerLine] = useState<FinCreditLineComputed | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [l, d] = await Promise.all([loanService.list(), depositService.list()])
-      setLoans(l); setDeposits(d)
+      const [l, cl] = await Promise.all([loanService.list(), creditLineService.listComputed()])
+      setLoans(l); setLines(cl)
     } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
 
-  // HĐTG đang đảm bảo cho từng khoản vay (chiều ngược) — loanId → {count, total}
-  const securedBy = useMemo(() => {
-    const m = new Map<string, { count: number; total: number }>()
-    deposits.forEach((d) => {
-      if (d.secured_loan_id && d.status !== 'closed') {
-        const cur = m.get(d.secured_loan_id) || { count: 0, total: 0 }
-        cur.count++; cur.total += d.amount || 0
-        m.set(d.secured_loan_id, cur)
-      }
-    })
-    return m
-  }, [deposits])
+  const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines])
+  const lineOptions = useMemo(() => lines.filter((l) => l.status === 'active')
+    .map((l) => ({ value: l.id, label: `${l.bank}${l.contract_no ? ' · ' + l.contract_no : ''} · HM ${fmtTy(l.limit_amount || 0)} · còn ${fmtTy(l.room)}` })), [lines])
 
   const rows = useMemo(() => {
     if (filter === 'all') return loans
@@ -97,7 +88,7 @@ export default function FinanceLoanListPage() {
       const v = await form.validateFields()
       setSaving(true)
       const payload = {
-        bank: v.bank, loan_no: v.loan_no || null,
+        bank: v.bank, loan_no: v.loan_no || null, credit_line_id: v.credit_line_id || null,
         principal: v.principal || 0, currency: v.currency || 'VND',
         disbursed_date: v.disbursed_date ? v.disbursed_date.format('YYYY-MM-DD') : null,
         due_date: v.due_date.format('YYYY-MM-DD'),
@@ -166,11 +157,11 @@ export default function FinanceLoanListPage() {
     { title: 'Nhảy nhóm', dataIndex: 'jump_date', width: 110, align: 'center' as const, render: (v: string, r: FinLoanComputed) =>
       r.cic === 'paid' ? '—' : <Tooltip title="Quá hạn ≥10 ngày → CIC nhóm 2"><Text type="danger">{fDate(v)}</Text></Tooltip> },
     { title: 'Trạng thái', key: 'cic', width: 150, render: (_: any, r: FinLoanComputed) => cicTag(r) },
-    { title: 'Đảm bảo bởi (HĐTG)', key: 'secured', width: 160, render: (_: any, r: FinLoanComputed) => {
-      const s = securedBy.get(r.id)
-      return s
-        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => setLinkLoan(r)}>🔒 {s.count} HĐ · <b>{fmtTy(s.total)}</b> <RightOutlined style={{ fontSize: 10 }} /></Button>
-        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+    { title: 'Hạn mức (HĐTD)', key: 'line', width: 185, render: (_: any, r: FinLoanComputed) => {
+      const cl = r.credit_line_id ? lineMap.get(r.credit_line_id) : null
+      return cl
+        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => setDrawerLine(cl)}>🏦 {cl.bank} · HM <b>{fmtTy(cl.limit_amount || 0)}</b>{cl.depositCount ? <span style={{ color: '#1677ff' }}> · 🔒{cl.depositCount}</span> : ''} <RightOutlined style={{ fontSize: 10 }} /></Button>
+        : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },
     { title: '', key: 'act', width: 120, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (
       <Space size={2}>
@@ -217,6 +208,12 @@ export default function FinanceLoanListPage() {
               <AutoComplete options={BANKS.map((b) => ({ value: b }))} placeholder="Agribank…" filterOption={(i, o) => (o?.value || '').toLowerCase().includes(i.toLowerCase())} />
             </Form.Item>
             <Form.Item name="loan_no" label="Số khế ước"><Input placeholder="vd: 4000-LCL-..." /></Form.Item>
+            <Form.Item name="credit_line_id" label="🏦 Thuộc hạn mức (HĐTD)" style={{ gridColumn: '1 / -1' }}
+              tooltip="Khoản vay này rút từ hạn mức nào — để tính room còn lại + tiền gửi đảm bảo">
+              <Select allowClear showSearch optionFilterProp="label"
+                placeholder={lineOptions.length ? 'Chọn hạn mức…' : 'Chưa có hạn mức — thêm ở tab Hạn mức'}
+                options={lineOptions} notFoundContent="Chưa có hạn mức" />
+            </Form.Item>
             <Form.Item name="principal" label="Số vay (VNĐ)" rules={[{ required: true, message: 'Nhập số vay' }]}>
               <InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} placeholder="0" />
             </Form.Item>
@@ -269,7 +266,7 @@ export default function FinanceLoanListPage() {
         )}
       </Drawer>
 
-      <LinkDrawer loan={linkLoan} deposits={deposits} open={!!linkLoan} onClose={() => setLinkLoan(null)} from="loans" />
+      <FacilityDrawer line={drawerLine} open={!!drawerLine} onClose={() => setDrawerLine(null)} />
     </div>
   )
 }

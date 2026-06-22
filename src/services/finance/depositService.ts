@@ -23,7 +23,8 @@ export interface FinDeposit {
   term: string | null
   expected_interest: number | null
   purpose: string | null        // dam_bao_vay | thuong
-  secured_loan_id: string | null // HĐTG này đảm bảo cho khoản vay nào
+  secured_loan_id: string | null         // (cũ) đảm bảo cho khoản vay lẻ
+  secured_credit_line_id: string | null  // đảm bảo cho HẠN MỨC (đúng bản chất)
   status: DepositStatus
   note: string | null
   created_at: string
@@ -88,6 +89,7 @@ export const depositService = {
       interest_rate: input.interest_rate ?? null, term: input.term || null,
       expected_interest: input.expected_interest ?? null, purpose: input.purpose || 'dam_bao_vay',
       secured_loan_id: input.secured_loan_id || null,
+      secured_credit_line_id: input.secured_credit_line_id || null,
       status: input.status || 'active', note: input.note || null, created_by: input.created_by || null,
     }).select('*').single()
     if (error) throw error

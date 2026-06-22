@@ -38,6 +38,7 @@ export interface FinLoanComputed extends FinLoan {
 export interface FinLoanInput {
   bank: string
   loan_no?: string | null
+  credit_line_id?: string | null
   principal: number
   currency?: string
   disbursed_date?: string | null
@@ -115,6 +116,7 @@ export const loanService = {
     const { data, error } = await supabase.from('fin_loans').insert({
       bank: input.bank,
       loan_no: input.loan_no || null,
+      credit_line_id: input.credit_line_id || null,
       principal: input.principal || 0,
       currency: input.currency || 'VND',
       disbursed_date: input.disbursed_date || null,

@@ -5,7 +5,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Card, Table, Button, Tag, Typography, Modal, Form, Input, InputNumber, DatePicker,
-  Select, AutoComplete, Space, message, Popconfirm, Segmented, Tooltip, Row, Col, Statistic, Alert,
+  Select, AutoComplete, Space, message, Popconfirm, Segmented, Tooltip, Row, Col, Statistic, Alert, Drawer, Badge,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
@@ -18,6 +18,8 @@ import { BANKS } from '../../services/finance/loanService'
 import { creditLineService, type FinCreditLineComputed } from '../../services/finance/creditLineService'
 import FacilityDrawer from './FacilityDrawer'
 import FinanceAttachments from './FinanceAttachments'
+import { attachmentService } from '../../services/finance/attachmentService'
+import { PaperClipOutlined } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -39,12 +41,15 @@ export default function FinanceDepositListPage() {
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
   const [drawerLine, setDrawerLine] = useState<FinCreditLineComputed | null>(null)
+  const [attachDep, setAttachDep] = useState<FinDepositComputed | null>(null)
+  const [attachCounts, setAttachCounts] = useState<Map<string, number>>(new Map())
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const [d, l] = await Promise.all([depositService.list(), creditLineService.listComputed()])
       setRows(d); setLines(l)
+      try { setAttachCounts(await attachmentService.countFor('deposit', d.map((x) => x.id))) } catch { /* bảng file chưa tạo */ }
     } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
     setLoading(false)
   }, [])
@@ -146,8 +151,11 @@ export default function FinanceDepositListPage() {
         : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },
     { title: 'Trạng thái', key: 'alert', width: 160, render: (_: any, r: FinDepositComputed) => alertTag(r) },
-    { title: '', key: 'act', width: 70, fixed: 'right' as const, render: (_: any, r: FinDepositComputed) => (
+    { title: '', key: 'act', width: 102, fixed: 'right' as const, render: (_: any, r: FinDepositComputed) => (
       <Space size={2}>
+        <Tooltip title="Tài liệu (sổ/giấy CN…)"><Badge count={attachCounts.get(r.id) || 0} size="small" offset={[-2, 2]}>
+          <Button type="text" size="small" icon={<PaperClipOutlined style={{ color: '#1E3A5F' }} />} onClick={() => setAttachDep(r)} />
+        </Badge></Tooltip>
         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
         <Popconfirm title="Xoá HĐTG này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelete(r)}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} />
@@ -225,15 +233,14 @@ export default function FinanceDepositListPage() {
           </div>
           <Form.Item name="note" label="Ghi chú"><Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item>
         </Form>
-        {editing && (
-          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 4 }}>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>📎 Tài liệu tiền gửi</div>
-            <FinanceAttachments entityType="deposit" entityId={editing.id} />
-          </div>
-        )}
       </Modal>
 
       <FacilityDrawer line={drawerLine} open={!!drawerLine} onClose={() => setDrawerLine(null)} />
+
+      <Drawer title={attachDep ? `📎 Tài liệu tiền gửi — ${attachDep.bank}${attachDep.deposit_no ? ' · ' + attachDep.deposit_no : ''}` : ''}
+        open={!!attachDep} onClose={() => { setAttachDep(null); load() }} width={520} destroyOnClose>
+        {attachDep && <FinanceAttachments entityType="deposit" entityId={attachDep.id} />}
+      </Drawer>
     </div>
   )
 }

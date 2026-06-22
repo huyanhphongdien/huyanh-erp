@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Card, Table, Button, Tag, Typography, Modal, Form, Input, InputNumber, DatePicker,
-  Select, AutoComplete, Space, message, Popconfirm, Drawer, Segmented, Tooltip,
+  Select, AutoComplete, Space, message, Popconfirm, Drawer, Segmented, Tooltip, Badge,
 } from 'antd'
 import {
   PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined, RightOutlined, PercentageOutlined, PaperClipOutlined,
@@ -20,6 +20,7 @@ import { creditLineService, type FinCreditLineComputed } from '../../services/fi
 import FacilityDrawer from './FacilityDrawer'
 import InterestDrawer from './InterestDrawer'
 import FinanceAttachments from './FinanceAttachments'
+import { attachmentService } from '../../services/finance/attachmentService'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -55,12 +56,16 @@ export default function FinanceLoanListPage() {
   const [interestLoan, setInterestLoan] = useState<FinLoanComputed | null>(null)
   // Modal đính kèm chứng từ trả nợ
   const [attachRepay, setAttachRepay] = useState<{ id: string; label: string } | null>(null)
+  // Drawer tài liệu khoản vay
+  const [attachLoan, setAttachLoan] = useState<FinLoanComputed | null>(null)
+  const [attachCounts, setAttachCounts] = useState<Map<string, number>>(new Map())
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const [l, cl] = await Promise.all([loanService.list(), creditLineService.listComputed()])
       setLoans(l); setLines(cl)
+      try { setAttachCounts(await attachmentService.countFor('loan', l.map((x) => x.id))) } catch { /* bảng file chưa tạo */ }
     } catch (e: any) { message.error('Lỗi tải: ' + (e?.message || e)) }
     setLoading(false)
   }, [])
@@ -178,8 +183,11 @@ export default function FinanceLoanListPage() {
         ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => setDrawerLine(cl)}>🏦 {cl.bank} · HM <b>{fmtTy(cl.limit_amount || 0)}</b>{cl.depositCount ? <span style={{ color: '#1677ff' }}> · 🔒{cl.depositCount}</span> : ''} <RightOutlined style={{ fontSize: 10 }} /></Button>
         : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },
-    { title: '', key: 'act', width: 148, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (
+    { title: '', key: 'act', width: 178, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (
       <Space size={2}>
+        <Tooltip title="Tài liệu (khế ước, sao kê…)"><Badge count={attachCounts.get(r.id) || 0} size="small" offset={[-2, 2]}>
+          <Button type="text" size="small" icon={<PaperClipOutlined style={{ color: '#1E3A5F' }} />} onClick={() => setAttachLoan(r)} />
+        </Badge></Tooltip>
         <Tooltip title="Lịch trả lãi"><Button type="text" size="small" icon={<PercentageOutlined style={{ color: '#92400E' }} />} onClick={() => setInterestLoan(r)} /></Tooltip>
         <Tooltip title="Ghi trả nợ"><Button type="text" size="small" icon={<DollarOutlined style={{ color: '#16a34a' }} />} onClick={() => openPay(r)} /></Tooltip>
         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
@@ -246,12 +254,6 @@ export default function FinanceLoanListPage() {
           </div>
           <Form.Item name="note" label="Ghi chú"><Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item>
         </Form>
-        {editing && (
-          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 4 }}>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>📎 Tài liệu khoản vay</div>
-            <FinanceAttachments entityType="loan" entityId={editing.id} />
-          </div>
-        )}
       </Modal>
 
       {/* Drawer trả nợ */}
@@ -299,6 +301,11 @@ export default function FinanceLoanListPage() {
         onCancel={() => setAttachRepay(null)} destroyOnClose width={560}>
         {attachRepay && <FinanceAttachments entityType="repayment" entityId={attachRepay.id} />}
       </Modal>
+
+      <Drawer title={attachLoan ? `📎 Tài liệu khoản vay — ${attachLoan.bank}${attachLoan.loan_no ? ' · ' + attachLoan.loan_no : ''}` : ''}
+        open={!!attachLoan} onClose={() => { setAttachLoan(null); load() }} width={520} destroyOnClose>
+        {attachLoan && <FinanceAttachments entityType="loan" entityId={attachLoan.id} />}
+      </Drawer>
     </div>
   )
 }

@@ -24,13 +24,16 @@ const CLIENT_ID = Deno.env.get('AZURE_CLIENT_ID') || 'ee1377e6-b52c-4326-88f2-c1
 const CLIENT_SECRET = Deno.env.get('AZURE_CLIENT_SECRET') || Deno.env.get('MICROSOFT_CLIENT_SECRET') || ''
 const SENDER_EMAIL = Deno.env.get('EMAIL_FROM') || 'huyanhphongdien@huyanhrubber.com'
 
-// ★ Gửi BGĐ (đã chốt). Quay lại test riêng: tạm đổi về [{ minhld }].
+// ⚠ ĐANG TEST: chỉ gửi minhld để xem nội dung trước. Khôi phục BGĐ → bỏ comment khối dưới.
 const REPORT_RECIPIENTS = [
-  { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
-  { name: 'Anh Trung', email: 'trunglxh@huyanhrubber.com' },
-  { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
 ]
+// const REPORT_RECIPIENTS = [
+//   { name: 'Lê Văn Huy', email: 'huylv@huyanhrubber.com' },
+//   { name: 'Anh Trung', email: 'trunglxh@huyanhrubber.com' },
+//   { name: 'Hồ Thị Thủy', email: 'thuyht@huyanhrubber.com' },
+//   { name: 'Lê Duy Minh', email: 'minhld@huyanhrubber.com' },
+// ]
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -161,42 +164,30 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
     fetchIN(supabase, monthStart, repEnd),
   ])
 
-  // DRC trung bình theo loại (từ phiếu có DRC) — để ước KL khô cho phiếu thiếu DRC
-  const drcSum: Record<string, number> = {}, drcCnt: Record<string, number> = {}
-  let allDrcSum = 0, allDrcCnt = 0
-  for (const t of today) {
-    if (t.qc_actual_drc != null && t.qc_actual_drc > 0) {
-      const rt = t.rubber_type || 'other'
-      drcSum[rt] = (drcSum[rt] || 0) + t.qc_actual_drc; drcCnt[rt] = (drcCnt[rt] || 0) + 1
-      allDrcSum += t.qc_actual_drc; allDrcCnt++
-    }
-  }
-  const avgAll = allDrcCnt ? allDrcSum / allDrcCnt : 32  // fallback 32% nếu chưa có DRC nào
-  const drcOf = (t: Ticket): { drc: number; estimated: boolean } => {
-    if (t.qc_actual_drc != null && t.qc_actual_drc > 0) return { drc: t.qc_actual_drc, estimated: false }
-    const rt = t.rubber_type || 'other'
-    const est = drcCnt[rt] ? drcSum[rt] / drcCnt[rt] : avgAll
-    return { drc: est, estimated: true }
-  }
-
-  const dryOf = (t: Ticket) => (t.net_weight || 0) * drcOf(t).drc / 100
+  // QUY ĐỔI KHÔ: CHỈ phiếu có DRC THỰC (mủ nước đã đốt + đo DRC). Mủ tạp/loại khác chưa đo DRC
+  // → KHÔNG quy đổi khô (không ước theo DRC trung bình nữa, tránh thổi phồng KL khô).
+  const hasDrc = (t: Ticket) => t.qc_actual_drc != null && t.qc_actual_drc > 0
+  const dryOf = (t: Ticket) => (hasDrc(t) ? (t.net_weight || 0) * (t.qc_actual_drc as number) / 100 : 0)
 
   const sumTuoi = (arr: Ticket[]) => arr.reduce((s, t) => s + (t.net_weight || 0), 0)
   const sumKho = (arr: Ticket[]) => arr.reduce((s, t) => s + dryOf(t), 0)
+  // KL tươi của RIÊNG phần có DRC — để DRC trung bình không bị pha loãng bởi mủ tạp.
+  const sumTuoiDrc = (arr: Ticket[]) => arr.reduce((s, t) => s + (hasDrc(t) ? (t.net_weight || 0) : 0), 0)
 
   const totalTuoi = sumTuoi(today)
   const totalKho = sumKho(today)
+  const totalTuoiDrc = sumTuoiDrc(today)
   const yTuoi = sumTuoi(yesterday)
   const pct = yTuoi > 0 ? ((totalTuoi - yTuoi) / yTuoi) * 100 : null
-  const drcTB = totalTuoi > 0 ? (totalKho / totalTuoi) * 100 : 0
+  const drcTB = totalTuoiDrc > 0 ? (totalKho / totalTuoiDrc) * 100 : 0
 
   // Theo nhà máy
-  const facMap = new Map<string, { code: string; name: string; xe: number; tuoi: number; kho: number }>()
+  const facMap = new Map<string, { code: string; name: string; xe: number; tuoi: number; kho: number; tuoiDrc: number }>()
   for (const t of today) {
     const f = facCode(t)
     const key = f.code
-    const cur = facMap.get(key) || { code: f.code, name: f.name, xe: 0, tuoi: 0, kho: 0 }
-    cur.xe++; cur.tuoi += t.net_weight || 0; cur.kho += dryOf(t)
+    const cur = facMap.get(key) || { code: f.code, name: f.name, xe: 0, tuoi: 0, kho: 0, tuoiDrc: 0 }
+    cur.xe++; cur.tuoi += t.net_weight || 0; cur.kho += dryOf(t); cur.tuoiDrc += hasDrc(t) ? (t.net_weight || 0) : 0
     facMap.set(key, cur)
   }
   const facilities = [...facMap.values()].sort((a, b) => b.tuoi - a.tuoi)
@@ -228,25 +219,26 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const dealerCount = dealerMap.size
 
   // Chi tiết TỪNG đại lý × loại mủ trong ngày: xe, KL tươi, DRC (bình quân theo KL), KL khô
-  const detMap = new Map<string, { name: string; fac: string; type: string; xe: number; tuoi: number; kho: number; drcW: number }>()
+  const detMap = new Map<string, { name: string; fac: string; type: string; xe: number; tuoi: number; kho: number; drcW: number; tuoiDrc: number }>()
   for (const t of today) {
     const name = t.supplier_name || (t.partner_id ? nameById.get(t.partner_id) : '') || 'Không rõ'
     const rt = normRt(t.rubber_type)
     const net = t.net_weight || 0
-    const { drc } = drcOf(t)
     const key = name + '|' + rt
-    const cur = detMap.get(key) || { name, fac: facCode(t).code, type: rt, xe: 0, tuoi: 0, kho: 0, drcW: 0 }
-    cur.xe++; cur.tuoi += net; cur.kho += net * drc / 100; cur.drcW += drc * net
+    const cur = detMap.get(key) || { name, fac: facCode(t).code, type: rt, xe: 0, tuoi: 0, kho: 0, drcW: 0, tuoiDrc: 0 }
+    cur.xe++; cur.tuoi += net
+    if (hasDrc(t)) { const drc = t.qc_actual_drc as number; cur.kho += net * drc / 100; cur.drcW += drc * net; cur.tuoiDrc += net }
     detMap.set(key, cur)
   }
   const dealerDetail = [...detMap.values()]
-    .map((x) => ({ ...x, drc: x.tuoi ? x.drcW / x.tuoi : 0 }))
+    .map((x) => ({ ...x, drc: x.tuoiDrc ? x.drcW / x.tuoiDrc : 0, hasDrc: x.tuoiDrc > 0 }))
     .sort((a, b) => b.tuoi - a.tuoi)
 
   // ── LŨY KẾ TỪ ĐẦU THÁNG (01/MM → hết kỳ báo cáo) ──
   const mTuoi = sumTuoi(month)
   const mKho = sumKho(month)
-  const mDrcTB = mTuoi > 0 ? (mKho / mTuoi) * 100 : 0
+  const mTuoiDrc = sumTuoiDrc(month)
+  const mDrcTB = mTuoiDrc > 0 ? (mKho / mTuoiDrc) * 100 : 0
   const mDealerMap = new Map<string, { name: string; fac: string; type: string; tuoi: number }>()
   for (const t of month) {
     const name = t.supplier_name || (t.partner_id ? nameById.get(t.partner_id) : '') || 'Không rõ'
@@ -262,8 +254,8 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
     xeCount: month.length, dealerCount: mDealerMap.size, topDealers: mTopDealers,
   }
 
-  // Cảnh báo thiếu DRC
-  const missing = today.filter((t) => (t.qc_actual_drc == null || t.qc_actual_drc <= 0) && (t.net_weight || 0) > 0)
+  // Cảnh báo: CHỈ phiếu MỦ NƯỚC thiếu DRC (mủ nước phải có DRC; mủ tạp không đo DRC nên không cảnh báo)
+  const missing = today.filter((t) => t.rubber_type === 'mu_nuoc' && !hasDrc(t) && (t.net_weight || 0) > 0)
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
 
   // Nhãn ngày = NGÀY ĐƯỢC BÁO CÁO (hôm qua, hoặc hôm nay nếu mode test)
@@ -294,8 +286,8 @@ function renderHtml(d: any): string {
       <td style="padding:8px 10px;">${esc(f.name)} <span style="color:#94a3b8;">(${esc(facLabel(f.code))})</span></td>
       <td align="center" style="padding:8px 10px;">${f.xe}</td>
       <td align="right" style="padding:8px 10px;font-weight:600;">${fmtT(f.tuoi)}</td>
-      <td align="right" style="padding:8px 10px;font-weight:600;color:#92400E;">${fmtT(f.kho)}</td>
-      <td align="right" style="padding:8px 10px;">${fmt1(f.tuoi > 0 ? f.kho / f.tuoi * 100 : 0)}%</td>
+      <td align="right" style="padding:8px 10px;font-weight:600;color:#92400E;">${f.kho > 0 ? fmtT(f.kho) : '—'}</td>
+      <td align="right" style="padding:8px 10px;">${f.tuoiDrc > 0 ? fmt1(f.kho / f.tuoiDrc * 100) + '%' : '—'}</td>
     </tr>`).join('')
 
   const maxTuoi = Math.max(1, ...d.types.map((x: any) => x.tuoi))
@@ -332,8 +324,8 @@ function renderHtml(d: any): string {
   // Chi tiết từng đại lý × loại mủ (KL theo kg)
   const detailRows = (d.dealerDetail || []).map((p: any, i: number) => {
     const m = (RUBBER as any)[p.type] || null
-    // Mủ tạp: KHÔNG đo DRC → để trống DRC + Khô (tránh số khô ước sai lệch).
-    const isTap = p.type === 'mu_tap'
+    // Không có DRC thực (mủ tạp/loại chưa đốt) → để trống DRC + Khô (không quy đổi).
+    const isTap = !p.hasDrc
     return `
     <tr style="border-top:1px solid #eef1f0;${i % 2 ? 'background:#fafcfb;' : ''}">
       <td style="padding:6px 8px;color:#94a3b8;">${i + 1}</td>
@@ -408,7 +400,7 @@ function renderHtml(d: any): string {
     <tr><td style="padding:10px 24px 4px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF7E6;border:1px solid #FFE08A;border-radius:8px;">
         <tr><td style="padding:10px 12px;font-size:12px;color:#92400E;">
-          ⚠ <b>${d.missingCount} phiếu chưa nhập DRC</b> (≈${fmtT(d.missingKg)} tấn tươi) — KL khô tạm tính theo DRC trung bình. Số khô có thể đổi sau khi QC nhập đủ.
+          ⚠ <b>${d.missingCount} phiếu MỦ NƯỚC chưa nhập DRC</b> (≈${fmtT(d.missingKg)} tấn tươi) — phần này CHƯA quy đổi khô, sẽ cập nhật sau khi QC nhập DRC.
         </td></tr>
       </table>
     </td></tr>` : ''
@@ -549,9 +541,9 @@ function renderHtml(d: any): string {
           ${d.isToday
             ? `Báo cáo nhanh số liệu <b>HÔM NAY tới giờ gọi</b> (chưa trọn ngày), từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
             : `Báo cáo tự động <b>đầu ngày (~00:01)</b> cho <b>TRỌN NGÀY HÔM TRƯỚC</b>, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
-          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN. KL khô = KL tươi × DRC.<br>
-          Khối <b>Lũy kế từ đầu tháng</b> = cộng dồn từ ngày 01 đến hết kỳ báo cáo.<br>
-          Mủ chưa có DRC được tạm tính theo DRC trung bình cùng loại.
+          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN.<br>
+          <b>KL khô = KL tươi × DRC, CHỈ quy đổi cho mủ có DRC thực</b> (mủ nước đã đốt). Mủ tạp chưa đo DRC nên KHÔNG quy đổi khô.<br>
+          Khối <b>Lũy kế từ đầu tháng</b> = cộng dồn từ ngày 01 đến hết kỳ báo cáo.
         </div>
       </td></tr>
     </table>

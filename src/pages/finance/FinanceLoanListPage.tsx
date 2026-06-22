@@ -9,7 +9,7 @@ import {
   Select, AutoComplete, Space, message, Popconfirm, Drawer, Segmented, Tooltip,
 } from 'antd'
 import {
-  PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined,
+  PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined, RightOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
@@ -17,6 +17,7 @@ import {
   type FinLoanComputed, type FinRepayment,
 } from '../../services/finance/loanService'
 import { depositService, type FinDepositComputed } from '../../services/finance/depositService'
+import LinkDrawer from './LinkDrawer'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -45,6 +46,8 @@ export default function FinanceLoanListPage() {
   const [payLoan, setPayLoan] = useState<FinLoanComputed | null>(null)
   const [repays, setRepays] = useState<FinRepayment[]>([])
   const [payForm] = Form.useForm()
+  // Drawer liên kết (xem HĐTG đảm bảo)
+  const [linkLoan, setLinkLoan] = useState<FinLoanComputed | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -162,9 +165,11 @@ export default function FinanceLoanListPage() {
     { title: 'Nhảy nhóm', dataIndex: 'jump_date', width: 110, align: 'center' as const, render: (v: string, r: FinLoanComputed) =>
       r.cic === 'paid' ? '—' : <Tooltip title="Quá hạn ≥10 ngày → CIC nhóm 2"><Text type="danger">{fDate(v)}</Text></Tooltip> },
     { title: 'Trạng thái', key: 'cic', width: 150, render: (_: any, r: FinLoanComputed) => cicTag(r) },
-    { title: 'Đảm bảo bởi (HĐTG)', key: 'secured', width: 150, render: (_: any, r: FinLoanComputed) => {
+    { title: 'Đảm bảo bởi (HĐTG)', key: 'secured', width: 160, render: (_: any, r: FinLoanComputed) => {
       const s = securedBy.get(r.id)
-      return s ? <span style={{ fontSize: 12 }}>🔒 {s.count} HĐ · <b>{fmtVnd(s.total)}</b></span> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+      return s
+        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto' }} onClick={() => setLinkLoan(r)}>🔒 {s.count} HĐ · {fmtVnd(s.total)} <RightOutlined style={{ fontSize: 10 }} /></Button>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
     } },
     { title: '', key: 'act', width: 120, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (
       <Space size={2}>
@@ -262,6 +267,8 @@ export default function FinanceLoanListPage() {
           </>
         )}
       </Drawer>
+
+      <LinkDrawer loan={linkLoan} deposits={deposits} open={!!linkLoan} onClose={() => setLinkLoan(null)} />
     </div>
   )
 }

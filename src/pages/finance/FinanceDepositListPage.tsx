@@ -14,6 +14,7 @@ import {
   type FinDepositComputed,
 } from '../../services/finance/depositService'
 import { loanService, BANKS, type FinLoanComputed } from '../../services/finance/loanService'
+import LinkDrawer from './LinkDrawer'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -34,6 +35,9 @@ export default function FinanceDepositListPage() {
   const [editing, setEditing] = useState<FinDepositComputed | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
+  // Drawer liên kết
+  const [linkLoan, setLinkLoan] = useState<FinLoanComputed | null>(null)
+  const [highlightDep, setHighlightDep] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -121,10 +125,12 @@ export default function FinanceDepositListPage() {
     { title: 'Đáo hạn', dataIndex: 'effective_maturity', width: 110, align: 'center' as const, render: (v: string, r: FinDepositComputed) => (
       <span>{fDate(v)}{r.extended_to ? <div style={{ fontSize: 10, color: '#16a34a' }}>(gia hạn)</div> : null}</span>) },
     { title: 'Mục đích', dataIndex: 'purpose', width: 110, render: (v: string) => v === 'dam_bao_vay' ? <Tag color="blue">Đảm bảo vay</Tag> : <Tag>Thường</Tag> },
-    { title: 'Đảm bảo cho khoản vay', key: 'secured', width: 180, render: (_: any, r: FinDepositComputed) => {
+    { title: 'Đảm bảo cho khoản vay', key: 'secured', width: 190, render: (_: any, r: FinDepositComputed) => {
       const ln = r.secured_loan_id ? loanMap.get(r.secured_loan_id) : null
       return ln
-        ? <span style={{ fontSize: 12 }}>🔗 <b>{ln.bank}</b> · {fmtVnd(ln.principal)}<div style={{ fontSize: 11, color: '#9ca3af' }}>đến hạn {fDate(ln.due_date)}</div></span>
+        ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', textAlign: 'left' }} onClick={() => { setLinkLoan(ln); setHighlightDep(r.id) }}>
+            🔗 <b>{ln.bank}</b> · {fmtVnd(ln.principal)}<div style={{ fontSize: 11, color: '#9ca3af' }}>đến hạn {fDate(ln.due_date)} · xem liên kết ›</div>
+          </Button>
         : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },
     { title: 'Trạng thái', key: 'alert', width: 160, render: (_: any, r: FinDepositComputed) => alertTag(r) },
@@ -207,6 +213,9 @@ export default function FinanceDepositListPage() {
           <Form.Item name="note" label="Ghi chú"><Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item>
         </Form>
       </Modal>
+
+      <LinkDrawer loan={linkLoan} deposits={rows} open={!!linkLoan}
+        onClose={() => { setLinkLoan(null); setHighlightDep(null) }} highlightDepositId={highlightDep} />
     </div>
   )
 }

@@ -9,7 +9,7 @@ import {
   Select, AutoComplete, Space, message, Popconfirm, Drawer, Segmented, Tooltip,
 } from 'antd'
 import {
-  PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined, RightOutlined, PercentageOutlined,
+  PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined, RightOutlined, PercentageOutlined, PaperClipOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
@@ -19,6 +19,7 @@ import {
 import { creditLineService, type FinCreditLineComputed } from '../../services/finance/creditLineService'
 import FacilityDrawer from './FacilityDrawer'
 import InterestDrawer from './InterestDrawer'
+import FinanceAttachments from './FinanceAttachments'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -52,6 +53,8 @@ export default function FinanceLoanListPage() {
   const [drawerLine, setDrawerLine] = useState<FinCreditLineComputed | null>(null)
   // Drawer lịch lãi
   const [interestLoan, setInterestLoan] = useState<FinLoanComputed | null>(null)
+  // Modal đính kèm chứng từ trả nợ
+  const [attachRepay, setAttachRepay] = useState<{ id: string; label: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -243,6 +246,12 @@ export default function FinanceLoanListPage() {
           </div>
           <Form.Item name="note" label="Ghi chú"><Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item>
         </Form>
+        {editing && (
+          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 4 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>📎 Tài liệu khoản vay</div>
+            <FinanceAttachments entityType="loan" entityId={editing.id} />
+          </div>
+        )}
       </Modal>
 
       {/* Drawer trả nợ */}
@@ -270,10 +279,13 @@ export default function FinanceLoanListPage() {
                 { title: 'Ngày', dataIndex: 'paid_date', render: fDate },
                 { title: 'Số tiền', dataIndex: 'amount', align: 'right', render: (v: number) => <b>{fmtVnd(v)}</b> },
                 { title: 'Nguồn', dataIndex: 'source', render: (v: string) => v === 'customer' ? 'Tiền hàng' : v === 'cash' ? 'Quỹ' : (v || '—') },
-                { title: '', key: 'd', width: 36, render: (_: any, r: FinRepayment) => (
-                  <Popconfirm title="Xoá lần trả này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelPay(r.id)}>
-                    <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                  </Popconfirm>) },
+                { title: '', key: 'd', width: 72, render: (_: any, r: FinRepayment) => (
+                  <Space size={0}>
+                    <Button type="text" size="small" icon={<PaperClipOutlined />} title="Chứng từ trả nợ" onClick={() => setAttachRepay({ id: r.id, label: `${fDate(r.paid_date)} · ${fmtVnd(r.amount)}` })} />
+                    <Popconfirm title="Xoá lần trả này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelPay(r.id)}>
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
+                  </Space>) },
               ] as any} />
           </>
         )}
@@ -282,6 +294,11 @@ export default function FinanceLoanListPage() {
       <FacilityDrawer line={drawerLine} open={!!drawerLine} onClose={() => setDrawerLine(null)} />
 
       <InterestDrawer loan={interestLoan} open={!!interestLoan} onClose={() => setInterestLoan(null)} onChanged={load} />
+
+      <Modal open={!!attachRepay} title={`📎 Chứng từ trả nợ — ${attachRepay?.label || ''}`} footer={null}
+        onCancel={() => setAttachRepay(null)} destroyOnClose width={560}>
+        {attachRepay && <FinanceAttachments entityType="repayment" entityId={attachRepay.id} />}
+      </Modal>
     </div>
   )
 }

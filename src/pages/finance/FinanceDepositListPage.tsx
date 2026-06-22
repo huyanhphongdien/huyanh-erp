@@ -17,6 +17,7 @@ import {
 import { BANKS } from '../../services/finance/loanService'
 import { creditLineService, type FinCreditLineComputed } from '../../services/finance/creditLineService'
 import FacilityDrawer from './FacilityDrawer'
+import FinanceAttachments from './FinanceAttachments'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -224,6 +225,12 @@ export default function FinanceDepositListPage() {
           </div>
           <Form.Item name="note" label="Ghi chú"><Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} /></Form.Item>
         </Form>
+        {editing && (
+          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 4 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>📎 Tài liệu tiền gửi</div>
+            <FinanceAttachments entityType="deposit" entityId={editing.id} />
+          </div>
+        )}
       </Modal>
 
       <FacilityDrawer line={drawerLine} open={!!drawerLine} onClose={() => setDrawerLine(null)} />

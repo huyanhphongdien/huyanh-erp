@@ -7,8 +7,9 @@ import {
   Drawer, Card, Table, Button, Form, InputNumber, DatePicker, Select, Space,
   Typography, message, Popconfirm, Row, Col, Statistic, Divider, Modal,
 } from 'antd'
-import { ThunderboltOutlined, CheckOutlined, UndoOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { ThunderboltOutlined, CheckOutlined, UndoOutlined, DeleteOutlined, PlusOutlined, PaperClipOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import FinanceAttachments from './FinanceAttachments'
 import {
   interestService, buildSchedule, FREQ_LABEL, IALERT_LABEL, IALERT_COLOR,
   type FinInterestComputed, type InterestFreq,
@@ -36,6 +37,7 @@ export default function InterestDrawer({ loan, open, onClose, onChanged }: {
   const [generating, setGenerating] = useState(false)
   const [payRow, setPayRow] = useState<FinInterestComputed | null>(null)
   const [payForm] = Form.useForm()
+  const [attachRow, setAttachRow] = useState<FinInterestComputed | null>(null)
 
   const load = useCallback(async () => {
     if (!loan) return
@@ -117,8 +119,9 @@ export default function InterestDrawer({ loan, open, onClose, onChanged }: {
     { title: 'Lãi (đ)', dataIndex: 'interest_amount', width: 120, align: 'right' as const, render: (v: number) => <b style={{ color: '#92400E' }}>{fmtVnd(v)}</b> },
     { title: 'Trạng thái', key: 'al', width: 100, align: 'center' as const, render: (_: any, r: FinInterestComputed) => (
       <span>{pill(IALERT_COLOR[r.alert], IALERT_LABEL[r.alert])}{r.status === 'paid' && r.paid_date ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{fDate(r.paid_date)}</div> : null}</span>) },
-    { title: '', key: 'act', width: 96, align: 'right' as const, render: (_: any, r: FinInterestComputed) => (
-      <Space size={2}>
+    { title: '', key: 'act', width: 120, align: 'right' as const, render: (_: any, r: FinInterestComputed) => (
+      <Space size={0}>
+        <Button type="text" size="small" icon={<PaperClipOutlined />} title="Chứng từ trả lãi" onClick={() => setAttachRow(r)} />
         {r.status === 'pending'
           ? <Button type="text" size="small" icon={<CheckOutlined style={{ color: '#16a34a' }} />} title="Đánh dấu đã trả" onClick={() => openPay(r)} />
           : <Button type="text" size="small" icon={<UndoOutlined />} title="Bỏ đã trả" onClick={() => unpay(r)} />}
@@ -175,6 +178,11 @@ export default function InterestDrawer({ loan, open, onClose, onChanged }: {
           <Form.Item name="paid_date" label="Ngày trả" rules={[{ required: true }]}><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="paid_amount" label="Số tiền lãi đã trả (đ)" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} /></Form.Item>
         </Form>
+      </Modal>
+
+      <Modal open={!!attachRow} title={`📎 Chứng từ trả lãi — kỳ ${attachRow?.period_no ?? '—'} · đến hạn ${fDate(attachRow?.due_date)}`}
+        footer={null} onCancel={() => setAttachRow(null)} destroyOnClose width={560}>
+        {attachRow && <FinanceAttachments entityType="interest" entityId={attachRow.id} />}
       </Modal>
     </Drawer>
   )

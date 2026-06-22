@@ -251,7 +251,7 @@ function renderHtml(d: any): string {
 <body style="margin:0;padding:0;background:#eef1f0;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#1f2937;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f0;padding:18px 10px;"><tr><td align="center">
     <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);">
-      <tr><td style="background:#1B4D3E;padding:20px 24px;">
+      <tr><td style="background:#1E3A5F;padding:20px 24px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
           <td style="vertical-align:middle;">
             <div style="color:#fff;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.85;">Cao Su Huy Anh · Tài chính</div>

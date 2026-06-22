@@ -9,7 +9,7 @@ import {
   Select, AutoComplete, Space, message, Popconfirm, Drawer, Segmented, Tooltip,
 } from 'antd'
 import {
-  PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined, RightOutlined,
+  PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined, RightOutlined, PercentageOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
@@ -18,6 +18,7 @@ import {
 } from '../../services/finance/loanService'
 import { creditLineService, type FinCreditLineComputed } from '../../services/finance/creditLineService'
 import FacilityDrawer from './FacilityDrawer'
+import InterestDrawer from './InterestDrawer'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Title, Text } = Typography
@@ -49,6 +50,8 @@ export default function FinanceLoanListPage() {
   const [payForm] = Form.useForm()
   // Drawer hạn mức
   const [drawerLine, setDrawerLine] = useState<FinCreditLineComputed | null>(null)
+  // Drawer lịch lãi
+  const [interestLoan, setInterestLoan] = useState<FinLoanComputed | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -172,8 +175,9 @@ export default function FinanceLoanListPage() {
         ? <Button type="link" size="small" style={{ padding: 0, fontSize: 12, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => setDrawerLine(cl)}>🏦 {cl.bank} · HM <b>{fmtTy(cl.limit_amount || 0)}</b>{cl.depositCount ? <span style={{ color: '#1677ff' }}> · 🔒{cl.depositCount}</span> : ''} <RightOutlined style={{ fontSize: 10 }} /></Button>
         : <Text type="secondary" style={{ fontSize: 12 }}>— chưa nối</Text>
     } },
-    { title: '', key: 'act', width: 120, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (
+    { title: '', key: 'act', width: 148, fixed: 'right' as const, render: (_: any, r: FinLoanComputed) => (
       <Space size={2}>
+        <Tooltip title="Lịch trả lãi"><Button type="text" size="small" icon={<PercentageOutlined style={{ color: '#92400E' }} />} onClick={() => setInterestLoan(r)} /></Tooltip>
         <Tooltip title="Ghi trả nợ"><Button type="text" size="small" icon={<DollarOutlined style={{ color: '#16a34a' }} />} onClick={() => openPay(r)} /></Tooltip>
         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
         <Popconfirm title="Xoá khoản vay này?" okText="Xoá" cancelText="Huỷ" onConfirm={() => handleDelete(r)}>
@@ -276,6 +280,8 @@ export default function FinanceLoanListPage() {
       </Drawer>
 
       <FacilityDrawer line={drawerLine} open={!!drawerLine} onClose={() => setDrawerLine(null)} />
+
+      <InterestDrawer loan={interestLoan} open={!!interestLoan} onClose={() => setInterestLoan(null)} onChanged={load} />
     </div>
   )
 }

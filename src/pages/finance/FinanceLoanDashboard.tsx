@@ -72,10 +72,10 @@ export default function FinanceLoanDashboard() {
   }, [deposits])
 
   const cicTag = (l: FinLoanComputed) => (
-    <Tag color={CIC_COLOR[l.cic]} style={{ color: '#fff', border: 'none', fontWeight: 600 }}>
-      {l.cic === 'red' || l.cic === 'orange' ? `${l.overdue_days >= 0 ? `quá hạn ${l.overdue_days}d` : ''} ` : ''}
+    <span style={{ display: 'inline-block', background: CIC_COLOR[l.cic], color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>
+      {l.cic === 'red' || l.cic === 'orange' ? `${l.overdue_days >= 0 ? `quá hạn ${l.overdue_days}d · ` : ''}` : ''}
       {CIC_LABEL[l.cic]}
-    </Tag>
+    </span>
   )
 
   if (loading) return <div style={{ padding: 60, textAlign: 'center' }}><Spin size="large" /></div>
@@ -179,7 +179,7 @@ export default function FinanceLoanDashboard() {
               { title: 'Ngân hàng', dataIndex: 'bank', render: (v, r) => <span><b>{v}</b>{r.holder ? <Text type="secondary"> · {r.holder}</Text> : ''}</span> },
               { title: 'Số tiền', dataIndex: 'amount', align: 'right', render: (v) => <b>{fmtVnd(v)}</b> },
               { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center', render: (v, r) => <span>{fDate(v)} <Text type="secondary" style={{ fontSize: 11 }}>({(r.days_to_maturity ?? 0) >= 0 ? `còn ${r.days_to_maturity}d` : `quá ${-(r.days_to_maturity ?? 0)}d`})</Text></span> },
-              { title: '', key: 'al', align: 'center', render: (_, r) => <Tag color={ALERT_COLOR[r.alert]} style={{ color: '#fff', border: 'none', fontWeight: 600 }}>{ALERT_LABEL[r.alert]}</Tag> },
+              { title: '', key: 'al', align: 'center', render: (_, r) => <span style={{ display: 'inline-block', background: ALERT_COLOR[r.alert], color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>{ALERT_LABEL[r.alert]}</span> },
             ] as any} />
         </Card>
       )}

@@ -127,9 +127,9 @@ export default function FinanceLoanListPage() {
   }
 
   const cicTag = (l: FinLoanComputed) => (
-    <Tag color={CIC_COLOR[l.cic]} style={{ color: '#fff', border: 'none', fontWeight: 600 }}>
+    <span style={{ display: 'inline-block', background: CIC_COLOR[l.cic], color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>
       {(l.cic === 'red' || l.cic === 'orange') && l.overdue_days >= 0 ? `quá ${l.overdue_days}d · ` : ''}{CIC_LABEL[l.cic]}
-    </Tag>
+    </span>
   )
 
   const columns = [

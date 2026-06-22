@@ -93,12 +93,13 @@ export default function FinanceDepositListPage() {
     catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
   }
 
+  const pill = { display: 'inline-block', color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' as const }
   const alertTag = (d: FinDepositComputed) => (
-    <Tag color={ALERT_COLOR[d.alert]} style={{ color: '#fff', border: 'none', fontWeight: 600 }}>
+    <span style={{ ...pill, background: ALERT_COLOR[d.alert] }}>
       {d.days_to_maturity != null && d.alert !== 'closed' && d.alert !== 'ok'
         ? (d.days_to_maturity >= 0 ? `còn ${d.days_to_maturity}d · ` : `quá ${-d.days_to_maturity}d · `) : ''}
       {ALERT_LABEL[d.alert]}
-    </Tag>
+    </span>
   )
 
   const columns = [

@@ -8,6 +8,7 @@ import {
   Select, AutoComplete, Space, message, Popconfirm, Segmented, Tooltip, Row, Col, Statistic, Alert,
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import {
   depositService, ALERT_LABEL, ALERT_COLOR, ALERT_BG,
@@ -47,6 +48,17 @@ export default function FinanceDepositListPage() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+
+  const [sp] = useSearchParams()
+  const focusId = sp.get('focus')
+  // Cuộn tới dòng được mở từ Drawer Hạn mức (?focus=<id>)
+  useEffect(() => {
+    if (!focusId || loading) return
+    const t = setTimeout(() => {
+      document.querySelector(`[data-row-key="${focusId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [focusId, loading, rows])
 
   const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines])
   const lineOptions = useMemo(() => lines.filter((l) => l.status === 'active')
@@ -175,7 +187,8 @@ export default function FinanceDepositListPage() {
       <Card size="small" styles={{ body: { padding: 0 } }}>
         <Table rowKey="id" size="small" loading={loading} columns={columns as any} dataSource={view}
           pagination={{ pageSize: 30, showSizeChanger: false }} scroll={{ x: 1380 }}
-          onRow={(r) => ({ style: { background: ALERT_BG[r.alert] } })} />
+          rowClassName={(r) => (r.id === focusId ? 'ant-table-row-selected' : '')}
+          onRow={(r) => ({ style: { background: r.id === focusId ? '#fffbe6' : ALERT_BG[r.alert] } })} />
       </Card>
 
       <Modal title={editing ? 'Sửa HĐTG' : 'Thêm HĐTG'} open={open} onCancel={() => setOpen(false)}

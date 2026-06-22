@@ -49,11 +49,13 @@ export default function FacilityDrawer({ line, open, onClose }: {
       </Card>
 
       {/* Tiền gửi đảm bảo */}
-      <div style={{ fontWeight: 700, color: '#1677ff', margin: '16px 0 8px' }}>
+      <div style={{ fontWeight: 700, color: '#1677ff', margin: '16px 0 4px' }}>
         <SafetyCertificateOutlined /> Tiền gửi đảm bảo hạn mức ({line.depositCount}) — {fmtTy(line.secured)}
       </div>
+      <Text type="secondary" style={{ fontSize: 11 }}>Bấm 1 dòng để mở đúng HĐTG đó →</Text>
       {line.deposits.length === 0 ? <Empty description="Chưa HĐTG nào nối hạn mức này" />
-        : <Table rowKey="id" size="small" pagination={false} dataSource={line.deposits}
+        : <Table rowKey="id" size="small" pagination={false} dataSource={line.deposits} style={{ marginTop: 4 }}
+            onRow={(r: any) => ({ onClick: () => { onClose(); navigate(`/finance/deposits?focus=${r.id}`) }, style: { cursor: 'pointer' } })}
             columns={[
               { title: 'Ngân hàng', dataIndex: 'bank', render: (v: string, r: any) => <span><b>{v}</b>{r.holder ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.holder}</div> : null}</span> },
               { title: 'Số tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number) => <b>{fmtVnd(v)}</b> },
@@ -62,13 +64,15 @@ export default function FacilityDrawer({ line, open, onClose }: {
             ] as any} />}
 
       {/* Khoản vay rút */}
-      <div style={{ fontWeight: 700, color: '#92400E', margin: '16px 0 8px' }}>
+      <div style={{ fontWeight: 700, color: '#92400E', margin: '16px 0 4px' }}>
         <BankOutlined /> Khoản vay đang rút từ hạn mức ({line.loanCount}) — {fmtTy(line.used)}
       </div>
+      <Text type="secondary" style={{ fontSize: 11 }}>Bấm 1 dòng để mở đúng khoản vay đó →</Text>
       {line.loans.length === 0 ? <Empty description="Chưa khoản vay nào thuộc hạn mức này" />
-        : <Table rowKey="id" size="small" pagination={false} dataSource={line.loans}
+        : <Table rowKey="id" size="small" pagination={false} dataSource={line.loans} style={{ marginTop: 4 }}
+            onRow={(r: any) => ({ onClick: () => { onClose(); navigate(`/finance/loans?focus=${r.id}`) }, style: { cursor: 'pointer' } })}
             columns={[
-              { title: 'Số khế ước', dataIndex: 'loan_no', render: (v: string | null) => v || '—' },
+              { title: 'Số khế ước', dataIndex: 'loan_no', render: (v: string | null) => <span style={{ color: '#1677ff' }}>{v || '—'}</span> },
               { title: 'Còn lại', dataIndex: 'remaining', align: 'right' as const, render: (v: number) => <b style={{ color: '#92400E' }}>{fmtVnd(v)}</b> },
               { title: 'Đến hạn', dataIndex: 'due_date', align: 'center' as const, render: (v: string) => fDate(v) },
               { title: 'Trạng thái', key: 'cic', align: 'center' as const, render: (_: any, r: any) => pill(CIC_COLOR[r.cic], CIC_LABEL[r.cic]) },

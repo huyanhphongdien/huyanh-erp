@@ -60,6 +60,15 @@ export default function FinanceLoanListPage() {
   }, [])
   useEffect(() => { load() }, [load])
 
+  // Cuộn tới dòng được mở từ Drawer Hạn mức (?focus=<id>)
+  useEffect(() => {
+    if (!focusId || loading) return
+    const t = setTimeout(() => {
+      document.querySelector(`[data-row-key="${focusId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [focusId, loading, loans])
+
   const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines])
   const lineOptions = useMemo(() => lines.filter((l) => l.status === 'active')
     .map((l) => ({ value: l.id, label: `${l.bank}${l.contract_no ? ' · ' + l.contract_no : ''} · HM ${fmtTy(l.limit_amount || 0)} · còn ${fmtTy(l.room)}` })), [lines])

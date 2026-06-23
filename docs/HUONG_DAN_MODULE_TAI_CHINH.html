@@ -52,6 +52,27 @@
     font-size:13px; line-height:1.7; overflow:auto; white-space:pre; }
   .map b{ color:var(--gold); }
   .relbox{ border:1px solid var(--line); border-radius:10px; padding:4px 0; }
+  /* Sơ đồ hộp màu */
+  .diag{ background:#f8fafc; border:1px solid var(--line); border-radius:12px; padding:18px; margin:16px 0; }
+  .flow{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:10px 0; }
+  .flow .col{ display:flex; flex-direction:column; gap:10px; }
+  .node{ border-radius:10px; padding:9px 14px; min-width:138px; background:#fff; border:1px solid var(--line); box-shadow:0 1px 3px rgba(0,0,0,.07); }
+  .node .t{ font-weight:700; font-size:13.5px; }
+  .node .s{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .node.hub{ background:linear-gradient(135deg,var(--navy),var(--green)); color:#fff; border:none; min-width:160px; }
+  .node.hub .t{ font-size:15px; } .node.hub .s{ color:#cfe8df; }
+  .node.dep{ border-left:4px solid var(--blue); }
+  .node.asset{ border-left:4px solid var(--purple); }
+  .node.loan{ border-left:4px solid #92400E; }
+  .node.in{ border-left:4px solid var(--ok); }
+  .node.out{ border-left:4px solid var(--red); }
+  .node.cash{ border-left:4px solid var(--navy); }
+  .node.warnnode{ border-left:4px solid var(--amber); }
+  .arrow{ display:flex; flex-direction:column; align-items:center; color:var(--muted); font-size:11.5px; min-width:54px; text-align:center; }
+  .arrow .a{ font-size:22px; color:#94a3b8; line-height:.9; }
+  .diag .lbl{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; margin:6px 0 2px; font-weight:700; }
+  .chips{ display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+  .chip{ background:#eef2f1; border-radius:9px; padding:9px 13px; font-size:12.5px; border-left:3px solid var(--green); }
   .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .card{ border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:#fff; }
   .card h4{ margin-top:0; }
@@ -124,21 +145,46 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <h2>★ Mối liên kết giữa các phần</h2>
 <p>Module không phải các màn hình rời rạc — chúng <b>nối với nhau theo dòng tiền</b>. Hiểu được sơ đồ này là hiểu cả module.</p>
 
-<div class="map">          🔒 <b>TIỀN GỬI (HĐTG)</b> ┐
-                              ├─ đảm bảo ─┐
-          🏛 <b>TÀI SẢN (HĐBĐ)</b>  ┘            ▼
-                                        ╔═══════════════════════╗        ┌─ sinh ─→ ％ <b>KỲ LÃI</b> (lịch trả lãi)
-                              rút từ →  ║  💳 <b>HẠN MỨC (HĐTD)</b>  ║─→ 🏦 <b>KHOẢN VAY</b> ┤
-                                        ║   = TRỤC · còn ROOM    ║        └─ ghi ──→ 💲 <b>TRẢ NỢ</b> → giảm dư nợ
-                                        ╚═══════════════════════╝               │
-                                                                                ▼  đèn <b>CIC nhảy nhóm</b>
-   ───────────────────────────────────────────────────────────────────────────────────────────
-          ⬆ <b>PHẢI THU</b> (tiền vào) ┐
-          ⬇ Gốc + Lãi + Phải nộp ───┼──→  📈 <b>DÒNG TIỀN TỔNG HỢP</b>  ←── 🏦 <b>TỒN QUỸ (112)</b>
-                                     ┘         (net + tồn dự kiến / tuần)
-   ───────────────────────────────────────────────────────────────────────────────────────────
-   📧 <b>EMAIL SÁNG</b>  ←── đọc cảnh báo từ: CIC khoản vay · kỳ lãi · HĐTG đáo hạn · phải nộp · hạn mức thiếu ĐB
-   📎 <b>ĐÍNH KÈM</b> ── gắn vào MỌI đối tượng        🔐 <b>PHÂN QUYỀN</b> ── bao trùm toàn module</div>
+<div class="diag">
+  <!-- Luồng 1: ĐẢM BẢO → HẠN MỨC → KHOẢN VAY -->
+  <div class="lbl">Luồng 1 — Trục Hạn mức</div>
+  <div class="flow">
+    <div class="col">
+      <div class="node dep"><div class="t">🔒 Tiền gửi (HĐTG)</div></div>
+      <div class="node asset"><div class="t">🏛 Tài sản (HĐBĐ)</div></div>
+    </div>
+    <div class="arrow"><div class="a">→</div>đảm bảo</div>
+    <div class="node hub"><div class="t">💳 HẠN MỨC (HĐTD)</div><div class="s">TRỤC · còn ROOM</div></div>
+    <div class="arrow"><div class="a">→</div>rút thành</div>
+    <div class="node loan"><div class="t">🏦 Khoản vay</div><div class="s">dư nợ</div></div>
+    <div class="arrow"><div class="a">→</div>sinh / dẫn tới</div>
+    <div class="col">
+      <div class="node"><div class="t">％ Kỳ lãi</div><div class="s">lịch trả lãi</div></div>
+      <div class="node"><div class="t">💲 Trả nợ</div><div class="s">giảm dư nợ</div></div>
+      <div class="node out"><div class="t">🔴 Đèn CIC nhảy nhóm</div><div class="s">quá hạn ≥ 10 ngày</div></div>
+    </div>
+  </div>
+
+  <!-- Luồng 2: DÒNG TIỀN -->
+  <div class="lbl">Luồng 2 — Dòng tiền</div>
+  <div class="flow">
+    <div class="col">
+      <div class="node in"><div class="t">⬆ Phải thu</div><div class="s">tiền VÀO</div></div>
+      <div class="node out"><div class="t">⬇ Gốc + Lãi + Phải nộp</div><div class="s">tiền RA</div></div>
+      <div class="node cash"><div class="t">🏦 Tồn quỹ (112)</div><div class="s">số dư đầu kỳ</div></div>
+    </div>
+    <div class="arrow"><div class="a">→</div>gộp</div>
+    <div class="node hub"><div class="t">📈 DÒNG TIỀN TỔNG HỢP</div><div class="s">net + tồn dự kiến / tuần · cảnh báo thiếu hụt</div></div>
+  </div>
+
+  <!-- Xuyên suốt -->
+  <div class="lbl">Xuyên suốt toàn module</div>
+  <div class="chips">
+    <span class="chip">📧 <b>Email sáng</b> ← đọc cảnh báo: CIC · kỳ lãi · HĐTG đáo hạn · phải nộp · hạn mức thiếu ĐB</span>
+    <span class="chip">📎 <b>Đính kèm</b> — gắn file mọi đối tượng</span>
+    <span class="chip">🔐 <b>Phân quyền</b> — Admin / BGĐ / Kế toán</span>
+  </div>
+</div>
 
 <h3>Bảng quan hệ (đọc là hiểu nối ở đâu)</h3>
 <table>

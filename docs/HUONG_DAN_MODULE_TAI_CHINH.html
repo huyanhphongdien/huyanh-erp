@@ -73,6 +73,15 @@
   .diag .lbl{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; margin:6px 0 2px; font-weight:700; }
   .chips{ display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
   .chip{ background:#eef2f1; border-radius:9px; padding:9px 13px; font-size:12.5px; border-left:3px solid var(--green); }
+  /* Sơ đồ DỌC theo tầng (rõ mũi tên, không đứt khi wrap) */
+  .stage{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:11px 14px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .stage.center{ justify-content:center; }
+  .stage .cap{ width:100%; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#94a3b8; font-weight:700; }
+  .down{ text-align:center; color:var(--green); font-weight:700; font-size:12.5px; padding:3px 0; }
+  .down .a{ display:block; font-size:24px; line-height:.85; color:#1B4D3E; }
+  .mini{ color:#94a3b8; font-size:20px; padding:0 2px; }
+  .mini small{ font-size:11px; color:#94a3b8; vertical-align:middle; }
   .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .card{ border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:#fff; }
   .card h4{ margin-top:0; }
@@ -146,39 +155,42 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <p>Module không phải các màn hình rời rạc — chúng <b>nối với nhau theo dòng tiền</b>. Hiểu được sơ đồ này là hiểu cả module.</p>
 
 <div class="diag">
-  <!-- Luồng 1: ĐẢM BẢO → HẠN MỨC → KHOẢN VAY -->
+  <!-- ===== Luồng 1: ĐẢM BẢO → HẠN MỨC → KHOẢN VAY ===== -->
   <div class="lbl">Luồng 1 — Trục Hạn mức</div>
-  <div class="flow">
-    <div class="col">
-      <div class="node dep"><div class="t">🔒 Tiền gửi (HĐTG)</div></div>
-      <div class="node asset"><div class="t">🏛 Tài sản (HĐBĐ)</div></div>
-    </div>
-    <div class="arrow"><div class="a">→</div>đảm bảo</div>
-    <div class="node hub"><div class="t">💳 HẠN MỨC (HĐTD)</div><div class="s">TRỤC · còn ROOM</div></div>
-    <div class="arrow"><div class="a">→</div>rút thành</div>
+  <div class="stage">
+    <span class="cap">① Tài sản chống lưng</span>
+    <div class="node dep"><div class="t">🔒 Tiền gửi (HĐTG)</div></div>
+    <div class="node asset"><div class="t">🏛 Tài sản (HĐBĐ)</div></div>
+  </div>
+  <div class="down"><span class="a">▼</span>đảm bảo cho</div>
+  <div class="stage center">
+    <div class="node hub"><div class="t">💳 HẠN MỨC TÍN DỤNG (HĐTD)</div><div class="s">= TRỤC · còn ROOM = hạn mức − đang vay</div></div>
+  </div>
+  <div class="down"><span class="a">▼</span>rút thành</div>
+  <div class="stage">
+    <span class="cap">② Khoản vay rút ra + hệ quả</span>
     <div class="node loan"><div class="t">🏦 Khoản vay</div><div class="s">dư nợ</div></div>
-    <div class="arrow"><div class="a">→</div>sinh / dẫn tới</div>
-    <div class="col">
-      <div class="node"><div class="t">％ Kỳ lãi</div><div class="s">lịch trả lãi</div></div>
-      <div class="node"><div class="t">💲 Trả nợ</div><div class="s">giảm dư nợ</div></div>
-      <div class="node out"><div class="t">🔴 Đèn CIC nhảy nhóm</div><div class="s">quá hạn ≥ 10 ngày</div></div>
-    </div>
+    <span class="mini">→<br><small>sinh / dẫn tới</small></span>
+    <div class="node"><div class="t">％ Kỳ lãi</div><div class="s">lịch trả lãi</div></div>
+    <div class="node"><div class="t">💲 Trả nợ</div><div class="s">giảm dư nợ</div></div>
+    <div class="node out"><div class="t">🔴 Đèn CIC nhảy nhóm</div><div class="s">quá hạn ≥ 10 ngày</div></div>
   </div>
 
-  <!-- Luồng 2: DÒNG TIỀN -->
-  <div class="lbl">Luồng 2 — Dòng tiền</div>
-  <div class="flow">
-    <div class="col">
-      <div class="node in"><div class="t">⬆ Phải thu</div><div class="s">tiền VÀO</div></div>
-      <div class="node out"><div class="t">⬇ Gốc + Lãi + Phải nộp</div><div class="s">tiền RA</div></div>
-      <div class="node cash"><div class="t">🏦 Tồn quỹ (112)</div><div class="s">số dư đầu kỳ</div></div>
-    </div>
-    <div class="arrow"><div class="a">→</div>gộp</div>
+  <!-- ===== Luồng 2: DÒNG TIỀN ===== -->
+  <div class="lbl" style="margin-top:16px">Luồng 2 — Dòng tiền</div>
+  <div class="stage">
+    <span class="cap">Tiền vào / ra + tồn quỹ</span>
+    <div class="node in"><div class="t">⬆ Phải thu</div><div class="s">tiền VÀO</div></div>
+    <div class="node out"><div class="t">⬇ Gốc + Lãi + Phải nộp</div><div class="s">tiền RA</div></div>
+    <div class="node cash"><div class="t">🏦 Tồn quỹ (112)</div><div class="s">số dư đầu kỳ</div></div>
+  </div>
+  <div class="down"><span class="a">▼</span>gộp lại</div>
+  <div class="stage center">
     <div class="node hub"><div class="t">📈 DÒNG TIỀN TỔNG HỢP</div><div class="s">net + tồn dự kiến / tuần · cảnh báo thiếu hụt</div></div>
   </div>
 
-  <!-- Xuyên suốt -->
-  <div class="lbl">Xuyên suốt toàn module</div>
+  <!-- ===== Xuyên suốt ===== -->
+  <div class="lbl" style="margin-top:16px">Xuyên suốt toàn module</div>
   <div class="chips">
     <span class="chip">📧 <b>Email sáng</b> ← đọc cảnh báo: CIC · kỳ lãi · HĐTG đáo hạn · phải nộp · hạn mức thiếu ĐB</span>
     <span class="chip">📎 <b>Đính kèm</b> — gắn file mọi đối tượng</span>

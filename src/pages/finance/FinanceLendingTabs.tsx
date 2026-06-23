@@ -20,8 +20,8 @@ export default function FinanceLendingTabs() {
   const loc = useLocation()
   const active = ITEMS.find((i) => loc.pathname.startsWith(i.key))?.key || ITEMS[0].key
   return (
-    <Tabs activeKey={active} onChange={(k) => navigate(k)} size="small"
-      items={ITEMS.map((i) => ({ key: i.key, label: i.label }))}
-      style={{ marginBottom: 8 }} tabBarStyle={{ marginBottom: 4 }} />
+    <Tabs activeKey={active} onChange={(k) => navigate(k)}
+      items={ITEMS.map((i) => ({ key: i.key, label: <span style={{ fontSize: 15, fontWeight: 600 }}>{i.label}</span> }))}
+      style={{ marginBottom: 10 }} tabBarStyle={{ marginBottom: 6 }} />
   )
 }

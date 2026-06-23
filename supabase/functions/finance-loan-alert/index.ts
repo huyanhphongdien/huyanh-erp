@@ -93,6 +93,15 @@ function vnToday(): Date {
   return new Date(Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate()))
 }
 function dDiff(a: Date, b: Date): number { return Math.round((a.getTime() - b.getTime()) / 86_400_000) }
+function daysInMonthUTC(y: number, m: number): number { return new Date(Date.UTC(y, m + 1, 0)).getUTCDate() }
+function nextDueDay(due_day: number | null, today: Date): string | null {
+  if (!due_day || due_day < 1 || due_day > 31) return null
+  const y = today.getUTCFullYear(), m = today.getUTCMonth(), d = today.getUTCDate()
+  const day = Math.min(due_day, daysInMonthUTC(y, m))
+  let target = new Date(Date.UTC(y, m, day))
+  if (day < d) { const dim = daysInMonthUTC(y, m + 1); target = new Date(Date.UTC(y, m + 1, Math.min(due_day, dim))) }
+  return target.toISOString().slice(0, 10)
+}
 function fDate(s?: string | null): string {
   if (!s) return '—'
   const d = new Date(s + 'T00:00:00Z')
@@ -102,20 +111,22 @@ function fDate(s?: string | null): string {
 // ── Thu thập + tính cảnh báo ─────────────────────────────────────────────────
 async function collectData(supabase: any) {
   const today = vnToday()
-  const [loansRes, depsRes, linesRes, intRes] = await Promise.all([
+  const [loansRes, depsRes, linesRes, intRes, payRes] = await Promise.all([
     supabase.from('fin_loans').select('id, bank, loan_no, principal, paid_amount, due_date, status, credit_line_id').neq('status', 'cancelled'),
     supabase.from('fin_deposits').select('id, bank, deposit_no, holder, amount, maturity_date, extended_to, status, secured_credit_line_id'),
     supabase.from('fin_credit_lines').select('id, bank, contract_no, limit_amount, status'),
     supabase.from('fin_interest_periods').select('id, period_no, due_date, interest_amount, status, loan:fin_loans(bank, loan_no)').eq('status', 'pending'),
+    supabase.from('fin_recurring_payables').select('name, category, due_day, due_rule, amount_est, bank, active').eq('active', true),
   ])
   if (loansRes.error) throw loansRes.error
   if (depsRes.error) throw depsRes.error
   if (linesRes.error) throw linesRes.error
-  // intRes có thể lỗi nếu chưa chạy migration lãi — bỏ qua mềm
+  // intRes/payRes có thể lỗi nếu chưa chạy migration tương ứng — bỏ qua mềm
   const loans = loansRes.data || []
   const deps = depsRes.data || []
   const lines = linesRes.data || []
   const ints = intRes.error ? [] : (intRes.data || [])
+  const pays = payRes.error ? [] : (payRes.data || [])
 
   // Khoản vay: tính còn lại + quá hạn + đèn CIC
   const loanRows = loans.map((l: any) => {
@@ -161,6 +172,13 @@ async function collectData(supabase: any) {
     return { ...p, loan, dleft }
   }).filter((p: any) => p.dleft <= WARN_DUE_DAYS).sort((a: any, b: any) => a.dleft - b.dleft)
 
+  // Khoản phải nộp định kỳ tới kỳ (≤7 ngày)
+  const payRows = pays.map((p: any) => {
+    const nd = nextDueDay(p.due_day, today)
+    const dleft = nd ? dDiff(new Date(nd + 'T00:00:00Z'), today) : 9999
+    return { ...p, nd, dleft }
+  }).filter((p: any) => p.dleft <= WARN_DUE_DAYS).sort((a: any, b: any) => a.dleft - b.dleft)
+
   const totalRemaining = loanRows.reduce((s: number, l: any) => s + l.remaining, 0)
 
   const vnNow = new Date(Date.now() + VN_OFFSET)
@@ -168,8 +186,8 @@ async function collectData(supabase: any) {
 
   return {
     dateLabel, totalRemaining,
-    critical, dueSoon, intRows, depRows, underSecured,
-    hasAlert: critical.length > 0 || dueSoon.length > 0 || intRows.length > 0 || depRows.length > 0 || underSecured.length > 0,
+    critical, dueSoon, intRows, depRows, underSecured, payRows,
+    hasAlert: critical.length > 0 || dueSoon.length > 0 || intRows.length > 0 || depRows.length > 0 || underSecured.length > 0 || payRows.length > 0,
   }
 }
 
@@ -243,6 +261,14 @@ function renderHtml(d: any): string {
     </tr>`
   }).join('')
 
+  const PAY_CAT: Record<string, string> = { thue_tc: 'Thuê TC', dien: 'Tiền điện', bao_hiem: 'Bảo hiểm', lai_vay: 'Lãi vay', thue: 'Thuế', khac: 'Khác' }
+  const payRows = d.payRows.map((p: any) => `<tr style="border-bottom:1px solid #eef1f0;${p.dleft <= 1 ? 'background:#fff7ed;' : ''}">
+      <td style="padding:8px 10px;font-weight:600;">${esc(p.name)}${p.category ? ` <span style="color:#94a3b8;">· ${esc(PAY_CAT[p.category] || p.category)}</span>` : ''}</td>
+      <td align="right" style="padding:8px 10px;">${p.amount_est ? fmtVnd(p.amount_est) : '—'}</td>
+      <td align="right" style="padding:8px 10px;">${fDate(p.nd)}</td>
+      <td align="center" style="padding:8px 10px;">${pill(p.dleft <= 1 ? '#dc2626' : '#0d9488', p.dleft === 0 ? 'HÔM NAY' : `còn ${p.dleft} ngày`)}</td>
+    </tr>`).join('')
+
   const underRows = d.underSecured.map((c: any) => `<tr style="border-bottom:1px solid #eef1f0;background:#fff7ed;">
       <td style="padding:8px 10px;font-weight:600;">${esc(c.bank)}${c.contract_no ? ` <span style="color:#94a3b8;">${esc(c.contract_no)}</span>` : ''}</td>
       <td align="right" style="padding:8px 10px;">${fmtVnd(c.used)}</td>
@@ -259,6 +285,8 @@ function renderHtml(d: any): string {
       ['Khoản vay', 'Lãi (đ)', 'Đến hạn', 'Còn'], intRows) +
     section(`💰 HĐTG cần TÁI TỤC ≤${WARN_MATURITY_DAYS} ngày (${d.depRows.length})`, '#0ea5e9',
       ['Ngân hàng', 'Số tiền (đ)', 'Đáo hạn', 'Còn'], depRows) +
+    section(`📌 Khoản phải nộp định kỳ tới kỳ (${d.payRows.length})`, '#0d9488',
+      ['Khoản phải nộp', 'Số tiền (đ)', 'Ngày nộp', 'Còn'], payRows) +
     section(`🏦 Hạn mức THIẾU đảm bảo (${d.underSecured.length})`, '#ea580c',
       ['Hạn mức', 'Đang vay (đ)', 'TG đảm bảo (đ)', 'Thiếu'], underRows)
 
@@ -322,9 +350,9 @@ serve(async (req) => {
     }
 
     const html = renderHtml(d)
-    const n = d.critical.length + d.dueSoon.length + d.intRows.length + d.depRows.length + d.underSecured.length
+    const n = d.critical.length + d.dueSoon.length + d.intRows.length + d.depRows.length + d.payRows.length + d.underSecured.length
     const subject = d.hasAlert
-      ? `Tình trạng vốn vay ${d.dateLabel}: ${d.critical.length} nhảy nhóm · ${d.dueSoon.length} đến hạn · ${d.intRows.length} kỳ lãi · ${d.depRows.length} HĐTG tái tục`
+      ? `Tình trạng vốn vay ${d.dateLabel}: ${d.critical.length} nhảy nhóm · ${d.dueSoon.length} đến hạn · ${d.intRows.length} kỳ lãi · ${d.depRows.length} HĐTG · ${d.payRows.length} phải nộp`
       : `Tình trạng vốn vay ${d.dateLabel}: không có cảnh báo ✅`
 
     const token = await getAccessToken()
@@ -332,7 +360,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true, sent: true, sent_to: REPORT_RECIPIENTS.map((r) => r.email), subject,
-      stats: { critical: d.critical.length, due_soon: d.dueSoon.length, interest_due: d.intRows.length, deposit_renew: d.depRows.length, under_secured: d.underSecured.length, total_alerts: n },
+      stats: { critical: d.critical.length, due_soon: d.dueSoon.length, interest_due: d.intRows.length, deposit_renew: d.depRows.length, payable_due: d.payRows.length, under_secured: d.underSecured.length, total_alerts: n },
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error: any) {
     console.error('❌ [finance-loan-alert]', error)

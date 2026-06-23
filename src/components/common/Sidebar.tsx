@@ -46,6 +46,7 @@ import {
   DollarSign,
   CreditCard,
   Percent,
+  Banknote,
   Timer,
   CalendarDays,
   AlarmClockPlus,
@@ -428,6 +429,7 @@ const getMenuGroups = (
       { path: '/finance/loans', label: 'Khoản vay', icon: <ClipboardList size={18} /> },
       { path: '/finance/interest', label: 'Lịch trả lãi', icon: <Percent size={18} /> },
       { path: '/finance/deposits', label: 'Tiền gửi (HĐTG)', icon: <Wallet size={18} /> },
+      { path: '/finance/cash', label: 'Tồn quỹ & phải nộp', icon: <Banknote size={18} /> },
     ],
   },
 

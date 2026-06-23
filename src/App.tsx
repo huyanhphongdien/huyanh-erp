@@ -177,6 +177,7 @@ const FinanceCreditLinePage = lazy(() => import('./pages/finance/FinanceCreditLi
 const FinanceInterestPage = lazy(() => import('./pages/finance/FinanceInterestPage'));
 const FinanceCollateralPage = lazy(() => import('./pages/finance/FinanceCollateralPage'));
 const FinanceReceivablePage = lazy(() => import('./pages/finance/FinanceReceivablePage'));
+const FinanceCashPage = lazy(() => import('./pages/finance/FinanceCashPage'));
 const VnBatchListPage = lazy(() => import('./pages/rubber/vn/VnBatchListPage'));
 const LaoTransferPage = lazy(() => import('./pages/rubber/lao/LaoTransferPage'));
 const LaoPurchasePage = lazy(() => import('./pages/rubber/lao/LaoPurchasePage'));
@@ -565,6 +566,7 @@ function App() {
                 <Route path="interest" element={<AdminGate><FinanceInterestPage /></AdminGate>} />
                 <Route path="deposits" element={<AdminGate><FinanceDepositListPage /></AdminGate>} />
                 <Route path="receivables" element={<AdminGate><FinanceReceivablePage /></AdminGate>} />
+                <Route path="cash" element={<AdminGate><FinanceCashPage /></AdminGate>} />
               </Route>
 
               {/* ===== PROJECTS MODULE ===== */}

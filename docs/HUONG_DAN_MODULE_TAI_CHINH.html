@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn Module Tài chính — Cao Su Huy Anh</title>
+<style>
+  :root{ --green:#1B4D3E; --navy:#1E3A5F; --gold:#FFD54F; --ink:#1f2937; --muted:#64748b; --line:#e5e7eb; --bg:#f4f6f8;
+    --red:#dc2626; --orange:#ea580c; --amber:#f97316; --yellow:#ca8a04; --ok:#16a34a; --blue:#1677ff; --purple:#7c3aed; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.65; }
+  a{ color:var(--navy); }
+  .wrap{ display:flex; max-width:1280px; margin:0 auto; gap:28px; padding:0 20px; }
+  /* Sidebar TOC */
+  nav.toc{ position:sticky; top:0; align-self:flex-start; height:100vh; overflow:auto; width:260px; flex:0 0 260px;
+    padding:22px 14px; border-right:1px solid var(--line); font-size:13.5px; }
+  nav.toc .brand{ font-weight:800; color:var(--green); font-size:15px; margin-bottom:4px; }
+  nav.toc .sub{ color:var(--muted); font-size:12px; margin-bottom:14px; }
+  nav.toc a{ display:block; padding:5px 10px; border-radius:7px; color:#334155; text-decoration:none; }
+  nav.toc a:hover{ background:#eef2f1; }
+  nav.toc a.h2{ padding-left:22px; color:#475569; font-size:12.5px; }
+  nav.toc .grp{ margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; padding:0 10px; }
+  main{ flex:1; min-width:0; padding:0 0 80px; }
+  /* Header */
+  header.hero{ background:linear-gradient(135deg,var(--navy),var(--green)); color:#fff; border-radius:0 0 16px 16px;
+    padding:30px 34px; margin-bottom:26px; }
+  header.hero .kicker{ text-transform:uppercase; letter-spacing:1.5px; font-size:12px; opacity:.85; }
+  header.hero h1{ margin:6px 0 4px; font-size:30px; }
+  header.hero .meta{ color:var(--gold); font-weight:600; font-size:14px; }
+  section{ scroll-margin-top:14px; padding:8px 34px; }
+  h2{ color:var(--green); border-bottom:2px solid var(--green); padding-bottom:7px; margin-top:34px; font-size:23px; }
+  h3{ color:var(--navy); margin-top:26px; font-size:18px; }
+  h4{ margin:18px 0 6px; font-size:15px; }
+  code{ background:#eef2f1; padding:1px 6px; border-radius:5px; font-size:13px; color:#0f5132; }
+  table{ border-collapse:collapse; width:100%; margin:12px 0; font-size:13.5px; }
+  th,td{ border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top; }
+  th{ background:#eef2f1; color:var(--green); font-weight:700; }
+  tr:nth-child(even) td{ background:#fafcfb; }
+  .pill{ display:inline-block; color:#fff; font-weight:700; font-size:12px; padding:2px 9px; border-radius:5px; white-space:nowrap; }
+  .callout{ border-left:4px solid; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:14px; }
+  .info{ background:#eff6ff; border-color:#3b82f6; }
+  .tip{ background:#f0fdf4; border-color:var(--ok); }
+  .warn{ background:#fff7ed; border-color:var(--orange); }
+  .danger{ background:#fef2f2; border-color:var(--red); }
+  .img-ph{ border:2px dashed #cbd5e1; border-radius:10px; background:#f8fafc; color:#94a3b8; text-align:center;
+    padding:26px 16px; margin:14px 0; font-size:13.5px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .card{ border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:#fff; }
+  .card h4{ margin-top:0; }
+  .tag{ display:inline-block; background:#eef2f1; color:var(--green); border-radius:6px; padding:1px 8px; font-size:12px; font-weight:600; }
+  .route{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; color:var(--navy); background:#eef2ff; padding:1px 7px; border-radius:5px; }
+  ul.tight{ margin:6px 0; } ul.tight li{ margin:3px 0; }
+  .legend span{ margin-right:6px; }
+  footer{ text-align:center; color:#9aa4a0; font-size:12px; padding:30px; }
+  @media(max-width:920px){ nav.toc{ display:none; } .wrap{ padding:0; } section,header.hero{ padding-left:18px; padding-right:18px; } .grid2{ grid-template-columns:1fr; } }
+  @media print{ nav.toc{ display:none; } .img-ph{ display:none; } body{ background:#fff; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc">
+  <div class="brand">🏦 Module Tài chính</div>
+  <div class="sub">Cao Su Huy Anh · Hướng dẫn chi tiết</div>
+  <a href="#gioithieu">1. Giới thiệu &amp; mục tiêu</a>
+  <a href="#phanquyen">2. Phân quyền (ai được xem)</a>
+  <a href="#dieuhuong">3. Menu &amp; điều hướng</a>
+  <div class="grp">Các màn hình</div>
+  <a href="#dongtien">4. Dòng tiền tổng hợp</a>
+  <a href="#tongquan">5. Tổng quan vốn vay</a>
+  <a href="#hanmuc">6. Hạn mức (HĐTD)</a>
+  <a href="#khoanvay">7. Khoản vay + đèn CIC</a>
+  <a href="#lai">8. Lịch trả lãi</a>
+  <a href="#taisan">9. Tài sản đảm bảo</a>
+  <a href="#tiengui">10. Tiền gửi (HĐTG)</a>
+  <a href="#phaithu">11. Phải thu khách hàng</a>
+  <a href="#tonquy">12. Tồn quỹ &amp; phải nộp</a>
+  <div class="grp">Tính năng nền</div>
+  <a href="#email">13. Email cảnh báo sáng</a>
+  <a href="#dinhkem">14. Đính kèm tài liệu</a>
+  <div class="grp">Kỹ thuật</div>
+  <a href="#dulieu">15. Mô hình dữ liệu</a>
+  <a href="#vanhanh">16. Vận hành &amp; bảo trì</a>
+  <a href="#thuatngu">17. Thuật ngữ</a>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="kicker">Cao Su Huy Anh · Tài chính / Treasury</div>
+  <h1>Hướng dẫn Module TÀI CHÍNH</h1>
+  <div class="meta">Quản lý dòng tiền: vốn vay · tiền gửi · phải thu · tồn quỹ — cập nhật 23/06/2026</div>
+</header>
+
+<!-- ============================ 1 ============================ -->
+<section id="gioithieu">
+<h2>1. Giới thiệu &amp; mục tiêu</h2>
+<p>Module <b>Tài chính</b> số hoá toàn bộ bộ file Excel <i>“PHẢI THU, NỢ ĐẾN HẠN, HĐTG”</i> (27 sheet) mà phòng kế toán đang theo dõi tay. Mục tiêu cao nhất: <b>Ban giám đốc nhìn 1 màn hình biết tuần này thừa hay thiếu tiền</b>, và <b>không bao giờ để khoản vay quá hạn dẫn tới “nhảy nhóm” CIC</b>.</p>
+
+<div class="callout info">
+<b>3 trụ của dòng tiền</b> (đúng tên file Excel):
+<ul class="tight">
+  <li><b>NỢ ĐẾN HẠN</b> — tiền RA: khoản vay, lãi, các khoản phải nộp định kỳ.</li>
+  <li><b>HĐTG</b> — tài sản chống lưng: tiền gửi + tài sản đảm bảo, gắn vào hạn mức tín dụng.</li>
+  <li><b>PHẢI THU</b> — tiền VÀO: công nợ khách hàng xuất khẩu (USD).</li>
+</ul>
+Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
+</div>
+
+<h3>“Nhảy nhóm CIC” là gì — vì sao module này quan trọng?</h3>
+<p>CIC là Trung tâm Thông tin Tín dụng. Khi một khoản vay <b>quá hạn ≥ 10 ngày</b>, ngân hàng phải xếp doanh nghiệp xuống <b>nhóm nợ 2</b> (“nợ cần chú ý”). Hậu quả: <b>khó vay tiếp, lãi suất tăng, mất uy tín tín dụng toàn hệ thống</b>. Module này cảnh báo <b>sớm từ 7 ngày trước</b> để xử lý kịp, tránh chạm mốc 10 ngày.</p>
+</section>
+
+<!-- ============================ 2 ============================ -->
+<section id="phanquyen">
+<h2>2. Phân quyền — ai được xem?</h2>
+<p>Đây là dữ liệu <b>nhạy cảm nhất hệ thống</b> (số dư ngân hàng, công nợ). Vì vậy module chặn ở <b>2 lớp</b>:</p>
+<table>
+<tr><th>Lớp</th><th>Cơ chế</th><th>Ý nghĩa</th></tr>
+<tr><td><b>Giao diện (UI)</b></td><td><code>isFinanceUser()</code> trong <code>src/lib/financeAccess.ts</code> — ẩn menu + chặn route (AdminGate)</td><td>Người không có quyền <b>không thấy menu</b> và vào route bị “403”.</td></tr>
+<tr><td><b>Cơ sở dữ liệu (RLS)</b></td><td>Hàm SQL <code>fn_is_finance_user()</code> trên Supabase — chặn tận REST API</td><td>Kể cả gọi thẳng API cũng <b>không đọc/ghi được</b> nếu không đúng vai trò.</td></tr>
+</table>
+
+<h3>3 nhóm được cấp quyền (khi mở đầy đủ)</h3>
+<ul class="tight">
+  <li><b>Admin</b> — email <code>minhld@huyanhrubber.com</code> hoặc role admin.</li>
+  <li><b>Ban giám đốc</b> — chức vụ cấp ≤ 3 (Giám đốc / Trợ lý GĐ / Phó GĐ).</li>
+  <li><b>Phòng kế toán</b> — phòng mã <code>HAP-KT</code> (hoặc email kế toán <code>yendt</code>, <code>phulv</code>).</li>
+</ul>
+
+<div class="callout warn">
+<b>⚠ Đang trong giai đoạn TEST:</b> module tạm khoá <b>chỉ Admin (minhld)</b> thấy — cờ <code>FINANCE_OPEN = false</code>. Khi test xong, đổi <code>FINANCE_OPEN = true</code> trong <code>financeAccess.ts</code> là tự mở cho Ban giám đốc + Phòng kế toán (không cần sửa gì thêm).
+</div>
+</section>
+
+<!-- ============================ 3 ============================ -->
+<section id="dieuhuong">
+<h2>3. Menu &amp; điều hướng</h2>
+<p>Trong sidebar, nhóm <b>TÀI CHÍNH</b> gọn còn <b>4 mục</b> (9 màn hình được gom lại để đỡ rối):</p>
+<table>
+<tr><th>Mục menu</th><th>Bên trong</th></tr>
+<tr><td>📈 <b>Dòng tiền tổng hợp</b></td><td>Dashboard tổng — tiền vào/ra theo tuần + tồn quỹ <span class="route">/finance/cashflow</span></td></tr>
+<tr><td>💳 <b>Vay vốn</b> (vay·lãi·gửi·ĐB)</td><td><b>6 tab</b>: Tổng quan · Hạn mức · Khoản vay · Lịch lãi · Tài sản ĐB · Tiền gửi</td></tr>
+<tr><td>💵 <b>Phải thu KH</b></td><td>Công nợ phải thu + tuổi nợ <span class="route">/finance/receivables</span></td></tr>
+<tr><td>🏦 <b>Tồn quỹ &amp; phải nộp</b></td><td>Số dư ngân hàng đa tệ + khoản phải nộp định kỳ <span class="route">/finance/cash</span></td></tr>
+</table>
+<div class="img-ph">📷 Ảnh: Sidebar nhóm TÀI CHÍNH (4 mục) — gửi ảnh để chèn</div>
+<div class="callout tip"><b>Mẹo:</b> Vào “Vay vốn” sẽ thấy <b>thanh tab ngang</b> ở đầu trang để chuyển nhanh giữa 6 màn hình của cụm đi vay. Bấm tab nào URL đổi tương ứng, có thể bookmark từng trang.</div>
+</section>
+
+<!-- ============================ 4 ============================ -->
+<section id="dongtien">
+<h2>4. Dòng tiền tổng hợp <span class="route">/finance/cashflow</span></h2>
+<p>Đây là <b>màn hình đỉnh</b> — gộp mọi dữ liệu thành bức tranh dòng tiền cho BGĐ.</p>
+<div class="img-ph">📷 Ảnh: Dashboard Dòng tiền tổng hợp (thẻ sức khỏe + bảng 6 tuần)</div>
+
+<h3>Phần 1 — Thẻ “sức khỏe tài chính”</h3>
+<table>
+<tr><th>Thẻ</th><th>Ý nghĩa</th></tr>
+<tr><td>🏦 <b>Tồn quỹ</b></td><td>Tổng số dư tại các ngân hàng (VNĐ + USD quy đổi).</td></tr>
+<tr><td>⬆ <b>Phải thu</b></td><td>Tổng công nợ khách còn phải thu (USD, quy ra VNĐ).</td></tr>
+<tr><td>⬇ <b>Dư nợ vay</b></td><td>Tổng còn nợ ngân hàng.</td></tr>
+<tr><td><b>Room hạn mức</b></td><td>Hạn mức tín dụng còn dư (chưa vay tới).</td></tr>
+<tr><td>🔒 <b>Tiền gửi</b> &amp; 🏛 <b>Tài sản ĐB</b></td><td>Tổng tài sản chống lưng cho các khoản vay.</td></tr>
+</table>
+
+<h3>Phần 2 — Dự báo dòng tiền 6 tuần tới</h3>
+<p>Mỗi dòng = 1 tuần. Công thức:</p>
+<div class="callout info">
+<b>Tiền vào</b> = Phải thu đến hạn trong tuần (USD × tỷ giá).<br>
+<b>Tiền ra</b> = Gốc vay đến hạn + Lãi đến kỳ + Khoản phải nộp định kỳ.<br>
+<b>Net</b> = Vào − Ra. &nbsp; <b>Tồn dự kiến</b> = Tồn quỹ hiện tại + cộng dồn Net các tuần.
+</div>
+<ul class="tight">
+  <li>Khoản <b>quá hạn</b> được dồn vào cột <b>“tuần này”</b>.</li>
+  <li><b>Tỷ giá USD</b> chỉnh được ở góc phải (mặc định 25.400đ) — phải thu là USD nên cần quy đổi.</li>
+  <li>Nếu <b>“Tồn dự kiến” âm</b> ở tuần nào → hiện <span class="pill" style="background:#ea580c">cảnh báo thiếu hụt</span> → cần đốc thu công nợ / giãn chi / dùng room hạn mức.</li>
+</ul>
+</section>
+
+<!-- ============================ 5 ============================ -->
+<section id="tongquan">
+<h2>5. Tổng quan vốn vay <span class="route">/finance/overview</span></h2>
+<p>Trang “bảng điều khiển” riêng cho mảng đi vay.</p>
+<ul class="tight">
+  <li><b>KPI</b>: Tổng dư nợ · Đến hạn ≤7 ngày · Đến hạn ≤30 ngày · Số khoản nguy cơ nhảy nhóm.</li>
+  <li><b>Bảng đỏ “Nguy cơ nhảy nhóm”</b>: liệt kê khoản quá hạn/sát mốc — xử lý gấp.</li>
+  <li><b>Dư nợ theo ngân hàng</b> + <b>Sắp đến hạn (30 ngày)</b>.</li>
+  <li>Khối <b>Tiền gửi (HĐTG)</b>: tổng tiền gửi, đảm bảo, HĐTG cần tái tục.</li>
+</ul>
+<div class="img-ph">📷 Ảnh: Trang Tổng quan vốn vay</div>
+</section>
+
+<!-- ============================ 6 ============================ -->
+<section id="hanmuc">
+<h2>6. Hạn mức tín dụng — HĐTD <span class="route">/finance/credit-lines</span></h2>
+<div class="callout tip"><b>Khái niệm trục:</b> Hạn mức (facility) là “bể” tín dụng ngân hàng cấp. Nó <b>được chống lưng</b> bởi tiền gửi + tài sản đảm bảo, và <b>được rút ra</b> thành nhiều khoản vay. Đây là cách thể hiện ĐÚNG bản chất (thay vì nối tiền gửi vào từng khoản vay lẻ).</p></div>
+
+<pre style="background:#0f172a;color:#e2e8f0;padding:14px 18px;border-radius:10px;font-size:13px;overflow:auto;">Hạn mức Agribank 99 tỷ (HĐTD)
+   ├── được ĐẢM BẢO bởi: 🔒 Tiền gửi (HĐTG) + 🏛 Tài sản (HĐBĐ)
+   └── được RÚT thành:  🏦 nhiều khoản vay  →  còn <b>ROOM</b> = hạn mức − đang vay</pre>
+
+<h4>Cột chính</h4>
+<table>
+<tr><th>Cột</th><th>Ý nghĩa</th></tr>
+<tr><td>Hạn mức</td><td>Tổng tín dụng được cấp.</td></tr>
+<tr><td>Đang vay</td><td>Tổng dư nợ các khoản vay đang rút từ hạn mức.</td></tr>
+<tr><td>Room còn lại</td><td><b>Hạn mức − Đang vay</b> (thanh xanh; đỏ nếu vượt).</td></tr>
+<tr><td>Đảm bảo (gửi + tài sản)</td><td>🔒 tiền gửi + 🏛 tài sản đang chống lưng.</td></tr>
+</table>
+<p>Bấm 1 hạn mức → mở <b>Drawer</b> xem đủ 3 bên: % sử dụng, % phủ dư nợ, danh sách tiền gửi đảm bảo, danh sách khoản vay rút. Bấm thẳng 1 dòng trong Drawer → nhảy tới đúng khoản đó.</p>
+<div class="img-ph">📷 Ảnh: Trang Hạn mức + Drawer chi tiết facility</div>
+</section>
+
+<!-- ============================ 7 ============================ -->
+<section id="khoanvay">
+<h2>7. Khoản vay + đèn CIC <span class="route">/finance/loans</span></h2>
+<p>Danh sách từng khoản vay. <b>Trái tim của module</b> là <b>đèn CIC “nhảy nhóm”</b> tính theo số ngày quá hạn so với ngày đến hạn:</p>
+
+<table>
+<tr><th>Đèn</th><th>Điều kiện</th><th>Ý nghĩa</th></tr>
+<tr><td><span class="pill" style="background:#16a34a">An toàn</span></td><td>Còn &gt; 7 ngày tới hạn</td><td>Bình thường.</td></tr>
+<tr><td><span class="pill" style="background:#ca8a04">Sắp đến hạn</span></td><td>Trong 7 ngày trước hạn → đến hạn hôm nay</td><td>Chuẩn bị tiền trả.</td></tr>
+<tr><td><span class="pill" style="background:#f97316">Quá hạn</span></td><td>Quá hạn 1–6 ngày</td><td>ĐÃ trễ — trả ngay.</td></tr>
+<tr><td><span class="pill" style="background:#ea580c">Sát nhảy nhóm</span></td><td>Quá hạn 7–9 ngày</td><td>Sát mốc 10 ngày — KHẨN.</td></tr>
+<tr><td><span class="pill" style="background:#dc2626">NGUY CƠ NHẢY NHÓM</span></td><td>Quá hạn ≥ 10 ngày</td><td>Đã/đang vào nhóm 2 CIC.</td></tr>
+<tr><td><span class="pill" style="background:#9ca3af">Đã tất toán</span></td><td>Trả hết / status paid</td><td>Khép khoản.</td></tr>
+</table>
+<div class="callout danger"><b>Mốc vàng = 10 ngày</b> (<code>JUMP_DAYS</code>). Cột “Nhảy nhóm” hiển thị ngày sẽ rơi vào nhóm 2 = ngày đến hạn + 10.</div>
+
+<h4>Thao tác trên mỗi dòng</h4>
+<ul class="tight">
+  <li>📎 <b>Tài liệu</b> — khế ước nhận nợ, sao kê (badge hiện số file).</li>
+  <li>％ <b>Lịch trả lãi</b> — mở Drawer sinh/theo dõi kỳ lãi (xem mục 8).</li>
+  <li>💲 <b>Ghi trả nợ</b> — nhập số tiền + ngày trả; dư nợ tự giảm.</li>
+  <li>✏️ sửa · 🗑 xoá · 🏦 cột “Hạn mức” bấm xem facility liên quan.</li>
+</ul>
+<div class="img-ph">📷 Ảnh: Danh sách Khoản vay (các đèn CIC) + Drawer trả nợ</div>
+</section>
+
+<!-- ============================ 8 ============================ -->
+<section id="lai">
+<h2>8. Lịch trả lãi <span class="route">/finance/interest</span></h2>
+<p>Theo dõi <b>lãi phải trả từng kỳ</b> để không bỏ lỡ. Có 2 chỗ:</p>
+<ul class="tight">
+  <li><b>Trang “Lịch trả lãi”</b>: gom <b>toàn bộ kỳ lãi</b> mọi khoản vay — lọc Sắp/quá hạn, banner đỏ kỳ quá hạn, đánh dấu đã trả ngay tại đây.</li>
+  <li><b>Drawer từng khoản</b> (icon ％ ở danh sách Khoản vay): bấm <b>“Sinh lịch”</b> → tự tạo kỳ lãi theo cấu hình.</li>
+</ul>
+<h4>Cách sinh lịch</h4>
+<p>Chọn <b>Kỳ trả lãi</b> (hằng tháng / quý / năm / cuối kỳ) · ngày trả · lãi suất · từ ngày → đáo hạn · dư nợ gốc. Lãi mỗi kỳ tính theo <b>số ngày thực</b> (actual/365) — kỳ cuối lẻ tháng không bị tính trọn tháng.</p>
+<div class="callout info">Sinh lại lịch chỉ xoá các kỳ <b>chưa trả</b>, giữ nguyên kỳ đã trả.</div>
+<div class="img-ph">📷 Ảnh: Trang Lịch trả lãi + Drawer sinh lịch</div>
+</section>
+
+<!-- ============================ 9 ============================ -->
+<section id="taisan">
+<h2>9. Tài sản đảm bảo — HĐBĐ <span class="route">/finance/collaterals</span></h2>
+<p>Tài sản thế chấp/cầm cố (xe, hệ thống silo, máy nghiền, BĐS…) gán vào hạn mức. Cùng với tiền gửi, tạo <b>bức tranh đảm bảo đầy đủ</b> cho mỗi facility.</p>
+<table>
+<tr><th>Trường</th><th>Ý nghĩa</th></tr>
+<tr><td>Tên/loại tài sản</td><td>Mô tả + loại (TSCĐ / BĐS / xe / máy móc / hàng tồn).</td></tr>
+<tr><td>Đảm bảo cho hạn mức</td><td>Facility được thế chấp.</td></tr>
+<tr><td>Giá trị định giá</td><td>Giá trị thẩm định.</td></tr>
+<tr><td>Giá trị bảo đảm</td><td>Giá trị NH nhận làm đảm bảo (thường = định giá × tỷ lệ cho vay).</td></tr>
+</table>
+<p>Mỗi tài sản có 📎 hồ sơ (HĐ bảo đảm, biên bản định giá).</p>
+<div class="img-ph">📷 Ảnh: Trang Tài sản đảm bảo</div>
+</section>
+
+<!-- ============================ 10 ============================ -->
+<section id="tiengui">
+<h2>10. Tiền gửi — HĐTG <span class="route">/finance/deposits</span></h2>
+<p>Hợp đồng tiền gửi có kỳ hạn. Phần lớn dùng để <b>cầm cố đảm bảo khoản vay</b> (lãi vay &gt; lãi gửi nhưng giữ để khỏi tất toán ép).</p>
+<div class="callout warn"><b>Cảnh báo tái tục:</b> HĐTG sắp/đã đáo hạn được tô đèn — <b>quên tái tục là bị tất toán ép → mất tài sản đảm bảo</b>, khoản vay hụt chống lưng. KPI “Cần tái tục gấp” + banner đỏ.</div>
+<ul class="tight">
+  <li>Cột <b>“Đảm bảo cho hạn mức”</b>: bấm xem facility được chống lưng.</li>
+  <li>Đáo hạn hiệu lực = ngày gia hạn (nếu có) hoặc ngày đáo hạn gốc.</li>
+  <li>📎 sổ/giấy chứng nhận tiền gửi, giấy gia hạn.</li>
+</ul>
+<div class="img-ph">📷 Ảnh: Trang Tiền gửi (HĐTG)</div>
+</section>
+
+<!-- ============================ 11 ============================ -->
+<section id="phaithu">
+<h2>11. Phải thu khách hàng <span class="route">/finance/receivables</span></h2>
+<p>Công nợ khách hàng <b>xuất khẩu (USD)</b> — tiền VÀO.</p>
+<h4>Tuổi nợ (aging)</h4>
+<p>Phân nhóm số còn phải thu theo số ngày quá hạn:</p>
+<div class="legend">
+  <span class="pill" style="background:#475569">Trong hạn</span>
+  <span class="pill" style="background:#ca8a04">Quá 1–30</span>
+  <span class="pill" style="background:#ea580c">Quá 31–60</span>
+  <span class="pill" style="background:#dc2626">Quá 61–90</span>
+  <span class="pill" style="background:#991b1b">Quá &gt;90</span>
+</div>
+<h4>Hạn thu tính thế nào?</h4>
+<p>Hạn thu = ngày tàu chạy (ATD/ETD) + <b>Term</b> (số ngày thanh toán, vd 90). Nếu <b>thiếu cả ngày hạn lẫn Term</b> → để trống (KHÔNG coi ngày tàu chạy là hạn → tránh báo “quá hạn” oan).</p>
+<ul class="tight">
+  <li>Nhập <b>“Ngày tiền về”</b> → tự chuyển trạng thái <b>Đã thu</b>.</li>
+  <li>KPI: Tổng phải thu · Quá hạn · Sắp về ≤30 ngày · Số khách còn nợ.</li>
+  <li>📎 bộ chứng từ (Invoice / Packing List / B/L / C/O).</li>
+</ul>
+<div class="callout info"><b>Lưu ý dữ liệu:</b> hiện đang dùng <b>6 dòng mẫu</b>. Khi cần, sẽ import <b>186 dòng phải thu thật</b> (~40 triệu USD) từ Excel.</div>
+<div class="img-ph">📷 Ảnh: Trang Phải thu + bảng tuổi nợ</div>
+</section>
+
+<!-- ============================ 12 ============================ -->
+<section id="tonquy">
+<h2>12. Tồn quỹ &amp; phải nộp định kỳ <span class="route">/finance/cash</span></h2>
+<h3>Tồn quỹ ngân hàng (Quỹ 112)</h3>
+<p>Lưới số dư từng ngân hàng theo <b>3 loại tiền: VNĐ / USD / KÍP</b> + dòng TỔNG + ngày cập nhật. Cập nhật tay (snapshot).</p>
+<h3>Khoản phải nộp định kỳ</h3>
+<p>Các khoản cố định: thuê tài chính, tiền điện, bảo hiểm, lãi bank… với <b>ngày nộp trong tháng</b>. Hệ thống tự tính <b>“kỳ tới”</b> + đèn sắp nộp. Các khoản này cũng vào <b>email cảnh báo sáng</b> + <b>dòng tiền ra</b>.</p>
+<div class="img-ph">📷 Ảnh: Trang Tồn quỹ + Khoản phải nộp</div>
+</section>
+
+<!-- ============================ 13 ============================ -->
+<section id="email">
+<h2>13. Email “Tình trạng vốn vay đầu ngày”</h2>
+<p>Edge function <code>finance-loan-alert</code> gửi <b>~07:00 sáng</b> (giờ VN) cho người nhận đã cấu hình. Chỉ gửi khi có cảnh báo (ngày sạch không gửi).</p>
+<h4>6 mục trong email</h4>
+<ol class="tight">
+  <li>🔴 Khoản vay <b>quá hạn / nguy cơ nhảy nhóm</b>.</li>
+  <li>🟡 Khoản vay <b>sắp đến hạn ≤7 ngày</b>.</li>
+  <li>💵 <b>Lãi vay đến kỳ ≤7 ngày</b>.</li>
+  <li>💰 <b>HĐTG cần tái tục ≤7 ngày</b>.</li>
+  <li>📌 <b>Khoản phải nộp định kỳ tới kỳ</b>.</li>
+  <li>🏦 <b>Hạn mức thiếu đảm bảo</b> (tiền gửi &lt; dư nợ).</li>
+</ol>
+<div class="callout warn"><b>Vận hành:</b> email không tự deploy theo git — phải chạy tay <code>npx supabase functions deploy finance-loan-alert --no-verify-jwt</code> khi sửa. Lịch 07:00 đặt bằng <code>finance_loan_alert_cron.sql</code>. Người nhận hiện để <b>minhld (test)</b>, mở BGĐ + Kế toán sau.</div>
+<div class="img-ph">📷 Ảnh: Email cảnh báo (header navy)</div>
+</section>
+
+<!-- ============================ 14 ============================ -->
+<section id="dinhkem">
+<h2>14. Đính kèm tài liệu</h2>
+<p>Mọi đối tượng (khoản vay, HĐTG, hạn mức, tài sản, kỳ lãi, phải nộp, phải thu) đều gắn file được qua nút <b>📎</b> (badge hiện số file).</p>
+<div class="callout tip"><b>Bảo mật:</b> file lưu ở bucket <b>riêng tư <code>finance-docs</code></b> — không có link công khai. Mỗi lần xem sinh <b>signed URL hết hạn ~5 phút</b>. Loại chứng từ gợi ý theo từng đối tượng (khế ước, sổ TG, UNC, Invoice…).</div>
+</section>
+
+<!-- ============================ 15 ============================ -->
+<section id="dulieu">
+<h2>15. Mô hình dữ liệu (bảng <code>fin_*</code>)</h2>
+<table>
+<tr><th>Bảng</th><th>Nội dung</th></tr>
+<tr><td><code>fin_credit_lines</code></td><td>Hạn mức tín dụng (HĐTD) — TRỤC.</td></tr>
+<tr><td><code>fin_loans</code> + <code>fin_loan_repayments</code></td><td>Khoản vay + lịch sử trả nợ (trigger tự tính dư nợ).</td></tr>
+<tr><td><code>fin_interest_periods</code></td><td>Kỳ lãi phải trả.</td></tr>
+<tr><td><code>fin_deposits</code></td><td>Tiền gửi (HĐTG) — nối hạn mức qua <code>secured_credit_line_id</code>.</td></tr>
+<tr><td><code>fin_collaterals</code></td><td>Tài sản đảm bảo (HĐBĐ).</td></tr>
+<tr><td><code>fin_receivables</code></td><td>Phải thu khách hàng.</td></tr>
+<tr><td><code>fin_cash_balances</code></td><td>Tồn quỹ ngân hàng (đa tệ).</td></tr>
+<tr><td><code>fin_recurring_payables</code></td><td>Khoản phải nộp định kỳ.</td></tr>
+<tr><td><code>fin_attachments</code></td><td>Đính kèm dùng chung (polymorphic) + bucket <code>finance-docs</code>.</td></tr>
+</table>
+<p>Service tương ứng ở <code>src/services/finance/*.ts</code>; trang ở <code>src/pages/finance/*.tsx</code>.</p>
+</section>
+
+<!-- ============================ 16 ============================ -->
+<section id="vanhanh">
+<h2>16. Vận hành &amp; bảo trì</h2>
+<h4>Migration (chạy trên Supabase SQL Editor — idempotent)</h4>
+<p>Các file <code>docs/migrations/finance_*_v1.sql</code> (tạo bảng) + <code>*_seed.sql</code> (dữ liệu mẫu, xoá được) + <code>finance_rls_roles_v1.sql</code> (phân quyền).</p>
+<div class="callout danger"><b>⚠ File RLS <code>finance_rls_roles_v1.sql</code> chưa chạy.</b> Khi chạy: làm <b>PART 0 (SELECT chẩn đoán)</b> trước để xác nhận đúng người được quyền, rồi PART 1–3; có <b>PART 4 rollback</b> nếu khoá nhầm.</div>
+<h4>Mở quyền Tài chính cho BGĐ + Kế toán</h4>
+<p>Sửa <code>FINANCE_OPEN = true</code> trong <code>src/lib/financeAccess.ts</code> (UI) + đã có sẵn quyền ở SQL.</p>
+<h4>Deploy email</h4>
+<p><code>npx supabase functions deploy finance-loan-alert --no-verify-jwt</code> mỗi khi sửa nội dung email.</p>
+<h4>Việc còn lại (TODO)</h4>
+<ul class="tight">
+  <li>Audit lại giao diện/UX (đang hoãn).</li>
+  <li>Patch dọn dẹp: gom hàm format, cascade xoá file khi xoá đối tượng.</li>
+  <li>Import 186 dòng phải thu thật.</li>
+  <li>Mở quyền + đổi người nhận email khi go-live đầy đủ.</li>
+</ul>
+</section>
+
+<!-- ============================ 17 ============================ -->
+<section id="thuatngu">
+<h2>17. Thuật ngữ nhanh</h2>
+<table>
+<tr><th>Từ</th><th>Nghĩa</th></tr>
+<tr><td>HĐTD / Hạn mức</td><td>Hợp đồng tín dụng — “bể” tín dụng ngân hàng cấp.</td></tr>
+<tr><td>HĐTG</td><td>Hợp đồng tiền gửi có kỳ hạn.</td></tr>
+<tr><td>HĐBĐ</td><td>Hợp đồng bảo đảm — tài sản thế chấp.</td></tr>
+<tr><td>Room</td><td>Hạn mức còn dư = hạn mức − đang vay.</td></tr>
+<tr><td>Nhảy nhóm (CIC)</td><td>Bị xếp xuống nhóm nợ xấu hơn khi quá hạn ≥10 ngày.</td></tr>
+<tr><td>Aging / Tuổi nợ</td><td>Phân nhóm công nợ theo số ngày quá hạn.</td></tr>
+<tr><td>ATD / ETD</td><td>Ngày tàu chạy thực / dự kiến (xuất khẩu).</td></tr>
+<tr><td>Term</td><td>Số ngày được thanh toán kể từ ngày giao.</td></tr>
+<tr><td>UNC</td><td>Uỷ nhiệm chi (chứng từ chuyển tiền).</td></tr>
+</table>
+</section>
+
+<footer>© Cao Su Huy Anh · Hướng dẫn nội bộ Module Tài chính · Tạo tự động bởi hệ thống ERP.</footer>
+</main>
+</div>
+</body>
+</html>

@@ -21,6 +21,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useOpenTab } from '../../hooks/useOpenTab';
 import { getSalesRole, hasSalesAccess } from '../../services/sales/salesPermissionService';
 import { supabase } from '../../lib/supabase';
+import { isFinanceUser } from '../../lib/financeAccess';
 import { purchaseAccessService } from '../../services/purchaseAccessService';
 import { overtimeRequestService } from '../../services/overtimeRequestService';
 import { leaveRequestService } from '../../services/leaveRequestService';
@@ -145,6 +146,7 @@ interface MenuGroup {
   allowedEmails?: string[];
   requireSalesRole?: boolean; // true = check getSalesRole
   adminOnly?: boolean;        // CHỈ Admin (vd Vốn vay — dữ liệu tài chính nhạy cảm)
+  financeOnly?: boolean;      // Admin / Ban giám đốc / Phòng kế toán (Module Tài chính)
 }
 
 // ============================================================
@@ -420,7 +422,7 @@ const getMenuGroups = (
     title: 'TÀI CHÍNH',
     icon: <Building2 size={18} />,
     collapsible: true,
-    adminOnly: true,
+    financeOnly: true,
     items: [
       { path: '/finance/cashflow', label: 'Dòng tiền tổng hợp', icon: <TrendingUp size={18} /> },
       { path: '/finance/overview', label: 'Vay vốn (vay·lãi·gửi·ĐB)', icon: <CreditCard size={18} />, extraActivePaths: ['/finance/credit-lines', '/finance/loans', '/finance/interest', '/finance/collaterals', '/finance/deposits'] },
@@ -510,6 +512,7 @@ export function Sidebar() {
 
   const ADMIN_EMAILS = ['minhld@huyanhrubber.com'];
   const isAdmin = user?.role === 'admin' || ADMIN_EMAILS.includes(user?.email?.toLowerCase() || '');
+  const isFinance = isFinanceUser(user);   // Admin / BGĐ / Phòng kế toán — Module Tài chính
   const userLevel = user?.position_level || (isAdmin ? 1 : 7);
   const isExecutive = isAdmin || userLevel <= 3;
   const isBGD = isAdmin || userLevel <= 3;
@@ -701,6 +704,7 @@ export function Sidebar() {
 
   const isGroupVisible = (group: MenuGroup): boolean => {
     if (group.adminOnly && !isAdmin) return false;
+    if (group.financeOnly && !isFinance) return false;
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
     if (group.managerLevelOnly && !isManagerLevel) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;

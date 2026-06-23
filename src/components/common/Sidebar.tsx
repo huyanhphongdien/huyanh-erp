@@ -422,6 +422,7 @@ const getMenuGroups = (
     collapsible: true,
     adminOnly: true,
     items: [
+      { path: '/finance/cashflow', label: 'Dòng tiền tổng hợp', icon: <TrendingUp size={18} /> },
       { path: '/finance/overview', label: 'Tổng quan vốn vay', icon: <LayoutDashboard size={18} /> },
       { path: '/finance/receivables', label: 'Phải thu KH', icon: <DollarSign size={18} /> },
       { path: '/finance/credit-lines', label: 'Hạn mức (HĐTD)', icon: <CreditCard size={18} /> },

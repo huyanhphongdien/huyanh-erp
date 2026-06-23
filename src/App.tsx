@@ -178,6 +178,7 @@ const FinanceInterestPage = lazy(() => import('./pages/finance/FinanceInterestPa
 const FinanceCollateralPage = lazy(() => import('./pages/finance/FinanceCollateralPage'));
 const FinanceReceivablePage = lazy(() => import('./pages/finance/FinanceReceivablePage'));
 const FinanceCashPage = lazy(() => import('./pages/finance/FinanceCashPage'));
+const FinanceCashflowDashboard = lazy(() => import('./pages/finance/FinanceCashflowDashboard'));
 const VnBatchListPage = lazy(() => import('./pages/rubber/vn/VnBatchListPage'));
 const LaoTransferPage = lazy(() => import('./pages/rubber/lao/LaoTransferPage'));
 const LaoPurchasePage = lazy(() => import('./pages/rubber/lao/LaoPurchasePage'));
@@ -560,6 +561,7 @@ function App() {
               <Route path="finance">
                 <Route index element={<Navigate to="/finance/overview" replace />} />
                 <Route path="overview" element={<AdminGate><FinanceLoanDashboard /></AdminGate>} />
+                <Route path="cashflow" element={<AdminGate><FinanceCashflowDashboard /></AdminGate>} />
                 <Route path="credit-lines" element={<AdminGate><FinanceCreditLinePage /></AdminGate>} />
                 <Route path="collaterals" element={<AdminGate><FinanceCollateralPage /></AdminGate>} />
                 <Route path="loans" element={<AdminGate><FinanceLoanListPage /></AdminGate>} />

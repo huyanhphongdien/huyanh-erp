@@ -6,6 +6,7 @@
 import { supabase } from '../../lib/supabase'
 import { loanService, type FinLoanComputed } from './loanService'
 import { depositService, type FinDepositComputed } from './depositService'
+import { collateralService, type FinCollateral } from './collateralService'
 
 export type LineType = 'vay' | 'chiet_khau' | 'thau_chi' | 'lc' | 'khac'
 
@@ -26,13 +27,17 @@ export interface FinCreditLine {
 }
 
 export interface FinCreditLineComputed extends FinCreditLine {
-  used: number          // tổng dư nợ khoản vay đang rút từ hạn mức
-  secured: number       // tổng tiền gửi đảm bảo hạn mức
-  room: number          // hạn mức - đã dùng
+  used: number           // tổng dư nợ khoản vay đang rút từ hạn mức
+  secured: number        // tổng tiền gửi (HĐTG) đảm bảo hạn mức
+  securedAssets: number  // tổng giá trị bảo đảm của tài sản (HĐBĐ)
+  securedTotal: number   // secured + securedAssets
+  room: number           // hạn mức - đã dùng
   loanCount: number
   depositCount: number
+  assetCount: number
   loans: FinLoanComputed[]
   deposits: FinDepositComputed[]
+  collaterals: FinCollateral[]
 }
 
 export type FinCreditLineInput = Partial<Omit<FinCreditLine, 'id' | 'created_at' | 'updated_at'>> & {
@@ -43,13 +48,19 @@ export const LINE_TYPE_LABEL: Record<string, string> = {
   vay: 'Vay vốn', chiet_khau: 'Chiết khấu BCT', thau_chi: 'Thấu chi', lc: 'L/C', khac: 'Khác',
 }
 
-function computeLine(cl: FinCreditLine, loans: FinLoanComputed[], deposits: FinDepositComputed[]): FinCreditLineComputed {
+function computeLine(cl: FinCreditLine, loans: FinLoanComputed[], deposits: FinDepositComputed[], collaterals: FinCollateral[]): FinCreditLineComputed {
   const ls = loans.filter((l) => l.credit_line_id === cl.id)
   const ds = deposits.filter((d) => d.secured_credit_line_id === cl.id && d.status !== 'closed')
+  const cs = collaterals.filter((c) => c.credit_line_id === cl.id && c.status !== 'released')
   const used = ls.filter((l) => l.status !== 'paid').reduce((s, l) => s + l.remaining, 0)
   const secured = ds.reduce((s, d) => s + (d.amount || 0), 0)
+  const securedAssets = cs.reduce((s, c) => s + (Number(c.secured_value) || 0), 0)
   const limit = Number(cl.limit_amount) || 0
-  return { ...cl, used, secured, room: limit - used, loanCount: ls.length, depositCount: ds.length, loans: ls, deposits: ds }
+  return {
+    ...cl, used, secured, securedAssets, securedTotal: secured + securedAssets, room: limit - used,
+    loanCount: ls.length, depositCount: ds.length, assetCount: cs.length,
+    loans: ls, deposits: ds, collaterals: cs,
+  }
 }
 
 async function listRaw(): Promise<FinCreditLine[]> {
@@ -61,10 +72,10 @@ async function listRaw(): Promise<FinCreditLine[]> {
 export const creditLineService = {
   list: listRaw,
 
-  /** Hạn mức + đã tính dư nợ đang rút / tiền gửi đảm bảo / room. */
+  /** Hạn mức + đã tính dư nợ đang rút / tiền gửi + tài sản đảm bảo / room. */
   async listComputed(): Promise<FinCreditLineComputed[]> {
-    const [cls, loans, deposits] = await Promise.all([listRaw(), loanService.list(), depositService.list()])
-    return cls.map((cl) => computeLine(cl, loans, deposits))
+    const [cls, loans, deposits, collaterals] = await Promise.all([listRaw(), loanService.list(), depositService.list(), collateralService.list()])
+    return cls.map((cl) => computeLine(cl, loans, deposits, collaterals))
   },
 
   async create(input: FinCreditLineInput): Promise<FinCreditLine> {

@@ -88,8 +88,12 @@ export default function FinanceCreditLinePage() {
       return <div><b style={{ color: v < 0 ? '#dc2626' : '#16a34a' }}>{fmtVnd(v)}</b>
         <Progress percent={Math.min(pct, 100)} size="small" showInfo={false} strokeColor={pct >= 90 ? '#dc2626' : '#1677ff'} /></div>
     } },
-    { title: 'TG đảm bảo', key: 'secured', width: 150, align: 'right' as const, render: (_: any, r: FinCreditLineComputed) =>
-      r.depositCount ? <span style={{ color: '#1677ff' }}>🔒 {r.depositCount} HĐ · <b>{fmtTy(r.secured)}</b></span> : <Text type="secondary">—</Text> },
+    { title: 'Đảm bảo (gửi + tài sản)', key: 'secured', width: 170, align: 'right' as const, render: (_: any, r: FinCreditLineComputed) => (
+      <div style={{ fontSize: 12 }}>
+        {r.depositCount ? <div style={{ color: '#1677ff' }}>🔒 {r.depositCount} · {fmtTy(r.secured)}</div> : null}
+        {r.assetCount ? <div style={{ color: '#7c3aed' }}>🏛 {r.assetCount} · {fmtTy(r.securedAssets)}</div> : null}
+        {!r.depositCount && !r.assetCount ? <Text type="secondary">—</Text> : null}
+      </div>) },
     { title: 'Khoản vay', key: 'loans', width: 80, align: 'center' as const, render: (_: any, r: FinCreditLineComputed) => r.loanCount || '—' },
     { title: '', key: 'act', width: 90, fixed: 'right' as const, render: (_: any, r: FinCreditLineComputed) => (
       <Space size={2} onClick={(e) => e.stopPropagation()}>

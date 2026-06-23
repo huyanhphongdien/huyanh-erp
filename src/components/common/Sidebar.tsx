@@ -423,6 +423,7 @@ const getMenuGroups = (
     items: [
       { path: '/finance/overview', label: 'Tổng quan vốn vay', icon: <LayoutDashboard size={18} /> },
       { path: '/finance/credit-lines', label: 'Hạn mức (HĐTD)', icon: <CreditCard size={18} /> },
+      { path: '/finance/collaterals', label: 'Tài sản đảm bảo', icon: <Shield size={18} /> },
       { path: '/finance/loans', label: 'Khoản vay', icon: <ClipboardList size={18} /> },
       { path: '/finance/interest', label: 'Lịch trả lãi', icon: <Percent size={18} /> },
       { path: '/finance/deposits', label: 'Tiền gửi (HĐTG)', icon: <Wallet size={18} /> },

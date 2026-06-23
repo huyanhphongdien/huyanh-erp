@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { CIC_LABEL, CIC_COLOR } from '../../services/finance/loanService'
 import { ALERT_LABEL, ALERT_COLOR } from '../../services/finance/depositService'
+import { ASSET_TYPE_LABEL } from '../../services/finance/collateralService'
 import { LINE_TYPE_LABEL, type FinCreditLineComputed } from '../../services/finance/creditLineService'
 
 const { Text } = Typography
@@ -28,7 +29,7 @@ export default function FacilityDrawer({ line, open, onClose }: {
 
   const limit = Number(line.limit_amount) || 0
   const usedPct = limit > 0 ? Math.round((line.used / limit) * 100) : 0
-  const coverPct = line.used > 0 ? Math.round((line.secured / line.used) * 100) : (line.secured > 0 ? 100 : 0)
+  const coverPct = line.used > 0 ? Math.round((line.securedTotal / line.used) * 100) : (line.securedTotal > 0 ? 100 : 0)
 
   return (
     <Drawer open={open} onClose={onClose} width={760}
@@ -43,9 +44,9 @@ export default function FacilityDrawer({ line, open, onClose }: {
       <Card size="small" style={{ marginTop: 10 }}>
         <Text strong style={{ fontSize: 12 }}>Mức sử dụng hạn mức</Text>
         <Progress percent={Math.min(usedPct, 100)} status={usedPct >= 100 ? 'exception' : 'active'} format={() => `${usedPct}%`} strokeColor={usedPct >= 90 ? '#dc2626' : '#1677ff'} />
-        <Text strong style={{ fontSize: 12 }}>Tiền gửi đảm bảo phủ dư nợ ({fmtTy(line.secured)} / {fmtTy(line.used)})</Text>
+        <Text strong style={{ fontSize: 12 }}>Đảm bảo phủ dư nợ ({fmtTy(line.securedTotal)} / {fmtTy(line.used)})</Text>
         <Progress percent={Math.min(coverPct, 100)} status={coverPct >= 100 ? 'success' : 'normal'} format={() => `${coverPct}%`} strokeColor={coverPct >= 100 ? '#16a34a' : '#f59e0b'} />
-        {line.line_type ? <Text type="secondary" style={{ fontSize: 12 }}>Loại: {LINE_TYPE_LABEL[line.line_type] || line.line_type} · Hết hạn HĐTD: {fDate(line.to_date)}</Text> : null}
+        <Text type="secondary" style={{ fontSize: 11 }}>🔒 Tiền gửi {fmtTy(line.secured)} + 🏛 Tài sản {fmtTy(line.securedAssets)}{line.line_type ? ` · ${LINE_TYPE_LABEL[line.line_type] || line.line_type} · hết hạn HĐTD ${fDate(line.to_date)}` : ''}</Text>
       </Card>
 
       {/* Tiền gửi đảm bảo */}
@@ -61,6 +62,18 @@ export default function FacilityDrawer({ line, open, onClose }: {
               { title: 'Số tiền', dataIndex: 'amount', align: 'right' as const, render: (v: number) => <b>{fmtVnd(v)}</b> },
               { title: 'Đáo hạn', dataIndex: 'effective_maturity', align: 'center' as const, render: (v: string) => fDate(v) },
               { title: 'Trạng thái', key: 'al', align: 'center' as const, render: (_: any, r: any) => pill(ALERT_COLOR[r.alert], ALERT_LABEL[r.alert]) },
+            ] as any} />}
+
+      {/* Tài sản đảm bảo */}
+      <div style={{ fontWeight: 700, color: '#7c3aed', margin: '16px 0 8px' }}>
+        🏛 Tài sản đảm bảo (HĐBĐ) ({line.assetCount}) — {fmtTy(line.securedAssets)}
+      </div>
+      {line.collaterals.length === 0 ? <Empty description="Chưa tài sản nào đảm bảo hạn mức này" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        : <Table rowKey="id" size="small" pagination={false} dataSource={line.collaterals}
+            columns={[
+              { title: 'Tài sản', dataIndex: 'asset_name', render: (v: string, r: any) => <span><b>{v}</b>{r.asset_type ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{ASSET_TYPE_LABEL[r.asset_type] || r.asset_type}</div> : null}</span> },
+              { title: 'Định giá', dataIndex: 'appraisal_value', align: 'right' as const, render: (v: number) => fmtVnd(v) },
+              { title: 'Giá trị BĐ', dataIndex: 'secured_value', align: 'right' as const, render: (v: number) => <b style={{ color: '#7c3aed' }}>{fmtVnd(v)}</b> },
             ] as any} />}
 
       {/* Khoản vay rút */}

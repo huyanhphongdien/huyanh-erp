@@ -90,8 +90,40 @@
   ul.tight{ margin:6px 0; } ul.tight li{ margin:3px 0; }
   .legend span{ margin-right:6px; }
   footer{ text-align:center; color:#9aa4a0; font-size:12px; padding:30px; }
-  @media(max-width:920px){ nav.toc{ display:none; } .wrap{ padding:0; } section,header.hero{ padding-left:18px; padding-right:18px; } .grid2{ grid-template-columns:1fr; } }
-  @media print{ nav.toc{ display:none; } .img-ph{ display:none; } body{ background:#fff; } }
+  /* Mục lục gấp cho điện thoại — mặc định ẩn (desktop dùng sidebar) */
+  details.mtoc{ display:none; }
+  @media(max-width:920px){
+    nav.toc{ display:none; }
+    .wrap{ padding:0; }
+    main{ padding-bottom:60px; }
+    header.hero{ border-radius:0 0 14px 14px; padding:22px 18px; }
+    header.hero h1{ font-size:23px; }
+    header.hero .meta{ font-size:13px; }
+    section{ padding:8px 16px; scroll-margin-top:64px; }
+    h2{ font-size:20px; margin-top:24px; }
+    h3{ font-size:16px; }
+    body{ font-size:15.5px; line-height:1.7; }
+    table{ font-size:13px; }
+    th,td{ padding:7px 9px; }
+    .grid2{ grid-template-columns:1fr; }
+    .diag{ padding:12px; }
+    .node{ min-width:118px; padding:8px 11px; }
+    .node .t{ font-size:13px; } .node.hub .t{ font-size:14px; }
+    pre{ font-size:11px; }
+    .callout{ font-size:14px; }
+    /* TOC điện thoại: nút gấp, dính trên cùng */
+    details.mtoc{ display:block; position:sticky; top:0; z-index:30; margin:10px 14px 6px;
+      background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 3px 12px rgba(0,0,0,.12); overflow:hidden; }
+    details.mtoc summary{ padding:13px 16px; font-weight:800; color:var(--green); font-size:15px; cursor:pointer; list-style:none; }
+    details.mtoc summary::-webkit-details-marker{ display:none; }
+    details.mtoc summary::after{ content:'▾'; float:right; color:#94a3b8; }
+    details.mtoc[open] summary::after{ content:'▴'; }
+    details.mtoc[open] summary{ border-bottom:1px solid var(--line); }
+    details.mtoc .mlinks{ max-height:62vh; overflow:auto; }
+    details.mtoc a{ display:block; padding:12px 16px; border-top:1px solid #f4f6f8; color:#334155; text-decoration:none; font-size:14.5px; }
+    details.mtoc a:active{ background:#eef2f1; }
+  }
+  @media print{ nav.toc,details.mtoc{ display:none; } .img-ph{ display:none; } body{ background:#fff; } }
 </style>
 </head>
 <body>
@@ -126,6 +158,29 @@
   <h1>Hướng dẫn Module TÀI CHÍNH</h1>
   <div class="meta">Quản lý dòng tiền: vốn vay · tiền gửi · phải thu · tồn quỹ — cập nhật 23/06/2026</div>
 </header>
+
+<!-- Mục lục gấp — chỉ hiện trên điện thoại -->
+<details class="mtoc">
+  <summary>☰ Mục lục</summary>
+  <div class="mlinks">
+    <a href="#gioithieu">1. Giới thiệu &amp; mục tiêu</a>
+    <a href="#lienket">★ Mối liên kết các phần</a>
+    <a href="#phanquyen">2. Phân quyền (ai được xem)</a>
+    <a href="#dieuhuong">3. Menu &amp; điều hướng</a>
+    <a href="#dongtien">4. Dòng tiền tổng hợp</a>
+    <a href="#tongquan">5. Tổng quan vốn vay</a>
+    <a href="#hanmuc">6. Hạn mức (HĐTD)</a>
+    <a href="#khoanvay">7. Khoản vay + đèn CIC</a>
+    <a href="#lai">8. Lịch trả lãi</a>
+    <a href="#taisan">9. Tài sản đảm bảo</a>
+    <a href="#tiengui">10. Tiền gửi (HĐTG)</a>
+    <a href="#phaithu">11. Phải thu khách hàng</a>
+    <a href="#tonquy">12. Tồn quỹ &amp; phải nộp</a>
+    <a href="#email">13. Email cảnh báo sáng</a>
+    <a href="#dinhkem">14. Đính kèm tài liệu</a>
+    <a href="#thuatngu">15. Thuật ngữ</a>
+  </div>
+</details>
 
 <!-- ============================ 1 ============================ -->
 <section id="gioithieu">
@@ -455,5 +510,11 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <footer>© Cao Su Huy Anh · Hướng dẫn nội bộ Module Tài chính · Tạo tự động bởi hệ thống ERP.</footer>
 </main>
 </div>
+<script>
+  // Đóng mục lục mobile sau khi chọn 1 mục (tránh thanh dính che nội dung)
+  document.querySelectorAll('.mtoc a').forEach(function(a){
+    a.addEventListener('click', function(){ var d = document.querySelector('.mtoc'); if (d) d.open = false; });
+  });
+</script>
 </body>
 </html>

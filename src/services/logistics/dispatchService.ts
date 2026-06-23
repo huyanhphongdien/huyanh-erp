@@ -32,6 +32,9 @@ export interface DispatchOrder {
   dispatch_date: string
   trip_type: TripType
   reason: string | null
+  is_hired: boolean
+  hire_company: string | null
+  hire_cost: number | null
   tractor_vehicle_id: string | null
   trailer_vehicle_id: string | null
   driver_id: string | null
@@ -99,6 +102,14 @@ export interface CreateDispatchInput {
   dispatch_date?: string
   trip_type?: TripType
   reason?: string | null
+  // Thuê ngoài: is_hired=true → nhập tay biển số/tài xế (các trường *_plate / driver_*)
+  is_hired?: boolean
+  hire_company?: string | null
+  hire_cost?: number | null
+  tractor_plate?: string | null
+  trailer_plate?: string | null
+  driver_name?: string | null
+  driver_phone?: string | null
   tractor_vehicle_id?: string | null
   trailer_vehicle_id?: string | null
   driver_id?: string | null
@@ -228,7 +239,15 @@ async function getById(id: string): Promise<{ order: DispatchOrder; lines: Dispa
 
 async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
   const code = await generateCode()
-  const snapshot = await resolveSnapshot(input)
+  const hired = !!input.is_hired
+  // Thuê ngoài → snapshot từ NHẬP TAY; xe nhà → snapshot từ danh mục.
+  const snapshot = hired
+    ? {
+        tractor_plate: input.tractor_plate || null, trailer_plate: input.trailer_plate || null,
+        driver_name: input.driver_name || null, driver_phone: input.driver_phone || null,
+        driver_license_no: null, driver_id_no: null, driver_dob: null, driver_address: null,
+      }
+    : await resolveSnapshot(input)
 
   const { data: order, error } = await supabase
     .from('dispatch_orders')
@@ -237,9 +256,12 @@ async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
       dispatch_date: input.dispatch_date || new Date().toISOString().slice(0, 10),
       trip_type: input.trip_type || 'port',
       reason: input.reason || null,
-      tractor_vehicle_id: input.tractor_vehicle_id || null,
-      trailer_vehicle_id: input.trailer_vehicle_id || null,
-      driver_id: input.driver_id || null,
+      is_hired: hired,
+      hire_company: hired ? (input.hire_company || null) : null,
+      hire_cost: hired ? (input.hire_cost ?? null) : null,
+      tractor_vehicle_id: hired ? null : (input.tractor_vehicle_id || null),
+      trailer_vehicle_id: hired ? null : (input.trailer_vehicle_id || null),
+      driver_id: hired ? null : (input.driver_id || null),
       contract_ref: input.contract_ref || null,
       customer_name: input.customer_name || null,
       destination: input.destination || null,
@@ -276,19 +298,32 @@ async function update(
   patch: Partial<CreateDispatchInput> & { tractor_vehicle_id?: string | null; trailer_vehicle_id?: string | null; driver_id?: string | null }
 ): Promise<DispatchOrder> {
   const out: Record<string, any> = {}
-  const keys = ['dispatch_date', 'trip_type', 'reason', 'tractor_vehicle_id', 'trailer_vehicle_id', 'driver_id',
-    'contract_ref', 'customer_name', 'destination', 'recipient_name', 'recipient_phone', 'sales_order_id', 'note'] as const
+  const keys = ['dispatch_date', 'trip_type', 'reason', 'contract_ref', 'customer_name', 'destination',
+    'recipient_name', 'recipient_phone', 'sales_order_id', 'note', 'is_hired', 'hire_company', 'hire_cost'] as const
   for (const k of keys) {
     if ((patch as any)[k] !== undefined) out[k] = (patch as any)[k] === '' ? null : (patch as any)[k]
   }
-  // Nếu đổi xe/tài xế → cập nhật snapshot
-  if (patch.tractor_vehicle_id !== undefined || patch.trailer_vehicle_id !== undefined || patch.driver_id !== undefined) {
-    const snapshot = await resolveSnapshot({
-      tractor_vehicle_id: patch.tractor_vehicle_id ?? null,
-      trailer_vehicle_id: patch.trailer_vehicle_id ?? null,
-      driver_id: patch.driver_id ?? null,
-    })
-    Object.assign(out, snapshot)
+  if (patch.is_hired === true) {
+    // Thuê ngoài: bỏ FK đội xe, snapshot từ nhập tay
+    out.tractor_vehicle_id = null; out.trailer_vehicle_id = null; out.driver_id = null
+    out.tractor_plate = patch.tractor_plate || null
+    out.trailer_plate = patch.trailer_plate || null
+    out.driver_name = patch.driver_name || null
+    out.driver_phone = patch.driver_phone || null
+    out.driver_license_no = null; out.driver_id_no = null; out.driver_dob = null; out.driver_address = null
+  } else {
+    if (patch.is_hired === false) { out.hire_company = null; out.hire_cost = null }
+    if (patch.tractor_vehicle_id !== undefined) out.tractor_vehicle_id = patch.tractor_vehicle_id || null
+    if (patch.trailer_vehicle_id !== undefined) out.trailer_vehicle_id = patch.trailer_vehicle_id || null
+    if (patch.driver_id !== undefined) out.driver_id = patch.driver_id || null
+    // Đổi xe/tài xế (xe nhà) → cập nhật snapshot từ danh mục
+    if (patch.tractor_vehicle_id !== undefined || patch.trailer_vehicle_id !== undefined || patch.driver_id !== undefined) {
+      Object.assign(out, await resolveSnapshot({
+        tractor_vehicle_id: patch.tractor_vehicle_id ?? null,
+        trailer_vehicle_id: patch.trailer_vehicle_id ?? null,
+        driver_id: patch.driver_id ?? null,
+      }))
+    }
   }
   const { data, error } = await supabase.from('dispatch_orders').update(out).eq('id', id).select(ORDER_SELECT).single()
   if (error) throw error

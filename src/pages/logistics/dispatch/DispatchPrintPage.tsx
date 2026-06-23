@@ -160,6 +160,9 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
               <td>Biển số đầu kéo: <strong>{order.tractor_plate || '..................'}</strong></td>
               <td>Biển số rơ-moóc: <strong>{order.trailer_plate || '..................'}</strong></td>
             </tr>
+            {order.is_hired && (
+              <tr><td colSpan={2}>Đơn vị vận tải (thuê ngoài): <strong>{order.hire_company || '..............................'}</strong></td></tr>
+            )}
             <tr>
               <td>Khách hàng: <strong>{order.customer_name || '..............................'}</strong></td>
               <td>Điểm giao / Cảng: <strong>{order.destination || '..............................'}</strong></td>
@@ -191,6 +194,9 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
                 <td>Biển số xe: <strong>{order.tractor_plate || '..................'}</strong></td>
                 <td>{rightOf2}</td>
               </tr>
+              {order.is_hired && (
+                <tr><td colSpan={2}>Đơn vị vận tải (thuê ngoài): <strong>{order.hire_company || '..............................'}</strong></td></tr>
+              )}
               {showRow3 && (
                 <tr>
                   <td>{showDest && showTrailer ? <>Điểm đến: <strong>{order.destination}</strong></> : null}</td>

@@ -187,6 +187,9 @@ export default function DispatchDetailPage() {
           <Descriptions.Item label="Đầu kéo">{order.tractor_plate ? <Tag icon={<TruckOutlined />} color="blue">{order.tractor_plate}</Tag> : '–'}</Descriptions.Item>
           <Descriptions.Item label="Rơ-moóc">{order.trailer_plate ? <Tag icon={<CarOutlined />} color="gold">{order.trailer_plate}</Tag> : '–'}</Descriptions.Item>
           <Descriptions.Item label="Tài xế">{order.driver_name ? <Space size={4}><IdcardOutlined />{order.driver_name}{order.driver_phone && <Text type="secondary">· {order.driver_phone}</Text>}</Space> : '–'}</Descriptions.Item>
+          <Descriptions.Item label="Phương tiện">{order.is_hired
+            ? <Space size={4} wrap><Tag color="orange">🤝 Thuê ngoài</Tag>{order.hire_company || ''}{order.hire_cost ? <Text type="secondary">· cước {Number(order.hire_cost).toLocaleString('vi-VN')}đ</Text> : null}</Space>
+            : <Tag color="green">Đội xe nhà</Tag>}</Descriptions.Item>
           <Descriptions.Item label="Khách hàng">{order.customer_name || '–'}</Descriptions.Item>
           <Descriptions.Item label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}>{order.destination || '–'}</Descriptions.Item>
           <Descriptions.Item label="Căn cứ HĐ / Booking">{order.contract_ref || '–'}</Descriptions.Item>

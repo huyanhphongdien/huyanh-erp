@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card, Form, Select, Input, AutoComplete, DatePicker, Button, Space, Typography, Row, Col,
-  Table, InputNumber, message, Breadcrumb, Divider, Tag, Modal, Empty,
+  Table, InputNumber, message, Breadcrumb, Divider, Tag, Modal, Empty, Segmented,
 } from 'antd'
 import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ImportOutlined, TruckOutlined, CarOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -123,9 +123,16 @@ export default function DispatchCreatePage() {
           dispatch_date: order.dispatch_date ? dayjs(order.dispatch_date) : dayjs(),
           trip_type: order.trip_type,
           reason: order.reason,
+          is_hired: order.is_hired || false,
+          hire_company: order.hire_company,
+          hire_cost: order.hire_cost,
           tractor_vehicle_id: order.tractor_vehicle_id,
           trailer_vehicle_id: order.trailer_vehicle_id,
           driver_id: order.driver_id,
+          tractor_plate: order.tractor_plate,
+          trailer_plate: order.trailer_plate,
+          driver_name: order.driver_name,
+          driver_phone: order.driver_phone,
           contract_ref: order.contract_ref,
           customer_name: order.customer_name,
           destination: order.destination,
@@ -283,13 +290,21 @@ export default function DispatchCreatePage() {
       // Đi cảng bắt buộc có container; chuyến thường (đón khách…) cho phép 0 dòng.
       if (isPort && lines.length === 0) { message.warning('Cần ít nhất 1 dòng container'); return }
       setSaving(true)
+      const hired = !!v.is_hired
       const payload = {
         dispatch_date: dayjs(v.dispatch_date).format('YYYY-MM-DD'),
         trip_type: v.trip_type as TripType,
         reason: v.reason || null,
-        tractor_vehicle_id: v.tractor_vehicle_id || null,
-        trailer_vehicle_id: v.trailer_vehicle_id || null,
-        driver_id: v.driver_id || null,
+        is_hired: hired,
+        hire_company: hired ? (v.hire_company || null) : null,
+        hire_cost: hired ? (v.hire_cost ?? null) : null,
+        tractor_vehicle_id: hired ? null : (v.tractor_vehicle_id || null),
+        trailer_vehicle_id: hired ? null : (v.trailer_vehicle_id || null),
+        driver_id: hired ? null : (v.driver_id || null),
+        tractor_plate: hired ? (v.tractor_plate || null) : null,
+        trailer_plate: hired ? (v.trailer_plate || null) : null,
+        driver_name: hired ? (v.driver_name || null) : null,
+        driver_phone: hired ? (v.driver_phone || null) : null,
         contract_ref: v.contract_ref || null,
         customer_name: v.customer_name || null,
         destination: v.destination || null,
@@ -328,6 +343,7 @@ export default function DispatchCreatePage() {
   // Khác (lao/internal/other) = chuyến thường (chở mủ, vật tư, nội bộ) → bảng GỌN.
   const watchedTripType = Form.useWatch('trip_type', form) as TripType | undefined
   const isPort = (watchedTripType ?? 'port') === 'port'
+  const isHired = Form.useWatch('is_hired', form) === true   // xe thuê ngoài
 
   // Ô xe chính LỌC THEO LOẠI CHUYẾN (phiếu):
   //   • Xuất hàng đi cảng → chỉ Đầu kéo (kéo container).
@@ -405,7 +421,7 @@ export default function DispatchCreatePage() {
           </Space>
         </div>
 
-        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port' }}>
+        <Form form={form} layout="vertical" size="large" initialValues={{ dispatch_date: dayjs(), trip_type: 'port', is_hired: false }}>
           <Row gutter={16}>
             <Col xs={24} sm={8} md={5}>
               <Form.Item name="dispatch_date" label="Ngày điều động" rules={[{ required: true }]}>
@@ -450,27 +466,66 @@ export default function DispatchCreatePage() {
           </Row>
 
           <Divider titlePlacement="left" style={{ margin: '4px 0 16px' }}>Phương tiện &amp; tài xế</Divider>
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item name="tractor_vehicle_id" label={isPort ? <><TruckOutlined /> Đầu kéo</> : <><CarOutlined /> Xe (đầu kéo / xe con / khách)</>}>
-                <Select allowClear showSearch optionFilterProp="label"
-                  placeholder={isPort ? 'Chọn đầu kéo' : 'Chọn xe'} onChange={onTractorChange}
-                  options={primaryVehicleOptions} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="trailer_vehicle_id" label={isPort ? <><CarOutlined /> Rơ-moóc (đổi theo chuyến)</> : <><CarOutlined /> Rơ-moóc (nếu kéo theo)</>}>
-                <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn rơ-moóc"
-                  options={trailers.map(t => ({ value: t.id, label: vehicleLabel(t) }))} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="driver_id" label="Tài xế">
-                <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn tài xế"
-                  options={drivers.map(d => ({ value: d.id, label: d.full_name }))} />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form.Item name="is_hired" style={{ marginBottom: 16 }}>
+            <Segmented options={[{ label: '🚛 Xe nhà', value: false }, { label: '🤝 Thuê ngoài', value: true }]} />
+          </Form.Item>
+
+          {!isHired ? (
+            <Row gutter={16}>
+              <Col xs={24} sm={8}>
+                <Form.Item name="tractor_vehicle_id" label={isPort ? <><TruckOutlined /> Đầu kéo</> : <><CarOutlined /> Xe (đầu kéo / xe con / khách)</>}>
+                  <Select allowClear showSearch optionFilterProp="label"
+                    placeholder={isPort ? 'Chọn đầu kéo' : 'Chọn xe'} onChange={onTractorChange}
+                    options={primaryVehicleOptions} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="trailer_vehicle_id" label={isPort ? <><CarOutlined /> Rơ-moóc (đổi theo chuyến)</> : <><CarOutlined /> Rơ-moóc (nếu kéo theo)</>}>
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn rơ-moóc"
+                    options={trailers.map(t => ({ value: t.id, label: vehicleLabel(t) }))} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="driver_id" label="Tài xế">
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="Chọn tài xế"
+                    options={drivers.map(d => ({ value: d.id, label: d.full_name }))} />
+                </Form.Item>
+              </Col>
+            </Row>
+          ) : (
+            <Row gutter={16}>
+              <Col xs={24} sm={8}>
+                <Form.Item name="hire_company" label="🏢 Nhà xe / đơn vị vận tải" rules={[{ required: true, message: 'Nhập nhà xe thuê' }]}>
+                  <Input placeholder="vd: Nhà xe Thành Công / Cty Vận tải ABC" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="tractor_plate" label={<><TruckOutlined /> Biển số đầu kéo</>}>
+                  <Input placeholder="vd: 43C-123.45" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="trailer_plate" label={<><CarOutlined /> Biển số rơ-moóc</>}>
+                  <Input placeholder="vd: 43R-678.90" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="driver_name" label="Tên tài xế (thuê ngoài)">
+                  <Input placeholder="Họ tên tài xế nhà xe" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="driver_phone" label="SĐT tài xế">
+                  <Input placeholder="09xx…" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="hire_cost" label="Cước thuê (VNĐ)">
+                  <InputNumber min={0} style={{ width: '100%' }} formatter={numFmt} parser={numParse as any} placeholder="0" />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
 
           <Divider titlePlacement="left" style={{ margin: '4px 0 16px' }}>Thông tin chuyến</Divider>
           <Row gutter={16}>

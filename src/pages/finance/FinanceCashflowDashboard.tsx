@@ -113,7 +113,7 @@ export default function FinanceCashflowDashboard() {
   ]
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1500, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><RiseOutlined /> Dòng tiền tổng hợp</Title>
         <Space>

@@ -7,7 +7,7 @@
 import { supabase } from '../../lib/supabase'
 
 export type LoanStatus = 'active' | 'paid' | 'cancelled'
-export type CicLight = 'green' | 'yellow' | 'orange' | 'red' | 'paid'
+export type CicLight = 'green' | 'yellow' | 'overdue' | 'orange' | 'red' | 'paid'
 
 export interface FinLoan {
   id: string
@@ -62,14 +62,14 @@ export interface FinRepayment {
 }
 
 export const CIC_LABEL: Record<CicLight, string> = {
-  green: 'An toàn', yellow: 'Sắp đến hạn', orange: 'Sát nhảy nhóm',
+  green: 'An toàn', yellow: 'Sắp đến hạn', overdue: 'Quá hạn', orange: 'Sát nhảy nhóm',
   red: 'NGUY CƠ NHẢY NHÓM', paid: 'Đã tất toán',
 }
 export const CIC_COLOR: Record<CicLight, string> = {
-  green: '#16a34a', yellow: '#ca8a04', orange: '#ea580c', red: '#dc2626', paid: '#9ca3af',
+  green: '#16a34a', yellow: '#ca8a04', overdue: '#f97316', orange: '#ea580c', red: '#dc2626', paid: '#9ca3af',
 }
 export const CIC_BG: Record<CicLight, string> = {
-  green: '#f0fdf4', yellow: '#fefce8', orange: '#fff7ed', red: '#fef2f2', paid: '#f9fafb',
+  green: '#f0fdf4', yellow: '#fefce8', overdue: '#fff7ed', orange: '#fff7ed', red: '#fef2f2', paid: '#f9fafb',
 }
 
 // Ngân hàng hay dùng (gợi ý dropdown — vẫn gõ tự do được)
@@ -82,6 +82,9 @@ function dayDiff(a: Date, b: Date): number {
            - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())
   return Math.round(ms / 86_400_000)
 }
+// Định dạng ngày theo LỊCH ĐỊA PHƯƠNG (tránh toISOString lệch -1 ngày ở UTC+7)
+const pad = (n: number) => String(n).padStart(2, '0')
+const toLocalISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 /** Tính còn lại + số ngày quá hạn + đèn CIC. */
 export function computeLoan(l: FinLoan, today = new Date()): FinLoanComputed {
@@ -93,9 +96,10 @@ export function computeLoan(l: FinLoan, today = new Date()): FinLoanComputed {
   if (l.status === 'paid' || remaining <= 0) cic = 'paid'
   else if (overdue_days >= JUMP_DAYS) cic = 'red'       // ≥10 ngày → đã nhảy nhóm
   else if (overdue_days >= 7) cic = 'orange'            // 7–9 ngày → sát mốc
-  else if (overdue_days >= -7) cic = 'yellow'           // trong 7 ngày trước hạn → 6 ngày quá hạn
+  else if (overdue_days >= 1) cic = 'overdue'           // 1–6 ngày → ĐÃ quá hạn (chưa tới mốc)
+  else if (overdue_days >= -7) cic = 'yellow'           // 7 ngày trước hạn → đến hạn hôm nay
   else cic = 'green'
-  return { ...l, remaining, overdue_days, jump_date: jump.toISOString().slice(0, 10), cic }
+  return { ...l, remaining, overdue_days, jump_date: toLocalISO(jump), cic }
 }
 
 export const loanService = {

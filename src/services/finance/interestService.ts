@@ -26,7 +26,7 @@ export interface FinInterestPeriod {
   created_at: string
   updated_at: string
   // join (khi list toàn bộ)
-  loan?: { bank: string; loan_no: string | null } | null
+  loan?: { bank: string; loan_no: string | null; currency?: string | null } | null
 }
 
 export interface FinInterestComputed extends FinInterestPeriod {
@@ -62,8 +62,9 @@ export function computePeriod(p: FinInterestPeriod, today = new Date()): FinInte
   return { ...p, days_to_due: days, alert }
 }
 
-const FACTOR: Record<InterestFreq, number> = { monthly: 1 / 12, quarterly: 1 / 4, yearly: 1, end: 1 }
 const STEP_MONTHS: Record<Exclude<InterestFreq, 'end'>, number> = { monthly: 1, quarterly: 3, yearly: 12 }
+// Lãi theo SỐ NGÀY THỰC của kỳ (actual/365) — kỳ cuối lẻ không bị tính trọn tháng.
+const interestFor = (base: number, rate: number, days: number) => Math.round(base * rate / 100 * Math.max(0, days) / 365)
 
 export interface GenerateOpts {
   freq: InterestFreq
@@ -88,7 +89,7 @@ export function buildSchedule(o: GenerateOpts): Array<Partial<FinInterestPeriod>
     out.push({
       period_no: 1, from_date: start.format('YYYY-MM-DD'), to_date: end.format('YYYY-MM-DD'),
       due_date: end.format('YYYY-MM-DD'), base_amount: base, rate,
-      interest_amount: Math.round(base * rate / 100 * days / 365),
+      interest_amount: interestFor(base, rate, days),
     })
     return out
   }
@@ -104,7 +105,7 @@ export function buildSchedule(o: GenerateOpts): Array<Partial<FinInterestPeriod>
     out.push({
       period_no: no, from_date: from.format('YYYY-MM-DD'), to_date: to.format('YYYY-MM-DD'),
       due_date: due.format('YYYY-MM-DD'), base_amount: base, rate,
-      interest_amount: Math.round(base * rate / 100 * FACTOR[o.freq]),
+      interest_amount: interestFor(base, rate, to.diff(from, 'day')),
     })
     from = to
     no++
@@ -124,7 +125,7 @@ export const interestService = {
   /** Toàn bộ kỳ lãi (join tên khoản vay) — cho trang nhắc + dashboard. */
   async listAll(): Promise<FinInterestComputed[]> {
     const { data, error } = await supabase.from('fin_interest_periods')
-      .select('*, loan:fin_loans(bank, loan_no)').order('due_date', { ascending: true })
+      .select('*, loan:fin_loans(bank, loan_no, currency)').order('due_date', { ascending: true })
     if (error) throw error
     return ((data as FinInterestPeriod[]) || []).map((p) => computePeriod(p))
   },

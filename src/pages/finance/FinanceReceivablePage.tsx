@@ -109,8 +109,10 @@ export default function FinanceReceivablePage() {
     catch (e: any) { message.error('Lỗi xoá: ' + (e?.message || e)) }
   }
   const markReceived = async (r: FinReceivableComputed) => {
-    await receivableService.update(r.id, { status: 'received', received_date: dayjs().format('YYYY-MM-DD'), amount_received: r.amount } as any)
-    load()
+    try {
+      await receivableService.update(r.id, { status: 'received', received_date: dayjs().format('YYYY-MM-DD'), amount_received: r.amount } as any)
+      message.success('Đã ghi nhận đã thu'); load()
+    } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
   }
 
   const columns = [

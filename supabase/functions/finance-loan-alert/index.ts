@@ -137,11 +137,12 @@ async function collectData(supabase: any) {
     if (l.status === 'paid' || remaining <= 0) cic = 'paid'
     else if (overdue >= JUMP_DAYS) cic = 'red'
     else if (overdue >= 7) cic = 'orange'
+    else if (overdue >= 1) cic = 'overdue'
     else if (overdue >= -WARN_DUE_DAYS) cic = 'yellow'
     return { ...l, remaining, overdue, cic }
   }).filter((l: any) => l.cic !== 'paid' && l.remaining > 0)
 
-  const critical = loanRows.filter((l: any) => l.cic === 'red' || l.cic === 'orange')
+  const critical = loanRows.filter((l: any) => l.cic === 'red' || l.cic === 'orange' || l.cic === 'overdue')
     .sort((a: any, b: any) => b.overdue - a.overdue)
   const dueSoon = loanRows.filter((l: any) => l.cic === 'yellow')
     .sort((a: any, b: any) => a.overdue - b.overdue)
@@ -187,6 +188,7 @@ async function collectData(supabase: any) {
   return {
     dateLabel, totalRemaining,
     critical, dueSoon, intRows, depRows, underSecured, payRows,
+    intAvailable: !intRes.error, payAvailable: !payRes.error,
     hasAlert: critical.length > 0 || dueSoon.length > 0 || intRows.length > 0 || depRows.length > 0 || underSecured.length > 0 || payRows.length > 0,
   }
 }
@@ -195,6 +197,7 @@ async function collectData(supabase: any) {
 const CIC = {
   red: { bg: '#fef2f2', bar: '#dc2626', label: 'NHẢY NHÓM' },
   orange: { bg: '#fff7ed', bar: '#ea580c', label: 'Sát mốc' },
+  overdue: { bg: '#fff7ed', bar: '#f97316', label: 'Quá hạn' },
   yellow: { bg: '#fefce8', bar: '#ca8a04', label: 'Sắp đến hạn' },
 } as const
 
@@ -277,7 +280,7 @@ function renderHtml(d: any): string {
     </tr>`).join('')
 
   const body =
-    section(`🔴 Khoản vay NGUY CƠ / ĐÃ nhảy nhóm (${d.critical.length})`, '#dc2626',
+    section(`🔴 Khoản vay QUÁ HẠN / nguy cơ nhảy nhóm (${d.critical.length})`, '#dc2626',
       ['Ngân hàng', 'Còn lại (đ)', 'Đến hạn', 'Tình trạng', 'CIC'], criticalRows) +
     section(`🟡 Khoản vay sắp đến hạn ≤${WARN_DUE_DAYS} ngày (${d.dueSoon.length})`, '#ca8a04',
       ['Ngân hàng', 'Còn lại (đ)', 'Đến hạn', 'Tình trạng', 'CIC'], dueSoonRows) +
@@ -351,8 +354,12 @@ serve(async (req) => {
 
     const html = renderHtml(d)
     const n = d.critical.length + d.dueSoon.length + d.intRows.length + d.depRows.length + d.payRows.length + d.underSecured.length
+    const parts = [`${d.critical.length} quá hạn`, `${d.dueSoon.length} đến hạn`]
+    if (d.intAvailable) parts.push(`${d.intRows.length} kỳ lãi`)
+    parts.push(`${d.depRows.length} HĐTG`)
+    if (d.payAvailable) parts.push(`${d.payRows.length} phải nộp`)
     const subject = d.hasAlert
-      ? `Tình trạng vốn vay ${d.dateLabel}: ${d.critical.length} nhảy nhóm · ${d.dueSoon.length} đến hạn · ${d.intRows.length} kỳ lãi · ${d.depRows.length} HĐTG · ${d.payRows.length} phải nộp`
+      ? `Tình trạng vốn vay ${d.dateLabel}: ${parts.join(' · ')}`
       : `Tình trạng vốn vay ${d.dateLabel}: không có cảnh báo ✅`
 
     const token = await getAccessToken()

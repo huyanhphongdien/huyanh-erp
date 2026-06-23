@@ -57,16 +57,17 @@ function dDiff(a: Date, b: Date): number {
 }
 function addDays(s: string, n: number): string {
   const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  // Định dạng theo lịch ĐỊA PHƯƠNG (toISOString lệch -1 ngày ở UTC+7)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export function computeAR(r: FinReceivable, today = new Date()): FinReceivableComputed {
   const remaining = Math.max(0, (Number(r.amount) || 0) - (Number(r.amount_received) || 0))
   const isReceived = r.status === 'received' || !!r.received_date || remaining <= 0
-  // hạn thu = due_date, hoặc (atd||etd) + term_days
+  // hạn thu = due_date, hoặc (atd||etd) + term_days.
+  // KHÔNG có cả due_date lẫn term_days → hạn thu KHÔNG xác định (đừng coi ngày tàu chạy là hạn → tránh báo "quá hạn" oan).
   let effective_due = r.due_date
   if (!effective_due && (r.atd || r.etd) && r.term_days) effective_due = addDays((r.atd || r.etd) as string, r.term_days)
-  else if (!effective_due) effective_due = r.atd || r.etd
   const due = effective_due ? new Date(effective_due + 'T00:00:00') : null
   const days = due ? dDiff(due, today) : 9999
   let alert: ARAlert

@@ -54,7 +54,8 @@ export function nextDueFromDay(due_day: number | null, today = new Date()): stri
   const y = today.getFullYear(), m = today.getMonth(), d = today.getDate()
   let target = new Date(y, m, Math.min(due_day, daysInMonth(y, m)))
   if (target.getDate() < d) { const nm = m + 1; target = new Date(y, nm, Math.min(due_day, daysInMonth(y, nm))) }
-  return target.toISOString().slice(0, 10)
+  // Định dạng theo lịch ĐỊA PHƯƠNG (toISOString lệch -1 ngày ở UTC+7)
+  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`
 }
 function daysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate() }
 

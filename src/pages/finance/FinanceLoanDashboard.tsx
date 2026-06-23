@@ -4,7 +4,7 @@
 // ============================================================================
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Statistic, Table, Tag, Button, Typography, Empty, Spin, Alert } from 'antd'
+import { Card, Row, Col, Statistic, Table, Tag, Button, Typography, Empty, Spin, Alert, message } from 'antd'
 import { ReloadOutlined, BankOutlined, WarningFilled, RightOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import FinanceLendingTabs from './FinanceLendingTabs'
@@ -28,7 +28,7 @@ export default function FinanceLoanDashboard() {
     try {
       const [l, d] = await Promise.all([loanService.list(), depositService.list()])
       setLoans(l); setDeposits(d)
-    } catch { /* ignore */ }
+    } catch (e: any) { message.error('Lỗi tải dữ liệu: ' + (e?.message || e)) }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -74,7 +74,7 @@ export default function FinanceLoanDashboard() {
 
   const cicTag = (l: FinLoanComputed) => (
     <span style={{ display: 'inline-block', background: CIC_COLOR[l.cic], color: '#fff', fontWeight: 700, fontSize: 12, padding: '2px 9px', borderRadius: 5, whiteSpace: 'nowrap' }}>
-      {l.cic === 'red' || l.cic === 'orange' ? `${l.overdue_days >= 0 ? `quá hạn ${l.overdue_days}d · ` : ''}` : ''}
+      {(l.cic === 'red' || l.cic === 'orange' || l.cic === 'overdue') && l.overdue_days >= 1 ? `quá ${l.overdue_days}d · ` : ''}
       {CIC_LABEL[l.cic]}
     </span>
   )

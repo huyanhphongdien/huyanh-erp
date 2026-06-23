@@ -103,12 +103,18 @@ export default function InterestDrawer({ loan, open, onClose, onChanged }: {
       message.success('Đã ghi nhận trả lãi'); setPayRow(null); load(); onChanged?.()
     } catch (e: any) { if (e?.errorFields) return; message.error('Lỗi: ' + (e?.message || e)) }
   }
-  const unpay = async (r: FinInterestComputed) => { await interestService.unpay(r.id); load(); onChanged?.() }
-  const del = async (r: FinInterestComputed) => { await interestService.remove(r.id); load(); onChanged?.() }
+  const unpay = async (r: FinInterestComputed) => {
+    try { await interestService.unpay(r.id); load(); onChanged?.() } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+  }
+  const del = async (r: FinInterestComputed) => {
+    try { await interestService.remove(r.id); load(); onChanged?.() } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+  }
   const addManual = async () => {
     if (!loan) return
-    await interestService.create({ loan_id: loan.id, due_date: dayjs().format('YYYY-MM-DD'), interest_amount: 0, base_amount: loan.remaining, rate: loan.interest_rate })
-    load(); onChanged?.()
+    try {
+      await interestService.create({ loan_id: loan.id, due_date: dayjs().format('YYYY-MM-DD'), interest_amount: 0, base_amount: loan.remaining, rate: loan.interest_rate })
+      load(); onChanged?.()
+    } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
   }
 
   const columns = [

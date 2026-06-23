@@ -55,7 +55,7 @@ export default function FinanceCashflowDashboard() {
     const arUsd = arOpen.filter((r: any) => r.currency === 'USD').reduce((s: number, r: any) => s + r.remaining, 0)
     const arVnd = arOpen.filter((r: any) => r.currency !== 'USD').reduce((s: number, r: any) => s + r.remaining, 0)
     const arTotalVnd = arUsd * usdRate + arVnd
-    const loanRemaining = loans.filter((l: any) => l.status === 'active').reduce((s: number, l: any) => s + l.remaining, 0)
+    const loanRemaining = loans.filter((l: any) => l.status === 'active').reduce((s: number, l: any) => s + toVnd(l.remaining, l.currency), 0)
     const roomTotal = lines.reduce((s: number, l: any) => s + l.room, 0)
     const depositTotal = deps.filter((x: any) => x.status !== 'closed').reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0)
     const collateralTotal = cols.filter((c: any) => c.status !== 'released').reduce((s: number, c: any) => s + (Number(c.secured_value) || 0), 0)
@@ -78,10 +78,10 @@ export default function FinanceCashflowDashboard() {
 
     // Tiền VÀO — phải thu
     arOpen.forEach((r: any) => { const i = idxOf(r.effective_due); if (i >= 0) buckets[i].inV += toVnd(r.remaining, r.currency) })
-    // Tiền RA — gốc khoản vay đến hạn
-    loans.filter((l: any) => l.status === 'active' && l.remaining > 0).forEach((l: any) => { const i = idxOf(l.due_date); if (i >= 0) buckets[i].outP += l.remaining })
-    // Tiền RA — lãi đến kỳ
-    ints.filter((p: any) => p.status === 'pending').forEach((p: any) => { const i = idxOf(p.due_date); if (i >= 0) buckets[i].outI += (Number(p.interest_amount) || 0) })
+    // Tiền RA — gốc khoản vay đến hạn (quy đổi USD nếu có)
+    loans.filter((l: any) => l.status === 'active' && l.remaining > 0).forEach((l: any) => { const i = idxOf(l.due_date); if (i >= 0) buckets[i].outP += toVnd(l.remaining, l.currency) })
+    // Tiền RA — lãi đến kỳ (quy đổi theo tiền tệ của khoản vay)
+    ints.filter((p: any) => p.status === 'pending').forEach((p: any) => { const i = idxOf(p.due_date); if (i >= 0) buckets[i].outI += toVnd(Number(p.interest_amount) || 0, p.loan?.currency || 'VND') })
     // Tiền RA — phải nộp định kỳ (theo kỳ tới)
     pays.filter((p: any) => p.active && p.amount_est).forEach((p: any) => { const i = idxOf(p.next_due); if (i >= 0) buckets[i].outPay += (Number(p.amount_est) || 0) })
 

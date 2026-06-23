@@ -66,7 +66,9 @@ export default function FinanceCashPage() {
       message.success('Đã lưu'); setBOpen(false); load()
     } catch (e: any) { if (e?.errorFields) return; message.error('Lỗi: ' + (e?.message || e)) } finally { setSaving(false) }
   }
-  const delB = async (r: FinCashBalance) => { await cashService.removeBalance(r.id); load() }
+  const delB = async (r: FinCashBalance) => {
+    try { await cashService.removeBalance(r.id); message.success('Đã xoá'); load() } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+  }
 
   // ── Phải nộp ──
   const openAddP = () => { setPEditing(null); pForm.resetFields(); pForm.setFieldsValue({ active: true, category: 'khac' }); setPOpen(true) }
@@ -78,7 +80,9 @@ export default function FinanceCashPage() {
       message.success('Đã lưu'); setPOpen(false); load()
     } catch (e: any) { if (e?.errorFields) return; message.error('Lỗi: ' + (e?.message || e)) } finally { setSaving(false) }
   }
-  const delP = async (r: FinPayableComputed) => { await cashService.removePayable(r.id); load() }
+  const delP = async (r: FinPayableComputed) => {
+    try { await cashService.removePayable(r.id); message.success('Đã xoá'); load() } catch (e: any) { message.error('Lỗi: ' + (e?.message || e)) }
+  }
 
   const balCols = [
     { title: 'Ngân hàng', dataIndex: 'bank', render: (v: string, r: FinCashBalance) => <span><b>{v}</b>{r.account_no ? <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.account_no}</div> : null}</span> },

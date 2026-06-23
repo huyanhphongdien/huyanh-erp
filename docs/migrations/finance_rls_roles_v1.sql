@@ -21,8 +21,9 @@
 -- ─────────────────────────────────────────────────────────────────────────
 -- PART 0 — CHẨN ĐOÁN (chạy riêng trước; xem ai sẽ được vào Tài chính)
 -- ─────────────────────────────────────────────────────────────────────────
--- select e.full_name, e.email, p.level as pos_level, d.name as department,
+-- select e.full_name, e.email, p.level as pos_level, d.code as dept_code, d.name as department,
 --   (coalesce(p.level,99) <= 3
+--    or upper(coalesce(d.code,'')) = 'HAP-KT'
 --    or lower(coalesce(d.name,'')) like '%kế toán%'
 --    or lower(coalesce(e.email,'')) in ('minhld@huyanhrubber.com','yendt@huyanhrubber.com','phulv@huyanhrubber.com')
 --   ) as duoc_xem_tai_chinh
@@ -55,8 +56,9 @@ as $$
       left join public.departments d on d.id = e.department_id
       where e.user_id = auth.uid()
         and (
-          coalesce(p.level, 99) <= 3
-          or lower(coalesce(d.name, '')) like '%kế toán%'
+          coalesce(p.level, 99) <= 3                  -- Ban giám đốc
+          or upper(coalesce(d.code, '')) = 'HAP-KT'   -- Phòng Kế toán (theo mã, ổn định)
+          or lower(coalesce(d.name, '')) like '%kế toán%'  -- fallback theo tên
           or lower(coalesce(e.email, '')) in (
                'minhld@huyanhrubber.com',
                'yendt@huyanhrubber.com',

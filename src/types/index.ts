@@ -15,6 +15,7 @@ export interface User {
   employee_code: string | null
   department_id: string | null
   department_name: string | null
+  department_code?: string | null
   position_id: string | null
   position_name?: string | null
   position_level?: number | null

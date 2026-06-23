@@ -517,11 +517,10 @@ export function Sidebar() {
   const isFinance = isFinanceUser(user);   // Admin / BGĐ / Phòng kế toán — Module Tài chính
   const userLevel = user?.position_level || (isAdmin ? 1 : 7);
   const isExecutive = isAdmin || userLevel <= 3;
-  // VẬN TẢI: Admin / BGĐ / Hành chính / QC
-  const deptName = (user?.department_name || '').toLowerCase();
-  const isTransport = isAdmin || userLevel <= 3
-    || deptName.includes('hành chính') || deptName.includes('hanh chinh')
-    || deptName.includes('qc') || deptName.includes('chất lượng') || deptName.includes('chat luong');
+  // VẬN TẢI: Admin / BGĐ (level<=3 hoặc phòng BGĐ) / Hành chính - Tổng hợp / QC — theo MÃ phòng
+  const deptCode = (user?.department_code || '').toUpperCase();
+  const TRANSPORT_DEPTS = ['HAP-BGD', 'HAP-HCTH', 'HAP-QC'];
+  const isTransport = isAdmin || userLevel <= 3 || TRANSPORT_DEPTS.includes(deptCode);
   const isBGD = isAdmin || userLevel <= 3;
   const isManagerLevel = isAdmin || userLevel <= 5;  // BGD + TP + PP — dùng cho Quản lý Dự án
   const canApproveOT = userLevel >= 4 && userLevel <= 5;

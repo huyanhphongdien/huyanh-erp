@@ -10,10 +10,12 @@ const FINANCE_EMAILS = ['minhld@huyanhrubber.com', 'yendt@huyanhrubber.com', 'ph
 export function isFinanceUser(user?: User | null): boolean {
   if (!user) return false
   const email = (user.email || '').toLowerCase()
-  const level = (user as any).position_level ?? 99            // BGĐ: Giám đốc/Trợ lý/Phó GĐ = level <= 3
-  const dept = String((user as any).department_name || '').toLowerCase()
+  const level = user.position_level ?? 99                       // BGĐ: Giám đốc/Trợ lý/Phó GĐ = level <= 3
+  const code = (user.department_code || '').toUpperCase()
+  const dept = String(user.department_name || '').toLowerCase()
   return user.role === 'admin'
-    || FINANCE_EMAILS.includes(email)        // Admin + kế toán hiện hữu
+    || FINANCE_EMAILS.includes(email)        // Admin + kế toán hiện hữu (email)
     || level <= 3                            // Ban giám đốc
-    || dept.includes('kế toán')              // Phòng kế toán
+    || code === 'HAP-KT'                     // Phòng Kế toán (theo mã)
+    || dept.includes('kế toán')              // fallback theo tên
 }

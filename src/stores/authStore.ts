@@ -31,6 +31,7 @@ interface EmployeeWithDepartment {
   position_id: string | null
   department: {
     id: string
+    code: string | null
     name: string
     manager_id: string | null
   } | null
@@ -67,7 +68,7 @@ async function getEmployeeByUserId(userId: string): Promise<EmployeeWithDepartme
     if (employee.department_id) {
       const { data: deptData, error: deptError } = await supabase
         .from('departments')
-        .select('id, name, manager_id')
+        .select('id, code, name, manager_id')
         .eq('id', employee.department_id)
         .maybeSingle()
 
@@ -222,6 +223,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
         employee_code: employee?.code || null,
         department_id: employee?.department_id || null,
         department_name: employee?.department?.name || null,
+        department_code: employee?.department?.code || null,
         position_id: employee?.position_id || null,
         position_name: employee?.position?.name || null,
         position_level: employee?.position?.level || null,

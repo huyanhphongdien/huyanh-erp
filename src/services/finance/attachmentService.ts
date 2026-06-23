@@ -5,7 +5,7 @@
 // ============================================================================
 import { supabase } from '../../lib/supabase'
 
-export type AttachEntity = 'loan' | 'deposit' | 'credit_line' | 'interest' | 'repayment' | 'collateral'
+export type AttachEntity = 'loan' | 'deposit' | 'credit_line' | 'interest' | 'repayment' | 'collateral' | 'receivable'
 
 export interface FinAttachment {
   id: string
@@ -31,6 +31,7 @@ export const DOC_TYPES: Record<AttachEntity, string[]> = {
   interest: ['Ủy nhiệm chi (lãi)', 'Chứng từ', 'Khác'],
   repayment: ['Ủy nhiệm chi (gốc)', 'Chứng từ', 'Khác'],
   collateral: ['HĐ bảo đảm', 'Biên bản định giá', 'Giấy tờ tài sản', 'Khác'],
+  receivable: ['Invoice (hóa đơn)', 'Packing List', 'B/L (vận đơn)', 'C/O', 'Bộ chứng từ', 'Khác'],
 }
 
 const sanitize = (name: string) =>

@@ -413,15 +413,16 @@ const getMenuGroups = (
     ],
   },
 
-  // ★ VỐN VAY NGÂN HÀNG — chỉ Admin
+  // ★ TÀI CHÍNH (vốn vay + tiền gửi + phải thu + dòng tiền) — chỉ Admin
   // ============================================================
   {
-    title: 'VỐN VAY',
+    title: 'TÀI CHÍNH',
     icon: <Building2 size={18} />,
     collapsible: true,
     adminOnly: true,
     items: [
       { path: '/finance/overview', label: 'Tổng quan vốn vay', icon: <LayoutDashboard size={18} /> },
+      { path: '/finance/receivables', label: 'Phải thu KH', icon: <DollarSign size={18} /> },
       { path: '/finance/credit-lines', label: 'Hạn mức (HĐTD)', icon: <CreditCard size={18} /> },
       { path: '/finance/collaterals', label: 'Tài sản đảm bảo', icon: <Shield size={18} /> },
       { path: '/finance/loans', label: 'Khoản vay', icon: <ClipboardList size={18} /> },

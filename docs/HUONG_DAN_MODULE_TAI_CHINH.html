@@ -44,6 +44,14 @@
   .danger{ background:#fef2f2; border-color:var(--red); }
   .img-ph{ border:2px dashed #cbd5e1; border-radius:10px; background:#f8fafc; color:#94a3b8; text-align:center;
     padding:26px 16px; margin:14px 0; font-size:13.5px; }
+  figure.shot{ margin:16px 0; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  figure.shot img{ display:block; width:100%; height:auto; }
+  figure.shot figcaption{ font-size:12.5px; color:var(--muted); padding:8px 13px; background:#f8fafc; border-top:1px solid var(--line); }
+  /* Sơ đồ liên kết */
+  .map{ background:#0f172a; color:#e2e8f0; border-radius:12px; padding:20px; font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px; line-height:1.7; overflow:auto; white-space:pre; }
+  .map b{ color:var(--gold); }
+  .relbox{ border:1px solid var(--line); border-radius:10px; padding:4px 0; }
   .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .card{ border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:#fff; }
   .card h4{ margin-top:0; }
@@ -63,6 +71,7 @@
   <div class="brand">🏦 Module Tài chính</div>
   <div class="sub">Cao Su Huy Anh · Hướng dẫn chi tiết</div>
   <a href="#gioithieu">1. Giới thiệu &amp; mục tiêu</a>
+  <a href="#lienket" style="color:var(--green);font-weight:700">★ Mối liên kết các phần</a>
   <a href="#phanquyen">2. Phân quyền (ai được xem)</a>
   <a href="#dieuhuong">3. Menu &amp; điều hướng</a>
   <div class="grp">Các màn hình</div>
@@ -110,6 +119,50 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <p>CIC là Trung tâm Thông tin Tín dụng. Khi một khoản vay <b>quá hạn ≥ 10 ngày</b>, ngân hàng phải xếp doanh nghiệp xuống <b>nhóm nợ 2</b> (“nợ cần chú ý”). Hậu quả: <b>khó vay tiếp, lãi suất tăng, mất uy tín tín dụng toàn hệ thống</b>. Module này cảnh báo <b>sớm từ 7 ngày trước</b> để xử lý kịp, tránh chạm mốc 10 ngày.</p>
 </section>
 
+<!-- ============================ LIÊN KẾT ============================ -->
+<section id="lienket">
+<h2>★ Mối liên kết giữa các phần</h2>
+<p>Module không phải các màn hình rời rạc — chúng <b>nối với nhau theo dòng tiền</b>. Hiểu được sơ đồ này là hiểu cả module.</p>
+
+<div class="map">          🔒 <b>TIỀN GỬI (HĐTG)</b> ┐
+                              ├─ đảm bảo ─┐
+          🏛 <b>TÀI SẢN (HĐBĐ)</b>  ┘            ▼
+                                        ╔═══════════════════════╗        ┌─ sinh ─→ ％ <b>KỲ LÃI</b> (lịch trả lãi)
+                              rút từ →  ║  💳 <b>HẠN MỨC (HĐTD)</b>  ║─→ 🏦 <b>KHOẢN VAY</b> ┤
+                                        ║   = TRỤC · còn ROOM    ║        └─ ghi ──→ 💲 <b>TRẢ NỢ</b> → giảm dư nợ
+                                        ╚═══════════════════════╝               │
+                                                                                ▼  đèn <b>CIC nhảy nhóm</b>
+   ───────────────────────────────────────────────────────────────────────────────────────────
+          ⬆ <b>PHẢI THU</b> (tiền vào) ┐
+          ⬇ Gốc + Lãi + Phải nộp ───┼──→  📈 <b>DÒNG TIỀN TỔNG HỢP</b>  ←── 🏦 <b>TỒN QUỸ (112)</b>
+                                     ┘         (net + tồn dự kiến / tuần)
+   ───────────────────────────────────────────────────────────────────────────────────────────
+   📧 <b>EMAIL SÁNG</b>  ←── đọc cảnh báo từ: CIC khoản vay · kỳ lãi · HĐTG đáo hạn · phải nộp · hạn mức thiếu ĐB
+   📎 <b>ĐÍNH KÈM</b> ── gắn vào MỌI đối tượng        🔐 <b>PHÂN QUYỀN</b> ── bao trùm toàn module</div>
+
+<h3>Bảng quan hệ (đọc là hiểu nối ở đâu)</h3>
+<table>
+<tr><th>Từ phần</th><th>Quan hệ</th><th>Tới phần</th><th>Khoá nối (DB)</th></tr>
+<tr><td>🔒 Tiền gửi (HĐTG)</td><td><b>đảm bảo cho</b></td><td>💳 Hạn mức</td><td><code>deposits.secured_credit_line_id</code></td></tr>
+<tr><td>🏛 Tài sản (HĐBĐ)</td><td><b>đảm bảo cho</b></td><td>💳 Hạn mức</td><td><code>collaterals.credit_line_id</code></td></tr>
+<tr><td>🏦 Khoản vay</td><td><b>rút từ</b> (→ tính room)</td><td>💳 Hạn mức</td><td><code>loans.credit_line_id</code></td></tr>
+<tr><td>🏦 Khoản vay</td><td><b>sinh ra</b></td><td>％ Kỳ lãi + 💲 Trả nợ</td><td><code>interest_periods.loan_id</code>, <code>repayments.loan_id</code></td></tr>
+<tr><td>⬆ Phải thu</td><td><b>tiền VÀO</b></td><td>📈 Dòng tiền</td><td>gộp khi tính (theo hạn thu)</td></tr>
+<tr><td>⬇ Gốc + Lãi + Phải nộp</td><td><b>tiền RA</b></td><td>📈 Dòng tiền</td><td>gộp khi tính (theo ngày đến hạn)</td></tr>
+<tr><td>🏦 Tồn quỹ (112)</td><td><b>số dư đầu kỳ</b></td><td>📈 Dòng tiền</td><td>điểm xuất phát “tồn dự kiến”</td></tr>
+<tr><td>📧 Email sáng</td><td><b>đọc trạng thái từ</b></td><td>Khoản vay · Lãi · HĐTG · Phải nộp · Hạn mức</td><td>tổng hợp lúc 07:00</td></tr>
+<tr><td>📎 Đính kèm</td><td><b>gắn file vào</b></td><td>mọi đối tượng</td><td><code>attachments(entity_type, entity_id)</code></td></tr>
+</table>
+
+<h3>3 luồng quan trọng nhất</h3>
+<div class="grid2">
+  <div class="card"><h4>① Trục Hạn mức</h4>Tiền gửi + tài sản <b>chống lưng</b> hạn mức; khoản vay <b>rút ra</b> từ hạn mức. Vì vậy 1 hạn mức luôn cân được: <b>được đảm bảo bao nhiêu</b> vs <b>đã vay bao nhiêu</b> vs <b>còn room bao nhiêu</b>.</div>
+  <div class="card"><h4>② Khoản vay → CIC + lãi</h4>Mỗi khoản vay đẻ ra <b>kỳ lãi</b> (lịch trả lãi) và nhận <b>ghi trả nợ</b>. Ngày đến hạn + dư nợ quyết định <b>đèn CIC nhảy nhóm</b> — cảnh báo lõi.</div>
+  <div class="card"><h4>③ Dòng tiền gộp tất cả</h4><b>Tiền vào</b> (phải thu) trừ <b>tiền ra</b> (gốc + lãi + phải nộp), cộng dồn trên <b>tồn quỹ</b> → biết tuần nào <b>thiếu hụt</b>.</div>
+  <div class="card"><h4>Xuyên suốt</h4><b>Email sáng</b> đọc cảnh báo từ nhiều phần; <b>đính kèm</b> gắn chứng từ mọi nơi; <b>phân quyền</b> (Admin/BGĐ/Kế toán) bao cả module.</div>
+</div>
+</section>
+
 <!-- ============================ 2 ============================ -->
 <section id="phanquyen">
 <h2>2. Phân quyền — ai được xem?</h2>
@@ -143,7 +196,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <tr><td>💵 <b>Phải thu KH</b></td><td>Công nợ phải thu + tuổi nợ <span class="route">/finance/receivables</span></td></tr>
 <tr><td>🏦 <b>Tồn quỹ &amp; phải nộp</b></td><td>Số dư ngân hàng đa tệ + khoản phải nộp định kỳ <span class="route">/finance/cash</span></td></tr>
 </table>
-<div class="img-ph">📷 Ảnh: Sidebar nhóm TÀI CHÍNH (4 mục) — gửi ảnh để chèn</div>
+<figure class="shot"><img src="images/Tai%20chinh/Sidebar%20nhóm%20TÀI%20CHÍNH.png" alt="Sidebar nhóm TÀI CHÍNH" loading="lazy"><figcaption>Sidebar nhóm TÀI CHÍNH — 4 mục</figcaption></figure>
 <div class="callout tip"><b>Mẹo:</b> Vào “Vay vốn” sẽ thấy <b>thanh tab ngang</b> ở đầu trang để chuyển nhanh giữa 6 màn hình của cụm đi vay. Bấm tab nào URL đổi tương ứng, có thể bookmark từng trang.</div>
 </section>
 
@@ -151,7 +204,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <section id="dongtien">
 <h2>4. Dòng tiền tổng hợp <span class="route">/finance/cashflow</span></h2>
 <p>Đây là <b>màn hình đỉnh</b> — gộp mọi dữ liệu thành bức tranh dòng tiền cho BGĐ.</p>
-<div class="img-ph">📷 Ảnh: Dashboard Dòng tiền tổng hợp (thẻ sức khỏe + bảng 6 tuần)</div>
+<figure class="shot"><img src="images/Tai%20chinh/Dashboard%20Dòng%20tiền%20tổng%20hợp.png" alt="Dashboard Dòng tiền tổng hợp" loading="lazy"><figcaption>Dashboard Dòng tiền tổng hợp — thẻ sức khỏe + dự báo 6 tuần</figcaption></figure>
 
 <h3>Phần 1 — Thẻ “sức khỏe tài chính”</h3>
 <table>
@@ -187,7 +240,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
   <li><b>Dư nợ theo ngân hàng</b> + <b>Sắp đến hạn (30 ngày)</b>.</li>
   <li>Khối <b>Tiền gửi (HĐTG)</b>: tổng tiền gửi, đảm bảo, HĐTG cần tái tục.</li>
 </ul>
-<div class="img-ph">📷 Ảnh: Trang Tổng quan vốn vay</div>
+<figure class="shot"><img src="images/Tai%20chinh/Trang%20Tổng%20quan%20vốn%20vay.png" alt="Trang Tổng quan vốn vay" loading="lazy"><figcaption>Trang Tổng quan vốn vay</figcaption></figure>
 </section>
 
 <!-- ============================ 6 ============================ -->
@@ -208,7 +261,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <tr><td>Đảm bảo (gửi + tài sản)</td><td>🔒 tiền gửi + 🏛 tài sản đang chống lưng.</td></tr>
 </table>
 <p>Bấm 1 hạn mức → mở <b>Drawer</b> xem đủ 3 bên: % sử dụng, % phủ dư nợ, danh sách tiền gửi đảm bảo, danh sách khoản vay rút. Bấm thẳng 1 dòng trong Drawer → nhảy tới đúng khoản đó.</p>
-<div class="img-ph">📷 Ảnh: Trang Hạn mức + Drawer chi tiết facility</div>
+<figure class="shot"><img src="images/Tai%20chinh/Trang%20Hạn%20mức%20+%20Drawer%20chi%20tiết%20facility.png" alt="Trang Hạn mức + Drawer facility" loading="lazy"><figcaption>Trang Hạn mức (HĐTD) + Drawer chi tiết facility</figcaption></figure>
 </section>
 
 <!-- ============================ 7 ============================ -->
@@ -234,7 +287,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
   <li>💲 <b>Ghi trả nợ</b> — nhập số tiền + ngày trả; dư nợ tự giảm.</li>
   <li>✏️ sửa · 🗑 xoá · 🏦 cột “Hạn mức” bấm xem facility liên quan.</li>
 </ul>
-<div class="img-ph">📷 Ảnh: Danh sách Khoản vay (các đèn CIC) + Drawer trả nợ</div>
+<figure class="shot"><img src="images/Tai%20chinh/Danh%20sách%20Khoản%20vay%20(các%20đèn%20CIC)%20+%20Drawer%20trả%20nợ.png" alt="Danh sách Khoản vay + Drawer trả nợ" loading="lazy"><figcaption>Danh sách Khoản vay (các đèn CIC) + Drawer trả nợ</figcaption></figure>
 </section>
 
 <!-- ============================ 8 ============================ -->
@@ -248,7 +301,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <h4>Cách sinh lịch</h4>
 <p>Chọn <b>Kỳ trả lãi</b> (hằng tháng / quý / năm / cuối kỳ) · ngày trả · lãi suất · từ ngày → đáo hạn · dư nợ gốc. Lãi mỗi kỳ tính theo <b>số ngày thực</b> (actual/365) — kỳ cuối lẻ tháng không bị tính trọn tháng.</p>
 <div class="callout info">Sinh lại lịch chỉ xoá các kỳ <b>chưa trả</b>, giữ nguyên kỳ đã trả.</div>
-<div class="img-ph">📷 Ảnh: Trang Lịch trả lãi + Drawer sinh lịch</div>
+<figure class="shot"><img src="images/Tai%20chinh/Trang%20Lịch%20trả%20lãi%20+%20Drawer%20sinh%20lịch.png" alt="Trang Lịch trả lãi + Drawer sinh lịch" loading="lazy"><figcaption>Trang Lịch trả lãi + Drawer sinh lịch</figcaption></figure>
 </section>
 
 <!-- ============================ 9 ============================ -->
@@ -263,7 +316,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <tr><td>Giá trị bảo đảm</td><td>Giá trị NH nhận làm đảm bảo (thường = định giá × tỷ lệ cho vay).</td></tr>
 </table>
 <p>Mỗi tài sản có 📎 hồ sơ (HĐ bảo đảm, biên bản định giá).</p>
-<div class="img-ph">📷 Ảnh: Trang Tài sản đảm bảo</div>
+<figure class="shot"><img src="images/Tai%20chinh/Trang%20Tài%20sản%20đảm%20bảo.png" alt="Trang Tài sản đảm bảo" loading="lazy"><figcaption>Trang Tài sản đảm bảo (HĐBĐ)</figcaption></figure>
 </section>
 
 <!-- ============================ 10 ============================ -->
@@ -276,7 +329,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
   <li>Đáo hạn hiệu lực = ngày gia hạn (nếu có) hoặc ngày đáo hạn gốc.</li>
   <li>📎 sổ/giấy chứng nhận tiền gửi, giấy gia hạn.</li>
 </ul>
-<div class="img-ph">📷 Ảnh: Trang Tiền gửi (HĐTG)</div>
+<figure class="shot"><img src="images/Tai%20chinh/Trang%20Tiền%20gửi%20(HĐTG).png" alt="Trang Tiền gửi HĐTG" loading="lazy"><figcaption>Trang Tiền gửi (HĐTG)</figcaption></figure>
 </section>
 
 <!-- ============================ 11 ============================ -->
@@ -300,7 +353,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
   <li>📎 bộ chứng từ (Invoice / Packing List / B/L / C/O).</li>
 </ul>
 <div class="callout info"><b>Lưu ý dữ liệu:</b> hiện đang dùng <b>6 dòng mẫu</b>. Khi cần, sẽ import <b>186 dòng phải thu thật</b> (~40 triệu USD) từ Excel.</div>
-<div class="img-ph">📷 Ảnh: Trang Phải thu + bảng tuổi nợ</div>
+<figure class="shot"><img src="images/Tai%20chinh/Trang%20Phải%20thu%20+%20bảng%20tuổi%20nợ.png" alt="Trang Phải thu + bảng tuổi nợ" loading="lazy"><figcaption>Trang Phải thu khách hàng + bảng tuổi nợ (aging)</figcaption></figure>
 </section>
 
 <!-- ============================ 12 ============================ -->
@@ -310,7 +363,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
 <p>Lưới số dư từng ngân hàng theo <b>3 loại tiền: VNĐ / USD / KÍP</b> + dòng TỔNG + ngày cập nhật. Cập nhật tay (snapshot).</p>
 <h3>Khoản phải nộp định kỳ</h3>
 <p>Các khoản cố định: thuê tài chính, tiền điện, bảo hiểm, lãi bank… với <b>ngày nộp trong tháng</b>. Hệ thống tự tính <b>“kỳ tới”</b> + đèn sắp nộp. Các khoản này cũng vào <b>email cảnh báo sáng</b> + <b>dòng tiền ra</b>.</p>
-<div class="img-ph">📷 Ảnh: Trang Tồn quỹ + Khoản phải nộp</div>
+<figure class="shot"><img src="images/Tai%20chinh/Trang%20Tồn%20quỹ%20+%20Khoản%20phải%20nộp.png" alt="Trang Tồn quỹ + Khoản phải nộp" loading="lazy"><figcaption>Trang Tồn quỹ (112) + Khoản phải nộp định kỳ</figcaption></figure>
 </section>
 
 <!-- ============================ 13 ============================ -->
@@ -327,7 +380,7 @@ Tất cả gộp lại thành <b>Dòng tiền tổng hợp</b> (mục 4).
   <li>🏦 <b>Hạn mức thiếu đảm bảo</b> (tiền gửi &lt; dư nợ).</li>
 </ol>
 <div class="callout warn"><b>Vận hành:</b> email không tự deploy theo git — phải chạy tay <code>npx supabase functions deploy finance-loan-alert --no-verify-jwt</code> khi sửa. Lịch 07:00 đặt bằng <code>finance_loan_alert_cron.sql</code>. Người nhận hiện để <b>minhld (test)</b>, mở BGĐ + Kế toán sau.</div>
-<div class="img-ph">📷 Ảnh: Email cảnh báo (header navy)</div>
+<figure class="shot"><img src="images/Tai%20chinh/Email%20cảnh%20báo%20(header%20navy).png" alt="Email cảnh báo header navy" loading="lazy"><figcaption>Email “Tình trạng vốn vay đầu ngày” (header navy)</figcaption></figure>
 </section>
 
 <!-- ============================ 14 ============================ -->

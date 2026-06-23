@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Row, Col, Statistic, Table, Tag, Button, Typography, Empty, Spin, Alert } from 'antd'
 import { ReloadOutlined, BankOutlined, WarningFilled, RightOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import FinanceLendingTabs from './FinanceLendingTabs'
 import { loanService, CIC_LABEL, CIC_COLOR, CIC_BG, type FinLoanComputed } from '../../services/finance/loanService'
 import { depositService, ALERT_LABEL, ALERT_COLOR, type FinDepositComputed } from '../../services/finance/depositService'
 
@@ -82,6 +83,7 @@ export default function FinanceLoanDashboard() {
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1760, margin: '0 auto' }}>
+      <FinanceLendingTabs />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><BankOutlined /> Vốn vay ngân hàng — Tổng quan</Title>
         <div>

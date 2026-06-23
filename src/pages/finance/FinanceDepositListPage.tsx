@@ -10,6 +10,7 @@ import {
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import FinanceLendingTabs from './FinanceLendingTabs'
 import {
   depositService, ALERT_LABEL, ALERT_COLOR, ALERT_BG,
   type FinDepositComputed,
@@ -165,6 +166,7 @@ export default function FinanceDepositListPage() {
 
   return (
     <div style={{ padding: '20px 24px' }}>
+      <FinanceLendingTabs />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><SafetyCertificateOutlined /> Hợp đồng tiền gửi (HĐTG)</Title>
         <Space>

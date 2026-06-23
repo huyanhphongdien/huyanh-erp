@@ -12,6 +12,7 @@ import {
   PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DollarOutlined, BankOutlined, RightOutlined, PercentageOutlined, PaperClipOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import FinanceLendingTabs from './FinanceLendingTabs'
 import {
   loanService, CIC_LABEL, CIC_COLOR, CIC_BG, BANKS,
   type FinLoanComputed, type FinRepayment,
@@ -199,6 +200,7 @@ export default function FinanceLoanListPage() {
 
   return (
     <div style={{ padding: '20px 24px' }}>
+      <FinanceLendingTabs />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><BankOutlined /> Khoản vay ngân hàng</Title>
         <Space>

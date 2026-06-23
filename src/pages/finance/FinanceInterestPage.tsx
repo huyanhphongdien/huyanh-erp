@@ -8,6 +8,7 @@ import {
 } from 'antd'
 import { ReloadOutlined, CheckOutlined, PercentageOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import FinanceLendingTabs from './FinanceLendingTabs'
 import {
   interestService, IALERT_LABEL, IALERT_COLOR, type FinInterestComputed,
 } from '../../services/finance/interestService'
@@ -79,6 +80,7 @@ export default function FinanceInterestPage() {
 
   return (
     <div style={{ padding: '20px 24px' }}>
+      <FinanceLendingTabs />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><PercentageOutlined /> Lịch trả lãi vay</Title>
         <Button icon={<ReloadOutlined />} onClick={load} />

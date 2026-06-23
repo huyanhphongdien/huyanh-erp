@@ -9,6 +9,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SafetyOutlined, PaperClipOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import FinanceLendingTabs from './FinanceLendingTabs'
 import {
   collateralService, ASSET_TYPE_LABEL, COLLATERAL_STATUS_LABEL, type FinCollateral,
 } from '../../services/finance/collateralService'
@@ -114,6 +115,7 @@ export default function FinanceCollateralPage() {
 
   return (
     <div style={{ padding: '20px 24px' }}>
+      <FinanceLendingTabs />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><SafetyOutlined /> Tài sản đảm bảo (HĐBĐ)</Title>
         <Space>

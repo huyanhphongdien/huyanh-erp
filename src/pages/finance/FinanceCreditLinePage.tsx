@@ -9,6 +9,7 @@ import {
 } from 'antd'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, BankOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import FinanceLendingTabs from './FinanceLendingTabs'
 import {
   creditLineService, LINE_TYPE_LABEL, type FinCreditLineComputed,
 } from '../../services/finance/creditLineService'
@@ -106,6 +107,7 @@ export default function FinanceCreditLinePage() {
 
   return (
     <div style={{ padding: '20px 24px' }}>
+      <FinanceLendingTabs />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={3} style={{ margin: 0 }}><BankOutlined /> Hạn mức tín dụng (HĐTD)</Title>
         <Space>

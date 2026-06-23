@@ -147,6 +147,7 @@ interface MenuGroup {
   requireSalesRole?: boolean; // true = check getSalesRole
   adminOnly?: boolean;        // CHỈ Admin (vd Vốn vay — dữ liệu tài chính nhạy cảm)
   financeOnly?: boolean;      // Admin / Ban giám đốc / Phòng kế toán (Module Tài chính)
+  transportOnly?: boolean;    // Admin / BGĐ / Hành chính / QC (Module Vận tải)
 }
 
 // ============================================================
@@ -409,6 +410,7 @@ const getMenuGroups = (
     title: 'VẬN TẢI',
     icon: <Truck size={18} />,
     collapsible: true,
+    transportOnly: true,
     items: [
       { path: '/logistics/dispatch', label: 'Lệnh điều động', icon: <ClipboardList size={18} /> },
       { path: '/logistics/fleet/vehicles', label: 'Đội xe', icon: <Truck size={18} /> },
@@ -515,6 +517,11 @@ export function Sidebar() {
   const isFinance = isFinanceUser(user);   // Admin / BGĐ / Phòng kế toán — Module Tài chính
   const userLevel = user?.position_level || (isAdmin ? 1 : 7);
   const isExecutive = isAdmin || userLevel <= 3;
+  // VẬN TẢI: Admin / BGĐ / Hành chính / QC
+  const deptName = (user?.department_name || '').toLowerCase();
+  const isTransport = isAdmin || userLevel <= 3
+    || deptName.includes('hành chính') || deptName.includes('hanh chinh')
+    || deptName.includes('qc') || deptName.includes('chất lượng') || deptName.includes('chat luong');
   const isBGD = isAdmin || userLevel <= 3;
   const isManagerLevel = isAdmin || userLevel <= 5;  // BGD + TP + PP — dùng cho Quản lý Dự án
   const canApproveOT = userLevel >= 4 && userLevel <= 5;
@@ -705,6 +712,7 @@ export function Sidebar() {
   const isGroupVisible = (group: MenuGroup): boolean => {
     if (group.adminOnly && !isAdmin) return false;
     if (group.financeOnly && !isFinance) return false;
+    if (group.transportOnly && !isTransport) return false;
     if (group.executiveOnly && !isExecutive && !isAdmin) return false;
     if (group.managerLevelOnly && !isManagerLevel) return false;
     if (group.requirePurchaseAccess && !hasPurchaseAccess && !isAdmin) return false;

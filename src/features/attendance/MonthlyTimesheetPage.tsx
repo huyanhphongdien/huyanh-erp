@@ -19,7 +19,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { monthlyTimesheetService } from '../../services/monthlyTimesheetService'
 import type { DayDetail, EmployeeMonthlySummary } from '../../services/monthlyTimesheetService'
-import { exportMonthlyTimesheetExcel } from '../../services/monthlyTimesheetExcel'
+import { exportMonthlyTimesheetExcel, exportEmployeeMonthlyExcel } from '../../services/monthlyTimesheetExcel'
 import EditAttendanceModal from './EditAttendanceModal'
 
 // ============================================================================
@@ -275,7 +275,10 @@ export default function MonthlyTimesheetPage() {
                         <td className="px-1 py-1.5 text-center">{emp.totalLateDays > 0 ? <span className="text-amber-600 font-bold text-[13px]">{emp.totalLateDays}</span> : <span className="text-gray-300">—</span>}</td>
                         <td className="px-1 py-1.5 text-center">{emp.totalAbsentDays > 0 ? <span className="text-red-500 font-bold text-[13px]">{emp.totalAbsentDays}</span> : <span className="text-gray-300">—</span>}</td>
                         <td className="px-1 py-1.5 text-center">{emp.totalHolidayDays > 0 ? <span className="text-amber-700 font-bold text-[13px]">{emp.totalHolidayDays}</span> : <span className="text-gray-300">—</span>}</td>
-                        <td className="px-1 py-1 text-center">
+                        <td className="px-1 py-1 text-center whitespace-nowrap">
+                          <button onClick={() => exportEmployeeMonthlyExcel(emp, selectedMonth, selectedYear)} className="p-1 rounded hover:bg-emerald-100 active:bg-emerald-200" title="Xuất Excel cá nhân tháng này">
+                            <Download size={13} className="text-emerald-700" />
+                          </button>
                           <button onClick={() => setSelectedEmployee(emp)} className="p-1 rounded hover:bg-gray-200 active:bg-gray-300" title="Xem chi tiết">
                             <Eye size={13} className="text-gray-400" />
                           </button>
@@ -341,9 +344,15 @@ export default function MonthlyTimesheetPage() {
                   <div className="text-[12px] text-white/70 truncate">{emp.employeeCode} • {emp.departmentName}</div>
                   <div className="text-[11px] text-white/60">{MONTHS_VN[selectedMonth]} {selectedYear}</div>
                 </div>
-                <button onClick={() => setSelectedEmployee(null)} className="p-1.5 rounded-lg hover:bg-white/10 active:bg-white/20 flex-shrink-0">
-                  <X size={20} />
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => exportEmployeeMonthlyExcel(emp, selectedMonth, selectedYear)}
+                    className="px-2 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 active:bg-white/30 flex items-center gap-1.5 text-[12px] font-medium" title="Xuất Excel cá nhân">
+                    <Download size={15} /><span className="hidden sm:inline">Excel</span>
+                  </button>
+                  <button onClick={() => setSelectedEmployee(null)} className="p-1.5 rounded-lg hover:bg-white/10 active:bg-white/20">
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               {/* KPI cards */}

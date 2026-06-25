@@ -9,7 +9,7 @@
 
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
-import type { MonthlyTimesheetData } from './monthlyTimesheetService'
+import type { MonthlyTimesheetData, EmployeeMonthlySummary } from './monthlyTimesheetService'
 
 // ============================================================================
 // CONSTANTS
@@ -419,4 +419,142 @@ export async function exportMonthlyTimesheetExcel(data: MonthlyTimesheetData): P
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const fileName = `Bang_Cham_Cong_T${month}_${year}_${departmentName.replace(/\s+/g, '_')}.xlsx`
   saveAs(blob, fileName)
+}
+
+// ============================================================================
+// EXPORT CÁ NHÂN — phiếu chấm công 1 nhân viên (layout DỌC: 1 ngày = 1 dòng)
+// ============================================================================
+
+const fmtTimeHM = (iso: string | null): string => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+const sanitizeName = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_')
+
+export async function exportEmployeeMonthlyExcel(emp: EmployeeMonthlySummary, month: number, year: number): Promise<void> {
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'Huy Anh ERP'
+  wb.created = new Date()
+
+  const ws = wb.addWorksheet(emp.employeeCode || 'NV', {
+    pageSetup: {
+      paperSize: 9 as ExcelJS.PaperSize, // A4
+      orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+      margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
+    },
+  })
+
+  const COLS = 11 // Ngày · Thứ · Ký hiệu · Ca · Vào · Ra · Công · Trễ · Sớm · OT · Ghi chú
+  const widths = [9, 6, 8, 22, 9, 9, 7, 7, 7, 7, 28]
+  widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
+
+  // Header
+  ws.mergeCells(1, 1, 1, COLS)
+  const r1 = ws.getRow(1)
+  r1.getCell(1).value = 'CÔNG TY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN'
+  r1.getCell(1).font = { name: 'Arial', size: 12, bold: true, color: { argb: BRAND_GREEN } }
+  r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }; r1.height = 22
+
+  ws.mergeCells(2, 1, 2, COLS)
+  const r2 = ws.getRow(2)
+  r2.getCell(1).value = `PHIẾU CHẤM CÔNG CÁ NHÂN — ${MONTHS_VN[month].toUpperCase()}/${year}`
+  r2.getCell(1).font = { name: 'Arial', size: 15, bold: true, color: { argb: BRAND_GREEN } }
+  r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }; r2.height = 28
+
+  ws.mergeCells(3, 1, 3, COLS)
+  const r3 = ws.getRow(3)
+  r3.getCell(1).value = `Họ tên: ${emp.fullName}     |     Mã NV: ${emp.employeeCode}     |     Phòng: ${emp.departmentName}`
+  r3.getCell(1).font = { name: 'Arial', size: 11, bold: true }
+  r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }; r3.height = 20
+  ws.getRow(4).height = 4
+
+  // Column header
+  const HDR = 5
+  const headers = ['Ngày', 'Thứ', 'Ký hiệu', 'Ca', 'Giờ vào', 'Giờ ra', 'Công', 'Trễ(p)', 'Sớm(p)', 'OT(p)', 'Ghi chú']
+  headers.forEach((h, i) => {
+    const c = ws.getRow(HDR).getCell(i + 1)
+    c.value = h
+    c.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE } }
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND_GREEN } }
+    c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    c.border = thinBorder
+  })
+  ws.getRow(HDR).height = 24
+
+  // Data — 1 dòng/ngày
+  const start = HDR + 1
+  emp.days.forEach((day, i) => {
+    const row = ws.getRow(start + i)
+    const dt = new Date(day.date + 'T00:00:00')
+    const sym = day.symbol === '—' ? '' : day.symbol
+    const ca = day.allShiftNames && day.allShiftNames.length ? day.allShiftNames.join(' + ') : (day.shiftName || '')
+    const ghichu = day.holidayName ? `Lễ: ${day.holidayName}`
+      : day.isBusinessTrip ? 'Công tác'
+      : day.isLeave ? `Nghỉ phép${day.leaveType ? ` (${day.leaveType})` : ''}`
+      : day.autoCheckout ? 'Hệ thống tự chốt ca' : ''
+    const isWorkedHoliday = day.isHoliday && WORKING_SYMBOLS.has(day.symbol)
+    const rowBg = dt.getDay() === 0 ? 'FEF2F2' : (day.isHoliday ? 'FEF3C7' : (i % 2 ? 'F9FAFB' : WHITE))
+
+    const cells: (string | number)[] = [
+      `${String(dt.getDate()).padStart(2, '0')}/${String(month).padStart(2, '0')}`,
+      WEEKDAY_SHORT[dt.getDay()],
+      sym, ca,
+      fmtTimeHM(day.checkIn), fmtTimeHM(day.checkOut),
+      day.dayWorkUnits || '', day.lateMinutes || '', day.earlyLeaveMinutes || '', day.overtimeMinutes || '',
+      ghichu + (isWorkedHoliday ? ' · đi làm lễ (nghỉ bù)' : ''),
+    ]
+    cells.forEach((val, ci) => {
+      const c = row.getCell(ci + 1)
+      c.value = val
+      const fill = (ci === 2 && sym) ? (SYMBOL_FILL[day.symbol] || rowBg) : rowBg
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }
+      c.font = { name: 'Arial', size: 10, bold: ci === 2 && !!sym, color: { argb: ci === 2 ? (SYMBOL_FONT[day.symbol] || '374151') : '374151' } }
+      c.alignment = { horizontal: ci === 3 || ci === 10 ? 'left' : 'center', vertical: 'middle', wrapText: ci === 10 }
+      c.border = thinBorder
+    })
+    row.height = 17
+  })
+
+  // Dòng TỔNG
+  const totRn = start + emp.days.length
+  const tr = ws.getRow(totRn)
+  ws.mergeCells(totRn, 1, totRn, 6)
+  const tc = tr.getCell(1)
+  tc.value = 'TỔNG CỘNG'
+  tc.font = { name: 'Arial', size: 11, bold: true, color: { argb: BRAND_GREEN } }
+  tc.alignment = { horizontal: 'right', vertical: 'middle' }
+  tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } }
+  tc.border = thinBorder
+  const totVals: (string | number)[] = [emp.totalCong, emp.totalLateDays || '', emp.totalEarlyDays || '', Math.round(emp.totalOvertimeHours * 60) || '', '']
+  totVals.forEach((v, i) => {
+    const c = tr.getCell(7 + i)
+    c.value = v
+    c.font = { name: 'Arial', size: 11, bold: true, color: { argb: '1D4ED8' } }
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } }
+    c.alignment = { horizontal: 'center', vertical: 'middle' }
+    c.border = thinBorder
+  })
+  tr.height = 22
+
+  // Dòng tóm tắt
+  const sumRn = totRn + 2
+  ws.mergeCells(sumRn, 1, sumRn, COLS)
+  const sc = ws.getRow(sumRn).getCell(1)
+  sc.value = `Tổng công: ${emp.totalCong}  •  Đi làm: ${emp.totalWorkDays} ngày  •  Trễ: ${emp.totalLateDays}  •  Về sớm: ${emp.totalEarlyDays}  •  OT: ${emp.totalOvertimeHours}h  •  Vắng: ${emp.totalAbsentDays}  •  Phép: ${emp.totalLeaveDays}  •  Công tác: ${emp.totalBusinessTripDays}  •  Lễ: ${emp.totalHolidayDays}`
+  sc.font = { name: 'Arial', size: 10, italic: true, color: { argb: '374151' } }
+  sc.alignment = { horizontal: 'left' }
+
+  // Ký
+  const sigRn = sumRn + 3
+  const sigStyle = { font: { name: 'Arial', size: 11, italic: true, color: { argb: '6B7280' } }, alignment: { horizontal: 'center' as const } }
+  ws.getRow(sigRn).getCell(3).value = 'Người lao động'; ws.getRow(sigRn).getCell(3).style = sigStyle
+  ws.getRow(sigRn).getCell(8).value = 'Trưởng phòng'; ws.getRow(sigRn).getCell(8).style = sigStyle
+  const sigLineRn = sigRn + 3
+  ws.getRow(sigLineRn).getCell(3).value = '........................'; ws.getRow(sigLineRn).getCell(3).style = sigStyle
+  ws.getRow(sigLineRn).getCell(8).value = '........................'; ws.getRow(sigLineRn).getCell(8).style = sigStyle
+
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  saveAs(blob, `Cham_Cong_${emp.employeeCode || 'NV'}_${sanitizeName(emp.fullName)}_T${month}_${year}.xlsx`)
 }

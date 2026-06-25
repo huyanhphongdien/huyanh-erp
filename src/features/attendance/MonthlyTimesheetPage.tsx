@@ -219,7 +219,7 @@ export default function MonthlyTimesheetPage() {
         ) : (
           <div ref={tableRef} className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="border-collapse text-[12px]" style={{ minWidth: COL_STT + COL_NAME + daysInMonth * 36 + 160 }}>
+              <table className="border-collapse text-[12px]" style={{ width: '100%', minWidth: COL_STT + COL_NAME + daysInMonth * 36 + 160 }}>
                 <thead>
                   <tr className="bg-[#1B4D3E] text-white">
                     <th style={{ position: 'sticky', left: 0, zIndex: 12, width: COL_STT, minWidth: COL_STT, backgroundColor: '#1B4D3E' }}
@@ -227,7 +227,7 @@ export default function MonthlyTimesheetPage() {
                     <th style={{ position: 'sticky', left: COL_NAME_LEFT, zIndex: 12, width: COL_NAME, minWidth: COL_NAME, backgroundColor: '#1B4D3E', boxShadow: '2px 0 4px rgba(0,0,0,0.15)' }}
                       className="px-2 py-2 text-left border-r border-[#2D8B6E]">Họ và tên</th>
                     {dayHeaders.map(h => (
-                      <th key={h.day} className={`px-0 py-1.5 text-center border-l border-[#2D8B6E]/40 ${h.isWeekend ? 'bg-red-600' : ''}`} style={{ width: 36, minWidth: 36 }}>
+                      <th key={h.day} className={`px-0 py-1.5 text-center border-l border-[#2D8B6E]/40 ${h.isWeekend ? 'bg-red-600' : ''}`} style={{ minWidth: 36 }}>
                         <div className="text-[12px] font-bold">{String(h.day).padStart(2, '0')}</div>
                         <div className={`text-[9px] font-normal ${h.isWeekend ? 'text-red-100' : 'text-white/60'}`}>{h.weekday}</div>
                       </th>

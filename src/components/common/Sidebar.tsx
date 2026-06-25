@@ -112,6 +112,7 @@ interface MenuItem {
   managerOnly?: boolean;
   executiveOnly?: boolean;
   bgdOnly?: boolean;
+  adminOnly?: boolean;        // CHỈ Admin (vd Nhật ký kiểm toán tài chính) — ẩn kể cả khi mở group cho BGĐ/Kế toán
   requirePurchaseAccess?: boolean;
   requireB2BPurchaser?: boolean;
   approvalLevel?: boolean;
@@ -430,6 +431,7 @@ const getMenuGroups = (
       { path: '/finance/overview', label: 'Vay vốn (vay·lãi·gửi·ĐB)', icon: <CreditCard size={18} />, extraActivePaths: ['/finance/credit-lines', '/finance/loans', '/finance/interest', '/finance/collaterals', '/finance/deposits'] },
       { path: '/finance/receivables', label: 'Phải thu KH', icon: <DollarSign size={18} /> },
       { path: '/finance/cash', label: 'Tồn quỹ & phải nộp', icon: <Banknote size={18} /> },
+      { path: '/finance/audit-log', label: 'Nhật ký kiểm toán', icon: <History size={18} />, adminOnly: true },
     ],
   },
 
@@ -700,6 +702,7 @@ export function Sidebar() {
   // ── Permission checks — ★ CẬP NHẬT: thêm check requireB2BPurchaser ──
   const isItemVisible = (item: MenuItem): boolean => {
     if (isAdmin) return true;
+    if (item.adminOnly) return false;   // chỉ Admin (đã return true ở trên)
     if (item.managerOnly && !isManager) return false;
     if (item.executiveOnly && !isExecutive) return false;
     if (item.bgdOnly && !isBGD) return false;

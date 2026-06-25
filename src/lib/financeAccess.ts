@@ -27,3 +27,11 @@ export function isFinanceUser(user?: User | null): boolean {
     || code === 'HAP-KT'                     // Phòng Kế toán (theo mã)
     || dept.includes('kế toán')              // fallback theo tên
 }
+
+// CHỈ Admin — dùng cho Nhật ký kiểm toán tài chính (dữ liệu cực nhạy cảm).
+// Phải KHỚP fn_is_finance_admin() trong finance_audit_log_v1.sql (UI gate + DB RLS).
+export function isFinanceAdmin(user?: User | null): boolean {
+  if (!user) return false
+  const email = (user.email || '').toLowerCase()
+  return user.role === 'admin' || ADMIN_EMAILS.includes(email)
+}

@@ -12,13 +12,21 @@ const tbl = (rows) => `<table style="border-collapse:collapse;width:100%">
 ${rows.map((r) => `<tr><td style="border:1px solid #888;padding:5px">${r[0]}</td><td style="border:1px solid #888;padding:5px"><b>${r[1]}</b></td></tr>`).join('')}
 </table>`
 
+// ── NGÀY: quy đổi offset → NGÀY CỤ THỂ, lấy mốc = ngày tạo tài liệu ──
+const TODAY = new Date()
+const _pad = (x) => String(x).padStart(2, '0')
+const fmtD = (d) => `${_pad(d.getDate())}/${_pad(d.getMonth() + 1)}/${d.getFullYear()}`
+const dOff = (n) => new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + n)
+// "26/04/2026 (hôm nay − 60 ngày)" — value cell đã bold sẵn nên phần ghi chú để normal weight
+const Dt = (n) => `${fmtD(dOff(n))} <span style="color:#94a3b8;font-weight:normal">(${n === 0 ? 'hôm nay' : `hôm nay ${n > 0 ? '+' : '−'}${Math.abs(n)} ngày`})</span>`
+
 const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:'Segoe UI',Arial,sans-serif;font-size:11pt;line-height:1.5">
 
 ${h1('KỊCH BẢN TEST GIAO DIỆN — NHẬP 1 BỘ DỮ LIỆU ĐẦY ĐỦ')}
 <p style="color:#64748b"><i>Module Tài chính · Cao Su Huy Anh — đi hết quy trình từ Hạn mức → Khoản vay → Lãi/Trả nợ → Tiền gửi/Tài sản → Phải thu → Tồn quỹ → Dòng tiền.</i></p>
 
 <p style="background:#fff7ed;border-left:4px solid #ea580c;padding:6px 10px">
-<b>Trước khi nhập:</b> đăng nhập <b>minhld</b>. Các ô <b>ngày</b> nhập <b>lệch so với HÔM NAY</b> (chọn trên lịch): “+20” = hôm nay + 20 ngày; “−12” = hôm nay − 12 ngày. Muốn bắt đầu từ trống thì xoá dữ liệu cũ trước.</p>
+<b>Trước khi nhập:</b> đăng nhập <b>minhld</b>. Mọi ô <b>ngày</b> bên dưới đã ghi sẵn <b>ngày cụ thể</b> (mốc = ngày tạo tài liệu <b>${fmtD(TODAY)}</b>); phần in nhạt trong ngoặc cho biết ngày đó cách hôm nay bao xa — nếu test vào ngày khác, chọn lại theo công thức trong ngoặc. Muốn bắt đầu từ trống thì xoá dữ liệu cũ trước.</p>
 
 ${h2('BƯỚC 1 — Tạo HẠN MỨC (trục)')}
 ${path('Menu <b>Vay vốn</b> → tab <b>Hạn mức</b> → nút <b>“Thêm hạn mức”</b>')}
@@ -28,25 +36,25 @@ ${chk('Danh sách hiện hạn mức Vietcombank, <b>Room còn lại = 40 tỷ</
 ${h2('BƯỚC 2 — Tạo 2 KHOẢN VAY (rút từ hạn mức)')}
 ${path('tab <b>Khoản vay</b> → <b>“Thêm khoản vay”</b> — nhớ chọn <b>“Thuộc hạn mức (HĐTD)”</b> = VCB-2026-01')}
 <p><b>Khoản A</b> (để test đèn 🟢 An toàn):</p>
-${tbl([['Ngân hàng', 'Vietcombank'], ['Số khế ước', 'KU-001'], ['Thuộc hạn mức', 'VCB-2026-01'], ['Số vay (VNĐ)', '8.000.000.000'], ['Lãi suất', '6.4'], ['Ngày giải ngân', 'HÔM NAY − 60'], ['Ngày đến hạn', 'HÔM NAY + 20']])}
+${tbl([['Ngân hàng', 'Vietcombank'], ['Số khế ước', 'KU-001'], ['Thuộc hạn mức', 'VCB-2026-01'], ['Số vay (VNĐ)', '8.000.000.000'], ['Lãi suất', '6.4'], ['Ngày giải ngân', Dt(-60)], ['Ngày đến hạn', Dt(20)]])}
 <p><b>Khoản B</b> (để test đèn 🔴 Nhảy nhóm):</p>
-${tbl([['Ngân hàng', 'Vietcombank'], ['Số khế ước', 'KU-002'], ['Thuộc hạn mức', 'VCB-2026-01'], ['Số vay (VNĐ)', '2.000.000.000'], ['Lãi suất', '6.4'], ['Ngày giải ngân', 'HÔM NAY − 110'], ['Ngày đến hạn', 'HÔM NAY − 12']])}
+${tbl([['Ngân hàng', 'Vietcombank'], ['Số khế ước', 'KU-002'], ['Thuộc hạn mức', 'VCB-2026-01'], ['Số vay (VNĐ)', '2.000.000.000'], ['Lãi suất', '6.4'], ['Ngày giải ngân', Dt(-110)], ['Ngày đến hạn', Dt(-12)]])}
 ${chk('KU-001 đèn <b>🟢 An toàn</b>; KU-002 đèn <b>🔴 NGUY CƠ NHẢY NHÓM</b>. Vào lại tab Hạn mức: <b>Đang vay = 10 tỷ · Room = 30 tỷ</b>.')}
 
 ${h2('BƯỚC 3 — Sinh LỊCH TRẢ LÃI cho KU-001')}
 ${path('tab <b>Khoản vay</b> → bấm icon <b>%</b> ở dòng KU-001 → trong Drawer điền rồi bấm <b>“Sinh lịch”</b>')}
-${tbl([['Kỳ trả lãi', 'Hằng tháng'], ['Ngày trả (1–28)', '25'], ['Lãi suất %/năm', '6.4'], ['Từ ngày', 'ngày giải ngân (HÔM NAY − 60)'], ['Đến ngày', 'ngày đến hạn (HÔM NAY + 20)'], ['Dư nợ gốc', '8.000.000.000']])}
+${tbl([['Kỳ trả lãi', 'Hằng tháng'], ['Ngày trả (1–28)', '25'], ['Lãi suất %/năm', '6.4'], ['Từ ngày', `ngày giải ngân = ${Dt(-60)}`], ['Đến ngày', `ngày đến hạn = ${Dt(20)}`], ['Dư nợ gốc', '8.000.000.000']])}
 <p>Sau khi sinh: bấm <b>✓ “đã trả”</b> ở 1 kỳ cũ nhất để test ghi nhận trả lãi.</p>
 ${chk('Drawer hiện các kỳ lãi; menu <b>Lịch trả lãi</b> gom các kỳ; 1 kỳ trạng thái “Đã trả”.')}
 
 ${h2('BƯỚC 4 — GHI TRẢ NỢ cho KU-001')}
 ${path('tab <b>Khoản vay</b> → bấm icon <b>💲</b> ở dòng KU-001')}
-${tbl([['Ngày trả', 'HÔM NAY − 7'], ['Số tiền', '2.000.000.000'], ['Nguồn', 'Tiền hàng KH']])}
+${tbl([['Ngày trả', Dt(-7)], ['Số tiền', '2.000.000.000'], ['Nguồn', 'Tiền hàng KH']])}
 ${chk('Dư nợ KU-001 giảm còn <b>6 tỷ</b> (8 − 2).')}
 
 ${h2('BƯỚC 5 — TIỀN GỬI đảm bảo hạn mức')}
 ${path('tab <b>Tiền gửi</b> → <b>“Thêm HĐTG”</b> — chọn <b>“Đảm bảo cho HẠN MỨC”</b> = VCB-2026-01')}
-${tbl([['Ngân hàng', 'Vietcombank'], ['Số HĐTG', 'TG-01'], ['Số tiền (VNĐ)', '15.000.000.000'], ['Lãi suất', '4.7'], ['Kỳ hạn', '6 tháng'], ['Ngày gửi', 'HÔM NAY − 180'], ['Ngày đến hạn', 'HÔM NAY + 5'], ['Đảm bảo cho hạn mức', 'VCB-2026-01']])}
+${tbl([['Ngân hàng', 'Vietcombank'], ['Số HĐTG', 'TG-01'], ['Số tiền (VNĐ)', '15.000.000.000'], ['Lãi suất', '4.7'], ['Kỳ hạn', '6 tháng'], ['Ngày gửi', Dt(-180)], ['Ngày đến hạn', Dt(5)], ['Đảm bảo cho hạn mức', 'VCB-2026-01']])}
 ${chk('Có cảnh báo <b>“cần tái tục gấp”</b> (đáo hạn ≤7 ngày). Hạn mức VCB nhận đảm bảo 15 tỷ.')}
 
 ${h2('BƯỚC 6 — TÀI SẢN ĐẢM BẢO')}
@@ -56,12 +64,12 @@ ${chk('Vào tab <b>Hạn mức</b> → bấm dòng Vietcombank → Drawer hiện
 
 ${h2('BƯỚC 7 — PHẢI THU khách hàng (USD)')}
 ${path('Menu <b>Phải thu KH</b> → <b>“Thêm phải thu”</b> — Tiền tệ <b>USD</b>, ô “Hạn thu” để TRỐNG')}
-${tbl([['Khách hàng (Buyer)', 'EVERGREEN RUBBER PTE'], ['Số hợp đồng', 'HD-01'], ['Mặt hàng', 'SVR 10'], ['Tiền tệ', 'USD'], ['Giá trị', '200000'], ['ATD (tàu chạy thực)', 'HÔM NAY − 88'], ['Term (ngày)', '90']])}
+${tbl([['Khách hàng (Buyer)', 'EVERGREEN RUBBER PTE'], ['Số hợp đồng', 'HD-01'], ['Mặt hàng', 'SVR 10'], ['Tiền tệ', 'USD'], ['Giá trị', '200000'], ['ATD (tàu chạy thực)', Dt(-88)], ['Term (ngày)', '90']])}
 ${chk('Hạn thu tự tính = ATD + 90 → còn ~2 ngày (Trong hạn). Bảng tuổi nợ có số.')}
 
 ${h2('BƯỚC 8 — TỒN QUỸ ngân hàng')}
 ${path('Menu <b>Tồn quỹ &amp; phải nộp</b> → khối Tồn quỹ → <b>“Thêm TK”</b>')}
-${tbl([['Ngân hàng', 'Vietcombank'], ['Số dư VNĐ', '3.000.000.000'], ['Số dư USD', '6000'], ['Cập nhật ngày', 'HÔM NAY']])}
+${tbl([['Ngân hàng', 'Vietcombank'], ['Số dư VNĐ', '3.000.000.000'], ['Số dư USD', '6000'], ['Cập nhật ngày', Dt(0)]])}
 ${chk('Lưới tồn quỹ + dòng TỔNG có số.')}
 
 ${h2('BƯỚC 9 — KHOẢN PHẢI NỘP định kỳ')}

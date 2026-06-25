@@ -12,6 +12,16 @@ const tbl = (head, rows) => `<table style="border-collapse:collapse;width:100%">
 ${rows.map((r) => `<tr>${r.map((c) => `<td style="border:1px solid #888;padding:5px">${c}</td>`).join('')}</tr>`).join('')}
 </table>`
 
+// ── NGÀY: quy đổi offset → NGÀY CỤ THỂ, lấy mốc = ngày tạo tài liệu (new Date()) ──
+const TODAY = new Date()
+const _pad = (x) => String(x).padStart(2, '0')
+const fmtD = (d) => `${_pad(d.getDate())}/${_pad(d.getMonth() + 1)}/${d.getFullYear()}`
+const dOff = (n) => new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + n)
+// In ra "26/04/2026 (hôm nay − 60 ngày)" — vừa cụ thể vừa nói rõ cách lệch
+const D = (n) => `<b>${fmtD(dOff(n))}</b> <span style="color:#94a3b8">(${n === 0 ? 'hôm nay' : `hôm nay ${n > 0 ? '+' : '−'}${Math.abs(n)} ngày`})</span>`
+// Khối giải thích từng trường dưới mỗi bảng
+const fields = (items) => `<p style="margin:8px 0 2px;color:${G}"><b>📝 Giải thích từng trường:</b></p><ul style="margin-top:2px">${items.map(([k, v]) => `<li><b>${k}</b> — ${v}</li>`).join('')}</ul>`
+
 const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:'Segoe UI',Arial,sans-serif;font-size:11pt;line-height:1.5">
 
 ${h1('HƯỚNG DẪN QUY TRÌNH &amp; LUỒNG — MODULE TÀI CHÍNH')}
@@ -92,7 +102,8 @@ ${h3('Xuyên suốt toàn module')}
 </ul>
 
 ${h2('C. QUY TRÌNH NHẬP LIỆU ĐỂ TEST')}
-<p><b>Quy ước ngày:</b> các ô ngày nhập <b>lệch so với HÔM NAY</b> (chọn trên lịch). “+20” = hôm nay + 20 ngày; “−12” = hôm nay − 12 ngày.</p>
+<p style="background:#fff7ed;border-left:4px solid #ea580c;padding:7px 11px"><b>📅 Về NGÀY trong tài liệu:</b> mọi ngày bên dưới đã được <b>quy đổi sẵn thành ngày cụ thể</b>, lấy <b>mốc = ngày tạo tài liệu này (${fmtD(TODAY)})</b>. Phần in nhạt trong ngoặc — ví dụ <i>(hôm nay − 60 ngày)</i> — chỉ nói rõ ngày đó cách hôm nay bao xa. Nếu bạn nhập vào <b>một ngày khác</b>, hãy chọn lại ngày theo công thức trong ngoặc để đèn cảnh báo / tuổi nợ hiện <b>đúng như cột mô tả</b>.</p>
+<p>Dưới mỗi bảng có mục <b style="color:${G}">📝 Giải thích từng trường</b> — nêu rõ ý nghĩa &amp; định dạng cần nhập.</p>
 <p><b>THỨ TỰ BẮT BUỘC</b> (vì phụ thuộc nhau): ① Hạn mức → ② Khoản vay → ③ Tiền gửi → ④ Tài sản → ⑤ Phải thu → ⑥ Tồn quỹ → ⑦ Phải nộp → ⑧ Lịch lãi → ⑨ Trả nợ. <i>(Phải tạo Hạn mức trước vì Khoản vay/Tiền gửi/Tài sản phải CHỌN hạn mức.)</i></p>
 
 ${h3('① Hạn mức (Vay vốn → tab Hạn mức → “Thêm hạn mức”)')}
@@ -100,34 +111,69 @@ ${tbl(['Ngân hàng', 'Số HĐTD', 'Hạn mức (VNĐ)', 'Loại', 'Lãi suất
   ['Vietcombank', 'VCB-2026-01', '40.000.000.000', 'Vay vốn', '6.4'],
   ['ACB', 'ACB-2026-02', '20.000.000.000', 'Chiết khấu BCT', '6.9'],
 ])}
+${fields([
+  ['Ngân hàng', 'tên NH cấp hạn mức (theo hợp đồng tín dụng).'],
+  ['Số HĐTD', 'số <b>Hợp đồng tín dụng</b> do NH cấp — nhập đúng theo chứng từ; các phần sau (khoản vay, tiền gửi, tài sản) sẽ “chọn” đúng số này.'],
+  ['Hạn mức (VNĐ)', 'tổng tiền NH cho vay tối đa — coi như “bể” tín dụng. <b>Room</b> còn lại = Hạn mức − tổng đang vay.'],
+  ['Loại', 'bản chất hạn mức: Vay vốn / Chiết khấu bộ chứng từ / Bảo lãnh… (theo HĐTD).'],
+  ['Lãi suất (%/năm)', 'lãi suất gốc của hạn mức (mỗi khoản vay có thể ghi đè lãi suất riêng).'],
+  ['Trạng thái', 'để <b>Hiệu lực</b> thì mới rút vốn được.'],
+])}
 
 ${h3('② Khoản vay (tab Khoản vay → “Thêm khoản vay”) — nhớ chọn “Thuộc hạn mức”')}
-${tbl(['Ngân hàng', 'Số khế ước', 'Thuộc hạn mức', 'Số vay (VNĐ)', 'Giải ngân', 'Đến hạn', 'Đèn'], [
-  ['Vietcombank', 'KU-001', 'VCB-2026-01', '8.000.000.000', '−60', '+20', '🟢 An toàn'],
-  ['ACB', 'KU-002', 'ACB-2026-02', '3.000.000.000', '−80', '−2', '🟧 Quá hạn'],
-  ['Vietcombank', 'KU-003', 'VCB-2026-01', '2.000.000.000', '−110', '−12', '🔴 Nhảy nhóm'],
-  ['ACB', 'KU-004', 'ACB-2026-02', '5.000.000.000', '−85', '+5', '🟡 Sắp đến hạn'],
+${tbl(['Ngân hàng', 'Số khế ước', 'Thuộc hạn mức', 'Số vay (VNĐ)', 'Ngày giải ngân', 'Ngày đến hạn', 'Đèn dự kiến'], [
+  ['Vietcombank', 'KU-001', 'VCB-2026-01', '8.000.000.000', D(-60), D(20), '🟢 An toàn'],
+  ['ACB', 'KU-002', 'ACB-2026-02', '3.000.000.000', D(-80), D(-2), '🟧 Quá hạn'],
+  ['Vietcombank', 'KU-003', 'VCB-2026-01', '2.000.000.000', D(-110), D(-12), '🔴 Nhảy nhóm'],
+  ['ACB', 'KU-004', 'ACB-2026-02', '5.000.000.000', D(-85), D(5), '🟡 Sắp đến hạn'],
+])}
+${fields([
+  ['Số khế ước', 'số khế ước nhận nợ — mỗi lần giải ngân NH cấp 1 số riêng.'],
+  ['Thuộc hạn mức (HĐTD)', '<b>BẮT BUỘC chọn</b> hạn mức đã tạo ở bước ①; khoản vay “rút” từ đây làm <b>giảm Room</b>.'],
+  ['Số vay (VNĐ)', 'số tiền giải ngân lần này.'],
+  ['Ngày giải ngân', 'ngày NH chuyển tiền (trong quá khứ).'],
+  ['Ngày đến hạn', 'ngày phải trả gốc — <b>đây là mốc tính ĐÈN CIC</b>: quá hạn ≥ 10 ngày = nguy cơ nhảy nhóm.'],
+  ['Đèn dự kiến', 'KHÔNG nhập — hệ thống tự tô màu từ Ngày đến hạn so với hôm nay (cột này chỉ để bạn đối chiếu kết quả).'],
 ])}
 
 ${h3('③ Tiền gửi (tab Tiền gửi → “Thêm HĐTG”) — chọn “Đảm bảo cho HẠN MỨC”')}
-${tbl(['Ngân hàng', 'Số HĐTG', 'Số tiền (VNĐ)', 'Đảm bảo cho', 'Ngày gửi', 'Đến hạn', 'Trạng thái'], [
-  ['Vietcombank', 'TG-01', '15.000.000.000', 'VCB-2026-01', '−180', '+5', 'cần tái tục gấp'],
-  ['Vietcombank', 'TG-02', '10.000.000.000', 'VCB-2026-01', '−100', '+150', 'còn xa'],
-  ['ACB', 'TG-03', '2.000.000.000', 'ACB-2026-02', '−200', '−3', 'QUÁ HẠN tái tục'],
+${tbl(['Ngân hàng', 'Số HĐTG', 'Số tiền (VNĐ)', 'Đảm bảo cho', 'Ngày gửi', 'Ngày đến hạn', 'Trạng thái dự kiến'], [
+  ['Vietcombank', 'TG-01', '15.000.000.000', 'VCB-2026-01', D(-180), D(5), 'cần tái tục gấp'],
+  ['Vietcombank', 'TG-02', '10.000.000.000', 'VCB-2026-01', D(-100), D(150), 'còn xa'],
+  ['ACB', 'TG-03', '2.000.000.000', 'ACB-2026-02', D(-200), D(-3), 'QUÁ HẠN tái tục'],
+])}
+${fields([
+  ['Số HĐTG', 'số hợp đồng tiền gửi / sổ tiết kiệm.'],
+  ['Số tiền (VNĐ)', 'gốc gửi.'],
+  ['Đảm bảo cho', 'chọn <b>hạn mức được cầm cố</b> bằng sổ này (để <i>trống</i> nếu chỉ là tiền gửi sinh lãi, không cầm cố).'],
+  ['Ngày gửi / Ngày đến hạn', 'kỳ hạn sổ; hệ thống cảnh báo <b>“cần tái tục”</b> khi sắp/đã đáo hạn (≤ 7 ngày hoặc đã quá).'],
 ])}
 
 ${h3('④ Tài sản đảm bảo (tab Tài sản ĐB → “Thêm tài sản”)')}
-${tbl(['Tên tài sản', 'Loại', 'Đảm bảo cho', 'Định giá', 'Giá trị bảo đảm'], [
+${tbl(['Tên tài sản', 'Loại', 'Đảm bảo cho', 'Giá trị định giá', 'Giá trị bảo đảm'], [
   ['Nhà xưởng sản xuất khu A', 'Bất động sản', 'VCB-2026-01', '18.000.000.000', '12.600.000.000'],
 ])}
-<p><i>Cố ý KHÔNG thêm tài sản cho ACB → ACB thiếu đảm bảo (để test cảnh báo).</i></p>
+${fields([
+  ['Tên / Loại tài sản', 'mô tả tài sản thế chấp (nhà xưởng, máy móc, xe…).'],
+  ['Đảm bảo cho', 'hạn mức được thế chấp bằng tài sản này.'],
+  ['Giá trị định giá', 'giá trị thẩm định của tài sản.'],
+  ['Giá trị bảo đảm', 'mức NH chấp nhận làm tài sản bảo đảm (thường ~ 60–70% định giá).'],
+])}
+<p><i>Cố ý KHÔNG thêm tài sản cho ACB → ACB thiếu đảm bảo (để test cảnh báo “thiếu đảm bảo”).</i></p>
 
-${h3('⑤ Phải thu KH (“Thêm phải thu”) — Tiền tệ USD, Hạn thu để trống')}
-${tbl(['Khách hàng', 'Số HĐ', 'Giá trị (USD)', 'ATD', 'Term', 'Ngày tiền về', 'Tuổi nợ'], [
-  ['EVERGREEN RUBBER PTE', 'HD-01', '200000', '−88', '90', '(trống)', 'Trong hạn'],
-  ['PACIFIC LATEX CO', 'HD-02', '150000', '−100', '90', '(trống)', 'Quá 1–30'],
-  ['ORIENT TYRE LTD', 'HD-03', '100000', '−165', '90', '(trống)', 'Quá 61–90'],
-  ['SUMMIT TRADING LLC', 'HD-04', '95000', '−120', '90', '−15', 'Đã thu'],
+${h3('⑤ Phải thu KH (“Thêm phải thu”) — Tiền tệ USD, Hạn thu để TRỐNG')}
+${tbl(['Khách hàng', 'Số HĐ', 'Giá trị (USD)', 'ATD (tàu chạy)', 'Term', 'Hạn thu', 'Tuổi nợ dự kiến'], [
+  ['EVERGREEN RUBBER PTE', 'HD-01', '200000', D(-88), '90', '(để trống)', 'Trong hạn'],
+  ['PACIFIC LATEX CO', 'HD-02', '150000', D(-100), '90', '(để trống)', 'Quá 1–30'],
+  ['ORIENT TYRE LTD', 'HD-03', '100000', D(-165), '90', '(để trống)', 'Quá 61–90'],
+  ['SUMMIT TRADING LLC', 'HD-04', '95000', D(-120), '90', D(-15), 'Đã thu'],
+])}
+${fields([
+  ['Khách hàng (Buyer) / Số HĐ', 'bên mua + hợp đồng xuất khẩu.'],
+  ['Tiền tệ / Giá trị', 'chọn <b>USD</b> và nhập số tiền phải thu.'],
+  ['ATD', 'ngày tàu chạy thực (<i>Actual Time of Departure</i>) — mốc bắt đầu đếm hạn thu.'],
+  ['Term (ngày)', 'số ngày cho khách nợ (ví dụ 90).'],
+  ['Hạn thu', '<b>để TRỐNG</b> → hệ thống tự tính = ATD + Term; tuổi nợ tính từ ngày này. (Dòng “Đã thu” có nhập ngày tiền về để test trạng thái đã thu.)'],
 ])}
 
 ${h3('⑥ Tồn quỹ (“Thêm TK”)')}
@@ -136,18 +182,42 @@ ${tbl(['Ngân hàng', 'Số dư VNĐ', 'Số dư USD'], [
   ['MB Bank', '2.500.000.000', '4000'],
   ['ACB', '1.200.000.000', '0'],
 ])}
+${fields([
+  ['Ngân hàng', 'tài khoản ngân hàng.'],
+  ['Số dư VNĐ / USD', 'số dư hiện tại của từng tài khoản — đây là <b>điểm xuất phát</b> của Dòng tiền tổng hợp.'],
+  ['Cập nhật ngày', 'để mặc định HÔM NAY (ngày chốt số dư).'],
+])}
 
 ${h3('⑦ Phải nộp định kỳ (“Thêm khoản”)')}
-${tbl(['Tên', 'Nhóm', 'Ngày nộp', 'Số tiền ước'], [
+${tbl(['Tên', 'Nhóm', 'Ngày nộp (1–28)', 'Số tiền ước'], [
   ['Tiền điện nhà máy', 'Tiền điện', '12', '85.000.000'],
   ['Bảo hiểm tài sản', 'Bảo hiểm', '20', '45.000.000'],
 ])}
+${fields([
+  ['Tên / Nhóm', 'khoản chi định kỳ (điện, bảo hiểm, thuế…).'],
+  ['Ngày nộp (1–28)', '<b>ngày trong tháng</b> phải nộp (không phải ngày cụ thể) → hệ thống tự suy ra “kỳ tới”.'],
+  ['Số tiền ước', 'số tiền dự kiến mỗi kỳ — tính vào <b>tiền RA</b> của dòng tiền.'],
+])}
 
 ${h3('⑧ Lịch trả lãi — tab Khoản vay, bấm icon % ở dòng KU-001')}
-<p>Trong Drawer → bấm “Sinh lịch”: Kỳ trả lãi <b>Hằng tháng</b> · Ngày trả <b>25</b> · Lãi suất <b>6.4</b> · Từ ngày = ngày giải ngân · Đến ngày = ngày đến hạn · Dư nợ gốc <b>8.000.000.000</b>. Bấm ✓ “đã trả” một kỳ cũ để test.</p>
+<p>Trong Drawer → bấm “Sinh lịch”:</p>
+${fields([
+  ['Kỳ trả lãi', 'chọn <b>Hằng tháng</b>.'],
+  ['Ngày trả (1–28)', 'nhập <b>25</b> (ngày trong tháng trả lãi).'],
+  ['Lãi suất (%/năm)', 'nhập <b>6.4</b>.'],
+  ['Từ ngày', `= ngày giải ngân KU-001 = ${D(-60)}.`],
+  ['Đến ngày', `= ngày đến hạn KU-001 = ${D(20)}.`],
+  ['Dư nợ gốc', 'nhập <b>8.000.000.000</b>.'],
+])}
+<p>Sau khi sinh: bấm <b>✓ “đã trả”</b> ở một kỳ cũ nhất để test ghi nhận đã trả lãi.</p>
 
 ${h3('⑨ Ghi trả nợ — tab Khoản vay, bấm icon 💲 ở dòng KU-001')}
-<p>Ngày trả <b>−7</b> · Số tiền <b>2.000.000.000</b> → dư nợ KU-001 giảm còn 6 tỷ.</p>
+${fields([
+  ['Ngày trả', `nhập ${D(-7)}.`],
+  ['Số tiền', 'nhập <b>2.000.000.000</b>.'],
+  ['Nguồn (nếu có)', 'ví dụ “Tiền hàng KH”.'],
+])}
+<p>✅ Kết quả: dư nợ KU-001 giảm còn <b>6 tỷ</b> (8 − 2).</p>
 
 ${h2('D. CHECKLIST KIỂM TRA SAU KHI NHẬP')}
 ${tbl(['Màn hình', 'Sẽ thấy'], [

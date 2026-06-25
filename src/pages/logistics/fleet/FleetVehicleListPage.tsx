@@ -117,8 +117,8 @@ export default function FleetVehicleListPage() {
   const columns = useMemo(() => [
     { title: 'Biển số', dataIndex: 'plate', key: 'plate', fixed: 'left' as const, width: 130, render: (v: string) => <b>{v}</b> },
     { title: 'Loại', dataIndex: 'kind', key: 'kind', width: 100, render: (k: VehicleKind) => <Tag color={KIND_COLOR[k]}>{VEHICLE_KIND_LABELS[k]}</Tag> },
-    { title: 'Mã / Nhãn hiệu', key: 'brand', width: 160, render: (_: any, r: FleetVehicle) => <span>{[r.internal_code, r.brand].filter(Boolean).join(' · ') || '–'}</span> },
-    { title: 'Tài xế', key: 'driver', width: 150, render: (_: any, r: FleetVehicle) => r.default_driver?.full_name || (r.kind === 'tractor' ? <span style={{ color: '#e8a33d' }}>Chưa gắn</span> : '–') },
+    { title: 'Mã / Nhãn hiệu', key: 'brand', minWidth: 160, render: (_: any, r: FleetVehicle) => <span>{[r.internal_code, r.brand].filter(Boolean).join(' · ') || '–'}</span> },
+    { title: 'Tài xế', key: 'driver', minWidth: 150, render: (_: any, r: FleetVehicle) => r.default_driver?.full_name || (r.kind === 'tractor' ? <span style={{ color: '#e8a33d' }}>Chưa gắn</span> : '–') },
     { title: 'Trọng tải', key: 'cap', width: 110, render: (_: any, r: FleetVehicle) => r.capacity_kg ? `${r.capacity_kg.toLocaleString('vi-VN')} kg` : (r.capacity_note || '–') },
     { title: 'Đăng kiểm', dataIndex: 'inspection_expiry', key: 'insp', width: 120, render: (v: string) => expiryTag(v) },
     { title: 'Phù hiệu', dataIndex: 'badge_expiry', key: 'badge', width: 120, render: (v: string) => expiryTag(v) },
@@ -136,7 +136,7 @@ export default function FleetVehicleListPage() {
   ], [])
 
   return (
-    <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto', fontSize: 15 }}>
+    <div style={{ padding: 20, fontSize: 15 }}>
       <Breadcrumb style={{ marginBottom: 8 }} items={[
         { title: <a onClick={() => navigate('/logistics/dispatch')}>Vận tải</a> },
         { title: 'Đội xe' },

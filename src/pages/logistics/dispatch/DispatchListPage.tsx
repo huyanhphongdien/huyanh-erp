@@ -68,7 +68,7 @@ export default function DispatchListPage() {
   ]
 
   return (
-    <div style={{ padding: 20, maxWidth: 1680, margin: '0 auto', fontSize: 15 }}>
+    <div style={{ padding: 20, fontSize: 15 }}>
       <Breadcrumb style={{ marginBottom: 8 }} items={[{ title: 'Vận tải' }, { title: 'Lệnh điều động' }]} />
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>

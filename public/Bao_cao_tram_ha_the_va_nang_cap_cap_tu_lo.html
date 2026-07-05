@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo cáo — Bảo dưỡng trạm hạ thế & nâng cấp cáp tủ lò</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#ECEDEA;
+  --card:#FFFFFF;
+  --ink:#1E252C;
+  --ink-soft:#4E5A64;
+  --line:#D8DAD4;
+  --copper:#A8541F;
+  --copper-soft:#F3E4D8;
+  --steel:#2C3B49;
+  --danger:#B93326;
+  --ok:#2C6E49;
+  --ok-soft:#E2EFE6;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:'Be Vietnam Pro',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  font-size:15.5px;
+  line-height:1.65;
+}
+.wrap{max-width:520px;margin:0 auto;padding:0 16px 56px}
+@media(min-width:760px){.wrap{max-width:640px}}
+
+/* ---------- header ---------- */
+header{
+  background:var(--steel);
+  color:#EDEFF1;
+  margin:0 -16px;
+  padding:26px 22px 30px;
+  position:relative;
+  overflow:hidden;
+}
+@media(min-width:760px){header{margin:0;border-radius:0 0 14px 14px}}
+header::after{
+  content:"";position:absolute;inset:auto -30px -60px auto;
+  width:220px;height:220px;border-radius:50%;
+  border:26px solid var(--copper);opacity:.28;
+}
+.org{font-family:'Archivo',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#B7C2CB;margin-bottom:2px}
+.org b{color:#fff;font-weight:700}
+.doc-tag{
+  display:inline-block;margin:14px 0 10px;
+  font-family:'Archivo',sans-serif;font-weight:800;font-size:11px;
+  letter-spacing:.22em;text-transform:uppercase;
+  color:var(--steel);background:#E9B884;
+  padding:4px 10px;border-radius:3px;
+}
+h1{
+  font-family:'Archivo',sans-serif;font-weight:800;
+  font-size:23px;line-height:1.3;letter-spacing:-.01em;color:#fff;
+  position:relative;z-index:1;
+}
+.date{margin-top:12px;font-size:12.5px;color:#9FAFBB}
+.date b{color:#E9B884;font-weight:600}
+
+/* ---------- summary ---------- */
+.summary{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:12px;margin-top:-14px;position:relative;z-index:2;
+  padding:18px 18px 6px;box-shadow:0 6px 18px rgba(30,37,44,.08);
+}
+.summary h2{font-family:'Archivo',sans-serif;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--copper);margin-bottom:12px}
+.sum-item{display:flex;gap:12px;padding:10px 0 14px;border-top:1px solid var(--line)}
+.sum-item:first-of-type{border-top:none;padding-top:0}
+.sum-ico{
+  flex:0 0 34px;height:34px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+}
+.sum-ico.done{background:var(--ok-soft);color:var(--ok)}
+.sum-ico.warn{background:#F6E3DF;color:var(--danger)}
+.sum-ico.plan{background:var(--copper-soft);color:var(--copper)}
+.sum-item p{font-size:14px;line-height:1.55;color:var(--ink-soft)}
+.sum-item b{color:var(--ink);font-weight:600}
+
+/* ---------- sections ---------- */
+section{margin-top:34px}
+.sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.sec-num{
+  font-family:'Archivo',sans-serif;font-weight:800;font-size:13px;
+  color:#fff;background:var(--steel);
+  padding:3px 9px;border-radius:3px;flex:0 0 auto;
+}
+.sec-head h2{font-family:'Archivo',sans-serif;font-weight:700;font-size:17px;line-height:1.35;letter-spacing:-.01em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px}
+.card h3{font-size:14.5px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.badge{font-family:'Archivo',sans-serif;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+.badge.done{background:var(--ok-soft);color:var(--ok)}
+.badge.hold{background:#F0EAD9;color:#8A6A15}
+.card p, .card li{font-size:14px;color:var(--ink-soft)}
+.card ul{padding-left:18px;margin-top:6px}
+.card li{margin-bottom:6px}
+.card li::marker{color:var(--copper)}
+.note{
+  border-left:3px solid var(--copper);background:var(--copper-soft);
+  border-radius:0 10px 10px 0;padding:12px 14px;font-size:13.5px;
+  color:#5C4330;font-style:italic;margin-top:4px;
+}
+
+/* ---------- gauge (signature) ---------- */
+.gauge-card{background:var(--steel);color:#DCE3E8;border:none;border-radius:12px;padding:20px 18px;margin-bottom:12px}
+.gauge-card h3{color:#fff;font-family:'Archivo',sans-serif;font-size:14px;letter-spacing:.02em;margin-bottom:4px}
+.gauge-card .sub{font-size:12.5px;color:#93A3AF;margin-bottom:18px}
+.gauge{margin-bottom:20px}
+.gauge:last-child{margin-bottom:4px}
+.g-label{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px}
+.g-label b{font-family:'Archivo',sans-serif;font-weight:700;color:#fff}
+.g-val{font-family:'Archivo',sans-serif;font-weight:800}
+.g-val.bad{color:#F08A7E}
+.g-val.good{color:#8FD3A8}
+.track{position:relative;height:26px;background:#1C2733;border-radius:6px;overflow:hidden}
+.fill{
+  position:absolute;inset:0 auto 0 0;width:0;border-radius:6px;
+  transition:width 1.1s cubic-bezier(.25,.7,.3,1);
+}
+.fill.cap{background:linear-gradient(90deg,#5E7183,#8BA0B2)}
+.fill.load-bad{background:linear-gradient(90deg,#B93326,#E1604F)}
+.fill.load-ok{background:linear-gradient(90deg,#A8541F,#D07A3E)}
+.fill.cap-new{background:linear-gradient(90deg,#2C6E49,#4E9B70)}
+.tick{
+  position:absolute;top:-4px;bottom:-4px;width:2px;background:#F3C98B;
+}
+.tick span{
+  position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+  font-size:10px;font-family:'Archivo',sans-serif;font-weight:700;
+  color:#F3C98B;white-space:nowrap;
+}
+.g-cap{font-size:11.5px;color:#93A3AF;margin-top:6px}
+.verdict{
+  margin-top:16px;padding-top:14px;border-top:1px solid #3A4A59;
+  font-size:13.5px;color:#C8D2DA;
+}
+.verdict b{color:#F3C98B}
+
+/* ---------- cost table ---------- */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{
+  font-family:'Archivo',sans-serif;font-size:11px;font-weight:800;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);
+  text-align:left;padding:8px 6px;border-bottom:2px solid var(--steel);
+}
+th:last-child,td:last-child{text-align:right;white-space:nowrap}
+td{padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-soft)}
+td:last-child{font-family:'Archivo',sans-serif;font-weight:700;color:var(--ink)}
+tr.total td{
+  border-bottom:none;border-top:2px solid var(--steel);
+  font-weight:700;color:var(--ink);padding-top:12px;font-size:14px;
+}
+tr.total td:last-child{color:var(--copper);font-size:16px}
+.cost-note{font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:10px;line-height:1.55}
+
+/* ---------- timeline ---------- */
+.step{display:flex;gap:14px;position:relative;padding-bottom:18px}
+.step:last-child{padding-bottom:0}
+.step::before{
+  content:"";position:absolute;left:14px;top:30px;bottom:0;width:2px;background:var(--line);
+}
+.step:last-child::before{display:none}
+.step-n{
+  flex:0 0 30px;height:30px;border-radius:50%;
+  background:var(--steel);color:#fff;
+  font-family:'Archivo',sans-serif;font-weight:800;font-size:13px;
+  display:flex;align-items:center;justify-content:center;position:relative;z-index:1;
+}
+.step h4{font-size:14px;font-weight:700;margin-bottom:2px}
+.step p{font-size:13.5px;color:var(--ink-soft)}
+.step .t{font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;color:var(--copper);letter-spacing:.06em;text-transform:uppercase}
+
+/* ---------- approval ---------- */
+.approve{
+  background:linear-gradient(135deg,#2C3B49,#1E2A35);
+  color:#E6EAEE;border-radius:12px;padding:20px 18px;margin-top:14px;
+}
+.approve h3{font-family:'Archivo',sans-serif;color:#F3C98B;font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+.approve p{font-size:14px;line-height:1.6;color:#C8D2DA}
+.approve .money{
+  font-family:'Archivo',sans-serif;font-weight:800;font-size:26px;color:#fff;
+  margin:10px 0 2px;letter-spacing:-.01em;
+}
+.approve .money small{font-size:13px;font-weight:500;color:#93A3AF;letter-spacing:0}
+
+footer{
+  margin-top:36px;padding-top:16px;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;gap:12px;
+  font-size:12px;color:var(--ink-soft);
+}
+footer b{display:block;font-family:'Archivo',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin-bottom:2px}
+
+@media(prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="org"><b>CÔNG TY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN</b><br>Bộ phận Cơ điện · Kính gửi Ban Giám đốc</div>
+  <div class="doc-tag">Báo cáo</div>
+  <h1>Bảo dưỡng trạm hạ thế 1.250kVA &amp; phương án nâng cấp tuyến cáp tủ lò</h1>
+  <div class="date">Phong Điền, ngày <b>05/7/2026</b></div>
+</header>
+
+<div class="summary">
+  <h2>Tóm tắt cho lãnh đạo</h2>
+  <div class="sum-item">
+    <div class="sum-ico done">✓</div>
+    <p><b>Đã hoàn tất</b> vệ sinh, bảo dưỡng trạm hạ thế. Giữ mức điện áp 1 (235V), tạm hoãn nâng mức 2.</p>
+  </div>
+  <div class="sum-item">
+    <div class="sum-ico warn">!</div>
+    <p><b>Cáp cấp điện tủ lò đang quá tải:</b> tải 1.000–1.200A vượt khả năng cáp hiện hữu (~1.050A) — gây sụt áp, nhảy MCCB, nguy cơ cháy cáp.</p>
+  </div>
+  <div class="sum-item">
+    <div class="sum-ico plan">→</div>
+    <p><b>Đề xuất:</b> kéo thêm 1 sợi cáp đồng 300mm²/pha (200m). Kinh phí <b>≈ 230–280 triệu đồng</b>, thi công 4–6 giờ.</p>
+  </div>
+</div>
+
+<section>
+  <div class="sec-head"><span class="sec-num">I</span><h2>Công tác bảo dưỡng trạm hạ thế</h2></div>
+
+  <div class="card">
+    <h3>Vệ sinh công nghiệp trạm <span class="badge done">Hoàn tất</span></h3>
+    <p>Đã vệ sinh sứ cách điện, thanh cái, tủ phân phối; kiểm tra và siết lại các điểm đấu nối. Thiết bị sau vệ sinh hoạt động ổn định.</p>
+  </div>
+
+  <div class="card">
+    <h3>Mức chỉnh điện áp <span class="badge hold">Giữ mức 1 — 235V</span></h3>
+    <p>Ban đầu dự kiến nâng lên mức 2 (tăng ~6V) do nhận định hụt áp tại tủ lò xuất phát từ điện áp nguồn thấp. Sau phân tích:</p>
+    <ul>
+      <li>Nguyên nhân sụt áp là <b>tuyến cáp tủ lò quá tải</b>, không phải điện áp nguồn (phần II).</li>
+      <li>Tăng thêm ~6V có nguy cơ ảnh hưởng thiết bị điện toàn nhà máy — giảm tuổi thọ, hoạt động kém ổn định, nhất là thiết bị điện tử và động cơ.</li>
+    </ul>
+    <p style="margin-top:8px"><b>Quyết định: tạm hoãn nâng mức</b>, giữ nguyên mức 1; đánh giá lại sau khi nâng cấp tuyến cáp.</p>
+  </div>
+
+  <div class="note">Giải pháp xử lý sụt áp không thực hiện bằng cách nâng mức điện áp tại trạm, mà tập trung vào nâng cấp tuyến cáp cấp điện.</div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">II</span><h2>Hiện trạng &amp; nguyên nhân sự cố</h2></div>
+
+  <div class="gauge-card">
+    <h3>Tải tủ lò so với khả năng mang tải của cáp</h3>
+    <div class="sub">Tuyến ~65m · môi trường nhiệt độ cao khu lò</div>
+
+    <div class="gauge">
+      <div class="g-label"><b>Hiện tại — 2×300/pha</b><span class="g-val bad">QUÁ TẢI</span></div>
+      <div class="track">
+        <div class="fill cap" data-w="52%"></div>
+        <div class="fill load-bad" data-w="60%" style="height:12px;top:7px;border-radius:4px"></div>
+        <div class="tick" style="left:52%"><span>giới hạn ~1.050A</span></div>
+      </div>
+      <div class="g-cap">Thanh đỏ: tải thực tế 1.000–1.200A — vượt giới hạn cáp</div>
+    </div>
+
+    <div class="gauge">
+      <div class="g-label"><b>Sau nâng cấp — 3×300/pha</b><span class="g-val good">DỰ PHÒNG ~30%</span></div>
+      <div class="track">
+        <div class="fill cap-new" data-w="78%"></div>
+        <div class="fill load-ok" data-w="60%" style="height:12px;top:7px;border-radius:4px"></div>
+        <div class="tick" style="left:78%"><span>giới hạn ~1.550A</span></div>
+      </div>
+      <div class="g-cap">Cùng mức tải 1.200A nhưng còn dự phòng an toàn</div>
+    </div>
+
+    <div class="verdict">Máy biến áp 1.250kVA mới mang tải <b>~66%</b> — còn dư, không phải nguyên nhân. Sự cố sụt áp, phát nóng và nhảy MCCB do <b>cáp vận hành vượt giới hạn</b>.</div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">III</span><h2>Phương án nâng cấp</h2></div>
+  <div class="card">
+    <h3>Kéo thêm 01 sợi cáp đồng 300mm² mỗi pha</h3>
+    <p>Nâng hệ cáp từ 2×300 lên <b>3×300/pha</b>. Vật tư: <b>200m cáp</b> (3 pha × ~65m, gồm dự phòng). Sụt áp sau nâng cấp ước tính 1,5–2% — đạt yêu cầu.</p>
+    <ul>
+      <li>Sợi mới <b>cùng tiết diện, chủng loại, chiều dài, cùng tuyến</b> với 2 sợi cũ (không dùng cáp 240mm²).</li>
+      <li>Ưu tiên cáp <b>XLPE (CXV, chịu nhiệt 90°C)</b> thay PVC do khu lò nóng — chênh giá chỉ 3–5%.</li>
+      <li>Ép cos thủy lực; siết lại toàn bộ điểm đấu nối cũ, thay đầu cos có dấu hiệu quá nhiệt.</li>
+      <li>Sau đóng điện: đo dòng từng sợi (~350–400A/sợi), cân pha, soi nhiệt điểm nối sau 2–3 giờ đầy tải.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">IV</span><h2>Dự toán chi phí</h2></div>
+  <div class="card">
+    <table>
+      <tr><th>Hạng mục</th><th>SL</th><th>Thành tiền</th></tr>
+      <tr><td>Cáp đồng 300mm² 0,6/1kV (CXV/CV)</td><td>200m</td><td>220–260 tr</td></tr>
+      <tr><td>Đầu cos đồng 300mm²</td><td>08</td><td>1,6–2,4 tr</td></tr>
+      <tr><td>Vật tư phụ (co nhiệt, kẹp, bu lông…)</td><td>—</td><td>2–3 tr</td></tr>
+      <tr><td>Nhân công kéo cáp, đấu nối</td><td>—</td><td>8–15 tr</td></tr>
+      <tr class="total"><td colspan="2">Tổng (chưa VAT)</td><td>≈ 230–280 tr</td></tr>
+    </table>
+    <p class="cost-note">Giá cáp đồng biến động theo giá đồng thế giới. Sẽ lấy báo giá 2–3 đại lý cấp 1 (CADIVI, Trần Phú, LS Vina, Cadisun) để hưởng chiết khấu công trình 10–20%; yêu cầu đầy đủ CO/CQ.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">V</span><h2>Kế hoạch thi công</h2></div>
+  <div class="card">
+    <div class="step">
+      <div class="step-n">1</div>
+      <div><span class="t">3–7 ngày</span><h4>Duyệt phương án, đặt cáp</h4><p>Lấy báo giá cạnh tranh, đặt hàng 200m cáp.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n">2</div>
+      <div><span class="t">Chuẩn bị</span><h4>Kiểm tra tuyến</h4><p>Thang/máng cáp đủ chỗ cho sợi thứ 3, vệ sinh tuyến.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n">3</div>
+      <div><span class="t">Cắt điện 4–6 giờ</span><h4>Thi công (ca lò dừng)</h4><p>Kéo cáp, ép cos, đấu song song, siết lại điểm nối cũ.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n">4</div>
+      <div><span class="t">Nghiệm thu</span><h4>Đóng điện, đo kiểm</h4><p>Chạy tải tăng dần, đo dòng từng sợi, soi nhiệt điểm nối.</p></div>
+    </div>
+  </div>
+
+  <div class="approve">
+    <h3>Kiến nghị phê duyệt</h3>
+    <div class="money">230 – 280 triệu đồng <small>(chưa VAT)</small></div>
+    <p>Đề nghị Ban Giám đốc phê duyệt phương án và kinh phí để triển khai sớm, tránh nguy cơ <b style="color:#F08A7E">cháy cáp và gián đoạn sản xuất</b> do tuyến cáp đang vận hành quá tải.</p>
+  </div>
+</section>
+
+<footer>
+  <div><b>Phê duyệt của Ban Giám đốc</b>(Ký, ghi rõ họ tên)</div>
+  <div style="text-align:right"><b>Người báo cáo</b>(Ký, ghi rõ họ tên)</div>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var fills=document.querySelectorAll('.fill');
+  var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function show(el){el.style.width=el.getAttribute('data-w');}
+  if(reduced||!('IntersectionObserver' in window)){fills.forEach(show);return;}
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){if(e.isIntersecting){show(e.target);io.unobserve(e.target);}});
+  },{threshold:.4});
+  fills.forEach(function(f){io.observe(f);});
+})();
+</script>
+</body>
+</html>

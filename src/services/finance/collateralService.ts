@@ -30,7 +30,8 @@ export type FinCollateralInput = Partial<Omit<FinCollateral, 'id' | 'created_at'
 
 export const ASSET_TYPE_LABEL: Record<string, string> = {
   tscd: 'Tài sản cố định', bds: 'Bất động sản', xe: 'Phương tiện/Xe',
-  may_moc: 'Máy móc thiết bị', hang_ton: 'Hàng tồn kho', khac: 'Khác',
+  may_moc: 'Máy móc thiết bị', hang_ton: 'Hàng tồn kho',
+  quyen_doi_no: 'Quyền đòi nợ (khoản phải thu)', khac: 'Khác',
 }
 export const COLLATERAL_STATUS_LABEL: Record<CollateralStatus, string> = {
   active: 'Đang thế chấp', released: 'Đã giải chấp',

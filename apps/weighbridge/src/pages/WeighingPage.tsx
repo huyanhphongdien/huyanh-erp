@@ -138,7 +138,9 @@ export default function WeighingPage() {
 
   // Rubber fields
   // Đã gộp còn 4 loại nhập (bỏ Mủ đông → gộp nhóm Mủ tạp); default Mủ tạp.
-  const [rubberType, setRubberType] = useState<string>('mu_tap')
+  // KHÔNG mặc định loại mủ — bắt thợ cân chọn rõ ràng. Trước đây mặc định 'mu_tap'
+  // nên phiếu mủ nước bị ghi nhầm thành mủ tạp mỗi khi quên đổi (phải sửa bằng SQL).
+  const [rubberType, setRubberType] = useState<string>('')
   // XUẤT: xe về PD có thể chở NHIỀU loại mủ → chọn nhiều (lưu "mu_dong,mu_nuoc")
   const [outRubberTypes, setOutRubberTypes] = useState<string[]>([])
   // Phiếu cân KHÔNG nhập giá / DRC kỳ vọng. Giá giải tại Đề nghị thanh toán
@@ -482,6 +484,8 @@ export default function WeighingPage() {
       if (sourceType === 'deal' && !selectedDealId) { setError('Vui lòng chọn Deal nguồn'); return }
       if (sourceType === 'supplier' && !selectedSupplierId) { setError('Vui lòng chọn nhà cung cấp'); return }
       if (sourceType === 'partner_direct' && !directPartnerId) { setError('Mủ bộc phát phải gắn đại lý (để gom & tính thưởng) — vui lòng chọn đại lý'); return }
+      // Bắt buộc chọn LOẠI MỦ (không còn mặc định) — chọn nhầm sẽ sai lô nhập, thưởng và tiền.
+      if (!rubberType) { setError('Vui lòng chọn LOẠI MỦ (Mủ nước / Mủ tạp / …)'); return }
     }
     // TẠM BỎ ràng buộc gắn phiếu chuyển kho cho XUẤT — đang chốt quy trình cân
     // xuất 2 lần trước, chưa đụng tới phiếu/trừ kho. Bật lại khi xong quy trình:
@@ -681,11 +685,37 @@ export default function WeighingPage() {
     }
   }
 
-  async function handleComplete(skipDrcCheck = false) {
+  async function handleComplete(skipChecks = false) {
     if (!ticket) return
+    if (!skipChecks) {
+      // ⚠ CHỐNG CHỌN NHẦM LOẠI MỦ: ĐỐT/DRC chỉ tồn tại ở MỦ NƯỚC. Nếu phiếu có
+      // ĐỐT/DRC (ô nhập, hoặc thợ cân gõ tay vào Ghi chú vì card DRC không hiện)
+      // mà loại mủ KHÔNG phải mủ nước → gần như chắc chắn chọn nhầm.
+      // Chặn ở đây vì lô nhập (rubber_intake_batches) chỉ sinh khi HOÀN TẤT —
+      // lúc này vẫn đổi lại loại mủ được.
+      const drcInNotes = /(\bdrc\b|đốt|\bdot\b)/i.test(notes || '')
+      const wrongRubberType =
+        ticket.ticket_type === 'in' &&
+        rubberType !== 'mu_nuoc' &&
+        (drcInNotes || dotReading != null || actualDrc != null)
+      if (wrongRubberType) {
+        Modal.confirm({
+          title: '⚠ Loại mủ có thể bị chọn NHẦM',
+          content:
+            'Phiếu này có ĐỐT/DRC — mà ĐỐT/DRC chỉ dùng cho MỦ NƯỚC, còn Loại mủ đang chọn KHÔNG phải mủ nước. ' +
+            'Hãy quay lại đổi Loại mủ sang "💧 Mủ nước" (vẫn sửa được vì phiếu chưa hoàn tất). ' +
+            'Nếu vẫn hoàn tất sai, lô nhập + thưởng + tiền sẽ sai và phải nhờ admin sửa bằng SQL.',
+          okText: 'Vẫn hoàn tất',
+          okButtonProps: { danger: true },
+          cancelText: 'Quay lại đổi loại mủ',
+          onOk: () => handleComplete(true),
+        })
+        return
+      }
+    }
     // Guard Tân Lâm: phiếu mủ nước IN cần ĐỐT + DRC để tính KL khô. Hoàn tất mà
     // thiếu DRC → mất dữ liệu quan trọng. Cảnh báo trước, cho phép vẫn hoàn tất.
-    if (!skipDrcCheck) {
+    if (!skipChecks) {
       const missingDrc =
         ticket.ticket_type === 'in' &&
         (rubberType === 'mu_nuoc' || dotReading != null) &&
@@ -1553,12 +1583,25 @@ export default function WeighingPage() {
                   <div>
                     <Divider style={{ margin: '4px 0 10px' }} />
                     <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Loại mủ <span style={{ color: '#94a3b8' }}>(1 chạm — dùng cho cả phiếu &amp; gom bonus)</span>
+                      Loại mủ <span style={{ color: '#dc2626', fontWeight: 700 }}>*</span>{' '}
+                      <span style={{ color: '#94a3b8' }}>(bắt buộc — lái cả lô nhập, thưởng &amp; tiền. Sửa được tới khi HOÀN TẤT)</span>
                     </Text>
                     <Radio.Group
                       value={rubberType}
-                      onChange={(e) => setRubberType(e.target.value)}
-                      disabled={!isCreate}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setRubberType(v)
+                        // Phiếu ĐÃ tạo nhưng CHƯA hoàn tất → lưu lại ngay. An toàn vì lô nhập
+                        // (rubber_intake_batches) chỉ sinh lúc HOÀN TẤT → thợ cân tự sửa được
+                        // nếu lỡ chọn nhầm, khỏi phải nhờ admin chạy SQL.
+                        if (ticket && ticket.status !== 'completed') {
+                          saveRubberFields(ticket.id, {
+                            rubber_type: v,
+                            price_unit: v === 'mu_nuoc' ? 'dry' : 'wet',
+                          }).catch((err: any) => setError('Lưu loại mủ lỗi: ' + (err?.message || '')))
+                        }
+                      }}
+                      disabled={ticket?.status === 'completed'}
                       buttonStyle="solid"
                       style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 8 }}
                     >

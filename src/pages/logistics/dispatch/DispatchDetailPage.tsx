@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
-  dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS,
+  dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS, isContainerTrip,
   type DispatchOrder, type DispatchLine, type DispatchStatus,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
@@ -96,7 +96,8 @@ export default function DispatchDetailPage() {
   }
 
   // Đi cảng = bảng container đầy đủ. Chuyến nội bộ/thường = bảng gọn (hành trình · nội dung · KL · ghi chú).
-  const isPort = order.trip_type === 'port'
+  const isPort = isContainerTrip(order.trip_type)
+  const isTrading = order.trip_type === 'trading'
   const colWeighed = {
     // Chỉ cần đánh dấu "Đã cân" — số cân (gồm pallet/bao bì) để nhỏ tham khảo, KHÔNG so với kế hoạch.
     title: 'Cân hàng', dataIndex: 'actual_weight_kg', width: 130, align: 'right' as const,
@@ -149,12 +150,19 @@ export default function DispatchDetailPage() {
           <Space wrap>
             {lines.some(l => l.actual_weight_kg == null) && (
               <Popconfirm
-                title="Đánh dấu lệnh này đã cân?"
-                description="Các container chưa cân sẽ được đánh dấu Đã cân → Đơn hàng bán tự cập nhật giao hàng."
-                okText="Đã cân" cancelText="Huỷ"
+                // Hàng thương mại bốc ở nhà máy NGOÀI → xe KHÔNG qua trạm cân Huy Anh →
+                // actual_weight_kg mãi NULL → Đơn hàng bán sẽ mãi báo "còn thiếu".
+                // Nút này là lối duy nhất để chốt đã giao → phải nói rõ cho người dùng.
+                title={isTrading ? 'Đánh dấu ĐÃ GIAO (hàng bốc ngoài)?' : 'Đánh dấu lệnh này đã cân?'}
+                description={isTrading
+                  ? 'Hàng thương mại không qua trạm cân Huy Anh. Bấm nút này thì Đơn hàng bán mới trừ vào "Còn thiếu (tấn)".'
+                  : 'Các container chưa cân sẽ được đánh dấu Đã cân → Đơn hàng bán tự cập nhật giao hàng.'}
+                okText={isTrading ? 'Đã giao' : 'Đã cân'} cancelText="Huỷ"
                 onConfirm={doMarkWeighed}
               >
-                <Button type="primary" ghost loading={weighing} icon={<CheckCircleOutlined />}>Đánh dấu đã cân</Button>
+                <Button type="primary" ghost loading={weighing} icon={<CheckCircleOutlined />}>
+                  {isTrading ? 'Đánh dấu ĐÃ GIAO (bốc ngoài)' : 'Đánh dấu đã cân'}
+                </Button>
               </Popconfirm>
             )}
             <Button icon={<PrinterOutlined />} onClick={() => window.open(`/logistics/dispatch/${id}/print?doc=order`, '_blank')}>In lệnh điều động</Button>
@@ -192,6 +200,12 @@ export default function DispatchDetailPage() {
             : <Tag color="green">Đội xe nhà</Tag>}</Descriptions.Item>
           <Descriptions.Item label="Khách hàng">{order.customer_name || '–'}</Descriptions.Item>
           <Descriptions.Item label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}>{order.destination || '–'}</Descriptions.Item>
+          {(order.pickup_location || order.pickup_contact) && (
+            <Descriptions.Item label="📦 Điểm BỐC hàng">
+              <b>{order.pickup_location || '–'}</b>
+              {order.pickup_contact ? <span style={{ color: '#64748b' }}> — LH: {order.pickup_contact}</span> : null}
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label="Căn cứ HĐ / Booking">{order.contract_ref || '–'}</Descriptions.Item>
           <Descriptions.Item label="Người nhận">{order.recipient_name || '–'}</Descriptions.Item>
           <Descriptions.Item label="SĐT người nhận">{order.recipient_phone || '–'}</Descriptions.Item>

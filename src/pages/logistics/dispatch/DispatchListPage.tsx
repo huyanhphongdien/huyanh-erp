@@ -11,7 +11,7 @@ import {
 import { PlusOutlined, ReloadOutlined, SendOutlined, TruckOutlined, CarOutlined, IdcardOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
-  dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS,
+  dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS, isContainerTrip,
   type DispatchOrder, type DispatchStatus,
 } from '../../../services/logistics/dispatchService'
 
@@ -61,7 +61,7 @@ export default function DispatchListPage() {
     {
       // Đi cảng: số container. Chuyến khác: số dòng hành trình → nhãn trung tính.
       title: 'Cont/Dòng', dataIndex: 'total_lines', key: 'lines', width: 80, align: 'center' as const,
-      render: (v: number, r: DispatchOrder) => (r.trip_type === 'port' ? (v || 0) : (v ? v : '–')),
+      render: (v: number, r: DispatchOrder) => (isContainerTrip(r.trip_type) ? (v || 0) : (v ? v : '–')),
     },
     { title: 'KL (kg)', dataIndex: 'total_weight', key: 'w', width: 110, align: 'right' as const, render: (v: number) => v ? v.toLocaleString('vi-VN') : '–' },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130, render: (s: DispatchStatus) => <Tag color={STATUS_COLOR[s]}>{DISPATCH_STATUS_LABELS[s]}</Tag> },

@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase'
 import type { FleetVehicle, FleetDriver } from './fleetService'
 
 export type DispatchStatus = 'draft' | 'dispatched' | 'in_transit' | 'completed' | 'cancelled'
-export type TripType = 'port' | 'lao' | 'internal' | 'other'
+export type TripType = 'port' | 'lao' | 'internal' | 'other' | 'trading'
 
 export const DISPATCH_STATUS_LABELS: Record<DispatchStatus, string> = {
   draft: 'Nháp',
@@ -21,10 +21,23 @@ export const DISPATCH_STATUS_LABELS: Record<DispatchStatus, string> = {
 
 export const TRIP_TYPE_LABELS: Record<TripType, string> = {
   port: 'Xuất hàng đi cảng',
+  trading: 'Hàng thương mại',      // mua của nhà máy khác → bốc TẠI NHÀ MÁY ĐÓ → giao khách
   lao: 'Đi Lào',
   internal: 'Nội bộ',
   other: 'Khác',
 }
+
+/**
+ * Chuyến CHỞ CONTAINER → dùng bảng cont/seal đầy đủ + gắn được Đơn hàng bán.
+ *  - 'port'    = hàng nhà, bốc tại kho Huy Anh → cảng.
+ *  - 'trading' = hàng thương mại: mua của nhà máy khác → bốc TẠI NHÀ MÁY ĐÓ → giao khách.
+ * Các loại còn lại (lao/internal/other) = chuyến thường → bảng gọn.
+ * ⚠ Dùng helper này thay cho `trip_type === 'port'` ở MỌI page — nếu không, chọn
+ *   'trading' sẽ mất bảng container + nút "Tạo từ Đơn hàng bán".
+ */
+export const CONTAINER_TRIP_TYPES: TripType[] = ['port', 'trading']
+export const isContainerTrip = (t?: TripType | string | null): boolean =>
+  CONTAINER_TRIP_TYPES.includes((t ?? 'port') as TripType)
 
 export interface DispatchOrder {
   id: string
@@ -49,6 +62,8 @@ export interface DispatchOrder {
   contract_ref: string | null
   customer_name: string | null
   destination: string | null
+  pickup_location: string | null   // điểm BỐC hàng (null = kho Huy Anh)
+  pickup_contact: string | null    // người/SĐT tại điểm bốc
   recipient_name: string | null
   recipient_phone: string | null
   sales_order_id: string | null
@@ -116,6 +131,8 @@ export interface CreateDispatchInput {
   contract_ref?: string | null
   customer_name?: string | null
   destination?: string | null
+  pickup_location?: string | null
+  pickup_contact?: string | null
   recipient_name?: string | null
   recipient_phone?: string | null
   sales_order_id?: string | null
@@ -265,6 +282,11 @@ async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
       contract_ref: input.contract_ref || null,
       customer_name: input.customer_name || null,
       destination: input.destination || null,
+      // Chỉ gửi khi CÓ giá trị: nếu code lỡ deploy trước khi chạy migration
+      // dispatch_pickup_location.sql, payload không mang key lạ → PostgREST không
+      // báo PGRST204 "column not found" làm chết TOÀN BỘ việc tạo lệnh điều động.
+      ...(input.pickup_location ? { pickup_location: input.pickup_location } : {}),
+      ...(input.pickup_contact ? { pickup_contact: input.pickup_contact } : {}),
       recipient_name: input.recipient_name || null,
       recipient_phone: input.recipient_phone || null,
       sales_order_id: input.sales_order_id || null,
@@ -298,7 +320,9 @@ async function update(
   patch: Partial<CreateDispatchInput> & { tractor_vehicle_id?: string | null; trailer_vehicle_id?: string | null; driver_id?: string | null }
 ): Promise<DispatchOrder> {
   const out: Record<string, any> = {}
+  // update() an toàn sẵn: chỉ set key khi patch có mặt (!== undefined).
   const keys = ['dispatch_date', 'trip_type', 'reason', 'contract_ref', 'customer_name', 'destination',
+    'pickup_location', 'pickup_contact',
     'recipient_name', 'recipient_phone', 'sales_order_id', 'note', 'is_hired', 'hire_company', 'hire_cost'] as const
   for (const k of keys) {
     if ((patch as any)[k] !== undefined) out[k] = (patch as any)[k] === '' ? null : (patch as any)[k]

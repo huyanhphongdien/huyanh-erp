@@ -12,7 +12,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
 import {
-  dispatchService, TRIP_TYPE_LABELS,
+  dispatchService, TRIP_TYPE_LABELS, isContainerTrip,
   type DispatchOrder, type DispatchLine,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
@@ -132,7 +132,7 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
   const totalGW = lines.reduce((s, l) => s + (l.gross_weight_kg || 0), 0)
   const totalPkg = lines.reduce((s, l) => s + (l.package_count || 0), 0)
   // Đi cảng = mẫu container/seal đầy đủ. Chuyến nội bộ/thường = mẫu gọn có cột Hành trình.
-  const isPort = order.trip_type === 'port'
+  const isPort = isContainerTrip(order.trip_type)
   return (
     <div style={{ fontFamily: "'Be Vietnam Pro', 'Segoe UI', Tahoma, Arial, sans-serif", fontSize: 12.5, color: '#111' }}>
       <CompanyHeader />
@@ -167,6 +167,13 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
               <td>Khách hàng: <strong>{order.customer_name || '..............................'}</strong></td>
               <td>Điểm giao / Cảng: <strong>{order.destination || '..............................'}</strong></td>
             </tr>
+            {/* Hàng thương mại: xe bốc ở NHÀ MÁY KHÁC → tài xế phải biết bốc ở đâu, gọi cho ai. */}
+            {(order.pickup_location || order.pickup_contact) && (
+              <tr>
+                <td>Điểm BỐC hàng: <strong>{order.pickup_location || '..............................'}</strong></td>
+                <td>Liên hệ tại điểm bốc: <strong>{order.pickup_contact || '..............................'}</strong></td>
+              </tr>
+            )}
             <tr>
               <td>Căn cứ HĐ / Booking: <strong>{order.contract_ref || '..............................'}</strong></td>
               <td>Lý do điều động: {order.reason || '..............................'}</td>
@@ -384,6 +391,10 @@ function HandoverSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps
         <div>- Tình trạng hàng hóa: Đảm bảo chất lượng và số lượng hàng hoá.</div>
         <div>- Yêu cầu trong quá trình vận chuyển: Cao su phải được che đậy cẩn thận, tránh mưa, nắng, các hóa chất, xăng, dầu và lẫn lộn với các hàng hóa khác.</div>
         <div>- Bên giao hàng không chịu trách nhiệm về hàng hoá khi đã giao cho bên nhận.</div>
+        {(order.pickup_location || order.pickup_contact) && (
+          <div>- Địa điểm BỐC hàng: <strong>{order.pickup_location || '..........................'}</strong>
+            {order.pickup_contact ? <> — Liên hệ: <strong>{order.pickup_contact}</strong></> : null}</div>
+        )}
         <div>- Địa điểm giao hàng: <strong>{order.destination || '..........................'}</strong></div>
         <div>- Người nhận hàng: <strong>{order.recipient_name || '..................'}</strong> {order.recipient_phone ? `- SĐT: ${order.recipient_phone}` : ''}</div>
         <div style={{ marginTop: 6 }}>Biên bản được lập thành 02 bản, có giá trị như nhau mỗi bên giữ 01 bản.</div>

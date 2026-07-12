@@ -9,13 +9,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Card, Form, Select, Input, AutoComplete, DatePicker, Button, Space, Typography, Row, Col,
-  Table, InputNumber, message, Breadcrumb, Divider, Tag, Modal, Empty, Segmented,
+  Table, InputNumber, message, Breadcrumb, Divider, Tag, Modal, Empty, Segmented, Alert,
 } from 'antd'
 import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ImportOutlined, TruckOutlined, CarOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { fleetService, VEHICLE_KIND_LABELS, type FleetVehicle, type FleetDriver } from '../../../services/logistics/fleetService'
 import {
-  dispatchService, TRIP_TYPE_LABELS,
+  dispatchService, TRIP_TYPE_LABELS, isContainerTrip,
   type TripType, type DispatchLineInput, type SalesOrderOption,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
@@ -54,6 +54,14 @@ const ROUTE_PRESETS = [
   'Kho Phong Điền → Cảng Chu Lai',
   'Kho Quảng Trị → Cảng Tiên Sa',
   'Kho Quảng Trị → Kho Phong Điền',
+].map(v => ({ value: v }))
+// Gợi ý điểm BỐC hàng (vẫn gõ tự do được) — dùng cho hàng thương mại mua ngoài.
+const PICKUP_PRESETS = [
+  'Kho Phong Điền (kho nhà)',
+  'Kho Quảng Trị (kho nhà)',
+  'Nhà máy Cao su Quảng Trị',
+  'Nhà máy Cao su Hương Khê',
+  'Nhà máy Cao su Nam Đông',
 ].map(v => ({ value: v }))
 const GRADE_PRESETS = ['SVR 10', 'SVR 3L', 'SVR L', 'SVR 5', 'SVR 20', 'SVR CV50', 'SVR CV60', 'RSS 1', 'RSS 3', 'Latex 60'].map(v => ({ value: v }))
 const acFilter = (input: string, opt?: { value: string }) => (opt?.value || '').toLowerCase().includes(input.toLowerCase())
@@ -136,6 +144,8 @@ export default function DispatchCreatePage() {
           contract_ref: order.contract_ref,
           customer_name: order.customer_name,
           destination: order.destination,
+          pickup_location: order.pickup_location,
+          pickup_contact: order.pickup_contact,
           recipient_name: order.recipient_name,
           recipient_phone: order.recipient_phone,
           note: order.note,
@@ -308,8 +318,9 @@ export default function DispatchCreatePage() {
         contract_ref: v.contract_ref || null,
         customer_name: v.customer_name || null,
         destination: v.destination || null,
+        pickup_location: v.pickup_location || null,
+        pickup_contact: v.pickup_contact || null,
         recipient_name: v.recipient_name || null,
-        recipient_phone: v.recipient_phone || null,
         sales_order_id: v.sales_order_id || null,
         note: v.note || null,
       }
@@ -342,7 +353,10 @@ export default function DispatchCreatePage() {
   // Loại chuyến: 'port' = đi cảng (đủ cột container/seal + gắn Đơn hàng bán).
   // Khác (lao/internal/other) = chuyến thường (chở mủ, vật tư, nội bộ) → bảng GỌN.
   const watchedTripType = Form.useWatch('trip_type', form) as TripType | undefined
-  const isPort = (watchedTripType ?? 'port') === 'port'
+  // isPort = "chế độ container" (bảng cont/seal + gắn Đơn hàng bán). 'trading' cũng chở
+  // container ra cảng, chỉ khác ĐIỂM BỐC → phải tính là true, nếu không bảng cont biến mất.
+  const isPort = isContainerTrip(watchedTripType)
+  const isTrading = watchedTripType === 'trading'
   const isHired = Form.useWatch('is_hired', form) === true   // xe thuê ngoài
 
   // Ô xe chính LỌC THEO LOẠI CHUYẾN (phiếu):
@@ -429,8 +443,12 @@ export default function DispatchCreatePage() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={8} md={6}>
-              <Form.Item name="trip_type" label="Loại chuyến" rules={[{ required: true }]}>
-                <Select options={(['port', 'lao', 'internal', 'other'] as TripType[]).map(t => ({ value: t, label: TRIP_TYPE_LABELS[t] }))} />
+              <Form.Item
+                name="trip_type" label="Loại chuyến" rules={[{ required: true }]}
+                extra={isTrading ? 'Mua của nhà máy khác → xe bốc TẠI NHÀ MÁY ĐÓ' : undefined}
+              >
+                <Select options={(['port', 'trading', 'lao', 'internal', 'other'] as TripType[])
+                  .map(t => ({ value: t, label: TRIP_TYPE_LABELS[t] }))} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={8} md={13}>
@@ -531,6 +549,30 @@ export default function DispatchCreatePage() {
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}><Form.Item name="customer_name" label="Khách hàng"><Input /></Form.Item></Col>
             <Col xs={24} sm={12} md={8}><Form.Item name="destination" label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}><Input placeholder={isPort ? 'Cảng Tiên Sa' : 'vd: Gio Linh / Kho Quảng Trị'} /></Form.Item></Col>
+            {/* Điểm BỐC hàng — bắt buộc với hàng thương mại (xe bốc ở nhà máy ngoài). */}
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                name="pickup_location"
+                label={<>📦 Điểm BỐC hàng {isTrading ? <span style={{ color: '#dc2626' }}>*</span> : <span style={{ color: '#94a3b8', fontWeight: 400 }}>(bỏ trống = kho Huy Anh)</span>}</>}
+                rules={isTrading ? [{ required: true, message: 'Hàng thương mại phải ghi rõ bốc ở đâu' }] : []}
+              >
+                <AutoComplete options={PICKUP_PRESETS} filterOption={acFilter as any}
+                  placeholder="vd: Nhà máy Cao su Quảng Trị" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="pickup_contact" label="Liên hệ tại điểm bốc">
+                <Input placeholder="vd: A. Hùng — 0905 xxx xxx" />
+              </Form.Item>
+            </Col>
+            {isTrading && (
+              <Col xs={24}>
+                <Alert type="warning" showIcon style={{ marginBottom: 8 }}
+                  message="Hàng thương mại (mua nhà máy ngoài)"
+                  description={<>Xe bốc ở <b>nhà máy khác</b>, <b>không qua trạm cân Huy Anh</b>. Sau khi giao xong, vào chi tiết lệnh bấm <b>“Đánh dấu ĐÃ GIAO (bốc ngoài)”</b> — nếu không, Đơn hàng bán sẽ mãi báo <b>“Còn thiếu”</b>.</>}
+                />
+              </Col>
+            )}
             <Col xs={24} sm={12} md={8}><Form.Item name="contract_ref" label="Căn cứ HĐ / Booking"><Input /></Form.Item></Col>
             <Col xs={24} sm={12} md={8}><Form.Item name="recipient_name" label="Người nhận"><Input /></Form.Item></Col>
             <Col xs={24} sm={12} md={8}><Form.Item name="recipient_phone" label="SĐT người nhận"><Input /></Form.Item></Col>

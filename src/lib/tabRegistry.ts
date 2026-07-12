@@ -154,3 +154,20 @@ registerTabComponent('sales-customer-detail', CustomerDetailPage)
 
 const DispatchDetailPage = lazy(() => import('../pages/logistics/dispatch/DispatchDetailPage'))
 registerTabComponent('dispatch-detail', DispatchDetailPage)
+
+// ===== ĐƠN HÀNG BÁN — các trang DANH SÁCH (mở thành tab như B2B) =====
+// Trước đây chỉ có trang chi tiết, nên bấm menu Đơn hàng là điều hướng đè trang:
+// đang xem lệnh điều động mà quay lại đơn hàng là mất tab. Đăng ký list vào tab
+// để mở song song, không đè nhau.
+
+const SalesOrderListPage = lazy(() => import('../pages/sales/SalesOrderListPage'))
+registerTabComponent('sales-order-list', SalesOrderListPage)
+
+const SalesDashboardPage = lazy(() => import('../pages/sales/SalesDashboardPage'))
+registerTabComponent('sales-dashboard', SalesDashboardPage)
+
+const CustomerListPage = lazy(() => import('../pages/sales/CustomerListPage'))
+registerTabComponent('sales-customer-list', CustomerListPage)
+
+const SalesKanbanPage = lazy(() => import('../pages/sales/SalesKanbanPage'))
+registerTabComponent('sales-kanban', SalesKanbanPage)

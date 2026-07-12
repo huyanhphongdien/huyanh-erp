@@ -14,7 +14,7 @@ import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '../../../services/sale
 import SalesOrderDetailPanel from './SalesOrderDetailPanel'
 import { getSLAStatus } from '../../../services/sales/salesStages'
 import type { SalesStage } from '../../../services/sales/salesStages'
-import type { LotProgress } from '../../../services/logistics/dispatchService'
+import { remainingTons, type LotProgress } from '../../../services/logistics/dispatchService'
 import LotProgressBadge from '../../../components/sales/LotProgressBadge'
 
 const PRIMARY = '#1B4D3E'
@@ -274,6 +274,15 @@ function OrderItem({ order, selected, onClick, lp }: {
         <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4, display: 'flex',
                        gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>📦 {order.grade || '—'} · {(order.quantity_tons || 0).toFixed(2)}MT</span>
+          {/* Còn thiếu (tấn) — cùng công thức với dạng Bảng & file Excel. */}
+          {order.status !== 'cancelled' && (() => {
+            const rem = remainingTons(order.quantity_tons, lp, order.status)
+            return rem > 0
+              ? <><span style={{ color: '#d9d9d9' }}>·</span>
+                  <span style={{ color: '#dc2626', fontWeight: 700 }}>còn thiếu {rem.toFixed(2)}T</span></>
+              : <><span style={{ color: '#d9d9d9' }}>·</span>
+                  <span style={{ color: '#15803d', fontWeight: 600 }}>đủ hàng</span></>
+          })()}
           {(incoterm || containers) && (
             <>
               <span style={{ color: '#d9d9d9' }}>·</span>

@@ -59,7 +59,7 @@ export default function SalesKanbanPage() {
     const { data, error } = await supabase
       .from('sales_orders')
       .select(`
-        id, code, contract_no, grade, quantity_tons, total_value_usd,
+        id, code, contract_no, grade, quantity_tons, status, total_value_usd,
         delivery_date, etd, current_stage, current_owner_id,
         stage_started_at, stage_sla_hours,
         customer:sales_customers!sales_orders_customer_id_fkey(id, short_name, name),
@@ -84,6 +84,7 @@ export default function SalesKanbanPage() {
         customer_short: customer?.short_name || customer?.name || '—',
         grade: o.grade,
         quantity_tons: o.quantity_tons,
+        status: o.status,
         total_value_usd: o.total_value_usd,
         delivery_date: o.delivery_date,
         etd: o.etd,

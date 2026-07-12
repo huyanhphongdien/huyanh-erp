@@ -10,7 +10,7 @@ import {
   formatDwell,
   SLA_PILL_COLORS,
 } from '../../../services/sales/salesStages'
-import type { LotProgress } from '../../../services/logistics/dispatchService'
+import { remainingTons, type LotProgress } from '../../../services/logistics/dispatchService'
 import LotProgressBadge from '../../../components/sales/LotProgressBadge'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 
@@ -21,6 +21,7 @@ export interface KanbanOrder {
   customer_short: string
   grade: string
   quantity_tons: number | null
+  status: string           // cần để kẹp "đã giao xong" khi tính Còn thiếu
   total_value_usd: number | null
   delivery_date: string | null
   etd: string | null
@@ -109,10 +110,16 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp }: Kanban
         </div>
       )}
 
-      {/* Tiến độ lô */}
-      {lp && lp.contsTotal > 0 && (
-        <div style={{ marginTop: 6 }}><LotProgressBadge p={lp} small /></div>
-      )}
+      {/* Tiến độ lô + Còn thiếu (cùng công thức với dạng Bảng, Split & file Excel) */}
+      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {lp && lp.contsTotal > 0 && <LotProgressBadge p={lp} small />}
+        {(() => {
+          const rem = remainingTons(order.quantity_tons, lp, order.status)
+          return rem > 0
+            ? <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626' }}>còn thiếu {rem.toFixed(2)}T</span>
+            : <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d' }}>đủ hàng</span>
+        })()}
+      </div>
 
       {/* Footer: dwell + ETD countdown */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>

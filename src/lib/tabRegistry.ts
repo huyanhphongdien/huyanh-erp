@@ -171,3 +171,17 @@ registerTabComponent('sales-customer-list', CustomerListPage)
 
 const SalesKanbanPage = lazy(() => import('../pages/sales/SalesKanbanPage'))
 registerTabComponent('sales-kanban', SalesKanbanPage)
+
+// ===== VẬN TẢI — các trang DANH SÁCH + tạo lệnh (mở thành tab như Đơn hàng bán) =====
+
+const DispatchListPage = lazy(() => import('../pages/logistics/dispatch/DispatchListPage'))
+registerTabComponent('dispatch-list', DispatchListPage)
+
+const DispatchCreatePage = lazy(() => import('../pages/logistics/dispatch/DispatchCreatePage'))
+registerTabComponent('dispatch-create', DispatchCreatePage)
+
+const FleetVehicleListPage = lazy(() => import('../pages/logistics/fleet/FleetVehicleListPage'))
+registerTabComponent('fleet-vehicle-list', FleetVehicleListPage)
+
+const FleetDriverListPage = lazy(() => import('../pages/logistics/fleet/FleetDriverListPage'))
+registerTabComponent('fleet-driver-list', FleetDriverListPage)

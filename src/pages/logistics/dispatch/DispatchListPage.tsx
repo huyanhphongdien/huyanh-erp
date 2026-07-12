@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   Card, Table, Button, Space, Typography, Tag, Input, Segmented, message, Breadcrumb,
 } from 'antd'
@@ -23,6 +24,7 @@ const STATUS_COLOR: Record<DispatchStatus, string> = {
 
 export default function DispatchListPage() {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
   const [rows, setRows] = useState<DispatchOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<DispatchStatus | 'all'>('all')
@@ -77,7 +79,15 @@ export default function DispatchListPage() {
             <Input.Search placeholder="Tìm mã / biển số / tài xế / khách" allowClear style={{ width: 280 }}
               onSearch={setSearch} onChange={e => !e.target.value && setSearch('')} />
             <Button icon={<ReloadOutlined />} onClick={load} />
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/logistics/dispatch/new')}>Tạo lệnh</Button>
+            <Button
+              type="primary" icon={<PlusOutlined />}
+              onClick={() => openTab({
+                key: 'dispatch-create',
+                title: 'Tạo lệnh điều động',
+                componentId: 'dispatch-create',
+                path: '/logistics/dispatch/new',
+              })}
+            >Tạo lệnh</Button>
           </Space>
         </div>
 
@@ -92,7 +102,18 @@ export default function DispatchListPage() {
         />
 
         <Table rowKey="id" size="middle" loading={loading} columns={columns as any} dataSource={rows}
-          onRow={(r) => ({ onClick: () => navigate(`/logistics/dispatch/${r.id}`), style: { cursor: 'pointer' } })}
+          onRow={(r) => ({
+            // Mở TAB chi tiết thay vì điều hướng — trang này giờ là 1 tab, navigate
+            // sẽ đè mất tab đang mở (vd tab Đơn hàng bán bên cạnh).
+            onClick: () => openTab({
+              key: `dispatch-${r.id}`,
+              title: `Lệnh ${r.code}`,
+              componentId: 'dispatch-detail',
+              props: { id: r.id },
+              path: `/logistics/dispatch/${r.id}`,
+            }),
+            style: { cursor: 'pointer' },
+          })}
           pagination={{ pageSize: 20, showSizeChanger: false }} />
       </Card>
     </div>

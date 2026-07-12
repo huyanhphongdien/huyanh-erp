@@ -4,7 +4,7 @@
 // ============================================================================
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Table, Tag, Space, Typography, Empty, Spin } from 'antd'
+import { Button, Table, Tag, Space, Typography, Empty, Spin, Popover } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ContainerOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -93,24 +93,39 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
             <Tag color="purple">{lotsTotal} lô{lotsTotal === 0 ? ' (chưa chia)' : ''}</Tag>
             {lotsTotal > 0 && <Tag color="green">🟢 Đã giao {lotsDelivered}/{lotsTotal} lô</Tag>}
             <Tag color="green">✅ {deliveredCount}/{containers.length} cont đã giao</Tag>
-            {/* Đi bằng lệnh nào — mở TAB MỚI, không rời khỏi đơn hàng đang xem */}
-            {dispatches.map((d) => (
-              <Tag
-                key={d.id}
-                color="purple"
-                style={{ cursor: 'pointer' }}
-                onClick={() => openTab({
-                  key: `dispatch-${d.id}`,
-                  title: `Lệnh ${d.code}`,
-                  componentId: 'dispatch-detail',
-                  props: { id: d.id },
-                  path: `/logistics/dispatch/${d.id}`,
-                })}
-                title={`Mở lệnh điều động ${d.code} ở tab mới`}
+            {/* Đi bằng lệnh nào — mở TAB MỚI, không rời khỏi đơn hàng đang xem.
+                Đơn có thể đi bằng cả chục lệnh → gộp popover, đừng rải chip cho tràn. */}
+            {dispatches.length > 0 && (
+              <Popover
+                trigger="click"
+                placement="bottomLeft"
+                title={`${dispatches.length} lệnh điều động`}
+                content={
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                    {dispatches.map((d) => (
+                      <Tag
+                        key={d.id}
+                        color="purple"
+                        style={{ cursor: 'pointer', margin: 0 }}
+                        onClick={() => openTab({
+                          key: `dispatch-${d.id}`,
+                          title: `Lệnh ${d.code}`,
+                          componentId: 'dispatch-detail',
+                          props: { id: d.id },
+                          path: `/logistics/dispatch/${d.id}`,
+                        })}
+                      >
+                        🚚 {d.code}
+                      </Tag>
+                    ))}
+                  </div>
+                }
               >
-                🚚 {d.code}
-              </Tag>
-            ))}
+                <Tag color="purple" style={{ cursor: 'pointer' }}>
+                  🚚 {dispatches.length} lệnh điều động
+                </Tag>
+              </Popover>
+            )}
           </Space>
           <Table dataSource={rows} columns={cols} rowKey="key" size="small" pagination={false} bordered scroll={{ x: 460 }} />
         </>

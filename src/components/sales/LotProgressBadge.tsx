@@ -1,9 +1,12 @@
 // ============================================================================
 // LotProgressBadge — chỉ báo tiến độ lô/giao của 1 đơn (dùng ở 3 view: bảng / split / kanban)
-// Kèm CHIP LỆNH ĐIỀU ĐỘNG bấm được: thấy "đã giao" thì biết luôn hàng đi bằng lệnh
-// nào, bấm nhảy thẳng sang xem — khỏi phải mò qua module Vận tải để tra.
+// Kèm lối nhảy sang LỆNH ĐIỀU ĐỘNG đã chở lô đó (mở TAB MỚI, không rời đơn hàng).
+//
+// ⚠ 1 đơn có thể đi bằng RẤT NHIỀU lệnh (thực tế có đơn 12 lệnh). Xếp chip inline
+//   thì dòng cao ngoằng, bảng vỡ → gộp thành 1 chip "🚚 N lệnh" + popover danh sách.
+//   Chỉ khi đúng 1 lệnh mới hiện thẳng mã cho nhanh.
 // ============================================================================
-import { Tag, Tooltip } from 'antd'
+import { Tag, Tooltip, Popover } from 'antd'
 import { useOpenTab } from '../../hooks/useOpenTab'
 import type { LotProgress } from '../../services/logistics/dispatchService'
 
@@ -34,7 +37,28 @@ export default function LotProgressBadge({
 
   const fs = small ? 11 : 12
   const lh = small ? '16px' : '18px'
-  const dispatches = showDispatch ? (dispatchOrders || []) : []
+  const ds = showDispatch ? (dispatchOrders || []) : []
+
+  const open = (d: { id: string; code: string }) => {
+    openTab({
+      key: `dispatch-${d.id}`,
+      title: `Lệnh ${d.code}`,
+      componentId: 'dispatch-detail',
+      props: { id: d.id },
+      path: `/logistics/dispatch/${d.id}`,
+    })
+  }
+
+  const chip = (d: { id: string; code: string }, key?: string) => (
+    <Tag
+      key={key ?? d.id}
+      color="purple"
+      style={{ margin: 0, fontSize: fs, lineHeight: lh, cursor: 'pointer' }}
+      onClick={(e) => { e.stopPropagation(); open(d) }}
+    >
+      🚚 {d.code}
+    </Tag>
+  )
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -42,28 +66,31 @@ export default function LotProgressBadge({
         <Tag color={color} style={{ margin: 0, fontSize: fs, lineHeight: lh }}>{label}</Tag>
       </Tooltip>
 
-      {dispatches.map((d) => (
-        <Tooltip key={d.id} title={`Mở lệnh điều động ${d.code} ở tab mới`}>
+      {/* 1 lệnh → hiện thẳng mã. Nhiều lệnh → gộp 1 chip + popover (giữ dòng gọn). */}
+      {ds.length === 1 && chip(ds[0])}
+      {ds.length > 1 && (
+        <Popover
+          trigger="click"
+          placement="right"
+          title={`${ds.length} lệnh điều động`}
+          content={
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {ds.map((d) => chip(d))}
+            </div>
+          }
+        >
           <Tag
             color="purple"
             style={{ margin: 0, fontSize: fs, lineHeight: lh, cursor: 'pointer' }}
-            onClick={(e) => {
-              e.stopPropagation()   // đừng mở đơn hàng khi bấm vào chip lệnh
-              // Mở TAB MỚI thay vì điều hướng tại chỗ — đang xem đơn hàng mà nhảy
-              // thẳng sang lệnh là mất chỗ đang làm. Trùng key → focus tab đã mở.
-              openTab({
-                key: `dispatch-${d.id}`,
-                title: `Lệnh ${d.code}`,
-                componentId: 'dispatch-detail',
-                props: { id: d.id },
-                path: `/logistics/dispatch/${d.id}`,
-              })
-            }}
+            onClick={(e) => e.stopPropagation()}   // đừng mở đơn hàng bên dưới
           >
-            🚚 {d.code}
+            🚚 {ds.length} lệnh
           </Tag>
-        </Tooltip>
-      ))}
+        </Popover>
+      )}
     </span>
   )
 }

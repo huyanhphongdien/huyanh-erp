@@ -1,12 +1,19 @@
 // =============================================================================
 // EDGE FUNCTION: daily-rubber-report
-// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — gửi ~00:01 giờ VN (đầu ngày), tổng hợp TRỌN NGÀY HÔM TRƯỚC (00:00–24:00).
+// Báo cáo THU MUA MỦ hằng ngày cho BGĐ — GỬI 21:00 GIỜ VN MỖI NGÀY.
+// Kỳ báo cáo = [21:00 hôm qua, 21:00 hôm nay) giờ VN. Phiếu HOÀN TẤT SAU 21:00
+// KHÔNG bị bỏ sót — tự động gom vào báo cáo NGÀY MAI.
+//
+// ⚠ Mốc phân kỳ là GIỜ HOÀN TẤT PHIẾU (completed_at), KHÔNG phải giờ tạo phiếu.
+//   Nếu cắt theo created_at: xe vào cân 20:45, hoàn tất 21:20 sẽ rơi vào khe chết —
+//   hôm nay loại (lúc 21:00 chưa completed), mai cũng loại (created_at ngoài cửa sổ).
+//   Phiếu cũ/backfill không có completed_at → fallback về created_at.
+//
 // Nguồn: weighbridge_tickets (NHẬP, completed) + facilities + b2b_partners.
-// Cửa sổ mặc định (prevday): [hôm qua 00:00, hôm nay 00:00) giờ VN; so với ngày trước đó.
-// (Tùy chọn body {"range":"today"} để xem nhanh HÔM NAY tới giờ gọi — KHÔNG trọn ngày.)
+// (Tùy chọn body {"range":"today"} để xem nhanh HÔM NAY 00:00 → giờ gọi — KHÔNG trọn kỳ.)
 //
 // Deploy: npx supabase functions deploy daily-rubber-report --no-verify-jwt
-// Schedule (pg_cron): `1 17 * * *` UTC = 00:01 VN, body {"range":"prevday"} (xem scheduled SQL ở docs).
+// Schedule (pg_cron): `0 14 * * *` UTC = 21:00 VN (xem scheduled SQL ở docs).
 // Test:   curl -X POST "https://dygveetaatqllhjusyzz.supabase.co/functions/v1/daily-rubber-report" \
 //           -H "Authorization: Bearer <SERVICE_ROLE_KEY>" -H "Content-Type: application/json" -d "{}"
 // =============================================================================
@@ -79,6 +86,8 @@ async function sendEmail(token: string, recipients: Array<{ name: string; email:
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const VN_OFFSET = 7 * 3600 * 1000
 const DAYS_VI = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+// Giờ chốt sổ báo cáo (giờ VN). Đổi số này là đổi luôn cả giờ gom lẫn nhãn hiển thị.
+const CUTOFF_HOUR = 21
 
 const RUBBER = {
   mu_nuoc: { label: 'Mủ nước', icon: '💧', bg: 'e6f0fb', bar: '2563eb' },
@@ -120,15 +129,20 @@ interface Ticket {
 const SELECT = `id, facility_id, net_weight, rubber_type, partner_id, supplier_name, qc_actual_drc,
   facility:facilities!facility_id(code, name)`
 
+// Phiếu thuộc kỳ nào = theo GIỜ HOÀN TẤT (completed_at). Phiếu cũ/backfill chưa có
+// completed_at → fallback created_at, nếu không sẽ biến mất khỏi mọi báo cáo.
+// Cận trên dùng `lt` (không phải `lte`) để 2 kỳ liền nhau không đếm trùng phiếu ở đúng mốc.
 async function fetchIN(supabase: any, fromISO: string, toISO: string): Promise<Ticket[]> {
+  const inWindow =
+    `and(completed_at.gte.${fromISO},completed_at.lt.${toISO}),` +
+    `and(completed_at.is.null,created_at.gte.${fromISO},created_at.lt.${toISO})`
   const { data, error } = await supabase
     .from('weighbridge_tickets')
     .select(SELECT)
     .eq('ticket_type', 'in')
     .eq('status', 'completed')
     .is('transfer_id', null)   // CHỈ mua thật từ đại lý; LOẠI xe nhận chuyển kho TL/LAO→PD (đã đếm ở NM gốc)
-    .gte('created_at', fromISO)
-    .lte('created_at', toISO)
+    .or(inWindow)
   if (error) throw error
   return (data || []) as Ticket[]
 }
@@ -138,19 +152,31 @@ function facCode(t: Ticket): { code: string; name: string } {
   return { code: f?.code || '?', name: f?.name || 'Chưa rõ' }
 }
 
-async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
+async function collectData(supabase: any, mode: 'cutoff' | 'today' = 'cutoff') {
   const DAY = 24 * 3600 * 1000
-  const vnNow = new Date(Date.now() + VN_OFFSET)
+  const nowMs = Date.now()
+  const vnNow = new Date(nowMs + VN_OFFSET)
   const vnMidnightUTC = Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate()) - VN_OFFSET
-  // Mặc định (cron 0h30): CẢ NGÀY HÔM QUA [hôm qua 00:00, hôm nay 00:00).
-  // mode='today' (test): HÔM NAY tới giờ chạy [hôm nay 00:00, now).
+
+  // ── Kỳ báo cáo: chốt lúc 21:00 giờ VN ──────────────────────────────────────
+  // Mốc chốt gần nhất ĐÃ QUA = kỳ vừa đóng. Cron bắn đúng 21:00 nhưng đồng hồ có thể
+  // lệch vài giây; nếu rơi vào 20:59:5x mà không có GRACE thì hàm sẽ tưởng kỳ hôm nay
+  // CHƯA đóng và gửi lại nguyên báo cáo HÔM QUA. GRACE 15' kéo nó về đúng mốc 21:00.
+  const GRACE = 15 * 60 * 1000
+  const todayCutoffUTC = vnMidnightUTC + CUTOFF_HOUR * 3600 * 1000
+  const cutoffEndUTC = nowMs >= todayCutoffUTC - GRACE ? todayCutoffUTC : todayCutoffUTC - DAY
+
+  // mode='today' (xem nhanh): HÔM NAY 00:00 → giờ gọi. Không dùng cho cron.
   const isToday = mode === 'today'
-  const repStart = new Date(isToday ? vnMidnightUTC : vnMidnightUTC - DAY).toISOString()
-  const repEnd = isToday ? new Date().toISOString() : new Date(vnMidnightUTC).toISOString()
-  const prevStart = new Date(isToday ? vnMidnightUTC - DAY : vnMidnightUTC - 2 * DAY).toISOString()
-  const prevEnd = isToday ? new Date(Date.now() - DAY).toISOString() : repStart
-  // NGÀY ĐƯỢC BÁO CÁO (prevday = hôm qua). Tháng/nhãn bám theo ngày này để mùng 1 vẫn ra tháng trước.
-  const reportedVn = new Date((isToday ? vnMidnightUTC : vnMidnightUTC - DAY) + VN_OFFSET)
+  const repStartMs = isToday ? vnMidnightUTC : cutoffEndUTC - DAY
+  const repEndMs = isToday ? nowMs : cutoffEndUTC
+  const repStart = new Date(repStartMs).toISOString()
+  const repEnd = new Date(repEndMs).toISOString()
+  const prevStart = new Date(repStartMs - DAY).toISOString()
+  const prevEnd = new Date(repEndMs - DAY).toISOString()
+  // NGÀY ĐƯỢC BÁO CÁO = ngày của mốc chốt (kỳ đóng lúc 21:00 ngày nào thì mang tên ngày đó).
+  // Trừ 1ms để mốc 21:00 không bao giờ trượt sang ngày kế khi tính nhãn/tháng.
+  const reportedVn = new Date((isToday ? vnMidnightUTC : repEndMs - 1) + VN_OFFSET)
   // LŨY KẾ THÁNG: 01/MM 00:00 (giờ VN) của THÁNG NGÀY BÁO CÁO → hết kỳ báo cáo (repEnd).
   const monthStartUTC = Date.UTC(reportedVn.getUTCFullYear(), reportedVn.getUTCMonth(), 1) - VN_OFFSET
   const monthStart = new Date(monthStartUTC).toISOString()
@@ -255,14 +281,24 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
   const missing = today.filter((t) => t.rubber_type === 'mu_nuoc' && !hasDrc(t) && (t.net_weight || 0) > 0)
   const missingKg = missing.reduce((s, t) => s + (t.net_weight || 0), 0)
 
-  // Nhãn ngày = NGÀY ĐƯỢC BÁO CÁO (hôm qua, hoặc hôm nay nếu mode test)
+  // Nhãn ngày = NGÀY ĐƯỢC BÁO CÁO (ngày mà kỳ đóng lúc 21:00)
   const repLocal = reportedVn
   const cutoff = `${String(vnNow.getUTCHours()).padStart(2, '0')}:${String(vnNow.getUTCMinutes()).padStart(2, '0')}`
   const dateLabel = `${DAYS_VI[repLocal.getUTCDay()]}, ${String(repLocal.getUTCDate()).padStart(2, '0')}/${String(repLocal.getUTCMonth() + 1).padStart(2, '0')}/${repLocal.getUTCFullYear()}`
     + (isToday ? ` (tới ${cutoff})` : '')
 
+  // Kỳ báo cáo hiện lên mail để BGĐ biết CHÍNH XÁC số liệu gom từ giờ nào tới giờ nào.
+  const H = String(CUTOFF_HOUR).padStart(2, '0')
+  const dm = (ms: number) => {
+    const v = new Date(ms + VN_OFFSET)
+    return `${String(v.getUTCDate()).padStart(2, '0')}/${String(v.getUTCMonth() + 1).padStart(2, '0')}`
+  }
+  const periodLabel = isToday
+    ? `00:00 → ${cutoff} ngày ${dm(nowMs)}`
+    : `${H}:00 ngày ${dm(repStartMs)} → ${H}:00 ngày ${dm(repEndMs - 1)}`
+
   return {
-    dateLabel, isToday, cutoff,
+    dateLabel, isToday, cutoff, periodLabel, cutoffHour: H,
     totalTuoi, totalKho, yTuoi, pct, drcTB,
     xeCount: today.length, dealerCount,
     facilities, types, topDealers, dealerDetail,
@@ -275,8 +311,8 @@ async function collectData(supabase: any, mode: 'prevday' | 'today' = 'today') {
 // ── Render HTML (khớp mock MAIL_BAO_CAO_THU_MUA_MOCK.html) ───────────────────
 function renderHtml(d: any): string {
   const trendHtml = d.pct == null
-    ? `<div style="font-size:12px;color:#94a3b8;margin-top:2px;">Chưa có số hôm qua để so sánh</div>`
-    : `<div style="font-size:12px;color:${d.pct >= 0 ? '#15803d' : '#dc2626'};margin-top:2px;">${d.pct >= 0 ? '▲' : '▼'} ${fmt1(Math.abs(d.pct))}% so với hôm trước (${fmtT(d.yTuoi)} t)</div>`
+    ? `<div style="font-size:12px;color:#94a3b8;margin-top:2px;">Chưa có số kỳ trước để so sánh</div>`
+    : `<div style="font-size:12px;color:${d.pct >= 0 ? '#15803d' : '#dc2626'};margin-top:2px;">${d.pct >= 0 ? '▲' : '▼'} ${fmt1(Math.abs(d.pct))}% so với kỳ trước (${fmtT(d.yTuoi)} t)</div>`
 
   const facRows = d.facilities.map((f: any) => `
     <tr style="border-bottom:1px solid #eef1f0;">
@@ -404,7 +440,7 @@ function renderHtml(d: any): string {
 
   const emptyHtml = d.empty ? `
     <tr><td style="padding:24px;text-align:center;color:#64748b;font-size:14px;">
-      Không có phiếu cân NHẬP hoàn tất nào trong ngày ${d.dateLabel}.
+      Không có phiếu cân NHẬP hoàn tất nào trong kỳ ${esc(d.periodLabel)}.
     </td></tr>` : ''
 
   const body = d.empty ? `${emptyHtml}${monthHtml}` : `
@@ -519,7 +555,8 @@ function renderHtml(d: any): string {
           <td style="vertical-align:middle;">
             <div style="color:#fff;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Cao Su Huy Anh</div>
             <div style="color:#fff;font-size:21px;font-weight:800;margin-top:2px;">BÁO CÁO THU MUA MỦ</div>
-            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel} &middot; ${d.isToday ? 'số liệu trong ngày' : 'tổng hợp cả ngày'}</div>
+            <div style="color:#FFD54F;font-size:13px;font-weight:600;margin-top:3px;">${d.dateLabel}</div>
+            <div style="color:#cfe3d8;font-size:12px;margin-top:2px;">Kỳ: ${esc(d.periodLabel)}</div>
           </td>
           <td style="vertical-align:middle;text-align:right;width:128px;">
             <img src="cid:huyanh-logo" alt="Cao Su Huy Anh" width="112" style="display:inline-block;background:#fff;border-radius:10px;padding:7px 10px;width:112px;height:auto;">
@@ -536,11 +573,13 @@ function renderHtml(d: any): string {
       <tr><td style="padding:16px 24px 22px 24px;border-top:1px solid #eef1f0;">
         <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
           ${d.isToday
-            ? `Báo cáo nhanh số liệu <b>HÔM NAY tới giờ gọi</b> (chưa trọn ngày), từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
-            : `Báo cáo tự động <b>đầu ngày (~00:01)</b> cho <b>TRỌN NGÀY HÔM TRƯỚC</b>, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`}<br>
-          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b>${d.isToday ? ` (00:00–${d.cutoff})` : ' trọn ngày (00:00–24:00)'} giờ VN.<br>
+            ? `Báo cáo nhanh số liệu <b>HÔM NAY tới giờ gọi</b> (chưa trọn kỳ), từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.`
+            : `Báo cáo tự động gửi <b>${d.cutoffHour}:00 mỗi ngày</b>, từ <b>Hệ thống Trạm cân Cao Su Huy Anh</b>.
+               Phiếu cân <b>hoàn tất sau ${d.cutoffHour}:00</b> không bị bỏ sót — được gom vào <b>báo cáo ngày mai</b>.`}<br>
+          Số liệu = phiếu cân NHẬP đã <b>hoàn tất</b> trong kỳ <b>${esc(d.periodLabel)}</b> (giờ VN), tính theo <b>giờ hoàn tất phiếu</b>.<br>
           <b>KL khô = KL tươi × DRC, CHỈ quy đổi cho mủ có DRC thực</b> (mủ nước đã đốt). Mủ tạp chưa đo DRC nên KHÔNG quy đổi khô.<br>
-          Khối <b>Lũy kế từ đầu tháng</b> = cộng dồn từ ngày 01 đến hết kỳ báo cáo.
+          Khối <b>Lũy kế từ đầu tháng</b> tính theo <b>tháng dương lịch</b>: từ 00:00 ngày 01 đến hết kỳ báo cáo
+          (khớp với trang Thống kê mủ trên phần mềm).
         </div>
       </td></tr>
     </table>
@@ -553,21 +592,35 @@ function renderHtml(d: any): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    // Mặc định: TRỌN NGÀY HÔM TRƯỚC (cron đầu ngày). Gửi {"range":"today"} để xem nhanh hôm nay tới giờ gọi.
-    let mode: 'prevday' | 'today' = 'prevday'
-    try { const b = await req.json(); if (b && b.range === 'today') mode = 'today' } catch { /* no body */ }
+    // Mặc định: kỳ 21:00→21:00 (cron 21:00 VN). Gửi {"range":"today"} để xem nhanh hôm nay tới giờ gọi.
+    // "prevday" là body của cron CŨ — cố tình map về 'cutoff' để nếu deploy code mới mà
+    // cron chưa kịp đổi thì vẫn ra báo cáo đúng kiểu mới, không lệch một ngày.
+    let mode: 'cutoff' | 'today' = 'cutoff'
+    // {"dry":true} → tính số + dựng mail nhưng KHÔNG gửi. Dùng để kiểm tra kỳ/cột/query
+    // trên dữ liệu thật mà không bắn mail ngoài lịch cho BGĐ.
+    let dry = false
+    try {
+      const b = await req.json()
+      if (b && b.range === 'today') mode = 'today'
+      if (b && b.dry === true) dry = true
+    } catch { /* no body */ }
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const d = await collectData(supabase, mode)
     const html = renderHtml(d)
     const subject = `Báo cáo thu mua mủ ngày ${d.dateLabel} — ${fmtT(d.totalTuoi)} tấn tươi · ${fmtT(d.totalKho)} tấn khô · ${d.xeCount} xe`
 
-    const token = await getAccessToken()
-    await sendEmail(token, REPORT_RECIPIENTS, subject, html)
+    if (!dry) {
+      const token = await getAccessToken()
+      await sendEmail(token, REPORT_RECIPIENTS, subject, html)
+    }
 
     return new Response(JSON.stringify({
       success: true,
-      sent_to: REPORT_RECIPIENTS.map((r) => r.email),
+      dry_run: dry,
+      sent_to: dry ? [] : REPORT_RECIPIENTS.map((r) => r.email),
       subject,
+      period: d.periodLabel,
+      html_bytes: html.length,
       stats: { tuoi_kg: d.totalTuoi, kho_kg: d.totalKho, xe: d.xeCount, dai_ly: d.dealerCount, missing_drc: d.missingCount },
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error: any) {

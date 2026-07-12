@@ -553,7 +553,7 @@ export default function DispatchCreatePage() {
             <Col xs={24} sm={12} md={8}>
               <Form.Item
                 name="pickup_location"
-                label={<>📦 Điểm BỐC hàng {isTrading ? <span style={{ color: '#dc2626' }}>*</span> : <span style={{ color: '#94a3b8', fontWeight: 400 }}>(bỏ trống = kho Huy Anh)</span>}</>}
+                label={<>📦 Điểm BỐC hàng{' '}{isTrading ? <span style={{ color: '#dc2626' }}>*</span> : <span style={{ color: '#94a3b8', fontWeight: 400 }}>(bỏ trống = kho Huy Anh)</span>}</>}
                 rules={isTrading ? [{ required: true, message: 'Hàng thương mại phải ghi rõ bốc ở đâu' }] : []}
               >
                 <AutoComplete options={PICKUP_PRESETS} filterOption={acFilter as any}

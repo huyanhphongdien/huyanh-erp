@@ -34,9 +34,14 @@ const NEXT_STATUS: Record<DispatchStatus, DispatchStatus[]> = {
   cancelled: ['draft'],
 }
 
-export default function DispatchDetailPage() {
+// Nhận id qua prop khi mở dạng TAB (từ Đơn hàng bán bấm chip lệnh) — fallback
+// useParams khi vào thẳng bằng URL. Cùng khuôn với SalesOrderDetailPage.
+interface DispatchDetailPageProps { id?: string }
+
+export default function DispatchDetailPage({ id: propId }: DispatchDetailPageProps = {}) {
   const navigate = useNavigate()
-  const { id } = useParams()
+  const { id: paramId } = useParams()
+  const id = propId || paramId
   const [order, setOrder] = useState<DispatchOrder | null>(null)
   const [lines, setLines] = useState<DispatchLine[]>([])
   const [loading, setLoading] = useState(true)

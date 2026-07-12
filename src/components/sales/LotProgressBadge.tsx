@@ -4,7 +4,7 @@
 // nào, bấm nhảy thẳng sang xem — khỏi phải mò qua module Vận tải để tra.
 // ============================================================================
 import { Tag, Tooltip } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useOpenTab } from '../../hooks/useOpenTab'
 import type { LotProgress } from '../../services/logistics/dispatchService'
 
 export default function LotProgressBadge({
@@ -17,7 +17,7 @@ export default function LotProgressBadge({
   /** Tắt chip lệnh khi chỗ hiển thị quá chật. */
   showDispatch?: boolean
 }) {
-  const navigate = useNavigate()
+  const openTab = useOpenTab()
   if (!p || p.contsTotal === 0) return null
   const { lotsTotal, lotsDelivered, contsTotal, contsDelivered, dispatchOrders } = p
 
@@ -43,13 +43,21 @@ export default function LotProgressBadge({
       </Tooltip>
 
       {dispatches.map((d) => (
-        <Tooltip key={d.id} title={`Xem lệnh điều động ${d.code}`}>
+        <Tooltip key={d.id} title={`Mở lệnh điều động ${d.code} ở tab mới`}>
           <Tag
             color="purple"
             style={{ margin: 0, fontSize: fs, lineHeight: lh, cursor: 'pointer' }}
             onClick={(e) => {
               e.stopPropagation()   // đừng mở đơn hàng khi bấm vào chip lệnh
-              navigate(`/logistics/dispatch/${d.id}`)
+              // Mở TAB MỚI thay vì điều hướng tại chỗ — đang xem đơn hàng mà nhảy
+              // thẳng sang lệnh là mất chỗ đang làm. Trùng key → focus tab đã mở.
+              openTab({
+                key: `dispatch-${d.id}`,
+                title: `Lệnh ${d.code}`,
+                componentId: 'dispatch-detail',
+                props: { id: d.id },
+                path: `/logistics/dispatch/${d.id}`,
+              })
             }}
           >
             🚚 {d.code}

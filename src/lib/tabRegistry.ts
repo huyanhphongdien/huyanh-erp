@@ -149,3 +149,8 @@ registerTabComponent('sales-export-documents', ExportDocumentsPage)
 
 const CustomerDetailPage = lazy(() => import('../pages/sales/CustomerDetailPage'))
 registerTabComponent('sales-customer-detail', CustomerDetailPage)
+
+// ===== VẬN TẢI — Lệnh điều động (mở TAB khi bấm chip từ Đơn hàng bán) =====
+
+const DispatchDetailPage = lazy(() => import('../pages/logistics/dispatch/DispatchDetailPage'))
+registerTabComponent('dispatch-detail', DispatchDetailPage)

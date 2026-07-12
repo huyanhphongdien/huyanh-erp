@@ -10,6 +10,7 @@ import { ContainerOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { containerService } from '../../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../../services/logistics/dispatchService'
+import { useOpenTab } from '../../../hooks/useOpenTab'
 import {
   LOT_STAGES, buildLotTrackRows, lotOverallStage, lotDeliveryStats,
 } from '../../../services/sales/lotTracking'
@@ -19,6 +20,7 @@ const { Text } = Typography
 
 export default function PackingTabPanel({ orderId }: { orderId: string }) {
   const navigate = useNavigate()
+  const openTab = useOpenTab()
   const [containers, setContainers] = useState<SalesOrderContainer[]>([])
   const [deliveryMap, setDeliveryMap] = useState<Record<string, DeliveryState>>({})
   // Lệnh điều động đã chở container của đơn này → cho bấm nhảy sang xem.
@@ -91,14 +93,20 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
             <Tag color="purple">{lotsTotal} lô{lotsTotal === 0 ? ' (chưa chia)' : ''}</Tag>
             {lotsTotal > 0 && <Tag color="green">🟢 Đã giao {lotsDelivered}/{lotsTotal} lô</Tag>}
             <Tag color="green">✅ {deliveredCount}/{containers.length} cont đã giao</Tag>
-            {/* Đi bằng lệnh nào — bấm nhảy thẳng sang Lệnh điều động */}
+            {/* Đi bằng lệnh nào — mở TAB MỚI, không rời khỏi đơn hàng đang xem */}
             {dispatches.map((d) => (
               <Tag
                 key={d.id}
                 color="purple"
                 style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/logistics/dispatch/${d.id}`)}
-                title={`Xem lệnh điều động ${d.code}`}
+                onClick={() => openTab({
+                  key: `dispatch-${d.id}`,
+                  title: `Lệnh ${d.code}`,
+                  componentId: 'dispatch-detail',
+                  props: { id: d.id },
+                  path: `/logistics/dispatch/${d.id}`,
+                })}
+                title={`Mở lệnh điều động ${d.code} ở tab mới`}
               >
                 🚚 {d.code}
               </Tag>

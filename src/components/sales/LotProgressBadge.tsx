@@ -1,18 +1,25 @@
 // ============================================================================
 // LotProgressBadge — chỉ báo tiến độ lô/giao của 1 đơn (dùng ở 3 view: bảng / split / kanban)
+// Kèm CHIP LỆNH ĐIỀU ĐỘNG bấm được: thấy "đã giao" thì biết luôn hàng đi bằng lệnh
+// nào, bấm nhảy thẳng sang xem — khỏi phải mò qua module Vận tải để tra.
 // ============================================================================
 import { Tag, Tooltip } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import type { LotProgress } from '../../services/logistics/dispatchService'
 
 export default function LotProgressBadge({
   p,
   small,
+  showDispatch = true,
 }: {
   p?: LotProgress
   small?: boolean
+  /** Tắt chip lệnh khi chỗ hiển thị quá chật. */
+  showDispatch?: boolean
 }) {
+  const navigate = useNavigate()
   if (!p || p.contsTotal === 0) return null
-  const { lotsTotal, lotsDelivered, contsTotal, contsDelivered } = p
+  const { lotsTotal, lotsDelivered, contsTotal, contsDelivered, dispatchOrders } = p
 
   const allDone = contsDelivered === contsTotal
   const color = allDone ? 'green' : contsDelivered > 0 ? 'blue' : 'default'
@@ -25,11 +32,30 @@ export default function LotProgressBadge({
     ? `Đã giao ${lotsDelivered}/${lotsTotal} lô · ${contsDelivered}/${contsTotal} container`
     : `Đã giao ${contsDelivered}/${contsTotal} container (chưa chia lô)`
 
+  const fs = small ? 11 : 12
+  const lh = small ? '16px' : '18px'
+  const dispatches = showDispatch ? (dispatchOrders || []) : []
+
   return (
-    <Tooltip title={tip}>
-      <Tag color={color} style={{ margin: 0, fontSize: small ? 11 : 12, lineHeight: small ? '16px' : '18px' }}>
-        {label}
-      </Tag>
-    </Tooltip>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+      <Tooltip title={tip}>
+        <Tag color={color} style={{ margin: 0, fontSize: fs, lineHeight: lh }}>{label}</Tag>
+      </Tooltip>
+
+      {dispatches.map((d) => (
+        <Tooltip key={d.id} title={`Xem lệnh điều động ${d.code}`}>
+          <Tag
+            color="purple"
+            style={{ margin: 0, fontSize: fs, lineHeight: lh, cursor: 'pointer' }}
+            onClick={(e) => {
+              e.stopPropagation()   // đừng mở đơn hàng khi bấm vào chip lệnh
+              navigate(`/logistics/dispatch/${d.id}`)
+            }}
+          >
+            🚚 {d.code}
+          </Tag>
+        </Tooltip>
+      ))}
+    </span>
   )
 }

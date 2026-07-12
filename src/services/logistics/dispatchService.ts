@@ -458,6 +458,32 @@ async function getDeliveryStatus(containerIds: string[]): Promise<Record<string,
 }
 
 /**
+ * Các LỆNH ĐIỀU ĐỘNG đã chở những container này — để tab Đóng gói hiện chip bấm
+ * được: thấy "đã giao" là biết luôn đi bằng lệnh nào, khỏi mò sang module Vận tải.
+ */
+async function getDispatchOrdersForContainers(containerIds: string[]): Promise<Array<{ id: string; code: string }>> {
+  const ids = [...new Set((containerIds || []).filter(Boolean))]
+  if (ids.length === 0) return []
+  const doIds = new Set<string>()
+  for (let i = 0; i < ids.length; i += 120) {
+    const { data } = await supabase
+      .from('dispatch_order_lines')
+      .select('dispatch_order_id')
+      .in('sales_order_container_id', ids.slice(i, i + 120))
+    for (const r of (data || []) as Array<{ dispatch_order_id: string | null }>) {
+      if (r.dispatch_order_id) doIds.add(r.dispatch_order_id)
+    }
+  }
+  if (doIds.size === 0) return []
+  const { data } = await supabase
+    .from('dispatch_orders')
+    .select('id, code')
+    .in('id', [...doIds])
+  return ((data || []) as Array<{ id: string; code: string }>)
+    .sort((a, b) => a.code.localeCompare(b.code))
+}
+
+/**
  * Tiến độ lô của 1 đơn — cho danh sách (3 view) + cột "Còn thiếu (tấn)" + dòng TỔNG.
  * KL để ở KG (nguồn gốc); quy ra tấn bằng deliveredTons()/remainingTons() bên dưới,
  * để MÀN HÌNH và EXCEL luôn dùng CHUNG một công thức (không thể lệch nhau).
@@ -471,6 +497,8 @@ export interface LotProgress {
   deliveredKg: number         // Σ net_weight_kg của container ĐÃ giao
   contsWithKg: number         // số container CÓ net_weight_kg (để ước lượng)
   deliveredContsNoKg: number  // container đã giao nhưng CHƯA nhập net_weight_kg
+  /** Lệnh điều động đã chở container của đơn này → cho bấm nhảy sang xem. */
+  dispatchOrders: Array<{ id: string; code: string }>
 }
 
 /** Trạng thái đơn coi như ĐÃ GIAO XONG → không còn thiếu gì nữa. */
@@ -541,21 +569,43 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
   }
   if (rows.length === 0) return out
 
-  // container đã giao — chunk IN tránh URL quá dài
+  // container đã giao + LỆNH nào chở nó — chunk IN tránh URL quá dài
+  const contToOrder = new Map<string, string>()
+  for (const r of rows) contToOrder.set(r.id, r.sales_order_id)
+
   const contIds = rows.map((r) => r.id)
   const deliveredSet = new Set<string>()
+  const dispatchIdsByOrder = new Map<string, Set<string>>()
   for (let i = 0; i < contIds.length; i += 120) {
     const chunk = contIds.slice(i, i + 120)
     const { data: lines } = await supabase
       .from('dispatch_order_lines')
-      .select('sales_order_container_id, actual_weight_kg')
+      .select('sales_order_container_id, actual_weight_kg, dispatch_order_id')
       .in('sales_order_container_id', chunk)
-    for (const l of (lines || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null }>) {
-      if (l.actual_weight_kg != null && l.sales_order_container_id) deliveredSet.add(l.sales_order_container_id)
+    for (const l of (lines || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null; dispatch_order_id: string | null }>) {
+      const cid = l.sales_order_container_id
+      if (!cid) continue
+      if (l.actual_weight_kg != null) deliveredSet.add(cid)
+      const oid = contToOrder.get(cid)
+      if (oid && l.dispatch_order_id) {
+        if (!dispatchIdsByOrder.has(oid)) dispatchIdsByOrder.set(oid, new Set())
+        dispatchIdsByOrder.get(oid)!.add(l.dispatch_order_id)
+      }
     }
   }
   // Bù cho đơn giao qua phiếu cân/xuất kho (không sinh dòng lệnh điều động).
   for (const r of rows) if (r.status === 'shipped') deliveredSet.add(r.id)
+
+  // Mã lệnh điều động (để hiện chip bấm được, khỏi phải mò sang module Vận tải)
+  const allDispatchIds = [...new Set([...dispatchIdsByOrder.values()].flatMap((s) => [...s]))]
+  const codeById = new Map<string, string>()
+  for (let i = 0; i < allDispatchIds.length; i += 120) {
+    const { data } = await supabase
+      .from('dispatch_orders')
+      .select('id, code')
+      .in('id', allDispatchIds.slice(i, i + 120))
+    for (const d of (data || []) as Array<{ id: string; code: string }>) codeById.set(d.id, d.code)
+  }
 
   const byOrder = new Map<string, ContRow[]>()
   for (const r of rows) {
@@ -587,6 +637,10 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
       lotsTotal: lots.size,
       lotsDelivered: [...lots.values()].filter((L) => L.total > 0 && L.delivered === L.total).length,
       plannedKg, deliveredKg, contsWithKg, deliveredContsNoKg,
+      dispatchOrders: [...(dispatchIdsByOrder.get(oid) || [])]
+        .map((id) => ({ id, code: codeById.get(id) || '' }))
+        .filter((d) => d.code)
+        .sort((a, b) => a.code.localeCompare(b.code)),
     }
   }
   return out
@@ -883,6 +937,7 @@ export const dispatchService = {
   markWeighed,
   getDeliveryStatus,
   getLotProgressForOrders,
+  getDispatchOrdersForContainers,
 }
 
 export default dispatchService

@@ -21,6 +21,8 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
   const navigate = useNavigate()
   const [containers, setContainers] = useState<SalesOrderContainer[]>([])
   const [deliveryMap, setDeliveryMap] = useState<Record<string, DeliveryState>>({})
+  // Lệnh điều động đã chở container của đơn này → cho bấm nhảy sang xem.
+  const [dispatches, setDispatches] = useState<Array<{ id: string; code: string }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,7 +32,12 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
       .then(async (cs) => {
         if (!alive) return
         setContainers(cs)
-        try { setDeliveryMap(await dispatchService.getDeliveryStatus(cs.map((c) => c.id))) } catch { /* ignore */ }
+        const ids = cs.map((c) => c.id)
+        try { setDeliveryMap(await dispatchService.getDeliveryStatus(ids)) } catch { /* ignore */ }
+        try {
+          const d = await dispatchService.getDispatchOrdersForContainers(ids)
+          if (alive) setDispatches(d)
+        } catch { /* ignore */ }
       })
       .catch(() => { /* ignore */ })
       .finally(() => { if (alive) setLoading(false) })
@@ -84,6 +91,18 @@ export default function PackingTabPanel({ orderId }: { orderId: string }) {
             <Tag color="purple">{lotsTotal} lô{lotsTotal === 0 ? ' (chưa chia)' : ''}</Tag>
             {lotsTotal > 0 && <Tag color="green">🟢 Đã giao {lotsDelivered}/{lotsTotal} lô</Tag>}
             <Tag color="green">✅ {deliveredCount}/{containers.length} cont đã giao</Tag>
+            {/* Đi bằng lệnh nào — bấm nhảy thẳng sang Lệnh điều động */}
+            {dispatches.map((d) => (
+              <Tag
+                key={d.id}
+                color="purple"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/logistics/dispatch/${d.id}`)}
+                title={`Xem lệnh điều động ${d.code}`}
+              >
+                🚚 {d.code}
+              </Tag>
+            ))}
           </Space>
           <Table dataSource={rows} columns={cols} rowKey="key" size="small" pagination={false} bordered scroll={{ x: 460 }} />
         </>

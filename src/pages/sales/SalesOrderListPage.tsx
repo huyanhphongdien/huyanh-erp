@@ -63,6 +63,7 @@ import {
   type PackingType,
   soDisplayCode,
 } from '../../services/sales/salesTypes'
+import { exportSalesOrdersExcel } from '../../services/sales/salesOrderExcel'
 import GradeBadge from '../../components/wms/GradeBadge'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
@@ -475,82 +476,77 @@ const SalesOrderListPage = () => {
     [orders, selectedRowKeys],
   )
 
-  // M3: Export Excel chỉ những đơn được chọn — load ExcelJS lazy để không nặng bundle
+  // Export Excel — dùng service riêng (salesOrderExcel.ts), tái dùng ĐÚNG helper
+  // deliveredTons/remainingTons → số trong file KHÔNG thể lệch số trên màn hình.
+  const [exportingAll, setExportingAll] = useState(false)
+
+  /** Mô tả bộ lọc đang áp — in lên đầu file để biết đây là báo cáo gì. */
+  const filterDesc = useMemo(() => {
+    const p: string[] = []
+    if (statusTab && statusTab !== 'all') p.push(`Trạng thái: ${ORDER_STATUS_LABELS[statusTab as SalesOrderStatus] || statusTab}`)
+    if (gradeFilter) p.push(`Grade: ${gradeFilter}`)
+    if (customerFilter) p.push(`Khách: ${customers.find((c) => c.id === customerFilter)?.name || customerFilter}`)
+    if (dateRange?.[0] && dateRange?.[1]) p.push(`Ngày đặt: ${dateRange[0].format('DD/MM/YYYY')} → ${dateRange[1].format('DD/MM/YYYY')}`)
+    if (searchText) p.push(`Tìm: "${searchText}"`)
+    if (overdueEtdOnly) p.push('Chỉ đơn quá ETD')
+    return p.join(' · ')
+  }, [statusTab, gradeFilter, customerFilter, dateRange, searchText, overdueEtdOnly, customers])
+
   const handleExportSelected = async () => {
     if (selectedOrders.length === 0) return
     try {
-      const ExcelJS = (await import('exceljs')).default
-      const { saveAs } = await import('file-saver')
-
-      const wb = new ExcelJS.Workbook()
-      wb.creator = 'Huy Anh ERP'
-      const ws = wb.addWorksheet('Đơn hàng bán', {
-        pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+      const prog = await dispatchService.getLotProgressForOrders(selectedOrders.map((o) => o.id))
+      await exportSalesOrdersExcel({
+        orders: selectedOrders, lotProgress: prog, filterDesc, scopeLabel: 'Đơn đã chọn',
       })
-
-      // Header row
-      ws.addRow([
-        'STT', 'Số HĐ', 'Khách hàng', 'Loại hàng', 'Số LOT',
-        'SL (tấn)', 'Đơn giá USD', 'Thành tiền USD',
-        'Đặt cọc', 'CK', 'NH CK', 'Còn lại',
-        'Hạn giao', 'Sẵn hàng', 'Ngân hàng', 'Số BKG', 'ETD', 'Tiền về',
-        'Trạng thái',
-      ])
-      const hdr = ws.getRow(1)
-      hdr.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
-      hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B4D3E' } }
-      hdr.alignment = { horizontal: 'center', vertical: 'middle' }
-      hdr.height = 24
-
-      // Data rows
-      selectedOrders.forEach((o: any, idx) => {
-        ws.addRow([
-          idx + 1,
-          soDisplayCode(o),
-          o.customer?.name || '',
-          o.grade || '',
-          o.customer_po || '',
-          o.quantity_tons || 0,
-          o.unit_price || 0,
-          o.total_value_usd || 0,
-          o.deposit_amount || 0,
-          o.discount_amount || 0,
-          o.discount_bank || '',
-          o.remaining_amount || ((o.total_value_usd || 0) - (o.deposit_amount || 0) - (o.discount_amount || 0)),
-          o.delivery_date || '',
-          o.ready_date || '',
-          o.bank_name || '',
-          o.booking_reference || '',
-          o.etd || '',
-          o.payment_received_date || '',
-          ORDER_STATUS_LABELS[o.status as keyof typeof ORDER_STATUS_LABELS] || o.status,
-        ])
-      })
-
-      // Auto-size cột (approximate)
-      const widths = [5, 13, 28, 10, 10, 9, 11, 14, 12, 10, 12, 14, 11, 11, 14, 14, 11, 11, 14]
-      widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
-
-      // Border all cells
-      const lastRow = selectedOrders.length + 1
-      for (let r = 1; r <= lastRow; r++) {
-        for (let c = 1; c <= 19; c++) {
-          ws.getRow(r).getCell(c).border = {
-            top: { style: 'thin', color: { argb: 'FFE5E5E5' } },
-            left: { style: 'thin', color: { argb: 'FFE5E5E5' } },
-            bottom: { style: 'thin', color: { argb: 'FFE5E5E5' } },
-            right: { style: 'thin', color: { argb: 'FFE5E5E5' } },
-          }
-        }
-      }
-
-      const buffer = await wb.xlsx.writeBuffer()
-      const fileName = `Don_hang_ban_${selectedOrders.length}_${dayjs().format('YYYYMMDD_HHmm')}.xlsx`
-      saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName)
-      message.success(`Đã xuất ${selectedOrders.length} đơn → ${fileName}`)
+      message.success(`Đã xuất ${selectedOrders.length} đơn`)
     } catch (e: any) {
       console.error(e)
-      message.error(e.message || 'Lỗi xuất Excel')
+      message.error(e?.message || 'Lỗi xuất Excel')
+    }
+  }
+
+  /**
+   * Xuất TẤT CẢ đơn theo bộ lọc hiện tại — không chỉ trang hiện tại / đơn đã tick.
+   * Trước đây muốn xuất 79 đơn phải tick từng cái.
+   */
+  const handleExportAll = async () => {
+    setExportingAll(true)
+    try {
+      const PAGE = 200, CAP = 3000
+      const all: SalesOrder[] = []
+      let grand = 0
+      for (let page = 1; (page - 1) * PAGE < CAP; page++) {
+        const res = await salesOrderService.getList({
+          page, pageSize: PAGE,
+          search: searchText || undefined,
+          status: statusTab !== 'all' ? (statusTab as SalesOrderStatus) : undefined,
+          customer_id: customerFilter || undefined,
+          grade: gradeFilter || undefined,
+          date_from: dateRange?.[0]?.format('YYYY-MM-DD') || undefined,
+          date_to: dateRange?.[1]?.format('YYYY-MM-DD') || undefined,
+          sort_by: sortBy, sort_order: sortOrder,
+          overdue_etd_only: overdueEtdOnly || undefined,
+        })
+        grand = res.total
+        all.push(...res.data)
+        if (all.length >= res.total || res.data.length < PAGE) break
+      }
+      if (all.length === 0) { message.info('Không có đơn nào khớp bộ lọc'); return }
+      // Cắt bớt thì phải NÓI, không im lặng xuất thiếu.
+      if (all.length < grand) {
+        message.warning(`Chỉ xuất ${all.length}/${grand} đơn (giới hạn ${CAP}) — thu hẹp bộ lọc để xuất đủ`)
+      }
+      const prog = await dispatchService.getLotProgressForOrders(all.map((o) => o.id))
+      await exportSalesOrdersExcel({
+        orders: all, lotProgress: prog, filterDesc, scopeLabel: 'Tất cả theo bộ lọc',
+      })
+      message.success(`Đã xuất ${all.length} đơn`)
+    } catch (e: any) {
+      console.error(e)
+      message.error(e?.message || 'Lỗi xuất Excel')
+    } finally {
+      setExportingAll(false)
     }
   }
 
@@ -1585,6 +1581,15 @@ const SalesOrderListPage = () => {
             Tùy chỉnh cột ({HIDEABLE_COLUMNS.length - hiddenCols.size}/{HIDEABLE_COLUMNS.length})
           </Button>
         </Dropdown>
+        {/* Xuất TẤT CẢ theo bộ lọc — không phải tick từng đơn như trước. */}
+        <Button
+          icon={<DownloadOutlined />}
+          loading={exportingAll}
+          onClick={handleExportAll}
+          title="Xuất toàn bộ đơn khớp bộ lọc hiện tại (kể cả các trang sau)"
+        >
+          Xuất Excel (theo bộ lọc)
+        </Button>
       </div>
 
       {/* Q2: Banner "đang lọc Quá ETD" + "Đang sắp xếp" — đã bỏ.

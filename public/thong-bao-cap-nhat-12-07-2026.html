@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thông báo cập nhật hệ thống — 12/07/2026</title>
+<style>
+  :root{
+    --brand:#1B4D3E; --brand2:#2D8B6E; --ink:#1f2937; --muted:#6b7280;
+    --line:#e5e7eb; --bg:#f6f7f5; --card:#fff;
+    --warn-bg:#fffbeb; --warn-line:#f59e0b; --warn-ink:#92400e;
+    --new-bg:#ecfdf5; --new-line:#10b981;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6;
+    font-size:16px; -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:16px}
+  header{
+    background:linear-gradient(135deg,var(--brand),var(--brand2));
+    color:#fff; border-radius:14px; padding:22px 20px; margin-bottom:18px;
+  }
+  header .co{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+  header h1{font-size:23px;line-height:1.25;margin:6px 0 8px;font-weight:800}
+  header .date{font-size:13px;opacity:.9}
+  .lead{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:18px;font-size:15px;color:#374151
+  }
+  .must{
+    background:var(--warn-bg);border:1px solid var(--warn-line);
+    border-left:5px solid var(--warn-line);
+    border-radius:12px;padding:14px 16px;margin-bottom:20px
+  }
+  .must h2{font-size:16px;color:var(--warn-ink);margin-bottom:8px}
+  .must ol{margin:0;padding-left:20px}
+  .must li{margin:6px 0;color:var(--warn-ink);font-size:15px}
+  section{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:16px;margin-bottom:14px
+  }
+  section > h2{
+    font-size:17px;color:var(--brand);display:flex;align-items:center;
+    gap:8px;flex-wrap:wrap;margin-bottom:4px
+  }
+  .who{
+    font-size:12px;font-weight:600;color:#fff;background:var(--brand2);
+    padding:2px 9px;border-radius:999px;white-space:nowrap
+  }
+  ul.items{list-style:none;margin-top:10px}
+  ul.items li{
+    padding:9px 0 9px 0;border-top:1px solid var(--line);font-size:15px
+  }
+  ul.items li:first-child{border-top:0}
+  .tag{
+    display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;
+    border-radius:5px;margin-right:6px;vertical-align:1px
+  }
+  .t-new{background:var(--new-bg);color:#047857;border:1px solid var(--new-line)}
+  .t-chg{background:#eff6ff;color:#1d4ed8;border:1px solid #60a5fa}
+  .t-warn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line)}
+  b.hl{background:#fef3c7;padding:0 3px;border-radius:3px}
+  .note{
+    margin-top:10px;font-size:13.5px;color:var(--warn-ink);
+    background:var(--warn-bg);border-left:4px solid var(--warn-line);
+    padding:9px 12px;border-radius:8px
+  }
+  footer{
+    text-align:center;color:var(--muted);font-size:12.5px;
+    padding:18px 8px 28px
+  }
+  @media (max-width:520px){
+    body{font-size:15.5px}
+    header h1{font-size:20px}
+    .wrap{padding:12px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="co">Công ty TNHH MTV Cao su Huy Anh Phong Điền</div>
+    <h1>Thông báo cập nhật hệ thống ERP</h1>
+    <div class="date">Ngày 12/07/2026 · Đã áp dụng — vui lòng <b>tải lại trang (F5)</b> để thấy thay đổi</div>
+  </header>
+
+  <div class="lead">
+    Hệ thống vừa cập nhật <b>Đơn hàng bán</b>, <b>Lệnh điều động</b>, <b>App trạm cân</b>,
+    <b>Thống kê mủ</b> và <b>Tài chính</b>. Anh/chị đọc phần có <b>tên bộ phận mình</b> ở dưới.
+  </div>
+
+  <div class="must">
+    <h2>⚠ 2 việc BẮT BUỘC phải nhớ (nếu không sẽ sai số liệu)</h2>
+    <ol>
+      <li><b>Thợ cân:</b> Loại mủ <b class="hl">không còn chọn sẵn</b> — phải <b>bấm chọn</b> mới tạo được phiếu.</li>
+      <li><b>Người lập lệnh điều động:</b> chuyến <b>Hàng thương mại</b> giao xong phải bấm
+          <b class="hl">“Đánh dấu ĐÃ GIAO (bốc ngoài)”</b>, nếu không Đơn hàng bán sẽ <b>mãi báo “Còn thiếu”</b>.</li>
+    </ol>
+  </div>
+
+  <section>
+    <h2>⚖️ App trạm cân <span class="who">Thợ cân</span></h2>
+    <ul class="items">
+      <li><span class="tag t-warn">ĐỔI</span> <b>Loại mủ không còn mặc định “Mủ tạp”</b>. Chưa chọn thì
+          <b>không tạo được phiếu</b> — tránh phiếu mủ nước bị ghi nhầm thành mủ tạp.</li>
+      <li><span class="tag t-new">MỚI</span> Phiếu có <b>ĐỐT / DRC</b> mà loại mủ <b>không phải Mủ nước</b>
+          → hệ thống <b>cảnh báo</b> trước khi hoàn tất (vì ĐỐT/DRC chỉ có ở mủ nước).</li>
+      <li><span class="tag t-new">MỚI</span> <b>Sửa lại loại mủ được</b> cho tới khi bấm <b>Hoàn tất</b>.
+          Trước đây khóa ngay sau khi tạo, chọn nhầm là phải nhờ admin.</li>
+    </ul>
+    <div class="note">Chọn nhầm loại mủ làm sai: khối lượng khô, tiền trả đại lý và thưởng tháng. Nhớ bấm chọn.</div>
+  </section>
+
+  <section>
+    <h2>🚚 Lệnh điều động <span class="who">Vận tải · Tài xế</span></h2>
+    <ul class="items">
+      <li><span class="tag t-new">MỚI</span> Loại chuyến <b>“Hàng thương mại”</b> — mua hàng của
+          <b>nhà máy khác</b> để bán cho khách.</li>
+      <li><span class="tag t-new">MỚI</span> Ô <b>📦 Điểm BỐC hàng</b> + <b>người liên hệ tại điểm bốc</b>.
+          Thông tin này <b>in lên cả 2 chứng từ</b> (Lệnh điều động &amp; Biên bản bàn giao) →
+          tài xế biết <b>đi đâu lấy hàng, gọi cho ai</b>.</li>
+      <li><span class="tag t-warn">QUAN TRỌNG</span> Hàng thương mại <b>không qua trạm cân Huy Anh</b>.
+          Giao xong phải vào chi tiết lệnh bấm <b class="hl">“Đánh dấu ĐÃ GIAO (bốc ngoài)”</b>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>📦 Đơn hàng bán <span class="who">Sale · Ban giám đốc</span></h2>
+    <ul class="items">
+      <li><span class="tag t-new">MỚI</span> 2 cột <b>Đã giao (T)</b> và <b>Còn thiếu (T)</b> cho từng đơn.
+          Đơn giao xong hiện <b>“Đủ”</b>.</li>
+      <li><span class="tag t-new">MỚI</span> <b>Dòng TỔNG</b> ngay trên bảng. Chọn <b>Grade = RSS</b> (hay bất kỳ loại nào)
+          → biết ngay <b class="hl">còn thiếu bao nhiêu tấn</b> trên <b>toàn bộ</b> đơn khớp lọc
+          (không phải chỉ trang đang xem).</li>
+      <li><span class="tag t-new">MỚI</span> Nút <b>“Xuất Excel (theo bộ lọc)”</b> — xuất <b>hết</b> đơn khớp bộ lọc,
+          <b>không phải tick từng đơn</b> như trước.</li>
+      <li><span class="tag t-chg">ĐẸP HƠN</span> File Excel có <b>tiêu đề công ty, bộ lọc đang áp, định dạng số/ngày,
+          dòng TỔNG, khóa dòng tiêu đề, bộ lọc sẵn</b> và sheet <b>Chú thích</b>.</li>
+    </ul>
+    <div class="note">Số trong file Excel <b>luôn trùng</b> số trên màn hình (dùng chung một cách tính).</div>
+  </section>
+
+  <section>
+    <h2>📊 Thống kê mủ <span class="who">Thu mua · BGĐ</span></h2>
+    <ul class="items">
+      <li><span class="tag t-chg">GỌN</span> Bộ lọc loại mủ chỉ còn <b>Mủ nước</b> và <b>Mủ tạp</b>
+          (bỏ các loại không dùng).</li>
+      <li><span class="tag t-new">MỚI</span> Bảng <b>Top đại lý</b> thêm cột <b>KL (T)</b> →
+          xem mủ tạp không còn thấy toàn số 0.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>💰 Tài chính <span class="who">Admin · Kế toán</span></h2>
+    <ul class="items">
+      <li><span class="tag t-new">MỚI</span> Tài sản đảm bảo: thêm loại <b>“Quyền đòi nợ (khoản phải thu)”</b>.</li>
+      <li><span class="tag t-new">MỚI</span> <b>Nhật ký kiểm toán</b> (chỉ Admin) — ghi lại <b>ai</b> sửa <b>gì</b>,
+          <b>lúc nào</b> trong toàn bộ module Tài chính.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>🕐 Chấm công <span class="who">Hành chính · Nhân sự</span></h2>
+    <ul class="items">
+      <li><span class="tag t-new">MỚI</span> Nút <b>📥 xuất Excel cá nhân</b> ngay trên từng dòng nhân viên —
+          ra <b>phiếu chấm công riêng</b> của người đó (mỗi ngày 1 dòng: ca, giờ vào/ra, công, trễ, OT).</li>
+      <li><span class="tag t-chg">RỘNG HƠN</span> Bảng chấm công dùng <b>trọn bề ngang màn hình</b>, dễ nhìn hơn.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Có gì bất thường hoặc số liệu chưa đúng, vui lòng báo lại để xử lý.<br>
+    Hỗ trợ kỹ thuật: <b>Lê Duy Minh</b> — 0901120167 · minhld@huyanhrubber.com
+  </footer>
+
+</div>
+</body>
+</html>

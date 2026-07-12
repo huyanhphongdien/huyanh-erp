@@ -589,7 +589,7 @@ const SalesOrderListPage = () => {
           let qty = 0, delivered = 0, shortage = 0, estimated = false
           for (const r of live) {
             qty += r.quantity_tons || 0
-            const d = deliveredTons(r.quantity_tons, prog[r.id])
+            const d = deliveredTons(r.quantity_tons, prog[r.id], r.status)
             delivered += d.tons
             if (d.estimated) estimated = true
             shortage += remainingTons(r.quantity_tons, prog[r.id], r.status)
@@ -1120,7 +1120,7 @@ const SalesOrderListPage = () => {
       align: 'right',
       render: (_: unknown, r: SalesOrder) => {
         if (r.status === 'cancelled') return gray(null)
-        const d = deliveredTons(r.quantity_tons, lotProgress[r.id])
+        const d = deliveredTons(r.quantity_tons, lotProgress[r.id], r.status)
         if (!d.tons) return gray(null)
         return mono(`${d.tons.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}${d.estimated ? ' ~' : ''}`)
       },
@@ -1717,6 +1717,14 @@ const SalesOrderListPage = () => {
           )}
           {summary.truncated && (
             <span style={{ color: '#dc2626', fontWeight: 600 }}>⚠ Tổng chưa đủ đơn — thu hẹp bộ lọc</span>
+          )}
+          {/* Bộ lọc Grade lọc theo grade CẤP ĐƠN, còn SL là tấn CẢ ĐƠN. Hệ thống có 2 đơn
+              nhiều loại hàng → với các đơn đó tổng gồm cả tấn loại khác. Nói rõ, không để
+              khách tưởng đây là con số tuyệt đối riêng cho grade đang lọc. */}
+          {gradeFilter && (
+            <span style={{ color: '#92400e' }}>
+              ⓘ Tổng tính theo tấn <b>cả đơn</b> — đơn có nhiều loại hàng sẽ gồm cả loại khác
+            </span>
           )}
         </div>
       )}

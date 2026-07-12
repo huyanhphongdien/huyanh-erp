@@ -481,7 +481,18 @@ const DELIVERED_ORDER_STATUSES = new Set(['delivered', 'shipped', 'invoiced', 'p
  * KL lấy net_weight_kg (KL hàng trong cont) — KHÔNG lấy actual_weight_kg của cân
  * (số cân gồm cả pallet/bao bì). actual_weight_kg chỉ là CỜ "đã cân = đã giao".
  */
-export function deliveredTons(qtyTons?: number | null, p?: LotProgress): { tons: number; estimated: boolean } {
+export function deliveredTons(
+  qtyTons?: number | null, p?: LotProgress, status?: string | null,
+): { tons: number; estimated: boolean } {
+  const q = qtyTons || 0
+  // ĐÃ GIAO XONG (theo trạng thái đơn, hoặc mọi container đã giao) → coi như giao ĐỦ
+  // hợp đồng. BẮT BUỘC: 38 đơn giao qua phiếu cân/xuất kho không có dữ liệu container
+  // → nếu để "đã giao = 0" thì banner ra "SL 100 · Đã giao 0 · Còn thiếu 0", cộng không
+  // khớp. Kẹp ở đây để LUÔN có: SL = Đã giao + Còn thiếu.
+  if ((status && DELIVERED_ORDER_STATUSES.has(status)) ||
+      (p && p.contsTotal > 0 && p.contsDelivered === p.contsTotal)) {
+    return { tons: q, estimated: false }
+  }
   if (!p || p.contsTotal === 0) return { tons: 0, estimated: false }
   const known = (p.deliveredKg || 0) / 1000
   if (!p.deliveredContsNoKg) return { tons: known, estimated: false }
@@ -502,9 +513,8 @@ export function deliveredTons(qtyTons?: number | null, p?: LotProgress): { tons:
  *   thì chúng bị tính thiếu NGUYÊN hợp đồng → tổng "còn thiếu" thổi phồng.
  */
 export function remainingTons(qtyTons?: number | null, p?: LotProgress, status?: string | null): number {
-  if (status && DELIVERED_ORDER_STATUSES.has(status)) return 0
-  if (p && p.contsTotal > 0 && p.contsDelivered === p.contsTotal) return 0
-  return Math.max(0, (qtyTons || 0) - deliveredTons(qtyTons, p).tons)
+  // deliveredTons đã tự kẹp "giao đủ" cho 2 trường hợp trên → luôn có SL = Đã giao + Còn thiếu.
+  return Math.max(0, (qtyTons || 0) - deliveredTons(qtyTons, p, status).tons)
 }
 
 /**

@@ -457,17 +457,60 @@ async function getDeliveryStatus(containerIds: string[]): Promise<Record<string,
   return map
 }
 
-/** Tiến độ lô của 1 đơn — cho danh sách (3 view): bao nhiêu cont/lô, đã giao bao nhiêu. */
+/**
+ * Tiến độ lô của 1 đơn — cho danh sách (3 view) + cột "Còn thiếu (tấn)" + dòng TỔNG.
+ * KL để ở KG (nguồn gốc); quy ra tấn bằng deliveredTons()/remainingTons() bên dưới,
+ * để MÀN HÌNH và EXCEL luôn dùng CHUNG một công thức (không thể lệch nhau).
+ */
 export interface LotProgress {
   contsTotal: number
   contsDelivered: number
   lotsTotal: number
   lotsDelivered: number
+  plannedKg: number           // Σ net_weight_kg của MỌI container trong đơn
+  deliveredKg: number         // Σ net_weight_kg của container ĐÃ giao
+  contsWithKg: number         // số container CÓ net_weight_kg (để ước lượng)
+  deliveredContsNoKg: number  // container đã giao nhưng CHƯA nhập net_weight_kg
+}
+
+/** Trạng thái đơn coi như ĐÃ GIAO XONG → không còn thiếu gì nữa. */
+const DELIVERED_ORDER_STATUSES = new Set(['delivered', 'shipped', 'invoiced', 'paid'])
+
+/**
+ * KL đã giao (tấn). `estimated` = có container đã giao mà chưa nhập KL → phải ước lượng.
+ * KL lấy net_weight_kg (KL hàng trong cont) — KHÔNG lấy actual_weight_kg của cân
+ * (số cân gồm cả pallet/bao bì). actual_weight_kg chỉ là CỜ "đã cân = đã giao".
+ */
+export function deliveredTons(qtyTons?: number | null, p?: LotProgress): { tons: number; estimated: boolean } {
+  if (!p || p.contsTotal === 0) return { tons: 0, estimated: false }
+  const known = (p.deliveredKg || 0) / 1000
+  if (!p.deliveredContsNoKg) return { tons: known, estimated: false }
+  // Ước lượng cho cont đã giao mà thiếu KL: ưu tiên KL TB của các cont ĐÃ CÓ KL;
+  // nếu cả đơn chưa cont nào có KL thì mới chia đều theo SL hợp đồng.
+  const avg = p.contsWithKg > 0
+    ? (p.plannedKg / p.contsWithKg) / 1000
+    : (qtyTons || 0) / p.contsTotal
+  return { tons: known + p.deliveredContsNoKg * avg, estimated: true }
 }
 
 /**
- * Tiến độ lô CHO NHIỀU ĐƠN cùng lúc (2 query batch) — dùng ở list/kanban/split.
- *  - đã giao container = có dòng lệnh điều động với actual_weight_kg.
+ * KL còn thiếu (tấn) = SL hợp đồng − đã giao, KẸP về 0 khi:
+ *  - đơn đã ở trạng thái giao xong (delivered/shipped/invoiced/paid), HOẶC
+ *  - mọi container của đơn đã giao.
+ * ⚠ BẮT BUỘC: 38 đơn đã giao xong KHÔNG có dòng lệnh điều động (giao qua phiếu cân /
+ *   xuất kho, hoặc giao trước khi có module Lệnh điều động). Không kẹp theo trạng thái
+ *   thì chúng bị tính thiếu NGUYÊN hợp đồng → tổng "còn thiếu" thổi phồng.
+ */
+export function remainingTons(qtyTons?: number | null, p?: LotProgress, status?: string | null): number {
+  if (status && DELIVERED_ORDER_STATUSES.has(status)) return 0
+  if (p && p.contsTotal > 0 && p.contsDelivered === p.contsTotal) return 0
+  return Math.max(0, (qtyTons || 0) - deliveredTons(qtyTons, p).tons)
+}
+
+/**
+ * Tiến độ lô CHO NHIỀU ĐƠN cùng lúc (2 query batch) — dùng ở list/kanban/split + dòng TỔNG.
+ *  - container ĐÃ GIAO = có dòng lệnh điều động với actual_weight_kg != null,
+ *    HOẶC container.status = 'shipped' (giao qua phiếu cân/xuất kho, không có lệnh).
  *  - 1 lô "đã giao" khi mọi container của lô đã giao.
  */
 async function getLotProgressForOrders(orderIds: string[]): Promise<Record<string, LotProgress>> {
@@ -475,11 +518,17 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
   const ids = [...new Set((orderIds || []).filter(Boolean))]
   if (ids.length === 0) return out
 
-  const { data: conts } = await supabase
-    .from('sales_order_containers')
-    .select('id, sales_order_id, lot_no')
-    .in('sales_order_id', ids)
-  const rows = (conts || []) as Array<{ id: string; sales_order_id: string; lot_no: number | null }>
+  type ContRow = { id: string; sales_order_id: string; lot_no: number | null; net_weight_kg: number | null; status: string | null }
+  // Chunk cả orderIds: dòng TỔNG truyền TOÀN BỘ đơn khớp bộ lọc (có thể hàng trăm)
+  // → IN(...) dài làm phình URL → HTTP 414 → tổng im lặng về 0.
+  const rows: ContRow[] = []
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await supabase
+      .from('sales_order_containers')
+      .select('id, sales_order_id, lot_no, net_weight_kg, status')
+      .in('sales_order_id', ids.slice(i, i + 100))
+    rows.push(...((data || []) as ContRow[]))
+  }
   if (rows.length === 0) return out
 
   // container đã giao — chunk IN tránh URL quá dài
@@ -495,26 +544,39 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
       if (l.actual_weight_kg != null && l.sales_order_container_id) deliveredSet.add(l.sales_order_container_id)
     }
   }
+  // Bù cho đơn giao qua phiếu cân/xuất kho (không sinh dòng lệnh điều động).
+  for (const r of rows) if (r.status === 'shipped') deliveredSet.add(r.id)
 
-  const byOrder = new Map<string, Array<{ id: string; lot: number | null }>>()
+  const byOrder = new Map<string, ContRow[]>()
   for (const r of rows) {
     if (!byOrder.has(r.sales_order_id)) byOrder.set(r.sales_order_id, [])
-    byOrder.get(r.sales_order_id)!.push({ id: r.id, lot: r.lot_no })
+    byOrder.get(r.sales_order_id)!.push(r)
   }
   for (const [oid, cs] of byOrder) {
     const lots = new Map<number, { total: number; delivered: number }>()
+    let plannedKg = 0, deliveredKg = 0, contsWithKg = 0, deliveredContsNoKg = 0, contsDelivered = 0
     for (const c of cs) {
-      if (c.lot == null) continue
-      if (!lots.has(c.lot)) lots.set(c.lot, { total: 0, delivered: 0 })
-      const L = lots.get(c.lot)!
+      const kg = c.net_weight_kg ?? 0
+      plannedKg += kg
+      if (c.net_weight_kg != null) contsWithKg++
+      const done = deliveredSet.has(c.id)
+      if (done) {
+        contsDelivered++
+        deliveredKg += kg
+        if (c.net_weight_kg == null) deliveredContsNoKg++
+      }
+      if (c.lot_no == null) continue
+      if (!lots.has(c.lot_no)) lots.set(c.lot_no, { total: 0, delivered: 0 })
+      const L = lots.get(c.lot_no)!
       L.total++
-      if (deliveredSet.has(c.id)) L.delivered++
+      if (done) L.delivered++
     }
     out[oid] = {
       contsTotal: cs.length,
-      contsDelivered: cs.filter((c) => deliveredSet.has(c.id)).length,
+      contsDelivered,
       lotsTotal: lots.size,
       lotsDelivered: [...lots.values()].filter((L) => L.total > 0 && L.delivered === L.total).length,
+      plannedKg, deliveredKg, contsWithKg, deliveredContsNoKg,
     }
   }
   return out

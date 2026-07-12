@@ -174,7 +174,69 @@ const VALID_TRANSITIONS: Record<SalesOrderStatus, SalesOrderStatus[]> = {
 // SERVICE
 // ============================================================================
 
+/**
+ * Bộ lọc DÙNG CHUNG cho getList() và getAllForSummary().
+ * BẮT BUỘC dùng chung: nếu 2 nơi lọc khác nhau thì DÒNG TỔNG sẽ không khớp
+ * danh sách đang hiển thị — và đó là con số khách dùng để lên kế hoạch.
+ */
+function applyListFilters<T>(query: T, params: SalesOrderListParams): T {
+  const { search, status, customer_id, grade, date_from, date_to } = params
+  let q: any = query
+  if (status && status !== 'all') q = q.eq('status', status)
+  if (customer_id) q = q.eq('customer_id', customer_id)
+  if (grade) q = q.eq('grade', grade)
+  if (date_from) q = q.gte('order_date', date_from)
+  if (date_to) q = q.lte('order_date', date_to)
+  if (params.overdue_etd_only) {
+    const today = new Date().toISOString().split('T')[0]
+    q = q.lt('etd', today).not('status', 'in', '(delivered,invoiced,paid,cancelled)')
+  }
+  if (search) {
+    q = q.or(
+      `contract_no.ilike.%${search}%,code.ilike.%${search}%,customer_po.ilike.%${search}%,grade.ilike.%${search}%,booking_reference.ilike.%${search}%,bl_number.ilike.%${search}%,bank_name.ilike.%${search}%,vessel_name.ilike.%${search}%`,
+    )
+  }
+  return q as T
+}
+
+/** Dòng nhẹ cho DÒNG TỔNG (chỉ 4 cột) — không kéo cả đơn về. */
+export interface SalesOrderSummaryRow {
+  id: string
+  quantity_tons: number | null
+  total_value_usd: number | null
+  status: string
+  grade: string | null
+}
+
 export const salesOrderService = {
+  /**
+   * TOÀN BỘ đơn khớp bộ lọc (KHÔNG phân trang) — cho DÒNG TỔNG.
+   * Khách hỏi "lọc RSS → còn thiếu bao nhiêu tấn" ⇒ tổng của 10 dòng/trang là VÔ NGHĨA.
+   * ⚠ Loop theo trang 1000: PostgREST có db.max_rows (thường 1000) và CẮT ÂM THẦM,
+   *   không báo lỗi → tổng sẽ thiếu mà không ai biết. Trả kèm `total` để UI cảnh báo.
+   */
+  async getAllForSummary(
+    params: SalesOrderListParams,
+  ): Promise<{ rows: SalesOrderSummaryRow[]; total: number; truncated: boolean }> {
+    const PAGE = 1000
+    const CAP = 5000
+    const rows: SalesOrderSummaryRow[] = []
+    let total = 0
+    for (let from = 0; from < CAP; from += PAGE) {
+      let q = supabase
+        .from('sales_orders')
+        .select('id, quantity_tons, total_value_usd, status, grade', { count: 'exact' })
+      q = applyListFilters(q, params)
+      const { data, error, count } = await q.range(from, from + PAGE - 1)
+      if (error) throw error
+      total = count ?? total
+      const batch = (data || []) as SalesOrderSummaryRow[]
+      rows.push(...batch)
+      if (batch.length < PAGE || rows.length >= total) break
+    }
+    return { rows, total, truncated: rows.length < total }
+  },
+
   // ==========================================================================
   // GENERATE CODE — SO-YYYY-XXXX
   // ==========================================================================
@@ -236,42 +298,7 @@ export const salesOrderService = {
       .from('sales_orders')
       .select(SELECT_WITH_CUSTOMER, { count: 'exact' })
 
-    // Lọc theo trạng thái
-    if (status && status !== 'all') {
-      query = query.eq('status', status)
-    }
-
-    // Lọc theo khách hàng
-    if (customer_id) {
-      query = query.eq('customer_id', customer_id)
-    }
-
-    // Lọc theo cấp mủ
-    if (grade) {
-      query = query.eq('grade', grade)
-    }
-
-    // Lọc theo khoảng ngày đặt hàng
-    if (date_from) {
-      query = query.gte('order_date', date_from)
-    }
-    if (date_to) {
-      query = query.lte('order_date', date_to)
-    }
-
-    // Filter "chỉ đơn quá ETD chưa giao" (dùng từ Watchlist click → jump qua list)
-    if (params.overdue_etd_only) {
-      const today = new Date().toISOString().split('T')[0]
-      query = query.lt('etd', today)
-        .not('status', 'in', '(delivered,invoiced,paid,cancelled)')
-    }
-
-    // Tìm kiếm thông minh: số HĐ, mã hệ thống, PO#, grade, booking, B/L, ngân hàng
-    if (search) {
-      query = query.or(
-        `contract_no.ilike.%${search}%,code.ilike.%${search}%,customer_po.ilike.%${search}%,grade.ilike.%${search}%,booking_reference.ilike.%${search}%,bl_number.ilike.%${search}%,bank_name.ilike.%${search}%,vessel_name.ilike.%${search}%`,
-      )
-    }
+    query = applyListFilters(query, params)
 
     // Sắp xếp — explicit NULLS LAST khi ASC để đơn chưa có giá trị
     // (vd ETD null) xuống cuối list. Secondary sort by id để stable order

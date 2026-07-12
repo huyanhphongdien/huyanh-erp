@@ -46,7 +46,7 @@ import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams } from '../../services/sales/salesOrderService'
-import { dispatchService, type LotProgress } from '../../services/logistics/dispatchService'
+import { dispatchService, deliveredTons, remainingTons, type LotProgress } from '../../services/logistics/dispatchService'
 import LotProgressBadge from '../../components/sales/LotProgressBadge'
 import StagePill from '../../components/common/StagePill'
 import type { SalesStage } from '../../services/sales/salesStages'
@@ -122,6 +122,8 @@ const SORT_FIELD_LABELS: Record<string, string> = {
   grade: 'Grade',
   customer_po: 'Số LOT',
   quantity_tons: 'Số lượng (tấn)',
+  delivered_tons: 'Đã giao (tấn)',
+  shortage: 'Còn thiếu (tấn)',
   unit_price: 'Đơn giá',
   total_value_usd: 'Thành tiền',
   bank_name: 'Ngân hàng',
@@ -216,6 +218,9 @@ const SalesOrderListPage = () => {
   // State
   const [orders, setOrders] = useState<SalesOrder[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})  // tiến độ lô từng đơn
+  // DÒNG TỔNG — tính trên TOÀN BỘ đơn khớp bộ lọc (KHÔNG chỉ trang hiện tại).
+  // Khách lọc Grade=RSS rồi hỏi "còn thiếu bao nhiêu tấn" ⇒ tổng của 10 dòng là vô nghĩa.
+  const [summary, setSummary] = useState<{ orders: number; qty: number; delivered: number; shortage: number; estimated: boolean; truncated: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState<SalesOrderStats>({
@@ -575,6 +580,23 @@ const SalesOrderListPage = () => {
       // Tiến độ lô cho 3 view (best-effort, không chặn list)
       dispatchService.getLotProgressForOrders(response.data.map((o) => o.id))
         .then(setLotProgress).catch(() => {})
+
+      // DÒNG TỔNG trên TOÀN BỘ bộ lọc (best-effort — lỗi thì ẩn dòng tổng, không chặn list)
+      salesOrderService.getAllForSummary(params)
+        .then(async ({ rows, truncated }) => {
+          const live = rows.filter((r) => r.status !== 'cancelled')   // đơn hủy KHÔNG phải nợ hàng
+          const prog = await dispatchService.getLotProgressForOrders(live.map((r) => r.id))
+          let qty = 0, delivered = 0, shortage = 0, estimated = false
+          for (const r of live) {
+            qty += r.quantity_tons || 0
+            const d = deliveredTons(r.quantity_tons, prog[r.id])
+            delivered += d.tons
+            if (d.estimated) estimated = true
+            shortage += remainingTons(r.quantity_tons, prog[r.id], r.status)
+          }
+          setSummary({ orders: live.length, qty, delivered, shortage, estimated, truncated })
+        })
+        .catch(() => setSummary(null))
     } catch (error) {
       console.error('Error fetching orders:', error)
       message.error('Không thể tải danh sách đơn hàng')
@@ -679,7 +701,11 @@ const SalesOrderListPage = () => {
         remaining: 'remaining_amount',
         payment_date: 'payment_received_date',
       }
-      setSortBy(fieldMap[field] || field)
+      // Whitelist: cột client-only (delivered_tons/shortage/lot_progress) KHÔNG có ở DB.
+      // Nếu lỡ để lọt vào .order() → Supabase 400 → DANH SÁCH TRẮNG.
+      const mapped = fieldMap[field]
+      if (!mapped) return
+      setSortBy(mapped)
       setSortOrder(single.order === 'ascend' ? 'asc' : 'desc')
     } else if (single && single.field && !single.order) {
       // User click lần 3 trên cùng cột → clear sort → fallback default
@@ -1085,6 +1111,33 @@ const SalesOrderListPage = () => {
       sorter: true,
       sortOrder: sortedColumn('qty'),
       render: (v: number) => v != null ? mono(v.toLocaleString('vi-VN')) : gray(null),
+    },
+    {
+      // "~" = có container đã giao nhưng chưa nhập KL → phải ước lượng.
+      title: hdr('Đã giao (T)'),
+      key: 'delivered_tons',
+      width: 92,
+      align: 'right',
+      render: (_: unknown, r: SalesOrder) => {
+        if (r.status === 'cancelled') return gray(null)
+        const d = deliveredTons(r.quantity_tons, lotProgress[r.id])
+        if (!d.tons) return gray(null)
+        return mono(`${d.tons.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}${d.estimated ? ' ~' : ''}`)
+      },
+    },
+    {
+      title: hdr('Còn thiếu (T)'),
+      key: 'shortage',
+      width: 100,
+      align: 'right',
+      render: (_: unknown, r: SalesOrder) => {
+        if (r.status === 'cancelled') return gray(null)
+        const rem = remainingTons(r.quantity_tons, lotProgress[r.id], r.status)
+        if (rem <= 0) return <Tag color="green" style={{ margin: 0 }}>Đủ</Tag>
+        return <b style={{ color: '#dc2626', fontFamily: 'monospace' }}>
+          {rem.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+        </b>
+      },
     },
     {
       title: hdr('Hạn giao'),
@@ -1643,6 +1696,31 @@ const SalesOrderListPage = () => {
         </div>
       )}
 
+      {/* DÒNG TỔNG — tính trên TOÀN BỘ đơn khớp bộ lọc, KHÔNG phải trang hiện tại.
+          Đây là con số khách dùng: "lọc Grade = RSS → còn thiếu bao nhiêu tấn". */}
+      {summary && summary.orders > 0 && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 20,
+          padding: '10px 14px', marginBottom: 10, borderRadius: 8,
+          background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: 13,
+        }}>
+          <span style={{ fontWeight: 700, color: '#1B4D3E' }}>
+            TỔNG · {summary.orders} đơn <span style={{ fontWeight: 400, color: '#64748b' }}>(toàn bộ bộ lọc, trừ đơn hủy)</span>
+          </span>
+          <span>SL: <b style={{ fontFamily: 'monospace' }}>{summary.qty.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}</b> T</span>
+          <span>Đã giao: <b style={{ fontFamily: 'monospace', color: '#15803d' }}>
+            {summary.delivered.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}{summary.estimated ? ' ~' : ''}</b> T</span>
+          <span>Còn thiếu: <b style={{ fontFamily: 'monospace', color: '#dc2626', fontSize: 15 }}>
+            {summary.shortage.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}</b> T</span>
+          {summary.estimated && (
+            <span style={{ color: '#92400e' }}>~ = có container đã giao chưa nhập KL → ước lượng</span>
+          )}
+          {summary.truncated && (
+            <span style={{ color: '#dc2626', fontWeight: 600 }}>⚠ Tổng chưa đủ đơn — thu hẹp bộ lọc</span>
+          )}
+        </div>
+      )}
+
       {/* Body: Split view HOẶC Table view tuỳ viewMode */}
       {viewMode === 'split' ? (
         <SalesOrderSplitView
@@ -1709,7 +1787,7 @@ const SalesOrderListPage = () => {
             pageSizeOptions: ['10', '20', '50'],
           }}
           onChange={handleTableChange}
-          scroll={{ x: 1600 }}
+          scroll={{ x: 1800 }}
           size={densityConfig.size}
           locale={{
             emptyText: (

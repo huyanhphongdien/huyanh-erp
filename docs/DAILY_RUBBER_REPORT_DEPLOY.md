@@ -34,8 +34,32 @@ Trả về JSON `{ success, sent_to, subject, stats }`.
 > Body `{"range":"today"}` → xem nhanh HÔM NAY 00:00 → giờ gọi (không phải kỳ chuẩn).
 
 ## 3. Đổi lịch cron sang 21:00 VN (pg_cron — chạy 1 lần ở Supabase SQL Editor)
-21:00 VN = **14:00 UTC** → cron `0 14 * * *`. Thay `<SERVICE_ROLE_KEY>` bằng key thật.
+21:00 VN = **14:00 UTC** → cron `0 14 * * *`.
 
+### Cách A (khuyên dùng) — giữ nguyên key của job cũ, khỏi phải dán lại
+```sql
+do $$
+declare cmd text;
+begin
+  -- Mượn lại command của job cũ (đã chứa sẵn SERVICE_ROLE_KEY) → không phải lộ key lần nữa.
+  select command into cmd from cron.job
+   where jobname like 'daily-rubber-report%' and command ilike '%daily-rubber-report%'
+   order by jobname limit 1;
+  if cmd is null then
+    raise exception 'Không thấy job cũ. Xem: select jobname from cron.job; rồi dùng Cách B.';
+  end if;
+
+  perform cron.unschedule(jobid) from cron.job where jobname like 'daily-rubber-report%';
+  perform cron.schedule('daily-rubber-report-2100', '0 14 * * *', cmd);
+end $$;
+
+-- Phải thấy ĐÚNG 1 dòng: daily-rubber-report-2100 | 0 14 * * * | t
+select jobname, schedule, active from cron.job where jobname like 'daily-rubber-report%';
+```
+> Body của job cũ là `{"range":"prevday"}` — code mới map nó về đúng kỳ 21:00→21:00, nên
+> giữ nguyên command vẫn chạy đúng.
+
+### Cách B — tạo mới hoàn toàn (phải thay `<SERVICE_ROLE_KEY>`)
 ```sql
 -- Huỷ MỌI job cũ (18:00 / 00:05 / 00:01). No-op nếu không tồn tại.
 select cron.unschedule(jobid) from cron.job

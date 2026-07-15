@@ -90,12 +90,9 @@
   table.sum td,table.sum th{white-space:normal; vertical-align:middle; padding:10px 9px}
   table.sum .down{color:var(--good); font-weight:800; font-variant-numeric:tabular-nums; line-height:1.35}
   tr.reco td,tr.reco th{background:var(--good-bg)}
-  /* Collapsible detail */
-  details.detail{margin-top:14px}
-  details.detail summary{cursor:pointer; font-weight:700; color:var(--brand); font-size:14px; padding:9px 2px; list-style:none; user-select:none}
-  details.detail summary::-webkit-details-marker{display:none}
-  details.detail summary:before{content:"▸ "}
-  details.detail[open] summary:before{content:"▾ "}
+  .detail-h{margin:16px 0 6px; font-weight:700; color:var(--brand); font-size:14px}
+  .callout.info{background:var(--accent-bg); color:var(--accent); border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+  table.motors td:first-child,table.motors th:first-child{width:36px; font-weight:800}
 
   /* Steps */
   ol.steps{list-style:none; counter-reset:s; margin:0; padding:0}
@@ -131,11 +128,11 @@
     <!-- Executive summary -->
     <section class="exec">
       <div class="sec-h"><span class="n">★</span><h2>Tóm tắt cho lãnh đạo</h2></div>
-      <p class="lead">Cụm <strong>5 quạt lò Apron</strong> hiện chạy 50&nbsp;Hz tiêu thụ <strong>≈ 247&nbsp;kW</strong>, góp phần làm máy biến áp <strong>vượt công suất</strong>, gây sụt áp và tự nhảy điện giờ cao điểm. Dùng <strong>biến tần sẵn có</strong> hạ tốc độ quạt theo 3 mức để giảm tải — <strong>không tốn chi phí đầu tư</strong>.</p>
+      <p class="lead">Máy biến áp (1.250&nbsp;kVA) đang <strong>quá tải ~134%</strong> <span class="u">(ước tính)</span> → nóng máy, và <strong>sụt áp/nhảy điện khi khởi động máy lớn</strong>. Hai biện pháp <strong>không tốn chi phí</strong>: ① <strong>hạ tốc 5 quạt lò Apron</strong> bằng biến tần → giảm kW <strong>thường trực</strong> (bên dưới); ② <strong>khởi động động cơ lớn line ướt lần lượt</strong> → chống <strong>nhảy điện lúc khởi động</strong> (mục 6). Cụm quạt lò chạy 50&nbsp;Hz ≈ 247&nbsp;kW:</p>
       <div class="stat-row">
-        <div class="stat"><div class="lv">Mức 1 (nhẹ)</div><div class="big">−160 kW</div><div class="a">≈ −287 A</div><div class="sub">còn 86,6 kW · ~65%</div></div>
-        <div class="stat"><div class="lv">Mức 2 (vừa)</div><div class="big">−137 kW</div><div class="a">≈ −244 A</div><div class="sub">còn 110,3 kW · ~55%</div></div>
-        <div class="stat"><div class="lv">Mức 3 (cao)</div><div class="big">−121 kW</div><div class="a">≈ −216 A</div><div class="sub">còn 126,3 kW · ~49%</div></div>
+        <div class="stat"><div class="lv">Mức 1 (nhẹ)</div><div class="big">−160 kW</div><div class="a">≈ −272 A</div><div class="sub">còn 86,6 kW · ~65%</div></div>
+        <div class="stat"><div class="lv">Mức 2 (vừa)</div><div class="big">−137 kW</div><div class="a">≈ −232 A</div><div class="sub">còn 110,3 kW · ~55%</div></div>
+        <div class="stat"><div class="lv">Mức 3 (cao)</div><div class="big">−121 kW</div><div class="a">≈ −205 A</div><div class="sub">còn 126,3 kW · ~49%</div></div>
       </div>
       <div class="badge-note">Đề xuất bắt đầu ở <strong>Mức 2</strong> (cân bằng tiết kiệm &amp; an toàn quá trình), theo dõi rồi hạ dần về Mức 1 trong giờ cao điểm. Quạt làm mát giữ nguyên 50&nbsp;Hz.</div>
     </section>
@@ -169,53 +166,51 @@
             </tr>
           </thead>
           <tbody>
-            <tr><th class="dev">50 Hz <span class="u">(hiện tại)</span></th><td>247 kW</td><td>~441 A</td><td class="u">—</td></tr>
-            <tr><th class="dev">Mức 1 <span class="u">(nhẹ)</span></th><td>86,6 kW</td><td>~155 A</td><td class="down">−160 kW<br>~287 A</td></tr>
-            <tr class="reco"><th class="dev">Mức 2 <span class="u">(vừa)</span> ★</th><td>110,3 kW</td><td>~197 A</td><td class="down">−137 kW<br>~244 A</td></tr>
-            <tr><th class="dev">Mức 3 <span class="u">(cao)</span></th><td>126,3 kW</td><td>~226 A</td><td class="down">−121 kW<br>~216 A</td></tr>
+            <tr><th class="dev">50 Hz <span class="u">(hiện tại)</span></th><td>247 kW</td><td>~419 A</td><td class="u">—</td></tr>
+            <tr><th class="dev">Mức 1 <span class="u">(nhẹ)</span></th><td>86,6 kW</td><td>~147 A</td><td class="down">−160 kW<br>~272 A</td></tr>
+            <tr class="reco"><th class="dev">Mức 2 <span class="u">(vừa)</span> ★</th><td>110,3 kW</td><td>~187 A</td><td class="down">−137 kW<br>~232 A</td></tr>
+            <tr><th class="dev">Mức 3 <span class="u">(cao)</span></th><td>126,3 kW</td><td>~214 A</td><td class="down">−121 kW<br>~205 A</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="scroll-hint">★ Mức 2 = khuyến nghị bắt đầu. Dòng điện quy đổi theo lưới 3 pha <strong>380V, cosφ ≈ 0,85</strong> <span class="u">— ước tính, đối chiếu dòng đo thực ở mục 5</span>.</p>
+      <p class="scroll-hint">★ Mức 2 = khuyến nghị bắt đầu. Dòng điện quy đổi theo lưới 3 pha <strong>400V, cosφ ≈ 0,85</strong> <span class="u">— ước tính, đối chiếu dòng đo thực ở mục 5</span>.</p>
 
       <div class="callout warn">
         <span class="ic">❄️</span>
         <span><strong>Quạt làm mát</strong> (Cooling 1/2/3) <strong>giữ nguyên 50&nbsp;Hz</strong> — tổng ≈ 108,5&nbsp;kW, không giảm để bảo đảm khả năng làm mát.</span>
       </div>
 
-      <details class="detail">
-        <summary>Chi tiết Hz &amp; kW từng quạt</summary>
-        <div class="tbl-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th class="dev" rowspan="2">Thiết bị</th>
-                <th rowspan="2">Định mức<br><span class="u">(kW,50Hz)</span></th>
-                <th colspan="2">Mức 1</th>
-                <th colspan="2" class="lv2-col">Mức 2</th>
-                <th colspan="2">Mức 3</th>
-              </tr>
-              <tr class="sub">
-                <th>Hz</th><th>kW</th>
-                <th class="lv2-col">Hz</th><th class="lv2-col">kW</th>
-                <th>Hz</th><th>kW</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><th class="dev">Apron <span class="u">(tốc độ sấy)</span></th><td>—</td><td>14–16</td><td>—</td><td class="lv2-col">18–20</td><td class="lv2-col">—</td><td>22–25</td><td>—</td></tr>
-              <tr><th class="dev">Quạt F0</th><td>45</td><td>35</td><td>15,4</td><td class="lv2-col">40</td><td class="lv2-col">23</td><td>40</td><td>23</td></tr>
-              <tr><th class="dev">Quạt F1</th><td>90</td><td>35</td><td>30,9</td><td class="lv2-col">37</td><td class="lv2-col">36,5</td><td>40</td><td>46,1</td></tr>
-              <tr><th class="dev">Quạt F2</th><td>45</td><td>37</td><td>18,2</td><td class="lv2-col">40</td><td class="lv2-col">23</td><td>40</td><td>23</td></tr>
-              <tr><th class="dev">Quạt F3</th><td>45</td><td>37</td><td>18,2</td><td class="lv2-col">40</td><td class="lv2-col">23</td><td>42</td><td>26,7</td></tr>
-              <tr><th class="dev">Quạt F4</th><td>22</td><td>28</td><td>3,9</td><td class="lv2-col">30</td><td class="lv2-col">4,8</td><td>35</td><td>7,5</td></tr>
-              <tr class="total"><th class="dev">Tổng 5 quạt</th><td>247</td><td>—</td><td>86,6</td><td class="lv2-col">—</td><td class="lv2-col">110,3</td><td>—</td><td>126,3</td></tr>
-              <tr class="save"><th class="dev">Giảm tải (kW)</th><td>—</td><td>—</td><td>160,4</td><td>—</td><td>136,7</td><td>—</td><td>120,7</td></tr>
-              <tr class="save"><th class="dev">Giảm dòng (~A)</th><td>—</td><td>—</td><td>~287</td><td>—</td><td>~244</td><td>—</td><td>~216</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="scroll-hint">↔ Vuốt ngang. kW tự tính <span class="formula">P = Định mức × (Hz/50)³</span>; A theo 380V/cosφ 0,85.</p>
-      </details>
+      <p class="detail-h">Chi tiết Hz &amp; kW từng quạt</p>
+      <div class="tbl-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th class="dev" rowspan="2">Thiết bị</th>
+              <th rowspan="2">Định mức<br><span class="u">(kW,50Hz)</span></th>
+              <th colspan="2">Mức 1</th>
+              <th colspan="2" class="lv2-col">Mức 2</th>
+              <th colspan="2">Mức 3</th>
+            </tr>
+            <tr class="sub">
+              <th>Hz</th><th>kW</th>
+              <th class="lv2-col">Hz</th><th class="lv2-col">kW</th>
+              <th>Hz</th><th>kW</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th class="dev">Apron <span class="u">(tốc độ sấy)</span></th><td>—</td><td>14–16</td><td>—</td><td class="lv2-col">18–20</td><td class="lv2-col">—</td><td>22–25</td><td>—</td></tr>
+            <tr><th class="dev">Quạt F0</th><td>45</td><td>35</td><td>15,4</td><td class="lv2-col">40</td><td class="lv2-col">23</td><td>40</td><td>23</td></tr>
+            <tr><th class="dev">Quạt F1</th><td>90</td><td>35</td><td>30,9</td><td class="lv2-col">37</td><td class="lv2-col">36,5</td><td>40</td><td>46,1</td></tr>
+            <tr><th class="dev">Quạt F2</th><td>45</td><td>37</td><td>18,2</td><td class="lv2-col">40</td><td class="lv2-col">23</td><td>40</td><td>23</td></tr>
+            <tr><th class="dev">Quạt F3</th><td>45</td><td>37</td><td>18,2</td><td class="lv2-col">40</td><td class="lv2-col">23</td><td>42</td><td>26,7</td></tr>
+            <tr><th class="dev">Quạt F4</th><td>22</td><td>28</td><td>3,9</td><td class="lv2-col">30</td><td class="lv2-col">4,8</td><td>35</td><td>7,5</td></tr>
+            <tr class="total"><th class="dev">Tổng 5 quạt</th><td>247</td><td>—</td><td>86,6</td><td class="lv2-col">—</td><td class="lv2-col">110,3</td><td>—</td><td>126,3</td></tr>
+            <tr class="save"><th class="dev">Giảm tải (kW)</th><td>—</td><td>—</td><td>160,4</td><td>—</td><td>136,7</td><td>—</td><td>120,7</td></tr>
+            <tr class="save"><th class="dev">Giảm dòng (~A)</th><td>—</td><td>—</td><td>~272</td><td>—</td><td>~232</td><td>—</td><td>~205</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="scroll-hint">↔ Vuốt ngang. kW tự tính <span class="formula">P = Định mức × (Hz/50)³</span>; A theo 400V/cosφ 0,85.</p>
     </section>
 
     <!-- 4. Hướng dẫn chạy & theo dõi -->
@@ -252,6 +247,60 @@
         </table>
       </div>
       <p class="scroll-hint">Ghi lại dòng đo thực để đối chiếu với công suất tính toán ở mục 3.</p>
+    </section>
+
+    <!-- 6. Khởi động động cơ lớn lần lượt -->
+    <section>
+      <div class="sec-h"><span class="n">6</span><h2>Khởi động động cơ lớn LẦN LƯỢT (line ướt)</h2></div>
+      <p><strong>Mục này chống nhảy điện &amp; sụt áp KHI KHỞI ĐỘNG</strong> — khác với giảm tải thường trực (mục 3–5). Không làm giảm mức 134% khi máy đã chạy ổn định.</p>
+      <p>Động cơ khởi động trực tiếp rút <strong>dòng gấp ≈ 6–8 lần</strong> dòng chạy bình thường (đến khi máy đủ tốc độ). Bật nhiều máy lớn cùng lúc → dòng đỉnh cộng dồn → <strong>sụt áp mạnh, nhảy MCCB</strong>. Nguy hiểm hơn: sụt áp làm <strong>contactor các máy đang chạy khác nhả ra</strong> → <strong>dừng loạt máy → nghẽn/kẹt mủ cả line</strong>. Vì vậy phải giãn cách khởi động.</p>
+
+      <p class="detail-h">3 nguyên tắc khởi động (theo thứ tự ưu tiên)</p>
+      <div class="callout info">
+        <span class="ic">①</span>
+        <span><strong>Theo DÒNG CÔNG NGHỆ trước:</strong> khởi động máy <strong>cuối line (hạ nguồn) trước</strong>, máy <strong>đầu line (thượng nguồn) sau</strong>; <strong>chỉ cấp mủ đầu vào khi cả line đã chạy</strong> — tránh dồn ứ, kẹt mủ, hư băng tải. Bảng thứ tự bấm cụ thể do <strong>Tổ trưởng SX + Cơ điện chốt</strong> theo thực tế line.</span>
+      </div>
+      <div class="callout info">
+        <span class="ic">②</span>
+        <span><strong>Theo NHÓM liên động:</strong> máy chính + phụ trợ (bơm làm mát/phun nước, bơm bôi trơn/thủy lực, băng tải cấp liệu) là <strong>một nhóm</strong> — <strong>phụ trợ chạy TRƯỚC, máy chính chạy SAU</strong>. Không tách máy chính khỏi phụ trợ (tránh chạy khô, hư máy).</span>
+      </div>
+      <div class="callout warn">
+        <span class="ic">③</span>
+        <span><strong>Giãn cách về điện (giữa các nhóm/máy độc lập):</strong> mỗi lần một nhóm; chờ đến khi <strong>ampe kế tụt về dòng định mức</strong> (máy đủ tốc độ — máy lớn như Mix có thể &gt;&nbsp;30&nbsp;giây) rồi mới bật nhóm kế. <strong>Tuyệt đối không 2 máy ≥ 90&nbsp;kW cùng lúc; Máy Mix (315&nbsp;kW) luôn khởi động một mình.</strong> Chỉ được chồng lấn các máy nhỏ &lt; 45&nbsp;kW. Ưu tiên khởi động máy lớn <strong>trước giờ cao điểm</strong>; không khởi động lại liên tục hay dưới tải nặng (mủ còn đầy máy).</span>
+      </div>
+
+      <p class="detail-h">Động cơ lớn line ướt cần giãn cách (≥ 45&nbsp;kW)</p>
+      <div class="tbl-scroll">
+        <table class="sum motors">
+          <thead><tr><th>#</th><th class="dev">Động cơ</th><th>Công suất</th><th class="dev">Khu vực</th></tr></thead>
+          <tbody>
+            <tr class="reco"><td>1</td><th class="dev">Máy Mix ⚠️ (một mình)</th><td>315 kW</td><td class="dev">Chế biến trước sấy</td></tr>
+            <tr><td>2</td><th class="dev">Máy SHD 2</th><td>200 kW</td><td class="dev">SHD / Crep</td></tr>
+            <tr><td>3</td><th class="dev">Máy SHD 1</th><td>160 kW</td><td class="dev">SHD / Crep</td></tr>
+            <tr><td>4</td><th class="dev">Máy CREP 2 <span class="u">(2×75)</span></th><td>150 kW</td><td class="dev">SHD / Crep</td></tr>
+            <tr><td>5</td><th class="dev">Máy Slạp 1</th><td>110 kW</td><td class="dev">Line lọc</td></tr>
+            <tr><td>6</td><th class="dev">Máy CRE1</th><td>90 kW</td><td class="dev">Bể 4</td></tr>
+            <tr><td>7</td><th class="dev">CREP 3</th><td>90 kW</td><td class="dev">SHD / Crep</td></tr>
+            <tr><td>8</td><th class="dev">CREP 4</th><td>90 kW</td><td class="dev">SHD / Crep</td></tr>
+            <tr><td>9</td><th class="dev">Dao Bay</th><td>90 kW</td><td class="dev">Chế biến</td></tr>
+            <tr><td>10</td><th class="dev">Máy Slạp 2</th><td>55 kW</td><td class="dev">Slạp 2</td></tr>
+            <tr><td>11</td><th class="dev">Máy Pre 1</th><td>45 kW</td><td class="dev">Bể 1</td></tr>
+            <tr><td>12</td><th class="dev">Máy Pre 2</th><td>45 kW</td><td class="dev">Bể 4</td></tr>
+            <tr><td>13</td><th class="dev">Bơm Gòm 1</th><td>45 kW</td><td class="dev">SHD / Crep</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="scroll-hint">Cột # xếp theo công suất (biết máy nào "nặng" nhất) — <strong>KHÔNG phải thứ tự bấm khởi động</strong>. Thứ tự bấm theo dòng công nghệ (nguyên tắc ①). Tổng 13 máy ≈ 1.485&nbsp;kW.</p>
+
+      <div class="callout warn">
+        <span class="ic">⛔</span>
+        <span><strong>An toàn — KHÔNG được làm:</strong> không "chữa" nhảy điện bằng cách nâng ngưỡng cắt MCCB / rơ-le nhiệt hay tháo bảo vệ. Trước khi bấm khởi động <strong>mỗi máy</strong>: xác nhận không có người/vật trong máy, che chắn đủ; <strong>một người điều phối</strong> khởi động toàn line.</span>
+      </div>
+
+      <div class="callout info">
+        <span class="ic">💡</span>
+        <span><strong>Về lâu dài (nên làm sớm cho 2 máy lớn nhất):</strong> lắp thiết bị <strong>giảm dòng khởi động</strong> — chọn theo tải: bơm/quạt → <strong>biến tần</strong> (giảm dòng + tiết kiệm điện); máy cán/creper/Mix (tải nặng, quán tính) → <strong>soft starter hoặc biến tần</strong>, <strong>tránh sao–tam giác</strong> (mô-men còn ~⅓, không đủ kéo tải). Ưu tiên <strong>Máy Mix (315)</strong> &amp; <strong>SHD 2 (200)</strong> vì một lần khởi động trực tiếp đã ~1,8 lần dòng định mức cả trạm.</span>
+      </div>
     </section>
 
   </div>

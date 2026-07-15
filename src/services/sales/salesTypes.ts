@@ -568,7 +568,8 @@ export const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {
 
 // ===== SELECT OPTIONS =====
 
-// Cấp mủ SVR phổ biến (Standard Vietnamese Rubber)
+// Cấp mủ / tên hàng cho Đơn hàng bán (Standard Vietnamese Rubber + tên xuất khẩu)
+// Lưu ý: value = label cho các tên EUDR/RSS3 EUDR để in NGUYÊN VĂN lên hợp đồng.
 export const SVR_GRADE_OPTIONS = [
   { value: 'SVR_3L', label: 'SVR 3L' },
   { value: 'SVR_L', label: 'SVR L' },
@@ -580,6 +581,10 @@ export const SVR_GRADE_OPTIONS = [
   { value: 'RSS_1', label: 'RSS 1' },
   { value: 'RSS_3', label: 'RSS 3' },
   { value: 'LATEX_60', label: 'Latex HA 60%' },
+  // Tên hàng xuất khẩu EUDR (khách yêu cầu — tránh nhầm lẫn)
+  { value: 'SVR10 EUDR', label: 'SVR10 EUDR' },
+  { value: 'SVR3L EUDR', label: 'SVR3L EUDR' },
+  { value: 'RSS3 EUDR', label: 'RSS3 EUDR' },
 ] as const
 
 // Quốc gia mua mủ phổ biến

@@ -160,6 +160,14 @@ export default function WeighingPage() {
   const [deductionKg, setDeductionKg] = useState<number>(0)
   const [notes, setNotes] = useState('')
 
+  // Đợt 1 pallet — số pallet trên xe TẠI LẦN CÂN đang thao tác. Giữ nguyên giữa
+  // lần 1 → lần 2 để "pre-fill L2 = L1"; operator chỉnh nếu dỡ bớt/lấy thêm pallet.
+  const [palletPlastic, setPalletPlastic] = useState<number>(0)
+  const [palletSteel, setPalletSteel] = useState<number>(0)
+  // Định mức bì (kg/cái) từ bảng pallet_types — fallback nhựa 10 / sắt 50.
+  const [palletUnits, setPalletUnits] = useState<{ plastic: number; steel: number }>({ plastic: 10, steel: 50 })
+  const palletKg = (palletPlastic || 0) * palletUnits.plastic + (palletSteel || 0) * palletUnits.steel
+
   // Manual weight input
   const [manualWeight, setManualWeight] = useState<number | null>(null)
 
@@ -182,6 +190,14 @@ export default function WeighingPage() {
     getRubberSuppliers().then((s) => setSuppliers(s.map((x: any) => ({ id: x.id, code: x.code, name: x.name })))).catch(() => {})
     // Load bảng tra DRC (cache 5 phút trong service)
     drcLookupService.getAll().then(setDrcLookupRows).catch((err) => console.warn('drc_lookup load error:', err))
+    // Đợt 1: định mức pallet (nhựa/sắt) từ danh mục. Lỗi/chưa migrate → giữ default 10/50.
+    supabase.from('pallet_types').select('code, unit_weight_kg, is_active')
+      .then(({ data }) => {
+        if (!data) return
+        const map: Record<string, number> = {}
+        for (const r of data as any[]) { if (r.is_active !== false) map[r.code] = Number(r.unit_weight_kg) }
+        setPalletUnits((prev) => ({ plastic: map.plastic ?? prev.plastic, steel: map.steel ?? prev.steel }))
+      })
   }, [currentFacility?.id, currentFacility?.code])
 
   // P4: Load nhập mủ gần đây (6 phiếu IN mới nhất tại NM này) — reload sau mỗi lần
@@ -342,9 +358,20 @@ export default function WeighingPage() {
           setDrcSource(ext.qc_drc_source)
         }
         if (ext.consolidation_code) setConsolidationCode(ext.consolidation_code)
+        // Đợt 1: pre-fill pallet lần 2 = lần 1 (đọc slot đã lưu ở lần cân 1).
+        // NHẬP: L1=gross → slot gross. XUẤT/CỔNG: L1=tare → slot tare.
+        const isReverseFlow = t.ticket_type === 'out' || t.ticket_type === 'gate'
+        if (t.status === 'weighing_tare') {
+          setPalletPlastic(Number((isReverseFlow ? ext.pallet_plastic_tare : ext.pallet_plastic_gross) || 0))
+          setPalletSteel(Number((isReverseFlow ? ext.pallet_steel_tare : ext.pallet_steel_gross) || 0))
+        } else {
+          setPalletPlastic(0)
+          setPalletSteel(0)
+        }
         // Calculate if both weights exist
         if (t.gross_weight != null && t.tare_weight != null) {
-          recalculate(t.gross_weight, t.tare_weight, ext.deduction_kg || 0, undefined, undefined, ext.price_unit)
+          recalculate(t.gross_weight, t.tare_weight, ext.deduction_kg || 0, undefined, undefined, ext.price_unit,
+            Number(ext.pallet_kg_gross || 0), Number(ext.pallet_kg_tare || 0))
         }
       }
     } catch (err: any) {
@@ -458,12 +485,15 @@ export default function WeighingPage() {
   function recalculate(
     gross: number, tare: number, ded: number,
     drc?: number | null, price?: number | null, pUnit?: 'wet' | 'dry',
+    palletGrossKg = 0, palletTareKg = 0,
   ) {
     const c = calculateWeights(gross, tare, {
       deduction_kg: ded,
       expected_drc: drc ?? undefined,
       unit_price: price ?? undefined,
       price_unit: pUnit,
+      pallet_gross_kg: palletGrossKg,
+      pallet_tare_kg: palletTareKg,
     })
     setCalc(c)
     return c
@@ -604,6 +634,15 @@ export default function WeighingPage() {
     setError('')
     try {
       let updated: WeighbridgeTicket
+      // Đợt 1: pallet CHỈ áp cho XUẤT ở NM vệ tinh (TL/LAO) và CỔNG (nhập nội bộ) ở PĐ.
+      // Nhập mủ thường (TL mủ nước / PĐ đại lý) + xuất bán khách (PĐ) → không có pallet.
+      // Service tự gắn kg vào slot gross/tare theo luồng + tính net mủ thuần.
+      const palletRelevant =
+        (!currentFacility?.can_ship_to_customer && ticket.ticket_type === 'out') ||
+        (currentFacility?.code === 'PD' && ticket.ticket_type === 'gate')
+      const palletInput = palletRelevant
+        ? { plastic: palletPlastic || 0, steel: palletSteel || 0, kg: palletKg }
+        : { plastic: 0, steel: 0, kg: 0 }
       // OUT 2-weigh — đo THỰC khối lượng hàng:
       //   • Lần 1 = XE RỖNG (tare)  → lần 2 = XE + HÀNG (gross)
       //   • NET hàng = gross − tare (không còn neo theo planned / tare cố định container)
@@ -613,7 +652,7 @@ export default function WeighingPage() {
         const isGateTicket = ticket.ticket_type === 'gate'
         if (ticket.status === 'weighing_gross') {
           // Lần 1
-          updated = await weighbridgeService.updateOutTareFirst(ticket.id, weight, operator?.id)
+          updated = await weighbridgeService.updateOutTareFirst(ticket.id, weight, operator?.id, palletInput)
           setTicket(updated)
           setSuccess(isGateTicket
             ? `Cân lần 1 (xe vào): ${weight.toLocaleString()} kg — chờ cân lần 2 (xe ra)`
@@ -621,10 +660,11 @@ export default function WeighingPage() {
           setManualWeight(null)
           if (cameraCaptureRef.current) cameraCaptureRef.current('L1').catch(() => {})
         } else {
-          // Lần 2 → tính NET hàng = |lần2 − lần1|
-          updated = await weighbridgeService.updateOutGrossSecond(ticket.id, weight, operator?.id)
+          // Lần 2 → tính NET mủ = (gross − pallet_gross) − (tare − pallet_tare)
+          updated = await weighbridgeService.updateOutGrossSecond(ticket.id, weight, operator?.id, palletInput)
           setTicket(updated)
-          const c = recalculate(weight, updated.tare_weight!, deductionKg, undefined, undefined, priceUnit)
+          const c = recalculate(weight, updated.tare_weight!, deductionKg, undefined, undefined, priceUnit,
+            Number((updated as any).pallet_kg_gross || 0), Number((updated as any).pallet_kg_tare || 0))
           setSuccess(isGateTicket
             ? `Cân lần 2 (xe ra): ${weight.toLocaleString()} kg → KL hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`
             : `Cân lần 2 (xe + hàng): ${weight.toLocaleString()} kg → NET hàng: ${c.net_weight.toLocaleString('vi-VN')} kg`)
@@ -645,7 +685,7 @@ export default function WeighingPage() {
       }
 
       if (ticket.status === 'weighing_gross') {
-        updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id)
+        updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id, palletInput)
         setTicket(updated)
         setSuccess(`Cân lần 1 (Gross): ${weight.toLocaleString()} kg`)
         setManualWeight(null)
@@ -664,12 +704,13 @@ export default function WeighingPage() {
               consolidation_code: consolidationCode.trim() || null,
             }
           : undefined
-        updated = await weighbridgeService.updateTareWeight(ticket.id, weight, operator?.id, drcExtras)
+        updated = await weighbridgeService.updateTareWeight(ticket.id, weight, operator?.id, drcExtras, palletInput)
         setTicket(updated)
         // Recalculate với DRC thực đo tại cân (không còn fallback expectedDrc).
         const c = recalculate(
           updated.gross_weight!, weight, deductionKg,
           actualDrc, undefined, priceUnit,
+          Number((updated as any).pallet_kg_gross || 0), Number((updated as any).pallet_kg_tare || 0),
         )
         setSuccess(`Cân lần 2 (Tare): ${weight.toLocaleString()} kg — NET: ${c.net_weight.toLocaleString()} kg`)
         setManualWeight(null)
@@ -1023,6 +1064,10 @@ export default function WeighingPage() {
   // GATE cân giống OUT (lần1 = tare, lần2 = gross). PD-only (chỉ NM Phong Điền).
   const isReverseWeigh = isOut || isGate
   const canShowGate = currentFacility?.code === 'PD'
+  // Đợt 1: khai pallet CHỈ ở XUẤT của NM vệ tinh (TL/LAO) + CỔNG nhập nội bộ ở PĐ.
+  const showPallet =
+    (!currentFacility?.can_ship_to_customer && (isOut || ticket?.ticket_type === 'out')) ||
+    (currentFacility?.code === 'PD' && (isGate || ticket?.ticket_type === 'gate'))
   // Panel kết quả: MỌI loại phiếu ghi "Cân lần 1 / Cân lần 2" theo đúng thứ tự cân.
   //   NHẬP:      lần 1 = Gross (xe+hàng)        → lần 2 = Tare (xe rỗng)
   //   XUẤT/CỔNG: lần 1 = Tare (xe rỗng/xe vào)  → lần 2 = Gross (xe+hàng/xe ra)
@@ -1992,6 +2037,38 @@ export default function WeighingPage() {
                         >
                           Dùng giá trị này
                         </Button>
+                      </div>
+                    )}
+
+                    {/* Đợt 1 — khai pallet trên xe (chỉ XUẤT ở TL/LAO + CỔNG nhập ở PĐ) */}
+                    {showPallet && canRecord && (
+                      <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#0369A1', marginBottom: 6 }}>
+                          📦 Pallet trên xe {isWeighingGross ? '(lần cân 1)' : '(lần cân 2)'}
+                        </div>
+                        <Row gutter={8}>
+                          {([['Nhựa', palletUnits.plastic, palletPlastic, setPalletPlastic],
+                             ['Sắt', palletUnits.steel, palletSteel, setPalletSteel]] as const).map(([lbl, unit, val, setter]) => (
+                            <Col span={12} key={lbl}>
+                              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>{lbl} ({unit}kg/cái)</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Button size="small" onClick={() => setter(Math.max(0, (val || 0) - 1))}>−</Button>
+                                <InputNumber size="small" min={0} precision={0} value={val}
+                                  onChange={(v) => setter(Math.max(0, Number(v) || 0))} style={{ width: 60 }} />
+                                <Button size="small" onClick={() => setter((val || 0) + 1)}>+</Button>
+                              </div>
+                            </Col>
+                          ))}
+                        </Row>
+                        <div style={{ fontSize: 12, color: '#0369A1', marginTop: 6 }}>
+                          = <b>{palletKg.toLocaleString('vi-VN')} kg</b> pallet — trừ khỏi lần cân này để ra KL mủ thuần.
+                          {!isWeighingGross && ' (điền sẵn = lần 1, chỉnh nếu dỡ bớt/lấy thêm)'}
+                        </div>
+                        {palletKg === 0 && (
+                          <div style={{ fontSize: 11, color: '#B45309', marginTop: 4 }}>
+                            ⚠️ Xe trung chuyển thường có pallet — khai nếu có để KL mủ không lẫn bì.
+                          </div>
+                        )}
                       </div>
                     )}
 

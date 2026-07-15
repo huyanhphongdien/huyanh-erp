@@ -109,6 +109,22 @@ export interface UpdateTicketQCData {
 }
 
 /**
+ * Đợt 1 pallet — số pallet + KL bì khai TẠI MỘT LẦN CÂN.
+ * App cân quy đổi số pallet → kg (theo định mức pallet_types) rồi truyền `kg`.
+ */
+export interface PalletWeighInput {
+  plastic?: number | null
+  steel?: number | null
+  kg?: number | null
+}
+
+/** Chỉ ghi cột pallet khi thực sự có khai (>0) — tránh PGRST204 nếu code deploy
+ *  trước migration, và không đè null vô nghĩa. Pallet = 0 → net = |gross−tare| như cũ. */
+function palletHasValue(p?: PalletWeighInput | null): boolean {
+  return !!p && ((p.kg || 0) > 0 || (p.plastic || 0) > 0 || (p.steel || 0) > 0)
+}
+
+/**
  * Tạo phiếu cân mới — status = 'weighing_gross'
  */
 async function create(data: CreateTicketData, userId?: string): Promise<WeighbridgeTicket> {
@@ -147,16 +163,23 @@ async function create(data: CreateTicketData, userId?: string): Promise<Weighbri
 async function updateGrossWeight(
   id: string,
   weight: number,
-  userId?: string
+  userId?: string,
+  pallet?: PalletWeighInput
 ): Promise<WeighbridgeTicket> {
+  const payload: Record<string, any> = {
+    gross_weight: weight,
+    gross_weighed_at: new Date().toISOString(),
+    gross_weighed_by: userId || null,
+    status: 'weighing_tare' as WeighbridgeStatus,
+  }
+  if (palletHasValue(pallet)) {
+    payload.pallet_plastic_gross = pallet!.plastic || 0
+    payload.pallet_steel_gross = pallet!.steel || 0
+    payload.pallet_kg_gross = pallet!.kg || 0
+  }
   const { data, error } = await supabase
     .from('weighbridge_tickets')
-    .update({
-      gross_weight: weight,
-      gross_weighed_at: new Date().toISOString(),
-      gross_weighed_by: userId || null,
-      status: 'weighing_tare' as WeighbridgeStatus,
-    })
+    .update(payload)
     .eq('id', id)
     .eq('status', 'weighing_gross')
     .select(TICKET_SELECT)
@@ -183,25 +206,35 @@ async function updateTareWeight(
     qc_actual_drc?: number | null
     qc_drc_source?: 'lookup' | 'manual' | null
     consolidation_code?: string | null
-  }
+  },
+  pallet?: PalletWeighInput
 ): Promise<WeighbridgeTicket> {
-  // Lấy gross trước để tính net
+  // Lấy gross + pallet_kg_gross (đã khai ở lần cân 1) để tính net mủ thuần.
+  // select('*') để không lỗi nếu cột pallet chưa có (trước migration).
   const { data: ticket, error: fetchError } = await supabase
     .from('weighbridge_tickets')
-    .select('gross_weight')
+    .select('*')
     .eq('id', id)
     .single()
 
   if (fetchError) throw fetchError
   if (!ticket?.gross_weight) throw new Error('Chưa có Gross weight')
 
-  const netWeight = Math.abs(ticket.gross_weight - weight)
+  // net mủ = (gross − pallet_gross) − (tare − pallet_tare). NHẬP: L1=gross, L2=tare.
+  const palletGrossKg = Number((ticket as any).pallet_kg_gross || 0)
+  const palletTareKg = Number(pallet?.kg || 0)
+  const netWeight = Math.abs((ticket.gross_weight - palletGrossKg) - (weight - palletTareKg))
 
   const updatePayload: Record<string, any> = {
     tare_weight: weight,
     net_weight: netWeight,
     tare_weighed_at: new Date().toISOString(),
     tare_weighed_by: userId || null,
+  }
+  if (palletHasValue(pallet)) {
+    updatePayload.pallet_plastic_tare = pallet!.plastic || 0
+    updatePayload.pallet_steel_tare = pallet!.steel || 0
+    updatePayload.pallet_kg_tare = pallet!.kg || 0
   }
   if (extras?.field_dot_reading !== undefined) updatePayload.field_dot_reading = extras.field_dot_reading
   if (extras?.qc_actual_drc !== undefined) updatePayload.qc_actual_drc = extras.qc_actual_drc
@@ -229,15 +262,21 @@ async function updateTareWeight(
 /**
  * OUT — cân lần 1 = XE RỖNG (tare). status weighing_gross → weighing_tare.
  */
-async function updateOutTareFirst(id: string, weight: number, userId?: string): Promise<WeighbridgeTicket> {
+async function updateOutTareFirst(id: string, weight: number, userId?: string, pallet?: PalletWeighInput): Promise<WeighbridgeTicket> {
+  const payload: Record<string, any> = {
+    tare_weight: weight,
+    tare_weighed_at: new Date().toISOString(),
+    tare_weighed_by: userId || null,
+    status: 'weighing_tare' as WeighbridgeStatus,
+  }
+  if (palletHasValue(pallet)) {
+    payload.pallet_plastic_tare = pallet!.plastic || 0
+    payload.pallet_steel_tare = pallet!.steel || 0
+    payload.pallet_kg_tare = pallet!.kg || 0
+  }
   const { data, error } = await supabase
     .from('weighbridge_tickets')
-    .update({
-      tare_weight: weight,
-      tare_weighed_at: new Date().toISOString(),
-      tare_weighed_by: userId || null,
-      status: 'weighing_tare' as WeighbridgeStatus,
-    })
+    .update(payload)
     .eq('id', id)
     .eq('status', 'weighing_gross')
     .select(TICKET_SELECT)
@@ -250,23 +289,33 @@ async function updateOutTareFirst(id: string, weight: number, userId?: string): 
  * OUT — cân lần 2 = XE + HÀNG (gross). NET = |gross − tare| (KL hàng đo thực).
  * Giữ status weighing_tare (chờ complete).
  */
-async function updateOutGrossSecond(id: string, weight: number, userId?: string): Promise<WeighbridgeTicket> {
+async function updateOutGrossSecond(id: string, weight: number, userId?: string, pallet?: PalletWeighInput): Promise<WeighbridgeTicket> {
+  // select('*') để lấy pallet_kg_tare (khai ở lần cân 1) + không lỗi trước migration.
   const { data: ticket, error: fetchError } = await supabase
     .from('weighbridge_tickets')
-    .select('tare_weight')
+    .select('*')
     .eq('id', id)
     .single()
   if (fetchError) throw fetchError
   if (ticket?.tare_weight == null) throw new Error('Chưa có cân xe rỗng (lần 1)')
-  const netWeight = Math.abs(weight - ticket.tare_weight)
+  // net mủ = (gross − pallet_gross) − (tare − pallet_tare). XUẤT/CỔNG: L1=tare, L2=gross.
+  const palletTareKg = Number((ticket as any).pallet_kg_tare || 0)
+  const palletGrossKg = Number(pallet?.kg || 0)
+  const netWeight = Math.abs((weight - palletGrossKg) - (ticket.tare_weight - palletTareKg))
+  const payload: Record<string, any> = {
+    gross_weight: weight,
+    net_weight: netWeight,
+    gross_weighed_at: new Date().toISOString(),
+    gross_weighed_by: userId || null,
+  }
+  if (palletHasValue(pallet)) {
+    payload.pallet_plastic_gross = pallet!.plastic || 0
+    payload.pallet_steel_gross = pallet!.steel || 0
+    payload.pallet_kg_gross = pallet!.kg || 0
+  }
   const { data, error } = await supabase
     .from('weighbridge_tickets')
-    .update({
-      gross_weight: weight,
-      net_weight: netWeight,
-      gross_weighed_at: new Date().toISOString(),
-      gross_weighed_by: userId || null,
-    })
+    .update(payload)
     .eq('id', id)
     .eq('status', 'weighing_tare')
     .select(TICKET_SELECT)

@@ -208,6 +208,14 @@ export default function PrintPage() {
   const w2Weight = isReverseTicket ? ticket!.gross_weight : ticket!.tare_weight
   const w2Time = isReverseTicket ? ticket!.gross_weighed_at : ticket!.tare_weighed_at
 
+  // Đợt 1 pallet — bì pallet mỗi lần cân (NET đã trừ pallet sẵn). Map slot gross/tare
+  // về "lần 1/lần 2" theo hướng phiếu (XUẤT/CỔNG: L1=tare, L2=gross; NHẬP: L1=gross, L2=tare).
+  const palletGrossKg = Number(ext.pallet_kg_gross || 0)
+  const palletTareKg = Number(ext.pallet_kg_tare || 0)
+  const palletTotal = palletGrossKg + palletTareKg
+  const pallet1Kg = isReverseTicket ? palletTareKg : palletGrossKg
+  const pallet2Kg = isReverseTicket ? palletGrossKg : palletTareKg
+
   // Hỗ trợ NHIỀU loại mủ (XUẤT lưu "mu_dong,mu_nuoc") — gộp nhãn
   const RT_LABELS: Record<string, string> = {
     mu_nuoc: 'Mủ nước', mu_tap: 'Mủ tạp', mu_dong: 'Mủ đông',
@@ -459,6 +467,12 @@ export default function PrintPage() {
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
             <Row2 l={`Cân lần 1 (${w1Label})`} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w1Weight)} kg</span>} />
             <Row2 l={`Cân lần 2 (${w2Label})`} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w2Weight)} kg</span>} />
+            {palletTotal > 0 && (
+              <>
+                <Row2 l="Pallet lần 1" r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet1Kg)} kg</span>} />
+                <Row2 l="Pallet lần 2" r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet2Kg)} kg</span>} />
+              </>
+            )}
             <div style={{ borderBottom: '1px solid #333', margin: '2px 0' }} />
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
@@ -499,6 +513,20 @@ export default function PrintPage() {
                 <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(w2Weight)}</td>
                 <td style={{ ...tdCenter, fontSize: fs }}>{w2Time ? fmtDateTime(w2Time) : '—'}</td>
               </tr>
+              {palletTotal > 0 && (
+                <>
+                  <tr>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 1 (bì)</td>
+                    <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet1Kg)}</td>
+                    <td style={tdCenter}></td>
+                  </tr>
+                  <tr>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 2 (bì)</td>
+                    <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet2Kg)}</td>
+                    <td style={tdCenter}></td>
+                  </tr>
+                </>
+              )}
               <tr style={{ background: '#DCFCE7' }}>
                 <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>NET</td>
                 <td style={{ ...tdCenter, fontSize: paperSize === 'a5' ? fs + 5 : fs + 7, fontWeight: 800, color: '#15803D', fontFamily: mono, letterSpacing: 1 }}>{fmt(ticket!.net_weight)}</td>

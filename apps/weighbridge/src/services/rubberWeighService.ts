@@ -28,7 +28,9 @@ export interface WeightCalculation {
   estimated_value: number | null
 }
 
-/** Calculate weights and estimated value */
+/** Calculate weights and estimated value.
+ *  Đợt 1 pallet: net mủ thuần = (gross − pallet_gross_kg) − (tare − pallet_tare_kg).
+ *  Nếu không khai pallet (mặc định 0) → net = |gross − tare| như cũ. */
 export function calculateWeights(
   gross: number,
   tare: number,
@@ -37,9 +39,13 @@ export function calculateWeights(
     expected_drc?: number
     unit_price?: number
     price_unit?: 'wet' | 'dry'
+    pallet_gross_kg?: number
+    pallet_tare_kg?: number
   },
 ): WeightCalculation {
-  const net_weight = Math.abs(gross - tare)
+  const pallet_gross_kg = opts.pallet_gross_kg || 0
+  const pallet_tare_kg = opts.pallet_tare_kg || 0
+  const net_weight = Math.abs((gross - pallet_gross_kg) - (tare - pallet_tare_kg))
   const deduction_kg = opts.deduction_kg || 0
   const actual_net_weight = net_weight - deduction_kg
 

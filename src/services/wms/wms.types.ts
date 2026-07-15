@@ -467,6 +467,23 @@ export interface WeighbridgeTicket {
   // F2 multi-facility — nhà máy phát sinh phiếu (PD/TL/LAO)
   facility_id?: string | null
   facility?: { id: string; code: string; name: string } | null
+  // Đợt 1 phương án cân pallet — số pallet + KL bì mỗi lần cân (theo gross/tare).
+  // net_weight = (gross − pallet_kg_gross) − (tare − pallet_kg_tare).
+  pallet_plastic_gross?: number | null
+  pallet_steel_gross?: number | null
+  pallet_kg_gross?: number | null
+  pallet_plastic_tare?: number | null
+  pallet_steel_tare?: number | null
+  pallet_kg_tare?: number | null
+}
+
+/** Danh mục loại pallet (bảng pallet_types) — định mức bì để quy đổi số pallet → kg. */
+export interface PalletType {
+  code: string
+  label: string
+  unit_weight_kg: number
+  is_active?: boolean
+  sort_order?: number
 }
 
 export interface WeighbridgeImage {

@@ -122,6 +122,14 @@
   .photos figure{margin:0}
   .photos img{width:100%; height:auto; border-radius:10px; border:1px solid var(--line); display:block}
   .photos figcaption{font-size:11px; color:var(--muted); text-align:center; margin-top:4px; line-height:1.3}
+  /* ── Nguyên nhân + Kiến nghị ── */
+  ol.causes{list-style:none; counter-reset:c; margin:6px 0 0; padding:0}
+  ol.causes li{counter-increment:c; position:relative; padding:0 0 12px 40px; margin:0}
+  ol.causes li:before{content:counter(c); position:absolute; left:0; top:1px; width:27px; height:27px; border-radius:8px; background:var(--warn); color:#fff; font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center}
+  .ref{display:inline-block; font-size:12px; font-weight:700; color:var(--accent); white-space:nowrap}
+  ul.recs{list-style:none; margin:0 0 8px; padding:0}
+  ul.recs li{position:relative; padding:0 0 8px 24px}
+  ul.recs li:before{content:"✓"; position:absolute; left:0; top:0; color:var(--good); font-weight:800}
 
   /* Steps */
   ol.steps{list-style:none; counter-reset:s; margin:0; padding:0}
@@ -164,6 +172,17 @@
         <div class="stat c3"><div class="lv">Mức 3 (cao)</div><div class="big">−121 kW</div><div class="a">≈ −205 A</div><div class="sub">còn 126,3 kW · ~49%</div></div>
       </div>
       <div class="badge-note">Đề xuất bắt đầu ở <strong>Mức 2</strong> (cân bằng tiết kiệm &amp; an toàn quá trình), theo dõi rồi hạ dần về Mức 1 trong giờ cao điểm. Quạt làm mát giữ nguyên 50&nbsp;Hz.</div>
+    </section>
+
+    <!-- Nguyên nhân chính -->
+    <section>
+      <div class="sec-h"><span class="n">⚠</span><h2>Nguyên nhân chính (đã xác định)</h2></div>
+      <ol class="causes">
+        <li><b>Máy biến áp quá tải:</b> trạm <b>1.250&nbsp;kVA</b> nhưng nhu cầu ~1.672&nbsp;kVA (<b>~134%</b>, ước tính) → sụt áp thường trực, nóng máy.</li>
+        <li><b>Một số quạt lò dòng cao bất thường:</b> F0/F2 Apron + F2 cooling (đo <b>94–140&nbsp;A</b> @ 50Hz) — nghi vấn cơ khí (bạc đạn, bụi bẩn, gối quạt). <span class="ref">→ Phát hiện ①</span></li>
+        <li><b>Crep 1 &amp; 4 ra tờ mủ dày:</b> máy SHD phải "ăn" nặng → dòng SHD tăng cao. <span class="ref">→ Phát hiện ②</span></li>
+        <li><b>Động cơ lớn khởi động trực tiếp:</b> dòng khởi động 6–8 lần dồn lại → sụt áp, nhảy MCCB. <span class="ref">→ Mục 6</span></li>
+      </ol>
     </section>
 
     <!-- Phát hiện hiện trường -->
@@ -364,6 +383,37 @@
         <span class="ic">💡</span>
         <span><strong>Về lâu dài (nên làm sớm cho 2 máy lớn nhất):</strong> lắp thiết bị <strong>giảm dòng khởi động</strong> — chọn theo tải: bơm/quạt → <strong>biến tần</strong> (giảm dòng + tiết kiệm điện); máy cán/creper/Mix (tải nặng, quán tính) → <strong>soft starter hoặc biến tần</strong>, <strong>tránh sao–tam giác</strong> (mô-men còn ~⅓, không đủ kéo tải). Ưu tiên <strong>Máy Mix (315)</strong> &amp; <strong>SHD 2 (200)</strong> vì một lần khởi động trực tiếp đã ~1,8 lần dòng định mức cả trạm.</span>
       </div>
+    </section>
+
+    <!-- Kết luận & Kiến nghị -->
+    <section class="exec">
+      <div class="sec-h"><span class="n">✓</span><h2>Kết luận &amp; Kiến nghị</h2></div>
+      <p style="margin-bottom:12px">Nhà máy đang <strong>quá tải máy biến áp (~134%)</strong> và <strong>sụt áp/nhảy điện khi khởi động máy lớn</strong>. Các việc cần làm — ưu tiên giải pháp <strong>0 đồng</strong> trước:</p>
+
+      <p class="detail-h">A. Giảm tải thường trực</p>
+      <ul class="recs">
+        <li><b>Hạ tốc 5 quạt lò Apron</b> bằng biến tần — bắt đầu Mức 2 (giảm ~137&nbsp;kW / ~232&nbsp;A). <span class="u">Mục 3–5</span></li>
+        <li><b>Bù công suất phản kháng</b> — nâng cosφ 0,85→~0,95 (giảm ~10% kVA).</li>
+        <li>Giãn / cắt tải phi sản xuất trong giờ cao điểm.</li>
+      </ul>
+
+      <p class="detail-h">B. Chống sụt áp / nhảy điện khi khởi động</p>
+      <ul class="recs">
+        <li><b>Khởi động động cơ lớn lần lượt</b> — theo dòng công nghệ + giãn cách điện. <span class="u">Mục 6</span></li>
+        <li>Lâu dài: lắp <b>soft starter / biến tần</b> cho Máy Mix (315&nbsp;kW) &amp; SHD 2 (200&nbsp;kW).</li>
+      </ul>
+
+      <p class="detail-h">C. Xử lý điểm nóng cơ khí</p>
+      <ul class="recs">
+        <li><b>Kiểm tra vòng bi/bạc đạn, bụi bẩn bám cánh, gối đỡ</b> các quạt dòng cao (F0/F2 Apron, F2 cooling).</li>
+        <li><b>Xiết lô Crep 1 &amp; 4</b> để tờ mủ mỏng lại → giảm tải máy SHD.</li>
+      </ul>
+
+      <p class="detail-h">D. Ngoài vận hành</p>
+      <ul class="recs">
+        <li><b>Kiểm định lại máy biến áp</b>; cân nhắc nâng cấp / san tải nếu quá tải kéo dài.</li>
+        <li>Đo dòng thực tế bằng <b>ampe kìm</b> ở mỗi mức để đối chiếu tính toán. <span class="u">Mục 5</span></li>
+      </ul>
     </section>
 
   </div>

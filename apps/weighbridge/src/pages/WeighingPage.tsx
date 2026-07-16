@@ -336,6 +336,7 @@ export default function WeighingPage() {
         if (ext.sales_order_id) setSelectedSalesOrderId(ext.sales_order_id)
         if (ext.container_id) setSelectedContainerId(ext.container_id)
         // ĐỢT 2: Sync lệnh điều động đã gắn (reference_type='dispatch_order')
+        console.log('[fetch] reference trên phiếu:', ext.reference_type, ext.reference_id)
         if (ext.reference_type === 'dispatch_order' && ext.reference_id) setSelectedDispatchOrderId(ext.reference_id)
         if (ext.deal_id) { setSelectedDealId(ext.deal_id); setSourceType('deal') }
         if (ext.supplier_id) { setSelectedSupplierId(ext.supplier_id); setSourceType('supplier') }
@@ -811,9 +812,10 @@ export default function WeighingPage() {
           }).eq('id', ticket.id)
         } catch (e) { console.warn('[fetch] lưu loại mủ/lô lỗi:', e) }
         // Cân xong → gắn phiếu vào lệnh điều động để ẩn lệnh khỏi danh sách app cân.
-        if (selectedDispatchOrderId) {
+        const fetchOrderId = (ticket as any).reference_id || selectedDispatchOrderId
+        if (fetchOrderId) {
           try {
-            await dispatchService.markFetchWeighed(selectedDispatchOrderId, ticket.id)
+            await dispatchService.markFetchWeighed(fetchOrderId, ticket.id)
           } catch (e) { console.warn('[fetch] gắn phiếu vào lệnh (ẩn khỏi list) lỗi:', e) }
         }
       }
@@ -1301,12 +1303,23 @@ export default function WeighingPage() {
                 <Card size="small" title="🚚 Nhận mủ từ NM khác (đi lấy mủ)" style={{ borderRadius: 12, borderColor: '#0E7490' }}>
                   <div style={{ marginBottom: 10 }}>
                     <Text style={{ fontSize: 12, color: '#64748b' }}>Lệnh điều động (đi lấy mủ)</Text>
+                    {ticket ? (
+                      // ĐÃ TẠO PHIẾU → KHOÁ lệnh, hiển thị read-only suốt 2 lần cân đến khi hoàn tất.
+                      // Ưu tiên mã lệnh (selectedDispatch); nếu chưa tra được thì hiện biển số/tài xế trên phiếu.
+                      <div style={{ marginTop: 4, padding: '8px 12px', background: '#ECFEFF', border: '1px solid #A5F3FC', borderRadius: 8, color: '#0E7490' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>
+                          🔒 {selectedDispatch
+                            ? `${selectedDispatch.code}${selectedDispatch.tractor_plate ? ` · ${selectedDispatch.tractor_plate}` : ''}${selectedDispatch.driver_name ? ` · ${selectedDispatch.driver_name}` : ''}`
+                            : `${ticket.vehicle_plate || ''}${ticket.driver_name ? ` · ${ticket.driver_name}` : ''}`}
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 400, color: '#0891B2', marginTop: 2 }}>Lệnh đã khoá — không đổi được đến khi hoàn tất 2 lần cân</div>
+                      </div>
+                    ) : (
                     <Select
                       value={selectedDispatchOrderId || undefined}
                       style={{ width: '100%', marginTop: 4 }}
                       placeholder="Chọn lệnh đi lấy mủ (điền sẵn pallet mang đi)"
                       allowClear
-                      disabled={!!ticket}
                       onChange={(v) => {
                         setSelectedDispatchOrderId(v || '')
                         const d = v ? dispatchOrders.find(o => o.id === v) : null
@@ -1333,6 +1346,7 @@ export default function WeighingPage() {
                           }
                         })}
                     />
+                    )}
                   </div>
                   <Row gutter={8}>
                     <Col xs={24} sm={14}>

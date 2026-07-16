@@ -13,6 +13,7 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import logoImg from '../../../assets/logo.png'
 import {
   dispatchService, TRIP_TYPE_LABELS, isContainerTrip,
+  FETCH_RUBBER_LABELS, palletOutKg,
   type DispatchOrder, type DispatchLine,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
@@ -217,6 +218,29 @@ function OrderSheet({ order, lines, lineCustomer, multiCustomer }: SheetProps) {
           </table>
         )
       })()}
+
+      {/* Đợt 2 — Đi lấy mủ: loại mủ + lô + PALLET MANG ĐI (bảo vệ đối chiếu ở cổng) */}
+      {order.trip_type === 'fetch_mu' && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, marginBottom: 12 }}>
+          <tbody>
+            <tr>
+              <td style={{ border: '1px solid #CBD5E1', background: '#F0F9FF', padding: '6px 10px', width: '50%' }}>
+                Loại mủ dự kiến: <strong>{order.fetch_rubber_type ? (FETCH_RUBBER_LABELS[order.fetch_rubber_type] || order.fetch_rubber_type) : '..................'}</strong>
+              </td>
+              <td style={{ border: '1px solid #CBD5E1', background: '#F0F9FF', padding: '6px 10px' }}>
+                Mã lô: <strong>{order.fetch_lot_code || '..................'}</strong>
+              </td>
+            </tr>
+            <tr>
+              <td colSpan={2} style={{ border: '1px solid #CBD5E1', background: '#FFFBEB', padding: '6px 10px' }}>
+                📦 <strong>Pallet mang đi</strong> (bảo vệ đối chiếu khi xe ra cổng):
+                {' '}Nhựa <strong>{order.pallet_plastic_out || 0}</strong> cái (10kg) &nbsp;+&nbsp; Sắt <strong>{order.pallet_steel_out || 0}</strong> cái (50kg)
+                {' '}=&nbsp; <strong>{fmt(palletOutKg(order.pallet_plastic_out, order.pallet_steel_out))} kg</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
 
       {/* Bảng chi tiết — đi cảng: container/seal; chuyến thường: hành trình/nội dung */}
       {isPort ? (

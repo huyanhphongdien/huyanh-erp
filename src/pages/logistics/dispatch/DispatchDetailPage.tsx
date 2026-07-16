@@ -16,6 +16,7 @@ import {
 import dayjs from 'dayjs'
 import {
   dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS, isContainerTrip,
+  FETCH_RUBBER_LABELS, palletOutKg,
   type DispatchOrder, type DispatchLine, type DispatchStatus,
 } from '../../../services/logistics/dispatchService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
@@ -217,6 +218,18 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
           <Descriptions.Item label="Lý do">{order.reason || '–'}</Descriptions.Item>
           {order.note && <Descriptions.Item label="Ghi chú" span={3}>{order.note}</Descriptions.Item>}
         </Descriptions>
+
+        {/* Đợt 2 — Thông tin đi lấy mủ (pallet mang đi + loại mủ + lô). App cân điền sẵn khi chọn lệnh. */}
+        {order.trip_type === 'fetch_mu' && (
+          <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '12px 16px', marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 8 }}>🚚 Thông tin đi lấy mủ (app cân điền sẵn khi chọn lệnh)</div>
+            <Space size={28} wrap>
+              <span>🌳 Loại mủ dự kiến: <Text strong>{order.fetch_rubber_type ? (FETCH_RUBBER_LABELS[order.fetch_rubber_type] || order.fetch_rubber_type) : '–'}</Text></span>
+              <span>🏷️ Mã lô dự kiến: <Text strong>{order.fetch_lot_code || '–'}</Text></span>
+              <span>📦 Pallet mang đi: <Text strong>{order.pallet_plastic_out || 0}</Text> nhựa (10kg) + <Text strong>{order.pallet_steel_out || 0}</Text> sắt (50kg) = <Text strong>{palletOutKg(order.pallet_plastic_out, order.pallet_steel_out).toLocaleString('vi-VN')} kg</Text></span>
+            </Space>
+          </div>
+        )}
 
         <Title level={4} style={{ marginTop: 8 }}>{isPort ? 'Container' : 'Chi tiết chuyến'} ({order.total_lines}) — tổng {order.total_weight.toLocaleString('vi-VN')} kg</Title>
         <Table rowKey="id" size="middle" pagination={false} columns={lineColumns as any} dataSource={lines}

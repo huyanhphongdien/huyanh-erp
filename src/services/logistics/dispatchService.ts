@@ -31,6 +31,19 @@ export const TRIP_TYPE_LABELS: Record<TripType, string> = {
 /** Chuyến ĐI LẤY MỦ (TL→PĐ) — khai pallet mang đi trên lệnh; app cân cân 2 đầu ở PĐ. */
 export const isFetchMuTrip = (t?: TripType | string | null): boolean => t === 'fetch_mu'
 
+/** Nhãn loại mủ dự kiến (chuyến đi lấy mủ) — đồng bộ options ở DispatchCreatePage + app cân. */
+export const FETCH_RUBBER_LABELS: Record<string, string> = {
+  mu_tap: 'Mủ tạp',
+  mu_nuoc: 'Mủ nước',
+  mu_dong: 'Mủ đông',
+  mu_to: 'Mủ tờ',
+  mu_rss3: 'Mủ RSS3',
+}
+
+/** Kg pallet mang đi = nhựa×10 + sắt×50. */
+export const palletOutKg = (plastic?: number | null, steel?: number | null): number =>
+  (Number(plastic) || 0) * 10 + (Number(steel) || 0) * 50
+
 /**
  * Chuyến CHỞ CONTAINER → dùng bảng cont/seal đầy đủ + gắn được Đơn hàng bán.
  *  - 'port'    = hàng nhà, bốc tại kho Huy Anh → cảng.

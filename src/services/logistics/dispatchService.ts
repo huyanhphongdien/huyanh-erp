@@ -840,6 +840,19 @@ async function getFetchReturnPallet(orderId: string): Promise<{ plastic: number;
   }
 }
 
+/** Báo cáo đi lấy mủ: danh sách chuyến fetch_mu (kèm pallet + KL 2 trạm) để tổng hợp + sổ pallet. */
+async function listFetchReport(params: { date_from?: string; date_to?: string } = {}): Promise<DispatchOrder[]> {
+  let q = supabase.from('dispatch_orders').select(ORDER_SELECT)
+    .eq('trip_type', 'fetch_mu')
+    .order('dispatch_date', { ascending: false })
+    .limit(500)
+  if (params.date_from) q = q.gte('dispatch_date', params.date_from)
+  if (params.date_to) q = q.lte('dispatch_date', params.date_to)
+  const { data, error } = await q
+  if (error) throw error
+  return (data || []).map(normalizeOrder)
+}
+
 /**
  * Đánh dấu thủ công lệnh "đã cân" (khi trạm cân đã cân thực tế nhưng không nối
  * lệnh, hoặc cân trước khi có tính năng nối). Theo nguyên tắc "đã cân là được"
@@ -1073,6 +1086,7 @@ export const dispatchService = {
   savePdWeigh,
   markTlSkipped,
   getFetchReturnPallet,
+  listFetchReport,
   markWeighed,
   getDeliveryStatus,
   getLotProgressForOrders,

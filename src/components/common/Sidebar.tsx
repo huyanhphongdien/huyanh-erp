@@ -421,6 +421,7 @@ const getMenuGroups = (
       { path: '/logistics/dispatch', label: 'Lệnh điều động', icon: <ClipboardList size={18} />,
         tab: { key: 'dispatch-list', componentId: 'dispatch-list' },
         extraActivePaths: ['/logistics/dispatch/new'] },
+      { path: '/logistics/dispatch/fetch-report', label: 'Báo cáo đi lấy mủ', icon: <BarChart3 size={18} /> },
       { path: '/logistics/fleet/vehicles', label: 'Đội xe', icon: <Truck size={18} />,
         tab: { key: 'fleet-vehicle-list', componentId: 'fleet-vehicle-list' } },
       { path: '/logistics/fleet/drivers', label: 'Tài xế', icon: <UserCheck size={18} />,

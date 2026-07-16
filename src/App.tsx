@@ -170,6 +170,7 @@ const DispatchListPage = lazy(() => import('./pages/logistics/dispatch/DispatchL
 const DispatchCreatePage = lazy(() => import('./pages/logistics/dispatch/DispatchCreatePage'));
 const DispatchDetailPage = lazy(() => import('./pages/logistics/dispatch/DispatchDetailPage'));
 const DispatchPrintPage = lazy(() => import('./pages/logistics/dispatch/DispatchPrintPage'));
+const FetchReportPage = lazy(() => import('./pages/logistics/dispatch/FetchReportPage'));
 const FinanceLoanDashboard = lazy(() => import('./pages/finance/FinanceLoanDashboard'));
 const FinanceLoanListPage = lazy(() => import('./pages/finance/FinanceLoanListPage'));
 const FinanceDepositListPage = lazy(() => import('./pages/finance/FinanceDepositListPage'));
@@ -551,6 +552,7 @@ function App() {
                 <Route index element={<Navigate to="/logistics/dispatch" replace />} />
                 <Route path="dispatch" element={<DispatchListPage />} />
                 <Route path="dispatch/new" element={<DispatchCreatePage />} />
+                <Route path="dispatch/fetch-report" element={<FetchReportPage />} />
                 <Route path="dispatch/:id" element={<DispatchDetailPage />} />
                 <Route path="dispatch/:id/edit" element={<DispatchCreatePage />} />
                 <Route path="dispatch/:id/print" element={<DispatchPrintPage />} />

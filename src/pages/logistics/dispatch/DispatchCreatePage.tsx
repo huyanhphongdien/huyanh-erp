@@ -477,6 +477,13 @@ export default function DispatchCreatePage() {
                     </Button>
                   </div>
                 </Form.Item>
+              ) : isFetchMu ? (
+                <Form.Item label="Loại chuyến này">
+                  <Typography.Text type="secondary">
+                    <b>Đi lấy mủ về PĐ</b> — khai <b>pallet mang đi</b> + chọn <b>nhà máy lấy mủ</b> (Tân Lâm / Lào).<br />
+                    App cân PĐ cân xe rỗng (lúc đi) + xe hàng (lúc về) → ra KL mủ. Không cần bảng chi tiết bên dưới.
+                  </Typography.Text>
+                </Form.Item>
               ) : (
                 <Form.Item label="Loại chuyến này">
                   <Typography.Text type="secondary">
@@ -555,14 +562,14 @@ export default function DispatchCreatePage() {
 
           <Divider titlePlacement="left" style={{ margin: '4px 0 16px' }}>Thông tin chuyến</Divider>
           <Row gutter={16}>
-            <Col xs={24} sm={12} md={8}><Form.Item name="customer_name" label="Khách hàng"><Input /></Form.Item></Col>
-            <Col xs={24} sm={12} md={8}><Form.Item name="destination" label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}><Input placeholder={isPort ? 'Cảng Tiên Sa' : 'vd: Gio Linh / Kho Quảng Trị'} /></Form.Item></Col>
+            {!isFetchMu && <Col xs={24} sm={12} md={8}><Form.Item name="customer_name" label="Khách hàng"><Input /></Form.Item></Col>}
+            {!isFetchMu && <Col xs={24} sm={12} md={8}><Form.Item name="destination" label={isPort ? 'Điểm giao / Cảng' : 'Điểm đến / nơi nhận'}><Input placeholder={isPort ? 'Cảng Tiên Sa' : 'vd: Gio Linh / Kho Quảng Trị'} /></Form.Item></Col>}
             {/* Điểm BỐC hàng — bắt buộc với hàng thương mại (xe bốc ở nhà máy ngoài). */}
             <Col xs={24} sm={12} md={8}>
               <Form.Item
                 name="pickup_location"
-                label={<>📦 Điểm BỐC hàng{' '}{isTrading ? <span style={{ color: '#dc2626' }}>*</span> : <span style={{ color: '#94a3b8', fontWeight: 400 }}>(bỏ trống = kho Huy Anh)</span>}</>}
-                rules={isTrading ? [{ required: true, message: 'Hàng thương mại phải ghi rõ bốc ở đâu' }] : []}
+                label={<>📦 {isFetchMu ? 'Nhà máy lấy mủ' : 'Điểm BỐC hàng'}{' '}{(isTrading || isFetchMu) ? <span style={{ color: '#dc2626' }}>*</span> : <span style={{ color: '#94a3b8', fontWeight: 400 }}>(bỏ trống = kho Huy Anh)</span>}</>}
+                rules={(isTrading || isFetchMu) ? [{ required: true, message: isFetchMu ? 'Chọn nhà máy lấy mủ (Tân Lâm / Lào)' : 'Hàng thương mại phải ghi rõ bốc ở đâu' }] : []}
               >
                 <AutoComplete options={PICKUP_PRESETS} filterOption={acFilter as any}
                   placeholder="vd: Nhà máy Cao su Quảng Trị" />
@@ -603,14 +610,15 @@ export default function DispatchCreatePage() {
                 />
               </Col>
             )}
-            <Col xs={24} sm={12} md={8}><Form.Item name="contract_ref" label="Căn cứ HĐ / Booking"><Input /></Form.Item></Col>
-            <Col xs={24} sm={12} md={8}><Form.Item name="recipient_name" label="Người nhận"><Input /></Form.Item></Col>
-            <Col xs={24} sm={12} md={8}><Form.Item name="recipient_phone" label="SĐT người nhận"><Input /></Form.Item></Col>
+            {!isFetchMu && <Col xs={24} sm={12} md={8}><Form.Item name="contract_ref" label="Căn cứ HĐ / Booking"><Input /></Form.Item></Col>}
+            {!isFetchMu && <Col xs={24} sm={12} md={8}><Form.Item name="recipient_name" label="Người nhận"><Input /></Form.Item></Col>}
+            {!isFetchMu && <Col xs={24} sm={12} md={8}><Form.Item name="recipient_phone" label="SĐT người nhận"><Input /></Form.Item></Col>}
             <Col xs={24} sm={12} md={8}><Form.Item name="reason" label="Lý do điều động"><Input /></Form.Item></Col>
             <Col xs={24}><Form.Item name="note" label="Ghi chú"><Input.TextArea rows={2} /></Form.Item></Col>
           </Row>
         </Form>
 
+        {!isFetchMu && (<>
         <Divider titlePlacement="left" style={{ margin: '4px 0 12px' }}>
           {isPort ? 'Danh sách container' : 'Chi tiết chuyến'} ({lines.length}) — tổng {totalWeight.toLocaleString('vi-VN')} kg
         </Divider>
@@ -618,6 +626,7 @@ export default function DispatchCreatePage() {
           scroll={{ x: isPort ? 1320 : 760 }}
           locale={{ emptyText: <Empty description={isPort ? "Chưa có container — bấm 'Thêm dòng' hoặc 'Tạo từ Đơn hàng bán'" : "Đón khách thì bỏ trống cũng được; chở hàng thì bấm 'Thêm dòng'"} /> }} />
         <Button type="dashed" icon={<PlusOutlined />} onClick={addLine} style={{ marginTop: 12 }} block>{isPort ? 'Thêm dòng container' : 'Thêm dòng'}</Button>
+        </>)}
       </Card>
 
       {/* SO picker — 2 BƯỚC: (1) chọn đơn → (2) tích container đi chuyến hôm nay */}

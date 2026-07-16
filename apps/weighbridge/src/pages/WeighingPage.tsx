@@ -273,9 +273,12 @@ export default function WeighingPage() {
     if (selectedContainer?.seal_no) setSealNoActual(selectedContainer.seal_no)
   }, [selectedContainerId])
 
-  // ĐỢT 2: Load lệnh điều động còn hiệu lực khi cân XUẤT đi cảng (NM xuất khẩu = PD).
+  // Load lệnh điều động: XUẤT đi cảng (chỉ PĐ) HOẶC FETCH đi lấy mủ (cả PĐ + TL/LAO).
   useEffect(() => {
-    if ((ticketDirection !== 'out' && ticketDirection !== 'fetch') || !currentFacility?.can_ship_to_customer) return
+    const needDispatch =
+      (ticketDirection === 'out' && currentFacility?.can_ship_to_customer) ||
+      ticketDirection === 'fetch'
+    if (!needDispatch) return
     setLoadingDispatch(true)
     dispatchService.listForWeighing()
       .then(setDispatchOrders)
@@ -1287,15 +1290,19 @@ export default function WeighingPage() {
                   >
                     📥 NHẬP (vào kho)
                   </Button>
-                  <Button
-                    type={ticketDirection === 'out' ? 'primary' : 'default'}
-                    onClick={() => setTicketDirection('out')}
-                    style={ticketDirection === 'out' ? { background: '#E8A838', borderColor: '#E8A838', flex: 1 } : { flex: 1 }}
-                    disabled={!!ticket}
-                    size="large"
-                  >
-                    📤 XUẤT (ra kho)
-                  </Button>
+                  {/* XUẤT (ra kho): PĐ (xuất bán khách). Satellite (TL/LAO) đã thay bằng
+                      "Cân mủ đi lấy" nên ẨN — trừ khi đang mở phiếu XUẤT cũ để xem tiếp. */}
+                  {(currentFacility?.can_ship_to_customer || ticket?.ticket_type === 'out') && (
+                    <Button
+                      type={ticketDirection === 'out' ? 'primary' : 'default'}
+                      onClick={() => setTicketDirection('out')}
+                      style={ticketDirection === 'out' ? { background: '#E8A838', borderColor: '#E8A838', flex: 1 } : { flex: 1 }}
+                      disabled={!!ticket}
+                      size="large"
+                    >
+                      📤 XUẤT (ra kho)
+                    </Button>
+                  )}
                   {/* CỔNG — cân hàng nội bộ (không phải mủ). Chỉ Phong Điền. */}
                   {canShowGate && (
                     <Button

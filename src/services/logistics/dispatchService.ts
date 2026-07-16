@@ -96,6 +96,7 @@ export interface DispatchOrder {
   tl_weighed_at?: string | null
   pd_net_kg?: number | null
   pd_weighed_at?: string | null
+  fetch_tl_skipped?: boolean | null   // xe container — TL không cân được, chỉ PĐ cân
   recipient_name: string | null
   recipient_phone: string | null
   sales_order_id: string | null
@@ -802,6 +803,11 @@ async function saveTlWeigh(orderId: string, p: {
   }).eq('id', orderId)
 }
 
+/** Xe container: TL không cân được → đánh dấu bỏ cân TL (chỉ PĐ cân). */
+async function markTlSkipped(orderId: string): Promise<void> {
+  await supabase.from('dispatch_orders').update({ fetch_tl_skipped: true }).eq('id', orderId)
+}
+
 /** 4-lần-cân: PHONG ĐIỀN cân về xong (cân 4) → ghi KL mủ PĐ vào lệnh. */
 async function savePdWeigh(orderId: string, netKg: number, weighedAt: string): Promise<void> {
   await supabase.from('dispatch_orders').update({
@@ -1056,6 +1062,7 @@ export const dispatchService = {
   getFetchPallet,
   saveTlWeigh,
   savePdWeigh,
+  markTlSkipped,
   getFetchReturnPallet,
   markWeighed,
   getDeliveryStatus,

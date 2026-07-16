@@ -234,10 +234,10 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
               <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 6 }}>⚖️ Đối chiếu 4 lần cân (2 Tân Lâm + 2 Phong Điền)</div>
               <Space size={28} wrap>
                 <span>📦 Pallet: đi <Text strong>{order.pallet_plastic_out || 0}N+{order.pallet_steel_out || 0}S</Text>
-                  {' → '}rời TL <Text strong>{(order.pallet_plastic_return != null || order.pallet_steel_return != null) ? `${order.pallet_plastic_return || 0}N+${order.pallet_steel_return || 0}S` : '⏳'}</Text>
-                  {(order.pallet_plastic_return != null || order.pallet_steel_return != null) && <>{' → '}để lại TL <Text strong>{(order.pallet_plastic_out || 0) - (order.pallet_plastic_return || 0)}N+{(order.pallet_steel_out || 0) - (order.pallet_steel_return || 0)}S</Text></>}
+                  {' → '}rời TL <Text strong>{order.fetch_tl_skipped ? '🚛 container' : ((order.pallet_plastic_return != null || order.pallet_steel_return != null) ? `${order.pallet_plastic_return || 0}N+${order.pallet_steel_return || 0}S` : '⏳')}</Text>
+                  {!order.fetch_tl_skipped && (order.pallet_plastic_return != null || order.pallet_steel_return != null) && <>{' → '}để lại TL <Text strong>{(order.pallet_plastic_out || 0) - (order.pallet_plastic_return || 0)}N+{(order.pallet_steel_out || 0) - (order.pallet_steel_return || 0)}S</Text></>}
                 </span>
-                <span>🌳 KL mủ: TL <Text strong>{order.tl_net_kg != null ? order.tl_net_kg.toLocaleString('vi-VN') + ' kg' : '⏳ chưa cân'}</Text> · PĐ <Text strong>{order.pd_net_kg != null ? order.pd_net_kg.toLocaleString('vi-VN') + ' kg' : '⏳ chưa cân'}</Text>
+                <span>🌳 KL mủ: TL <Text strong>{order.fetch_tl_skipped ? '🚛 bỏ cân (container)' : (order.tl_net_kg != null ? order.tl_net_kg.toLocaleString('vi-VN') + ' kg' : '⏳ chưa cân')}</Text> · PĐ <Text strong>{order.pd_net_kg != null ? order.pd_net_kg.toLocaleString('vi-VN') + ' kg' : '⏳ chưa cân'}</Text>
                   {order.tl_net_kg != null && order.pd_net_kg != null && (() => {
                     const diff = (order.pd_net_kg || 0) - (order.tl_net_kg || 0)
                     const pct = order.tl_net_kg ? Math.abs(diff) / order.tl_net_kg * 100 : 0

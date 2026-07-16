@@ -1391,6 +1391,34 @@ export default function WeighingPage() {
                     />
                     )}
                   </div>
+                  {/* Xe container: bàn cân TL không cân được → bỏ cân TL, chỉ PĐ cân. */}
+                  {isFetchSource && !ticket && selectedDispatchOrderId && (
+                    <Button
+                      danger block style={{ marginBottom: 10 }}
+                      onClick={() => {
+                        Modal.confirm({
+                          title: '🚛 Xe container — bỏ cân ở TL?',
+                          content: 'Đánh dấu lệnh này TL KHÔNG cân (bàn cân TL không cân được xe container). Xe đưa mủ về PĐ, PĐ cân 2 lần. KHÔNG tạo phiếu cân ở TL.',
+                          okText: 'Đánh dấu bỏ cân TL',
+                          okButtonProps: { danger: true },
+                          cancelText: 'Huỷ',
+                          onOk: async () => {
+                            try {
+                              await dispatchService.markTlSkipped(selectedDispatchOrderId)
+                              message.success('Đã đánh dấu: TL bỏ cân (xe container). Đưa mủ về PĐ để cân.')
+                              setSelectedDispatchOrderId('')
+                              setVehiclePlate(''); setDriverName(''); setDriverPhone('')
+                              setPalletPlastic(0); setPalletSteel(0)
+                            } catch (e: any) {
+                              message.error('Lỗi đánh dấu: ' + (e?.message || ''))
+                            }
+                          },
+                        })
+                      }}
+                    >
+                      🚛 Xe container — bỏ cân TL (chỉ PĐ cân)
+                    </Button>
+                  )}
                   <Row gutter={8}>
                     <Col xs={24} sm={14}>
                       <Text style={{ fontSize: 12, color: '#64748b' }}>Loại mủ nhận về</Text>

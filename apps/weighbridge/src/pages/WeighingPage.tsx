@@ -1287,6 +1287,8 @@ export default function WeighingPage() {
                           const ext = d as any
                           setPalletPlastic(Number(ext.pallet_plastic_out || 0))
                           setPalletSteel(Number(ext.pallet_steel_out || 0))
+                          if (ext.fetch_rubber_type) setRubberType(ext.fetch_rubber_type)
+                          if (ext.fetch_lot_code) setConsolidationCode(ext.fetch_lot_code)
                         }
                       }}
                       options={dispatchOrders

@@ -148,6 +148,8 @@ export default function DispatchCreatePage() {
           pickup_contact: order.pickup_contact,
           pallet_plastic_out: order.pallet_plastic_out,
           pallet_steel_out: order.pallet_steel_out,
+          fetch_rubber_type: (order as any).fetch_rubber_type,
+          fetch_lot_code: (order as any).fetch_lot_code,
           recipient_name: order.recipient_name,
           recipient_phone: order.recipient_phone,
           note: order.note,
@@ -327,6 +329,8 @@ export default function DispatchCreatePage() {
         pallet_plastic_out: v.trip_type === 'fetch_mu' ? (v.pallet_plastic_out ?? 0) : undefined,
         pallet_steel_out: v.trip_type === 'fetch_mu' ? (v.pallet_steel_out ?? 0) : undefined,
         pallet_kg_out: v.trip_type === 'fetch_mu' ? ((v.pallet_plastic_out || 0) * 10 + (v.pallet_steel_out || 0) * 50) : undefined,
+        fetch_rubber_type: v.trip_type === 'fetch_mu' ? (v.fetch_rubber_type || null) : undefined,
+        fetch_lot_code: v.trip_type === 'fetch_mu' ? (v.fetch_lot_code || null) : undefined,
         recipient_name: v.recipient_name || null,
         sales_order_id: v.sales_order_id || null,
         note: v.note || null,
@@ -583,7 +587,27 @@ export default function DispatchCreatePage() {
             {isFetchMu && (
               <Col xs={24}>
                 <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '10px 12px' }}>
-                  <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 8 }}>📦 Pallet mang đi (để lấy mủ ở NM khác)</div>
+                  <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 8 }}>🚚 Thông tin lấy mủ (app cân điền sẵn khi chọn lệnh)</div>
+                  <Row gutter={12}>
+                    <Col xs={24} sm={12}>
+                      <Form.Item name="fetch_rubber_type" label="Loại mủ dự kiến" style={{ marginBottom: 8 }}>
+                        <Select allowClear placeholder="Chọn loại mủ (nếu biết trước)"
+                          options={[
+                            { value: 'mu_tap', label: 'Mủ tạp' },
+                            { value: 'mu_nuoc', label: 'Mủ nước' },
+                            { value: 'mu_dong', label: 'Mủ đông' },
+                            { value: 'mu_to', label: 'Mủ tờ' },
+                            { value: 'mu_rss3', label: 'Mủ RSS3' },
+                          ]} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item name="fetch_lot_code" label="Mã lô dự kiến" style={{ marginBottom: 8 }}>
+                        <Input placeholder="vd: TMMN-11-02" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <div style={{ fontWeight: 600, color: '#0369A1', margin: '2px 0 8px' }}>📦 Pallet mang đi</div>
                   <Row gutter={12}>
                     <Col xs={12} sm={6}>
                       <Form.Item name="pallet_plastic_out" label="Pallet nhựa (10kg)" style={{ marginBottom: 4 }}>
@@ -597,7 +621,7 @@ export default function DispatchCreatePage() {
                     </Col>
                   </Row>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    Số pallet xe mang đi — app cân PĐ sẽ điền sẵn ở cân lần 1 (xe rỗng). Điểm bốc = Tân Lâm.
+                    Chọn lệnh này ở app cân PĐ → tự điền biển số + pallet + loại mủ + lô. Điểm bốc = Tân Lâm. Cân lần 1 = xe rỗng (đi), lần 2 = xe hàng (về).
                   </Typography.Text>
                 </div>
               </Col>

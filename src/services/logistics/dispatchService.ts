@@ -72,6 +72,8 @@ export interface DispatchOrder {
   pallet_plastic_out?: number | null
   pallet_steel_out?: number | null
   pallet_kg_out?: number | null
+  fetch_rubber_type?: string | null   // loại mủ dự kiến lấy — app cân điền sẵn
+  fetch_lot_code?: string | null      // mã lô dự kiến lấy — app cân điền sẵn
   recipient_name: string | null
   recipient_phone: string | null
   sales_order_id: string | null
@@ -144,6 +146,8 @@ export interface CreateDispatchInput {
   pallet_plastic_out?: number | null
   pallet_steel_out?: number | null
   pallet_kg_out?: number | null
+  fetch_rubber_type?: string | null
+  fetch_lot_code?: string | null
   recipient_name?: string | null
   recipient_phone?: string | null
   sales_order_id?: string | null
@@ -302,6 +306,8 @@ async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
       ...(input.pallet_plastic_out != null ? { pallet_plastic_out: input.pallet_plastic_out } : {}),
       ...(input.pallet_steel_out != null ? { pallet_steel_out: input.pallet_steel_out } : {}),
       ...(input.pallet_kg_out != null ? { pallet_kg_out: input.pallet_kg_out } : {}),
+      ...(input.fetch_rubber_type ? { fetch_rubber_type: input.fetch_rubber_type } : {}),
+      ...(input.fetch_lot_code ? { fetch_lot_code: input.fetch_lot_code } : {}),
       recipient_name: input.recipient_name || null,
       recipient_phone: input.recipient_phone || null,
       sales_order_id: input.sales_order_id || null,
@@ -338,6 +344,7 @@ async function update(
   // update() an toàn sẵn: chỉ set key khi patch có mặt (!== undefined).
   const keys = ['dispatch_date', 'trip_type', 'reason', 'contract_ref', 'customer_name', 'destination',
     'pickup_location', 'pickup_contact', 'pallet_plastic_out', 'pallet_steel_out', 'pallet_kg_out',
+    'fetch_rubber_type', 'fetch_lot_code',
     'recipient_name', 'recipient_phone', 'sales_order_id', 'note', 'is_hired', 'hire_company', 'hire_cost'] as const
   for (const k of keys) {
     if ((patch as any)[k] !== undefined) out[k] = (patch as any)[k] === '' ? null : (patch as any)[k]

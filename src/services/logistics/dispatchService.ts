@@ -803,9 +803,18 @@ async function saveTlWeigh(orderId: string, p: {
   }).eq('id', orderId)
 }
 
-/** Xe container: TL không cân được → đánh dấu bỏ cân TL (chỉ PĐ cân). */
-async function markTlSkipped(orderId: string): Promise<void> {
-  await supabase.from('dispatch_orders').update({ fetch_tl_skipped: true }).eq('id', orderId)
+/**
+ * Xe container: TL không cân được → đánh dấu bỏ cân TL (chỉ PĐ cân).
+ * Vẫn LƯU số pallet CÒN TRÊN XE rời TL (đếm tay, không cân) để PĐ đối chiếu.
+ */
+async function markTlSkipped(orderId: string, pallet?: { plastic: number; steel: number }): Promise<void> {
+  const upd: Record<string, any> = { fetch_tl_skipped: true }
+  if (pallet) {
+    upd.pallet_plastic_return = pallet.plastic || 0
+    upd.pallet_steel_return = pallet.steel || 0
+    upd.pallet_kg_return = (pallet.plastic || 0) * 10 + (pallet.steel || 0) * 50
+  }
+  await supabase.from('dispatch_orders').update(upd).eq('id', orderId)
 }
 
 /** 4-lần-cân: PHONG ĐIỀN cân về xong (cân 4) → ghi KL mủ PĐ vào lệnh. */

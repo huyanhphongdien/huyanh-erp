@@ -167,6 +167,7 @@ export default function WeighingPage() {
   // 4-lần-cân (đi lấy mủ): số TL khai để PĐ cân lần 2 đối chiếu.
   const [tlNetKg, setTlNetKg] = useState<number | null>(null)
   const [tlReturnPallet, setTlReturnPallet] = useState<{ plastic: number; steel: number } | null>(null)
+  const [containerModalOpen, setContainerModalOpen] = useState(false)  // popup TL bỏ cân xe container
   // Định mức bì (kg/cái) từ bảng pallet_types — fallback nhựa 10 / sắt 50.
   const [palletUnits, setPalletUnits] = useState<{ plastic: number; steel: number }>({ plastic: 10, steel: 50 })
   const palletKg = (palletPlastic || 0) * palletUnits.plastic + (palletSteel || 0) * palletUnits.steel
@@ -1393,32 +1394,47 @@ export default function WeighingPage() {
                   </div>
                   {/* Xe container: bàn cân TL không cân được → bỏ cân TL, chỉ PĐ cân. */}
                   {isFetchSource && !ticket && selectedDispatchOrderId && (
-                    <Button
-                      danger block style={{ marginBottom: 10 }}
-                      onClick={() => {
-                        Modal.confirm({
-                          title: '🚛 Xe container — bỏ cân ở TL?',
-                          content: 'Đánh dấu lệnh này TL KHÔNG cân (bàn cân TL không cân được xe container). Xe đưa mủ về PĐ, PĐ cân 2 lần. KHÔNG tạo phiếu cân ở TL.',
-                          okText: 'Đánh dấu bỏ cân TL',
-                          okButtonProps: { danger: true },
-                          cancelText: 'Huỷ',
-                          onOk: async () => {
-                            try {
-                              await dispatchService.markTlSkipped(selectedDispatchOrderId)
-                              message.success('Đã đánh dấu: TL bỏ cân (xe container). Đưa mủ về PĐ để cân.')
-                              setSelectedDispatchOrderId('')
-                              setVehiclePlate(''); setDriverName(''); setDriverPhone('')
-                              setPalletPlastic(0); setPalletSteel(0)
-                            } catch (e: any) {
-                              message.error('Lỗi đánh dấu: ' + (e?.message || ''))
-                            }
-                          },
-                        })
-                      }}
-                    >
-                      🚛 Xe container — bỏ cân TL (chỉ PĐ cân)
+                    <Button danger block style={{ marginBottom: 10 }} onClick={() => setContainerModalOpen(true)}>
+                      🚛 Xe container — bỏ cân TL (chỉ khai pallet)
                     </Button>
                   )}
+                  <Modal
+                    open={containerModalOpen}
+                    title="🚛 Xe container — bỏ cân TL"
+                    okText="Đánh dấu bỏ cân TL"
+                    okButtonProps={{ danger: true }}
+                    cancelText="Huỷ"
+                    onCancel={() => setContainerModalOpen(false)}
+                    onOk={async () => {
+                      try {
+                        await dispatchService.markTlSkipped(selectedDispatchOrderId, { plastic: palletPlastic || 0, steel: palletSteel || 0 })
+                        message.success('Đã đánh dấu TL bỏ cân + lưu pallet rời TL. Đưa mủ về PĐ để cân.')
+                        setContainerModalOpen(false)
+                        setSelectedDispatchOrderId(''); setVehiclePlate(''); setDriverName(''); setDriverPhone('')
+                        setPalletPlastic(0); setPalletSteel(0)
+                      } catch (e: any) { message.error('Lỗi đánh dấu: ' + (e?.message || '')) }
+                    }}
+                  >
+                    <div style={{ fontSize: 13, marginBottom: 10 }}>
+                      Bàn cân TL không cân được xe container → TL <b>KHÔNG cân KL</b>, nhưng vẫn <b>đếm số pallet CÒN TRÊN XE</b> rời TL để PĐ đối chiếu:
+                    </div>
+                    <Row gutter={8}>
+                      {([['Nhựa', palletUnits.plastic, palletPlastic, setPalletPlastic],
+                         ['Sắt', palletUnits.steel, palletSteel, setPalletSteel]] as const).map(([lbl, unit, val, setter]) => (
+                        <Col span={12} key={lbl}>
+                          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{lbl} ({unit}kg/cái)</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Button size="small" onClick={() => setter(Math.max(0, (val || 0) - 1))}>−</Button>
+                            <InputNumber size="small" min={0} precision={0} value={val} onChange={(v) => setter(Math.max(0, Number(v) || 0))} style={{ width: 70 }} />
+                            <Button size="small" onClick={() => setter((val || 0) + 1)}>+</Button>
+                          </div>
+                        </Col>
+                      ))}
+                    </Row>
+                    <div style={{ fontSize: 12, color: '#0369A1', marginTop: 8 }}>
+                      = <b>{palletKg.toLocaleString('vi-VN')} kg</b> pallet còn trên xe → ghi vào lệnh, PĐ cân lần 2 đối chiếu.
+                    </div>
+                  </Modal>
                   <Row gutter={8}>
                     <Col xs={24} sm={14}>
                       <Text style={{ fontSize: 12, color: '#64748b' }}>Loại mủ nhận về</Text>

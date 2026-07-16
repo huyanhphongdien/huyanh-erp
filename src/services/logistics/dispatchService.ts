@@ -757,6 +757,25 @@ async function markFetchWeighed(orderId: string, ticketId: string): Promise<void
 }
 
 /**
+ * Đợt 2 (đi lấy mủ): lấy nhanh SỐ PALLET MANG ĐI của lệnh — dùng cho app cân
+ * điền sẵn pallet lần 1. Query GỌN (chỉ 2 cột, KHÔNG đọc dispatch_order_lines /
+ * embed sales_orders) qua client dispatchService — client này đọc được
+ * dispatch_orders (listForWeighing chứng minh). Lỗi → trả 0 (không chặn cân).
+ */
+async function getFetchPallet(orderId: string): Promise<{ plastic: number; steel: number }> {
+  const { data, error } = await supabase
+    .from('dispatch_orders')
+    .select('pallet_plastic_out, pallet_steel_out')
+    .eq('id', orderId)
+    .maybeSingle()
+  if (error) { console.warn('[getFetchPallet]', error.message); return { plastic: 0, steel: 0 } }
+  return {
+    plastic: Number((data as any)?.pallet_plastic_out || 0),
+    steel: Number((data as any)?.pallet_steel_out || 0),
+  }
+}
+
+/**
  * Đánh dấu thủ công lệnh "đã cân" (khi trạm cân đã cân thực tế nhưng không nối
  * lệnh, hoặc cân trước khi có tính năng nối). Theo nguyên tắc "đã cân là được"
  * (KHÔNG so KL): set actual_weight_kg = KL kế hoạch cho các dòng CHƯA cân, để
@@ -984,6 +1003,7 @@ export const dispatchService = {
   listForWeighing,
   syncWeighing,
   markFetchWeighed,
+  getFetchPallet,
   markWeighed,
   getDeliveryStatus,
   getLotProgressForOrders,

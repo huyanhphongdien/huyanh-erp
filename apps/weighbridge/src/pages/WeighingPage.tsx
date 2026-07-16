@@ -281,12 +281,14 @@ export default function WeighingPage() {
   }, [ticketDirection, currentFacility?.can_ship_to_customer])
 
   // Load TẤT CẢ container của lệnh khi chọn lệnh (cả xe).
+  // FETCH (đi lấy mủ) KHÔNG có dòng hàng → bỏ qua; getById đọc dispatch_order_lines
+  // mà anon app cân bị RLS chặn → gây lỗi 400 vô nghĩa.
   useEffect(() => {
-    if (!selectedDispatchOrderId) { setDispatchLines([]); return }
+    if (!selectedDispatchOrderId || ticketDirection === 'fetch') { setDispatchLines([]); return }
     dispatchService.getById(selectedDispatchOrderId).then(res => {
       if (res) setDispatchLines(res.lines)
     }).catch(e => console.warn('Load dispatch lines failed:', e))
-  }, [selectedDispatchOrderId])
+  }, [selectedDispatchOrderId, ticketDirection])
 
   // Cân XUẤT: TỰ khớp lệnh điều động theo BIỂN SỐ đầu kéo — operator quên chọn lệnh
   // thì vẫn link để ghi KL thực về lệnh. Chỉ tự chọn khi đúng 1 lệnh khớp + chưa chọn + chưa tạo phiếu.
@@ -367,17 +369,13 @@ export default function WeighingPage() {
         } else if (t.ticket_type === 'fetch' && ext.reference_type === 'dispatch_order' && ext.reference_id) {
           // Đợt 2 — Cân lần 1 chuyến đi lấy mủ: điền sẵn pallet MANG ĐI từ lệnh điều động.
           // (State pre-fill lúc chọn lệnh bị reset khi tạo phiếu → nạp lại từ lệnh.)
-          // Query GỌN dispatch_orders (KHÔNG dùng getById — nó còn đọc dispatch_order_lines +
-          // embed sales_orders mà anon app cân bị RLS chặn → 400). Chỉ lấy 2 cột pallet.
+          // Dùng dispatchService.getFetchPallet (client đọc được dispatch_orders, query gọn).
           try {
-            const { data: o } = await supabase
-              .from('dispatch_orders')
-              .select('pallet_plastic_out, pallet_steel_out')
-              .eq('id', ext.reference_id)
-              .maybeSingle()
-            setPalletPlastic(Number((o as any)?.pallet_plastic_out || 0))
-            setPalletSteel(Number((o as any)?.pallet_steel_out || 0))
-          } catch { setPalletPlastic(0); setPalletSteel(0) }
+            const pal = await dispatchService.getFetchPallet(ext.reference_id)
+            console.log('[fetch L1] pallet mang đi từ lệnh:', pal, '· order=', ext.reference_id)
+            setPalletPlastic(pal.plastic)
+            setPalletSteel(pal.steel)
+          } catch (e) { console.warn('[fetch L1] pallet lỗi:', e); setPalletPlastic(0); setPalletSteel(0) }
         } else {
           setPalletPlastic(0)
           setPalletSteel(0)

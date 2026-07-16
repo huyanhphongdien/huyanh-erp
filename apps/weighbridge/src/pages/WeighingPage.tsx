@@ -788,6 +788,12 @@ export default function WeighingPage() {
             consolidation_code: consolidationCode.trim() || null,
           }).eq('id', ticket.id)
         } catch (e) { console.warn('[fetch] lưu loại mủ/lô lỗi:', e) }
+        // Cân xong → gắn phiếu vào lệnh điều động để ẩn lệnh khỏi danh sách app cân.
+        if (selectedDispatchOrderId) {
+          try {
+            await dispatchService.markFetchWeighed(selectedDispatchOrderId, ticket.id)
+          } catch (e) { console.warn('[fetch] gắn phiếu vào lệnh (ẩn khỏi list) lỗi:', e) }
+        }
       }
 
       // Save calculated values
@@ -1284,6 +1290,8 @@ export default function WeighingPage() {
                         const d = v ? dispatchOrders.find(o => o.id === v) : null
                         if (d) {
                           if (d.tractor_plate) setVehiclePlate(d.tractor_plate.toUpperCase())
+                          if (d.driver_name) setDriverName(d.driver_name)
+                          if (d.driver_phone) setDriverPhone(d.driver_phone)
                           const ext = d as any
                           setPalletPlastic(Number(ext.pallet_plastic_out || 0))
                           setPalletSteel(Number(ext.pallet_steel_out || 0))
@@ -1293,10 +1301,15 @@ export default function WeighingPage() {
                       }}
                       options={dispatchOrders
                         .filter(d => (d as any).trip_type === 'fetch_mu')
-                        .map(d => ({
-                          value: d.id,
-                          label: `${d.code}${d.tractor_plate ? ` · ${d.tractor_plate}` : ''}${d.pickup_location ? ` · ${d.pickup_location}` : ''}`,
-                        }))}
+                        .map(d => {
+                          const ng = d.dispatch_date
+                            ? new Date(d.dispatch_date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+                            : ''
+                          return {
+                            value: d.id,
+                            label: `${ng ? ng + ' · ' : ''}${d.code}${d.tractor_plate ? ` · ${d.tractor_plate}` : ''}${d.driver_name ? ` · 👤 ${d.driver_name}` : ''}${d.pickup_location ? ` · ${d.pickup_location}` : ''}`,
+                          }
+                        })}
                     />
                   </div>
                   <Row gutter={8}>

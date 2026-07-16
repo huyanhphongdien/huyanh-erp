@@ -743,6 +743,20 @@ async function syncWeighing(params: {
 }
 
 /**
+ * Đợt 2 (đi lấy mủ TL→PĐ): sau khi cân XONG ở app cân, gắn phiếu cân vào lệnh
+ * → lệnh biến khỏi danh sách chọn ở app cân (listForWeighing lọc weighbridge_ticket_id).
+ * Chuyến fetch không có dòng hàng nên không đi qua syncWeighing — dùng hàm này.
+ * Idempotent: chỉ set nếu lệnh chưa gắn phiếu nào (phiếu cân đầu tiên thắng).
+ */
+async function markFetchWeighed(orderId: string, ticketId: string): Promise<void> {
+  await supabase
+    .from('dispatch_orders')
+    .update({ weighbridge_ticket_id: ticketId })
+    .eq('id', orderId)
+    .is('weighbridge_ticket_id', null)
+}
+
+/**
  * Đánh dấu thủ công lệnh "đã cân" (khi trạm cân đã cân thực tế nhưng không nối
  * lệnh, hoặc cân trước khi có tính năng nối). Theo nguyên tắc "đã cân là được"
  * (KHÔNG so KL): set actual_weight_kg = KL kế hoạch cho các dòng CHƯA cân, để
@@ -969,6 +983,7 @@ export const dispatchService = {
   ordersFromContainerIds,
   listForWeighing,
   syncWeighing,
+  markFetchWeighed,
   markWeighed,
   getDeliveryStatus,
   getLotProgressForOrders,

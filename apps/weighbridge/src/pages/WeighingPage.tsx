@@ -366,16 +366,14 @@ export default function WeighingPage() {
         if (t.status === 'weighing_tare') {
           setPalletPlastic(Number((isReverseFlow ? ext.pallet_plastic_tare : ext.pallet_plastic_gross) || 0))
           setPalletSteel(Number((isReverseFlow ? ext.pallet_steel_tare : ext.pallet_steel_gross) || 0))
-        } else if (t.ticket_type === 'fetch' && ext.reference_type === 'dispatch_order' && ext.reference_id) {
-          // Đợt 2 — Cân lần 1 chuyến đi lấy mủ: điền sẵn pallet MANG ĐI từ lệnh điều động.
-          // (State pre-fill lúc chọn lệnh bị reset khi tạo phiếu → nạp lại từ lệnh.)
-          // Dùng dispatchService.getFetchPallet (client đọc được dispatch_orders, query gọn).
-          try {
-            const pal = await dispatchService.getFetchPallet(ext.reference_id)
-            console.log('[fetch L1] pallet mang đi từ lệnh:', pal, '· order=', ext.reference_id)
-            setPalletPlastic(pal.plastic)
-            setPalletSteel(pal.steel)
-          } catch (e) { console.warn('[fetch L1] pallet lỗi:', e); setPalletPlastic(0); setPalletSteel(0) }
+        } else if (t.ticket_type === 'fetch') {
+          // Đợt 2 — Cân lần 1 đi lấy mủ: pallet MANG ĐI đã lưu vào slot tare lúc tạo phiếu.
+          // Slot có số → hiện lại. Slot trống → GIỮ NGUYÊN state (đã điền lúc chọn lệnh),
+          // TUYỆT ĐỐI không reset 0 (đây là chỗ trước đây xoá mất pallet).
+          const pp = Number(ext.pallet_plastic_tare || 0)
+          const ps = Number(ext.pallet_steel_tare || 0)
+          console.log('[fetch L1] pallet từ phiếu (slot tare):', { pp, ps })
+          if (pp || ps) { setPalletPlastic(pp); setPalletSteel(ps) }
         } else {
           setPalletPlastic(0)
           setPalletSteel(0)
@@ -581,6 +579,18 @@ export default function WeighingPage() {
         } catch (e) {
           console.warn('Link dispatch order failed:', e)
         }
+      }
+
+      // ĐỢT 2 fetch: LƯU THẲNG pallet MANG ĐI (đã điền lúc chọn lệnh) vào slot tare (L1=tare)
+      // ngay lúc tạo phiếu → cân lần 1 hiện lại đúng dù đã chuyển trang (khỏi query lại lệnh).
+      if (ticketDirection === 'fetch' && (palletPlastic || palletSteel)) {
+        try {
+          await supabase.from('weighbridge_tickets').update({
+            pallet_plastic_tare: palletPlastic || 0,
+            pallet_steel_tare: palletSteel || 0,
+            pallet_kg_tare: palletKg || 0,
+          }).eq('id', t.id)
+        } catch (e) { console.warn('[fetch] lưu pallet mang đi lỗi:', e) }
       }
 
       // F3: Link transfer_id nếu user đã chọn phiếu chuyển kho

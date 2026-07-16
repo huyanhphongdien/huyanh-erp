@@ -367,11 +367,16 @@ export default function WeighingPage() {
         } else if (t.ticket_type === 'fetch' && ext.reference_type === 'dispatch_order' && ext.reference_id) {
           // Đợt 2 — Cân lần 1 chuyến đi lấy mủ: điền sẵn pallet MANG ĐI từ lệnh điều động.
           // (State pre-fill lúc chọn lệnh bị reset khi tạo phiếu → nạp lại từ lệnh.)
+          // Query GỌN dispatch_orders (KHÔNG dùng getById — nó còn đọc dispatch_order_lines +
+          // embed sales_orders mà anon app cân bị RLS chặn → 400). Chỉ lấy 2 cột pallet.
           try {
-            const res = await dispatchService.getById(ext.reference_id)
-            const o = res?.order as any
-            setPalletPlastic(Number(o?.pallet_plastic_out || 0))
-            setPalletSteel(Number(o?.pallet_steel_out || 0))
+            const { data: o } = await supabase
+              .from('dispatch_orders')
+              .select('pallet_plastic_out, pallet_steel_out')
+              .eq('id', ext.reference_id)
+              .maybeSingle()
+            setPalletPlastic(Number((o as any)?.pallet_plastic_out || 0))
+            setPalletSteel(Number((o as any)?.pallet_steel_out || 0))
           } catch { setPalletPlastic(0); setPalletSteel(0) }
         } else {
           setPalletPlastic(0)

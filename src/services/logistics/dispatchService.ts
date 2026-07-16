@@ -87,6 +87,15 @@ export interface DispatchOrder {
   pallet_kg_out?: number | null
   fetch_rubber_type?: string | null   // loại mủ dự kiến lấy — app cân điền sẵn
   fetch_lot_code?: string | null      // mã lô dự kiến lấy — app cân điền sẵn
+  // 4-lần-cân đối chiếu (đi lấy mủ): pallet CÒN TRÊN XE rời TL + KL mủ 2 trạm
+  pallet_plastic_return?: number | null
+  pallet_steel_return?: number | null
+  pallet_kg_return?: number | null
+  tl_ticket_id?: string | null
+  tl_net_kg?: number | null
+  tl_weighed_at?: string | null
+  pd_net_kg?: number | null
+  pd_weighed_at?: string | null
   recipient_name: string | null
   recipient_phone: string | null
   sales_order_id: string | null
@@ -776,6 +785,47 @@ async function getFetchPallet(orderId: string): Promise<{ plastic: number; steel
 }
 
 /**
+ * 4-lần-cân: TÂN LÂM cân xong (cân 2+3) → ghi KL mủ TL + pallet CÒN TRÊN XE rời TL
+ * vào lệnh. KHÔNG ẩn lệnh (PĐ còn cân lần về). pallet_return dùng cho PĐ cân lần 2.
+ */
+async function saveTlWeigh(orderId: string, p: {
+  ticketId: string; netKg: number; palletPlastic: number; palletSteel: number; weighedAt: string
+}): Promise<void> {
+  const kg = (p.palletPlastic || 0) * 10 + (p.palletSteel || 0) * 50
+  await supabase.from('dispatch_orders').update({
+    tl_ticket_id: p.ticketId,
+    tl_net_kg: p.netKg,
+    tl_weighed_at: p.weighedAt,
+    pallet_plastic_return: p.palletPlastic || 0,
+    pallet_steel_return: p.palletSteel || 0,
+    pallet_kg_return: kg,
+  }).eq('id', orderId)
+}
+
+/** 4-lần-cân: PHONG ĐIỀN cân về xong (cân 4) → ghi KL mủ PĐ vào lệnh. */
+async function savePdWeigh(orderId: string, netKg: number, weighedAt: string): Promise<void> {
+  await supabase.from('dispatch_orders').update({
+    pd_net_kg: netKg,
+    pd_weighed_at: weighedAt,
+  }).eq('id', orderId)
+}
+
+/** PĐ cân lần 2 đọc pallet RỜI TL (TL đã khai) để điền sẵn + KL mủ TL để đối chiếu. */
+async function getFetchReturnPallet(orderId: string): Promise<{ plastic: number; steel: number; tlNetKg: number | null }> {
+  const { data, error } = await supabase
+    .from('dispatch_orders')
+    .select('pallet_plastic_return, pallet_steel_return, tl_net_kg')
+    .eq('id', orderId)
+    .maybeSingle()
+  if (error) { console.warn('[getFetchReturnPallet]', error.message); return { plastic: 0, steel: 0, tlNetKg: null } }
+  return {
+    plastic: Number((data as any)?.pallet_plastic_return || 0),
+    steel: Number((data as any)?.pallet_steel_return || 0),
+    tlNetKg: (data as any)?.tl_net_kg != null ? Number((data as any).tl_net_kg) : null,
+  }
+}
+
+/**
  * Đánh dấu thủ công lệnh "đã cân" (khi trạm cân đã cân thực tế nhưng không nối
  * lệnh, hoặc cân trước khi có tính năng nối). Theo nguyên tắc "đã cân là được"
  * (KHÔNG so KL): set actual_weight_kg = KL kế hoạch cho các dòng CHƯA cân, để
@@ -1004,6 +1054,9 @@ export const dispatchService = {
   syncWeighing,
   markFetchWeighed,
   getFetchPallet,
+  saveTlWeigh,
+  savePdWeigh,
+  getFetchReturnPallet,
   markWeighed,
   getDeliveryStatus,
   getLotProgressForOrders,

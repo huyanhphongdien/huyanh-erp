@@ -228,6 +228,24 @@ export default function DispatchDetailPage({ id: propId }: DispatchDetailPagePro
               <span>🏷️ Mã lô dự kiến: <Text strong>{order.fetch_lot_code || '–'}</Text></span>
               <span>📦 Pallet mang đi: <Text strong>{order.pallet_plastic_out || 0}</Text> nhựa (10kg) + <Text strong>{order.pallet_steel_out || 0}</Text> sắt (50kg) = <Text strong>{palletOutKg(order.pallet_plastic_out, order.pallet_steel_out).toLocaleString('vi-VN')} kg</Text></span>
             </Space>
+
+            {/* ĐỐI CHIẾU 4 LẦN CÂN (2 TL + 2 PĐ) */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed #BAE6FD' }}>
+              <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 6 }}>⚖️ Đối chiếu 4 lần cân (2 Tân Lâm + 2 Phong Điền)</div>
+              <Space size={28} wrap>
+                <span>📦 Pallet: đi <Text strong>{order.pallet_plastic_out || 0}N+{order.pallet_steel_out || 0}S</Text>
+                  {' → '}rời TL <Text strong>{(order.pallet_plastic_return != null || order.pallet_steel_return != null) ? `${order.pallet_plastic_return || 0}N+${order.pallet_steel_return || 0}S` : '⏳'}</Text>
+                  {(order.pallet_plastic_return != null || order.pallet_steel_return != null) && <>{' → '}để lại TL <Text strong>{(order.pallet_plastic_out || 0) - (order.pallet_plastic_return || 0)}N+{(order.pallet_steel_out || 0) - (order.pallet_steel_return || 0)}S</Text></>}
+                </span>
+                <span>🌳 KL mủ: TL <Text strong>{order.tl_net_kg != null ? order.tl_net_kg.toLocaleString('vi-VN') + ' kg' : '⏳ chưa cân'}</Text> · PĐ <Text strong>{order.pd_net_kg != null ? order.pd_net_kg.toLocaleString('vi-VN') + ' kg' : '⏳ chưa cân'}</Text>
+                  {order.tl_net_kg != null && order.pd_net_kg != null && (() => {
+                    const diff = (order.pd_net_kg || 0) - (order.tl_net_kg || 0)
+                    const pct = order.tl_net_kg ? Math.abs(diff) / order.tl_net_kg * 100 : 0
+                    return <> · chênh <Text strong style={{ color: pct > 1 ? '#dc2626' : '#15803d' }}>{diff > 0 ? '+' : ''}{diff.toLocaleString('vi-VN')} kg ({pct.toFixed(2)}%)</Text></>
+                  })()}
+                </span>
+              </Space>
+            </div>
           </div>
         )}
 

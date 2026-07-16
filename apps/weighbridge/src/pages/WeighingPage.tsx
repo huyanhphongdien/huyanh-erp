@@ -164,6 +164,9 @@ export default function WeighingPage() {
   // lần 1 → lần 2 để "pre-fill L2 = L1"; operator chỉnh nếu dỡ bớt/lấy thêm pallet.
   const [palletPlastic, setPalletPlastic] = useState<number>(0)
   const [palletSteel, setPalletSteel] = useState<number>(0)
+  // 4-lần-cân (đi lấy mủ): số TL khai để PĐ cân lần 2 đối chiếu.
+  const [tlNetKg, setTlNetKg] = useState<number | null>(null)
+  const [tlReturnPallet, setTlReturnPallet] = useState<{ plastic: number; steel: number } | null>(null)
   // Định mức bì (kg/cái) từ bảng pallet_types — fallback nhựa 10 / sắt 50.
   const [palletUnits, setPalletUnits] = useState<{ plastic: number; steel: number }>({ plastic: 10, steel: 50 })
   const palletKg = (palletPlastic || 0) * palletUnits.plastic + (palletSteel || 0) * palletUnits.steel
@@ -364,7 +367,19 @@ export default function WeighingPage() {
         // Đợt 1: pre-fill pallet lần 2 = lần 1 (đọc slot đã lưu ở lần cân 1).
         // NHẬP: L1=gross → slot gross. XUẤT/CỔNG: L1=tare → slot tare.
         const isReverseFlow = t.ticket_type === 'out' || t.ticket_type === 'gate' || t.ticket_type === 'fetch'
-        if (t.status === 'weighing_tare') {
+        if (t.status === 'weighing_tare' && t.ticket_type === 'fetch' && currentFacility?.code === 'PD' && ext.reference_id) {
+          // 4-lần-cân — PĐ cân VỀ (mốc 4): pallet điền sẵn từ số TL khai (pallet_return) để đối chiếu.
+          try {
+            const ret = await dispatchService.getFetchReturnPallet(ext.reference_id)
+            console.log('[fetch L2 PĐ] pallet TL khai (return):', ret)
+            setTlReturnPallet({ plastic: ret.plastic, steel: ret.steel })
+            setTlNetKg(ret.tlNetKg)
+            if (ret.plastic || ret.steel) { setPalletPlastic(ret.plastic); setPalletSteel(ret.steel) }
+            else { setPalletPlastic(Number(ext.pallet_plastic_tare || 0)); setPalletSteel(Number(ext.pallet_steel_tare || 0)) }
+          } catch {
+            setPalletPlastic(Number(ext.pallet_plastic_tare || 0)); setPalletSteel(Number(ext.pallet_steel_tare || 0))
+          }
+        } else if (t.status === 'weighing_tare') {
           setPalletPlastic(Number((isReverseFlow ? ext.pallet_plastic_tare : ext.pallet_plastic_gross) || 0))
           setPalletSteel(Number((isReverseFlow ? ext.pallet_steel_tare : ext.pallet_steel_gross) || 0))
         } else if (t.ticket_type === 'fetch') {
@@ -662,7 +677,8 @@ export default function WeighingPage() {
       // Service tự gắn kg vào slot gross/tare theo luồng + tính net mủ thuần.
       const palletRelevant =
         (!currentFacility?.can_ship_to_customer && ticket.ticket_type === 'out') ||
-        (currentFacility?.code === 'PD' && (ticket.ticket_type === 'gate' || ticket.ticket_type === 'fetch'))
+        (currentFacility?.code === 'PD' && ticket.ticket_type === 'gate') ||
+        ticket.ticket_type === 'fetch'
       const palletInput = palletRelevant
         ? { plastic: palletPlastic || 0, steel: palletSteel || 0, kg: palletKg }
         : { plastic: 0, steel: 0, kg: 0 }
@@ -803,7 +819,7 @@ export default function WeighingPage() {
       const updated = await weighbridgeService.complete(ticket.id)
       setTicket(updated)
 
-      // Đợt 2 fetch (nhận mủ NM khác): lưu loại mủ + mã lô (khai lúc cân lần 2).
+      // Đợt 2 fetch (đi lấy mủ): lưu loại mủ + mã lô + ghi kết quả cân vào lệnh (4 lần đối chiếu).
       if (ticket.ticket_type === 'fetch') {
         try {
           await supabase.from('weighbridge_tickets').update({
@@ -811,12 +827,26 @@ export default function WeighingPage() {
             consolidation_code: consolidationCode.trim() || null,
           }).eq('id', ticket.id)
         } catch (e) { console.warn('[fetch] lưu loại mủ/lô lỗi:', e) }
-        // Cân xong → gắn phiếu vào lệnh điều động để ẩn lệnh khỏi danh sách app cân.
+
         const fetchOrderId = (ticket as any).reference_id || selectedDispatchOrderId
+        const netKg = Number(updated.net_weight || 0)
+        const nowIso = new Date().toISOString()
         if (fetchOrderId) {
           try {
-            await dispatchService.markFetchWeighed(fetchOrderId, ticket.id)
-          } catch (e) { console.warn('[fetch] gắn phiếu vào lệnh (ẩn khỏi list) lỗi:', e) }
+            if (currentFacility?.code === 'PD') {
+              // PĐ cân VỀ (mốc 4) → ghi KL mủ PĐ + ẨN lệnh (xong quá trình).
+              await dispatchService.savePdWeigh(fetchOrderId, netKg, nowIso)
+              await dispatchService.markFetchWeighed(fetchOrderId, ticket.id)
+            } else {
+              // TL/LAO cân RỜI NM (mốc 3) → ghi KL mủ TL + pallet CÒN TRÊN XE.
+              // KHÔNG ẩn lệnh — PĐ còn cân lần về (mốc 4).
+              await dispatchService.saveTlWeigh(fetchOrderId, {
+                ticketId: ticket.id, netKg,
+                palletPlastic: palletPlastic || 0, palletSteel: palletSteel || 0,
+                weighedAt: nowIso,
+              })
+            }
+          } catch (e) { console.warn('[fetch] ghi kết quả cân vào lệnh lỗi:', e) }
         }
       }
 
@@ -1106,10 +1136,14 @@ export default function WeighingPage() {
   // GATE/FETCH cân giống OUT (lần1 = tare, lần2 = gross). PD-only.
   const isReverseWeigh = isOut || isGate || isFetch
   const canShowGate = currentFacility?.code === 'PD'
-  // Pallet: XUẤT của NM vệ tinh (TL/LAO) + CỔNG + NHẬN MỦ NM KHÁC (fetch) ở PĐ.
+  // FETCH (đi lấy mủ): PĐ = nhận (cân 1+4); TL/LAO = nguồn (cân 2+3). 4 lần cân đối chiếu.
+  const canFetch = ['PD', 'TL', 'LAO'].includes(currentFacility?.code || '')
+  const isFetchSource = isFetch && currentFacility?.code !== 'PD'  // TL/LAO = phía xuất mủ
+  // Pallet: XUẤT của NM vệ tinh (TL/LAO) + CỔNG (PĐ) + FETCH (mọi trạm — pallet trên xe).
   const showPallet =
     (!currentFacility?.can_ship_to_customer && (isOut || ticket?.ticket_type === 'out')) ||
-    (currentFacility?.code === 'PD' && (isGate || ticket?.ticket_type === 'gate' || isFetch))
+    (currentFacility?.code === 'PD' && (isGate || ticket?.ticket_type === 'gate')) ||
+    isFetch || ticket?.ticket_type === 'fetch'
   // Panel kết quả: MỌI loại phiếu ghi "Cân lần 1 / Cân lần 2" theo đúng thứ tự cân.
   //   NHẬP:      lần 1 = Gross (xe+hàng)        → lần 2 = Tare (xe rỗng)
   //   XUẤT/CỔNG: lần 1 = Tare (xe rỗng/xe vào)  → lần 2 = Gross (xe+hàng/xe ra)
@@ -1274,8 +1308,8 @@ export default function WeighingPage() {
                       🚪 CỔNG (hàng nội bộ)
                     </Button>
                   )}
-                  {/* FETCH — Nhận mủ từ NM khác (đi lấy mủ TL→PĐ). Chỉ Phong Điền. */}
-                  {canShowGate && (
+                  {/* FETCH — đi lấy mủ TL→PĐ. PĐ = nhận (cân về); TL/LAO = nguồn (cân xuất). */}
+                  {canFetch && (
                     <Button
                       type={ticketDirection === 'fetch' ? 'primary' : 'default'}
                       onClick={() => setTicketDirection('fetch')}
@@ -1283,7 +1317,7 @@ export default function WeighingPage() {
                       disabled={!!ticket}
                       size="large"
                     >
-                      🚚 Nhận mủ NM khác
+                      {currentFacility?.code === 'PD' ? '🚚 Nhận mủ NM khác' : '🚚 Cân mủ đi lấy (xuất)'}
                     </Button>
                   )}
                 </div>
@@ -1293,14 +1327,16 @@ export default function WeighingPage() {
                     : ticketDirection === 'gate'
                     ? 'Cân hàng nội bộ (không phải mủ) — 2 lần: Xe vào → Xe ra → KL hàng. Không tính tồn kho.'
                     : ticketDirection === 'fetch'
-                    ? 'Đi lấy mủ TL/Lào về — cân 2 lần Ở PĐ: Xe rỗng (đi) → Xe + hàng (về) → KL mủ. Chọn lệnh "đi lấy mủ" để điền sẵn pallet.'
+                    ? (currentFacility?.code === 'PD'
+                        ? 'Đi lấy mủ về PĐ — cân 2 lần Ở PĐ: Xe rỗng (đi) → Xe + mủ (về) → KL mủ PĐ. Chọn lệnh để điền sẵn pallet.'
+                        : 'Cân mủ đi lấy — 2 lần Ở NM này: Xe rỗng (đến) → Xe + mủ (rời NM) → KL mủ. Khai pallet CÒN TRÊN XE để PĐ đối chiếu.')
                     : 'Cân 2 lần: Xe rỗng (Tare) → Xe + hàng (Gross) → Net hàng'}
                 </Text>
               </Card>
 
               {/* FETCH — Nhận mủ NM khác: lệnh đi lấy mủ + loại mủ + lô */}
               {isFetch && (
-                <Card size="small" title="🚚 Nhận mủ từ NM khác (đi lấy mủ)" style={{ borderRadius: 12, borderColor: '#0E7490' }}>
+                <Card size="small" title={isFetchSource ? '🚚 Cân mủ đi lấy (xuất tại NM này)' : '🚚 Nhận mủ từ NM khác (đi lấy mủ)'} style={{ borderRadius: 12, borderColor: '#0E7490' }}>
                   <div style={{ marginBottom: 10 }}>
                     <Text style={{ fontSize: 12, color: '#64748b' }}>Lệnh điều động (đi lấy mủ)</Text>
                     {ticket ? (
@@ -1372,7 +1408,9 @@ export default function WeighingPage() {
                     </Col>
                   </Row>
                   <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
-                    Cân lần 1 (xe rỗng, lúc đi) điền sẵn pallet từ lệnh; cân lần 2 (xe về) khai pallet còn lại → KL mủ thuần.
+                    {isFetchSource
+                      ? 'Cân lần 1 (xe rỗng, khi ĐẾN) điền sẵn pallet từ lệnh; cân lần 2 (rời NM) khai pallet CÒN TRÊN XE → KL mủ TL + số pallet để PĐ đối chiếu.'
+                      : 'Cân lần 1 (xe rỗng, lúc đi) điền sẵn pallet từ lệnh; cân lần 2 (xe về) — pallet điền sẵn từ số TL khai, đối chiếu → KL mủ thuần.'}
                   </Text>
                 </Card>
               )}
@@ -2199,6 +2237,16 @@ export default function WeighingPage() {
                           = <b>{palletKg.toLocaleString('vi-VN')} kg</b> pallet — trừ khỏi lần cân này để ra KL mủ thuần.
                           {!isWeighingGross && ' (điền sẵn = lần 1, chỉnh nếu dỡ bớt/lấy thêm)'}
                         </div>
+                        {/* 4-lần-cân: PĐ cân về đối chiếu pallet với số TL khai. */}
+                        {tlReturnPallet && (() => {
+                          const lech = (palletPlastic || 0) !== tlReturnPallet.plastic || (palletSteel || 0) !== tlReturnPallet.steel
+                          return (
+                            <div style={{ fontSize: 11, marginTop: 4, padding: '4px 8px', borderRadius: 6, background: lech ? '#FEF2F2' : '#F0FDF4', border: `1px solid ${lech ? '#FECACA' : '#BBF7D0'}`, color: lech ? '#B91C1C' : '#15803D' }}>
+                              {lech ? '🔴' : '✅'} TL khai pallet rời NM: <b>{tlReturnPallet.plastic} nhựa + {tlReturnPallet.steel} sắt</b>
+                              {lech && <> — bạn đang khai <b>{palletPlastic || 0} + {palletSteel || 0}</b>, <b>LỆCH!</b> Kiểm tra lại.</>}
+                            </div>
+                          )
+                        })()}
                         {palletKg === 0 && (
                           <div style={{ fontSize: 11, color: '#B45309', marginTop: 4 }}>
                             ⚠️ Xe trung chuyển thường có pallet — khai nếu có để KL mủ không lẫn bì.

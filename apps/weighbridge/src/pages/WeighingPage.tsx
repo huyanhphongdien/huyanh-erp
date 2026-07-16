@@ -87,7 +87,7 @@ export default function WeighingPage() {
   const [dupPlateWarning, setDupPlateWarning] = useState<{ count: number; codes: string[] } | null>(null)
   // Loại phiếu cân — IN (cân 2 lần: gross→tare) | OUT (cân 2 lần: tare xe rỗng→gross xe+hàng)
   //                  | GATE (cân cổng hàng nội bộ: vào→ra, chênh lệch = hàng — chỉ Phong Điền)
-  const [ticketDirection, setTicketDirection] = useState<'in' | 'out' | 'gate'>('in')
+  const [ticketDirection, setTicketDirection] = useState<'in' | 'out' | 'gate' | 'fetch'>('in')
 
   // S3 OUT: Sales Order + Container picker (optional cho OUT — cho phép xuất lẻ không SO)
   const [salesOrders, setSalesOrders] = useState<Array<{
@@ -272,7 +272,7 @@ export default function WeighingPage() {
 
   // ĐỢT 2: Load lệnh điều động còn hiệu lực khi cân XUẤT đi cảng (NM xuất khẩu = PD).
   useEffect(() => {
-    if (ticketDirection !== 'out' || !currentFacility?.can_ship_to_customer) return
+    if ((ticketDirection !== 'out' && ticketDirection !== 'fetch') || !currentFacility?.can_ship_to_customer) return
     setLoadingDispatch(true)
     dispatchService.listForWeighing()
       .then(setDispatchOrders)
@@ -322,7 +322,7 @@ export default function WeighingPage() {
       if (t) {
         setTicket(t)
         // Sync direction toggle với ticket type từ DB
-        if (t.ticket_type === 'in' || t.ticket_type === 'out' || t.ticket_type === 'gate') {
+        if (t.ticket_type === 'in' || t.ticket_type === 'out' || t.ticket_type === 'gate' || t.ticket_type === 'fetch') {
           setTicketDirection(t.ticket_type)
         }
         setVehiclePlate(t.vehicle_plate)
@@ -560,7 +560,7 @@ export default function WeighingPage() {
       }
 
       // ĐỢT 2: link Lệnh điều động (để báo cáo biết hàng gì + đồng bộ KL khi hoàn tất)
-      if (ticketDirection === 'out' && selectedDispatchOrderId) {
+      if ((ticketDirection === 'out' || ticketDirection === 'fetch') && selectedDispatchOrderId) {
         try {
           await supabase.from('weighbridge_tickets').update({
             reference_type: 'dispatch_order',
@@ -639,7 +639,7 @@ export default function WeighingPage() {
       // Service tự gắn kg vào slot gross/tare theo luồng + tính net mủ thuần.
       const palletRelevant =
         (!currentFacility?.can_ship_to_customer && ticket.ticket_type === 'out') ||
-        (currentFacility?.code === 'PD' && ticket.ticket_type === 'gate')
+        (currentFacility?.code === 'PD' && (ticket.ticket_type === 'gate' || ticket.ticket_type === 'fetch'))
       const palletInput = palletRelevant
         ? { plastic: palletPlastic || 0, steel: palletSteel || 0, kg: palletKg }
         : { plastic: 0, steel: 0, kg: 0 }
@@ -648,7 +648,7 @@ export default function WeighingPage() {
       //   • NET hàng = gross − tare (không còn neo theo planned / tare cố định container)
       // OUT và GATE dùng chung luồng 2-weigh đo thực (NET hàng = |lần2 − lần1|).
       // OUT: lần1 = xe rỗng → lần2 = xe + hàng. GATE (cân cổng): lần1 = xe vào → lần2 = xe ra.
-      if (ticket.ticket_type === 'out' || ticket.ticket_type === 'gate') {
+      if (ticket.ticket_type === 'out' || ticket.ticket_type === 'gate' || ticket.ticket_type === 'fetch') {
         const isGateTicket = ticket.ticket_type === 'gate'
         if (ticket.status === 'weighing_gross') {
           // Lần 1
@@ -672,7 +672,7 @@ export default function WeighingPage() {
           if (cameraCaptureRef.current) cameraCaptureRef.current('L2').catch(() => {})
           // ĐỢT 2: ghi KL net về lệnh điều động (chỉ XUẤT, không gate).
           // 1 lệnh = cả xe → áp cho TẤT CẢ container của lệnh, chia net theo tỉ lệ kế hoạch.
-          if (selectedDispatchOrderId && dispatchLines.length > 0 && !isGateTicket) {
+          if (selectedDispatchOrderId && dispatchLines.length > 0 && ticket.ticket_type === 'out') {
             dispatchService.syncWeighing({
               orderId: selectedDispatchOrderId,
               lineIds: dispatchLines.map(l => l.id),
@@ -779,6 +779,16 @@ export default function WeighingPage() {
     try {
       const updated = await weighbridgeService.complete(ticket.id)
       setTicket(updated)
+
+      // Đợt 2 fetch (nhận mủ NM khác): lưu loại mủ + mã lô (khai lúc cân lần 2).
+      if (ticket.ticket_type === 'fetch') {
+        try {
+          await supabase.from('weighbridge_tickets').update({
+            rubber_type: rubberType || null,
+            consolidation_code: consolidationCode.trim() || null,
+          }).eq('id', ticket.id)
+        } catch (e) { console.warn('[fetch] lưu loại mủ/lô lỗi:', e) }
+      }
 
       // Save calculated values
       if (calc) {
@@ -1061,13 +1071,15 @@ export default function WeighingPage() {
   const isCompleted = ticket?.status === 'completed'
   const isOut = ticketDirection === 'out'
   const isGate = ticketDirection === 'gate'
-  // GATE cân giống OUT (lần1 = tare, lần2 = gross). PD-only (chỉ NM Phong Điền).
-  const isReverseWeigh = isOut || isGate
+  // Đợt 2 — "Nhận mủ NM khác" (đi lấy mủ TL→PĐ): cân đảo chiều như OUT, chỉ PĐ.
+  const isFetch = ticketDirection === 'fetch' || ticket?.ticket_type === 'fetch'
+  // GATE/FETCH cân giống OUT (lần1 = tare, lần2 = gross). PD-only.
+  const isReverseWeigh = isOut || isGate || isFetch
   const canShowGate = currentFacility?.code === 'PD'
-  // Đợt 1: khai pallet CHỈ ở XUẤT của NM vệ tinh (TL/LAO) + CỔNG nhập nội bộ ở PĐ.
+  // Pallet: XUẤT của NM vệ tinh (TL/LAO) + CỔNG + NHẬN MỦ NM KHÁC (fetch) ở PĐ.
   const showPallet =
     (!currentFacility?.can_ship_to_customer && (isOut || ticket?.ticket_type === 'out')) ||
-    (currentFacility?.code === 'PD' && (isGate || ticket?.ticket_type === 'gate'))
+    (currentFacility?.code === 'PD' && (isGate || ticket?.ticket_type === 'gate' || isFetch))
   // Panel kết quả: MỌI loại phiếu ghi "Cân lần 1 / Cân lần 2" theo đúng thứ tự cân.
   //   NHẬP:      lần 1 = Gross (xe+hàng)        → lần 2 = Tare (xe rỗng)
   //   XUẤT/CỔNG: lần 1 = Tare (xe rỗng/xe vào)  → lần 2 = Gross (xe+hàng/xe ra)
@@ -1160,7 +1172,7 @@ export default function WeighingPage() {
 
         {/* Thanh tiến trình — NHẬP / XUẤT / CỔNG đều cân 2 lần (thứ tự ngược nhau):
             NHẬP: Gross (xe+hàng) → Tare (xe rỗng). XUẤT: Xe rỗng → Xe + hàng. CỔNG: Xe vào → Xe ra. */}
-        {(ticketDirection === 'in' || ticketDirection === 'out' || isGate) && (
+        {(ticketDirection === 'in' || ticketDirection === 'out' || isGate || isFetch) && (
           <Card size="small" style={{ borderRadius: 12, marginBottom: 8 }} styles={{ body: { padding: '8px 12px' } }}>
             <Steps
               size="small"
@@ -1172,7 +1184,7 @@ export default function WeighingPage() {
                     { title: 'Cân lần 2', description: 'Xe ra' },
                     { title: 'Hoàn tất' },
                   ]
-                : ticketDirection === 'out'
+                : (ticketDirection === 'out' || isFetch)
                 ? [
                     { title: 'Tạo phiếu' },
                     { title: 'Cân lần 1', description: 'Xe rỗng' },
@@ -1232,15 +1244,87 @@ export default function WeighingPage() {
                       🚪 CỔNG (hàng nội bộ)
                     </Button>
                   )}
+                  {/* FETCH — Nhận mủ từ NM khác (đi lấy mủ TL→PĐ). Chỉ Phong Điền. */}
+                  {canShowGate && (
+                    <Button
+                      type={ticketDirection === 'fetch' ? 'primary' : 'default'}
+                      onClick={() => setTicketDirection('fetch')}
+                      style={ticketDirection === 'fetch' ? { background: '#0E7490', borderColor: '#0E7490', flex: 1 } : { flex: 1 }}
+                      disabled={!!ticket}
+                      size="large"
+                    >
+                      🚚 Nhận mủ NM khác
+                    </Button>
+                  )}
                 </div>
                 <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
                   {ticketDirection === 'in'
                     ? 'Cân 2 lần: Gross (xe + hàng) → Tare (xe rỗng) → Net'
                     : ticketDirection === 'gate'
                     ? 'Cân hàng nội bộ (không phải mủ) — 2 lần: Xe vào → Xe ra → KL hàng. Không tính tồn kho.'
+                    : ticketDirection === 'fetch'
+                    ? 'Đi lấy mủ TL/Lào về — cân 2 lần Ở PĐ: Xe rỗng (đi) → Xe + hàng (về) → KL mủ. Chọn lệnh "đi lấy mủ" để điền sẵn pallet.'
                     : 'Cân 2 lần: Xe rỗng (Tare) → Xe + hàng (Gross) → Net hàng'}
                 </Text>
               </Card>
+
+              {/* FETCH — Nhận mủ NM khác: lệnh đi lấy mủ + loại mủ + lô */}
+              {isFetch && (
+                <Card size="small" title="🚚 Nhận mủ từ NM khác (đi lấy mủ)" style={{ borderRadius: 12, borderColor: '#0E7490' }}>
+                  <div style={{ marginBottom: 10 }}>
+                    <Text style={{ fontSize: 12, color: '#64748b' }}>Lệnh điều động (đi lấy mủ)</Text>
+                    <Select
+                      value={selectedDispatchOrderId || undefined}
+                      style={{ width: '100%', marginTop: 4 }}
+                      placeholder="Chọn lệnh đi lấy mủ (điền sẵn pallet mang đi)"
+                      allowClear
+                      disabled={!!ticket}
+                      onChange={(v) => {
+                        setSelectedDispatchOrderId(v || '')
+                        const d = v ? dispatchOrders.find(o => o.id === v) : null
+                        if (d) {
+                          if (d.tractor_plate) setVehiclePlate(d.tractor_plate.toUpperCase())
+                          const ext = d as any
+                          setPalletPlastic(Number(ext.pallet_plastic_out || 0))
+                          setPalletSteel(Number(ext.pallet_steel_out || 0))
+                        }
+                      }}
+                      options={dispatchOrders
+                        .filter(d => (d as any).trip_type === 'fetch_mu')
+                        .map(d => ({
+                          value: d.id,
+                          label: `${d.code}${d.tractor_plate ? ` · ${d.tractor_plate}` : ''}${d.pickup_location ? ` · ${d.pickup_location}` : ''}`,
+                        }))}
+                    />
+                  </div>
+                  <Row gutter={8}>
+                    <Col xs={24} sm={14}>
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>Loại mủ nhận về</Text>
+                      <Select
+                        value={rubberType || undefined}
+                        style={{ width: '100%', marginTop: 4 }}
+                        placeholder="Chọn loại mủ"
+                        disabled={isCompleted}
+                        onChange={(v) => setRubberType(v)}
+                        options={['mu_tap', 'mu_nuoc', 'mu_dong', 'mu_to', 'mu_rss3'].map(v => ({ value: v, label: RUBBER_LABELS[v] || v }))}
+                      />
+                    </Col>
+                    <Col xs={24} sm={10}>
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>Mã lô (nếu có)</Text>
+                      <Input
+                        value={consolidationCode}
+                        onChange={(e) => setConsolidationCode(e.target.value)}
+                        placeholder="vd: TMMN-11-02"
+                        style={{ marginTop: 4 }}
+                        disabled={isCompleted}
+                      />
+                    </Col>
+                  </Row>
+                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
+                    Cân lần 1 (xe rỗng, lúc đi) điền sẵn pallet từ lệnh; cân lần 2 (xe về) khai pallet còn lại → KL mủ thuần.
+                  </Text>
+                </Card>
+              )}
 
               {/* CỔNG: Nội dung hàng nội bộ (→ notes) */}
               {isGate && (

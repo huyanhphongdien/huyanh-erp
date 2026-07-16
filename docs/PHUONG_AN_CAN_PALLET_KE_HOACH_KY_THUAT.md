@@ -94,17 +94,31 @@ với `palletKL = plastic_qty×10 + steel_qty×50` (lấy định mức từ dan
 
 ---
 
-## PHẦN 3 — ĐỢT 2: PĐ "NHẬN TỪ NHÀ MÁY KHÁC" (auto-match biển số)
+## PHẦN 3 — ĐỢT 2: "ĐI LẤY MỦ TL→PĐ" — cân 2 đầu ở PĐ (CHỐT 2026-07-16)
 
-### Code
-| File | Sửa |
+> **Đổi hướng** so với bản plate-match cũ. Lý do: cân 2 lần **cùng bàn cân PĐ** → hết lệch 0,9%; **kiểm soát pallet tại PĐ**; không phụ thuộc cân TL. Ý user: khai **pallet mang đi ngay trên lệnh điều động** (trước khi cân).
+
+### Luồng
+1. Lập **lệnh điều động loại "Đi lấy mủ (NM khác)"** tại PĐ (điểm bốc = Tân Lâm, không cần Đơn hàng bán) → khai **số pallet mang đi** (nhựa/sắt) trên lệnh.
+2. **Cân lần 1 tại PĐ** (xe rỗng + pallet): pre-fill pallet = số trên lệnh; operator xác nhận.
+3. Xe lên TL, dỡ bớt pallet, lấy mủ, về PĐ.
+4. **Cân lần 2 tại PĐ** (xe + hàng): khai **pallet còn lại** (khai tay — QĐ (a)) → **KL mủ thuần** = (gross−pallet_gross)−(tare−pallet_tare).
+5. **Pallet để lại TL = pallet đi − pallet về** → Sổ pallet (Đợt 3). Net = **mủ NHẬP về PĐ**.
+
+### Loại phiếu cân thứ 4 (QĐ: KHÔNG nhét vào in/out/gate)
+- NHẬP = gross trước (sai thứ tự); XUẤT = đúng thứ tự nhưng là "ra kho"; CỔNG = hàng nội bộ không phải mủ (D.1). → **thêm `ticket_type='fetch'`** (nút "🚚 Nhận mủ NM khác", chỉ PĐ), **cân đảo chiều như OUT** (L1 tare xe rỗng → L2 gross xe+hàng), nhưng **ghi nhận là mủ nhập** + có loại mủ/lô + nguồn.
+
+### Việc cần làm
+| Phần | Chi tiết |
 |---|---|
-| `src/services/wms/weighbridgeService.ts` | Hàm mới `findOutgoingByPlate(plate, {sinceHours:24, excludeGate:true})` — copy shape `checkPlateDupToday`: `ticket_type='out'`, facility = TL, `created_at ≥ now−24h`, `status='completed'`, **loại `gate`**; trả `rubber_type`(CSV), `notes`(lô), `supplier_name/partner_id`, `net_weight`, `consolidation_code`. |
-| `apps/weighbridge/src/pages/WeighingPage.tsx` | Card mới khi `currentFacility.code==='PD' && ticketDirection==='in'`. Nhập biển số → gọi `findOutgoingByPlate` → hiện "Xe … rời TL HH:MM · … kg · <loại mủ> · lô …" → **1 chạm xác nhận** → set `rubberType` (split CSV), `notes`(lô), nguồn. Dùng normalize biển số như useEffect ~L277-290. |
-| " | **Ghép cặp phiếu (Hướng A):** phiếu nhận PĐ lưu tham chiếu tới phiếu 'out' TL — dùng `reference_type='tl_out_weigh'` + `reference_id` (đã có sẵn 2 cột này), KHÔNG cần bảng mới. Đây là mấu chốt để Đợt 4 đối chiếu. |
-| " | **Chặn CỔNG cho mủ**: nếu operator chọn gate mà là mủ → chặn/điều hướng sang luồng này (giải quyết D.1). |
+| **Migration A** | `dispatch_orders` ADD `pallet_plastic_out`, `pallet_steel_out` (số mang đi) + `pallet_kg_out` snapshot; nới CHECK `trip_type` thêm `'fetch_mu'` (nếu có CHECK) |
+| **Migration B** | Nới CHECK `weighbridge_tickets.ticket_type` thêm `'fetch'` (mẫu `weighbridge_ticket_type_gate.sql`) |
+| **DispatchCreatePage** + service | Loại chuyến **"Đi lấy mủ (NM khác)"** (`trip_type='fetch_mu'`); ô khai pallet nhựa/sắt (hiện khi loại này); lưu vào lệnh |
+| **WeighingPage** (app cân, PĐ) | Nút loại phiếu thứ 4 `fetch`; dùng luồng `updateOutTareFirst/updateOutGrossSecond` (đảo chiều); **bật pallet** (mở rộng `showPallet`); **cân lần 1 pre-fill pallet từ lệnh** (đọc `pallet_plastic_out`/`steel_out` của lệnh đã chọn); picker lệnh loại `fetch_mu`; khai loại mủ + mã lô (như intake); lưu `rubber_type`, `source_type`, `reference_type='dispatch_order'`+`reference_id` |
+| **Ghi nhận** | Net = mủ nhập PĐ (rubber_type/lô trên phiếu). **Nối tồn kho** để Đợt 5. Ghép cặp đối chiếu (Đợt 4) qua lệnh điều động. |
+| **D.2** | Miễn cảnh báo "bỏ dở >4h" cho phiếu `fetch` (xe đi lâu là bình thường) |
 
-**Gotcha:** chuẩn hóa biển số 2 phía cho khớp (dispatch strip ký tự đặc biệt `43C-123.45→43C12345`, query DB so chuỗi thô). Cửa sổ `checkPlateDupToday` là "từ 0h hôm nay" — Đợt 2 cần **24h trượt** (`now − 24h`).
+**Ghi chú:** phải cân xe rỗng ở PĐ **trước khi đi** (thêm 1 bước lúc xuất phát); nếu quên → không có "lần 1", phải cân ở TL như cũ.
 
 ---
 

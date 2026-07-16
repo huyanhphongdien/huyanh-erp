@@ -437,7 +437,8 @@ export interface BatchQCResult {
 // ===== CÂN XE =====
 
 // 'gate' = cân xe ra/vô CỔNG (hàng nội bộ, không phải mủ) — chỉ Phong Điền
-export type TicketType = 'in' | 'out' | 'gate'
+// 'fetch' = Đợt 2 "Nhận mủ NM khác" (đi lấy mủ TL→PĐ) — cân đảo chiều như out, ghi là mủ nhập
+export type TicketType = 'in' | 'out' | 'gate' | 'fetch'
 export type WeighbridgeStatus = 'weighing_gross' | 'weighing_tare' | 'completed' | 'cancelled'
 export type ReferenceType = 'stock_in' | 'stock_out' | 'stock_in_raw' | 'purchase_order' | 'none'
 

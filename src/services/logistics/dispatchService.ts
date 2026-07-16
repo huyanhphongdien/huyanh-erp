@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase'
 import type { FleetVehicle, FleetDriver } from './fleetService'
 
 export type DispatchStatus = 'draft' | 'dispatched' | 'in_transit' | 'completed' | 'cancelled'
-export type TripType = 'port' | 'lao' | 'internal' | 'other' | 'trading'
+export type TripType = 'port' | 'lao' | 'internal' | 'other' | 'trading' | 'fetch_mu'
 
 export const DISPATCH_STATUS_LABELS: Record<DispatchStatus, string> = {
   draft: 'Nháp',
@@ -22,10 +22,14 @@ export const DISPATCH_STATUS_LABELS: Record<DispatchStatus, string> = {
 export const TRIP_TYPE_LABELS: Record<TripType, string> = {
   port: 'Xuất hàng đi cảng',
   trading: 'Hàng thương mại',      // mua của nhà máy khác → bốc TẠI NHÀ MÁY ĐÓ → giao khách
+  fetch_mu: 'Đi lấy mủ (NM khác)', // Đợt 2: đi lấy mủ TL/Lào về PĐ — cân 2 đầu ở PĐ
   lao: 'Đi Lào',
   internal: 'Nội bộ',
   other: 'Khác',
 }
+
+/** Chuyến ĐI LẤY MỦ (TL→PĐ) — khai pallet mang đi trên lệnh; app cân cân 2 đầu ở PĐ. */
+export const isFetchMuTrip = (t?: TripType | string | null): boolean => t === 'fetch_mu'
 
 /**
  * Chuyến CHỞ CONTAINER → dùng bảng cont/seal đầy đủ + gắn được Đơn hàng bán.
@@ -64,6 +68,10 @@ export interface DispatchOrder {
   destination: string | null
   pickup_location: string | null   // điểm BỐC hàng (null = kho Huy Anh)
   pickup_contact: string | null    // người/SĐT tại điểm bốc
+  // Đợt 2 — pallet MANG ĐI (chuyến đi lấy mủ); app cân pre-fill cân lần 1
+  pallet_plastic_out?: number | null
+  pallet_steel_out?: number | null
+  pallet_kg_out?: number | null
   recipient_name: string | null
   recipient_phone: string | null
   sales_order_id: string | null
@@ -133,6 +141,9 @@ export interface CreateDispatchInput {
   destination?: string | null
   pickup_location?: string | null
   pickup_contact?: string | null
+  pallet_plastic_out?: number | null
+  pallet_steel_out?: number | null
+  pallet_kg_out?: number | null
   recipient_name?: string | null
   recipient_phone?: string | null
   sales_order_id?: string | null
@@ -287,6 +298,10 @@ async function create(input: CreateDispatchInput): Promise<DispatchOrder> {
       // báo PGRST204 "column not found" làm chết TOÀN BỘ việc tạo lệnh điều động.
       ...(input.pickup_location ? { pickup_location: input.pickup_location } : {}),
       ...(input.pickup_contact ? { pickup_contact: input.pickup_contact } : {}),
+      // Đợt 2: pallet mang đi — chỉ gửi key khi có (an toàn nếu deploy trước migration)
+      ...(input.pallet_plastic_out != null ? { pallet_plastic_out: input.pallet_plastic_out } : {}),
+      ...(input.pallet_steel_out != null ? { pallet_steel_out: input.pallet_steel_out } : {}),
+      ...(input.pallet_kg_out != null ? { pallet_kg_out: input.pallet_kg_out } : {}),
       recipient_name: input.recipient_name || null,
       recipient_phone: input.recipient_phone || null,
       sales_order_id: input.sales_order_id || null,
@@ -322,7 +337,7 @@ async function update(
   const out: Record<string, any> = {}
   // update() an toàn sẵn: chỉ set key khi patch có mặt (!== undefined).
   const keys = ['dispatch_date', 'trip_type', 'reason', 'contract_ref', 'customer_name', 'destination',
-    'pickup_location', 'pickup_contact',
+    'pickup_location', 'pickup_contact', 'pallet_plastic_out', 'pallet_steel_out', 'pallet_kg_out',
     'recipient_name', 'recipient_phone', 'sales_order_id', 'note', 'is_hired', 'hire_company', 'hire_cost'] as const
   for (const k of keys) {
     if ((patch as any)[k] !== undefined) out[k] = (patch as any)[k] === '' ? null : (patch as any)[k]

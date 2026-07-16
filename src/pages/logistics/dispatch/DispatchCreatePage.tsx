@@ -146,6 +146,8 @@ export default function DispatchCreatePage() {
           destination: order.destination,
           pickup_location: order.pickup_location,
           pickup_contact: order.pickup_contact,
+          pallet_plastic_out: order.pallet_plastic_out,
+          pallet_steel_out: order.pallet_steel_out,
           recipient_name: order.recipient_name,
           recipient_phone: order.recipient_phone,
           note: order.note,
@@ -320,6 +322,11 @@ export default function DispatchCreatePage() {
         destination: v.destination || null,
         pickup_location: v.pickup_location || null,
         pickup_contact: v.pickup_contact || null,
+        // Đợt 2 pallet mang đi — chỉ set khi loại "đi lấy mủ"; chuyến khác để undefined
+        // (service bỏ qua key → an toàn PGRST204 nếu deploy trước migration).
+        pallet_plastic_out: v.trip_type === 'fetch_mu' ? (v.pallet_plastic_out ?? 0) : undefined,
+        pallet_steel_out: v.trip_type === 'fetch_mu' ? (v.pallet_steel_out ?? 0) : undefined,
+        pallet_kg_out: v.trip_type === 'fetch_mu' ? ((v.pallet_plastic_out || 0) * 10 + (v.pallet_steel_out || 0) * 50) : undefined,
         recipient_name: v.recipient_name || null,
         sales_order_id: v.sales_order_id || null,
         note: v.note || null,
@@ -357,6 +364,7 @@ export default function DispatchCreatePage() {
   // container ra cảng, chỉ khác ĐIỂM BỐC → phải tính là true, nếu không bảng cont biến mất.
   const isPort = isContainerTrip(watchedTripType)
   const isTrading = watchedTripType === 'trading'
+  const isFetchMu = watchedTripType === 'fetch_mu'           // đi lấy mủ TL→PĐ (Đợt 2)
   const isHired = Form.useWatch('is_hired', form) === true   // xe thuê ngoài
 
   // Ô xe chính LỌC THEO LOẠI CHUYẾN (phiếu):
@@ -447,7 +455,7 @@ export default function DispatchCreatePage() {
                 name="trip_type" label="Loại chuyến" rules={[{ required: true }]}
                 extra={isTrading ? 'Mua của nhà máy khác → xe bốc TẠI NHÀ MÁY ĐÓ' : undefined}
               >
-                <Select options={(['port', 'trading', 'lao', 'internal', 'other'] as TripType[])
+                <Select options={(['port', 'trading', 'fetch_mu', 'lao', 'internal', 'other'] as TripType[])
                   .map(t => ({ value: t, label: TRIP_TYPE_LABELS[t] }))} />
               </Form.Item>
             </Col>
@@ -565,6 +573,28 @@ export default function DispatchCreatePage() {
                 <Input placeholder="vd: A. Hùng — 0905 xxx xxx" />
               </Form.Item>
             </Col>
+            {isFetchMu && (
+              <Col xs={24}>
+                <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ fontWeight: 600, color: '#0369A1', marginBottom: 8 }}>📦 Pallet mang đi (để lấy mủ ở NM khác)</div>
+                  <Row gutter={12}>
+                    <Col xs={12} sm={6}>
+                      <Form.Item name="pallet_plastic_out" label="Pallet nhựa (10kg)" style={{ marginBottom: 4 }}>
+                        <InputNumber min={0} precision={0} style={{ width: '100%' }} placeholder="0" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Form.Item name="pallet_steel_out" label="Pallet sắt (50kg)" style={{ marginBottom: 4 }}>
+                        <InputNumber min={0} precision={0} style={{ width: '100%' }} placeholder="0" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Số pallet xe mang đi — app cân PĐ sẽ điền sẵn ở cân lần 1 (xe rỗng). Điểm bốc = Tân Lâm.
+                  </Typography.Text>
+                </div>
+              </Col>
+            )}
             {isTrading && (
               <Col xs={24}>
                 <Alert type="warning" showIcon style={{ marginBottom: 8 }}

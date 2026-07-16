@@ -1,4 +1,7 @@
-export type SalesRole = 'sale' | 'production' | 'logistics' | 'accounting' | 'admin'
+// 'viewer' = XEM-ONLY toàn module Đơn hàng bán (kế toán giám sát) — thấy MỌI tab
+// (kể cả Vận chuyển/Logistics) đều VIEW-ONLY, KHÔNG sửa, KHÔNG xóa (kể cả HĐ).
+// Tải file HĐ: KHÔNG mặc định (cấp riêng qua BOD_EMAILS nếu cần). 2026-07-16
+export type SalesRole = 'sale' | 'production' | 'logistics' | 'accounting' | 'admin' | 'viewer'
 
 // ============================================================================
 // ★ Phân quyền email cụ thể cho module Đơn hàng bán
@@ -24,6 +27,8 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   // Accounting
   'yendt@huyanhrubber.com': 'accounting',
   'phulv@huyanhrubber.com': 'accounting',
+  // Kế toán XEM-ONLY (xem toàn module + Log, không sửa/xóa) — 2026-07-16
+  'hungtv@huyanhrubber.com': 'viewer',  // Thái Văn Hùng
   // Admin (toàn quyền module Đơn hàng bán)
   'minhld@huyanhrubber.com': 'admin',
   'thuyht@huyanhrubber.com': 'admin',
@@ -87,6 +92,7 @@ export const SALES_ROLE_LABELS: Record<SalesRole, string> = {
   logistics: 'Xuất nhập khẩu',
   accounting: 'Kế toán',
   admin: 'Quản trị',
+  viewer: 'Kế toán (chỉ xem)',
 }
 
 // Permission checks — field level
@@ -95,7 +101,7 @@ export const salesPermissions = {
   // Khách hàng
   canCreateCustomer: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
   canEditCustomer: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
-  canViewCustomer: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin'].includes(role),
+  canViewCustomer: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin', 'viewer'].includes(role),
 
   // Đơn hàng - tạo/sửa thông tin chung
   canCreateOrder: (role: SalesRole) => ['sale', 'logistics', 'admin'].includes(role),
@@ -105,7 +111,7 @@ export const salesPermissions = {
 
   // Tab Sản xuất
   canEditProduction: (role: SalesRole) => ['production', 'logistics', 'admin'].includes(role),
-  canViewProduction: (role: SalesRole) => ['sale', 'production', 'logistics', 'admin'].includes(role),
+  canViewProduction: (role: SalesRole) => ['sale', 'production', 'logistics', 'admin', 'viewer'].includes(role),
 
   // Tab Đóng gói + Logistics
   canEditBooking: (role: SalesRole) => ['logistics', 'admin'].includes(role),
@@ -118,10 +124,10 @@ export const salesPermissions = {
   canCreateCOA: (role: SalesRole) => ['logistics', 'admin'].includes(role),
   canCreatePL: (role: SalesRole) => ['logistics', 'admin'].includes(role),
   canCreateInvoice: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
-  canViewDocs: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin'].includes(role),
+  canViewDocs: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin', 'viewer'].includes(role),
 
   // Tab Tài chính (MỚI)
-  canViewFinance: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
+  canViewFinance: (role: SalesRole) => ['accounting', 'logistics', 'admin', 'viewer'].includes(role),
   canEditFinance: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
   canEditLC: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
   canEditPayment: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
@@ -133,10 +139,10 @@ export const salesPermissions = {
   canEditShipmentFinance: (role: SalesRole) => ['accounting', 'logistics', 'admin'].includes(role),
 
   // Executive Dashboard
-  canViewExecutive: (role: SalesRole) => ['logistics', 'admin'].includes(role),
+  canViewExecutive: (role: SalesRole) => ['logistics', 'admin', 'viewer'].includes(role),
 
   // Dashboard
-  canViewDashboard: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin'].includes(role),
+  canViewDashboard: (role: SalesRole) => ['sale', 'logistics', 'accounting', 'admin', 'viewer'].includes(role),
 }
 
 // ★ v4: Tabs cho detail panel
@@ -144,8 +150,8 @@ export function getVisibleTabs(role: SalesRole | null): string[] {
   if (!role) return ['contract']
   const tabs = ['contract'] // ai cũng thấy tab HĐ
 
-  if (['production', 'sale', 'logistics', 'admin'].includes(role)) { tabs.push('production'); tabs.push('packing') }
-  if (['logistics', 'sale', 'accounting', 'admin'].includes(role)) tabs.push('shipping')
+  if (['production', 'sale', 'logistics', 'admin', 'viewer'].includes(role)) { tabs.push('production'); tabs.push('packing') }
+  if (['logistics', 'sale', 'accounting', 'admin', 'viewer'].includes(role)) tabs.push('shipping')
   // tabs.push('documents') // tạm ẩn tab chứng từ
   if (salesPermissions.canViewFinance(role)) tabs.push('finance')
 

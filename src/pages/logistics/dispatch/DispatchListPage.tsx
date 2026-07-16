@@ -13,6 +13,7 @@ import { PlusOutlined, ReloadOutlined, SendOutlined, TruckOutlined, CarOutlined,
 import dayjs from 'dayjs'
 import {
   dispatchService, DISPATCH_STATUS_LABELS, TRIP_TYPE_LABELS, isContainerTrip,
+  FETCH_RUBBER_LABELS, palletOutKg,
   type DispatchOrder, type DispatchStatus,
 } from '../../../services/logistics/dispatchService'
 
@@ -59,13 +60,33 @@ export default function DispatchListPage() {
         </Space>
       ),
     },
-    { title: 'Khách / Điểm đến', key: 'cust', render: (_: any, r: DispatchOrder) => <span>{[r.customer_name, r.destination].filter(Boolean).join(' → ') || '–'}</span> },
+    { title: 'Khách / Điểm đến', key: 'cust', render: (_: any, r: DispatchOrder) => {
+      // Đi lấy mủ: không có khách/điểm giao → hiện nơi lấy + loại mủ + lô cho dễ nhận.
+      if (r.trip_type === 'fetch_mu') {
+        const parts = [
+          r.pickup_location,
+          r.fetch_rubber_type ? (FETCH_RUBBER_LABELS[r.fetch_rubber_type] || r.fetch_rubber_type) : null,
+          r.fetch_lot_code ? `lô ${r.fetch_lot_code}` : null,
+        ].filter(Boolean)
+        return <span style={{ color: '#0369A1' }}>🌳 Lấy mủ{parts.length ? ': ' + parts.join(' · ') : ''}</span>
+      }
+      return <span>{[r.customer_name, r.destination].filter(Boolean).join(' → ') || '–'}</span>
+    } },
     {
-      // Đi cảng: số container. Chuyến khác: số dòng hành trình → nhãn trung tính.
-      title: 'Cont/Dòng', dataIndex: 'total_lines', key: 'lines', width: 80, align: 'center' as const,
-      render: (v: number, r: DispatchOrder) => (isContainerTrip(r.trip_type) ? (v || 0) : (v ? v : '–')),
+      // Đi cảng: số container. Đi lấy mủ: số pallet mang đi. Chuyến khác: số dòng hành trình.
+      title: 'Cont/Pallet', dataIndex: 'total_lines', key: 'lines', width: 90, align: 'center' as const,
+      render: (v: number, r: DispatchOrder) => {
+        if (r.trip_type === 'fetch_mu') {
+          const p = r.pallet_plastic_out || 0, s = r.pallet_steel_out || 0
+          return (p || s)
+            ? <span title={`${p} nhựa + ${s} sắt = ${palletOutKg(p, s).toLocaleString('vi-VN')} kg`}>📦 {p + s}</span>
+            : '–'
+        }
+        return isContainerTrip(r.trip_type) ? (v || 0) : (v ? v : '–')
+      },
     },
-    { title: 'KL (kg)', dataIndex: 'total_weight', key: 'w', width: 110, align: 'right' as const, render: (v: number) => v ? v.toLocaleString('vi-VN') : '–' },
+    { title: 'KL (kg)', dataIndex: 'total_weight', key: 'w', width: 110, align: 'right' as const,
+      render: (v: number, r: DispatchOrder) => (r.trip_type === 'fetch_mu' ? <span style={{ color: '#94a3b8' }}>cân sau</span> : (v ? v.toLocaleString('vi-VN') : '–')) },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130, render: (s: DispatchStatus) => <Tag color={STATUS_COLOR[s]}>{DISPATCH_STATUS_LABELS[s]}</Tag> },
   ]
 

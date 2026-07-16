@@ -24,11 +24,14 @@ const SALES_EMAIL_ROLE_MAP: Record<string, SalesRole> = {
   'logistics@huyanhrubber.com': 'logistics',
   'anhlp@huyanhrubber.com': 'logistics',
   'nhungtt@huyanhrubber.com': 'admin',  // Trương Thị Nhung — nâng ADMIN, phân quyền đầy đủ module Đơn hàng bán (2026-06-12)
-  // Accounting
-  'yendt@huyanhrubber.com': 'accounting',
-  'phulv@huyanhrubber.com': 'accounting',
-  // Kế toán XEM-ONLY (xem toàn module + Log, không sửa/xóa) — 2026-07-16
-  'hungtv@huyanhrubber.com': 'viewer',  // Thái Văn Hùng
+  // Accounting — TOÀN phòng Kế toán, quyền như yendt (accounting + reviewer + xem/tải HĐ) 2026-07-16
+  'yendt@huyanhrubber.com': 'accounting',   // Đỗ Thị Yến
+  'phulv@huyanhrubber.com': 'accounting',   // Lê Văn Phú
+  'ahtn@huyanhrubber.com': 'accounting',    // Hồ Thị Á
+  'linhlt@huyanhrubber.com': 'accounting',  // Lê Thị Linh
+  'tamltt@huyanhrubber.com': 'accounting',  // Lê Thị Tâm
+  'phungnt@huyanhrubber.com': 'accounting', // Nguyễn Thị Phụng
+  'hungtv@huyanhrubber.com': 'accounting',  // Thái Văn Hùng (trước là viewer, nâng như yendt)
   // Admin (toàn quyền module Đơn hàng bán)
   'minhld@huyanhrubber.com': 'admin',
   'thuyht@huyanhrubber.com': 'admin',
@@ -79,6 +82,9 @@ const BOD_EMAILS: string[] = [
   'trunglxh@huyanhrubber.com',  // Mr. Trung — BGĐ contract view
   'logistics@huyanhrubber.com', // Trần Thị Minh Anh — toàn quyền Đơn hàng bán (2026-05-22)
   'yendt@huyanhrubber.com',     // Đỗ Thị Yến — cấp quyền XEM & TẢI hợp đồng đã upload (2026-07-16)
+  // Toàn phòng Kế toán xem/tải HĐ (như yendt) — 2026-07-16
+  'phulv@huyanhrubber.com', 'ahtn@huyanhrubber.com', 'linhlt@huyanhrubber.com',
+  'tamltt@huyanhrubber.com', 'phungnt@huyanhrubber.com', 'hungtv@huyanhrubber.com',
 ]
 
 export function isBOD(user: any): boolean {

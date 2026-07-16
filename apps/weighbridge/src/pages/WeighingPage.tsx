@@ -360,10 +360,19 @@ export default function WeighingPage() {
         if (ext.consolidation_code) setConsolidationCode(ext.consolidation_code)
         // Đợt 1: pre-fill pallet lần 2 = lần 1 (đọc slot đã lưu ở lần cân 1).
         // NHẬP: L1=gross → slot gross. XUẤT/CỔNG: L1=tare → slot tare.
-        const isReverseFlow = t.ticket_type === 'out' || t.ticket_type === 'gate'
+        const isReverseFlow = t.ticket_type === 'out' || t.ticket_type === 'gate' || t.ticket_type === 'fetch'
         if (t.status === 'weighing_tare') {
           setPalletPlastic(Number((isReverseFlow ? ext.pallet_plastic_tare : ext.pallet_plastic_gross) || 0))
           setPalletSteel(Number((isReverseFlow ? ext.pallet_steel_tare : ext.pallet_steel_gross) || 0))
+        } else if (t.ticket_type === 'fetch' && ext.reference_type === 'dispatch_order' && ext.reference_id) {
+          // Đợt 2 — Cân lần 1 chuyến đi lấy mủ: điền sẵn pallet MANG ĐI từ lệnh điều động.
+          // (State pre-fill lúc chọn lệnh bị reset khi tạo phiếu → nạp lại từ lệnh.)
+          try {
+            const res = await dispatchService.getById(ext.reference_id)
+            const o = res?.order as any
+            setPalletPlastic(Number(o?.pallet_plastic_out || 0))
+            setPalletSteel(Number(o?.pallet_steel_out || 0))
+          } catch { setPalletPlastic(0); setPalletSteel(0) }
         } else {
           setPalletPlastic(0)
           setPalletSteel(0)

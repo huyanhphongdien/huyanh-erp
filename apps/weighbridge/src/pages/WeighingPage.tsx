@@ -2534,8 +2534,8 @@ export default function WeighingPage() {
                           const setLot = (idx: number, patch: Partial<{ code: string; rubberType: string; weighAfter: number | null }>) =>
                             setNhapLots(prev => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
                           const rubberOpts = ['mu_tap', 'mu_nuoc', 'mu_dong', 'mu_to', 'mu_rss3'].map(v => ({ value: v, label: RUBBER_LABELS[v] || v }))
-                          // Nhắc thứ tự: lô cần lấy số kế tiếp = lô đầu tiên (chưa phải lô cuối) còn trống.
-                          const firstUnsetIdx = nhapLots.findIndex((l, idx) => idx < N - 1 && l.weighAfter == null)
+                          // Nhắc thứ tự: lô cần lấy số kế tiếp = lô đầu tiên (chưa phải lô cuối) chưa có số HỢP LỆ (>0).
+                          const firstUnsetIdx = nhapLots.findIndex((l, idx) => idx < N - 1 && !(l.weighAfter != null && (l.weighAfter as number) > 0))
                           // Kiểm thứ tự cân: dãy phải GIẢM DẦN (tổng > w1 > … > rỗng).
                           const seq: Array<number | null> = [gross, ...nhapLots.slice(0, N - 1).map(l => l.weighAfter), tareLive]
                           let orderIssue: string | null = null
@@ -2556,8 +2556,8 @@ export default function WeighingPage() {
                               {nhapLots.map((lot, i) => {
                                 const isLast = i === N - 1
                                 // Lô cuối = "còn lại", KHÔNG có bước lấy số riêng → không đánh ✓
-                                // (chốt bằng nút GHI CÂN LẦN 2 khi xe trống).
-                                const captured = isLast ? false : (lot.weighAfter != null)
+                                // (chốt bằng nút GHI CÂN LẦN 2 khi xe trống). Lô thường: cần số >0.
+                                const captured = isLast ? false : (lot.weighAfter != null && (lot.weighAfter as number) > 0)
                                 const isNext = !isLast && i === firstUnsetIdx
                                 const waiting = !isLast && !captured && firstUnsetIdx !== -1 && i > firstUnsetIdx
                                 return (
@@ -2657,7 +2657,9 @@ export default function WeighingPage() {
                           }
                         }}
                         loading={loading}
-                        style={{ height: 48, background: '#D97706', borderColor: '#D97706', fontSize: 16 }}
+                        style={{ height: 48, fontSize: 16,
+                          background: (nhapSplitActive && !nhapSplitReady) ? '#9CA3AF' : '#D97706',
+                          borderColor: (nhapSplitActive && !nhapSplitReady) ? '#9CA3AF' : '#D97706' }}
                       >
                         {isWeighingGross ? 'GHI CÂN LẦN 1' : (nhapSplitActive ? 'GHI XE RỖNG · LƯU LÔ' : 'GHI CÂN LẦN 2')}
                       </Button>

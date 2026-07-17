@@ -168,6 +168,17 @@ export default function WeighingPage() {
   const [tlNetKg, setTlNetKg] = useState<number | null>(null)
   const [tlReturnPallet, setTlReturnPallet] = useState<{ plastic: number; steel: number } | null>(null)
   const [containerModalOpen, setContainerModalOpen] = useState(false)  // popup TL bỏ cân xe container
+  // Tách lô (nhiều mã hàng trên xe) — mở sau khi cân xong tổng.
+  const [splitOpen, setSplitOpen] = useState(false)
+  const [lotDropCode, setLotDropCode] = useState('')
+  const [lotDropType, setLotDropType] = useState<string>('')
+  const [lotKeepCode, setLotKeepCode] = useState('')
+  const [lotKeepType, setLotKeepType] = useState<string>('')
+  const [weighAfter, setWeighAfter] = useState<number | null>(null)
+  const [palletAfterPlastic, setPalletAfterPlastic] = useState(0)
+  const [palletAfterSteel, setPalletAfterSteel] = useState(0)
+  const [savingLots, setSavingLots] = useState(false)
+  const [savedLots, setSavedLots] = useState<Array<{ lot_code: string; rubber_type: string; net_kg: number }>>([])
   // Định mức bì (kg/cái) từ bảng pallet_types — fallback nhựa 10 / sắt 50.
   const [palletUnits, setPalletUnits] = useState<{ plastic: number; steel: number }>({ plastic: 10, steel: 50 })
   const palletKg = (palletPlastic || 0) * palletUnits.plastic + (palletSteel || 0) * palletUnits.steel
@@ -1154,6 +1165,42 @@ export default function WeighingPage() {
   // Keyboard shortcuts removed to prevent accidental actions
 
   // ============================================================================
+  // ── Tách lô: load các lô đã lưu khi mở phiếu ──
+  useEffect(() => {
+    if (!ticket?.id) { setSavedLots([]); return }
+    supabase.from('weighbridge_ticket_lots').select('lot_code, rubber_type, net_kg')
+      .eq('ticket_id', ticket.id).order('sort_order')
+      .then(({ data }) => setSavedLots((data as any[]) || []))
+  }, [ticket?.id])
+
+  // ── Tách lô: tính KL từng lô + lưu ──
+  const tongNet = Number(ticket?.net_weight || 0)
+  const grossTongNet = Number(ticket?.gross_weight || 0) - Number((ticket as any)?.pallet_kg_gross || 0)  // xe + cả 2 lô (trừ pallet)
+  const palletAfterKg = (palletAfterPlastic || 0) * palletUnits.plastic + (palletAfterSteel || 0) * palletUnits.steel
+  const afterNet = weighAfter != null ? weighAfter - palletAfterKg : null  // xe + lô còn (trừ pallet)
+  const lotDropKg = afterNet != null ? Math.max(0, Math.round(grossTongNet - afterNet)) : null  // lô đã dỡ
+  const lotKeepKg = lotDropKg != null ? Math.round(tongNet - lotDropKg) : null                  // lô còn = tổng − đã dỡ
+
+  async function saveLots() {
+    if (!ticket?.id || lotDropKg == null || lotKeepKg == null) return
+    setSavingLots(true)
+    try {
+      await supabase.from('weighbridge_ticket_lots').delete().eq('ticket_id', ticket.id)
+      const { error } = await supabase.from('weighbridge_ticket_lots').insert([
+        { ticket_id: ticket.id, lot_code: lotDropCode.trim() || null, rubber_type: lotDropType || null, net_kg: lotDropKg, is_derived: false, sort_order: 1 },
+        { ticket_id: ticket.id, lot_code: lotKeepCode.trim() || null, rubber_type: lotKeepType || null, net_kg: lotKeepKg, is_derived: true, sort_order: 2 },
+      ])
+      if (error) throw error
+      message.success('Đã lưu tách lô. In phiếu sẽ hiện chi tiết từng lô.')
+      setSavedLots([
+        { lot_code: lotDropCode.trim(), rubber_type: lotDropType, net_kg: lotDropKg },
+        { lot_code: lotKeepCode.trim(), rubber_type: lotKeepType, net_kg: lotKeepKg },
+      ])
+      setSplitOpen(false)
+    } catch (e: any) { message.error('Lưu tách lô lỗi: ' + (e?.message || '')) }
+    finally { setSavingLots(false) }
+  }
+
   // RENDER
   // ============================================================================
 
@@ -2389,6 +2436,70 @@ export default function WeighingPage() {
                   </Col>
                 </Row>
               </Card>
+
+              {/* Tách lô — nhiều mã hàng trên xe (hiện khi phiếu đi lấy mủ đã có Tổng NET) */}
+              {isFetch && !isCreate && tongNet > 0 && (
+                <>
+                  <Button block size="large" style={{ marginTop: 8, height: 44, borderColor: '#7C3AED', color: '#7C3AED', fontWeight: 600 }} onClick={() => setSplitOpen(true)}>
+                    🔀 Tách lô (nhiều mã hàng){savedLots.length ? ` · đã tách ${savedLots.length} lô` : ''}
+                  </Button>
+                  <Modal
+                    open={splitOpen}
+                    title="🔀 Tách lô — nhiều mã hàng trên xe"
+                    width={520}
+                    okText={savingLots ? 'Đang lưu…' : '💾 Lưu tách lô'}
+                    okButtonProps={{ disabled: lotDropKg == null || savingLots, loading: savingLots }}
+                    cancelText="Đóng"
+                    onCancel={() => setSplitOpen(false)}
+                    onOk={saveLots}
+                  >
+                    <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
+                      Tổng NET (cả 2 lô): <b>{tongNet.toLocaleString('vi-VN')} kg</b><br />
+                      <span style={{ color: '#64748b', fontSize: 12 }}>Cân tổng {Number(ticket?.gross_weight || 0).toLocaleString('vi-VN')} − pallet {Number((ticket as any)?.pallet_kg_gross || 0).toLocaleString('vi-VN')} = {grossTongNet.toLocaleString('vi-VN')} (xe + cả 2 mủ)</span>
+                    </div>
+                    <Row gutter={8} style={{ marginBottom: 8 }}>
+                      <Col span={14}><Text style={{ fontSize: 12, color: '#64748b' }}>Lô ĐÃ DỠ xuống — Mã lô</Text>
+                        <Input value={lotDropCode} onChange={e => setLotDropCode(e.target.value)} placeholder="vd: TM72" /></Col>
+                      <Col span={10}><Text style={{ fontSize: 12, color: '#64748b' }}>Loại mủ</Text>
+                        <Select value={lotDropType || undefined} onChange={setLotDropType} placeholder="Chọn" style={{ width: '100%' }}
+                          options={['mu_tap', 'mu_nuoc', 'mu_dong', 'mu_to', 'mu_rss3'].map(v => ({ value: v, label: RUBBER_LABELS[v] || v }))} /></Col>
+                    </Row>
+                    <Row gutter={8} style={{ marginBottom: 12 }}>
+                      <Col span={14}><Text style={{ fontSize: 12, color: '#64748b' }}>Lô CÒN trên xe — Mã lô</Text>
+                        <Input value={lotKeepCode} onChange={e => setLotKeepCode(e.target.value)} placeholder="vd: HAQT-05-01" /></Col>
+                      <Col span={10}><Text style={{ fontSize: 12, color: '#64748b' }}>Loại mủ</Text>
+                        <Select value={lotKeepType || undefined} onChange={setLotKeepType} placeholder="Chọn" style={{ width: '100%' }}
+                          options={['mu_tap', 'mu_nuoc', 'mu_dong', 'mu_to', 'mu_rss3'].map(v => ({ value: v, label: RUBBER_LABELS[v] || v }))} /></Col>
+                    </Row>
+                    <div style={{ borderTop: '1px dashed #ddd', paddingTop: 10 }}>
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>Cân xe SAU KHI DỠ (xe + lô còn) — kg</Text>
+                      <InputNumber value={weighAfter} onChange={v => setWeighAfter(v)} min={0} style={{ width: '100%', marginTop: 4 }} placeholder="Gõ số cân từ đầu cân" />
+                      <div style={{ marginTop: 8 }}>
+                        <Text style={{ fontSize: 12, color: '#64748b' }}>Pallet sau khi dỡ</Text>
+                        <Row gutter={8} style={{ marginTop: 4 }}>
+                          {([['Nhựa', palletUnits.plastic, palletAfterPlastic, setPalletAfterPlastic], ['Sắt', palletUnits.steel, palletAfterSteel, setPalletAfterSteel]] as const).map(([lbl, unit, val, setter]) => (
+                            <Col span={12} key={lbl}>
+                              <div style={{ fontSize: 11, color: '#64748b' }}>{lbl} ({unit}kg)</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Button size="small" onClick={() => setter(Math.max(0, (val || 0) - 1))}>−</Button>
+                                <InputNumber size="small" min={0} precision={0} value={val} onChange={v => setter(Math.max(0, Number(v) || 0))} style={{ width: 60 }} />
+                                <Button size="small" onClick={() => setter((val || 0) + 1)}>+</Button>
+                              </div>
+                            </Col>
+                          ))}
+                        </Row>
+                      </div>
+                    </div>
+                    {lotDropKg != null && (
+                      <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '10px 12px', marginTop: 12, fontSize: 14 }}>
+                        → Lô đã dỡ ({RUBBER_LABELS[lotDropType] || lotDropType || '?'}): <b>{lotDropKg.toLocaleString('vi-VN')} kg</b><br />
+                        → Lô còn ({RUBBER_LABELS[lotKeepType] || lotKeepType || '?'}): <b>{(lotKeepKg || 0).toLocaleString('vi-VN')} kg</b>
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Cộng lại = {((lotDropKg || 0) + (lotKeepKg || 0)).toLocaleString('vi-VN')} kg (= Tổng)</div>
+                      </div>
+                    )}
+                  </Modal>
+                </>
+              )}
 
               {/* P4: Nhập mủ gần đây — dưới tổng kết (theo mock), avatar loại mủ + DRC/Net + link */}
               {isCreate && (

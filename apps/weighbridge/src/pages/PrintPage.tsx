@@ -33,6 +33,7 @@ export default function PrintPage() {
   const navigate = useNavigate()
   const [ticket, setTicket] = useState<WeighbridgeTicket | null>(null)
   const [images, setImages] = useState<WeighbridgeImage[]>([])
+  const [lots, setLots] = useState<Array<{ lot_code: string | null; rubber_type: string | null; net_kg: number }>>([])
   const [dealInfo, setDealInfo] = useState<{ deal_number: string; partner_name: string } | null>(null)
   // Đối tác (mọi nguồn): deal→đại lý, partner_direct→đại lý, supplier→NCC
   const [partner, setPartner] = useState<{ name: string; label: string } | null>(null)
@@ -70,6 +71,10 @@ export default function PrintPage() {
       ])
       setTicket(t)
       setImages(imgs)
+      // Tách lô — chi tiết nhiều mã hàng trên xe (nếu có)
+      supabase.from('weighbridge_ticket_lots').select('lot_code, rubber_type, net_kg')
+        .eq('ticket_id', id).order('sort_order')
+        .then(({ data }) => setLots((data as any[]) || []))
       // Resolve đối tác theo nguồn: deal → đại lý, partner_direct → đại lý, supplier → NCC
       const ext = t as any
       if (ext?.deal_id) {
@@ -613,6 +618,35 @@ export default function PrintPage() {
               </tbody>
             </table>
           )
+        )}
+
+        {/* ===== CHI TIẾT LÔ (tách nhiều mã hàng trên xe) ===== */}
+        {lots.length > 0 && (
+          <div style={{ marginBottom: isThermal ? 4 : 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 4 }}>Chi tiết lô (nhiều mã hàng)</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: '#1B4D3E', color: '#fff' }}>
+                  <th style={{ border: '1px solid #ccc', padding: '4px 8px', textAlign: 'left' }}>Mã lô</th>
+                  <th style={{ border: '1px solid #ccc', padding: '4px 8px', textAlign: 'left' }}>Loại mủ</th>
+                  <th style={{ border: '1px solid #ccc', padding: '4px 8px', textAlign: 'right' }}>KL (kg)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lots.map((lo, i) => (
+                  <tr key={i}>
+                    <td style={{ border: '1px solid #ccc', padding: '4px 8px', fontWeight: 600 }}>{lo.lot_code || '—'}</td>
+                    <td style={{ border: '1px solid #ccc', padding: '4px 8px' }}>{lo.rubber_type ? (RT_LABELS[lo.rubber_type] || lo.rubber_type) : '—'}</td>
+                    <td style={{ border: '1px solid #ccc', padding: '4px 8px', textAlign: 'right', fontWeight: 700, fontFamily: mono }}>{fmt(lo.net_kg)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: '#DCFCE7', fontWeight: 700 }}>
+                  <td style={{ border: '1px solid #ccc', padding: '4px 8px' }} colSpan={2}>TỔNG</td>
+                  <td style={{ border: '1px solid #ccc', padding: '4px 8px', textAlign: 'right', fontFamily: mono }}>{fmt(lots.reduce((s, l) => s + (Number(l.net_kg) || 0), 0))}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
 
         {/* ===== NOTES ===== */}

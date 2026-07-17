@@ -799,7 +799,7 @@ export default function WeighingPage() {
       if (ticket.status === 'weighing_gross') {
         updated = await weighbridgeService.updateGrossWeight(ticket.id, weight, operator?.id, palletInput)
         setTicket(updated)
-        setSuccess(`Cân lần 1 (Gross): ${weight.toLocaleString()} kg`)
+        setSuccess(`Cân lần 1 (Xe + hàng): ${weight.toLocaleString()} kg`)
         setManualWeight(null)
         // Auto chụp + lưu ảnh camera lần 1
         if (cameraCaptureRef.current) {
@@ -829,7 +829,7 @@ export default function WeighingPage() {
           actualDrc, undefined, priceUnit,
           Number((updated as any).pallet_kg_gross || 0), Number((updated as any).pallet_kg_tare || 0),
         )
-        setSuccess(`Cân lần 2 (Tare): ${weight.toLocaleString()} kg — NET: ${c.net_weight.toLocaleString()} kg`)
+        setSuccess(`Cân lần 2 (Xe rỗng): ${weight.toLocaleString()} kg — KL mủ: ${c.net_weight.toLocaleString()} kg`)
         setManualWeight(null)
         // Auto chụp + lưu ảnh camera lần 2
         if (cameraCaptureRef.current) {
@@ -1299,7 +1299,7 @@ export default function WeighingPage() {
   const reverseView = isReverseWeigh || ticket?.ticket_type === 'out' || ticket?.ticket_type === 'gate'
   const box1Label = 'Cân lần 1'
   const box2Label = 'Cân lần 2'
-  const box3Label = isGateView ? 'KL hàng' : 'NET'
+  const box3Label = isGateView ? 'KL hàng' : 'KL tịnh'
   const box1Val = reverseView ? ticket?.tare_weight : ticket?.gross_weight
   const box2Val = reverseView ? ticket?.gross_weight : ticket?.tare_weight
   // NHẬP: lần1 gross → lần2 tare (chờ tare==null). XUẤT/CỔNG: lần1 tare → lần2 gross (chờ gross==null).
@@ -1405,12 +1405,12 @@ export default function WeighingPage() {
                   ]
                 : [
                     { title: 'Tạo phiếu' },
-                    { title: 'Cân lần 1', description: 'Gross' },
+                    { title: 'Cân lần 1', description: 'Xe + hàng' },
                     {
                       title: 'Cân lần 2',
                       description: (rubberType === 'mu_nuoc' || dotReading != null)
-                        ? 'Lấy mẫu · đốt · DRC · tare'
-                        : 'Tare',
+                        ? 'Lấy mẫu · đốt · DRC · xe rỗng'
+                        : 'Xe rỗng',
                     },
                     { title: 'Hoàn tất' },
                   ]
@@ -1475,14 +1475,14 @@ export default function WeighingPage() {
                 </div>
                 <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
                   {ticketDirection === 'in'
-                    ? 'Cân 2 lần: Gross (xe + hàng) → Tare (xe rỗng) → Net'
+                    ? 'Cân 2 lần: Xe + hàng → Xe rỗng → KL mủ'
                     : ticketDirection === 'gate'
                     ? 'Cân hàng nội bộ (không phải mủ) — 2 lần: Xe vào → Xe ra → KL hàng. Không tính tồn kho.'
                     : ticketDirection === 'fetch'
                     ? (currentFacility?.code === 'PD'
                         ? 'Đi lấy mủ về PĐ — cân 2 lần Ở PĐ: Xe rỗng (đi) → Xe + mủ (về) → KL mủ PĐ. Chọn lệnh để điền sẵn pallet.'
                         : 'Cân mủ đi lấy — 2 lần Ở NM này: Xe rỗng (đến) → Xe + mủ (rời NM) → KL mủ. Khai pallet CÒN TRÊN XE để PĐ đối chiếu.')
-                    : 'Cân 2 lần: Xe rỗng (Tare) → Xe + hàng (Gross) → Net hàng'}
+                    : 'Cân 2 lần: Xe rỗng → Xe + hàng → KL hàng'}
                 </Text>
               </Card>
 
@@ -2095,7 +2095,7 @@ export default function WeighingPage() {
                     )}
                     {tareSuggestion && tareSuggestion.count > 0 && (
                       <Text type="secondary" style={{ fontSize: 11 }}>
-                        💡 Tare TB {tareSuggestion.count} lần: {tareSuggestion.avgTare?.toLocaleString()} kg
+                        💡 Xe rỗng TB {tareSuggestion.count} lần: {tareSuggestion.avgTare?.toLocaleString()} kg
                       </Text>
                     )}
                   </Col>
@@ -2399,7 +2399,7 @@ export default function WeighingPage() {
                         ? (isWeighingGross ? '⚖️ Cân lần 1 (Xe vào)' : '⚖️ Cân lần 2 (Xe ra)')
                         : isOut
                         ? (isWeighingGross ? '⚖️ Cân lần 1 (Xe rỗng)' : '⚖️ Cân lần 2 (Xe + hàng)')
-                        : (isWeighingGross ? '⚖️ Cân lần 1 (Gross)' : '⚖️ Cân lần 2 (Tare)')}
+                        : (isWeighingGross ? '⚖️ Cân lần 1 (Xe + hàng)' : '⚖️ Cân lần 2 (Xe rỗng)')}
                     </Text>
 
                     {/* Scale reading */}
@@ -2444,7 +2444,7 @@ export default function WeighingPage() {
                     {isWeighingTare && tareSuggestion && tareSuggestion.avgTare && (
                       <div style={{ background: '#FFFBE6', padding: 8, borderRadius: 8, marginBottom: 8 }}>
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          💡 Tare TB {tareSuggestion.count} lần trước: {tareSuggestion.avgTare?.toLocaleString()} kg
+                          💡 Xe rỗng TB {tareSuggestion.count} lần trước: {tareSuggestion.avgTare?.toLocaleString()} kg
                         </Text>
                         <Button
                           type="link" size="small"
@@ -2499,7 +2499,7 @@ export default function WeighingPage() {
 
                     {/* Tách lô INLINE — chỉ NHẬP ở PĐ, ở cân lần 2 (lúc dỡ). Lấy số trung gian thẳng từ COM. */}
                     {ticket?.ticket_type === 'in' && currentFacility?.code === 'PD' && isWeighingTare && canRecord && (
-                      <div style={{ textAlign: 'left', background: '#F5F3FF', border: '1.5px solid #C4B5FD', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                      <div style={{ textAlign: 'left', background: '#F5F3FF', border: '1.5px solid #C4B5FD', borderRadius: 10, padding: 12, margin: '14px 0 10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span style={{ fontWeight: 700, color: '#5B21B6', fontSize: 14 }}>🔀 Xe chở nhiều lô?</span>
                           <Button size="small" type={nhapSplitOn ? 'primary' : 'default'}
@@ -2524,7 +2524,7 @@ export default function WeighingPage() {
                           return (
                             <div style={{ marginTop: 10 }}>
                               <div style={{ fontSize: 12, color: '#6D28D9', marginBottom: 8 }}>
-                                Tổng (cân lần 1): <b>{gross.toLocaleString('vi-VN')} kg</b>. Dỡ từng lô → bấm 📥 lấy số cân sau mỗi lô. Lô CUỐI đóng bằng <b>XE RỖNG</b> (cân lần 2 bên dưới).
+                                Tổng (cân lần 1): <b>{gross.toLocaleString('vi-VN')} kg</b>. Dỡ 1 lô rồi bấm 📥 lấy số cân (lúc CÒN lô trên xe). Lô CUỐI tự tính khi cân <b>XE RỖNG</b> — nhập ở <b>ô cân phía trên</b>.
                               </div>
                               {nhapLots.map((lot, i) => (
                                 <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < N - 1 ? '1px dashed #DDD6FE' : 'none' }}>
@@ -2553,23 +2553,34 @@ export default function WeighingPage() {
                                   )}
                                 </div>
                               ))}
+                              {/* Đóng dãy bằng XE RỖNG = số cân lần 2 (ô cân phía trên) — để thợ cân thấy rõ nguồn số */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 8px', padding: '7px 10px', borderRadius: 8, background: '#EDE9FE', border: '1px dashed #C4B5FD' }}>
+                                <span style={{ fontSize: 12, fontWeight: 800, color: '#5B21B6' }}>⬇ Cân lần 2 = XE RỖNG</span>
+                                <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: tareLive != null ? '#5B21B6' : '#B45309' }}>
+                                  {tareLive != null ? `${tareLive.toLocaleString('vi-VN')} kg` : '↑ nhập ở ô cân trên'}
+                                </span>
+                              </div>
                               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                                 <Button size="small" onClick={() => setNhapLots(prev => [...prev.slice(0, -1), { code: '', rubberType: '', weighAfter: null }, prev[prev.length - 1]])}>+ Thêm lô</Button>
                                 {N > 2 && <Button size="small" danger onClick={() => setNhapLots(prev => prev.filter((_, i) => i !== prev.length - 2))}>− Bớt lô</Button>}
                               </div>
-                              {tareLive != null && (() => {
+                              {tareLive != null ? (() => {
                                 const sum = kgs.reduce((s: number, k) => s + (k || 0), 0)
                                 const net = gross - tareLive
                                 const ok = Math.abs(sum - net) <= 2 && kgs.every(k => k != null && (k as number) > 0)
                                 return (
                                   <div style={{ fontSize: 12, padding: '6px 10px', borderRadius: 7, background: ok ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${ok ? '#BBF7D0' : '#FECACA'}`, color: ok ? '#15803D' : '#B91C1C' }}>
-                                    {ok ? '✅' : '⚠️'} Σ {kgs.length} lô = {sum.toLocaleString('vi-VN')} kg / NET (tổng − rỗng) = {net.toLocaleString('vi-VN')} kg
+                                    {ok ? '✅' : '⚠️'} Σ {kgs.length} lô = <b>{sum.toLocaleString('vi-VN')}</b> kg = KL tịnh (tổng {gross.toLocaleString('vi-VN')} − rỗng {tareLive.toLocaleString('vi-VN')}) = <b>{net.toLocaleString('vi-VN')}</b> kg
                                     {!ok && ' — kiểm tra số cân trung gian.'}
                                   </div>
                                 )
-                              })()}
+                              })() : (
+                                <div style={{ fontSize: 12, padding: '6px 10px', borderRadius: 7, background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E' }}>
+                                  → Nhập/cân <b>XE RỖNG</b> ở ô cân phía trên để hiện KL từng lô.
+                                </div>
+                              )}
                               <div style={{ fontSize: 11, color: '#7C3AED', marginTop: 6 }}>
-                                Khai xong → dỡ HẾT rồi cân <b>XE RỖNG</b> → bấm <b>GHI CÂN LẦN 2</b> để lưu tách lô.
+                                Khai xong → dỡ HẾT rồi cân <b>XE RỖNG</b> (ô trên) → bấm <b>GHI CÂN LẦN 2</b> để lưu tách lô.
                               </div>
                             </div>
                           )
@@ -2749,7 +2760,7 @@ export default function WeighingPage() {
                                 <div style={{ fontSize: 10, color: drc != null ? '#2563eb' : '#94a3b8' }}>
                                   {drc != null
                                     ? `DRC ${drc}%`
-                                    : t.status === 'completed' ? 'Net' : t.status === 'weighing_tare' ? 'Chờ L2' : 'Chờ L1'}
+                                    : t.status === 'completed' ? 'Tịnh' : t.status === 'weighing_tare' ? 'Chờ L2' : 'Chờ L1'}
                                 </div>
                               </div>
                             </div>

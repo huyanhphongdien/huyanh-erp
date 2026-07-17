@@ -1281,6 +1281,17 @@ export default function WeighingPage() {
   const isGate = ticketDirection === 'gate'
   // Đợt 2 — "Nhận mủ NM khác" (đi lấy mủ TL→PĐ): cân đảo chiều như OUT, chỉ PĐ.
   const isFetch = ticketDirection === 'fetch' || ticket?.ticket_type === 'fetch'
+
+  // Tách lô NHẬP đang bật (ở cân lần 2, PĐ) — dùng để KHOÁ nút "Ghi cân lần 2"
+  // cho tới khi đã LẤY SỐ đủ các lô (tránh nhầm "Lấy số" với "Ghi cân lần 2").
+  const nhapSplitActive = ticket?.ticket_type === 'in' && currentFacility?.code === 'PD' && isWeighingTare && nhapSplitOn
+  const nhapAllInterCaptured = nhapLots.slice(0, nhapLots.length - 1).every(l => l.weighAfter != null && (l.weighAfter as number) > 0)
+  const nhapInterDecreasing = (() => {
+    const s = [Number(ticket?.gross_weight || 0), ...nhapLots.slice(0, nhapLots.length - 1).map(l => Number(l.weighAfter || 0))]
+    for (let i = 0; i < s.length - 1; i++) if (s[i + 1] >= s[i]) return false
+    return true
+  })()
+  const nhapSplitReady = !nhapSplitActive || (nhapAllInterCaptured && nhapInterDecreasing)
   // GATE/FETCH cân giống OUT (lần1 = tare, lần2 = gross). PD-only.
   const isReverseWeigh = isOut || isGate || isFetch
   const canShowGate = currentFacility?.code === 'PD'
@@ -2514,7 +2525,9 @@ export default function WeighingPage() {
                         </div>
 
                         {nhapSplitOn && (() => {
-                          const tareLive = (scale.connected && scale.liveWeight) ? scale.liveWeight.weight : manualWeight
+                          const tareRaw = (scale.connected && scale.liveWeight) ? scale.liveWeight.weight : manualWeight
+                          // Xe rỗng KHÔNG thể = 0 → coi 0/rỗng là "chưa cân" (tránh hiện ✓/KL sai).
+                          const tareLive = (tareRaw != null && tareRaw > 0) ? tareRaw : null
                           const kgs = computeNhapLotKgs(tareLive)
                           const gross = Number(ticket?.gross_weight || 0)
                           const N = nhapLots.length
@@ -2542,7 +2555,9 @@ export default function WeighingPage() {
                               </div>
                               {nhapLots.map((lot, i) => {
                                 const isLast = i === N - 1
-                                const captured = isLast ? (tareLive != null) : (lot.weighAfter != null)
+                                // Lô cuối = "còn lại", KHÔNG có bước lấy số riêng → không đánh ✓
+                                // (chốt bằng nút GHI CÂN LẦN 2 khi xe trống).
+                                const captured = isLast ? false : (lot.weighAfter != null)
                                 const isNext = !isLast && i === firstUnsetIdx
                                 const waiting = !isLast && !captured && firstUnsetIdx !== -1 && i > firstUnsetIdx
                                 return (
@@ -2571,8 +2586,8 @@ export default function WeighingPage() {
                                             onChange={v => setLot(i, { weighAfter: (v as number) })} />
                                           {scale.connected && scale.liveWeight && (
                                             <Button size="small" type="primary" disabled={waiting}
-                                              style={waiting ? {} : { background: '#7C3AED', borderColor: '#7C3AED' }}
-                                              onClick={() => setLot(i, { weighAfter: scale.liveWeight!.weight })}>📥 Lấy số</Button>
+                                              style={waiting ? {} : { background: '#7C3AED', borderColor: '#7C3AED', whiteSpace: 'nowrap' }}
+                                              onClick={() => setLot(i, { weighAfter: scale.liveWeight!.weight })}>📥 Lấy số lô {i + 1}</Button>
                                           )}
                                         </div>
                                       </div>
@@ -2582,9 +2597,9 @@ export default function WeighingPage() {
                               })}
                               {/* Đóng dãy bằng XE RỖNG = số cân lần 2 (ô cân phía trên) — để thợ cân thấy rõ nguồn số */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 8px', padding: '7px 10px', borderRadius: 8, background: '#EDE9FE', border: '1px dashed #C4B5FD' }}>
-                                <span style={{ fontSize: 12, fontWeight: 800, color: '#5B21B6' }}>⬇ Cân lần 2 = XE RỖNG</span>
+                                <span style={{ fontSize: 12, fontWeight: 800, color: '#5B21B6' }}>⬇ Lô cuối chốt bằng XE RỖNG (khi xe trống)</span>
                                 <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: tareLive != null ? '#5B21B6' : '#B45309' }}>
-                                  {tareLive != null ? `${tareLive.toLocaleString('vi-VN')} kg` : '↑ nhập ở ô cân trên'}
+                                  {tareLive != null ? `${tareLive.toLocaleString('vi-VN')} kg` : '↑ cân ở ô trên'}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -2624,12 +2639,33 @@ export default function WeighingPage() {
                       <Button
                         type="primary" size="large" block
                         icon={<ThunderboltOutlined />}
-                        onClick={handleRecordWeight}
+                        disabled={nhapSplitActive && !nhapSplitReady}
+                        onClick={() => {
+                          // Tách lô: chống nhầm với "Lấy số" — xác nhận xe đã dỡ HẾT
+                          // trước khi ghi số hiện tại thành XE RỖNG (và chốt phiếu).
+                          if (nhapSplitActive) {
+                            Modal.confirm({
+                              title: 'Ghi cân lần 2 = XE RỖNG?',
+                              content: 'Xác nhận xe đã DỠ HẾT — trên xe không còn lô nào. Số cân hiện tại sẽ ghi thành XE RỖNG và lưu tách lô, chốt phiếu. Nếu trên xe VẪN CÒN lô, hãy bấm nút tím "📥 Lấy số lô …" chứ không phải nút này.',
+                              okText: '✓ Xe đã trống — Ghi cân lần 2',
+                              cancelText: 'Chưa, để cân tiếp',
+                              okButtonProps: { style: { background: '#D97706', borderColor: '#D97706' } },
+                              onOk: () => handleRecordWeight(),
+                            })
+                          } else {
+                            handleRecordWeight()
+                          }
+                        }}
                         loading={loading}
                         style={{ height: 48, background: '#D97706', borderColor: '#D97706', fontSize: 16 }}
                       >
-                        {isWeighingGross ? 'GHI CÂN LẦN 1' : 'GHI CÂN LẦN 2'}
+                        {isWeighingGross ? 'GHI CÂN LẦN 1' : (nhapSplitActive ? 'GHI XE RỖNG · LƯU LÔ' : 'GHI CÂN LẦN 2')}
                       </Button>
+                    )}
+                    {nhapSplitActive && !nhapSplitReady && (
+                      <div style={{ fontSize: 11, color: '#B45309', marginTop: 6, textAlign: 'center' }}>
+                        ⏳ Bấm <b>📥 Lấy số</b> đủ các lô (đúng thứ tự, số giảm dần) rồi mới ghi cân lần 2.
+                      </div>
                     )}
                   </div>
                 </Card>

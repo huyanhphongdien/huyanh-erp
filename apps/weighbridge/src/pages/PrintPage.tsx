@@ -217,6 +217,13 @@ export default function PrintPage() {
   const palletTotal = palletGrossKg + palletTareKg
   const pallet1Kg = isReverseTicket ? palletTareKg : palletGrossKg
   const pallet2Kg = isReverseTicket ? palletGrossKg : palletTareKg
+  // Số LƯỢNG pallet mỗi lần cân (nhựa/sắt) — in dòng nhỏ để tiện theo dõi pallet.
+  const pallet1Plastic = Number((isReverseTicket ? ext.pallet_plastic_tare : ext.pallet_plastic_gross) || 0)
+  const pallet1Steel = Number((isReverseTicket ? ext.pallet_steel_tare : ext.pallet_steel_gross) || 0)
+  const pallet2Plastic = Number((isReverseTicket ? ext.pallet_plastic_gross : ext.pallet_plastic_tare) || 0)
+  const pallet2Steel = Number((isReverseTicket ? ext.pallet_steel_gross : ext.pallet_steel_tare) || 0)
+  const palletCountStr = (p: number, s: number) =>
+    [p ? `${p} nhựa` : '', s ? `${s} sắt` : ''].filter(Boolean).join(' + ')
 
   // Hỗ trợ NHIỀU loại mủ (XUẤT lưu "mu_dong,mu_nuoc") — gộp nhãn
   const RT_LABELS: Record<string, string> = {
@@ -471,8 +478,8 @@ export default function PrintPage() {
             <Row2 l={`Cân lần 2 (${w2Label})`} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w2Weight)} kg</span>} />
             {palletTotal > 0 && (
               <>
-                <Row2 l="Pallet lần 1" r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet1Kg)} kg</span>} />
-                <Row2 l="Pallet lần 2" r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet2Kg)} kg</span>} />
+                <Row2 l={`Pallet lần 1${palletCountStr(pallet1Plastic, pallet1Steel) ? ` (${palletCountStr(pallet1Plastic, pallet1Steel)})` : ''}`} r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet1Kg)} kg</span>} />
+                <Row2 l={`Pallet lần 2${palletCountStr(pallet2Plastic, pallet2Steel) ? ` (${palletCountStr(pallet2Plastic, pallet2Steel)})` : ''}`} r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet2Kg)} kg</span>} />
               </>
             )}
             <div style={{ borderBottom: '1px solid #333', margin: '2px 0' }} />
@@ -518,12 +525,12 @@ export default function PrintPage() {
               {palletTotal > 0 && (
                 <>
                   <tr>
-                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 1 (bì)</td>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 1 (bì){palletCountStr(pallet1Plastic, pallet1Steel) && <div style={{ fontSize: fs - 3, color: '#6B7280', fontWeight: 400 }}>{palletCountStr(pallet1Plastic, pallet1Steel)}</div>}</td>
                     <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet1Kg)}</td>
                     <td style={tdCenter}></td>
                   </tr>
                   <tr>
-                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 2 (bì)</td>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 2 (bì){palletCountStr(pallet2Plastic, pallet2Steel) && <div style={{ fontSize: fs - 3, color: '#6B7280', fontWeight: 400 }}>{palletCountStr(pallet2Plastic, pallet2Steel)}</div>}</td>
                     <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet2Kg)}</td>
                     <td style={tdCenter}></td>
                   </tr>

@@ -1213,7 +1213,6 @@ export default function WeighingPage() {
   const isGate = ticketDirection === 'gate'
   // Đợt 2 — "Nhận mủ NM khác" (đi lấy mủ TL→PĐ): cân đảo chiều như OUT, chỉ PĐ.
   const isFetch = ticketDirection === 'fetch' || ticket?.ticket_type === 'fetch'
-  const isNhap = ticketDirection === 'in' || ticket?.ticket_type === 'in'  // tách lô áp cho cả NHẬP
   // GATE/FETCH cân giống OUT (lần1 = tare, lần2 = gross). PD-only.
   const isReverseWeigh = isOut || isGate || isFetch
   const canShowGate = currentFacility?.code === 'PD'
@@ -2439,8 +2438,8 @@ export default function WeighingPage() {
                 </Row>
               </Card>
 
-              {/* Tách lô — nhiều mã hàng trên xe (phiếu đi lấy mủ HOẶC NHẬP kho, đã có Tổng NET) */}
-              {(isFetch || isNhap) && !isCreate && tongNet > 0 && (
+              {/* Tách lô — nhiều mã hàng trên xe (MỌI loại phiếu đã cân xong, có Tổng NET) */}
+              {!isCreate && tongNet > 0 && (
                 <>
                   <Button block size="large" style={{ marginTop: 8, height: 44, borderColor: '#7C3AED', color: '#7C3AED', fontWeight: 600 }} onClick={() => setSplitOpen(true)}>
                     🔀 Tách lô (nhiều mã hàng){savedLots.length ? ` · đã tách ${savedLots.length} lô` : ''}
@@ -2475,7 +2474,20 @@ export default function WeighingPage() {
                     </Row>
                     <div style={{ borderTop: '1px dashed #ddd', paddingTop: 10 }}>
                       <Text style={{ fontSize: 12, color: '#64748b' }}>Cân xe SAU KHI DỠ (xe + lô còn) — kg</Text>
-                      <InputNumber value={weighAfter} onChange={v => setWeighAfter(v)} min={0} style={{ width: '100%', marginTop: 4 }} placeholder="Gõ số cân từ đầu cân" />
+                      {scale.connected && scale.liveWeight ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                          <div style={{ flex: 1, background: '#0F172A', borderRadius: 8, padding: '6px 12px', textAlign: 'center' }}>
+                            <span style={{ fontFamily: 'monospace', fontSize: 26, fontWeight: 700, color: '#00FF41' }}>{scale.liveWeight.weight.toLocaleString()}</span>
+                            <span style={{ color: '#94a3b8', fontSize: 11 }}> kg từ cân</span>
+                          </div>
+                          <Button type="primary" onClick={() => setWeighAfter(scale.liveWeight!.weight)}>📥 Lấy số</Button>
+                        </div>
+                      ) : null}
+                      <InputNumber value={weighAfter} onChange={v => setWeighAfter(v)} min={0} style={{ width: '100%', marginTop: 4 }}
+                        placeholder={scale.connected ? 'Bấm "Lấy số" hoặc gõ tay' : 'Gõ số cân (cân chưa kết nối cổng)'} />
+                      <div style={{ fontSize: 11, color: scale.connected ? '#15803d' : '#b45309', marginTop: 2 }}>
+                        {scale.connected ? '● Cân đã nối cổng COM — bấm "Lấy số" để ghi trực tiếp, tránh gõ sai.' : '○ Cân chưa kết nối — gõ tay số cân.'}
+                      </div>
                       <div style={{ marginTop: 8 }}>
                         <Text style={{ fontSize: 12, color: '#64748b' }}>Pallet sau khi dỡ</Text>
                         <Row gutter={8} style={{ marginTop: 4 }}>

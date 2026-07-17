@@ -2521,38 +2521,65 @@ export default function WeighingPage() {
                           const setLot = (idx: number, patch: Partial<{ code: string; rubberType: string; weighAfter: number | null }>) =>
                             setNhapLots(prev => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
                           const rubberOpts = ['mu_tap', 'mu_nuoc', 'mu_dong', 'mu_to', 'mu_rss3'].map(v => ({ value: v, label: RUBBER_LABELS[v] || v }))
+                          // Nhắc thứ tự: lô cần lấy số kế tiếp = lô đầu tiên (chưa phải lô cuối) còn trống.
+                          const firstUnsetIdx = nhapLots.findIndex((l, idx) => idx < N - 1 && l.weighAfter == null)
+                          // Kiểm thứ tự cân: dãy phải GIẢM DẦN (tổng > w1 > … > rỗng).
+                          const seq: Array<number | null> = [gross, ...nhapLots.slice(0, N - 1).map(l => l.weighAfter), tareLive]
+                          let orderIssue: string | null = null
+                          for (let s = 0; s < seq.length - 1; s++) {
+                            const a = seq[s], b = seq[s + 1]
+                            if (a != null && b != null && b >= a) {
+                              const la = s === 0 ? 'TỔNG' : `cân sau lô ${s}`
+                              const lb = (s + 1) === seq.length - 1 ? 'XE RỖNG' : `cân sau lô ${s + 1}`
+                              orderIssue = `"${lb}" (${b.toLocaleString('vi-VN')} kg) không nhỏ hơn "${la}" (${a.toLocaleString('vi-VN')} kg) — kiểm tra thứ tự / số cân.`
+                              break
+                            }
+                          }
                           return (
                             <div style={{ marginTop: 10 }}>
                               <div style={{ fontSize: 12, color: '#6D28D9', marginBottom: 8 }}>
                                 Tổng (cân lần 1): <b>{gross.toLocaleString('vi-VN')} kg</b>. Dỡ 1 lô rồi bấm 📥 lấy số cân (lúc CÒN lô trên xe). Lô CUỐI tự tính khi cân <b>XE RỖNG</b> — nhập ở <b>ô cân phía trên</b>.
                               </div>
-                              {nhapLots.map((lot, i) => (
-                                <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < N - 1 ? '1px dashed #DDD6FE' : 'none' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 22px' }}>{i + 1}</span>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#5B21B6' }}>Lô {i + 1}{i === N - 1 ? ' (còn lại)' : ''}</span>
-                                    <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: kgs[i] != null && (kgs[i] as number) > 0 ? '#15803D' : '#B45309' }}>
-                                      {kgs[i] != null ? `${(kgs[i] as number).toLocaleString('vi-VN')} kg` : '— kg'}
-                                    </span>
-                                  </div>
-                                  <Row gutter={6}>
-                                    <Col span={13}><Input size="small" value={lot.code} placeholder="Mã lô" onChange={e => setLot(i, { code: e.target.value })} /></Col>
-                                    <Col span={11}><Select size="small" value={lot.rubberType || undefined} placeholder="Loại mủ" style={{ width: '100%' }} options={rubberOpts} onChange={v => setLot(i, { rubberType: v })} /></Col>
-                                  </Row>
-                                  {i < N - 1 && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                                      <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>Cân xe sau dỡ lô {i + 1}:</span>
-                                      <InputNumber size="small" value={lot.weighAfter} min={0} style={{ flex: 1 }}
-                                        formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                                        onChange={v => setLot(i, { weighAfter: (v as number) })} />
-                                      {scale.connected && scale.liveWeight && (
-                                        <Button size="small" type="primary" style={{ background: '#7C3AED', borderColor: '#7C3AED' }}
-                                          onClick={() => setLot(i, { weighAfter: scale.liveWeight!.weight })}>📥 Lấy số</Button>
-                                      )}
+                              {nhapLots.map((lot, i) => {
+                                const isLast = i === N - 1
+                                const captured = isLast ? (tareLive != null) : (lot.weighAfter != null)
+                                const isNext = !isLast && i === firstUnsetIdx
+                                const waiting = !isLast && !captured && firstUnsetIdx !== -1 && i > firstUnsetIdx
+                                return (
+                                  <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < N - 1 ? '1px dashed #DDD6FE' : 'none', opacity: waiting ? 0.5 : 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: captured ? '#16A34A' : (isNext ? '#D97706' : '#7C3AED'), color: '#fff', fontWeight: 800, fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 22px' }}>{captured ? '✓' : i + 1}</span>
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: '#5B21B6' }}>Lô {i + 1}{isLast ? ' (còn lại)' : ''}</span>
+                                      <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: kgs[i] != null && (kgs[i] as number) > 0 ? '#15803D' : '#B45309' }}>
+                                        {kgs[i] != null ? `${(kgs[i] as number).toLocaleString('vi-VN')} kg` : '— kg'}
+                                      </span>
                                     </div>
-                                  )}
-                                </div>
-                              ))}
+                                    <Row gutter={6}>
+                                      <Col span={13}><Input size="small" value={lot.code} placeholder="Mã lô" onChange={e => setLot(i, { code: e.target.value })} /></Col>
+                                      <Col span={11}><Select size="small" value={lot.rubberType || undefined} placeholder="Loại mủ" style={{ width: '100%' }} options={rubberOpts} onChange={v => setLot(i, { rubberType: v })} /></Col>
+                                    </Row>
+                                    {!isLast && (
+                                      <div style={{ marginTop: 5 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 3, color: captured ? '#15803D' : (isNext ? '#B45309' : '#94A3B8') }}>
+                                          {captured ? `✓ Đã lấy số cân sau dỡ lô ${i + 1}`
+                                            : isNext ? `⏳ DỠ LÔ ${i + 1} XONG → bấm 📥 lấy số cân`
+                                            : `Chờ lấy số lô ${i} trước`}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                          <InputNumber size="small" value={lot.weighAfter} min={0} style={{ flex: 1 }} disabled={waiting}
+                                            formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                            onChange={v => setLot(i, { weighAfter: (v as number) })} />
+                                          {scale.connected && scale.liveWeight && (
+                                            <Button size="small" type="primary" disabled={waiting}
+                                              style={waiting ? {} : { background: '#7C3AED', borderColor: '#7C3AED' }}
+                                              onClick={() => setLot(i, { weighAfter: scale.liveWeight!.weight })}>📥 Lấy số</Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                               {/* Đóng dãy bằng XE RỖNG = số cân lần 2 (ô cân phía trên) — để thợ cân thấy rõ nguồn số */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 8px', padding: '7px 10px', borderRadius: 8, background: '#EDE9FE', border: '1px dashed #C4B5FD' }}>
                                 <span style={{ fontSize: 12, fontWeight: 800, color: '#5B21B6' }}>⬇ Cân lần 2 = XE RỖNG</span>
@@ -2564,6 +2591,11 @@ export default function WeighingPage() {
                                 <Button size="small" onClick={() => setNhapLots(prev => [...prev.slice(0, -1), { code: '', rubberType: '', weighAfter: null }, prev[prev.length - 1]])}>+ Thêm lô</Button>
                                 {N > 2 && <Button size="small" danger onClick={() => setNhapLots(prev => prev.filter((_, i) => i !== prev.length - 2))}>− Bớt lô</Button>}
                               </div>
+                              {orderIssue && (
+                                <div style={{ fontSize: 12, fontWeight: 600, padding: '6px 10px', borderRadius: 7, marginBottom: 6, background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C' }}>
+                                  🔴 Thứ tự cân sai: {orderIssue}
+                                </div>
+                              )}
                               {tareLive != null ? (() => {
                                 const sum = kgs.reduce((s: number, k) => s + (k || 0), 0)
                                 const net = gross - tareLive

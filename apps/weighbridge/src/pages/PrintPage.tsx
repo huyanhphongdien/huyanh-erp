@@ -200,9 +200,11 @@ export default function PrintPage() {
   // NHẬP thì ngược lại. → bảng cân in theo đúng thứ tự + nhãn + thời gian của từng hướng.
   const isOutTicket = ticket!.ticket_type === 'out'
   const isGateTicket = ticket!.ticket_type === 'gate'
-  const isReverseTicket = isOutTicket || isGateTicket  // lần1 = tare, lần2 = gross
-  const w1Label = isGateTicket ? 'Xe vào' : isOutTicket ? 'Xe rỗng' : 'Gross'
-  const w2Label = isGateTicket ? 'Xe ra' : isOutTicket ? 'Xe + hàng' : 'Tare'
+  const isFetchTicket = ticket!.ticket_type === 'fetch'
+  // FETCH (đi lấy mủ) đảo chiều như OUT: lần1 = tare (xe rỗng đi), lần2 = gross (xe+mủ về).
+  const isReverseTicket = isOutTicket || isGateTicket || isFetchTicket
+  const w1Label = isGateTicket ? 'Xe vào' : isFetchTicket ? 'Xe rỗng (đi)' : isOutTicket ? 'Xe rỗng' : 'Gross'
+  const w2Label = isGateTicket ? 'Xe ra' : isFetchTicket ? 'Xe + mủ (về)' : isOutTicket ? 'Xe + hàng' : 'Tare'
   const w1Weight = isReverseTicket ? ticket!.tare_weight : ticket!.gross_weight
   const w1Time = isReverseTicket ? ticket!.tare_weighed_at : ticket!.gross_weighed_at
   const w2Weight = isReverseTicket ? ticket!.gross_weight : ticket!.tare_weight
@@ -423,7 +425,7 @@ export default function PrintPage() {
                 <td style={tdLabel}>{isGateTicket ? 'Nội dung hàng' : 'Loại mủ'}</td>
                 <td style={{ ...tdValue, fontWeight: 600 }}>{isGateTicket ? (ticket!.notes || 'Hàng nội bộ') : rubberLabel}</td>
                 <td style={tdLabel}>Loại cân</td>
-                <td style={{ ...tdValue, fontWeight: 600 }}>{isGateTicket ? 'Cân cổng (hàng nội bộ)' : ticket!.ticket_type === 'in' ? 'Xe vào (Nhập)' : 'Xe ra (Xuất)'}</td>
+                <td style={{ ...tdValue, fontWeight: 600 }}>{isGateTicket ? 'Cân cổng (hàng nội bộ)' : isFetchTicket ? 'Đi lấy mủ (nhận về)' : ticket!.ticket_type === 'in' ? 'Xe vào (Nhập)' : 'Xe ra (Xuất)'}</td>
               </tr>
             </tbody>
           </table>

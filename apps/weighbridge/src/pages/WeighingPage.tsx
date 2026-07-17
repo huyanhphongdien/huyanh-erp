@@ -297,14 +297,15 @@ export default function WeighingPage() {
     }).catch(e => console.warn('Load dispatch lines failed:', e))
   }, [selectedDispatchOrderId, ticketDirection])
 
-  // Cân XUẤT: TỰ khớp lệnh điều động theo BIỂN SỐ đầu kéo — operator quên chọn lệnh
+  // Cân XUẤT/FETCH: TỰ khớp lệnh điều động theo BIỂN SỐ đầu kéo — operator quên chọn lệnh
   // thì vẫn link để ghi KL thực về lệnh. Chỉ tự chọn khi đúng 1 lệnh khớp + chưa chọn + chưa tạo phiếu.
   useEffect(() => {
-    if (ticket || ticketDirection !== 'out' || selectedDispatchOrderId) return
+    if (ticket || (ticketDirection !== 'out' && ticketDirection !== 'fetch') || selectedDispatchOrderId) return
     const norm = (s?: string | null) => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
     const plate = norm(vehiclePlate)
     if (!plate) return
-    const matches = dispatchOrders.filter(d => norm(d.tractor_plate) === plate)
+    const matches = dispatchOrders.filter(d => norm(d.tractor_plate) === plate
+      && (ticketDirection !== 'fetch' || (d as any).trip_type === 'fetch_mu'))
     if (matches.length === 1) {
       const d = matches[0]
       setSelectedDispatchOrderId(d.id)
@@ -313,6 +314,33 @@ export default function WeighingPage() {
       message.info(`Đã tự khớp lệnh ${d.code} theo biển số ${vehiclePlate}`)
     }
   }, [vehiclePlate, dispatchOrders, ticket, ticketDirection, selectedDispatchOrderId])
+
+  // PĐ cân lần 2 (đi lấy mủ): tra pallet CÒN TRÊN XE (TL đã khai) để điền sẵn + đối chiếu,
+  // KỂ CẢ phiếu chưa nối reference — tự khớp lệnh theo biển số. Đồng thời set order id để
+  // lưu pd_net + ẩn lệnh khi hoàn tất.
+  useEffect(() => {
+    if (currentFacility?.code !== 'PD') return
+    if (ticket?.ticket_type !== 'fetch' || ticket?.status !== 'weighing_tare') return
+    if (tlReturnPallet) return  // đã nạp rồi
+    const norm = (s?: string | null) => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    let orderId = (ticket as any).reference_id || selectedDispatchOrderId || ''
+    if (!orderId) {
+      const plate = norm(ticket.vehicle_plate || vehiclePlate)
+      const m = dispatchOrders.filter(d => (d as any).trip_type === 'fetch_mu' && norm(d.tractor_plate) === plate)
+      if (m.length === 1) orderId = m[0].id
+    }
+    if (!orderId) return
+    const oid = orderId
+    dispatchService.getFetchReturnPallet(oid).then(ret => {
+      console.log('[fetch L2 PĐ] tra pallet TL khai:', ret, '· order=', oid)
+      if (ret.plastic || ret.steel) {
+        setTlReturnPallet({ plastic: ret.plastic, steel: ret.steel })
+        setTlNetKg(ret.tlNetKg)
+        setPalletPlastic(ret.plastic); setPalletSteel(ret.steel)
+      }
+      if (!selectedDispatchOrderId) setSelectedDispatchOrderId(oid)
+    }).catch(() => {})
+  }, [ticket, currentFacility, dispatchOrders, vehiclePlate, tlReturnPallet, selectedDispatchOrderId])
 
   const selectedDispatch = dispatchOrders.find(d => d.id === selectedDispatchOrderId)
   const dispatchPlannedKg = dispatchLines.reduce((s, l) => s + (l.weight_kg || 0), 0)

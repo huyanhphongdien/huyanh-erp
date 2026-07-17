@@ -1683,12 +1683,12 @@ export default function WeighingPage() {
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     <div>
                       <Text type="secondary" style={{ fontSize: 12 }}>Chọn lệnh điều động — để biết hàng gì + ghi KL cân về lệnh</Text>
-                      {ticket ? (
+                      {(ticket && selectedDispatchOrderId) ? (
                         <div style={{ marginTop: 4, padding: '8px 12px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, color: '#065F46' }}>
                           <div style={{ fontSize: 13, fontWeight: 700 }}>
                             🔒 {selectedDispatch
                               ? `${selectedDispatch.code}${selectedDispatch.tractor_plate ? ` · ${selectedDispatch.tractor_plate}` : ''}${selectedDispatch.driver_name ? ` · ${selectedDispatch.driver_name}` : ''}`
-                              : (selectedDispatchOrderId ? 'Lệnh đã gắn (đang tải…)' : `${ticket.vehicle_plate || ''} (chưa gắn lệnh)`)}
+                              : 'Lệnh đã gắn (đang tải…)'}
                           </div>
                           <div style={{ fontSize: 11, fontWeight: 400, color: '#059669', marginTop: 2 }}>Lệnh đã khoá — không đổi được khi đang cân</div>
                         </div>

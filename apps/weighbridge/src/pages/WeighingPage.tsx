@@ -2700,6 +2700,26 @@ export default function WeighingPage() {
                 </Row>
               </Card>
 
+              {/* Chi tiết lô — hiện ngay trên màn hình khi phiếu đã tách lô (theo dõi khỏi cần in) */}
+              {savedLots.length > 0 && (
+                <Card size="small" title={`🔀 Chi tiết lô (${savedLots.length} lô)`} style={{ borderRadius: 12, marginTop: 8, borderColor: '#C4B5FD' }}
+                  styles={{ header: { background: '#F5F3FF', color: '#5B21B6', minHeight: 38 }, body: { padding: '8px 14px' } }}>
+                  {savedLots.map((l, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < savedLots.length - 1 ? '1px dashed #EDE9FE' : 'none' }}>
+                      <span style={{ fontSize: 13 }}>
+                        <b>{l.lot_code || '(không mã)'}</b>
+                        <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>{RUBBER_LABELS[l.rubber_type] || l.rubber_type || '—'}</Text>
+                      </span>
+                      <b style={{ ...MONO, fontSize: 14 }}>{Number(l.net_kg).toLocaleString('vi-VN')} kg</b>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 2px', marginTop: 4, borderTop: '2px solid #EDE9FE' }}>
+                    <b style={{ color: '#5B21B6' }}>TỔNG</b>
+                    <b style={{ ...MONO, color: '#5B21B6', fontSize: 14 }}>{savedLots.reduce((s, l) => s + (Number(l.net_kg) || 0), 0).toLocaleString('vi-VN')} kg</b>
+                  </div>
+                </Card>
+              )}
+
               {/* Tách lô SAU hoàn tất — cho fetch/XUẤT/CỔNG (luồng cân rỗng→đầy→dỡ→cân).
                   NHẬP KHÔNG dùng nút này nữa: đã tách INLINE ngay ở cân lần 2 (lúc dỡ). */}
               {!isCreate && tongNet > 0 && ticket?.ticket_type !== 'in' && (

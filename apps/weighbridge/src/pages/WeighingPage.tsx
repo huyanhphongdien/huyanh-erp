@@ -630,6 +630,15 @@ export default function WeighingPage() {
         return
       }
 
+      // Mã hàng/Lô hàng đã gõ ngay ở bước Tạo phiếu → lưu (create() không gửi
+      // consolidation_code). Ở cân lần 1 thì ô Mã hàng/Lô tự lưu onBlur.
+      if (consolidationCode.trim()) {
+        try {
+          await supabase.from('weighbridge_tickets')
+            .update({ consolidation_code: consolidationCode.trim() }).eq('id', t.id)
+        } catch (e) { console.warn('Link consolidation_code failed:', e) }
+      }
+
       // S3 OUT: link sales_order + container nếu user đã chọn
       if (ticketDirection === 'out' && (selectedSalesOrderId || selectedContainerId)) {
         try {
@@ -2224,7 +2233,29 @@ export default function WeighingPage() {
 
               {/* NHẬP + XUẤT: Ghi chú (mã hàng, lô hàng…). CỔNG có card "Nội dung hàng" riêng. */}
               {ticketDirection !== 'gate' && (
-                <Card size="small" title="📝 Ghi chú (mã hàng, lô hàng)" style={{ borderRadius: 12 }}>
+                <Card size="small" title="🏷️ Mã hàng / Lô hàng &amp; Ghi chú" style={{ borderRadius: 12 }}>
+                  {/* NHẬP (cổng 1): ô Mã hàng/Lô hàng có cấu trúc — khai NGAY ở cân lần 1,
+                      giống ô Mã lô của "Nhận mủ NM khác" (cổng 4). Lưu vào consolidation_code. */}
+                  {ticketDirection === 'in' && (
+                    <div style={{ marginBottom: 10 }}>
+                      <Text style={{ fontSize: 12, color: '#64748b' }}>Mã hàng / Lô hàng (in lên phiếu)</Text>
+                      <Input
+                        value={consolidationCode}
+                        onChange={(e) => setConsolidationCode(e.target.value)}
+                        onBlur={() => {
+                          // Lưu ngay khi đang cân (phiếu đã tạo) — tránh mất khi thoát/refresh.
+                          if (ticket?.id && !isCompleted) {
+                            supabase.from('weighbridge_tickets')
+                              .update({ consolidation_code: consolidationCode.trim() || null }).eq('id', ticket.id)
+                              .then(({ error }) => { if (error) console.warn('Lưu mã hàng/lô thất bại:', error.message) })
+                          }
+                        }}
+                        placeholder="vd: TM72, TMBG-01, TMMN-11-02…"
+                        disabled={isCompleted}
+                        style={{ marginTop: 4 }}
+                      />
+                    </div>
+                  )}
                   <Input.TextArea value={notes} onChange={(e) => setNotes(e.target.value)}
                     onBlur={() => {
                       // notes chỉ được gửi lúc create(). Nếu phiếu ĐÃ tạo (đang cân) mà
@@ -2236,7 +2267,7 @@ export default function WeighingPage() {
                           .then(({ error }) => { if (error) console.warn('Lưu ghi chú thất bại:', error.message) })
                       }
                     }}
-                    rows={2} placeholder="Nhập mã hàng / lô hàng / ghi chú thêm (in lên phiếu)..." disabled={isCompleted} />
+                    rows={2} placeholder={ticketDirection === 'in' ? 'Ghi chú thêm (in lên phiếu)…' : 'Nhập mã hàng / lô hàng / ghi chú thêm (in lên phiếu)...'} disabled={isCompleted} />
                 </Card>
               )}
 

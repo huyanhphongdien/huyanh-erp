@@ -1471,7 +1471,14 @@ export default function WeighingPage() {
                         style={{ width: '100%', marginTop: 4 }}
                         placeholder="Chọn loại mủ"
                         disabled={isCompleted}
-                        onChange={(v) => setRubberType(v)}
+                        onChange={(v) => {
+                          setRubberType(v)
+                          // Lưu NGAY khi sửa ở cân lần 2 (không đợi Hoàn tất) — tránh mất khi thoát/refresh.
+                          if (ticket?.id && !isCompleted) {
+                            supabase.from('weighbridge_tickets').update({ rubber_type: v || null }).eq('id', ticket.id)
+                              .then(({ error }) => { if (error) console.warn('Lưu loại mủ thất bại:', error.message) })
+                          }
+                        }}
                         options={['mu_tap', 'mu_nuoc', 'mu_dong', 'mu_to', 'mu_rss3'].map(v => ({ value: v, label: RUBBER_LABELS[v] || v }))}
                       />
                     </Col>
@@ -1480,6 +1487,13 @@ export default function WeighingPage() {
                       <Input
                         value={consolidationCode}
                         onChange={(e) => setConsolidationCode(e.target.value)}
+                        onBlur={() => {
+                          // Lưu NGAY mã lô khi sửa ở cân lần 2 (giống ghi chú) — tránh mất khi thoát/refresh.
+                          if (ticket?.id && !isCompleted) {
+                            supabase.from('weighbridge_tickets').update({ consolidation_code: consolidationCode.trim() || null }).eq('id', ticket.id)
+                              .then(({ error }) => { if (error) console.warn('Lưu mã lô thất bại:', error.message) })
+                          }
+                        }}
                         placeholder="vd: TMMN-11-02"
                         style={{ marginTop: 4 }}
                         disabled={isCompleted}

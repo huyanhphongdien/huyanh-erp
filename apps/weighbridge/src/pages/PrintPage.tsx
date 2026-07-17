@@ -569,7 +569,7 @@ export default function PrintPage() {
               {dryWeight != null && (
                 <Row2 l="KL khô" r={<span style={{ fontFamily: mono, fontWeight: 700, color: '#15803D' }}>{dryWeight.toLocaleString()} kg</span>} />
               )}
-              {consolidationCode && <Row2 l="Mã LLM" r={consolidationCode} />}
+              {consolidationCode && <Row2 l="Mã lô" r={consolidationCode} />}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fs, marginBottom: paperSize === 'a5' ? 6 : 10, border: '2px solid #15803D' }}>
@@ -604,7 +604,7 @@ export default function PrintPage() {
                 </tr>
                 {consolidationCode && (
                   <tr>
-                    <td style={{ ...tdLabel, fontSize: fs - 1 }}>Mã LLM (gộp xe)</td>
+                    <td style={{ ...tdLabel, fontSize: fs - 1 }}>Mã lô</td>
                     <td style={{ ...tdValue, fontSize: fs + 1 }} colSpan={3}>
                       <strong>{consolidationCode}</strong>
                     </td>

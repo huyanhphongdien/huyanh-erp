@@ -8,6 +8,8 @@ const theme = {
   token: {
     colorPrimary: '#1B4D3E',
     borderRadius: 8,
+    // Nâng nền chữ 14→15 cho dễ đọc trên màn trạm 21/23/25" (Đợt 1 co giãn).
+    fontSize: 15,
     fontFamily: "'Be Vietnam Pro', -apple-system, sans-serif",
   },
 }

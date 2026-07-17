@@ -169,7 +169,7 @@ export default function HomePage() {
       render: (v: string) => <Text strong>{v}</Text>,
     },
     {
-      title: 'Đại lý / Hàng', key: 'partner', width: 160, ellipsis: true,
+      title: 'Đại lý / Hàng', key: 'partner', ellipsis: true,
       render: (_: unknown, t: WeighbridgeTicket) => {
         // CỔNG: hiện nội dung hàng nội bộ (notes) thay vì đại lý
         if (t.ticket_type === 'gate') {
@@ -381,7 +381,7 @@ export default function HomePage() {
             gridTemplateColumns: '1fr auto 1fr',
             alignItems: 'center',
             gap: 16,
-            maxWidth: 1400,
+            maxWidth: 'min(1800px, 95vw)',
             margin: '0 auto',
           }}
         >
@@ -437,7 +437,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
+      <div style={{ maxWidth: 'min(1800px, 95vw)', margin: '0 auto', padding: 16 }}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {/* Stats */}
           <Row gutter={[12, 12]}>
@@ -446,7 +446,7 @@ export default function HomePage() {
                 <Statistic
                   title={<Text type="secondary" style={{ fontSize: 11 }}>Đang cân</Text>}
                   value={stats?.inProgress || 0}
-                  valueStyle={{ fontSize: 24, fontWeight: 700 }}
+                  valueStyle={{ fontSize: 'clamp(24px, 2vw, 40px)', fontWeight: 700 }}
                 />
               </Card>
             </Col>
@@ -455,7 +455,7 @@ export default function HomePage() {
                 <Statistic
                   title={<Text type="secondary" style={{ fontSize: 11 }}>Hôm nay</Text>}
                   value={stats?.completedToday || 0}
-                  valueStyle={{ fontSize: 24, fontWeight: 700, color: '#16A34A' }}
+                  valueStyle={{ fontSize: 'clamp(24px, 2vw, 40px)', fontWeight: 700, color: '#16A34A' }}
                 />
               </Card>
             </Col>
@@ -464,7 +464,7 @@ export default function HomePage() {
                 <Statistic
                   title={<Text type="secondary" style={{ fontSize: 11 }}>Tổng phiếu</Text>}
                   value={stats?.totalTickets || 0}
-                  valueStyle={{ fontSize: 24, fontWeight: 700, color: '#2563EB' }}
+                  valueStyle={{ fontSize: 'clamp(24px, 2vw, 40px)', fontWeight: 700, color: '#2563EB' }}
                 />
               </Card>
             </Col>
@@ -475,7 +475,7 @@ export default function HomePage() {
                   value={stats ? (stats.totalNetWeight >= 1000 ? stats.totalNetWeight / 1000 : stats.totalNetWeight) : 0}
                   precision={stats && stats.totalNetWeight >= 1000 ? 1 : 0}
                   suffix={stats && stats.totalNetWeight >= 1000 ? 'T' : 'kg'}
-                  valueStyle={{ fontSize: 24, fontWeight: 700, color: PRIMARY, ...MONO }}
+                  valueStyle={{ fontSize: 'clamp(24px, 2vw, 40px)', fontWeight: 700, color: PRIMARY, ...MONO }}
                 />
               </Card>
             </Col>

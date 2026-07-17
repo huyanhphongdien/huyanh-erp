@@ -1334,7 +1334,7 @@ export default function WeighingPage() {
             gridTemplateColumns: '1fr auto 1fr',
             alignItems: 'center',
             gap: 16,
-            maxWidth: 1400,
+            maxWidth: 'min(1800px, 95vw)',
             margin: '0 auto',
           }}
         >
@@ -1388,7 +1388,7 @@ export default function WeighingPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1500, margin: '0 auto', padding: '8px 16px 12px' }}>
+      <div style={{ maxWidth: 'min(1800px, 95vw)', margin: '0 auto', padding: '8px 16px 12px' }}>
         {error && <Alert type="error" message={error} showIcon closable onClose={() => setError('')} style={{ marginBottom: 12 }} />}
         {success && <Alert type="success" message={success} showIcon closable onClose={() => setSuccess('')} style={{ marginBottom: 12 }} />}
         {facilityError && <Alert type="warning" message={`Lỗi facility: ${facilityError}`} showIcon style={{ marginBottom: 12 }} />}
@@ -2419,7 +2419,7 @@ export default function WeighingPage() {
                         background: '#111', borderRadius: 12, padding: '16px 24px', margin: '12px 0',
                         border: '2px solid #333',
                       }}>
-                        <div style={{ ...MONO, fontSize: 56, fontWeight: 700, color: '#00FF41', lineHeight: 1.1 }}>
+                        <div style={{ ...MONO, fontSize: 'clamp(56px, 6vw, 120px)', fontWeight: 700, color: '#00FF41', lineHeight: 1.1 }}>
                           {scale.liveWeight.weight.toLocaleString()}
                         </div>
                         <Text style={{ color: '#666', fontSize: 14 }}>
@@ -2760,7 +2760,7 @@ export default function WeighingPage() {
                       {scale.connected && scale.liveWeight ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                           <div style={{ flex: 1, background: '#0F172A', borderRadius: 8, padding: '6px 12px', textAlign: 'center' }}>
-                            <span style={{ fontFamily: 'monospace', fontSize: 26, fontWeight: 700, color: '#00FF41' }}>{scale.liveWeight.weight.toLocaleString()}</span>
+                            <span style={{ fontFamily: 'monospace', fontSize: 'clamp(26px, 2.6vw, 48px)', fontWeight: 700, color: '#00FF41' }}>{scale.liveWeight.weight.toLocaleString()}</span>
                             <span style={{ color: '#94a3b8', fontSize: 11 }}> kg từ cân</span>
                           </div>
                           <Button type="primary" onClick={() => setWeighAfter(scale.liveWeight!.weight)}>📥 Lấy số</Button>

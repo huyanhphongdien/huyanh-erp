@@ -118,6 +118,26 @@ export default function HomePage() {
     return () => clearInterval(timer)
   }, [load])
 
+  // Chọn NGÀY QUÁ KHỨ (ngoài 200 phiếu mới nhất) → tải BỔ SUNG phiếu đúng ngày đó
+  // từ DB rồi gộp vào danh sách (không đụng load chính → "đang cân dở" không đổi).
+  useEffect(() => {
+    if (showAllDates || !filterDate) return
+    const d = filterDate.format('YYYY-MM-DD')
+    if (d === dayjs().format('YYYY-MM-DD')) return  // hôm nay đã nằm trong 200 phiếu mới
+    const facilityId = facility?.id || null
+    weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facilityId, from_date: d, to_date: d })
+      .then(res => {
+        const extra = res.data || []
+        if (!extra.length) return
+        setAllTickets(prev => {
+          const ids = new Set(prev.map(t => t.id))
+          const add = extra.filter(t => !ids.has(t.id))
+          return add.length ? [...prev, ...add] : prev
+        })
+      })
+      .catch(() => {})
+  }, [filterDate, showAllDates, facility?.id])
+
   // Map partner_id → tên đại lý (ưu tiên deal, fallback supplier_name trên phiếu)
   const partnerNameById = new Map<string, string>()
   for (const d of activeDeals) {

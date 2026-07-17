@@ -1175,11 +1175,12 @@ export default function WeighingPage() {
 
   // ── Tách lô: tính KL từng lô + lưu ──
   const tongNet = Number(ticket?.net_weight || 0)
-  const grossTongNet = Number(ticket?.gross_weight || 0) - Number((ticket as any)?.pallet_kg_gross || 0)  // xe + cả 2 lô (trừ pallet)
+  // Xe rỗng THUẦN = tare − pallet_tare (đúng cho cả NHẬP lẫn đi lấy mủ, không phụ thuộc pallet lúc cân đầy).
+  const xeRongNet = Number(ticket?.tare_weight || 0) - Number((ticket as any)?.pallet_kg_tare || 0)
   const palletAfterKg = (palletAfterPlastic || 0) * palletUnits.plastic + (palletAfterSteel || 0) * palletUnits.steel
   const afterNet = weighAfter != null ? weighAfter - palletAfterKg : null  // xe + lô còn (trừ pallet)
-  const lotDropKg = afterNet != null ? Math.max(0, Math.round(grossTongNet - afterNet)) : null  // lô đã dỡ
-  const lotKeepKg = lotDropKg != null ? Math.round(tongNet - lotDropKg) : null                  // lô còn = tổng − đã dỡ
+  const lotKeepKg = afterNet != null ? Math.max(0, Math.round(afterNet - xeRongNet)) : null  // lô còn = (xe+lô còn) − xe rỗng
+  const lotDropKg = lotKeepKg != null ? Math.round(tongNet - lotKeepKg) : null                // lô đã dỡ = tổng − còn
 
   async function saveLots() {
     if (!ticket?.id || lotDropKg == null || lotKeepKg == null) return
@@ -1212,6 +1213,7 @@ export default function WeighingPage() {
   const isGate = ticketDirection === 'gate'
   // Đợt 2 — "Nhận mủ NM khác" (đi lấy mủ TL→PĐ): cân đảo chiều như OUT, chỉ PĐ.
   const isFetch = ticketDirection === 'fetch' || ticket?.ticket_type === 'fetch'
+  const isNhap = ticketDirection === 'in' || ticket?.ticket_type === 'in'  // tách lô áp cho cả NHẬP
   // GATE/FETCH cân giống OUT (lần1 = tare, lần2 = gross). PD-only.
   const isReverseWeigh = isOut || isGate || isFetch
   const canShowGate = currentFacility?.code === 'PD'
@@ -2437,8 +2439,8 @@ export default function WeighingPage() {
                 </Row>
               </Card>
 
-              {/* Tách lô — nhiều mã hàng trên xe (hiện khi phiếu đi lấy mủ đã có Tổng NET) */}
-              {isFetch && !isCreate && tongNet > 0 && (
+              {/* Tách lô — nhiều mã hàng trên xe (phiếu đi lấy mủ HOẶC NHẬP kho, đã có Tổng NET) */}
+              {(isFetch || isNhap) && !isCreate && tongNet > 0 && (
                 <>
                   <Button block size="large" style={{ marginTop: 8, height: 44, borderColor: '#7C3AED', color: '#7C3AED', fontWeight: 600 }} onClick={() => setSplitOpen(true)}>
                     🔀 Tách lô (nhiều mã hàng){savedLots.length ? ` · đã tách ${savedLots.length} lô` : ''}
@@ -2455,7 +2457,7 @@ export default function WeighingPage() {
                   >
                     <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
                       Tổng NET (cả 2 lô): <b>{tongNet.toLocaleString('vi-VN')} kg</b><br />
-                      <span style={{ color: '#64748b', fontSize: 12 }}>Cân tổng {Number(ticket?.gross_weight || 0).toLocaleString('vi-VN')} − pallet {Number((ticket as any)?.pallet_kg_gross || 0).toLocaleString('vi-VN')} = {grossTongNet.toLocaleString('vi-VN')} (xe + cả 2 mủ)</span>
+                      <span style={{ color: '#64748b', fontSize: 12 }}>Xe rỗng thuần = {Number(ticket?.tare_weight || 0).toLocaleString('vi-VN')} − pallet {Number((ticket as any)?.pallet_kg_tare || 0).toLocaleString('vi-VN')} = {xeRongNet.toLocaleString('vi-VN')} kg (dùng để tính lô còn)</span>
                     </div>
                     <Row gutter={8} style={{ marginBottom: 8 }}>
                       <Col span={14}><Text style={{ fontSize: 12, color: '#64748b' }}>Lô ĐÃ DỠ xuống — Mã lô</Text>

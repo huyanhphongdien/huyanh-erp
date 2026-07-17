@@ -124,8 +124,7 @@ export default function HomePage() {
     if (showAllDates || !filterDate) return
     const d = filterDate.format('YYYY-MM-DD')
     if (d === dayjs().format('YYYY-MM-DD')) return  // hôm nay đã nằm trong 200 phiếu mới
-    const facilityId = facility?.id || null
-    weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facilityId, from_date: d, to_date: d })
+    weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facility?.id, from_date: d, to_date: d })
       .then(res => {
         const extra = res.data || []
         if (!extra.length) return

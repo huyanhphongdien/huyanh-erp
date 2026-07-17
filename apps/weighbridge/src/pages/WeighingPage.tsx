@@ -179,6 +179,13 @@ export default function WeighingPage() {
   const [palletAfterSteel, setPalletAfterSteel] = useState(0)
   const [savingLots, setSavingLots] = useState(false)
   const [savedLots, setSavedLots] = useState<Array<{ lot_code: string; rubber_type: string; net_kg: number }>>([])
+  // Tách lô INLINE cho NHẬP (cổng 1): khai NGAY khi cân lần 2 (lúc dỡ), lấy số
+  // cân trung gian trực tiếp từ COM. Dãy cân: gross(tổng) → w1 → … → tare(rỗng).
+  // Lô i = cân trước − cân sau. weighAfter của lô CUỐI không dùng (đóng bằng tare).
+  const [nhapSplitOn, setNhapSplitOn] = useState(false)
+  const [nhapLots, setNhapLots] = useState<Array<{ code: string; rubberType: string; weighAfter: number | null }>>(
+    [{ code: '', rubberType: '', weighAfter: null }, { code: '', rubberType: '', weighAfter: null }],
+  )
   // Định mức bì (kg/cái) từ bảng pallet_types — fallback nhựa 10 / sắt 50.
   const [palletUnits, setPalletUnits] = useState<{ plastic: number; steel: number }>({ plastic: 10, steel: 50 })
   const palletKg = (palletPlastic || 0) * palletUnits.plastic + (palletSteel || 0) * palletUnits.steel
@@ -811,6 +818,11 @@ export default function WeighingPage() {
           : undefined
         updated = await weighbridgeService.updateTareWeight(ticket.id, weight, operator?.id, drcExtras, palletInput)
         setTicket(updated)
+        // Tách lô INLINE (NHẬP ở PĐ): lưu KL từng lô = hiệu 2 lần cân liên tiếp (best-effort).
+        if (nhapSplitOn && ticket.ticket_type === 'in' && currentFacility?.code === 'PD' && updated.gross_weight) {
+          try { await saveNhapSplitLots(updated.gross_weight, weight) }
+          catch (e: any) { console.warn('Lưu tách lô NHẬP lỗi:', e?.message || e) }
+        }
         // Recalculate với DRC thực đo tại cân (không còn fallback expectedDrc).
         const c = recalculate(
           updated.gross_weight!, weight, deductionKg,
@@ -1223,6 +1235,39 @@ export default function WeighingPage() {
       setSplitOpen(false)
     } catch (e: any) { message.error('Lưu tách lô lỗi: ' + (e?.message || '')) }
     finally { setSavingLots(false) }
+  }
+
+  // ── Tách lô INLINE (NHẬP): KL từng lô = hiệu 2 lần cân liên tiếp ──
+  // Dãy cân: W0 = gross (tổng) → w1…w(N-1) (cân sau dỡ từng lô) → WN = tare (rỗng).
+  // Lô i = W(i-1) − W(i). tareVal = số cân lần 2 (rỗng) đang/đã đo.
+  function computeNhapLotKgs(tareVal: number | null): Array<number | null> {
+    const N = nhapLots.length
+    const gross = Number(ticket?.gross_weight || 0)
+    const W: Array<number | null> = [gross, ...nhapLots.slice(0, N - 1).map(l => l.weighAfter), tareVal]
+    const out: Array<number | null> = []
+    for (let i = 1; i <= N; i++) {
+      const a = W[i - 1], b = W[i]
+      out.push(a != null && b != null ? Math.round(a - b) : null)
+    }
+    return out
+  }
+
+  async function saveNhapSplitLots(gross: number, tare: number) {
+    if (!ticket?.id) return
+    const N = nhapLots.length
+    const W = [gross, ...nhapLots.slice(0, N - 1).map(l => Number(l.weighAfter || 0)), tare]
+    const rows = nhapLots.map((l, i) => ({
+      ticket_id: ticket.id,
+      lot_code: l.code.trim() || null,
+      rubber_type: l.rubberType || null,
+      net_kg: Math.round(W[i] - W[i + 1]),
+      is_derived: i === N - 1,        // lô cuối = phần còn lại (đóng bằng tare)
+      sort_order: i + 1,
+    }))
+    await supabase.from('weighbridge_ticket_lots').delete().eq('ticket_id', ticket.id)
+    const { error } = await supabase.from('weighbridge_ticket_lots').insert(rows)
+    if (error) throw error
+    setSavedLots(rows.map(r => ({ lot_code: r.lot_code || '', rubber_type: r.rubber_type || '', net_kg: r.net_kg })))
   }
 
   // RENDER
@@ -2452,6 +2497,86 @@ export default function WeighingPage() {
                       </div>
                     )}
 
+                    {/* Tách lô INLINE — chỉ NHẬP ở PĐ, ở cân lần 2 (lúc dỡ). Lấy số trung gian thẳng từ COM. */}
+                    {ticket?.ticket_type === 'in' && currentFacility?.code === 'PD' && isWeighingTare && canRecord && (
+                      <div style={{ textAlign: 'left', background: '#F5F3FF', border: '1.5px solid #C4B5FD', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 700, color: '#5B21B6', fontSize: 14 }}>🔀 Xe chở nhiều lô?</span>
+                          <Button size="small" type={nhapSplitOn ? 'primary' : 'default'}
+                            style={nhapSplitOn ? { background: '#7C3AED', borderColor: '#7C3AED' } : {}}
+                            onClick={() => {
+                              const next = !nhapSplitOn
+                              setNhapSplitOn(next)
+                              if (next && rubberType) setNhapLots(prev => prev.map((l, i) => (i === 0 && !l.rubberType) ? { ...l, rubberType } : l))
+                            }}>
+                            {nhapSplitOn ? '● Đang tách lô' : 'Bật tách lô'}
+                          </Button>
+                        </div>
+
+                        {nhapSplitOn && (() => {
+                          const tareLive = (scale.connected && scale.liveWeight) ? scale.liveWeight.weight : manualWeight
+                          const kgs = computeNhapLotKgs(tareLive)
+                          const gross = Number(ticket?.gross_weight || 0)
+                          const N = nhapLots.length
+                          const setLot = (idx: number, patch: Partial<{ code: string; rubberType: string; weighAfter: number | null }>) =>
+                            setNhapLots(prev => prev.map((l, i) => i === idx ? { ...l, ...patch } : l))
+                          const rubberOpts = ['mu_tap', 'mu_nuoc', 'mu_dong', 'mu_to', 'mu_rss3'].map(v => ({ value: v, label: RUBBER_LABELS[v] || v }))
+                          return (
+                            <div style={{ marginTop: 10 }}>
+                              <div style={{ fontSize: 12, color: '#6D28D9', marginBottom: 8 }}>
+                                Tổng (cân lần 1): <b>{gross.toLocaleString('vi-VN')} kg</b>. Dỡ từng lô → bấm 📥 lấy số cân sau mỗi lô. Lô CUỐI đóng bằng <b>XE RỖNG</b> (cân lần 2 bên dưới).
+                              </div>
+                              {nhapLots.map((lot, i) => (
+                                <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < N - 1 ? '1px dashed #DDD6FE' : 'none' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 22px' }}>{i + 1}</span>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#5B21B6' }}>Lô {i + 1}{i === N - 1 ? ' (còn lại)' : ''}</span>
+                                    <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: kgs[i] != null && (kgs[i] as number) > 0 ? '#15803D' : '#B45309' }}>
+                                      {kgs[i] != null ? `${(kgs[i] as number).toLocaleString('vi-VN')} kg` : '— kg'}
+                                    </span>
+                                  </div>
+                                  <Row gutter={6}>
+                                    <Col span={13}><Input size="small" value={lot.code} placeholder="Mã lô" onChange={e => setLot(i, { code: e.target.value })} /></Col>
+                                    <Col span={11}><Select size="small" value={lot.rubberType || undefined} placeholder="Loại mủ" style={{ width: '100%' }} options={rubberOpts} onChange={v => setLot(i, { rubberType: v })} /></Col>
+                                  </Row>
+                                  {i < N - 1 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                                      <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>Cân xe sau dỡ lô {i + 1}:</span>
+                                      <InputNumber size="small" value={lot.weighAfter} min={0} style={{ flex: 1 }}
+                                        formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                        onChange={v => setLot(i, { weighAfter: (v as number) })} />
+                                      {scale.connected && scale.liveWeight && (
+                                        <Button size="small" type="primary" style={{ background: '#7C3AED', borderColor: '#7C3AED' }}
+                                          onClick={() => setLot(i, { weighAfter: scale.liveWeight!.weight })}>📥 Lấy số</Button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                                <Button size="small" onClick={() => setNhapLots(prev => [...prev.slice(0, -1), { code: '', rubberType: '', weighAfter: null }, prev[prev.length - 1]])}>+ Thêm lô</Button>
+                                {N > 2 && <Button size="small" danger onClick={() => setNhapLots(prev => prev.filter((_, i) => i !== prev.length - 2))}>− Bớt lô</Button>}
+                              </div>
+                              {tareLive != null && (() => {
+                                const sum = kgs.reduce((s: number, k) => s + (k || 0), 0)
+                                const net = gross - tareLive
+                                const ok = Math.abs(sum - net) <= 2 && kgs.every(k => k != null && (k as number) > 0)
+                                return (
+                                  <div style={{ fontSize: 12, padding: '6px 10px', borderRadius: 7, background: ok ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${ok ? '#BBF7D0' : '#FECACA'}`, color: ok ? '#15803D' : '#B91C1C' }}>
+                                    {ok ? '✅' : '⚠️'} Σ {kgs.length} lô = {sum.toLocaleString('vi-VN')} kg / NET (tổng − rỗng) = {net.toLocaleString('vi-VN')} kg
+                                    {!ok && ' — kiểm tra số cân trung gian.'}
+                                  </div>
+                                )
+                              })()}
+                              <div style={{ fontSize: 11, color: '#7C3AED', marginTop: 6 }}>
+                                Khai xong → dỡ HẾT rồi cân <b>XE RỖNG</b> → bấm <b>GHI CÂN LẦN 2</b> để lưu tách lô.
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
+
                     {canRecord && (
                       <Button
                         type="primary" size="large" block
@@ -2494,8 +2619,9 @@ export default function WeighingPage() {
                 </Row>
               </Card>
 
-              {/* Tách lô — nhiều mã hàng trên xe (MỌI loại phiếu đã cân xong, có Tổng NET) */}
-              {!isCreate && tongNet > 0 && (
+              {/* Tách lô SAU hoàn tất — cho fetch/XUẤT/CỔNG (luồng cân rỗng→đầy→dỡ→cân).
+                  NHẬP KHÔNG dùng nút này nữa: đã tách INLINE ngay ở cân lần 2 (lúc dỡ). */}
+              {!isCreate && tongNet > 0 && ticket?.ticket_type !== 'in' && (
                 <>
                   <Button block size="large" style={{ marginTop: 8, height: 44, borderColor: '#7C3AED', color: '#7C3AED', fontWeight: 600 }} onClick={() => setSplitOpen(true)}>
                     🔀 Tách lô (nhiều mã hàng){savedLots.length ? ` · đã tách ${savedLots.length} lô` : ''}

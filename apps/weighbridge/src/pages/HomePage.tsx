@@ -676,7 +676,7 @@ export default function HomePage() {
               rowKey="id"
               loading={loading}
               size="middle"
-              pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} phiếu`, size: 'default' }}
+              pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} phiếu` }}
               scroll={{ x: 900 }}
               locale={{
                 emptyText: (

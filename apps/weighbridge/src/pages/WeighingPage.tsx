@@ -1432,7 +1432,7 @@ export default function WeighingPage() {
 
         <Row gutter={16}>
           {/* LEFT: Form — xếp dọc 1 cột (theo mock), rộng hơn camera */}
-          <Col xs={24} lg={15}>
+          <Col xs={24} lg={15} xxl={14}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
               {/* S3: Loại phiếu — IN (cân 2 lần) | OUT (cân 1 lần) */}
               <Card size="small" title="Loại phiếu cân" style={{ borderRadius: 12 }}>
@@ -2341,7 +2341,7 @@ export default function WeighingPage() {
           </Col>
 
           {/* RIGHT: Scale + Summary — sticky, luôn thấy số cân khi cuộn form */}
-          <Col xs={24} lg={9}>
+          <Col xs={24} lg={9} xxl={10}>
             <div style={{ position: 'sticky', top: 72, display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
               {/* SỐ PHIẾU CÂN — luôn hiển thị nổi bật */}
               <Card
@@ -2432,7 +2432,7 @@ export default function WeighingPage() {
                         <InputNumber
                           value={manualWeight}
                           onChange={(v) => setManualWeight(v)}
-                          style={{ width: '100%', marginTop: 4 }}
+                          style={{ width: '100%', marginTop: 4, fontSize: 'clamp(20px, 2vw, 32px)' }}
                           size="large"
                           min={0}
                           placeholder="Nhập trọng lượng (kg)"
@@ -2657,7 +2657,7 @@ export default function WeighingPage() {
                           }
                         }}
                         loading={loading}
-                        style={{ height: 48, fontSize: 16,
+                        style={{ height: 'clamp(48px, 4.5vw, 72px)', fontSize: 'clamp(16px, 1.6vw, 24px)', fontWeight: 700,
                           background: (nhapSplitActive && !nhapSplitReady) ? '#9CA3AF' : '#D97706',
                           borderColor: (nhapSplitActive && !nhapSplitReady) ? '#9CA3AF' : '#D97706' }}
                       >

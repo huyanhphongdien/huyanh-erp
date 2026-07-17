@@ -162,7 +162,7 @@ export default function HomePage() {
     },
     {
       title: 'Phiếu', dataIndex: 'code', width: 130,
-      render: (code: string) => <Text style={{ ...MONO, fontSize: 12 }}>{code}</Text>,
+      render: (code: string) => <Text style={{ ...MONO, fontSize: 13 }}>{code}</Text>,
     },
     {
       title: 'Biển số', dataIndex: 'vehicle_plate', width: 110,
@@ -183,20 +183,20 @@ export default function HomePage() {
     {
       title: 'Gross', dataIndex: 'gross_weight', width: 90, align: 'right',
       render: (w: number | null) => w != null
-        ? <Text style={MONO}>{w.toLocaleString()}</Text>
+        ? <Text style={{ ...MONO, fontSize: 16 }}>{w.toLocaleString()}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
       title: 'Tare', dataIndex: 'tare_weight', width: 90, align: 'right',
       render: (w: number | null) => w != null
-        ? <Text style={MONO}>{w.toLocaleString()}</Text>
+        ? <Text style={{ ...MONO, fontSize: 16 }}>{w.toLocaleString()}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
       title: 'NET (kg)', dataIndex: 'net_weight', width: 100, align: 'right',
       sorter: (a: WeighbridgeTicket, b: WeighbridgeTicket) => (a.net_weight || 0) - (b.net_weight || 0),
       render: (w: number | null) => w != null
-        ? <Text strong style={{ ...MONO, color: '#15803D' }}>{w.toLocaleString()}</Text>
+        ? <Text strong style={{ ...MONO, color: '#15803D', fontSize: 18 }}>{w.toLocaleString()}</Text>
         : <Text type="secondary">—</Text>,
     },
     {
@@ -206,10 +206,10 @@ export default function HomePage() {
       defaultSortOrder: 'descend' as const,
       render: (d: string) => (
         <div>
-          <Text style={{ fontSize: 12, display: 'block' }}>
+          <Text style={{ fontSize: 14, fontWeight: 600, display: 'block' }}>
             {new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
           </Text>
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             {new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </div>
@@ -675,9 +675,9 @@ export default function HomePage() {
               dataSource={filteredTickets}
               rowKey="id"
               loading={loading}
-              size="small"
-              pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} phiếu`, size: 'small' }}
-              scroll={{ x: 800 }}
+              size="middle"
+              pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} phiếu`, size: 'default' }}
+              scroll={{ x: 900 }}
               locale={{
                 emptyText: (
                   <Empty description={<Text type="secondary">Không có phiếu cân nào</Text>} />

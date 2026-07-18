@@ -95,6 +95,19 @@ const DEFAULT_CONFIG: KeliScaleConfig = {
   flowControl: 'none' as FlowControlType,
 }
 
+// Cấu hình mặc định theo NHÀ MÁY (đầu cân thực tế đã xác định qua console).
+// TL (Tân Lâm / Quảng Trị): đầu cân chạy 1200/8/None/1 (legacy) — KHÔNG phải 9600.
+// → vào thẳng cấu hình đúng, khỏi dò 14 lần.
+const FACILITY_DEFAULT_CONFIG: Record<string, KeliScaleConfig> = {
+  TL: { baudRate: 1200, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
+}
+function getFacilityDefaultConfig(): KeliScaleConfig | null {
+  try {
+    const code = String((import.meta as any).env?.VITE_FACILITY_CODE || '').toUpperCase()
+    return FACILITY_DEFAULT_CONFIG[code] || null
+  } catch { return null }
+}
+
 // Configs to try when auto-detecting (most common for weighbridge scales)
 // Order: most common truck scales first → small scales
 // Some 120T truck scales use 7 data bits + even parity + 2 stop bits
@@ -456,7 +469,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       const saved = localStorage.getItem(CONFIG_KEY)
       if (saved) return { ...DEFAULT_CONFIG, ...JSON.parse(saved) }
     } catch { /* ignore */ }
-    return DEFAULT_CONFIG
+    // Chưa lưu → ưu tiên default theo nhà máy (TL=1200/8/None/1), nếu không có thì generic
+    return getFacilityDefaultConfig() ?? DEFAULT_CONFIG
   })
 
   const portRef = useRef<SerialPort | null>(null)
@@ -468,6 +482,15 @@ export function useKeliScale(): UseKeliScaleReturn {
   const fatalErrorRef = useRef(false)
   // Chặn connect()/auto-reconnect chạy ĐỒNG THỜI (tranh cổng → kết nối không khóa được)
   const connectingRef = useRef(false)
+  // --- Tự kết nối lại khi RỚT GIỮA CHỪNG (cáp lỏng / đầu cân reset / USB re-enumerate) ---
+  const reconnectTimerRef = useRef<any>(null)
+  const reconnectTriesRef = useRef(0)
+  // Mốc thời gian nhận số cuối cùng — watchdog dùng để phát hiện "cổng mở nhưng câm".
+  const lastDataAtRef = useRef(0)
+  // User bấm Ngắt kết nối → KHÔNG tự nối lại.
+  const manualDisconnectRef = useRef(false)
+  // Ref trỏ tới scheduleReconnect (tránh phụ thuộc vòng giữa read-loop và reconnect).
+  const scheduleRef = useRef<(delayMs?: number) => void>(() => {})
 
   // Save config
   const setConfig = useCallback((partial: Partial<KeliScaleConfig>) => {
@@ -537,6 +560,7 @@ export function useKeliScale(): UseKeliScaleReturn {
                 if (reading) {
                   console.log(`[KeliScale] ✅ Weight: ${reading.weight} ${reading.unit} | Stable: ${reading.stable} | Line: ${JSON.stringify(line)}`)
                   setLiveWeight(reading)
+                  lastDataAtRef.current = Date.now()
                   textParsed = true
                 } else {
                   console.warn(`[KeliScale] ❌ Cannot parse text: ${JSON.stringify(line)}`)
@@ -551,6 +575,7 @@ export function useKeliScale(): UseKeliScaleReturn {
               for (const reading of readings) {
                 console.log(`[KeliScale] ✅ Binary weight: ${reading.weight} ${reading.unit}`)
                 setLiveWeight(reading)
+                lastDataAtRef.current = Date.now()
               }
             }
           }
@@ -565,6 +590,8 @@ export function useKeliScale(): UseKeliScaleReturn {
             // Close port so auto-detect can use it
             try { await port.close() } catch { /* ignore */ }
             portRef.current = null
+            // Dò lại cấu hình rồi nối lại (parity sai → autoDetect sẽ tìm đúng)
+            scheduleRef.current?.(2000)
             break
           }
 
@@ -574,12 +601,14 @@ export function useKeliScale(): UseKeliScaleReturn {
 
             if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
               console.error('[KeliScale] Too many consecutive errors, stopping read loop')
-              setError(`Lỗi đọc cân liên tục: ${err.message || err.name}. Kiểm tra kết nối và cài đặt cân.`)
+              setError(`Lỗi đọc cân liên tục: ${err.message || err.name}. Đang thử kết nối lại...`)
               readingRef.current = false
               setConnected(false)
               fatalErrorRef.current = true
               try { await port.close() } catch { /* ignore */ }
               portRef.current = null
+              // Lỗi đọc thường là tạm thời (nhiễu/cáp) → thử nối lại thay vì nằm im
+              scheduleRef.current?.(3000)
               break
             }
           }
@@ -600,25 +629,30 @@ export function useKeliScale(): UseKeliScaleReturn {
   const autoDetect = useCallback(async (port: SerialPort): Promise<KeliScaleConfig | null> => {
     console.log('[KeliScale] Auto-detecting config...')
 
-    // Thử cấu hình ĐÃ LƯU trước — kết nối nhanh (tránh dò 14 cấu hình ~50s) +
-    // giảm cửa sổ race với auto-reconnect. Sai thì rơi xuống danh sách dò đầy đủ.
+    // Thử cấu hình ĐÃ LƯU (hoặc default theo nhà máy) TRƯỚC — kết nối nhanh
+    // (tránh dò 14 cấu hình ~50s) + giảm cửa sổ race với auto-reconnect.
+    // Sai thì rơi xuống danh sách dò đầy đủ.
     let configList: typeof AUTO_DETECT_CONFIGS = AUTO_DETECT_CONFIGS
     try {
+      let firstCfg: { baudRate: number; parity?: ParityType; dataBits?: number; stopBits?: number } | null = null
       const saved = localStorage.getItem(CONFIG_KEY)
       if (saved) {
         const s = JSON.parse(saved)
-        if (s && typeof s.baudRate === 'number') {
-          configList = [
-            {
-              baudRate: s.baudRate,
-              parity: (s.parity ?? 'none') as ParityType,
-              dataBits: s.dataBits ?? 8,
-              stopBits: s.stopBits ?? 1,
-              label: `Đã lưu: ${s.baudRate}/${s.dataBits ?? 8}/${s.parity ?? 'none'}/${s.stopBits ?? 1}`,
-            },
-            ...AUTO_DETECT_CONFIGS,
-          ]
-        }
+        if (s && typeof s.baudRate === 'number') firstCfg = s
+      }
+      // Chưa lưu → dùng default theo nhà máy (TL=1200/8/None/1)
+      if (!firstCfg) firstCfg = getFacilityDefaultConfig()
+      if (firstCfg) {
+        configList = [
+          {
+            baudRate: firstCfg.baudRate,
+            parity: (firstCfg.parity ?? 'none') as ParityType,
+            dataBits: firstCfg.dataBits ?? 8,
+            stopBits: firstCfg.stopBits ?? 1,
+            label: `Ưu tiên: ${firstCfg.baudRate}/${firstCfg.dataBits ?? 8}/${firstCfg.parity ?? 'none'}/${firstCfg.stopBits ?? 1}`,
+          },
+          ...AUTO_DETECT_CONFIGS,
+        ]
       }
     } catch { /* ignore */ }
 
@@ -681,6 +715,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       setConnected(true)
       setError(null)
       fatalErrorRef.current = false
+      // Mốc cho watchdog: nếu 12s sau vẫn không có số nào → coi như rớt, nối lại.
+      lastDataAtRef.current = Date.now()
       // Đánh dấu đã connect thành công ít nhất 1 lần — auto-reconnect lần load sau OK
       try { localStorage.setItem(LAST_SUCCESS_KEY, '1') } catch { /* ignore */ }
       console.log(`[KeliScale] ✅ Connected — Model: XK3118T1-A3 | Baud: ${cfg.baudRate} | Parity: ${cfg.parity} | DataBits: ${cfg.dataBits} | StopBits: ${cfg.stopBits}`)
@@ -694,6 +730,8 @@ export function useKeliScale(): UseKeliScaleReturn {
         setLiveWeight(null)
         readingRef.current = false
         portRef.current = null
+        // Rớt ngoài ý muốn → tự nối lại (trừ khi user chủ động ngắt)
+        if (!manualDisconnectRef.current) scheduleRef.current?.(2000)
       })
 
       return true
@@ -717,6 +755,10 @@ export function useKeliScale(): UseKeliScaleReturn {
     try {
       setError(null)
       fatalErrorRef.current = false
+      // User bấm kết nối lại → cho phép tự nối lại về sau
+      manualDisconnectRef.current = false
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null }
+      reconnectTriesRef.current = 0
 
       // Close existing connection cleanly
       if (portRef.current) {
@@ -780,10 +822,103 @@ export function useKeliScale(): UseKeliScaleReturn {
   }, [supported, config, connectWithConfig, autoDetect])
 
   // --------------------------------------------------------------------------
+  // TỰ KẾT NỐI LẠI khi rớt giữa chừng + WATCHDOG "cổng mở nhưng câm"
+  // --------------------------------------------------------------------------
+
+  const reconnectNow = useCallback(async (): Promise<boolean> => {
+    if (!supported || manualDisconnectRef.current) return false
+    if (connectingRef.current || portRef.current) return false
+    // Chỉ tự nối lại nếu đã từng kết nối thành công (cổng đã được cấp quyền)
+    const everConnected = (() => {
+      try { return localStorage.getItem(LAST_SUCCESS_KEY) === '1' } catch { return false }
+    })()
+    if (!everConnected) return false
+
+    connectingRef.current = true
+    try {
+      const ports = await (navigator as any).serial.getPorts()
+      if (!ports.length) return false
+      const port = ports[0]
+
+      // CHỈ dùng cấu hình ĐÃ LƯU (cấu hình đang chạy tốt) — mở cổng phát 1, ~tức thì.
+      // KHÔNG dò 14 cấu hình ở đây: dò mất ~60s, không hợp cho tự-nối-lại.
+      // Nếu cấu hình sai/garbled → watchdog 12s sẽ bắt và thử lại vòng sau.
+      // Dò đầy đủ chỉ chạy khi user bấm "Kết nối cổng COM" (connect()).
+      const saved: KeliScaleConfig = (() => {
+        try {
+          const s = localStorage.getItem(CONFIG_KEY)
+          if (s) return { ...DEFAULT_CONFIG, ...JSON.parse(s) }
+        } catch { /* ignore */ }
+        return getFacilityDefaultConfig() ?? DEFAULT_CONFIG
+      })()
+      return await connectWithConfig(port, saved)
+    } catch {
+      return false
+    } finally {
+      connectingRef.current = false
+    }
+  }, [supported, connectWithConfig])
+
+  const scheduleReconnect = useCallback((delayMs?: number) => {
+    if (manualDisconnectRef.current) return
+    if (reconnectTimerRef.current) return          // đã hẹn rồi, khỏi hẹn chồng
+    const tries = reconnectTriesRef.current
+    const delay = delayMs ?? Math.min(3000 + tries * 2000, 15000)   // backoff, tối đa 15s
+    console.log(`[KeliScale] ⏳ Thử kết nối lại sau ${Math.round(delay / 1000)}s (lần ${tries + 1})`)
+    setError(`Mất kết nối đầu cân — đang tự kết nối lại (lần ${tries + 1})…`)
+    reconnectTimerRef.current = setTimeout(async () => {
+      reconnectTimerRef.current = null
+      reconnectTriesRef.current++
+      const ok = await reconnectNow()
+      if (ok) {
+        reconnectTriesRef.current = 0
+        setError(null)
+        console.log('[KeliScale] ✅ Đã tự kết nối lại')
+      } else {
+        scheduleRef.current?.()                    // thử tiếp, giãn dần
+      }
+    }, delay)
+  }, [reconnectNow])
+
+  // Cho read-loop / handler 'disconnect' gọi mà không tạo phụ thuộc vòng
+  useEffect(() => { scheduleRef.current = scheduleReconnect }, [scheduleReconnect])
+
+  // WATCHDOG: cổng còn mở nhưng đầu cân ngưng gửi → UI vẫn "Cân OK" mà số đứng im.
+  // Quá 12s không nhận số → coi như rớt, đóng cổng rồi nối lại.
+  useEffect(() => {
+    if (!supported) return
+    const iv = setInterval(() => {
+      if (!portRef.current || manualDisconnectRef.current) return
+      if (!lastDataAtRef.current) return
+      const silentMs = Date.now() - lastDataAtRef.current
+      if (silentMs > 12000) {
+        console.warn(`[KeliScale] ⚠️ ${Math.round(silentMs / 1000)}s không nhận số — coi như mất kết nối, nối lại`)
+        readingRef.current = false
+        try { readerRef.current?.cancel() } catch { /* ignore */ }
+        readerRef.current = null
+        const p = portRef.current
+        portRef.current = null
+        setConnected(false)
+        setLiveWeight(null)
+        lastDataAtRef.current = 0
+        if (p) { try { p.close() } catch { /* ignore */ } }
+        scheduleRef.current?.(1500)
+      }
+    }, 5000)
+    return () => clearInterval(iv)
+  }, [supported])
+
+  // --------------------------------------------------------------------------
   // DISCONNECT
   // --------------------------------------------------------------------------
 
   const disconnect = useCallback(async () => {
+    // 0. User chủ động ngắt → KHÔNG tự nối lại + huỷ lịch hẹn đang chờ
+    manualDisconnectRef.current = true
+    if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null }
+    reconnectTriesRef.current = 0
+    lastDataAtRef.current = 0
+
     // 1. Stop read loop first
     readingRef.current = false
 
@@ -842,6 +977,7 @@ export function useKeliScale(): UseKeliScaleReturn {
   useEffect(() => {
     return () => {
       readingRef.current = false
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null }
       if (readerRef.current) {
         try { readerRef.current.cancel() } catch { /* ignore */ }
         try { readerRef.current.releaseLock() } catch { /* ignore */ }

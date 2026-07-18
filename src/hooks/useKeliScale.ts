@@ -95,11 +95,15 @@ const DEFAULT_CONFIG: KeliScaleConfig = {
   flowControl: 'none' as FlowControlType,
 }
 
-// Cấu hình mặc định theo NHÀ MÁY (đầu cân thực tế đã xác định qua console).
-// TL (Tân Lâm / Quảng Trị): đầu cân chạy 1200/8/None/1 (legacy) — KHÔNG phải 9600.
-// → vào thẳng cấu hình đúng, khỏi dò 14 lần.
+// Cấu hình mặc định theo NHÀ MÁY (đầu cân thực tế đã xác định qua console/Cài đặt).
+// → vào thẳng cấu hình đúng, KHỎI dò 14 lần (~60s).
+//   TL (Tân Lâm / Quảng Trị): 1200/8/None/1 (legacy) — KHÔNG phải 9600.
+//   PD (Phong Điền): 9600/8/None/1 — preset XK3118K8, xuất frame NHỊ PHÂN 10 byte
+//      STX + '+' + 7 chữ số + dp + status + ETX (vd "+000000001B"). Xác nhận 18/07/2026.
+//      LƯU Ý: parity = None (khác DEFAULT_CONFIG generic dùng Even).
 const FACILITY_DEFAULT_CONFIG: Record<string, KeliScaleConfig> = {
   TL: { baudRate: 1200, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
+  PD: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
 }
 function getFacilityDefaultConfig(): KeliScaleConfig | null {
   try {

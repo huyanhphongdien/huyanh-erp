@@ -222,6 +222,15 @@ export default function PrintPage() {
   const palletTotal = palletGrossKg + palletTareKg
   const pallet1Kg = isReverseTicket ? palletTareKg : palletGrossKg
   const pallet2Kg = isReverseTicket ? palletGrossKg : palletTareKg
+  // Cân từng lần SAU KHI trừ bì — in ra để phiếu tự cộng trừ khớp mắt thường.
+  // (Trước đây in 2 dòng pallet đều dấu trừ → người đọc cộng trừ ra số khác NET,
+  //  vì pallet ở lần cân XE RỖNG thực chất CỘNG vào NET chứ không trừ.)
+  const w1NetKg = Number(w1Weight || 0) - pallet1Kg
+  const w2NetKg = Number(w2Weight || 0) - pallet2Kg
+  // NHẬP: L1=xe+hàng, L2=xe rỗng → NET = L1 − L2. Ngược lại (XUẤT/CỔNG/đi lấy mủ) → NET = L2 − L1.
+  const netFormulaStr = isReverseTicket
+    ? `${fmt(w2NetKg)} − ${fmt(w1NetKg)}`
+    : `${fmt(w1NetKg)} − ${fmt(w2NetKg)}`
   // Số LƯỢNG pallet mỗi lần cân (nhựa/sắt) — in dòng nhỏ để tiện theo dõi pallet.
   const pallet1Plastic = Number((isReverseTicket ? ext.pallet_plastic_tare : ext.pallet_plastic_gross) || 0)
   const pallet1Steel = Number((isReverseTicket ? ext.pallet_steel_tare : ext.pallet_steel_gross) || 0)
@@ -481,10 +490,16 @@ export default function PrintPage() {
             <div style={{ borderBottom: '1px dashed #ccc', marginBottom: 2 }} />
             <Row2 l={`Cân lần 1 (${w1Label})`} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w1Weight)} kg</span>} />
             <Row2 l={`Cân lần 2 (${w2Label})`} r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w2Weight)} kg</span>} />
-            {palletTotal > 0 && (
+            {pallet1Kg > 0 && (
               <>
-                <Row2 l={`Pallet lần 1${palletCountStr(pallet1Plastic, pallet1Steel) ? ` (${palletCountStr(pallet1Plastic, pallet1Steel)})` : ''}`} r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet1Kg)} kg</span>} />
-                <Row2 l={`Pallet lần 2${palletCountStr(pallet2Plastic, pallet2Steel) ? ` (${palletCountStr(pallet2Plastic, pallet2Steel)})` : ''}`} r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet2Kg)} kg</span>} />
+                <Row2 l={`− Pallet lần 1${palletCountStr(pallet1Plastic, pallet1Steel) ? ` (${palletCountStr(pallet1Plastic, pallet1Steel)})` : ''}`} r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet1Kg)} kg</span>} />
+                <Row2 l="= Cân lần 1 sau trừ bì" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w1NetKg)} kg</span>} />
+              </>
+            )}
+            {pallet2Kg > 0 && (
+              <>
+                <Row2 l={`− Pallet lần 2${palletCountStr(pallet2Plastic, pallet2Steel) ? ` (${palletCountStr(pallet2Plastic, pallet2Steel)})` : ''}`} r={<span style={{ color: '#DC2626', fontFamily: mono }}>- {fmt(pallet2Kg)} kg</span>} />
+                <Row2 l="= Cân lần 2 sau trừ bì" r={<span style={{ fontFamily: mono, fontWeight: 700 }}>{fmt(w2NetKg)} kg</span>} />
               </>
             )}
             <div style={{ borderBottom: '1px solid #333', margin: '2px 0' }} />
@@ -522,27 +537,43 @@ export default function PrintPage() {
                 <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(w1Weight)}</td>
                 <td style={{ ...tdCenter, fontSize: fs }}>{w1Time ? fmtDateTime(w1Time) : '—'}</td>
               </tr>
+              {pallet1Kg > 0 && (
+                <>
+                  <tr>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500, color: '#6B7280' }}>− Pallet lần 1 (bì){palletCountStr(pallet1Plastic, pallet1Steel) && <div style={{ fontSize: fs - 3, color: '#6B7280', fontWeight: 400 }}>{palletCountStr(pallet1Plastic, pallet1Steel)}</div>}</td>
+                    <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet1Kg)}</td>
+                    <td style={tdCenter}></td>
+                  </tr>
+                  <tr>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 600, fontStyle: 'italic' }}>= Cân lần 1 sau trừ bì</td>
+                    <td style={{ ...tdCenter, fontFamily: mono, fontSize: fs + 3, fontWeight: 700 }}>{fmt(w1NetKg)}</td>
+                    <td style={tdCenter}></td>
+                  </tr>
+                </>
+              )}
               <tr>
                 <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Cân lần 2 ({w2Label})</td>
                 <td style={{ ...tdCenter, fontSize: fs + 5, fontWeight: 700, fontFamily: mono }}>{fmt(w2Weight)}</td>
                 <td style={{ ...tdCenter, fontSize: fs }}>{w2Time ? fmtDateTime(w2Time) : '—'}</td>
               </tr>
-              {palletTotal > 0 && (
+              {pallet2Kg > 0 && (
                 <>
                   <tr>
-                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 1 (bì){palletCountStr(pallet1Plastic, pallet1Steel) && <div style={{ fontSize: fs - 3, color: '#6B7280', fontWeight: 400 }}>{palletCountStr(pallet1Plastic, pallet1Steel)}</div>}</td>
-                    <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet1Kg)}</td>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500, color: '#6B7280' }}>− Pallet lần 2 (bì){palletCountStr(pallet2Plastic, pallet2Steel) && <div style={{ fontSize: fs - 3, color: '#6B7280', fontWeight: 400 }}>{palletCountStr(pallet2Plastic, pallet2Steel)}</div>}</td>
+                    <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet2Kg)}</td>
                     <td style={tdCenter}></td>
                   </tr>
                   <tr>
-                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 500 }}>Pallet lần 2 (bì){palletCountStr(pallet2Plastic, pallet2Steel) && <div style={{ fontSize: fs - 3, color: '#6B7280', fontWeight: 400 }}>{palletCountStr(pallet2Plastic, pallet2Steel)}</div>}</td>
-                    <td style={{ ...tdCenter, color: '#DC2626', fontFamily: mono, fontSize: fs + 2, fontWeight: 700 }}>- {fmt(pallet2Kg)}</td>
+                    <td style={{ ...tdCenter, fontSize: fs, fontWeight: 600, fontStyle: 'italic' }}>= Cân lần 2 sau trừ bì</td>
+                    <td style={{ ...tdCenter, fontFamily: mono, fontSize: fs + 3, fontWeight: 700 }}>{fmt(w2NetKg)}</td>
                     <td style={tdCenter}></td>
                   </tr>
                 </>
               )}
               <tr style={{ background: '#DCFCE7' }}>
-                <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>NET</td>
+                <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>NET
+                  {palletTotal > 0 && <div style={{ fontSize: fs - 3, color: '#166534', fontWeight: 500 }}>= {netFormulaStr}</div>}
+                </td>
                 <td style={{ ...tdCenter, fontSize: paperSize === 'a5' ? fs + 5 : fs + 7, fontWeight: 800, color: '#15803D', fontFamily: mono, letterSpacing: 1 }}>{fmt(ticket!.net_weight)}</td>
                 <td style={tdCenter}></td>
               </tr>

@@ -12,6 +12,8 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrentFacility } from '@/stores/facilityStore'
 import weighbridgeService from '@erp/services/wms/weighbridgeService'
+import { PALLET_ENABLED } from '../featureFlags'
+import { isLoadedWeighFirst } from '../weighFlow'
 import drcLookupService, { type DrcLookupRow } from '@erp/services/wms/drcLookupService'
 import stockInService from '@erp/services/wms/stockInService'
 import stockOutService from '@erp/services/wms/stockOutService'
@@ -354,7 +356,8 @@ export default function WeighingPage() {
       if (ret.plastic || ret.steel) {
         setTlReturnPallet({ plastic: ret.plastic, steel: ret.steel })
         setTlNetKg(ret.tlNetKg)
-        setPalletPlastic(ret.plastic); setPalletSteel(ret.steel)
+        // PALLET TẠM KHÓA: KHÔNG điền pallet vào phiếu cân nữa (khỏi trừ vào NET).
+        if (PALLET_ENABLED) { setPalletPlastic(ret.plastic); setPalletSteel(ret.steel) }
       }
       if (!selectedDispatchOrderId) setSelectedDispatchOrderId(oid)
     }).catch(() => {})
@@ -438,11 +441,17 @@ export default function WeighingPage() {
             console.log('[fetch L2 PĐ] pallet TL khai (return):', ret)
             setTlReturnPallet({ plastic: ret.plastic, steel: ret.steel })
             setTlNetKg(ret.tlNetKg)
-            if (ret.plastic || ret.steel) { setPalletPlastic(ret.plastic); setPalletSteel(ret.steel) }
-            else { setPalletPlastic(Number(ext.pallet_plastic_tare || 0)); setPalletSteel(Number(ext.pallet_steel_tare || 0)) }
+            // PALLET TẠM KHÓA: chỉ đọc số TL khai để HIỂN THỊ đối chiếu, không điền vào phiếu cân.
+            if (PALLET_ENABLED) {
+              if (ret.plastic || ret.steel) { setPalletPlastic(ret.plastic); setPalletSteel(ret.steel) }
+              else { setPalletPlastic(Number(ext.pallet_plastic_tare || 0)); setPalletSteel(Number(ext.pallet_steel_tare || 0)) }
+            }
           } catch {
-            setPalletPlastic(Number(ext.pallet_plastic_tare || 0)); setPalletSteel(Number(ext.pallet_steel_tare || 0))
+            if (PALLET_ENABLED) { setPalletPlastic(Number(ext.pallet_plastic_tare || 0)); setPalletSteel(Number(ext.pallet_steel_tare || 0)) }
           }
+        } else if (!PALLET_ENABLED) {
+          // PALLET TẠM KHÓA: không điền lại pallet cho lần cân 2 → NET = |lần 1 − lần 2|.
+          setPalletPlastic(0); setPalletSteel(0)
         } else if (t.status === 'weighing_tare') {
           setPalletPlastic(Number((isReverseFlow ? ext.pallet_plastic_tare : ext.pallet_plastic_gross) || 0))
           setPalletSteel(Number((isReverseFlow ? ext.pallet_steel_tare : ext.pallet_steel_gross) || 0))
@@ -672,7 +681,7 @@ export default function WeighingPage() {
 
       // ĐỢT 2 fetch: LƯU THẲNG pallet MANG ĐI (đã điền lúc chọn lệnh) vào slot tare (L1=tare)
       // ngay lúc tạo phiếu → cân lần 1 hiện lại đúng dù đã chuyển trang (khỏi query lại lệnh).
-      if (ticketDirection === 'fetch' && (palletPlastic || palletSteel)) {
+      if (PALLET_ENABLED && ticketDirection === 'fetch' && (palletPlastic || palletSteel)) {
         try {
           await supabase.from('weighbridge_tickets').update({
             pallet_plastic_tare: palletPlastic || 0,
@@ -748,10 +757,11 @@ export default function WeighingPage() {
       // Đợt 1: pallet CHỈ áp cho XUẤT ở NM vệ tinh (TL/LAO) và CỔNG (nhập nội bộ) ở PĐ.
       // Nhập mủ thường (TL mủ nước / PĐ đại lý) + xuất bán khách (PĐ) → không có pallet.
       // Service tự gắn kg vào slot gross/tare theo luồng + tính net mủ thuần.
-      const palletRelevant =
+      // PALLET TẠM KHÓA → luôn gửi 0, KL pallet KHÔNG còn trừ vào NET (xem featureFlags.ts).
+      const palletRelevant = PALLET_ENABLED && (
         (!currentFacility?.can_ship_to_customer && ticket.ticket_type === 'out') ||
         (currentFacility?.code === 'PD' && ticket.ticket_type === 'gate') ||
-        ticket.ticket_type === 'fetch'
+        ticket.ticket_type === 'fetch')
       const palletInput = palletRelevant
         ? { plastic: palletPlastic || 0, steel: palletSteel || 0, kg: palletKg }
         : { plastic: 0, steel: 0, kg: 0 }
@@ -760,7 +770,12 @@ export default function WeighingPage() {
       //   • NET hàng = gross − tare (không còn neo theo planned / tare cố định container)
       // OUT và GATE dùng chung luồng 2-weigh đo thực (NET hàng = |lần2 − lần1|).
       // OUT: lần1 = xe rỗng → lần2 = xe + hàng. GATE (cân cổng): lần1 = xe vào → lần2 = xe ra.
-      if (ticket.ticket_type === 'out' || ticket.ticket_type === 'gate' || ticket.ticket_type === 'fetch') {
+      // FETCH ở PĐ (xe VỀ đã đầy mủ) → cân ĐẦY trước như NHẬP: rơi xuống nhánh dưới.
+      // Phiếu fetch cũ đang cân dở (đã cân rỗng lần 1) vẫn đi nhánh này → không vỡ.
+      const fetchLoadedFirst =
+        ticket.ticket_type === 'fetch' && isLoadedWeighFirst(ticket, currentFacility?.code)
+      if (!fetchLoadedFirst &&
+          (ticket.ticket_type === 'out' || ticket.ticket_type === 'gate' || ticket.ticket_type === 'fetch')) {
         const isGateTicket = ticket.ticket_type === 'gate'
         if (ticket.status === 'weighing_gross') {
           // Lần 1
@@ -1292,17 +1307,19 @@ export default function WeighingPage() {
     return true
   })()
   const nhapSplitReady = !nhapSplitActive || (nhapAllInterCaptured && nhapInterDecreasing)
-  // GATE/FETCH cân giống OUT (lần1 = tare, lần2 = gross). PD-only.
-  const isReverseWeigh = isOut || isGate || isFetch
+  // GATE cân giống OUT (lần1 = tare, lần2 = gross). PD-only.
+  // FETCH: PĐ (xe VỀ đã đầy) cân ĐẦY trước như NHẬP; TL/LAO (xe tới rỗng) vẫn cân RỖNG trước.
+  const fetchLoadedFirstView = isFetch && isLoadedWeighFirst(ticket, currentFacility?.code)
+  const isReverseWeigh = isOut || isGate || (isFetch && !fetchLoadedFirstView)
   const canShowGate = currentFacility?.code === 'PD'
   // FETCH (đi lấy mủ): PĐ = nhận (cân 1+4); TL/LAO = nguồn (cân 2+3). 4 lần cân đối chiếu.
   const canFetch = ['PD', 'TL', 'LAO'].includes(currentFacility?.code || '')
   const isFetchSource = isFetch && currentFacility?.code !== 'PD'  // TL/LAO = phía xuất mủ
   // Pallet: XUẤT của NM vệ tinh (TL/LAO) + CỔNG (PĐ) + FETCH (mọi trạm — pallet trên xe).
-  const showPallet =
+  const showPallet = PALLET_ENABLED && (
     (!currentFacility?.can_ship_to_customer && (isOut || ticket?.ticket_type === 'out')) ||
     (currentFacility?.code === 'PD' && (isGate || ticket?.ticket_type === 'gate')) ||
-    isFetch || ticket?.ticket_type === 'fetch'
+    isFetch || ticket?.ticket_type === 'fetch')
   // Panel kết quả: MỌI loại phiếu ghi "Cân lần 1 / Cân lần 2" theo đúng thứ tự cân.
   //   NHẬP:      lần 1 = Gross (xe+hàng)        → lần 2 = Tare (xe rỗng)
   //   XUẤT/CỔNG: lần 1 = Tare (xe rỗng/xe vào)  → lần 2 = Gross (xe+hàng/xe ra)
@@ -1407,7 +1424,7 @@ export default function WeighingPage() {
                     { title: 'Cân lần 2', description: 'Xe ra' },
                     { title: 'Hoàn tất' },
                   ]
-                : (ticketDirection === 'out' || isFetch)
+                : (ticketDirection === 'out' || (isFetch && !fetchLoadedFirstView))
                 ? [
                     { title: 'Tạo phiếu' },
                     { title: 'Cân lần 1', description: 'Xe rỗng' },
@@ -1419,7 +1436,8 @@ export default function WeighingPage() {
                     { title: 'Cân lần 1', description: 'Xe + hàng' },
                     {
                       title: 'Cân lần 2',
-                      description: (rubberType === 'mu_nuoc' || dotReading != null)
+                      // Đi lấy mủ (fetch): PĐ không đốt/DRC ở trạm cân → chỉ "Xe rỗng".
+                      description: (!isFetch && (rubberType === 'mu_nuoc' || dotReading != null))
                         ? 'Lấy mẫu · đốt · DRC · xe rỗng'
                         : 'Xe rỗng',
                     },
@@ -1491,8 +1509,8 @@ export default function WeighingPage() {
                     ? 'Cân hàng nội bộ (không phải mủ) — 2 lần: Xe vào → Xe ra → KL hàng. Không tính tồn kho.'
                     : ticketDirection === 'fetch'
                     ? (currentFacility?.code === 'PD'
-                        ? 'Đi lấy mủ về PĐ — cân 2 lần Ở PĐ: Xe rỗng (đi) → Xe + mủ (về) → KL mủ PĐ. Chọn lệnh để điền sẵn pallet.'
-                        : 'Cân mủ đi lấy — 2 lần Ở NM này: Xe rỗng (đến) → Xe + mủ (rời NM) → KL mủ. Khai pallet CÒN TRÊN XE để PĐ đối chiếu.')
+                        ? 'Nhận mủ NM khác — cân 2 lần Ở PĐ: Xe + mủ (xe VỀ) → Xe rỗng (sau khi dỡ) → KL mủ PĐ.'
+                        : 'Cân mủ đi lấy — 2 lần Ở NM này: Xe rỗng (đến) → Xe + mủ (rời NM) → KL mủ.')
                     : 'Cân 2 lần: Xe rỗng → Xe + hàng → KL hàng'}
                 </Text>
               </Card>
@@ -1629,8 +1647,8 @@ export default function WeighingPage() {
                   </Row>
                   <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
                     {isFetchSource
-                      ? 'Cân lần 1 (xe rỗng, khi ĐẾN) điền sẵn pallet từ lệnh; cân lần 2 (rời NM) khai pallet CÒN TRÊN XE → KL mủ TL + số pallet để PĐ đối chiếu.'
-                      : 'Cân lần 1 (xe rỗng, lúc đi) điền sẵn pallet từ lệnh; cân lần 2 (xe về) — pallet điền sẵn từ số TL khai, đối chiếu → KL mủ thuần.'}
+                      ? 'Xe tới NM còn RỖNG → cân lần 1 = xe rỗng, xếp mủ xong cân lần 2 = xe + mủ. KL mủ = lần 2 − lần 1.'
+                      : 'Xe VỀ đã có mủ → cân lần 1 = xe + mủ NGAY khi về, dỡ hết mủ rồi cân lần 2 = xe rỗng. KL mủ = lần 1 − lần 2.'}
                   </Text>
                 </Card>
               )}
@@ -2408,7 +2426,7 @@ export default function WeighingPage() {
                     <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>
                       {isGate
                         ? (isWeighingGross ? '⚖️ Cân lần 1 (Xe vào)' : '⚖️ Cân lần 2 (Xe ra)')
-                        : isOut
+                        : (isOut || (isFetch && !fetchLoadedFirstView))
                         ? (isWeighingGross ? '⚖️ Cân lần 1 (Xe rỗng)' : '⚖️ Cân lần 2 (Xe + hàng)')
                         : (isWeighingGross ? '⚖️ Cân lần 1 (Xe + hàng)' : '⚖️ Cân lần 2 (Xe rỗng)')}
                     </Text>
@@ -2739,7 +2757,7 @@ export default function WeighingPage() {
                   >
                     <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>
                       Tổng NET (cả 2 lô): <b>{tongNet.toLocaleString('vi-VN')} kg</b><br />
-                      <span style={{ color: '#64748b', fontSize: 12 }}>Xe rỗng thuần = {Number(ticket?.tare_weight || 0).toLocaleString('vi-VN')} − pallet {Number((ticket as any)?.pallet_kg_tare || 0).toLocaleString('vi-VN')} = {xeRongNet.toLocaleString('vi-VN')} kg (dùng để tính lô còn)</span>
+                      <span style={{ color: '#64748b', fontSize: 12 }}>Xe rỗng = {Number(ticket?.tare_weight || 0).toLocaleString('vi-VN')}{Number((ticket as any)?.pallet_kg_tare || 0) > 0 && <> − pallet {Number((ticket as any)?.pallet_kg_tare || 0).toLocaleString('vi-VN')}</>} = {xeRongNet.toLocaleString('vi-VN')} kg (dùng để tính lô còn)</span>
                     </div>
                     <Row gutter={8} style={{ marginBottom: 8 }}>
                       <Col span={14}><Text style={{ fontSize: 12, color: '#64748b' }}>Lô ĐÃ DỠ xuống — Mã lô</Text>

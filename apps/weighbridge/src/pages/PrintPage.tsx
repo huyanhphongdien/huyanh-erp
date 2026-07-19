@@ -6,6 +6,7 @@ import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
 import { supabase } from '@erp/lib/supabase'
 import { getFacilityCode } from '@/stores/facilityStore'
+import { isLoadedWeighFirst } from '../weighFlow'
 import type { WeighbridgeTicket, WeighbridgeImage } from '@erp/services/wms/wms.types'
 
 const { Text } = Typography
@@ -206,10 +207,12 @@ export default function PrintPage() {
   const isOutTicket = ticket!.ticket_type === 'out'
   const isGateTicket = ticket!.ticket_type === 'gate'
   const isFetchTicket = ticket!.ticket_type === 'fetch'
-  // FETCH (đi lấy mủ) đảo chiều như OUT: lần1 = tare (xe rỗng đi), lần2 = gross (xe+mủ về).
-  const isReverseTicket = isOutTicket || isGateTicket || isFetchTicket
-  const w1Label = isGateTicket ? 'Xe vào' : isFetchTicket ? 'Xe rỗng (đi)' : isOutTicket ? 'Xe rỗng' : 'Gross'
-  const w2Label = isGateTicket ? 'Xe ra' : isFetchTicket ? 'Xe + mủ (về)' : isOutTicket ? 'Xe + hàng' : 'Tare'
+  // FETCH (đi lấy mủ) thứ tự cân KHÁC NHAU ở 2 đầu — TL cân rỗng trước, PĐ cân đầy trước
+  // (đổi 19/07/2026) → suy từ mốc thời gian cân THẬT của phiếu, không suy theo loại phiếu.
+  const fetchLoadedFirst = isFetchTicket && isLoadedWeighFirst(ticket, (ticket as any)?.facility?.code)
+  const isReverseTicket = isOutTicket || isGateTicket || (isFetchTicket && !fetchLoadedFirst)
+  const w1Label = isGateTicket ? 'Xe vào' : isFetchTicket ? (fetchLoadedFirst ? 'Xe + mủ (về)' : 'Xe rỗng (đi)') : isOutTicket ? 'Xe rỗng' : 'Xe + hàng'
+  const w2Label = isGateTicket ? 'Xe ra' : isFetchTicket ? (fetchLoadedFirst ? 'Xe rỗng (sau dỡ)' : 'Xe + mủ (về)') : isOutTicket ? 'Xe + hàng' : 'Xe rỗng'
   const w1Weight = isReverseTicket ? ticket!.tare_weight : ticket!.gross_weight
   const w1Time = isReverseTicket ? ticket!.tare_weighed_at : ticket!.gross_weighed_at
   const w2Weight = isReverseTicket ? ticket!.gross_weight : ticket!.tare_weight
@@ -571,7 +574,7 @@ export default function PrintPage() {
                 </>
               )}
               <tr style={{ background: '#DCFCE7' }}>
-                <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>NET
+                <td style={{ ...tdCenter, fontWeight: 800, fontSize: fs + 2 }}>KL TỊNH
                   {palletTotal > 0 && <div style={{ fontSize: fs - 3, color: '#166534', fontWeight: 500 }}>= {netFormulaStr}</div>}
                 </td>
                 <td style={{ ...tdCenter, fontSize: paperSize === 'a5' ? fs + 5 : fs + 7, fontWeight: 800, color: '#15803D', fontFamily: mono, letterSpacing: 1 }}>{fmt(ticket!.net_weight)}</td>

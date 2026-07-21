@@ -48,7 +48,7 @@ async function sendFCM(accessToken: string, token: string, title: string, body: 
     body: JSON.stringify({
       message: {
         token, notification: { title, body }, data,
-        android: { priority: 'high', notification: { sound: 'default', click_action: 'FCM_PLUGIN_ACTIVITY' } },
+        android: { priority: 'high', notification: { channel_id: 'machine_alerts', sound: 'default', click_action: 'FCM_PLUGIN_ACTIVITY' } },
       },
     }),
   })

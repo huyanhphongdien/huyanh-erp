@@ -27,11 +27,22 @@ export async function syncFcmTokenToDb() {
   }
 }
 
+let _inited = false // chống đăng ký listener 2 lần → khỏi bắn thông báo đúp
+
 // Gọi 1 lần khi app mount
 export async function initCapacitorPush() {
   const isNative = Capacitor.isNativePlatform()
-  if (!isNative) return
+  if (!isNative || _inited) return
+  _inited = true
   try {
+    // Kênh HIGH: heads-up "trồi" ra + chuông + rung, kể cả khi app đóng
+    try {
+      await PushNotifications.createChannel({
+        id: 'machine_alerts', name: 'Máy hỏng', description: 'Cảnh báo máy dừng / bất thường',
+        importance: 5, visibility: 1, sound: 'default', vibration: true, lights: true, lightColor: '#C1291F',
+      })
+    } catch { /* máy cũ không hỗ trợ channel — bỏ qua */ }
+
     const perm = await PushNotifications.requestPermissions()
     if (perm.receive !== 'granted') return
     await PushNotifications.register()
@@ -43,13 +54,14 @@ export async function initCapacitorPush() {
     })
     PushNotifications.addListener('registrationError', (e) => console.error('[Push] reg error:', e))
 
-    // Foreground: hiện local notification (kèm chuông)
+    // Foreground: hiện local notification (kèm chuông) trên kênh HIGH
     PushNotifications.addListener('pushNotificationReceived', (n) => {
       LocalNotifications.schedule({
         notifications: [{
           id: Math.floor(Math.random() * 100000),
           title: n.title || 'Huy Anh Ops',
           body: n.body || 'Có thông báo mới',
+          channelId: 'machine_alerts',
           sound: 'default',
           extra: n.data,
         }],

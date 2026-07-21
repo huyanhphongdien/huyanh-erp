@@ -4,6 +4,7 @@
 // ============================================================================
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -67,7 +68,9 @@ export default function MachineQueuePage() {
         g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5); o.start(); o.stop(ac.currentTime + 0.5)
       }
       if (navigator.vibrate) navigator.vibrate(row?.severity === 'do' ? [200, 100, 200] : [150])
-      if ('Notification' in window && Notification.permission === 'granted') {
+      // App native: FCM push đã lo thông báo hệ thống → KHÔNG bắn thêm (tránh đúp).
+      // Chỉ web (trình duyệt trạm) mới cần Notification này.
+      if (!Capacitor.isNativePlatform() && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(row?.severity === 'do' ? '🔴 Máy đang DỪNG' : '🟡 Máy báo bất thường', {
           body: `${row?.equipment_code || 'Máy'} — ${row?.symptom || 'có sự cố'}`, tag: 'machine-issue',
         })

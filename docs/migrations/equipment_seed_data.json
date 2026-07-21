@@ -1,0 +1,695 @@
+[
+ {
+  "stt": 1,
+  "khu_vuc": "LINE LỌC",
+  "ten": "Băng tải Slạp 1",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LL-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LL-01"
+ },
+ {
+  "stt": 2,
+  "khu_vuc": "LINE LỌC",
+  "ten": "Máy Slạp 1",
+  "kw": 110.0,
+  "ghi_chu": "",
+  "ma": "HA-LL-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LL-02"
+ },
+ {
+  "stt": 3,
+  "khu_vuc": "LINE LỌC",
+  "ten": "Bể Quậy Slạp 1",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-LL-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LL-03"
+ },
+ {
+  "stt": 4,
+  "khu_vuc": "LINE LỌC",
+  "ten": "Vít Xoắn Qua đường",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LL-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LL-04"
+ },
+ {
+  "stt": 5,
+  "khu_vuc": "LINE LỌC",
+  "ten": "Vít Tải Lên Sàn Rung 1",
+  "kw": 7.5,
+  "ghi_chu": "",
+  "ma": "HA-LL-05",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LL-05"
+ },
+ {
+  "stt": 6,
+  "khu_vuc": "LINE LỌC",
+  "ten": "Sàn Rung 1",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-LL-06",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LL-06"
+ },
+ {
+  "stt": 7,
+  "khu_vuc": "LINE LỌC",
+  "ten": "Băng Tải Lên Bể 1",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-LL-07",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LL-07"
+ },
+ {
+  "stt": 8,
+  "khu_vuc": "SLẠP 2",
+  "ten": "Vít tải Lên Slạp 2",
+  "kw": 7.5,
+  "ghi_chu": "",
+  "ma": "HA-SL-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SL-01"
+ },
+ {
+  "stt": 9,
+  "khu_vuc": "SLẠP 2",
+  "ten": "Máy Slạp 2",
+  "kw": 55.0,
+  "ghi_chu": "",
+  "ma": "HA-SL-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SL-02"
+ },
+ {
+  "stt": 10,
+  "khu_vuc": "BỂ 1",
+  "ten": "Bể Quậy 1",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-B1-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B1-01"
+ },
+ {
+  "stt": 11,
+  "khu_vuc": "BỂ 1",
+  "ten": "Mô tơ Đạp vít Lên PRE 1",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-B1-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B1-02"
+ },
+ {
+  "stt": 12,
+  "khu_vuc": "BỂ 1",
+  "ten": "Vít tải Pre 1",
+  "kw": 7.5,
+  "ghi_chu": "",
+  "ma": "HA-B1-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B1-03"
+ },
+ {
+  "stt": 13,
+  "khu_vuc": "BỂ 1",
+  "ten": "Máy Pre 1",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-B1-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B1-04"
+ },
+ {
+  "stt": 14,
+  "khu_vuc": "BỂ 2",
+  "ten": "Đạp Vít 1",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-B2-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B2-01"
+ },
+ {
+  "stt": 15,
+  "khu_vuc": "BỂ 2",
+  "ten": "Lồng Rác",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-B2-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B2-02"
+ },
+ {
+  "stt": 16,
+  "khu_vuc": "BỂ 2",
+  "ten": "Đạp Vít 2",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-B2-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B2-03"
+ },
+ {
+  "stt": 17,
+  "khu_vuc": "BỂ 2",
+  "ten": "Đạp Vít Lên Bể 3",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-B2-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B2-04"
+ },
+ {
+  "stt": 18,
+  "khu_vuc": "BỂ 2",
+  "ten": "Vít tải Lên Bể 3",
+  "kw": 7.5,
+  "ghi_chu": "",
+  "ma": "HA-B2-05",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B2-05"
+ },
+ {
+  "stt": 19,
+  "khu_vuc": "BỂ 3",
+  "ten": "Vít-Đạp Vít 1",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-B3-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B3-01"
+ },
+ {
+  "stt": 20,
+  "khu_vuc": "BỂ 3",
+  "ten": "Đạp Vít 2",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-B3-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B3-02"
+ },
+ {
+  "stt": 21,
+  "khu_vuc": "BỂ 3",
+  "ten": "Đạp Vít 3",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-B3-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B3-03"
+ },
+ {
+  "stt": 22,
+  "khu_vuc": "BỂ 3",
+  "ten": "Đạp Vít Lên Bể 4",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-B3-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B3-04"
+ },
+ {
+  "stt": 23,
+  "khu_vuc": "BỂ 3",
+  "ten": "Vít tải Lên Bể 4",
+  "kw": 7.5,
+  "ghi_chu": "",
+  "ma": "HA-B3-05",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B3-05"
+ },
+ {
+  "stt": 24,
+  "khu_vuc": "BỂ 4",
+  "ten": "Máy Pre 2",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-B4-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B4-01"
+ },
+ {
+  "stt": 25,
+  "khu_vuc": "BỂ 4",
+  "ten": "Đạp Vít 1",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-B4-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B4-02"
+ },
+ {
+  "stt": 26,
+  "khu_vuc": "BỂ 4",
+  "ten": "Đạp Vít 2",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-B4-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B4-03"
+ },
+ {
+  "stt": 27,
+  "khu_vuc": "BỂ 4",
+  "ten": "Lồng Rác",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-B4-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B4-04"
+ },
+ {
+  "stt": 28,
+  "khu_vuc": "BỂ 4",
+  "ten": "Gầu Vớt mủ",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-B4-05",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B4-05"
+ },
+ {
+  "stt": 29,
+  "khu_vuc": "BỂ 4",
+  "ten": "Máy CRE1",
+  "kw": 90.0,
+  "ghi_chu": "",
+  "ma": "HA-B4-06",
+  "url": "https://huyanhrubber.vn/m/tb/HA-B4-06"
+ },
+ {
+  "stt": 30,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Băng tải Lên SHD 1",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-SC-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-01"
+ },
+ {
+  "stt": 31,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Máy SHD 1",
+  "kw": 160.0,
+  "ghi_chu": "",
+  "ma": "HA-SC-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-02"
+ },
+ {
+  "stt": 32,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Máy Chém mủ 1",
+  "kw": 15.0,
+  "ghi_chu": "",
+  "ma": "HA-SC-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-03"
+ },
+ {
+  "stt": 33,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Bơm Gòm 1",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-SC-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-04"
+ },
+ {
+  "stt": 34,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Sàn Rung CREP 2",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-SC-05",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-05"
+ },
+ {
+  "stt": 35,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Máy CREP 2 (2 động cơ 75 kW)",
+  "kw": 150.0,
+  "ghi_chu": "",
+  "ma": "HA-SC-06",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-06"
+ },
+ {
+  "stt": 36,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Băng tải Lên CREP 3",
+  "kw": 2.5,
+  "ghi_chu": "",
+  "ma": "HA-SC-07",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-07"
+ },
+ {
+  "stt": 37,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "CREP 3",
+  "kw": 90.0,
+  "ghi_chu": "",
+  "ma": "HA-SC-08",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-08"
+ },
+ {
+  "stt": 38,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Băng tải Lên CREP 4",
+  "kw": 3.7,
+  "ghi_chu": "",
+  "ma": "HA-SC-09",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-09"
+ },
+ {
+  "stt": 39,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "CREP 4",
+  "kw": 90.0,
+  "ghi_chu": "",
+  "ma": "HA-SC-10",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-10"
+ },
+ {
+  "stt": 40,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Băng tải 1 Lên SHD 2",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-SC-11",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-11"
+ },
+ {
+  "stt": 41,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Băng tải 2 Lên SHD 2",
+  "kw": 2.2,
+  "ghi_chu": "",
+  "ma": "HA-SC-12",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-12"
+ },
+ {
+  "stt": 42,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Máy SHD 2",
+  "kw": 200.0,
+  "ghi_chu": "",
+  "ma": "HA-SC-13",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-13"
+ },
+ {
+  "stt": 43,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Máy chém Bể SHD 2",
+  "kw": 7.5,
+  "ghi_chu": "",
+  "ma": "HA-SC-14",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-14"
+ },
+ {
+  "stt": 44,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Bơm Cốm 2",
+  "kw": 4.5,
+  "ghi_chu": "",
+  "ma": "HA-SC-15",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-15"
+ },
+ {
+  "stt": 45,
+  "khu_vuc": "MÁY SHD / CREP",
+  "ten": "Sàn Rung A Lon",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-SC-16",
+  "url": "https://huyanhrubber.vn/m/tb/HA-SC-16"
+ },
+ {
+  "stt": 46,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Lò APLON",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-01"
+ },
+ {
+  "stt": 47,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt F0",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-02"
+ },
+ {
+  "stt": 48,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt F1",
+  "kw": 90.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-03"
+ },
+ {
+  "stt": 49,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt F2",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-04"
+ },
+ {
+  "stt": 50,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt F3",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-05",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-05"
+ },
+ {
+  "stt": 51,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt F4",
+  "kw": 22.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-06",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-06"
+ },
+ {
+  "stt": 52,
+  "khu_vuc": "LÒ APLON",
+  "ten": "APLON (băng tải)",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-07",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-07"
+ },
+ {
+  "stt": 53,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Băng tải Lên máy Mix",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-08",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-08"
+ },
+ {
+  "stt": 54,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Vét mủ",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-09",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-09"
+ },
+ {
+  "stt": 55,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Máy Mix",
+  "kw": 315.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-10",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-10"
+ },
+ {
+  "stt": 56,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Dao Bay",
+  "kw": 90.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-11",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-11"
+ },
+ {
+  "stt": 57,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Băng tải Lên Sàn Rung",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-12",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-12"
+ },
+ {
+  "stt": 58,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Sàn Rung",
+  "kw": 5.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-13",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-13"
+ },
+ {
+  "stt": 59,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Coolling",
+  "kw": 18.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-14",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-14"
+ },
+ {
+  "stt": 60,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt Cô Ling 1",
+  "kw": 11.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-15",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-15"
+ },
+ {
+  "stt": 61,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt Cô Ling 2",
+  "kw": 90.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-16",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-16"
+ },
+ {
+  "stt": 62,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt Cô Ling 3",
+  "kw": 7.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-17",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-17"
+ },
+ {
+  "stt": 63,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Quạt thải Khói Coling",
+  "kw": 22.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-18",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-18"
+ },
+ {
+  "stt": 64,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Băng tải Ra thành phẩm",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-LA-19",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-19"
+ },
+ {
+  "stt": 65,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Máy Ép Số 1",
+  "kw": 11.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-20",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-20"
+ },
+ {
+  "stt": 66,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Máy Ép Số 2",
+  "kw": 11.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-21",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-21"
+ },
+ {
+  "stt": 67,
+  "khu_vuc": "LÒ APLON",
+  "ten": "Máy Ép Số 3",
+  "kw": 11.0,
+  "ghi_chu": "",
+  "ma": "HA-LA-22",
+  "url": "https://huyanhrubber.vn/m/tb/HA-LA-22"
+ },
+ {
+  "stt": 68,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Số 1",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-01",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-01"
+ },
+ {
+  "stt": 69,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Số 2",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-02",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-02"
+ },
+ {
+  "stt": 70,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Bù nước 1",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-03",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-03"
+ },
+ {
+  "stt": 71,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Bù nước 2",
+  "kw": 45.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-04",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-04"
+ },
+ {
+  "stt": 72,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Thổi Khí 1",
+  "kw": 22.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-05",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-05"
+ },
+ {
+  "stt": 73,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Thổi Khí 2",
+  "kw": 22.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-06",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-06"
+ },
+ {
+  "stt": 74,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Thổi Khí 3",
+  "kw": 22.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-07",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-07"
+ },
+ {
+  "stt": 75,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm Thổi Khí 4",
+  "kw": 22.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-08",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-08"
+ },
+ {
+  "stt": 76,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm PCCC",
+  "kw": 18.0,
+  "ghi_chu": "",
+  "ma": "HA-TB-09",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-09"
+ },
+ {
+  "stt": 77,
+  "khu_vuc": "THÁP / BƠM",
+  "ten": "Bơm bù áp",
+  "kw": 1.5,
+  "ghi_chu": "",
+  "ma": "HA-TB-10",
+  "url": "https://huyanhrubber.vn/m/tb/HA-TB-10"
+ }
+]

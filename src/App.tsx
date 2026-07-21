@@ -79,6 +79,8 @@ const UserSettingsPage = lazy(() => import('./pages/settings/UserSettingsPage'))
 
 // ===== MOBILE CÔNG KHAI: quét QR máy → báo hỏng (KHÔNG cần đăng nhập) =====
 const MachineReportPage = lazy(() => import('./pages/mobile/MachineReportPage'));
+// ===== MOBILE thợ bảo trì (đăng nhập): hàng chờ phiếu báo hỏng =====
+const MachineQueuePage = lazy(() => import('./pages/mobile/MachineQueuePage'));
 
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
 const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
@@ -376,6 +378,9 @@ function App() {
             {/* CÔNG KHAI — quét QR máy báo hỏng (công nhân KHÔNG cần login) */}
             {/* ============================================================ */}
             <Route path="/m/tb/:code" element={<MachineReportPage />} />
+
+            {/* Thợ bảo trì (đăng nhập) — hàng chờ báo hỏng, layout mobile riêng */}
+            <Route path="/m/yeu-cau" element={<ProtectedRoute><MachineQueuePage /></ProtectedRoute>} />
 
             {/* ============================================================ */}
             {/* Protected Routes — ERP Internal                              */}

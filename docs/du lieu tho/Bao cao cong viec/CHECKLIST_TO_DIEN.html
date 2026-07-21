@@ -1,0 +1,91 @@
+<title>Checklist tổ Điện — Nước — Tự động hoá</title>
+<style>
+  :root{--g:#0F5132;--gd:#0A3A24;--lime:#3B9612;--ink:#0C1F17;--ink2:#3D4F46;--ink3:#728478;
+    --paper:#F4F2EC;--card:#fff;--line:#DEE3DA;--day:#DCFCE7;--dayc:#166534;--week:#FEF3C7;--weekc:#92600C;
+    --month:#DBEAFE;--monthc:#1E40AF;--amber:#B45309;--amberbg:#FDF1D6;--alert:#B4231D;--alertbg:#FCE8E6;
+    --sh:0 1px 2px rgba(12,31,23,.07),0 6px 18px rgba(12,31,23,.06);}
+  @media(prefers-color-scheme:dark){:root{--ink:#E8EDE9;--ink2:#A9B8AF;--ink3:#7C8D83;--paper:#0B120F;
+    --card:#141D18;--line:#26332C;--g:#39A06A;--gd:#0C2418;--day:#12301F;--dayc:#4ADE80;--week:#3A2A0E;
+    --weekc:#E9A23B;--month:#16233F;--monthc:#7EA6FF;--amber:#E9A23B;--amberbg:#3A2A0E;--alert:#F0736B;--alertbg:#3A1614;
+    --sh:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.35);}}
+  :root[data-theme="dark"]{--ink:#E8EDE9;--ink2:#A9B8AF;--ink3:#7C8D83;--paper:#0B120F;--card:#141D18;--line:#26332C;
+    --g:#39A06A;--gd:#0C2418;--day:#12301F;--dayc:#4ADE80;--week:#3A2A0E;--weekc:#E9A23B;--month:#16233F;--monthc:#7EA6FF;
+    --amber:#E9A23B;--amberbg:#3A2A0E;--alert:#F0736B;--alertbg:#3A1614;--sh:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.35);}
+  :root[data-theme="light"]{--ink:#0C1F17;--ink2:#3D4F46;--ink3:#728478;--paper:#F4F2EC;--card:#fff;--line:#DEE3DA;
+    --g:#0F5132;--gd:#0A3A24;--day:#DCFCE7;--dayc:#166534;--week:#FEF3C7;--weekc:#92600C;--month:#DBEAFE;--monthc:#1E40AF;
+    --amber:#B45309;--amberbg:#FDF1D6;--alert:#B4231D;--alertbg:#FCE8E6;--sh:0 1px 2px rgba(12,31,23,.07),0 6px 18px rgba(12,31,23,.06);}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);line-height:1.5;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Be Vietnam Pro",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:32px 20px 90px}
+  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--g);font-weight:750;margin:0 0 10px}
+  h1{font-size:clamp(25px,4vw,38px);line-height:1.1;margin:0 0 14px;letter-spacing:-.02em;font-weight:800;text-wrap:balance}
+  .lede{font-size:16px;color:var(--ink2);max-width:62ch;margin:0}
+  .lede b{color:var(--ink)}
+  .kpis{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0 8px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 18px;box-shadow:var(--sh)}
+  .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:12px;color:var(--ink3)}
+  h2{display:flex;align-items:center;gap:12px;margin:40px 0 14px;padding-top:20px;border-top:2px solid var(--g)}
+  .fbadge{font-size:13px;font-weight:800;letter-spacing:.05em;padding:4px 12px;border-radius:8px}
+  .fbadge.daily{background:var(--day);color:var(--dayc)} .fbadge.weekly{background:var(--week);color:var(--weekc)}
+  .fbadge.monthly{background:var(--month);color:var(--monthc)}
+  .fcount{font-size:13px;color:var(--ink3);font-weight:600}
+  .task{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px;margin-bottom:12px;
+    box-shadow:var(--sh);break-inside:avoid;border-left:4px solid var(--line)}
+  .task.daily{border-left-color:var(--dayc)} .task.weekly{border-left-color:var(--weekc)} .task.monthly{border-left-color:var(--monthc)}
+  .thead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .tno{font-size:12px;font-weight:800;color:var(--ink3);font-variant-numeric:tabular-nums}
+  .ttl{font-size:16px;font-weight:730;letter-spacing:-.01em;flex:1;min-width:200px}
+  .pri{font-size:10.5px;font-weight:750;padding:2px 9px;border-radius:20px}
+  .pri.u{background:var(--alertbg);color:var(--alert)} .pri.h{background:var(--amberbg);color:var(--amber)}
+  .pri.m{background:var(--line);color:var(--ink3)}
+  .when{font-size:12px;color:var(--ink3);margin:5px 0 10px}
+  .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+  .steps li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--ink2)}
+  .box{flex:0 0 18px;height:18px;border:2px solid var(--line);border-radius:5px;margin-top:1px}
+  .st{flex:1}
+  .cam{display:inline-block;margin-left:8px;font-size:10.5px;font-weight:750;color:var(--amber);
+    background:var(--amberbg);padding:1px 7px;border-radius:20px;white-space:nowrap}
+  .note{margin-top:34px;padding:18px 20px;border-radius:14px;background:var(--gd);color:#DCEBE2;box-shadow:var(--sh)}
+  .note b{color:#fff}
+  .foot{margin-top:22px;font-size:12px;color:var(--ink3)}
+  @media print{.task{box-shadow:none}.note{background:#eee;color:#333}}
+</style>
+<div class="wrap">
+  <p class="eyebrow">Thí điểm tổ Điện · checklist chuẩn</p>
+  <h1>Checklist tổ Điện — Nước — Tự động hoá</h1>
+  <p class="lede">Danh sách <b>21 việc định kỳ</b> của tổ, mỗi việc kèm các bước cần làm. Bước dán nhãn <b>📷 cần ảnh</b> phải chụp minh chứng mới tick được. Dựng theo mô tả công việc + KPI có sẵn, giữ gọn — chỉ những gì thật sự phải kiểm.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">21</div><div class="l">việc định kỳ</div></div>
+    <div class="kpi"><div class="v">49</div><div class="l">bước kiểm</div></div>
+    <div class="kpi"><div class="v">13</div><div class="l">bước cần ảnh</div></div>
+    <div class="kpi"><div class="v">2</div><div class="l">người phụ trách</div></div>
+  </div>
+  <h2><span class="fbadge daily">HẰNG NGÀY</span><span class="fcount">10 việc</span></h2>
+<div class="task daily"><div class="thead"><span class="tno">01</span><span class="ttl">Đọc &amp; theo dõi hệ số công suất cosφ, thông số tủ điện</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 07:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Ghi cosφ, dòng, áp các tủ chính vào phiếu<span class="cam">📷 cần ảnh</span></span></li><li><span class="box"></span><span class="st">Đối chiếu — phát hiện lệch pha / quá tải, báo ngay nếu bất thường</span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">02</span><span class="ttl">Giám sát ổn định nhiệt độ lò sấy theo setpoint</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 08:00 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Nhiệt lò sấy bám setpoint (ghi sai lệch nếu có)</span></li><li><span class="box"></span><span class="st">Sai lệch lớn kéo dài → kiểm cảm biến + bộ điều khiển</span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">03</span><span class="ttl">Theo dõi uptime PLC / biến tần / HMI dây chuyền</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 08:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Soát PLC, biến tần, HMI — không báo lỗi/cảnh báo</span></li><li><span class="box"></span><span class="st">Có lỗi/cảnh báo → chụp lại và xử lý/báo<span class="cam">📷 cần ảnh</span></span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">04</span><span class="ttl">Kiểm tra kết nối cân Keli → ERP (RS232) tại trạm cân</span><span class="pri u">Khẩn cấp</span></div><div class="when">⏰ 07:30 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">App cân đọc được số từ đầu cân<span class="cam">📷 cần ảnh</span></span></li><li><span class="box"></span><span class="st">Thử cân 1 xe thật</span></li><li><span class="box"></span><span class="st">Mất kết nối → kiểm cổng COM, dây RS232, nguồn đầu cân trước khi báo kỹ thuật</span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">05</span><span class="ttl">Kiểm tra tỷ lệ thiết bị IoT online</span><span class="pri m">Bình thường</span></div><div class="when">⏰ 07:30 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Rà tỷ lệ thiết bị/cảm biến IoT còn online</span></li><li><span class="box"></span><span class="st">Thiết bị rớt mạng → khởi động lại hoặc báo</span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">06</span><span class="ttl">Kiểm tra uptime camera Dahua &amp; mạng LAN/switch</span><span class="pri m">Bình thường</span></div><div class="when">⏰ 07:45 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Đủ camera Dahua lên hình</span></li><li><span class="box"></span><span class="st">Switch + đường LAN không báo lỗi</span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">07</span><span class="ttl">Vận hành &amp; kiểm tra hệ bơm cấp nước, máy nén khí</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 07:00 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Bơm cấp nước chạy êm, áp lực khí nén đủ</span></li><li><span class="box"></span><span class="st">Không rò rỉ, không tiếng kêu bất thường</span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">08</span><span class="ttl">Vận hành hệ xử lý nước thải &amp; kiểm tra thông số đầu ra</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 09:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Hệ xử lý nước thải vận hành bình thường</span></li><li><span class="box"></span><span class="st">Ghi thông số đầu ra theo quy định môi trường<span class="cam">📷 cần ảnh</span></span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">09</span><span class="ttl">Giám sát mực nước &amp; cảm biến lưu lượng (IoT nước)</span><span class="pri m">Bình thường</span></div><div class="when">⏰ 09:00 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Mực nước bể trong ngưỡng</span></li><li><span class="box"></span><span class="st">Cảm biến lưu lượng báo số hợp lý</span></li></ol></div>
+<div class="task daily"><div class="thead"><span class="tno">10</span><span class="ttl">Kiểm tra điểm 0 bàn cân đầu ca &amp; soát gầm cân (cả 2 trạm)</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 06:30 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Bàn cân TRỐNG hiện đúng 0 (chụp màn hình đầu cân)<span class="cam">📷 cần ảnh</span></span></li><li><span class="box"></span><span class="st">Lệch quá 1 độ chia (e) → zero lại và GHI SỔ</span></li><li><span class="box"></span><span class="st">Soát gầm cân / hố cân: đá, bùn, nước, vật kẹt</span></li></ol></div>
+<h2><span class="fbadge weekly">HẰNG TUẦN</span><span class="fcount">4 việc</span></h2>
+<div class="task weekly"><div class="thead"><span class="tno">11</span><span class="ttl">Kiểm tra chống rò rỉ đường ống, van, đồng hồ nước</span><span class="pri m">Bình thường</span></div><div class="when">⏰ 08:00 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Đi hết tuyến ống, van, đồng hồ nước</span></li><li><span class="box"></span><span class="st">Ghi điểm rò rỉ cần xử lý (chụp nếu có)<span class="cam">📷 cần ảnh</span></span></li></ol></div>
+<div class="task weekly"><div class="thead"><span class="tno">12</span><span class="ttl">Đo dòng điện các pha tủ MCCB &amp; ghi trị số</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 08:30 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Đo dòng từng pha các tủ MCCB, ghi trị số<span class="cam">📷 cần ảnh</span></span></li><li><span class="box"></span><span class="st">So với kỳ trước — đánh dấu tủ lệch bất thường</span></li></ol></div>
+<div class="task weekly"><div class="thead"><span class="tno">13</span><span class="ttl">Vệ sinh gầm &amp; hố cân, kiểm tra hộp nối + cáp tín hiệu loadcell</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 08:00 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Dọn đá, bùn, rác mủ dưới bàn cân; thoát nước hố cân</span></li><li><span class="box"></span><span class="st">Hộp nối (junction box) khô ráo, siết lại cáp tín hiệu loadcell<span class="cam">📷 cần ảnh</span></span></li></ol></div>
+<div class="task weekly"><div class="thead"><span class="tno">14</span><span class="ttl">Đối chiếu khối lượng cân giữa 2 trạm (Tân Lâm ↔ Phong Điền)</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 09:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Lấy các chuyến đi lấy mủ trong tuần trên ERP</span></li><li><span class="box"></span><span class="st">So KL cân Tân Lâm ↔ Phong Điền cùng chuyến</span></li><li><span class="box"></span><span class="st">Lệch quá 0,5% (hoặc 60 kg) → báo Trưởng phòng, KHÔNG sửa số cân</span></li></ol></div>
+<h2><span class="fbadge monthly">HẰNG THÁNG</span><span class="fcount">7 việc</span></h2>
+<div class="task monthly"><div class="thead"><span class="tno">15</span><span class="ttl">Bảo trì &amp; chạy thử trạm biến áp, ATS, máy phát dự phòng</span><span class="pri u">Khẩn cấp</span></div><div class="when">⏰ 08:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Vệ sinh, siết cực trạm biến áp</span></li><li><span class="box"></span><span class="st">Chạy thử máy phát dự phòng + ATS có tải</span></li><li><span class="box"></span><span class="st">Ghi biên bản chạy thử<span class="cam">📷 cần ảnh</span></span></li></ol></div>
+<div class="task monthly"><div class="thead"><span class="tno">16</span><span class="ttl">Đo nhiệt độ điểm nối &amp; kiểm tra cân bằng pha tủ điện</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 10:00 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Đo nhiệt các điểm nối tủ điện (chụp điểm nóng nếu có)<span class="cam">📷 cần ảnh</span></span></li><li><span class="box"></span><span class="st">Kiểm cân bằng pha các tủ</span></li></ol></div>
+<div class="task monthly"><div class="thead"><span class="tno">17</span><span class="ttl">Sao lưu chương trình PLC/HMI &amp; cấu hình biến tần</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 14:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Backup toàn bộ chương trình PLC/HMI + cấu hình biến tần</span></li><li><span class="box"></span><span class="st">Lưu tối thiểu 2 nơi, ghi phiên bản/ngày backup<span class="cam">📷 cần ảnh</span></span></li></ol></div>
+<div class="task monthly"><div class="thead"><span class="tno">18</span><span class="ttl">Kiểm tra an toàn điện &amp; lao động (LOTO, tiếp địa, chống quá tải)</span><span class="pri u">Khẩn cấp</span></div><div class="when">⏰ 08:00 · phụ trách: Ngô Quý Trường Sơn</div><ol class="steps"><li><span class="box"></span><span class="st">Soát quy trình LOTO (khoá — treo thẻ)</span></li><li><span class="box"></span><span class="st">Kiểm hệ tiếp địa</span></li><li><span class="box"></span><span class="st">Kiểm thiết bị bảo vệ quá tải</span></li></ol></div>
+<div class="task monthly"><div class="thead"><span class="tno">19</span><span class="ttl">Kiểm kê &amp; đề xuất tồn kho vật tư – phụ tùng điện dự phòng</span><span class="pri m">Bình thường</span></div><div class="when">⏰ 14:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Đếm tồn CB, contactor, cảm biến, cáp dự phòng</span></li><li><span class="box"></span><span class="st">Đề xuất bổ sung phần thiếu</span></li></ol></div>
+<div class="task monthly"><div class="thead"><span class="tno">20</span><span class="ttl">Nộp phiếu tự đánh giá KPI kèm minh chứng</span><span class="pri h">Ưu tiên cao</span></div><div class="when">⏰ 15:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Tự chấm 23 chỉ tiêu KPI</span></li><li><span class="box"></span><span class="st">Đính minh chứng<span class="cam">📷 cần ảnh</span></span></li><li><span class="box"></span><span class="st">Nộp Trưởng phòng</span></li></ol></div>
+<div class="task monthly"><div class="thead"><span class="tno">21</span><span class="ttl">Kiểm tra sai số bàn cân: độ lặp lại, độ lệch tâm, tín hiệu loadcell</span><span class="pri u">Khẩn cấp</span></div><div class="when">⏰ 08:00 · phụ trách: Võ Văn Hoài</div><ol class="steps"><li><span class="box"></span><span class="st">Độ lặp lại: cân 1 xe có tải 3 lần liên tiếp — chênh ≤ sai số cho phép (chụp 3 số)<span class="cam">📷 cần ảnh</span></span></li><li><span class="box"></span><span class="st">Độ lệch tâm: đưa tải về 4 góc + giữa bàn cân</span></li><li><span class="box"></span><span class="st">Đo mV từng loadcell, so với tháng trước</span></li></ol></div>
+  <div class="note"><b>Cách đọc:</b> ô vuông = bước cần tick khi làm xong. Nhãn <b>📷 cần ảnh</b> = bắt buộc chụp mới hoàn thành được việc (số đo, tình trạng thiết bị, biên bản — thứ sau này có thể cần tra lại). Việc chỉ kiểm bằng mắt thì không bắt ảnh, tránh thợ chụp cho có.</div>
+  <p class="foot">Checklist này sẽ nạp vào ERP để mỗi sáng tự sinh việc cho 2 thợ tổ Điện. Anh xem, sửa/thêm/bớt bước nào rồi tôi chốt và nạp thí điểm.</p>
+</div>

@@ -1,0 +1,534 @@
+[
+ {
+  "stt": 15,
+  "to": "Điện",
+  "ten": "Đọc & theo dõi hệ số công suất cosφ, thông số tủ điện",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "07:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Ghi cosφ, dòng, áp các tủ chính; phát hiện lệch pha/quá tải sớm.",
+  "uu_tien": "high",
+  "nguon": "KPI A",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Ghi cosφ, dòng, áp các tủ chính vào phiếu",
+    "requires_evidence": true
+   },
+   {
+    "title": "Đối chiếu — phát hiện lệch pha / quá tải, báo ngay nếu bất thường",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 16,
+  "to": "Điện",
+  "ten": "Giám sát ổn định nhiệt độ lò sấy theo setpoint",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "08:00",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Theo dõi nhiệt lò sấy SVR bám setpoint, ghi sai lệch.",
+  "uu_tien": "high",
+  "nguon": "KPI B",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Nhiệt lò sấy bám setpoint (ghi sai lệch nếu có)",
+    "requires_evidence": false
+   },
+   {
+    "title": "Sai lệch lớn kéo dài → kiểm cảm biến + bộ điều khiển",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 17,
+  "to": "Điện",
+  "ten": "Theo dõi uptime PLC / biến tần / HMI dây chuyền",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "08:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Kiểm tra tình trạng PLC, biến tần, HMI; ghi lỗi/cảnh báo.",
+  "uu_tien": "high",
+  "nguon": "KPI B",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Soát PLC, biến tần, HMI — không báo lỗi/cảnh báo",
+    "requires_evidence": false
+   },
+   {
+    "title": "Có lỗi/cảnh báo → chụp lại và xử lý/báo",
+    "requires_evidence": true
+   }
+  ]
+ },
+ {
+  "stt": 18,
+  "to": "Điện",
+  "ten": "Kiểm tra kết nối cân Keli → ERP (RS232) tại trạm cân",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "07:30",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Xác nhận app cân đọc được số; xử lý mất kết nối cổng COM.",
+  "uu_tien": "urgent",
+  "nguon": "KPI D + thực tế trạm cân",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "App cân đọc được số từ đầu cân",
+    "requires_evidence": true
+   },
+   {
+    "title": "Thử cân 1 xe thật",
+    "requires_evidence": false
+   },
+   {
+    "title": "Mất kết nối → kiểm cổng COM, dây RS232, nguồn đầu cân trước khi báo kỹ thuật",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 19,
+  "to": "Điện",
+  "ten": "Kiểm tra tỷ lệ thiết bị IoT online",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "07:30",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Rà soát cảm biến/thiết bị IoT còn online, xử lý thiết bị rớt.",
+  "uu_tien": "medium",
+  "nguon": "KPI D",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Rà tỷ lệ thiết bị/cảm biến IoT còn online",
+    "requires_evidence": false
+   },
+   {
+    "title": "Thiết bị rớt mạng → khởi động lại hoặc báo",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 20,
+  "to": "Điện",
+  "ten": "Kiểm tra uptime camera Dahua & mạng LAN/switch",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "07:45",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Soát camera RTSP, switch, đường LAN nhà máy.",
+  "uu_tien": "medium",
+  "nguon": "KPI D",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Đủ camera Dahua lên hình",
+    "requires_evidence": false
+   },
+   {
+    "title": "Switch + đường LAN không báo lỗi",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 21,
+  "to": "Điện",
+  "ten": "Vận hành & kiểm tra hệ bơm cấp nước, máy nén khí",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "07:00",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Kiểm tra bơm, áp lực khí nén, rò rỉ, tiếng kêu bất thường.",
+  "uu_tien": "high",
+  "nguon": "KPI C",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Bơm cấp nước chạy êm, áp lực khí nén đủ",
+    "requires_evidence": false
+   },
+   {
+    "title": "Không rò rỉ, không tiếng kêu bất thường",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 22,
+  "to": "Điện",
+  "ten": "Vận hành hệ xử lý nước thải & kiểm tra thông số đầu ra",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "09:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Vận hành hệ XLNT, ghi thông số đầu ra theo quy định môi trường.",
+  "uu_tien": "high",
+  "nguon": "KPI C",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Hệ xử lý nước thải vận hành bình thường",
+    "requires_evidence": false
+   },
+   {
+    "title": "Ghi thông số đầu ra theo quy định môi trường",
+    "requires_evidence": true
+   }
+  ]
+ },
+ {
+  "stt": 23,
+  "to": "Điện",
+  "ten": "Giám sát mực nước & cảm biến lưu lượng (IoT nước)",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "09:00",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Theo dõi mực nước bể, lưu lượng; cảnh báo bất thường.",
+  "uu_tien": "medium",
+  "nguon": "KPI C/D",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Mực nước bể trong ngưỡng",
+    "requires_evidence": false
+   },
+   {
+    "title": "Cảm biến lưu lượng báo số hợp lý",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 24,
+  "to": "Điện",
+  "ten": "Kiểm tra chống rò rỉ đường ống, van, đồng hồ nước",
+  "freq": "weekly",
+  "day_of_week": 3,
+  "day_of_month": null,
+  "time_of_day": "08:00",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Đi tuyến ống, van, đồng hồ; ghi điểm rò rỉ cần xử lý.",
+  "uu_tien": "medium",
+  "nguon": "KPI C",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Đi hết tuyến ống, van, đồng hồ nước",
+    "requires_evidence": false
+   },
+   {
+    "title": "Ghi điểm rò rỉ cần xử lý (chụp nếu có)",
+    "requires_evidence": true
+   }
+  ]
+ },
+ {
+  "stt": 25,
+  "to": "Điện",
+  "ten": "Đo dòng điện các pha tủ MCCB & ghi trị số",
+  "freq": "weekly",
+  "day_of_week": 5,
+  "day_of_month": null,
+  "time_of_day": "08:30",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Đo & ghi dòng từng pha các tủ, so sánh kỳ trước (vd 35.83A).",
+  "uu_tien": "high",
+  "nguon": "Dữ liệu thô 09,18/07",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Đo dòng từng pha các tủ MCCB, ghi trị số",
+    "requires_evidence": true
+   },
+   {
+    "title": "So với kỳ trước — đánh dấu tủ lệch bất thường",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 26,
+  "to": "Điện",
+  "ten": "Bảo trì & chạy thử trạm biến áp, ATS, máy phát dự phòng",
+  "freq": "monthly",
+  "day_of_week": null,
+  "day_of_month": 8,
+  "time_of_day": "08:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Vệ sinh, siết cực, chạy thử máy phát & ATS có tải; ghi biên bản.",
+  "uu_tien": "urgent",
+  "nguon": "KPI A",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Vệ sinh, siết cực trạm biến áp",
+    "requires_evidence": false
+   },
+   {
+    "title": "Chạy thử máy phát dự phòng + ATS có tải",
+    "requires_evidence": false
+   },
+   {
+    "title": "Ghi biên bản chạy thử",
+    "requires_evidence": true
+   }
+  ]
+ },
+ {
+  "stt": 27,
+  "to": "Điện",
+  "ten": "Đo nhiệt độ điểm nối & kiểm tra cân bằng pha tủ điện",
+  "freq": "monthly",
+  "day_of_week": null,
+  "day_of_month": 8,
+  "time_of_day": "10:00",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Đo nhiệt điểm nối (camera nhiệt nếu có), kiểm cân bằng pha.",
+  "uu_tien": "high",
+  "nguon": "KPI A",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Đo nhiệt các điểm nối tủ điện (chụp điểm nóng nếu có)",
+    "requires_evidence": true
+   },
+   {
+    "title": "Kiểm cân bằng pha các tủ",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 28,
+  "to": "Điện",
+  "ten": "Sao lưu chương trình PLC/HMI & cấu hình biến tần",
+  "freq": "monthly",
+  "day_of_week": null,
+  "day_of_month": 15,
+  "time_of_day": "14:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Backup toàn bộ chương trình, lưu tối thiểu 2 nơi, ghi phiên bản.",
+  "uu_tien": "high",
+  "nguon": "KPI B",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Backup toàn bộ chương trình PLC/HMI + cấu hình biến tần",
+    "requires_evidence": false
+   },
+   {
+    "title": "Lưu tối thiểu 2 nơi, ghi phiên bản/ngày backup",
+    "requires_evidence": true
+   }
+  ]
+ },
+ {
+  "stt": 29,
+  "to": "Điện",
+  "ten": "Kiểm tra an toàn điện & lao động (LOTO, tiếp địa, chống quá tải)",
+  "freq": "monthly",
+  "day_of_week": null,
+  "day_of_month": 20,
+  "time_of_day": "08:00",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Soát quy trình LOTO, hệ tiếp địa, thiết bị bảo vệ quá tải.",
+  "uu_tien": "urgent",
+  "nguon": "KPI E",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Soát quy trình LOTO (khoá — treo thẻ)",
+    "requires_evidence": false
+   },
+   {
+    "title": "Kiểm hệ tiếp địa",
+    "requires_evidence": false
+   },
+   {
+    "title": "Kiểm thiết bị bảo vệ quá tải",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 30,
+  "to": "Điện",
+  "ten": "Kiểm kê & đề xuất tồn kho vật tư – phụ tùng điện dự phòng",
+  "freq": "monthly",
+  "day_of_week": null,
+  "day_of_month": 25,
+  "time_of_day": "14:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Đếm tồn CB, contactor, cảm biến, cáp…; đề xuất bổ sung.",
+  "uu_tien": "medium",
+  "nguon": "KPI E",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Đếm tồn CB, contactor, cảm biến, cáp dự phòng",
+    "requires_evidence": false
+   },
+   {
+    "title": "Đề xuất bổ sung phần thiếu",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 31,
+  "to": "Điện",
+  "ten": "Nộp phiếu tự đánh giá KPI kèm minh chứng",
+  "freq": "monthly",
+  "day_of_week": null,
+  "day_of_month": 28,
+  "time_of_day": "15:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Tự chấm 23 chỉ tiêu, đính minh chứng, nộp Trưởng phòng.",
+  "uu_tien": "high",
+  "nguon": "KPI F",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Tự chấm 23 chỉ tiêu KPI",
+    "requires_evidence": false
+   },
+   {
+    "title": "Đính minh chứng",
+    "requires_evidence": true
+   },
+   {
+    "title": "Nộp Trưởng phòng",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 32,
+  "to": "Điện",
+  "ten": "Kiểm tra điểm 0 bàn cân đầu ca & soát gầm cân (cả 2 trạm)",
+  "freq": "daily",
+  "day_of_week": null,
+  "day_of_month": null,
+  "time_of_day": "06:30",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Bàn cân TRỐNG phải hiện đúng 0; lệch quá 1 độ chia (e) thì zero lại và GHI SỔ (lệch lặp lại nhiều ngày là dấu hiệu cân trôi). Nhìn nhanh gầm cân / hố cân: đá, bùn, nước đọng, vật kẹt chạm bàn cân — đều làm sai số cân.",
+  "uu_tien": "high",
+  "nguon": "ĐLVN 13:2019 — duy trì đặc tính đo giữa 2 kỳ kiểm định",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Bàn cân TRỐNG hiện đúng 0 (chụp màn hình đầu cân)",
+    "requires_evidence": true
+   },
+   {
+    "title": "Lệch quá 1 độ chia (e) → zero lại và GHI SỔ",
+    "requires_evidence": false
+   },
+   {
+    "title": "Soát gầm cân / hố cân: đá, bùn, nước, vật kẹt",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 33,
+  "to": "Điện",
+  "ten": "Vệ sinh gầm & hố cân, kiểm tra hộp nối + cáp tín hiệu loadcell",
+  "freq": "weekly",
+  "day_of_week": 2,
+  "day_of_month": null,
+  "time_of_day": "08:00",
+  "nguoi": "Ngô Quý Trường Sơn",
+  "mo_ta": "Dọn đá, bùn, rác mủ dưới bàn cân; thoát nước hố cân. Mở hộp nối (junction box) kiểm tra khô ráo, siết lại đầu cáp, kiểm tra chống ẩm. Đây là nguyên nhân phổ biến nhất làm bàn cân trôi số.",
+  "uu_tien": "high",
+  "nguon": "ĐLVN 13:2019 — bảo quản cân ô tô",
+  "employee_id": "02a6b75d-d28e-471a-9d29-def8d1bf6dfd",
+  "checklist_items": [
+   {
+    "title": "Dọn đá, bùn, rác mủ dưới bàn cân; thoát nước hố cân",
+    "requires_evidence": false
+   },
+   {
+    "title": "Hộp nối (junction box) khô ráo, siết lại cáp tín hiệu loadcell",
+    "requires_evidence": true
+   }
+  ]
+ },
+ {
+  "stt": 34,
+  "to": "Điện",
+  "ten": "Đối chiếu khối lượng cân giữa 2 trạm (Tân Lâm ↔ Phong Điền)",
+  "freq": "weekly",
+  "day_of_week": 1,
+  "day_of_month": null,
+  "time_of_day": "09:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "Lấy các chuyến đi lấy mủ trong tuần trên ERP, so KL cân ở Tân Lâm với KL cân ở Phong Điền cùng chuyến. Lệch quá 0,5% tải hoặc 60 kg (lấy mức lớn hơn) → báo Trưởng phòng, lập biên bản kiểm tra cân. TUYỆT ĐỐI không sửa số cân cho khớp. Lệch LUÔN theo một chiều qua nhiều chuyến = cân lệch hệ thống, phải kiểm định lại.",
+  "uu_tien": "high",
+  "nguon": "Thực tế 19/07/2026 — chuyến LDD-2607-031 lệch 210 kg (1,7%)",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Lấy các chuyến đi lấy mủ trong tuần trên ERP",
+    "requires_evidence": false
+   },
+   {
+    "title": "So KL cân Tân Lâm ↔ Phong Điền cùng chuyến",
+    "requires_evidence": false
+   },
+   {
+    "title": "Lệch quá 0,5% (hoặc 60 kg) → báo Trưởng phòng, KHÔNG sửa số cân",
+    "requires_evidence": false
+   }
+  ]
+ },
+ {
+  "stt": 35,
+  "to": "Điện",
+  "ten": "Kiểm tra sai số bàn cân: độ lặp lại, độ lệch tâm, tín hiệu loadcell",
+  "freq": "monthly",
+  "day_of_week": null,
+  "day_of_month": 10,
+  "time_of_day": "08:00",
+  "nguoi": "Võ Văn Hoài",
+  "mo_ta": "(1) Độ lặp lại: 1 xe có tải cân 3 lần liên tiếp, giữa các lần cho xe xuống rồi lên lại — chênh lớn nhất phải ≤ sai số cho phép. (2) Độ lệch tâm: đưa tải lần lượt về 4 góc và giữa bàn cân — lệch ở 1 góc thì nghi loadcell/gối đỡ góc đó. (3) Đo mV từng loadcell qua hộp nối, so với tháng trước. Ghi rõ độ chia e trên tem kiểm định của từng trạm — mọi ngưỡng sai số đều tính theo e (đang sử dụng: ±2e ở mức tải 500e–2000e, ví dụ e=10kg thì xe 12 tấn cho phép lệch ±20 kg).",
+  "uu_tien": "urgent",
+  "nguon": "ĐLVN 13:2019 — tự kiểm giữa 2 kỳ kiểm định",
+  "employee_id": "9cdcad95-fb04-448d-bd9a-8933302ad660",
+  "checklist_items": [
+   {
+    "title": "Độ lặp lại: cân 1 xe có tải 3 lần liên tiếp — chênh ≤ sai số cho phép (chụp 3 số)",
+    "requires_evidence": true
+   },
+   {
+    "title": "Độ lệch tâm: đưa tải về 4 góc + giữa bàn cân",
+    "requires_evidence": false
+   },
+   {
+    "title": "Đo mV từng loadcell, so với tháng trước",
+    "requires_evidence": false
+   }
+  ]
+ }
+]

@@ -10,7 +10,8 @@
 // ============================================================
 
 import { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/authStore';
 
@@ -81,6 +82,12 @@ const UserSettingsPage = lazy(() => import('./pages/settings/UserSettingsPage'))
 const MachineReportPage = lazy(() => import('./pages/mobile/MachineReportPage'));
 // ===== MOBILE thợ bảo trì (đăng nhập): hàng chờ phiếu báo hỏng =====
 const MachineQueuePage = lazy(() => import('./pages/mobile/MachineQueuePage'));
+// ===== APP "Huy Anh Ops" — vỏ mobile 4 tab (Hôm nay/Tuần tra/Ca/Công) =====
+const OpsShell = lazy(() => import('./pages/mobile/OpsShell'));
+const OpsHome = lazy(() => import('./pages/mobile/OpsHome'));
+const OpsPatrol = lazy(() => import('./pages/mobile/OpsPatrol'));
+const OpsShift = lazy(() => import('./pages/mobile/OpsShift'));
+const OpsTimesheet = lazy(() => import('./pages/mobile/OpsTimesheet'));
 
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
 const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
@@ -364,6 +371,20 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// App native "Huy Anh Ops" mở là vào thẳng vỏ mobile /m/app (web KHÔNG đổi).
+// Chỉ chặn trang gốc '/'; điều hướng nội bộ (vd /tasks/:id) vẫn cho qua.
+function NativeGate() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const { isAuthenticated } = useAuthStore();
+  useEffect(() => {
+    if (Capacitor.isNativePlatform() && isAuthenticated && loc.pathname === '/') {
+      nav('/m/app', { replace: true });
+    }
+  }, [isAuthenticated, loc.pathname, nav]);
+  return null;
+}
+
 function LoadingSpinner() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -377,6 +398,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthInitializer>
+          <NativeGate />
           <Routes>
             {/* ============================================================ */}
             {/* ERP Login                                                    */}
@@ -390,6 +412,15 @@ function App() {
 
             {/* Thợ bảo trì (đăng nhập) — hàng chờ báo hỏng, layout mobile riêng */}
             <Route path="/m/yeu-cau" element={<ProtectedRoute><MachineQueuePage /></ProtectedRoute>} />
+
+            {/* App "Huy Anh Ops" — vỏ mobile 4 tab cho thợ (đăng nhập) */}
+            <Route path="/m" element={<Navigate to="/m/app" replace />} />
+            <Route path="/m/app" element={<ProtectedRoute><Suspense fallback={<LoadingSpinner />}><OpsShell /></Suspense></ProtectedRoute>}>
+              <Route index element={<Suspense fallback={<LoadingSpinner />}><OpsHome /></Suspense>} />
+              <Route path="tuan-tra" element={<Suspense fallback={<LoadingSpinner />}><OpsPatrol /></Suspense>} />
+              <Route path="ca" element={<Suspense fallback={<LoadingSpinner />}><OpsShift /></Suspense>} />
+              <Route path="cong" element={<Suspense fallback={<LoadingSpinner />}><OpsTimesheet /></Suspense>} />
+            </Route>
 
             {/* ============================================================ */}
             {/* Protected Routes — ERP Internal                              */}

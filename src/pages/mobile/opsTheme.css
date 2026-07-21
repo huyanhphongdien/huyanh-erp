@@ -1,0 +1,153 @@
+/* ==========================================================================
+   Huy Anh Ops — hệ thiết kế mobile (Material Design, xanh cao su + xanh chanh)
+   Port từ mock_android.html. Mọi class prefix .ops- + biến scope .ops-root
+   để KHÔNG đụng Tailwind/global của ERP. Tự đổi sáng/tối theo máy.
+   ========================================================================== */
+.ops-root {
+  --g:#0F5132; --g-d:#0A3A24; --g-dd:#062017; --lime:#52C41A; --lime-d:#3B9612;
+  --ink:#0B1A13; --ink-2:#3D4F46; --ink-3:#728478;
+  --bg:#EEF1EC; --surf:#FFFFFF; --surf-2:#F5F7F3; --line:#DEE3DA;
+  --red:#C1291F; --red-bg:#FCE8E6; --amber:#B7791F; --amber-bg:#FDF1D6;
+  --ok:#1E7D3A; --ok-bg:#DEF3E3;
+  --mono:ui-monospace,"Roboto Mono",Consolas,monospace;
+  --sans:"Roboto","Google Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --el1:0 1px 2px rgba(11,26,19,.10), 0 1px 3px rgba(11,26,19,.06);
+  --el2:0 2px 6px rgba(11,26,19,.12), 0 6px 16px rgba(11,26,19,.10);
+  --el3:0 8px 28px rgba(11,26,19,.20);
+
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans); line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark) {
+  .ops-root {
+    --ink:#E4EAE5; --ink-2:#A7B6AC; --ink-3:#76887C;
+    --bg:#070C09; --surf:#121A15; --surf-2:#0D1410; --line:#232E27;
+    --g:#2FA163; --g-d:#0C2418; --g-dd:#081711; --lime:#6BE03A; --lime-d:#52C41A;
+    --red:#F0776D; --red-bg:#33130F; --amber:#E6A93C; --amber-bg:#2E2109;
+    --ok:#57D07C; --ok-bg:#0E2A17;
+    --el1:0 1px 2px rgba(0,0,0,.5); --el2:0 4px 14px rgba(0,0,0,.5); --el3:0 10px 30px rgba(0,0,0,.6);
+  }
+}
+
+.ops-root *, .ops-root *::before, .ops-root *::after { box-sizing: border-box; }
+
+/* ---- App bar (đầu trang, xanh cao su, chừa tai thỏ) ---- */
+.ops-appbar {
+  background: var(--g); color: #fff;
+  padding: calc(10px + env(safe-area-inset-top)) 15px 12px;
+  display: flex; align-items: center; gap: 11px; flex: 0 0 auto;
+  box-shadow: var(--el1);
+}
+.ops-appbar.red { background: var(--red); }
+.ops-appbar .ops-av {
+  width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.16);
+  display: grid; place-items: center; font-size: 20px; flex: 0 0 40px;
+}
+.ops-appbar .ops-tt { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.ops-appbar .ops-su { font-size: 11.5px; opacity: .85; margin-top: 1px; }
+.ops-appbar .ops-r { margin-left: auto; display: flex; gap: 14px; font-size: 19px; align-items: center; }
+.ops-appbar .ops-bell { position: relative; background: none; border: 0; color: #fff; font-size: 19px; padding: 4px; cursor: pointer; }
+.ops-appbar .ops-bell .dot {
+  position: absolute; top: 0; right: 0; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 8px; background: var(--lime); color: #06210A; font-size: 10px; font-weight: 800;
+  display: grid; place-items: center; box-shadow: 0 0 0 2px var(--g);
+}
+
+/* ---- Body cuộn ---- */
+.ops-body {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--surf-2);
+  padding: 12px;
+  padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ops-inner { width: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+
+/* ---- Bottom nav Material ---- */
+.ops-botnav {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: calc(60px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surf); border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-around;
+  z-index: 20;
+}
+.ops-botnav .it {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10px; color: var(--ink-3); font-weight: 600; flex: 1;
+  background: none; border: 0; cursor: pointer; padding: 0;
+}
+.ops-botnav .it .ico { width: 56px; height: 28px; border-radius: 16px; display: grid; place-items: center; font-size: 17px; transition: background .15s; }
+.ops-botnav .it.on { color: var(--g); }
+.ops-botnav .it.on .ico { background: color-mix(in srgb, var(--lime) 26%, transparent); }
+
+/* ---- FAB (quẹt QR) ---- */
+.ops-fab {
+  position: absolute; right: 16px; bottom: calc(74px + env(safe-area-inset-bottom));
+  width: 56px; height: 56px; border-radius: 18px; background: var(--lime); color: #06210A;
+  display: grid; place-items: center; font-size: 25px; box-shadow: var(--el2);
+  z-index: 21; border: 0; cursor: pointer; font-weight: 700;
+}
+
+/* ---- Card + typography ---- */
+.ops-card { background: var(--surf); border-radius: 14px; padding: 12px 13px; box-shadow: var(--el1); }
+.ops-card.tint { background: color-mix(in srgb, var(--lime) 12%, var(--surf)); }
+.ops-card.press { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .08s; }
+.ops-card.press:active { transform: scale(.985); }
+.ops-lbl { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); font-weight: 750; margin-bottom: 4px; }
+.ops-big { font-size: 30px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.03; }
+.ops-mid { font-size: 16px; font-weight: 750; letter-spacing: -.015em; }
+.ops-sm { font-size: 11.5px; color: var(--ink-3); }
+.ops-rw { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ops-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ---- Chip ---- */
+.ops-chip { font-size: 10px; font-weight: 750; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.ops-chip.ok { background: var(--ok-bg); color: var(--ok); }
+.ops-chip.red { background: var(--red-bg); color: var(--red); }
+.ops-chip.amb { background: var(--amber-bg); color: var(--amber); }
+.ops-chip.lime { background: color-mix(in srgb, var(--lime) 20%, transparent); color: var(--lime-d); }
+.ops-chip.mut { background: var(--line); color: var(--ink-2); }
+
+/* ---- Nút ---- */
+.ops-btn { border: 0; border-radius: 26px; padding: 13px; font: inherit; font-size: 14.5px; font-weight: 750; letter-spacing: .01em; width: 100%; box-shadow: var(--el1); cursor: pointer; }
+.ops-btn.g { background: var(--g); color: #fff; }
+.ops-btn.l { background: var(--lime); color: #06210A; }
+.ops-btn.r { background: var(--red); color: #fff; }
+.ops-btn.o { background: transparent; box-shadow: none; border: 1.5px solid var(--line); color: var(--ink-2); }
+.ops-btn:disabled { opacity: .55; }
+
+/* ---- Điểm tuần tra / dòng việc ---- */
+.ops-pt { display: flex; gap: 11px; align-items: center; background: var(--surf); border-radius: 13px; padding: 11px 12px; box-shadow: var(--el1); position: relative; }
+.ops-pt.done { background: var(--ok-bg); }
+.ops-pt.now { box-shadow: 0 0 0 2px var(--lime), var(--el1); }
+.ops-ptn { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 800; background: var(--line); color: var(--ink-3); flex: 0 0 30px; }
+.ops-pt.done .ops-ptn { background: var(--ok); color: #fff; }
+.ops-pt.now .ops-ptn { background: var(--g); color: #fff; }
+.ops-ptt { font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; }
+.ops-ptm { font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+.ops-pt.done .ops-ptm { color: var(--ok); }
+
+/* ---- Trạng thái rỗng / tải ---- */
+.ops-empty { text-align: center; padding: 44px 20px; color: var(--ink-3); }
+.ops-empty .em { font-size: 42px; }
+.ops-empty .et { font-size: 16px; font-weight: 700; color: var(--ink); margin-top: 10px; }
+.ops-empty .ed { font-size: 13px; margin-top: 4px; }
+.ops-skel { height: 70px; border-radius: 14px; background: linear-gradient(90deg, var(--surf) 25%, var(--surf-2) 50%, var(--surf) 75%); background-size: 200% 100%; animation: ops-sh 1.3s infinite; }
+@keyframes ops-sh { to { background-position: -200% 0; } }
+
+/* ---- Section header trong body ---- */
+.ops-sh { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 800; margin: 6px 2px 0; }
+
+/* ---- Banner cảnh báo (máy đang chờ) ---- */
+.ops-alert { display: flex; align-items: center; gap: 11px; background: var(--red); color: #fff; border-radius: 14px; padding: 13px 14px; box-shadow: var(--el2); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ops-alert .ic { font-size: 24px; }
+.ops-alert .n { font-size: 15px; font-weight: 780; }
+.ops-alert .d { font-size: 11.5px; opacity: .9; margin-top: 1px; }
+.ops-alert .go { margin-left: auto; font-size: 20px; opacity: .9; }
+@media (prefers-reduced-motion: no-preference) { .ops-alert { animation: ops-pulse 2.2s ease-in-out infinite; } }
+@keyframes ops-pulse { 0%,100% { box-shadow: var(--el2); } 50% { box-shadow: var(--el2), 0 0 0 4px color-mix(in srgb, var(--red) 30%, transparent); } }

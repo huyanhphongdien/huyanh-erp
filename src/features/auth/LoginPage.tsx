@@ -4,12 +4,13 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { Button, Card } from '../../components/ui';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   const [email, setEmail] = useState('');
@@ -22,12 +23,13 @@ export function LoginPage() {
     clearError();
   }, [clearError]);
 
-  // Tự động chuyển trang khi đã đăng nhập
+  // Tự động chuyển trang khi đã đăng nhập — về đúng trang đích (vd app Ops /m/app)
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      const to = (location.state as any)?.from?.pathname || '/';
+      navigate(to, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

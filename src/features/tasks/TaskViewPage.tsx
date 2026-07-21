@@ -170,20 +170,23 @@ export function TaskViewPage() {
       const isRecurring = t?.task_source === 'recurring'
       const isProject = t?.task_source === 'project'
 
-      // ★ Task dự án: bắt buộc phải có ảnh minh chứng
+      // ★ 0.5 — Kiểm ảnh áp cho MỌI việc có bước "bắt buộc ảnh" (gồm việc ĐỊNH KỲ).
+      //   Trước đây khối này nằm trong if(isProject) nên việc định kỳ đi thẳng
+      //   xuống nhánh tự chấm 80 điểm mà KHÔNG kiểm một tấm ảnh nào (lỗ hổng).
+      const { count: missingEvidence } = await supabase
+        .from('task_checklist_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('task_id', id)
+        .eq('requires_evidence', true)
+        .is('evidence_url', null)
+      if (missingEvidence && missingEvidence > 0) {
+        message.warning(`Còn ${missingEvidence} bước bắt buộc chưa có ảnh minh chứng. Vui lòng upload trước khi hoàn thành.`)
+        setActionLoading(null)
+        return
+      }
+
+      // ★ Riêng việc DỰ ÁN: thêm quy tắc phải có ít nhất 1 ảnh toàn task.
       if (isProject) {
-        const { count: evidenceCount } = await supabase
-          .from('task_checklist_items')
-          .select('id', { count: 'exact', head: true })
-          .eq('task_id', id)
-          .eq('requires_evidence', true)
-          .is('evidence_url', null)
-        if (evidenceCount && evidenceCount > 0) {
-          message.warning(`Còn ${evidenceCount} bước chưa có ảnh minh chứng. Vui lòng upload trước khi hoàn thành.`)
-          setActionLoading(null)
-          return
-        }
-        // Kiểm tra có ít nhất 1 evidence trong toàn task
         const { count: totalEvidence } = await supabase
           .from('task_checklist_items')
           .select('id', { count: 'exact', head: true })

@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons'
 import { taskChecklistService, ChecklistItem } from '../../services/taskChecklistService'
 import { supabase } from '../../lib/supabase'
+import { compressImage } from '../../lib/imageCompress'
 import { useAuthStore } from '../../stores/authStore'
 
 const { Text } = Typography
@@ -26,7 +27,7 @@ interface TaskChecklistProps {
 }
 
 const MAX_FILES = 10
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB (ảnh sẽ được nén còn ~300KB; trần này cho video/PDF)
 const ACCEPT_TYPES = 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx'
 
 function getFileIcon(url: string) {
@@ -142,7 +143,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
   // ── File selection ──
   const addFiles = useCallback((newFiles: File[]) => {
     const valid = newFiles.filter(f => {
-      if (f.size > MAX_FILE_SIZE) { message.warning(`${f.name} quá lớn (max 50MB)`); return false }
+      if (f.size > MAX_FILE_SIZE) { message.warning(`${f.name} quá lớn (max 20MB)`); return false }
       return true
     })
     setPendingFiles(prev => {
@@ -184,7 +185,8 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
       const total = pendingFiles.length
 
       for (let i = 0; i < pendingFiles.length; i++) {
-        const file = pendingFiles[i]
+        // 0.6 — nén ảnh trước khi gửi (2,6MB → ~300KB). Lỗi nén tự trả về file gốc.
+        const file = await compressImage(pendingFiles[i])
         const ext = file.name.split('.').pop() || 'bin'
         const path = `evidence/${taskId}/${uploadingId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`
         const { error: uploadError } = await supabase.storage.from('task-evidence').upload(path, file)
@@ -374,7 +376,7 @@ export default function TaskChecklist({ taskId, readonly = false, userId, onProg
                         </Text>
                         <br />
                         <Text type="secondary" style={{ fontSize: 10 }}>
-                          Ảnh, video, PDF, Word, Excel — Tối đa {MAX_FILES} file, mỗi file ≤ 50MB
+                          Ảnh, video, PDF, Word, Excel — Tối đa {MAX_FILES} file, mỗi file ≤ 20MB (ảnh tự nén nhẹ)
                         </Text>
                       </div>
 

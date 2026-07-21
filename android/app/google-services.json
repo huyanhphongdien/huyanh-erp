@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "731946898681",
+    "project_id": "huyanh-b2b",
+    "storage_bucket": "huyanh-b2b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:731946898681:android:9661c8f768eacc194bbe28",
+        "android_client_info": {
+          "package_name": "vn.huyanhrubber.b2b"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkoLXuwCPI8O-xEjqAahRWbHuYX1nwwhM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:731946898681:android:8829f8a5e2a97afe4bbe28",
+        "android_client_info": {
+          "package_name": "vn.huyanhrubber.qlsx"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkoLXuwCPI8O-xEjqAahRWbHuYX1nwwhM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

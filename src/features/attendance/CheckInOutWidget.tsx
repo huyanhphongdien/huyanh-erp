@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { attendanceService } from '../../services/attendanceService'
+import { getActiveShifts } from '../../services/opsService'
 import type {
   ShiftInfo,
   AttendanceRecord,
@@ -166,6 +167,8 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
   const [gpsPosition, setGpsPosition] = useState<GPSData | null>(null)
   const [gpsError, setGpsError] = useState<string | null>(null)
   const [showAllShifts, setShowAllShifts] = useState(false)
+  // Tự chọn ca: NV chủ động chọn ca vào làm hôm nay (override ca auto-detect)
+  const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null)
   const [toast, setToast] = useState<{
     type: 'success' | 'error'
     message: string
@@ -241,6 +244,13 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
     staleTime: 60 * 1000,
   })
 
+  // ── Query: Danh sách ca đang bật (để NV tự chọn ca vào làm) ──
+  const { data: activeShifts = [] } = useQuery({
+    queryKey: ['active-shifts-all'],
+    queryFn: getActiveShifts,
+    staleTime: 10 * 60 * 1000,
+  })
+
   // ── Query: Today's attendance records (via service V4 — includes overnight) ──
   const { data: todayAttendances = [], isLoading: attendanceLoading } =
     useQuery({
@@ -312,11 +322,13 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
 
   // ── ★ V4: Permission checks — xử lý đúng multi-shift ──
   // canCheckIn: GPS OK + không có ca đang mở + có ca chưa hoàn thành + KHÔNG đi công tác + KHÔNG phải KT
+  // Tự chọn ca: khi NV chủ động chọn ca (selectedShiftId) → cho check-in kể cả
+  // chưa phân ca hoặc đã xong ca trước (làm 2 ca liên tục). Không chọn → y như cũ.
   const canCheckIn =
     gpsStatus === 'available' &&
     !openAttendance &&
-    currentShiftAssignment !== null &&
-    !isComplete &&
+    (currentShiftAssignment !== null || !!selectedShiftId) &&
+    (!isComplete || !!selectedShiftId) &&
     !isOnBusinessTrip &&
     !isAccountingDept
 
@@ -349,6 +361,8 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
     queryClient.invalidateQueries({ queryKey: ['today-attendance'] })
     queryClient.invalidateQueries({ queryKey: ['open-attendance'] })
     queryClient.invalidateQueries({ queryKey: ['attendance'] })
+    queryClient.invalidateQueries({ queryKey: ['today-attendances'] })
+    setSelectedShiftId(null)
     onCheckInOut?.()
   }, [queryClient, onCheckInOut])
 
@@ -359,7 +373,7 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
         throw new Error('Không tìm thấy thông tin nhân viên')
 
       return attendanceService.checkIn(employeeId, {
-        targetShiftId: currentShift?.id,
+        targetShiftId: selectedShiftId || currentShift?.id,
         gps: gpsPosition,
         isGpsVerified: gpsStatus === 'available' && !!gpsPosition,
       })
@@ -624,6 +638,27 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
               </div>
             )}
 
+            {/* Tự chọn ca vào làm (override ca auto-detect; hỗ trợ 2 ca liên tục) */}
+            {!openAttendance && !isOnBusinessTrip && !isAccountingDept && activeShifts.length > 0 && (
+              <div className="mb-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  {currentShift ? 'Ca của bạn (đổi nếu làm ca khác)' : 'Chọn ca vào làm hôm nay'}
+                </label>
+                <select
+                  value={selectedShiftId ?? (currentShift?.id ?? '')}
+                  onChange={(e) => setSelectedShiftId(e.target.value || null)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm bg-white text-gray-800 min-h-[44px]"
+                >
+                  {!currentShift && <option value="">— Chọn ca —</option>}
+                  {activeShifts.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({formatTime(s.start_time)}–{formatTime(s.end_time)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Check-in button */}
             {canCheckIn && (
               <button
@@ -640,9 +675,10 @@ export function CheckInOutWidget({ onCheckInOut, compact = false }: Props) {
                 )}
                 {isActionLoading
                   ? 'Đang xử lý...'
-                  : currentShift
-                    ? `Check-in — ${currentShift.name}`
-                    : 'Check-in'}
+                  : (() => {
+                      const name = (selectedShiftId ? activeShifts.find((s) => s.id === selectedShiftId)?.name : null) || currentShift?.name
+                      return name ? `Check-in — ${name}` : 'Check-in'
+                    })()}
               </button>
             )}
 

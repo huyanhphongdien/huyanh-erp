@@ -60,13 +60,25 @@ export type OpsAttendance = {
   working_minutes: number | null; overtime_minutes: number | null
   is_gps_verified: boolean | null; check_in_lat: number | null; check_in_lng: number | null
 }
-export async function getTodayAttendance(employeeId: string): Promise<OpsAttendance | null> {
+// Tất cả bản ghi chấm công HÔM NAY (có thể 1–2 ca) — mới nhất trước
+export async function getTodayAttendanceRows(employeeId: string): Promise<(OpsAttendance & { shift_id: string | null; shift?: { name: string } | null })[]> {
   const { data } = await supabase
     .from('attendance')
-    .select('id, date, check_in_time, check_out_time, status, late_minutes, early_leave_minutes, working_minutes, overtime_minutes, is_gps_verified, check_in_lat, check_in_lng')
+    .select('id, date, check_in_time, check_out_time, status, late_minutes, early_leave_minutes, working_minutes, overtime_minutes, is_gps_verified, check_in_lat, check_in_lng, shift_id, shift:shift_id(name)')
     .eq('employee_id', employeeId).eq('date', vnToday())
-    .maybeSingle()
-  return (data as OpsAttendance) || null
+    .order('check_in_time', { ascending: true })
+  return (data as any) || []
+}
+
+export type OpsShiftOption = { id: string; code: string | null; name: string; start_time: string | null; end_time: string | null; shift_category: string | null; crosses_midnight: boolean | null }
+// Danh sách ca đang bật để thợ TỰ CHỌN khi vào ca
+export async function getActiveShifts(): Promise<OpsShiftOption[]> {
+  const { data } = await supabase
+    .from('shifts')
+    .select('id, code, name, start_time, end_time, shift_category, crosses_midnight')
+    .eq('is_active', true)
+    .order('start_time', { ascending: true })
+  return (data as OpsShiftOption[]) || []
 }
 export async function getMonthAttendance(employeeId: string): Promise<OpsAttendance[]> {
   const { first, last } = vnMonthRange()

@@ -77,6 +77,9 @@ const CoverageDashboardPage = lazy(() => import('./pages/operations/CoverageDash
 // User Settings
 const UserSettingsPage = lazy(() => import('./pages/settings/UserSettingsPage'));
 
+// ===== MOBILE CÔNG KHAI: quét QR máy → báo hỏng (KHÔNG cần đăng nhập) =====
+const MachineReportPage = lazy(() => import('./pages/mobile/MachineReportPage'));
+
 // ===== CHẤM CÔNG V2: Ca, Phân ca, Tăng ca =====
 const ShiftListPage = lazy(() => import('./features/shifts').then(m => ({ default: m.ShiftListPage })));
 const ShiftCalendarPage = lazy(() => import('./features/shift-assignments').then(m => ({ default: m.ShiftCalendarPage })));
@@ -368,6 +371,11 @@ function App() {
             {/* ERP Login                                                    */}
             {/* ============================================================ */}
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+
+            {/* ============================================================ */}
+            {/* CÔNG KHAI — quét QR máy báo hỏng (công nhân KHÔNG cần login) */}
+            {/* ============================================================ */}
+            <Route path="/m/tb/:code" element={<MachineReportPage />} />
 
             {/* ============================================================ */}
             {/* Protected Routes — ERP Internal                              */}

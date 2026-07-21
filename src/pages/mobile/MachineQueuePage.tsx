@@ -3,6 +3,7 @@
 // Thấy phiếu báo hỏng đang mở → Nhận việc → Xử lý xong. Máy đang dừng nổi đầu.
 // ============================================================================
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -30,6 +31,7 @@ function ago(iso: string) {
 }
 
 export default function MachineQueuePage() {
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [issues, setIssues] = useState<Issue[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,9 +106,11 @@ export default function MachineQueuePage() {
 
   return (
     <div style={page}>
-      <div style={{ background: C.g, color: '#fff', padding: '13px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
+      <div style={{ background: C.g, color: '#fff', padding: 'calc(13px + env(safe-area-inset-top)) 16px 13px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => navigate('/m/app')} aria-label="Quay lại"
+            style={{ background: 'rgba(255,255,255,.16)', border: 0, color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 20, cursor: 'pointer', flex: '0 0 34px', lineHeight: 1 }}>‹</button>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>Yêu cầu chờ tiếp nhận</div>
             <div style={{ fontSize: 11, opacity: .85 }}>{user?.full_name || 'Thợ bảo trì'}</div>
           </div>

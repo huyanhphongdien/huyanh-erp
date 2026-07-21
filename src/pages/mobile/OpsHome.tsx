@@ -18,7 +18,7 @@ export default function OpsHome() {
   const tasks = useQuery({ queryKey: ['ops-today-tasks', emp], queryFn: () => getTodayTasks(emp), enabled: !!emp })
   const att = useQuery({ queryKey: ['ops-today-att', emp], queryFn: () => getTodayAttendance(emp), enabled: !!emp })
   const shift = useQuery({ queryKey: ['ops-today-shift', emp], queryFn: () => getTodayShift(emp), enabled: !!emp })
-  const issues = useQuery({ queryKey: ['ops-open-issues'], queryFn: getOpenIssues, refetchInterval: 30000 })
+  const issues = useQuery({ queryKey: ['ops-open-issues'], queryFn: getOpenIssues, refetchInterval: 20000, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: true })
 
   const list = tasks.data || []
   const done = list.filter(taskDone).length

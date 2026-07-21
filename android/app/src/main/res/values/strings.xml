@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Huy Anh Ops</string>
+    <string name="title_activity_main">Huy Anh Ops</string>
+    <string name="package_name">vn.huyanhrubber.qlsx</string>
+    <string name="custom_url_scheme">vn.huyanhrubber.qlsx</string>
+</resources>

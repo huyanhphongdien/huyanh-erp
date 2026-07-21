@@ -346,11 +346,20 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AuthInitializer({ children }: { children: React.ReactNode }) {
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
+    // App Android "Huy Anh Ops": đăng ký FCM push (web = no-op)
+    import('./services/capacitorPush').then(m => m.initCapacitorPush()).catch(() => {});
   }, [checkAuth]);
+
+  // Sau khi đăng nhập → lưu FCM token theo employee
+  useEffect(() => {
+    if (isAuthenticated) {
+      import('./services/capacitorPush').then(m => m.syncFcmTokenToDb()).catch(() => {});
+    }
+  }, [isAuthenticated]);
 
   return <>{children}</>;
 }

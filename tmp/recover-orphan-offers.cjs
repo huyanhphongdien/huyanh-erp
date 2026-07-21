@@ -1,6 +1,6 @@
 const https = require('https')
 
-const SR = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5Z3ZlZXRhYXRxbGxoanVzeXp6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODQ2MDY4NSwiZXhwIjoyMDg0MDM2Njg1fQ.bw4dPo4e8pLfbdlhHFFGnCVejp15z4BPANjtOQ3h6bc'
+const SR = process.env.SUPABASE_SERVICE_ROLE_KEY || ''  // doc tu .env.local — KHONG viet cung
 const HOST = 'dygveetaatqllhjusyzz.supabase.co'
 
 function req(method, path, body) {

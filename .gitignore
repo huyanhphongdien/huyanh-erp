@@ -16,3 +16,8 @@ huyanh-erp-8/
 
 # Test render outputs (sinh từ docs/contract-templates/test_render.mjs)
 docs/contract-templates/_out_*.docx
+
+# Secrets — KHONG BAO GIO commit
+.env.local
+.env.*.local
+*.key

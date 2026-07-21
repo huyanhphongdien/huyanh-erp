@@ -7,11 +7,18 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import OpsQrScanner from './OpsQrScanner'
 import './opsTheme.css'
 
+// Icon line SVG (kế thừa màu theo .it / .it.on) — sạch hơn emoji, khỏi lệch ngày
+const I = {
+  home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></svg>,
+  patrol: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9.5 4h5V6.5h-5z" /><path d="M9 11h6M9 15h4" /></svg>,
+  shift: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><rect x="4" y="5" width="16" height="16" rx="2" /><path d="M4 9.5h16M8 3v4M16 3v4" /></svg>,
+  clock: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5l3 2" /></svg>,
+}
 const TABS = [
-  { to: '/m/app', ico: '🏠', label: 'Hôm nay', exact: true },
-  { to: '/m/app/tuan-tra', ico: '📋', label: 'Tuần tra', exact: false },
-  { to: '/m/app/ca', ico: '📅', label: 'Ca', exact: false },
-  { to: '/m/app/cong', ico: '🕐', label: 'Công', exact: false },
+  { to: '/m/app', ico: I.home, label: 'Hôm nay', exact: true },
+  { to: '/m/app/tuan-tra', ico: I.patrol, label: 'Tuần tra', exact: false },
+  { to: '/m/app/ca', ico: I.shift, label: 'Ca', exact: false },
+  { to: '/m/app/cong', ico: I.clock, label: 'Công', exact: false },
 ]
 
 export default function OpsShell() {

@@ -2,13 +2,27 @@
 // OpsHome — tab "Hôm nay": chào thợ, cảnh báo máy đang chờ, việc hôm nay,
 // trạng thái ca, nhắc việc kế tiếp. Dữ liệu thật theo employee đăng nhập.
 // ============================================================================
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
+import { attendanceService } from '../../services/attendanceService'
 import {
   getTodayTasks, getTodayAttendance, getTodayShift, getOpenIssues, taskDone,
 } from '../../services/opsService'
 import { firstName, hhmm, clock } from './opsUtil'
+
+// Lấy vị trí GPS (không bắt buộc — service tự báo lỗi nếu công ty yêu cầu GPS)
+function getGps(): Promise<{ latitude: number; longitude: number; accuracy: number } | undefined> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(undefined)
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
+      () => resolve(undefined),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+    )
+  })
+}
 
 export default function OpsHome() {
   const nav = useNavigate()
@@ -19,6 +33,25 @@ export default function OpsHome() {
   const att = useQuery({ queryKey: ['ops-today-att', emp], queryFn: () => getTodayAttendance(emp), enabled: !!emp })
   const shift = useQuery({ queryKey: ['ops-today-shift', emp], queryFn: () => getTodayShift(emp), enabled: !!emp })
   const issues = useQuery({ queryKey: ['ops-open-issues'], queryFn: getOpenIssues, refetchInterval: 20000, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: true })
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState<'in' | 'out' | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  async function doPunch(kind: 'in' | 'out') {
+    setBusy(kind); setMsg(null)
+    try {
+      const gps = await getGps()
+      if (kind === 'in') await attendanceService.checkIn(emp, { gps, isGpsVerified: !!gps })
+      else await attendanceService.checkOut(emp, { gps })
+      setMsg({ ok: true, text: kind === 'in' ? '✅ Đã vào ca' : '✅ Đã ra ca' })
+      qc.invalidateQueries({ queryKey: ['ops-today-att', emp] })
+      qc.invalidateQueries({ queryKey: ['open-attendance'] })
+      qc.invalidateQueries({ queryKey: ['attendance'] })
+      att.refetch()
+    } catch (e: any) {
+      setMsg({ ok: false, text: e?.message || 'Lỗi chấm công' })
+    } finally { setBusy(null) }
+  }
 
   const list = tasks.data || []
   const done = list.filter(taskDone).length
@@ -74,12 +107,12 @@ export default function OpsHome() {
             )}
           </div>
 
-          {/* Ca hôm nay */}
+          {/* Ca hôm nay + chấm công GPS */}
           <div className="ops-card">
             <div className="ops-rw">
               <span>
                 <div className="ops-lbl">Ca hôm nay</div>
-                <div className="ops-mid">{a?.check_in_time ? `Đã vào ca ${hhmm(a.check_in_time)}` : 'Chưa chấm công'}</div>
+                <div className="ops-mid">{a?.check_in_time ? `Đã vào ca ${hhmm(a.check_in_time)}` : 'Chưa vào ca'}</div>
               </span>
               {a?.check_in_time
                 ? <span className={`ops-chip ${a.late_minutes && a.late_minutes > 0 ? 'amb' : 'ok'}`}>{a.late_minutes && a.late_minutes > 0 ? `Trễ ${a.late_minutes}′` : 'Đúng giờ'}</span>
@@ -87,12 +120,23 @@ export default function OpsHome() {
             </div>
             {a?.check_in_time && (
               <div className="ops-sm" style={{ marginTop: 5 }}>
-                {a.is_gps_verified || a.check_in_lat ? '📍 Đã xác thực vị trí' : '📍 Chưa có vị trí'}
+                {a.is_gps_verified ? '📍 Đã xác thực vị trí' : a.check_in_lat ? '📍 Có vị trí (chưa xác thực)' : '📍 Chưa có vị trí'}
                 {a.check_out_time ? ` · Đã ra ca ${hhmm(a.check_out_time)}` : ''}
               </div>
             )}
-            {!a?.check_in_time && (
-              <div className="ops-sm" style={{ marginTop: 5 }}>Chấm công qua máy chấm/điện thoại khi vào nhà máy.</div>
+
+            {!a?.check_in_time ? (
+              <button className="ops-btn g" style={{ marginTop: 10 }} disabled={busy === 'in'} onClick={() => doPunch('in')}>
+                {busy === 'in' ? 'Đang lấy vị trí…' : '📍 Vào ca'}
+              </button>
+            ) : !a.check_out_time ? (
+              <button className="ops-btn o" style={{ marginTop: 10 }} disabled={busy === 'out'} onClick={() => doPunch('out')}>
+                {busy === 'out' ? 'Đang lấy vị trí…' : '🏁 Ra ca'}
+              </button>
+            ) : null}
+
+            {msg && (
+              <div className="ops-sm" style={{ marginTop: 8, color: msg.ok ? 'var(--ok)' : 'var(--red)', fontWeight: 650 }}>{msg.text}</div>
             )}
           </div>
 

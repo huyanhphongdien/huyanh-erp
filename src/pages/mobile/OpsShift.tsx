@@ -19,7 +19,7 @@ export default function OpsShift() {
   return (
     <>
       <header className="ops-appbar">
-        <span className="ops-av">📅</span>
+        <span className="ops-av"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22"><rect x="4" y="5" width="16" height="16" rx="2" /><path d="M4 9.5h16M8 3v4M16 3v4" /></svg></span>
         <div>
           <div className="ops-tt">Ca tuần này</div>
           <div className="ops-su">{ddmm(days[0])} – {ddmm(days[6])}</div>

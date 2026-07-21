@@ -46,7 +46,46 @@ export default function MachineQueuePage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t) }, [load])
+  // Xin quyền thông báo trình duyệt (1 lần)
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
+  }, [])
+
+  // Khi có phiếu mới → chuông + rung + thông báo (dù đang mở màn khác trong app)
+  const alertNew = useCallback((row: any) => {
+    try {
+      // chuông ngắn bằng WebAudio (không cần file)
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext
+      if (AC) {
+        const ac = new AC(); const o = ac.createOscillator(); const g = ac.createGain()
+        o.connect(g); g.connect(ac.destination); o.frequency.value = row?.severity === 'do' ? 880 : 660
+        g.gain.setValueAtTime(0.001, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.3, ac.currentTime + 0.02)
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5); o.start(); o.stop(ac.currentTime + 0.5)
+      }
+      if (navigator.vibrate) navigator.vibrate(row?.severity === 'do' ? [200, 100, 200] : [150])
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(row?.severity === 'do' ? '🔴 Máy đang DỪNG' : '🟡 Máy báo bất thường', {
+          body: `${row?.equipment_code || 'Máy'} — ${row?.symptom || 'có sự cố'}`, tag: 'machine-issue',
+        })
+      }
+    } catch { /* im lặng */ }
+  }, [])
+
+  useEffect(() => {
+    load()
+    const poll = setInterval(load, 20000)
+    // Realtime: phiếu mới → cảnh báo + nạp lại ngay
+    const ch = supabase
+      .channel('machine-issues-queue')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'machine_issues' },
+        (payload) => { alertNew(payload.new); load() })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'machine_issues' },
+        () => load())
+      .subscribe()
+    return () => { clearInterval(poll); supabase.removeChannel(ch) }
+  }, [load, alertNew])
 
   async function ack(id: string) {
     setBusy(id)
@@ -120,7 +159,7 @@ export default function MachineQueuePage() {
               </div>
             )
           })}
-        {!loading && issues.length > 0 && <div style={{ textAlign: 'center', fontSize: 11, color: C.ink3, marginTop: 4 }}>Tự cập nhật mỗi 20 giây · máy đang dừng luôn ở trên</div>}
+        {!loading && issues.length > 0 && <div style={{ textAlign: 'center', fontSize: 11, color: C.ink3, marginTop: 4 }}>Phiếu mới hiện + kêu ngay · máy đang dừng luôn ở trên</div>}
       </div>
     </div>
   )

@@ -33,16 +33,21 @@ messaging.onBackgroundMessage((payload) => {
   })
 })
 
-// Chạm thông báo → mở hàng chờ nhận việc (dùng lại tab đang mở nếu có)
+// Chạm thông báo → mở hàng chờ nhận việc (dùng lại cửa sổ đang mở nếu có).
+// Dùng URL tuyệt đối + bọc try/catch: vài trình duyệt chặn client.navigate().
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const target = (event.notification.data && event.notification.data.url) || '/m/yeu-cau'
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const c of list) {
-        if (c.url.includes('/m/') && 'focus' in c) { c.navigate(target); return c.focus() }
-      }
-      return clients.openWindow(target)
-    }),
-  )
+  const full = new URL(target, self.location.origin).href
+  event.waitUntil((async () => {
+    const list = await clients.matchAll({ type: 'window', includeUncontrolled: true })
+    for (const c of list) {
+      try {
+        if (new URL(c.url).origin !== self.location.origin) continue
+        if ('navigate' in c) { await c.navigate(full) }
+        return await c.focus()
+      } catch { /* thử cửa sổ kế tiếp */ }
+    }
+    return clients.openWindow(full)
+  })())
 })

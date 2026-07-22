@@ -3,7 +3,7 @@
 // Công nhân vận hành quét QR trên máy → xem thông tin máy + báo hỏng.
 // Không dùng layout desktop. Anon đọc equipment + gọi RPC report_machine_issue.
 // ============================================================================
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { compressImage } from '../../lib/imageCompress'
@@ -58,6 +58,65 @@ export default function MachineReportPage() {
     return () => clearInterval(t)
   }, [issueId, mode])
 
+  // ── GHI ÂM: thợ tay dính mủ/đeo găng → nói nhanh hơn bấm ──
+  const MAX_SEC = 60
+  const [recording, setRecording] = useState(false)
+  const [voice, setVoice] = useState<{ blob: Blob; url: string; ext: string } | null>(null)
+  const [recSec, setRecSec] = useState(0)
+  const [voiceErr, setVoiceErr] = useState('')
+  const recRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<number | null>(null)
+
+  function pickMime(): { mime: string; ext: string } {
+    const cands = [
+      { mime: 'audio/webm;codecs=opus', ext: 'webm' },
+      { mime: 'audio/webm', ext: 'webm' },
+      { mime: 'audio/mp4', ext: 'm4a' },
+      { mime: 'audio/ogg;codecs=opus', ext: 'ogg' },
+    ]
+    for (const c of cands) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported?.(c.mime)) return c
+    }
+    return { mime: '', ext: 'webm' }
+  }
+
+  async function startRec() {
+    setVoiceErr('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const { mime, ext } = pickMime()
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data) }
+      rec.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        setVoice(prev => { if (prev?.url) URL.revokeObjectURL(prev.url); return { blob, url: URL.createObjectURL(blob), ext } })
+        setRecording(false)
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+      }
+      recRef.current = rec
+      rec.start()
+      setRecording(true); setRecSec(0)
+      timerRef.current = window.setInterval(() => {
+        setRecSec(s => {
+          if (s + 1 >= MAX_SEC) { try { rec.stop() } catch { /* rồi */ } return MAX_SEC }
+          return s + 1
+        })
+      }, 1000)
+    } catch {
+      setVoiceErr('Không dùng được micro. Bấm "Cho phép" khi máy hỏi quyền ghi âm, rồi thử lại.')
+      setRecording(false)
+    }
+  }
+  function stopRec() { try { recRef.current?.stop() } catch { /* rồi */ } }
+  function clearVoice() {
+    setVoice(prev => { if (prev?.url) URL.revokeObjectURL(prev.url); return null })
+    setRecSec(0)
+  }
+  const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+
   const addPhoto = useCallback(async (files: FileList | null) => {
     if (!files) return
     const arr = Array.from(files).slice(0, 3 - photos.length)
@@ -80,9 +139,18 @@ export default function MachineReportPage() {
         const { error } = await supabase.storage.from('machine-issues').upload(path, p.file)
         if (!error) urls.push(supabase.storage.from('machine-issues').getPublicUrl(path).data.publicUrl)
       }
+      // upload ghi âm (nếu có)
+      let voiceUrl: string | null = null
+      if (voice) {
+        const vpath = `${code}/voice_${Date.now()}.${voice.ext}`
+        const { error: ve } = await supabase.storage.from('machine-issues')
+          .upload(vpath, voice.blob, { contentType: voice.blob.type || 'audio/webm' })
+        if (!ve) voiceUrl = supabase.storage.from('machine-issues').getPublicUrl(vpath).data.publicUrl
+      }
       const { data, error } = await supabase.rpc('report_machine_issue', {
         p_equipment_code: code, p_severity: severity, p_symptom: symptom || null,
         p_note: note.trim() || null, p_photo_urls: urls, p_reporter_name: reporter.trim() || null,
+        p_voice_url: voiceUrl,
       })
       if (error) throw error
       setIssueId(data as string); setStatus('moi'); setMode('sent')
@@ -184,6 +252,48 @@ export default function MachineReportPage() {
                 </div>
               </div>
             )}
+
+            {/* GHI ÂM — nhanh hơn bấm, tay dính mủ vẫn nói được */}
+            <div style={card}>
+              <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: C.ink3, fontWeight: 750, marginBottom: 8 }}>
+                🎙 Ghi âm — nói cho nhanh
+              </div>
+
+              {!recording && !voice && (
+                <>
+                  <button onClick={startRec} style={{ ...bigBtn, background: C.g, color: '#fff', padding: 15, fontSize: 15.5 }}>
+                    🎙 Bấm để nói
+                  </button>
+                  <div style={{ fontSize: 11.5, color: C.ink3, marginTop: 7, textAlign: 'center' }}>
+                    Nói: máy bị gì · nghe/thấy thế nào · cần gì gấp không
+                  </div>
+                </>
+              )}
+
+              {recording && (
+                <>
+                  <button onClick={stopRec} style={{ ...bigBtn, background: C.red, color: '#fff', padding: 15, fontSize: 15.5, animation: 'none' }}>
+                    ⏹ Đang ghi {mmss(recSec)} — bấm để dừng
+                  </button>
+                  <div style={{ height: 5, borderRadius: 5, background: C.line, marginTop: 9, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${(recSec / MAX_SEC) * 100}%`, background: C.red, borderRadius: 5, transition: 'width .3s' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: C.ink3, marginTop: 5, textAlign: 'center' }}>Tối đa {MAX_SEC} giây, tự dừng</div>
+                </>
+              )}
+
+              {voice && !recording && (
+                <>
+                  <audio controls src={voice.url} style={{ width: '100%' }} />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
+                    <button onClick={startRec} style={{ flex: 1, padding: 11, borderRadius: 12, border: `1.5px solid ${C.line}`, background: C.card, color: C.ink2, fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>🎙 Ghi lại</button>
+                    <button onClick={clearVoice} style={{ flex: 1, padding: 11, borderRadius: 12, border: `1.5px solid ${C.line}`, background: C.card, color: C.red, fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>🗑 Xoá</button>
+                  </div>
+                </>
+              )}
+
+              {voiceErr && <div style={{ color: C.red, fontSize: 12.5, marginTop: 8, lineHeight: 1.4 }}>{voiceErr}</div>}
+            </div>
 
             <div style={card}>
               <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: C.ink3, fontWeight: 750, marginBottom: 6 }}>Ảnh (nếu có)</div>

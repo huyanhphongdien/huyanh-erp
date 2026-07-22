@@ -65,13 +65,14 @@ Deno.serve(async (req) => {
 
     // lấy phiếu + tên máy
     const { data: iss } = await supabase.from('machine_issues')
-      .select('equipment_code, severity, symptom, note, equipment:equipment_id(name, khu_vuc)')
+      .select('equipment_code, severity, symptom, note, voice_url, equipment:equipment_id(name, khu_vuc)')
       .eq('id', issueId).maybeSingle()
     if (!iss) return new Response(JSON.stringify({ skipped: 'không tìm thấy phiếu' }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 
     const dung = (iss as any).severity === 'do'
     const title = dung ? '🔴 Máy đang DỪNG' : '🟡 Máy báo bất thường'
     const body = `${(iss as any).equipment_code} · ${(iss as any).equipment?.name || ''} — ${(iss as any).symptom || 'có sự cố'}`
+      + ((iss as any).voice_url ? ' · 🎙 có ghi âm' : '')
 
     // giai đoạn test: bắn cho MỌI device_token
     const { data: toks } = await supabase.from('device_tokens').select('token, employee_id')

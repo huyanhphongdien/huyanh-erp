@@ -10,7 +10,7 @@ import { useAuthStore } from '../../stores/authStore'
 
 type Issue = {
   id: string; equipment_code: string; severity: 'do' | 'vang'; symptom: string | null
-  note: string | null; photo_urls: string[]; reporter_name: string | null
+  note: string | null; photo_urls: string[]; voice_url: string | null; reporter_name: string | null
   status: string; acked_at: string | null; created_at: string
   equipment?: { name: string; khu_vuc: string | null }
 }
@@ -41,7 +41,7 @@ export default function MachineQueuePage() {
   const load = useCallback(async () => {
     const { data } = await supabase
       .from('machine_issues')
-      .select('id, equipment_code, severity, symptom, note, photo_urls, reporter_name, status, acked_at, created_at, equipment:equipment_id(name, khu_vuc)')
+      .select('id, equipment_code, severity, symptom, note, photo_urls, voice_url, reporter_name, status, acked_at, created_at, equipment:equipment_id(name, khu_vuc)')
       .in('status', ['moi', 'da_nhan', 'dang_xu_ly'])
       .order('severity', { ascending: true })   // 'do' < 'vang' → đang dừng lên đầu
       .order('created_at', { ascending: true })
@@ -147,6 +147,12 @@ export default function MachineQueuePage() {
                   {it.status !== 'moi' ? ` · ${STATUS_VI[it.status]}` : ''}
                 </div>
                 {it.note && <div style={{ fontSize: 12.5, color: C.ink2, marginTop: 5, fontStyle: 'italic' }}>"{it.note}"</div>}
+                {it.voice_url && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 750, color: C.g, marginBottom: 4 }}>🎙 Người báo có ghi âm — nghe:</div>
+                    <audio controls preload="none" src={it.voice_url} style={{ width: '100%', height: 36 }} />
+                  </div>
+                )}
                 {Array.isArray(it.photo_urls) && it.photo_urls.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                     {it.photo_urls.slice(0, 3).map((u, i) => <img key={i} src={u} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 9 }} />)}

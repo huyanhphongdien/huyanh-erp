@@ -8,6 +8,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import TabbedWorkspace from './TabbedWorkspace'
 import { useB2BDealToasts } from '../../hooks/useB2BDealToasts'
+import { useMachineIssueAlerts } from '../../hooks/useMachineIssueAlerts'
 // Side-effect import: đăng ký tất cả tab components vào registry
 // để tabs có thể restore sau khi user F5 reload
 import '../../lib/tabRegistry'
@@ -23,6 +24,8 @@ function PageLoader() {
 export function MainLayout() {
   // Global realtime toast cho b2b_deals UPDATE (QC xong, accepted, settled...)
   useB2BDealToasts(true)
+  // Cảnh báo MÁY HỎNG ở mọi trang ERP (chuông + rung + toast), không chỉ /m/yeu-cau
+  useMachineIssueAlerts(true)
 
   return (
     <div className="flex min-h-screen" style={{ background: '#F0EDE8' }}>

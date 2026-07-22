@@ -37,9 +37,10 @@ async function saveWebToken(token: string) {
   if (!user) return
   const { data: emp } = await supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle()
   if (!emp?.id) return
+  // onConflict theo TOKEN → 1 người dùng được nhiều máy (điện thoại + máy bảng…)
   await supabase.from('device_tokens').upsert(
     { employee_id: emp.id, token, platform: 'web', updated_at: new Date().toISOString() },
-    { onConflict: 'employee_id,platform' },
+    { onConflict: 'token' },
   )
   console.log('[WebPush] Đã lưu token web cho employee', emp.id)
 }

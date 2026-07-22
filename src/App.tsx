@@ -52,6 +52,8 @@ const PerformanceReviewListPage = lazy(() => import('./features/performance-revi
 
 // Phase 4.1: Task Management
 const TaskListPage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskListPage })));
+// GĐ 5 — "Cần anh xem": duyệt theo NGOẠI LỆ + xuất Nhật ký Excel
+const TaskExceptionsPage = lazy(() => import('./pages/tasks/TaskExceptionsPage'));
 const TaskCreatePage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskCreatePage })));
 const TaskEditPage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskEditPage })));
 const TaskViewPage = lazy(() => import('./features/tasks').then(m => ({ default: m.TaskViewPage })));
@@ -678,6 +680,8 @@ function App() {
 
               {/* ===== TASKS MODULE ===== */}
               <Route path="tasks" element={<TaskListPage />} />
+              {/* GĐ 5 — đặt TRƯỚC tasks/:id để không bị nuốt bởi route động */}
+              <Route path="tasks/can-xem" element={<Suspense fallback={<LoadingSpinner />}><TaskExceptionsPage /></Suspense>} />
               <Route path="tasks/create" element={<TaskCreatePage />} />
               <Route path="tasks/new" element={<TaskCreatePage />} />
               <Route path="tasks/:id" element={<TaskViewPage />} />

@@ -202,6 +202,8 @@ const getMenuGroups = (
     collapsible: true,
     icon: <ClipboardList size={18} />,
     items: [
+      // ★ GĐ 5 — màn chính của chủ dự án: chỉ xem việc LỆCH (duyệt theo ngoại lệ)
+      { path: '/tasks/can-xem', label: 'Cần anh xem', icon: <AlertTriangle size={18} />, managerOnly: true },
       { path: '/tasks', label: 'Danh sách công việc', icon: <ClipboardList size={18} /> },
       { path: '/my-tasks', label: 'Công việc của tôi', icon: <UserCheck size={18} /> },
       {

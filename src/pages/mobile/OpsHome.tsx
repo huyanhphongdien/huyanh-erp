@@ -2,11 +2,12 @@
 // OpsHome — tab "Hôm nay": chào thợ, cảnh báo máy đang chờ, việc hôm nay,
 // chấm công GPS + TỰ CHỌN CA (làm được 2 ca liên tục), nhắc việc.
 // ============================================================================
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { attendanceService } from '../../services/attendanceService'
+import { initWebPush, webPushState, type WebPushState } from '../../services/webPush'
 import {
   getTodayTasks, getTodayAttendanceRows, getActiveShifts, getOpenIssues, taskDone,
 } from '../../services/opsService'
@@ -37,6 +38,11 @@ export default function OpsHome() {
   const [busy, setBusy] = useState(false)
   const [picker, setPicker] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [push, setPush] = useState<WebPushState>('native')
+  useEffect(() => { setPush(webPushState()) }, [])
+  async function enablePush() {
+    setPush(await initWebPush(true))
+  }
 
   async function punch(kind: 'in' | 'out', shiftId?: string) {
     setBusy(true); setMsg(null); setPicker(false)
@@ -82,6 +88,21 @@ export default function OpsHome() {
 
       <div className="ops-body">
         <div className="ops-inner">
+          {/* Chưa bật thông báo → máy hỏng sẽ không kêu. Nhắc ngay đầu màn. */}
+          {(push === 'default' || push === 'denied') && (
+            <div className="ops-card" style={{ borderLeft: '5px solid var(--amber)' }}>
+              <div className="ops-mid" style={{ fontSize: 15 }}>🔔 Chưa bật thông báo</div>
+              <div className="ops-sm" style={{ marginTop: 3 }}>
+                {push === 'denied'
+                  ? 'Máy đang CHẶN thông báo. Vào Cài đặt trình duyệt → Thông báo → cho phép huyanhrubber.vn, rồi mở lại trang.'
+                  : 'Bật để nhận báo máy hỏng ngay cả khi tắt màn hình.'}
+              </div>
+              {push === 'default' && (
+                <button className="ops-btn g" style={{ marginTop: 10 }} onClick={enablePush}>Bật thông báo</button>
+              )}
+            </div>
+          )}
+
           {open.total > 0 && (
             <div className="ops-alert" onClick={() => nav('/m/yeu-cau')}>
               <span className="ic">{open.dung > 0 ? '🔴' : '🟡'}</span>

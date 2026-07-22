@@ -29,6 +29,7 @@
     "docxtemplater": "^3.68.7",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
+    "firebase": "^12.16.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",

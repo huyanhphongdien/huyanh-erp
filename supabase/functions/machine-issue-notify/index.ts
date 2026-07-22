@@ -49,6 +49,16 @@ async function sendFCM(accessToken: string, token: string, title: string, body: 
       message: {
         token, notification: { title, body }, data,
         android: { priority: 'high', notification: { channel_id: 'machine_alerts', sound: 'default', click_action: 'FCM_PLUGIN_ACTIVITY' } },
+        // Bản PWA (Chrome): icon + bấm vào mở thẳng hàng chờ
+        webpush: {
+          headers: { Urgency: 'high', TTL: '3600' },
+          notification: {
+            icon: 'https://huyanhrubber.vn/icon-192.png',
+            badge: 'https://huyanhrubber.vn/icon-192.png',
+            requireInteraction: data.severity === 'do',
+          },
+          fcm_options: { link: 'https://huyanhrubber.vn/m/yeu-cau' },
+        },
       },
     }),
   })

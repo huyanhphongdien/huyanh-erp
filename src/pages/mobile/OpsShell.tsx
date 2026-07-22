@@ -2,9 +2,10 @@
 // OpsShell — khung App "Huy Anh Ops": .ops-root + thanh điều hướng dưới (4 tab)
 // + FAB quẹt QR dùng chung. Mỗi màn con tự dựng .ops-appbar + .ops-body.
 // ============================================================================
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import OpsQrScanner from './OpsQrScanner'
+import { initWebPush } from '../../services/webPush'
 import './opsTheme.css'
 
 // Icon line SVG (kế thừa màu theo .it / .it.on) — sạch hơn emoji, khỏi lệch ngày
@@ -27,6 +28,17 @@ export default function OpsShell() {
   const [scan, setScan] = useState(false)
   // FAB quẹt QR ở màn Hôm nay (Tuần tra có nút quẹt riêng)
   const showFab = loc.pathname === '/m/app'
+
+  useEffect(() => {
+    // PWA: trong màn thợ thì dùng manifest riêng → "Thêm vào màn hình chính"
+    // sẽ tạo app "Huy Anh Ops" mở thẳng /m/app (không phải ERP desktop).
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
+    const prev = link?.getAttribute('href') || '/manifest.json'
+    link?.setAttribute('href', '/manifest-ops.json')
+    // Đăng ký nhận đẩy nếu user ĐÃ cho phép trước đó (không tự hiện hộp xin quyền)
+    initWebPush(false).catch(() => { /* im lặng */ })
+    return () => { link?.setAttribute('href', prev) }
+  }, [])
 
   return (
     <div className="ops-root">

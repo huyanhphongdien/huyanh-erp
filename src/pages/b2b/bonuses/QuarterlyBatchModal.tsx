@@ -116,7 +116,7 @@ export function QuarterlyBatchModal({ year, quarter, onClose, onCreated }: Quart
                 </div>
               </div>
 
-              <div className="border rounded-md overflow-hidden">
+              <div className="border rounded-md overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-slate-700">
                     <tr>

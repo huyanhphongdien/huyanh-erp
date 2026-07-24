@@ -80,7 +80,7 @@ export function BonusRulesPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border rounded-md overflow-hidden">
+      <div className="bg-white border rounded-md overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-700">
             <tr>

@@ -60,6 +60,7 @@ export default function SalesKanbanPage() {
       .from('sales_orders')
       .select(`
         id, code, contract_no, grade, quantity_tons, status, total_value_usd,
+        payment_status, actual_payment_amount,
         delivery_date, etd, current_stage, current_owner_id,
         stage_started_at, stage_sla_hours,
         customer:sales_customers!sales_orders_customer_id_fkey(id, short_name, name),
@@ -86,6 +87,8 @@ export default function SalesKanbanPage() {
         quantity_tons: o.quantity_tons,
         status: o.status,
         total_value_usd: o.total_value_usd,
+        payment_status: o.payment_status || null,
+        actual_payment_amount: o.actual_payment_amount ?? null,
         delivery_date: o.delivery_date,
         etd: o.etd,
         current_stage: (o.current_stage as SalesStage) || 'sales',

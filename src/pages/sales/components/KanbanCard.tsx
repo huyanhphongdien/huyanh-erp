@@ -23,6 +23,8 @@ export interface KanbanOrder {
   quantity_tons: number | null
   status: string           // cần để kẹp "đã giao xong" khi tính Còn thiếu
   total_value_usd: number | null
+  payment_status: string | null       // unpaid | partial | paid — tiền về
+  actual_payment_amount: number | null // USD đã thu thực tế
   delivery_date: string | null
   etd: string | null
   current_stage: SalesStage
@@ -118,6 +120,18 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp }: Kanban
           return rem > 0
             ? <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626' }}>còn thiếu {rem.toFixed(2)}T</span>
             : <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d' }}>đủ hàng</span>
+        })()}
+        {/* Tiền về — hiện khi đã giao/xuất trở đi HOẶC đã thu 1 phần/đủ (nhập ở tab Tài chính) */}
+        {(() => {
+          const ps = order.payment_status
+          const expectPay = ['shipped', 'delivered', 'invoiced', 'paid'].includes(order.status)
+          if (!expectPay && ps !== 'partial' && ps !== 'paid') return null
+          const pill = (bg: string, fg: string, txt: string) => (
+            <span style={{ fontSize: 10, fontWeight: 700, color: fg, background: bg, padding: '1px 7px', borderRadius: 10 }}>{txt}</span>
+          )
+          if (ps === 'paid') return pill('#dcfce7', '#15803d', '✅ đã thu tiền')
+          if (ps === 'partial') return pill('#dbeafe', '#1d4ed8', '💰 thu 1 phần')
+          return pill('#fef3c7', '#b45309', '⚠ chưa thu tiền')
         })()}
       </div>
 

@@ -217,26 +217,13 @@ export default function OrderProgressDashboard({ order, onChanged, onNavigateTab
             <Spin size="small" />
           ) : !latest ? (
             <div style={empty}>
-              <div style={{ marginBottom: 8 }}>Chưa có HĐ workflow</div>
-              {order.status === 'draft' ? (
-                <>
-                  <Button size="small" type="primary" onClick={handleCreateContract}
-                          loading={creatingContract}
-                          style={{ background: PRIMARY }}>
-                    + Tạo HĐ workflow
-                  </Button>
-                  <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 8 }}>
-                    Hệ thống tạo từ data đơn + trình Phú LV duyệt
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: 12, color: '#8c8c8c', padding: 8, background: '#fafafa',
-                              borderRadius: 6, textAlign: 'left', maxWidth: 340 }}>
-                  📁 <strong>Đơn cũ trước cut-over</strong> — không có HĐ workflow.
-                  <br />
-                  Dùng tab <strong>"Hợp đồng"</strong> để upload file PDF scan đã ký (legacy flow).
-                </div>
-              )}
+              {/* Bỏ hẳn quy trình duyệt/ký (2026-08-05) — HĐ quản lý trực tiếp ở tab "Hợp đồng" */}
+              <div style={{ fontSize: 12, color: '#8c8c8c', padding: 8, background: '#fafafa',
+                            borderRadius: 6, textAlign: 'left', maxWidth: 340 }}>
+                📁 HĐ quản lý trực tiếp ở tab <strong>"Hợp đồng"</strong> — đính kèm file HĐ đã ký (Word/PDF).
+                <br />
+                <span style={{ color: '#bfbfbf' }}>Không còn bước trình duyệt/ký qua queue.</span>
+              </div>
             </div>
           ) : (
             <>

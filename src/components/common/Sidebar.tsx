@@ -363,11 +363,8 @@ const getMenuGroups = (
       { path: '/sales/orders', label: 'Đơn hàng', icon: <FileText size={18} />,
         tab: { key: 'sales-order-list', componentId: 'sales-order-list' },
         requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin', 'viewer'] },
-      { path: '/sales/contracts/review', label: 'Kiểm tra HĐ', icon: <FileText size={18} />,
-        allowedEmails: ['phulv@huyanhrubber.com', 'minhld@huyanhrubber.com', 'sales@huyanhrubber.com', 'yendt@huyanhrubber.com',
-          'ahtn@huyanhrubber.com', 'linhlt@huyanhrubber.com', 'tamltt@huyanhrubber.com', 'phungnt@huyanhrubber.com', 'hungtv@huyanhrubber.com'] },
-      { path: '/sales/contracts/sign', label: 'Ký HĐ', icon: <FileText size={18} />,
-        allowedEmails: ['trunglxh@huyanhrubber.com', 'huylv@huyanhrubber.com'] },
+      // Bỏ hẳn quy trình duyệt/ký HĐ (2026-08-05) — Sale tự quản HĐ ở tab "Hợp đồng".
+      // Route /sales/contracts/{review,sign} vẫn còn (xem lịch sử 10 HĐ đã archive) nhưng gỡ khỏi menu.
       { path: '/sales/kanban', label: 'Kanban tiến độ', icon: <LayoutDashboard size={18} />,
         tab: { key: 'sales-kanban', componentId: 'sales-kanban' },
         requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin'] },

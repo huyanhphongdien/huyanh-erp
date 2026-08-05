@@ -433,8 +433,11 @@ function SalesOrderCreatePage() {
 
       // silent mode: caller xử lý message + navigate (vd: upload flow cần SO trước)
       if (!opts?.silent) {
-        message.success(asDraft ? 'Đã lưu nháp đơn hàng' : 'Đã xác nhận đơn hàng')
-        navigate('/sales/orders')
+        message.success(asDraft
+          ? 'Đã lưu đơn — mở chi tiết để đính kèm file HĐ đã ký'
+          : 'Đã xác nhận đơn hàng')
+        // Mở thẳng chi tiết đơn để Sale đính kèm file HĐ ở tab "Hợp đồng"
+        navigate(created?.id ? `/sales/orders/${created.id}` : '/sales/orders')
       }
       return created?.id ? { id: created.id } : null
     } catch (err: unknown) {
@@ -885,22 +888,23 @@ function SalesOrderCreatePage() {
           </Row>
         </Card>
 
-        {/* ═══ Action buttons — Upload .docx (Docs trình HĐ) ═══
-            Compose flow bỏ hẳn (2026-05-20). HĐ mới CHỈ upload — Docs (Nhung+PA)
-            soạn Word + upload → Phú điền + duyệt → Trung/Huy ký → Docs upload FINAL.
-            HĐ cũ status='reviewing' flow_type='compose' vẫn render UI cũ ở
-            ContractReviewPage (backward compat). */}
+        {/* ═══ Action buttons — luồng ĐƠN GIẢN (2026-08-05) ═══
+            Bỏ hẳn quy trình duyệt/ký phức tạp (form mẫu không cover hết HĐ thật).
+            Sale tự quản HĐ: tạo đơn → lấy/soạn Word → ký ngoài → đính kèm file đã ký
+            ở tab "Hợp đồng" của đơn (ContractFileSection). Không còn reviewing/approved/signed.
+            10 HĐ workflow cũ đã archive — vẫn xem được lịch sử ở tab Hợp đồng. */}
         <Card size="small" style={{ marginTop: 12, borderRadius: 12 }}>
           <Space direction="vertical" style={{ width: '100%' }} size={8}>
             <Alert
               type="success"
               showIcon
               style={{ borderRadius: 8, fontSize: 12 }}
-              message="Làm hợp đồng — 3 bước nối tiếp"
+              message="Làm hợp đồng — đơn giản 2 bước"
               description={
                 <div style={{ fontSize: 12, lineHeight: 1.7 }}>
-                  <b>①</b> Tạo đơn hàng (lưu) → <b>②</b> Lấy file Word HĐ → <b>③</b> Nộp để Phú duyệt + Trung/Huy ký.
-                  <br /><span style={{ color: '#52803f' }}>Làm <b>lần lượt từ trên xuống</b> — không phải chọn 1 trong 2.</span>
+                  <b>①</b> Tạo đơn hàng (lưu) → <b>②</b> Lấy/soạn file Word HĐ → ký + đóng dấu →{' '}
+                  <b>đính kèm file đã ký</b> ở tab "Hợp đồng" của đơn.
+                  <br /><span style={{ color: '#52803f' }}>Không còn bước trình duyệt — Sale tự quản HĐ của mình.</span>
                 </div>
               }
             />
@@ -922,12 +926,12 @@ function SalesOrderCreatePage() {
               Tạo đơn hàng
             </Button>
             <div style={{ fontSize: 11, color: '#8c8c8c', textAlign: 'center' }}>
-              Lưu đơn (dạng nháp). Lưu xong vẫn sửa được. Xong bước này → xuống ②.
+              Lưu đơn xong sẽ <b>mở chi tiết đơn</b> để bạn đính kèm file HĐ đã ký (tab "Hợp đồng").
             </div>
 
-            {/* ── BƯỚC ② lấy file Word HĐ (máy điền — Nấc 1) ── */}
+            {/* ── BƯỚC ② lấy file Word HĐ (tùy chọn — máy điền sẵn) ── */}
             <Divider style={{ margin: '4px 0' }}>
-              <Tag color="blue" style={{ fontSize: 11 }}>② Lấy file Word HĐ</Tag>
+              <Tag color="blue" style={{ fontSize: 11 }}>② Lấy file Word HĐ (tùy chọn)</Tag>
             </Divider>
             <Button
               type="default"
@@ -940,23 +944,9 @@ function SalesOrderCreatePage() {
               Tải HĐ máy điền sẵn (SC + PI)
             </Button>
             <div style={{ fontSize: 11, color: '#8c8c8c', textAlign: 'center', lineHeight: 1.5 }}>
-              Máy lấy số liệu form điền vào mẫu Word — <b>bạn không phải tự gõ</b>. Mở file xem/sửa/in.
-              <br />(Hoặc dùng file Word bạn tự soạn.) <b>Rồi nộp file này ở bước ③ ngay dưới.</b>
+              Máy điền số liệu form vào mẫu Word cho bạn bản nháp nhanh — <b>hoặc tự soạn Word</b> nếu HĐ đặc thù.
+              <br />Ký + đóng dấu xong → vào chi tiết đơn, tab <b>"Hợp đồng"</b>, đính kèm file đã ký.
             </div>
-
-            {/* ── BƯỚC ③ nộp Word vào hệ thống để duyệt + ký ── */}
-            <Divider style={{ margin: '4px 0' }}>
-              <Tag color="purple" style={{ fontSize: 11 }}>③ Nộp HĐ để duyệt + ký</Tag>
-            </Divider>
-            <UploadFlowAction
-              contractNoHint={contractData.contract_no}
-              loading={loading || submittingReview}
-              onBeforeSubmit={async () => {
-                const ok = await handleSubmit(true, { silent: true })
-                return ok?.id || null
-              }}
-              onUploaded={() => navigate('/sales/orders')}
-            />
           </Space>
         </Card>
         </div>

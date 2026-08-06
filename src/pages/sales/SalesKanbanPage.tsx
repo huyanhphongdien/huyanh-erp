@@ -11,6 +11,8 @@ import { Search, RefreshCw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { salesStageService } from '../../services/sales/salesStageService'
+import { getSalesRole } from '../../services/sales/salesPermissionService'
+import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
 import {
   SALES_STAGES,
   SALES_STAGE_LABELS,
@@ -49,6 +51,7 @@ import { soDisplayCode } from '../../services/sales/salesTypes'
 export default function SalesKanbanPage() {
   const user = useAuthStore(s => s.user)
   const navigate = useNavigate()
+  const canCollect = ['accounting', 'admin'].includes(getSalesRole(user) || '')
   const [orders, setOrders] = useState<KanbanOrder[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})
   const [loading, setLoading] = useState(true)
@@ -57,6 +60,8 @@ export default function SalesKanbanPage() {
   const [showOnlyMine, setShowOnlyMine] = useState(false)
   const [showOnlyOverdue, setShowOnlyOverdue] = useState(false)
   const [showOnlyUnpaid, setShowOnlyUnpaid] = useState(false)   // Chỉ đơn chưa thu tiền
+  const [dragOverSettled, setDragOverSettled] = useState(false) // kéo card vào cột "Đã tất toán"
+  const [payTarget, setPayTarget] = useState<QuickPayTarget | null>(null)
   const [dragOverStage, setDragOverStage] = useState<SalesStage | null>(null)
   const [confirmTransition, setConfirmTransition] = useState<{
     orderId: string
@@ -178,6 +183,26 @@ export default function SalesKanbanPage() {
   }
 
   const handleDragLeave = () => setDragOverStage(null)
+
+  // Kéo 1 card thả vào cột "Đã tất toán" → bật modal "Ghi nhận đã thu" (nhanh)
+  const handleDropSettled = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOverSettled(false)
+    const orderId = e.dataTransfer.getData('text/plain')
+    const order = orders.find(o => o.id === orderId)
+    if (!order) return
+    if (paymentBucket(order) === 'paid') return  // đã tất toán rồi
+    if (!canCollect) {
+      message.warning('Chỉ Kế toán/Admin mới ghi nhận đã thu')
+      return
+    }
+    setPayTarget({
+      id: order.id,
+      label: order.contract_no || order.code,
+      subLabel: order.contract_no ? order.code : undefined,
+      outstanding: outstandingUsd(order),
+    })
+  }
 
   const handleDrop = (e: React.DragEvent, toStage: SalesStage) => {
     e.preventDefault()
@@ -424,10 +449,14 @@ export default function SalesKanbanPage() {
             return (
               <div
                 key="settled"
+                onDragOver={(e) => { e.preventDefault(); if (!dragOverSettled) setDragOverSettled(true) }}
+                onDragLeave={() => setDragOverSettled(false)}
+                onDrop={handleDropSettled}
                 style={{
                   flex: '1 1 0', minWidth: 180,
-                  background: '#f0fdf4', border: '1px solid #bbf7d0',
-                  borderRadius: 8, padding: 8,
+                  background: dragOverSettled ? '#dcfce7' : '#f0fdf4',
+                  border: dragOverSettled ? '2px dashed #15803d' : '1px solid #bbf7d0',
+                  borderRadius: 8, padding: 8, transition: 'background 0.15s',
                 }}
               >
                 <div style={{
@@ -457,8 +486,11 @@ export default function SalesKanbanPage() {
                 )}
                 <div style={{ minHeight: 60 }}>
                   {settledList.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px 0', color: '#a1a1aa', fontSize: 11, fontStyle: 'italic' }}>
-                      (chưa có đơn tất toán)
+                    <div style={{ textAlign: 'center', padding: '16px 8px', color: '#a1a1aa', fontSize: 11 }}>
+                      <div style={{ fontStyle: 'italic' }}>(chưa có đơn tất toán)</div>
+                      <div style={{ marginTop: 8, color: '#15803d', fontSize: 10.5, lineHeight: 1.5 }}>
+                        ⬅ Kéo đơn từ "Đã giao khách" thả vào đây để <b>ghi "đã thu"</b>
+                      </div>
                     </div>
                   ) : (
                     settledList.map(o => (
@@ -481,6 +513,13 @@ export default function SalesKanbanPage() {
       {filtered.length === 0 && !loading && (
         <Empty description="Không có đơn nào khớp filter" style={{ marginTop: 40 }} />
       )}
+
+      {/* Modal ghi nhận đã thu (kéo card vào cột "Đã tất toán") — dùng chung với Công nợ khách */}
+      <QuickPayModal
+        target={payTarget}
+        onClose={() => setPayTarget(null)}
+        onDone={() => { setPayTarget(null); fetchOrders() }}
+      />
 
       {/* Confirm modal */}
       <Modal

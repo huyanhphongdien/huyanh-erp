@@ -23,9 +23,7 @@ import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
-import {
-  salesOrderPaymentService, PAYMENT_TYPE_LABELS, type PaymentType,
-} from '../../services/sales/salesOrderPaymentService'
+import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
 
 const { Title, Text } = Typography
 
@@ -100,13 +98,8 @@ export default function ARAgingReportPage() {
   const [scope, setScope] = useState<'delivered' | 'all'>('delivered')
   const [showAging, setShowAging] = useState(false)
 
-  // Quick-pay modal state
-  const [payOrder, setPayOrder] = useState<AROrder | null>(null)
-  const [payAmount, setPayAmount] = useState<number>(0)
-  const [payDate, setPayDate] = useState<dayjs.Dayjs>(dayjs())
-  const [payType, setPayType] = useState<PaymentType>('final')
-  const [payBankRef, setPayBankRef] = useState<string>('')
-  const [paying, setPaying] = useState(false)
+  // Quick-pay modal (dùng chung QuickPayModal)
+  const [payTarget, setPayTarget] = useState<QuickPayTarget | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -217,37 +210,13 @@ export default function ARAgingReportPage() {
     return { missing: inScope.filter((o) => !o.delivery_date).length, total: inScope.length }
   }, [rawOrders, scope])
 
-  // ── Mở modal ghi thu ──
-  const openPay = (o: AROrder) => {
-    setPayOrder(o)
-    setPayAmount(Math.round(o.outstanding * 100) / 100)
-    setPayDate(dayjs())
-    setPayType('final')
-    setPayBankRef('')
-  }
-
-  const submitPay = async () => {
-    if (!payOrder) return
-    if (!payAmount || payAmount <= 0) { message.error('Nhập số tiền đã thu'); return }
-    setPaying(true)
-    try {
-      await salesOrderPaymentService.create({
-        sales_order_id: payOrder.id,
-        payment_date: payDate.format('YYYY-MM-DD'),
-        amount: payAmount,
-        currency: 'USD',
-        payment_type: payType,
-        bank_reference: payBankRef.trim() || null,
-      })
-      message.success(`Đã ghi nhận thu ${formatUSD(payAmount)} cho ${payOrder.contractNo || payOrder.code}`)
-      setPayOrder(null)
-      await load()
-    } catch (e: any) {
-      message.error(e?.message || 'Lỗi ghi nhận thu')
-    } finally {
-      setPaying(false)
-    }
-  }
+  // ── Mở modal ghi thu (số HĐ lên đầu) ──
+  const openPay = (o: AROrder) => setPayTarget({
+    id: o.id,
+    label: o.contractNo || o.code,
+    subLabel: o.contractNo ? o.code : undefined,
+    outstanding: o.outstanding,
+  })
 
   // ── Bảng con: đơn của 1 khách ──
   const renderOrders = (rec: ARRecord) => {
@@ -401,62 +370,12 @@ export default function ARAgingReportPage() {
         />
       </Card>
 
-      {/* Modal ghi nhận đã thu */}
-      <Modal
-        title={<span><DollarOutlined style={{ color: '#15803d' }} /> Ghi nhận đã thu — {payOrder?.contractNo || payOrder?.code}</span>}
-        open={!!payOrder}
-        onCancel={() => setPayOrder(null)}
-        onOk={submitPay}
-        confirmLoading={paying}
-        okText="Xác nhận đã thu"
-        cancelText="Hủy"
-        okButtonProps={{ style: { background: '#15803d', borderColor: '#15803d' } }}
-        destroyOnClose
-      >
-        {payOrder && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ background: '#fafafa', borderRadius: 8, padding: 10, fontSize: 13 }}>
-              Đơn <strong>{payOrder.contractNo || payOrder.code}</strong>
-              {payOrder.contractNo && <Text type="secondary" style={{ fontSize: 11 }}> ({payOrder.code})</Text>} · Còn nợ:{' '}
-              <strong style={{ color: '#f5222d' }}>{formatUSD(payOrder.outstanding)}</strong>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Số tiền đã thu (USD)</div>
-              <InputNumber
-                value={payAmount}
-                onChange={(v) => setPayAmount(Number(v) || 0)}
-                min={0} step={100} style={{ width: '100%' }}
-                formatter={(v) => `$ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(v) => Number((v || '').replace(/[$,\s]/g, ''))}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Ngày tiền về</div>
-                <DatePicker value={payDate} onChange={(d) => d && setPayDate(d)} format="DD/MM/YYYY" style={{ width: '100%' }} allowClear={false} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Loại</div>
-                <Select value={payType} onChange={(v) => setPayType(v)} style={{ width: '100%' }}
-                  options={Object.entries(PAYMENT_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Số tham chiếu NH (tùy chọn)</div>
-              <input
-                value={payBankRef}
-                onChange={(e) => setPayBankRef(e.target.value)}
-                placeholder="VD: MT103 ref / số UNC"
-                style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 6 }}
-              />
-            </div>
-            {payAmount >= payOrder.outstanding && payOrder.outstanding > 0 && (
-              <Alert type="success" showIcon style={{ fontSize: 12 }}
-                message="Thu ĐỦ → đơn tự chuyển 'đã thu đủ' và rời cột 'Đã giao khách' trên Kanban." />
-            )}
-          </div>
-        )}
-      </Modal>
+      {/* Modal ghi nhận đã thu (dùng chung với kéo-thả Kanban) */}
+      <QuickPayModal
+        target={payTarget}
+        onClose={() => setPayTarget(null)}
+        onDone={() => { setPayTarget(null); load() }}
+      />
     </div>
   )
 }

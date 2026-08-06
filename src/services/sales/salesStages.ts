@@ -160,3 +160,45 @@ export const SLA_PILL_COLORS: Record<SLAStatus, { fg: string; bg: string }> = {
   overdue:    { fg: '#ff5b4f', bg: '#fee2e2' },   // red
   pending:    { fg: '#6b7280', bg: '#f3f4f6' },   // gray
 }
+
+// ============================================================================
+// TIỀN VỀ (thu tiền khách) — helper DÙNG CHUNG cho KanbanCard (badge) +
+// SalesKanbanPage (KPI/sort/lọc) để KHÔNG lệch định nghĩa "chưa thu".
+// Chỉ dựa field đã có sẵn trên đơn (status, payment_status, total_value_usd,
+// actual_payment_amount) — KHÔNG cần điều khoản/hạn nợ/ngày giao (data đang thiếu).
+// ============================================================================
+
+export type PaymentBucket = 'paid' | 'partial' | 'unpaid' | 'none'
+
+/** Đơn đã tới khâu KỲ VỌNG có tiền về (đã xuất/giao trở đi). */
+export function expectPayment(o: { status?: string | null }): boolean {
+  return ['shipped', 'delivered', 'invoiced', 'paid'].includes(o.status || '')
+}
+
+/** Phân loại tiền về của 1 đơn. 'none' = chưa tới khâu thu → không tính vào công nợ. */
+export function paymentBucket(o: {
+  status?: string | null
+  payment_status?: string | null
+}): PaymentBucket {
+  if (o.payment_status === 'paid') return 'paid'
+  if (o.payment_status === 'partial') return 'partial'
+  if (expectPayment(o)) return 'unpaid'
+  return 'none'
+}
+
+/** Đơn ĐÃ tới khâu thu nhưng CHƯA thu đủ (unpaid hoặc partial). */
+export function isUnpaid(o: {
+  status?: string | null
+  payment_status?: string | null
+}): boolean {
+  const b = paymentBucket(o)
+  return b === 'unpaid' || b === 'partial'
+}
+
+/** Số tiền CÒN PHẢI THU (USD), không âm. */
+export function outstandingUsd(o: {
+  total_value_usd?: number | null
+  actual_payment_amount?: number | null
+}): number {
+  return Math.max(0, (o.total_value_usd || 0) - (o.actual_payment_amount || 0))
+}

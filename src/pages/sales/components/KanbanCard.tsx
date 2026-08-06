@@ -9,6 +9,7 @@ import {
   getSLAStatus,
   formatDwell,
   SLA_PILL_COLORS,
+  paymentBucket,
 } from '../../../services/sales/salesStages'
 import { remainingTons, type LotProgress } from '../../../services/logistics/dispatchService'
 import LotProgressBadge from '../../../components/sales/LotProgressBadge'
@@ -121,16 +122,15 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp }: Kanban
             ? <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626' }}>còn thiếu {rem.toFixed(2)}T</span>
             : <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d' }}>đủ hàng</span>
         })()}
-        {/* Tiền về — hiện khi đã giao/xuất trở đi HOẶC đã thu 1 phần/đủ (nhập ở tab Tài chính) */}
+        {/* Tiền về — dùng chung paymentBucket() với KPI/lọc ở KanbanPage */}
         {(() => {
-          const ps = order.payment_status
-          const expectPay = ['shipped', 'delivered', 'invoiced', 'paid'].includes(order.status)
-          if (!expectPay && ps !== 'partial' && ps !== 'paid') return null
+          const b = paymentBucket(order)
+          if (b === 'none') return null
           const pill = (bg: string, fg: string, txt: string) => (
             <span style={{ fontSize: 10, fontWeight: 700, color: fg, background: bg, padding: '1px 7px', borderRadius: 10 }}>{txt}</span>
           )
-          if (ps === 'paid') return pill('#dcfce7', '#15803d', '✅ đã thu tiền')
-          if (ps === 'partial') return pill('#dbeafe', '#1d4ed8', '💰 thu 1 phần')
+          if (b === 'paid') return pill('#dcfce7', '#15803d', '✅ đã thu tiền')
+          if (b === 'partial') return pill('#dbeafe', '#1d4ed8', '💰 thu 1 phần')
           return pill('#fef3c7', '#b45309', '⚠ chưa thu tiền')
         })()}
       </div>

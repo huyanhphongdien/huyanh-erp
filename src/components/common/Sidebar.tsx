@@ -368,6 +368,11 @@ const getMenuGroups = (
       { path: '/sales/kanban', label: 'Kanban tiến độ', icon: <LayoutDashboard size={18} />,
         tab: { key: 'sales-kanban', componentId: 'sales-kanban' },
         requireSalesRoles: ['sale', 'production', 'logistics', 'accounting', 'admin'] },
+      // Nối lại 2 trang công nợ/dòng tiền (đã code sẵn, route có nhưng thiếu link — 2026-08-06)
+      { path: '/sales/ar-aging', label: 'Công nợ khách', icon: <DollarSign size={18} />,
+        requireSalesRoles: ['sale', 'accounting', 'admin'] },
+      { path: '/sales/cash-flow', label: 'Dòng tiền bán', icon: <BarChart3 size={18} />,
+        requireSalesRoles: ['accounting', 'admin'] },
     ],
   },
 

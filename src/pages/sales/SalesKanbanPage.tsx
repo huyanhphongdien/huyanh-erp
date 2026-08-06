@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Input, Select, message, Spin, Button, Modal, Empty } from 'antd'
 import { Search, RefreshCw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -14,8 +15,18 @@ import {
   SALES_STAGES,
   SALES_STAGE_LABELS,
   SALES_STAGE_EMOJI,
+  paymentBucket,
+  isUnpaid,
+  outstandingUsd,
   type SalesStage,
 } from '../../services/sales/salesStages'
+
+// Format tiền USD gọn cho KPI cột (vd $5.9M, $307K)
+const fmtUsdCompact = (v: number): string => {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
+  if (v >= 1_000) return `$${Math.round(v / 1000)}K`
+  return `$${Math.round(v)}`
+}
 
 // Stage rank cho forward-only validation
 const STAGE_RANK: Record<SalesStage, number> = {
@@ -37,6 +48,7 @@ import { soDisplayCode } from '../../services/sales/salesTypes'
 
 export default function SalesKanbanPage() {
   const user = useAuthStore(s => s.user)
+  const navigate = useNavigate()
   const [orders, setOrders] = useState<KanbanOrder[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})
   const [loading, setLoading] = useState(true)
@@ -44,6 +56,8 @@ export default function SalesKanbanPage() {
   const [filterEtd, setFilterEtd] = useState<'all' | '7d' | '14d' | '30d'>('all')
   const [showOnlyMine, setShowOnlyMine] = useState(false)
   const [showOnlyOverdue, setShowOnlyOverdue] = useState(false)
+  const [showOnlyUnpaid, setShowOnlyUnpaid] = useState(false)   // Chỉ đơn chưa thu tiền
+  const [showPaidDone, setShowPaidDone] = useState(false)       // Bung đơn đã thu đủ (cột giao)
   const [dragOverStage, setDragOverStage] = useState<SalesStage | null>(null)
   const [confirmTransition, setConfirmTransition] = useState<{
     orderId: string
@@ -133,9 +147,10 @@ export default function SalesKanbanPage() {
         const elapsed = (Date.now() - new Date(o.stage_started_at).getTime()) / (1000 * 3600)
         if (elapsed <= o.stage_sla_hours) return false
       }
+      if (showOnlyUnpaid && !isUnpaid(o)) return false   // chỉ đơn đã tới khâu thu mà chưa thu đủ
       return true
     })
-  }, [orders, search, filterEtd, showOnlyMine, showOnlyOverdue, user])
+  }, [orders, search, filterEtd, showOnlyMine, showOnlyOverdue, showOnlyUnpaid, user])
 
   // ── Group by stage ──
   const byStage = useMemo(() => {
@@ -265,6 +280,13 @@ export default function SalesKanbanPage() {
         >
           Quá SLA
         </Button>
+        <Button
+          type={showOnlyUnpaid ? 'primary' : 'default'}
+          onClick={() => setShowOnlyUnpaid(!showOnlyUnpaid)}
+          style={showOnlyUnpaid ? { background: '#b45309', borderColor: '#b45309' } : {}}
+        >
+          💰 Chỉ chưa thu tiền
+        </Button>
       </div>
 
       {loading ? (
@@ -278,6 +300,30 @@ export default function SalesKanbanPage() {
             const list = byStage[stage]
             const isOver = dragOverStage === stage
             const isOverloaded = list.length >= 8
+
+            // ── Cột "Đã giao khách": xếp chưa-thu/nợ-to lên đầu, tách đơn đã thu đủ,
+            //    tính KPI tiền về (dùng chung paymentBucket/outstandingUsd với card) ──
+            const isDelivered = stage === 'delivered'
+            let renderList = list
+            let doneList: KanbanOrder[] = []
+            let kpi: { unpaid: number; partial: number; out: number } | null = null
+            if (isDelivered) {
+              const rank = (o: KanbanOrder) => {
+                const b = paymentBucket(o)
+                return b === 'unpaid' ? 0 : b === 'partial' ? 1 : b === 'paid' ? 3 : 2
+              }
+              const sorted = [...list].sort((a, b) => {
+                const r = rank(a) - rank(b)
+                return r !== 0 ? r : outstandingUsd(b) - outstandingUsd(a)
+              })
+              doneList = sorted.filter(o => paymentBucket(o) === 'paid')
+              renderList = sorted.filter(o => paymentBucket(o) !== 'paid')
+              kpi = {
+                unpaid: list.filter(o => paymentBucket(o) === 'unpaid').length,
+                partial: list.filter(o => paymentBucket(o) === 'partial').length,
+                out: list.reduce((s, o) => s + (paymentBucket(o) === 'paid' ? 0 : outstandingUsd(o)), 0),
+              }
+            }
             return (
               <div
                 key={stage}
@@ -317,6 +363,31 @@ export default function SalesKanbanPage() {
                   </span>
                 </div>
 
+                {/* KPI tiền về + link Công nợ — CHỈ cột "Đã giao khách" */}
+                {isDelivered && kpi && list.length > 0 && (
+                  <div style={{
+                    margin: '0 2px 8px', padding: '8px 10px', borderRadius: 8,
+                    background: kpi.out > 0 ? '#fff7ed' : '#f0fdf4',
+                    border: `1px solid ${kpi.out > 0 ? '#fed7aa' : '#bbf7d0'}`,
+                  }}>
+                    <div style={{ fontSize: 10, color: '#9a3412', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Còn phải thu
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: kpi.out > 0 ? '#b45309' : '#15803d', lineHeight: 1.1 }}>
+                      {fmtUsdCompact(kpi.out)}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#6b7280', marginTop: 2 }}>
+                      {kpi.unpaid} chưa thu · {kpi.partial} thu 1 phần · {doneList.length} đã thu đủ
+                    </div>
+                    <div
+                      onClick={() => navigate('/sales/ar-aging')}
+                      style={{ fontSize: 11, color: '#0a72ef', fontWeight: 600, cursor: 'pointer', marginTop: 4 }}
+                    >
+                      → Xem Công nợ khách
+                    </div>
+                  </div>
+                )}
+
                 {/* Cards */}
                 <div style={{ minHeight: 60 }}>
                   {list.length === 0 ? (
@@ -324,15 +395,41 @@ export default function SalesKanbanPage() {
                       (rảnh)
                     </div>
                   ) : (
-                    list.map(o => (
-                      <KanbanCard
-                        key={o.id}
-                        order={o}
-                        lp={lotProgress[o.id]}
-                        onDragStart={() => {}}
-                        onDragEnd={() => {}}
-                      />
-                    ))
+                    <>
+                      {renderList.map(o => (
+                        <KanbanCard
+                          key={o.id}
+                          order={o}
+                          lp={lotProgress[o.id]}
+                          onDragStart={() => {}}
+                          onDragEnd={() => {}}
+                        />
+                      ))}
+                      {/* Đơn đã thu đủ — gom gọn 1 dòng, bấm mới bung (chỉ cột giao) */}
+                      {isDelivered && doneList.length > 0 && (
+                        <>
+                          <div
+                            onClick={() => setShowPaidDone(v => !v)}
+                            style={{
+                              cursor: 'pointer', textAlign: 'center', fontSize: 11, fontWeight: 600,
+                              color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0',
+                              borderRadius: 8, padding: '6px 8px', margin: '2px 0',
+                            }}
+                          >
+                            ✅ {doneList.length} đơn đã thu đủ — {showPaidDone ? 'Ẩn' : 'Hiện'}
+                          </div>
+                          {showPaidDone && doneList.map(o => (
+                            <KanbanCard
+                              key={o.id}
+                              order={o}
+                              lp={lotProgress[o.id]}
+                              onDragStart={() => {}}
+                              onDragEnd={() => {}}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

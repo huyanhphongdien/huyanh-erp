@@ -41,6 +41,7 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons'
 import { salesCustomerService } from '../../services/sales/salesCustomerService'
+import CustomerExportProfileTab from './components/CustomerExportProfileTab'
 import type {
   SalesCustomer,
   CreateCustomerData,
@@ -408,6 +409,11 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
           )}
         </div>
       ),
+    },
+    {
+      key: 'export',
+      label: 'Hồ sơ chứng từ',
+      children: <CustomerExportProfileTab customerId={customer.id} />,
     },
     {
       key: 'orders',

@@ -36,6 +36,7 @@ const { Title, Text } = Typography
 interface AROrder {
   id: string
   code: string
+  contractNo: string | null
   status: string
   total: number
   paid: number
@@ -113,7 +114,7 @@ export default function ARAgingReportPage() {
       const { data: orders, error } = await supabase
         .from('sales_orders')
         .select(`
-          id, code, customer_id, quantity_tons, unit_price, total_value_usd, currency,
+          id, code, contract_no, customer_id, quantity_tons, unit_price, total_value_usd, currency,
           payment_status, delivery_date, etd, confirmed_at, status, created_at,
           customer:sales_customers!customer_id(id, code, name, short_name, country),
           payments:sales_order_payments!sales_order_id(amount, payment_type, payment_date)
@@ -136,6 +137,7 @@ export default function ARAgingReportPage() {
         rows.push({
           id: o.id,
           code: o.code,
+          contractNo: o.contract_no || null,
           status: o.status,
           total,
           paid,
@@ -237,7 +239,7 @@ export default function ARAgingReportPage() {
         payment_type: payType,
         bank_reference: payBankRef.trim() || null,
       })
-      message.success(`Đã ghi nhận thu ${formatUSD(payAmount)} cho ${payOrder.code}`)
+      message.success(`Đã ghi nhận thu ${formatUSD(payAmount)} cho ${payOrder.contractNo || payOrder.code}`)
       setPayOrder(null)
       await load()
     } catch (e: any) {
@@ -250,7 +252,12 @@ export default function ARAgingReportPage() {
   // ── Bảng con: đơn của 1 khách ──
   const renderOrders = (rec: ARRecord) => {
     const orderCols: ColumnsType<AROrder> = [
-      { title: 'Mã đơn', dataIndex: 'code', key: 'code', render: (v) => <Text strong style={{ fontSize: 12 }}>{v}</Text> },
+      { title: 'Số HĐ', key: 'contract', width: 180, render: (_, o) => (
+        <div>
+          <Text strong style={{ fontSize: 13 }}>{o.contractNo || o.code}</Text>
+          {o.contractNo && <><br /><Text type="secondary" style={{ fontSize: 10 }}>{o.code}</Text></>}
+        </div>
+      ) },
       { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 110,
         render: (v: string) => <Tag>{STATUS_LABELS[v] || v}</Tag> },
       { title: 'Tổng', dataIndex: 'total', key: 'total', align: 'right', render: (v) => formatUSD(v) },
@@ -396,7 +403,7 @@ export default function ARAgingReportPage() {
 
       {/* Modal ghi nhận đã thu */}
       <Modal
-        title={<span><DollarOutlined style={{ color: '#15803d' }} /> Ghi nhận đã thu — {payOrder?.code}</span>}
+        title={<span><DollarOutlined style={{ color: '#15803d' }} /> Ghi nhận đã thu — {payOrder?.contractNo || payOrder?.code}</span>}
         open={!!payOrder}
         onCancel={() => setPayOrder(null)}
         onOk={submitPay}
@@ -409,7 +416,8 @@ export default function ARAgingReportPage() {
         {payOrder && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ background: '#fafafa', borderRadius: 8, padding: 10, fontSize: 13 }}>
-              Đơn <strong>{payOrder.code}</strong> · Còn nợ:{' '}
+              Đơn <strong>{payOrder.contractNo || payOrder.code}</strong>
+              {payOrder.contractNo && <Text type="secondary" style={{ fontSize: 11 }}> ({payOrder.code})</Text>} · Còn nợ:{' '}
               <strong style={{ color: '#f5222d' }}>{formatUSD(payOrder.outstanding)}</strong>
             </div>
             <div>

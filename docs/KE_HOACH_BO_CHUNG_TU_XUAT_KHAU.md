@@ -108,20 +108,20 @@ CREATE TABLE IF NOT EXISTS public.sales_customer_export_profiles (
 **Mục tiêu:** 2 chứng từ hay dùng nhất tự ra đúng consignee/mark/bank của khách.
 **Ước lượng:** ~2 ngày · **Phụ thuộc:** GĐ 1 (hồ sơ khách).
 
-### 2.1 Backend — bổ sung `documentService.ts`
-- [ ] `getInvoiceData(orderId)`: đọc thêm `export_profile` → điền consignee, notify, buyer legal, shipping mark, bank đã chọn, PO#
-- [ ] `getPackingListData(orderId)`: đọc thêm shipping mark + consignee
-- [ ] (Kiểm) nguồn container/khối lượng lấy từ `sales_order_containers`
+### 2.1 Backend — bổ sung `documentService.ts` ✅
+- [x] `getInvoiceData(orderId)`: đọc thêm hồ sơ (`loadExportProfile`) → consignee, notify, buyer legal/address, shipping mark, **bank từ `company_banks`** (thay bank giả hardcoded), PO#, điều khoản TT
+- [x] `getPackingListData(orderId)`: đọc thêm buyer/consignee/shipping mark
+- [x] Container/khối lượng lấy từ `sales_order_containers` (đã có sẵn)
 
-### 2.2 UI — `ExportDocumentsPage.tsx`
-- [ ] Tab Invoice: bổ sung khối consignee / shipping mark / bank / PO# vào layout in
-- [ ] Tab Packing List: bổ sung shipping mark + consignee
-- [ ] Xuất file: giữ In PDF (`window.print`) + thêm nút **Tải .docx** theo template (dùng docxtemplater)
+### 2.2 UI — `ExportDocumentsPage.tsx` ✅
+- [x] Tab Invoice: thêm Buyer/Consignee/Notify + PO# + Shipping Marks + bank đúng
+- [x] Tab Packing List: thêm Buyer/Consignee + Shipping Marks
+- [x] Xuất file: In→PDF (`window.print`) + **Tải Word (.doc)** qua `lib/htmlToWord.ts` (HTML→.doc, không cần template)
 
 ### 2.3 Acceptance
-- [ ] Chọn 1 đơn (VD GRI) → tab Hóa đơn ra đúng consignee + bank + shipping mark của khách
-- [ ] Tab Packing List khớp số container/khối lượng thực tế
-- [ ] In PDF / tải .docx được
+- [x] Đơn GRI (HA20260080) → Hóa đơn ra đúng consignee (Commercial Bank of Ceylon) + bank (Vietinbank) + shipping mark (verified data chain)
+- [x] Packing List khớp container/khối lượng từ `sales_order_containers`
+- [x] In PDF / Tải Word được (build OK)
 
 ---
 
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS public.sales_order_lc_negotiations (
 | GĐ | Nội dung | Trạng thái | Ghi chú |
 |---|---|---|---|
 | 1 | Hồ sơ chứng từ khách + checklist | ✅ **Xong** (2026-08-07) | Migration đã áp prod (2 bảng + 7 TK); tab "Hồ sơ chứng từ" trong màn khách; seed hồ sơ GRI |
-| 2 | Sinh Invoice + Packing List | ⬜ Chưa bắt đầu | |
+| 2 | Sinh Invoice + Packing List | ✅ **Xong** (2026-08-07) | `documentService` nối hồ sơ khách (consignee/notify/mark/bank/PO); tab Invoice+PKL bổ sung field; xuất **In→PDF + Tải Word (.doc)** |
 | 3 | Weight List + COA + đính kèm ngoài | ⬜ Chưa bắt đầu | |
 | 4 | Hối phiếu + Đơn chiết khấu + xuất cả bộ | ⬜ Chưa bắt đầu | |
 

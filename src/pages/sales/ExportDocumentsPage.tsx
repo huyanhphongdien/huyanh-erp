@@ -31,12 +31,14 @@ import {
   PrinterOutlined,
   FileTextOutlined,
   FileDoneOutlined,
+  FileWordOutlined,
   SafetyCertificateOutlined,
   ContainerOutlined,
   DollarOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { documentService } from '../../services/sales/documentService'
+import { downloadElementAsWord } from '../../lib/htmlToWord'
 import type { COAData, PackingListData, InvoiceData } from '../../services/sales/documentService'
 import type { SalesOrder } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
@@ -269,8 +271,9 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
 
       <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
         <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
-        <Descriptions.Item label="Customer">{data.customer_name}</Descriptions.Item>
+        <Descriptions.Item label="Buyer">{data.buyer_name || data.customer_name}</Descriptions.Item>
         <Descriptions.Item label="Address" span={2}>{data.customer_address}</Descriptions.Item>
+        {data.consignee && <Descriptions.Item label="Consignee" span={2}>{data.consignee}</Descriptions.Item>}
         <Descriptions.Item label="Commodity">Natural Rubber {data.grade?.replace(/_/g, ' ')}</Descriptions.Item>
         <Descriptions.Item label="Vessel">{data.vessel_name || 'TBD'}</Descriptions.Item>
         <Descriptions.Item label="Port of Loading">{data.port_of_loading || 'TBD'}</Descriptions.Item>
@@ -328,6 +331,13 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
         )
       ))}
 
+      {data.shipping_marks && (
+        <div style={{ marginTop: 16 }}>
+          <Title level={5}>Shipping Marks</Title>
+          <Paragraph style={{ whiteSpace: 'pre-line' }}>{data.shipping_marks}</Paragraph>
+        </div>
+      )}
+
       <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ textAlign: 'center', width: 250 }}>
           <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
@@ -340,9 +350,15 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
-        <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>
-          Print Packing List
-        </Button>
+        <Space>
+          <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>
+            In / Lưu PDF
+          </Button>
+          <Button icon={<FileWordOutlined />} size="large"
+            onClick={() => downloadElementAsWord('packing-list-print', `${data.order_code}_PKL`)}>
+            Tải Word (.doc)
+          </Button>
+        </Space>
       </div>
     </div>
   )
@@ -385,13 +401,29 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
       <Row gutter={24} style={{ marginBottom: 16 }}>
         <Col span={12}>
           <Card size="small" style={{ height: '100%' }}>
-            <Text type="secondary">Bill To:</Text>
+            <Text type="secondary">The Buyer:</Text>
             <br />
-            <Text strong style={{ fontSize: 15 }}>{data.customer.name}</Text>
+            <Text strong style={{ fontSize: 15 }}>{data.buyer_name || data.customer.name}</Text>
             <br />
-            <Text>{data.customer.address}</Text>
+            <Text>{data.buyer_address || data.customer.address}</Text>
             <br />
             <Text>{data.customer.country}</Text>
+            {data.consignee && (
+              <>
+                <Divider style={{ margin: '8px 0' }} />
+                <Text type="secondary">Consignee:</Text><br />
+                <Text strong>{data.consignee}</Text>
+                {data.consignee_address && <><br /><Text>{data.consignee_address}</Text></>}
+              </>
+            )}
+            {data.notify_party && (
+              <>
+                <Divider style={{ margin: '8px 0' }} />
+                <Text type="secondary">Notify Party:</Text><br />
+                <Text>{data.notify_party}</Text>
+                {data.notify_address && <><br /><Text>{data.notify_address}</Text></>}
+              </>
+            )}
           </Card>
         </Col>
         <Col span={12}>
@@ -399,6 +431,7 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
             <Descriptions.Item label="Invoice No.">{data.invoice_code}</Descriptions.Item>
             <Descriptions.Item label="Date">{data.invoice_date}</Descriptions.Item>
             <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
+            {data.po_number && <Descriptions.Item label="PO No.">{data.po_number}</Descriptions.Item>}
             <Descriptions.Item label="Incoterm">{data.incoterm}</Descriptions.Item>
           </Descriptions>
         </Col>
@@ -464,16 +497,25 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
         <Col span={12}>
           <Title level={5}>Bank Details</Title>
           <Paragraph>
+            Beneficiary: {data.bank_info.account_name}
+            <br />
             Bank: {data.bank_info.name}
             <br />
+            {data.bank_info.address && <>Bank Address: {data.bank_info.address}<br /></>}
             Account: {data.bank_info.account}
             <br />
             SWIFT: {data.bank_info.swift}
-            <br />
-            Beneficiary: Huy Anh Phong Dien Rubber Co., Ltd.
           </Paragraph>
         </Col>
       </Row>
+
+      {data.shipping_marks && (
+        <>
+          <Divider />
+          <Title level={5}>Shipping Marks</Title>
+          <Paragraph style={{ whiteSpace: 'pre-line' }}>{data.shipping_marks}</Paragraph>
+        </>
+      )}
 
       <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ textAlign: 'center', width: 250 }}>
@@ -487,9 +529,15 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
-        <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>
-          Print Invoice
-        </Button>
+        <Space>
+          <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>
+            In / Lưu PDF
+          </Button>
+          <Button icon={<FileWordOutlined />} size="large"
+            onClick={() => downloadElementAsWord('invoice-print', `${data.invoice_code}_INV`)}>
+            Tải Word (.doc)
+          </Button>
+        </Space>
       </div>
     </div>
   )

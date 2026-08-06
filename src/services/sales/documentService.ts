@@ -47,6 +47,9 @@ export interface PackingListData {
   order_code: string
   customer_name: string
   customer_address: string
+  buyer_name: string
+  consignee: string
+  shipping_marks: string
   grade: string
   containers: Array<{
     container_no: string
@@ -90,7 +93,17 @@ export interface InvoiceData {
   lc_number: string | null
   bl_number: string | null
   invoice_date: string
-  bank_info: { name: string; account: string; swift: string }
+  bank_info: { account_name: string; name: string; account: string; address: string; swift: string }
+  // GĐ2 — từ hồ sơ chứng từ khách (sales_customer_export_profiles)
+  buyer_name: string
+  buyer_address: string
+  consignee: string
+  consignee_address: string
+  notify_party: string
+  notify_address: string
+  shipping_marks: string
+  attn_contacts: string
+  po_number: string | null
 }
 
 // ============================================================================
@@ -120,6 +133,26 @@ const PAYMENT_TERMS_EN: Record<string, string> = {
   TT_60: 'T/T 60% in advance, balance against B/L',
   CAD: 'Cash Against Documents',
   DP: 'Documents against Payment',
+}
+
+// GĐ2 — nạp hồ sơ chứng từ khách + ngân hàng thụ hưởng đã chọn
+async function loadExportProfile(customerId: string | null | undefined): Promise<{ profile: any; bank: any }> {
+  if (!customerId) return { profile: null, bank: null }
+  const { data: profile } = await supabase
+    .from('sales_customer_export_profiles')
+    .select('*')
+    .eq('customer_id', customerId)
+    .maybeSingle()
+  let bank: any = null
+  if (profile?.preferred_bank_id) {
+    const { data } = await supabase
+      .from('company_banks')
+      .select('*')
+      .eq('id', profile.preferred_bank_id)
+      .maybeSingle()
+    bank = data
+  }
+  return { profile, bank }
 }
 
 // ============================================================================
@@ -308,11 +341,15 @@ export const documentService = {
     }
 
     const customer = order.customer as { name?: string; address?: string } | null
+    const { profile } = await loadExportProfile(order.customer_id)
 
     return {
       order_code: soDisplayCode(order),
       customer_name: customer?.name || '',
       customer_address: customer?.address || '',
+      buyer_name: profile?.buyer_legal_name || customer?.name || '',
+      consignee: profile?.consignee_name || '',
+      shipping_marks: profile?.shipping_marks || '',
       grade: order.grade,
       containers,
       total_containers: containers.length,
@@ -352,6 +389,7 @@ export const documentService = {
       .maybeSingle()
 
     const customer = order.customer as { name?: string; address?: string; country?: string } | null
+    const { profile, bank } = await loadExportProfile(order.customer_id)
 
     const subtotal = order.quantity_tons * order.unit_price
     const freight = invoice?.freight_charge ?? 0
@@ -375,11 +413,23 @@ export const documentService = {
       freight,
       insurance,
       total,
-      payment_terms: PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
+      payment_terms: profile?.default_payment_term || PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
       lc_number: order.lc_number || null,
       bl_number: invoice?.bl_number || null,
       invoice_date: invoice?.invoice_date || new Date().toISOString().split('T')[0],
-      bank_info: BANK_INFO,
+      bank_info: bank
+        ? { account_name: bank.account_name || 'HUY ANH RUBBER COMPANY LIMITED', name: bank.bank_name, account: bank.account_no, address: bank.bank_address || '', swift: bank.swift_code || '' }
+        : { account_name: 'HUY ANH RUBBER COMPANY LIMITED', name: BANK_INFO.name, account: BANK_INFO.account, address: '', swift: BANK_INFO.swift },
+      // GĐ2 — hồ sơ chứng từ khách
+      buyer_name: profile?.buyer_legal_name || customer?.name || '',
+      buyer_address: profile?.buyer_address || customer?.address || '',
+      consignee: profile?.consignee_name || '',
+      consignee_address: profile?.consignee_address || '',
+      notify_party: profile?.notify_party || '',
+      notify_address: profile?.notify_address || '',
+      shipping_marks: profile?.shipping_marks || '',
+      attn_contacts: profile?.attn_contacts || '',
+      po_number: order.customer_po || null,
     }
   },
 

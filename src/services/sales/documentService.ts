@@ -76,6 +76,31 @@ export interface PackingListData {
   etd: string
 }
 
+export interface WeightListData {
+  order_code: string
+  buyer_name: string
+  consignee: string
+  grade: string
+  containers: Array<{
+    container_no: string
+    seal_no: string
+    bale_count: number
+    net_weight_kg: number
+    tare_weight_kg: number
+    gross_weight_kg: number
+  }>
+  total_bales: number
+  total_net: number
+  total_tare: number
+  total_gross: number
+  vessel_name: string
+  bl_number: string | null
+  port_of_loading: string
+  port_of_destination: string
+  etd: string
+  shipping_marks: string
+}
+
 export interface InvoiceData {
   invoice_code: string
   order_code: string
@@ -360,6 +385,75 @@ export const documentService = {
       port_of_destination: order.port_of_destination || '',
       vessel_name: order.vessel_name || '',
       etd: order.etd || '',
+    }
+  },
+
+  // ==========================================================================
+  // WEIGHT LIST
+  // ==========================================================================
+
+  async getWeightListData(orderId: string): Promise<WeightListData> {
+    const { data: order, error } = await supabase
+      .from('sales_orders')
+      .select('*, customer:sales_customers!customer_id(id,name,address)')
+      .eq('id', orderId)
+      .single()
+    if (error || !order) throw new Error('Không thể tải thông tin đơn hàng')
+
+    const { data: rawContainers } = await supabase
+      .from('sales_order_containers')
+      .select('container_no,seal_no,bale_count,net_weight_kg,tare_weight_kg,gross_weight_kg, items:sales_order_container_items(weight_kg)')
+      .eq('sales_order_id', orderId)
+      .order('created_at')
+
+    const { profile } = await loadExportProfile(order.customer_id)
+    const { data: invoice } = await supabase
+      .from('sales_invoices')
+      .select('bl_number')
+      .eq('sales_order_id', orderId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const containers = (rawContainers || []).map((c) => {
+      // Fallback net theo item (khớp getPackingListData — tránh 2 chứng từ lệch nhau)
+      const itemNet = ((c as { items?: Array<{ weight_kg?: number }> }).items || [])
+        .reduce((s, i) => s + (i.weight_kg || 0), 0)
+      const net = c.net_weight_kg || itemNet
+      const tare = c.tare_weight_kg || 0
+      // gross: ưu tiên số thật; thiếu → net + tare (nếu có tare) hoặc ước lượng net×1.02
+      const gross = c.gross_weight_kg || (tare > 0 ? net + tare : Math.round(net * 1.02))
+      // tare hiển thị: thiếu tare nhưng có gross → gross − net (giữ net + tare = gross)
+      const tareShown = tare > 0 ? tare : Math.max(0, gross - net)
+      return {
+        container_no: c.container_no || 'TBD',
+        seal_no: c.seal_no || 'TBD',
+        bale_count: c.bale_count || 0,
+        net_weight_kg: net,
+        tare_weight_kg: tareShown,
+        gross_weight_kg: gross,
+      }
+    })
+    const sum = (f: 'bale_count' | 'net_weight_kg' | 'tare_weight_kg' | 'gross_weight_kg') =>
+      containers.reduce((s, c) => s + (c[f] || 0), 0)
+
+    const customer = order.customer as { name?: string } | null
+    return {
+      order_code: soDisplayCode(order),
+      buyer_name: profile?.buyer_legal_name || customer?.name || '',
+      consignee: profile?.consignee_name || '',
+      grade: order.grade,
+      containers,
+      total_bales: sum('bale_count'),
+      total_net: sum('net_weight_kg'),
+      total_tare: sum('tare_weight_kg'),
+      total_gross: sum('gross_weight_kg'),
+      vessel_name: order.vessel_name || '',
+      bl_number: invoice?.bl_number || null,
+      port_of_loading: PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
+      port_of_destination: order.port_of_destination || '',
+      etd: order.etd || '',
+      shipping_marks: profile?.shipping_marks || '',
     }
   },
 

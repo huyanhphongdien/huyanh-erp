@@ -39,7 +39,7 @@ import {
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { documentService } from '../../services/sales/documentService'
 import { downloadElementAsWord } from '../../lib/htmlToWord'
-import type { COAData, PackingListData, InvoiceData } from '../../services/sales/documentService'
+import type { COAData, PackingListData, InvoiceData, WeightListData } from '../../services/sales/documentService'
 import type { SalesOrder } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
 
@@ -365,6 +365,106 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
 }
 
 // ============================================================================
+// WEIGHT LIST TAB
+// ============================================================================
+
+interface WeightListTabProps {
+  data: WeightListData | null
+  loading: boolean
+  onGenerate: () => void
+}
+
+const WeightListTab = ({ data, loading, onGenerate }: WeightListTabProps) => {
+  if (loading) return <Spin tip="Loading..." />
+  if (!data) {
+    return (
+      <Result
+        icon={<FileDoneOutlined />}
+        title="Weight List"
+        subTitle="Click button below to generate Weight List data"
+        extra={<Button type="primary" onClick={onGenerate}>Generate Weight List</Button>}
+      />
+    )
+  }
+  const fmt = (v: number) => (v || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })
+  return (
+    <div className="doc-print-area" id="weight-list-print">
+      <CompanyHeader />
+      <Title level={3} style={{ textAlign: 'center', marginBottom: 24 }}>WEIGHT LIST</Title>
+
+      <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
+        <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
+        <Descriptions.Item label="Buyer">{data.buyer_name}</Descriptions.Item>
+        {data.consignee && <Descriptions.Item label="Consignee" span={2}>{data.consignee}</Descriptions.Item>}
+        <Descriptions.Item label="Commodity">Natural Rubber {data.grade?.replace(/_/g, ' ')}</Descriptions.Item>
+        <Descriptions.Item label="Vessel">{data.vessel_name || 'TBD'}</Descriptions.Item>
+        <Descriptions.Item label="B/L No.">{data.bl_number || 'TBD'}</Descriptions.Item>
+        <Descriptions.Item label="ETD">{data.etd || 'TBD'}</Descriptions.Item>
+        <Descriptions.Item label="Port of Loading">{data.port_of_loading || 'TBD'}</Descriptions.Item>
+        <Descriptions.Item label="Port of Destination">{data.port_of_destination || 'TBD'}</Descriptions.Item>
+      </Descriptions>
+
+      <Table
+        dataSource={data.containers}
+        rowKey="container_no"
+        pagination={false}
+        size="small"
+        bordered
+        columns={[
+          { title: 'Container No.', dataIndex: 'container_no', key: 'c', width: 160 },
+          { title: 'Seal No.', dataIndex: 'seal_no', key: 's', width: 140 },
+          { title: 'Bales', dataIndex: 'bale_count', key: 'b', align: 'right', render: (v: number) => fmt(v) },
+          { title: 'Net Weight (KG)', dataIndex: 'net_weight_kg', key: 'n', align: 'right', render: (v: number) => fmt(v) },
+          { title: 'Tare Weight (KG)', dataIndex: 'tare_weight_kg', key: 't', align: 'right', render: (v: number) => fmt(v) },
+          { title: 'Gross Weight (KG)', dataIndex: 'gross_weight_kg', key: 'g', align: 'right', render: (v: number) => fmt(v) },
+        ]}
+        summary={() => (
+          <Table.Summary fixed>
+            <Table.Summary.Row style={{ fontWeight: 'bold', background: '#fafafa' }}>
+              <Table.Summary.Cell index={0} colSpan={2}>TOTAL</Table.Summary.Cell>
+              <Table.Summary.Cell index={2} align="right">{fmt(data.total_bales)}</Table.Summary.Cell>
+              <Table.Summary.Cell index={3} align="right">{fmt(data.total_net)}</Table.Summary.Cell>
+              <Table.Summary.Cell index={4} align="right">{fmt(data.total_tare)}</Table.Summary.Cell>
+              <Table.Summary.Cell index={5} align="right">{fmt(data.total_gross)}</Table.Summary.Cell>
+            </Table.Summary.Row>
+          </Table.Summary>
+        )}
+      />
+
+      {data.shipping_marks && (
+        <div style={{ marginTop: 16 }}>
+          <Title level={5}>Shipping Marks</Title>
+          <Paragraph style={{ whiteSpace: 'pre-line' }}>{data.shipping_marks}</Paragraph>
+        </div>
+      )}
+
+      <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ textAlign: 'center', width: 250 }}>
+          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
+          <Text strong>Warehouse Manager</Text>
+        </div>
+        <div style={{ textAlign: 'center', width: 250 }}>
+          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
+          <Text strong>General Director</Text>
+        </div>
+      </div>
+
+      <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
+        <Space>
+          <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>
+            In / Lưu PDF
+          </Button>
+          <Button icon={<FileWordOutlined />} size="large"
+            onClick={() => downloadElementAsWord('weight-list-print', `${data.order_code}_WL`)}>
+            Tải Word (.doc)
+          </Button>
+        </Space>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // INVOICE TAB
 // ============================================================================
 
@@ -562,6 +662,8 @@ const ExportDocumentsPage = () => {
   const [packingLoading, setPackingLoading] = useState(false)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
+  const [weightData, setWeightData] = useState<WeightListData | null>(null)
+  const [weightLoading, setWeightLoading] = useState(false)
 
   // Load order
   useEffect(() => {
@@ -608,6 +710,21 @@ const ExportDocumentsPage = () => {
     }
   }, [orderId])
 
+  // Generate Weight List
+  const generateWeight = useCallback(async () => {
+    if (!orderId) return
+    setWeightLoading(true)
+    try {
+      const data = await documentService.getWeightListData(orderId)
+      setWeightData(data)
+      message.success('Weight List generated successfully')
+    } catch (err: unknown) {
+      message.error(err instanceof Error ? err.message : 'Failed to generate Weight List')
+    } finally {
+      setWeightLoading(false)
+    }
+  }, [orderId])
+
   // Generate Invoice
   const generateInvoice = useCallback(async () => {
     if (!orderId) return
@@ -628,17 +745,23 @@ const ExportDocumentsPage = () => {
   // Print all
   const printAll = useCallback(async () => {
     if (!orderId) return
-    // Generate all if not yet
+    // Generate all if not yet (gồm cả Weight List)
     const promises: Promise<void>[] = []
     if (!coaData) promises.push(generateCOA())
     if (!packingData) promises.push(generatePacking())
+    if (!weightData) promises.push(generateWeight())
     if (!invoiceData) promises.push(generateInvoice())
     if (promises.length > 0) {
       await Promise.all(promises)
     }
-    // Small delay then print
-    setTimeout(() => window.print(), 500)
-  }, [orderId, coaData, packingData, invoiceData, generateCOA, generatePacking, generateInvoice])
+    // Bật class để print CSS hiện MỌI tab pane (mặc định AntD ẩn pane không active).
+    // Tab items dùng forceRender nên các pane đã mount sẵn dù chưa bấm vào.
+    document.body.classList.add('print-all')
+    setTimeout(() => {
+      window.print()
+      document.body.classList.remove('print-all')
+    }, 500)
+  }, [orderId, coaData, packingData, weightData, invoiceData, generateCOA, generatePacking, generateWeight, generateInvoice])
 
   if (loading) {
     return (
@@ -682,6 +805,10 @@ const ExportDocumentsPage = () => {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+          /* "In tất cả": hiện MỌI tab pane (kể cả pane đang ẩn) + ngắt trang giữa các chứng từ.
+             Per-tab print (không có class print-all) vẫn chỉ in pane đang mở. */
+          body.print-all .ant-tabs-tabpane { display: block !important; }
+          body.print-all .ant-tabs-tabpane .doc-print-area { page-break-after: always; }
         }
       `}</style>
 
@@ -776,6 +903,7 @@ const ExportDocumentsPage = () => {
           items={[
             {
               key: 'coa',
+              forceRender: true,
               label: (
                 <span>
                   <SafetyCertificateOutlined /> COA
@@ -786,6 +914,7 @@ const ExportDocumentsPage = () => {
             },
             {
               key: 'packing',
+              forceRender: true,
               label: (
                 <span>
                   <ContainerOutlined /> Packing List
@@ -795,7 +924,18 @@ const ExportDocumentsPage = () => {
               children: <PackingListTab data={packingData} loading={packingLoading} onGenerate={generatePacking} />,
             },
             {
+              key: 'weight',
+              forceRender: true,
+              label: (
+                <span>
+                  <FileDoneOutlined /> Weight List
+                </span>
+              ),
+              children: <WeightListTab data={weightData} loading={weightLoading} onGenerate={generateWeight} />,
+            },
+            {
               key: 'invoice',
+              forceRender: true,
               label: (
                 <span>
                   <DollarOutlined /> Invoice

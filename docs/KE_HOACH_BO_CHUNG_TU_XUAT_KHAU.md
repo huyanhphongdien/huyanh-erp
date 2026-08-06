@@ -130,14 +130,20 @@ CREATE TABLE IF NOT EXISTS public.sales_customer_export_profiles (
 **Mục tiêu:** gần đủ bộ + kiểm soát chứng từ thiếu.
 **Ước lượng:** ~2–3 ngày · **Phụ thuộc:** GĐ 2.
 
-### 3.1 Weight List (mới)
-- [ ] `documentService.getWeightListData(orderId)` (NW/GW từng container từ `sales_order_containers`)
-- [ ] Thêm tab **Weight List** vào `ExportDocumentsPage`
+> **PHÁT HIỆN 2026-08-07:** hạ tầng đính kèm + đủ/thiếu (mục 3.2, 3.3) **ĐÃ TỒN TẠI SẴN** trong ERP:
+> bảng `sales_order_documents` (167 dòng) + `salesDocumentUploadService` (upload bucket `sales-documents`)
+> + `STANDARD_DOCUMENTS` đã gồm B/L, COA, C/O, Insurance, Phyto, Fumigation… + **`DocumentChecklistTab` đã nối**
+> vào chi tiết đơn (Progress bar, received/total, upload từng loại). → KHÔNG cần tạo bảng/migration mới.
+> GĐ3 chỉ còn build **Weight List**.
 
-### 3.2 COA — ĐÍNH KÈM (không tự sinh)
+### 3.1 Weight List (mới) ✅
+- [x] `documentService.getWeightListData(orderId)` (NW/GW/Tare từng container từ `sales_order_containers` + hồ sơ khách)
+- [x] Thêm tab **Weight List** vào `ExportDocumentsPage` (In→PDF + Tải Word)
+
+### 3.2 COA — ĐÍNH KÈM (không tự sinh) ✅ (đã có sẵn)
 > **Chốt 2026-08-07:** COA lấy từ phòng LAB (file/link ngoài), **KHÔNG tự sinh** từ QC.
-- [ ] Thêm `coa` vào `doc_type` của `sales_order_documents` (mục 3.3) — upload như B/L/C/O/Bảo hiểm
-- [ ] Tab COA tự sinh cũ ở `ExportDocumentsPage` **giữ lại làm tham khảo** (tùy chọn), không bắt buộc
+- [x] `coa` ĐÃ có sẵn trong `STANDARD_DOCUMENTS` (doc_type='coa') — upload qua `DocumentChecklistTab` như B/L/C/O
+- [x] Tab COA tự sinh cũ ở `ExportDocumentsPage` giữ lại làm tham khảo (không bắt buộc)
 
 ### 3.3 Đính kèm chứng từ bên ngoài — migration `sales_order_documents.sql`
 ```sql
@@ -152,12 +158,13 @@ CREATE TABLE IF NOT EXISTS public.sales_order_documents (
   created_at     timestamptz DEFAULT now()
 );
 ```
-- [ ] Ô upload B/L · C/O · Bảo hiểm (+ Phyto/Fumigation) — tái dùng pattern `ContractFileSection`
-- [ ] **Bảng đủ/thiếu** đối chiếu với checklist khách (GĐ1) → hiện "còn thiếu: C/O, Bảo hiểm…"
+- [x] Ô upload B/L · C/O · Bảo hiểm · COA (+ Phyto/Fumigation) — **đã có** (`DocumentChecklistTab` + `salesDocumentUploadService`)
+- [x] **Bảng đủ/thiếu** — **đã có** (Progress bar + received/total trong `DocumentChecklistTab`)
+- [ ] *(GĐ4)* Đối chiếu SỐ BẢN gốc/copy với checklist khách (GĐ1) — để dành làm cùng bảng kê cho ngân hàng
 
 ### 3.4 Acceptance
-- [ ] Tab Weight List ra đúng NW/GW từng cont
-- [ ] Upload được COA + B/L + C/O + Bảo hiểm; bảng đủ/thiếu phản ánh đúng checklist khách
+- [x] Tab Weight List ra đúng NW/GW/Tare từng cont (verified: GRI HA20260080 có 5 cont, fallback tare/gross chạy)
+- [x] Upload được COA + B/L + C/O + Bảo hiểm; bảng đủ/thiếu phản ánh đúng (đã có sẵn)
 
 ---
 
@@ -204,7 +211,7 @@ CREATE TABLE IF NOT EXISTS public.sales_order_lc_negotiations (
 |---|---|---|---|
 | 1 | Hồ sơ chứng từ khách + checklist | ✅ **Xong** (2026-08-07) | Migration đã áp prod (2 bảng + 7 TK); tab "Hồ sơ chứng từ" trong màn khách; seed hồ sơ GRI |
 | 2 | Sinh Invoice + Packing List | ✅ **Xong** (2026-08-07) | `documentService` nối hồ sơ khách (consignee/notify/mark/bank/PO); tab Invoice+PKL bổ sung field; xuất **In→PDF + Tải Word (.doc)** |
-| 3 | Weight List + COA + đính kèm ngoài | ⬜ Chưa bắt đầu | |
+| 3 | Weight List + COA + đính kèm ngoài | ✅ **Xong** (2026-08-07) | Weight List (tab mới) build xong; **đính kèm B/L/C/O/BH/COA + đủ/thiếu ĐÃ CÓ SẴN** (`DocumentChecklistTab` + bảng `sales_order_documents`) → KHÔNG cần migration |
 | 4 | Hối phiếu + Đơn chiết khấu + xuất cả bộ | ⬜ Chưa bắt đầu | |
 
 *(⬜ chưa · 🟨 đang làm · ✅ xong)*

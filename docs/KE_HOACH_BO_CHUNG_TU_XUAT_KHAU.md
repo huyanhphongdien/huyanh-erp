@@ -173,9 +173,9 @@ CREATE TABLE IF NOT EXISTS public.sales_order_documents (
 **Mục tiêu:** bấm 1 nút ra trọn bộ + đơn nộp ngân hàng.
 **Ước lượng:** ~3–4 ngày · **Phụ thuộc:** GĐ 2, 3.
 
-### 4.1 Hối phiếu (Bill of Exchange)
-- [ ] Generator nhỏ từ dữ liệu Invoice (số tiền, số/ngày L/C, tenor, ngân hàng phát hành)
-- [ ] Tab BOE (2 bản: First / Second of Exchange)
+### 4.1 Hối phiếu (Bill of Exchange) ✅
+- [x] `BillOfExchangeTab` — sinh từ Invoice + Đơn chiết khấu (số tiền + amountToWords, tenor suy từ payment terms/hạn, ngân hàng phát hành = consignee/nhập tay, NH thụ hưởng = bank hồ sơ)
+- [x] Tab Hối phiếu (bản "First"; Second là bản sao cùng nội dung)
 
 ### 4.2 Đơn đề nghị chiết khấu (mẫu Vietinbank BM03) — migration `sales_order_lc_negotiations.sql`
 ```sql
@@ -192,16 +192,18 @@ CREATE TABLE IF NOT EXISTS public.sales_order_lc_negotiations (
   created_at         timestamptz DEFAULT now()
 );
 ```
-- [ ] Sinh phần đầu đơn (kéo từ đơn + L/C) + **bảng kê số bản** từ checklist khách
-- [ ] Lưu %, lãi, hạn, ngày nộp → **nối module tiền về** (đã có) để theo dõi ứng/đáo hạn
+- [x] `LcNegotiationTab` — form nhập (bank/issuing/L/C/%/lãi/hạn/ngày nộp/trạng thái) + văn bản BM03 + **bảng kê số bản** từ checklist khách (GĐ1). Migration `sales_order_lc_negotiations` đã áp prod. `lcNegotiationService` (get/upsert).
+- [ ] *(để dành)* Nối trạng thái (submitted/financed/settled) với module tiền về `sales_order_payments`
 
-### 4.3 Xuất cả bộ
-- [ ] Nút **"Xuất bộ chứng từ"** → gộp (tự-sinh + đính-kèm) thành 1 PDF/zip đúng số bản khách/NH yêu cầu
+### 4.3 Xuất cả bộ ✅ (một phần)
+- [x] **"In tất cả"** in bộ chứng từ GIAO HÀNG tự-sinh: COA + PKL + WL + Invoice (forceRender + body.print-all)
+- [x] **Hối phiếu + Đơn chiết khấu** in RIÊNG từng tab (In→PDF + Tải Word) — cố ý không gộp vào "In tất cả" vì chúng tải bất đồng bộ (review bắt lỗi in blank) + là chứng từ tài chính/ngân hàng riêng
+- [ ] *(để dành)* Gộp thêm file ĐÍNH KÈM (B/L/C/O/BH — PDF upload) vào 1 PDF/zip theo đúng số bản (cần PDF-merge)
 
 ### 4.4 Acceptance
-- [ ] Sinh được Hối phiếu + Đơn chiết khấu điền sẵn
-- [ ] Bảng kê số bản khớp checklist khách
-- [ ] Xuất 1 lần ra trọn bộ, sẵn sàng nộp ngân hàng
+- [x] Sinh được Hối phiếu + Đơn chiết khấu điền sẵn (build OK)
+- [x] Bảng kê số bản khớp checklist khách (GRI: 9 loại)
+- [x] "In tất cả" ra trọn bộ tự-sinh (đính kèm PDF-merge để dành)
 
 ---
 
@@ -212,7 +214,7 @@ CREATE TABLE IF NOT EXISTS public.sales_order_lc_negotiations (
 | 1 | Hồ sơ chứng từ khách + checklist | ✅ **Xong** (2026-08-07) | Migration đã áp prod (2 bảng + 7 TK); tab "Hồ sơ chứng từ" trong màn khách; seed hồ sơ GRI |
 | 2 | Sinh Invoice + Packing List | ✅ **Xong** (2026-08-07) | `documentService` nối hồ sơ khách (consignee/notify/mark/bank/PO); tab Invoice+PKL bổ sung field; xuất **In→PDF + Tải Word (.doc)** |
 | 3 | Weight List + COA + đính kèm ngoài | ✅ **Xong** (2026-08-07) | Weight List (tab mới) build xong; **đính kèm B/L/C/O/BH/COA + đủ/thiếu ĐÃ CÓ SẴN** (`DocumentChecklistTab` + bảng `sales_order_documents`) → KHÔNG cần migration |
-| 4 | Hối phiếu + Đơn chiết khấu + xuất cả bộ | ⬜ Chưa bắt đầu | |
+| 4 | Hối phiếu + Đơn chiết khấu + xuất cả bộ | ✅ **Xong** (2026-08-07) | Tab **Hối phiếu (BOE)** + **Đơn chiết khấu** (form + văn bản + bảng kê số bản; bảng `sales_order_lc_negotiations`). "In tất cả" = 4 chứng từ giao hàng; BOE/ĐNCK in riêng. Đã qua review đối kháng (5 fix). *(Còn: PDF-merge file đính kèm + nối trạng thái tiền về)* |
 
 *(⬜ chưa · 🟨 đang làm · ✅ xong)*
 

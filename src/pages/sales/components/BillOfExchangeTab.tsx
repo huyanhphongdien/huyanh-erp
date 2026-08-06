@@ -1,0 +1,125 @@
+// ============================================================================
+// BILL OF EXCHANGE TAB — Hối phiếu (GĐ 4)
+// File: src/pages/sales/components/BillOfExchangeTab.tsx
+//
+// Sinh Hối phiếu từ dữ liệu Hóa đơn + Đơn chiết khấu (số L/C, ngân hàng phát hành,
+// kỳ hạn). Tự nạp khi mount (để "In tất cả" luôn sẵn). In→PDF + Tải Word.
+// ============================================================================
+
+import { useState, useEffect } from 'react'
+import { Spin, Button, Space, Typography, Result, message } from 'antd'
+import { PrinterOutlined, FileWordOutlined, FileDoneOutlined } from '@ant-design/icons'
+import { documentService, type InvoiceData } from '../../../services/sales/documentService'
+import { lcNegotiationService, type LcNegotiation } from '../../../services/sales/lcNegotiationService'
+import { amountToWords } from '../../../services/sales/contractGeneratorService'
+import { downloadElementAsWord } from '../../../lib/htmlToWord'
+
+const { Title, Text } = Typography
+
+const fmtMoney = (v: number) =>
+  (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+// Suy kỳ hạn (số ngày) từ text payment terms, vd "LC 90 days from B/L date" -> 90
+const parseTenorDays = (paymentTerms?: string): number | null => {
+  if (!paymentTerms) return null
+  const m = paymentTerms.match(/(\d+)\s*day/i)
+  return m ? Number(m[1]) : null
+}
+
+export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: string; reloadKey?: number }) {
+  const [inv, setInv] = useState<InvoiceData | null>(null)
+  const [neg, setNeg] = useState<LcNegotiation | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      try {
+        const [i, n] = await Promise.all([
+          documentService.getInvoiceData(orderId),
+          lcNegotiationService.getByOrder(orderId),
+        ])
+        if (cancelled) return
+        setInv(i)
+        setNeg(n)
+      } catch (e: any) {
+        if (!cancelled) { setError(true); message.error(e?.message || 'Lỗi tải Hối phiếu') }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [orderId, reloadKey])   // reloadKey bump khi ĐNCK lưu → BOE nạp lại số L/C/tenor/NH mới
+
+  if (loading) return <Spin tip="Loading..." />
+  if (error || !inv) {
+    return <Result icon={<FileDoneOutlined />} title="Bill of Exchange" subTitle="Chưa tải được dữ liệu" />
+  }
+
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  // tenor: null = chưa rõ (để trống), 0 = AT SIGHT, N = usance. KHÔNG default 90.
+  const tenorDays = neg?.term_days ?? parseTenorDays(inv.payment_terms)
+  const issuingBank = neg?.issuing_bank || inv.consignee || ''
+  const lcNo = neg?.lc_number || inv.lc_number || ''
+  const lcDate = neg?.lc_date ? new Date(neg.lc_date).toLocaleDateString('en-GB') : ''
+  const words = amountToWords(inv.total)
+
+  const kv = (label: string, value: React.ReactNode) => (
+    <tr>
+      <td style={{ padding: '5px 8px', width: '38%', verticalAlign: 'top', color: '#444' }}>{label}</td>
+      <td style={{ padding: '5px 8px', fontWeight: 500 }}>: {value}</td>
+    </tr>
+  )
+
+  return (
+    <div className="doc-print-area" id="boe-print">
+      <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>BILL OF EXCHANGE</Title>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '16px 0 8px' }}>
+        <Text>Hue City, {today}</Text>
+        <Text strong>FOR: USD {fmtMoney(inv.total)}</Text>
+      </div>
+      <div style={{ marginBottom: 4 }}>
+        {tenorDays == null
+          ? <>AT <strong>______ DAYS</strong> FROM BILL OF LADING DATE</>
+          : tenorDays === 0
+            ? <strong>AT SIGHT</strong>
+            : <>AT <strong>{tenorDays} DAYS</strong> FROM BILL OF LADING DATE</>}
+      </div>
+      <div style={{ fontStyle: 'italic', color: '#555', marginBottom: 12 }}>
+        of this <strong>First</strong> Bill of Exchange (Second of the same tenor and date being unpaid)
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <tbody>
+          {kv('Pay To The Order Of', inv.bank_info.name)}
+          {kv('The Sum Of Say (US DOLLARS)', <span style={{ textTransform: 'uppercase' }}>{words}</span>)}
+          {kv('Value received as per our Invoice(s) No(s)', `${inv.invoice_code}  Dated ${inv.invoice_date}`)}
+          {kv('Drawn under', issuingBank)}
+          {kv('L/C Number', `${lcNo}${lcDate ? `      L/C Date: ${lcDate}` : ''}`)}
+          {kv('TO', issuingBank)}
+        </tbody>
+      </table>
+
+      <div style={{ marginTop: 40, textAlign: 'right' }}>
+        <Text strong>HUY ANH RUBBER COMPANY LIMITED</Text>
+        <div style={{ height: 56 }} />
+        <Text strong>PHÓ GIÁM ĐỐC</Text>
+      </div>
+
+      <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
+        <Space>
+          <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>
+            In / Lưu PDF
+          </Button>
+          <Button icon={<FileWordOutlined />} size="large"
+            onClick={() => downloadElementAsWord('boe-print', `${inv.invoice_code}_BOE`)}>
+            Tải Word (.doc)
+          </Button>
+        </Space>
+      </div>
+    </div>
+  )
+}

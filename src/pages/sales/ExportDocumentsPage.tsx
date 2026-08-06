@@ -39,6 +39,8 @@ import {
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { documentService } from '../../services/sales/documentService'
 import { downloadElementAsWord } from '../../lib/htmlToWord'
+import BillOfExchangeTab from './components/BillOfExchangeTab'
+import LcNegotiationTab from './components/LcNegotiationTab'
 import type { COAData, PackingListData, InvoiceData, WeightListData } from '../../services/sales/documentService'
 import type { SalesOrder } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
@@ -664,6 +666,7 @@ const ExportDocumentsPage = () => {
   const [invoiceLoading, setInvoiceLoading] = useState(false)
   const [weightData, setWeightData] = useState<WeightListData | null>(null)
   const [weightLoading, setWeightLoading] = useState(false)
+  const [negVersion, setNegVersion] = useState(0)   // bump khi ĐNCK lưu → BOE nạp lại
 
   // Load order
   useEffect(() => {
@@ -943,6 +946,24 @@ const ExportDocumentsPage = () => {
                 </span>
               ),
               children: <InvoiceTab data={invoiceData} loading={invoiceLoading} onGenerate={generateInvoice} />,
+            },
+            {
+              key: 'boe',
+              label: (
+                <span>
+                  <FileDoneOutlined /> Hối phiếu
+                </span>
+              ),
+              children: <BillOfExchangeTab orderId={orderId!} reloadKey={negVersion} />,
+            },
+            {
+              key: 'dnck',
+              label: (
+                <span>
+                  <DollarOutlined /> Đơn chiết khấu
+                </span>
+              ),
+              children: <LcNegotiationTab orderId={orderId!} order={order} onSaved={() => setNegVersion((v) => v + 1)} />,
             },
           ]}
         />

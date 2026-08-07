@@ -168,6 +168,58 @@ function guideDoc() {
     'Đủ hết → Khách → Lịch sử bộ chứng từ → Đánh dấu hoàn thiện.',
   ].forEach((t) => k.push(bullet('☐ ' + t)))
 
+  // ── PHỤ LỤC: đơn mẫu HA20260080 ──
+  k.push(H1('PHỤ LỤC — Phiếu nhập liệu MẪU: đơn HA20260080 (GRI)'))
+  k.push(P([R('Đơn thực hành HA20260080 — GLOBAL RUBBER INDUSTRIES (Sri Lanka) · SVR 10 · 105 tấn · $2,290/MT · CIF Colombo · Tổng $240,450. Số liệu dưới là THẬT (trích hồ sơ gốc). [Đã có] = hệ sẵn; [Cần nhập] = nhập theo giá trị in.', { i: true })], { after: 100 }))
+  const wsHead = ['Trường', 'Trạng thái', 'Giá trị nhập']
+  k.push(P('Bước 0 — Hồ sơ khách (Khách → Hồ sơ chứng từ)', { b: true, color: GREEN, before: 60 }))
+  k.push(table(wsHead, [
+    ['Buyer', 'Đã có', 'GLOBAL RUBBER INDUSTRIES (PVT) LTD'],
+    ['Consignee', 'SỬA LẠI', 'THE ORDER OF HATTON NATIONAL BANK PLC (L/C này do HATTON phát hành)'],
+    ['Notify', 'Đã có', 'GLOBAL RUBBER INDUSTRIES (PVT) LTD'],
+    ['Shipping marks', 'Đã có', "Global Rubber Industries (Pvt) Ltd / No 28 Joseph's Lane, Colombo 04"],
+    ['Ngân hàng thụ hưởng', 'Đã có', '(đã chọn — Vietcombank)'],
+  ], [26, 16, 58]))
+  k.push(P('Bước 1 — Thông tin đơn (tab Thông tin)', { b: true, color: GREEN, before: 100 }))
+  k.push(table(wsHead, [
+    ['Grade·SL·Giá·Incoterm·Số HĐ', 'Đã có', 'SVR 10 · 105 tấn · $2,290 · CIF · HA20260080'],
+    ['PO#', 'Cần nhập', 'R7323'],
+    ['Điều khoản TT', 'Tuỳ', 'LC 90 days from B/L date (hồ sơ khách đã có default)'],
+  ], [26, 16, 58]))
+  k.push(P('Bước 2 — Đóng gói: 5 container (thêm cột Gross; Tare = 0)', { b: true, color: GREEN, before: 100 }))
+  k.push(table(['#', 'Container', 'Seal', 'Bành', 'Net', 'Tare', 'Gross'], [
+    ['1', 'MAXU1366024', 'J0163428', '600', '21000', '0', '21000'],
+    ['2', 'TEMU1273290', 'J0163423', '600', '21000', '0', '21000'],
+    ['3', 'CMAU2637820', 'J0163425', '600', '21000', '0', '21000'],
+    ['4', 'GCXU2399422', 'J0163430', '600', '21000', '0', '21000'],
+    ['5', 'APZU3777740', 'J0163141', '600', '21000', '0', '21000'],
+    ['', 'TỔNG', '', '3000', '105000', '—', '105000'],
+  ], [6, 24, 20, 10, 14, 12, 14]))
+  k.push(P('Bước 3 — Vận chuyển (tab Vận chuyển → Chỉnh sửa)', { b: true, color: GREEN, before: 100 }))
+  k.push(table(wsHead, [
+    ['Tàu / Chuyến (Vessel)', 'Cần nhập', 'BRIDGE V.377S'],
+    ['B/L Number', 'Cần nhập', 'SGN3340104'],
+    ['B/L Type · Ngày B/L', 'Cần nhập', 'Original · 03/08/2026'],
+    ['POL · POD', 'Đã có', 'Đà Nẵng · COLOMBO, SRI LANKA'],
+    ['ETD', 'Cần nhập', '03/08/2026'],
+    ['Cước · Phí bảo hiểm', 'ĐỂ TRỐNG', 'Đơn giá 2290 đã là CIF → để trống (nhập vào sẽ cộng dư)'],
+    ['Số hóa đơn · Ngày hóa đơn', 'Cần nhập', 'HA20260080/CI · 26/07/2026'],
+  ], [26, 16, 58]))
+  k.push(P('Bước 4 — Chiết khấu L/C (tab Đơn chiết khấu)', { b: true, color: GREEN, before: 100 }))
+  k.push(table(wsHead, [
+    ['Số L/C · Ngày L/C', 'Cần nhập', '906OMLCU26010816 · 23/07/2026'],
+    ['NH phát hành', 'Cần nhập', 'HATTON NATIONAL BANK PLC (SWIFT HBLILKLX001)'],
+    ['Kỳ hạn', 'Cần nhập', '90 ngày (từ ngày B/L)'],
+    ['Tỷ lệ TL · Lãi suất · Ngày nộp', 'Nếu có', 'Theo hồ sơ chiết khấu thực tế'],
+  ], [26, 16, 58]))
+  k.push(P('Kết quả kỳ vọng khi sinh:', { b: true, color: GREEN, before: 100 }))
+  ;[
+    'Invoice: No HA20260080/CI · 26/07/2026 · CIF Colombo · 105 MT SVR10 @ 2,290 = 240,450 · Vessel BRIDGE V.377S · B/L SGN3340104 · PO R7323 · L/C 906OMLCU26010816.',
+    'Packing/Weight List: 5 cont × (Net 21.000 / Gross 21.000) · 3.000 bành · 105.000 KGS.',
+    'Hối phiếu: AT 90 DAYS FROM B/L DATE · FOR USD 240,450 · Drawn under HATTON NATIONAL BANK.',
+    'Lưu ý: bộ gốc draw Hối phiếu 234,094.20 (240,450 − cước 6,250 − BH 105.80); hệ ta draw theo tổng Invoice 240,450.',
+  ].forEach((t) => k.push(bullet(t)))
+
   return makeDoc(k)
 }
 

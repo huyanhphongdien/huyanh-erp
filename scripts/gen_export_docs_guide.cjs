@@ -76,14 +76,15 @@ function guideDoc() {
       where: 'Khách hàng → chọn khách → tab "Hồ sơ chứng từ" (KHÁC nút "Sửa" ở góc — nút Sửa chỉ có info chung, không có consignee/mark)',
       rows: [
         ['Buyer legal name + địa chỉ', 'Bắt buộc', 'Invoice, Packing List, Weight List'],
-        ['Consignee (người nhận) + địa chỉ', 'Bắt buộc', 'Invoice, PKL, WL'],
+        ['Consignee (người nhận) + địa chỉ', 'D/P / T-T', 'Invoice, PKL, WL — L/C: TỰ SUY "THE ORDER OF {NH phát hành}" theo mỗi đơn'],
         ['Notify party + địa chỉ', 'Nên có', 'Invoice'],
         ['Shipping marks (ký mã hiệu)', 'Bắt buộc', 'Invoice, PKL'],
         ['Ngân hàng thụ hưởng (chọn từ DS)', 'Bắt buộc', 'Invoice, Hối phiếu, Đơn chiết khấu'],
         ['Điều khoản thanh toán mặc định', 'Nên có', 'Invoice'],
         ['Checklist số bản (gốc/copy)', 'Nên có', 'Đơn chiết khấu'],
+        ['Chiết khấu/Thanh toán mặc định [MỚI] — Phương thức (L/C·D/P·D/A)·NH·%/lãi/kỳ hạn', 'Nên có', 'Hối phiếu, Đơn chiết khấu'],
       ],
-      note: 'QUAN TRỌNG NHẤT. Chưa nhập → Invoice/PKL/WL trống Consignee/Bank/Mark. Làm cho ~10–15 khách chủ lực trước. · Số bản gốc/copy = do NGÂN HÀNG phát hành L/C quy định (trường 46A "Documents Required") — đọc từ L/C rồi nhập, hệ KHÔNG tự sinh; lô có L/C khác thì chỉnh theo L/C lô đó.' },
+      note: 'QUAN TRỌNG NHẤT. Chưa nhập → Invoice/PKL/WL trống Consignee/Bank/Mark. Làm cho ~10–15 khách chủ lực trước. · Số bản gốc/copy = do NGÂN HÀNG phát hành L/C quy định (46A) — đọc từ L/C rồi nhập. · [MỚI] Template chiết khấu: set Phương thức+NH+điều kiện 1 lần → đơn mới tự điền. · Consignee L/C TỰ SUY theo NH phát hành mỗi đơn (khỏi sửa tay khi đổi L/C).' },
     { n: '1', dept: 'Sale', title: 'Thông tin đơn hàng',
       where: 'Tạo đơn hàng bán (đơn mới) — HOẶC đơn đã tạo: Chi tiết đơn → tab "Hợp đồng" → nút Sửa (tab "Thông tin" chỉ để xem)',
       rows: [
@@ -125,7 +126,7 @@ function guideDoc() {
         ['D/P/D/A: NH nhờ thu (NH người mua) — bỏ ô L/C', 'Nếu D/P', 'Hối phiếu, Đơn chiết khấu'],
         ['Tỷ lệ % · Lãi suất · Thời hạn · Ngày nộp', 'Nếu chiết khấu', 'Đơn chiết khấu'],
       ],
-      note: 'Chọn Phương thức quyết định cả bộ: L/C -> BM03 + Hối phiếu "Drawn under {NH phát hành}, L/C số". D/P/D/A (nhờ thu URC 522) -> BM08 + Hối phiếu "Drawn on {người mua}", D/P = AT SIGHT (D/A = usance theo Thời hạn), TO = NH nhờ thu, không L/C.' },
+      note: 'Chọn Phương thức quyết định cả bộ: L/C -> BM03 + Hối phiếu "Drawn under {NH phát hành}, L/C số". D/P/D/A (nhờ thu URC 522) -> BM08 + Hối phiếu "Drawn on {người mua}", D/P = AT SIGHT, TO = NH nhờ thu, không L/C. · [MỚI] Tự điền từ template khách (chỉ nhập số L/C + ngày theo lô); làm xong bấm "Lưu làm mẫu cho khách".' },
     { n: '5', dept: 'Logistics / LAB', title: 'Đính kèm file bên ngoài',
       where: 'Chi tiết đơn → tab "Chứng từ" → mục "Checklist chứng từ" → nút Upload',
       rows: [
@@ -188,7 +189,7 @@ function guideDoc() {
   k.push(P('Bước 0 — Hồ sơ khách (Khách → Hồ sơ chứng từ)', { b: true, color: GREEN, before: 60 }))
   k.push(table(wsHead, [
     ['Buyer', 'Đã có', 'GLOBAL RUBBER INDUSTRIES (PVT) LTD'],
-    ['Consignee', 'SỬA LẠI', 'THE ORDER OF HATTON NATIONAL BANK PLC (L/C này do HATTON phát hành)'],
+    ['Consignee', 'TỰ SUY', 'THE ORDER OF HATTON NATIONAL BANK PLC — hệ tự suy từ NH phát hành L/C (khỏi sửa tay)'],
     ['Notify', 'Đã có', 'GLOBAL RUBBER INDUSTRIES (PVT) LTD'],
     ['Shipping marks', 'Đã có', "Global Rubber Industries (Pvt) Ltd / No 28 Joseph's Lane, Colombo 04"],
     ['Ngân hàng thụ hưởng', 'Đã có', '(đã chọn — Vietcombank)'],

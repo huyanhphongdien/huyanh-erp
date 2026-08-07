@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Card,
   Tabs,
@@ -119,12 +119,18 @@ export default function CustomerDetailPage({ customerId: propCustomerId }: Custo
   const { customerId: paramCustomerId } = useParams<{ customerId: string }>()
   const customerId = propCustomerId || paramCustomerId
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [customer, setCustomer] = useState<SalesCustomer | null>(null)
   const [orders, setOrders] = useState<SalesOrder[]>([])
   const [stats, setStats] = useState<CustomerDetailStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('info')
+  // Deep-link: ?tab=export mở thẳng tab "Hồ sơ chứng từ" (chỉ ở chế độ route, không phải khi nhúng tab)
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const t = searchParams.get('tab')
+    const valid = ['info', 'quality', 'export', 'doc-history', 'orders', 'stats']
+    return !propCustomerId && t && valid.includes(t) ? t : 'info'
+  })
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()

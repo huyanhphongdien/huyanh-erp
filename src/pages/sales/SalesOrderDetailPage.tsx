@@ -331,7 +331,28 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Khách hàng" span={2}>
-              {customerName} {customerCountry ? `(${customerCountry})` : ''}
+              {order.customer_id ? (
+                <Space size={8} wrap>
+                  <a
+                    onClick={() => navigate(`/sales/customers/${order.customer_id}`)}
+                    style={{ fontWeight: 600 }}
+                  >
+                    {customerName}
+                  </a>
+                  {customerCountry ? <span>({customerCountry})</span> : null}
+                  <Button
+                    size="small"
+                    type="link"
+                    icon={<SolutionOutlined />}
+                    style={{ padding: '0 4px', height: 'auto' }}
+                    onClick={() => navigate(`/sales/customers/${order.customer_id}?tab=export`)}
+                  >
+                    Hồ sơ chứng từ
+                  </Button>
+                </Space>
+              ) : (
+                <>{customerName} {customerCountry ? `(${customerCountry})` : ''}</>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Grade">
               <Tag color="blue">{gradeLabel}</Tag>

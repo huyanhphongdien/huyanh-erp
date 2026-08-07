@@ -1440,6 +1440,9 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 {canEdit ? <Select defaultValue={order.bl_type || undefined} onChange={v => handleShippingUpdate('bl_type', v)} placeholder="Chọn..." allowClear style={{ width: '100%' }}
                   options={[{ value: 'original', label: 'Original' }, { value: 'telex', label: 'Telex Release' }, { value: 'surrendered', label: 'Surrendered' }]} /> : (order.bl_type || '-')}
               </Descriptions.Item>
+              <Descriptions.Item label="Ngày B/L">
+                {canEdit ? <DatePicker defaultValue={order.bl_date ? dayjs(order.bl_date) : undefined} onChange={d => handleShippingUpdate('bl_date', d?.format('YYYY-MM-DD') || null)} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.bl_date)}
+              </Descriptions.Item>
               <Descriptions.Item label="ETD">
                 {canEdit ? <DatePicker defaultValue={order.etd ? dayjs(order.etd) : undefined} onChange={d => handleShippingUpdate('etd', d?.format('YYYY-MM-DD'))} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.etd)}
               </Descriptions.Item>
@@ -1451,6 +1454,15 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
               </Descriptions.Item>
               <Descriptions.Item label="DHL Number">
                 {canEdit ? <Input defaultValue={order.dhl_number || ''} onBlur={e => handleShippingUpdate('dhl_number', e.target.value)} placeholder="DHL tracking" /> : (order.dhl_number || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Cảng xếp (POL)">
+                {canEdit ? <Select defaultValue={order.port_of_loading || undefined} onChange={v => handleShippingUpdate('port_of_loading', v)} placeholder="Chọn cảng VN" allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} options={PORT_OF_LOADING_OPTIONS} /> : polLabel}
+              </Descriptions.Item>
+              <Descriptions.Item label="Cảng đến (POD)">
+                {canEdit ? <Input defaultValue={order.port_of_destination || ''} onBlur={e => handleShippingUpdate('port_of_destination', e.target.value)} placeholder="VD: Colombo, Sri Lanka" /> : (order.port_of_destination || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Cảng dỡ (nếu khác)">
+                {canEdit ? <Input defaultValue={order.port_of_discharge || ''} onBlur={e => handleShippingUpdate('port_of_discharge', e.target.value)} placeholder="Tuỳ chọn" /> : (order.port_of_discharge || '-')}
               </Descriptions.Item>
             </Descriptions>
           </Card>
@@ -1472,6 +1484,23 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                     {order.customs_clearance_status === 'cleared' ? 'Đã TQ' : order.customs_clearance_status === 'rejected' ? 'Từ chối' : 'Chờ TQ'}
                   </Tag>
                 )}
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <Card title="Cước, Bảo hiểm & Hóa đơn (chứng từ)" size="small" style={{ marginBottom: 16 }}>
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Cước (USD)">
+                {canEdit ? <InputNumber defaultValue={order.freight_amount ?? undefined} onBlur={e => handleShippingUpdate('freight_amount', Number((e.target as any).value) || null)} placeholder="USD (chỉ khi CFR/CIF tách)" style={{ width: '100%' }} /> : (order.freight_amount ? `$${order.freight_amount.toLocaleString()}` : '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Bảo hiểm (USD)">
+                {canEdit ? <InputNumber defaultValue={order.insurance_amount ?? undefined} onBlur={e => handleShippingUpdate('insurance_amount', Number((e.target as any).value) || null)} placeholder="USD (chỉ khi CIF tách)" style={{ width: '100%' }} /> : (order.insurance_amount ? `$${order.insurance_amount.toLocaleString()}` : '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số hóa đơn">
+                {canEdit ? <Input defaultValue={order.invoice_no || ''} onBlur={e => handleShippingUpdate('invoice_no', e.target.value)} placeholder="Trống → INV-<mã đơn>" /> : (order.invoice_no || '-')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày hóa đơn">
+                {canEdit ? <DatePicker defaultValue={order.invoice_date ? dayjs(order.invoice_date) : undefined} onChange={d => handleShippingUpdate('invoice_date', d?.format('YYYY-MM-DD') || null)} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.invoice_date)}
               </Descriptions.Item>
             </Descriptions>
           </Card>

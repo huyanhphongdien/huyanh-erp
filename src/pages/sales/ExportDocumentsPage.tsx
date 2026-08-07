@@ -744,7 +744,7 @@ const ExportDocumentsPage = () => {
     if (!orderId) return
     // Generate all if not yet (gồm cả Weight List)
     const promises: Promise<void>[] = []
-    if (!coaData) promises.push(generateCOA())
+    // COA không tự sinh (đính kèm từ LAB) → không đưa vào "In tất cả"
     if (!packingData) promises.push(generatePacking())
     if (!weightData) promises.push(generateWeight())
     if (!invoiceData) promises.push(generateInvoice())
@@ -793,7 +793,8 @@ const ExportDocumentsPage = () => {
           background: #f2f2f2 !important; color: #000 !important; font-weight: 700;
         }
         @media print {
-          .no-print, .ant-layout-sider, .ant-layout-header,
+          /* aside = sidebar menu của app (Tailwind) — phải ẩn kẻo lọt vào bản in */
+          aside, .no-print, .ant-layout-sider, .ant-layout-header,
           .ant-breadcrumb, .doc-status-cards, .ant-tabs-nav {
             display: none !important;
           }
@@ -862,16 +863,15 @@ const ExportDocumentsPage = () => {
         {/* Document status cards */}
         <Row gutter={16} style={{ marginBottom: 24 }} className="doc-status-cards">
           <Col span={8}>
-            <Card size="small" hoverable onClick={() => { setActiveTab('coa'); if (!coaData) generateCOA() }}>
+            <Card size="small" hoverable onClick={() => setActiveTab('coa')}>
               <Space>
                 <SafetyCertificateOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
                 <div>
                   <Text strong>COA</Text>
                   <br />
-                  <Text type="secondary" style={{ fontSize: 12 }}>Certificate of Analysis</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Đính kèm từ LAB</Text>
                 </div>
               </Space>
-              <div style={{ marginTop: 8 }}>{docStatus(order.coa_generated)}</div>
             </Card>
           </Col>
           <Col span={8}>
@@ -911,14 +911,25 @@ const ExportDocumentsPage = () => {
           items={[
             {
               key: 'coa',
-              forceRender: true,
               label: (
                 <span>
                   <SafetyCertificateOutlined /> COA
-                  {order.coa_generated && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 4 }} />}
                 </span>
               ),
-              children: <COATab data={coaData} loading={coaLoading} onGenerate={generateCOA} />,
+              children: (
+                <div style={{ padding: 24, maxWidth: 680, margin: '0 auto' }}>
+                  <Result
+                    icon={<SafetyCertificateOutlined style={{ color: '#1B4D3E', fontSize: 40 }} />}
+                    title="COA — đính kèm từ phòng LAB"
+                    subTitle={
+                      <span>
+                        Certificate of Analysis do phòng thí nghiệm (VILAS 1522) cấp — <b>không tự sinh</b> từ hệ thống.
+                        <br />Vui lòng đính kèm file COA ở tab <b>"Chứng từ"</b> → mục Checklist (dòng "Certificate of Analysis (COA)").
+                      </span>
+                    }
+                  />
+                </div>
+              ),
             },
             {
               key: 'packing',

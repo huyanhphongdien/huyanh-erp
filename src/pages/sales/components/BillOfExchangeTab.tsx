@@ -59,6 +59,11 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
   }
 
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  // Ngày lập Hối phiếu = ngày B/L (theo chuẩn); thiếu → ngày hóa đơn → hôm nay
+  const drawSrc = inv.bl_date || inv.invoice_date
+  const drawDate = drawSrc
+    ? new Date(drawSrc).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : today
   // tenor: null = chưa rõ (để trống), 0 = AT SIGHT, N = usance. KHÔNG default 90.
   const tenorDays = neg?.term_days ?? parseTenorDays(inv.payment_terms)
   const issuingBank = neg?.issuing_bank || inv.consignee || ''
@@ -78,7 +83,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
       <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>BILL OF EXCHANGE</Title>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '16px 0 8px' }}>
-        <Text>Hue City, {today}</Text>
+        <Text>Hue City, {drawDate}</Text>
         <Text strong>FOR: USD {fmtMoney(inv.total)}</Text>
       </div>
       <div style={{ marginBottom: 4 }}>
@@ -118,7 +123,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
             onClick={() => saveDocx(boeDoc({
               amount: inv.total, ourBank: inv.bank_info.name, issuingBank,
               invoiceRef: inv.invoice_code, invoiceDate: inv.invoice_date,
-              tenorDays, lcNumber: lcNo, lcDate, today,
+              tenorDays, lcNumber: lcNo, lcDate, today: drawDate,
             }), `${inv.invoice_code}_BOE`).catch(() => message.error('Lỗi xuất Word'))}>
             Tải Word (.docx)
           </Button>

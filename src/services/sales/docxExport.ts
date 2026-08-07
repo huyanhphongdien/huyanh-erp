@@ -18,6 +18,14 @@ const FONT = 'Times New Roman'
 const hp = (pt: number) => Math.round(pt * 2)   // half-points
 const money = (v: number | null | undefined) =>
   (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+// Ngày -> DD/MM/YYYY (bỏ ISO). Trả nguyên nếu không parse được.
+const fmtD = (s: string | null | undefined): string => {
+  if (!s) return ''
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return s
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
+}
 const B = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
 const CELL_BORDERS = { top: B, bottom: B, left: B, right: B }
 const TABLE_BORDERS = { ...CELL_BORDERS, insideHorizontal: B, insideVertical: B }
@@ -78,15 +86,15 @@ export function invoiceDoc(d: InvoiceData): Document {
   const kids: (Paragraph | Table)[] = [
     ...letterhead(),
     P('COMMERCIAL INVOICE', { align: AlignmentType.CENTER, bold: true, size: 15, after: 20 }),
-    P(`No: ${d.invoice_code}          Date: ${d.invoice_date}`, { align: AlignmentType.CENTER, after: 100 }),
+    P(`No: ${d.invoice_code}          Date: ${fmtD(d.invoice_date)}`, { align: AlignmentType.CENTER, after: 100 }),
     P([R('THE SELLER: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 0 }),
     P('ADDRESS: Khe Ma, Phong Dien Ward, Hue City, Viet Nam', { after: 0 }),
     P('TEL: 054.3774994   FAX: 054.3774994', { after: 60 }),
     P([R('THE BUYER: ', { bold: true }), R(d.buyer_name || d.customer.name)], { after: 0 }),
     P(`ADDRESS: ${d.buyer_address || d.customer.address}`, { after: 60 }),
   ]
-  if (d.consignee) kids.push(P([R('CONSIGNEE: ', { bold: true }), R(d.consignee)], { after: 0 }))
-  if (d.notify_party) kids.push(P([R('NOTIFY: ', { bold: true }), R(d.notify_party)], { after: 60 }))
+  if (d.consignee) kids.push(P([R('CONSIGNEE: ', { bold: true }), R(d.consignee.trim())], { after: 0 }))
+  if (d.notify_party) kids.push(P([R('NOTIFY: ', { bold: true }), R(d.notify_party.trim())], { after: 60 }))
   kids.push(
     gridTable(
       ['CONTRACT NO', 'INCOTERM', 'PORT OF LOADING', 'PORT OF DISCHARGE', 'PO NO.'],
@@ -97,8 +105,8 @@ export function invoiceDoc(d: InvoiceData): Document {
   if (d.vessel_name || d.etd || d.bl_number) {
     const parts: TextRun[] = []
     if (d.vessel_name) parts.push(R('VESSEL: ', { bold: true }), R(`${d.vessel_name}${d.voyage_number ? ' / ' + d.voyage_number : ''}    `))
-    if (d.etd) parts.push(R('ETD: ', { bold: true }), R(`${d.etd}    `))
-    if (d.bl_number) parts.push(R('B/L NO: ', { bold: true }), R(`${d.bl_number}${d.bl_date ? '  DATED ' + d.bl_date : ''}`))
+    if (d.etd) parts.push(R('ETD: ', { bold: true }), R(`${fmtD(d.etd)}    `))
+    if (d.bl_number) parts.push(R('B/L NO: ', { bold: true }), R(`${d.bl_number}${d.bl_date ? '  DATED ' + fmtD(d.bl_date) : ''}`))
     kids.push(P(parts, { before: 40, after: 40 }))
   }
   kids.push(
@@ -108,14 +116,18 @@ export function invoiceDoc(d: InvoiceData): Document {
       [[`${d.quantity_tons} MT - NATURAL RUBBER ${(d.grade || '').replace(/_/g, ' ')}`, `${d.quantity_tons}`, money(d.unit_price), money(d.subtotal)]],
       [46, 14, 20, 20],
     ),
-    P('', { after: 40 }),
+    P(`${d.incoterm} ${d.port_of_destination || ''}`.trim(), { after: 40, size: 10.5 }),
+    P([R('NET WEIGHT: ', { bold: true }), R(`${d.net_weight_kg.toFixed(2)} KGS`)], { after: 0 }),
+    P([R('GROSS WEIGHT: ', { bold: true }), R(`${d.gross_weight_kg.toFixed(2)} KGS`)], { after: 0 }),
+    P([R('HS CODE: ', { bold: true }), R(d.hs_code), R('        COUNTRY OF ORIGIN: ', { bold: true }), R(d.country_of_origin)], { after: 0 }),
+    P([R('PRODUCER: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 60 }),
   )
   if (d.freight > 0) kids.push(P(`FREIGHT: USD ${money(d.freight)}`, { after: 0 }))
   if (d.insurance > 0) kids.push(P(`INSURANCE: USD ${money(d.insurance)}`, { after: 0 }))
   kids.push(
     P([R('TOTAL: ', { bold: true }), R(`USD ${money(d.total)}`, { bold: true })], { after: 0 }),
     P(`PAYMENT TERM: ${d.payment_terms || ''}`, { after: 0 }),
-    P(`SAY US DOLLARS: ${amountToWords(d.total).toUpperCase()} US DOLLARS`, { italics: true, after: 60 }),
+    P(`SAY US DOLLARS: ${amountToWords(d.total).toUpperCase()}`, { italics: true, after: 60 }),
   )
   if (d.lc_number) kids.push(P(`L/C NUMBER: ${d.lc_number}`, { after: 0 }))
   if (d.shipping_marks) {
@@ -143,10 +155,10 @@ export function packingListDoc(d: PackingListData): Document {
     P('PACKING LIST', { align: AlignmentType.CENTER, bold: true, size: 15, after: 60 }),
     P([R('Sales Order: ', { bold: true }), R(d.order_code), R('     Buyer: ', { bold: true }), R(d.buyer_name || d.customer_name)], { after: 0 }),
   ]
-  if (d.consignee) kids.push(P([R('Consignee: ', { bold: true }), R(d.consignee)], { after: 0 }))
+  if (d.consignee) kids.push(P([R('Consignee: ', { bold: true }), R(d.consignee.trim())], { after: 0 }))
   kids.push(
     P([R('Commodity: ', { bold: true }), R(`Natural Rubber ${(d.grade || '').replace(/_/g, ' ')}`), R('     Vessel: ', { bold: true }), R(d.vessel_name || 'TBD')], { after: 0 }),
-    P([R('POL: ', { bold: true }), R(d.port_of_loading || 'TBD'), R('     POD: ', { bold: true }), R(d.port_of_destination || 'TBD'), R('     ETD: ', { bold: true }), R(d.etd || 'TBD')], { after: 80 }),
+    P([R('POL: ', { bold: true }), R(d.port_of_loading || 'TBD'), R('     POD: ', { bold: true }), R(d.port_of_destination || 'TBD'), R('     ETD: ', { bold: true }), R(d.etd ? fmtD(d.etd) : 'TBD')], { after: 80 }),
     gridTable(
       ['Container No.', 'Seal No.', 'Type', 'Bales', 'Net Weight (KG)', 'Gross Weight (KG)'],
       [
@@ -171,9 +183,9 @@ export function weightListDoc(d: WeightListData): Document {
     P('WEIGHT LIST', { align: AlignmentType.CENTER, bold: true, size: 15, after: 60 }),
     P([R('Sales Order: ', { bold: true }), R(d.order_code), R('     Buyer: ', { bold: true }), R(d.buyer_name)], { after: 0 }),
   ]
-  if (d.consignee) kids.push(P([R('Consignee: ', { bold: true }), R(d.consignee)], { after: 0 }))
+  if (d.consignee) kids.push(P([R('Consignee: ', { bold: true }), R(d.consignee.trim())], { after: 0 }))
   kids.push(
-    P([R('Vessel: ', { bold: true }), R(d.vessel_name || 'TBD'), R('     B/L No.: ', { bold: true }), R(`${d.bl_number || 'TBD'}${d.bl_date ? ' (' + d.bl_date + ')' : ''}`), R('     ETD: ', { bold: true }), R(d.etd || 'TBD')], { after: 80 }),
+    P([R('Vessel: ', { bold: true }), R(d.vessel_name || 'TBD'), R('     B/L No.: ', { bold: true }), R(`${d.bl_number || 'TBD'}${d.bl_date ? ' (' + fmtD(d.bl_date) + ')' : ''}`), R('     ETD: ', { bold: true }), R(d.etd ? fmtD(d.etd) : 'TBD')], { after: 80 }),
     gridTable(
       ['Container No.', 'Seal No.', 'Bales', 'Net (KG)', 'Tare (KG)', 'Gross (KG)'],
       [
@@ -203,7 +215,7 @@ export function boeDoc(d: {
     P('of this First Bill of Exchange (Second of the same tenor and date being unpaid)', { italics: true, after: 80 }),
     kv('Pay To The Order Of', d.ourBank),
     kv('The Sum Of Say (US DOLLARS)', amountToWords(d.amount).toUpperCase()),
-    kv('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}  Dated ${d.invoiceDate}`),
+    kv('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}  Dated ${fmtD(d.invoiceDate)}`),
     kv('Drawn under', d.issuingBank),
     kv('L/C Number', `${d.lcNumber}${d.lcDate ? `   L/C Date: ${d.lcDate}` : ''}`),
     kv('TO', d.issuingBank),

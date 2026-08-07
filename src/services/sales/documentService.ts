@@ -137,6 +137,11 @@ export interface InvoiceData {
   voyage_number: string
   etd: string
   bl_date: string | null
+  // Thông số hàng (khớp mẫu gốc): khối lượng + HS code + xuất xứ
+  net_weight_kg: number
+  gross_weight_kg: number
+  hs_code: string
+  country_of_origin: string
 }
 
 // ============================================================================
@@ -356,7 +361,8 @@ export const documentService = {
 
       const containerBales = c.bale_count || items.reduce((s: number, i: { bale_count: number }) => s + i.bale_count, 0)
       const containerNet = c.net_weight_kg || items.reduce((s: number, i: { weight_kg: number }) => s + i.weight_kg, 0)
-      const containerGross = c.gross_weight_kg || Math.round(containerNet * 1.02)
+      // Gross thiếu → bằng Net (bao bì bành không đáng kể, khớp mẫu gốc); KHÔNG ước lượng ×1.02
+      const containerGross = c.gross_weight_kg || containerNet
 
       containers.push({
         container_no: c.container_no || 'TBD',
@@ -429,8 +435,8 @@ export const documentService = {
         .reduce((s, i) => s + (i.weight_kg || 0), 0)
       const net = c.net_weight_kg || itemNet
       const tare = c.tare_weight_kg || 0
-      // gross: ưu tiên số thật; thiếu → net + tare (nếu có tare) hoặc ước lượng net×1.02
-      const gross = c.gross_weight_kg || (tare > 0 ? net + tare : Math.round(net * 1.02))
+      // gross: ưu tiên số thật; thiếu → net + tare (nếu có tare) hoặc = net (KHÔNG ước lượng ×1.02)
+      const gross = c.gross_weight_kg || (tare > 0 ? net + tare : net)
       // tare hiển thị: thiếu tare nhưng có gross → gross − net (giữ net + tare = gross)
       const tareShown = tare > 0 ? tare : Math.max(0, gross - net)
       return {
@@ -495,6 +501,18 @@ export const documentService = {
     const { profile, bank } = await loadExportProfile(order.customer_id)
 
     const subtotal = order.quantity_tons * order.unit_price
+    // Khối lượng: ưu tiên tổng container thật; thiếu → quy từ số lượng tấn
+    const { data: wlCont } = await supabase
+      .from('sales_order_containers')
+      .select('net_weight_kg,gross_weight_kg')
+      .eq('sales_order_id', orderId)
+    const sumNet = (wlCont || []).reduce((s, c) => s + (c.net_weight_kg || 0), 0)
+    const sumGross = (wlCont || []).reduce((s, c) => s + (c.gross_weight_kg || c.net_weight_kg || 0), 0)
+    const netKg = sumNet || Math.round((order.quantity_tons || 0) * 1000)
+    const grossKg = sumGross || netKg
+    // HS code theo loại mủ (SVR/TSNR=40012200, RSS=40012100, khác=40012900)
+    const g = order.grade || ''
+    const hsCode = /RSS/i.test(g) ? '40012100' : /SVR|TSNR/i.test(g) ? '40012200' : '40012900'
     // Cước & bảo hiểm: ưu tiên nhập trực tiếp trên đơn (ShippingTab), fallback bảng invoice cũ
     const freight = order.freight_amount ?? invoice?.freight_charge ?? 0
     const insurance = order.insurance_amount ?? invoice?.insurance_charge ?? 0
@@ -542,6 +560,10 @@ export const documentService = {
       voyage_number: order.voyage_number || '',
       etd: order.etd || '',
       bl_date: order.bl_date || null,
+      net_weight_kg: netKg,
+      gross_weight_kg: grossKg,
+      hs_code: hsCode,
+      country_of_origin: 'VIET NAM',
     }
   },
 

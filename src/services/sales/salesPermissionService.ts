@@ -158,7 +158,9 @@ export function getVisibleTabs(role: SalesRole | null): string[] {
 
   if (['production', 'sale', 'logistics', 'admin', 'viewer'].includes(role)) { tabs.push('production'); tabs.push('packing') }
   if (['logistics', 'sale', 'accounting', 'admin', 'viewer'].includes(role)) tabs.push('shipping')
-  // tabs.push('documents') // tạm ẩn tab chứng từ
+  // Tab "Chứng từ": sinh Invoice/PKL/WL/COA/Hối phiếu/Đơn chiết khấu + upload B/L/C/O/Bảo hiểm
+  // (2026-08-07 MỞ LẠI — hệ bộ chứng từ xuất khẩu 4 giai đoạn đã xong)
+  if (['logistics', 'sale', 'accounting', 'admin', 'viewer'].includes(role)) tabs.push('documents')
   if (salesPermissions.canViewFinance(role)) tabs.push('finance')
 
   return tabs

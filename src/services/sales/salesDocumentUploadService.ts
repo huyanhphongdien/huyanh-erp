@@ -103,13 +103,15 @@ export const salesDocumentUploadService = {
     return data || []
   },
 
-  /** Khởi tạo checklist chứng từ chuẩn cho đơn hàng (chạy 1 lần) */
+  /** Khởi tạo checklist chứng từ chuẩn cho đơn hàng — chỉ tạo loại còn THIẾU.
+   *  (Đơn cũ có sẵn doc 'contract' vẫn phải bổ sung đủ B/L, COA, C/O, Bảo hiểm... — trước đây bị bỏ qua) */
   async initChecklist(orderId: string): Promise<SalesDocument[]> {
-    // Check if already initialized
     const existing = await this.getByOrderId(orderId)
-    if (existing.length > 0) return existing
+    const existingTypes = new Set(existing.map(d => d.doc_type))
+    const missing = STANDARD_DOCUMENTS.filter(d => !existingTypes.has(d.doc_type))
+    if (missing.length === 0) return existing
 
-    const rows = STANDARD_DOCUMENTS.map(d => ({
+    const rows = missing.map(d => ({
       sales_order_id: orderId,
       doc_type: d.doc_type,
       doc_name: d.doc_name,
@@ -123,7 +125,8 @@ export const salesDocumentUploadService = {
       .select('*')
 
     if (error) { console.error('[salesDoc] initChecklist error:', error); return [] }
-    return data || []
+    // Trả về gộp + sắp theo sort_order
+    return [...existing, ...(data || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
   },
 
   /** Upload file cho 1 chứng từ */

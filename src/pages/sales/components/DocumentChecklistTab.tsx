@@ -78,7 +78,9 @@ export default function DocumentChecklistTab({ orderId, orderCode, readonly = fa
   const load = useCallback(async () => {
     setLoading(true)
     let data = await salesDocumentUploadService.getByOrderId(orderId)
-    if (data.length === 0 && !initRef.current) {
+    // Init nếu THIẾU danh mục chuẩn (kể cả khi đã có doc 'contract' từ luồng cũ → trước đây bị 0/0)
+    const nonContract = data.filter(d => d.doc_type !== 'contract')
+    if (nonContract.length === 0 && !initRef.current) {
       initRef.current = true // prevent double init
       data = await salesDocumentUploadService.initChecklist(orderId)
     }

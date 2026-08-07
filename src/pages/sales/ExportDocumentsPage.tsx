@@ -51,19 +51,13 @@ const { Title, Text, Paragraph } = Typography
 // COMPANY HEADER (shared)
 // ============================================================================
 
+// Letterhead khớp mẫu chứng từ thật (tên tiếng Anh, serif, chữ đen, gạch chân)
 const CompanyHeader = () => (
-  <div className="doc-company-header" style={{ textAlign: 'center', marginBottom: 24 }}>
-    <Title level={4} style={{ margin: 0, color: '#1B4D3E' }}>
-      CÔNG TY TNHH MỘT THÀNH VIÊN CAO SU HUY ANH PHONG ĐIỀN
-    </Title>
-    <Title level={5} style={{ margin: '4px 0', color: '#1B4D3E' }}>
-      HUY ANH PHONG ĐIỀN RUBBER COMPANY LIMITED
-    </Title>
-    <Text type="secondary">
-      Khe Mạ, Phường Phong Điền, TP Huế, Việt Nam
-    </Text>
-    <br />
-    <Text type="secondary">Tax ID: 3301549896</Text>
+  <div className="doc-company-header" style={{ textAlign: 'center', marginBottom: 18, color: '#000' }}>
+    <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: 0.3 }}>HUY ANH RUBBER COMPANY LIMITED</div>
+    <div style={{ fontSize: 12.5 }}>Khe Ma, Phong Dien Ward, Hue City, Viet Nam</div>
+    <div style={{ fontSize: 12.5 }}>Tel: 054.3774994&nbsp;&nbsp;·&nbsp;&nbsp;Fax: 054.3774994&nbsp;&nbsp;·&nbsp;&nbsp;Tax ID: 3301549896</div>
+    <div style={{ borderBottom: '2px solid #000', marginTop: 8 }} />
   </div>
 )
 
@@ -787,6 +781,17 @@ const ExportDocumentsPage = () => {
     <div style={{ padding: '0 0 24px' }}>
       {/* Print styles */}
       <style>{`
+        /* Font/định dạng giống mẫu chứng từ xuất khẩu: Times New Roman + chữ đen (màn hình lẫn in) */
+        .doc-print-area, .doc-print-area .ant-typography,
+        .doc-print-area .ant-table, .doc-print-area .ant-table-cell,
+        .doc-print-area .ant-descriptions-item-label,
+        .doc-print-area .ant-descriptions-item-content {
+          font-family: 'Times New Roman', Times, serif !important;
+          color: #000 !important;
+        }
+        .doc-print-area .ant-table-thead > tr > th {
+          background: #f2f2f2 !important; color: #000 !important; font-weight: 700;
+        }
         @media print {
           .no-print, .ant-layout-sider, .ant-layout-header,
           .ant-breadcrumb, .doc-status-cards, .ant-tabs-nav {

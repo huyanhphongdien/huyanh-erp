@@ -66,7 +66,7 @@ function guideDoc() {
     ['PO# · Số HĐ · Grade · Số lượng · Đơn giá', 'Đơn → tab "Hợp đồng" → nút Sửa (tab "Thông tin" chỉ để xem)'],
     ['Vessel · Cảng · ETD · B/L số+ngày · Cước/BH · Số hóa đơn', 'Đơn → tab "Vận chuyển" → nút Sửa'],
     ['Tare · Gross từng container', 'Đơn → Đóng gói (bảng container)'],
-    ['Số L/C · NH phát hành · Kỳ hạn · Chiết khấu', 'Đơn → tab "Chứng từ" → Mở trang Sinh chứng từ → Đơn chiết khấu'],
+    ['Phương thức (L/C·D/P·D/A) · NH phát hành/nhờ thu · Số L/C · Kỳ hạn · Chiết khấu', 'Đơn → tab "Chứng từ" → Mở trang Sinh chứng từ → Đơn chiết khấu'],
     ['Upload COA · B/L · C/O · Bảo hiểm · Phyto · LC copy', 'Đơn → tab "Chứng từ" → mục Checklist chứng từ'],
   ], [46, 54]))
   k.push(P([R('2 chỗ hay nhầm: ', { b: true }), R('(1) Hồ sơ chứng từ (consignee/mark/bank) ở TAB RIÊNG, không phải nút "Sửa". (2) PO# ở ĐƠN → tab "Hợp đồng", không phải màn Khách.', { i: true })], { before: 40, after: 120 }))
@@ -116,14 +116,16 @@ function guideDoc() {
         ['Số hóa đơn · Ngày hóa đơn  [MỚI]', 'Trống → tự sinh', 'Invoice, Hối phiếu'],
       ],
       note: 'CIF: NÊN NHẬP Cước & Bảo hiểm — đơn giá đã là CIF nên cước/BH TRỪ khỏi TOTAL để ra "THE COST" (số Hối phiếu draw), khớp mẫu gốc. FOB thì để trống. Số hóa đơn trống → INV-<mã đơn>; ngày trống → hôm nay.' },
-    { n: '4', dept: 'Kế toán', title: 'Chiết khấu L/C (khi thanh toán bằng L/C)',
+    { n: '4', dept: 'Kế toán', title: 'Chiết khấu — L/C hoặc D/P (nhờ thu)',
       where: 'Chi tiết đơn → tab "Chứng từ" → "Mở trang Sinh chứng từ" → tab "Đơn chiết khấu"',
       rows: [
-        ['NH thương lượng · NH phát hành L/C', 'Nếu L/C', 'Hối phiếu, Đơn chiết khấu'],
-        ['Số L/C · Ngày L/C', 'Nếu L/C', 'Hối phiếu, Invoice, Đơn chiết khấu'],
-        ['Tỷ lệ TL % · Lãi suất · Thời hạn · Ngày nộp', 'Nếu chiết khấu', 'Đơn chiết khấu'],
+        ['Phương thức thanh toán [MỚI] — L/C · D/P · D/A', 'Bắt buộc', 'Hối phiếu, Đơn chiết khấu'],
+        ['Ngân hàng chiết khấu (của Huy Anh)', 'Bắt buộc', 'Đơn chiết khấu'],
+        ['L/C: NH phát hành · Số L/C · Ngày L/C', 'Nếu L/C', 'Hối phiếu, Đơn chiết khấu'],
+        ['D/P/D/A: NH nhờ thu (NH người mua) — bỏ ô L/C', 'Nếu D/P', 'Hối phiếu, Đơn chiết khấu'],
+        ['Tỷ lệ % · Lãi suất · Thời hạn · Ngày nộp', 'Nếu chiết khấu', 'Đơn chiết khấu'],
       ],
-      note: 'Kỳ hạn quyết định dòng "AT … DAYS / AT SIGHT" của Hối phiếu. Thanh toán T/T thì bỏ qua bước này.' },
+      note: 'Chọn Phương thức quyết định cả bộ: L/C -> BM03 + Hối phiếu "Drawn under {NH phát hành}, L/C số". D/P/D/A (nhờ thu URC 522) -> BM08 + Hối phiếu "Drawn on {người mua}", D/P = AT SIGHT (D/A = usance theo Thời hạn), TO = NH nhờ thu, không L/C.' },
     { n: '5', dept: 'Logistics / LAB', title: 'Đính kèm file bên ngoài',
       where: 'Chi tiết đơn → tab "Chứng từ" → mục "Checklist chứng từ" → nút Upload',
       rows: [
@@ -162,7 +164,7 @@ function guideDoc() {
     ['B/L số + ngày (Logistics)', Y, '', Y, Y, ''],
     ['Cước/Bảo hiểm CIF (Logistics)', Y, '', '', '', ''],
     ['Số/ngày hóa đơn (Logistics)', Y, '', '', Y, ''],
-    ['L/C số·ngày·NH·kỳ hạn (Kế toán)', Y, '', '', Y, Y],
+    ['Phương thức·NH phát hành/nhờ thu·L/C·kỳ hạn (Kế toán)', Y, '', '', Y, Y],
   ]
   k.push(table(mHead, mrows, [34, 13, 13, 13, 13, 14]))
 
@@ -216,8 +218,9 @@ function guideDoc() {
     ['Cước · Phí bảo hiểm', 'Cần nhập', 'Cước 6,250 · BH 105.80 → hệ trừ ra THE COST 234,094.20 (Hối phiếu draw số này)'],
     ['Số hóa đơn · Ngày hóa đơn', 'Cần nhập', 'HA20260080/CI · 26/07/2026'],
   ], [26, 16, 58]))
-  k.push(P('Bước 4 — Chiết khấu L/C (tab Đơn chiết khấu)', { b: true, color: GREEN, before: 100 }))
+  k.push(P('Bước 4 — Chiết khấu (tab Đơn chiết khấu)', { b: true, color: GREEN, before: 100 }))
   k.push(table(wsHead, [
+    ['Phương thức', 'Chọn', 'L/C (đơn HA20260080 này là L/C 90 ngày)'],
     ['Số L/C · Ngày L/C', 'Cần nhập', '906OMLCU26010816 · 23/07/2026'],
     ['NH phát hành', 'Cần nhập', 'HATTON NATIONAL BANK PLC (SWIFT HBLILKLX001)'],
     ['Kỳ hạn', 'Cần nhập', '90 ngày (từ ngày B/L)'],

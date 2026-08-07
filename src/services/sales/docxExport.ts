@@ -12,7 +12,7 @@ import {
 } from 'docx'
 import { saveAs } from 'file-saver'
 import { amountToWords } from './contractGeneratorService'
-import type { InvoiceData, PackingListData, WeightListData } from './documentService'
+import type { InvoiceData, PackingListData, WeightListData, BeneficiaryCertData, NonWoodCertData } from './documentService'
 
 const FONT = 'Times New Roman'
 const hp = (pt: number) => Math.round(pt * 2)   // half-points
@@ -267,3 +267,57 @@ export function lcNegotiationDoc(d: {
   ]
   return makeDoc(kids)
 }
+
+// ── BENEFICIARY'S CERTIFICATE ──
+export function beneficiaryCertDoc(d: BeneficiaryCertData): Document {
+  const kv = (k: string, v: string) => P([R(k, { bold: true }), R(`   ${v}`)], { after: 20 })
+  return makeDoc([
+    ...letterhead(),
+    P("BENEFICIARY'S CERTIFICATE", { align: AlignmentType.CENTER, bold: true, size: 15, after: 20 }),
+    P(`No.: ${d.cert_no}          Date: ${fmtD(d.date)}`, { align: AlignmentType.CENTER, after: 100 }),
+    kv('THE BUYER/APPLICANT:', d.buyer_name),
+    P(`ADDRESS: ${d.buyer_address}`, { after: 60 }),
+    kv('BILL OF LADING NO.:', d.bl_number || '—'),
+    kv('SHIPPED ON BOARD:', fmtD(d.shipped_on_board) || '—'),
+    kv('VESSEL/VOYAGE:', d.vessel || '—'),
+    kv('PORT OF LOADING:', d.port_of_loading || '—'),
+    kv('PORT OF DISCHARGE:', d.port_of_destination || '—'),
+    kv('L/C NO:', `${d.lc_number || '—'}${d.lc_date ? '   DATE: ' + fmtD(d.lc_date) : ''}`),
+    ...(d.buyer_email ? [kv('EMAIL ADDRESS:', d.buyer_email)] : []),
+    P('', { after: 40 }),
+    P('We, HUY ANH RUBBER COMPANY LIMITED CERTIFY THAT, a set of copy documents had been emailed to the applicant within 03 days from shipment.', { after: 220 }),
+    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
+    P('', { after: 300 }),
+    P('GENERAL DIRECTOR', { align: AlignmentType.RIGHT, bold: true }),
+  ])
+}
+
+// ── CERTIFICATE OF NON-WOOD PACKING MATERIAL ──
+export function nonWoodCertDoc(d: NonWoodCertData): Document {
+  const kv = (k: string, v: string) => P([R(k, { bold: true }), R(`   ${v}`)], { after: 20 })
+  return makeDoc([
+    ...letterhead(),
+    P('CERTIFICATE OF NON-WOOD PACKING MATERIAL', { align: AlignmentType.CENTER, bold: true, size: 15, after: 20 }),
+    P(`No: ${d.cert_no}          Date: ${fmtD(d.date)}`, { align: AlignmentType.CENTER, after: 100 }),
+    kv('THE SELLER:', 'HUY ANH RUBBER COMPANY LIMITED'),
+    P('ADDRESS: Khe Ma, Phong Dien Ward, Hue City, Viet Nam', { after: 40 }),
+    kv('THE BUYER:', d.buyer_name),
+    P(`ADDRESS: ${d.buyer_address}`, { after: 60 }),
+    kv('COMMODITY:', d.commodity),
+    kv('COUNTRY OF ORIGIN:', d.country_of_origin),
+    kv('NET WEIGHT:', `${d.net_weight_kg.toFixed(2)} KGS`),
+    kv('GROSS WEIGHT:', `${d.gross_weight_kg.toFixed(2)} KGS`),
+    kv('VESSEL:', d.vessel || '—'),
+    kv('PORT OF LOADING:', d.port_of_loading || '—'),
+    kv('PORT OF DISCHARGE:', d.port_of_destination || '—'),
+    kv('BILL OF LADING NUMBER:', d.bl_number || '—'),
+    kv('CONTRACT NO.:', d.contract_no),
+    kv('INVOICE NO.:', d.invoice_no),
+    P('', { after: 40 }),
+    P(`WE, HUY ANH RUBBER COMPANY LIMITED CERTIFY THAT ${d.quantity_tons} MT OF NATURAL RUBBER ${d.grade_label}, NO WOODEN PACKING MATERIAL USED IN THE WHOLE OF SHIPMENT OF GOODS.`, { after: 220 }),
+    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
+    P('', { after: 300 }),
+    P('GENERAL DIRECTOR', { align: AlignmentType.RIGHT, bold: true }),
+  ])
+}
+

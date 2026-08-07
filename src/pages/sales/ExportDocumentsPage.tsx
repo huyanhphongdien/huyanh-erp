@@ -41,6 +41,8 @@ import { documentService } from '../../services/sales/documentService'
 import { invoiceDoc, packingListDoc, weightListDoc, saveDocx } from '../../services/sales/docxExport'
 import BillOfExchangeTab from './components/BillOfExchangeTab'
 import LcNegotiationTab from './components/LcNegotiationTab'
+import BeneficiaryCertTab from './components/BeneficiaryCertTab'
+import NonWoodCertTab from './components/NonWoodCertTab'
 import type { COAData, PackingListData, InvoiceData, WeightListData } from '../../services/sales/documentService'
 import type { SalesOrder } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
@@ -988,6 +990,24 @@ const ExportDocumentsPage = () => {
                 </span>
               ),
               children: <LcNegotiationTab orderId={orderId!} order={order} onSaved={() => setNegVersion((v) => v + 1)} />,
+            },
+            {
+              key: 'bencert',
+              label: (
+                <span>
+                  <SafetyCertificateOutlined /> Beneficiary Cert
+                </span>
+              ),
+              children: <BeneficiaryCertTab orderId={orderId!} />,
+            },
+            {
+              key: 'nonwood',
+              label: (
+                <span>
+                  <SafetyCertificateOutlined /> Non-Wood Cert
+                </span>
+              ),
+              children: <NonWoodCertTab orderId={orderId!} />,
             },
           ]}
         />

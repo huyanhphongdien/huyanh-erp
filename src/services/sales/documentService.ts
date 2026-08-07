@@ -144,6 +144,41 @@ export interface InvoiceData {
   country_of_origin: string
 }
 
+// GĐ5 — 2 chứng từ người bán TỰ KHAI (khớp mẫu gốc HA20260080.xlsm)
+export interface BeneficiaryCertData {
+  cert_no: string
+  date: string
+  buyer_name: string
+  buyer_address: string
+  buyer_email: string
+  bl_number: string
+  shipped_on_board: string
+  vessel: string
+  port_of_loading: string
+  port_of_destination: string
+  lc_number: string
+  lc_date: string
+}
+
+export interface NonWoodCertData {
+  cert_no: string
+  date: string
+  buyer_name: string
+  buyer_address: string
+  commodity: string
+  grade_label: string
+  quantity_tons: number
+  country_of_origin: string
+  net_weight_kg: number
+  gross_weight_kg: number
+  vessel: string
+  port_of_loading: string
+  port_of_destination: string
+  bl_number: string
+  contract_no: string
+  invoice_no: string
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -564,6 +599,67 @@ export const documentService = {
       gross_weight_kg: grossKg,
       hs_code: hsCode,
       country_of_origin: 'VIET NAM',
+    }
+  },
+
+  // ==========================================================================
+  // BENEFICIARY'S CERTIFICATE — người bán tự khai (đã email bộ copy cho khách)
+  // ==========================================================================
+
+  async getBeneficiaryCertData(orderId: string): Promise<BeneficiaryCertData> {
+    const inv = await this.getInvoiceData(orderId)
+    const { data: neg } = await supabase
+      .from('sales_order_lc_negotiations')
+      .select('lc_number,lc_date')
+      .eq('sales_order_id', orderId)
+      .maybeSingle()
+    const { data: row } = await supabase
+      .from('sales_orders')
+      .select('customer:sales_customers!customer_id(email)')
+      .eq('id', orderId)
+      .maybeSingle()
+    const email = (row?.customer as { email?: string } | null)?.email || ''
+    return {
+      cert_no: `${inv.order_code}/BC`,
+      date: inv.invoice_date,
+      buyer_name: inv.buyer_name,
+      buyer_address: inv.buyer_address,
+      buyer_email: email,
+      bl_number: inv.bl_number || '',
+      shipped_on_board: inv.bl_date || '',
+      vessel: inv.vessel_name,
+      port_of_loading: inv.port_of_loading,
+      port_of_destination: inv.port_of_destination,
+      lc_number: inv.lc_number || neg?.lc_number || '',
+      lc_date: neg?.lc_date || '',
+    }
+  },
+
+  // ==========================================================================
+  // NON-WOOD PACKING CERTIFICATE — người bán tự khai (không dùng bao bì gỗ)
+  // ==========================================================================
+
+  async getNonWoodCertData(orderId: string): Promise<NonWoodCertData> {
+    const inv = await this.getInvoiceData(orderId)
+    const gradeLabel = (inv.grade || '').replace(/_/g, ' ')
+    return {
+      cert_no: `${inv.order_code}/NW`,
+      date: inv.invoice_date,
+      // "buyer" trên Non-Wood = consignee (to order of NH), giống mẫu gốc
+      buyer_name: inv.consignee || inv.buyer_name,
+      buyer_address: inv.consignee_address || inv.buyer_address,
+      commodity: `${inv.quantity_tons} MT - NATURAL RUBBER ${gradeLabel}`,
+      grade_label: gradeLabel,
+      quantity_tons: inv.quantity_tons,
+      country_of_origin: inv.country_of_origin,
+      net_weight_kg: inv.net_weight_kg,
+      gross_weight_kg: inv.gross_weight_kg,
+      vessel: inv.vessel_name,
+      port_of_loading: inv.port_of_loading,
+      port_of_destination: inv.port_of_destination,
+      bl_number: inv.bl_number || '',
+      contract_no: inv.order_code,
+      invoice_no: inv.invoice_code,
     }
   },
 

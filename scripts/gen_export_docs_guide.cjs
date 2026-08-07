@@ -257,11 +257,12 @@ function reportDoc() {
     ['Commercial Invoice', 'Đơn + hồ sơ khách + bank', 'CIF: TOTAL → trừ cước/BH → THE COST'],
     ['Packing List', 'Container + hồ sơ', 'Gross = Net khi chưa nhập bì'],
     ['Weight List', 'Container', 'Net/Tare/Gross thật'],
-    ['Hối phiếu (BOE)', 'Invoice + chiết khấu', 'Draw THE COST; số & chữ nhất quán'],
-    ['Đơn chiết khấu (L/C)', 'Form + checklist', 'Nhập tay điều kiện'],
+    ['Hối phiếu (BOE)', 'Invoice + chiết khấu', 'L/C: drawn under NH phát hành · D/P: drawn on người mua, AT SIGHT'],
+    ['Đơn chiết khấu (L/C · D/P)', 'Form + checklist', 'Chọn phương thức → BM03 (L/C) hoặc BM08 (D/P/D/A URC 522)'],
     ["Beneficiary's Certificate", 'Đơn + L/C', 'Người bán tự khai (đã email bộ copy)'],
     ['Non-Wood Certificate', 'Đơn', 'Người bán tự khai (không bao bì gỗ)'],
   ], [26, 38, 36]))
+  k.push(P([R('Phương thức thanh toán hỗ trợ: ', { b: true }), R('L/C (BM03) & D/P·D/A nhờ thu (BM08, URC 522) — chọn ở tab Đơn chiết khấu, hệ tự đổi cả bộ (mẫu đơn + Hối phiếu).', { i: true })], { before: 40, after: 40 }))
 
   k.push(H2('B. Đã cải thiện 07/08/2026 (code + khung)'))
   k.push(P('Đã SỬA 2 bug + THÊM đủ ô nhập:', { b: true, after: 60 }))

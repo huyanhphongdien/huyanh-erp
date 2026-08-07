@@ -79,7 +79,7 @@ const TAB_META: Record<string, { icon: React.ReactNode; label: string; color: st
   production: { icon: <ToolOutlined />, label: 'Sản xuất', color: '#1677ff' },
   packing: { icon: <InboxOutlined />, label: 'Đóng gói', color: '#1B4D3E' },
   shipping: { icon: <CarOutlined />, label: 'Vận chuyển', color: '#d48806' },
-  // documents: { icon: <FolderOpenOutlined />, label: 'Chứng từ', color: '#722ed1' }, // tạm ẩn
+  documents: { icon: <FolderOpenOutlined />, label: 'Chứng từ', color: '#722ed1' },  // mở lại 2026-08-07
   finance: { icon: <DollarOutlined />, label: 'Tài chính', color: '#cf1322' },
 }
 
@@ -515,10 +515,20 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
         )
       case 'documents':
         return (
-          <DocumentChecklistTab
-            orderId={order.id}
-            orderCode={soDisplayCode(order)}
-          />
+          <div>
+            <Button
+              type="primary"
+              icon={<FolderOpenOutlined />}
+              style={{ marginBottom: 12, background: '#1B4D3E', borderColor: '#1B4D3E' }}
+              onClick={() => navigate(`/sales/orders/${order.id}/documents`)}
+            >
+              Mở trang Sinh chứng từ (Invoice · Packing List · Weight List · COA · Hối phiếu · Đơn chiết khấu)
+            </Button>
+            <DocumentChecklistTab
+              orderId={order.id}
+              orderCode={soDisplayCode(order)}
+            />
+          </div>
         )
       case 'finance':
         return (

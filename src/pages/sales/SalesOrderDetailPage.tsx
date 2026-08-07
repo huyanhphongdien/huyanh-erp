@@ -1671,12 +1671,36 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={6}>
           <Card size="small">
-            <Statistic
-              title="Khách hàng"
-              value={customerName}
-              suffix={customerCountry ? `(${customerCountry})` : undefined}
-              valueStyle={{ fontSize: 14 }}
-            />
+            {order.customer_id ? (
+              <>
+                <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.45)', marginBottom: 4 }}>Khách hàng</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <a
+                    onClick={() => navigate(`/sales/customers/${order.customer_id}`)}
+                    style={{ fontSize: 14, fontWeight: 600, color: '#1B4D3E' }}
+                  >
+                    {customerName}{customerCountry ? ` (${customerCountry})` : ''}
+                  </a>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<SolutionOutlined />}
+                    title="Mở Hồ sơ chứng từ của khách"
+                    style={{ padding: 0, height: 'auto', fontSize: 12 }}
+                    onClick={() => navigate(`/sales/customers/${order.customer_id}?tab=export`)}
+                  >
+                    Hồ sơ CT
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Statistic
+                title="Khách hàng"
+                value={customerName}
+                suffix={customerCountry ? `(${customerCountry})` : undefined}
+                valueStyle={{ fontSize: 14 }}
+              />
+            )}
           </Card>
         </Col>
         <Col xs={12} sm={4}>

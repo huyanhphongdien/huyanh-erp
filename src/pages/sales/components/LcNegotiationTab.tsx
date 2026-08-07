@@ -186,6 +186,9 @@ export default function LcNegotiationTab(
         </table>
 
         <Title level={5}>BỘ CHỨNG TỪ ĐỀ NGHỊ THƯƠNG LƯỢNG (số bản)</Title>
+        <div style={{ fontSize: 12, color: '#874d00', marginBottom: 6 }}>
+          📌 Số bản lấy từ <b>Hồ sơ chứng từ khách</b> — vốn là số <b>ngân hàng phát hành L/C yêu cầu (trường 46A)</b>. Sửa ở tab Khách → "Hồ sơ chứng từ".
+        </div>
         <Table
           size="small" bordered pagination={false} rowKey="doc"
           dataSource={checklist}

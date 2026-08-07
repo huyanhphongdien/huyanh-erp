@@ -162,6 +162,11 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
         </Card>
 
         <Card size="small" title="Checklist chứng từ (số bản khách / ngân hàng yêu cầu)" style={{ marginBottom: 12 }}>
+          <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontSize: 12, color: '#874d00' }}>
+            📌 <b>Số bản gốc/copy do NGÂN HÀNG phát hành L/C quy định</b> — nằm ở trường <b>46A "Documents Required"</b> trong L/C.
+            Đọc từ L/C của khách rồi nhập vào đây (hệ KHÔNG tự sinh). Đây là bản mặc định dùng cho các lô của khách;
+            lô nào có L/C yêu cầu khác thì phải chỉnh theo đúng L/C của lô đó, kẻo bộ chứng từ bị bắt lỗi (discrepancy).
+          </div>
           <Table rowKey="key" dataSource={EXPORT_DOC_TYPES} columns={checklistCols} pagination={false} size="small" />
         </Card>
 

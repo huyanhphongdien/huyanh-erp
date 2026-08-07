@@ -83,7 +83,7 @@ function guideDoc() {
         ['Điều khoản thanh toán mặc định', 'Nên có', 'Invoice'],
         ['Checklist số bản (gốc/copy)', 'Nên có', 'Đơn chiết khấu'],
       ],
-      note: 'QUAN TRỌNG NHẤT. Chưa nhập → Invoice/PKL/WL trống Consignee/Bank/Mark. Làm cho ~10–15 khách chủ lực trước.' },
+      note: 'QUAN TRỌNG NHẤT. Chưa nhập → Invoice/PKL/WL trống Consignee/Bank/Mark. Làm cho ~10–15 khách chủ lực trước. · Số bản gốc/copy = do NGÂN HÀNG phát hành L/C quy định (trường 46A "Documents Required") — đọc từ L/C rồi nhập, hệ KHÔNG tự sinh; lô có L/C khác thì chỉnh theo L/C lô đó.' },
     { n: '1', dept: 'Sale', title: 'Thông tin đơn hàng',
       where: 'Tạo đơn hàng bán (đơn mới) — HOẶC đơn đã tạo: Chi tiết đơn → tab "Hợp đồng" → nút Sửa (tab "Thông tin" chỉ để xem)',
       rows: [

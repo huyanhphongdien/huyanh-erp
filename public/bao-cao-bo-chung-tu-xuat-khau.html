@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo cáo tổng quan — Hệ bộ chứng từ xuất khẩu</title>
+<style>
+  :root{
+    --green:#1a7a3d; --green-l:#e7f4ec; --amber:#b9770e; --amber-l:#fdf3e2;
+    --red:#c0392b; --red-l:#fbeae8; --blue:#1257a8; --blue-l:#e9f1fb;
+    --ink:#1e2429; --muted:#5c6873; --line:#e2e7ec; --bg:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 60px}
+  header.rpt{background:linear-gradient(120deg,#12492a,#1a7a3d);color:#fff;
+    padding:34px 20px 30px;text-align:center;margin-bottom:28px}
+  header.rpt .co{font-size:13px;letter-spacing:2px;opacity:.85;text-transform:uppercase}
+  header.rpt h1{margin:8px 0 6px;font-size:26px;font-weight:700}
+  header.rpt .sub{opacity:.9;font-size:14px}
+  header.rpt .meta{margin-top:14px;font-size:12.5px;opacity:.8}
+  h2{font-size:19px;margin:34px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h2 .n{display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;
+    background:var(--green);color:#fff;border-radius:6px;font-size:14px;margin-right:8px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:14px 0;
+    box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .lead{background:var(--green-l);border-left:5px solid var(--green);padding:14px 18px;border-radius:0 8px 8px 0;
+    font-size:15.5px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:#f0f3f6;font-weight:600}
+  tr:nth-child(even) td{background:#fafbfc}
+  .b{font-weight:600}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+  .ok{background:var(--green-l);color:var(--green)}
+  .warn{background:var(--amber-l);color:var(--amber)}
+  .bad{background:var(--red-l);color:var(--red)}
+  .info{background:var(--blue-l);color:var(--blue)}
+  .bar{height:9px;border-radius:6px;background:#eceff2;overflow:hidden;min-width:110px;display:inline-block;vertical-align:middle}
+  .bar > i{display:block;height:100%}
+  .pct{font-size:12px;color:var(--muted);margin-left:6px}
+  ul.clean{margin:8px 0;padding-left:20px}
+  ul.clean li{margin:5px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+  .kpi .v{font-size:26px;font-weight:700}
+  .kpi .l{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .step{display:flex;gap:12px;align-items:flex-start;margin:10px 0}
+  .step .num{flex:none;width:30px;height:30px;border-radius:50%;background:var(--green);color:#fff;
+    font-weight:700;display:flex;align-items:center;justify-content:center}
+  .step.p1 .num{background:var(--red)} .step.p2 .num{background:var(--amber)} .step.p3 .num{background:var(--blue)}
+  .foot{margin-top:40px;text-align:center;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
+  .new{background:var(--blue-l);color:var(--blue);font-size:11px;padding:1px 7px;border-radius:5px;font-weight:700;margin-left:6px}
+  @media print{body{background:#fff}.card,.kpi{box-shadow:none}header.rpt{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<header class="rpt">
+  <div class="co">Công ty TNHH Cao su Huy Anh · Huy Anh Rubber</div>
+  <h1>Báo cáo tổng quan — Hệ bộ chứng từ xuất khẩu</h1>
+  <div class="sub">Tình hình hiện tại · Điểm cần cải thiện · Lộ trình phát triển</div>
+  <div class="meta">Cập nhật: 07/08/2026 · Nguồn số liệu: dữ liệu prod thực tế (87 đơn đã xác nhận trở lên)</div>
+</header>
+
+<div class="wrap">
+
+  <div class="lead">
+    <b>Kết luận 1 dòng:</b> Khung &amp; công cụ đã xong <b>~90%</b> (tự sinh 5 chứng từ .docx chuẩn + đính kèm 7 loại + lịch sử theo khách).
+    Nhưng độ chính xác đang bị chặn bởi <b>DỮ LIỆU ĐẦU VÀO còn thiếu</b> — <i>"máy đã có, thiếu xăng"</i>.
+    Ưu tiên tiếp theo = <b>bơm dữ liệu</b>, không phải code thêm.
+  </div>
+
+  <!-- ================= A ================= -->
+  <h2><span class="n">A</span>Bức tranh tổng thể</h2>
+  <div class="grid">
+    <div class="kpi"><div class="v" style="color:var(--green)">7</div><div class="l">Chứng từ TỰ SINH<br>(.docx + PDF)</div></div>
+    <div class="kpi"><div class="v" style="color:var(--blue)">7</div><div class="l">Loại ĐÍNH KÈM<br>từ bên ngoài</div></div>
+    <div class="kpi"><div class="v" style="color:var(--green)">~95%</div><div class="l">Khung / công cụ<br>+ đủ ô nhập</div></div>
+    <div class="kpi"><div class="v" style="color:var(--red)">~20%</div><div class="l">Dữ liệu đã nhập<br>(cần đôn đốc)</div></div>
+  </div>
+  <div class="card">
+    <b>Vào ở đâu:</b> Chi tiết đơn → tab <b>"Chứng từ"</b> → nút <b>"Mở trang Sinh chứng từ"</b> (6 tab: COA · Packing List · Weight List · Invoice · Hối phiếu · Đơn chiết khấu) + <b>Checklist</b> upload bên dưới.
+    Ở cấp khách: Khách hàng → tab <b>"Lịch sử bộ chứng từ"</b>.
+  </div>
+
+  <!-- ================= B ================= -->
+  <h2><span class="n">B</span>Phần TỰ SINH được từ ERP (7 chứng từ)</h2>
+  <table>
+    <thead><tr><th>Chứng từ</th><th>Nguồn dữ liệu</th><th>Chuẩn khi đủ data?</th><th>Thực tế hiện tại</th></tr></thead>
+    <tbody>
+      <tr><td class="b">Commercial Invoice</td><td>Đơn + hồ sơ khách + bank</td><td><span class="badge ok">✔ Chuẩn</span></td><td>CIF: TOTAL → trừ cước/BH → THE COST (khớp gốc)</td></tr>
+      <tr><td class="b">Packing List</td><td>Container + hồ sơ</td><td><span class="badge ok">✔ Chuẩn</span></td><td>Gross = Net khi chưa nhập bì</td></tr>
+      <tr><td class="b">Weight List</td><td>Container</td><td><span class="badge ok">✔ Chuẩn</span></td><td>Dùng Net/Tare/Gross thật (Gross=Net nếu chưa nhập)</td></tr>
+      <tr><td class="b">Hối phiếu (BOE)</td><td>Invoice + chiết khấu</td><td><span class="badge ok">✔ Chuẩn</span></td><td>Draw THE COST · <b>L/C</b>: drawn under NH phát hành · <b>D/P</b>: drawn on người mua, AT SIGHT</td></tr>
+      <tr><td class="b">Đơn chiết khấu (L/C · D/P) 🆕</td><td>Form + checklist</td><td><span class="badge ok">✔ Chuẩn</span></td><td>Chọn phương thức → <b>BM03</b> (L/C) hoặc <b>BM08</b> (D/P/D/A nhờ thu URC 522)</td></tr>
+      <tr><td class="b">Beneficiary's Certificate 🆕</td><td>Đơn + L/C</td><td><span class="badge ok">✔ Chuẩn</span></td><td>Người bán tự khai (đã email bộ copy)</td></tr>
+      <tr><td class="b">Non-Wood Certificate 🆕</td><td>Đơn</td><td><span class="badge ok">✔ Chuẩn</span></td><td>Người bán tự khai (không bao bì gỗ)</td></tr>
+    </tbody>
+  </table>
+  <div class="card">
+    <b>Phương thức thanh toán hỗ trợ 🆕:</b> <b>L/C</b> (BM03 + Hối phiếu drawn under NH phát hành) &amp; <b>D/P · D/A nhờ thu</b> (BM08 + Hối phiếu drawn on người mua, AT SIGHT, URC 522). Chọn ở tab Đơn chiết khấu → hệ tự đổi cả bộ.
+    <br><b>Dữ liệu 100% tin cậy sẵn có:</b> grade · số lượng · đơn giá · tổng tiền · incoterm ·
+    <b>net weight từng container (100%)</b> · số container/seal (92%).
+    <br><b>Định dạng xuất:</b> In → PDF <span class="badge info">window.print</span> + Tải Word <b>.docx chuẩn</b> (Times New Roman, letterhead, bảng viền — thư viện <code>docx</code>).
+  </div>
+
+  <!-- ================= C ================= -->
+  <h2><span class="n">C</span>Phần cần CẢI THIỆN (bơm dữ liệu để tự sinh chuẩn)</h2>
+  <div class="lead" style="border-color:var(--green);margin:6px 0 12px">
+    <b>✅ Cập nhật 07/08/2026 — phần CODE/KHUNG đã xong:</b> toàn bộ ô nhập cho 8 mục dưới <b>ĐÃ CÓ trong ERP</b>
+    (Cảng · B/L date · Cước &amp; Bảo hiểm · Số/ngày hóa đơn · cột Tare/Gross ở đóng gói) và đã <b>sửa 2 bug</b>
+    (B/L nhập rồi mà không lên chứng từ; Invoice hardcode cảng "—"). <b>% bên dưới là tỷ lệ ĐÃ NHẬP</b> —
+    việc còn lại là con người nhập. Chi tiết cách nhập: <b>file "Hướng dẫn nhập liệu bộ chứng từ"</b>.
+  </div>
+  <p style="color:var(--muted);font-size:13.5px;margin:4px 0 10px">% = tỷ lệ đơn/khách đã có dữ liệu (trên 87 đơn đã xác nhận trở lên · 169 container · 56 khách).</p>
+  <table>
+    <thead><tr><th>#</th><th>Dữ liệu thiếu</th><th style="width:200px">Hiện có</th><th>Tác động</th><th>Bổ sung ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="b">Hồ sơ chứng từ khách</td>
+        <td><span class="bar"><i style="width:2%;background:var(--red)"></i></span><span class="pct">1/56 · 2%</span></td>
+        <td><span class="badge bad">CAO NHẤT</span> Thiếu → Invoice trống consignee/bank/mark</td><td>Khách → tab "Hồ sơ chứng từ"</td></tr>
+      <tr><td>2</td><td class="b">Tare / Gross container</td>
+        <td><span class="bar"><i style="width:1%;background:var(--red)"></i></span><span class="pct">0/169 · 0%</span></td>
+        <td>Weight List / Invoice sai khối lượng bì</td><td>Khâu Đóng gói (cân bì cont)</td></tr>
+      <tr><td>3</td><td class="b">Tên tàu (Vessel)</td>
+        <td><span class="bar"><i style="width:14%;background:var(--amber)"></i></span><span class="pct">14%</span></td>
+        <td>Invoice/PKL/WL thiếu tàu</td><td>Khâu Logistics</td></tr>
+      <tr><td>4</td><td class="b">Số B/L</td>
+        <td><span class="bar"><i style="width:1%;background:var(--red)"></i></span><span class="pct">~0%</span></td>
+        <td>Thiếu B/L trên Invoice / BOE</td><td>Khâu Logistics</td></tr>
+      <tr><td>5</td><td class="b">ETD / Ngày giao</td>
+        <td><span class="bar"><i style="width:39%;background:var(--amber)"></i></span><span class="pct">39% / 13%</span></td>
+        <td>Thiếu ngày shipment</td><td>Logistics / khi giao</td></tr>
+      <tr><td>6</td><td class="b">Số &amp; ngày L/C</td>
+        <td><span class="bar"><i style="width:5%;background:var(--red)"></i></span><span class="pct">5%</span></td>
+        <td>BOE/ĐNCK phải nhập tay</td><td>Đơn chiết khấu (đã có form)</td></tr>
+      <tr><td>7</td><td class="b">PO# / Điều khoản TT</td>
+        <td><span class="bar"><i style="width:15%;background:var(--amber)"></i></span><span class="pct">15% / 14%</span></td>
+        <td>Invoice thiếu PO</td><td>Khi tạo đơn / hồ sơ khách</td></tr>
+      <tr><td>8</td><td class="b">Freight / Insurance (CIF)</td>
+        <td><span class="bar"><i style="width:1%;background:var(--red)"></i></span><span class="pct">0%</span></td>
+        <td>Invoice CIF thiếu tách cost</td><td>Tab Vận chuyển → Cước &amp; Bảo hiểm <span class="badge ok">đã có ô</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ================= D ================= -->
+  <h2><span class="n">D</span>Phần ĐÍNH KÈM từ bên ngoài (7 loại — hoàn thiện bộ)</h2>
+  <table>
+    <thead><tr><th>Loại chứng từ</th><th>Nguồn cấp</th><th>Cách bổ sung</th></tr></thead>
+    <tbody>
+      <tr><td class="b">COA (Certificate of Analysis)</td><td>Phòng LAB (VILAS 1522)</td><td rowspan="6" style="vertical-align:middle">Upload ở <b>Checklist chứng từ</b> (tab "Chứng từ" của đơn) — lưu bucket <code>sales-documents</code>, thanh đủ/thiếu tự chạy</td></tr>
+      <tr><td class="b">Bill of Lading (B/L)</td><td>Hãng tàu</td></tr>
+      <tr><td class="b">Certificate of Origin (C/O Form B)</td><td>VCCI / cơ quan cấp</td></tr>
+      <tr><td class="b">Insurance Certificate</td><td>Cty bảo hiểm (nếu CIF)</td></tr>
+      <tr><td class="b">Phytosanitary / Fumigation</td><td>Cơ quan kiểm dịch</td></tr>
+      <tr><td class="b">LC Copy</td><td>Ngân hàng</td></tr>
+    </tbody>
+  </table>
+  <div class="card">
+    <b>Quyết định:</b> COA <b>= đính kèm</b> từ phòng LAB (không tự sinh — không có dữ liệu QC nên từng ra 0%/FAIL).
+    <br><b>Hiện trạng:</b> chưa có file ngoài nào được upload (158 file cũ là HĐ scan) — tính năng upload vừa mở, chờ dùng thật.
+  </div>
+
+  <!-- ================= E ================= -->
+  <h2><span class="n">E</span>Lịch sử bộ chứng từ theo KHÁCH HÀNG <span class="new">MỚI</span></h2>
+  <div class="card">
+    Màn <b>Khách hàng → tab "Lịch sử bộ chứng từ"</b> tổng hợp mọi đơn của khách:
+    <ul class="clean">
+      <li>Tiến độ <b>đủ/thiếu</b> từng bộ (VD 8/12) + trạng thái đơn.</li>
+      <li>Nút <b>"Đánh dấu hoàn thiện"</b> → ghi <b>ai + lúc nào</b> (theo dõi được).</li>
+      <li>Nút <b>"Mở bộ chứng từ"</b> → vào thẳng trang sinh/đính kèm &amp; tải file.</li>
+      <li>KPI: Tổng đơn · Bộ hoàn thiện (x/y) · lọc "Chỉ hiện đã hoàn thiện".</li>
+    </ul>
+    <b>Bản chất:</b> tổng hợp <i>live</i> từ chứng từ của từng đơn (không tạo bản sao) → luôn khớp thực tế.
+  </div>
+
+  <!-- ================= F ================= -->
+  <h2><span class="n">F</span>Độ hoàn thiện</h2>
+  <table>
+    <tbody>
+      <tr><td class="b" style="width:60%">Khung / công cụ (sinh + đính kèm + xuất .docx/PDF + lịch sử)</td><td><span class="badge ok">✔ ~95%</span></td></tr>
+      <tr><td class="b">Ô nhập dữ liệu (UI đủ cho mọi field của bộ chứng từ)</td><td><span class="badge ok">✔ 100%</span></td></tr>
+      <tr><td class="b">Dữ liệu đã nhập thực tế (con người điền)</td><td><span class="badge warn">~20% → cần đôn đốc</span></td></tr>
+    </tbody>
+  </table>
+  <div class="card"><b>Nói gọn:</b> máy đã đủ ô + tự điền đúng. Nút thắt duy nhất còn lại là <b>con người nhập đủ</b> ở 5 khâu (xem file Hướng dẫn nhập liệu).</div>
+
+  <!-- ================= G ================= -->
+  <h2><span class="n">G</span>Lộ trình phát triển đề xuất</h2>
+  <p style="color:var(--muted);font-size:13.5px;margin:4px 0 12px">Sắp theo tác động giảm dần.</p>
+
+  <div class="card">
+    <div class="step"><div class="num" style="background:var(--green)">✓</div><div><b>ĐÃ XONG (07/08):</b> Tare/Gross ở đóng gói · Cảng/Vessel/B-L/ETD ở Vận chuyển · Freight/Insurance (CIF) · Số/ngày hóa đơn · sửa bug B/L &amp; cảng · Lịch sử bộ chứng từ theo khách.</div></div>
+    <div class="step p1"><div class="num">1</div><div><b>ĐÔN ĐỐC NHẬP LIỆU</b> theo file Hướng dẫn <span class="badge bad">Ưu tiên 1</span><br>
+      <span style="color:var(--muted)">→ ưu tiên hồ sơ chứng từ ~10–15 khách chủ lực (làm 1 lần, dùng mãi) + nhập Vận chuyển/Đóng gói cho các đơn đang xuất.</span></div></div>
+    <div class="step p2"><div class="num">2</div><div><b>Gộp cả bộ (sinh + đính kèm) thành 1 file PDF</b> để gửi ngân hàng/khách một lần.</div></div>
+    <div class="step p3"><div class="num">3</div><div><b>Nối trạng thái chiết khấu (L/C) với module tiền về</b> (`sales_order_payments`).</div></div>
+    <div class="step"><div class="num">4</div><div><b>(Nâng cao)</b> Auto-fill hồ sơ khách từ HĐ/đơn cũ · nút "Đánh dấu hoàn thiện" ngay trong trang bộ chứng từ.</div></div>
+  </div>
+
+  <div class="lead" style="margin-top:20px">
+    <b>Nút thắt hiện tại KHÔNG còn ở code</b> mà ở <b>nhập liệu</b>. Xem <b>"Hướng dẫn nhập liệu bộ chứng từ"</b> (kèm theo)
+    để biết mỗi bộ phận nhập gì, ở đâu, để ra bộ chứng từ đầy đủ.
+  </div>
+
+  <div class="foot">
+    Huy Anh Rubber ERP · huyanhrubber.vn · Module Đơn hàng bán → Bộ chứng từ xuất khẩu<br>
+    Kế hoạch chi tiết: <code>docs/KE_HOACH_BO_CHUNG_TU_XUAT_KHAU.md</code> · Báo cáo cập nhật 07/08/2026
+  </div>
+
+</div>
+</body>
+</html>

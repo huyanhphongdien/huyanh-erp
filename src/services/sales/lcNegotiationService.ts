@@ -6,11 +6,14 @@
 
 import { supabase } from '../../lib/supabase'
 
+export type PaymentMethod = 'lc' | 'dp' | 'da'
+
 export interface LcNegotiation {
   id?: string
   sales_order_id: string
+  method?: PaymentMethod          // 'lc' = L/C (BM03) | 'dp' = Nhờ thu D/P (BM08) | 'da' = D/A
   bank_id: string | null
-  issuing_bank: string | null
+  issuing_bank: string | null     // L/C: NH phát hành · D/P: NH nhờ thu (NH người mua)
   lc_number: string | null
   lc_date: string | null
   negotiate_pct: number | null

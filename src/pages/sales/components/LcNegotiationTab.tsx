@@ -20,7 +20,7 @@ import customerExportProfileService, {
 } from '../../../services/sales/customerExportProfileService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
-import { lcNegotiationDoc, saveDocx } from '../../../services/sales/docxExport'
+import { lcNegotiationDoc, collectionDiscountDoc, saveDocx } from '../../../services/sales/docxExport'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -57,7 +57,9 @@ export default function LcNegotiationTab(
         ])
         if (cancelled) return
         setInv(i); setProfile(p); setBanks(b); setNeg(n)
+        const defaultMethod = n?.method || (/\b(dp|cad|d\/p|nhờ thu|collection)\b/i.test(order.payment_terms || '') ? 'dp' : 'lc')
         form.setFieldsValue({
+          method: defaultMethod,
           bank_id: n?.bank_id || p?.preferred_bank_id || null,
           issuing_bank: n?.issuing_bank || i?.consignee || '',
           lc_number: n?.lc_number || i?.lc_number || '',
@@ -90,6 +92,7 @@ export default function LcNegotiationTab(
     setSaving(true)
     try {
       const saved = await lcNegotiationService.upsert(orderId, {
+        method: v.method || 'lc',
         bank_id: v.bank_id || null,
         issuing_bank: v.issuing_bank || null,
         lc_number: v.lc_number || null,
@@ -116,6 +119,12 @@ export default function LcNegotiationTab(
   const v = watched || form.getFieldsValue()
   const bank = banks.find((b) => b.id === v.bank_id) || null
   const checklist = (profile?.doc_checklist || []).filter((c) => (c.originals || 0) > 0 || (c.copies || 0) > 0)
+  const method: string = v?.method || 'lc'
+  const isDP = method !== 'lc'
+  const methodLabel = method === 'dp' ? 'Nhờ thu D/P (URC 522)' : method === 'da' ? 'Nhờ thu D/A (URC 522)' : 'L/C'
+  const counterBankLabel = isDP ? 'Ngân hàng nhờ thu (NH người mua)' : 'Ngân hàng phát hành L/C (của khách)'
+  // Số tiền đòi qua Hối phiếu = THE COST (đã trừ cước/BH), khớp bộ gốc D/P
+  const draftValue = (inv?.the_cost ?? inv?.total) || 0
 
   return (
     <div>
@@ -125,13 +134,20 @@ export default function LcNegotiationTab(
         extra={<Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave} style={{ background: '#1B4D3E' }}>Lưu</Button>}>
         <Form form={form} layout="vertical" size="small" onValuesChange={(chg) => { if ('negotiate_pct' in chg) onPctChange(chg.negotiate_pct) }}>
           <Row gutter={12}>
-            <Col xs={24} md={12}><Form.Item label="Ngân hàng chiết khấu (của Huy Anh)" name="bank_id">
+            <Col xs={24} md={6}><Form.Item label="Phương thức thanh toán" name="method">
+              <Select options={[
+                { value: 'lc', label: 'L/C (thư tín dụng) — BM03' },
+                { value: 'dp', label: 'Nhờ thu D/P — BM08' },
+                { value: 'da', label: 'Nhờ thu D/A — BM08' },
+              ]} />
+            </Form.Item></Col>
+            <Col xs={24} md={6}><Form.Item label="Ngân hàng chiết khấu (của Huy Anh)" name="bank_id">
               <Select allowClear showSearch optionFilterProp="label"
                 options={banks.map((b) => ({ value: b.id, label: `${b.swift_code || ''} — ${b.bank_name}` }))} />
             </Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item label="Ngân hàng phát hành L/C (của khách)" name="issuing_bank"><Input /></Form.Item></Col>
-            <Col xs={12} md={6}><Form.Item label="Số L/C" name="lc_number"><Input /></Form.Item></Col>
-            <Col xs={12} md={6}><Form.Item label="Ngày L/C" name="lc_date"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item label={counterBankLabel} name="issuing_bank"><Input /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label={isDP ? 'Số L/C (bỏ trống)' : 'Số L/C'} name="lc_number"><Input disabled={isDP} /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label={isDP ? 'Ngày L/C (bỏ trống)' : 'Ngày L/C'} name="lc_date"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabled={isDP} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label="Tỷ lệ TL (%)" name="negotiate_pct"><InputNumber min={0} max={100} style={{ width: '100%' }} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label="Số tiền TL (USD)" name="negotiate_amount"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label="Lãi suất (%/năm)" name="interest_rate"><InputNumber min={0} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
@@ -157,10 +173,11 @@ export default function LcNegotiationTab(
       {/* ── Văn bản đề nghị (in được) ── */}
       <div className="doc-print-area" id="dnck-print">
         <Title level={4} style={{ textAlign: 'center', marginBottom: 2 }}>
-          GIẤY ĐỀ NGHỊ KIÊM HỢP ĐỒNG THƯƠNG LƯỢNG THANH TOÁN
+          {isDP ? 'GIẤY ĐỀ NGHỊ CHIẾT KHẤU KIÊM PHỤ LỤC HỢP ĐỒNG' : 'GIẤY ĐỀ NGHỊ KIÊM HỢP ĐỒNG THƯƠNG LƯỢNG THANH TOÁN'}
         </Title>
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <Text>Số: {soDisplayCode(order)}/TLTT</Text>
+          <Text>Số: {isDP ? `${soDisplayCode(order)}/CI-CK` : `${soDisplayCode(order)}/TLTT`}</Text>
+          {isDP && <div><Text type="secondary" style={{ fontSize: 12 }}>(Mẫu BM08 — Hối phiếu kèm bộ chứng từ, TRỪ L/C)</Text></div>}
         </div>
 
         <Paragraph><strong>Kính gửi:</strong> Ngân hàng {bank?.bank_name || '.....................'}</Paragraph>
@@ -177,13 +194,30 @@ export default function LcNegotiationTab(
         <Title level={5}>NỘI DUNG ĐỀ NGHỊ</Title>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
           <tbody>
-            <tr><td style={{ padding: '4px 8px', width: '32%', color: '#444' }}>L/C số</td><td style={{ padding: '4px 8px' }}>: {v.lc_number || '—'}{v.lc_date ? `   ngày ${dayjs(v.lc_date).format('DD/MM/YYYY')}` : ''}</td></tr>
-            <tr><td style={{ padding: '4px 8px', color: '#444' }}>Ngân hàng phát hành</td><td style={{ padding: '4px 8px' }}>: {v.issuing_bank || '—'}</td></tr>
+            {isDP ? (
+              <>
+                <tr><td style={{ padding: '4px 8px', width: '32%', color: '#444' }}>Phương thức thanh toán</td><td style={{ padding: '4px 8px' }}>: {methodLabel}</td></tr>
+                <tr><td style={{ padding: '4px 8px', color: '#444' }}>Ngân hàng nhờ thu (người mua)</td><td style={{ padding: '4px 8px' }}>: {v.issuing_bank || '—'}</td></tr>
+                <tr><td style={{ padding: '4px 8px', color: '#444' }}>Người nhập khẩu / người mua</td><td style={{ padding: '4px 8px' }}>: {inv?.buyer_name || '—'}</td></tr>
+              </>
+            ) : (
+              <>
+                <tr><td style={{ padding: '4px 8px', width: '32%', color: '#444' }}>L/C số</td><td style={{ padding: '4px 8px' }}>: {v.lc_number || '—'}{v.lc_date ? `   ngày ${dayjs(v.lc_date).format('DD/MM/YYYY')}` : ''}</td></tr>
+                <tr><td style={{ padding: '4px 8px', color: '#444' }}>Ngân hàng phát hành</td><td style={{ padding: '4px 8px' }}>: {v.issuing_bank || '—'}</td></tr>
+              </>
+            )}
             <tr><td style={{ padding: '4px 8px', color: '#444' }}>Loại hàng</td><td style={{ padding: '4px 8px' }}>: NATURAL RUBBER {order.grade?.replace(/_/g, ' ')}</td></tr>
             <tr><td style={{ padding: '4px 8px', color: '#444' }}>Số hợp đồng</td><td style={{ padding: '4px 8px' }}>: {order.contract_no || soDisplayCode(order)}</td></tr>
             <tr><td style={{ padding: '4px 8px', color: '#444' }}>Trị giá hóa đơn</td><td style={{ padding: '4px 8px' }}>: USD {fmtUSD(inv?.total || 0)}</td></tr>
+            {isDP && <tr><td style={{ padding: '4px 8px', color: '#444' }}>Giá trị Hối phiếu (đòi tiền)</td><td style={{ padding: '4px 8px', fontWeight: 600 }}>: USD {fmtUSD(draftValue)}</td></tr>}
           </tbody>
         </table>
+        {isDP && (
+          <Paragraph style={{ fontSize: 12, fontStyle: 'italic', color: '#555' }}>
+            Cam kết xuất trình đầy đủ bộ chứng từ trong vòng 15 ngày làm việc kể từ ngày Ngân hàng thực hiện thương lượng thanh toán.
+            Gửi Hối phiếu kèm bộ chứng từ đi nhờ thu theo Quy tắc thống nhất về Nhờ thu (URC 522). Mọi rủi ro &amp; chi phí thuộc về khách hàng.
+          </Paragraph>
+        )}
 
         <Title level={5}>BỘ CHỨNG TỪ ĐỀ NGHỊ THƯƠNG LƯỢNG (số bản)</Title>
         <div style={{ fontSize: 12, color: '#874d00', marginBottom: 6 }}>
@@ -221,17 +255,24 @@ export default function LcNegotiationTab(
       <div className="no-print" style={{ marginTop: 16, textAlign: 'center' }}>
         <Space>
           <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>In / Lưu PDF</Button>
-          <Button icon={<FileWordOutlined />} size="large" onClick={() => saveDocx(lcNegotiationDoc({
-            orderCode: soDisplayCode(order), contractNo: order.contract_no || soDisplayCode(order),
-            grade: order.grade || '', invTotal: inv?.total || 0,
-            bankName: bank?.bank_name || '', accountNo: bank?.account_no || '',
-            issuingBank: v.issuing_bank || '', lcNumber: v.lc_number || '',
-            lcDate: v.lc_date ? dayjs(v.lc_date).format('DD/MM/YYYY') : '',
-            negotiatePct: v.negotiate_pct ?? null, negotiateAmount: v.negotiate_amount ?? null,
-            interestRate: v.interest_rate ?? null, termDays: v.term_days ?? null,
-            submittedDate: v.submitted_date ? dayjs(v.submitted_date).format('DD/MM/YYYY') : '',
-            checklist: checklist.map((c) => ({ label: DOC_LABEL(c.doc), originals: c.originals || 0, copies: c.copies || 0 })),
-          }), `${soDisplayCode(order)}_DNCK`).catch(() => message.error('Lỗi xuất Word'))}>Tải Word (.docx)</Button>
+          <Button icon={<FileWordOutlined />} size="large" onClick={() => {
+            const cl = checklist.map((c) => ({ label: DOC_LABEL(c.doc), originals: c.originals || 0, copies: c.copies || 0 }))
+            const common = {
+              orderCode: soDisplayCode(order), contractNo: order.contract_no || soDisplayCode(order),
+              grade: order.grade || '', invTotal: inv?.total || 0,
+              bankName: bank?.bank_name || '', accountNo: bank?.account_no || '',
+              negotiatePct: v.negotiate_pct ?? null, negotiateAmount: v.negotiate_amount ?? null,
+              interestRate: v.interest_rate ?? null, termDays: v.term_days ?? null,
+              submittedDate: v.submitted_date ? dayjs(v.submitted_date).format('DD/MM/YYYY') : '',
+              checklist: cl,
+            }
+            const doc = isDP
+              ? collectionDiscountDoc({ ...common, method: (method as 'dp' | 'da'), draftValue,
+                  collectingBank: v.issuing_bank || '', buyerName: inv?.buyer_name || '' })
+              : lcNegotiationDoc({ ...common, issuingBank: v.issuing_bank || '', lcNumber: v.lc_number || '',
+                  lcDate: v.lc_date ? dayjs(v.lc_date).format('DD/MM/YYYY') : '' })
+            saveDocx(doc, `${soDisplayCode(order)}_${isDP ? 'CK-DP' : 'DNCK'}`).catch(() => message.error('Lỗi xuất Word'))
+          }}>Tải Word (.docx)</Button>
         </Space>
       </div>
     </div>

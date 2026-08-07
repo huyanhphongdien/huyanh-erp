@@ -208,7 +208,9 @@ export function weightListDoc(d: WeightListData): Document {
 export function boeDoc(d: {
   amount: number; ourBank: string; issuingBank: string; invoiceRef: string; invoiceDate: string
   tenorDays: number | null; lcNumber: string; lcDate: string; today: string
+  method?: 'lc' | 'dp' | 'da'; drawnOn?: string   // D/P·D/A: drawn ON người mua, không L/C
 }): Document {
+  const isDP = d.method === 'dp' || d.method === 'da'
   const tenorLine = d.tenorDays == null ? 'AT ______ DAYS FROM BILL OF LADING DATE'
     : d.tenorDays === 0 ? 'AT SIGHT' : `AT ${d.tenorDays} DAYS FROM BILL OF LADING DATE`
   const kv = (k: string, v: string) => P([R(k, {}), R(`: ${v}`, { bold: true })], { after: 20 })
@@ -220,9 +222,10 @@ export function boeDoc(d: {
     kv('Pay To The Order Of', d.ourBank),
     kv('The Sum Of Say (US DOLLARS)', amountToWords(d.amount).toUpperCase()),
     kv('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}  Dated ${fmtD(d.invoiceDate)}`),
-    kv('Drawn under', d.issuingBank),
-    kv('L/C Number', `${d.lcNumber}${d.lcDate ? `   L/C Date: ${d.lcDate}` : ''}`),
-    kv('TO', d.issuingBank),
+    // L/C: "Drawn under {NH phát hành}" + số L/C · D/P·D/A: "Drawn on {người mua}", KHÔNG L/C
+    ...(isDP
+      ? [kv('Drawn on', d.drawnOn || ''), kv('TO', d.issuingBank)]
+      : [kv('Drawn under', d.issuingBank), kv('L/C Number', `${d.lcNumber}${d.lcDate ? `   L/C Date: ${d.lcDate}` : ''}`), kv('TO', d.issuingBank)]),
     P('', { after: 240 }),
     P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
     P('', { after: 260 }),
@@ -261,6 +264,54 @@ export function lcNegotiationDoc(d: {
     ),
     P('ĐIỀU KIỆN THƯƠNG LƯỢNG', { bold: true, size: 12, after: 20, before: 80 }),
     kv('Tỷ lệ thương lượng', `${d.negotiatePct ?? '—'}%  = USD ${money(d.negotiateAmount || 0)}`),
+    kv('Lãi suất', `${d.interestRate ?? '—'} %/năm`),
+    kv('Thời hạn', `${d.termDays ?? '—'} ngày`),
+    kv('Ngày nộp', d.submittedDate || '—'),
+    P('', { after: 240 }),
+    P('CÔNG TY TNHH MTV CAO SU HUY ANH PHONG ĐIỀN', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
+    P('', { after: 260 }),
+    P('PHÓ GIÁM ĐỐC', { align: AlignmentType.RIGHT, bold: true }),
+  ]
+  return makeDoc(kids)
+}
+
+// ── ĐƠN CHIẾT KHẤU nhờ thu D/P · D/A (BM08 — bộ chứng từ TRỪ L/C) ──
+export function collectionDiscountDoc(d: {
+  orderCode: string; contractNo: string; grade: string; invTotal: number; draftValue: number
+  bankName: string; accountNo: string; method: 'dp' | 'da'
+  collectingBank: string; buyerName: string
+  negotiatePct: number | null; negotiateAmount: number | null; interestRate: number | null
+  termDays: number | null; submittedDate: string
+  checklist: { label: string; originals: number; copies: number }[]
+}): Document {
+  const kv = (k: string, v: string) => P([R(k, {}), R(`: ${v}`)], { after: 20 })
+  const methodLabel = d.method === 'da' ? 'Nhờ thu D/A (URC 522)' : 'Nhờ thu D/P (URC 522)'
+  const kids: (Paragraph | Table)[] = [
+    P('GIẤY ĐỀ NGHỊ CHIẾT KHẤU KIÊM PHỤ LỤC HỢP ĐỒNG', { align: AlignmentType.CENTER, bold: true, size: 14, after: 20 }),
+    P(`Số: ${d.orderCode}/CI-CK`, { align: AlignmentType.CENTER, after: 10 }),
+    P('(Mẫu BM08 — Hối phiếu kèm bộ chứng từ, TRỪ L/C)', { align: AlignmentType.CENTER, italics: true, size: 10, after: 100 }),
+    P([R('Kính gửi: ', { bold: true }), R(`Ngân hàng ${d.bankName || '.....'}`)], { after: 80 }),
+    P('A. ĐỀ NGHỊ CỦA KHÁCH HÀNG', { bold: true, size: 12, after: 20 }),
+    kv('Khách hàng', 'CÔNG TY TNHH MỘT THÀNH VIÊN CAO SU HUY ANH PHONG ĐIỀN'),
+    kv('Tài khoản', `${d.accountNo || '—'} tại ${d.bankName || '—'}`),
+    kv('Người đại diện', 'Ông Lê Xuân Hồng Trung — Phó Giám Đốc'),
+    P('NỘI DUNG ĐỀ NGHỊ', { bold: true, size: 12, after: 20, before: 60 }),
+    kv('Phương thức thanh toán', methodLabel),
+    kv('Ngân hàng nhờ thu (người mua)', d.collectingBank || '—'),
+    kv('Người nhập khẩu / người mua', d.buyerName || '—'),
+    kv('Loại hàng', `NATURAL RUBBER ${(d.grade || '').replace(/_/g, ' ')}`),
+    kv('Số hợp đồng', d.contractNo || d.orderCode),
+    kv('Trị giá hóa đơn', `USD ${money(d.invTotal)}`),
+    P([R('Giá trị Hối phiếu (đòi tiền)', {}), R(`: USD ${money(d.draftValue)}`, { bold: true })], { after: 20 }),
+    P('BỘ CHỨNG TỪ (số bản)', { bold: true, size: 12, after: 20, before: 60 }),
+    gridTable(
+      ['Chứng từ', 'Bản gốc', 'Bản copy'],
+      d.checklist.length ? d.checklist.map((c) => [c.label, `${c.originals}`, `${c.copies}`]) : [['(Chưa nhập checklist ở Hồ sơ chứng từ khách)', '', '']],
+      [60, 20, 20],
+    ),
+    P('Cam kết xuất trình đầy đủ bộ chứng từ trong vòng 15 ngày làm việc kể từ ngày Ngân hàng thực hiện thương lượng thanh toán. Gửi Hối phiếu kèm bộ chứng từ đi nhờ thu theo Quy tắc thống nhất về Nhờ thu (URC 522). Mọi rủi ro & chi phí thuộc về khách hàng.', { italics: true, before: 30, after: 40 }),
+    P('ĐIỀU KIỆN CHIẾT KHẤU', { bold: true, size: 12, after: 20, before: 40 }),
+    kv('Tỷ lệ chiết khấu', `${d.negotiatePct ?? '—'}%  = USD ${money(d.negotiateAmount || 0)}`),
     kv('Lãi suất', `${d.interestRate ?? '—'} %/năm`),
     kv('Thời hạn', `${d.termDays ?? '—'} ngày`),
     kv('Ngày nộp', d.submittedDate || '—'),

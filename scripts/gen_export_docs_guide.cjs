@@ -60,9 +60,20 @@ function guideDoc() {
     P('LUỒNG: (0) Hồ sơ khách → (1) Sale tạo đơn → (2) SX/Kho đóng gói → (3) Logistics vận chuyển → (4) Kế toán chiết khấu L/C → (5) Đính kèm file ngoài.', { b: true, color: BLUE, after: 160 }),
   )
 
+  k.push(H2('BẢN ĐỒ NHANH — mỗi thứ nhập ở đâu'))
+  k.push(table(['Cần nhập', 'Vào đâu'], [
+    ['Buyer · Consignee · Notify · Shipping marks · Ngân hàng', 'Khách → tab "Hồ sơ chứng từ" (KHÁC nút "Sửa" — nút Sửa chỉ info chung)'],
+    ['PO# · Số HĐ · Grade · Số lượng · Đơn giá', 'Đơn → tab "Hợp đồng" → nút Sửa (tab "Thông tin" chỉ để xem)'],
+    ['Vessel · Cảng · ETD · B/L số+ngày · Cước/BH · Số hóa đơn', 'Đơn → tab "Vận chuyển" → nút Sửa'],
+    ['Tare · Gross từng container', 'Đơn → Đóng gói (bảng container)'],
+    ['Số L/C · NH phát hành · Kỳ hạn · Chiết khấu', 'Đơn → tab "Chứng từ" → Mở trang Sinh chứng từ → Đơn chiết khấu'],
+    ['Upload COA · B/L · C/O · Bảo hiểm · Phyto · LC copy', 'Đơn → tab "Chứng từ" → mục Checklist chứng từ'],
+  ], [46, 54]))
+  k.push(P([R('2 chỗ hay nhầm: ', { b: true }), R('(1) Hồ sơ chứng từ (consignee/mark/bank) ở TAB RIÊNG, không phải nút "Sửa". (2) PO# ở ĐƠN → tab "Hợp đồng", không phải màn Khách.', { i: true })], { before: 40, after: 120 }))
+
   const secs = [
     { n: '0', dept: 'Admin / Sale', title: 'Hồ sơ chứng từ khách (nhập 1 lần / khách)',
-      where: 'Khách hàng → chọn khách → tab "Hồ sơ chứng từ"',
+      where: 'Khách hàng → chọn khách → tab "Hồ sơ chứng từ" (KHÁC nút "Sửa" ở góc — nút Sửa chỉ có info chung, không có consignee/mark)',
       rows: [
         ['Buyer legal name + địa chỉ', 'Bắt buộc', 'Invoice, Packing List, Weight List'],
         ['Consignee (người nhận) + địa chỉ', 'Bắt buộc', 'Invoice, PKL, WL'],

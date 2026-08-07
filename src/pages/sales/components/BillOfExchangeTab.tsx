@@ -101,7 +101,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
         <tbody>
           {kv('Pay To The Order Of', inv.bank_info.name)}
           {kv('The Sum Of Say (US DOLLARS)', <span style={{ textTransform: 'uppercase' }}>{words}</span>)}
-          {kv('Value received as per our Invoice(s) No(s)', `${inv.invoice_code}  Dated ${inv.invoice_date}`)}
+          {kv('Value received as per our Invoice(s) No(s)', `${inv.invoice_code}  Dated ${inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-GB') : ''}`)}
           {kv('Drawn under', issuingBank)}
           {kv('L/C Number', `${lcNo}${lcDate ? `      L/C Date: ${lcDate}` : ''}`)}
           {kv('TO', issuingBank)}

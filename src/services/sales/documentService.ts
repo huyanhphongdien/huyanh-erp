@@ -95,6 +95,7 @@ export interface WeightListData {
   total_gross: number
   vessel_name: string
   bl_number: string | null
+  bl_date: string | null
   port_of_loading: string
   port_of_destination: string
   etd: string
@@ -129,6 +130,13 @@ export interface InvoiceData {
   shipping_marks: string
   attn_contacts: string
   po_number: string | null
+  // Vận đơn — hiển thị trên Invoice (cảng/tàu/ngày)
+  port_of_loading: string
+  port_of_destination: string
+  vessel_name: string
+  voyage_number: string
+  etd: string
+  bl_date: string | null
 }
 
 // ============================================================================
@@ -449,7 +457,8 @@ export const documentService = {
       total_tare: sum('tare_weight_kg'),
       total_gross: sum('gross_weight_kg'),
       vessel_name: order.vessel_name || '',
-      bl_number: invoice?.bl_number || null,
+      bl_number: order.bl_number || invoice?.bl_number || null,
+      bl_date: order.bl_date || null,
       port_of_loading: PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
       port_of_destination: order.port_of_destination || '',
       etd: order.etd || '',
@@ -486,12 +495,13 @@ export const documentService = {
     const { profile, bank } = await loadExportProfile(order.customer_id)
 
     const subtotal = order.quantity_tons * order.unit_price
-    const freight = invoice?.freight_charge ?? 0
-    const insurance = invoice?.insurance_charge ?? 0
+    // Cước & bảo hiểm: ưu tiên nhập trực tiếp trên đơn (ShippingTab), fallback bảng invoice cũ
+    const freight = order.freight_amount ?? invoice?.freight_charge ?? 0
+    const insurance = order.insurance_amount ?? invoice?.insurance_charge ?? 0
     const total = subtotal + freight + insurance
 
     return {
-      invoice_code: invoice?.code || `INV-${order.code}`,
+      invoice_code: order.invoice_no || invoice?.code || `INV-${order.code}`,
       order_code: soDisplayCode(order),
       customer: {
         name: customer?.name || '',
@@ -509,8 +519,9 @@ export const documentService = {
       total,
       payment_terms: profile?.default_payment_term || PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
       lc_number: order.lc_number || null,
-      bl_number: invoice?.bl_number || null,
-      invoice_date: invoice?.invoice_date || new Date().toISOString().split('T')[0],
+      // B/L nhập ở đơn (ShippingTab) — trước đây đọc nhầm từ sales_invoices (trống)
+      bl_number: order.bl_number || invoice?.bl_number || null,
+      invoice_date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
       bank_info: bank
         ? { account_name: bank.account_name || 'HUY ANH RUBBER COMPANY LIMITED', name: bank.bank_name, account: bank.account_no, address: bank.bank_address || '', swift: bank.swift_code || '' }
         : { account_name: 'HUY ANH RUBBER COMPANY LIMITED', name: BANK_INFO.name, account: BANK_INFO.account, address: '', swift: BANK_INFO.swift },
@@ -524,6 +535,13 @@ export const documentService = {
       shipping_marks: profile?.shipping_marks || '',
       attn_contacts: profile?.attn_contacts || '',
       po_number: order.customer_po || null,
+      // Vận đơn — cảng/tàu/ngày (trước đây Invoice hardcode '—')
+      port_of_loading: PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
+      port_of_destination: order.port_of_destination || order.port_of_discharge || '',
+      vessel_name: order.vessel_name || '',
+      voyage_number: order.voyage_number || '',
+      etd: order.etd || '',
+      bl_date: order.bl_date || null,
     }
   },
 

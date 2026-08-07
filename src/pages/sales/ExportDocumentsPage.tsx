@@ -529,6 +529,14 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
             <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
             {data.po_number && <Descriptions.Item label="PO No.">{data.po_number}</Descriptions.Item>}
             <Descriptions.Item label="Incoterm">{data.incoterm}</Descriptions.Item>
+            <Descriptions.Item label="Port of Loading">{data.port_of_loading || 'TBD'}</Descriptions.Item>
+            <Descriptions.Item label="Port of Discharge">{data.port_of_destination || 'TBD'}</Descriptions.Item>
+            {data.vessel_name && (
+              <Descriptions.Item label="Vessel">
+                {data.vessel_name}{data.voyage_number ? ` / ${data.voyage_number}` : ''}
+              </Descriptions.Item>
+            )}
+            {data.etd && <Descriptions.Item label="ETD">{data.etd}</Descriptions.Item>}
           </Descriptions>
         </Col>
       </Row>

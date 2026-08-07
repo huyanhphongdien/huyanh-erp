@@ -90,9 +90,18 @@ export function invoiceDoc(d: InvoiceData): Document {
   kids.push(
     gridTable(
       ['CONTRACT NO', 'INCOTERM', 'PORT OF LOADING', 'PORT OF DISCHARGE', 'PO NO.'],
-      [[d.order_code, d.incoterm, '—', '—', d.po_number || '—']],
+      [[d.order_code, d.incoterm, d.port_of_loading || '—', d.port_of_destination || '—', d.po_number || '—']],
       [22, 14, 24, 24, 16],
     ),
+  )
+  if (d.vessel_name || d.etd || d.bl_number) {
+    const parts: TextRun[] = []
+    if (d.vessel_name) parts.push(R('VESSEL: ', { bold: true }), R(`${d.vessel_name}${d.voyage_number ? ' / ' + d.voyage_number : ''}    `))
+    if (d.etd) parts.push(R('ETD: ', { bold: true }), R(`${d.etd}    `))
+    if (d.bl_number) parts.push(R('B/L NO: ', { bold: true }), R(`${d.bl_number}${d.bl_date ? '  DATED ' + d.bl_date : ''}`))
+    kids.push(P(parts, { before: 40, after: 40 }))
+  }
+  kids.push(
     P('', { after: 40 }),
     gridTable(
       ['DESCRIPTION OF GOODS', 'QUANTITY (MT)', `UNIT PRICE (${d.currency}/MT)`, 'AMOUNT (USD)'],
@@ -164,7 +173,7 @@ export function weightListDoc(d: WeightListData): Document {
   ]
   if (d.consignee) kids.push(P([R('Consignee: ', { bold: true }), R(d.consignee)], { after: 0 }))
   kids.push(
-    P([R('Vessel: ', { bold: true }), R(d.vessel_name || 'TBD'), R('     B/L No.: ', { bold: true }), R(d.bl_number || 'TBD'), R('     ETD: ', { bold: true }), R(d.etd || 'TBD')], { after: 80 }),
+    P([R('Vessel: ', { bold: true }), R(d.vessel_name || 'TBD'), R('     B/L No.: ', { bold: true }), R(`${d.bl_number || 'TBD'}${d.bl_date ? ' (' + d.bl_date + ')' : ''}`), R('     ETD: ', { bold: true }), R(d.etd || 'TBD')], { after: 80 }),
     gridTable(
       ['Container No.', 'Seal No.', 'Bales', 'Net (KG)', 'Tare (KG)', 'Gross (KG)'],
       [

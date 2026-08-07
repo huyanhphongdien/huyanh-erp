@@ -628,15 +628,39 @@ function ContainerPackingPage() {
       ),
     },
     {
-      title: 'KL (kg)',
+      title: 'Net (kg)',
       key: 'net_weight_kg',
+      width: 96,
+      align: 'right' as const,
+      render: (_: unknown, r) => (
+        <InputNumber size="small" min={0} controls={false} style={{ width: 82 }} placeholder="—"
+          value={r.net_weight_kg ?? undefined}
+          onChange={(v) => patchLocal(r.id, { net_weight_kg: (v as number) ?? null })}
+          onBlur={() => { const c = containers.find((x) => x.id === r.id); persistField(r.id, { net_weight_kg: c?.net_weight_kg ?? null }) }} />
+      ),
+    },
+    {
+      title: 'Bì/Tare (kg)',
+      key: 'tare_weight_kg',
+      width: 96,
+      align: 'right' as const,
+      render: (_: unknown, r) => (
+        <InputNumber size="small" min={0} controls={false} style={{ width: 82 }} placeholder="—"
+          value={r.tare_weight_kg ?? undefined}
+          onChange={(v) => patchLocal(r.id, { tare_weight_kg: (v as number) ?? null })}
+          onBlur={() => { const c = containers.find((x) => x.id === r.id); persistField(r.id, { tare_weight_kg: c?.tare_weight_kg ?? null }) }} />
+      ),
+    },
+    {
+      title: 'Gross (kg)',
+      key: 'gross_weight_kg',
       width: 100,
       align: 'right' as const,
       render: (_: unknown, r) => (
         <InputNumber size="small" min={0} controls={false} style={{ width: 86 }} placeholder="—"
-          value={r.net_weight_kg ?? undefined}
-          onChange={(v) => patchLocal(r.id, { net_weight_kg: (v as number) ?? null })}
-          onBlur={() => { const c = containers.find((x) => x.id === r.id); persistField(r.id, { net_weight_kg: c?.net_weight_kg ?? null }) }} />
+          value={r.gross_weight_kg ?? undefined}
+          onChange={(v) => patchLocal(r.id, { gross_weight_kg: (v as number) ?? null })}
+          onBlur={() => { const c = containers.find((x) => x.id === r.id); persistField(r.id, { gross_weight_kg: c?.gross_weight_kg ?? null }) }} />
       ),
     },
     {

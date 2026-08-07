@@ -75,6 +75,18 @@ const BL_TYPE_OPTIONS = [
   { value: 'surrendered', label: 'Surrendered' },
 ]
 
+// Cảng xếp hàng VN — key khớp PORT_LABELS trong documentService để chứng từ map ra tên đầy đủ
+const PORT_OF_LOADING_OPTIONS = [
+  { value: 'HCM_CAT_LAI', label: 'Cat Lai Port, Ho Chi Minh City' },
+  { value: 'HCM_HIEP_PHUOC', label: 'Hiep Phuoc Port, Ho Chi Minh City' },
+  { value: 'VUNG_TAU', label: 'Cai Mep Port, Vung Tau' },
+  { value: 'QUY_NHON', label: 'Quy Nhon Port' },
+  { value: 'DA_NANG', label: 'Da Nang Port' },
+  { value: 'HAI_PHONG', label: 'Hai Phong Port' },
+]
+const portLoadingLabel = (v: string | undefined | null) =>
+  PORT_OF_LOADING_OPTIONS.find(o => o.value === v)?.label || v || '—'
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -96,10 +108,20 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       booking_reference: order.booking_reference,
       bl_number: order.bl_number,
       bl_type: order.bl_type,
+      bl_date: order.bl_date ? dayjs(order.bl_date) : null,
       etd: order.etd ? dayjs(order.etd) : null,
       eta: order.eta ? dayjs(order.eta) : null,
       cutoff_date: order.cutoff_date ? dayjs(order.cutoff_date) : null,
       dhl_number: order.dhl_number,
+      // Cảng
+      port_of_loading: order.port_of_loading,
+      port_of_destination: order.port_of_destination,
+      port_of_discharge: order.port_of_discharge,
+      // Cước & bảo hiểm (CIF) + hóa đơn
+      freight_amount: order.freight_amount,
+      insurance_amount: order.insurance_amount,
+      invoice_no: order.invoice_no,
+      invoice_date: order.invoice_date ? dayjs(order.invoice_date) : null,
       // L/C
       lc_number: order.lc_number,
       lc_bank: order.lc_bank,
@@ -135,10 +157,18 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         booking_reference: vals.booking_reference || null,
         bl_number: vals.bl_number || null,
         bl_type: vals.bl_type || null,
+        bl_date: vals.bl_date?.format('YYYY-MM-DD') || null,
         etd: vals.etd?.format('YYYY-MM-DD') || null,
         eta: vals.eta?.format('YYYY-MM-DD') || null,
         cutoff_date: vals.cutoff_date?.format('YYYY-MM-DD') || null,
         dhl_number: vals.dhl_number || null,
+        port_of_loading: vals.port_of_loading || null,
+        port_of_destination: vals.port_of_destination || null,
+        port_of_discharge: vals.port_of_discharge || null,
+        freight_amount: vals.freight_amount ?? null,
+        insurance_amount: vals.insurance_amount ?? null,
+        invoice_no: vals.invoice_no || null,
+        invoice_date: vals.invoice_date?.format('YYYY-MM-DD') || null,
         lc_number: vals.lc_number || null,
         lc_bank: vals.lc_bank || null,
         lc_expiry_date: vals.lc_expiry_date?.format('YYYY-MM-DD') || null,
@@ -212,14 +242,31 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
           </Form.Item>
         </div>
 
+        {/* Cảng — POL/POD (bắt buộc cho chứng từ) */}
+        <SectionHeader title="Cảng (dùng cho chứng từ)" color="#1257a8" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Cảng xếp (POL)" name="port_of_loading">
+            <Select allowClear showSearch optionFilterProp="label" options={PORT_OF_LOADING_OPTIONS} placeholder="Chọn cảng VN" />
+          </Form.Item>
+          <Form.Item label="Cảng đến (POD)" name="port_of_destination">
+            <Input placeholder="VD: Nhava Sheva, India" />
+          </Form.Item>
+          <Form.Item label="Cảng dỡ (nếu khác)" name="port_of_discharge">
+            <Input placeholder="Tuỳ chọn" />
+          </Form.Item>
+        </div>
+
         {/* B/L */}
         <SectionHeader title="Vận đơn (B/L)" color="#d48806" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
           <Form.Item label="B/L Number" name="bl_number">
             <Input placeholder="B/L number" />
           </Form.Item>
           <Form.Item label="B/L Type" name="bl_type">
             <Select allowClear options={BL_TYPE_OPTIONS} placeholder="Chọn..." />
+          </Form.Item>
+          <Form.Item label="Ngày B/L" name="bl_date">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
         </div>
 
@@ -256,6 +303,27 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
           </Form.Item>
           <Form.Item label="Số tiền L/C (USD)" name="lc_amount">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+          </Form.Item>
+        </div>
+
+        {/* Cước & Bảo hiểm (CIF/CFR) + Hóa đơn thương mại */}
+        <SectionHeader title="Cước, Bảo hiểm & Hóa đơn (cho Invoice)" color="#1257a8" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Cước vận chuyển (USD)" name="freight_amount"
+            tooltip="Chỉ nhập khi Incoterm là CFR/CIF — sẽ cộng vào TOTAL của Invoice">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+          </Form.Item>
+          <Form.Item label="Phí bảo hiểm (USD)" name="insurance_amount"
+            tooltip="Chỉ nhập khi Incoterm là CIF — sẽ cộng vào TOTAL của Invoice">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+          </Form.Item>
+          <Form.Item label="Số hóa đơn (Invoice No.)" name="invoice_no"
+            tooltip="Để trống → hệ tự dùng INV-<mã đơn>">
+            <Input placeholder="VD: HA20260080" />
+          </Form.Item>
+          <Form.Item label="Ngày hóa đơn" name="invoice_date"
+            tooltip="Để trống → hệ dùng ngày hôm nay">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
         </div>
 
@@ -335,15 +403,37 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
 
       <Divider style={{ margin: '12px 0' }} />
 
+      {/* Cảng */}
+      <SectionHeader title="Cảng (chứng từ)" color="#1257a8" />
+      <Descriptions column={3} size="small" bordered>
+        <Descriptions.Item label="Cảng xếp (POL)">{portLoadingLabel(order.port_of_loading)}</Descriptions.Item>
+        <Descriptions.Item label="Cảng đến (POD)">{order.port_of_destination || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Cảng dỡ">{order.port_of_discharge || '—'}</Descriptions.Item>
+      </Descriptions>
+
+      <Divider style={{ margin: '12px 0' }} />
+
       {/* B/L */}
       <SectionHeader title="Vận đơn (B/L)" color="#d48806" />
-      <Descriptions column={2} size="small" bordered>
+      <Descriptions column={3} size="small" bordered>
         <Descriptions.Item label="B/L Number">
           {order.bl_number ? <Tag color="blue">{order.bl_number}</Tag> : '—'}
         </Descriptions.Item>
         <Descriptions.Item label="B/L Type">
           {BL_TYPE_OPTIONS.find(o => o.value === order.bl_type)?.label || order.bl_type || '—'}
         </Descriptions.Item>
+        <Descriptions.Item label="Ngày B/L">{fmtDate(order.bl_date)}</Descriptions.Item>
+      </Descriptions>
+
+      <Divider style={{ margin: '12px 0' }} />
+
+      {/* Cước & Bảo hiểm + Hóa đơn */}
+      <SectionHeader title="Cước, Bảo hiểm & Hóa đơn (Invoice)" color="#1257a8" />
+      <Descriptions column={2} size="small" bordered>
+        <Descriptions.Item label="Cước (USD)">{fmtCurrency(order.freight_amount)}</Descriptions.Item>
+        <Descriptions.Item label="Bảo hiểm (USD)">{fmtCurrency(order.insurance_amount)}</Descriptions.Item>
+        <Descriptions.Item label="Số hóa đơn">{order.invoice_no || <span style={{ color: '#aaa' }}>INV-{order.code}</span>}</Descriptions.Item>
+        <Descriptions.Item label="Ngày hóa đơn">{order.invoice_date ? fmtDate(order.invoice_date) : <span style={{ color: '#aaa' }}>(hôm nay khi sinh)</span>}</Descriptions.Item>
       </Descriptions>
 
       <Divider style={{ margin: '12px 0' }} />

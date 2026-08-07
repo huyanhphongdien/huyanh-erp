@@ -96,6 +96,13 @@ export interface SalesOrder {
   incoterm: Incoterm
   port_of_loading?: string
   port_of_destination?: string
+  port_of_discharge?: string
+  // Bộ chứng từ xuất khẩu — cước/bảo hiểm CIF + ngày B/L + số/ngày hóa đơn
+  freight_amount?: number
+  insurance_amount?: number
+  bl_date?: string
+  invoice_no?: string
+  invoice_date?: string
 
   // Chỉ tiêu kỹ thuật
   drc_min?: number

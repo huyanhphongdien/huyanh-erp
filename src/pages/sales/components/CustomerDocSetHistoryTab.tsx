@@ -202,8 +202,9 @@ export default function CustomerDocSetHistoryTab({ customerId }: { customerId: s
       key: 'action',
       width: 130,
       render: (_, r) => (
-        <Button type="primary" ghost size="small" icon={<FolderOpenOutlined />}
-          onClick={() => navigate(`/sales/orders/${r.id}/documents`)}>
+        <Button type="primary" size="small" icon={<FolderOpenOutlined />}
+          onClick={() => navigate(`/sales/orders/${r.id}/documents`)}
+          style={{ background: '#1B4D3E', borderColor: '#1B4D3E', color: '#fff' }}>
           Mở bộ chứng từ
         </Button>
       ),

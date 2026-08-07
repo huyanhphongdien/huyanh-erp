@@ -53,6 +53,26 @@
   .foot{margin-top:40px;text-align:center;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
   .new{background:var(--blue-l);color:var(--blue);font-size:11px;padding:1px 7px;border-radius:5px;font-weight:700;margin-left:6px}
   @media print{body{background:#fff}.card,.kpi{box-shadow:none}header.rpt{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  /* ── Điện thoại ── */
+  @media (max-width:640px){
+    body{font-size:14px}
+    .wrap{padding:0 12px 48px}
+    header.rpt{padding:24px 14px 22px}
+    header.rpt h1{font-size:20px}
+    header.rpt .sub{font-size:13px}
+    header.rpt .meta{font-size:11.5px}
+    h2{font-size:17px;margin:26px 0 10px}
+    h2 .n{width:24px;height:24px;line-height:24px;font-size:13px}
+    .card{padding:14px 14px}
+    /* Bảng: cho cuộn ngang thay vì tràn màn hình */
+    table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:12.5px}
+    th,td{padding:7px 9px}
+    .bar{min-width:80px}
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .kpi .v{font-size:22px}
+    .step{gap:9px}
+    .lead{font-size:14px;padding:12px 14px}
+  }
 </style>
 </head>
 <body>

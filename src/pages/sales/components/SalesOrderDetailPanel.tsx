@@ -26,6 +26,7 @@ import {
   DownOutlined,
   ThunderboltOutlined,
   ShareAltOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
@@ -676,7 +677,27 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
               }}>
                 {order.customer && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {flag} <b style={{ color: '#262626', fontWeight: 600 }}>{order.customer.name}</b>
+                    {flag}
+                    {(order as any).customer_id || order.customer.id ? (
+                      <>
+                        <a
+                          onClick={() => navigate(`/sales/customers/${(order as any).customer_id || order.customer!.id}`)}
+                          style={{ color: '#262626', fontWeight: 600 }}
+                        >
+                          {order.customer.name}
+                        </a>
+                        <Tooltip title="Mở Hồ sơ chứng từ của khách">
+                          <Button
+                            type="link" size="small"
+                            icon={<SolutionOutlined />}
+                            style={{ padding: '0 2px', height: 'auto', fontSize: 12 }}
+                            onClick={() => navigate(`/sales/customers/${(order as any).customer_id || order.customer!.id}?tab=export`)}
+                          />
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <b style={{ color: '#262626', fontWeight: 600 }}>{order.customer.name}</b>
+                    )}
                   </span>
                 )}
                 {order.grade && (

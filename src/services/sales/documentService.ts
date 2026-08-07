@@ -115,6 +115,7 @@ export interface InvoiceData {
   freight: number
   insurance: number
   total: number
+  the_cost: number
   payment_terms: string
   lc_number: string | null
   bl_number: string | null
@@ -551,7 +552,9 @@ export const documentService = {
     // Cước & bảo hiểm: ưu tiên nhập trực tiếp trên đơn (ShippingTab), fallback bảng invoice cũ
     const freight = order.freight_amount ?? invoice?.freight_charge ?? 0
     const insurance = order.insurance_amount ?? invoice?.insurance_charge ?? 0
-    const total = subtotal + freight + insurance
+    // Khớp mẫu gốc: đơn giá đã là CIF → TOTAL = trị giá CIF; cước+BH TRỪ ra "THE COST" (số Hối phiếu draw)
+    const total = subtotal
+    const theCost = subtotal - freight - insurance
 
     return {
       invoice_code: order.invoice_no || invoice?.code || `INV-${order.code}`,
@@ -570,6 +573,7 @@ export const documentService = {
       freight,
       insurance,
       total,
+      the_cost: theCost,
       payment_terms: profile?.default_payment_term || PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
       lc_number: order.lc_number || null,
       // B/L nhập ở đơn (ShippingTab) — trước đây đọc nhầm từ sales_invoices (trống)

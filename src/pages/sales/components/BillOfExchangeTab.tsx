@@ -69,7 +69,9 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
   const issuingBank = neg?.issuing_bank || inv.consignee || ''
   const lcNo = neg?.lc_number || inv.lc_number || ''
   const lcDate = neg?.lc_date ? new Date(neg.lc_date).toLocaleDateString('en-GB') : ''
-  const words = amountToWords(inv.total)
+  // Số tiền draw = THE COST (CIF − cước − BH) nếu có tách cước/BH; không thì = trị giá Invoice. Khớp mẫu gốc.
+  const drawAmount = (inv.freight > 0 || inv.insurance > 0) ? inv.the_cost : inv.total
+  const words = amountToWords(drawAmount)
 
   const kv = (label: string, value: React.ReactNode) => (
     <tr>
@@ -84,7 +86,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
 
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '16px 0 8px' }}>
         <Text>Hue City, {drawDate}</Text>
-        <Text strong>FOR: USD {fmtMoney(inv.total)}</Text>
+        <Text strong>FOR: USD {fmtMoney(drawAmount)}</Text>
       </div>
       <div style={{ marginBottom: 4 }}>
         {tenorDays == null
@@ -121,7 +123,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
           </Button>
           <Button icon={<FileWordOutlined />} size="large"
             onClick={() => saveDocx(boeDoc({
-              amount: inv.total, ourBank: inv.bank_info.name, issuingBank,
+              amount: drawAmount, ourBank: inv.bank_info.name, issuingBank,
               invoiceRef: inv.invoice_code, invoiceDate: inv.invoice_date,
               tenorDays, lcNumber: lcNo, lcDate, today: drawDate,
             }), `${inv.invoice_code}_BOE`).catch(() => message.error('Lỗi xuất Word'))}>

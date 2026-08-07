@@ -122,10 +122,14 @@ export function invoiceDoc(d: InvoiceData): Document {
     P([R('HS CODE: ', { bold: true }), R(d.hs_code), R('        COUNTRY OF ORIGIN: ', { bold: true }), R(d.country_of_origin)], { after: 0 }),
     P([R('PRODUCER: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 60 }),
   )
-  if (d.freight > 0) kids.push(P(`FREIGHT: USD ${money(d.freight)}`, { after: 0 }))
-  if (d.insurance > 0) kids.push(P(`INSURANCE: USD ${money(d.insurance)}`, { after: 0 }))
+  kids.push(P([R('TOTAL: ', { bold: true }), R(`USD ${money(d.total)}`, { bold: true })], { after: 0 }))
+  // CIF: cước + bảo hiểm TRỪ ra "THE COST" (số Hối phiếu draw) — khớp mẫu gốc
+  if (d.freight > 0 || d.insurance > 0) {
+    if (d.freight > 0) kids.push(P(`FREIGHT CHARGE: USD ${money(d.freight)}`, { after: 0 }))
+    if (d.insurance > 0) kids.push(P(`INSURANCE: USD ${money(d.insurance)}`, { after: 0 }))
+    kids.push(P([R('THE COST: ', { bold: true }), R(`USD ${money(d.the_cost)}`, { bold: true })], { after: 0 }))
+  }
   kids.push(
-    P([R('TOTAL: ', { bold: true }), R(`USD ${money(d.total)}`, { bold: true })], { after: 0 }),
     P(`PAYMENT TERM: ${d.payment_terms || ''}`, { after: 0 }),
     P(`SAY US DOLLARS: ${amountToWords(d.total).toUpperCase()}`, { italics: true, after: 60 }),
   )

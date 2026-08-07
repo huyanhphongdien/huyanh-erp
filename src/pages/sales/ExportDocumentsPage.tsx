@@ -565,29 +565,33 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
         bordered
       />
 
-      {/* Totals */}
+      {/* Totals — CIF: TOTAL (trị giá CIF) rồi TRỪ Freight/Insurance -> THE COST (khớp mẫu gốc) */}
       <div style={{ width: 400, marginLeft: 'auto', marginTop: 16 }}>
-        <Row justify="space-between" style={{ padding: '4px 8px' }}>
-          <Col><Text>Subtotal:</Text></Col>
-          <Col><Text>{data.currency} {fmtMoney(data.subtotal)}</Text></Col>
-        </Row>
-        {data.freight > 0 && (
-          <Row justify="space-between" style={{ padding: '4px 8px' }}>
-            <Col><Text>Freight:</Text></Col>
-            <Col><Text>{data.currency} {fmtMoney(data.freight)}</Text></Col>
-          </Row>
-        )}
-        {data.insurance > 0 && (
-          <Row justify="space-between" style={{ padding: '4px 8px' }}>
-            <Col><Text>Insurance:</Text></Col>
-            <Col><Text>{data.currency} {fmtMoney(data.insurance)}</Text></Col>
-          </Row>
-        )}
-        <Divider style={{ margin: '4px 0' }} />
         <Row justify="space-between" style={{ padding: '4px 8px' }}>
           <Col><Text strong style={{ fontSize: 16 }}>TOTAL:</Text></Col>
           <Col><Text strong style={{ fontSize: 16 }}>{data.currency} {fmtMoney(data.total)}</Text></Col>
         </Row>
+        {(data.freight > 0 || data.insurance > 0) && (
+          <>
+            {data.freight > 0 && (
+              <Row justify="space-between" style={{ padding: '4px 8px' }}>
+                <Col><Text>Freight Charge:</Text></Col>
+                <Col><Text>− {data.currency} {fmtMoney(data.freight)}</Text></Col>
+              </Row>
+            )}
+            {data.insurance > 0 && (
+              <Row justify="space-between" style={{ padding: '4px 8px' }}>
+                <Col><Text>Insurance:</Text></Col>
+                <Col><Text>− {data.currency} {fmtMoney(data.insurance)}</Text></Col>
+              </Row>
+            )}
+            <Divider style={{ margin: '4px 0' }} />
+            <Row justify="space-between" style={{ padding: '4px 8px' }}>
+              <Col><Text strong>THE COST:</Text></Col>
+              <Col><Text strong>{data.currency} {fmtMoney(data.the_cost)}</Text></Col>
+            </Row>
+          </>
+        )}
       </div>
 
       {/* Payment & Banking */}

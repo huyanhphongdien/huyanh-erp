@@ -38,7 +38,7 @@ import {
 } from '@ant-design/icons'
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { documentService } from '../../services/sales/documentService'
-import { downloadElementAsWord } from '../../lib/htmlToWord'
+import { invoiceDoc, packingListDoc, weightListDoc, saveDocx } from '../../services/sales/docxExport'
 import BillOfExchangeTab from './components/BillOfExchangeTab'
 import LcNegotiationTab from './components/LcNegotiationTab'
 import type { COAData, PackingListData, InvoiceData, WeightListData } from '../../services/sales/documentService'
@@ -351,8 +351,8 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
             In / Lưu PDF
           </Button>
           <Button icon={<FileWordOutlined />} size="large"
-            onClick={() => downloadElementAsWord('packing-list-print', `${data.order_code}_PKL`)}>
-            Tải Word (.doc)
+            onClick={() => saveDocx(packingListDoc(data), `${data.order_code}_PKL`).catch(() => message.error('Lỗi xuất Word'))}>
+            Tải Word (.docx)
           </Button>
         </Space>
       </div>
@@ -451,8 +451,8 @@ const WeightListTab = ({ data, loading, onGenerate }: WeightListTabProps) => {
             In / Lưu PDF
           </Button>
           <Button icon={<FileWordOutlined />} size="large"
-            onClick={() => downloadElementAsWord('weight-list-print', `${data.order_code}_WL`)}>
-            Tải Word (.doc)
+            onClick={() => saveDocx(weightListDoc(data), `${data.order_code}_WL`).catch(() => message.error('Lỗi xuất Word'))}>
+            Tải Word (.docx)
           </Button>
         </Space>
       </div>
@@ -630,8 +630,8 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
             In / Lưu PDF
           </Button>
           <Button icon={<FileWordOutlined />} size="large"
-            onClick={() => downloadElementAsWord('invoice-print', `${data.invoice_code}_INV`)}>
-            Tải Word (.doc)
+            onClick={() => saveDocx(invoiceDoc(data), `${data.invoice_code}_INV`).catch(() => message.error('Lỗi xuất Word'))}>
+            Tải Word (.docx)
           </Button>
         </Space>
       </div>

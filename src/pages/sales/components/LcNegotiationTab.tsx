@@ -20,7 +20,7 @@ import customerExportProfileService, {
 } from '../../../services/sales/customerExportProfileService'
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
-import { downloadElementAsWord } from '../../../lib/htmlToWord'
+import { lcNegotiationDoc, saveDocx } from '../../../services/sales/docxExport'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -218,7 +218,17 @@ export default function LcNegotiationTab(
       <div className="no-print" style={{ marginTop: 16, textAlign: 'center' }}>
         <Space>
           <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>In / Lưu PDF</Button>
-          <Button icon={<FileWordOutlined />} size="large" onClick={() => downloadElementAsWord('dnck-print', `${soDisplayCode(order)}_DNCK`)}>Tải Word (.doc)</Button>
+          <Button icon={<FileWordOutlined />} size="large" onClick={() => saveDocx(lcNegotiationDoc({
+            orderCode: soDisplayCode(order), contractNo: order.contract_no || soDisplayCode(order),
+            grade: order.grade || '', invTotal: inv?.total || 0,
+            bankName: bank?.bank_name || '', accountNo: bank?.account_no || '',
+            issuingBank: v.issuing_bank || '', lcNumber: v.lc_number || '',
+            lcDate: v.lc_date ? dayjs(v.lc_date).format('DD/MM/YYYY') : '',
+            negotiatePct: v.negotiate_pct ?? null, negotiateAmount: v.negotiate_amount ?? null,
+            interestRate: v.interest_rate ?? null, termDays: v.term_days ?? null,
+            submittedDate: v.submitted_date ? dayjs(v.submitted_date).format('DD/MM/YYYY') : '',
+            checklist: checklist.map((c) => ({ label: DOC_LABEL(c.doc), originals: c.originals || 0, copies: c.copies || 0 })),
+          }), `${soDisplayCode(order)}_DNCK`).catch(() => message.error('Lỗi xuất Word'))}>Tải Word (.docx)</Button>
         </Space>
       </div>
     </div>

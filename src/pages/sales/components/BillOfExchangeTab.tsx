@@ -12,7 +12,7 @@ import { PrinterOutlined, FileWordOutlined, FileDoneOutlined } from '@ant-design
 import { documentService, type InvoiceData } from '../../../services/sales/documentService'
 import { lcNegotiationService, type LcNegotiation } from '../../../services/sales/lcNegotiationService'
 import { amountToWords } from '../../../services/sales/contractGeneratorService'
-import { downloadElementAsWord } from '../../../lib/htmlToWord'
+import { boeDoc, saveDocx } from '../../../services/sales/docxExport'
 
 const { Title, Text } = Typography
 
@@ -115,8 +115,12 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
             In / Lưu PDF
           </Button>
           <Button icon={<FileWordOutlined />} size="large"
-            onClick={() => downloadElementAsWord('boe-print', `${inv.invoice_code}_BOE`)}>
-            Tải Word (.doc)
+            onClick={() => saveDocx(boeDoc({
+              amount: inv.total, ourBank: inv.bank_info.name, issuingBank,
+              invoiceRef: inv.invoice_code, invoiceDate: inv.invoice_date,
+              tenorDays, lcNumber: lcNo, lcDate, today,
+            }), `${inv.invoice_code}_BOE`).catch(() => message.error('Lỗi xuất Word'))}>
+            Tải Word (.docx)
           </Button>
         </Space>
       </div>

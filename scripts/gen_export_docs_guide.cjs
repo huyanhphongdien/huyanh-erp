@@ -56,7 +56,7 @@ function guideDoc() {
     P('CÔNG TY TNHH CAO SU HUY ANH', { align: AlignmentType.CENTER, size: 10.5, color: MUTED, after: 20 }),
     P('HƯỚNG DẪN NHẬP LIỆU ĐỂ SINH BỘ CHỨNG TỪ XUẤT KHẨU ĐẦY ĐỦ', { align: AlignmentType.CENTER, b: true, size: 15, after: 20 }),
     P('Ai nhập · Nhập gì · Nhập ở đâu · Lên chứng từ nào   —   Phiên bản 07/08/2026', { align: AlignmentType.CENTER, i: true, size: 10, color: MUTED, after: 160 }),
-    P([R('1 bộ chứng từ đầy đủ', { b: true }), R(' = 5 chứng từ hệ TỰ SINH (Commercial Invoice · Packing List · Weight List · Hối phiếu · Đơn chiết khấu) + các file ĐÍNH KÈM (COA · B/L · C/O · Bảo hiểm · Phyto · Fumigation · LC copy). Hệ tự điền đúng khi 5 khâu dưới nhập đủ. Nguyên tắc vàng: HỒ SƠ CHỨNG TỪ KHÁCH nhập 1 lần dùng mãi.')]),
+    P([R('1 bộ chứng từ đầy đủ', { b: true }), R(' = 7 chứng từ hệ TỰ SINH (Commercial Invoice · Packing List · Weight List · Hối phiếu · Đơn chiết khấu · Beneficiary\'s Certificate · Non-Wood Certificate) + các file ĐÍNH KÈM (COA · B/L · C/O · Bảo hiểm · Phyto · Fumigation · LC copy). Hệ tự điền đúng khi 5 khâu dưới nhập đủ. Nguyên tắc vàng: HỒ SƠ CHỨNG TỪ KHÁCH nhập 1 lần dùng mãi.')]),
     P('LUỒNG: (0) Hồ sơ khách → (1) Sale tạo đơn → (2) SX/Kho đóng gói → (3) Logistics vận chuyển → (4) Kế toán chiết khấu L/C → (5) Đính kèm file ngoài.', { b: true, color: BLUE, after: 160 }),
   )
 
@@ -229,6 +229,8 @@ function guideDoc() {
     'Packing/Weight List: 5 cont × (Net 21.000 / Gross 21.000) · 3.000 bành · 105.000 KGS.',
     'Invoice: TOTAL 240,450 − Freight 6,250 − Insurance 105.80 = THE COST 234,094.20.',
     'Hối phiếu: AT 90 DAYS FROM B/L DATE · FOR USD 234,094.20 (= THE COST) · Drawn under HATTON NATIONAL BANK.',
+    'Beneficiary\'s Certificate (BC): xác nhận đã email 1 bộ copy cho khách trong 03 ngày.',
+    'Non-Wood Certificate (NW): xác nhận 105 MT SVR 10 không dùng bao bì gỗ.',
     'Đã khớp mẫu gốc: Invoice hiện THE COST; Hối phiếu draw đúng THE COST (số & chữ nhất quán).',
   ].forEach((t) => k.push(bullet(t)))
 
@@ -247,14 +249,16 @@ function reportDoc() {
     P([R('Kết luận: ', { b: true }), R('Khung & công cụ đã xong ~95% (tự sinh 5 chứng từ .docx chuẩn + đính kèm 7 loại + lịch sử theo khách + ĐỦ ô nhập). Nút thắt còn lại KHÔNG ở code mà ở NHẬP LIỆU — xem file "Hướng dẫn nhập liệu".')], { after: 140 }),
   )
 
-  k.push(H2('A. Phần TỰ SINH được từ ERP (5 chứng từ)'))
+  k.push(H2('A. Phần TỰ SINH được từ ERP (7 chứng từ)'))
   k.push(table(['Chứng từ', 'Nguồn dữ liệu', 'Ghi chú'], [
-    ['Commercial Invoice', 'Đơn + hồ sơ khách + bank', 'Chuẩn khi khách có hồ sơ'],
-    ['Packing List', 'Container + hồ sơ', 'Net chuẩn; gross từ số cân'],
-    ['Weight List', 'Container', 'Nay dùng Tare/Gross thật'],
-    ['Hối phiếu (BOE)', 'Invoice + chiết khấu', 'Tenor/L/C/NH nhập ở bước 4'],
+    ['Commercial Invoice', 'Đơn + hồ sơ khách + bank', 'CIF: TOTAL → trừ cước/BH → THE COST'],
+    ['Packing List', 'Container + hồ sơ', 'Gross = Net khi chưa nhập bì'],
+    ['Weight List', 'Container', 'Net/Tare/Gross thật'],
+    ['Hối phiếu (BOE)', 'Invoice + chiết khấu', 'Draw THE COST; số & chữ nhất quán'],
     ['Đơn chiết khấu (L/C)', 'Form + checklist', 'Nhập tay điều kiện'],
-  ], [26, 40, 34]))
+    ["Beneficiary's Certificate", 'Đơn + L/C', 'Người bán tự khai (đã email bộ copy)'],
+    ['Non-Wood Certificate', 'Đơn', 'Người bán tự khai (không bao bì gỗ)'],
+  ], [26, 38, 36]))
 
   k.push(H2('B. Đã cải thiện 07/08/2026 (code + khung)'))
   k.push(P('Đã SỬA 2 bug + THÊM đủ ô nhập:', { b: true, after: 60 }))

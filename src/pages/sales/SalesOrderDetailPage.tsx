@@ -1528,7 +1528,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
         <DocumentChecklistTab
           orderId={order.id}
           orderCode={soDisplayCode(order)}
-          readonly={!['shipped', 'delivered', 'invoiced', 'paid'].includes(order.status)}
+          readonly={['draft', 'cancelled'].includes(order.status)}
         />
       </div>
     )

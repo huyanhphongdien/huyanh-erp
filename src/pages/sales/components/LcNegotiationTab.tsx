@@ -11,7 +11,7 @@ import {
   Card, Form, Input, InputNumber, DatePicker, Select, Button, Space, Table,
   Typography, Spin, message, Row, Col, Divider,
 } from 'antd'
-import { SaveOutlined, PrinterOutlined, FileWordOutlined } from '@ant-design/icons'
+import { SaveOutlined, PrinterOutlined, FileWordOutlined, SnippetsOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { documentService, type InvoiceData } from '../../../services/sales/documentService'
 import { lcNegotiationService, type LcNegotiation } from '../../../services/sales/lcNegotiationService'
@@ -43,6 +43,7 @@ export default function LcNegotiationTab(
   const [neg, setNeg] = useState<LcNegotiation | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingTpl, setSavingTpl] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -57,17 +58,20 @@ export default function LcNegotiationTab(
         ])
         if (cancelled) return
         setInv(i); setProfile(p); setBanks(b); setNeg(n)
-        const defaultMethod = n?.method || (/\b(dp|cad|d\/p|nhờ thu|collection)\b/i.test(order.payment_terms || '') ? 'dp' : 'lc')
+        // Ưu tiên: đơn đã lưu → template hồ sơ khách → suy từ payment_terms
+        const defaultMethod = n?.method || p?.default_payment_method
+          || (/\b(dp|cad|d\/p|nhờ thu|collection)\b/i.test(order.payment_terms || '') ? 'dp' : 'lc')
+        const pct = n?.negotiate_pct ?? p?.default_negotiate_pct ?? 90
         form.setFieldsValue({
           method: defaultMethod,
           bank_id: n?.bank_id || p?.preferred_bank_id || null,
-          issuing_bank: n?.issuing_bank || i?.consignee || '',
+          issuing_bank: n?.issuing_bank || p?.default_counterparty_bank || i?.consignee || '',
           lc_number: n?.lc_number || i?.lc_number || '',
           lc_date: n?.lc_date ? dayjs(n.lc_date) : null,
-          negotiate_pct: n?.negotiate_pct ?? 90,
-          negotiate_amount: n?.negotiate_amount ?? Math.round((i?.total || 0) * 0.9),
-          interest_rate: n?.interest_rate ?? null,
-          term_days: n?.term_days ?? null,
+          negotiate_pct: pct,
+          negotiate_amount: n?.negotiate_amount ?? Math.round((i?.total || 0) * pct / 100),
+          interest_rate: n?.interest_rate ?? p?.default_interest_rate ?? null,
+          term_days: n?.term_days ?? p?.default_term_days ?? null,
           submitted_date: n?.submitted_date ? dayjs(n.submitted_date) : dayjs(),
           status: n?.status || 'draft',
         })
@@ -114,6 +118,26 @@ export default function LcNegotiationTab(
     }
   }
 
+  // Lưu điều kiện hiện tại làm MẪU chiết khấu cho khách (đơn sau tự điền)
+  const handleSaveTemplate = async () => {
+    const v = form.getFieldsValue()
+    setSavingTpl(true)
+    try {
+      await customerExportProfileService.upsert(order.customer_id, {
+        default_payment_method: v.method || 'lc',
+        default_counterparty_bank: v.issuing_bank || null,
+        default_negotiate_pct: v.negotiate_pct ?? null,
+        default_interest_rate: v.interest_rate ?? null,
+        default_term_days: v.term_days ?? null,
+      })
+      message.success('Đã lưu làm mẫu chiết khấu cho khách — đơn sau tự điền')
+    } catch (e: any) {
+      message.error(e?.message || 'Lỗi lưu mẫu')
+    } finally {
+      setSavingTpl(false)
+    }
+  }
+
   if (loading) return <Spin tip="Loading..." />
 
   const v = watched || form.getFieldsValue()
@@ -131,7 +155,11 @@ export default function LcNegotiationTab(
       {/* ── Form nhập (không in) ── */}
       <Card size="small" className="no-print" style={{ marginBottom: 16 }}
         title="Điều kiện thương lượng / chiết khấu (nhập rồi Lưu)"
-        extra={<Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave} style={{ background: '#1B4D3E' }}>Lưu</Button>}>
+        extra={<Space>
+          <Button icon={<SnippetsOutlined />} loading={savingTpl} onClick={handleSaveTemplate}
+            title="Lưu phương thức + NH + điều kiện hiện tại làm mẫu cho khách này">💾 Lưu làm mẫu cho khách</Button>
+          <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave} style={{ background: '#1B4D3E' }}>Lưu</Button>
+        </Space>}>
         <Form form={form} layout="vertical" size="small" onValuesChange={(chg) => { if ('negotiate_pct' in chg) onPctChange(chg.negotiate_pct) }}>
           <Row gutter={12}>
             <Col xs={24} md={6}><Form.Item label="Phương thức thanh toán" name="method">

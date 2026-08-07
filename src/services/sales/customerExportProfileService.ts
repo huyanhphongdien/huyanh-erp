@@ -40,6 +40,12 @@ export interface CustomerExportProfile {
   default_payment_term: string | null
   doc_checklist: DocChecklistItem[]
   special_instructions: string | null
+  // Template chiết khấu theo khách (đơn mới tự điền)
+  default_payment_method?: 'lc' | 'dp' | 'da' | null   // L/C · Nhờ thu D/P · D/A
+  default_counterparty_bank?: string | null            // NH phát hành L/C / NH nhờ thu (người mua)
+  default_negotiate_pct?: number | null
+  default_interest_rate?: number | null
+  default_term_days?: number | null
 }
 
 // Danh mục chứng từ chuẩn (dựng checklist). Khớp bộ thật + sheet "kHÁCH YÊU CẦU".

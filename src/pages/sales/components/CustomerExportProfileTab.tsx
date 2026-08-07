@@ -51,6 +51,11 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
             preferred_bank_id: profile.preferred_bank_id,
             default_payment_term: profile.default_payment_term,
             special_instructions: profile.special_instructions,
+            default_payment_method: profile.default_payment_method || 'lc',
+            default_counterparty_bank: profile.default_counterparty_bank,
+            default_negotiate_pct: profile.default_negotiate_pct,
+            default_interest_rate: profile.default_interest_rate,
+            default_term_days: profile.default_term_days,
           })
           const cl: CellMap = {}
           for (const it of profile.doc_checklist || []) {
@@ -158,6 +163,31 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
               </Form.Item>
             </Col>
             <Col xs={24} md={12}><Form.Item label="Điều khoản thanh toán mặc định" name="default_payment_term"><Input placeholder="VD: LC 90 days from B/L date" /></Form.Item></Col>
+          </Row>
+        </Card>
+
+        <Card size="small" title="Chiết khấu / Thanh toán mặc định (template theo khách)" style={{ marginBottom: 12 }}>
+          <div style={{ background: '#e9f1fb', border: '1px solid #b9d3f2', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#1257a8' }}>
+            📌 Set 1 lần → đơn mới của khách này tự điền phương thức + ngân hàng + điều kiện chiết khấu. Có thể ghi đè theo từng đơn ở tab "Đơn chiết khấu".
+          </div>
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
+              <Form.Item label="Phương thức mặc định" name="default_payment_method">
+                <Select options={[
+                  { value: 'lc', label: 'L/C (thư tín dụng) — BM03' },
+                  { value: 'dp', label: 'Nhờ thu D/P — BM08' },
+                  { value: 'da', label: 'Nhờ thu D/A — BM08' },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={16}>
+              <Form.Item label="NH phát hành L/C (hoặc NH nhờ thu = NH người mua nếu D/P)" name="default_counterparty_bank">
+                <Input placeholder="VD: HATTON NATIONAL BANK PLC (SWIFT HBLILKLX001)" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={8}><Form.Item label="Tỷ lệ chiết khấu mặc định (%)" name="default_negotiate_pct"><InputNumber min={0} max={100} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={8}><Form.Item label="Lãi suất mặc định (%/năm)" name="default_interest_rate"><InputNumber min={0} step={0.1} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={8}><Form.Item label="Kỳ hạn mặc định (ngày)" name="default_term_days"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
         </Card>
 

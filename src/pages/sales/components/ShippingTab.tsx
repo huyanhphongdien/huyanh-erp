@@ -310,11 +310,11 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         <SectionHeader title="Cước, Bảo hiểm & Hóa đơn (cho Invoice)" color="#1257a8" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
           <Form.Item label="Cước vận chuyển (USD)" name="freight_amount"
-            tooltip="Chỉ nhập khi Incoterm là CFR/CIF — sẽ cộng vào TOTAL của Invoice">
+            tooltip="CIF/CFR: nhập cước — sẽ TRỪ khỏi trị giá CIF để ra 'THE COST' (số Hối phiếu draw)">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
           </Form.Item>
           <Form.Item label="Phí bảo hiểm (USD)" name="insurance_amount"
-            tooltip="Chỉ nhập khi Incoterm là CIF — sẽ cộng vào TOTAL của Invoice">
+            tooltip="CIF: nhập phí bảo hiểm — sẽ TRỪ khỏi trị giá CIF để ra 'THE COST'">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
           </Form.Item>
           <Form.Item label="Số hóa đơn (Invoice No.)" name="invoice_no"

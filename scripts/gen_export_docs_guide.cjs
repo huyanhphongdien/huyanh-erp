@@ -115,7 +115,7 @@ function guideDoc() {
         ['Cước · Phí bảo hiểm (USD)  [MỚI]', 'Chỉ khi CFR/CIF', 'Invoice'],
         ['Số hóa đơn · Ngày hóa đơn  [MỚI]', 'Trống → tự sinh', 'Invoice, Hối phiếu'],
       ],
-      note: 'Cước & Bảo hiểm nhập sẽ CỘNG vào TOTAL Invoice → chỉ nhập khi giá FOB tách riêng. Số hóa đơn trống → INV-<mã đơn>; ngày trống → hôm nay.' },
+      note: 'CIF: NÊN NHẬP Cước & Bảo hiểm — đơn giá đã là CIF nên cước/BH TRỪ khỏi TOTAL để ra "THE COST" (số Hối phiếu draw), khớp mẫu gốc. FOB thì để trống. Số hóa đơn trống → INV-<mã đơn>; ngày trống → hôm nay.' },
     { n: '4', dept: 'Kế toán', title: 'Chiết khấu L/C (khi thanh toán bằng L/C)',
       where: 'Chi tiết đơn → tab "Chứng từ" → "Mở trang Sinh chứng từ" → tab "Đơn chiết khấu"',
       rows: [
@@ -213,7 +213,7 @@ function guideDoc() {
     ['B/L Type · Ngày B/L', 'Cần nhập', 'Original · 03/08/2026'],
     ['POL · POD', 'Đã có', 'Đà Nẵng · COLOMBO, SRI LANKA'],
     ['ETD', 'Cần nhập', '03/08/2026'],
-    ['Cước · Phí bảo hiểm', 'ĐỂ TRỐNG', 'Đơn giá 2290 đã là CIF → để trống (nhập vào sẽ cộng dư)'],
+    ['Cước · Phí bảo hiểm', 'Cần nhập', 'Cước 6,250 · BH 105.80 → hệ trừ ra THE COST 234,094.20 (Hối phiếu draw số này)'],
     ['Số hóa đơn · Ngày hóa đơn', 'Cần nhập', 'HA20260080/CI · 26/07/2026'],
   ], [26, 16, 58]))
   k.push(P('Bước 4 — Chiết khấu L/C (tab Đơn chiết khấu)', { b: true, color: GREEN, before: 100 }))
@@ -227,8 +227,9 @@ function guideDoc() {
   ;[
     'Invoice: No HA20260080/CI · 26/07/2026 · CIF Colombo · 105 MT SVR10 @ 2,290 = 240,450 · Vessel BRIDGE V.377S · B/L SGN3340104 · PO R7323 · L/C 906OMLCU26010816.',
     'Packing/Weight List: 5 cont × (Net 21.000 / Gross 21.000) · 3.000 bành · 105.000 KGS.',
-    'Hối phiếu: AT 90 DAYS FROM B/L DATE · FOR USD 240,450 · Drawn under HATTON NATIONAL BANK.',
-    'Lưu ý: bộ gốc draw Hối phiếu 234,094.20 (240,450 − cước 6,250 − BH 105.80); hệ ta draw theo tổng Invoice 240,450.',
+    'Invoice: TOTAL 240,450 − Freight 6,250 − Insurance 105.80 = THE COST 234,094.20.',
+    'Hối phiếu: AT 90 DAYS FROM B/L DATE · FOR USD 234,094.20 (= THE COST) · Drawn under HATTON NATIONAL BANK.',
+    'Đã khớp mẫu gốc: Invoice hiện THE COST; Hối phiếu draw đúng THE COST (số & chữ nhất quán).',
   ].forEach((t) => k.push(bullet(t)))
 
   return makeDoc(k)

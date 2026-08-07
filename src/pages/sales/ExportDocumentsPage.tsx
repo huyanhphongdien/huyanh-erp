@@ -796,12 +796,15 @@ const ExportDocumentsPage = () => {
       {/* Print styles */}
       <style>{`
         /* Font/định dạng giống mẫu chứng từ xuất khẩu: Times New Roman + chữ đen (màn hình lẫn in) */
+        /* Ép ĐEN mọi phần tử trong chứng từ (kể cả <td> thuần của Hối phiếu/ĐNCK) — tránh antd tô đỏ/xanh */
+        .doc-print-area, .doc-print-area * {
+          color: #000 !important;
+        }
         .doc-print-area, .doc-print-area .ant-typography,
         .doc-print-area .ant-table, .doc-print-area .ant-table-cell,
         .doc-print-area .ant-descriptions-item-label,
         .doc-print-area .ant-descriptions-item-content {
           font-family: 'Times New Roman', Times, serif !important;
-          color: #000 !important;
         }
         .doc-print-area .ant-table-thead > tr > th {
           background: #f2f2f2 !important; color: #000 !important; font-weight: 700;

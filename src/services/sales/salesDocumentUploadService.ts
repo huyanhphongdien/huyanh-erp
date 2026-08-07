@@ -205,4 +205,38 @@ export const salesDocumentUploadService = {
       uploaded: docs.filter(d => d.file_url).length,
     }
   },
+
+  /** Thống kê chứng từ cho NHIỀU đơn cùng lúc (dùng cho lịch sử bộ chứng từ ở màn Khách) */
+  async getStatsForOrders(
+    orderIds: string[],
+  ): Promise<Record<string, { total: number; received: number; uploaded: number }>> {
+    const map: Record<string, { total: number; received: number; uploaded: number }> = {}
+    orderIds.forEach(id => { map[id] = { total: 0, received: 0, uploaded: 0 } })
+    if (orderIds.length === 0) return map
+
+    const { data, error } = await supabase
+      .from('sales_order_documents')
+      .select('sales_order_id, is_received, file_url')
+      .in('sales_order_id', orderIds)
+
+    if (error) { console.error('[salesDoc] getStatsForOrders error:', error); return map }
+    for (const d of data || []) {
+      const m = map[(d as any).sales_order_id]
+      if (!m) continue
+      m.total++
+      if ((d as any).is_received) m.received++
+      if ((d as any).file_url) m.uploaded++
+    }
+    return map
+  },
+
+  /** Đánh dấu bộ chứng từ của đơn ĐÃ hoàn thiện (hoặc bỏ đánh dấu) — lưu tên + thời điểm */
+  async setDocSetCompleted(orderId: string, completed: boolean, byName?: string | null): Promise<boolean> {
+    const { error } = await supabase.from('sales_orders').update({
+      doc_set_completed_at: completed ? new Date().toISOString() : null,
+      doc_set_completed_by: completed ? (byName || null) : null,
+    }).eq('id', orderId)
+    if (error) { console.error('[salesDoc] setDocSetCompleted error:', error); return false }
+    return true
+  },
 }

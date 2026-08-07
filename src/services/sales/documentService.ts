@@ -229,6 +229,22 @@ async function loadExportProfile(customerId: string | null | undefined): Promise
   return { profile, bank }
 }
 
+// Consignee theo TỪNG ĐƠN: L/C → "THE ORDER OF {NH phát hành}" (đổi theo mỗi L/C),
+// còn lại (D/P/D/A/T-T) → consignee mặc định ở hồ sơ khách.
+async function resolveConsignee(orderId: string, profile: any): Promise<string> {
+  const { data: neg } = await supabase
+    .from('sales_order_lc_negotiations')
+    .select('method, issuing_bank')
+    .eq('sales_order_id', orderId)
+    .maybeSingle()
+  const clean = (s: string) => (s || '').replace(/\s*\(SWIFT[^)]*\)\s*/i, '').trim()
+  if ((neg?.method || 'lc') === 'lc' && neg?.issuing_bank) {
+    const b = clean(neg.issuing_bank)
+    return /^(THE|TO)\s+ORDER/i.test(b) ? b : `THE ORDER OF ${b}`
+  }
+  return profile?.consignee_name || ''
+}
+
 // ============================================================================
 // SERVICE
 // ============================================================================
@@ -423,7 +439,7 @@ export const documentService = {
       customer_name: customer?.name || '',
       customer_address: customer?.address || '',
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
-      consignee: profile?.consignee_name || '',
+      consignee: await resolveConsignee(orderId, profile),
       shipping_marks: profile?.shipping_marks || '',
       grade: order.grade,
       containers,
@@ -491,7 +507,7 @@ export const documentService = {
     return {
       order_code: soDisplayCode(order),
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
-      consignee: profile?.consignee_name || '',
+      consignee: await resolveConsignee(orderId, profile),
       grade: order.grade,
       containers,
       total_bales: sum('bale_count'),
@@ -585,7 +601,7 @@ export const documentService = {
       // GĐ2 — hồ sơ chứng từ khách
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       buyer_address: profile?.buyer_address || customer?.address || '',
-      consignee: profile?.consignee_name || '',
+      consignee: await resolveConsignee(orderId, profile),
       consignee_address: profile?.consignee_address || '',
       notify_party: profile?.notify_party || '',
       notify_address: profile?.notify_address || '',

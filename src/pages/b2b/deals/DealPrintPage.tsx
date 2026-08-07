@@ -96,7 +96,7 @@ const DealPrintPage = ({ id: propId }: DealPrintPageProps = {}) => {
       </div>
 
       {/* A4 paper */}
-      <div className="max-w-[210mm] mx-auto bg-white shadow-md print:shadow-none" style={{ minHeight: '297mm' }}>
+      <div className="deal-print-sheet max-w-[210mm] mx-auto bg-white shadow-md print:shadow-none" style={{ minHeight: '297mm' }}>
         <div className="p-10 print:p-8">
           {/* HEADER */}
           <div className="flex items-start justify-between pb-4 border-b-2 border-[#1B4D3E]">
@@ -253,6 +253,13 @@ const DealPrintPage = ({ id: propId }: DealPrintPageProps = {}) => {
         @media print {
           @page { size: A4 portrait; margin: 0; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          /* Ẩn TOÀN BỘ app (sidebar <aside>, header...) — chỉ in phiếu, full khổ giấy */
+          body * { visibility: hidden !important; }
+          .deal-print-sheet, .deal-print-sheet * { visibility: visible !important; }
+          .deal-print-sheet {
+            position: absolute !important; left: 0; top: 0;
+            width: 100% !important; max-width: 100% !important; margin: 0 !important; box-shadow: none !important;
+          }
         }
       `}</style>
     </div>

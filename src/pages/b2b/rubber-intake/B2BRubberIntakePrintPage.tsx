@@ -98,8 +98,11 @@ export default function B2BRubberIntakePrintPage() {
       <style>{`
         .print-only { display: none; }
         @media print {
+          /* Ẩn TOÀN BỘ app (sidebar <aside>, header...) — chỉ in phiếu, full khổ giấy */
+          body * { visibility: hidden !important; }
           .no-print { display: none !important; }
-          .print-only { display: block !important; }
+          .print-only, .print-only * { visibility: visible !important; }
+          .print-only { display: block !important; position: absolute !important; left: 0; top: 0; width: 100% !important; }
           html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
           @page { size: A4; margin: 12mm; }
         }

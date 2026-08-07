@@ -810,31 +810,29 @@ const ExportDocumentsPage = () => {
           background: #f2f2f2 !important; color: #000 !important; font-weight: 700;
         }
         @media print {
-          /* aside = sidebar menu của app (Tailwind) — phải ẩn kẻo lọt vào bản in */
-          aside, .no-print, .ant-layout-sider, .ant-layout-header,
-          .ant-breadcrumb, .doc-status-cards, .ant-tabs-nav {
+          .no-print { display: none !important; }
+          .ant-card { box-shadow: none !important; border: none !important; }
+          @page { size: A4; margin: 12mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+          /* IN 1 CHỨNG TỪ (mặc định): ẩn TOÀN BỘ trang (menu ☰, header, sidebar...),
+             chỉ hiện chứng từ đang mở, KÉO FULL khổ giấy. */
+          body:not(.print-all) * { visibility: hidden !important; }
+          body:not(.print-all) .doc-print-area,
+          body:not(.print-all) .doc-print-area * { visibility: visible !important; }
+          body:not(.print-all) .doc-print-area {
+            position: absolute !important; left: 0 !important; top: 0 !important;
+            width: 100% !important; max-width: 100% !important;
+            padding: 0 !important; margin: 0 !important;
+          }
+
+          /* IN TẤT CẢ: hiện mọi pane + ẩn chrome + ngắt trang giữa các chứng từ. */
+          body.print-all aside, body.print-all .ant-layout-sider, body.print-all .ant-layout-header,
+          body.print-all .ant-breadcrumb, body.print-all .doc-status-cards, body.print-all .ant-tabs-nav {
             display: none !important;
           }
-          .doc-print-area {
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .ant-card {
-            box-shadow: none !important;
-            border: none !important;
-          }
-          @page {
-            size: A4;
-            margin: 15mm;
-          }
-          body {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          /* "In tất cả": hiện MỌI tab pane (kể cả pane đang ẩn) + ngắt trang giữa các chứng từ.
-             Per-tab print (không có class print-all) vẫn chỉ in pane đang mở. */
           body.print-all .ant-tabs-tabpane { display: block !important; }
-          body.print-all .ant-tabs-tabpane .doc-print-area { page-break-after: always; }
+          body.print-all .ant-tabs-tabpane .doc-print-area { page-break-after: always; padding: 0 !important; margin: 0 !important; }
         }
       `}</style>
 

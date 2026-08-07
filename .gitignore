@@ -21,3 +21,14 @@ docs/contract-templates/_out_*.docx
 .env.local
 .env.*.local
 *.key
+
+# ── Dữ liệu nhạy cảm / file thô — KHÔNG commit (khách hàng, backup, ảnh, archive) ──
+# (đã từng bị lỡ `git add -A` cuốn vào commit + push — repo từng public)
+backup_*.sql
+*.rar
+*.zip
+# Dữ liệu thô: hợp đồng khách, ảnh cân, tài liệu tham chiếu
+docs/du lieu tho/
+SC + PI*/
+apps/weighbridge/*.png
+apps/weighbridge/*.jpg

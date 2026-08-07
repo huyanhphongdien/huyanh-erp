@@ -74,7 +74,7 @@ function guideDoc() {
       ],
       note: 'QUAN TRỌNG NHẤT. Chưa nhập → Invoice/PKL/WL trống Consignee/Bank/Mark. Làm cho ~10–15 khách chủ lực trước.' },
     { n: '1', dept: 'Sale', title: 'Thông tin đơn hàng',
-      where: 'Tạo đơn hàng bán (hoặc Chi tiết đơn → tab "Thông tin" → Sửa)',
+      where: 'Tạo đơn hàng bán (đơn mới) — HOẶC đơn đã tạo: Chi tiết đơn → tab "Hợp đồng" → nút Sửa (tab "Thông tin" chỉ để xem)',
       rows: [
         ['Khách · Grade · Số lượng · Đơn giá · Tiền tệ', 'Bắt buộc', 'Invoice, PKL, WL, Hối phiếu'],
         ['Incoterm (FOB/CIF/CFR…)', 'Bắt buộc', 'Invoice'],
@@ -180,7 +180,7 @@ function guideDoc() {
     ['Shipping marks', 'Đã có', "Global Rubber Industries (Pvt) Ltd / No 28 Joseph's Lane, Colombo 04"],
     ['Ngân hàng thụ hưởng', 'Đã có', '(đã chọn — Vietcombank)'],
   ], [26, 16, 58]))
-  k.push(P('Bước 1 — Thông tin đơn (tab Thông tin)', { b: true, color: GREEN, before: 100 }))
+  k.push(P('Bước 1 — Thông tin đơn (Chi tiết đơn → tab Hợp đồng → Sửa)', { b: true, color: GREEN, before: 100 }))
   k.push(table(wsHead, [
     ['Grade·SL·Giá·Incoterm·Số HĐ', 'Đã có', 'SVR 10 · 105 tấn · $2,290 · CIF · HA20260080'],
     ['PO#', 'Cần nhập', 'R7323'],

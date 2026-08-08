@@ -252,6 +252,27 @@ function guideDoc() {
     'Đã khớp mẫu gốc: Invoice hiện THE COST; Hối phiếu draw đúng THE COST (số & chữ nhất quán).',
   ].forEach((t) => k.push(bullet(t)))
 
+  // ── PHỤ LỤC 2: ví dụ D/P (HA20260087) ──
+  k.push(H1('PHỤ LỤC 2 — Ví dụ D/P: đơn HA20260087 (Qingdao, China)'))
+  k.push(P('Đơn D/P: HA20260087 — QINGDAO JINTONG TRADING (China) · SVR 3L + SBR1502 · CIF · Nhờ thu D/P (URC 522), thu qua Bank of Qingdao. Đặt cạnh HA20260080 (L/C) để thấy điểm KHÁC.', { i: true, after: 100 }))
+  k.push(P('Nhập ở tab Đơn chiết khấu (chọn Phương thức = D/P):', { b: true, color: GREEN }))
+  k.push(table(['Trường', 'Nhập / kết quả'], [
+    ['Phương thức', 'CHỌN Nhờ thu D/P -> mẫu BM08'],
+    ['NH nhờ thu (NH người mua)', 'BANK OF QINGDAO (SWIFT QCCBCNBQXXX)'],
+    ['Số L/C · Ngày L/C', 'bỏ trống (D/P không có L/C)'],
+    ['Người mua', 'QINGDAO JINTONG TRADING CO., LTD'],
+    ['Số · Ngày hóa đơn', 'HA20260087/CI · 05/08/2026'],
+    ['Giá trị · THE COST', 'TOTAL 239,925 -> THE COST 227,928.75'],
+    ['Consignee', 'Người mua / to order (hồ sơ) — KHÔNG "THE ORDER OF NH phát hành"'],
+  ], [34, 66]))
+  k.push(P('Kết quả D/P — khác L/C:', { b: true, color: GREEN, before: 80 }))
+  ;[
+    'Đơn chiết khấu: mẫu BM08 (không phải BM03) — D/P URC 522, NH nhờ thu Bank of Qingdao, giá trị Hối phiếu 227,928.75, cam kết 15 ngày.',
+    'Hối phiếu: Drawn ON QINGDAO JINTONG (người mua), AT SIGHT, KHÔNG L/C, TO Bank of Qingdao, FOR USD 227,928.75.',
+    'Các chứng từ còn lại (Invoice/PKL/WL/COA/2 Cert) làm giống hệt đơn L/C.',
+    'Chỉ cần đổi Phương thức = D/P -> hệ tự đổi mẫu đơn (BM08) + Hối phiếu. Consignee dùng hồ sơ khách (không suy theo NH).',
+  ].forEach((t) => k.push(bullet(t)))
+
   return makeDoc(k)
 }
 

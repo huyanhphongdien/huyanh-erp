@@ -44,6 +44,8 @@ export default function LcNegotiationTab(
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingTpl, setSavingTpl] = useState(false)
+  // Số bản riêng đơn (mặc định lấy hồ sơ khách; sửa cho L/C của đơn này)
+  const [docCounts, setDocCounts] = useState<Record<string, { originals: number; copies: number }>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -58,6 +60,11 @@ export default function LcNegotiationTab(
         ])
         if (cancelled) return
         setInv(i); setProfile(p); setBanks(b); setNeg(n)
+        // Số bản: ưu tiên bản riêng của đơn (neg.doc_checklist), thiếu → hồ sơ khách
+        const srcCl = (n?.doc_checklist && n.doc_checklist.length ? n.doc_checklist : p?.doc_checklist) || []
+        const cl: Record<string, { originals: number; copies: number }> = {}
+        for (const it of srcCl) cl[it.doc] = { originals: it.originals || 0, copies: it.copies || 0 }
+        setDocCounts(cl)
         // Ưu tiên: đơn đã lưu → template hồ sơ khách → suy từ payment_terms
         const defaultMethod = n?.method || p?.default_payment_method
           || (/\b(dp|cad|d\/p|nhờ thu|collection)\b/i.test(order.payment_terms || '') ? 'dp' : 'lc')
@@ -90,6 +97,11 @@ export default function LcNegotiationTab(
     if (pct != null && total > 0) form.setFieldsValue({ negotiate_amount: Math.round(total * pct / 100) })
   }
 
+  // Số bản của đơn (từ docCounts, bỏ dòng 0)
+  const buildDocChecklist = () => EXPORT_DOC_TYPES
+    .map((d) => ({ doc: d.key, originals: docCounts[d.key]?.originals || 0, copies: docCounts[d.key]?.copies || 0 }))
+    .filter((c) => c.originals > 0 || c.copies > 0)
+
   const handleSave = async () => {
     let v: any
     try { v = await form.validateFields() } catch { return }
@@ -107,6 +119,7 @@ export default function LcNegotiationTab(
         term_days: v.term_days ?? null,
         submitted_date: v.submitted_date ? v.submitted_date.format('YYYY-MM-DD') : null,
         status: v.status || 'draft',
+        doc_checklist: buildDocChecklist(),
       })
       setNeg(saved)
       message.success('Đã lưu đơn chiết khấu')
@@ -129,8 +142,9 @@ export default function LcNegotiationTab(
         default_negotiate_pct: v.negotiate_pct ?? null,
         default_interest_rate: v.interest_rate ?? null,
         default_term_days: v.term_days ?? null,
+        doc_checklist: buildDocChecklist(),
       })
-      message.success('Đã lưu làm mẫu chiết khấu cho khách — đơn sau tự điền')
+      message.success('Đã lưu làm mẫu chiết khấu + số bản cho khách — đơn sau tự điền')
     } catch (e: any) {
       message.error(e?.message || 'Lỗi lưu mẫu')
     } finally {
@@ -142,7 +156,11 @@ export default function LcNegotiationTab(
 
   const v = watched || form.getFieldsValue()
   const bank = banks.find((b) => b.id === v.bank_id) || null
-  const checklist = (profile?.doc_checklist || []).filter((c) => (c.originals || 0) > 0 || (c.copies || 0) > 0)
+  const checklist = EXPORT_DOC_TYPES
+    .map((d) => ({ doc: d.key, originals: docCounts[d.key]?.originals || 0, copies: docCounts[d.key]?.copies || 0 }))
+    .filter((c) => c.originals > 0 || c.copies > 0)
+  const setDocCell = (doc: string, field: 'originals' | 'copies', val: number) =>
+    setDocCounts((prev) => ({ ...prev, [doc]: { originals: prev[doc]?.originals || 0, copies: prev[doc]?.copies || 0, [field]: val } }))
   const method: string = v?.method || 'lc'
   const isDP = method !== 'lc'
   const methodLabel = method === 'dp' ? 'Nhờ thu D/P (URC 522)' : method === 'da' ? 'Nhờ thu D/A (URC 522)' : 'L/C'
@@ -190,11 +208,26 @@ export default function LcNegotiationTab(
               ]} />
             </Form.Item></Col>
           </Row>
-          {checklist.length === 0 && (
-            <Text type="warning" style={{ fontSize: 12 }}>
-              ⚠ Khách chưa có checklist số bản chứng từ. Vào Khách hàng → tab "Hồ sơ chứng từ" để nhập → bảng kê bên dưới mới đủ.
-            </Text>
-          )}
+          <div style={{ marginTop: 4 }}>
+            <Text strong style={{ fontSize: 13 }}>Số bản chứng từ (46A) — riêng đơn này</Text>
+            <div style={{ fontSize: 11.5, color: '#1257a8', margin: '2px 0 6px' }}>
+              Mặc định lấy từ Hồ sơ chứng từ khách; sửa ở đây nếu L/C của đơn này yêu cầu khác — <b>không đụng hồ sơ khách</b>. Bấm <b>Lưu</b> để áp cho đơn.
+            </div>
+            <Table size="small" bordered pagination={false} rowKey="key" dataSource={EXPORT_DOC_TYPES}
+              columns={[
+                { title: 'Chứng từ', dataIndex: 'label', key: 'label' },
+                { title: 'Bản gốc', key: 'o', width: 110, align: 'center' as const,
+                  render: (_: unknown, r: { key: string }) => (
+                    <InputNumber min={0} size="small" value={docCounts[r.key]?.originals || 0}
+                      onChange={(val) => setDocCell(r.key, 'originals', Number(val) || 0)} style={{ width: '100%' }} />
+                  ) },
+                { title: 'Bản copy', key: 'c', width: 110, align: 'center' as const,
+                  render: (_: unknown, r: { key: string }) => (
+                    <InputNumber min={0} size="small" value={docCounts[r.key]?.copies || 0}
+                      onChange={(val) => setDocCell(r.key, 'copies', Number(val) || 0)} style={{ width: '100%' }} />
+                  ) },
+              ]} />
+          </div>
         </Form>
       </Card>
 

@@ -103,6 +103,7 @@ export interface SalesOrder {
   bl_date?: string
   invoice_no?: string
   invoice_date?: string
+  shipping_marks?: string   // shipping mark riêng đơn (ghi đè hồ sơ khách)
 
   // Chỉ tiêu kỹ thuật
   drc_min?: number

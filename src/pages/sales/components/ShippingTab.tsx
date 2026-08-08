@@ -117,6 +117,7 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       port_of_loading: order.port_of_loading,
       port_of_destination: order.port_of_destination,
       port_of_discharge: order.port_of_discharge,
+      shipping_marks: order.shipping_marks,
       // Cước & bảo hiểm (CIF) + hóa đơn
       freight_amount: order.freight_amount,
       insurance_amount: order.insurance_amount,
@@ -165,6 +166,7 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         port_of_loading: vals.port_of_loading || null,
         port_of_destination: vals.port_of_destination || null,
         port_of_discharge: vals.port_of_discharge || null,
+        shipping_marks: vals.shipping_marks || null,
         freight_amount: vals.freight_amount ?? null,
         insurance_amount: vals.insurance_amount ?? null,
         invoice_no: vals.invoice_no || null,
@@ -255,6 +257,9 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
             <Input placeholder="Tuỳ chọn" />
           </Form.Item>
         </div>
+        <Form.Item label="Shipping mark (riêng đơn này — trống thì dùng hồ sơ khách)" name="shipping_marks">
+          <Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} placeholder="Nhập nếu đơn này khác hồ sơ (grade/số HĐ/lô...)" />
+        </Form.Item>
 
         {/* B/L */}
         <SectionHeader title="Vận đơn (B/L)" color="#d48806" />
@@ -409,6 +414,11 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         <Descriptions.Item label="Cảng xếp (POL)">{portLoadingLabel(order.port_of_loading)}</Descriptions.Item>
         <Descriptions.Item label="Cảng đến (POD)">{order.port_of_destination || '—'}</Descriptions.Item>
         <Descriptions.Item label="Cảng dỡ">{order.port_of_discharge || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Shipping mark (đơn)" span={3}>
+          {order.shipping_marks
+            ? <span style={{ whiteSpace: 'pre-line' }}>{order.shipping_marks}</span>
+            : <span style={{ color: '#aaa' }}>(dùng mark hồ sơ khách)</span>}
+        </Descriptions.Item>
       </Descriptions>
 
       <Divider style={{ margin: '12px 0' }} />

@@ -1464,6 +1464,13 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
               <Descriptions.Item label="Cảng dỡ (nếu khác)">
                 {canEdit ? <Input defaultValue={order.port_of_discharge || ''} onBlur={e => handleShippingUpdate('port_of_discharge', e.target.value)} placeholder="Tuỳ chọn" /> : (order.port_of_discharge || '-')}
               </Descriptions.Item>
+              <Descriptions.Item label="Shipping mark (riêng đơn này)">
+                {canEdit
+                  ? <Input.TextArea defaultValue={order.shipping_marks || ''} rows={3}
+                      onBlur={e => handleShippingUpdate('shipping_marks', e.target.value || null)}
+                      placeholder="Để trống → dùng mark hồ sơ khách. Nhập nếu đơn này khác (grade/số HĐ/lô...)" />
+                  : (order.shipping_marks || <span style={{ color: '#aaa' }}>(dùng mark hồ sơ khách)</span>)}
+              </Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>

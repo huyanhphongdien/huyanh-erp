@@ -440,7 +440,7 @@ export const documentService = {
       customer_address: customer?.address || '',
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       consignee: await resolveConsignee(orderId, profile),
-      shipping_marks: profile?.shipping_marks || '',
+      shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
       grade: order.grade,
       containers,
       total_containers: containers.length,
@@ -520,7 +520,7 @@ export const documentService = {
       port_of_loading: PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
       port_of_destination: order.port_of_destination || '',
       etd: order.etd || '',
-      shipping_marks: profile?.shipping_marks || '',
+      shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
     }
   },
 
@@ -603,9 +603,9 @@ export const documentService = {
       buyer_address: profile?.buyer_address || customer?.address || '',
       consignee: await resolveConsignee(orderId, profile),
       consignee_address: profile?.consignee_address || '',
-      notify_party: profile?.notify_party || '',
+      notify_party: profile?.notify_party || profile?.buyer_legal_name || customer?.name || '',
       notify_address: profile?.notify_address || '',
-      shipping_marks: profile?.shipping_marks || '',
+      shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
       attn_contacts: profile?.attn_contacts || '',
       po_number: order.customer_po || null,
       // Vận đơn — cảng/tàu/ngày (trước đây Invoice hardcode '—')

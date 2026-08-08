@@ -23,6 +23,7 @@ export interface LcNegotiation {
   submitted_date: string | null
   status: string
   notes: string | null
+  doc_checklist?: { doc: string; originals: number; copies: number }[] | null  // số bản riêng đơn (ghi đè hồ sơ)
 }
 
 export const lcNegotiationService = {

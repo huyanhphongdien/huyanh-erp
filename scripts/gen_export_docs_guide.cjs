@@ -56,7 +56,7 @@ function guideDoc() {
     P('CÔNG TY TNHH CAO SU HUY ANH', { align: AlignmentType.CENTER, size: 10.5, color: MUTED, after: 20 }),
     P('HƯỚNG DẪN NHẬP LIỆU ĐỂ SINH BỘ CHỨNG TỪ XUẤT KHẨU ĐẦY ĐỦ', { align: AlignmentType.CENTER, b: true, size: 15, after: 20 }),
     P('Ai nhập · Nhập gì · Nhập ở đâu · Lên chứng từ nào   —   Phiên bản 07/08/2026', { align: AlignmentType.CENTER, i: true, size: 10, color: MUTED, after: 160 }),
-    P([R('1 bộ chứng từ đầy đủ', { b: true }), R(' = 7 chứng từ hệ TỰ SINH (Commercial Invoice · Packing List · Weight List · Hối phiếu · Đơn chiết khấu · Beneficiary\'s Certificate · Non-Wood Certificate) + các file ĐÍNH KÈM (COA · B/L · C/O · Bảo hiểm · Phyto · Fumigation · LC copy). Hệ tự điền đúng khi 5 khâu dưới nhập đủ. Nguyên tắc vàng: HỒ SƠ CHỨNG TỪ KHÁCH nhập 1 lần dùng mãi.')]),
+    P([R('1 bộ chứng từ đầy đủ', { b: true }), R(' = 7 chứng từ hệ TỰ SINH (Commercial Invoice · Packing List · Weight List · Hối phiếu · Đơn chiết khấu [L/C: BM03 · D/P: BM08] · Beneficiary\'s Certificate · Non-Wood Certificate) + các file ĐÍNH KÈM (COA · B/L · C/O · Bảo hiểm · Phyto · Fumigation · LC copy). Hệ tự điền đúng khi 5 khâu dưới nhập đủ. Nguyên tắc vàng: HỒ SƠ CHỨNG TỪ KHÁCH nhập 1 lần dùng mãi.')]),
     P('LUỒNG: (0) Hồ sơ khách → (1) Sale tạo đơn → (2) SX/Kho đóng gói → (3) Logistics vận chuyển → (4) Kế toán chiết khấu L/C → (5) Đính kèm file ngoài.', { b: true, color: BLUE, after: 160 }),
   )
 
@@ -70,6 +70,20 @@ function guideDoc() {
     ['Upload COA · B/L · C/O · Bảo hiểm · Phyto · LC copy', 'Đơn → tab "Chứng từ" → mục Checklist chứng từ'],
   ], [46, 54]))
   k.push(P([R('2 chỗ hay nhầm: ', { b: true }), R('(1) Hồ sơ chứng từ (consignee/mark/bank) ở TAB RIÊNG, không phải nút "Sửa". (2) PO# ở ĐƠN → tab "Hợp đồng", không phải màn Khách.', { i: true })], { before: 40, after: 120 }))
+
+  k.push(H2('PHÂN BIỆT 2 LOẠI THANH TOÁN: L/C vs D/P'))
+  k.push(P('Chọn Phương thức ở tab "Đơn chiết khấu" (hoặc mặc định ở Hồ sơ khách) → hệ tự đổi Đơn chiết khấu + Hối phiếu + Consignee. Các chứng từ khác giống nhau.', { i: true, after: 60 }))
+  k.push(table(['Tiêu chí', 'L/C — Thư tín dụng', 'D/P — Nhờ thu'], [
+    ['Bản chất', 'NH CAM KẾT trả tiền (bảo lãnh)', 'NH chỉ THU HỘ — không bảo lãnh'],
+    ['Đơn chiết khấu (mẫu)', 'BM03 — thương lượng L/C', 'BM08 — Hối phiếu kèm bộ CT, TRỪ L/C'],
+    ['Ngân hàng đối tác', 'NH phát hành L/C', 'NH nhờ thu = NH người mua'],
+    ['Consignee (B/L)', 'THE ORDER OF {NH phát hành} — tự suy', 'Người mua / to order (hồ sơ khách)'],
+    ['Hối phiếu (BOE)', 'Drawn under {NH phát hành}, có số L/C, kỳ hạn', 'Drawn on {người mua}, AT SIGHT, KHÔNG L/C'],
+    ['Số tiền đòi (draw)', 'THE COST', 'THE COST'],
+    ['Quy tắc quốc tế', 'UCP 600', 'URC 522'],
+    ['Rủi ro người bán', 'Thấp (NH cam kết trả)', 'Cao hơn (người mua có thể không nhận)'],
+  ], [22, 39, 39]))
+  k.push(P('Phần còn lại của bộ (Invoice·PKL·WL·COA·B/L·C/O·Bảo hiểm·2 Cert) GIỐNG NHAU cho cả 2 loại — chỉ khác Đơn chiết khấu (BM03/BM08) và Hối phiếu (under L/C / on người mua).', { i: true, before: 40, after: 120 }))
 
   const secs = [
     { n: '0', dept: 'Admin / Sale', title: 'Hồ sơ chứng từ khách (nhập 1 lần / khách)',

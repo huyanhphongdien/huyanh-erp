@@ -26,6 +26,14 @@ const ddmmyyyy = (s: string | null | undefined): string => {
 /** Field nhập riêng cho form ĐNCK (lưu ở negotiation.dnck_fields). */
 export type DnckFields = Record<string, string>
 
+// Nhãn chứng từ trên form Vietinbank (map từ key checklist 46A của đơn)
+const DOC_FORM_LABELS: Record<string, string> = {
+  BOE: 'Bill of Exchange', CI: 'Commercial Invoice', PL: 'Packing List',
+  WL: 'Weight List', COA: 'Certificate of Analysis', BL: 'Bill of Lading',
+  CO: 'Certificate of Origin', INS: 'Insurance', PHYTO: 'Phyto Certificate',
+}
+const pad2 = (n: number) => String(n || 0).padStart(2, '0')
+
 /** Gộp dữ liệu ERP + field nhập tay → object điền vào template. */
 export async function buildDnckData(orderId: string, lotNo = 0) {
   const inv = await documentService.getInvoiceData(orderId, lotNo)
@@ -41,7 +49,17 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
   const addrLines = (inv.buyer_address || '').split(/\n|,\s*/).map((x) => x.trim()).filter(Boolean)
   const base = inv.order_code.split(' — ')[0]
 
+  // Checklist mục 3 (động theo 46A của đơn) → loop {#docs} trong template
+  const docs = (neg?.doc_checklist || [])
+    .filter((c) => (c.originals || 0) > 0 || (c.copies || 0) > 0)
+    .map((c) => ({
+      name: DOC_FORM_LABELS[c.doc] || c.doc,
+      orig: c.doc === 'BOE' ? '2/2' : pad2(c.originals),
+      copy: pad2(c.copies),
+    }))
+
   return {
+    docs,
     form_seq: df.form_seq || '',
     form_year: df.form_year || String(reqDate.getFullYear()),
     invoice_ref: inv.invoice_code,

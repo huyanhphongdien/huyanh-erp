@@ -257,8 +257,9 @@ export function invoiceDoc(d: InvoiceData): Document {
 export function packingListDoc(d: PackingListData): Document {
   const CENTER = AlignmentType.CENTER, RIGHT = AlignmentType.RIGHT, VC = VerticalAlign.CENTER
   const kgs = (v: number) => String(Math.round(v || 0))
-  const netMts = (d.total_net_weight / 1000).toFixed(2)
-  const grossMts = (d.total_gross_weight / 1000).toFixed(2)
+  // MTS lấy CÙNG nguồn với dòng NET/GROSS WEIGHT KGS trong ô mô tả (net_weight_kg có fallback) → không mâu thuẫn
+  const netMts = (d.net_weight_kg / 1000).toFixed(2)
+  const grossMts = (d.gross_weight_kg / 1000).toFixed(2)
   const vessel = `${d.vessel_name || ''}${d.voyage_number ? ' ' + d.voyage_number : ''}`.trim() || '—'
 
   // Bảng container: NO restart theo lô (lot_no)

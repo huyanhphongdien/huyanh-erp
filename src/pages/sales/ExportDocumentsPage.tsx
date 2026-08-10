@@ -288,8 +288,8 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
   const hcell: React.CSSProperties = { ...cell, fontWeight: 700, textAlign: 'center' }
   const fmtd = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
   const kgs = (v: number) => String(Math.round(v || 0))
-  const netMts = (data.total_net_weight / 1000).toFixed(2)
-  const grossMts = (data.total_gross_weight / 1000).toFixed(2)
+  const netMts = (data.net_weight_kg / 1000).toFixed(2)
+  const grossMts = (data.gross_weight_kg / 1000).toFixed(2)
   const vessel = `${data.vessel_name || ''}${data.voyage_number ? ' ' + data.voyage_number : ''}`.trim() || '—'
   const descNodes = buildInvoiceDescNodes(data)
   // NO restart theo lô

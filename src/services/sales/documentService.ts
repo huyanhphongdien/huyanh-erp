@@ -291,15 +291,15 @@ async function resolveConsignee(orderId: string, profile: any, lotNo?: number): 
   return profile?.consignee_name || ''
 }
 
-// L/C date của đơn/lô (từ bảng thương lượng) — cho dòng "LC NO ... DATE:" trong PKL
-async function loadLcDate(orderId: string, lotNo?: number): Promise<string | null> {
+// L/C số + ngày của đơn/lô (CÙNG nguồn = bảng thương lượng) — cho dòng "LC NO ... DATE:"
+async function loadLcInfo(orderId: string, lotNo?: number): Promise<{ lc_number: string | null; lc_date: string | null }> {
   const { data } = await supabase
     .from('sales_order_lc_negotiations')
-    .select('lc_date')
+    .select('lc_number, lc_date')
     .eq('sales_order_id', orderId)
     .eq('lot_no', lotNo || 0)
     .maybeSingle()
-  return data?.lc_date || null
+  return { lc_number: data?.lc_number || null, lc_date: data?.lc_date || null }
 }
 
 // ── Helper thuần (khớp mẫu) — dùng chung getInvoiceData / getPackingListData / getWeightListData ──
@@ -533,7 +533,15 @@ export const documentService = {
 
     const customer = order.customer as { name?: string; address?: string } | null
     const { profile } = await loadExportProfile(order.customer_id)
-    const lcDate = await loadLcDate(orderId, lotNo)
+    const lcInfo = await loadLcInfo(orderId, lotNo)
+    // Nạp hóa đơn (cùng nguồn getInvoiceData) → invoice_code/bl/ngày KHỚP giữa các chứng từ 1 bộ
+    const { data: invoice } = await supabase
+      .from('sales_invoices')
+      .select('code,bl_number,invoice_date')
+      .eq('sales_order_id', orderId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
     const orderQty = order.quantity_tons || 0
     const qtyTons = lotNo ? (totalNet / 1000) : orderQty
     const packingStyle = order.packing_desc || profile?.default_packing_desc || ''
@@ -556,11 +564,11 @@ export const documentService = {
       port_of_destination: booking?.port_of_destination || order.port_of_destination || order.port_of_discharge || '',
       vessel_name: booking?.vessel_name || order.vessel_name || '',
       etd: booking?.etd || order.etd || '',
-      // Khớp HỆT sheet PKL
+      // Khớp HỆT sheet PKL; invoice_code/bl/ngày/LC MIRROR getInvoiceData → 1 bộ khớp nhau
       pkl_no: `${soDisplayCode(order)}/PL${lotNo ? `/L${lotNo}` : ''}`,
-      date: order.invoice_date || new Date().toISOString().split('T')[0],
-      invoice_code: order.invoice_no || `${soDisplayCode(order)}/CI`,
-      bl_number: booking?.bl_number || order.bl_number || null,
+      date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
+      invoice_code: (order.invoice_no || invoice?.code || `INV-${order.code}`) + (lotNo ? `/L${lotNo}` : ''),
+      bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       voyage_number: booking?.voyage_no || order.voyage_number || '',
       quantity_tons: qtyTons,
       net_weight_kg: totalNet || Math.round(qtyTons * 1000),
@@ -573,8 +581,8 @@ export const documentService = {
       packing_desc: packingLineFrom(packingStyle, containers),
       total_packing: totalPackingFrom(containers),
       item_no: order.item_no || profile?.default_item_no || '',
-      lc_number: order.lc_number || null,
-      lc_date: lcDate,
+      lc_number: order.lc_number || lcInfo.lc_number,
+      lc_date: lcInfo.lc_date,
       invoice_extra_lines: order.invoice_extra_lines || profile?.default_invoice_extra_lines || '',
       po_number: order.customer_po || null,
       attn_contacts: profile?.attn_contacts || '',
@@ -681,6 +689,7 @@ export const documentService = {
     const customer = order.customer as { name?: string; address?: string; country?: string } | null
     const { profile, bank } = await loadExportProfile(order.customer_id)
     const booking = await loadLotBooking(orderId, lotNo)
+    const lcInfo = await loadLcInfo(orderId, lotNo)
 
     // Khối lượng theo LÔ (lot_no) nếu chọn lô; không thì cả đơn
     let contQ = supabase.from('sales_order_containers').select('net_weight_kg,gross_weight_kg,bale_count,container_type').eq('sales_order_id', orderId)
@@ -738,7 +747,7 @@ export const documentService = {
       total,
       the_cost: theCost,
       payment_terms: profile?.default_payment_term || PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
-      lc_number: order.lc_number || null,
+      lc_number: order.lc_number || lcInfo.lc_number,
       // B/L: lô → từ booking của lô; cả đơn → order.bl_number
       bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       invoice_date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],

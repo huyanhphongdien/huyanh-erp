@@ -143,6 +143,14 @@ export interface InvoiceData {
   gross_weight_kg: number
   hs_code: string
   country_of_origin: string
+  // Khớp HỆT sheet INV (HA20260080.xlsm): ô mô tả hàng chi tiết
+  shipment_date: string          // cột SHIPMENT DATE (ngày lên tàu = B/L date, thiếu → ETD)
+  proforma_no: string            // "AS PER PROFORMA INVOICE NO.<mã>/PR.CI"
+  proforma_date: string          // "DATED <proforma_date>"
+  packing_desc: string           // dòng PACKING đầy đủ, vd "35 KG/BALE. LOOSE BALES. 600 BALES/01X20'"
+  total_packing: string          // dòng TOTAL PACKING, vd "3000 BALES/05X20'"
+  item_no: string                // ITEM NO. (mã hàng của khách)
+  invoice_extra_lines: string    // dòng mô tả riêng theo khách (BOI REG NO, BANK NAME…), mỗi dòng 1 mục
 }
 
 // GĐ5 — 2 chứng từ người bán TỰ KHAI (khớp mẫu gốc HA20260080.xlsm)
@@ -588,11 +596,21 @@ export const documentService = {
     const booking = await loadLotBooking(orderId, lotNo)
 
     // Khối lượng theo LÔ (lot_no) nếu chọn lô; không thì cả đơn
-    let contQ = supabase.from('sales_order_containers').select('net_weight_kg,gross_weight_kg').eq('sales_order_id', orderId)
+    let contQ = supabase.from('sales_order_containers').select('net_weight_kg,gross_weight_kg,bale_count,container_type').eq('sales_order_id', orderId)
     if (lotNo) contQ = contQ.eq('lot_no', lotNo)
     const { data: wlCont } = await contQ
-    const sumNet = (wlCont || []).reduce((s, c) => s + (c.net_weight_kg || 0), 0)
-    const sumGross = (wlCont || []).reduce((s, c) => s + (c.gross_weight_kg || c.net_weight_kg || 0), 0)
+    const conts = wlCont || []
+    const sumNet = conts.reduce((s, c) => s + (c.net_weight_kg || 0), 0)
+    const sumGross = conts.reduce((s, c) => s + (c.gross_weight_kg || c.net_weight_kg || 0), 0)
+    // Đóng gói (khớp mẫu): PACKING = "<kiểu> <bao/cont> BALES/01X<size>", TOTAL PACKING = "<tổng bao> BALES/<số cont>X<size>"
+    const contCount = conts.length
+    const totalBales = conts.reduce((s, c) => s + (c.bale_count || 0), 0)
+    const balesPerCont = contCount ? Math.round(totalBales / contCount) : 0
+    const contSize = /40/.test(String(conts[0]?.container_type || '')) ? "40'" : "20'"
+    const pad2 = (n: number) => String(n).padStart(2, '0')
+    const packingStyle = order.packing_desc || profile?.default_packing_desc || ''
+    const packingLine = [packingStyle, balesPerCont ? `${balesPerCont} BALES/01X${contSize}` : ''].filter(Boolean).join(' ').trim()
+    const totalPacking = (totalBales && contCount) ? `${totalBales} BALES/${pad2(contCount)}X${contSize}` : ''
     const orderQty = order.quantity_tons || 0
     // Số lượng (MT): lô → tổng net lô / 1000; cả đơn → theo đơn
     const qtyTons = lotNo ? (sumNet / 1000) : orderQty
@@ -660,6 +678,14 @@ export const documentService = {
       gross_weight_kg: grossKg,
       hs_code: hsCode,
       country_of_origin: 'VIET NAM',
+      // Khớp HỆT sheet INV
+      shipment_date: order.bl_date || booking?.etd || order.etd || '',
+      proforma_no: `${soDisplayCode(order)}/PR.CI`,
+      proforma_date: order.proforma_date || '',
+      packing_desc: packingLine,
+      total_packing: totalPacking,
+      item_no: order.item_no || profile?.default_item_no || '',
+      invoice_extra_lines: order.invoice_extra_lines || profile?.default_invoice_extra_lines || '',
     }
   },
 

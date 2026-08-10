@@ -40,6 +40,7 @@ import {
 import { salesOrderService } from '../../services/sales/salesOrderService'
 import { documentService } from '../../services/sales/documentService'
 import { invoiceDoc, packingListDoc, weightListDoc, saveDocx } from '../../services/sales/docxExport'
+import { amountToWords } from '../../services/sales/contractGeneratorService'
 import BillOfExchangeTab from './components/BillOfExchangeTab'
 import LcNegotiationTab from './components/LcNegotiationTab'
 import BeneficiaryCertTab from './components/BeneficiaryCertTab'
@@ -480,157 +481,138 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
     )
   }
 
-  const fmtMoney = (v: number) =>
-    v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // ── Định dạng khớp HỆT mẫu gốc (INV) ──
+  const n2 = (v: number) => (v || 0).toFixed(2)
+  const qtyFmt = data.quantity_tons.toFixed(2)
+  const priceFmt = Number.isInteger(data.unit_price) ? String(data.unit_price) : data.unit_price.toFixed(2)
+  const gradeLabel = (data.grade || '').replace(/_/g, ' ')
+  const pod = data.port_of_destination || ''
+  const fmtd = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
+  const fmtDot = (s?: string | null) => {
+    if (!s) return ''
+    const dt = new Date(s); if (isNaN(dt.getTime())) return s
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${p(dt.getDate())}.${p(dt.getMonth() + 1)}.${dt.getFullYear()}`
+  }
+  const bd = '1px solid #000'
+  const cell: React.CSSProperties = { border: bd, padding: '3px 6px', fontSize: 12.5, verticalAlign: 'middle' }
+  const hcell: React.CSSProperties = { ...cell, fontWeight: 700, textAlign: 'center' }
+
+  // Các dòng trong ô mô tả hàng — khớp thứ tự sheet INV
+  const descLines: React.ReactNode[] = []
+  descLines.push(<div key="c" style={{ fontWeight: 700 }}>{qtyFmt.replace(/\.00$/, '')} MT -&nbsp; NATURAL RUBBER {gradeLabel}.</div>)
+  if (data.proforma_no) descLines.push(<div key="pf">AS PER PROFORMA INVOICE NO.{data.proforma_no}</div>)
+  if (data.proforma_date) descLines.push(<div key="pfd">DATED {fmtDot(data.proforma_date)}</div>)
+  if (data.packing_desc) descLines.push(<div key="pk">PACKING: {data.packing_desc}</div>)
+  if (data.total_packing) descLines.push(<div key="tpk">TOTAL PACKING: {data.total_packing}</div>)
+  descLines.push(<div key="nw">NET WEIGHT: {n2(data.net_weight_kg)} KGS</div>)
+  descLines.push(<div key="gw">GROSS WEIGHT: {n2(data.gross_weight_kg)} KGS</div>)
+  if (data.item_no) descLines.push(<div key="it">ITEM NO.: {data.item_no}</div>)
+  if (data.lc_number) descLines.push(<div key="lc">LC NO: {data.lc_number}</div>)
+  descLines.push(<div key="hs">HS CODE: {data.hs_code}</div>)
+  descLines.push(<div key="pr">PRODUCER: HUY ANH RUBBER COMPANY LIMITED</div>)
+  descLines.push(<div key="co">COUNTRY OF ORIGIN: {data.country_of_origin}</div>)
+  if (data.invoice_extra_lines) data.invoice_extra_lines.split('\n').filter((l) => l.trim()).forEach((l, i) => descLines.push(<div key={'ex' + i}>{l.trim()}</div>))
+  descLines.push(<div key="sp1" style={{ height: 8 }} />)
+  descLines.push(<div key="smh" style={{ fontWeight: 700 }}>SHIPPING MARK</div>)
+  if (data.shipping_marks) data.shipping_marks.split('\n').forEach((l, i) => descLines.push(<div key={'sm' + i}>{l}</div>))
+  if (data.po_number) descLines.push(<div key="po">PO NO: {data.po_number}</div>)
+  if (data.attn_contacts) { descLines.push(<div key="attn">Attn:</div>); data.attn_contacts.split('\n').filter((l) => l.trim()).forEach((l, i) => descLines.push(<div key={'at' + i}>{l.trim()}</div>)) }
 
   return (
-    <div className="doc-print-area" id="invoice-print">
+    <div className="doc-print-area" id="invoice-print" style={{ color: '#000', fontSize: 12.5 }}>
       <CompanyHeader />
 
-      <Title level={3} style={{ textAlign: 'center', marginBottom: 24 }}>
-        COMMERCIAL INVOICE
-      </Title>
-
-      <Row gutter={24} style={{ marginBottom: 16 }}>
-        <Col span={12}>
-          <Card size="small" style={{ height: '100%' }}>
-            <Text type="secondary">The Buyer:</Text>
-            <br />
-            <Text strong style={{ fontSize: 15 }}>{data.buyer_name || data.customer.name}</Text>
-            <br />
-            <Text>{data.buyer_address || data.customer.address}</Text>
-            <br />
-            <Text>{data.customer.country}</Text>
-            {data.consignee && (
-              <>
-                <Divider style={{ margin: '8px 0' }} />
-                <Text type="secondary">Consignee:</Text><br />
-                <Text strong>{data.consignee}</Text>
-                {data.consignee_address && <><br /><Text>{data.consignee_address}</Text></>}
-              </>
-            )}
-            {data.notify_party && (
-              <>
-                <Divider style={{ margin: '8px 0' }} />
-                <Text type="secondary">Notify Party:</Text><br />
-                <Text>{data.notify_party}</Text>
-                {data.notify_address && <><br /><Text>{data.notify_address}</Text></>}
-              </>
-            )}
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Descriptions bordered size="small" column={1}>
-            <Descriptions.Item label="Invoice No.">{data.invoice_code}</Descriptions.Item>
-            <Descriptions.Item label="Date">{data.invoice_date}</Descriptions.Item>
-            <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
-            {data.po_number && <Descriptions.Item label="PO No.">{data.po_number}</Descriptions.Item>}
-            <Descriptions.Item label="Incoterm">{data.incoterm}</Descriptions.Item>
-            <Descriptions.Item label="Port of Loading">{data.port_of_loading || 'TBD'}</Descriptions.Item>
-            <Descriptions.Item label="Port of Discharge">{data.port_of_destination || 'TBD'}</Descriptions.Item>
-            {data.vessel_name && (
-              <Descriptions.Item label="Vessel">
-                {data.vessel_name}{data.voyage_number ? ` / ${data.voyage_number}` : ''}
-              </Descriptions.Item>
-            )}
-            {data.etd && <Descriptions.Item label="ETD">{data.etd}</Descriptions.Item>}
-          </Descriptions>
-        </Col>
-      </Row>
-
-      {/* Item table */}
-      <Table
-        dataSource={[
-          {
-            key: '1',
-            description: `Natural Rubber ${data.grade?.replace(/_/g, ' ')}`,
-            quantity: `${data.quantity_tons} MT`,
-            unit_price: `${data.currency} ${fmtMoney(data.unit_price)}/MT`,
-            amount: `${data.currency} ${fmtMoney(data.subtotal)}`,
-          },
-        ]}
-        columns={[
-          { title: 'Description', dataIndex: 'description', key: 'description', width: '40%' },
-          { title: 'Quantity', dataIndex: 'quantity', key: 'quantity', align: 'center' },
-          { title: 'Unit Price', dataIndex: 'unit_price', key: 'unit_price', align: 'right' },
-          { title: 'Amount', dataIndex: 'amount', key: 'amount', align: 'right' },
-        ]}
-        pagination={false}
-        size="small"
-        bordered
-      />
-
-      {/* Totals — CIF: TOTAL (trị giá CIF) rồi TRỪ Freight/Insurance -> THE COST (khớp mẫu gốc) */}
-      <div style={{ width: 400, marginLeft: 'auto', marginTop: 16 }}>
-        <Row justify="space-between" style={{ padding: '4px 8px' }}>
-          <Col><Text strong style={{ fontSize: 16 }}>TOTAL:</Text></Col>
-          <Col><Text strong style={{ fontSize: 16 }}>{data.currency} {fmtMoney(data.total)}</Text></Col>
-        </Row>
-        {(data.freight > 0 || data.insurance > 0) && (
-          <>
-            {data.freight > 0 && (
-              <Row justify="space-between" style={{ padding: '4px 8px' }}>
-                <Col><Text>Freight Charge:</Text></Col>
-                <Col><Text>− {data.currency} {fmtMoney(data.freight)}</Text></Col>
-              </Row>
-            )}
-            {data.insurance > 0 && (
-              <Row justify="space-between" style={{ padding: '4px 8px' }}>
-                <Col><Text>Insurance:</Text></Col>
-                <Col><Text>− {data.currency} {fmtMoney(data.insurance)}</Text></Col>
-              </Row>
-            )}
-            <Divider style={{ margin: '4px 0' }} />
-            <Row justify="space-between" style={{ padding: '4px 8px' }}>
-              <Col><Text strong>THE COST:</Text></Col>
-              <Col><Text strong>{data.currency} {fmtMoney(data.the_cost)}</Text></Col>
-            </Row>
-          </>
-        )}
+      <Title level={3} style={{ textAlign: 'center', margin: '0 0 6px' }}>COMMERCIAL INVOICE</Title>
+      <div style={{ textAlign: 'right', marginBottom: 10 }}>
+        <div>No: {data.invoice_code}</div>
+        <div>Date: {fmtd(data.invoice_date)}</div>
       </div>
 
-      {/* Payment & Banking */}
-      <Divider />
+      <div style={{ marginBottom: 10, lineHeight: 1.5 }}>
+        <div><b>THE SELLER/THE BENEFICIARY: </b>HUY ANH RUBBER COMPANY LIMITED</div>
+        <div>ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM</div>
+        <div style={{ marginTop: 4 }}><b>THE BUYER/THE APPLICANT: </b>{data.buyer_name || data.customer.name}</div>
+        <div>ADDRESS: {data.buyer_address || data.customer.address}</div>
+      </div>
 
-      <Row gutter={24}>
-        <Col span={12}>
-          <Title level={5}>Payment Terms</Title>
-          <Paragraph>{data.payment_terms}</Paragraph>
-          {data.lc_number && <Paragraph>L/C Number: {data.lc_number}</Paragraph>}
-          {data.bl_number && <Paragraph>B/L Number: {data.bl_number}</Paragraph>}
-        </Col>
-        <Col span={12}>
-          <Title level={5}>Bank Details</Title>
-          <Paragraph>
-            Beneficiary: {data.bank_info.account_name}
-            <br />
-            Bank: {data.bank_info.name}
-            <br />
-            {data.bank_info.address && <>Bank Address: {data.bank_info.address}<br /></>}
-            Account: {data.bank_info.account}
-            <br />
-            SWIFT: {data.bank_info.swift}
-          </Paragraph>
-        </Col>
-      </Row>
+      {/* Bảng shipment 6 cột */}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>
+          {['CONTRACT NO', 'SHIPMENT DATE', 'VESSEL', 'PORT OF LOADING', 'BILL OF LADING NUMBER', 'PORT OF DISCHARGE'].map((h) => (
+            <th key={h} style={{ ...hcell, fontSize: 11 }}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody><tr style={{ textAlign: 'center' }}>
+          <td style={cell}>{data.order_code}</td>
+          <td style={cell}>{fmtd(data.shipment_date) || '—'}</td>
+          <td style={cell}>{`${data.vessel_name || ''}${data.voyage_number ? ' ' + data.voyage_number : ''}`.trim() || '—'}</td>
+          <td style={cell}>{data.port_of_loading || '—'}</td>
+          <td style={cell}>{data.bl_number || '—'}</td>
+          <td style={cell}>{pod || '—'}</td>
+        </tr></tbody>
+      </table>
 
-      {data.shipping_marks && (
-        <>
-          <Divider />
-          <Title level={5}>Shipping Marks</Title>
-          <Paragraph style={{ whiteSpace: 'pre-line' }}>{data.shipping_marks}</Paragraph>
-        </>
-      )}
+      {/* Bảng hàng lớn */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, tableLayout: 'fixed' }}>
+        <colgroup><col style={{ width: '52%' }} /><col style={{ width: '12%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /></colgroup>
+        <thead><tr>
+          <th style={hcell}>DESCRIPTION OF GOODS AND/OR SERVICE</th>
+          <th style={{ ...hcell, fontSize: 11 }}>QUANTITY OF GOODS (MT)</th>
+          <th style={{ ...hcell, fontSize: 11 }}>UNIT PRICE (USD/MT)<div style={{ fontWeight: 400, fontSize: 10 }}>{`${data.incoterm} ${pod}`.trim()}</div></th>
+          <th style={{ ...hcell, fontSize: 11 }}>AMOUNT (USD)</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td style={{ ...cell, verticalAlign: 'top', lineHeight: 1.45 }}>{descLines}</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{qtyFmt}</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{priceFmt}</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{n2(data.subtotal)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...cell, textAlign: 'center', fontWeight: 700 }}>TOTAL</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{qtyFmt}</td>
+            <td style={cell} />
+            <td style={{ ...cell, textAlign: 'center' }}>{n2(data.subtotal)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...cell, textAlign: 'center' }} colSpan={3}>FREIGHT CHARGES</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{n2(data.freight)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...cell, textAlign: 'center' }} colSpan={3}>INSURANCE</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{n2(data.insurance)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...cell, textAlign: 'center' }} colSpan={3}>FOB {data.port_of_loading || ''} (COST)</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{n2(data.the_cost)}</td>
+          </tr>
+          <tr>
+            <td style={cell}>SAY US DOLLARS:</td>
+            <td style={cell} colSpan={3}>{amountToWords(data.total)}</td>
+          </tr>
+          <tr>
+            <td style={cell}>PAYMENT TERM:</td>
+            <td style={cell} colSpan={3}>{data.payment_terms}</td>
+          </tr>
+        </tbody>
+      </table>
 
-      <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>Accountant</Text>
-        </div>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>General Director</Text>
-        </div>
+      {/* Bank + chữ ký */}
+      <div style={{ marginTop: 12, lineHeight: 1.5 }}>
+        <div style={{ fontWeight: 700 }}>BANK INFORMATION:</div>
+        <div>ACCOUNT NAME: {data.bank_info.account_name}</div>
+        <div>BANK NAME: {data.bank_info.name}</div>
+        <div>ACCOUNT NUMBER: {data.bank_info.account}</div>
+        {data.bank_info.address && <div>BANK ADDRESS: {data.bank_info.address}</div>}
+        <div>SWIFT CODE: {data.bank_info.swift}</div>
+      </div>
+
+      <div style={{ marginTop: 40, textAlign: 'right' }}>
+        <div style={{ fontWeight: 700 }}>HUY ANH RUBBER COMPANY LIMITED</div>
+        <div style={{ height: 64 }} />
+        <div style={{ fontWeight: 700 }}>PHÓ GIÁM ĐỐC</div>
+        <div style={{ fontWeight: 700 }}>Lê Xuân Hồng Trung</div>
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>

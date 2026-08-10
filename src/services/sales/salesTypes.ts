@@ -104,6 +104,11 @@ export interface SalesOrder {
   invoice_no?: string
   invoice_date?: string
   shipping_marks?: string   // shipping mark riêng đơn (ghi đè hồ sơ khách)
+  // Commercial Invoice — khớp mẫu gốc (ô mô tả hàng); trống → mặc định hồ sơ khách
+  proforma_date?: string        // "AS PER PROFORMA INVOICE ... DATED <...>"
+  item_no?: string              // ITEM NO. (mã hàng của khách)
+  packing_desc?: string         // kiểu đóng gói (dòng PACKING)
+  invoice_extra_lines?: string  // dòng mô tả riêng theo khách (mỗi dòng 1 mục)
 
   // Chỉ tiêu kỹ thuật
   drc_min?: number

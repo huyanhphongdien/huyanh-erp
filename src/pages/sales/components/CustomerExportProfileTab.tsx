@@ -50,6 +50,9 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
             attn_contacts: profile.attn_contacts,
             preferred_bank_id: profile.preferred_bank_id,
             default_payment_term: profile.default_payment_term,
+            default_item_no: profile.default_item_no,
+            default_packing_desc: profile.default_packing_desc,
+            default_invoice_extra_lines: profile.default_invoice_extra_lines,
             special_instructions: profile.special_instructions,
             default_payment_method: profile.default_payment_method || 'lc',
             default_counterparty_bank: profile.default_counterparty_bank,
@@ -163,6 +166,17 @@ export default function CustomerExportProfileTab({ customerId }: { customerId: s
               </Form.Item>
             </Col>
             <Col xs={24} md={12}><Form.Item label="Điều khoản thanh toán mặc định" name="default_payment_term"><Input placeholder="VD: LC 90 days from B/L date" /></Form.Item></Col>
+          </Row>
+        </Card>
+
+        <Card size="small" title="Mặc định Commercial Invoice (ô mô tả hàng)" style={{ marginBottom: 12 }}>
+          <div style={{ background: '#e9f1fb', border: '1px solid #b9d3f2', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#1257a8' }}>
+            📌 Giá trị ổn định theo khách → tự điền vào ô mô tả invoice cho mọi đơn. Đơn nào khác thì ghi đè ở tab "Chứng từ" của đơn.
+          </div>
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item label="ITEM NO. (mã hàng của khách)" name="default_item_no"><Input placeholder="VD: RRB01021" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item label="Kiểu đóng gói (PACKING)" name="default_packing_desc"><Input placeholder="VD: 35 KG/BALE. LOOSE BALES." /></Form.Item></Col>
+            <Col xs={24}><Form.Item label="Dòng mô tả riêng trong invoice (mỗi dòng 1 mục)" name="default_invoice_extra_lines"><TextArea autoSize={{ minRows: 2, maxRows: 5 }} placeholder="VD: BANK NAME: COMMERCIAL BANK OF CEYLON PLC" /></Form.Item></Col>
           </Row>
         </Card>
 

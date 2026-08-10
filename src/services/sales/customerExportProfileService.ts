@@ -46,6 +46,10 @@ export interface CustomerExportProfile {
   default_negotiate_pct?: number | null
   default_interest_rate?: number | null
   default_term_days?: number | null
+  // Mặc định Commercial Invoice (ổn định theo khách → tự điền cho mọi đơn)
+  default_item_no?: string | null              // ITEM NO. mặc định
+  default_packing_desc?: string | null         // kiểu đóng gói mặc định (PACKING)
+  default_invoice_extra_lines?: string | null  // dòng mô tả riêng mặc định
 }
 
 // Danh mục chứng từ chuẩn (dựng checklist). Khớp bộ thật + sheet "kHÁCH YÊU CẦU".

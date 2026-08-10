@@ -8,7 +8,7 @@
 
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  AlignmentType, BorderStyle, WidthType, ImageRun, VerticalAlign,
+  AlignmentType, BorderStyle, WidthType, ImageRun, VerticalAlign, TableLayoutType, type TableVerticalAlign,
 } from 'docx'
 import { saveAs } from 'file-saver'
 import { amountToWords } from './contractGeneratorService'
@@ -65,6 +65,25 @@ function gridTable(headers: string[], rows: string[][], widths?: number[]) {
   }))
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: TABLE_BORDERS, rows: [headRow, ...bodyRows] })
 }
+// Cell linh hoạt: nhiều paragraph, căn dọc, gộp cột — để dựng bảng invoice khớp mẫu
+function cellBox(children: Paragraph[], o: { width?: number; valign?: TableVerticalAlign; columnSpan?: number } = {}) {
+  return new TableCell({
+    children,
+    width: o.width ? { size: o.width, type: WidthType.PERCENTAGE } : undefined,
+    columnSpan: o.columnSpan,
+    verticalAlign: o.valign,
+    margins: { top: 40, bottom: 40, left: 70, right: 70 },
+    borders: CELL_BORDERS,
+  })
+}
+// Ngày -> DD.MM.YYYY (dòng "DATED ..." trong Commercial Invoice)
+const fmtDot = (s: string | null | undefined): string => {
+  if (!s) return ''
+  const dt = new Date(s)
+  if (isNaN(dt.getTime())) return s
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(dt.getDate())}.${p(dt.getMonth() + 1)}.${dt.getFullYear()}`
+}
 // Logo HUYANH Natural Rubber (khớp mẫu chứng từ thật) — nhúng từ src/assets/logo.png
 function logoImage(width = 168): ImageRun {
   const height = Math.round((width * LOGO_H) / LOGO_W)   // giữ tỉ lệ 300×96
@@ -110,74 +129,112 @@ export async function saveDocx(doc: Document, filename: string) {
   saveAs(blob, filename.toLowerCase().endsWith('.docx') ? filename : `${filename}.docx`)
 }
 
-// ── COMMERCIAL INVOICE ──
+// ── COMMERCIAL INVOICE ── (khớp HỆT sheet INV HA20260080.xlsm: 1 bảng viền lớn)
 export function invoiceDoc(d: InvoiceData): Document {
+  const CENTER = AlignmentType.CENTER, RIGHT = AlignmentType.RIGHT, VC = VerticalAlign.CENTER
+  const gradeLabel = (d.grade || '').replace(/_/g, ' ')
+  const qtyFmt = d.quantity_tons.toFixed(2)
+  const priceFmt = Number.isInteger(d.unit_price) ? String(d.unit_price) : d.unit_price.toFixed(2)
+  const n2 = (v: number) => (v || 0).toFixed(2)
+  const pod = d.port_of_destination || ''
+  const cifLine = `${d.incoterm} ${pod}`.trim()
+
+  // Ô mô tả hàng (cột trái, cao) — từng dòng khớp thứ tự sheet INV
+  const desc: Paragraph[] = []
+  const dl = (s: string, o: PO = {}) => desc.push(P(s, { after: 0, size: 9.5, ...o }))
+  dl(`${qtyFmt.replace(/\.00$/, '')} MT -  NATURAL RUBBER ${gradeLabel}.`, { bold: true })
+  if (d.proforma_no) dl(`AS PER PROFORMA INVOICE NO.${d.proforma_no}`)
+  if (d.proforma_date) dl(`DATED ${fmtDot(d.proforma_date)}`)
+  if (d.packing_desc) dl(`PACKING: ${d.packing_desc}`)
+  if (d.total_packing) dl(`TOTAL PACKING: ${d.total_packing}`)
+  dl(`NET WEIGHT: ${d.net_weight_kg.toFixed(2)} KGS`)
+  dl(`GROSS WEIGHT: ${d.gross_weight_kg.toFixed(2)} KGS`)
+  if (d.item_no) dl(`ITEM NO.: ${d.item_no}`)
+  if (d.lc_number) dl(`LC NO: ${d.lc_number}`)
+  dl(`HS CODE: ${d.hs_code}`)
+  dl('PRODUCER: HUY ANH RUBBER COMPANY LIMITED')
+  dl(`COUNTRY OF ORIGIN: ${d.country_of_origin}`)
+  if (d.invoice_extra_lines) d.invoice_extra_lines.split('\n').forEach((l) => l.trim() && dl(l.trim()))
+  dl('')
+  dl('SHIPPING MARK', { bold: true })
+  if (d.shipping_marks) d.shipping_marks.split('\n').forEach((l) => dl(l))
+  if (d.po_number) dl(`PO NO: ${d.po_number}`)
+  if (d.attn_contacts) { dl('Attn:'); d.attn_contacts.split('\n').forEach((l) => l.trim() && dl(l.trim())) }
+
+  // Bảng hàng: header + body + TOTAL/FREIGHT/INSURANCE/FOB(COST) + SAY + PAYMENT TERM
+  const goods = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE }, borders: TABLE_BORDERS,
+    layout: TableLayoutType.FIXED, columnWidths: [5255, 1213, 1819, 1819],
+    rows: [
+      new TableRow({ tableHeader: true, children: [
+        cellBox([P('DESCRIPTION OF GOODS AND/OR SERVICE', { bold: true, align: CENTER, size: 10, after: 0 })], { valign: VC }),
+        cellBox([P('QUANTITY OF GOODS (MT)', { bold: true, align: CENTER, size: 8.5, after: 0 })], { valign: VC }),
+        cellBox([P('UNIT PRICE (USD/MT)', { bold: true, align: CENTER, size: 8.5, after: 0 }), P(cifLine, { align: CENTER, size: 8, after: 0 })], { valign: VC }),
+        cellBox([P('AMOUNT (USD)', { bold: true, align: CENTER, size: 8.5, after: 0 })], { valign: VC }),
+      ] }),
+      new TableRow({ children: [
+        cellBox(desc),
+        cellBox([P(qtyFmt, { align: CENTER, after: 0 })], { valign: VC }),
+        cellBox([P(priceFmt, { align: CENTER, after: 0 })], { valign: VC }),
+        cellBox([P(n2(d.subtotal), { align: CENTER, after: 0 })], { valign: VC }),
+      ] }),
+      new TableRow({ children: [
+        cellBox([P('TOTAL', { bold: true, align: CENTER, after: 0 })]),
+        cellBox([P(qtyFmt, { align: CENTER, after: 0 })]),
+        cellBox([P('', { after: 0 })]),
+        cellBox([P(n2(d.subtotal), { align: CENTER, after: 0 })]),
+      ] }),
+      new TableRow({ children: [
+        cellBox([P('FREIGHT CHARGES', { align: CENTER, after: 0 })], { columnSpan: 3 }),
+        cellBox([P(n2(d.freight), { align: CENTER, after: 0 })]),
+      ] }),
+      new TableRow({ children: [
+        cellBox([P('INSURANCE', { align: CENTER, after: 0 })], { columnSpan: 3 }),
+        cellBox([P(n2(d.insurance), { align: CENTER, after: 0 })]),
+      ] }),
+      new TableRow({ children: [
+        cellBox([P(`FOB ${d.port_of_loading || ''} (COST)`, { align: CENTER, after: 0 })], { columnSpan: 3 }),
+        cellBox([P(n2(d.the_cost), { align: CENTER, after: 0 })]),
+      ] }),
+      new TableRow({ children: [
+        cellBox([P('SAY US DOLLARS:', { after: 0 })]),
+        cellBox([P(amountToWords(d.total), { after: 0 })], { columnSpan: 3 }),
+      ] }),
+      new TableRow({ children: [
+        cellBox([P('PAYMENT TERM:', { after: 0 })]),
+        cellBox([P(d.payment_terms || '', { after: 0 })], { columnSpan: 3 }),
+      ] }),
+    ],
+  })
+
   const kids: (Paragraph | Table)[] = [
     ...letterhead(),
-    P('COMMERCIAL INVOICE', { align: AlignmentType.CENTER, bold: true, size: 15, after: 20 }),
-    P(`No: ${d.invoice_code}          Date: ${fmtD(d.invoice_date)}`, { align: AlignmentType.CENTER, after: 100 }),
-    P([R('THE SELLER: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 0 }),
-    P('ADDRESS: Khe Ma, Phong Dien Ward, Hue City, Viet Nam', { after: 0 }),
-    P('TEL: 054.3774994   FAX: 054.3774994', { after: 60 }),
-    P([R('THE BUYER: ', { bold: true }), R(d.buyer_name || d.customer.name)], { after: 0 }),
-    P(`ADDRESS: ${d.buyer_address || d.customer.address}`, { after: 60 }),
-  ]
-  if (d.consignee) kids.push(P([R('CONSIGNEE: ', { bold: true }), R(d.consignee.trim())], { after: 0 }))
-  if (d.notify_party) kids.push(P([R('NOTIFY: ', { bold: true }), R(d.notify_party.trim())], { after: 60 }))
-  kids.push(
+    P('COMMERCIAL INVOICE', { align: CENTER, bold: true, size: 15, after: 20 }),
+    P(`No: ${d.invoice_code}`, { align: RIGHT, after: 0 }),
+    P(`Date: ${fmtD(d.invoice_date)}`, { align: RIGHT, after: 80 }),
+    P([R('THE SELLER/THE BENEFICIARY: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 0 }),
+    P('ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM', { after: 40 }),
+    P([R('THE BUYER/THE APPLICANT: ', { bold: true }), R(d.buyer_name || d.customer.name)], { after: 0 }),
+    P(`ADDRESS: ${d.buyer_address || d.customer.address}`, { after: 80 }),
     gridTable(
-      ['CONTRACT NO', 'INCOTERM', 'PORT OF LOADING', 'PORT OF DISCHARGE', 'PO NO.'],
-      [[d.order_code, d.incoterm, d.port_of_loading || '—', d.port_of_destination || '—', d.po_number || '—']],
-      [22, 14, 24, 24, 16],
+      ['CONTRACT NO', 'SHIPMENT DATE', 'VESSEL', 'PORT OF LOADING', 'BILL OF LADING NUMBER', 'PORT OF DISCHARGE'],
+      [[d.order_code, fmtD(d.shipment_date) || '—', `${d.vessel_name || ''}${d.voyage_number ? ' ' + d.voyage_number : ''}`.trim() || '—', d.port_of_loading || '—', d.bl_number || '—', pod || '—']],
+      [15, 14, 19, 18, 18, 16],
     ),
-  )
-  if (d.vessel_name || d.etd || d.bl_number) {
-    const parts: TextRun[] = []
-    if (d.vessel_name) parts.push(R('VESSEL: ', { bold: true }), R(`${d.vessel_name}${d.voyage_number ? ' / ' + d.voyage_number : ''}    `))
-    if (d.etd) parts.push(R('ETD: ', { bold: true }), R(`${fmtD(d.etd)}    `))
-    if (d.bl_number) parts.push(R('B/L NO: ', { bold: true }), R(`${d.bl_number}${d.bl_date ? '  DATED ' + fmtD(d.bl_date) : ''}`))
-    kids.push(P(parts, { before: 40, after: 40 }))
-  }
-  kids.push(
-    P('', { after: 40 }),
-    gridTable(
-      ['DESCRIPTION OF GOODS', 'QUANTITY (MT)', `UNIT PRICE (${d.currency}/MT)`, 'AMOUNT (USD)'],
-      [[`${d.quantity_tons} MT - NATURAL RUBBER ${(d.grade || '').replace(/_/g, ' ')}`, `${d.quantity_tons}`, money(d.unit_price), money(d.subtotal)]],
-      [46, 14, 20, 20],
-    ),
-    P(`${d.incoterm} ${d.port_of_destination || ''}`.trim(), { after: 40, size: 10.5 }),
-    P([R('NET WEIGHT: ', { bold: true }), R(`${d.net_weight_kg.toFixed(2)} KGS`)], { after: 0 }),
-    P([R('GROSS WEIGHT: ', { bold: true }), R(`${d.gross_weight_kg.toFixed(2)} KGS`)], { after: 0 }),
-    P([R('HS CODE: ', { bold: true }), R(d.hs_code), R('        COUNTRY OF ORIGIN: ', { bold: true }), R(d.country_of_origin)], { after: 0 }),
-    P([R('PRODUCER: ', { bold: true }), R('HUY ANH RUBBER COMPANY LIMITED')], { after: 60 }),
-  )
-  kids.push(P([R('TOTAL: ', { bold: true }), R(`USD ${money(d.total)}`, { bold: true })], { after: 0 }))
-  // CIF: cước + bảo hiểm TRỪ ra "THE COST" (số Hối phiếu draw) — khớp mẫu gốc
-  if (d.freight > 0 || d.insurance > 0) {
-    if (d.freight > 0) kids.push(P(`FREIGHT CHARGE: USD ${money(d.freight)}`, { after: 0 }))
-    if (d.insurance > 0) kids.push(P(`INSURANCE: USD ${money(d.insurance)}`, { after: 0 }))
-    kids.push(P([R('THE COST: ', { bold: true }), R(`USD ${money(d.the_cost)}`, { bold: true })], { after: 0 }))
-  }
-  kids.push(
-    P(`PAYMENT TERM: ${d.payment_terms || ''}`, { after: 0 }),
-    P(`SAY US DOLLARS: ${amountToWords(d.total).toUpperCase()}`, { italics: true, after: 60 }),
-  )
-  if (d.lc_number) kids.push(P(`L/C NUMBER: ${d.lc_number}`, { after: 0 }))
-  if (d.shipping_marks) {
-    kids.push(P('SHIPPING MARK:', { bold: true, after: 0 }))
-    d.shipping_marks.split('\n').forEach((l) => kids.push(P(l, { after: 0, size: 10.5 })))
-  }
-  kids.push(
+    P('', { after: 20 }),
+    goods,
     P('', { after: 40 }),
     P('BANK INFORMATION:', { bold: true, after: 0 }),
     P(`ACCOUNT NAME: ${d.bank_info.account_name}`, { after: 0 }),
     P(`BANK NAME: ${d.bank_info.name}`, { after: 0 }),
+    P(`ACCOUNT NUMBER: ${d.bank_info.account}`, { after: 0 }),
     ...(d.bank_info.address ? [P(`BANK ADDRESS: ${d.bank_info.address}`, { after: 0 })] : []),
-    P(`ACCOUNT NUMBER: ${d.bank_info.account}     SWIFT CODE: ${d.bank_info.swift}`, { after: 200 }),
-    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
-    P('', { after: 300 }),
-    P('GENERAL DIRECTOR', { align: AlignmentType.RIGHT, bold: true }),
-  )
+    P(`SWIFT CODE: ${d.bank_info.swift}`, { after: 220 }),
+    P('HUY ANH RUBBER COMPANY LIMITED', { align: RIGHT, bold: true, after: 0 }),
+    P('', { after: 280 }),
+    P('PHÓ GIÁM ĐỐC', { align: RIGHT, bold: true, after: 0 }),
+    P('Lê Xuân Hồng Trung', { align: RIGHT, bold: true }),
+  ]
   return makeDoc(kids)
 }
 

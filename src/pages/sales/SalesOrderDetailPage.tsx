@@ -1512,6 +1512,24 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             </Descriptions>
           </Card>
 
+          <Card title="Chi tiết Commercial Invoice (khớp mẫu)" size="small" style={{ marginBottom: 16 }}>
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Ngày Proforma (PI)">
+                {canEdit ? <DatePicker defaultValue={order.proforma_date ? dayjs(order.proforma_date) : undefined} onChange={d => handleShippingUpdate('proforma_date', d?.format('YYYY-MM-DD') || null)} format="DD/MM/YYYY" style={{ width: '100%' }} /> : formatDate(order.proforma_date)}
+              </Descriptions.Item>
+              <Descriptions.Item label="ITEM NO. (mã hàng khách)">
+                {canEdit ? <Input defaultValue={order.item_no || ''} onBlur={e => handleShippingUpdate('item_no', e.target.value || null)} placeholder="Trống → mặc định hồ sơ khách. VD: RRB01021" /> : (order.item_no || <span style={{ color: '#aaa' }}>(mặc định hồ sơ khách)</span>)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Kiểu đóng gói (PACKING)">
+                {canEdit ? <Input defaultValue={order.packing_desc || ''} onBlur={e => handleShippingUpdate('packing_desc', e.target.value || null)} placeholder="Trống → hồ sơ khách. VD: 35 KG/BALE. LOOSE BALES." /> : (order.packing_desc || <span style={{ color: '#aaa' }}>(mặc định hồ sơ khách)</span>)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Dòng mô tả riêng">
+                {canEdit ? <Input.TextArea defaultValue={order.invoice_extra_lines || ''} rows={2} onBlur={e => handleShippingUpdate('invoice_extra_lines', e.target.value || null)} placeholder="Mỗi dòng 1 mục. VD: BANK NAME: COMMERCIAL BANK OF CEYLON PLC" /> : (order.invoice_extra_lines || <span style={{ color: '#aaa' }}>(mặc định hồ sơ khách)</span>)}
+              </Descriptions.Item>
+            </Descriptions>
+            <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>Số bao/cont & TOTAL PACKING tự suy từ tab Đóng gói · Proforma No tự sinh = &lt;mã đơn&gt;/PR.CI</div>
+          </Card>
+
           <Card title="Chiết khấu Ngân hàng" size="small">
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="NH chiết khấu">

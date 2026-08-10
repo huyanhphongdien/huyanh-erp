@@ -85,7 +85,7 @@
   <div class="co">Công ty TNHH Cao su Huy Anh · Huy Anh Rubber</div>
   <h1>Hướng dẫn nhập liệu để sinh BỘ CHỨNG TỪ XUẤT KHẨU đầy đủ</h1>
   <div class="sub">Ai nhập · Nhập gì · Nhập ở đâu · Lên chứng từ nào</div>
-  <div class="meta">Phiên bản 07/08/2026 · Áp dụng cho Module Đơn hàng bán → Bộ chứng từ</div>
+  <div class="meta">Phiên bản 13/08/2026 · chứng từ khớp HỆT mẫu gốc · Module Đơn hàng bán → Bộ chứng từ</div>
 </header>
 
 <div class="wrap">
@@ -112,6 +112,22 @@
     <div class="fstep"><div class="dot" style="background:#555">5</div><div class="fl">Đính kèm<br>file ngoài</div></div>
   </div>
 
+  <!-- ============ CẬP NHẬT 13/08 ============ -->
+  <h2>🆕 Cập nhật 13/08/2026 — chứng từ tự sinh khớp HỆT mẫu gốc</h2>
+  <div class="lead" style="background:#f6ffed;border-color:#b7eb8f">
+    7 chứng từ đã dựng lại đúng <b>form / khung / chữ ký</b> theo mẫu Huy Anh đang dùng (đối chiếu bản Word thật). Riêng <b>Đơn ĐNCK dùng ĐÚNG FORM VIETINBANK</b> (điền template, giữ nguyên định dạng ngân hàng). Để bộ <b>đầy đủ</b>, cần nhập THÊM vài field mới:
+  </div>
+  <table>
+    <thead><tr><th style="width:24%">Chứng từ</th><th style="width:46%">Field MỚI cần nhập</th><th>Nhập ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td class="b">Commercial Invoice</td><td>Ngày Proforma (PI) · ITEM NO. (mã hàng khách) · Kiểu đóng gói (PACKING) · Dòng mô tả riêng</td><td>tab <b>Vận chuyển</b> (ghi đè đơn) / <b>Hồ sơ khách</b> (mặc định)</td></tr>
+      <tr><td class="b">Commercial Invoice — CIF</td><td><span style="color:var(--red)">Cước + Bảo hiểm: BẮT BUỘC</span> với đơn CIF (kẻo FOB(COST) = CIF, sai)</td><td>tab <b>Vận chuyển</b></td></tr>
+      <tr><td class="b">Weight List</td><td>Số <b>PALLET</b> / container</td><td>tab <b>Đóng gói</b> → bảng container → cột "Pallet"</td></tr>
+      <tr><td class="b">Đơn ĐNCK Vietinbank (L/C)</td><td>STT đơn · hãng tàu (tên đầy đủ) · NH nhận CT (địa chỉ) · số tiền bằng chữ · giá trị nghĩa vụ bảo đảm (VNĐ)</td><td>tab <b>Đơn chiết khấu</b> → panel "Đơn ĐNCK Vietinbank" → nút <b>"Tải đơn ĐNCK Vietinbank (.docx)"</b></td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>Đơn ĐNCK Vietinbank</b> = ĐIỀN FORM CHUẨN của ngân hàng, KHÔNG dựng lại — giữ nguyên toàn bộ văn bản/định dạng. Số L/C, ngày, NH phát hành, giá trị đòi tiền (=trị giá CIF), % + số tiền + kỳ hạn thương lượng… tự lấy từ đơn; field không có trong hệ thì điền ở panel.</div>
+
   <!-- ============ BẢN ĐỒ NHANH ============ -->
   <h2>Bản đồ nhanh — mỗi thứ nhập ở đâu</h2>
   <table>
@@ -121,9 +137,9 @@
         <td>Khách → tab <b>"Hồ sơ chứng từ"</b> <span style="color:var(--red)">(KHÁC nút "Sửa" — nút Sửa chỉ có thông tin chung)</span></td></tr>
       <tr><td class="b">PO# · Số hợp đồng · Grade · Số lượng · Đơn giá</td>
         <td>Đơn hàng → tab <b>"Hợp đồng"</b> → nút <b>Sửa</b> <span class="opt">(tab "Thông tin" chỉ để xem)</span></td></tr>
-      <tr><td class="b">Vessel · Cảng (POL/POD) · ETD · B/L số+ngày · Cước/Bảo hiểm · Số hóa đơn</td>
+      <tr><td class="b">Vessel · Cảng (POL/POD) · ETD · B/L số+ngày · Cước/Bảo hiểm · Số hóa đơn · Ngày Proforma · ITEM NO · PACKING</td>
         <td>Đơn hàng → tab <b>"Vận chuyển"</b> → nút <b>Sửa</b></td></tr>
-      <tr><td class="b">Tare · Gross từng container</td>
+      <tr><td class="b">Tare · Gross · <b>Pallet</b> từng container</td>
         <td>Đơn hàng → <b>Đóng gói</b> (bảng container)</td></tr>
       <tr><td class="b">Phương thức (L/C · D/P · D/A) · NH phát hành/nhờ thu · Số L/C · Kỳ hạn · Chiết khấu</td>
         <td>Đơn hàng → tab <b>"Chứng từ"</b> → "Mở trang Sinh chứng từ" → tab <b>"Đơn chiết khấu"</b></td></tr>

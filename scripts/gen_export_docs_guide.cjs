@@ -55,17 +55,27 @@ function guideDoc() {
   k.push(
     P('CÔNG TY TNHH CAO SU HUY ANH', { align: AlignmentType.CENTER, size: 10.5, color: MUTED, after: 20 }),
     P('HƯỚNG DẪN NHẬP LIỆU ĐỂ SINH BỘ CHỨNG TỪ XUẤT KHẨU ĐẦY ĐỦ', { align: AlignmentType.CENTER, b: true, size: 15, after: 20 }),
-    P('Ai nhập · Nhập gì · Nhập ở đâu · Lên chứng từ nào   —   Phiên bản 07/08/2026', { align: AlignmentType.CENTER, i: true, size: 10, color: MUTED, after: 160 }),
-    P([R('1 bộ chứng từ đầy đủ', { b: true }), R(' = 7 chứng từ hệ TỰ SINH (Commercial Invoice · Packing List · Weight List · Hối phiếu · Đơn chiết khấu [L/C: BM03 · D/P: BM08] · Beneficiary\'s Certificate · Non-Wood Certificate) + các file ĐÍNH KÈM (COA · B/L · C/O · Bảo hiểm · Phyto · Fumigation · LC copy). Hệ tự điền đúng khi 5 khâu dưới nhập đủ. Nguyên tắc vàng: HỒ SƠ CHỨNG TỪ KHÁCH nhập 1 lần dùng mãi.')]),
+    P('Ai nhập · Nhập gì · Nhập ở đâu · Lên chứng từ nào   —   Phiên bản 13/08/2026 (chứng từ khớp HỆT mẫu gốc)', { align: AlignmentType.CENTER, i: true, size: 10, color: MUTED, after: 160 }),
+    P([R('1 bộ chứng từ đầy đủ', { b: true }), R(' = 7 chứng từ hệ TỰ SINH (Commercial Invoice · Packing List · Weight List · Hối phiếu · Đơn chiết khấu [L/C: Đơn ĐNCK Vietinbank · D/P: BM08] · Beneficiary\'s Certificate · Non-Wood Certificate) + các file ĐÍNH KÈM (COA · B/L · C/O · Bảo hiểm · Phyto · Fumigation · LC copy). Hệ tự điền đúng khi 5 khâu dưới nhập đủ. Nguyên tắc vàng: HỒ SƠ CHỨNG TỪ KHÁCH nhập 1 lần dùng mãi.')]),
     P('LUỒNG: (0) Hồ sơ khách → (1) Sale tạo đơn → (2) SX/Kho đóng gói → (3) Logistics vận chuyển → (4) Kế toán chiết khấu L/C → (5) Đính kèm file ngoài.', { b: true, color: BLUE, after: 160 }),
   )
+
+  k.push(H2('CẬP NHẬT 13/08/2026 — chứng từ tự sinh KHỚP HỆT mẫu gốc + field cần nhập thêm'))
+  k.push(P('7 chứng từ đã dựng lại đúng form/khung/chữ ký theo mẫu Huy Anh đang dùng (đối chiếu bản Word thật). Riêng Đơn ĐNCK dùng ĐÚNG FORM VIETINBANK (điền template, giữ nguyên định dạng ngân hàng). Để bộ ĐẦY ĐỦ, cần nhập THÊM vài field mới:', { after: 60 }))
+  k.push(table(['Chứng từ', 'Field MỚI cần nhập', 'Nhập ở đâu'], [
+    ['Commercial Invoice', 'Ngày Proforma (PI) · ITEM NO. (mã hàng khách) · Kiểu đóng gói (PACKING) · Dòng mô tả riêng', 'tab Vận chuyển (ghi đè đơn) / Hồ sơ khách (mặc định)'],
+    ['Commercial Invoice — CIF', 'Cước + Bảo hiểm: BẮT BUỘC với đơn CIF (kẻo FOB(COST) = CIF, sai)', 'tab Vận chuyển'],
+    ['Weight List', 'Số PALLET / container', 'tab Đóng gói → bảng container → cột "Pallet"'],
+    ['Đơn ĐNCK Vietinbank (L/C)', 'STT đơn · hãng tàu (tên đầy đủ) · NH nhận CT (địa chỉ) · số tiền bằng chữ · giá trị nghĩa vụ bảo đảm (VNĐ)', 'tab Đơn chiết khấu → panel "Đơn ĐNCK Vietinbank" → nút "Tải đơn ĐNCK Vietinbank (.docx)"'],
+  ], [24, 46, 30]))
+  k.push(P([R('Đơn ĐNCK Vietinbank', { b: true }), R(' = ĐIỀN FORM CHUẨN của ngân hàng, KHÔNG dựng lại — giữ nguyên toàn bộ văn bản/định dạng. Số L/C, ngày, NH phát hành, giá trị đòi tiền (=trị giá CIF), % + số tiền + kỳ hạn thương lượng… tự lấy từ đơn; field không có trong hệ thì điền ở panel.', { i: true })], { before: 20, after: 120 }))
 
   k.push(H2('BẢN ĐỒ NHANH — mỗi thứ nhập ở đâu'))
   k.push(table(['Cần nhập', 'Vào đâu'], [
     ['Buyer · Consignee · Notify · Shipping marks · Ngân hàng', 'Khách → tab "Hồ sơ chứng từ" (KHÁC nút "Sửa" — nút Sửa chỉ info chung)'],
     ['PO# · Số HĐ · Grade · Số lượng · Đơn giá', 'Đơn → tab "Hợp đồng" → nút Sửa (tab "Thông tin" chỉ để xem)'],
-    ['Vessel · Cảng · ETD · B/L số+ngày · Cước/BH · Số hóa đơn', 'Đơn → tab "Vận chuyển" → nút Sửa'],
-    ['Tare · Gross từng container', 'Đơn → Đóng gói (bảng container)'],
+    ['Vessel · Cảng · ETD · B/L số+ngày · Cước/BH · Số hóa đơn · Ngày Proforma · ITEM NO · PACKING', 'Đơn → tab "Vận chuyển" → nút Sửa'],
+    ['Tare · Gross · Pallet từng container', 'Đơn → Đóng gói (bảng container)'],
     ['Phương thức (L/C·D/P·D/A) · NH phát hành/nhờ thu · Số L/C · Kỳ hạn · Chiết khấu', 'Đơn → tab "Chứng từ" → Mở trang Sinh chứng từ → Đơn chiết khấu'],
     ['Upload COA · B/L · C/O · Bảo hiểm · Phyto · LC copy', 'Đơn → tab "Chứng từ" → mục Checklist chứng từ'],
   ], [46, 54]))
@@ -117,6 +127,7 @@ function guideDoc() {
         ['Net (kg) — cao su thuần', 'Bắt buộc', 'PKL, WL, Invoice'],
         ['Bì/Tare (kg) — bì container  [MỚI]', 'Bắt buộc', 'WL'],
         ['Gross (kg) — tổng cân tại trạm  [MỚI]', 'Bắt buộc', 'PKL, WL'],
+        ['Số PALLET / container  [MỚI]', 'Nếu làm WL', 'Weight List (cột PALLET)'],
         ['Lô (lot) · Hạn giao', 'Nếu chia lô', 'theo dõi nội bộ'],
       ],
       note: 'Trước chỉ nhập Net → WL phải ước lượng bì = Net×1.02. Nay có 2 cột Tare + Gross, nhập số cân thật. COA lấy từ LAB (đính kèm bước 5).' },
@@ -130,8 +141,12 @@ function guideDoc() {
         ['Cước · Phí bảo hiểm (USD)  [MỚI]', 'Chỉ khi CFR/CIF', 'Invoice'],
         ['Số hóa đơn · Ngày hóa đơn  [MỚI]', 'Trống → tự sinh', 'Invoice, Hối phiếu'],
         ['Shipping mark (riêng đơn này)  [MỚI]', 'Trống → dùng hồ sơ', 'Invoice, PKL — chỉ nhập nếu đơn khác hồ sơ (grade/số HĐ/lô)'],
+        ['Ngày Proforma (PI)  [MỚI]', 'Nên có', 'Invoice — dòng "AS PER PROFORMA … DATED …"'],
+        ['ITEM NO. (mã hàng khách)  [MỚI]', 'Nếu khách yêu cầu', 'Invoice — trống thì lấy mặc định hồ sơ khách'],
+        ['Kiểu đóng gói / PACKING  [MỚI]', 'Nên có', 'Invoice — vd "35 KG/BALE. LOOSE BALES."; số bao/cont + TOTAL PACKING tự suy'],
+        ['Dòng mô tả riêng (BOI/BANK NAME…)  [MỚI]', 'Nếu L/C yêu cầu', 'Invoice — mỗi dòng 1 mục'],
       ],
-      note: 'CIF: NÊN NHẬP Cước & Bảo hiểm — đơn giá đã là CIF nên cước/BH TRỪ khỏi TOTAL để ra "THE COST" (số Hối phiếu draw), khớp mẫu gốc. FOB thì để trống. Số hóa đơn trống → INV-<mã đơn>; ngày trống → hôm nay.' },
+      note: 'CIF: BẮT BUỘC NHẬP Cước & Bảo hiểm — đơn giá đã là CIF nên cước/BH TRỪ khỏi TOTAL để ra FOB(COST) (số Hối phiếu draw), khớp mẫu gốc; CHƯA nhập thì FOB(COST) = CIF (sai). FOB thì để trống. Số hóa đơn trống → INV-<mã đơn>; ngày trống → hôm nay. Card "Chi tiết Commercial Invoice" ở tab Vận chuyển chứa Proforma/ITEM NO/PACKING/dòng mô tả riêng.' },
     { n: '4', dept: 'Kế toán', title: 'Chiết khấu — L/C hoặc D/P (nhờ thu)',
       where: 'Chi tiết đơn → tab "Chứng từ" → "Mở trang Sinh chứng từ" → tab "Đơn chiết khấu"',
       rows: [
@@ -142,7 +157,7 @@ function guideDoc() {
         ['Tỷ lệ % · Lãi suất · Thời hạn · Ngày nộp', 'Nếu chiết khấu', 'Đơn chiết khấu'],
         ['Số bản chứng từ (46A) — riêng đơn này  [MỚI]', 'Mặc định hồ sơ', 'Đơn chiết khấu — sửa nếu L/C lô này khác; "Lưu làm mẫu" để thành mặc định'],
       ],
-      note: 'Chọn Phương thức quyết định cả bộ: L/C -> BM03 + Hối phiếu "Drawn under {NH phát hành}, L/C số". D/P/D/A (nhờ thu URC 522) -> BM08 + Hối phiếu "Drawn on {người mua}", D/P = AT SIGHT, TO = NH nhờ thu, không L/C. · [MỚI] Tự điền từ template khách (chỉ nhập số L/C + ngày theo lô); làm xong bấm "Lưu làm mẫu cho khách".' },
+      note: 'Chọn Phương thức quyết định cả bộ: L/C -> Đơn ĐNCK + Hối phiếu "Drawn under {NH phát hành}, L/C số". D/P/D/A (nhờ thu URC 522) -> BM08 + Hối phiếu "Drawn on {người mua}", D/P = AT SIGHT, TO = NH nhờ thu, không L/C. · [MỚI 13/08] L/C: mở panel "Đơn ĐNCK Vietinbank" → điền STT đơn + hãng tàu + NH nhận CT + số tiền bằng chữ + giá trị bảo đảm → bấm "Tải đơn ĐNCK Vietinbank (.docx)" = FORM CHUẨN VIETINBANK (giữ nguyên định dạng, chỉ điền field động). · Tự điền từ template khách (chỉ nhập số L/C + ngày theo lô); làm xong bấm "Lưu làm mẫu cho khách".' },
     { n: '5', dept: 'Logistics / LAB', title: 'Đính kèm file bên ngoài',
       where: 'Chi tiết đơn → tab "Chứng từ" → mục "Checklist chứng từ" → nút Upload',
       rows: [

@@ -326,27 +326,84 @@ export function packingListDoc(d: PackingListData): Document {
 }
 
 // ── WEIGHT LIST ──
+// ── WEIGHT LIST ── (khớp HỆT sheet WL HA20260080.xlsm: khối info dọc + bảng container có PALLET)
 export function weightListDoc(d: WeightListData): Document {
-  const kids: (Paragraph | Table)[] = [
-    ...letterhead(),
-    P('WEIGHT LIST', { align: AlignmentType.CENTER, bold: true, size: 15, after: 60 }),
-    P([R('Sales Order: ', { bold: true }), R(d.order_code), R('     Buyer: ', { bold: true }), R(d.buyer_name)], { after: 0 }),
+  const CENTER = AlignmentType.CENTER, RIGHT = AlignmentType.RIGHT, VC = VerticalAlign.CENTER
+  const kgs = (v: number) => String(Math.round(v || 0))
+  const vessel = `${d.vessel_name || ''}${d.voyage_number ? ' ' + d.voyage_number : ''}`.trim() || '—'
+  const lcLine = d.lc_number ? `${d.lc_number}${d.lc_date ? `      DATE: ${fmtDot(d.lc_date)}` : ''}` : '—'
+
+  // Khối info dọc (borderless 2 cột)
+  const info: [string, string][] = [
+    ['THE SELLER/BENEFICIARY:', 'HUY ANH RUBBER COMPANY LIMITED'],
+    ['ADDRESS:', 'KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM'],
+    ['CONSIGNEE:', d.consignee || '—'],
+    ['ADDRESS:', d.consignee_address || '—'],
+    ['COMMODITY:', `NATURAL RUBBER ${(d.grade || '').replace(/_/g, ' ')}`],
+    ['PACKING:', d.packing_desc || '—'],
+    ['TOTAL:', d.total_packing || '—'],
+    ['NET WEIGHT:', `${d.net_weight_kg.toFixed(2)} KGS`],
+    ['GROSS WEIGHT:', `${d.gross_weight_kg.toFixed(2)} KGS`],
+    ['VESSEL:', vessel],
+    ['PORT OF LOADING:', d.port_of_loading || '—'],
+    ['PORT OF DISCHARGE:', d.port_of_destination || '—'],
+    ['BILL OF LADING NUMBER:', d.bl_number || '—'],
+    ['LC NO:', lcLine],
   ]
-  if (d.consignee) kids.push(P([R('Consignee: ', { bold: true }), R(d.consignee.trim())], { after: 0 }))
-  kids.push(
-    P([R('Vessel: ', { bold: true }), R(d.vessel_name || 'TBD'), R('     B/L No.: ', { bold: true }), R(`${d.bl_number || 'TBD'}${d.bl_date ? ' (' + fmtD(d.bl_date) + ')' : ''}`), R('     ETD: ', { bold: true }), R(d.etd ? fmtD(d.etd) : 'TBD')], { after: 80 }),
-    gridTable(
-      ['Container No.', 'Seal No.', 'Bales', 'Net (KG)', 'Tare (KG)', 'Gross (KG)'],
-      [
-        ...d.containers.map((c) => [c.container_no, c.seal_no, `${c.bale_count}`, money(c.net_weight_kg).replace(/\.00$/, ''), money(c.tare_weight_kg).replace(/\.00$/, ''), money(c.gross_weight_kg).replace(/\.00$/, '')]),
-        ['TOTAL', '', `${d.total_bales}`, money(d.total_net).replace(/\.00$/, ''), money(d.total_tare).replace(/\.00$/, ''), money(d.total_gross).replace(/\.00$/, '')],
-      ],
-      [24, 20, 12, 15, 14, 15],
-    ),
-    P('', { after: 300 }),
-    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true }),
-  )
-  return makeDoc(kids)
+  const infoTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS,
+    layout: TableLayoutType.FIXED, columnWidths: [2900, 7206],
+    rows: info.map(([k, v]) => new TableRow({ children: [
+      new TableCell({ borders: NO_BORDERS, margins: { top: 8, bottom: 8, left: 0, right: 40 }, children: [P(k, { bold: true, size: 10.5, after: 0 })] }),
+      new TableCell({ borders: NO_BORDERS, margins: { top: 8, bottom: 8, left: 0, right: 0 }, children: [P(v, { size: 10.5, after: 0 })] }),
+    ] })),
+  })
+
+  // Bảng container: NO restart theo lô, cột PALLET, TOTAL span 3 cột đầu
+  let no = 0
+  let prevLot: number | null = null
+  const bodyRows = d.containers.map((c) => {
+    const lot = c.lot_no ?? 0
+    if (lot !== prevLot) { no = 1; prevLot = lot } else { no += 1 }
+    return new TableRow({ children: [
+      cellBox([P(String(no), { align: CENTER, after: 0 })], { valign: VC }),
+      cellBox([P(c.container_no, { align: CENTER, after: 0 })], { valign: VC }),
+      cellBox([P(c.seal_no, { align: CENTER, after: 0 })], { valign: VC }),
+      cellBox([P(c.pallet_count != null ? String(c.pallet_count) : '', { align: CENTER, after: 0 })], { valign: VC }),
+      cellBox([P(kgs(c.net_weight_kg), { align: CENTER, after: 0 })], { valign: VC }),
+      cellBox([P(kgs(c.gross_weight_kg), { align: CENTER, after: 0 })], { valign: VC }),
+    ] })
+  })
+  const contTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE }, borders: TABLE_BORDERS,
+    layout: TableLayoutType.FIXED, columnWidths: [808, 2425, 2223, 1213, 1718, 1719],
+    rows: [
+      new TableRow({ tableHeader: true, children: ['NO', 'CONTAINER NO', 'SEAL NO', 'PALLET', 'NET WEIGHT (KGS)', 'GROSS WEIGHT (KGS)'].map((h) =>
+        cellBox([P(h, { bold: true, align: CENTER, size: 8.5, after: 0 })], { valign: VC })) }),
+      ...bodyRows,
+      new TableRow({ children: [
+        cellBox([P('TOTAL', { bold: true, align: CENTER, after: 0 })], { columnSpan: 3 }),
+        cellBox([P(d.total_pallet ? String(d.total_pallet) : '', { bold: true, align: CENTER, after: 0 })]),
+        cellBox([P(kgs(d.total_net), { bold: true, align: CENTER, after: 0 })]),
+        cellBox([P(kgs(d.total_gross), { bold: true, align: CENTER, after: 0 })]),
+      ] }),
+    ],
+  })
+
+  return makeDoc([
+    ...letterhead(),
+    P('WEIGHT LIST', { align: CENTER, bold: true, size: 15, after: 20 }),
+    P(`No: ${d.wl_no}`, { align: RIGHT, after: 0 }),
+    P(`Date: ${fmtD(d.date)}`, { align: RIGHT, after: 80 }),
+    infoTable,
+    P('', { after: 20 }),
+    contTable,
+    P('', { after: 260 }),
+    P('HUY ANH RUBBER COMPANY LIMITED', { align: RIGHT, bold: true, after: 0 }),
+    P('', { after: 260 }),
+    P('PHÓ GIÁM ĐỐC', { align: RIGHT, bold: true, after: 0 }),
+    P('Lê Xuân Hồng Trung', { align: RIGHT, bold: true }),
+  ])
 }
 
 // ── BILL OF EXCHANGE ──

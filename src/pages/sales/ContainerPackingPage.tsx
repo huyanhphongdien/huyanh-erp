@@ -664,6 +664,18 @@ function ContainerPackingPage() {
       ),
     },
     {
+      title: 'Pallet',
+      key: 'pallet_count',
+      width: 76,
+      align: 'right' as const,
+      render: (_: unknown, r) => (
+        <InputNumber size="small" min={0} controls={false} style={{ width: 62 }} placeholder="—"
+          value={r.pallet_count ?? undefined}
+          onChange={(v) => patchLocal(r.id, { pallet_count: (v as number) ?? null })}
+          onBlur={() => { const c = containers.find((x) => x.id === r.id); persistField(r.id, { pallet_count: c?.pallet_count ?? null }) }} />
+      ),
+    },
+    {
       title: 'Lô',
       key: 'lot_no',
       width: 80,

@@ -188,6 +188,7 @@ export const containerService = {
     if (data.tare_weight_kg !== undefined) updateData.tare_weight_kg = data.tare_weight_kg
     if (data.net_weight_kg !== undefined) updateData.net_weight_kg = data.net_weight_kg
     if (data.bale_count !== undefined) updateData.bale_count = data.bale_count
+    if (data.pallet_count !== undefined) updateData.pallet_count = data.pallet_count
     if (data.notes !== undefined) updateData.notes = data.notes
     if (data.lot_no !== undefined) updateData.lot_no = data.lot_no
     if (data.lot_deadline !== undefined) updateData.lot_deadline = data.lot_deadline

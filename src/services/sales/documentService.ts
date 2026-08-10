@@ -101,25 +101,35 @@ export interface PackingListData {
 }
 
 export interface WeightListData {
+  // Khớp HỆT sheet WL (HA20260080.xlsm): khối info dọc + bảng container có cột PALLET
+  wl_no: string
+  date: string
   order_code: string
   buyer_name: string
   consignee: string
+  consignee_address: string
   grade: string
+  packing_desc: string
+  total_packing: string
+  net_weight_kg: number    // tổng net (dòng NET WEIGHT trong khối info)
+  gross_weight_kg: number  // tổng gross
   containers: Array<{
     container_no: string
     seal_no: string
-    bale_count: number
+    pallet_count: number | null
     net_weight_kg: number
-    tare_weight_kg: number
     gross_weight_kg: number
+    lot_no: number | null
   }>
-  total_bales: number
+  total_pallet: number
   total_net: number
-  total_tare: number
   total_gross: number
   vessel_name: string
+  voyage_number: string
   bl_number: string | null
   bl_date: string | null
+  lc_number: string | null
+  lc_date: string | null
   port_of_loading: string
   port_of_destination: string
   etd: string
@@ -602,60 +612,72 @@ export const documentService = {
     if (error || !order) throw new Error('Không thể tải thông tin đơn hàng')
 
     const booking = await loadLotBooking(orderId, lotNo)
+    const lcInfo = await loadLcInfo(orderId, lotNo)
     let wlQ = supabase
       .from('sales_order_containers')
-      .select('container_no,seal_no,bale_count,net_weight_kg,tare_weight_kg,gross_weight_kg, items:sales_order_container_items(weight_kg)')
+      .select('container_no,seal_no,bale_count,pallet_count,container_type,lot_no,net_weight_kg,tare_weight_kg,gross_weight_kg, items:sales_order_container_items(weight_kg)')
       .eq('sales_order_id', orderId)
     if (lotNo) wlQ = wlQ.eq('lot_no', lotNo)
-    const { data: rawContainers } = await wlQ.order('created_at')
+    // Sắp theo lô → NO trong bảng restart đúng theo từng lô (khớp PKL)
+    const { data: rawContainers } = await wlQ.order('lot_no', { ascending: true, nullsFirst: true }).order('created_at')
 
     const { profile } = await loadExportProfile(order.customer_id)
     const { data: invoice } = await supabase
       .from('sales_invoices')
-      .select('bl_number')
+      .select('code,bl_number,invoice_date')
       .eq('sales_order_id', orderId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    const containers = (rawContainers || []).map((c) => {
-      // Fallback net theo item (khớp getPackingListData — tránh 2 chứng từ lệch nhau)
+    const rawArr = rawContainers || []
+    const containers = rawArr.map((c) => {
       const itemNet = ((c as { items?: Array<{ weight_kg?: number }> }).items || [])
         .reduce((s, i) => s + (i.weight_kg || 0), 0)
       const net = c.net_weight_kg || itemNet
       const tare = c.tare_weight_kg || 0
-      // gross: ưu tiên số thật; thiếu → net + tare (nếu có tare) hoặc = net (KHÔNG ước lượng ×1.02)
       const gross = c.gross_weight_kg || (tare > 0 ? net + tare : net)
-      // tare hiển thị: thiếu tare nhưng có gross → gross − net (giữ net + tare = gross)
-      const tareShown = tare > 0 ? tare : Math.max(0, gross - net)
       return {
         container_no: c.container_no || 'TBD',
         seal_no: c.seal_no || 'TBD',
-        bale_count: c.bale_count || 0,
+        pallet_count: c.pallet_count ?? null,
         net_weight_kg: net,
-        tare_weight_kg: tareShown,
         gross_weight_kg: gross,
+        lot_no: c.lot_no ?? null,
       }
     })
-    const sum = (f: 'bale_count' | 'net_weight_kg' | 'tare_weight_kg' | 'gross_weight_kg') =>
-      containers.reduce((s, c) => s + (c[f] || 0), 0)
+    const totalNet = containers.reduce((s, c) => s + (c.net_weight_kg || 0), 0)
+    const totalGross = containers.reduce((s, c) => s + (c.gross_weight_kg || 0), 0)
+    const totalPallet = containers.reduce((s, c) => s + (c.pallet_count || 0), 0)
 
-    const customer = order.customer as { name?: string } | null
+    const customer = order.customer as { name?: string; address?: string } | null
+    const packingStyle = order.packing_desc || profile?.default_packing_desc || ''
+    const orderQty = order.quantity_tons || 0
+    const qtyTons = lotNo ? (totalNet / 1000) : orderQty
     return {
+      wl_no: `${soDisplayCode(order)}/WL${lotNo ? `/L${lotNo}` : ''}`,
+      date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
       order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       consignee: await resolveConsignee(orderId, profile, lotNo),
+      consignee_address: profile?.consignee_address || profile?.buyer_address || customer?.address || '',
       grade: order.grade,
+      packing_desc: packingLineFrom(packingStyle, rawArr),
+      total_packing: totalPackingFrom(rawArr),
+      net_weight_kg: totalNet || Math.round(qtyTons * 1000),
+      gross_weight_kg: totalGross || totalNet || Math.round(qtyTons * 1000),
       containers,
-      total_bales: sum('bale_count'),
-      total_net: sum('net_weight_kg'),
-      total_tare: sum('tare_weight_kg'),
-      total_gross: sum('gross_weight_kg'),
+      total_pallet: totalPallet,
+      total_net: totalNet,
+      total_gross: totalGross,
       vessel_name: booking?.vessel_name || order.vessel_name || '',
+      voyage_number: booking?.voyage_no || order.voyage_number || '',
       bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       bl_date: order.bl_date || null,
+      lc_number: order.lc_number || lcInfo.lc_number,
+      lc_date: lcInfo.lc_date,
       port_of_loading: booking?.port_of_loading || PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
-      port_of_destination: booking?.port_of_destination || order.port_of_destination || '',
+      port_of_destination: booking?.port_of_destination || order.port_of_destination || order.port_of_discharge || '',
       etd: booking?.etd || order.etd || '',
       shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
     }

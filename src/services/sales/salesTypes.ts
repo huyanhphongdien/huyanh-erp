@@ -293,6 +293,7 @@ export interface SalesOrderContainer {
   tare_weight_kg?: number
   net_weight_kg?: number
   bale_count?: number
+  pallet_count?: number | null   // số pallet trong container (cột PALLET của Weight List)
   status: ContainerStatus
   packed_at?: string
   sealed_at?: string

@@ -418,67 +418,85 @@ const WeightListTab = ({ data, loading, onGenerate }: WeightListTabProps) => {
       />
     )
   }
-  const fmt = (v: number) => (v || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })
+  const bd = '1px solid #000'
+  const cell: React.CSSProperties = { border: bd, padding: '3px 6px', fontSize: 12.5, verticalAlign: 'middle' }
+  const hcell: React.CSSProperties = { ...cell, fontWeight: 700, textAlign: 'center' }
+  const fmtd = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
+  const kgs = (v: number) => String(Math.round(v || 0))
+  const vessel = `${data.vessel_name || ''}${data.voyage_number ? ' ' + data.voyage_number : ''}`.trim() || '—'
+  const lcLine = data.lc_number ? `${data.lc_number}${data.lc_date ? `      DATE: ${fmtDotDate(data.lc_date)}` : ''}` : '—'
+  const info: [string, string][] = [
+    ['THE SELLER/BENEFICIARY:', 'HUY ANH RUBBER COMPANY LIMITED'],
+    ['ADDRESS:', 'KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM'],
+    ['CONSIGNEE:', data.consignee || '—'],
+    ['ADDRESS:', data.consignee_address || '—'],
+    ['COMMODITY:', `NATURAL RUBBER ${(data.grade || '').replace(/_/g, ' ')}`],
+    ['PACKING:', data.packing_desc || '—'],
+    ['TOTAL:', data.total_packing || '—'],
+    ['NET WEIGHT:', `${data.net_weight_kg.toFixed(2)} KGS`],
+    ['GROSS WEIGHT:', `${data.gross_weight_kg.toFixed(2)} KGS`],
+    ['VESSEL:', vessel],
+    ['PORT OF LOADING:', data.port_of_loading || '—'],
+    ['PORT OF DISCHARGE:', data.port_of_destination || '—'],
+    ['BILL OF LADING NUMBER:', data.bl_number || '—'],
+    ['LC NO:', lcLine],
+  ]
+  let no = 0, prevLot: number | null = null
   return (
-    <div className="doc-print-area" id="weight-list-print">
+    <div className="doc-print-area" id="weight-list-print" style={{ color: '#000', fontSize: 12.5 }}>
       <CompanyHeader />
-      <Title level={3} style={{ textAlign: 'center', marginBottom: 24 }}>WEIGHT LIST</Title>
+      <Title level={3} style={{ textAlign: 'center', margin: '0 0 6px' }}>WEIGHT LIST</Title>
+      <div style={{ textAlign: 'right', marginBottom: 10 }}>
+        <div>No: {data.wl_no}</div>
+        <div>Date: {fmtd(data.date)}</div>
+      </div>
 
-      <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
-        <Descriptions.Item label="Buyer">{data.buyer_name}</Descriptions.Item>
-        {data.consignee && <Descriptions.Item label="Consignee" span={2}>{data.consignee}</Descriptions.Item>}
-        <Descriptions.Item label="Commodity">Natural Rubber {data.grade?.replace(/_/g, ' ')}</Descriptions.Item>
-        <Descriptions.Item label="Vessel">{data.vessel_name || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="B/L No.">{data.bl_number || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="ETD">{data.etd || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="Port of Loading">{data.port_of_loading || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="Port of Destination">{data.port_of_destination || 'TBD'}</Descriptions.Item>
-      </Descriptions>
+      <table style={{ borderCollapse: 'collapse', marginBottom: 10 }}>
+        <tbody>
+          {info.map(([k, v], i) => (
+            <tr key={i}>
+              <td style={{ fontWeight: 700, padding: '2px 12px 2px 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>{k}</td>
+              <td style={{ padding: '2px 0' }}>{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-      <Table
-        dataSource={data.containers}
-        rowKey="container_no"
-        pagination={false}
-        size="small"
-        bordered
-        columns={[
-          { title: 'Container No.', dataIndex: 'container_no', key: 'c', width: 160 },
-          { title: 'Seal No.', dataIndex: 'seal_no', key: 's', width: 140 },
-          { title: 'Bales', dataIndex: 'bale_count', key: 'b', align: 'right', render: (v: number) => fmt(v) },
-          { title: 'Net Weight (KG)', dataIndex: 'net_weight_kg', key: 'n', align: 'right', render: (v: number) => fmt(v) },
-          { title: 'Tare Weight (KG)', dataIndex: 'tare_weight_kg', key: 't', align: 'right', render: (v: number) => fmt(v) },
-          { title: 'Gross Weight (KG)', dataIndex: 'gross_weight_kg', key: 'g', align: 'right', render: (v: number) => fmt(v) },
-        ]}
-        summary={() => (
-          <Table.Summary fixed>
-            <Table.Summary.Row style={{ fontWeight: 'bold', background: '#fafafa' }}>
-              <Table.Summary.Cell index={0} colSpan={2}>TOTAL</Table.Summary.Cell>
-              <Table.Summary.Cell index={2} align="right">{fmt(data.total_bales)}</Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right">{fmt(data.total_net)}</Table.Summary.Cell>
-              <Table.Summary.Cell index={4} align="right">{fmt(data.total_tare)}</Table.Summary.Cell>
-              <Table.Summary.Cell index={5} align="right">{fmt(data.total_gross)}</Table.Summary.Cell>
-            </Table.Summary.Row>
-          </Table.Summary>
-        )}
-      />
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>
+          {['NO', 'CONTAINER NO', 'SEAL NO', 'PALLET', 'NET WEIGHT (KGS)', 'GROSS WEIGHT (KGS)'].map((h) => (
+            <th key={h} style={{ ...hcell, fontSize: 11 }}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody>
+          {data.containers.map((c, i) => {
+            const lot = c.lot_no ?? 0
+            if (lot !== prevLot) { no = 1; prevLot = lot } else { no += 1 }
+            return (
+              <tr key={i} style={{ textAlign: 'center' }}>
+                <td style={cell}>{no}</td>
+                <td style={cell}>{c.container_no}</td>
+                <td style={cell}>{c.seal_no}</td>
+                <td style={cell}>{c.pallet_count ?? ''}</td>
+                <td style={cell}>{kgs(c.net_weight_kg)}</td>
+                <td style={cell}>{kgs(c.gross_weight_kg)}</td>
+              </tr>
+            )
+          })}
+          <tr style={{ textAlign: 'center', fontWeight: 700 }}>
+            <td style={cell} colSpan={3}>TOTAL</td>
+            <td style={cell}>{data.total_pallet || ''}</td>
+            <td style={cell}>{kgs(data.total_net)}</td>
+            <td style={cell}>{kgs(data.total_gross)}</td>
+          </tr>
+        </tbody>
+      </table>
 
-      {data.shipping_marks && (
-        <div style={{ marginTop: 16 }}>
-          <Title level={5}>Shipping Marks</Title>
-          <Paragraph style={{ whiteSpace: 'pre-line' }}>{data.shipping_marks}</Paragraph>
-        </div>
-      )}
-
-      <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>Warehouse Manager</Text>
-        </div>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>General Director</Text>
-        </div>
+      <div style={{ marginTop: 40, textAlign: 'right' }}>
+        <div style={{ fontWeight: 700 }}>HUY ANH RUBBER COMPANY LIMITED</div>
+        <div style={{ height: 64 }} />
+        <div style={{ fontWeight: 700 }}>PHÓ GIÁM ĐỐC</div>
+        <div style={{ fontWeight: 700 }}>Lê Xuân Hồng Trung</div>
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>

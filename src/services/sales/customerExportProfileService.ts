@@ -63,6 +63,8 @@ export const EXPORT_DOC_TYPES: { key: string; label: string }[] = [
   { key: 'CO', label: 'C/O (Giấy chứng nhận xuất xứ)' },
   { key: 'INS', label: 'Bảo hiểm hàng hóa (Insurance)' },
   { key: 'PHYTO', label: 'Phytosanitary / Fumigation' },
+  { key: 'NONWOOD', label: 'Non-Wood Certificate' },
+  { key: 'QUALITY', label: 'Quality Certificate' },
 ]
 
 export const customerExportProfileService = {

@@ -181,6 +181,7 @@ export interface InvoiceData {
   shipment_date: string          // cột SHIPMENT DATE (ngày lên tàu = B/L date, thiếu → ETD)
   proforma_no: string            // "AS PER PROFORMA INVOICE NO.<mã>/PR.CI"
   proforma_date: string          // "DATED <proforma_date>"
+  contract_date?: string         // Ngày HĐ (KHÁC ngày Proforma) — dùng cho ĐNCK
   packing_desc: string           // dòng PACKING đầy đủ, vd "35 KG/BALE. LOOSE BALES. 600 BALES/01X20'"
   total_packing: string          // dòng TOTAL PACKING, vd "3000 BALES/05X20'"
   item_no: string                // ITEM NO. (mã hàng của khách)
@@ -808,6 +809,7 @@ export const documentService = {
       total_packing: totalPacking,
       item_no: order.item_no || profile?.default_item_no || '',
       invoice_extra_lines: order.invoice_extra_lines || profile?.default_invoice_extra_lines || '',
+      contract_date: order.contract_date || '',   // Ngày HĐ (KHÁC ngày Proforma) — cho ĐNCK
     }
   },
 

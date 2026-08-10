@@ -173,6 +173,7 @@ export default function LcNegotiationTab(
         negotiate_pct: v.negotiate_pct ?? null,
         negotiate_amount: v.negotiate_amount ?? null,
         term_days: v.term_days ?? null,
+        doc_checklist: buildDocChecklist(),   // để lưới checklist tự tick đúng (kẻo trống)
         dnck_fields: dnckFields,
       }, lotNo)
       await generateDNCK(orderId, lotNo)
@@ -290,6 +291,43 @@ export default function LcNegotiationTab(
                   Tải đơn ĐNCK Vietinbank (.docx)
                 </Button>
                 <Text type="secondary" style={{ marginLeft: 10, fontSize: 12 }}>Lưu + điền form chuẩn Vietinbank rồi tải về.</Text>
+              </div>
+            </>
+          ),
+        }]} />
+      )}
+
+      {/* ── Đơn ĐNCK D/P (BM08 nhờ thu — trừ L/C) — điền template .docx ── */}
+      {isDP && (
+        <Collapse style={{ marginBottom: 16 }} items={[{
+          key: 'dnck-dp',
+          label: <span><BankOutlined /> <b>Đơn ĐNCK Vietinbank — Nhờ thu D/P (BM08)</b> — điền form ngân hàng chuẩn (.docx)</span>,
+          children: (
+            <>
+              <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#389e0d' }}>
+                Giữ NGUYÊN form Vietinbank (nhờ thu). Loại hàng, số tiền (=CIF), % + kỳ hạn, người mua… lấy tự động; lưới chứng từ tự tick theo checklist 46A. Mấy ô dưới điền thêm phần form yêu cầu.
+              </div>
+              <Row gutter={12}>
+                <Col xs={12} md={6}><div style={{ fontSize: 12, color: '#666' }}>STT đơn (SỐ …/năm)</div><Input size="small" value={dnckFields.form_seq || ''} placeholder="VD: 07" onChange={(e) => setDf('form_seq', e.target.value)} /></Col>
+                <Col xs={12} md={6}><div style={{ fontSize: 12, color: '#666' }}>Năm</div><Input size="small" value={dnckFields.form_year || ''} placeholder={String(new Date().getFullYear())} onChange={(e) => setDf('form_year', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Hãng vận chuyển (tên đầy đủ)</div><Input size="small" value={dnckFields.shipping_line || ''} placeholder="VD: MINH ANH SUPPLY CHAIN JSC" onChange={(e) => setDf('shipping_line', e.target.value)} /></Col>
+                <Col xs={12} md={8}><div style={{ fontSize: 12, color: '#666' }}>NH nhờ thu (người mua) — SWIFT</div><Input size="small" value={dnckFields.recv_swift || ''} placeholder="VD: BCEYLKLX131" onChange={(e) => setDf('recv_swift', e.target.value)} /></Col>
+                <Col xs={12} md={16}><div style={{ fontSize: 12, color: '#666' }}>NH nhờ thu — tên</div><Input size="small" value={dnckFields.recv_bank_name || ''} placeholder="VD: BANK OF CEYLON…" onChange={(e) => setDf('recv_bank_name', e.target.value)} /></Col>
+                <Col xs={24} md={24}><div style={{ fontSize: 12, color: '#666' }}>NH nhờ thu — địa chỉ</div><Input size="small" value={dnckFields.recv_bank_addr || ''} placeholder="VD: 2ND FLOOR, HEAD OFFICE, COLOMBO 01, SRI LANKA" onChange={(e) => setDf('recv_bank_addr', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Người mua/nhập khẩu — tên</div><Input size="small" value={dnckFields.buyer_name || ''} placeholder="trống → lấy từ hồ sơ khách" onChange={(e) => setDf('buyer_name', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Người mua — địa chỉ</div><Input size="small" value={dnckFields.buyer_addr || ''} placeholder="trống → lấy từ hồ sơ khách" onChange={(e) => setDf('buyer_addr', e.target.value)} /></Col>
+                <Col xs={12} md={8}><div style={{ fontSize: 12, color: '#666' }}>Ngày thương lượng thanh toán</div><Input size="small" value={dnckFields.negotiate_date || ''} placeholder="YYYY-MM-DD" onChange={(e) => setDf('negotiate_date', e.target.value)} /></Col>
+                <Col xs={24} md={16}><div style={{ fontSize: 12, color: '#666' }}>Số tiền đề nghị chiết khấu (bằng chữ, KHÔNG kèm "đô la Mỹ")</div><Input size="small" value={dnckFields.discount_amount_words || ''} placeholder="VD: Bốn mươi lăm nghìn bảy trăm ba mươi tám" onChange={(e) => setDf('discount_amount_words', e.target.value)} /></Col>
+                <Col xs={12} md={8}><div style={{ fontSize: 12, color: '#666' }}>Ngày lập đơn (trên tiêu đề)</div><Input size="small" value={dnckFields.request_date || ''} placeholder="trống → ngày sinh file" onChange={(e) => setDf('request_date', e.target.value)} /></Col>
+                <Col xs={12} md={8}><div style={{ fontSize: 12, color: '#666' }}>Loại hàng hóa</div><Input size="small" value={dnckFields.commodity || ''} placeholder="trống → NATURAL RUBBER + loại mủ" onChange={(e) => setDf('commodity', e.target.value)} /></Col>
+                <Col xs={12} md={4}><div style={{ fontSize: 12, color: '#666' }}>Số HĐ</div><Input size="small" value={dnckFields.contract_no || ''} placeholder="trống → mã đơn" onChange={(e) => setDf('contract_no', e.target.value)} /></Col>
+                <Col xs={12} md={4}><div style={{ fontSize: 12, color: '#666' }}>Ngày HĐ</div><Input size="small" value={dnckFields.contract_date || ''} placeholder="YYYY-MM-DD" onChange={(e) => setDf('contract_date', e.target.value)} /></Col>
+              </Row>
+              <div style={{ marginTop: 12 }}>
+                <Button type="primary" icon={<FileWordOutlined />} loading={genDnck} onClick={handleGenDnck} style={{ background: '#1B4D3E' }}>
+                  Tải đơn ĐNCK Nhờ thu D/P (.docx)
+                </Button>
+                <Text type="secondary" style={{ marginLeft: 10, fontSize: 12 }}>Lưu + điền form nhờ thu chuẩn Vietinbank rồi tải về.</Text>
               </div>
             </>
           ),

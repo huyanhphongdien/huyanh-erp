@@ -85,8 +85,11 @@ function containersItem(c: ReadyCtx): ReadyItem {
 function lcItem(c: ReadyCtx): ReadyItem {
   const method = c.negotiation?.method || 'lc'
   const isDP = method !== 'lc'
-  const ok = isDP ? has(c.negotiation?.issuing_bank) : (has(c.negotiation?.issuing_bank) && has(c.negotiation?.lc_number || c.order.lc_number))
-  return { label: isDP ? 'NH nhờ thu (người mua)' : 'Số L/C + NH phát hành', group: 'negotiation', required: true, ok, value: ok ? (c.negotiation?.lc_number || c.order.lc_number || c.negotiation?.issuing_bank || '') : undefined }
+  const df = (c.negotiation?.dnck_fields as Record<string, string>) || {}
+  const ok = isDP
+    ? (has(c.negotiation?.issuing_bank) || has(df.recv_bank_name))   // D/P: NH nhờ thu (field chính hoặc ô ĐNCK)
+    : (has(c.negotiation?.issuing_bank) && has(c.negotiation?.lc_number || c.order.lc_number))
+  return { label: isDP ? 'NH nhờ thu (người mua)' : 'Số L/C + NH phát hành', group: 'negotiation', required: true, ok, value: ok ? (c.negotiation?.lc_number || c.order.lc_number || c.negotiation?.issuing_bank || df.recv_bank_name || '') : undefined }
 }
 
 // ── registry: mỗi doc → hàm sinh danh sách mục cần ──
@@ -121,13 +124,16 @@ const REG: Record<string, Builder> = {
   ],
   lc: (c) => {
     const df = (c.negotiation?.dnck_fields as Record<string, string>) || {}
+    const isDP = (c.negotiation?.method || 'lc') !== 'lc'
     return [
       lcItem(c),
       { label: '% · Kỳ hạn thương lượng', group: 'negotiation', required: false, ok: has(c.negotiation?.negotiate_pct) && c.negotiation?.term_days != null, value: c.negotiation?.negotiate_pct ? `${c.negotiation.negotiate_pct}%` : undefined },
       { label: 'Checklist chứng từ (46A)', group: 'negotiation', required: true, ok: (c.negotiation?.doc_checklist?.length || 0) > 0, value: c.negotiation?.doc_checklist?.length ? `${c.negotiation.doc_checklist.length} loại` : undefined },
       { label: 'STT đơn ĐNCK', group: 'negotiation', required: true, ok: has(df.form_seq) },
       { label: 'Hãng tàu (tên đầy đủ)', group: 'negotiation', required: false, ok: has(df.shipping_line) },
-      { label: 'NH nhận CT (địa chỉ) · Số tiền bằng chữ · Bảo đảm (VNĐ)', group: 'negotiation', required: false, ok: has(df.recv_bank_addr1) && has(df.negotiate_amount_words) && has(df.secured_amount_vnd) },
+      isDP
+        ? { label: 'NH nhờ thu (địa chỉ) · Số tiền bằng chữ', group: 'negotiation', required: false, ok: has(df.recv_bank_addr) && has(df.discount_amount_words) }
+        : { label: 'NH nhận CT (địa chỉ) · Số tiền bằng chữ · Bảo đảm (VNĐ)', group: 'negotiation', required: false, ok: has(df.recv_bank_addr1) && has(df.negotiate_amount_words) && has(df.secured_amount_vnd) },
     ]
   },
 }

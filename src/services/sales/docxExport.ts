@@ -614,7 +614,7 @@ export function nonWoodCertDoc(d: NonWoodCertData): Document {
     kv('CONTRACT NO.:', d.contract_no),
     kv('INVOICE NO.:', d.invoice_no),
     P('', { after: 40 }),
-    P(`WE, HUY ANH RUBBER COMPANY LIMITED CERTIFY THAT ${d.quantity_tons} MT OF NATURAL RUBBER ${d.grade_label}, NO WOODEN PACKING MATERIAL USED IN THE WHOLE OF SHIPMENT OF GOODS.`, { after: 220 }),
+    P(`WE, HUY ANH RUBBER COMPANY LIMITED CERTIFY THAT ${d.quantity_tons.toFixed(2).replace(/\.00$/, '')} MT OF NATURAL RUBBER ${d.grade_label}, NO WOODEN PACKING MATERIAL USED IN THE WHOLE OF SHIPMENT OF GOODS.`, { after: 220 }),
     P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
     P('', { after: 260 }),
     P('PHÓ GIÁM ĐỐC', { align: AlignmentType.RIGHT, bold: true, after: 0 }),

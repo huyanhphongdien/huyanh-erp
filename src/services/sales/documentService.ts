@@ -857,10 +857,11 @@ export const documentService = {
     return {
       cert_no: `${base}${lotNo ? `/L${lotNo}` : ''}/NW`,
       date: inv.invoice_date,
-      // "buyer" trên Non-Wood = consignee (to order of NH); ADDRESS = tên+địa chỉ người mua thật (khớp mẫu)
+      // "buyer" trên Non-Wood = consignee (to order of NH); ADDRESS = tên+địa chỉ người mua thật (khớp mẫu).
+      // Chỉ ghép tên vào ADDRESS khi THE BUYER là consignee (khác người mua) — tránh lặp tên khi D/P.
       buyer_name: inv.consignee || inv.buyer_name,
-      buyer_address: [inv.buyer_name, inv.buyer_address].filter(Boolean).join(', '),
-      commodity: `${inv.quantity_tons} MT - NATURAL RUBBER ${gradeLabel}`,
+      buyer_address: inv.consignee ? [inv.buyer_name, inv.buyer_address].filter(Boolean).join(', ') : inv.buyer_address,
+      commodity: `${inv.quantity_tons.toFixed(2).replace(/\.00$/, '')} MT - NATURAL RUBBER ${gradeLabel}`,
       grade_label: gradeLabel,
       quantity_tons: inv.quantity_tons,
       country_of_origin: inv.country_of_origin,

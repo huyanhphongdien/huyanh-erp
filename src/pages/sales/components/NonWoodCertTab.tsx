@@ -12,7 +12,7 @@ import DocLetterhead from './DocLetterhead'
 
 const { Title, Text } = Typography
 const fmtD = (s?: string) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
-const fmtKg = (v: number) => `${(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KGS`
+const fmtKg = (v: number) => `${(v || 0).toFixed(2)} KGS`   // KHÔNG dấu phẩy — khớp bản Word
 
 export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string; lotNo?: number }) {
   const [d, setD] = useState<NonWoodCertData | null>(null)
@@ -81,7 +81,7 @@ export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string
       </table>
 
       <p style={{ marginTop: 16 }}>
-        WE, <b>HUY ANH RUBBER COMPANY LIMITED</b> CERTIFY THAT {d.quantity_tons} MT OF NATURAL RUBBER {d.grade_label},
+        WE, <b>HUY ANH RUBBER COMPANY LIMITED</b> CERTIFY THAT {d.quantity_tons.toFixed(2).replace(/\.00$/, '')} MT OF NATURAL RUBBER {d.grade_label},
         NO WOODEN PACKING MATERIAL USED IN THE WHOLE OF SHIPMENT OF GOODS.
       </p>
 

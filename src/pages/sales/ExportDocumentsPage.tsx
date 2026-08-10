@@ -28,7 +28,6 @@ import type { ColumnsType } from 'antd/es/table'
 import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   PrinterOutlined,
   FileTextOutlined,
   FileDoneOutlined,
@@ -841,11 +840,6 @@ const ExportDocumentsPage = () => {
     return <Result status="404" title="Order not found" />
   }
 
-  const docStatus = (generated: boolean) =>
-    generated
-      ? <Tag color="success" icon={<CheckCircleOutlined />}>Generated</Tag>
-      : <Tag color="default" icon={<ClockCircleOutlined />}>Chưa tạo</Tag>
-
   // Ctx kiểm tra sẵn sàng + đèn trạng thái (🟢 đủ / 🟡 thiếu / ⚪ đính kèm)
   const readyCtx: ReadyCtx = {
     order,
@@ -944,47 +938,58 @@ const ExportDocumentsPage = () => {
           </Col>
         </Row>
 
-        {/* Document status cards */}
-        <Row gutter={16} style={{ marginBottom: 24 }} className="doc-status-cards">
-          <Col span={8}>
-            <Card size="small" hoverable onClick={() => setActiveTab('coa')}>
-              <Space>
-                <SafetyCertificateOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
-                <div>
-                  <Text strong>{readyDot('coa')}COA</Text>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 12 }}>Đính kèm từ LAB</Text>
+        {/* Dải tổng quan bộ chứng từ — 8 chứng từ, đèn 🟢/🟡/⚪ + tiến độ, bấm để mở tab */}
+        {(() => {
+          const DOCS = [
+            { key: 'coa', label: 'COA' },
+            { key: 'packing', label: 'Packing List' },
+            { key: 'weight', label: 'Weight List' },
+            { key: 'invoice', label: 'Commercial Invoice' },
+            { key: 'boe', label: 'Hối phiếu' },
+            { key: 'beneficiary', label: 'Beneficiary Cert' },
+            { key: 'nonwood', label: 'Non-Wood Cert' },
+            { key: 'lc', label: 'Đơn chiết khấu' },
+          ]
+          const results = DOCS.map((d) => ({ ...d, r: checkReadiness(d.key, readyCtx) }))
+          const auto = results.filter((d) => d.r.status !== 'idle')
+          const readyCount = auto.filter((d) => d.r.requiredMissing === 0).length
+          const pct = auto.length ? Math.round((readyCount / auto.length) * 100) : 0
+          return (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <Text strong style={{ color: '#1B4D3E' }}>Tổng quan bộ chứng từ</Text>
+                <Text type="secondary" style={{ fontSize: 12.5 }}>{readyCount}/{auto.length} chứng từ đủ dữ liệu để sinh</Text>
+                <div style={{ flex: 1, maxWidth: 220, height: 6, borderRadius: 3, background: '#eee', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? '#52c41a' : '#faad14', transition: 'width .3s' }} />
                 </div>
-              </Space>
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small" hoverable onClick={() => { setActiveTab('packing'); if (!packingData) generatePacking() }}>
-              <Space>
-                <ContainerOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
-                <div>
-                  <Text strong>{readyDot('packing')}Packing List</Text>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 12 }}>Container & Bale Details</Text>
-                </div>
-              </Space>
-              <div style={{ marginTop: 8 }}>{docStatus(order.packing_list_generated)}</div>
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small" hoverable onClick={() => { setActiveTab('invoice'); if (!invoiceData) generateInvoice() }}>
-              <Space>
-                <DollarOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
-                <div>
-                  <Text strong>{readyDot('invoice')}Commercial Invoice</Text>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 12 }}>Payment & Banking</Text>
-                </div>
-              </Space>
-              <div style={{ marginTop: 8 }}>{docStatus(order.invoice_generated)}</div>
-            </Card>
-          </Col>
-        </Row>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(188px, 1fr))', gap: 10 }}>
+                {results.map((d) => {
+                  const idle = d.r.status === 'idle'
+                  const ok = d.r.requiredMissing === 0
+                  const active = activeTab === d.key
+                  return (
+                    <div key={d.key} onClick={() => setActiveTab(d.key)}
+                      style={{
+                        cursor: 'pointer', borderRadius: 10, padding: '9px 12px',
+                        border: `1px solid ${active ? '#1B4D3E' : '#ececec'}`,
+                        background: active ? '#f4f9f6' : '#fff',
+                        display: 'flex', flexDirection: 'column', gap: 3,
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        {readyDot(d.key)}
+                        <Text strong style={{ fontSize: 13 }}>{d.label}</Text>
+                      </div>
+                      <Text style={{ fontSize: 12, color: idle ? '#8c8c8c' : ok ? '#1f9d55' : '#b5730a' }}>
+                        {idle ? 'Đính kèm scan' : ok ? '✓ Đủ dữ liệu' : `● Thiếu ${d.r.requiredMissing} mục`}
+                      </Text>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Chọn LÔ — sinh bộ chứng từ theo từng lô (mỗi lô 1 B/L riêng) */}

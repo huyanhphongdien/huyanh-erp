@@ -617,9 +617,10 @@ export const documentService = {
     const netKg = sumNet || Math.round(qtyTons * 1000)
     const grossKg = sumGross || netKg
     const subtotal = qtyTons * order.unit_price
-    // HS code theo loại mủ (SVR/TSNR=40012200, RSS=40012100, khác=40012900)
+    // HS code theo loại mủ (SVR/TSNR=40012200, RSS=40012100, khác=40012900) → định dạng có dấu chấm "4001.22.00" khớp mẫu
     const g = order.grade || ''
-    const hsCode = /RSS/i.test(g) ? '40012100' : /SVR|TSNR/i.test(g) ? '40012200' : '40012900'
+    const hsRaw = /RSS/i.test(g) ? '40012100' : /SVR|TSNR/i.test(g) ? '40012200' : '40012900'
+    const hsCode = `${hsRaw.slice(0, 4)}.${hsRaw.slice(4, 6)}.${hsRaw.slice(6, 8)}`
     // Cước & bảo hiểm: cả đơn nhập ở ShippingTab; theo lô → chia tỷ lệ theo số lượng
     const frOrder = order.freight_amount ?? invoice?.freight_charge ?? 0
     const insOrder = order.insurance_amount ?? invoice?.insurance_charge ?? 0

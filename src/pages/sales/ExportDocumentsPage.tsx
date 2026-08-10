@@ -22,6 +22,7 @@ import {
   Divider,
   Descriptions,
   Result,
+  Segmented,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -675,6 +676,9 @@ const ExportDocumentsPage = () => {
   const [weightData, setWeightData] = useState<WeightListData | null>(null)
   const [weightLoading, setWeightLoading] = useState(false)
   const [negVersion, setNegVersion] = useState(0)   // bump khi ĐNCK lưu → BOE nạp lại
+  // Bộ chứng từ theo LÔ: 0 = cả đơn; >0 = lot_no
+  const [lotNo, setLotNo] = useState(0)
+  const [lots, setLots] = useState<number[]>([])
 
   // Load order
   useEffect(() => {
@@ -685,14 +689,21 @@ const ExportDocumentsPage = () => {
       .then((data) => setOrder(data))
       .catch(() => message.error('Không thể tải đơn hàng'))
       .finally(() => setLoading(false))
+    documentService.listLots(orderId).then(setLots).catch(() => setLots([]))
   }, [orderId])
+
+  // Đổi lô → xoá dữ liệu đã sinh (sinh lại theo lô mới) + báo BOE/ĐNCK nạp lại
+  useEffect(() => {
+    setCOAData(null); setPackingData(null); setWeightData(null); setInvoiceData(null)
+    setNegVersion((v) => v + 1)
+  }, [lotNo])
 
   // Generate COA
   const generateCOA = useCallback(async () => {
     if (!orderId) return
     setCOALoading(true)
     try {
-      const data = await documentService.getCOAData(orderId)
+      const data = await documentService.getCOAData(orderId, lotNo)
       setCOAData(data)
       await documentService.markGenerated(orderId, 'coa')
       setOrder((prev) => prev ? { ...prev, coa_generated: true } : prev)
@@ -702,14 +713,14 @@ const ExportDocumentsPage = () => {
     } finally {
       setCOALoading(false)
     }
-  }, [orderId])
+  }, [orderId, lotNo])
 
   // Generate Packing List
   const generatePacking = useCallback(async () => {
     if (!orderId) return
     setPackingLoading(true)
     try {
-      const data = await documentService.getPackingListData(orderId)
+      const data = await documentService.getPackingListData(orderId, lotNo)
       setPackingData(data)
       await documentService.markGenerated(orderId, 'packing_list')
       setOrder((prev) => prev ? { ...prev, packing_list_generated: true } : prev)
@@ -719,14 +730,14 @@ const ExportDocumentsPage = () => {
     } finally {
       setPackingLoading(false)
     }
-  }, [orderId])
+  }, [orderId, lotNo])
 
   // Generate Weight List
   const generateWeight = useCallback(async () => {
     if (!orderId) return
     setWeightLoading(true)
     try {
-      const data = await documentService.getWeightListData(orderId)
+      const data = await documentService.getWeightListData(orderId, lotNo)
       setWeightData(data)
       message.success('Weight List generated successfully')
     } catch (err: unknown) {
@@ -734,14 +745,14 @@ const ExportDocumentsPage = () => {
     } finally {
       setWeightLoading(false)
     }
-  }, [orderId])
+  }, [orderId, lotNo])
 
   // Generate Invoice
   const generateInvoice = useCallback(async () => {
     if (!orderId) return
     setInvoiceLoading(true)
     try {
-      const data = await documentService.getInvoiceData(orderId)
+      const data = await documentService.getInvoiceData(orderId, lotNo)
       setInvoiceData(data)
       await documentService.markGenerated(orderId, 'invoice')
       setOrder((prev) => prev ? { ...prev, invoice_generated: true } : prev)
@@ -751,7 +762,7 @@ const ExportDocumentsPage = () => {
     } finally {
       setInvoiceLoading(false)
     }
-  }, [orderId])
+  }, [orderId, lotNo])
 
   // Print all
   const printAll = useCallback(async () => {
@@ -918,6 +929,25 @@ const ExportDocumentsPage = () => {
         </Row>
       </div>
 
+      {/* Chọn LÔ — sinh bộ chứng từ theo từng lô (mỗi lô 1 B/L riêng) */}
+      {lots.length > 0 && (
+        <Card size="small" style={{ marginBottom: 12 }} className="no-print"
+          styles={{ body: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } }}>
+          <Text strong style={{ color: '#1B4D3E' }}>📦 Bộ chứng từ theo lô:</Text>
+          <Segmented
+            value={lotNo}
+            onChange={(v) => setLotNo(Number(v))}
+            options={[
+              { label: 'Toàn đơn', value: 0 },
+              ...lots.map((l) => ({ label: `Lô ${l}`, value: l })),
+            ]}
+          />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {lotNo ? `Đang sinh riêng cho Lô ${lotNo} (container + B/L + giá trị của lô).` : 'Đang sinh cho cả đơn.'}
+          </Text>
+        </Card>
+      )}
+
       {/* Tabs */}
       <Card>
         <Tabs
@@ -985,7 +1015,7 @@ const ExportDocumentsPage = () => {
                   <FileDoneOutlined /> Hối phiếu
                 </span>
               ),
-              children: <BillOfExchangeTab orderId={orderId!} reloadKey={negVersion} />,
+              children: <BillOfExchangeTab orderId={orderId!} reloadKey={negVersion} lotNo={lotNo} />,
             },
             {
               key: 'dnck',
@@ -994,7 +1024,7 @@ const ExportDocumentsPage = () => {
                   <DollarOutlined /> Đơn chiết khấu
                 </span>
               ),
-              children: <LcNegotiationTab orderId={orderId!} order={order} onSaved={() => setNegVersion((v) => v + 1)} />,
+              children: <LcNegotiationTab orderId={orderId!} order={order} lotNo={lotNo} onSaved={() => setNegVersion((v) => v + 1)} />,
             },
             {
               key: 'bencert',
@@ -1003,7 +1033,7 @@ const ExportDocumentsPage = () => {
                   <SafetyCertificateOutlined /> Beneficiary Cert
                 </span>
               ),
-              children: <BeneficiaryCertTab orderId={orderId!} />,
+              children: <BeneficiaryCertTab orderId={orderId!} lotNo={lotNo} />,
             },
             {
               key: 'nonwood',
@@ -1012,7 +1042,7 @@ const ExportDocumentsPage = () => {
                   <SafetyCertificateOutlined /> Non-Wood Cert
                 </span>
               ),
-              children: <NonWoodCertTab orderId={orderId!} />,
+              children: <NonWoodCertTab orderId={orderId!} lotNo={lotNo} />,
             },
           ]}
         />

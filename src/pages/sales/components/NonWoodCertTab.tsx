@@ -13,7 +13,7 @@ const { Title, Text } = Typography
 const fmtD = (s?: string) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
 const fmtKg = (v: number) => `${(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KGS`
 
-export default function NonWoodCertTab({ orderId }: { orderId: string }) {
+export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string; lotNo?: number }) {
   const [d, setD] = useState<NonWoodCertData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -23,7 +23,7 @@ export default function NonWoodCertTab({ orderId }: { orderId: string }) {
     ;(async () => {
       setLoading(true)
       try {
-        const r = await documentService.getNonWoodCertData(orderId)
+        const r = await documentService.getNonWoodCertData(orderId, lotNo)
         if (!cancelled) setD(r)
       } catch (e: any) {
         if (!cancelled) { setError(true); message.error(e?.message || 'Lỗi tải Non-Wood Certificate') }
@@ -32,7 +32,7 @@ export default function NonWoodCertTab({ orderId }: { orderId: string }) {
       }
     })()
     return () => { cancelled = true }
-  }, [orderId])
+  }, [orderId, lotNo])
 
   if (loading) return <Spin tip="Loading..." />
   if (error || !d) return <Result icon={<FileProtectOutlined />} title="Non-Wood Packing Certificate" subTitle="Chưa tải được dữ liệu" />

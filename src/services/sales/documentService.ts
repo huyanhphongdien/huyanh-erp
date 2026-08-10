@@ -229,13 +229,27 @@ async function loadExportProfile(customerId: string | null | undefined): Promise
   return { profile, bank }
 }
 
-// Consignee theo TỪNG ĐƠN: L/C → "THE ORDER OF {NH phát hành}" (đổi theo mỗi L/C),
+// Booking (B/L · tàu · ETD · cảng) của 1 LÔ — null nếu không theo lô. Dùng để bộ chứng
+// từ theo lô lấy đúng B/L/tàu của lô đó (mỗi lô ship riêng).
+async function loadLotBooking(orderId: string, lotNo?: number): Promise<any> {
+  if (!lotNo) return null
+  const { data } = await supabase
+    .from('sales_order_bookings')
+    .select('*')
+    .eq('sales_order_id', orderId)
+    .eq('lot_no', lotNo)
+    .maybeSingle()
+  return data
+}
+
+// Consignee theo TỪNG ĐƠN/LÔ: L/C → "THE ORDER OF {NH phát hành}" (đổi theo mỗi L/C),
 // còn lại (D/P/D/A/T-T) → consignee mặc định ở hồ sơ khách.
-async function resolveConsignee(orderId: string, profile: any): Promise<string> {
+async function resolveConsignee(orderId: string, profile: any, lotNo?: number): Promise<string> {
   const { data: neg } = await supabase
     .from('sales_order_lc_negotiations')
     .select('method, issuing_bank')
     .eq('sales_order_id', orderId)
+    .eq('lot_no', lotNo || 0)
     .maybeSingle()
   const clean = (s: string) => (s || '').replace(/\s*\(SWIFT[^)]*\)\s*/i, '').trim()
   if ((neg?.method || 'lc') === 'lc' && neg?.issuing_bank) {
@@ -251,10 +265,24 @@ async function resolveConsignee(orderId: string, profile: any): Promise<string> 
 
 export const documentService = {
   // ==========================================================================
+  // LÔ — danh sách lot_no của đơn (để sinh bộ chứng từ theo lô)
+  // ==========================================================================
+  async listLots(orderId: string): Promise<number[]> {
+    const { data } = await supabase
+      .from('sales_order_containers')
+      .select('lot_no')
+      .eq('sales_order_id', orderId)
+      .not('lot_no', 'is', null)
+    const set = new Set<number>()
+    for (const r of data || []) if (r.lot_no) set.add(r.lot_no as number)
+    return Array.from(set).sort((a, b) => a - b)
+  },
+
+  // ==========================================================================
   // COA — Certificate of Analysis
   // ==========================================================================
 
-  async getCOAData(orderId: string): Promise<COAData> {
+  async getCOAData(orderId: string, lotNo = 0): Promise<COAData> {
     // Fetch order with customer
     const { data: order, error: orderErr } = await supabase
       .from('sales_orders')
@@ -273,11 +301,13 @@ export const documentService = {
       .eq('grade', order.grade)
       .maybeSingle()
 
-    // Fetch containers with items to get batch info
-    const { data: containers } = await supabase
+    // Fetch containers with items to get batch info — lọc theo lô nếu chọn
+    let coaQ = supabase
       .from('sales_order_containers')
       .select('*, items:sales_order_container_items(*)')
       .eq('sales_order_id', orderId)
+    if (lotNo) coaQ = coaQ.eq('lot_no', lotNo)
+    const { data: containers } = await coaQ
 
     // Collect unique batch IDs
     const batchIds = new Set<string>()
@@ -378,7 +408,7 @@ export const documentService = {
   // PACKING LIST
   // ==========================================================================
 
-  async getPackingListData(orderId: string): Promise<PackingListData> {
+  async getPackingListData(orderId: string, lotNo = 0): Promise<PackingListData> {
     // Fetch order with customer
     const { data: order, error: orderErr } = await supabase
       .from('sales_orders')
@@ -390,12 +420,14 @@ export const documentService = {
       throw new Error('Không thể tải thông tin đơn hàng')
     }
 
-    // Fetch containers with items
-    const { data: rawContainers } = await supabase
+    const booking = await loadLotBooking(orderId, lotNo)
+    // Fetch containers with items — lọc theo LÔ nếu chọn
+    let pklQ = supabase
       .from('sales_order_containers')
       .select('*, items:sales_order_container_items(*)')
       .eq('sales_order_id', orderId)
-      .order('created_at')
+    if (lotNo) pklQ = pklQ.eq('lot_no', lotNo)
+    const { data: rawContainers } = await pklQ.order('created_at')
 
     const containers: PackingListData['containers'] = []
     let totalBales = 0
@@ -435,11 +467,11 @@ export const documentService = {
     const { profile } = await loadExportProfile(order.customer_id)
 
     return {
-      order_code: soDisplayCode(order),
+      order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       customer_name: customer?.name || '',
       customer_address: customer?.address || '',
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
-      consignee: await resolveConsignee(orderId, profile),
+      consignee: await resolveConsignee(orderId, profile, lotNo),
       shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
       grade: order.grade,
       containers,
@@ -447,10 +479,10 @@ export const documentService = {
       total_bales: totalBales,
       total_net_weight: totalNet,
       total_gross_weight: totalGross,
-      port_of_loading: PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
-      port_of_destination: order.port_of_destination || '',
-      vessel_name: order.vessel_name || '',
-      etd: order.etd || '',
+      port_of_loading: booking?.port_of_loading || PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
+      port_of_destination: booking?.port_of_destination || order.port_of_destination || '',
+      vessel_name: booking?.vessel_name || order.vessel_name || '',
+      etd: booking?.etd || order.etd || '',
     }
   },
 
@@ -458,7 +490,7 @@ export const documentService = {
   // WEIGHT LIST
   // ==========================================================================
 
-  async getWeightListData(orderId: string): Promise<WeightListData> {
+  async getWeightListData(orderId: string, lotNo = 0): Promise<WeightListData> {
     const { data: order, error } = await supabase
       .from('sales_orders')
       .select('*, customer:sales_customers!customer_id(id,name,address)')
@@ -466,11 +498,13 @@ export const documentService = {
       .single()
     if (error || !order) throw new Error('Không thể tải thông tin đơn hàng')
 
-    const { data: rawContainers } = await supabase
+    const booking = await loadLotBooking(orderId, lotNo)
+    let wlQ = supabase
       .from('sales_order_containers')
       .select('container_no,seal_no,bale_count,net_weight_kg,tare_weight_kg,gross_weight_kg, items:sales_order_container_items(weight_kg)')
       .eq('sales_order_id', orderId)
-      .order('created_at')
+    if (lotNo) wlQ = wlQ.eq('lot_no', lotNo)
+    const { data: rawContainers } = await wlQ.order('created_at')
 
     const { profile } = await loadExportProfile(order.customer_id)
     const { data: invoice } = await supabase
@@ -505,21 +539,21 @@ export const documentService = {
 
     const customer = order.customer as { name?: string } | null
     return {
-      order_code: soDisplayCode(order),
+      order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
-      consignee: await resolveConsignee(orderId, profile),
+      consignee: await resolveConsignee(orderId, profile, lotNo),
       grade: order.grade,
       containers,
       total_bales: sum('bale_count'),
       total_net: sum('net_weight_kg'),
       total_tare: sum('tare_weight_kg'),
       total_gross: sum('gross_weight_kg'),
-      vessel_name: order.vessel_name || '',
-      bl_number: order.bl_number || invoice?.bl_number || null,
+      vessel_name: booking?.vessel_name || order.vessel_name || '',
+      bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       bl_date: order.bl_date || null,
-      port_of_loading: PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
-      port_of_destination: order.port_of_destination || '',
-      etd: order.etd || '',
+      port_of_loading: booking?.port_of_loading || PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
+      port_of_destination: booking?.port_of_destination || order.port_of_destination || '',
+      etd: booking?.etd || order.etd || '',
       shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
     }
   },
@@ -528,7 +562,7 @@ export const documentService = {
   // COMMERCIAL INVOICE
   // ==========================================================================
 
-  async getInvoiceData(orderId: string): Promise<InvoiceData> {
+  async getInvoiceData(orderId: string, lotNo = 0): Promise<InvoiceData> {
     // Fetch order with customer
     const { data: order, error: orderErr } = await supabase
       .from('sales_orders')
@@ -551,37 +585,44 @@ export const documentService = {
 
     const customer = order.customer as { name?: string; address?: string; country?: string } | null
     const { profile, bank } = await loadExportProfile(order.customer_id)
+    const booking = await loadLotBooking(orderId, lotNo)
 
-    const subtotal = order.quantity_tons * order.unit_price
-    // Khối lượng: ưu tiên tổng container thật; thiếu → quy từ số lượng tấn
-    const { data: wlCont } = await supabase
-      .from('sales_order_containers')
-      .select('net_weight_kg,gross_weight_kg')
-      .eq('sales_order_id', orderId)
+    // Khối lượng theo LÔ (lot_no) nếu chọn lô; không thì cả đơn
+    let contQ = supabase.from('sales_order_containers').select('net_weight_kg,gross_weight_kg').eq('sales_order_id', orderId)
+    if (lotNo) contQ = contQ.eq('lot_no', lotNo)
+    const { data: wlCont } = await contQ
     const sumNet = (wlCont || []).reduce((s, c) => s + (c.net_weight_kg || 0), 0)
     const sumGross = (wlCont || []).reduce((s, c) => s + (c.gross_weight_kg || c.net_weight_kg || 0), 0)
-    const netKg = sumNet || Math.round((order.quantity_tons || 0) * 1000)
+    const orderQty = order.quantity_tons || 0
+    // Số lượng (MT): lô → tổng net lô / 1000; cả đơn → theo đơn
+    const qtyTons = lotNo ? (sumNet / 1000) : orderQty
+    const netKg = sumNet || Math.round(qtyTons * 1000)
     const grossKg = sumGross || netKg
+    const subtotal = qtyTons * order.unit_price
     // HS code theo loại mủ (SVR/TSNR=40012200, RSS=40012100, khác=40012900)
     const g = order.grade || ''
     const hsCode = /RSS/i.test(g) ? '40012100' : /SVR|TSNR/i.test(g) ? '40012200' : '40012900'
-    // Cước & bảo hiểm: ưu tiên nhập trực tiếp trên đơn (ShippingTab), fallback bảng invoice cũ
-    const freight = order.freight_amount ?? invoice?.freight_charge ?? 0
-    const insurance = order.insurance_amount ?? invoice?.insurance_charge ?? 0
+    // Cước & bảo hiểm: cả đơn nhập ở ShippingTab; theo lô → chia tỷ lệ theo số lượng
+    const frOrder = order.freight_amount ?? invoice?.freight_charge ?? 0
+    const insOrder = order.insurance_amount ?? invoice?.insurance_charge ?? 0
+    const lotFrac = lotNo && orderQty > 0 ? Math.min(1, qtyTons / orderQty) : 1
+    const freight = Math.round(frOrder * lotFrac * 100) / 100
+    const insurance = Math.round(insOrder * lotFrac * 100) / 100
     // Khớp mẫu gốc: đơn giá đã là CIF → TOTAL = trị giá CIF; cước+BH TRỪ ra "THE COST" (số Hối phiếu draw)
     const total = subtotal
     const theCost = subtotal - freight - insurance
+    const lotSuffix = lotNo ? `/L${lotNo}` : ''
 
     return {
-      invoice_code: order.invoice_no || invoice?.code || `INV-${order.code}`,
-      order_code: soDisplayCode(order),
+      invoice_code: (order.invoice_no || invoice?.code || `INV-${order.code}`) + lotSuffix,
+      order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       customer: {
         name: customer?.name || '',
         address: customer?.address || '',
         country: customer?.country || '',
       },
       grade: order.grade,
-      quantity_tons: order.quantity_tons,
+      quantity_tons: qtyTons,
       unit_price: order.unit_price,
       currency: order.currency || 'USD',
       incoterm: order.incoterm || 'FOB',
@@ -592,8 +633,8 @@ export const documentService = {
       the_cost: theCost,
       payment_terms: profile?.default_payment_term || PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
       lc_number: order.lc_number || null,
-      // B/L nhập ở đơn (ShippingTab) — trước đây đọc nhầm từ sales_invoices (trống)
-      bl_number: order.bl_number || invoice?.bl_number || null,
+      // B/L: lô → từ booking của lô; cả đơn → order.bl_number
+      bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       invoice_date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
       bank_info: bank
         ? { account_name: bank.account_name || 'HUY ANH RUBBER COMPANY LIMITED', name: bank.bank_name, account: bank.account_no, address: bank.bank_address || '', swift: bank.swift_code || '' }
@@ -601,19 +642,19 @@ export const documentService = {
       // GĐ2 — hồ sơ chứng từ khách
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       buyer_address: profile?.buyer_address || customer?.address || '',
-      consignee: await resolveConsignee(orderId, profile),
+      consignee: await resolveConsignee(orderId, profile, lotNo),
       consignee_address: profile?.consignee_address || '',
       notify_party: profile?.notify_party || profile?.buyer_legal_name || customer?.name || '',
       notify_address: profile?.notify_address || '',
       shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
       attn_contacts: profile?.attn_contacts || '',
       po_number: order.customer_po || null,
-      // Vận đơn — cảng/tàu/ngày (trước đây Invoice hardcode '—')
-      port_of_loading: PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
-      port_of_destination: order.port_of_destination || order.port_of_discharge || '',
-      vessel_name: order.vessel_name || '',
-      voyage_number: order.voyage_number || '',
-      etd: order.etd || '',
+      // Vận đơn — lô → từ booking của lô; cả đơn → order
+      port_of_loading: booking?.port_of_loading || PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
+      port_of_destination: booking?.port_of_destination || order.port_of_destination || order.port_of_discharge || '',
+      vessel_name: booking?.vessel_name || order.vessel_name || '',
+      voyage_number: booking?.voyage_no || order.voyage_number || '',
+      etd: booking?.etd || order.etd || '',
       bl_date: order.bl_date || null,
       net_weight_kg: netKg,
       gross_weight_kg: grossKg,
@@ -626,12 +667,13 @@ export const documentService = {
   // BENEFICIARY'S CERTIFICATE — người bán tự khai (đã email bộ copy cho khách)
   // ==========================================================================
 
-  async getBeneficiaryCertData(orderId: string): Promise<BeneficiaryCertData> {
-    const inv = await this.getInvoiceData(orderId)
+  async getBeneficiaryCertData(orderId: string, lotNo = 0): Promise<BeneficiaryCertData> {
+    const inv = await this.getInvoiceData(orderId, lotNo)
     const { data: neg } = await supabase
       .from('sales_order_lc_negotiations')
       .select('lc_number,lc_date')
       .eq('sales_order_id', orderId)
+      .eq('lot_no', lotNo || 0)
       .maybeSingle()
     const { data: row } = await supabase
       .from('sales_orders')
@@ -639,8 +681,9 @@ export const documentService = {
       .eq('id', orderId)
       .maybeSingle()
     const email = (row?.customer as { email?: string } | null)?.email || ''
+    const base = inv.order_code.split(' — ')[0]
     return {
-      cert_no: `${inv.order_code}/BC`,
+      cert_no: `${base}${lotNo ? `/L${lotNo}` : ''}/BC`,
       date: inv.invoice_date,
       buyer_name: inv.buyer_name,
       buyer_address: inv.buyer_address,
@@ -659,11 +702,12 @@ export const documentService = {
   // NON-WOOD PACKING CERTIFICATE — người bán tự khai (không dùng bao bì gỗ)
   // ==========================================================================
 
-  async getNonWoodCertData(orderId: string): Promise<NonWoodCertData> {
-    const inv = await this.getInvoiceData(orderId)
+  async getNonWoodCertData(orderId: string, lotNo = 0): Promise<NonWoodCertData> {
+    const inv = await this.getInvoiceData(orderId, lotNo)
     const gradeLabel = (inv.grade || '').replace(/_/g, ' ')
+    const base = inv.order_code.split(' — ')[0]
     return {
-      cert_no: `${inv.order_code}/NW`,
+      cert_no: `${base}${lotNo ? `/L${lotNo}` : ''}/NW`,
       date: inv.invoice_date,
       // "buyer" trên Non-Wood = consignee (to order of NH), giống mẫu gốc
       buyer_name: inv.consignee || inv.buyer_name,
@@ -678,7 +722,7 @@ export const documentService = {
       port_of_loading: inv.port_of_loading,
       port_of_destination: inv.port_of_destination,
       bl_number: inv.bl_number || '',
-      contract_no: inv.order_code,
+      contract_no: base,
       invoice_no: inv.invoice_code,
     }
   },

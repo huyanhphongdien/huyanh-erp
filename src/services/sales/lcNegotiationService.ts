@@ -27,21 +27,22 @@ export interface LcNegotiation {
 }
 
 export const lcNegotiationService = {
-  async getByOrder(orderId: string): Promise<LcNegotiation | null> {
+  async getByOrder(orderId: string, lotNo = 0): Promise<LcNegotiation | null> {
     const { data, error } = await supabase
       .from('sales_order_lc_negotiations')
       .select('*')
       .eq('sales_order_id', orderId)
+      .eq('lot_no', lotNo)
       .maybeSingle()
     if (error) throw error
     return data as LcNegotiation | null
   },
 
-  async upsert(orderId: string, patch: Partial<LcNegotiation>): Promise<LcNegotiation> {
-    const row = { ...patch, sales_order_id: orderId, updated_at: new Date().toISOString() }
+  async upsert(orderId: string, patch: Partial<LcNegotiation>, lotNo = 0): Promise<LcNegotiation> {
+    const row = { ...patch, sales_order_id: orderId, lot_no: lotNo, updated_at: new Date().toISOString() }
     const { data, error } = await supabase
       .from('sales_order_lc_negotiations')
-      .upsert(row, { onConflict: 'sales_order_id' })
+      .upsert(row, { onConflict: 'sales_order_id,lot_no' })
       .select('*')
       .single()
     if (error) throw error

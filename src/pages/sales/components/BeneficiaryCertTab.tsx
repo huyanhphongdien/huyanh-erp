@@ -12,7 +12,7 @@ import { beneficiaryCertDoc, saveDocx } from '../../../services/sales/docxExport
 const { Title, Text } = Typography
 const fmtD = (s?: string) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
 
-export default function BeneficiaryCertTab({ orderId }: { orderId: string }) {
+export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: string; lotNo?: number }) {
   const [d, setD] = useState<BeneficiaryCertData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -22,7 +22,7 @@ export default function BeneficiaryCertTab({ orderId }: { orderId: string }) {
     ;(async () => {
       setLoading(true)
       try {
-        const r = await documentService.getBeneficiaryCertData(orderId)
+        const r = await documentService.getBeneficiaryCertData(orderId, lotNo)
         if (!cancelled) setD(r)
       } catch (e: any) {
         if (!cancelled) { setError(true); message.error(e?.message || 'Lỗi tải Beneficiary Certificate') }
@@ -31,7 +31,7 @@ export default function BeneficiaryCertTab({ orderId }: { orderId: string }) {
       }
     })()
     return () => { cancelled = true }
-  }, [orderId])
+  }, [orderId, lotNo])
 
   if (loading) return <Spin tip="Loading..." />
   if (error || !d) return <Result icon={<FileProtectOutlined />} title="Beneficiary's Certificate" subTitle="Chưa tải được dữ liệu" />

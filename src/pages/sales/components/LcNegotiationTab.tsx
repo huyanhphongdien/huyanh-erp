@@ -33,7 +33,7 @@ const DOC_LABEL = (k: string) => EXPORT_DOC_TYPES.find((d) => d.key === k)?.labe
 const fmtUSD = (v: number) => (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export default function LcNegotiationTab(
-  { orderId, order, onSaved }: { orderId: string; order: SalesOrder; onSaved?: () => void },
+  { orderId, order, onSaved, lotNo = 0 }: { orderId: string; order: SalesOrder; onSaved?: () => void; lotNo?: number },
 ) {
   const [form] = Form.useForm()
   const watched = Form.useWatch([], form)   // để văn bản cập nhật live khi sửa form
@@ -53,10 +53,10 @@ export default function LcNegotiationTab(
       setLoading(true)
       try {
         const [i, p, b, n] = await Promise.all([
-          documentService.getInvoiceData(orderId),
+          documentService.getInvoiceData(orderId, lotNo),
           customerExportProfileService.getByCustomer(order.customer_id),
           customerExportProfileService.listBanks(),
-          lcNegotiationService.getByOrder(orderId),
+          lcNegotiationService.getByOrder(orderId, lotNo),
         ])
         if (cancelled) return
         setInv(i); setProfile(p); setBanks(b); setNeg(n)
@@ -89,7 +89,7 @@ export default function LcNegotiationTab(
       }
     })()
     return () => { cancelled = true }
-  }, [orderId, order.customer_id, form])
+  }, [orderId, order.customer_id, form, lotNo])
 
   // Tự tính số tiền thương lượng khi đổi %
   const onPctChange = (pct: number | null) => {
@@ -120,7 +120,7 @@ export default function LcNegotiationTab(
         submitted_date: v.submitted_date ? v.submitted_date.format('YYYY-MM-DD') : null,
         status: v.status || 'draft',
         doc_checklist: buildDocChecklist(),
-      })
+      }, lotNo)
       setNeg(saved)
       message.success('Đã lưu đơn chiết khấu')
       onSaved?.()   // báo BOE nạp lại (số L/C, tenor, ngân hàng phát hành)

@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 export interface SalesBooking {
   id: string
   sales_order_id: string
+  lot_no: number | null       // khớp lot_no của container → bộ chứng từ theo lô lấy B/L của booking này
   lot_label: string | null
   booking_no: string | null
   shipping_line: string | null

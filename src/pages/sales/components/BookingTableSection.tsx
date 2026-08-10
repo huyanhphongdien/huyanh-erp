@@ -67,6 +67,7 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
       const v = await form.validateFields()
       setSaving(true)
       const input = {
+        lot_no: v.lot_no ?? null,
         lot_label: v.lot_label || null,
         booking_no: v.booking_no || null,
         shipping_line: v.shipping_line || null,
@@ -100,7 +101,7 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
   }
 
   const columns: ColumnsType<SalesBooking> = [
-    { title: 'Lô', dataIndex: 'lot_label', width: 70, render: (v) => v ? <Tag color="blue">{v}</Tag> : '—' },
+    { title: 'Lô', key: 'lot', width: 90, render: (_, r) => (r.lot_no || r.lot_label) ? <Tag color="blue">{r.lot_no ? `Lô ${r.lot_no}` : r.lot_label}</Tag> : '—' },
     { title: 'Số booking', dataIndex: 'booking_no', width: 120, render: (v) => v ? <b>{v}</b> : '—' },
     { title: 'Hãng tàu', dataIndex: 'shipping_line', width: 100, render: (v) => v || '—' },
     {
@@ -164,7 +165,10 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
       >
         <Form form={form} layout="vertical" size="small">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="lot_label" label="Lô"><Input placeholder="Lot 1" /></Form.Item>
+            <Form.Item name="lot_no" label="Số lô (khớp container)" tooltip="Số lô này phải bằng 'Lô' của container ở tab Đóng gói → bộ chứng từ theo lô sẽ lấy B/L/tàu của booking này">
+              <InputNumber min={1} style={{ width: '100%' }} placeholder="1" />
+            </Form.Item>
+            <Form.Item name="lot_label" label="Nhãn lô"><Input placeholder="Lot 1" /></Form.Item>
             <Form.Item name="booking_no" label="Số booking"><Input placeholder="271516317" /></Form.Item>
             <Form.Item name="shipping_line" label="Hãng tàu"><Input placeholder="MAERSK / ONE…" /></Form.Item>
             <Form.Item name="container_count" label="Số container"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>

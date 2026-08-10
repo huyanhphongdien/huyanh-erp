@@ -26,7 +26,7 @@ const parseTenorDays = (paymentTerms?: string): number | null => {
   return m ? Number(m[1]) : null
 }
 
-export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: string; reloadKey?: number }) {
+export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { orderId: string; reloadKey?: number; lotNo?: number }) {
   const [inv, setInv] = useState<InvoiceData | null>(null)
   const [neg, setNeg] = useState<LcNegotiation | null>(null)
   const [loading, setLoading] = useState(true)
@@ -38,8 +38,8 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
       setLoading(true)
       try {
         const [i, n] = await Promise.all([
-          documentService.getInvoiceData(orderId),
-          lcNegotiationService.getByOrder(orderId),
+          documentService.getInvoiceData(orderId, lotNo),
+          lcNegotiationService.getByOrder(orderId, lotNo),
         ])
         if (cancelled) return
         setInv(i)
@@ -51,7 +51,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey }: { orderId: str
       }
     })()
     return () => { cancelled = true }
-  }, [orderId, reloadKey])   // reloadKey bump khi ĐNCK lưu → BOE nạp lại số L/C/tenor/NH mới
+  }, [orderId, reloadKey, lotNo])   // reloadKey bump khi ĐNCK lưu → BOE nạp lại số L/C/tenor/NH mới
 
   if (loading) return <Spin tip="Loading..." />
   if (error || !inv) {

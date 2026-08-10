@@ -8,10 +8,11 @@
 
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  AlignmentType, BorderStyle, WidthType,
+  AlignmentType, BorderStyle, WidthType, ImageRun, VerticalAlign,
 } from 'docx'
 import { saveAs } from 'file-saver'
 import { amountToWords } from './contractGeneratorService'
+import { logoUint8Array, LOGO_W, LOGO_H } from './logoAsset'
 import type { InvoiceData, PackingListData, WeightListData, BeneficiaryCertData, NonWoodCertData } from './documentService'
 
 const FONT = 'Times New Roman'
@@ -29,6 +30,8 @@ const fmtD = (s: string | null | undefined): string => {
 const B = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
 const CELL_BORDERS = { top: B, bottom: B, left: B, right: B }
 const TABLE_BORDERS = { ...CELL_BORDERS, insideHorizontal: B, insideVertical: B }
+const NB = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+const NO_BORDERS = { top: NB, bottom: NB, left: NB, right: NB, insideHorizontal: NB, insideVertical: NB }
 
 type PO = { align?: (typeof AlignmentType)[keyof typeof AlignmentType]; after?: number; before?: number; bold?: boolean; italics?: boolean; size?: number; rule?: boolean }
 
@@ -62,12 +65,38 @@ function gridTable(headers: string[], rows: string[][], widths?: number[]) {
   }))
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: TABLE_BORDERS, rows: [headRow, ...bodyRows] })
 }
-function letterhead(): Paragraph[] {
-  return [
-    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.CENTER, bold: true, size: 15, after: 0 }),
-    P('Khe Ma, Phong Dien Ward, Hue City, Viet Nam', { align: AlignmentType.CENTER, size: 10.5, after: 0 }),
-    P('Tel: 054.3774994   ·   Fax: 054.3774994   ·   Tax ID: 3301549896', { align: AlignmentType.CENTER, size: 10.5, after: 60, rule: true }),
+// Logo HUYANH Natural Rubber (khớp mẫu chứng từ thật) — nhúng từ src/assets/logo.png
+function logoImage(width = 168): ImageRun {
+  const height = Math.round((width * LOGO_H) / LOGO_W)   // giữ tỉ lệ 300×96
+  return new ImageRun({ type: 'png', data: logoUint8Array(), transformation: { width, height } })
+}
+// Letterhead = LOGO trái + khối thông tin công ty căn phải (giống hệt mẫu)
+function letterhead(): (Paragraph | Table)[] {
+  const right = [
+    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, size: 12, after: 0 }),
+    P('KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM', { align: AlignmentType.RIGHT, size: 9.5, after: 0 }),
+    P('TEL: 054 3774994    FAX: 054 3774994', { align: AlignmentType.RIGHT, size: 9.5, after: 0 }),
+    P('EMAIL: info@huyanh.com    WEB: http://huyanhrubber.com.vn', { align: AlignmentType.RIGHT, size: 9.5, after: 0 }),
   ]
+  const headTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NO_BORDERS,
+    rows: [new TableRow({
+      children: [
+        new TableCell({
+          width: { size: 42, type: WidthType.PERCENTAGE }, borders: NO_BORDERS,
+          verticalAlign: VerticalAlign.CENTER, margins: { top: 0, bottom: 0, left: 0, right: 0 },
+          children: [new Paragraph({ children: [logoImage()], spacing: { after: 0 } })],
+        }),
+        new TableCell({
+          width: { size: 58, type: WidthType.PERCENTAGE }, borders: NO_BORDERS,
+          verticalAlign: VerticalAlign.CENTER, margins: { top: 0, bottom: 0, left: 0, right: 0 },
+          children: right,
+        }),
+      ],
+    })],
+  })
+  return [headTable, P('', { after: 80, rule: true })]
 }
 function makeDoc(children: (Paragraph | Table)[]) {
   return new Document({
@@ -215,6 +244,7 @@ export function boeDoc(d: {
     : d.tenorDays === 0 ? 'AT SIGHT' : `AT ${d.tenorDays} DAYS FROM BILL OF LADING DATE`
   const kv = (k: string, v: string) => P([R(k, {}), R(`: ${v}`, { bold: true })], { after: 20 })
   return makeDoc([
+    ...letterhead(),
     P('BILL OF EXCHANGE', { align: AlignmentType.CENTER, bold: true, size: 15, after: 60 }),
     P([R(`Hue City, ${d.today}`), R('                                          '), R(`FOR: USD ${money(d.amount)}`, { bold: true })], { after: 20 }),
     P(tenorLine, { bold: true, after: 0 }),
@@ -243,6 +273,7 @@ export function lcNegotiationDoc(d: {
 }): Document {
   const kv = (k: string, v: string) => P([R(k, {}), R(`: ${v}`)], { after: 20 })
   const kids: (Paragraph | Table)[] = [
+    ...letterhead(),
     P('GIẤY ĐỀ NGHỊ KIÊM HỢP ĐỒNG THƯƠNG LƯỢNG THANH TOÁN', { align: AlignmentType.CENTER, bold: true, size: 14, after: 20 }),
     P(`Số: ${d.orderCode}/TLTT`, { align: AlignmentType.CENTER, after: 100 }),
     P([R('Kính gửi: ', { bold: true }), R(`Ngân hàng ${d.bankName || '.....'}`)], { after: 80 }),
@@ -287,6 +318,7 @@ export function collectionDiscountDoc(d: {
   const kv = (k: string, v: string) => P([R(k, {}), R(`: ${v}`)], { after: 20 })
   const methodLabel = d.method === 'da' ? 'Nhờ thu D/A (URC 522)' : 'Nhờ thu D/P (URC 522)'
   const kids: (Paragraph | Table)[] = [
+    ...letterhead(),
     P('GIẤY ĐỀ NGHỊ CHIẾT KHẤU KIÊM PHỤ LỤC HỢP ĐỒNG', { align: AlignmentType.CENTER, bold: true, size: 14, after: 20 }),
     P(`Số: ${d.orderCode}/CI-CK`, { align: AlignmentType.CENTER, after: 10 }),
     P('(Mẫu BM08 — Hối phiếu kèm bộ chứng từ, TRỪ L/C)', { align: AlignmentType.CENTER, italics: true, size: 10, after: 100 }),

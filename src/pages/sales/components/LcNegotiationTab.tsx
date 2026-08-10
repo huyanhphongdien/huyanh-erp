@@ -21,6 +21,7 @@ import customerExportProfileService, {
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { lcNegotiationDoc, collectionDiscountDoc, saveDocx } from '../../../services/sales/docxExport'
+import DocLetterhead from './DocLetterhead'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -233,6 +234,7 @@ export default function LcNegotiationTab(
 
       {/* ── Văn bản đề nghị (in được) ── */}
       <div className="doc-print-area" id="dnck-print">
+        <DocLetterhead />
         <Title level={4} style={{ textAlign: 'center', marginBottom: 2 }}>
           {isDP ? 'GIẤY ĐỀ NGHỊ CHIẾT KHẤU KIÊM PHỤ LỤC HỢP ĐỒNG' : 'GIẤY ĐỀ NGHỊ KIÊM HỢP ĐỒNG THƯƠNG LƯỢNG THANH TOÁN'}
         </Title>

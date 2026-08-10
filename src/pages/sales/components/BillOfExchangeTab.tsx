@@ -13,6 +13,7 @@ import { documentService, type InvoiceData } from '../../../services/sales/docum
 import { lcNegotiationService, type LcNegotiation } from '../../../services/sales/lcNegotiationService'
 import { amountToWords } from '../../../services/sales/contractGeneratorService'
 import { boeDoc, saveDocx } from '../../../services/sales/docxExport'
+import DocLetterhead from './DocLetterhead'
 
 const { Title, Text } = Typography
 
@@ -88,6 +89,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
 
   return (
     <div className="doc-print-area" id="boe-print">
+      <DocLetterhead />
       <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>BILL OF EXCHANGE</Title>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '16px 0 8px' }}>

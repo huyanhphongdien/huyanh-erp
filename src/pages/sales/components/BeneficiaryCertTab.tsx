@@ -8,6 +8,7 @@ import { Spin, Button, Space, Typography, Result, message } from 'antd'
 import { PrinterOutlined, FileWordOutlined, FileProtectOutlined } from '@ant-design/icons'
 import { documentService, type BeneficiaryCertData } from '../../../services/sales/documentService'
 import { beneficiaryCertDoc, saveDocx } from '../../../services/sales/docxExport'
+import DocLetterhead from './DocLetterhead'
 
 const { Title, Text } = Typography
 const fmtD = (s?: string) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
@@ -45,6 +46,7 @@ export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: st
 
   return (
     <div className="doc-print-area">
+      <DocLetterhead />
       <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>BENEFICIARY'S CERTIFICATE</Title>
       <div style={{ textAlign: 'center', marginBottom: 16 }}>
         <Text>No.: {d.cert_no}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Date: {fmtD(d.date)}</Text>

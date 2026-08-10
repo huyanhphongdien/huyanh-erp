@@ -44,6 +44,7 @@ import BillOfExchangeTab from './components/BillOfExchangeTab'
 import LcNegotiationTab from './components/LcNegotiationTab'
 import BeneficiaryCertTab from './components/BeneficiaryCertTab'
 import NonWoodCertTab from './components/NonWoodCertTab'
+import DocLetterhead from './components/DocLetterhead'
 import type { COAData, PackingListData, InvoiceData, WeightListData } from '../../services/sales/documentService'
 import type { SalesOrder } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
@@ -54,15 +55,8 @@ const { Title, Text, Paragraph } = Typography
 // COMPANY HEADER (shared)
 // ============================================================================
 
-// Letterhead khớp mẫu chứng từ thật (tên tiếng Anh, serif, chữ đen, gạch chân)
-const CompanyHeader = () => (
-  <div className="doc-company-header" style={{ textAlign: 'center', marginBottom: 18, color: '#000' }}>
-    <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: 0.3 }}>HUY ANH RUBBER COMPANY LIMITED</div>
-    <div style={{ fontSize: 12.5 }}>Khe Ma, Phong Dien Ward, Hue City, Viet Nam</div>
-    <div style={{ fontSize: 12.5 }}>Tel: 054.3774994&nbsp;&nbsp;·&nbsp;&nbsp;Fax: 054.3774994&nbsp;&nbsp;·&nbsp;&nbsp;Tax ID: 3301549896</div>
-    <div style={{ borderBottom: '2px solid #000', marginTop: 8 }} />
-  </div>
-)
+// Letterhead khớp HỆT mẫu chứng từ thật (LOGO trái + info phải) — dùng chung DocLetterhead
+const CompanyHeader = DocLetterhead
 
 // ============================================================================
 // COA TAB

@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hướng dẫn toàn diện — Bộ chứng từ xuất khẩu (Huy Anh)</title>
+<style>
+:root{
+  --bg:#f6f4ef; --surface:#ffffff; --surface-2:#faf8f3;
+  --ink:#22282c; --muted:#61707a; --line:#e7e1d6;
+  --brand:#1B4D3E; --brand-2:#2f6f57; --brand-ink:#123c30;
+  --accent:#b5730a; --ok:#1f9d55; --danger:#c0392b; --info:#1257a8;
+  --tint-green:#eef4f0; --tint-amber:#fbf2df; --tint-red:#fbeceb; --tint-blue:#eaf1fb;
+  --chip:#eef2ef;
+  --shadow:0 1px 2px rgba(18,40,32,.05),0 6px 20px rgba(18,40,32,.05);
+  --radius:14px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12171a; --surface:#1a2126; --surface-2:#161d21;
+  --ink:#e6ebe8; --muted:#95a3aa; --line:#2a343a;
+  --brand:#7ec6a3; --brand-2:#5fb894; --brand-ink:#bfe6d4;
+  --accent:#e6a23c; --ok:#4ac97e; --danger:#e8756a; --info:#6ea8e8;
+  --tint-green:#17281f; --tint-amber:#2a2417; --tint-red:#2a1a18; --tint-blue:#17222e;
+  --chip:#20292e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+}}
+:root[data-theme="dark"]{
+  --bg:#12171a; --surface:#1a2126; --surface-2:#161d21;
+  --ink:#e6ebe8; --muted:#95a3aa; --line:#2a343a;
+  --brand:#7ec6a3; --brand-2:#5fb894; --brand-ink:#bfe6d4;
+  --accent:#e6a23c; --ok:#4ac97e; --danger:#e8756a; --info:#6ea8e8;
+  --tint-green:#17281f; --tint-amber:#2a2417; --tint-red:#2a1a18; --tint-blue:#17222e;
+  --chip:#20292e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:74px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.wrap{max-width:940px;margin:0 auto;padding:0 20px}
+h1,h2,h3{font-family:var(--serif);line-height:1.2;text-wrap:balance;color:var(--ink)}
+a{color:var(--brand-2);text-decoration:none}
+a:hover{text-decoration:underline}
+code,.mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.88em;
+  background:var(--chip);padding:.08em .38em;border-radius:5px}
+
+/* top bar */
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;gap:14px;height:56px;overflow-x:auto}
+.topbar .brand{font-weight:800;color:var(--brand);white-space:nowrap;font-size:15px;letter-spacing:.01em}
+.topbar nav{display:flex;gap:4px;margin-left:auto}
+.topbar nav a{font-size:12.5px;color:var(--muted);padding:6px 9px;border-radius:8px;white-space:nowrap}
+.topbar nav a:hover{background:var(--chip);color:var(--brand);text-decoration:none}
+
+/* hero */
+.hero{padding:46px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-2);font-weight:700}
+.hero h1{font-size:clamp(28px,5vw,40px);margin:.32em 0 .28em}
+.hero .lede{font-size:18px;color:var(--muted);max-width:64ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.tag{font-size:12.5px;background:var(--chip);color:var(--muted);padding:4px 11px;border-radius:999px;border:1px solid var(--line)}
+.tag.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+:root[data-theme="dark"] .tag.on, :root:not([data-theme="light"]) .tag.on{color:#0f1613}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.on{color:#0f1613}}
+
+section{padding:34px 0;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+h2{font-size:25px;margin:0 0 4px;display:flex;align-items:baseline;gap:12px}
+h2 .num{font-family:var(--sans);font-size:13px;font-weight:800;color:#fff;background:var(--brand);
+  min-width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+:root[data-theme="dark"] h2 .num,:root:not([data-theme="light"]) h2 .num{color:#0f1613}
+h2 + .sub{color:var(--muted);margin:2px 0 18px;font-size:15.5px}
+h3{font-size:18px;margin:26px 0 8px;color:var(--brand-ink)}
+p{margin:0 0 12px}
+strong{color:var(--ink)}
+.lead{font-size:17px}
+
+/* cards & callouts */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;box-shadow:var(--shadow);margin:14px 0}
+.grid{display:grid;gap:14px}
+.grid.two{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.callout{border-left:4px solid var(--brand);background:var(--tint-green);border-radius:10px;
+  padding:12px 16px;margin:14px 0;font-size:15px}
+.callout.warn{border-color:var(--accent);background:var(--tint-amber)}
+.callout.warn b{color:var(--accent)}
+.callout.danger{border-color:var(--danger);background:var(--tint-red)}
+.callout.info{border-color:var(--info);background:var(--tint-blue)}
+.callout .t{font-weight:800;display:block;margin-bottom:2px}
+
+/* tables */
+.tblwrap{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--surface-2);font-size:12px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td b{color:var(--ink)}
+.req{color:var(--accent);font-weight:700}
+.opt{color:var(--muted)}
+.auto{color:var(--brand-2);font-weight:600}
+
+/* dots / legend */
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:middle;margin-right:7px;flex:0 0 auto}
+.dot.g{background:var(--ok)} .dot.y{background:var(--accent)} .dot.n{background:#b9c1c4}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin:6px 0 4px;font-size:14px}
+.legend span{display:inline-block}
+
+/* readiness mock */
+.mock{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin:16px 0}
+.mock .bar{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.mock .bar .lbl{font-weight:800;color:var(--brand)}
+.mock .bar .prog{flex:1;min-width:120px;max-width:220px;height:6px;border-radius:3px;background:var(--chip);overflow:hidden}
+.mock .bar .prog i{display:block;height:100%;background:var(--accent);width:71%}
+.docgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.doccell{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;background:var(--surface-2)}
+.doccell.active{border-color:var(--brand);background:var(--tint-green)}
+.doccell .nm{font-weight:700;display:flex;align-items:center}
+.doccell .st{font-size:11.5px;color:var(--muted);margin-top:2px}
+.doccell .st.g{color:var(--ok)} .doccell .st.y{color:var(--accent)}
+.panel{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:12px 14px;margin-top:12px}
+.panel .ph{font-weight:800;font-size:13.5px;margin-bottom:8px}
+.chkrow{display:flex;align-items:flex-start;gap:9px;padding:3px 0;font-size:14px}
+.ic{width:18px;height:18px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;font-size:11px;font-weight:800;margin-top:1px}
+.ic.ok{background:var(--tint-green);color:var(--ok)} .ic.no{background:var(--tint-amber);color:var(--accent)}
+.grpttl{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;display:flex;gap:10px;align-items:center}
+.mini{font-size:12px;color:var(--brand-2);font-weight:600}
+
+/* step chips */
+.flow{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+.flow .step{font-size:13px;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:5px 13px}
+.flow .step b{color:var(--brand)}
+.arrow{color:var(--muted);align-self:center}
+
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;margin-left:6px}
+.pill.new{background:var(--brand);color:#fff}
+:root[data-theme="dark"] .pill.new,:root:not([data-theme="light"]) .pill.new{color:#0f1613}
+.pill.lc{background:var(--tint-blue);color:var(--info)}
+.pill.dp{background:var(--tint-amber);color:var(--accent)}
+
+ul.clean{margin:8px 0;padding-left:22px}
+ul.clean li{margin:5px 0}
+.foot{padding:28px 0 60px;color:var(--muted);font-size:13.5px}
+.kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:.86em;background:var(--surface-2)}
+hr.soft{border:0;border-top:1px dashed var(--line);margin:18px 0}
+.toc{columns:2;column-gap:24px;font-size:14.5px}
+.toc a{display:block;padding:3px 0}
+@media(max-width:620px){.toc{columns:1}}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <span class="brand">Huy Anh · Bộ chứng từ</span>
+  <nav>
+    <a href="#tongquan">Tổng quan</a>
+    <a href="#giaodien">Giao diện mới</a>
+    <a href="#lc-dp">L/C vs D/P</a>
+    <a href="#nhaplieu">5 khâu nhập</a>
+    <a href="#chungtu">7 chứng từ</a>
+    <a href="#dnck">ĐNCK</a>
+    <a href="#field">Field bắt buộc</a>
+    <a href="#vidu">Ví dụ</a>
+  </nav>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">Cao su Huy Anh · Tài liệu vận hành</div>
+  <h1>Bộ chứng từ xuất khẩu — Hướng dẫn toàn diện</h1>
+  <p class="lede">Từ nhập liệu đến tự sinh: giao diện kiểm tra sẵn sàng, 7 chứng từ tự sinh khớp mẫu gốc,
+     Đơn chiết khấu ĐNCK cho cả <b>L/C</b> và <b>D/P (nhờ thu)</b>, và mọi field bắt buộc hay hay thiếu.</p>
+  <div class="meta">
+    <span class="tag on">Cập nhật 10/08/2026</span>
+    <span class="tag">7 chứng từ tự sinh</span>
+    <span class="tag">L/C · D/P</span>
+    <span class="tag">Giao diện readiness + drawer</span>
+    <span class="tag">huyanhrubber.vn</span>
+  </div>
+</div></header>
+
+<main class="wrap">
+
+<!-- 0. TỔNG QUAN -->
+<section id="tongquan">
+  <h2><span class="num">01</span> Tổng quan — 1 bộ chứng từ gồm gì</h2>
+  <p class="sub">Nguyên tắc vàng: <b>Hồ sơ chứng từ khách nhập 1 lần, dùng mãi</b>. Hệ tự điền đúng khi 5 khâu nhập đủ.</p>
+
+  <p class="lead"><b>1 bộ đầy đủ = 7 chứng từ hệ TỰ SINH + các file ĐÍNH KÈM.</b></p>
+  <div class="grid two">
+    <div class="card">
+      <h3 style="margin-top:0">🟢 7 chứng từ tự sinh (.docx)</h3>
+      <ul class="clean">
+        <li>Commercial Invoice</li>
+        <li>Packing List</li>
+        <li>Weight List</li>
+        <li>Hối phiếu (Bill of Exchange)</li>
+        <li>Đơn chiết khấu — <span class="pill lc">L/C: ĐNCK Vietinbank</span> <span class="pill dp">D/P: BM08 nhờ thu</span></li>
+        <li>Beneficiary's Certificate</li>
+        <li>Non-Wood Certificate</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">⚪ File đính kèm (từ bên ngoài)</h3>
+      <ul class="clean">
+        <li>COA (Certificate of Analysis) — phòng LAB (VILAS 1522)</li>
+        <li>Bill of Lading (B/L) — hãng tàu</li>
+        <li>C/O Form B — VCCI</li>
+        <li>Insurance Certificate — cty bảo hiểm (nếu CIF)</li>
+        <li>Phytosanitary · Fumigation — cơ quan kiểm dịch</li>
+        <li>LC Copy — ngân hàng</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Luồng 5 khâu — ai nhập gì, ở đâu</h3>
+  <div class="flow">
+    <span class="step"><b>0.</b> Hồ sơ khách</span><span class="arrow">→</span>
+    <span class="step"><b>1.</b> Sale tạo đơn</span><span class="arrow">→</span>
+    <span class="step"><b>2.</b> SX/Kho đóng gói</span><span class="arrow">→</span>
+    <span class="step"><b>3.</b> Logistics vận chuyển</span><span class="arrow">→</span>
+    <span class="step"><b>4.</b> Kế toán chiết khấu</span><span class="arrow">→</span>
+    <span class="step"><b>5.</b> Đính kèm file</span>
+  </div>
+  <div class="callout info"><span class="t">2 chỗ hay nhầm</span>
+    (1) <b>Hồ sơ chứng từ</b> (consignee/mark/bank) nằm ở <b>tab riêng</b> trong màn Khách — KHÔNG phải nút "Sửa" (nút Sửa chỉ có info chung).
+    (2) <b>PO# / Số HĐ</b> nhập ở <b>Đơn → tab "Hợp đồng"</b>, không phải màn Khách.
+  </div>
+</section>
+
+<!-- 1. GIAO DIỆN MỚI -->
+<section id="giaodien">
+  <h2><span class="num">02</span> Giao diện mới — Trang sinh chứng từ trực quan</h2>
+  <p class="sub">Vào: Chi tiết đơn → tab <b>"Chứng từ"</b> → <b>Mở trang Sinh chứng từ</b> (<span class="mono">/sales/orders/…/documents</span>).</p>
+
+  <p>Trước khi sinh một chứng từ, trang cho biết <b>đã đủ dữ liệu chưa</b>. Thiếu thì mở ngay ô nhập <b>tại chỗ</b> → Lưu → tự cập nhật → tải file. Không phải nhớ nhập ở đâu nữa.</p>
+
+  <h3>a) Dải tổng quan 8 chứng từ — nhìn là biết đủ/thiếu</h3>
+  <div class="legend">
+    <span><i class="dot g"></i> <b>Đủ dữ liệu</b> — sinh được ngay</span>
+    <span><i class="dot y"></i> <b>Thiếu N mục</b> bắt buộc</span>
+    <span><i class="dot n"></i> <b>Đính kèm</b> (COA — không tự sinh)</span>
+  </div>
+  <div class="mock" aria-label="minh hoạ dải tổng quan">
+    <div class="bar"><span class="lbl">Tổng quan bộ chứng từ</span>
+      <span style="color:var(--muted);font-size:13px">5/7 chứng từ đủ dữ liệu để sinh</span>
+      <span class="prog"><i></i></span>
+    </div>
+    <div class="docgrid">
+      <div class="doccell"><div class="nm"><i class="dot n"></i>COA</div><div class="st">Đính kèm scan</div></div>
+      <div class="doccell active"><div class="nm"><i class="dot g"></i>Commercial Invoice</div><div class="st g">✓ Đủ dữ liệu</div></div>
+      <div class="doccell"><div class="nm"><i class="dot g"></i>Packing List</div><div class="st g">✓ Đủ dữ liệu</div></div>
+      <div class="doccell"><div class="nm"><i class="dot y"></i>Weight List</div><div class="st y">● Thiếu 1 mục</div></div>
+      <div class="doccell"><div class="nm"><i class="dot g"></i>Hối phiếu</div><div class="st g">✓ Đủ dữ liệu</div></div>
+      <div class="doccell"><div class="nm"><i class="dot y"></i>Đơn chiết khấu</div><div class="st y">● Thiếu 2 mục</div></div>
+      <div class="doccell"><div class="nm"><i class="dot g"></i>Beneficiary Cert</div><div class="st g">✓ Đủ dữ liệu</div></div>
+      <div class="doccell"><div class="nm"><i class="dot g"></i>Non-Wood Cert</div><div class="st g">✓ Đủ dữ liệu</div></div>
+    </div>
+  </div>
+  <p style="font-size:14.5px;color:var(--muted)">Mỗi <b>tab chứng từ</b> cũng có đèn cùng màu ở nhãn. Bấm 1 thẻ để nhảy tới tab tương ứng.</p>
+
+  <h3>b) Panel "Dữ liệu cần" — checklist ✓/✗ gom theo NƠI nhập</h3>
+  <p>Ngay trên nội dung mỗi chứng từ có panel liệt kê từng mục dữ liệu, gom theo nơi nhập (Hồ sơ khách · Hợp đồng · Vận chuyển · Đóng gói · Đơn chiết khấu). Mục thiếu có nút <b>"Nhập ngay →"</b>.</p>
+  <div class="mock" aria-label="minh hoạ panel dữ liệu cần">
+    <div class="bar"><span class="lbl">Dữ liệu cần cho chứng từ</span>
+      <span class="tag" style="background:var(--tint-amber);color:var(--accent);border-color:var(--accent)">● Thiếu 1 mục bắt buộc</span></div>
+    <div class="grpttl">Hợp đồng</div>
+    <div class="chkrow"><span class="ic ok">✓</span><div>Grade · Số lượng · Đơn giá <span style="color:var(--muted);font-size:12px">— SVR 10 · 105 · 2290</span></div></div>
+    <div class="grpttl">Vận chuyển <span class="mini">Nhập ngay →</span></div>
+    <div class="chkrow"><span class="ic ok">✓</span><div>Cảng xếp · Cảng đến · Tàu</div></div>
+    <div class="chkrow"><span class="ic no">!</span><div>Cước + Bảo hiểm (đơn CIF)<div style="color:var(--accent);font-size:12px">Thiếu → FOB(COST) sẽ = CIF (sai)</div></div></div>
+    <div class="chkrow"><span class="ic ok">✓</span><div>Ngày Proforma (PI) <span class="opt">· nên có</span></div></div>
+  </div>
+
+  <h3>c) "Nhập ngay" → Drawer nhập tại chỗ <span class="pill new">CHÍNH</span></h3>
+  <p>Bấm <b>"Nhập ngay →"</b> mở một ngăn (drawer) trượt ra bên phải, chỉ chứa <b>vài ô cần</b> của nhóm đó. Nhập → <b>Lưu</b> → đèn/panel tự cập nhật → tải file. Kèm link phụ <b>"Mở tab đầy đủ ↗"</b> khi cần form đầy đủ.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Nhóm (Nhập ngay)</th><th>Ô trong drawer</th></tr></thead>
+    <tbody>
+      <tr><td><b>Hồ sơ khách</b></td><td>Buyer (tên pháp lý) · Địa chỉ · Ngân hàng thụ hưởng</td></tr>
+      <tr><td><b>Hợp đồng</b></td><td>Grade · Số lượng · Đơn giá · Incoterm</td></tr>
+      <tr><td><b>Vận chuyển</b></td><td>Cước + Bảo hiểm <span class="opt">(có xem trước CIF → FOB(COST))</span> · Cảng · Tàu · B/L · Ngày Proforma · ITEM NO · PACKING</td></tr>
+      <tr><td><b>Đóng gói</b></td><td>Số Pallet / container (cho Weight List)</td></tr>
+      <tr><td><b>Đơn chiết khấu</b></td><td>Nhảy thẳng tới tab ĐNCK ngay trong trang</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><span class="t">Mẹo</span> Drawer Vận chuyển hiện <b>xem trước</b>: CIF ≈ Số lượng × Đơn giá, và FOB(COST) trên Hối phiếu = CIF − Cước − Bảo hiểm. Nhập cước/BH là thấy ngay số Hối phiếu sẽ draw.</div>
+</section>
+
+<!-- 2. L/C vs D/P -->
+<section id="lc-dp">
+  <h2><span class="num">03</span> Phân biệt 2 loại thanh toán: L/C và D/P</h2>
+  <p class="sub">Chọn <b>Phương thức</b> ở tab "Đơn chiết khấu" (hoặc mặc định ở Hồ sơ khách) → hệ tự đổi Đơn chiết khấu + Hối phiếu + Consignee. Các chứng từ khác giống nhau.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Tiêu chí</th><th>L/C — Thư tín dụng</th><th>D/P — Nhờ thu</th></tr></thead>
+    <tbody>
+      <tr><td><b>Bản chất</b></td><td>NH <b>cam kết</b> trả tiền (bảo lãnh)</td><td>NH chỉ <b>thu hộ</b> — không bảo lãnh</td></tr>
+      <tr><td><b>Đơn chiết khấu</b></td><td>ĐNCK Vietinbank (BM03/L/C)</td><td>BM08 — Hối phiếu kèm bộ CT, <b>TRỪ L/C</b></td></tr>
+      <tr><td><b>Ngân hàng đối tác</b></td><td>NH phát hành L/C</td><td>NH nhờ thu = NH người mua</td></tr>
+      <tr><td><b>Consignee (B/L)</b></td><td>THE ORDER OF {NH phát hành} — tự suy</td><td>Người mua / to order (hồ sơ khách)</td></tr>
+      <tr><td><b>Hối phiếu</b></td><td>Drawn under {NH phát hành}, có số L/C, kỳ hạn</td><td>Drawn on {người mua}, AT SIGHT, KHÔNG L/C</td></tr>
+      <tr><td><b>Số tiền draw</b></td><td>THE COST</td><td>THE COST</td></tr>
+      <tr><td><b>Quy tắc</b></td><td>UCP 600</td><td>URC 522</td></tr>
+      <tr><td><b>Rủi ro người bán</b></td><td>Thấp</td><td>Cao hơn</td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:14.5px;color:var(--muted)">Phần còn lại (Invoice · PKL · WL · COA · B/L · C/O · Bảo hiểm · 2 Cert) <b>giống nhau</b> cho cả 2 loại — chỉ khác Đơn chiết khấu và Hối phiếu.</p>
+</section>
+
+<!-- 3. 5 KHÂU NHẬP LIỆU -->
+<section id="nhaplieu">
+  <h2><span class="num">04</span> 5 khâu nhập liệu — nhập gì · ở đâu · lên chứng từ nào</h2>
+  <p class="sub"><span class="req">Đỏ</span> = bắt buộc · <span class="opt">xám</span> = nên có · <span class="auto">xanh</span> = tự động/suy.</p>
+
+  <h3>Khâu 0 — Hồ sơ chứng từ khách <span class="opt">[Admin/Sale · nhập 1 lần/khách]</span></h3>
+  <p><b>Vào:</b> Khách hàng → chọn khách → tab <b>"Hồ sơ chứng từ"</b> (KHÁC nút "Sửa").</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Nhập gì</th><th>Bắt buộc</th><th>Lên chứng từ</th></tr></thead>
+    <tbody>
+      <tr><td>Buyer (tên pháp lý) + địa chỉ</td><td class="req">Bắt buộc</td><td>Invoice, PKL, WL</td></tr>
+      <tr><td>Consignee + địa chỉ</td><td>D/P</td><td>Invoice/PKL/WL — <span class="auto">L/C tự suy "THE ORDER OF {NH phát hành}"</span></td></tr>
+      <tr><td>Notify party</td><td class="opt">Tuỳ</td><td>Invoice — trống thì tự = buyer</td></tr>
+      <tr><td>Shipping marks (base)</td><td class="req">Bắt buộc</td><td>Invoice, PKL — đơn khác thì override ở Vận chuyển</td></tr>
+      <tr><td>Ngân hàng thụ hưởng</td><td class="req">Bắt buộc</td><td>Invoice, Hối phiếu, ĐNCK</td></tr>
+      <tr><td>Checklist số bản (46A) mặc định</td><td class="opt">Nên có</td><td>ĐNCK — lô khác thì sửa ở tab Đơn chiết khấu</td></tr>
+      <tr><td>Chiết khấu mặc định (Phương thức · NH · %/lãi/kỳ hạn)</td><td class="opt">Nên có</td><td>Hối phiếu, ĐNCK</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><span class="t">Hồ sơ = mẫu cố định; Đơn = ghi đè động</span>
+    Thứ đổi theo lô KHỎI sửa hồ sơ: Consignee (auto theo NH phát hành) · Shipping mark (ô riêng tab Vận chuyển) · Số bản 46A (bảng riêng tab Đơn chiết khấu) · Notify (tự = buyer).</div>
+
+  <h3>Khâu 1 — Thông tin đơn <span class="opt">[Sale]</span></h3>
+  <p><b>Vào:</b> Tạo đơn — hoặc Chi tiết đơn → tab <b>"Hợp đồng"</b> → Sửa (tab "Thông tin" chỉ để xem).</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Nhập gì</th><th>Bắt buộc</th><th>Lên chứng từ</th></tr></thead>
+    <tbody>
+      <tr><td>Grade · Số lượng · Đơn giá · Tiền tệ</td><td class="req">Bắt buộc</td><td>Invoice, PKL, WL, Hối phiếu</td></tr>
+      <tr><td>Incoterm (FOB/CIF/CFR…)</td><td class="req">Bắt buộc</td><td>Invoice</td></tr>
+      <tr><td>Số hợp đồng · <b>Ngày HĐ</b> <span class="pill new">MỚI dùng cho ĐNCK</span></td><td class="req">Bắt buộc</td><td>Invoice, ĐNCK ("Hợp đồng số … ngày …")</td></tr>
+      <tr><td>PO# của khách</td><td class="opt">Nếu có</td><td>Invoice</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><span class="t">Ngày HĐ ≠ Ngày Proforma</span> ĐNCK lấy dòng "Hợp đồng số … ngày …" theo <b>Ngày HĐ</b> (khâu 1), còn dòng "DATED …" trên Invoice lấy <b>Ngày Proforma</b> (khâu 3). Trước đây ĐNCK vô tình lấy ngày Proforma — nay đã sửa lấy đúng Ngày HĐ; nhớ nhập cả hai.</div>
+
+  <h3>Khâu 2 — Đóng gói container <span class="opt">[SX/Kho]</span></h3>
+  <p><b>Vào:</b> Chi tiết đơn → <b>Đóng gói</b> (nhập theo từng container).</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Nhập gì</th><th>Bắt buộc</th><th>Lên chứng từ</th></tr></thead>
+    <tbody>
+      <tr><td>Số container · Số seal · Số bành</td><td class="req">Bắt buộc</td><td>PKL, WL</td></tr>
+      <tr><td>Net (kg) — cao su thuần</td><td class="req">Bắt buộc</td><td>PKL, WL, Invoice</td></tr>
+      <tr><td>Bì/Tare (kg) · Gross (kg)</td><td class="req">Bắt buộc</td><td>WL, PKL</td></tr>
+      <tr><td>Số PALLET / container</td><td class="opt">Nếu làm WL</td><td>Weight List (cột PALLET)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Khâu 3 — Vận chuyển <span class="opt">[Logistics]</span></h3>
+  <p><b>Vào:</b> Chi tiết đơn → tab <b>"Vận chuyển"</b> → Chỉnh sửa. Card "Chi tiết Commercial Invoice" chứa Proforma/ITEM NO/PACKING.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Nhập gì</th><th>Bắt buộc</th><th>Lên chứng từ</th></tr></thead>
+    <tbody>
+      <tr><td>Hãng tàu · Tàu/Chuyến · Booking</td><td class="req">Bắt buộc</td><td>Invoice, PKL, WL</td></tr>
+      <tr><td>B/L số · loại · ngày</td><td class="req">Bắt buộc</td><td>Invoice, WL, Hối phiếu</td></tr>
+      <tr><td>Cảng xếp POL · Cảng đến POD</td><td class="req">Bắt buộc</td><td>Invoice, PKL, WL</td></tr>
+      <tr><td>ETD · ETA · Cutoff</td><td class="req">Bắt buộc</td><td>Invoice, PKL, WL</td></tr>
+      <tr><td><b>Cước · Phí bảo hiểm (USD)</b></td><td class="req">CFR/CIF</td><td>Invoice (trừ ra FOB COST)</td></tr>
+      <tr><td>Số hóa đơn · Ngày hóa đơn</td><td class="opt">Trống → tự sinh</td><td>Invoice, Hối phiếu</td></tr>
+      <tr><td>Ngày Proforma (PI)</td><td class="opt">Nên có</td><td>Invoice — dòng "DATED …"</td></tr>
+      <tr><td>ITEM NO · Kiểu đóng gói (PACKING)</td><td class="opt">Nếu khách yêu cầu</td><td>Invoice</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout danger"><span class="t">CIF: BẮT BUỘC nhập Cước &amp; Bảo hiểm</span>
+    Đơn giá đã là CIF nên cước/BH bị <b>trừ khỏi TOTAL</b> để ra FOB(COST) — số Hối phiếu draw. <b>Chưa nhập ⇒ FOB(COST) = CIF (sai)</b>. FOB thì để trống.</div>
+
+  <h3>Khâu 4 — Chiết khấu (L/C hoặc D/P) <span class="opt">[Kế toán]</span></h3>
+  <p><b>Vào:</b> Chi tiết đơn → tab "Chứng từ" → Mở trang Sinh chứng từ → tab <b>"Đơn chiết khấu"</b>. Chi tiết ở <a href="#dnck">mục 06</a>.</p>
+
+  <h3>Khâu 5 — Đính kèm file ngoài <span class="opt">[Logistics/LAB]</span></h3>
+  <p><b>Vào:</b> tab "Chứng từ" → mục "Checklist chứng từ" → Upload. Xong → Khách → "Lịch sử bộ chứng từ" → "Đánh dấu hoàn thiện".</p>
+</section>
+
+<!-- 4. THAM CHIẾU 7 CHỨNG TỪ -->
+<section id="chungtu">
+  <h2><span class="num">05</span> Tham chiếu 7 chứng từ tự sinh</h2>
+  <p class="sub">Tất cả đã dựng lại đúng form/khung/chữ ký theo mẫu Huy Anh đang dùng (đối chiếu bản Word thật).</p>
+  <div class="grid two">
+    <div class="card"><h3 style="margin-top:0">1 · Commercial Invoice</h3>
+      <p>Cần: buyer/bank (Hồ sơ) · grade/số lượng/đơn giá/incoterm/số HĐ (Hợp đồng) · cảng/tàu/B-L (Vận chuyển).</p>
+      <p><b>Đơn CIF:</b> nhập Cước + Bảo hiểm → hiện TOTAL rồi trừ ra <b>THE COST</b>. Nên có Ngày Proforma, ITEM NO, PACKING.</p></div>
+    <div class="card"><h3 style="margin-top:0">2 · Packing List</h3>
+      <p>Cần: buyer · grade/số lượng · container (số cont/seal/net/gross) · cảng/tàu. Chia lô thì gán lot ở tab Đóng gói.</p></div>
+    <div class="card"><h3 style="margin-top:0">3 · Weight List</h3>
+      <p>Cần: container (net/tare/gross) · cảng/tàu · <b>Số PALLET/container</b> (cột PALLET). Làm tròn theo từng container.</p></div>
+    <div class="card"><h3 style="margin-top:0">4 · Hối phiếu (BOE)</h3>
+      <p>Draw đúng <b>THE COST</b> (CIF − cước − BH). <span class="pill lc">L/C</span> Drawn under NH phát hành, có kỳ hạn. <span class="pill dp">D/P</span> Drawn on người mua, AT SIGHT.</p></div>
+    <div class="card"><h3 style="margin-top:0">5 · Đơn chiết khấu (ĐNCK)</h3>
+      <p>Điền <b>form ngân hàng chuẩn</b> (giữ nguyên định dạng). <span class="pill lc">L/C</span> ĐNCK Vietinbank · <span class="pill dp">D/P</span> BM08 nhờ thu. Xem <a href="#dnck">mục 06</a>.</p></div>
+    <div class="card"><h3 style="margin-top:0">6 · Beneficiary's &amp; 7 · Non-Wood</h3>
+      <p>Người bán tự khai. BC: đã email 1 bộ copy cho khách trong hạn. NW: hàng không dùng bao bì gỗ. Chữ ký: Phó Giám đốc.</p></div>
+  </div>
+  <div class="callout"><span class="t">COA = đính kèm, không tự sinh</span> Lấy từ phòng LAB rồi upload ở Checklist. Trên dải tổng quan, COA hiện đèn ⚪.</div>
+</section>
+
+<!-- 5. ĐNCK -->
+<section id="dnck">
+  <h2><span class="num">06</span> Đơn chiết khấu ĐNCK — L/C &amp; D/P</h2>
+  <p class="sub">Cùng chỗ: tab "Đơn chiết khấu". Chọn <b>Phương thức</b> → hệ hiện panel đúng loại. Bấm nút Tải = <b>điền form ngân hàng chuẩn</b>, không dựng lại.</p>
+
+  <h3><span class="pill lc">L/C</span> Đơn ĐNCK Vietinbank</h3>
+  <p>Panel "Đơn ĐNCK Vietinbank (BM08A)": nhập STT đơn + Năm · Hãng tàu (tên đầy đủ) · NH nhận CT (SWIFT/tên/địa chỉ) · Số tiền thương lượng (bằng chữ) · Giá trị nghĩa vụ bảo đảm (VNĐ). Số L/C, ngày, NH phát hành, giá trị đòi tiền (=CIF), %/kỳ hạn… tự lấy từ đơn. → <b>Tải đơn ĐNCK Vietinbank (.docx)</b>.</p>
+
+  <h3><span class="pill dp">D/P</span> Đơn ĐNCK Nhờ thu (BM08) <span class="pill new">MỚI</span></h3>
+  <p>Chọn Phương thức = <b>Nhờ thu D/P</b> → hiện panel "Đơn ĐNCK Vietinbank — Nhờ thu D/P (BM08)". Giữ nguyên form nhờ thu; điền:</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Ô nhập</th><th>Ví dụ</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>STT đơn · Năm</td><td>07 · 2026</td><td>dòng "SỐ …/năm"</td></tr>
+      <tr><td>Hãng tàu (tên đầy đủ)</td><td>MINH ANH SUPPLY CHAIN JSC</td><td></td></tr>
+      <tr><td>NH nhờ thu — SWIFT · tên · địa chỉ</td><td>BCEYLKLX131 · BANK OF CEYLON… · 2ND FLOOR, COLOMBO 01</td><td>NH của người mua</td></tr>
+      <tr><td>Người mua/nhập khẩu — tên · địa chỉ</td><td>EASTERN MERCHANTS…</td><td class="opt">trống → lấy từ hồ sơ khách</td></tr>
+      <tr><td>Ngày thương lượng thanh toán</td><td>2026-07-20</td><td>cam kết xuất trình 15 ngày</td></tr>
+      <tr><td>Số tiền đề nghị chiết khấu (bằng chữ)</td><td>Bốn mươi lăm nghìn bảy trăm ba mươi tám</td><td><b>KHÔNG kèm "đô la Mỹ"</b> (form đã có sẵn)</td></tr>
+      <tr><td>Ngày lập · Loại hàng · Số HĐ · Ngày HĐ</td><td>trống → tự suy</td><td class="opt">override nếu cần</td></tr>
+    </tbody>
+  </table></div>
+  <p>→ <b>Tải đơn ĐNCK Nhờ thu D/P (.docx)</b>. Tự lấy: loại hàng (NATURAL RUBBER + loại mủ) · giá trị (=CIF) · % + kỳ hạn · invoice/hợp đồng · người mua.</p>
+
+  <div class="callout"><span class="t">Lưới checklist 46A tự tick</span>
+    Bảng 11 ô chứng từ trên form (Commercial Invoice · Drafts · Test Results · B/L · Packing List · Non-wood · Airway · C/O · Phyto · Insurance · Quality) <b>tự đánh ☑ + điền số bản</b> theo checklist 46A của đơn. Sửa số bản ở bảng "Số bản chứng từ" trong tab; loại nào không có → để ☐ trống.</div>
+  <div class="callout warn"><span class="t">Nhớ bấm "Lưu" checklist trước khi Tải</span>
+    Nút Tải nay đã tự lưu checklist, nhưng nếu bạn vừa sửa số bản trên bảng thì cứ bấm <b>Lưu</b> để chắc lưới tick đúng.</div>
+</section>
+
+<!-- 6. FIELD BẮT BUỘC / HAY THIẾU -->
+<section id="field">
+  <h2><span class="num">07</span> Field bắt buộc hay bị thiếu — bảng nhắc nhanh</h2>
+  <p class="sub">Đây là những ô hay quên khiến chứng từ sai hoặc thiếu dòng.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Field</th><th>Khi nào bắt buộc</th><th>Nhập ở đâu</th><th>Thiếu thì sao</th></tr></thead>
+    <tbody>
+      <tr><td><b>Cước + Bảo hiểm</b></td><td class="req">Đơn CIF / CFR</td><td>Vận chuyển</td><td>FOB(COST) = CIF (Hối phiếu draw SAI)</td></tr>
+      <tr><td><b>Ngày Proforma (PI)</b></td><td class="opt">Nên có</td><td>Vận chuyển</td><td>Invoice thiếu dòng "DATED …"</td></tr>
+      <tr><td><b>Ngày HĐ (Contract date)</b></td><td class="req">Cho ĐNCK</td><td>Hợp đồng</td><td>ĐNCK ghi sai ngày hợp đồng</td></tr>
+      <tr><td><b>Tare + Gross / container</b></td><td class="req">Bắt buộc WL</td><td>Đóng gói</td><td>WL phải ước lượng bì (không chuẩn)</td></tr>
+      <tr><td><b>Số PALLET / container</b></td><td class="opt">Nếu làm WL</td><td>Đóng gói</td><td>Cột PALLET trống</td></tr>
+      <tr><td><b>ITEM NO · PACKING</b></td><td class="opt">Nếu khách yêu cầu</td><td>Vận chuyển</td><td>Invoice thiếu mã hàng / dòng đóng gói</td></tr>
+      <tr><td><b>Checklist số bản (46A)</b></td><td class="req">Cho ĐNCK</td><td>Đơn chiết khấu</td><td>Lưới ĐNCK không tick / để trống</td></tr>
+      <tr><td><b>NH nhờ thu (D/P) · Số L/C (L/C)</b></td><td class="req">Theo phương thức</td><td>Đơn chiết khấu</td><td>ĐNCK/Hối phiếu thiếu ngân hàng</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout info"><span class="t">Cách nhanh nhất</span> Cứ mở trang Sinh chứng từ — <b>đèn 🟡 + panel ✗</b> sẽ chỉ đúng field còn thiếu và nút <b>"Nhập ngay"</b> để điền tại chỗ. Không cần thuộc bảng này.</div>
+</section>
+
+<!-- 7. VÍ DỤ -->
+<section id="vidu">
+  <h2><span class="num">08</span> Ví dụ thực tế</h2>
+
+  <h3>A · HA20260080 — L/C (GRI, Sri Lanka)</h3>
+  <p>SVR 10 · 105 tấn · $2,290/MT · CIF Colombo · TOTAL $240,450. Nhập: PO R7323 · Vessel BRIDGE V.377S · B/L SGN3340104 (03/08/2026) · Cước 6,250 · BH 105.80 → <b>THE COST 234,094.20</b> · L/C 906OMLCU26010816 (23/07/2026) · NH phát hành HATTON NATIONAL BANK (HBLILKLX001) · 90 ngày.</p>
+  <ul class="clean">
+    <li>Hối phiếu: AT 90 DAYS FROM B/L DATE · FOR USD 234,094.20 · Drawn under HATTON NATIONAL BANK.</li>
+    <li>Invoice hiện TOTAL 240,450 − Freight 6,250 − Insurance 105.80 = THE COST 234,094.20.</li>
+  </ul>
+
+  <h3>B · HA20260059 — D/P (Eastern Merchants, Singapore) <span class="pill new">mẫu D/P</span></h3>
+  <p>NATURAL RUBBER GRADE 10 · CIF · TOTAL $50,820 · nhờ thu qua <b>BANK OF CEYLON</b> (SWIFT BCEYLKLX131). Nhập ở panel D/P: NH nhờ thu + Người mua EASTERN MERCHANTS + Ngày thương lượng 20/07/2026 + số tiền chiết khấu <b>$45,738</b> (90%) bằng chữ.</p>
+  <ul class="clean">
+    <li>ĐNCK BM08: SỐ 07/2026-CK-HA20260059/CI.2 · giá trị 50,820 · đề nghị chiết khấu 45,738 · kỳ hạn 60 ngày.</li>
+    <li>Lưới 46A tự tick: Invoice · Drafts · Test Results · Packing List · Non-wood · Quality… theo checklist đơn.</li>
+    <li>Hối phiếu: Drawn on EASTERN MERCHANTS, AT SIGHT, TO Bank of Ceylon, KHÔNG L/C.</li>
+  </ul>
+
+  <h3>C · HA20260087 — D/P (Qingdao, China)</h3>
+  <p>SVR 3L + SBR1502 · CIF · nhờ thu qua BANK OF QINGDAO (QCCBCNBQXXX) · TOTAL 239,925 → THE COST 227,928.75. Consignee dùng hồ sơ khách (không "THE ORDER OF NH phát hành"). Chỉ đổi Phương thức = D/P → hệ tự đổi mẫu đơn (BM08) + Hối phiếu.</p>
+</section>
+
+<div class="foot wrap">
+  <hr class="soft">
+  <p><b>Cao su Huy Anh</b> — Hướng dẫn bộ chứng từ xuất khẩu · Cập nhật 10/08/2026.
+     Trang sinh chứng từ: Chi tiết đơn → tab "Chứng từ" → "Mở trang Sinh chứng từ".
+     File hướng dẫn nhập liệu chi tiết theo bộ phận (bản .docx) vẫn dùng song song.</p>
+</div>
+</main>
+</body>
+</html>

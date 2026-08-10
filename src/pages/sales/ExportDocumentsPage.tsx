@@ -59,6 +59,48 @@ const { Title, Text, Paragraph } = Typography
 // Letterhead khớp HỆT mẫu chứng từ thật (LOGO trái + info phải) — dùng chung DocLetterhead
 const CompanyHeader = DocLetterhead
 
+// ── Ô "DESCRIPTION OF GOODS AND/OR SERVICE" — DÙNG CHUNG Invoice / Packing List (khớp mẫu) ──
+type DescLike = {
+  quantity_tons: number; grade: string
+  proforma_no?: string; proforma_date?: string
+  packing_desc?: string; total_packing?: string
+  net_weight_kg: number; gross_weight_kg: number
+  item_no?: string; lc_number?: string | null; lc_date?: string | null
+  hs_code: string; country_of_origin: string
+  invoice_extra_lines?: string; shipping_marks?: string
+  po_number?: string | null; attn_contacts?: string
+}
+const fmtDotDate = (s?: string | null) => {
+  if (!s) return ''
+  const dt = new Date(s); if (isNaN(dt.getTime())) return s
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(dt.getDate())}.${p(dt.getMonth() + 1)}.${dt.getFullYear()}`
+}
+function buildInvoiceDescNodes(d: DescLike): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  const n2kg = (v: number) => (v || 0).toFixed(2)
+  const qty = d.quantity_tons.toFixed(2).replace(/\.00$/, '')
+  out.push(<div key="c" style={{ fontWeight: 700 }}>{qty} MT -&nbsp; NATURAL RUBBER {(d.grade || '').replace(/_/g, ' ')}.</div>)
+  if (d.proforma_no) out.push(<div key="pf">AS PER PROFORMA INVOICE NO.{d.proforma_no}</div>)
+  if (d.proforma_date) out.push(<div key="pfd">DATED {fmtDotDate(d.proforma_date)}</div>)
+  if (d.packing_desc) out.push(<div key="pk">PACKING: {d.packing_desc}</div>)
+  if (d.total_packing) out.push(<div key="tpk">TOTAL PACKING: {d.total_packing}</div>)
+  out.push(<div key="nw">NET WEIGHT: {n2kg(d.net_weight_kg)} KGS</div>)
+  out.push(<div key="gw">GROSS WEIGHT: {n2kg(d.gross_weight_kg)} KGS</div>)
+  if (d.item_no) out.push(<div key="it">ITEM NO.: {d.item_no}</div>)
+  if (d.lc_number) out.push(<div key="lc">LC NO: {d.lc_number}{d.lc_date ? `   DATE: ${fmtDotDate(d.lc_date)}` : ''}</div>)
+  out.push(<div key="hs">HS CODE: {d.hs_code}</div>)
+  out.push(<div key="pr">PRODUCER: HUY ANH RUBBER COMPANY LIMITED</div>)
+  out.push(<div key="co">COUNTRY OF ORIGIN: {d.country_of_origin}</div>)
+  if (d.invoice_extra_lines) d.invoice_extra_lines.split('\n').filter((l) => l.trim()).forEach((l, i) => out.push(<div key={'ex' + i}>{l.trim()}</div>))
+  out.push(<div key="sp1" style={{ height: 8 }} />)
+  out.push(<div key="smh" style={{ fontWeight: 700 }}>SHIPPING MARK</div>)
+  if (d.shipping_marks) d.shipping_marks.split('\n').forEach((l, i) => out.push(<div key={'sm' + i}>{l}</div>))
+  if (d.po_number) out.push(<div key="po">PO NO: {d.po_number}</div>)
+  if (d.attn_contacts) { out.push(<div key="attn">Attn:</div>); d.attn_contacts.split('\n').filter((l) => l.trim()).forEach((l, i) => out.push(<div key={'at' + i}>{l.trim()}</div>)) }
+  return out
+}
+
 // ============================================================================
 // COA TAB
 // ============================================================================
@@ -240,107 +282,103 @@ const PackingListTab = ({ data, loading, onGenerate }: PackingListTabProps) => {
     )
   }
 
-  const containerColumns: ColumnsType<PackingListData['containers'][0]> = [
-    { title: 'Container No.', dataIndex: 'container_no', key: 'container_no', width: 160 },
-    { title: 'Seal No.', dataIndex: 'seal_no', key: 'seal_no', width: 140 },
-    { title: 'Type', dataIndex: 'container_type', key: 'container_type', width: 80, align: 'center' },
-    { title: 'Bales', dataIndex: 'bale_count', key: 'bale_count', width: 80, align: 'right', render: (v: number) => v?.toLocaleString() },
-    {
-      title: 'Net Weight (KG)', dataIndex: 'net_weight_kg', key: 'net_weight_kg', width: 130, align: 'right',
-      render: (v: number) => v?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-    },
-    {
-      title: 'Gross Weight (KG)', dataIndex: 'gross_weight_kg', key: 'gross_weight_kg', width: 140, align: 'right',
-      render: (v: number) => v?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-    },
-  ]
+  // Định dạng khớp mẫu PKL
+  const bd = '1px solid #000'
+  const cell: React.CSSProperties = { border: bd, padding: '3px 6px', fontSize: 12.5, verticalAlign: 'middle' }
+  const hcell: React.CSSProperties = { ...cell, fontWeight: 700, textAlign: 'center' }
+  const fmtd = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
+  const kgs = (v: number) => String(Math.round(v || 0))
+  const netMts = (data.total_net_weight / 1000).toFixed(2)
+  const grossMts = (data.total_gross_weight / 1000).toFixed(2)
+  const vessel = `${data.vessel_name || ''}${data.voyage_number ? ' ' + data.voyage_number : ''}`.trim() || '—'
+  const descNodes = buildInvoiceDescNodes(data)
+  // NO restart theo lô
+  let no = 0, prevLot: number | null = null
 
   return (
-    <div className="doc-print-area" id="packing-list-print">
+    <div className="doc-print-area" id="packing-list-print" style={{ color: '#000', fontSize: 12.5 }}>
       <CompanyHeader />
 
-      <Title level={3} style={{ textAlign: 'center', marginBottom: 24 }}>
-        PACKING LIST
-      </Title>
+      <Title level={3} style={{ textAlign: 'center', margin: '0 0 6px' }}>PACKING LIST</Title>
+      <div style={{ textAlign: 'right', marginBottom: 10 }}>
+        <div>No: {data.pkl_no}</div>
+        <div>Date: {fmtd(data.date)}</div>
+      </div>
 
-      <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="Sales Order">{data.order_code}</Descriptions.Item>
-        <Descriptions.Item label="Buyer">{data.buyer_name || data.customer_name}</Descriptions.Item>
-        <Descriptions.Item label="Address" span={2}>{data.customer_address}</Descriptions.Item>
-        {data.consignee && <Descriptions.Item label="Consignee" span={2}>{data.consignee}</Descriptions.Item>}
-        <Descriptions.Item label="Commodity">Natural Rubber {data.grade?.replace(/_/g, ' ')}</Descriptions.Item>
-        <Descriptions.Item label="Vessel">{data.vessel_name || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="Port of Loading">{data.port_of_loading || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="Port of Destination">{data.port_of_destination || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="ETD">{data.etd || 'TBD'}</Descriptions.Item>
-        <Descriptions.Item label="Total Containers">{data.total_containers}</Descriptions.Item>
-      </Descriptions>
+      <div style={{ marginBottom: 10, lineHeight: 1.5 }}>
+        <div><b>THE SELLER/THE BENEFICIARY: </b>HUY ANH RUBBER COMPANY LIMITED</div>
+        <div>ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM</div>
+        <div style={{ marginTop: 4 }}><b>THE BUYER/THE APPLICANT: </b>{data.buyer_name || data.customer_name}</div>
+        <div>ADDRESS: {data.buyer_address || data.customer_address}</div>
+      </div>
 
-      <Title level={5} style={{ marginTop: 16, marginBottom: 8 }}>Container Summary</Title>
+      {/* Ref invoice 5 cột */}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr>
+          {['COMMERCIAL INVOICE', 'BILL OF LADING NUMBER', 'VESSEL', 'PORT OF LOADING', 'PORT OF DISCHARGE'].map((h) => (
+            <th key={h} style={{ ...hcell, fontSize: 11 }}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody><tr style={{ textAlign: 'center' }}>
+          <td style={cell}>{data.invoice_code}</td>
+          <td style={cell}>{data.bl_number || '—'}</td>
+          <td style={cell}>{vessel}</td>
+          <td style={cell}>{data.port_of_loading || '—'}</td>
+          <td style={cell}>{data.port_of_destination || '—'}</td>
+        </tr></tbody>
+      </table>
 
-      <Table
-        dataSource={data.containers}
-        columns={containerColumns}
-        rowKey="container_no"
-        pagination={false}
-        size="small"
-        bordered
-        summary={() => (
-          <Table.Summary fixed>
-            <Table.Summary.Row style={{ fontWeight: 'bold', background: '#fafafa' }}>
-              <Table.Summary.Cell index={0} colSpan={3}>TOTAL</Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right">{data.total_bales?.toLocaleString()}</Table.Summary.Cell>
-              <Table.Summary.Cell index={4} align="right">{data.total_net_weight?.toLocaleString()}</Table.Summary.Cell>
-              <Table.Summary.Cell index={5} align="right">{data.total_gross_weight?.toLocaleString()}</Table.Summary.Cell>
-            </Table.Summary.Row>
-          </Table.Summary>
-        )}
-      />
+      {/* Bảng container */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
+        <thead><tr>
+          {['NO', 'CONTAINER NO', 'SEAL NO', 'NET WEIGHT (KGS)', 'GROSS WEIGHT (KGS)'].map((h) => (
+            <th key={h} style={{ ...hcell, fontSize: 11 }}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody>
+          {data.containers.map((c, i) => {
+            const lot = c.lot_no ?? 0
+            if (lot !== prevLot) { no = 1; prevLot = lot } else { no += 1 }
+            return (
+              <tr key={i} style={{ textAlign: 'center' }}>
+                <td style={cell}>{no}</td>
+                <td style={cell}>{c.container_no}</td>
+                <td style={cell}>{c.seal_no}</td>
+                <td style={cell}>{kgs(c.net_weight_kg)}</td>
+                <td style={cell}>{kgs(c.gross_weight_kg)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
 
-      {/* Bale detail per container */}
-      {data.containers.map((c) => (
-        c.items && c.items.length > 0 && (
-          <div key={c.container_no} style={{ marginTop: 16 }}>
-            <Title level={5} style={{ marginBottom: 8 }}>
-              Container: {c.container_no} / Seal: {c.seal_no}
-            </Title>
-            <Table
-              dataSource={c.items}
-              rowKey={(_, idx) => `${c.container_no}-${idx}`}
-              pagination={false}
-              size="small"
-              bordered
-              columns={[
-                { title: 'Batch No.', dataIndex: 'batch_no', key: 'batch_no' },
-                { title: 'Bale From', dataIndex: 'bale_from', key: 'bale_from', align: 'center' },
-                { title: 'Bale To', dataIndex: 'bale_to', key: 'bale_to', align: 'center' },
-                { title: 'Bale Count', dataIndex: 'bale_count', key: 'bale_count', align: 'right' },
-                {
-                  title: 'Weight (KG)', dataIndex: 'weight_kg', key: 'weight_kg', align: 'right',
-                  render: (v: number) => v?.toLocaleString(),
-                },
-              ]}
-            />
-          </div>
-        )
-      ))}
+      {/* Bảng mô tả 3 cột */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, tableLayout: 'fixed' }}>
+        <colgroup><col style={{ width: '70%' }} /><col style={{ width: '15%' }} /><col style={{ width: '15%' }} /></colgroup>
+        <thead><tr>
+          <th style={hcell}>DESCRIPTION OF GOODS AND/OR SERVICE</th>
+          <th style={{ ...hcell, fontSize: 11 }}>NET WEIGHT (MTS)</th>
+          <th style={{ ...hcell, fontSize: 11 }}>GROSS WEIGHT (MTS)</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td style={{ ...cell, verticalAlign: 'top', lineHeight: 1.45 }}>{descNodes}</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{netMts}</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{grossMts}</td>
+          </tr>
+          <tr>
+            <td style={{ ...cell, textAlign: 'center', fontWeight: 700 }}>TOTAL</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{netMts}</td>
+            <td style={{ ...cell, textAlign: 'center' }}>{grossMts}</td>
+          </tr>
+        </tbody>
+      </table>
 
-      {data.shipping_marks && (
-        <div style={{ marginTop: 16 }}>
-          <Title level={5}>Shipping Marks</Title>
-          <Paragraph style={{ whiteSpace: 'pre-line' }}>{data.shipping_marks}</Paragraph>
-        </div>
-      )}
-
-      <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>Warehouse Manager</Text>
-        </div>
-        <div style={{ textAlign: 'center', width: 250 }}>
-          <Divider style={{ borderColor: '#000', marginBottom: 4 }} />
-          <Text strong>General Director</Text>
-        </div>
+      <div style={{ marginTop: 40, textAlign: 'right' }}>
+        <div style={{ fontWeight: 700 }}>HUY ANH RUBBER COMPANY LIMITED</div>
+        <div style={{ height: 64 }} />
+        <div style={{ fontWeight: 700 }}>PHÓ GIÁM ĐỐC</div>
+        <div style={{ fontWeight: 700 }}>Lê Xuân Hồng Trung</div>
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
@@ -485,39 +523,14 @@ const InvoiceTab = ({ data, loading, onGenerate }: InvoiceTabProps) => {
   const n2 = (v: number) => (v || 0).toFixed(2)
   const qtyFmt = data.quantity_tons.toFixed(2)
   const priceFmt = Number.isInteger(data.unit_price) ? String(data.unit_price) : data.unit_price.toFixed(2)
-  const gradeLabel = (data.grade || '').replace(/_/g, ' ')
   const pod = data.port_of_destination || ''
   const fmtd = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
-  const fmtDot = (s?: string | null) => {
-    if (!s) return ''
-    const dt = new Date(s); if (isNaN(dt.getTime())) return s
-    const p = (n: number) => String(n).padStart(2, '0')
-    return `${p(dt.getDate())}.${p(dt.getMonth() + 1)}.${dt.getFullYear()}`
-  }
   const bd = '1px solid #000'
   const cell: React.CSSProperties = { border: bd, padding: '3px 6px', fontSize: 12.5, verticalAlign: 'middle' }
   const hcell: React.CSSProperties = { ...cell, fontWeight: 700, textAlign: 'center' }
 
-  // Các dòng trong ô mô tả hàng — khớp thứ tự sheet INV
-  const descLines: React.ReactNode[] = []
-  descLines.push(<div key="c" style={{ fontWeight: 700 }}>{qtyFmt.replace(/\.00$/, '')} MT -&nbsp; NATURAL RUBBER {gradeLabel}.</div>)
-  if (data.proforma_no) descLines.push(<div key="pf">AS PER PROFORMA INVOICE NO.{data.proforma_no}</div>)
-  if (data.proforma_date) descLines.push(<div key="pfd">DATED {fmtDot(data.proforma_date)}</div>)
-  if (data.packing_desc) descLines.push(<div key="pk">PACKING: {data.packing_desc}</div>)
-  if (data.total_packing) descLines.push(<div key="tpk">TOTAL PACKING: {data.total_packing}</div>)
-  descLines.push(<div key="nw">NET WEIGHT: {n2(data.net_weight_kg)} KGS</div>)
-  descLines.push(<div key="gw">GROSS WEIGHT: {n2(data.gross_weight_kg)} KGS</div>)
-  if (data.item_no) descLines.push(<div key="it">ITEM NO.: {data.item_no}</div>)
-  if (data.lc_number) descLines.push(<div key="lc">LC NO: {data.lc_number}</div>)
-  descLines.push(<div key="hs">HS CODE: {data.hs_code}</div>)
-  descLines.push(<div key="pr">PRODUCER: HUY ANH RUBBER COMPANY LIMITED</div>)
-  descLines.push(<div key="co">COUNTRY OF ORIGIN: {data.country_of_origin}</div>)
-  if (data.invoice_extra_lines) data.invoice_extra_lines.split('\n').filter((l) => l.trim()).forEach((l, i) => descLines.push(<div key={'ex' + i}>{l.trim()}</div>))
-  descLines.push(<div key="sp1" style={{ height: 8 }} />)
-  descLines.push(<div key="smh" style={{ fontWeight: 700 }}>SHIPPING MARK</div>)
-  if (data.shipping_marks) data.shipping_marks.split('\n').forEach((l, i) => descLines.push(<div key={'sm' + i}>{l}</div>))
-  if (data.po_number) descLines.push(<div key="po">PO NO: {data.po_number}</div>)
-  if (data.attn_contacts) { descLines.push(<div key="attn">Attn:</div>); data.attn_contacts.split('\n').filter((l) => l.trim()).forEach((l, i) => descLines.push(<div key={'at' + i}>{l.trim()}</div>)) }
+  // Ô mô tả hàng — dùng chung với PKL
+  const descLines = buildInvoiceDescNodes(data)
 
   return (
     <div className="doc-print-area" id="invoice-print" style={{ color: '#000', fontSize: 12.5 }}>

@@ -48,6 +48,7 @@ export interface PackingListData {
   customer_name: string
   customer_address: string
   buyer_name: string
+  buyer_address: string
   consignee: string
   shipping_marks: string
   grade: string
@@ -58,6 +59,7 @@ export interface PackingListData {
     net_weight_kg: number
     gross_weight_kg: number
     bale_count: number
+    lot_no: number | null
     items: Array<{
       batch_no: string
       bale_from: number
@@ -74,6 +76,28 @@ export interface PackingListData {
   port_of_destination: string
   vessel_name: string
   etd: string
+  // Khớp HỆT sheet PKL: header ref invoice + ô mô tả (dùng chung Invoice)
+  pkl_no: string
+  date: string
+  invoice_code: string
+  bl_number: string | null
+  voyage_number: string
+  quantity_tons: number
+  net_weight_kg: number
+  gross_weight_kg: number
+  hs_code: string
+  country_of_origin: string
+  incoterm: string
+  proforma_no: string
+  proforma_date: string
+  packing_desc: string
+  total_packing: string
+  item_no: string
+  lc_number: string | null
+  lc_date: string | null
+  invoice_extra_lines: string
+  po_number: string | null
+  attn_contacts: string
 }
 
 export interface WeightListData {
@@ -267,6 +291,40 @@ async function resolveConsignee(orderId: string, profile: any, lotNo?: number): 
   return profile?.consignee_name || ''
 }
 
+// L/C date của đơn/lô (từ bảng thương lượng) — cho dòng "LC NO ... DATE:" trong PKL
+async function loadLcDate(orderId: string, lotNo?: number): Promise<string | null> {
+  const { data } = await supabase
+    .from('sales_order_lc_negotiations')
+    .select('lc_date')
+    .eq('sales_order_id', orderId)
+    .eq('lot_no', lotNo || 0)
+    .maybeSingle()
+  return data?.lc_date || null
+}
+
+// ── Helper thuần (khớp mẫu) — dùng chung getInvoiceData / getPackingListData / getWeightListData ──
+type ContLite = { bale_count?: number | null; container_type?: string | null }
+// HS code có dấu chấm: SVR/TSNR→4001.22.00, RSS→4001.21.00, khác→4001.29.00
+function hsCodeDotted(grade: string): string {
+  const g = grade || ''
+  const raw = /RSS/i.test(g) ? '40012100' : /SVR|TSNR/i.test(g) ? '40012200' : '40012900'
+  return `${raw.slice(0, 4)}.${raw.slice(4, 6)}.${raw.slice(6, 8)}`
+}
+const contSizeOf = (conts: ContLite[]) => (/40/.test(String(conts[0]?.container_type || '')) ? "40'" : "20'")
+// Dòng PACKING: "<kiểu> <bao/cont> BALES/01X<size>"
+function packingLineFrom(style: string, conts: ContLite[]): string {
+  const n = conts.length
+  const totalBales = conts.reduce((s, c) => s + (c.bale_count || 0), 0)
+  const perCont = n ? Math.round(totalBales / n) : 0
+  return [style, perCont ? `${perCont} BALES/01X${contSizeOf(conts)}` : ''].filter(Boolean).join(' ').trim()
+}
+// Dòng TOTAL PACKING: "<tổng bao> BALES/<số cont>X<size>"
+function totalPackingFrom(conts: ContLite[]): string {
+  const n = conts.length
+  const totalBales = conts.reduce((s, c) => s + (c.bale_count || 0), 0)
+  return (totalBales && n) ? `${totalBales} BALES/${String(n).padStart(2, '0')}X${contSizeOf(conts)}` : ''
+}
+
 // ============================================================================
 // SERVICE
 // ============================================================================
@@ -435,7 +493,8 @@ export const documentService = {
       .select('*, items:sales_order_container_items(*)')
       .eq('sales_order_id', orderId)
     if (lotNo) pklQ = pklQ.eq('lot_no', lotNo)
-    const { data: rawContainers } = await pklQ.order('created_at')
+    // Sắp theo lô rồi theo thời gian → NO trong bảng container restart đúng theo từng lô
+    const { data: rawContainers } = await pklQ.order('lot_no', { ascending: true, nullsFirst: true }).order('created_at')
 
     const containers: PackingListData['containers'] = []
     let totalBales = 0
@@ -463,6 +522,7 @@ export const documentService = {
         net_weight_kg: containerNet,
         gross_weight_kg: containerGross,
         bale_count: containerBales,
+        lot_no: c.lot_no ?? null,
         items,
       })
 
@@ -473,12 +533,17 @@ export const documentService = {
 
     const customer = order.customer as { name?: string; address?: string } | null
     const { profile } = await loadExportProfile(order.customer_id)
+    const lcDate = await loadLcDate(orderId, lotNo)
+    const orderQty = order.quantity_tons || 0
+    const qtyTons = lotNo ? (totalNet / 1000) : orderQty
+    const packingStyle = order.packing_desc || profile?.default_packing_desc || ''
 
     return {
       order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       customer_name: customer?.name || '',
       customer_address: customer?.address || '',
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
+      buyer_address: profile?.buyer_address || customer?.address || '',
       consignee: await resolveConsignee(orderId, profile, lotNo),
       shipping_marks: order.shipping_marks || profile?.shipping_marks || '',
       grade: order.grade,
@@ -488,9 +553,31 @@ export const documentService = {
       total_net_weight: totalNet,
       total_gross_weight: totalGross,
       port_of_loading: booking?.port_of_loading || PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
-      port_of_destination: booking?.port_of_destination || order.port_of_destination || '',
+      port_of_destination: booking?.port_of_destination || order.port_of_destination || order.port_of_discharge || '',
       vessel_name: booking?.vessel_name || order.vessel_name || '',
       etd: booking?.etd || order.etd || '',
+      // Khớp HỆT sheet PKL
+      pkl_no: `${soDisplayCode(order)}/PL${lotNo ? `/L${lotNo}` : ''}`,
+      date: order.invoice_date || new Date().toISOString().split('T')[0],
+      invoice_code: order.invoice_no || `${soDisplayCode(order)}/CI`,
+      bl_number: booking?.bl_number || order.bl_number || null,
+      voyage_number: booking?.voyage_no || order.voyage_number || '',
+      quantity_tons: qtyTons,
+      net_weight_kg: totalNet || Math.round(qtyTons * 1000),
+      gross_weight_kg: totalGross || totalNet || Math.round(qtyTons * 1000),
+      hs_code: hsCodeDotted(order.grade || ''),
+      country_of_origin: 'VIET NAM',
+      incoterm: order.incoterm || 'CIF',
+      proforma_no: `${soDisplayCode(order)}/PR.CI`,
+      proforma_date: order.proforma_date || '',
+      packing_desc: packingLineFrom(packingStyle, containers),
+      total_packing: totalPackingFrom(containers),
+      item_no: order.item_no || profile?.default_item_no || '',
+      lc_number: order.lc_number || null,
+      lc_date: lcDate,
+      invoice_extra_lines: order.invoice_extra_lines || profile?.default_invoice_extra_lines || '',
+      po_number: order.customer_po || null,
+      attn_contacts: profile?.attn_contacts || '',
     }
   },
 

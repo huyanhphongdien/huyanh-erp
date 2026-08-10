@@ -148,6 +148,22 @@ hr.soft{border:0;border-top:1px dashed var(--line);margin:18px 0}
 .toc{columns:2;column-gap:24px;font-size:14.5px}
 .toc a{display:block;padding:3px 0}
 @media(max-width:620px){.toc{columns:1}}
+
+/* step-by-step (click-by-click) */
+.howto{counter-reset:hstep;margin:6px 0}
+.hstep{position:relative;padding:13px 16px 13px 56px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:10px 0;box-shadow:var(--shadow)}
+.hstep::before{counter-increment:hstep;content:counter(hstep);position:absolute;left:13px;top:13px;width:30px;height:30px;border-radius:9px;background:var(--brand);display:grid;place-items:center;font-weight:800;font-size:15px;font-family:var(--sans);color:#fff}
+:root[data-theme="dark"] .hstep::before,:root:not([data-theme="light"]) .hstep::before{color:#0f1613}
+.hstep h4{margin:0 0 3px;font-family:var(--sans);font-size:16px;font-weight:700}
+.hstep p{margin:2px 0;font-size:14.5px}
+.hstep ul{margin:6px 0;padding-left:20px;font-size:14px}
+.hstep ul li{margin:3px 0}
+.btn{display:inline-block;font-size:12.5px;font-weight:700;background:var(--brand);color:#fff;padding:1px 9px;border-radius:6px;white-space:nowrap}
+:root[data-theme="dark"] .btn,:root:not([data-theme="light"]) .btn{color:#0f1613}
+.btn.ghost{background:transparent;color:var(--brand-2);border:1px solid var(--brand-2)}
+.tabname{font-weight:700;color:var(--brand-2)}
+.where{font-size:13px;color:var(--muted);margin:2px 0 6px}
+.where b{color:var(--brand-2)}
 </style>
 </head>
 <body>
@@ -155,6 +171,7 @@ hr.soft{border:0;border-top:1px dashed var(--line);margin:18px 0}
 <div class="topbar"><div class="wrap">
   <span class="brand">Huy Anh · Bộ chứng từ</span>
   <nav>
+    <a href="#batdau">▶ Bắt đầu từng bước</a>
     <a href="#tongquan">Tổng quan</a>
     <a href="#giaodien">Giao diện mới</a>
     <a href="#lc-dp">L/C vs D/P</a>
@@ -169,10 +186,11 @@ hr.soft{border:0;border-top:1px dashed var(--line);margin:18px 0}
 <header class="hero"><div class="wrap">
   <div class="eyebrow">Cao su Huy Anh · Tài liệu vận hành</div>
   <h1>Bộ chứng từ xuất khẩu — Hướng dẫn toàn diện</h1>
-  <p class="lede">Từ nhập liệu đến tự sinh: giao diện kiểm tra sẵn sàng, 7 chứng từ tự sinh khớp mẫu gốc,
-     Đơn chiết khấu ĐNCK cho cả <b>L/C</b> và <b>D/P (nhờ thu)</b>, và mọi field bắt buộc hay hay thiếu.</p>
+  <p class="lede">Hướng dẫn <b>từng bước click-by-click</b> để tự sinh 7 chứng từ + Đơn chiết khấu ĐNCK (L/C &amp; D/P).
+     Bắt đầu ngay ở mục <a href="#batdau"><b>▶ Bắt đầu từng bước</b></a>; phần sau là tra cứu chi tiết.</p>
   <div class="meta">
     <span class="tag on">Cập nhật 10/08/2026</span>
+    <span class="tag">Từng bước click-by-click</span>
     <span class="tag">7 chứng từ tự sinh</span>
     <span class="tag">L/C · D/P</span>
     <span class="tag">Giao diện readiness + drawer</span>
@@ -181,6 +199,127 @@ hr.soft{border:0;border-top:1px dashed var(--line);margin:18px 0}
 </div></header>
 
 <main class="wrap">
+
+<!-- BẮT ĐẦU TỪNG BƯỚC -->
+<section id="batdau">
+  <h2><span class="num">▶</span> Bắt đầu — tự sinh 1 chứng từ, từng bước</h2>
+  <p class="sub">Làm đúng thứ tự dưới đây là ra file. Nút bấm ghi bằng <span class="btn">chữ trong nút</span>, tab ghi bằng <span class="tabname">tên tab</span>.</p>
+
+  <div class="callout"><span class="t">Trình tự tổng quát</span>
+    Mở đơn → mở trang Sinh chứng từ → xem đèn → chỗ nào 🟡 thì <span class="btn">Nhập ngay</span> điền cho đủ → bấm <span class="btn">Generate</span> xem trước → <span class="btn">Tải Word (.docx)</span>.</div>
+
+  <h3>A · Mở trang sinh chứng từ</h3>
+  <div class="howto">
+    <div class="hstep"><h4>Vào đơn hàng cần làm</h4>
+      <p class="where">Menu <b>Bán hàng → Đơn hàng bán</b> → bấm vào đơn cần xuất chứng từ.</p></div>
+    <div class="hstep"><h4>Bấm tab "Chứng từ"</h4>
+      <p>Trong màn chi tiết đơn, chọn tab <span class="tabname">Chứng từ</span>.</p></div>
+    <div class="hstep"><h4>Bấm "Mở trang Sinh chứng từ"</h4>
+      <p>Mở trang riêng (địa chỉ dạng <span class="mono">/sales/orders/…/documents</span>) — đây là nơi làm toàn bộ.</p></div>
+  </div>
+
+  <h3>B · Nhìn 3 khu trên trang</h3>
+  <div class="grid two">
+    <div class="card"><h4 style="margin-top:0">① Thanh "📦 Container &amp; Lô" (trên cùng)</h4>
+      <p>Cho biết đang sinh cho <b>Toàn đơn</b> hay <b>Lô mấy</b> + số container · số tấn · CIF. Có cảnh báo <b>"K/N cont còn TBD"</b> khi chưa nhập số cont/seal, kèm nút <span class="btn ghost">Chia lô / Nhập container</span>.</p></div>
+    <div class="card"><h4 style="margin-top:0">② "Tổng quan bộ chứng từ" (8 thẻ)</h4>
+      <p>Mỗi chứng từ 1 đèn: <i class="dot g"></i><b>🟢 đủ</b> · <i class="dot y"></i><b>🟡 thiếu N</b> · <i class="dot n"></i><b>⚪ đính kèm (COA)</b>. Có thanh tiến độ <b>"N/7 đủ dữ liệu"</b>. Bấm 1 thẻ để nhảy tới tab đó.</p></div>
+  </div>
+  <div class="card"><h4 style="margin-top:0">③ Các tab chứng từ (dưới cùng)</h4>
+    <p>8 tab: <span class="tabname">COA · Packing List · Weight List · Invoice · Hối phiếu · Beneficiary Cert · Non-Wood Cert · Đơn chiết khấu</span>. Mở 1 tab sẽ thấy: <b>panel "Dữ liệu cần"</b> (✓/✗) ở trên → rồi <b>bản xem trước</b> → rồi <b>các nút</b> ở dưới.</p></div>
+
+  <h3>C · Đèn 🟡 (thiếu dữ liệu) → điền cho đủ</h3>
+  <div class="howto">
+    <div class="hstep"><h4>Mở đúng chứng từ đang 🟡</h4>
+      <p>Bấm thẻ vàng ở dải tổng quan, hoặc mở tab đó. Panel <b>"Dữ liệu cần"</b> liệt kê từng mục — mục thiếu có dấu <span style="color:var(--accent);font-weight:800">!</span>.</p></div>
+    <div class="hstep"><h4>Bấm "Nhập ngay →" ở nhóm còn thiếu</h4>
+      <p>Panel gom theo <b>nơi nhập</b>. Nhóm nào có mục ✗ sẽ có nút <span class="btn ghost">Nhập ngay →</span>.</p></div>
+    <div class="hstep"><h4>Điền trong drawer (ngăn trượt ra bên phải) rồi bấm "Lưu"</h4>
+      <p>Drawer chỉ chứa vài ô cần của nhóm đó:</p>
+      <ul>
+        <li><b>Hồ sơ khách:</b> Buyer (tên pháp lý) · Địa chỉ · Ngân hàng thụ hưởng.</li>
+        <li><b>Hợp đồng:</b> Grade · Số lượng · Đơn giá · Incoterm.</li>
+        <li><b>Vận chuyển:</b> <b>Cước + Bảo hiểm</b> (đơn CIF — bắt buộc, có xem trước FOB) · Cảng · Tàu · B/L · Ngày Proforma · ITEM NO · PACKING.</li>
+        <li><b>Đóng gói:</b> mở bảng nhập Số cont · Seal · Gross · Pallet · Lô (xem mục D).</li>
+      </ul>
+      <p>Bấm <span class="btn">Lưu</span> → đèn tự chuyển 🟢, panel tự cập nhật. (Muốn form đầy đủ thì bấm link phụ <b>"Mở tab đầy đủ ↗"</b>.)</p></div>
+  </div>
+  <div class="callout warn"><span class="t">Đơn CIF nhớ nhập Cước + Bảo hiểm</span> Nếu không, số Hối phiếu (THE COST) sẽ bằng đúng giá bán CIF → <b>sai</b>. Drawer Vận chuyển hiện sẵn phép tính CIF − Cước − BH để bạn kiểm.</div>
+
+  <h3>D · Nhập container thật (bỏ "TBD") + chia lô</h3>
+  <div class="howto">
+    <div class="hstep"><h4>Bấm "Chia lô / Nhập container"</h4>
+      <p class="where">Ở thanh <b>📦 Container &amp; Lô</b> trên cùng (hoặc "Nhập ngay" ở nhóm Đóng gói).</p></div>
+    <div class="hstep"><h4>Điền từng dòng container</h4>
+      <p>Bảng hiện mọi container của đơn. Với mỗi dòng gõ: <b>Số cont</b> · <b>Seal</b> · <b>Gross</b> · <b>Pallet</b> · <b>Lô</b> (số 1, 2… nếu chia lô — bỏ trống nếu không chia).</p></div>
+    <div class="hstep"><h4>Bấm "Lưu"</h4>
+      <p>Thanh trên cập nhật số cont, đèn container chuyển 🟢, chứng từ hết in <b>"TBD"</b>. Nếu có gõ số Lô → bộ chọn <b>"Lô 1 / Lô 2 / Toàn đơn"</b> hiện ra.</p></div>
+  </div>
+
+  <h3>E · Sinh + tải từng chứng từ</h3>
+  <div class="grid two">
+    <div class="card"><h4 style="margin-top:0">Invoice · Packing List · Weight List</h4>
+      <ul class="clean">
+        <li>Mở tab → bấm <span class="btn">Generate Invoice</span> / <span class="btn">Generate Packing List</span> / <span class="btn">Generate Weight List</span>.</li>
+        <li>Xem bản xem trước hiện ra.</li>
+        <li>Bấm <span class="btn">Tải Word (.docx)</span> để tải, hoặc <span class="btn">In / Lưu PDF</span>.</li>
+      </ul></div>
+    <div class="card"><h4 style="margin-top:0">Hối phiếu · Beneficiary · Non-Wood</h4>
+      <ul class="clean">
+        <li>Mở tab → bản xem trước hiện <b>ngay</b> (không cần Generate).</li>
+        <li>Bấm <span class="btn">Tải Word (.docx)</span> hoặc <span class="btn">In / Lưu PDF</span>.</li>
+      </ul></div>
+  </div>
+  <div class="callout info"><span class="t">COA khác các chứng từ kia</span> COA <b>không tự sinh</b> (đèn ⚪) — lấy scan từ phòng LAB rồi <b>đính kèm</b> ở mục Checklist (xem mục H). Nút "In tất cả" ở đầu trang in gộp Packing/Weight/Invoice.</div>
+
+  <h3>F · Đơn chiết khấu (ĐNCK) — L/C hoặc D/P</h3>
+  <div class="howto">
+    <div class="hstep"><h4>Mở tab "Đơn chiết khấu" → chọn Phương thức</h4>
+      <p>Chọn <b>L/C</b> hoặc <b>Nhờ thu D/P</b>. Hệ tự hiện panel đúng loại.</p></div>
+    <div class="hstep"><h4>Nhập điều kiện</h4>
+      <ul>
+        <li><b>L/C:</b> Số L/C · Ngày L/C · NH phát hành · Tỷ lệ % · Kỳ hạn.</li>
+        <li><b>D/P:</b> NH nhờ thu (NH người mua) · Người mua. (Bỏ ô L/C.)</li>
+      </ul></div>
+    <div class="hstep"><h4>Mở panel form ngân hàng → điền ô còn thiếu</h4>
+      <p>Panel <span class="tabname">Đơn ĐNCK Vietinbank (BM08A)</span> (L/C) hoặc <span class="tabname">Nhờ thu D/P (BM08)</span> (D/P): điền STT đơn · Năm · Hãng tàu (tên đầy đủ) · NH nhận CT/nhờ thu (SWIFT/tên/địa chỉ) · Số tiền bằng chữ… (những thứ hệ không có sẵn).</p></div>
+    <div class="hstep"><h4>Bấm "Tải đơn ĐNCK … (.docx)" = form ngân hàng chuẩn</h4>
+      <p>Ra file Vietinbank đúng định dạng, lưới chứng từ (46A) tự tick theo checklist đơn.</p>
+      <p><b>Nếu nút bị xám/khoá:</b> lô đang chọn còn container thiếu cont/seal → vào <span class="btn ghost">Chia lô / Nhập container</span> nhập đủ trước (mục D).</p></div>
+  </div>
+
+  <h3>G · Sinh bộ chứng từ theo LÔ</h3>
+  <div class="howto">
+    <div class="hstep"><h4>Gán số Lô cho container</h4>
+      <p>Trong drawer "Chia lô / Nhập container", cột <b>Lô</b> gõ 1, 2… cho từng container (mục D).</p></div>
+    <div class="hstep"><h4>Nhập ngày B/L của từng lô</h4>
+      <p class="where">Tab <b>Vận chuyển</b> → khu <b>Booking theo lô</b> → mở booking của lô → ô <b>"Ngày B/L"</b> (mỗi lô số + ngày B/L riêng).</p></div>
+    <div class="hstep"><h4>Chọn lô trên thanh trên cùng rồi sinh như thường</h4>
+      <p>Bộ chọn <b>"Lô 1 / Lô 2 / Toàn đơn"</b> → chọn <b>Lô 1</b> → mọi chứng từ + ĐNCK chỉ tính container, giá trị, B/L, ngày B/L của Lô 1. Muốn chiết khấu 1 lô → chọn đúng lô đó rồi Tải.</p></div>
+  </div>
+
+  <h3>H · Đính kèm file ngoài + đánh dấu hoàn thiện</h3>
+  <div class="howto">
+    <div class="hstep"><h4>Upload COA · B/L · C/O · Bảo hiểm · Phyto</h4>
+      <p class="where">Kéo xuống mục <b>"Checklist chứng từ"</b> (tab Chứng từ của đơn) → nút <b>Upload</b> từng loại. Thanh đủ/thiếu tự chạy.</p></div>
+    <div class="hstep"><h4>Đánh dấu hoàn thiện</h4>
+      <p class="where">Màn <b>Khách → "Lịch sử bộ chứng từ"</b> → nút <b>"Đánh dấu hoàn thiện"</b> (ghi ai + lúc nào).</p></div>
+  </div>
+
+  <h3>Khi gặp — thì làm</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Hiện tượng</th><th>Xử lý</th></tr></thead>
+    <tbody>
+      <tr><td>Đèn <b>🟡 thiếu N</b> ở 1 chứng từ</td><td>Mở tab đó → panel chỉ mục ✗ → bấm <b>Nhập ngay</b> điền.</td></tr>
+      <tr><td>Chứng từ in <b>"TBD"</b> ở Số cont/Seal</td><td>Chưa nhập cont/seal → <b>Chia lô / Nhập container</b> gõ số thật → Lưu.</td></tr>
+      <tr><td>Nút <b>Tải đơn ĐNCK</b> bị xám</td><td>Container của lô còn thiếu cont/seal → nhập đủ ở drawer container.</td></tr>
+      <tr><td>Bộ chọn <b>Lô</b> không hiện</td><td>Đơn chưa chia lô → gõ số <b>Lô</b> cho container trong drawer.</td></tr>
+      <tr><td>Hoá đơn theo lô ra <b>0 tấn / $0</b></td><td>Container của lô chưa nhập KL net → nhập net (hoặc chọn đúng lô có hàng).</td></tr>
+      <tr><td>Số <b>Hối phiếu ≠</b> tổng tiền CIF</td><td>Đúng — Hối phiếu draw <b>THE COST</b> = CIF − Cước − Bảo hiểm.</td></tr>
+      <tr><td>Invoice/Hối phiếu <b>trống ngân hàng</b></td><td>Chưa chọn NH thụ hưởng → vào Hồ sơ chứng từ khách chọn ngân hàng.</td></tr>
+    </tbody>
+  </table></div>
+</section>
 
 <!-- 0. TỔNG QUAN -->
 <section id="tongquan">

@@ -7,6 +7,7 @@
 import type { SalesOrder, SalesOrderContainer } from './salesTypes'
 import type { CustomerExportProfile } from './customerExportProfileService'
 import type { LcNegotiation } from './lcNegotiationService'
+import type { SalesBooking } from './salesBookingService'
 
 /** Nơi nhập dữ liệu (để deep-link tới đúng tab). */
 export type ReadyGroup =
@@ -47,11 +48,13 @@ export interface ReadyCtx {
   containers: SalesOrderContainer[]
   profile: CustomerExportProfile | null
   negotiation: LcNegotiation | null
+  booking?: SalesBooking | null   // booking của LÔ đang chọn (vessel/cảng/B-L theo lô)
+  lotNo?: number                  // 0 = cả đơn; >0 = lô
 }
 
 const has = (v: unknown) => v !== null && v !== undefined && String(v).trim() !== ''
-const CIF_TERMS = ['CIF', 'CFR', 'CNF', 'CIP', 'CPT', 'DDP']
-const isCIF = (o: SalesOrder) => CIF_TERMS.includes((o.incoterm || '').toUpperCase())
+const FREIGHT_TERMS = ['CIF', 'CFR', 'CNF', 'CIP', 'CPT', 'DDP']   // người bán trả cước
+const INSURED_TERMS = ['CIF', 'CIP']                               // người bán mua bảo hiểm
 
 // ── các mục dùng lại nhiều doc ──
 function buyerItem(c: ReadyCtx): ReadyItem {
@@ -66,16 +69,31 @@ function goodsItem(c: ReadyCtx): ReadyItem {
   return { label: 'Grade · Số lượng · Đơn giá', group: 'contract', required: true, ok, value: ok ? `${c.order.grade} · ${c.order.quantity_tons} · ${c.order.unit_price}` : undefined }
 }
 function shipItem(c: ReadyCtx): ReadyItem {
-  const ok = has(c.order.port_of_loading) && has(c.order.port_of_destination) && has(c.order.vessel_name)
-  return { label: 'Cảng xếp · Cảng đến · Tàu', group: 'shipping', required: true, ok, value: ok ? `${c.order.port_of_loading} → ${c.order.port_of_destination}` : undefined }
+  // booking-aware: chứng từ lấy cảng/tàu từ booking của LÔ, fallback order (khớp documentService)
+  const pol = c.booking?.port_of_loading || c.order.port_of_loading
+  const pod = c.booking?.port_of_destination || c.order.port_of_destination
+  const vessel = c.booking?.vessel_name || c.order.vessel_name
+  const ok = has(pol) && has(pod) && has(vessel)
+  return { label: 'Cảng xếp · Cảng đến · Tàu', group: 'shipping', required: true, ok, value: ok ? `${pol} → ${pod}` : undefined }
 }
 function blItem(c: ReadyCtx, required = false): ReadyItem {
-  return { label: 'Số B/L' + (required ? '' : ' (nên có)'), group: 'shipping', required, ok: has(c.order.bl_number), value: c.order.bl_number || undefined }
+  const bl = c.booking?.bl_number || c.order.bl_number
+  return { label: 'Số B/L' + (required ? '' : ' (nên có)'), group: 'shipping', required, ok: has(bl), value: bl || undefined }
 }
 function freightItem(c: ReadyCtx): ReadyItem {
-  const need = isCIF(c.order)
-  const ok = !need || (has(c.order.freight_amount) && has(c.order.insurance_amount))
-  return { label: 'Cước + Bảo hiểm (đơn CIF)', group: 'shipping', required: need, ok, sub: need && !ok ? 'Thiếu → FOB(COST) sẽ = CIF (sai)' : undefined, value: ok && need ? `$${c.order.freight_amount} · $${c.order.insurance_amount}` : undefined }
+  const term = (c.order.incoterm || '').toUpperCase()
+  const needFreight = FREIGHT_TERMS.includes(term)
+  const needIns = INSURED_TERMS.includes(term)   // CFR/CNF/CPT/DDP = chỉ cước, KHÔNG bảo hiểm
+  const ok = (!needFreight || has(c.order.freight_amount)) && (!needIns || has(c.order.insurance_amount))
+  const label = needIns ? 'Cước + Bảo hiểm (đơn CIF)' : 'Cước (Freight)'
+  return { label, group: 'shipping', required: needFreight, ok, sub: needFreight && !ok ? 'Thiếu → FOB(COST) sẽ = giá bán (sai)' : undefined,
+    value: ok && needFreight ? (needIns ? `$${c.order.freight_amount} · $${c.order.insurance_amount}` : `$${c.order.freight_amount}`) : undefined }
+}
+// Container chỉ cần có KL net (cho chứng từ tổng hợp không in cont/seal, vd Non-Wood)
+function containersNetItem(c: ReadyCtx): ReadyItem {
+  const net = c.containers.reduce((s, x) => s + (x.net_weight_kg || 0), 0)
+  const ok = net > 0
+  return { label: 'Container (khối lượng)', group: 'packing', required: true, ok, value: ok ? `${(net / 1000).toFixed(2)} tấn` : undefined, sub: ok ? undefined : 'Chưa có container / KL' }
 }
 function containersItem(c: ReadyCtx): ReadyItem {
   const withW = c.containers.filter((x) => (x.net_weight_kg || 0) > 0)
@@ -107,6 +125,8 @@ const REG: Record<string, Builder> = {
     shipItem(c), blItem(c, false), freightItem(c),
     { label: 'Ngày Proforma (PI)', group: 'shipping', required: false, ok: has(c.order.proforma_date), value: c.order.proforma_date || undefined },
     { label: 'ITEM NO · Kiểu đóng gói (PACKING)', group: 'shipping', required: false, ok: has(c.order.item_no || c.profile?.default_item_no) && has(c.order.packing_desc || c.profile?.default_packing_desc) },
+    // Sinh theo LÔ: lô phải có KL net (kẻo hoá đơn ra 0 tấn / $0)
+    ...(c.lotNo ? [{ label: 'KL net của lô (>0)', group: 'packing' as ReadyGroup, required: true, ok: c.containers.reduce((s, x) => s + (x.net_weight_kg || 0), 0) > 0, sub: 'Lô chưa nhập KL net → hoá đơn 0 tấn/$0' }] : []),
   ],
   packing: (c) => [
     buyerItem(c), goodsItem(c), containersItem(c), shipItem(c), blItem(c, false),
@@ -123,10 +143,12 @@ const REG: Record<string, Builder> = {
   beneficiary: (c) => [
     buyerItem(c),
     { label: 'Email người mua', group: 'profile', required: false, ok: has((c.order as { customer?: { email?: string } }).customer?.email) },
-    shipItem(c), blItem(c, true), lcItem(c),
+    shipItem(c), blItem(c, true),
+    // Beneficiary cert KHÔNG in ngân hàng → chỉ cần Số L/C nếu có (không đòi bank)
+    { label: 'Số L/C (nếu có)', group: 'negotiation', required: false, ok: has(c.negotiation?.lc_number || c.order.lc_number), value: (c.negotiation?.lc_number || c.order.lc_number) || undefined },
   ],
   nonwood: (c) => [
-    buyerItem(c), goodsItem(c), containersItem(c), shipItem(c), blItem(c, true),
+    buyerItem(c), goodsItem(c), containersNetItem(c), shipItem(c), blItem(c, true),
   ],
   lc: (c) => {
     const df = (c.negotiation?.dnck_fields as Record<string, string>) || {}

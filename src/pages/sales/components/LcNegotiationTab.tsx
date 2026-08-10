@@ -166,17 +166,23 @@ export default function LcNegotiationTab(
     setGenDnck(true)
     try {
       const v = form.getFieldsValue()
-      await lcNegotiationService.upsert(orderId, {
+      const saved = await lcNegotiationService.upsert(orderId, {
         method: v.method || 'lc',
+        bank_id: v.bank_id || null,
         issuing_bank: v.issuing_bank || null,
         lc_number: v.lc_number || null,
         lc_date: v.lc_date ? v.lc_date.format('YYYY-MM-DD') : null,
         negotiate_pct: v.negotiate_pct ?? null,
         negotiate_amount: v.negotiate_amount ?? null,
+        interest_rate: v.interest_rate ?? null,
         term_days: v.term_days ?? null,
+        submitted_date: v.submitted_date ? v.submitted_date.format('YYYY-MM-DD') : null,
+        status: v.status || 'draft',
         doc_checklist: buildDocChecklist(),   // để lưới checklist tự tick đúng (kẻo trống)
         dnck_fields: dnckFields,
       }, lotNo)
+      setNeg(saved)
+      onSaved?.()
       await generateDNCK(orderId, lotNo)
     } catch (e: any) {
       message.error(e?.message || 'Lỗi sinh đơn ĐNCK')
@@ -427,7 +433,8 @@ export default function LcNegotiationTab(
       <div className="no-print" style={{ marginTop: 16, textAlign: 'center' }}>
         <Space>
           <Button type="primary" icon={<PrinterOutlined />} size="large" onClick={() => window.print()}>In / Lưu PDF</Button>
-          <Button icon={<FileWordOutlined />} size="large" onClick={() => {
+          <Button icon={<FileWordOutlined />} size="large" onClick={async () => {
+            await handleSave()   // lưu trước để Invoice/WL/Hối phiếu đọc cùng số L/C · bank · phương thức
             const cl = checklist.map((c) => ({ label: DOC_LABEL(c.doc), originals: c.originals || 0, copies: c.copies || 0 }))
             const common = {
               orderCode: soDisplayCode(order), contractNo: order.contract_no || soDisplayCode(order),
@@ -443,9 +450,12 @@ export default function LcNegotiationTab(
                   collectingBank: v.issuing_bank || '', buyerName: inv?.buyer_name || '' })
               : lcNegotiationDoc({ ...common, issuingBank: v.issuing_bank || '', lcNumber: v.lc_number || '',
                   lcDate: v.lc_date ? dayjs(v.lc_date).format('DD/MM/YYYY') : '' })
-            saveDocx(doc, `${soDisplayCode(order)}_${isDP ? 'CK-DP' : 'DNCK'}`).catch(() => message.error('Lỗi xuất Word'))
+            saveDocx(doc, `${soDisplayCode(order)}_${isDP ? 'CK-DP' : 'DNCK'}${lotNo ? `_L${lotNo}` : ''}`).catch(() => message.error('Lỗi xuất Word'))
           }}>Tải Word (.docx)</Button>
         </Space>
+        <div style={{ fontSize: 12, color: '#874d00', marginTop: 8 }}>
+          Đây là bản <b>own-format</b> của Huy Anh (xem trước ở trên). <b>Form ngân hàng Vietinbank chuẩn</b> (điền các ô override) tải ở panel <b>"{isDP ? 'Đơn ĐNCK Nhờ thu D/P (BM08)' : 'Đơn ĐNCK Vietinbank (BM08A)'}"</b> phía trên.
+        </div>
       </div>
     </div>
   )

@@ -4,7 +4,7 @@
 // Module Bán hàng quốc tế — Huy Anh Rubber ERP
 // ============================================================================
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Card,
@@ -54,6 +54,7 @@ import QuickFillDrawer from './components/QuickFillDrawer'
 import { containerService } from '../../services/sales/containerService'
 import customerExportProfileService, { type CustomerExportProfile } from '../../services/sales/customerExportProfileService'
 import { lcNegotiationService, type LcNegotiation } from '../../services/sales/lcNegotiationService'
+import { salesBookingService, type SalesBooking } from '../../services/sales/salesBookingService'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -690,11 +691,11 @@ const ExportDocumentsPage = () => {
   const [negVersion, setNegVersion] = useState(0)   // bump khi ĐNCK lưu → BOE nạp lại
   // Bộ chứng từ theo LÔ: 0 = cả đơn; >0 = lot_no
   const [lotNo, setLotNo] = useState(0)
-  const [lots, setLots] = useState<number[]>([])
   // Dữ liệu để KIỂM TRA SẴN SÀNG (readiness): container + hồ sơ khách + đơn chiết khấu
   const [rdContainers, setRdContainers] = useState<SalesOrderContainer[]>([])
   const [rdProfile, setRdProfile] = useState<CustomerExportProfile | null>(null)
   const [rdNeg, setRdNeg] = useState<LcNegotiation | null>(null)
+  const [rdBookings, setRdBookings] = useState<SalesBooking[]>([])
   const [readyVersion, setReadyVersion] = useState(0)       // bump sau khi nhập nhanh → nạp lại ctx
   const [quickGroup, setQuickGroup] = useState<ReadyGroup | null>(null)  // group đang mở drawer nhập nhanh
 
@@ -707,8 +708,14 @@ const ExportDocumentsPage = () => {
       .then((data) => setOrder(data))
       .catch(() => message.error('Không thể tải đơn hàng'))
       .finally(() => setLoading(false))
-    documentService.listLots(orderId).then(setLots).catch(() => setLots([]))
   }, [orderId])
+
+  // Danh sách LÔ suy thẳng từ container (tự refresh sau khi "Chia lô" trong drawer)
+  const lots = useMemo(() => {
+    const s = new Set<number>()
+    for (const c of rdContainers) if (c.lot_no) s.add(c.lot_no as number)
+    return Array.from(s).sort((a, b) => a - b)
+  }, [rdContainers])
 
   // Nạp dữ liệu readiness (container / hồ sơ khách / đơn chiết khấu). negVersion bump khi lưu ĐNCK.
   useEffect(() => {
@@ -716,6 +723,7 @@ const ExportDocumentsPage = () => {
     containerService.getContainers(order.id).then(setRdContainers).catch(() => setRdContainers([]))
     if (order.customer_id) customerExportProfileService.getByCustomer(order.customer_id).then(setRdProfile).catch(() => setRdProfile(null))
     lcNegotiationService.getByOrder(order.id, lotNo).then(setRdNeg).catch(() => setRdNeg(null))
+    salesBookingService.list(order.id).then(setRdBookings).catch(() => setRdBookings([]))
   }, [order?.id, order?.customer_id, lotNo, negVersion, readyVersion])
 
   // Sau khi nhập nhanh trong drawer: nạp lại order (field vận chuyển/hợp đồng) + container/hồ sơ/ĐNCK
@@ -846,6 +854,8 @@ const ExportDocumentsPage = () => {
     containers: lotNo ? rdContainers.filter((c) => (c.lot_no ?? 0) === lotNo) : rdContainers,
     profile: rdProfile,
     negotiation: rdNeg,
+    booking: lotNo ? (rdBookings.find((b) => b.lot_no === lotNo) ?? null) : null,
+    lotNo,
   }
   const readyDot = (key: string) => {
     const r = checkReadiness(key, readyCtx)
@@ -1109,7 +1119,7 @@ const ExportDocumentsPage = () => {
               children: <BillOfExchangeTab orderId={orderId!} reloadKey={negVersion} lotNo={lotNo} />,
             },
             {
-              key: 'dnck',
+              key: 'lc',
               label: (
                 <span>
                   {readyDot('lc')}<DollarOutlined /> Đơn chiết khấu
@@ -1118,7 +1128,7 @@ const ExportDocumentsPage = () => {
               children: <LcNegotiationTab orderId={orderId!} order={order} lotNo={lotNo} onSaved={() => setNegVersion((v) => v + 1)} docBlocked={contIncomplete} blockReason={blockReason} />,
             },
             {
-              key: 'bencert',
+              key: 'beneficiary',
               label: (
                 <span>
                   {readyDot('beneficiary')}<SafetyCertificateOutlined /> Beneficiary Cert

@@ -229,12 +229,6 @@ export interface NonWoodCertData {
 // CONSTANTS
 // ============================================================================
 
-const BANK_INFO = {
-  name: 'Vietcombank - Chi nhanh Hue',
-  account: '0491000XXXXXX',
-  swift: 'BFTVVNVX009',
-}
-
 const PORT_LABELS: Record<string, string> = {
   HCM_CAT_LAI: 'Cat Lai Port, Ho Chi Minh City, Vietnam',
   HCM_HIEP_PHUOC: 'Hiep Phuoc Port, Ho Chi Minh City, Vietnam',
@@ -524,9 +518,10 @@ export const documentService = {
       }))
 
       const containerBales = c.bale_count || items.reduce((s: number, i: { bale_count: number }) => s + i.bale_count, 0)
-      const containerNet = c.net_weight_kg || items.reduce((s: number, i: { weight_kg: number }) => s + i.weight_kg, 0)
+      // Làm tròn/cont (khớp Weight List + Invoice) — cột container cộng đúng bằng TOTAL
+      const containerNet = Math.round(c.net_weight_kg || items.reduce((s: number, i: { weight_kg: number }) => s + i.weight_kg, 0))
       // Gross thiếu → bằng Net (bao bì bành không đáng kể, khớp mẫu gốc); KHÔNG ước lượng ×1.02
-      const containerGross = c.gross_weight_kg || containerNet
+      const containerGross = Math.round(c.gross_weight_kg || containerNet)
 
       containers.push({
         container_no: c.container_no || 'TBD',
@@ -722,8 +717,11 @@ export const documentService = {
     if (lotNo) contQ = contQ.eq('lot_no', lotNo)
     const { data: wlCont } = await contQ
     const conts = wlCont || []
-    const sumNet = conts.reduce((s, c) => s + (c.net_weight_kg || 0), 0)
-    const sumGross = conts.reduce((s, c) => s + (c.gross_weight_kg || c.net_weight_kg || 0), 0)
+    const sumNet = conts.reduce((s, c) => s + Math.round(c.net_weight_kg || 0), 0)   // làm tròn/cont (khớp Weight List)
+    const sumGross = conts.reduce((s, c) => s + Math.round(c.gross_weight_kg || c.net_weight_kg || 0), 0)
+    // Tổng net THỰC của CẢ đơn (mọi lô) — mẫu số chia cước/BH cho đúng (Σ các lô = cước đơn)
+    const { data: allNetC } = await supabase.from('sales_order_containers').select('net_weight_kg').eq('sales_order_id', orderId)
+    const totalOrderNet = (allNetC || []).reduce((s, c) => s + Math.round(c.net_weight_kg || 0), 0)
     // Đóng gói (khớp mẫu): PACKING = "<kiểu> <bao/cont> BALES/01X<size>", TOTAL PACKING = "<tổng bao> BALES/<số cont>X<size>"
     const contCount = conts.length
     const totalBales = conts.reduce((s, c) => s + (c.bale_count || 0), 0)
@@ -741,12 +739,12 @@ export const documentService = {
     const subtotal = qtyTons * order.unit_price
     // HS code theo loại mủ (SVR/TSNR=40012200, RSS=40012100, khác=40012900) → định dạng có dấu chấm "4001.22.00" khớp mẫu
     const g = order.grade || ''
-    const hsRaw = /RSS/i.test(g) ? '40012100' : /SVR|TSNR/i.test(g) ? '40012200' : '40012900'
+    const hsRaw = /LATEX/i.test(g) ? '40011000' : /RSS/i.test(g) ? '40012100' : /SVR|TSNR/i.test(g) ? '40012200' : '40012900'
     const hsCode = `${hsRaw.slice(0, 4)}.${hsRaw.slice(4, 6)}.${hsRaw.slice(6, 8)}`
     // Cước & bảo hiểm: cả đơn nhập ở ShippingTab; theo lô → chia tỷ lệ theo số lượng
     const frOrder = order.freight_amount ?? invoice?.freight_charge ?? 0
     const insOrder = order.insurance_amount ?? invoice?.insurance_charge ?? 0
-    const lotFrac = lotNo && orderQty > 0 ? Math.min(1, qtyTons / orderQty) : 1
+    const lotFrac = lotNo && totalOrderNet > 0 ? (sumNet / totalOrderNet) : 1   // theo tổng net THỰC → Σ lô = cước đơn
     const freight = Math.round(frOrder * lotFrac * 100) / 100
     const insurance = Math.round(insOrder * lotFrac * 100) / 100
     // Khớp mẫu gốc: đơn giá đã là CIF → TOTAL = trị giá CIF; cước+BH TRỪ ra "THE COST" (số Hối phiếu draw)
@@ -777,9 +775,10 @@ export const documentService = {
       // B/L: lô → từ booking của lô; cả đơn → order.bl_number
       bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       invoice_date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
+      // Chưa chọn NH thụ hưởng → để TRỐNG (đừng in số TK/SWIFT GIẢ); readiness bankItem sẽ cảnh báo
       bank_info: bank
         ? { account_name: bank.account_name || 'HUY ANH RUBBER COMPANY LIMITED', name: bank.bank_name, account: bank.account_no, address: bank.bank_address || '', swift: bank.swift_code || '' }
-        : { account_name: 'HUY ANH RUBBER COMPANY LIMITED', name: BANK_INFO.name, account: BANK_INFO.account, address: '', swift: BANK_INFO.swift },
+        : { account_name: 'HUY ANH RUBBER COMPANY LIMITED', name: '', account: '', address: '', swift: '' },
       // GĐ2 — hồ sơ chứng từ khách
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       buyer_address: profile?.buyer_address || customer?.address || '',

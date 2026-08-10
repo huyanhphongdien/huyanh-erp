@@ -286,10 +286,10 @@ export interface SalesOrderItem {
 export interface SalesOrderContainer {
   id: string
   sales_order_id: string
-  container_no?: string
-  seal_no?: string
+  container_no?: string | null
+  seal_no?: string | null
   container_type?: ContainerType
-  gross_weight_kg?: number
+  gross_weight_kg?: number | null
   tare_weight_kg?: number
   net_weight_kg?: number
   bale_count?: number

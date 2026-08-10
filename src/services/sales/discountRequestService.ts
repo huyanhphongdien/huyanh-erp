@@ -67,11 +67,13 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
   const inv = await documentService.getInvoiceData(orderId, lotNo)
   const neg = await lcNegotiationService.getByOrder(orderId, lotNo)
   const df: DnckFields = (neg?.dnck_fields as DnckFields) || {}
-  const amount = inv.total
-  const pct = neg?.negotiate_pct ?? 90
-  const negAmount = neg?.negotiate_amount ?? (amount * pct) / 100
+  // Giá trị đòi tiền = số Hối phiếu draw (THE COST khi đơn CIF có cước/BH), khớp Hối phiếu + bản in
+  const drawAmount = (inv.freight > 0 || inv.insurance > 0) ? inv.the_cost : inv.total
+  const pct = neg?.negotiate_pct ?? null
+  const negAmount = neg?.negotiate_amount ?? (pct != null ? (drawAmount * pct) / 100 : null)
   const bank = parseBankSwift(neg?.issuing_bank || inv.consignee || '')
-  const reqDate = df.request_date ? new Date(df.request_date) : new Date()
+  const parsed = df.request_date ? new Date(df.request_date) : null
+  const reqDate = parsed && !isNaN(parsed.getTime()) ? parsed : new Date()
   const p = (n: number) => String(n).padStart(2, '0')
   const gradeCompact = (inv.grade || '').replace(/_/g, ' ')   // SVR_10 → "SVR 10" (khớp Invoice)
   const addrLines = (inv.buyer_address || '').split(/\n|,\s*/).map((x) => x.trim()).filter(Boolean)
@@ -97,12 +99,12 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
     issuing_bank: df.issuing_bank || neg?.issuing_bank || '',
     commodity: df.commodity || `NATURAL RUBBER ${gradeCompact}`,
     shipping_line: df.shipping_line || '',
-    amount: money(amount),
+    amount: money(drawAmount),
     invoice_no: inv.invoice_code,
     invoice_date: ddmmyyyy(inv.invoice_date),
     contract_no: df.contract_no || base,
     contract_date: ddmmyyyy(df.contract_date || (inv as { contract_date?: string }).contract_date || ''),
-    lc_remaining: df.lc_remaining || money(amount),
+    lc_remaining: df.lc_remaining || money(drawAmount),
     recv_swift: df.recv_swift || bank.swift,
     recv_bank_name: df.recv_bank_name || bank.name,
     recv_bank_addr1: df.recv_bank_addr1 || '',
@@ -111,7 +113,7 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
     applicant_addr1: df.applicant_addr1 || addrLines[0] || inv.buyer_address,
     applicant_addr2: df.applicant_addr2 || addrLines[1] || '',
     applicant_addr3: df.applicant_addr3 || addrLines[2] || '',
-    negotiate_amount: money(negAmount),
+    negotiate_amount: negAmount != null ? money(negAmount) : '',
     negotiate_amount_words: df.negotiate_amount_words || '',
     term_days: neg?.term_days != null ? String(neg.term_days) : '',
     secured_amount_vnd: df.secured_amount_vnd || '',
@@ -123,12 +125,13 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
   const inv = await documentService.getInvoiceData(orderId, lotNo)
   const neg = await lcNegotiationService.getByOrder(orderId, lotNo)
   const df: DnckFields = (neg?.dnck_fields as DnckFields) || {}
-  const amount = inv.total
-  const pct = neg?.negotiate_pct ?? 90
-  const negAmount = neg?.negotiate_amount ?? (amount * pct) / 100
+  const drawAmount = (inv.freight > 0 || inv.insurance > 0) ? inv.the_cost : inv.total
+  const pct = neg?.negotiate_pct ?? null
+  const negAmount = neg?.negotiate_amount ?? (pct != null ? (drawAmount * pct) / 100 : null)
   // D/P: issuing_bank = NH nhờ thu (NH người mua) → tách tên + swift
   const bank = parseBankSwift(df.recv_bank_name || neg?.issuing_bank || '')
-  const reqDate = df.request_date ? new Date(df.request_date) : new Date()
+  const parsed = df.request_date ? new Date(df.request_date) : null
+  const reqDate = parsed && !isNaN(parsed.getTime()) ? parsed : new Date()
   const p = (n: number) => String(n).padStart(2, '0')
   const gradeCompact = (inv.grade || '').replace(/_/g, ' ')   // SVR_10 → "SVR 10" (khớp Invoice)
   const base = inv.order_code.split(' — ')[0]
@@ -142,7 +145,7 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
     rq_d: p(reqDate.getDate()), rq_m: p(reqDate.getMonth() + 1), rq_y: String(reqDate.getFullYear()),
     commodity: df.commodity || `NATURAL RUBBER ${gradeCompact}`,
     shipping_line: df.shipping_line || '',
-    amount: money(amount),
+    amount: money(drawAmount),
     invoice_no: inv.invoice_code,
     invoice_date: ddmmyyyy(inv.invoice_date),
     contract_no: df.contract_no || base,
@@ -155,9 +158,9 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
     // Người nhập khẩu / người mua
     buyer_name: df.buyer_name || inv.buyer_name,
     buyer_addr: df.buyer_addr || buyerAddr,
-    discount_amount: money(negAmount),
+    discount_amount: negAmount != null ? money(negAmount) : '',
     discount_amount_words: df.discount_amount_words || '',
-    negotiate_pct: String(pct),
+    negotiate_pct: pct != null ? String(pct) : '',
     term_days: neg?.term_days != null ? String(neg.term_days) : '',
   }
 }

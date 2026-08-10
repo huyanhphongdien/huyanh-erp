@@ -124,9 +124,9 @@ export default function QuickFillDrawer(
           if (!c.id) continue
           const r = rows[c.id]; if (!r) continue
           const patch: Partial<SalesOrderContainer> = {}
-          if ((r.container_no || '') !== (c.container_no || '')) patch.container_no = r.container_no.trim() || undefined
-          if ((r.seal_no || '') !== (c.seal_no || '')) patch.seal_no = r.seal_no.trim() || undefined
-          if ((r.gross_weight_kg ?? null) !== (c.gross_weight_kg ?? null)) patch.gross_weight_kg = r.gross_weight_kg ?? undefined
+          if ((r.container_no || '') !== (c.container_no || '')) patch.container_no = r.container_no.trim() || null
+          if ((r.seal_no || '') !== (c.seal_no || '')) patch.seal_no = r.seal_no.trim() || null
+          if ((r.gross_weight_kg ?? null) !== (c.gross_weight_kg ?? null)) patch.gross_weight_kg = r.gross_weight_kg ?? null
           if ((r.pallet_count ?? null) !== (c.pallet_count ?? null)) patch.pallet_count = r.pallet_count ?? null
           if ((r.lot_no ?? null) !== (c.lot_no ?? null)) patch.lot_no = r.lot_no ?? null
           if (Object.keys(patch).length) await containerService.updateContainer(c.id, patch)

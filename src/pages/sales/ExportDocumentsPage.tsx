@@ -49,8 +49,9 @@ import DocLetterhead from './components/DocLetterhead'
 import type { COAData, PackingListData, InvoiceData, WeightListData } from '../../services/sales/documentService'
 import type { SalesOrder, SalesOrderContainer } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
-import { checkReadiness, type ReadyCtx } from '../../services/sales/docReadiness'
+import { checkReadiness, type ReadyCtx, type ReadyGroup } from '../../services/sales/docReadiness'
 import DocReadinessPanel from './components/DocReadinessPanel'
+import QuickFillDrawer from './components/QuickFillDrawer'
 import { containerService } from '../../services/sales/containerService'
 import customerExportProfileService, { type CustomerExportProfile } from '../../services/sales/customerExportProfileService'
 import { lcNegotiationService, type LcNegotiation } from '../../services/sales/lcNegotiationService'
@@ -695,6 +696,8 @@ const ExportDocumentsPage = () => {
   const [rdContainers, setRdContainers] = useState<SalesOrderContainer[]>([])
   const [rdProfile, setRdProfile] = useState<CustomerExportProfile | null>(null)
   const [rdNeg, setRdNeg] = useState<LcNegotiation | null>(null)
+  const [readyVersion, setReadyVersion] = useState(0)       // bump sau khi nhập nhanh → nạp lại ctx
+  const [quickGroup, setQuickGroup] = useState<ReadyGroup | null>(null)  // group đang mở drawer nhập nhanh
 
   // Load order
   useEffect(() => {
@@ -714,7 +717,24 @@ const ExportDocumentsPage = () => {
     containerService.getContainers(order.id).then(setRdContainers).catch(() => setRdContainers([]))
     if (order.customer_id) customerExportProfileService.getByCustomer(order.customer_id).then(setRdProfile).catch(() => setRdProfile(null))
     lcNegotiationService.getByOrder(order.id, lotNo).then(setRdNeg).catch(() => setRdNeg(null))
-  }, [order?.id, order?.customer_id, lotNo, negVersion])
+  }, [order?.id, order?.customer_id, lotNo, negVersion, readyVersion])
+
+  // Sau khi nhập nhanh trong drawer: nạp lại order (field vận chuyển/hợp đồng) + container/hồ sơ/ĐNCK
+  const reloadReadiness = useCallback(() => {
+    if (orderId) salesOrderService.getById(orderId).then(setOrder).catch(() => {})
+    setReadyVersion((v) => v + 1)
+  }, [orderId])
+
+  // "Mở tab đầy đủ" từ drawer → mở đúng tab của đơn/khách ở cửa sổ mới
+  const openFullTab = useCallback((g: ReadyGroup) => {
+    if (!order) return
+    let url = ''
+    if (g === 'profile' && order.customer_id) url = `/sales/customers/${order.customer_id}?tab=export`
+    else if (g === 'contract') url = `/sales/orders/${order.id}?tab=contract`
+    else if (g === 'shipping') url = `/sales/orders/${order.id}?tab=shipping`
+    else if (g === 'packing') url = `/sales/orders/${order.id}?tab=packing`
+    if (url) window.open(url, '_blank', 'noopener')
+  }, [order])
 
   // Đổi lô → xoá dữ liệu đã sinh (sinh lại theo lô mới) + báo BOE/ĐNCK nạp lại
   useEffect(() => {
@@ -992,8 +1012,7 @@ const ExportDocumentsPage = () => {
         {activeTab !== 'coa' && (
           <DocReadinessPanel
             result={checkReadiness(activeTab, readyCtx)}
-            orderId={order.id}
-            customerId={order.customer_id}
+            onQuickFill={(g) => setQuickGroup(g)}
             onGotoNegotiation={() => setActiveTab('lc')}
           />
         )}
@@ -1094,6 +1113,15 @@ const ExportDocumentsPage = () => {
           ]}
         />
       </Card>
+
+      <QuickFillDrawer
+        open={quickGroup != null}
+        group={quickGroup}
+        ctx={readyCtx}
+        onClose={() => setQuickGroup(null)}
+        onSaved={() => { setQuickGroup(null); reloadReadiness() }}
+        onOpenFullTab={(g) => { setQuickGroup(null); openFullTab(g) }}
+      />
     </div>
   )
 }

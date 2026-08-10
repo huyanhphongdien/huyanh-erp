@@ -10,8 +10,8 @@ import { GROUP_LABEL, type ReadyResult, type ReadyGroup, type ReadyItem } from '
 const BRAND = '#1B4D3E'
 
 export default function DocReadinessPanel(
-  { result, orderId, customerId, onGotoNegotiation }:
-  { result: ReadyResult; orderId: string; customerId?: string | null; onGotoNegotiation?: () => void },
+  { result, onQuickFill, onGotoNegotiation }:
+  { result: ReadyResult; onQuickFill: (g: ReadyGroup) => void; onGotoNegotiation?: () => void },
 ) {
   if (result.status === 'idle') {
     return (
@@ -19,17 +19,6 @@ export default function DocReadinessPanel(
         <div style={{ fontSize: 13, color: '#8c8c8c' }}>{result.items[0]?.label}</div>
       </div>
     )
-  }
-
-  // mở đúng nơi nhập (tab mới cho order/khách; trong trang cho Đơn chiết khấu)
-  const openGroup = (g: ReadyGroup) => {
-    if (g === 'negotiation') { onGotoNegotiation?.(); return }
-    let url = ''
-    if (g === 'profile' && customerId) url = `/sales/customers/${customerId}?tab=export`
-    else if (g === 'contract') url = `/sales/orders/${orderId}?tab=contract`
-    else if (g === 'shipping') url = `/sales/orders/${orderId}?tab=shipping`
-    else if (g === 'packing') url = `/sales/orders/${orderId}?tab=packing`
-    if (url) window.open(url, '_blank', 'noopener')
   }
 
   // gom theo group, giữ thứ tự xuất hiện
@@ -62,9 +51,9 @@ export default function DocReadinessPanel(
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#8c8c8c' }}>{GROUP_LABEL[g]}</span>
                 {groupHasMissing && g !== 'auto' && (
-                  <Button size="small" type="link" style={{ padding: 0, height: 'auto', fontSize: 12, color: BRAND }}
-                    onClick={() => openGroup(g)}>
-                    {g === 'negotiation' ? 'Mở tab Đơn chiết khấu' : 'Mở tab để nhập'} <ArrowRightOutlined style={{ fontSize: 10 }} />
+                  <Button size="small" type="link" style={{ padding: 0, height: 'auto', fontSize: 12, color: BRAND, fontWeight: 600 }}
+                    onClick={() => (g === 'negotiation' ? onGotoNegotiation?.() : onQuickFill(g))}>
+                    {g === 'negotiation' ? 'Mở tab Đơn chiết khấu' : 'Nhập ngay'} <ArrowRightOutlined style={{ fontSize: 10 }} />
                   </Button>
                 )}
               </div>

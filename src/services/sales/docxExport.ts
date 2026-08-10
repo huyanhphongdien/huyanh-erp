@@ -411,8 +411,9 @@ export function parseBankSwift(s: string): { name: string; swift: string } {
   const raw = (s || '').trim()
   const m = raw.match(/\(SWIFT\s*:?\s*([A-Z0-9]{6,11})\)/i)
   if (m) return { name: raw.replace(/\s*\(SWIFT[^)]*\)\s*/i, '').trim(), swift: m[1].toUpperCase() }
+  // BIC chuẩn: 6 chữ + 2 alnum (+ tuỳ chọn 3 alnum) = 8 hoặc 11 ký tự → tránh nhầm 1 từ tên NH thành SWIFT
   const parts = raw.split(/\s*\/\s*/).map((x) => x.trim()).filter(Boolean)
-  if (parts.length > 1 && /^[A-Z]{4}[A-Z0-9]{2,7}$/i.test(parts[0])) {
+  if (parts.length > 1 && /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/i.test(parts[0])) {
     return { name: parts.slice(1).join(', '), swift: parts[0].toUpperCase() }
   }
   return { name: raw, swift: '' }
@@ -567,21 +568,24 @@ export function beneficiaryCertDoc(d: BeneficiaryCertData): Document {
   return makeDoc([
     ...letterhead(),
     P("BENEFICIARY'S CERTIFICATE", { align: AlignmentType.CENTER, bold: true, size: 15, after: 20 }),
-    P(`No.: ${d.cert_no}          Date: ${fmtD(d.date)}`, { align: AlignmentType.CENTER, after: 100 }),
+    P(`No.: ${d.cert_no}`, { align: AlignmentType.RIGHT, after: 0 }),
+    P(`Date: ${fmtD(d.date)}`, { align: AlignmentType.RIGHT, after: 100 }),
     kv('THE BUYER/APPLICANT:', d.buyer_name),
-    P(`ADDRESS: ${d.buyer_address}`, { after: 60 }),
+    P(`ADDRESS: ${d.buyer_address}`, { after: 40 }),
     kv('BILL OF LADING NO.:', d.bl_number || '—'),
     kv('SHIPPED ON BOARD:', fmtD(d.shipped_on_board) || '—'),
     kv('VESSEL/VOYAGE:', d.vessel || '—'),
     kv('PORT OF LOADING:', d.port_of_loading || '—'),
     kv('PORT OF DISCHARGE:', d.port_of_destination || '—'),
-    kv('L/C NO:', `${d.lc_number || '—'}${d.lc_date ? '   DATE: ' + fmtD(d.lc_date) : ''}`),
+    kv('LC NO:', `${d.lc_number || '—'}${d.lc_date ? '        DATE: ' + fmtDot(d.lc_date) : ''}`),
+    kv('BUYER:', d.buyer_name),
     ...(d.buyer_email ? [kv('EMAIL ADDRESS:', d.buyer_email)] : []),
     P('', { after: 40 }),
     P('We, HUY ANH RUBBER COMPANY LIMITED CERTIFY THAT, a set of copy documents had been emailed to the applicant within 03 days from shipment.', { after: 220 }),
     P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
-    P('', { after: 300 }),
-    P('GENERAL DIRECTOR', { align: AlignmentType.RIGHT, bold: true }),
+    P('', { after: 260 }),
+    P('PHÓ GIÁM ĐỐC', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
+    P('Lê Xuân Hồng Trung', { align: AlignmentType.RIGHT, bold: true }),
   ])
 }
 

@@ -12,6 +12,12 @@ import DocLetterhead from './DocLetterhead'
 
 const { Title, Text } = Typography
 const fmtD = (s?: string) => (s ? new Date(s).toLocaleDateString('en-GB') : '')
+const dotDate = (s?: string) => {
+  if (!s) return ''
+  const dt = new Date(s); if (isNaN(dt.getTime())) return s
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(dt.getDate())}.${p(dt.getMonth() + 1)}.${dt.getFullYear()}`
+}
 
 export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: string; lotNo?: number }) {
   const [d, setD] = useState<BeneficiaryCertData | null>(null)
@@ -48,8 +54,9 @@ export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: st
     <div className="doc-print-area">
       <DocLetterhead />
       <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>BENEFICIARY'S CERTIFICATE</Title>
-      <div style={{ textAlign: 'center', marginBottom: 16 }}>
-        <Text>No.: {d.cert_no}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Date: {fmtD(d.date)}</Text>
+      <div style={{ textAlign: 'right', marginBottom: 16 }}>
+        <div>No.: {d.cert_no}</div>
+        <div>Date: {fmtD(d.date)}</div>
       </div>
 
       <div style={{ marginBottom: 10 }}>
@@ -64,7 +71,8 @@ export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: st
           {row('VESSEL/VOYAGE', d.vessel || '—')}
           {row('PORT OF LOADING', d.port_of_loading || '—')}
           {row('PORT OF DISCHARGE', d.port_of_destination || '—')}
-          {row('L/C NO', `${d.lc_number || '—'}${d.lc_date ? `   DATE: ${fmtD(d.lc_date)}` : ''}`)}
+          {row('LC NO', `${d.lc_number || '—'}${d.lc_date ? `        DATE: ${dotDate(d.lc_date)}` : ''}`)}
+          {row('BUYER', d.buyer_name)}
           {d.buyer_email ? row('EMAIL ADDRESS', d.buyer_email) : null}
         </tbody>
       </table>
@@ -77,7 +85,8 @@ export default function BeneficiaryCertTab({ orderId, lotNo = 0 }: { orderId: st
       <div style={{ marginTop: 40, textAlign: 'right' }}>
         <Text strong>HUY ANH RUBBER COMPANY LIMITED</Text>
         <div style={{ height: 56 }} />
-        <Text strong>GENERAL DIRECTOR</Text>
+        <Text strong>PHÓ GIÁM ĐỐC</Text>
+        <div><Text strong>Lê Xuân Hồng Trung</Text></div>
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>

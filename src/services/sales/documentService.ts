@@ -836,7 +836,7 @@ export const documentService = {
       buyer_email: email,
       bl_number: inv.bl_number || '',
       shipped_on_board: inv.bl_date || '',
-      vessel: inv.vessel_name,
+      vessel: `${inv.vessel_name || ''}${inv.voyage_number ? ' ' + inv.voyage_number : ''}`.trim(),
       port_of_loading: inv.port_of_loading,
       port_of_destination: inv.port_of_destination,
       lc_number: inv.lc_number || neg?.lc_number || '',

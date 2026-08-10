@@ -212,6 +212,8 @@ export interface NonWoodCertData {
   grade_label: string
   quantity_tons: number
   country_of_origin: string
+  packing_desc: string
+  total_packing: string
   net_weight_kg: number
   gross_weight_kg: number
   vessel: string
@@ -855,16 +857,18 @@ export const documentService = {
     return {
       cert_no: `${base}${lotNo ? `/L${lotNo}` : ''}/NW`,
       date: inv.invoice_date,
-      // "buyer" trên Non-Wood = consignee (to order of NH), giống mẫu gốc
+      // "buyer" trên Non-Wood = consignee (to order of NH); ADDRESS = tên+địa chỉ người mua thật (khớp mẫu)
       buyer_name: inv.consignee || inv.buyer_name,
-      buyer_address: inv.consignee_address || inv.buyer_address,
+      buyer_address: [inv.buyer_name, inv.buyer_address].filter(Boolean).join(', '),
       commodity: `${inv.quantity_tons} MT - NATURAL RUBBER ${gradeLabel}`,
       grade_label: gradeLabel,
       quantity_tons: inv.quantity_tons,
       country_of_origin: inv.country_of_origin,
+      packing_desc: inv.packing_desc,
+      total_packing: inv.total_packing,
       net_weight_kg: inv.net_weight_kg,
       gross_weight_kg: inv.gross_weight_kg,
-      vessel: inv.vessel_name,
+      vessel: `${inv.vessel_name || ''}${inv.voyage_number ? ' ' + inv.voyage_number : ''}`.trim(),
       port_of_loading: inv.port_of_loading,
       port_of_destination: inv.port_of_destination,
       bl_number: inv.bl_number || '',

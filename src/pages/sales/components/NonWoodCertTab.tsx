@@ -49,13 +49,14 @@ export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string
     <div className="doc-print-area">
       <DocLetterhead />
       <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>CERTIFICATE OF NON-WOOD PACKING MATERIAL</Title>
-      <div style={{ textAlign: 'center', marginBottom: 16 }}>
-        <Text>No: {d.cert_no}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Date: {fmtD(d.date)}</Text>
+      <div style={{ textAlign: 'right', marginBottom: 16 }}>
+        <div>No: {d.cert_no}</div>
+        <div>Date: {fmtD(d.date)}</div>
       </div>
 
       <div style={{ marginBottom: 6 }}>
         <Text strong>THE SELLER: </Text>HUY ANH RUBBER COMPANY LIMITED
-        <br /><Text>ADDRESS: Khe Ma, Phong Dien Ward, Hue City, Viet Nam</Text>
+        <br /><Text>ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM</Text>
       </div>
       <div style={{ marginBottom: 10 }}>
         <Text strong>THE BUYER: </Text>{d.buyer_name}
@@ -66,6 +67,8 @@ export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string
         <tbody>
           {row('COMMODITY', d.commodity)}
           {row('COUNTRY OF ORIGIN', d.country_of_origin)}
+          {d.packing_desc ? row('PACKING', d.packing_desc) : null}
+          {d.total_packing ? row('TOTAL', d.total_packing) : null}
           {row('NET WEIGHT', fmtKg(d.net_weight_kg))}
           {row('GROSS WEIGHT', fmtKg(d.gross_weight_kg))}
           {row('VESSEL', d.vessel || '—')}
@@ -85,7 +88,8 @@ export default function NonWoodCertTab({ orderId, lotNo = 0 }: { orderId: string
       <div style={{ marginTop: 40, textAlign: 'right' }}>
         <Text strong>HUY ANH RUBBER COMPANY LIMITED</Text>
         <div style={{ height: 56 }} />
-        <Text strong>GENERAL DIRECTOR</Text>
+        <Text strong>PHÓ GIÁM ĐỐC</Text>
+        <div><Text strong>Lê Xuân Hồng Trung</Text></div>
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>

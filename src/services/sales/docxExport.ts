@@ -595,13 +595,16 @@ export function nonWoodCertDoc(d: NonWoodCertData): Document {
   return makeDoc([
     ...letterhead(),
     P('CERTIFICATE OF NON-WOOD PACKING MATERIAL', { align: AlignmentType.CENTER, bold: true, size: 15, after: 20 }),
-    P(`No: ${d.cert_no}          Date: ${fmtD(d.date)}`, { align: AlignmentType.CENTER, after: 100 }),
+    P(`No: ${d.cert_no}`, { align: AlignmentType.RIGHT, after: 0 }),
+    P(`Date: ${fmtD(d.date)}`, { align: AlignmentType.RIGHT, after: 100 }),
     kv('THE SELLER:', 'HUY ANH RUBBER COMPANY LIMITED'),
-    P('ADDRESS: Khe Ma, Phong Dien Ward, Hue City, Viet Nam', { after: 40 }),
+    P('ADDRESS: KHE MA, PHONG DIEN WARD, HUE CITY, VIETNAM', { after: 40 }),
     kv('THE BUYER:', d.buyer_name),
-    P(`ADDRESS: ${d.buyer_address}`, { after: 60 }),
+    P(`ADDRESS: ${d.buyer_address}`, { after: 40 }),
     kv('COMMODITY:', d.commodity),
     kv('COUNTRY OF ORIGIN:', d.country_of_origin),
+    ...(d.packing_desc ? [kv('PACKING:', d.packing_desc)] : []),
+    ...(d.total_packing ? [kv('TOTAL:', d.total_packing)] : []),
     kv('NET WEIGHT:', `${d.net_weight_kg.toFixed(2)} KGS`),
     kv('GROSS WEIGHT:', `${d.gross_weight_kg.toFixed(2)} KGS`),
     kv('VESSEL:', d.vessel || '—'),
@@ -613,8 +616,9 @@ export function nonWoodCertDoc(d: NonWoodCertData): Document {
     P('', { after: 40 }),
     P(`WE, HUY ANH RUBBER COMPANY LIMITED CERTIFY THAT ${d.quantity_tons} MT OF NATURAL RUBBER ${d.grade_label}, NO WOODEN PACKING MATERIAL USED IN THE WHOLE OF SHIPMENT OF GOODS.`, { after: 220 }),
     P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
-    P('', { after: 300 }),
-    P('GENERAL DIRECTOR', { align: AlignmentType.RIGHT, bold: true }),
+    P('', { after: 260 }),
+    P('PHÓ GIÁM ĐỐC', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
+    P('Lê Xuân Hồng Trung', { align: AlignmentType.RIGHT, bold: true }),
   ])
 }
 

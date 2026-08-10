@@ -47,6 +47,7 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
       ...b,
       etd: b.etd ? dayjs(b.etd) : null,
       eta: b.eta ? dayjs(b.eta) : null,
+      bl_date: b.bl_date ? dayjs(b.bl_date) : null,
     })
     setOpen(true)
   }
@@ -80,6 +81,7 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
         port_of_loading: v.port_of_loading || null,
         port_of_destination: v.port_of_destination || null,
         bl_number: v.bl_number || null,
+        bl_date: v.bl_date ? v.bl_date.format('YYYY-MM-DD') : null,
         file_url: pendingFile?.file_url || null,
         file_name: pendingFile?.file_name || null,
         notes: v.notes || null,
@@ -178,6 +180,7 @@ export default function BookingTableSection({ orderId, canEdit }: { orderId: str
             <Form.Item name="eta" label="ETA"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="cutoff" label="Cutoff" tooltip="vd: 06/06 10:00 hoặc Sat 10:00"><Input placeholder="06/06 10:00" /></Form.Item>
             <Form.Item name="bl_number" label="B/L Number"><Input placeholder="(điền sau)" /></Form.Item>
+            <Form.Item name="bl_date" label="Ngày B/L" tooltip="Ngày phát hành B/L của lô này — chứng từ theo lô dùng ngày này (Invoice/WL/Hối phiếu/Beneficiary)"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="port_of_loading" label="Cảng xếp (POL)"><Input placeholder="Da Nang" /></Form.Item>
             <Form.Item name="port_of_destination" label="Cảng đích (POD)"><Input placeholder="Shanghai" /></Form.Item>
           </div>

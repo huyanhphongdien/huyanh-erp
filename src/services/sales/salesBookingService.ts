@@ -21,6 +21,7 @@ export interface SalesBooking {
   port_of_loading: string | null
   port_of_destination: string | null
   bl_number: string | null
+  bl_date: string | null      // ngày phát hành B/L của LÔ (chứng từ theo lô dùng ngày này)
   file_url: string | null
   file_name: string | null
   notes: string | null

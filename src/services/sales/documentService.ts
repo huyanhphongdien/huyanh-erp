@@ -591,7 +591,7 @@ export const documentService = {
       packing_desc: packingLineFrom(packingStyle, containers),
       total_packing: totalPackingFrom(containers),
       item_no: order.item_no || profile?.default_item_no || '',
-      lc_number: order.lc_number || lcInfo.lc_number,
+      lc_number: lcInfo.lc_number || order.lc_number,
       lc_date: lcInfo.lc_date,
       invoice_extra_lines: order.invoice_extra_lines || profile?.default_invoice_extra_lines || '',
       po_number: order.customer_po || null,
@@ -635,37 +635,38 @@ export const documentService = {
       const itemNet = ((c as { items?: Array<{ weight_kg?: number }> }).items || [])
         .reduce((s, i) => s + (i.weight_kg || 0), 0)
       const net = c.net_weight_kg || itemNet
-      const tare = c.tare_weight_kg || 0
-      const gross = c.gross_weight_kg || (tare > 0 ? net + tare : net)
+      // gross fallback = net (KHÔNG cộng tare) — thống nhất với PKL/Invoice để 3 chứng từ khớp
+      const gross = c.gross_weight_kg || net
       return {
         container_no: c.container_no || 'TBD',
         seal_no: c.seal_no || 'TBD',
         pallet_count: c.pallet_count ?? null,
-        net_weight_kg: net,
-        gross_weight_kg: gross,
+        // Làm tròn từng container 1 lần → cột NET/GROSS cộng khớp hàng TOTAL (không lệch do làm tròn)
+        net_weight_kg: Math.round(net),
+        gross_weight_kg: Math.round(gross),
         lot_no: c.lot_no ?? null,
       }
     })
-    const totalNet = containers.reduce((s, c) => s + (c.net_weight_kg || 0), 0)
-    const totalGross = containers.reduce((s, c) => s + (c.gross_weight_kg || 0), 0)
+    // Tổng = cộng các giá trị ĐÃ làm tròn → khối info + hàng TOTAL luôn khớp nhau
+    const totalNet = containers.reduce((s, c) => s + c.net_weight_kg, 0)
+    const totalGross = containers.reduce((s, c) => s + c.gross_weight_kg, 0)
     const totalPallet = containers.reduce((s, c) => s + (c.pallet_count || 0), 0)
 
     const customer = order.customer as { name?: string; address?: string } | null
     const packingStyle = order.packing_desc || profile?.default_packing_desc || ''
-    const orderQty = order.quantity_tons || 0
-    const qtyTons = lotNo ? (totalNet / 1000) : orderQty
     return {
       wl_no: `${soDisplayCode(order)}/WL${lotNo ? `/L${lotNo}` : ''}`,
       date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],
       order_code: soDisplayCode(order) + (lotNo ? ` — Lô ${lotNo}` : ''),
       buyer_name: profile?.buyer_legal_name || customer?.name || '',
       consignee: await resolveConsignee(orderId, profile, lotNo),
-      consignee_address: profile?.consignee_address || profile?.buyer_address || customer?.address || '',
+      consignee_address: profile?.consignee_address || '',
       grade: order.grade,
       packing_desc: packingLineFrom(packingStyle, rawArr),
       total_packing: totalPackingFrom(rawArr),
-      net_weight_kg: totalNet || Math.round(qtyTons * 1000),
-      gross_weight_kg: totalGross || totalNet || Math.round(qtyTons * 1000),
+      // Khối info NET/GROSS = ĐÚNG tổng bảng (không dùng ước lượng qtyTons) → 2 vùng luôn nhất quán
+      net_weight_kg: totalNet,
+      gross_weight_kg: totalGross,
       containers,
       total_pallet: totalPallet,
       total_net: totalNet,
@@ -674,7 +675,7 @@ export const documentService = {
       voyage_number: booking?.voyage_no || order.voyage_number || '',
       bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       bl_date: order.bl_date || null,
-      lc_number: order.lc_number || lcInfo.lc_number,
+      lc_number: lcInfo.lc_number || order.lc_number,
       lc_date: lcInfo.lc_date,
       port_of_loading: booking?.port_of_loading || PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
       port_of_destination: booking?.port_of_destination || order.port_of_destination || order.port_of_discharge || '',
@@ -769,7 +770,7 @@ export const documentService = {
       total,
       the_cost: theCost,
       payment_terms: profile?.default_payment_term || PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
-      lc_number: order.lc_number || lcInfo.lc_number,
+      lc_number: lcInfo.lc_number || order.lc_number,
       // B/L: lô → từ booking của lô; cả đơn → order.bl_number
       bl_number: booking?.bl_number || order.bl_number || invoice?.bl_number || null,
       invoice_date: order.invoice_date || invoice?.invoice_date || new Date().toISOString().split('T')[0],

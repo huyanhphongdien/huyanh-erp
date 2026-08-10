@@ -12,10 +12,9 @@ import { PrinterOutlined, FileWordOutlined, FileDoneOutlined } from '@ant-design
 import { documentService, type InvoiceData } from '../../../services/sales/documentService'
 import { lcNegotiationService, type LcNegotiation } from '../../../services/sales/lcNegotiationService'
 import { amountToWords } from '../../../services/sales/contractGeneratorService'
-import { boeDoc, saveDocx } from '../../../services/sales/docxExport'
-import DocLetterhead from './DocLetterhead'
+import { boeDoc, saveDocx, parseBankSwift } from '../../../services/sales/docxExport'
 
-const { Title, Text } = Typography
+const { Title } = Typography
 
 const fmtMoney = (v: number) =>
   (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -80,57 +79,60 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
   // D/P = at sight (0); D/A = usance (term_days); L/C giữ tenor suy từ payment terms
   const effTenor = isDP ? (method === 'da' ? (neg?.term_days ?? null) : 0) : tenorDays
 
-  const kv = (label: string, value: React.ReactNode) => (
+  const bank = parseBankSwift(issuingBank)
+  const invDate = inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-GB') : ''
+  const kv = (label: string, value: React.ReactNode, boldV = false) => (
     <tr>
-      <td style={{ padding: '5px 8px', width: '38%', verticalAlign: 'top', color: '#444' }}>{label}</td>
-      <td style={{ padding: '5px 8px', fontWeight: 500 }}>: {value}</td>
+      <td style={{ padding: '4px 6px 4px 0', width: '37%', verticalAlign: 'top' }}>{label}</td>
+      <td style={{ padding: '4px 4px', verticalAlign: 'top', width: 12 }}>:</td>
+      <td style={{ padding: '4px 6px', fontWeight: boldV ? 700 : 500 }}>{value}</td>
     </tr>
   )
 
   return (
-    <div className="doc-print-area" id="boe-print">
-      <DocLetterhead />
-      <Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>BILL OF EXCHANGE</Title>
+    <div className="doc-print-area" id="boe-print" style={{ color: '#000', fontSize: 13 }}>
+      <Title level={3} style={{ textAlign: 'center', marginBottom: 12 }}>BILL OF EXCHANGE</Title>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '16px 0 8px' }}>
-        <Text>Hue City, {drawDate}</Text>
-        <Text strong>FOR: USD {fmtMoney(drawAmount)}</Text>
-      </div>
-      <div style={{ marginBottom: 4 }}>
+      <div>Hue City, {drawDate}</div>
+      <div style={{ fontWeight: 700, marginBottom: 8 }}>FOR: USD {fmtMoney(drawAmount)}</div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>
         {effTenor == null
-          ? <>AT <strong>______ DAYS</strong> FROM BILL OF LADING DATE</>
+          ? 'AT ______ DAYS FROM BILL OF LADING DATE'
           : effTenor === 0
-            ? <strong>AT SIGHT</strong>
-            : <>AT <strong>{effTenor} DAYS</strong> FROM BILL OF LADING DATE</>}
+            ? 'AT SIGHT'
+            : `AT ${effTenor} DAYS FROM BILL OF LADING DATE   -   ${drawDate}`}
       </div>
-      <div style={{ fontStyle: 'italic', color: '#555', marginBottom: 12 }}>
-        of this <strong>First</strong> Bill of Exchange (Second of the same tenor and date being unpaid)
+      <div style={{ fontStyle: 'italic', marginBottom: 14 }}>
+        of this First Bill of Exchange (Second of the same tenor and date being unpaid)
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <table style={{ borderCollapse: 'collapse', fontSize: 13 }}>
         <tbody>
           {kv('Pay To The Order Of', inv.bank_info.name)}
-          {kv('The Sum Of Say (US DOLLARS)', <span style={{ textTransform: 'uppercase' }}>{words}</span>)}
-          {kv('Value received as per our Invoice(s) No(s)', `${inv.invoice_code}  Dated ${inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-GB') : ''}`)}
+          {kv('The Sum Of SAY (US DOLLARS)', <span style={{ textTransform: 'uppercase' }}>{words}</span>)}
+          {kv('Value received as per our Invoice(s) No(s)', `${inv.invoice_code}       Date: ${invDate}`)}
           {isDP ? (
             <>
               {kv('Drawn on', drawnOn)}
-              {kv('TO', issuingBank)}
+              {bank.swift && kv('Swift code', bank.swift)}
+              {kv('TO', bank.name, true)}
             </>
           ) : (
             <>
-              {kv('Drawn under', issuingBank)}
-              {kv('L/C Number', `${lcNo}${lcDate ? `      L/C Date: ${lcDate}` : ''}`)}
-              {kv('TO', issuingBank)}
+              {kv('Drawn under', bank.name)}
+              {bank.swift && kv('Swift code', bank.swift)}
+              {kv('L/C NUMBER', `${lcNo}${lcDate ? `        L/C DATE: ${lcDate}` : ''}`)}
+              {kv('TO', bank.name, true)}
             </>
           )}
         </tbody>
       </table>
 
-      <div style={{ marginTop: 40, textAlign: 'right' }}>
-        <Text strong>HUY ANH RUBBER COMPANY LIMITED</Text>
+      <div style={{ marginTop: 40, textAlign: 'center' }}>
+        <div style={{ fontWeight: 700 }}>HUY ANH RUBBER COMPANY LIMITED</div>
         <div style={{ height: 56 }} />
-        <Text strong>PHÓ GIÁM ĐỐC</Text>
+        <div style={{ fontWeight: 700 }}>PHÓ GIÁM ĐỐC</div>
+        <div style={{ fontWeight: 700 }}>Lê Xuân Hồng Trung</div>
       </div>
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>

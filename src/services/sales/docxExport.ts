@@ -406,33 +406,66 @@ export function weightListDoc(d: WeightListData): Document {
   ])
 }
 
-// ── BILL OF EXCHANGE ──
+// Tách chuỗi ngân hàng → { name, swift }. Hỗ trợ "BANK (SWIFT XXX)" và "XXX / BANK / UNIT / LOC".
+export function parseBankSwift(s: string): { name: string; swift: string } {
+  const raw = (s || '').trim()
+  const m = raw.match(/\(SWIFT\s*:?\s*([A-Z0-9]{6,11})\)/i)
+  if (m) return { name: raw.replace(/\s*\(SWIFT[^)]*\)\s*/i, '').trim(), swift: m[1].toUpperCase() }
+  const parts = raw.split(/\s*\/\s*/).map((x) => x.trim()).filter(Boolean)
+  if (parts.length > 1 && /^[A-Z]{4}[A-Z0-9]{2,7}$/i.test(parts[0])) {
+    return { name: parts.slice(1).join(', '), swift: parts[0].toUpperCase() }
+  }
+  return { name: raw, swift: '' }
+}
+
+// ── BILL OF EXCHANGE ── (khớp HỆT sheet BOE / bản in — KHÔNG letterhead)
 export function boeDoc(d: {
   amount: number; ourBank: string; issuingBank: string; invoiceRef: string; invoiceDate: string
   tenorDays: number | null; lcNumber: string; lcDate: string; today: string
   method?: 'lc' | 'dp' | 'da'; drawnOn?: string   // D/P·D/A: drawn ON người mua, không L/C
 }): Document {
   const isDP = d.method === 'dp' || d.method === 'da'
-  const tenorLine = d.tenorDays == null ? 'AT ______ DAYS FROM BILL OF LADING DATE'
+  const bank = parseBankSwift(d.issuingBank)
+  const tenorBase = d.tenorDays == null ? 'AT ______ DAYS FROM BILL OF LADING DATE'
     : d.tenorDays === 0 ? 'AT SIGHT' : `AT ${d.tenorDays} DAYS FROM BILL OF LADING DATE`
-  const kv = (k: string, v: string) => P([R(k, {}), R(`: ${v}`, { bold: true })], { after: 20 })
+  const tenorLine = (d.tenorDays && d.tenorDays > 0 && d.today) ? `${tenorBase}   -   ${d.today}` : tenorBase
+
+  // Dòng label : value (borderless 3 cột — canh cột như mẫu)
+  const NBM = { top: 26, bottom: 26, left: 0, right: 30 }
+  const kvRow = (k: string, v: string, boldV = false) => new TableRow({ children: [
+    new TableCell({ width: { size: 37, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, margins: NBM, children: [P(k, { size: 11, after: 0 })] }),
+    new TableCell({ width: { size: 3, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, margins: { top: 26, bottom: 26, left: 0, right: 0 }, children: [P(':', { size: 11, after: 0 })] }),
+    new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, margins: { top: 26, bottom: 26, left: 30, right: 0 }, children: [P(v, { size: 11, bold: boldV, after: 0 })] }),
+  ] })
+  const rows: TableRow[] = [
+    kvRow('Pay To The Order Of', d.ourBank),
+    kvRow('The Sum Of SAY (US DOLLARS)', amountToWords(d.amount).toUpperCase()),
+    kvRow('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}       Date: ${fmtD(d.invoiceDate)}`),
+  ]
+  if (isDP) {
+    rows.push(kvRow('Drawn on', d.drawnOn || ''))
+    if (bank.swift) rows.push(kvRow('Swift code', bank.swift))
+    rows.push(kvRow('TO', bank.name, true))
+  } else {
+    rows.push(kvRow('Drawn under', bank.name))
+    if (bank.swift) rows.push(kvRow('Swift code', bank.swift))
+    rows.push(kvRow('L/C NUMBER', `${d.lcNumber}${d.lcDate ? `        L/C DATE: ${d.lcDate}` : ''}`))
+    rows.push(kvRow('TO', bank.name, true))
+  }
+  const fieldTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, rows })
+
   return makeDoc([
-    ...letterhead(),
     P('BILL OF EXCHANGE', { align: AlignmentType.CENTER, bold: true, size: 15, after: 60 }),
-    P([R(`Hue City, ${d.today}`), R('                                          '), R(`FOR: USD ${money(d.amount)}`, { bold: true })], { after: 20 }),
+    P(`Hue City, ${d.today}`, { after: 0 }),
+    P([R('FOR: USD ', { bold: true }), R(money(d.amount), { bold: true })], { after: 20 }),
     P(tenorLine, { bold: true, after: 0 }),
     P('of this First Bill of Exchange (Second of the same tenor and date being unpaid)', { italics: true, after: 80 }),
-    kv('Pay To The Order Of', d.ourBank),
-    kv('The Sum Of Say (US DOLLARS)', amountToWords(d.amount).toUpperCase()),
-    kv('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}  Dated ${fmtD(d.invoiceDate)}`),
-    // L/C: "Drawn under {NH phát hành}" + số L/C · D/P·D/A: "Drawn on {người mua}", KHÔNG L/C
-    ...(isDP
-      ? [kv('Drawn on', d.drawnOn || ''), kv('TO', d.issuingBank)]
-      : [kv('Drawn under', d.issuingBank), kv('L/C Number', `${d.lcNumber}${d.lcDate ? `   L/C Date: ${d.lcDate}` : ''}`), kv('TO', d.issuingBank)]),
+    fieldTable,
+    P('', { after: 200 }),
+    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.CENTER, bold: true, after: 0 }),
     P('', { after: 240 }),
-    P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.RIGHT, bold: true, after: 0 }),
-    P('', { after: 260 }),
-    P('PHÓ GIÁM ĐỐC', { align: AlignmentType.RIGHT, bold: true }),
+    P('PHÓ GIÁM ĐỐC', { align: AlignmentType.CENTER, bold: true, after: 0 }),
+    P('Lê Xuân Hồng Trung', { align: AlignmentType.CENTER, bold: true }),
   ])
 }
 

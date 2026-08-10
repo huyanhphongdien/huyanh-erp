@@ -47,8 +47,13 @@ import BeneficiaryCertTab from './components/BeneficiaryCertTab'
 import NonWoodCertTab from './components/NonWoodCertTab'
 import DocLetterhead from './components/DocLetterhead'
 import type { COAData, PackingListData, InvoiceData, WeightListData } from '../../services/sales/documentService'
-import type { SalesOrder } from '../../services/sales/salesTypes'
+import type { SalesOrder, SalesOrderContainer } from '../../services/sales/salesTypes'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, soDisplayCode } from '../../services/sales/salesTypes'
+import { checkReadiness, type ReadyCtx } from '../../services/sales/docReadiness'
+import DocReadinessPanel from './components/DocReadinessPanel'
+import { containerService } from '../../services/sales/containerService'
+import customerExportProfileService, { type CustomerExportProfile } from '../../services/sales/customerExportProfileService'
+import { lcNegotiationService, type LcNegotiation } from '../../services/sales/lcNegotiationService'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -686,6 +691,10 @@ const ExportDocumentsPage = () => {
   // Bộ chứng từ theo LÔ: 0 = cả đơn; >0 = lot_no
   const [lotNo, setLotNo] = useState(0)
   const [lots, setLots] = useState<number[]>([])
+  // Dữ liệu để KIỂM TRA SẴN SÀNG (readiness): container + hồ sơ khách + đơn chiết khấu
+  const [rdContainers, setRdContainers] = useState<SalesOrderContainer[]>([])
+  const [rdProfile, setRdProfile] = useState<CustomerExportProfile | null>(null)
+  const [rdNeg, setRdNeg] = useState<LcNegotiation | null>(null)
 
   // Load order
   useEffect(() => {
@@ -698,6 +707,14 @@ const ExportDocumentsPage = () => {
       .finally(() => setLoading(false))
     documentService.listLots(orderId).then(setLots).catch(() => setLots([]))
   }, [orderId])
+
+  // Nạp dữ liệu readiness (container / hồ sơ khách / đơn chiết khấu). negVersion bump khi lưu ĐNCK.
+  useEffect(() => {
+    if (!order?.id) return
+    containerService.getContainers(order.id).then(setRdContainers).catch(() => setRdContainers([]))
+    if (order.customer_id) customerExportProfileService.getByCustomer(order.customer_id).then(setRdProfile).catch(() => setRdProfile(null))
+    lcNegotiationService.getByOrder(order.id, lotNo).then(setRdNeg).catch(() => setRdNeg(null))
+  }, [order?.id, order?.customer_id, lotNo, negVersion])
 
   // Đổi lô → xoá dữ liệu đã sinh (sinh lại theo lô mới) + báo BOE/ĐNCK nạp lại
   useEffect(() => {
@@ -809,6 +826,20 @@ const ExportDocumentsPage = () => {
       ? <Tag color="success" icon={<CheckCircleOutlined />}>Generated</Tag>
       : <Tag color="default" icon={<ClockCircleOutlined />}>Chưa tạo</Tag>
 
+  // Ctx kiểm tra sẵn sàng + đèn trạng thái (🟢 đủ / 🟡 thiếu / ⚪ đính kèm)
+  const readyCtx: ReadyCtx = {
+    order,
+    containers: lotNo ? rdContainers.filter((c) => (c.lot_no ?? 0) === lotNo) : rdContainers,
+    profile: rdProfile,
+    negotiation: rdNeg,
+  }
+  const readyDot = (key: string) => {
+    const r = checkReadiness(key, readyCtx)
+    const color = r.status === 'idle' ? '#bfbfbf' : r.requiredMissing > 0 ? '#faad14' : '#52c41a'
+    const title = r.status === 'idle' ? 'Đính kèm — không tự sinh' : r.requiredMissing > 0 ? `Thiếu ${r.requiredMissing} mục bắt buộc` : 'Đủ dữ liệu'
+    return <span title={title} style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: color, marginRight: 7, flex: '0 0 auto', verticalAlign: 'middle' }} />
+  }
+
   return (
     <div style={{ padding: '0 0 24px' }}>
       {/* Print styles */}
@@ -900,7 +931,7 @@ const ExportDocumentsPage = () => {
               <Space>
                 <SafetyCertificateOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
                 <div>
-                  <Text strong>COA</Text>
+                  <Text strong>{readyDot('coa')}COA</Text>
                   <br />
                   <Text type="secondary" style={{ fontSize: 12 }}>Đính kèm từ LAB</Text>
                 </div>
@@ -912,7 +943,7 @@ const ExportDocumentsPage = () => {
               <Space>
                 <ContainerOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
                 <div>
-                  <Text strong>Packing List</Text>
+                  <Text strong>{readyDot('packing')}Packing List</Text>
                   <br />
                   <Text type="secondary" style={{ fontSize: 12 }}>Container & Bale Details</Text>
                 </div>
@@ -925,7 +956,7 @@ const ExportDocumentsPage = () => {
               <Space>
                 <DollarOutlined style={{ fontSize: 24, color: '#1B4D3E' }} />
                 <div>
-                  <Text strong>Commercial Invoice</Text>
+                  <Text strong>{readyDot('invoice')}Commercial Invoice</Text>
                   <br />
                   <Text type="secondary" style={{ fontSize: 12 }}>Payment & Banking</Text>
                 </div>
@@ -957,6 +988,15 @@ const ExportDocumentsPage = () => {
 
       {/* Tabs */}
       <Card>
+        {/* Panel KIỂM TRA SẴN SÀNG cho chứng từ đang xem */}
+        {activeTab !== 'coa' && (
+          <DocReadinessPanel
+            result={checkReadiness(activeTab, readyCtx)}
+            orderId={order.id}
+            customerId={order.customer_id}
+            onGotoNegotiation={() => setActiveTab('lc')}
+          />
+        )}
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
@@ -965,7 +1005,7 @@ const ExportDocumentsPage = () => {
               key: 'coa',
               label: (
                 <span>
-                  <SafetyCertificateOutlined /> COA
+                  {readyDot('coa')}<SafetyCertificateOutlined /> COA
                 </span>
               ),
               children: (
@@ -988,7 +1028,7 @@ const ExportDocumentsPage = () => {
               forceRender: true,
               label: (
                 <span>
-                  <ContainerOutlined /> Packing List
+                  {readyDot('packing')}<ContainerOutlined /> Packing List
                   {order.packing_list_generated && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 4 }} />}
                 </span>
               ),
@@ -999,7 +1039,7 @@ const ExportDocumentsPage = () => {
               forceRender: true,
               label: (
                 <span>
-                  <FileDoneOutlined /> Weight List
+                  {readyDot('weight')}<FileDoneOutlined /> Weight List
                 </span>
               ),
               children: <WeightListTab data={weightData} loading={weightLoading} onGenerate={generateWeight} />,
@@ -1009,7 +1049,7 @@ const ExportDocumentsPage = () => {
               forceRender: true,
               label: (
                 <span>
-                  <DollarOutlined /> Invoice
+                  {readyDot('invoice')}<DollarOutlined /> Invoice
                   {order.invoice_generated && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 4 }} />}
                 </span>
               ),
@@ -1019,7 +1059,7 @@ const ExportDocumentsPage = () => {
               key: 'boe',
               label: (
                 <span>
-                  <FileDoneOutlined /> Hối phiếu
+                  {readyDot('boe')}<FileDoneOutlined /> Hối phiếu
                 </span>
               ),
               children: <BillOfExchangeTab orderId={orderId!} reloadKey={negVersion} lotNo={lotNo} />,
@@ -1028,7 +1068,7 @@ const ExportDocumentsPage = () => {
               key: 'dnck',
               label: (
                 <span>
-                  <DollarOutlined /> Đơn chiết khấu
+                  {readyDot('lc')}<DollarOutlined /> Đơn chiết khấu
                 </span>
               ),
               children: <LcNegotiationTab orderId={orderId!} order={order} lotNo={lotNo} onSaved={() => setNegVersion((v) => v + 1)} />,
@@ -1037,7 +1077,7 @@ const ExportDocumentsPage = () => {
               key: 'bencert',
               label: (
                 <span>
-                  <SafetyCertificateOutlined /> Beneficiary Cert
+                  {readyDot('beneficiary')}<SafetyCertificateOutlined /> Beneficiary Cert
                 </span>
               ),
               children: <BeneficiaryCertTab orderId={orderId!} lotNo={lotNo} />,
@@ -1046,7 +1086,7 @@ const ExportDocumentsPage = () => {
               key: 'nonwood',
               label: (
                 <span>
-                  <SafetyCertificateOutlined /> Non-Wood Cert
+                  {readyDot('nonwood')}<SafetyCertificateOutlined /> Non-Wood Cert
                 </span>
               ),
               children: <NonWoodCertTab orderId={orderId!} lotNo={lotNo} />,

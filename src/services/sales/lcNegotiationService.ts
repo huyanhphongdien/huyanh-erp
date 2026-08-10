@@ -24,6 +24,7 @@ export interface LcNegotiation {
   status: string
   notes: string | null
   doc_checklist?: { doc: string; originals: number; copies: number }[] | null  // số bản riêng đơn (ghi đè hồ sơ)
+  dnck_fields?: Record<string, string> | null  // field nhập riêng cho đơn ĐNCK Vietinbank (BM08A)
 }
 
 export const lcNegotiationService = {

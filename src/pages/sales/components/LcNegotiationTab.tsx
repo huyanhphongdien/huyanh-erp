@@ -9,9 +9,9 @@
 import { useState, useEffect } from 'react'
 import {
   Card, Form, Input, InputNumber, DatePicker, Select, Button, Space, Table,
-  Typography, Spin, message, Row, Col, Divider,
+  Typography, Spin, message, Row, Col, Divider, Collapse,
 } from 'antd'
-import { SaveOutlined, PrinterOutlined, FileWordOutlined, SnippetsOutlined } from '@ant-design/icons'
+import { SaveOutlined, PrinterOutlined, FileWordOutlined, SnippetsOutlined, BankOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { documentService, type InvoiceData } from '../../../services/sales/documentService'
 import { lcNegotiationService, type LcNegotiation } from '../../../services/sales/lcNegotiationService'
@@ -21,6 +21,7 @@ import customerExportProfileService, {
 import type { SalesOrder } from '../../../services/sales/salesTypes'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 import { lcNegotiationDoc, collectionDiscountDoc, saveDocx } from '../../../services/sales/docxExport'
+import { generateDNCK } from '../../../services/sales/discountRequestService'
 import DocLetterhead from './DocLetterhead'
 
 const { Title, Text, Paragraph } = Typography
@@ -47,6 +48,10 @@ export default function LcNegotiationTab(
   const [savingTpl, setSavingTpl] = useState(false)
   // Số bản riêng đơn (mặc định lấy hồ sơ khách; sửa cho L/C của đơn này)
   const [docCounts, setDocCounts] = useState<Record<string, { originals: number; copies: number }>>({})
+  // Field nhập riêng cho đơn ĐNCK Vietinbank (BM08A) — lưu neg.dnck_fields
+  const [dnckFields, setDnckFields] = useState<Record<string, string>>({})
+  const [genDnck, setGenDnck] = useState(false)
+  const setDf = (k: string, val: string) => setDnckFields((prev) => ({ ...prev, [k]: val }))
 
   useEffect(() => {
     let cancelled = false
@@ -66,6 +71,7 @@ export default function LcNegotiationTab(
         const cl: Record<string, { originals: number; copies: number }> = {}
         for (const it of srcCl) cl[it.doc] = { originals: it.originals || 0, copies: it.copies || 0 }
         setDocCounts(cl)
+        setDnckFields((n?.dnck_fields as Record<string, string>) || {})
         // Ưu tiên: đơn đã lưu → template hồ sơ khách → suy từ payment_terms
         const defaultMethod = n?.method || p?.default_payment_method
           || (/\b(dp|cad|d\/p|nhờ thu|collection)\b/i.test(order.payment_terms || '') ? 'dp' : 'lc')
@@ -121,6 +127,7 @@ export default function LcNegotiationTab(
         submitted_date: v.submitted_date ? v.submitted_date.format('YYYY-MM-DD') : null,
         status: v.status || 'draft',
         doc_checklist: buildDocChecklist(),
+        dnck_fields: dnckFields,
       }, lotNo)
       setNeg(saved)
       message.success('Đã lưu đơn chiết khấu')
@@ -150,6 +157,29 @@ export default function LcNegotiationTab(
       message.error(e?.message || 'Lỗi lưu mẫu')
     } finally {
       setSavingTpl(false)
+    }
+  }
+
+  // Lưu (gồm dnck_fields) → điền template Vietinbank → tải .docx
+  const handleGenDnck = async () => {
+    setGenDnck(true)
+    try {
+      const v = form.getFieldsValue()
+      await lcNegotiationService.upsert(orderId, {
+        method: v.method || 'lc',
+        issuing_bank: v.issuing_bank || null,
+        lc_number: v.lc_number || null,
+        lc_date: v.lc_date ? v.lc_date.format('YYYY-MM-DD') : null,
+        negotiate_pct: v.negotiate_pct ?? null,
+        negotiate_amount: v.negotiate_amount ?? null,
+        term_days: v.term_days ?? null,
+        dnck_fields: dnckFields,
+      }, lotNo)
+      await generateDNCK(orderId, lotNo)
+    } catch (e: any) {
+      message.error(e?.message || 'Lỗi sinh đơn ĐNCK')
+    } finally {
+      setGenDnck(false)
     }
   }
 
@@ -231,6 +261,40 @@ export default function LcNegotiationTab(
           </div>
         </Form>
       </Card>
+
+      {/* ── Đơn ĐNCK theo FORM VIETINBANK (điền template .docx) — chỉ L/C ── */}
+      {!isDP && (
+        <Collapse style={{ marginBottom: 16 }} items={[{
+          key: 'dnck',
+          label: <span><BankOutlined /> <b>Đơn ĐNCK Vietinbank (BM08A)</b> — điền form ngân hàng chuẩn (.docx)</span>,
+          children: (
+            <>
+              <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#389e0d' }}>
+                Giữ NGUYÊN form Vietinbank; chỉ điền field động. Số L/C, ngày, NH phát hành, giá trị (=trị giá CIF), % + số tiền + kỳ hạn thương lượng… lấy tự động từ tab bên trên. Mấy ô dưới đây điền thêm phần form yêu cầu.
+              </div>
+              <Row gutter={12}>
+                <Col xs={12} md={6}><div style={{ fontSize: 12, color: '#666' }}>STT đơn (SỐ …/năm)</div><Input size="small" value={dnckFields.form_seq || ''} placeholder="VD: 07" onChange={(e) => setDf('form_seq', e.target.value)} /></Col>
+                <Col xs={12} md={6}><div style={{ fontSize: 12, color: '#666' }}>Năm</div><Input size="small" value={dnckFields.form_year || ''} placeholder={String(new Date().getFullYear())} onChange={(e) => setDf('form_year', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Hãng vận chuyển (tên đầy đủ)</div><Input size="small" value={dnckFields.shipping_line || ''} placeholder="VD: CMA CGM Société Anonyme…" onChange={(e) => setDf('shipping_line', e.target.value)} /></Col>
+                <Col xs={12} md={6}><div style={{ fontSize: 12, color: '#666' }}>NH nhận CT — SWIFT</div><Input size="small" value={dnckFields.recv_swift || ''} placeholder="tự lấy từ NH phát hành" onChange={(e) => setDf('recv_swift', e.target.value)} /></Col>
+                <Col xs={12} md={18}><div style={{ fontSize: 12, color: '#666' }}>NH nhận CT — tên</div><Input size="small" value={dnckFields.recv_bank_name || ''} placeholder="tự lấy từ NH phát hành" onChange={(e) => setDf('recv_bank_name', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>NH nhận CT — địa chỉ 1</div><Input size="small" value={dnckFields.recv_bank_addr1 || ''} onChange={(e) => setDf('recv_bank_addr1', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>NH nhận CT — địa chỉ 2</div><Input size="small" value={dnckFields.recv_bank_addr2 || ''} onChange={(e) => setDf('recv_bank_addr2', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Số tiền thương lượng (bằng chữ)</div><Input size="small" value={dnckFields.negotiate_amount_words || ''} placeholder="VD: Hai trăm mười sáu nghìn… đô la Mỹ." onChange={(e) => setDf('negotiate_amount_words', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Giá trị nghĩa vụ bảo đảm (VNĐ)</div><Input size="small" value={dnckFields.secured_amount_vnd || ''} placeholder="VD: 5.700.000.000 VNĐ (Bằng chữ: …)." onChange={(e) => setDf('secured_amount_vnd', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Bên đề nghị (người mua) — địa chỉ</div><Input size="small" value={dnckFields.applicant_addr1 || ''} placeholder="trống → lấy từ hồ sơ khách" onChange={(e) => setDf('applicant_addr1', e.target.value)} /></Col>
+                <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Giá trị còn lại của L/C</div><Input size="small" value={dnckFields.lc_remaining || ''} placeholder="trống → = trị giá đòi tiền" onChange={(e) => setDf('lc_remaining', e.target.value)} /></Col>
+              </Row>
+              <div style={{ marginTop: 12 }}>
+                <Button type="primary" icon={<FileWordOutlined />} loading={genDnck} onClick={handleGenDnck} style={{ background: '#1B4D3E' }}>
+                  Tải đơn ĐNCK Vietinbank (.docx)
+                </Button>
+                <Text type="secondary" style={{ marginLeft: 10, fontSize: 12 }}>Lưu + điền form chuẩn Vietinbank rồi tải về.</Text>
+              </div>
+            </>
+          ),
+        }]} />
+      )}
 
       {/* ── Văn bản đề nghị (in được) ── */}
       <div className="doc-print-area" id="dnck-print">

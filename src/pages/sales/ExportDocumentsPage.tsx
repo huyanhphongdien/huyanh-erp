@@ -854,6 +854,20 @@ const ExportDocumentsPage = () => {
     return <span title={title} style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: color, marginRight: 7, flex: '0 0 auto', verticalAlign: 'middle' }} />
   }
 
+  // Tóm tắt container theo phạm vi đang chọn (lô / toàn đơn) — để verify + khoá sinh ĐNCK
+  const scopeConts = readyCtx.containers
+  const nCont = scopeConts.length
+  const nReal = scopeConts.filter((c) => c.container_no && c.seal_no).length
+  const scopeNetTons = scopeConts.reduce((s, c) => s + (c.net_weight_kg || 0), 0) / 1000
+  const scopeQtyTons = lotNo ? scopeNetTons : (order.quantity_tons || 0)
+  const scopeCif = scopeQtyTons * (order.unit_price || 0)
+  const contIncomplete = nCont === 0 || nReal < nCont
+  const blockReason = nCont === 0
+    ? `${lotNo ? `Lô ${lotNo}` : 'Đơn'} chưa có container`
+    : contIncomplete ? `Còn ${nCont - nReal}/${nCont} container chưa nhập số cont/seal` : ''
+  // Drawer "Chia lô / Nhập container" thao tác trên TOÀN BỘ container (không lọc lô) để gán/đổi lô được
+  const drawerCtx: ReadyCtx = { ...readyCtx, containers: rdContainers }
+
   return (
     <div style={{ padding: '0 0 24px' }}>
       {/* Print styles */}
@@ -992,24 +1006,30 @@ const ExportDocumentsPage = () => {
         })()}
       </div>
 
-      {/* Chọn LÔ — sinh bộ chứng từ theo từng lô (mỗi lô 1 B/L riêng) */}
-      {lots.length > 0 && (
-        <Card size="small" style={{ marginBottom: 12 }} className="no-print"
-          styles={{ body: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } }}>
-          <Text strong style={{ color: '#1B4D3E' }}>📦 Bộ chứng từ theo lô:</Text>
+      {/* Thanh Container & Lô — verify phạm vi đang sinh + nhập cont/seal + chia lô tại chỗ */}
+      <Card size="small" style={{ marginBottom: 12 }} className="no-print"
+        styles={{ body: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } }}>
+        <Text strong style={{ color: '#1B4D3E' }}>📦 Container &amp; Lô:</Text>
+        {lots.length > 0 ? (
           <Segmented
             value={lotNo}
             onChange={(v) => setLotNo(Number(v))}
-            options={[
-              { label: 'Toàn đơn', value: 0 },
-              ...lots.map((l) => ({ label: `Lô ${l}`, value: l })),
-            ]}
+            options={[{ label: 'Toàn đơn', value: 0 }, ...lots.map((l) => ({ label: `Lô ${l}`, value: l }))]}
           />
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {lotNo ? `Đang sinh riêng cho Lô ${lotNo} (container + B/L + giá trị của lô).` : 'Đang sinh cho cả đơn.'}
-          </Text>
-        </Card>
-      )}
+        ) : <Tag>Chưa chia lô</Tag>}
+        <Text style={{ fontSize: 13 }}>
+          {lotNo ? `Lô ${lotNo}: ` : 'Toàn đơn: '}
+          <b>{nCont}</b> cont · <b>{scopeQtyTons.toLocaleString('en-US', { maximumFractionDigits: 3 })}</b> tấn ·
+          CIF <b>${scopeCif.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+        </Text>
+        {contIncomplete && (
+          <Tag color="warning">{nCont === 0 ? 'Chưa có container' : `${nCont - nReal}/${nCont} cont còn TBD`}</Tag>
+        )}
+        <Button size="small" type="primary" ghost style={{ borderColor: '#1B4D3E', color: '#1B4D3E' }}
+          onClick={() => setQuickGroup('packing')}>Chia lô / Nhập container</Button>
+        <Button size="small" type="link" style={{ padding: 0 }}
+          onClick={() => openFullTab('packing')}>Mở tab Đóng gói ↗</Button>
+      </Card>
 
       {/* Tabs */}
       <Card>
@@ -1095,7 +1115,7 @@ const ExportDocumentsPage = () => {
                   {readyDot('lc')}<DollarOutlined /> Đơn chiết khấu
                 </span>
               ),
-              children: <LcNegotiationTab orderId={orderId!} order={order} lotNo={lotNo} onSaved={() => setNegVersion((v) => v + 1)} />,
+              children: <LcNegotiationTab orderId={orderId!} order={order} lotNo={lotNo} onSaved={() => setNegVersion((v) => v + 1)} docBlocked={contIncomplete} blockReason={blockReason} />,
             },
             {
               key: 'bencert',
@@ -1122,7 +1142,7 @@ const ExportDocumentsPage = () => {
       <QuickFillDrawer
         open={quickGroup != null}
         group={quickGroup}
-        ctx={readyCtx}
+        ctx={quickGroup === 'packing' ? drawerCtx : readyCtx}
         onClose={() => setQuickGroup(null)}
         onSaved={() => { setQuickGroup(null); reloadReadiness() }}
         onOpenFullTab={(g) => { setQuickGroup(null); openFullTab(g) }}

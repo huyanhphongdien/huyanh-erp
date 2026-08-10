@@ -35,7 +35,8 @@ const DOC_LABEL = (k: string) => EXPORT_DOC_TYPES.find((d) => d.key === k)?.labe
 const fmtUSD = (v: number) => (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export default function LcNegotiationTab(
-  { orderId, order, onSaved, lotNo = 0 }: { orderId: string; order: SalesOrder; onSaved?: () => void; lotNo?: number },
+  { orderId, order, onSaved, lotNo = 0, docBlocked = false, blockReason = '' }:
+  { orderId: string; order: SalesOrder; onSaved?: () => void; lotNo?: number; docBlocked?: boolean; blockReason?: string },
 ) {
   const [form] = Form.useForm()
   const watched = Form.useWatch([], form)   // để văn bản cập nhật live khi sửa form
@@ -287,10 +288,13 @@ export default function LcNegotiationTab(
                 <Col xs={24} md={12}><div style={{ fontSize: 12, color: '#666' }}>Giá trị còn lại của L/C</div><Input size="small" value={dnckFields.lc_remaining || ''} placeholder="trống → = trị giá đòi tiền" onChange={(e) => setDf('lc_remaining', e.target.value)} /></Col>
               </Row>
               <div style={{ marginTop: 12 }}>
-                <Button type="primary" icon={<FileWordOutlined />} loading={genDnck} onClick={handleGenDnck} style={{ background: '#1B4D3E' }}>
+                <Button type="primary" icon={<FileWordOutlined />} loading={genDnck} onClick={handleGenDnck}
+                  disabled={docBlocked} style={{ background: docBlocked ? undefined : '#1B4D3E' }}>
                   Tải đơn ĐNCK Vietinbank (.docx)
                 </Button>
-                <Text type="secondary" style={{ marginLeft: 10, fontSize: 12 }}>Lưu + điền form chuẩn Vietinbank rồi tải về.</Text>
+                <Text type={docBlocked ? 'warning' : 'secondary'} style={{ marginLeft: 10, fontSize: 12 }}>
+                  {docBlocked ? `⚠ ${blockReason} — nhập ở tab Đóng gói trước` : 'Lưu + điền form chuẩn Vietinbank rồi tải về.'}
+                </Text>
               </div>
             </>
           ),
@@ -324,10 +328,13 @@ export default function LcNegotiationTab(
                 <Col xs={12} md={4}><div style={{ fontSize: 12, color: '#666' }}>Ngày HĐ</div><Input size="small" value={dnckFields.contract_date || ''} placeholder="YYYY-MM-DD" onChange={(e) => setDf('contract_date', e.target.value)} /></Col>
               </Row>
               <div style={{ marginTop: 12 }}>
-                <Button type="primary" icon={<FileWordOutlined />} loading={genDnck} onClick={handleGenDnck} style={{ background: '#1B4D3E' }}>
+                <Button type="primary" icon={<FileWordOutlined />} loading={genDnck} onClick={handleGenDnck}
+                  disabled={docBlocked} style={{ background: docBlocked ? undefined : '#1B4D3E' }}>
                   Tải đơn ĐNCK Nhờ thu D/P (.docx)
                 </Button>
-                <Text type="secondary" style={{ marginLeft: 10, fontSize: 12 }}>Lưu + điền form nhờ thu chuẩn Vietinbank rồi tải về.</Text>
+                <Text type={docBlocked ? 'warning' : 'secondary'} style={{ marginLeft: 10, fontSize: 12 }}>
+                  {docBlocked ? `⚠ ${blockReason} — nhập ở tab Đóng gói trước` : 'Lưu + điền form nhờ thu chuẩn Vietinbank rồi tải về.'}
+                </Text>
               </div>
             </>
           ),

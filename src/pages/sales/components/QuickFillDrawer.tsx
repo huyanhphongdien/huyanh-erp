@@ -34,8 +34,9 @@ export default function QuickFillDrawer(
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
   const [banks, setBanks] = useState<CompanyBank[]>([])
-  // Đóng gói: pallet_count theo từng container (id → số pallet)
-  const [pallets, setPallets] = useState<Record<string, number | null>>({})
+  // Đóng gói: nhập cont/seal/gross/pallet/lô theo từng container (id → patch)
+  type CRow = { container_no: string; seal_no: string; gross_weight_kg: number | null; pallet_count: number | null; lot_no: number | null }
+  const [rows, setRows] = useState<Record<string, CRow>>({})
 
   const order = ctx.order
   const conts = ctx.containers
@@ -64,9 +65,14 @@ export default function QuickFillDrawer(
         item_no: order.item_no, packing_desc: order.packing_desc,
       })
     } else if (group === 'packing') {
-      const m: Record<string, number | null> = {}
-      conts.forEach((c) => { if (c.id) m[c.id] = c.pallet_count ?? null })
-      setPallets(m)
+      const m: Record<string, CRow> = {}
+      conts.forEach((c) => {
+        if (c.id) m[c.id] = {
+          container_no: c.container_no || '', seal_no: c.seal_no || '',
+          gross_weight_kg: c.gross_weight_kg ?? null, pallet_count: c.pallet_count ?? null, lot_no: c.lot_no ?? null,
+        }
+      })
+      setRows(m)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, group])
@@ -78,6 +84,9 @@ export default function QuickFillDrawer(
     const cif = (order.quantity_tons || 0) * (order.unit_price || 0)
     return { cif }
   }, [group, isCIF, order.quantity_tons, order.unit_price])
+
+  const setRow = (id: string, key: keyof CRow, val: string | number | null) =>
+    setRows((p) => ({ ...p, [id]: { ...p[id], [key]: val } as CRow }))
 
   const doSave = async () => {
     if (!group) return
@@ -111,9 +120,16 @@ export default function QuickFillDrawer(
           packing_desc: v.packing_desc || null,
         })
       } else if (group === 'packing') {
-        const changed = conts.filter((c) => c.id && (c.pallet_count ?? null) !== (pallets[c.id] ?? null))
-        for (const c of changed) {
-          await containerService.updateContainer(c.id!, { pallet_count: pallets[c.id!] ?? null })
+        for (const c of conts) {
+          if (!c.id) continue
+          const r = rows[c.id]; if (!r) continue
+          const patch: Partial<SalesOrderContainer> = {}
+          if ((r.container_no || '') !== (c.container_no || '')) patch.container_no = r.container_no.trim() || undefined
+          if ((r.seal_no || '') !== (c.seal_no || '')) patch.seal_no = r.seal_no.trim() || undefined
+          if ((r.gross_weight_kg ?? null) !== (c.gross_weight_kg ?? null)) patch.gross_weight_kg = r.gross_weight_kg ?? undefined
+          if ((r.pallet_count ?? null) !== (c.pallet_count ?? null)) patch.pallet_count = r.pallet_count ?? null
+          if ((r.lot_no ?? null) !== (c.lot_no ?? null)) patch.lot_no = r.lot_no ?? null
+          if (Object.keys(patch).length) await containerService.updateContainer(c.id, patch)
         }
       }
       message.success('Đã lưu — kiểm tra lại dữ liệu chứng từ')
@@ -131,7 +147,7 @@ export default function QuickFillDrawer(
   return (
     <Drawer
       title={title}
-      width={480}
+      width={group === 'packing' ? 760 : 480}
       open={open}
       onClose={onClose}
       destroyOnClose
@@ -237,20 +253,29 @@ export default function QuickFillDrawer(
       {group === 'packing' && (
         <>
           <Alert type="info" showIcon style={{ marginBottom: 12 }}
-            message="Số PALLET / container (cho Weight List)"
-            description="Chi tiết cont/seal/net/gross nhập ở tab Đóng gói đầy đủ." />
+            message="Nhập Số cont · Seal · Gross · Pallet · Lô cho từng container"
+            description='Cont/Seal trống → chứng từ in "TBD". Gán "Lô" giống nhau để chiết khấu theo lô.' />
           <Table<SalesOrderContainer>
             size="small" rowKey={(c) => c.id || ''} pagination={false} dataSource={conts}
+            scroll={{ x: 620 }}
             columns={[
-              { title: 'Số cont', dataIndex: 'container_no', render: (v: string) => v || <Text type="secondary">—</Text> },
-              { title: 'Net (kg)', dataIndex: 'net_weight_kg', align: 'right', render: (v: number) => v ? v.toLocaleString('en-US') : <Text type="secondary">—</Text> },
-              {
-                title: 'Pallet', width: 110,
-                render: (_: unknown, c: SalesOrderContainer) => (
-                  <InputNumber min={0} style={{ width: '100%' }} value={c.id ? pallets[c.id] ?? undefined : undefined}
-                    onChange={(val) => c.id && setPallets((p) => ({ ...p, [c.id!]: (val as number) ?? null }))} />
-                ),
-              },
+              { title: 'Số cont', width: 130, render: (_: unknown, c: SalesOrderContainer) => (
+                <Input size="small" value={c.id ? rows[c.id]?.container_no : ''} placeholder="TBD"
+                  onChange={(e) => c.id && setRow(c.id, 'container_no', e.target.value)} />) },
+              { title: 'Seal', width: 120, render: (_: unknown, c: SalesOrderContainer) => (
+                <Input size="small" value={c.id ? rows[c.id]?.seal_no : ''} placeholder="TBD"
+                  onChange={(e) => c.id && setRow(c.id, 'seal_no', e.target.value)} />) },
+              { title: 'Net (kg)', width: 80, align: 'right', render: (_: unknown, c: SalesOrderContainer) =>
+                c.net_weight_kg ? c.net_weight_kg.toLocaleString('en-US') : <Text type="secondary">—</Text> },
+              { title: 'Gross', width: 90, render: (_: unknown, c: SalesOrderContainer) => (
+                <InputNumber size="small" min={0} style={{ width: '100%' }} value={c.id ? rows[c.id]?.gross_weight_kg ?? undefined : undefined}
+                  onChange={(val) => c.id && setRow(c.id, 'gross_weight_kg', (val as number) ?? null)} />) },
+              { title: 'Pallet', width: 70, render: (_: unknown, c: SalesOrderContainer) => (
+                <InputNumber size="small" min={0} style={{ width: '100%' }} value={c.id ? rows[c.id]?.pallet_count ?? undefined : undefined}
+                  onChange={(val) => c.id && setRow(c.id, 'pallet_count', (val as number) ?? null)} />) },
+              { title: 'Lô', width: 62, render: (_: unknown, c: SalesOrderContainer) => (
+                <InputNumber size="small" min={1} style={{ width: '100%' }} value={c.id ? rows[c.id]?.lot_no ?? undefined : undefined}
+                  onChange={(val) => c.id && setRow(c.id, 'lot_no', (val as number) ?? null)} />) },
             ]}
           />
         </>

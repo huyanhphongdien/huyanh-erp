@@ -79,8 +79,14 @@ function freightItem(c: ReadyCtx): ReadyItem {
 }
 function containersItem(c: ReadyCtx): ReadyItem {
   const withW = c.containers.filter((x) => (x.net_weight_kg || 0) > 0)
-  const ok = withW.length > 0
-  return { label: 'Container (Số cont · Seal · Net · Gross)', group: 'packing', required: true, ok, value: ok ? `${withW.length} container` : undefined }
+  const real = withW.filter((x) => has(x.container_no) && has(x.seal_no))
+  const ok = withW.length > 0 && real.length === withW.length
+  const missing = withW.length - real.length
+  return {
+    label: 'Container (Số cont · Seal · Net · Gross)', group: 'packing', required: true, ok,
+    value: ok ? `${real.length} container` : undefined,
+    sub: ok ? undefined : (withW.length === 0 ? 'Chưa có container' : `${missing}/${withW.length} container còn "TBD" (chưa nhập số cont/seal)`),
+  }
 }
 function lcItem(c: ReadyCtx): ReadyItem {
   const method = c.negotiation?.method || 'lc'

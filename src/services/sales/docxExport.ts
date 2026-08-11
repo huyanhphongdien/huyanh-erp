@@ -423,10 +423,12 @@ export function parseBankSwift(s: string): { name: string; swift: string } {
 export function boeDoc(d: {
   amount: number; ourBank: string; issuingBank: string; invoiceRef: string; invoiceDate: string
   tenorDays: number | null; lcNumber: string; lcDate: string; today: string
-  method?: 'lc' | 'dp' | 'da'; drawnOn?: string   // D/P·D/A: drawn ON người mua, không L/C
+  method?: 'lc' | 'dp' | 'da'; drawnOn?: string   // D/P·D/A: TO = người mua, không L/C
+  issuingBankAddress?: string; issuingBankSwift?: string   // NH nhờ thu (D/P) / phát hành (L/C): địa chỉ + SWIFT
 }): Document {
   const isDP = d.method === 'dp' || d.method === 'da'
   const bank = parseBankSwift(d.issuingBank)
+  const swift = d.issuingBankSwift || bank.swift
   const tenorBase = d.tenorDays == null ? 'AT ______ DAYS FROM BILL OF LADING DATE'
     : d.tenorDays === 0 ? 'AT SIGHT' : `AT ${d.tenorDays} DAYS FROM BILL OF LADING DATE`
   const tenorLine = (d.tenorDays && d.tenorDays > 0 && d.today) ? `${tenorBase}   -   ${d.today}` : tenorBase
@@ -444,12 +446,15 @@ export function boeDoc(d: {
     kvRow('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}       Date: ${fmtD(d.invoiceDate)}`),
   ]
   if (isDP) {
-    rows.push(kvRow('Drawn on', d.drawnOn || ''))
-    if (bank.swift) rows.push(kvRow('Swift code', bank.swift))
-    rows.push(kvRow('TO', bank.name, true))
+    // D/P·D/A (nhờ thu): NH người mua = "collecting bank" (tên + địa chỉ + SWIFT), TO = NGƯỜI MUA
+    rows.push(kvRow("The collecting bank's name", bank.name))
+    if (d.issuingBankAddress) rows.push(kvRow('Bank address', d.issuingBankAddress))
+    if (swift) rows.push(kvRow('Swift code', swift))
+    rows.push(kvRow('TO', d.drawnOn || '', true))
   } else {
+    // L/C: drawn under NH phát hành, có số L/C, TO = NH phát hành
     rows.push(kvRow('Drawn under', bank.name))
-    if (bank.swift) rows.push(kvRow('Swift code', bank.swift))
+    if (swift) rows.push(kvRow('Swift code', swift))
     rows.push(kvRow('L/C NUMBER', `${d.lcNumber}${d.lcDate ? `        L/C DATE: ${d.lcDate}` : ''}`))
     rows.push(kvRow('TO', bank.name, true))
   }

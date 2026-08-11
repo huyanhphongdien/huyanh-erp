@@ -81,6 +81,8 @@ export default function LcNegotiationTab(
           method: defaultMethod,
           bank_id: n?.bank_id || p?.preferred_bank_id || null,
           issuing_bank: n?.issuing_bank || p?.default_counterparty_bank || i?.consignee || '',
+          issuing_bank_address: n?.issuing_bank_address || '',
+          issuing_bank_swift: n?.issuing_bank_swift || '',
           lc_number: n?.lc_number || i?.lc_number || '',
           lc_date: n?.lc_date ? dayjs(n.lc_date) : null,
           negotiate_pct: pct,
@@ -119,6 +121,8 @@ export default function LcNegotiationTab(
         method: v.method || 'lc',
         bank_id: v.bank_id || null,
         issuing_bank: v.issuing_bank || null,
+        issuing_bank_address: v.issuing_bank_address || null,
+        issuing_bank_swift: v.issuing_bank_swift || null,
         lc_number: v.lc_number || null,
         lc_date: v.lc_date ? v.lc_date.format('YYYY-MM-DD') : null,
         negotiate_pct: v.negotiate_pct ?? null,
@@ -170,6 +174,8 @@ export default function LcNegotiationTab(
         method: v.method || 'lc',
         bank_id: v.bank_id || null,
         issuing_bank: v.issuing_bank || null,
+        issuing_bank_address: v.issuing_bank_address || null,
+        issuing_bank_swift: v.issuing_bank_swift || null,
         lc_number: v.lc_number || null,
         lc_date: v.lc_date ? v.lc_date.format('YYYY-MM-DD') : null,
         negotiate_pct: v.negotiate_pct ?? null,
@@ -231,6 +237,8 @@ export default function LcNegotiationTab(
                 options={banks.map((b) => ({ value: b.id, label: `${b.swift_code || ''} — ${b.bank_name}` }))} />
             </Form.Item></Col>
             <Col xs={24} md={12}><Form.Item label={counterBankLabel} name="issuing_bank"><Input /></Form.Item></Col>
+            <Col xs={24} md={16}><Form.Item label={`Địa chỉ ${isDP ? 'NH nhờ thu' : 'NH phát hành'} (lên Hối phiếu)`} name="issuing_bank_address"><Input placeholder="Số nhà, đường, thành phố, tỉnh, quốc gia, mã bưu điện" /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item label="SWIFT NH (lên Hối phiếu)" name="issuing_bank_swift"><Input placeholder="VD: ICBKCNBJAHI" /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label={isDP ? 'Số L/C (bỏ trống)' : 'Số L/C'} name="lc_number"><Input disabled={isDP} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label={isDP ? 'Ngày L/C (bỏ trống)' : 'Ngày L/C'} name="lc_date"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabled={isDP} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label="Tỷ lệ TL (%)" name="negotiate_pct"><InputNumber min={0} max={100} style={{ width: '100%' }} /></Form.Item></Col>

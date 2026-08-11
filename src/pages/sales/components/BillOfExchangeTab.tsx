@@ -69,17 +69,19 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
   const issuingBank = neg?.issuing_bank || inv.consignee || ''
   const lcNo = neg?.lc_number || inv.lc_number || ''
   const lcDate = neg?.lc_date ? new Date(neg.lc_date).toLocaleDateString('en-GB') : ''
-  // Số tiền draw = THE COST (CIF − cước − BH) nếu có tách cước/BH; không thì = trị giá Invoice. Khớp mẫu gốc.
-  const drawAmount = (inv.freight > 0 || inv.insurance > 0) ? inv.the_cost : inv.total
-  const words = amountToWords(drawAmount)
-  // Phương thức: L/C (drawn under NH phát hành + L/C) vs D/P·D/A (drawn ON người mua, không L/C)
+  // Phương thức: L/C (drawn under NH phát hành + L/C, TO = NH phát hành) vs D/P·D/A (TO = người mua, không L/C)
   const method = neg?.method || 'lc'
   const isDP = method !== 'lc'
   const drawnOn = inv.buyer_name || inv.customer.name || ''
+  // Số tiền draw: D/P → TỔNG CIF (trị giá Invoice, khớp mẫu nhờ thu). L/C → THE COST (CIF − cước − BH) nếu tách, không thì Invoice.
+  const drawAmount = isDP ? inv.total : ((inv.freight > 0 || inv.insurance > 0) ? inv.the_cost : inv.total)
+  const words = amountToWords(drawAmount)
   // D/P = at sight (0); D/A = usance (term_days); L/C giữ tenor suy từ payment terms
   const effTenor = isDP ? (method === 'da' ? (neg?.term_days ?? null) : 0) : tenorDays
 
   const bank = parseBankSwift(issuingBank)
+  const collectSwift = neg?.issuing_bank_swift || bank.swift
+  const collectAddr = neg?.issuing_bank_address || ''
   const invDate = inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-GB') : ''
   const kv = (label: string, value: React.ReactNode, boldV = false) => (
     <tr>
@@ -113,14 +115,15 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
           {kv('Value received as per our Invoice(s) No(s)', `${inv.invoice_code}       Date: ${invDate}`)}
           {isDP ? (
             <>
-              {kv('Drawn on', drawnOn)}
-              {bank.swift && kv('Swift code', bank.swift)}
-              {kv('TO', bank.name, true)}
+              {kv("The collecting bank's name", bank.name)}
+              {collectAddr && kv('Bank address', collectAddr)}
+              {collectSwift && kv('Swift code', collectSwift)}
+              {kv('TO', drawnOn, true)}
             </>
           ) : (
             <>
               {kv('Drawn under', bank.name)}
-              {bank.swift && kv('Swift code', bank.swift)}
+              {collectSwift && kv('Swift code', collectSwift)}
               {kv('L/C NUMBER', `${lcNo}${lcDate ? `        L/C DATE: ${lcDate}` : ''}`)}
               {kv('TO', bank.name, true)}
             </>
@@ -146,6 +149,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
               invoiceRef: inv.invoice_code, invoiceDate: inv.invoice_date,
               tenorDays: effTenor, lcNumber: lcNo, lcDate, today: drawDate,
               method: (method as 'lc' | 'dp' | 'da'), drawnOn,
+              issuingBankAddress: collectAddr, issuingBankSwift: collectSwift,
             }), `${inv.invoice_code}_BOE`).catch(() => message.error('Lỗi xuất Word'))}>
             Tải Word (.docx)
           </Button>

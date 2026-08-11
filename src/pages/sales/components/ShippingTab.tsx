@@ -137,6 +137,15 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
       discount_date: order.discount_date ? dayjs(order.discount_date) : null,
       discount_amount: order.discount_amount,
       bank_charges: order.bank_charges,
+      // Hải quan (gộp từ bản full-page)
+      customs_declaration_no: order.customs_declaration_no,
+      customs_declaration_date: order.customs_declaration_date ? dayjs(order.customs_declaration_date) : null,
+      customs_clearance_status: order.customs_clearance_status || 'pending',
+      // Chi tiết Commercial Invoice (gộp từ bản full-page)
+      proforma_date: order.proforma_date ? dayjs(order.proforma_date) : null,
+      item_no: order.item_no,
+      packing_desc: order.packing_desc,
+      invoice_extra_lines: order.invoice_extra_lines,
     })
     setEditing(true)
   }
@@ -182,6 +191,15 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         discount_date: vals.discount_date?.format('YYYY-MM-DD') || null,
         discount_amount: vals.discount_amount || null,
         bank_charges: vals.bank_charges || null,
+        // Hải quan
+        customs_declaration_no: vals.customs_declaration_no || null,
+        customs_declaration_date: vals.customs_declaration_date?.format('YYYY-MM-DD') || null,
+        customs_clearance_status: vals.customs_clearance_status || null,
+        // Chi tiết Commercial Invoice
+        proforma_date: vals.proforma_date?.format('YYYY-MM-DD') || null,
+        item_no: vals.item_no || null,
+        packing_desc: vals.packing_desc || null,
+        invoice_extra_lines: vals.invoice_extra_lines || null,
       }
 
       // Auto calc: Còn lại = Thành tiền - Đặt cọc - Chiết khấu - Phí NH
@@ -332,6 +350,37 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
           </Form.Item>
         </div>
 
+        {/* Chi tiết Commercial Invoice (khớp mẫu) */}
+        <SectionHeader title="Chi tiết Commercial Invoice (khớp mẫu)" color="#1257a8" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Ngày Proforma (PI)" name="proforma_date" tooltip='Dòng "AS PER PROFORMA … DATED …" trên Invoice'>
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item label="ITEM NO. (mã hàng khách)" name="item_no" tooltip="Trống → mặc định hồ sơ khách">
+            <Input placeholder="VD: RRB01021" />
+          </Form.Item>
+          <Form.Item label="Kiểu đóng gói (PACKING)" name="packing_desc" tooltip="Trống → mặc định hồ sơ khách">
+            <Input placeholder="VD: 35 KG/BALE. LOOSE BALES." />
+          </Form.Item>
+          <Form.Item label="Dòng mô tả riêng" name="invoice_extra_lines" tooltip="Mỗi dòng 1 mục (nếu L/C yêu cầu)">
+            <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} placeholder="VD: BANK NAME: COMMERCIAL BANK OF CEYLON PLC" />
+          </Form.Item>
+        </div>
+
+        {/* Hải quan */}
+        <SectionHeader title="Hải quan" color="#666" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Số tờ khai" name="customs_declaration_no">
+            <Input placeholder="Số tờ khai HQ" />
+          </Form.Item>
+          <Form.Item label="Ngày đăng ký" name="customs_declaration_date">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item label="Thông quan" name="customs_clearance_status">
+            <Select options={[{ value: 'pending', label: '⏳ Chờ thông quan' }, { value: 'cleared', label: '✅ Đã thông quan' }, { value: 'rejected', label: '❌ Từ chối' }]} />
+          </Form.Item>
+        </div>
+
         {/* Đặt cọc */}
         <SectionHeader title="Đặt cọc" color="#722ed1" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
@@ -444,6 +493,31 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
         <Descriptions.Item label="Bảo hiểm (USD)">{fmtCurrency(order.insurance_amount)}</Descriptions.Item>
         <Descriptions.Item label="Số hóa đơn">{order.invoice_no || <span style={{ color: '#aaa' }}>INV-{order.code}</span>}</Descriptions.Item>
         <Descriptions.Item label="Ngày hóa đơn">{order.invoice_date ? fmtDate(order.invoice_date) : <span style={{ color: '#aaa' }}>(hôm nay khi sinh)</span>}</Descriptions.Item>
+      </Descriptions>
+
+      <Divider style={{ margin: '12px 0' }} />
+
+      {/* Chi tiết Commercial Invoice (khớp mẫu) */}
+      <SectionHeader title="Chi tiết Commercial Invoice (khớp mẫu)" color="#1257a8" />
+      <Descriptions column={2} size="small" bordered>
+        <Descriptions.Item label="Ngày Proforma (PI)">{fmtDate(order.proforma_date)}</Descriptions.Item>
+        <Descriptions.Item label="ITEM NO.">{order.item_no || <span style={{ color: '#aaa' }}>(hồ sơ khách)</span>}</Descriptions.Item>
+        <Descriptions.Item label="Kiểu đóng gói">{order.packing_desc || <span style={{ color: '#aaa' }}>(hồ sơ khách)</span>}</Descriptions.Item>
+        <Descriptions.Item label="Dòng mô tả riêng">{order.invoice_extra_lines ? <span style={{ whiteSpace: 'pre-line' }}>{order.invoice_extra_lines}</span> : <span style={{ color: '#aaa' }}>(hồ sơ khách)</span>}</Descriptions.Item>
+      </Descriptions>
+
+      <Divider style={{ margin: '12px 0' }} />
+
+      {/* Hải quan */}
+      <SectionHeader title="Hải quan" color="#666" />
+      <Descriptions column={3} size="small" bordered>
+        <Descriptions.Item label="Số tờ khai">{order.customs_declaration_no || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Ngày đăng ký">{fmtDate(order.customs_declaration_date)}</Descriptions.Item>
+        <Descriptions.Item label="Thông quan">
+          <Tag color={order.customs_clearance_status === 'cleared' ? 'green' : order.customs_clearance_status === 'rejected' ? 'red' : 'orange'}>
+            {order.customs_clearance_status === 'cleared' ? 'Đã TQ' : order.customs_clearance_status === 'rejected' ? 'Từ chối' : 'Chờ TQ'}
+          </Tag>
+        </Descriptions.Item>
       </Descriptions>
 
       <Divider style={{ margin: '12px 0' }} />

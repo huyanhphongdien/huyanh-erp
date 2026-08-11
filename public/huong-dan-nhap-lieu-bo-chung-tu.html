@@ -125,6 +125,7 @@
       <tr><td class="b">Commercial Invoice — CIF</td><td><span style="color:var(--red)">Cước + Bảo hiểm: BẮT BUỘC</span> với đơn CIF (kẻo FOB(COST) = CIF, sai)</td><td>tab <b>Vận chuyển</b></td></tr>
       <tr><td class="b">Weight List</td><td>Số <b>PALLET</b> / container</td><td>tab <b>Đóng gói</b> → bảng container → cột "Pallet"</td></tr>
       <tr><td class="b">Đơn ĐNCK Vietinbank (L/C)</td><td>STT đơn · hãng tàu (tên đầy đủ) · NH nhận CT (địa chỉ) · số tiền bằng chữ · giá trị nghĩa vụ bảo đảm (VNĐ)</td><td>tab <b>Đơn chiết khấu</b> → panel "Đơn ĐNCK Vietinbank" → nút <b>"Tải đơn ĐNCK Vietinbank (.docx)"</b></td></tr>
+      <tr><td class="b">Hối phiếu (BOE) — D/P nhờ thu</td><td><b>Địa chỉ</b> + <b>SWIFT</b> của NH nhờ thu (tên đã có ở ô "NH nhờ thu") → khối "The collecting bank's name / Bank address / Swift code", <b>TO = người mua</b>. Số tiền draw = <b>TỔNG CIF</b> (khác L/C = THE COST).</td><td>tab <b>Đơn chiết khấu</b> → ô <b>"Địa chỉ NH nhờ thu"</b> + <b>"SWIFT NH"</b> (nhập 1 chỗ → lên cả Hối phiếu &amp; ĐNCK)</td></tr>
     </tbody>
   </table>
   <div class="note"><b>Đơn ĐNCK Vietinbank</b> = ĐIỀN FORM CHUẨN của ngân hàng, KHÔNG dựng lại — giữ nguyên toàn bộ văn bản/định dạng. Số L/C, ngày, NH phát hành, giá trị đòi tiền (=trị giá CIF), % + số tiền + kỳ hạn thương lượng… tự lấy từ đơn; field không có trong hệ thì điền ở panel.</div>
@@ -142,7 +143,7 @@
         <td>Đơn hàng → tab <b>"Vận chuyển"</b> → nút <b>"Chỉnh sửa"</b> <span class="opt">(chỉ Logistics/Admin thấy nút)</span></td></tr>
       <tr><td class="b">Số container · Seal · Bành · Net · Tare · Gross · <b>Pallet</b> từng container</td>
         <td>Đơn hàng → tab <b>"Đóng gói"</b> → nút <b>"Quản lý đóng gói →"</b> → trang riêng, bảng <b>"Chia lô giao hàng"</b> (gõ thẳng vào ô, tự lưu khi rời ô) <span class="opt">— tab Đóng gói trong đơn chỉ theo dõi lô, KHÔNG nhập được ở đó</span></td></tr>
-      <tr><td class="b">Phương thức (L/C · D/P · D/A) · NH phát hành/nhờ thu · Số L/C · Kỳ hạn · Chiết khấu</td>
+      <tr><td class="b">Phương thức (L/C · D/P · D/A) · NH phát hành/nhờ thu (tên · <b>địa chỉ · SWIFT</b>) · Số L/C · Kỳ hạn · Chiết khấu</td>
         <td>Đơn hàng → tab <b>"Chứng từ"</b> → "Mở trang Sinh chứng từ" → tab <b>"Đơn chiết khấu"</b></td></tr>
       <tr><td class="b">Upload COA · B/L · C/O · Bảo hiểm · Phyto · LC copy</td>
         <td>Đơn hàng → tab <b>"Chứng từ"</b> → mục <b>"Checklist chứng từ"</b></td></tr>
@@ -265,6 +266,7 @@
           <tr><td class="b">Ngân hàng chiết khấu (của Huy Anh)</td><td><span class="req">Bắt buộc</span></td><td><span class="doc">Đơn chiết khấu</span></td></tr>
           <tr><td class="b"><b>L/C:</b> NH phát hành · Số L/C · Ngày L/C</td><td><span class="req">Nếu L/C</span></td><td><span class="doc">Hối phiếu</span> <span class="doc">Đơn chiết khấu</span></td></tr>
           <tr><td class="b"><b>D/P/D/A:</b> NH nhờ thu (NH người mua) — bỏ ô L/C</td><td><span class="req">Nếu D/P</span></td><td><span class="doc">Hối phiếu</span> <span class="doc">Đơn chiết khấu</span></td></tr>
+          <tr><td class="b"><b>Địa chỉ</b> + <b>SWIFT</b> NH nhờ thu / phát hành <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="req">D/P: bắt buộc</span></td><td><span class="doc">Hối phiếu</span> <span class="doc">Đơn chiết khấu</span> <span style="color:var(--blue);font-size:11px">— nhập 1 chỗ, lên cả 2</span></td></tr>
           <tr><td class="b">Tỷ lệ % · Lãi suất · Thời hạn · Ngày nộp</td><td><span class="opt">Nếu chiết khấu</span></td><td><span class="doc">Đơn chiết khấu</span></td></tr>
           <tr><td class="b">Số bản chứng từ (46A) — riêng đơn này <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="opt">Mặc định hồ sơ</span></td><td><span class="doc">Đơn chiết khấu</span> — sửa nếu L/C lô này khác; "Lưu làm mẫu" để thành mặc định</td></tr>
         </tbody>
@@ -437,7 +439,8 @@
     Đơn <b>D/P</b> đang chạy thật: <b>HA20260075</b> — ASIMCO NVH TECHNOLOGIES CO., LTD. (ANHUI), China · <b>SVR10CV60 MIXTURE SBR1502 (97,5% + 2,5%) · 403,2 tấn · $2.220/MT · CIF Shanghai · Tổng $895.104</b>. Đơn này từng dùng để <b>thực hành</b> nên còn <b>DÍNH data của đơn mẫu GRI (HA20260080)</b> → lấy làm ví dụ "kiểm &amp; sửa": ô <span class="mk-have">ĐÃ CÓ</span> đúng · ô <span class="mk-fill">CẦN NHẬP</span> còn trống · ô <span class="mk-fix">⚠ CẦN SỬA</span> đang SAI (data lẫn), phải sửa lại.
   </div>
 
-  <div class="card" style="border-color:var(--red)"><div class="hd"><div class="stepno" style="background:var(--red)">⚠</div><div class="tt">4 chỗ data đang LẪN — sửa TRƯỚC khi sinh chứng từ</div></div><div class="bd">
+  <div class="card" style="border-color:var(--red)"><div class="hd"><div class="stepno" style="background:var(--red)">⚠</div><div class="tt">4 chỗ data từng LẪN (đã dọn) — mẫu để nhận biết ở đơn khác</div></div><div class="bd">
+    <div class="note" style="border-color:var(--green);background:var(--green-l);margin-top:0">✅ Đơn HA20260075 đã được dọn sạch 4 chỗ này (2026-08-11). Bảng dưới giữ lại làm <b>mẫu nhận biết</b>: gặp đơn nào dính data mẫu thì sửa tương tự.</div>
     <table><thead><tr><th style="width:20%">Chỗ</th><th style="width:28%">Đang là (SAI)</th><th style="width:24%">Sửa thành</th><th>Sửa ở đâu</th></tr></thead><tbody>
       <tr><td class="b">Số hóa đơn (Invoice No.)</td><td><span class="mk-fix">HA20260080/CI</span></td><td><b>HA20260075/CI</b></td><td>tab <b>Vận chuyển → Chỉnh sửa</b> → mục "Cước, Bảo hiểm &amp; Hóa đơn"</td></tr>
       <tr><td class="b">Shipping mark riêng đơn</td><td><span class="mk-fix">BRIDGE V.377S</span> <span class="opt">(là tên TÀU của đơn GRI)</span></td><td><b>Để TRỐNG</b> → dùng mark hồ sơ ASIMCO</td><td>tab <b>Vận chuyển → Chỉnh sửa</b> → mục "Cảng" → ô "Shipping mark (riêng đơn này)"</td></tr>

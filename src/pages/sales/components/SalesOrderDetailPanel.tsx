@@ -27,6 +27,7 @@ import {
   ThunderboltOutlined,
   ShareAltOutlined,
   SolutionOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
 import { salesContractWorkflowService } from '../../../services/sales/salesContractWorkflowService'
@@ -45,6 +46,7 @@ import ContractTab from './ContractTab'
 import PackingTabPanel from './PackingTabPanel'
 import OrderInfoTab from './OrderInfoTab'
 import ProductionTab from './ProductionTab'
+import QualityTab from './QualityTab'
 import ShippingTab from './ShippingTab'
 import FinanceTabV4 from './FinanceTabV4'
 import DocumentChecklistTab from './DocumentChecklistTab'
@@ -476,8 +478,19 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
       }
     })
 
-  // Thứ tự thống nhất: Thông tin · [Hợp đồng · Sản xuất · Đóng gói · Vận chuyển · Tài chính] · Tiến độ · Trao đổi
-  const tabItems = [...infoTabItem, ...legacyTabItems, ...progressTabItem, ...chatTabItem, ...historyTabItem]
+  // Tab Chất lượng — luôn hiện (giống trang chi tiết), chèn ngay sau Sản xuất để đồng nhất thứ tự.
+  const qualityTabItem = order ? [{
+    key: 'quality',
+    label: <Space size={4}><ExperimentOutlined /><span>Chất lượng</span></Space>,
+    children: <QualityTab order={order} />,
+  }] : []
+  const hasProduction = legacyTabItems.some((i) => i.key === 'production')
+  const legacyWithQuality = hasProduction
+    ? legacyTabItems.flatMap((i) => (i.key === 'production' ? [i, ...qualityTabItem] : [i]))
+    : [...qualityTabItem, ...legacyTabItems]
+
+  // Thứ tự thống nhất: Thông tin · [Hợp đồng · Sản xuất · Chất lượng · Đóng gói · Vận chuyển · Chứng từ · Tài chính] · Tiến độ · Trao đổi · Lịch sử
+  const tabItems = [...infoTabItem, ...legacyWithQuality, ...progressTabItem, ...chatTabItem, ...historyTabItem]
   // Nếu tab đã lưu không có trong bộ tab của đơn/role này (vd máy dùng chung, đổi user)
   // → fallback về tab đầu để tránh nội dung trắng.
   const safeActiveTab = tabItems.some((t) => t.key === activeTab) ? activeTab : (tabItems[0]?.key as string) || 'info'
@@ -528,6 +541,7 @@ export default function SalesOrderDetailPanel({ orderId, open, onClose, onOrderU
             <DocumentChecklistTab
               orderId={order.id}
               orderCode={soDisplayCode(order)}
+              readonly={['draft', 'cancelled'].includes(order.status)}
             />
           </div>
         )

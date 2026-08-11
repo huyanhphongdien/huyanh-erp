@@ -56,6 +56,7 @@ import {
   DeleteOutlined,
   SolutionOutlined,
   MessageOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
@@ -71,6 +72,9 @@ import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
 import StageOwnershipCard from './components/StageOwnershipCard'
 import BookingTableSection from './components/BookingTableSection'
 import ShippingTab from './components/ShippingTab'
+import OrderInfoTab from './components/OrderInfoTab'
+import QualityTab from './components/QualityTab'
+import StatusHistoryTab from './components/StatusHistoryTab'
 import HandoffTimeline from './components/HandoffTimeline'
 import ContractTab from './components/ContractTab'
 import SalesOrderChat from './components/SalesOrderChat'
@@ -317,247 +321,9 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     )
   }
 
-  // ══════════════════════════════════════════════════════════════
-  // TAB: THÔNG TIN
-  // ══════════════════════════════════════════════════════════════
+  // Tab "Thông tin" giờ dùng chung component <OrderInfoTab /> (đồng nhất với dạng Bảng/Split)
 
-  const renderInfoTab = () => (
-    <Row gutter={24}>
-      <Col xs={24} lg={14}>
-        <Card title="Thông tin đơn hàng" size="small">
-          <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-            <Descriptions.Item label="Mã đơn">{soDisplayCode(order)}</Descriptions.Item>
-            <Descriptions.Item label="Trạng thái">
-              <Tag color={ORDER_STATUS_COLORS[order.status]}>
-                {ORDER_STATUS_LABELS[order.status]}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Khách hàng" span={2}>
-              {order.customer_id ? (
-                <Space size={8} wrap>
-                  <a
-                    onClick={() => navigate(`/sales/customers/${order.customer_id}`)}
-                    style={{ fontWeight: 600 }}
-                  >
-                    {customerName}
-                  </a>
-                  {customerCountry ? <span>({customerCountry})</span> : null}
-                  <Button
-                    size="small"
-                    type="link"
-                    icon={<SolutionOutlined />}
-                    style={{ padding: '0 4px', height: 'auto' }}
-                    onClick={() => navigate(`/sales/customers/${order.customer_id}?tab=export`)}
-                  >
-                    Hồ sơ chứng từ
-                  </Button>
-                </Space>
-              ) : (
-                <>{customerName} {customerCountry ? `(${customerCountry})` : ''}</>
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Grade">
-              <Tag color="blue">{gradeLabel}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="PO# KH">{order.customer_po || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Số lượng">
-              {order.quantity_tons} tấn ({order.quantity_kg?.toLocaleString()} kg)
-            </Descriptions.Item>
-            <Descriptions.Item label="Đơn giá">
-              {formatCurrency(order.unit_price, order.currency)} / tấn
-            </Descriptions.Item>
-            <Descriptions.Item label="Giá trị USD">
-              {formatCurrency(order.total_value_usd)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Giá trị VND">{formatVND(order.total_value_vnd)}</Descriptions.Item>
-            <Descriptions.Item label="Tỷ giá">
-              {order.exchange_rate ? `${order.exchange_rate.toLocaleString()} VND/USD` : '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Incoterm">
-              {INCOTERM_LABELS[order.incoterm as Incoterm] || order.incoterm}
-            </Descriptions.Item>
-            <Descriptions.Item label="Cảng xếp hàng">{polLabel}</Descriptions.Item>
-            <Descriptions.Item label="Cảng đích">
-              {order.port_of_destination || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Loại container">
-              {order.container_count || 0} x{' '}
-              {CONTAINER_TYPE_LABELS[order.container_type as keyof typeof CONTAINER_TYPE_LABELS] ||
-                order.container_type ||
-                '20ft'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Tổng bành">{order.total_bales || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Đóng gói">
-              {PACKING_TYPE_LABELS[order.packing_type as PackingType] || order.packing_type}
-              {order.shrink_wrap ? ' + Shrink wrap' : ''}
-              {order.pallet_required ? ' + Pallet' : ''}
-              {order.packing_note ? (
-                <div style={{ fontSize: 12, color: '#666', marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
-                  Ghi chú: {order.packing_note}
-                </div>
-              ) : null}
-            </Descriptions.Item>
-            <Descriptions.Item label="KL bành">{order.bale_weight_kg} kg</Descriptions.Item>
-            <Descriptions.Item label="Thanh toán">
-              {PAYMENT_TERMS_LABELS[order.payment_terms as PaymentTerms] ||
-                order.payment_terms ||
-                '-'}
-              {order.payment_terms_note ? (
-                <div style={{ fontSize: 12, color: '#666', marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
-                  Ghi chú: {order.payment_terms_note}
-                </div>
-              ) : null}
-            </Descriptions.Item>
-            <Descriptions.Item label="Shipment Time" span={2}>
-              {order.shipment_time || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Số L/C">{order.lc_number || '-'}</Descriptions.Item>
-            <Descriptions.Item label="NH L/C">{order.lc_bank || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Hết hạn L/C">
-              {formatDate(order.lc_expiry_date)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Ngày đặt">{formatDate(order.order_date)}</Descriptions.Item>
-            <Descriptions.Item label="Ngày giao">
-              {formatDate(order.delivery_date)}
-            </Descriptions.Item>
-            <Descriptions.Item label="ETD">{formatDate(order.etd)}</Descriptions.Item>
-            <Descriptions.Item label="ETA">{formatDate(order.eta)}</Descriptions.Item>
-            <Descriptions.Item label="Hãng tàu">{order.shipping_line || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Tàu">{order.vessel_name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Booking ref">
-              {order.booking_reference || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Marking" span={2}>
-              {order.marking_instructions || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Ghi chú" span={2}>
-              {order.notes || '-'}
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
-      </Col>
-
-      <Col xs={24} lg={10}>
-        {/* Customer card */}
-        {order.customer && (
-          <Card
-            size="small"
-            title="Khách hàng"
-            style={{ marginBottom: 16 }}
-            extra={
-              <Button
-                size="small"
-                type="link"
-                onClick={() => navigate(`/sales/customers/${order.customer!.id}`)}
-              >
-                Chi tiết
-              </Button>
-            }
-          >
-            <Descriptions column={1} size="small">
-              <Descriptions.Item label="Mã">{order.customer.code}</Descriptions.Item>
-              <Descriptions.Item label="Tên">{order.customer.name}</Descriptions.Item>
-              <Descriptions.Item label="Quốc gia">{customerCountry || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Hạng">
-                <Tag color={CUSTOMER_TIER_COLORS[order.customer.tier]}>
-                  {CUSTOMER_TIER_LABELS[order.customer.tier]}
-                </Tag>
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
-        )}
-
-        {/* Quality specs card */}
-        <Card size="small" title="Chỉ tiêu kỹ thuật yêu cầu">
-          <Descriptions column={2} size="small" bordered>
-            <Descriptions.Item label="DRC min">{order.drc_min ?? '-'} %</Descriptions.Item>
-            <Descriptions.Item label="DRC max">{order.drc_max ?? '-'} %</Descriptions.Item>
-            <Descriptions.Item label="Moisture">{order.moisture_max ?? '-'} %</Descriptions.Item>
-            <Descriptions.Item label="Dirt">{order.dirt_max ?? '-'} %</Descriptions.Item>
-            <Descriptions.Item label="Ash">{order.ash_max ?? '-'} %</Descriptions.Item>
-            <Descriptions.Item label="Nitrogen">{order.nitrogen_max ?? '-'} %</Descriptions.Item>
-            <Descriptions.Item label="Volatile">{order.volatile_max ?? '-'} %</Descriptions.Item>
-            <Descriptions.Item label="PRI">{order.pri_min ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Mooney">{order.mooney_max ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Color">{order.color_lovibond_max ?? '-'}</Descriptions.Item>
-          </Descriptions>
-        </Card>
-      </Col>
-    </Row>
-  )
-
-  // ══════════════════════════════════════════════════════════════
-  // TAB: CHẤT LƯỢNG
-  // ══════════════════════════════════════════════════════════════
-
-  const renderQualityTab = () => {
-    interface QualityRow {
-      key: string
-      parameter: string
-      unit: string
-      required: number | null | undefined
-      standard: number | null | undefined
-      type: 'min' | 'max'
-    }
-
-    const rows: QualityRow[] = [
-      { key: 'drc_min', parameter: 'DRC', unit: '%', required: order.drc_min, standard: gradeStandard?.drc_min, type: 'min' },
-      { key: 'drc_max', parameter: 'DRC', unit: '%', required: order.drc_max, standard: gradeStandard?.drc_max, type: 'max' },
-      { key: 'moisture', parameter: 'Moisture', unit: '%', required: order.moisture_max, standard: gradeStandard?.moisture_max, type: 'max' },
-      { key: 'dirt', parameter: 'Dirt', unit: '%', required: order.dirt_max, standard: gradeStandard?.dirt_max, type: 'max' },
-      { key: 'ash', parameter: 'Ash', unit: '%', required: order.ash_max, standard: gradeStandard?.ash_max, type: 'max' },
-      { key: 'nitrogen', parameter: 'Nitrogen', unit: '%', required: order.nitrogen_max, standard: gradeStandard?.nitrogen_max, type: 'max' },
-      { key: 'volatile', parameter: 'Volatile', unit: '%', required: order.volatile_max, standard: gradeStandard?.volatile_matter_max, type: 'max' },
-      { key: 'pri', parameter: 'PRI', unit: '', required: order.pri_min, standard: gradeStandard?.pri_min, type: 'min' },
-      { key: 'mooney', parameter: 'Mooney', unit: '', required: order.mooney_max, standard: gradeStandard?.mooney_max, type: 'max' },
-      { key: 'color', parameter: 'Color Lovibond', unit: '', required: order.color_lovibond_max, standard: gradeStandard?.color_lovibond_max, type: 'max' },
-    ]
-
-    const columns: ColumnsType<QualityRow> = [
-      { title: 'Chỉ tiêu', dataIndex: 'parameter', key: 'parameter' },
-      { title: 'Loại', dataIndex: 'type', key: 'type', render: (t) => t === 'min' ? 'Min' : 'Max' },
-      {
-        title: 'Yêu cầu đơn hàng',
-        dataIndex: 'required',
-        key: 'required',
-        render: (v, row) => (v != null ? `${v} ${row.unit}` : '-'),
-      },
-      {
-        title: `Tiêu chuẩn ${gradeLabel}`,
-        dataIndex: 'standard',
-        key: 'standard',
-        render: (v, row) => (v != null ? `${v} ${row.unit}` : '-'),
-      },
-      {
-        title: 'Trạng thái',
-        key: 'status',
-        render: (_: unknown, row: QualityRow) => {
-          if (row.required == null || row.standard == null) return <Tag>N/A</Tag>
-          const inSpec =
-            row.type === 'min'
-              ? row.required >= row.standard
-              : row.required <= row.standard
-          return inSpec ? (
-            <Tag color="green">Đạt</Tag>
-          ) : (
-            <Tag color="red">Không đạt</Tag>
-          )
-        },
-      },
-    ]
-
-    return (
-      <Card title="So sánh chỉ tiêu kỹ thuật" size="small">
-        <Table
-          dataSource={rows}
-          columns={columns}
-          pagination={false}
-          size="small"
-          bordered
-        />
-      </Card>
-    )
-  }
+  // Tab "Chất lượng" giờ dùng chung component <QualityTab /> (đồng nhất 2 dạng xem)
 
   // ══════════════════════════════════════════════════════════════
   // TAB: SẢN XUẤT
@@ -1657,7 +1423,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 <FileTextOutlined /> Thông tin
               </span>
             ),
-            children: renderInfoTab(),
+            children: <OrderInfoTab order={order} />,
           },
           ...(visibleTabs.includes('contract') ? [{
             key: 'contract',
@@ -1691,7 +1457,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 <ExperimentOutlined /> Chất lượng
               </span>
             ),
-            children: renderQualityTab(),
+            children: <QualityTab order={order} />,
           },
           ...(visibleTabs.includes('packing') ? [{
             key: 'packing',
@@ -1733,7 +1499,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             key: 'progress',
             label: (
               <span>
-                🏉 Tiến độ
+                📈 Tiến độ
               </span>
             ),
             children: (
@@ -1767,6 +1533,15 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
             ),
             children: <SalesOrderChat salesOrderId={order.id} />,
           },
+          ...(salesRole === 'admin' ? [{
+            key: 'history',
+            label: (
+              <span>
+                <ClockCircleOutlined /> Lịch sử
+              </span>
+            ),
+            children: <StatusHistoryTab orderId={order.id} />,
+          }] : []),
         ]}
       />
 

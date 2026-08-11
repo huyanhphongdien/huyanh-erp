@@ -69,6 +69,7 @@ import FinanceTab from '../../components/sales/FinanceTab'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
 import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
 import StageOwnershipCard from './components/StageOwnershipCard'
+import BookingTableSection from './components/BookingTableSection'
 import HandoffTimeline from './components/HandoffTimeline'
 import ContractTab from './components/ContractTab'
 import SalesOrderChat from './components/SalesOrderChat'
@@ -1415,6 +1416,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
     }
 
     return (
+      <>
       <Row gutter={24}>
         <Col xs={24} lg={12}>
           <Card title="Thông tin vận chuyển" size="small" style={{ marginBottom: 16 }}>
@@ -1548,6 +1550,9 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
           </Card>
         </Col>
       </Row>
+      {/* Booking THEO LÔ — mỗi lô 1 tàu/B-L/ngày riêng (bộ chứng từ + ĐNCK theo lô lấy từ đây) */}
+      <BookingTableSection orderId={order.id} canEdit={canEdit} />
+      </>
     )
   }
 

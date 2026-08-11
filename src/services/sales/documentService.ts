@@ -169,6 +169,7 @@ export interface InvoiceData {
   port_of_loading: string
   port_of_destination: string
   vessel_name: string
+  shipping_line: string          // hãng tàu (cho ĐNCK "Hãng vận chuyển")
   voyage_number: string
   etd: string
   bl_date: string | null
@@ -793,6 +794,7 @@ export const documentService = {
       port_of_loading: booking?.port_of_loading || PORT_LABELS[order.port_of_loading] || order.port_of_loading || '',
       port_of_destination: booking?.port_of_destination || order.port_of_destination || order.port_of_discharge || '',
       vessel_name: booking?.vessel_name || order.vessel_name || '',
+      shipping_line: booking?.shipping_line || order.shipping_line || '',   // hãng tàu (cho ĐNCK)
       voyage_number: booking?.voyage_no || order.voyage_number || '',
       etd: booking?.etd || order.etd || '',
       bl_date: booking?.bl_date || order.bl_date || null,

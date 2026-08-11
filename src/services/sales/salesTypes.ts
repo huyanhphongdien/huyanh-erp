@@ -196,6 +196,7 @@ export interface SalesOrder {
   discount_amount?: number
   discount_bank?: string
   discount_exchange_rate?: number
+  contract_price?: number        // giá ký HĐ (so với đơn giá chốt) — dùng ở tab Tài chính
   dhl_number?: string
 
   // Đặt cọc

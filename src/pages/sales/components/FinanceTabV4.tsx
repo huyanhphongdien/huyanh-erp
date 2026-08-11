@@ -113,6 +113,12 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
       actual_payment_amount: order.actual_payment_amount,
       bank_charges: order.bank_charges,
       bank_name: order.bank_name,
+      // Chiết khấu · Hoa hồng · Giá (gộp từ bản full-page cũ)
+      discount_amount: order.discount_amount,
+      discount_date: order.discount_date ? dayjs(order.discount_date) : null,
+      commission_usd_per_mt: order.commission_usd_per_mt,
+      commission_pct: order.commission_pct,
+      contract_price: order.contract_price,
     })
     setEditing(true)
   }
@@ -130,12 +136,15 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
       const exRate = vals.exchange_rate || 0
       const discExRate = vals.discount_exchange_rate || 0
       const charges = vals.bank_charges || 0
+      const disc = vals.discount_amount || 0
+      const commUsdPerMt = vals.commission_usd_per_mt || 0
+      const commPct = vals.commission_pct || 0
+      const commTotal = commUsdPerMt > 0 ? (order.quantity_tons || 0) * commUsdPerMt : totalUSD * commPct / 100
 
       // Recalc
       const totalVndCalc = exRate > 0 ? totalUSD * exRate : null
-      const discountVnd = discExRate > 0 && discount > 0 ? discount * discExRate : null
       const dep = order.deposit_amount || 0
-      const netRev = totalUSD - dep - discount - charges - commissionAmt
+      const netRev = totalUSD - dep - disc - charges - commTotal
 
       const updateData: Record<string, any> = {
         exchange_rate: exRate || null,
@@ -146,8 +155,15 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         actual_payment_amount: vals.actual_payment_amount || null,
         bank_charges: charges || null,
         bank_name: vals.bank_name || null,
+        // Chiết khấu · Hoa hồng · Giá HĐ (gộp từ bản full-page cũ — dùng cột THẬT)
+        discount_amount: disc || null,
+        discount_date: vals.discount_date?.format('YYYY-MM-DD') || null,
+        commission_usd_per_mt: commUsdPerMt || null,
+        commission_pct: commPct || null,
+        commission_amount: commTotal || null,
+        contract_price: vals.contract_price || null,
         net_revenue: netRev,
-        remaining_amount: totalUSD - dep - discount - charges,
+        remaining_amount: totalUSD - dep - disc - charges,
       }
 
       await salesOrderService.updateFields(order.id, updateData)
@@ -213,6 +229,26 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         <Form.Item label="Ngân hàng nhận" name="bank_name">
           <Input placeholder="Tên ngân hàng" />
         </Form.Item>
+
+        {/* Chiết khấu · Hoa hồng · Giá HĐ */}
+        <SectionHeader title="Chiết khấu · Hoa hồng · Giá" color="#cf1322" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+          <Form.Item label="Chiết khấu NH (USD)" name="discount_amount">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+          </Form.Item>
+          <Form.Item label="Ngày chiết khấu" name="discount_date">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item label="Hoa hồng (USD/MT)" name="commission_usd_per_mt" tooltip="Dùng USD/MT HOẶC %, không dùng cả hai.">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD/tấn" />
+          </Form.Item>
+          <Form.Item label="Hoa hồng (%)" name="commission_pct">
+            <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder="%" />
+          </Form.Item>
+          <Form.Item label="Giá HĐ (contract price)" name="contract_price" tooltip="Giá ký hợp đồng — để so với giá chốt thực tế.">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD/tấn" />
+          </Form.Item>
+        </div>
       </Form>
     )
   }
@@ -353,6 +389,25 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
           </tbody>
         </table>
       </div>
+
+      {/* Giá chốt vs Giá HĐ (gộp từ bản full-page) */}
+      {(order.contract_price || 0) > 0 && (
+        <>
+          <Divider style={{ margin: '12px 0' }} />
+          <SectionHeader title="Giá" color="#cf1322" />
+          <Descriptions column={3} size="small" bordered>
+            <Descriptions.Item label="Giá chốt (đơn giá)">{fmtUSD(order.unit_price)}/MT</Descriptions.Item>
+            <Descriptions.Item label="Giá HĐ">{fmtUSD(order.contract_price)}/MT</Descriptions.Item>
+            <Descriptions.Item label="Chênh lệch">
+              {(() => {
+                const diff = (order.unit_price || 0) - (order.contract_price || 0)
+                const c = diff > 0 ? '#1B4D3E' : diff < 0 ? '#cf1322' : '#666'
+                return <span style={{ color: c, fontWeight: 600 }}>{diff >= 0 ? '+' : ''}{fmtUSD(diff)}/MT</span>
+              })()}
+            </Descriptions.Item>
+          </Descriptions>
+        </>
+      )}
 
       {/* L/C info */}
       {order.lc_number && (

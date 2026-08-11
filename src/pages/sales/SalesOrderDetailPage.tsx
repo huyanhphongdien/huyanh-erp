@@ -65,7 +65,7 @@ import { containerService } from '../../services/sales/containerService'
 import { dispatchService, type DeliveryState } from '../../services/logistics/dispatchService'
 import { LOT_STAGES, buildLotTrackRows, lotOverallStage, lotDeliveryStats } from '../../services/sales/lotTracking'
 import { getSalesRole, salesPermissions, getVisibleTabs, isTabEditable } from '../../services/sales/salesPermissionService'
-import FinanceTab from '../../components/sales/FinanceTab'
+import FinanceTabV4 from './components/FinanceTabV4'
 import DocumentChecklistTab from './components/DocumentChecklistTab'
 import SalesOrderStatusTimeline from './components/SalesOrderStatusTimeline'
 import StageOwnershipCard from './components/StageOwnershipCard'
@@ -1882,7 +1882,7 @@ function SalesOrderDetailPage({ orderId: propOrderId }: SalesOrderDetailPageProp
                 <DollarOutlined /> Tài chính
               </span>
             ),
-            children: <FinanceTab order={order} readOnly={!salesRole || !salesPermissions.canEditFinance(salesRole)} onUpdate={loadOrder} />,
+            children: <FinanceTabV4 order={order} salesRole={salesRole} editable={!!salesRole && salesPermissions.canEditFinance(salesRole)} onSaved={loadOrder} />,
           }] : []),
           {
             key: 'progress',

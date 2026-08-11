@@ -139,9 +139,9 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
     contract_no: df.contract_no || base,
     contract_date: ddmmyyyy(df.contract_date || (inv as { contract_date?: string }).contract_date || ''),
     lc_remaining: df.lc_remaining || money(drawAmount),
-    recv_swift: df.recv_swift || bank.swift,
+    recv_swift: df.recv_swift || neg?.issuing_bank_swift || bank.swift,
     recv_bank_name: df.recv_bank_name || bank.name,
-    recv_bank_addr1: df.recv_bank_addr1 || '',
+    recv_bank_addr1: df.recv_bank_addr1 || neg?.issuing_bank_address || '',
     recv_bank_addr2: df.recv_bank_addr2 || '',
     applicant_name: df.applicant_name || inv.buyer_name,
     applicant_addr1: df.applicant_addr1 || addrLines[0] || inv.buyer_address,
@@ -159,7 +159,8 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
   const inv = await documentService.getInvoiceData(orderId, lotNo)
   const neg = await lcNegotiationService.getByOrder(orderId, lotNo)
   const df: DnckFields = (neg?.dnck_fields as DnckFields) || {}
-  const drawAmount = (inv.freight > 0 || inv.insurance > 0) ? inv.the_cost : inv.total
+  // D/P (nhờ thu): Hối phiếu draw = TỔNG CIF (trị giá Invoice), KHÔNG trừ cước/BH — khác L/C (THE COST).
+  const drawAmount = inv.total
   const pct = neg?.negotiate_pct ?? null
   const negAmount = neg?.negotiate_amount ?? (pct != null ? (drawAmount * pct) / 100 : null)
   // D/P: issuing_bank = NH nhờ thu (NH người mua) → tách tên + swift
@@ -185,10 +186,11 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
     contract_no: df.contract_no || base,
     contract_date: ddmmyyyy(df.contract_date || (inv as { contract_date?: string }).contract_date || ''),
     negotiate_date: ddmmyyyy(df.negotiate_date || ''),
-    // NH nhờ thu (người mua) — strip SWIFT khỏi tên nếu người dùng gộp chung
+    // NH nhờ thu (người mua) — strip SWIFT khỏi tên nếu người dùng gộp chung;
+    // địa chỉ + SWIFT ưu tiên field riêng của đơn (issuing_bank_address/swift) → nhập 1 chỗ, lên cả BOE + ĐNCK
     recv_bank_name: df.recv_bank_name ? parseBankSwift(df.recv_bank_name).name : bank.name,
-    recv_bank_addr: df.recv_bank_addr || '',
-    recv_swift: df.recv_swift || bank.swift,
+    recv_bank_addr: df.recv_bank_addr || neg?.issuing_bank_address || '',
+    recv_swift: df.recv_swift || neg?.issuing_bank_swift || bank.swift,
     // Người nhập khẩu / người mua
     buyer_name: df.buyer_name || inv.buyer_name,
     buyer_addr: df.buyer_addr || buyerAddr,

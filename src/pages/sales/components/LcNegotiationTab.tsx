@@ -211,7 +211,8 @@ export default function LcNegotiationTab(
   const methodLabel = method === 'dp' ? 'Nhờ thu D/P (URC 522)' : method === 'da' ? 'Nhờ thu D/A (URC 522)' : 'L/C'
   const counterBankLabel = isDP ? 'Ngân hàng nhờ thu (NH người mua)' : 'Ngân hàng phát hành L/C (của khách)'
   // Số tiền đòi qua Hối phiếu = THE COST (đã trừ cước/BH), khớp bộ gốc D/P
-  const draftValue = (inv?.the_cost ?? inv?.total) || 0
+  // Giá trị Hối phiếu (đòi tiền) của D/P = TỔNG CIF (trị giá Invoice), khớp BOE nhờ thu (không trừ cước/BH).
+  const draftValue = inv?.total || 0
 
   return (
     <div>
@@ -237,8 +238,8 @@ export default function LcNegotiationTab(
                 options={banks.map((b) => ({ value: b.id, label: `${b.swift_code || ''} — ${b.bank_name}` }))} />
             </Form.Item></Col>
             <Col xs={24} md={12}><Form.Item label={counterBankLabel} name="issuing_bank"><Input /></Form.Item></Col>
-            <Col xs={24} md={16}><Form.Item label={`Địa chỉ ${isDP ? 'NH nhờ thu' : 'NH phát hành'} (lên Hối phiếu)`} name="issuing_bank_address"><Input placeholder="Số nhà, đường, thành phố, tỉnh, quốc gia, mã bưu điện" /></Form.Item></Col>
-            <Col xs={24} md={8}><Form.Item label="SWIFT NH (lên Hối phiếu)" name="issuing_bank_swift"><Input placeholder="VD: ICBKCNBJAHI" /></Form.Item></Col>
+            <Col xs={24} md={16}><Form.Item label={`Địa chỉ ${isDP ? 'NH nhờ thu' : 'NH phát hành'} (lên chứng từ)`} name="issuing_bank_address"><Input placeholder="Số nhà, đường, thành phố, tỉnh, quốc gia, mã bưu điện" /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item label="SWIFT NH (lên chứng từ)" name="issuing_bank_swift"><Input placeholder="VD: ICBKCNBJAHI" /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label={isDP ? 'Số L/C (bỏ trống)' : 'Số L/C'} name="lc_number"><Input disabled={isDP} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label={isDP ? 'Ngày L/C (bỏ trống)' : 'Ngày L/C'} name="lc_date"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabled={isDP} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label="Tỷ lệ TL (%)" name="negotiate_pct"><InputNumber min={0} max={100} style={{ width: '100%' }} /></Form.Item></Col>

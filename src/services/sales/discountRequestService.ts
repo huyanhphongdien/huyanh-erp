@@ -171,14 +171,26 @@ export async function generateDNCK(orderId: string, lotNo = 0): Promise<void> {
   const isDP = !!(neg?.method && neg.method !== 'lc')   // 'dp' / 'da' → BM08 nhờ thu
   const data = isDP ? await buildDnckDataDP(orderId, lotNo) : await buildDnckData(orderId, lotNo)
   const tpl = isDP ? 'template_DNCK_DP.docx' : 'template_DNCK_LC.docx'
-  const res = await fetch(`${SALES_CONFIG.TEMPLATE_BASE}/${tpl}`)
+  // cache-bust: luôn lấy template mới nhất (tránh trình duyệt giữ bản cũ còn highlight vàng)
+  const res = await fetch(`${SALES_CONFIG.TEMPLATE_BASE}/${tpl}?v=${Date.now()}`, { cache: 'no-store' })
   if (!res.ok) throw new Error(`Không tải được template ĐNCK (HTTP ${res.status})`)
   const zip = new PizZip(await res.arrayBuffer())
   const doc = new Docxtemplater(zip, {
     delimiters: { start: '{', end: '}' }, paragraphLoop: true, linebreaks: true, nullGetter: () => '',
   })
   doc.render(data)
-  const blob = doc.getZip().generate({
+  const outZip = doc.getZip()
+  // An toàn: xoá MỌI highlight (bôi vàng…) còn sót trước khi xuất — "định dạng sạch trước khi tải"
+  try {
+    const docXml = outZip.file('word/document.xml')?.asText()
+    if (docXml) {
+      const cleaned = docXml
+        .replace(/<w:highlight\b[^>]*\/>/g, '')
+        .replace(/<w:highlight\b[^>]*>[\s\S]*?<\/w:highlight>/g, '')
+      outZip.file('word/document.xml', cleaned)
+    }
+  } catch { /* không có gì để xoá thì bỏ qua */ }
+  const blob = outZip.generate({
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   })

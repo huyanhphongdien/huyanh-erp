@@ -43,6 +43,7 @@
   .doc{display:inline-block;background:var(--green-l);color:var(--green);border-radius:5px;padding:1px 7px;font-size:12px;font-weight:600;margin:1px 2px;white-space:nowrap}
   .mk-have{display:inline-block;background:var(--green-l);color:var(--green);border-radius:5px;padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap}
   .mk-fill{display:inline-block;background:var(--red-l);color:var(--red);border-radius:5px;padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .mk-fix{display:inline-block;background:var(--amber-l);color:var(--amber);border:1px solid var(--amber);border-radius:5px;padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap}
   .note{background:var(--amber-l);border-left:4px solid var(--amber);padding:10px 14px;border-radius:0 6px 6px 0;font-size:13.5px;margin-top:12px}
   ul.clean{margin:8px 0;padding-left:20px} ul.clean li{margin:4px 0}
   .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin:16px 0;padding:14px;background:#fff;border:1px solid var(--line);border-radius:12px}
@@ -135,12 +136,12 @@
     <tbody>
       <tr><td class="b">Buyer · Consignee · Notify · Shipping marks · Ngân hàng thụ hưởng</td>
         <td>Khách → tab <b>"Hồ sơ chứng từ"</b> <span style="color:var(--red)">(KHÁC nút "Sửa" — nút Sửa chỉ có thông tin chung)</span></td></tr>
-      <tr><td class="b">PO# · Số hợp đồng · Grade · Số lượng · Đơn giá</td>
-        <td>Đơn hàng → tab <b>"Hợp đồng"</b> → nút <b>Sửa</b> <span class="opt">(tab "Thông tin" chỉ để xem)</span></td></tr>
-      <tr><td class="b">Vessel · Cảng (POL/POD) · ETD · B/L số+ngày · Cước/Bảo hiểm · Số hóa đơn · Ngày Proforma · ITEM NO · PACKING</td>
-        <td>Đơn hàng → tab <b>"Vận chuyển"</b> → nút <b>Sửa</b></td></tr>
-      <tr><td class="b">Tare · Gross · <b>Pallet</b> từng container</td>
-        <td>Đơn hàng → <b>Đóng gói</b> (bảng container)</td></tr>
+      <tr><td class="b">Số hợp đồng · PO# · Grade · Số lượng · Đơn giá · Incoterm · Điều khoản TT</td>
+        <td>Đơn hàng → tab <b>"Hợp đồng"</b> → nút <b>"Chỉnh sửa"</b> <span class="opt">(Grade/SL/Giá nhập theo TỪNG DÒNG hàng ở mục "Sản phẩm &amp; Giá"; tab "Thông tin" chỉ để XEM)</span></td></tr>
+      <tr><td class="b">Vessel · Cảng (POL/POD) · ETD/ETA · B/L số+ngày · Cước/Bảo hiểm · Số hóa đơn · Ngày Proforma · ITEM NO · PACKING</td>
+        <td>Đơn hàng → tab <b>"Vận chuyển"</b> → nút <b>"Chỉnh sửa"</b> <span class="opt">(chỉ Logistics/Admin thấy nút)</span></td></tr>
+      <tr><td class="b">Số container · Seal · Bành · Net · Tare · Gross · <b>Pallet</b> từng container</td>
+        <td>Đơn hàng → tab <b>"Đóng gói"</b> → nút <b>"Quản lý đóng gói →"</b> → trang riêng, bảng <b>"Chia lô giao hàng"</b> (gõ thẳng vào ô, tự lưu khi rời ô) <span class="opt">— tab Đóng gói trong đơn chỉ theo dõi lô, KHÔNG nhập được ở đó</span></td></tr>
       <tr><td class="b">Phương thức (L/C · D/P · D/A) · NH phát hành/nhờ thu · Số L/C · Kỳ hạn · Chiết khấu</td>
         <td>Đơn hàng → tab <b>"Chứng từ"</b> → "Mở trang Sinh chứng từ" → tab <b>"Đơn chiết khấu"</b></td></tr>
       <tr><td class="b">Upload COA · B/L · C/O · Bảo hiểm · Phyto · LC copy</td>
@@ -196,7 +197,7 @@
   <div class="card">
     <div class="hd"><div class="stepno" style="background:var(--green)">1</div><div class="tt">Thông tin đơn hàng</div><span class="dept d-sale">Sale</span></div>
     <div class="bd">
-      <div class="where">📍 <b>Tạo đơn hàng bán</b> (đơn mới) — HOẶC đơn đã tạo: <b>Chi tiết đơn → tab "Hợp đồng" → nút Sửa</b> (tab "Thông tin" chỉ để xem, không sửa được)</div>
+      <div class="where">📍 <b>Tạo đơn hàng bán</b> (đơn mới) — HOẶC đơn đã tạo: <b>Chi tiết đơn → tab "Hợp đồng" → nút "Chỉnh sửa"</b> (tab "Thông tin" chỉ để XEM, không sửa được). <span class="opt">Grade · Số lượng · Đơn giá nhập theo TỪNG DÒNG hàng ở mục "Sản phẩm &amp; Giá" — hệ tự tổng hợp lên header khi Lưu.</span></div>
       <table>
         <thead><tr><th style="width:34%">Nhập gì</th><th style="width:12%">Bắt buộc</th><th>Lên chứng từ nào</th></tr></thead>
         <tbody>
@@ -215,7 +216,7 @@
   <div class="card">
     <div class="hd"><div class="stepno" style="background:var(--teal)">2</div><div class="tt">Đóng gói container</div><span class="dept d-prod">Sản xuất / Kho</span></div>
     <div class="bd">
-      <div class="where">📍 <b>Chi tiết đơn → Đóng gói</b> (hoặc trang Đóng gói container) — nhập theo từng container</div>
+      <div class="where">📍 <b>Chi tiết đơn → tab "Đóng gói" → nút "Quản lý đóng gói →"</b> (mở trang riêng) → bảng <b>"Chia lô giao hàng"</b> — gõ thẳng vào ô từng container, <b>tự lưu khi rời ô</b>. <span style="color:var(--red)">Tab "Đóng gói" trong đơn chỉ THEO DÕI lô, không nhập số cont ở đó.</span></div>
       <table>
         <thead><tr><th style="width:34%">Nhập gì (mỗi container)</th><th style="width:12%">Bắt buộc</th><th>Lên chứng từ nào</th></tr></thead>
         <tbody>
@@ -345,7 +346,7 @@
     </tbody></table>
   </div></div>
 
-  <div class="card"><div class="hd"><div class="stepno" style="background:var(--green)">1</div><div class="tt">Thông tin đơn (Chi tiết đơn → tab Hợp đồng → Sửa)</div></div><div class="bd">
+  <div class="card"><div class="hd"><div class="stepno" style="background:var(--green)">1</div><div class="tt">Thông tin đơn (Chi tiết đơn → tab Hợp đồng → Chỉnh sửa)</div></div><div class="bd">
     <table><thead><tr><th style="width:26%">Trường</th><th style="width:16%">Trạng thái</th><th>Giá trị</th></tr></thead><tbody>
       <tr><td class="b">Grade · SL · Giá · Incoterm · Số HĐ</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>SVR 10 · 105 tấn · $2,290 · CIF · HA20260080</td></tr>
       <tr><td class="b">PO#</td><td><span class="mk-fill">CẦN NHẬP</span></td><td><b>R7323</b></td></tr>
@@ -430,9 +431,90 @@
   <div class="note">🔑 Chỉ cần đổi <b>Phương thức = D/P</b> ở tab Đơn chiết khấu → hệ tự đổi mẫu đơn (BM08) + Hối phiếu (drawn on người mua, AT SIGHT). Consignee tự dùng hồ sơ khách (không suy theo NH như L/C).</div>
   </div></div>
 
+  <!-- ============ PHỤ LỤC 3: VÍ DỤ THỰC CHIẾN — HA20260075 (data đang lẫn) ============ -->
+  <h2>PHỤ LỤC 3 — Ví dụ THỰC CHIẾN: đơn HA20260075 (ASIMCO, China · D/P · CIF)</h2>
+  <div class="lead" style="border-color:var(--amber);background:var(--amber-l)">
+    Đơn <b>D/P</b> đang chạy thật: <b>HA20260075</b> — ASIMCO NVH TECHNOLOGIES CO., LTD. (ANHUI), China · <b>SVR10CV60 MIXTURE SBR1502 (97,5% + 2,5%) · 403,2 tấn · $2.220/MT · CIF Shanghai · Tổng $895.104</b>. Đơn này từng dùng để <b>thực hành</b> nên còn <b>DÍNH data của đơn mẫu GRI (HA20260080)</b> → lấy làm ví dụ "kiểm &amp; sửa": ô <span class="mk-have">ĐÃ CÓ</span> đúng · ô <span class="mk-fill">CẦN NHẬP</span> còn trống · ô <span class="mk-fix">⚠ CẦN SỬA</span> đang SAI (data lẫn), phải sửa lại.
+  </div>
+
+  <div class="card" style="border-color:var(--red)"><div class="hd"><div class="stepno" style="background:var(--red)">⚠</div><div class="tt">4 chỗ data đang LẪN — sửa TRƯỚC khi sinh chứng từ</div></div><div class="bd">
+    <table><thead><tr><th style="width:20%">Chỗ</th><th style="width:28%">Đang là (SAI)</th><th style="width:24%">Sửa thành</th><th>Sửa ở đâu</th></tr></thead><tbody>
+      <tr><td class="b">Số hóa đơn (Invoice No.)</td><td><span class="mk-fix">HA20260080/CI</span></td><td><b>HA20260075/CI</b></td><td>tab <b>Vận chuyển → Chỉnh sửa</b> → mục "Cước, Bảo hiểm &amp; Hóa đơn"</td></tr>
+      <tr><td class="b">Shipping mark riêng đơn</td><td><span class="mk-fix">BRIDGE V.377S</span> <span class="opt">(là tên TÀU của đơn GRI)</span></td><td><b>Để TRỐNG</b> → dùng mark hồ sơ ASIMCO</td><td>tab <b>Vận chuyển → Chỉnh sửa</b> → mục "Cảng" → ô "Shipping mark (riêng đơn này)"</td></tr>
+      <tr><td class="b">NH nhờ thu (D/P)</td><td><span class="mk-fix">THE ORDER OF HATTON NATIONAL BANK PLC</span> <span class="opt">(NH của GRI, Sri Lanka)</span></td><td><b>NH nhờ thu THẬT của ASIMCO</b> (China)</td><td>tab <b>Chứng từ → Mở trang Sinh chứng từ → Đơn chiết khấu</b> → ô "Ngân hàng nhờ thu (NH người mua)"</td></tr>
+      <tr><td class="b">Consignee (hồ sơ khách)</td><td><span class="mk-fix">THE ORDER OF HATTON NATIONAL BANK PLC</span></td><td><b>ASIMCO NVH … / "to order"</b> <span class="opt">(D/P dùng người mua, KHÔNG dùng NH)</span></td><td><b>Khách → ASIMCO → tab "Hồ sơ chứng từ"</b> → Card "Người mua &amp; Nhận hàng"</td></tr>
+    </tbody></table>
+    <div class="note">Hồ sơ khách ASIMCO còn để <b>Phương thức mặc định = L/C</b> trong khi đơn thật là <b>D/P</b> → nên đổi default sang <b>Nhờ thu D/P</b> (tab "Hồ sơ chứng từ" → Card "Chiết khấu / Thanh toán mặc định") để các lô sau tự đúng.</div>
+  </div></div>
+
+  <div class="card"><div class="hd"><div class="stepno" style="background:var(--purple)">0</div><div class="tt">Hồ sơ khách ASIMCO (Khách → tab "Hồ sơ chứng từ" → "Lưu hồ sơ")</div></div><div class="bd">
+    <table><thead><tr><th style="width:26%">Trường</th><th style="width:16%">Trạng thái</th><th>Giá trị</th></tr></thead><tbody>
+      <tr><td class="b">Buyer</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>ASIMCO NVH TECHNOLOGIES CO., LTD. (ANHUI)</td></tr>
+      <tr><td class="b">Consignee</td><td><span class="mk-fix">⚠ CẦN SỬA</span></td><td>Đang "THE ORDER OF HATTON NATIONAL BANK PLC" → D/P dùng <b>người mua ASIMCO / "to order"</b></td></tr>
+      <tr><td class="b">Shipping marks (base)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>ASIMCO NVH TECHNOLOGIES CO., LTD. (ANHUI)</td></tr>
+      <tr><td class="b">Ngân hàng thụ hưởng</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Vietinbank (SWIFT ICBVVNVX460)</td></tr>
+      <tr><td class="b">Phương thức mặc định</td><td><span class="mk-fix">⚠ NÊN SỬA</span></td><td>Đang <b>L/C</b> → đổi <b>Nhờ thu D/P</b> (đơn thật là D/P)</td></tr>
+    </tbody></table>
+  </div></div>
+
+  <div class="card"><div class="hd"><div class="stepno" style="background:var(--green)">1</div><div class="tt">Thông tin đơn (tab Hợp đồng → Chỉnh sửa)</div></div><div class="bd">
+    <table><thead><tr><th style="width:26%">Trường</th><th style="width:16%">Trạng thái</th><th>Giá trị</th></tr></thead><tbody>
+      <tr><td class="b">Grade · SL · Giá · Incoterm · Số HĐ</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>SVR10CV60 MIXTURE SBR1502 (97,5%+2,5%) · 403,2 tấn · $2.220 · CIF · HA20260075</td></tr>
+      <tr><td class="b">PO# khách</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>2026LUN1P</td></tr>
+      <tr><td class="b">Tổng trị giá</td><td><span class="mk-have">TỰ TÍNH</span></td><td>403,2 × 2.220 = <b>$895.104</b></td></tr>
+    </tbody></table>
+  </div></div>
+
+  <div class="card"><div class="hd"><div class="stepno" style="background:var(--teal)">2</div><div class="tt">Đóng gói — 20 container</div></div><div class="bd">
+    <div class="where">📍 tab "Đóng gói" → nút <b>"Quản lý đóng gói →"</b> (mở trang riêng) → bảng <b>"Chia lô giao hàng"</b> — gõ thẳng vào ô, tự lưu khi rời ô.</div>
+    <table><thead><tr><th style="width:26%">Chỉ tiêu</th><th style="width:16%">Trạng thái</th><th>Giá trị</th></tr></thead><tbody>
+      <tr><td class="b">Số container / seal (đủ 20)</td><td><span class="mk-fix">⚠ CẦN SỬA</span></td><td>Đang chỉ 5/20 cont, giá trị TEST ("contnumber1 / seal1") → nhập <b>số cont &amp; seal thật, đủ 20 cont</b></td></tr>
+      <tr><td class="b">Bành · Net / container</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>576 bành × 35 kg = <b>20.160 kg net/cont</b> (20 cont = 11.520 bành / 403.200 kg)</td></tr>
+      <tr><td class="b">Tare · Gross từng cont</td><td><span class="mk-fill">CẦN NHẬP</span></td><td>Nhập số cân thật ở trạm (bành cao su thường để Gross = Net)</td></tr>
+    </tbody></table>
+  </div></div>
+
+  <div class="card"><div class="hd"><div class="stepno" style="background:var(--amber)">3</div><div class="tt">Vận chuyển (tab Vận chuyển → Chỉnh sửa)</div></div><div class="bd">
+    <table><thead><tr><th style="width:26%">Trường</th><th style="width:16%">Trạng thái</th><th>Giá trị</th></tr></thead><tbody>
+      <tr><td class="b">Hãng tàu · Tàu · Booking</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>SITC CONTAINER LINES · YOUCAN · ETUDADSHA020681</td></tr>
+      <tr><td class="b">Cảng xếp (POL) · Cảng đến (POD)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Đà Nẵng · SHANGHAI, CHINA</td></tr>
+      <tr><td class="b">ETD · ETA</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>16/08/2026 · 23/08/2026</td></tr>
+      <tr><td class="b">Cước · Phí bảo hiểm (CIF)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Cước <b>6.250</b> · BH <b>105,80</b> → hệ trừ ra <b>THE COST 888.748,20</b> (Hối phiếu draw số này)</td></tr>
+      <tr><td class="b">Số hóa đơn · Ngày HĐ</td><td><span class="mk-fix">⚠ CẦN SỬA</span></td><td>Đang <b>HA20260080/CI</b> → sửa <b>HA20260075/CI</b> · ngày 14/08/2026</td></tr>
+      <tr><td class="b">Shipping mark (riêng đơn)</td><td><span class="mk-fix">⚠ CẦN SỬA</span></td><td>Đang "BRIDGE V.377S" (tàu đơn GRI) → <b>để trống</b> để dùng mark hồ sơ</td></tr>
+      <tr><td class="b">B/L số · ngày</td><td><span class="mk-fill">CẦN NHẬP</span></td><td>Nhập khi hãng tàu cấp B/L</td></tr>
+      <tr><td class="b">Ngày Proforma (PI)</td><td><span class="mk-fill">CẦN NHẬP</span></td><td>Nhập nếu có PI (kẻo Invoice thiếu dòng "DATED")</td></tr>
+    </tbody></table>
+  </div></div>
+
+  <div class="card"><div class="hd"><div class="stepno" style="background:var(--blue)">4</div><div class="tt">Chiết khấu — D/P (tab Chứng từ → Sinh chứng từ → Đơn chiết khấu)</div></div><div class="bd">
+    <table><thead><tr><th style="width:26%">Trường</th><th style="width:16%">Trạng thái</th><th>Giá trị</th></tr></thead><tbody>
+      <tr><td class="b">Phương thức</td><td><span class="mk-have">ĐÃ CHỌN</span></td><td><b>Nhờ thu D/P</b> → mẫu <b>BM08</b></td></tr>
+      <tr><td class="b">NH chiết khấu (của Huy Anh)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Vietinbank (ICBVVNVX460)</td></tr>
+      <tr><td class="b">NH nhờ thu (của ASIMCO)</td><td><span class="mk-fix">⚠ CẦN SỬA</span></td><td>Đang "THE ORDER OF HATTON NATIONAL BANK PLC" → nhập <b>NH nhờ thu THẬT của ASIMCO</b> (China)</td></tr>
+      <tr><td class="b">Số L/C · Ngày L/C</td><td><span class="opt">bỏ trống</span></td><td>D/P không có L/C (ô tự khóa khi chọn D/P)</td></tr>
+      <tr><td class="b">Kỳ hạn · % thương lượng · Lãi</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>90 ngày · 90% · 5%/năm</td></tr>
+    </tbody></table>
+  </div></div>
+
+  <div class="card"><div class="hd"><div class="stepno" style="background:#555">5</div><div class="tt">Đính kèm (Checklist chứng từ)</div></div><div class="bd">
+    Upload: <b>COA</b> (LAB) · <b>B/L</b> (scan) · <b>C/O Form B</b> · <b>Insurance</b> (CIF) · Phyto/Fumigation (nếu có).
+  </div></div>
+
+  <h2>Kết quả kỳ vọng (HA20260075) — sau khi sửa 4 chỗ lẫn</h2>
+  <div class="card"><div class="bd"><ul class="clean">
+    <li><b>Commercial Invoice:</b> No <b>HA20260075/CI</b> · Buyer ASIMCO NVH · CIF Shanghai · 403,2 MT SVR10CV60 mixture @ 2.220 = <b>895.104</b> · Vessel YOUCAN · POL Đà Nẵng · POD Shanghai · PO 2026LUN1P.</li>
+    <li><b>Invoice → THE COST:</b> 895.104 − Cước 6.250 − BH 105,80 = <b>THE COST 888.748,20</b>.</li>
+    <li><b>Packing List / Weight List:</b> 20 cont × (576 bành / 20.160 kg) · tổng 11.520 bành · <b>403.200 KGS</b>.</li>
+    <li><b>Đơn chiết khấu:</b> mẫu <b>BM08</b> (Nhờ thu D/P · URC 522) · NH nhờ thu của ASIMCO · chiết khấu 90% · kỳ hạn 90 ngày.</li>
+    <li><b>Hối phiếu:</b> <b>Drawn ON</b> ASIMCO NVH (người mua) · <b>AT SIGHT</b> · <b>KHÔNG có L/C</b> · FOR USD <b>888.748,20</b> (= THE COST).</li>
+  </ul>
+  <div class="note">⚠ Nếu KHÔNG sửa 4 chỗ lẫn ở trên, bộ chứng từ sẽ in ra <b>số hóa đơn HA20260080</b>, <b>consignee/NH Hatton (Sri Lanka)</b> và <b>shipping mark "BRIDGE V.377S"</b> — sai hoàn toàn cho lô ASIMCO.</div>
+  </div></div>
+
   <div class="foot">
     Huy Anh Rubber ERP · huyanhrubber.vn · Module Đơn hàng bán → Bộ chứng từ xuất khẩu<br>
-    Báo cáo tổng quan: <code>docs/BAO_CAO_TONG_QUAN_BO_CHUNG_TU.html</code> · Hướng dẫn cập nhật 07/08/2026 · Đơn mẫu: HA20260080 (L/C) · HA20260087 (D/P)
+    Báo cáo tổng quan: <code>docs/BAO_CAO_TONG_QUAN_BO_CHUNG_TU.html</code> · Cập nhật 11/08/2026 · Đơn mẫu: HA20260080 (L/C) · HA20260087 (D/P) · HA20260075 (D/P — kiểm &amp; sửa data lẫn)
   </div>
 
 </div>

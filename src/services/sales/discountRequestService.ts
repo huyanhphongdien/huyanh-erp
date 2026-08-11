@@ -23,6 +23,40 @@ const ddmmyyyy = (s: string | null | undefined): string => {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
 }
 
+// Đọc số tiền ra CHỮ tiếng Việt (cho ô "Bằng chữ" trên ĐNCK) — bỏ lẻ xu, làm tròn.
+const VI_ONES = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
+function readVi3(n: number, full: boolean): string {
+  const tr = Math.floor(n / 100), ch = Math.floor((n % 100) / 10), dv = n % 10
+  let s = ''
+  if (tr > 0 || full) s += VI_ONES[tr] + ' trăm'
+  if (ch === 0) {
+    if (dv > 0) s += (s ? ' lẻ ' : '') + VI_ONES[dv]
+  } else if (ch === 1) {
+    s += (s ? ' ' : '') + 'mười'
+    if (dv === 5) s += ' lăm'; else if (dv > 0) s += ' ' + VI_ONES[dv]
+  } else {
+    s += (s ? ' ' : '') + VI_ONES[ch] + ' mươi'
+    if (dv === 1) s += ' mốt'; else if (dv === 5) s += ' lăm'; else if (dv > 0) s += ' ' + VI_ONES[dv]
+  }
+  return s.trim()
+}
+/** VD: amountToWordsVi(216405) → "Hai trăm mười sáu nghìn bốn trăm lẻ năm đô la Mỹ". */
+function amountToWordsVi(amount: number | null | undefined, currency = 'đô la Mỹ'): string {
+  let n = Math.round(amount || 0)
+  if (n <= 0) return ''
+  const units = ['', ' nghìn', ' triệu', ' tỷ']
+  const groups: number[] = []
+  while (n > 0) { groups.push(n % 1000); n = Math.floor(n / 1000) }
+  const parts: string[] = []
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i] === 0 && parts.length > 0) continue   // bỏ nhóm 0 ở đuôi (vd tròn triệu)
+    parts.push(readVi3(groups[i], i < groups.length - 1) + units[i])
+  }
+  let s = parts.join(' ').replace(/\s+/g, ' ').trim()
+  s = s.charAt(0).toUpperCase() + s.slice(1)
+  return currency ? `${s} ${currency}` : s
+}
+
 /** Field nhập riêng cho form ĐNCK (lưu ở negotiation.dnck_fields). */
 export type DnckFields = Record<string, string>
 
@@ -114,7 +148,7 @@ export async function buildDnckData(orderId: string, lotNo = 0) {
     applicant_addr2: df.applicant_addr2 || addrLines[1] || '',
     applicant_addr3: df.applicant_addr3 || addrLines[2] || '',
     negotiate_amount: negAmount != null ? money(negAmount) : '',
-    negotiate_amount_words: df.negotiate_amount_words || '',
+    negotiate_amount_words: df.negotiate_amount_words || (negAmount != null ? amountToWordsVi(negAmount, 'đô la Mỹ') : ''),
     term_days: neg?.term_days != null ? String(neg.term_days) : '',
     secured_amount_vnd: df.secured_amount_vnd || '',
   }
@@ -159,7 +193,8 @@ export async function buildDnckDataDP(orderId: string, lotNo = 0) {
     buyer_name: df.buyer_name || inv.buyer_name,
     buyer_addr: df.buyer_addr || buyerAddr,
     discount_amount: negAmount != null ? money(negAmount) : '',
-    discount_amount_words: df.discount_amount_words || '',
+    // template D/P đã có sẵn " đô la Mỹ" tĩnh sau chỗ này → chỉ điền phần CHỮ SỐ
+    discount_amount_words: df.discount_amount_words || (negAmount != null ? amountToWordsVi(negAmount, '') : ''),
     negotiate_pct: pct != null ? String(pct) : '',
     term_days: neg?.term_days != null ? String(neg.term_days) : '',
   }

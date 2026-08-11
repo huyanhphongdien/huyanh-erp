@@ -1035,7 +1035,7 @@ const ExportDocumentsPage = () => {
         {contIncomplete && (
           <Tag color="warning">{nCont === 0 ? 'Chưa có container' : `${nCont - nReal}/${nCont} cont còn TBD`}</Tag>
         )}
-        <Button size="small" type="primary" ghost style={{ borderColor: '#1B4D3E', color: '#1B4D3E' }}
+        <Button size="small" type="primary" style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           onClick={() => setQuickGroup('packing')}>Chia lô / Nhập container</Button>
         <Button size="small" type="link" style={{ padding: 0 }}
           onClick={() => openFullTab('packing')}>Mở tab Đóng gói ↗</Button>

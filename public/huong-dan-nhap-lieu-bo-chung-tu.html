@@ -160,8 +160,8 @@
       <tr><td class="b">Đơn chiết khấu (mẫu)</td><td><span class="doc">BM03</span> — thương lượng L/C</td><td><span class="doc">BM08</span> — Hối phiếu kèm bộ CT, TRỪ L/C</td></tr>
       <tr><td class="b">Ngân hàng đối tác</td><td>NH <b>phát hành L/C</b> (của người mua)</td><td>NH <b>nhờ thu</b> = NH của người mua</td></tr>
       <tr><td class="b">Consignee (trên B/L)</td><td><b>THE ORDER OF {NH phát hành}</b> — tự suy mỗi đơn</td><td>Người mua / "to order" (theo hồ sơ khách)</td></tr>
-      <tr><td class="b">Hối phiếu (BOE)</td><td>Drawn <b>under</b> {NH phát hành} · có <b>số L/C</b> · kỳ hạn L/C</td><td>Drawn <b>on</b> {người mua} · <b>AT SIGHT</b> · <b>KHÔNG L/C</b></td></tr>
-      <tr><td class="b">Số tiền đòi (draw)</td><td>THE COST</td><td>THE COST</td></tr>
+      <tr><td class="b">Hối phiếu (BOE)</td><td>Drawn <b>under</b> {NH phát hành} · có <b>số L/C</b> · <b>TO = NH phát hành</b></td><td><b>AT SIGHT</b> · kèm khối <b>NH nhờ thu</b> (tên · địa chỉ · SWIFT) · <b>TO = người mua</b> · KHÔNG L/C</td></tr>
+      <tr><td class="b">Số tiền đòi (draw)</td><td><b>THE COST</b> (CIF − cước − BH)</td><td><b>Tổng CIF</b> (trị giá Invoice, KHÔNG trừ cước/BH)</td></tr>
       <tr><td class="b">Quy tắc quốc tế</td><td>UCP 600</td><td><b>URC 522</b></td></tr>
       <tr><td class="b">Rủi ro cho người bán</td><td><span class="badge ok">Thấp</span> — NH cam kết trả</td><td><span class="badge warn">Cao hơn</span> — người mua có thể không nhận</td></tr>
     </tbody>
@@ -249,7 +249,7 @@
           <tr><td class="b">Shipping mark (riêng đơn này) <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="opt">Trống → dùng hồ sơ</span></td><td><span class="doc">Invoice</span> <span class="doc">PKL</span> — chỉ nhập nếu đơn khác hồ sơ (grade/số HĐ/lô)</td></tr>
         </tbody>
       </table>
-      <div class="note">⚠️ <b>CIF: NÊN NHẬP Cước &amp; Bảo hiểm</b> — đơn giá đã là giá CIF, nên cước/BH sẽ <b>TRỪ khỏi TOTAL để ra "THE COST"</b> (số tiền Hối phiếu draw), khớp mẫu gốc. (FOB: để trống.) · <b>Số hóa đơn</b> để trống hệ tự dùng <code>INV-&lt;mã đơn&gt;</code>; ngày trống → ngày hôm nay.</div>
+      <div class="note">⚠️ <b>CIF: NÊN NHẬP Cước &amp; Bảo hiểm</b> — đơn giá đã là giá CIF, cước/BH sẽ <b>TRỪ khỏi TOTAL để ra dòng "THE COST" (FOB)</b> trên Invoice. (FOB: để trống.) · <b>Hối phiếu:</b> <b>L/C</b> draw = THE COST; <b>D/P</b> draw = <b>tổng CIF</b> (trị giá Invoice). · <b>Số hóa đơn</b> để trống hệ tự dùng <code>INV-&lt;mã đơn&gt;</code>; ngày trống → ngày hôm nay.</div>
     </div>
   </div>
 
@@ -417,7 +417,7 @@
       <tr><td class="b">Số L/C · Ngày L/C</td><td><span class="opt">bỏ trống</span> (D/P không có L/C)</td></tr>
       <tr><td class="b">Người mua (từ hồ sơ/đơn)</td><td>QINGDAO JINTONG TRADING CO., LTD</td></tr>
       <tr><td class="b">Số · Ngày hóa đơn</td><td>HA20260087/CI · 05/08/2026</td></tr>
-      <tr><td class="b">Giá trị · THE COST</td><td>TOTAL <b>239,925</b> → (trừ cước/BH) → THE COST <b>227,928.75</b></td></tr>
+      <tr><td class="b">Số tiền Hối phiếu (D/P)</td><td>= <b>tổng CIF 239,925</b> (trị giá Invoice, KHÔNG trừ cước/BH)</td></tr>
       <tr><td class="b">Consignee</td><td><span class="mk-have">HỒ SƠ</span> Người mua / "to order" — <b>KHÔNG</b> "THE ORDER OF NH phát hành" (đó là kiểu L/C)</td></tr>
     </tbody></table>
   </div></div>
@@ -425,7 +425,7 @@
   <h2>Kết quả D/P — khác L/C ở đâu</h2>
   <div class="card"><div class="bd"><ul class="clean">
     <li><b>Đơn chiết khấu:</b> mẫu <b>BM08</b> (không phải BM03) — Nhờ thu D/P URC 522 · NH nhờ thu Bank of Qingdao · giá trị Hối phiếu <b>227,928.75</b> · cam kết xuất trình 15 ngày.</li>
-    <li><b>Hối phiếu:</b> <b>Drawn ON</b> QINGDAO JINTONG (người mua) · <b>AT SIGHT</b> · <b>KHÔNG có L/C</b> · TO Bank of Qingdao · FOR USD <b>227,928.75</b>.</li>
+    <li><b>Hối phiếu:</b> <b>AT SIGHT</b> · The collecting bank's name = <b>Bank of Qingdao</b> · <b>TO = QINGDAO JINTONG</b> (người mua) · KHÔNG L/C · FOR USD <b>239,925</b> (= tổng CIF).</li>
     <li><b>Các chứng từ còn lại</b> (Invoice · Packing List · Weight List · COA · 2 Certificate) làm <b>giống hệt</b> đơn L/C.</li>
   </ul>
   <div class="note">🔑 Chỉ cần đổi <b>Phương thức = D/P</b> ở tab Đơn chiết khấu → hệ tự đổi mẫu đơn (BM08) + Hối phiếu (drawn on người mua, AT SIGHT). Consignee tự dùng hồ sơ khách (không suy theo NH như L/C).</div>
@@ -441,7 +441,7 @@
     <table><thead><tr><th style="width:20%">Chỗ</th><th style="width:28%">Đang là (SAI)</th><th style="width:24%">Sửa thành</th><th>Sửa ở đâu</th></tr></thead><tbody>
       <tr><td class="b">Số hóa đơn (Invoice No.)</td><td><span class="mk-fix">HA20260080/CI</span></td><td><b>HA20260075/CI</b></td><td>tab <b>Vận chuyển → Chỉnh sửa</b> → mục "Cước, Bảo hiểm &amp; Hóa đơn"</td></tr>
       <tr><td class="b">Shipping mark riêng đơn</td><td><span class="mk-fix">BRIDGE V.377S</span> <span class="opt">(là tên TÀU của đơn GRI)</span></td><td><b>Để TRỐNG</b> → dùng mark hồ sơ ASIMCO</td><td>tab <b>Vận chuyển → Chỉnh sửa</b> → mục "Cảng" → ô "Shipping mark (riêng đơn này)"</td></tr>
-      <tr><td class="b">NH nhờ thu (D/P)</td><td><span class="mk-fix">THE ORDER OF HATTON NATIONAL BANK PLC</span> <span class="opt">(NH của GRI, Sri Lanka)</span></td><td><b>NH nhờ thu THẬT của ASIMCO</b> (China)</td><td>tab <b>Chứng từ → Mở trang Sinh chứng từ → Đơn chiết khấu</b> → ô "Ngân hàng nhờ thu (NH người mua)"</td></tr>
+      <tr><td class="b">NH nhờ thu (D/P)</td><td><span class="mk-fix">THE ORDER OF HATTON NATIONAL BANK PLC</span> <span class="opt">(NH của GRI, Sri Lanka)</span></td><td><span class="mk-have">✅ ĐÃ SỬA</span> <b>ICBC XUANCHENG</b> · SWIFT ICBKCNBJAHI (+ địa chỉ)</td><td>tab <b>Chứng từ → Mở trang Sinh chứng từ → Đơn chiết khấu</b> → ô "Ngân hàng nhờ thu" + "Địa chỉ" + "SWIFT"</td></tr>
       <tr><td class="b">Consignee (hồ sơ khách)</td><td><span class="mk-fix">THE ORDER OF HATTON NATIONAL BANK PLC</span></td><td><b>ASIMCO NVH … / "to order"</b> <span class="opt">(D/P dùng người mua, KHÔNG dùng NH)</span></td><td><b>Khách → ASIMCO → tab "Hồ sơ chứng từ"</b> → Card "Người mua &amp; Nhận hàng"</td></tr>
     </tbody></table>
     <div class="note">Hồ sơ khách ASIMCO còn để <b>Phương thức mặc định = L/C</b> trong khi đơn thật là <b>D/P</b> → nên đổi default sang <b>Nhờ thu D/P</b> (tab "Hồ sơ chứng từ" → Card "Chiết khấu / Thanh toán mặc định") để các lô sau tự đúng.</div>
@@ -491,7 +491,7 @@
     <table><thead><tr><th style="width:26%">Trường</th><th style="width:16%">Trạng thái</th><th>Giá trị</th></tr></thead><tbody>
       <tr><td class="b">Phương thức</td><td><span class="mk-have">ĐÃ CHỌN</span></td><td><b>Nhờ thu D/P</b> → mẫu <b>BM08</b></td></tr>
       <tr><td class="b">NH chiết khấu (của Huy Anh)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Vietinbank (ICBVVNVX460)</td></tr>
-      <tr><td class="b">NH nhờ thu (của ASIMCO)</td><td><span class="mk-fix">⚠ CẦN SỬA</span></td><td>Đang "THE ORDER OF HATTON NATIONAL BANK PLC" → nhập <b>NH nhờ thu THẬT của ASIMCO</b> (China)</td></tr>
+      <tr><td class="b">NH nhờ thu (của ASIMCO)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td><b>INDUSTRIAL AND COMMERCIAL BANK OF CHINA, XUANCHENG BR</b> · SWIFT <b>ICBKCNBJAHI</b> (tên + địa chỉ + SWIFT đã điền → lên Hối phiếu)</td></tr>
       <tr><td class="b">Số L/C · Ngày L/C</td><td><span class="opt">bỏ trống</span></td><td>D/P không có L/C (ô tự khóa khi chọn D/P)</td></tr>
       <tr><td class="b">Kỳ hạn · % thương lượng · Lãi</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>90 ngày · 90% · 5%/năm</td></tr>
     </tbody></table>
@@ -504,10 +504,10 @@
   <h2>Kết quả kỳ vọng (HA20260075) — sau khi sửa 4 chỗ lẫn</h2>
   <div class="card"><div class="bd"><ul class="clean">
     <li><b>Commercial Invoice:</b> No <b>HA20260075/CI</b> · Buyer ASIMCO NVH · CIF Shanghai · 403,2 MT SVR10CV60 mixture @ 2.220 = <b>895.104</b> · Vessel YOUCAN · POL Đà Nẵng · POD Shanghai · PO 2026LUN1P.</li>
-    <li><b>Invoice → THE COST:</b> 895.104 − Cước 6.250 − BH 105,80 = <b>THE COST 888.748,20</b>.</li>
+    <li><b>Invoice:</b> TOTAL <b>895.104</b> (CIF) → dòng FOB "THE COST" = 895.104 − Cước 6.250 − BH 105,80 = <b>888.748,20</b>.</li>
     <li><b>Packing List / Weight List:</b> 20 cont × (576 bành / 20.160 kg) · tổng 11.520 bành · <b>403.200 KGS</b>.</li>
     <li><b>Đơn chiết khấu:</b> mẫu <b>BM08</b> (Nhờ thu D/P · URC 522) · NH nhờ thu của ASIMCO · chiết khấu 90% · kỳ hạn 90 ngày.</li>
-    <li><b>Hối phiếu:</b> <b>Drawn ON</b> ASIMCO NVH (người mua) · <b>AT SIGHT</b> · <b>KHÔNG có L/C</b> · FOR USD <b>888.748,20</b> (= THE COST).</li>
+    <li><b>Hối phiếu (D/P):</b> <b>AT SIGHT</b> · The collecting bank's name = <b>ICBC XUANCHENG</b> (+ địa chỉ + SWIFT ICBKCNBJAHI) · <b>TO = ASIMCO NVH</b> (người mua) · KHÔNG L/C · FOR USD <b>895.104</b> (= <b>tổng CIF</b>, KHÔNG trừ cước/BH).</li>
   </ul>
   <div class="note">⚠ Nếu KHÔNG sửa 4 chỗ lẫn ở trên, bộ chứng từ sẽ in ra <b>số hóa đơn HA20260080</b>, <b>consignee/NH Hatton (Sri Lanka)</b> và <b>shipping mark "BRIDGE V.377S"</b> — sai hoàn toàn cho lô ASIMCO.</div>
   </div></div>

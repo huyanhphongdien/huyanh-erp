@@ -272,7 +272,7 @@ export default function LcNegotiationTab(
 
       {/* ── Đơn ĐNCK theo FORM VIETINBANK (điền template .docx) — chỉ L/C ── */}
       {!isDP && (
-        <Collapse style={{ marginBottom: 16 }} items={[{
+        <Collapse defaultActiveKey={['dnck']} style={{ marginBottom: 16 }} items={[{
           key: 'dnck',
           label: <span><BankOutlined /> <b>Đơn ĐNCK Vietinbank (BM08A)</b> — điền form ngân hàng chuẩn (.docx)</span>,
           children: (
@@ -309,7 +309,7 @@ export default function LcNegotiationTab(
 
       {/* ── Đơn ĐNCK D/P (BM08 nhờ thu — trừ L/C) — điền template .docx ── */}
       {isDP && (
-        <Collapse style={{ marginBottom: 16 }} items={[{
+        <Collapse defaultActiveKey={['dnck-dp']} style={{ marginBottom: 16 }} items={[{
           key: 'dnck-dp',
           label: <span><BankOutlined /> <b>Đơn ĐNCK Vietinbank — Nhờ thu D/P (BM08)</b> — điền form ngân hàng chuẩn (.docx)</span>,
           children: (
@@ -451,10 +451,10 @@ export default function LcNegotiationTab(
               : lcNegotiationDoc({ ...common, issuingBank: v.issuing_bank || '', lcNumber: v.lc_number || '',
                   lcDate: v.lc_date ? dayjs(v.lc_date).format('DD/MM/YYYY') : '' })
             saveDocx(doc, `${soDisplayCode(order)}_${isDP ? 'CK-DP' : 'DNCK'}${lotNo ? `_L${lotNo}` : ''}`).catch(() => message.error('Lỗi xuất Word'))
-          }}>Tải Word (.docx)</Button>
+          }}>Tải bản NỘI BỘ (.docx)</Button>
         </Space>
-        <div style={{ fontSize: 12, color: '#874d00', marginTop: 8 }}>
-          Đây là bản <b>own-format</b> của Huy Anh (xem trước ở trên). <b>Form ngân hàng Vietinbank chuẩn</b> (điền các ô override) tải ở panel <b>"{isDP ? 'Đơn ĐNCK Nhờ thu D/P (BM08)' : 'Đơn ĐNCK Vietinbank (BM08A)'}"</b> phía trên.
+        <div style={{ fontSize: 12.5, color: '#874d00', marginTop: 8, fontWeight: 500 }}>
+          ⚠ Đây là <b>bản nội bộ rút gọn</b> của Huy Anh (bản xem trước ở trên). Để nộp <b>NGÂN HÀNG</b> phải dùng <b>form Vietinbank chuẩn</b> — bấm nút xanh <b>"{isDP ? 'Tải đơn ĐNCK Nhờ thu D/P (.docx)' : 'Tải đơn ĐNCK Vietinbank (.docx)'}"</b> ở panel <b>"{isDP ? 'Đơn ĐNCK Nhờ thu D/P (BM08)' : 'Đơn ĐNCK Vietinbank (BM08A)'}"</b> phía trên.
         </div>
       </div>
     </div>

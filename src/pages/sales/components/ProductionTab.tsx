@@ -128,15 +128,15 @@ export default function ProductionTab({ order, salesRole, editable, onSaved }: P
               icon={<ThunderboltOutlined />}
               style={{ marginTop: 12 }}
               message="Tạo lệnh sản xuất cho đơn này"
-              description="Tạo lệnh SX cần chọn các lô NVL (batch) trong kho. Mở trang chi tiết đầy đủ để check NVL và tạo lệnh."
+              description="Tạo lệnh SX cần chọn các lô NVL (batch) trong kho. Mở trang Sản xuất để check NVL và tạo lệnh."
               action={
                 <Button
                   type="primary"
                   icon={<ArrowRightOutlined />}
-                  onClick={() => navigate(`/sales/orders/${order.id}?tab=production`)}
+                  onClick={() => navigate(`/sales/orders/${order.id}/production`)}
                   style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
                 >
-                  Mở trang chi tiết
+                  Mở trang Sản xuất
                 </Button>
               }
             />

@@ -245,12 +245,13 @@
           <tr><td class="b">B/L Number · B/L Type · Ngày B/L <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="req">Bắt buộc</span></td><td><span class="doc">Invoice</span> <span class="doc">WL</span> <span class="doc">Hối phiếu</span></td></tr>
           <tr><td class="b">Cảng xếp (POL) · Cảng đến (POD) · Cảng dỡ <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="req">Bắt buộc</span></td><td><span class="doc">Invoice</span> <span class="doc">PKL</span> <span class="doc">WL</span></td></tr>
           <tr><td class="b">ETD · ETA · Cutoff</td><td><span class="req">Bắt buộc</span></td><td><span class="doc">Invoice</span> <span class="doc">PKL</span> <span class="doc">WL</span></td></tr>
-          <tr><td class="b">Cước vận chuyển (USD) · Phí bảo hiểm (USD) <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="opt">Chỉ khi CFR/CIF</span></td><td><span class="doc">Invoice</span></td></tr>
+          <tr><td class="b">Cước vận chuyển (USD) · Phí bảo hiểm (USD) <span style="color:var(--green);font-size:11px">MỚI</span> — có nút <b>"Tính tự động"</b></td><td><span class="opt">Chỉ khi CFR/CIF</span></td><td><span class="doc">Invoice</span></td></tr>
           <tr><td class="b">Số hóa đơn · Ngày hóa đơn <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="opt">Để trống → tự sinh</span></td><td><span class="doc">Invoice</span> <span class="doc">Hối phiếu</span></td></tr>
           <tr><td class="b">Shipping mark (riêng đơn này) <span style="color:var(--green);font-size:11px">MỚI</span></td><td><span class="opt">Trống → dùng hồ sơ</span></td><td><span class="doc">Invoice</span> <span class="doc">PKL</span> — chỉ nhập nếu đơn khác hồ sơ (grade/số HĐ/lô)</td></tr>
         </tbody>
       </table>
       <div class="note">⚠️ <b>CIF: NÊN NHẬP Cước &amp; Bảo hiểm</b> — đơn giá đã là giá CIF, cước/BH sẽ <b>TRỪ khỏi TOTAL để ra dòng "THE COST" (FOB)</b> trên Invoice. (FOB: để trống.) · <b>Hối phiếu:</b> <b>L/C</b> draw = THE COST; <b>D/P</b> draw = <b>tổng CIF</b> (trị giá Invoice). · <b>Số hóa đơn</b> để trống hệ tự dùng <code>INV-&lt;mã đơn&gt;</code>; ngày trống → ngày hôm nay.</div>
+      <div class="note" style="border-color:var(--blue)">⚡ <b>Nút "Tính tự động"</b> (cạnh ô Cước/Bảo hiểm) điền theo công thức: <b>Bảo hiểm = trị giá CIF × 1,1 × 0,04% × 1,1</b> (giá trị BH 110% × phí 0,04% × VAT 10%) · <b>Cước = $5 × số cont</b>. Số tự tính — <b>kiểm tra lại</b> (sửa cước nếu tuyến khác) rồi mới Lưu.</div>
     </div>
   </div>
 
@@ -471,7 +472,7 @@
       <tr><td class="b">Hãng tàu · Tàu · Booking</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>SITC CONTAINER LINES · YOUCAN · ETUDADSHA020681</td></tr>
       <tr><td class="b">Cảng xếp (POL) · Cảng đến (POD)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Đà Nẵng · SHANGHAI, CHINA</td></tr>
       <tr><td class="b">ETD · ETA</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>16/08/2026 · 23/08/2026</td></tr>
-      <tr><td class="b">Cước · Phí bảo hiểm (CIF)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Cước <b>6.250</b> · BH <b>105,80</b> → dòng FOB "THE COST" 888.748,20 trên Invoice. <b>Hối phiếu D/P draw TỔNG CIF 895.104.</b></td></tr>
+      <tr><td class="b">Cước · Phí bảo hiểm (CIF)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Cước <b>$100</b> (20×$5) · BH <b>$433,23</b> = 895.104 × 1,1 × 0,04% × 1,1 — bấm <b>"Tính tự động"</b> rồi kiểm tra. → dòng FOB "THE COST" = <b>894.570,77</b>. <b>Hối phiếu D/P vẫn draw TỔNG CIF 895.104.</b></td></tr>
       <tr><td class="b">Số hóa đơn · Ngày HĐ</td><td><span class="mk-have">ĐÃ CÓ</span></td><td><b>HA20260075/CI</b> · ngày 14/08/2026</td></tr>
       <tr><td class="b">Shipping mark (riêng đơn)</td><td><span class="mk-have">ĐÃ CÓ</span></td><td>Để trống → dùng mark hồ sơ ASIMCO</td></tr>
       <tr><td class="b">B/L số · ngày</td><td><span class="mk-fill">CẦN NHẬP</span></td><td>Nhập khi hãng tàu cấp B/L</td></tr>
@@ -496,7 +497,7 @@
   <h2>Kết quả kỳ vọng (HA20260075)</h2>
   <div class="card"><div class="bd"><ul class="clean">
     <li><b>Commercial Invoice:</b> No <b>HA20260075/CI</b> · Buyer ASIMCO NVH · CIF Shanghai · 403,2 MT SVR10CV60 mixture @ 2.220 = <b>895.104</b> · Vessel YOUCAN · POL Đà Nẵng · POD Shanghai · PO 2026LUN1P.</li>
-    <li><b>Invoice:</b> TOTAL <b>895.104</b> (CIF) → dòng FOB "THE COST" = 895.104 − Cước 6.250 − BH 105,80 = <b>888.748,20</b>.</li>
+    <li><b>Invoice:</b> TOTAL <b>895.104</b> (CIF) → dòng FOB "THE COST" = 895.104 − Cước 100 − BH 433,23 = <b>894.570,77</b>.</li>
     <li><b>Packing List / Weight List:</b> 20 cont × (576 bành / 20.160 kg) · tổng 11.520 bành · <b>403.200 KGS</b>.</li>
     <li><b>Đơn chiết khấu:</b> mẫu <b>BM08</b> (Nhờ thu D/P · URC 522) · NH nhờ thu của ASIMCO · chiết khấu 90% · kỳ hạn 90 ngày.</li>
     <li><b>Hối phiếu (D/P):</b> <b>AT SIGHT</b> · The collecting bank's name = <b>ICBC XUANCHENG</b> (+ địa chỉ + SWIFT ICBKCNBJAHI) · <b>TO = ASIMCO NVH</b> (người mua) · KHÔNG L/C · FOR USD <b>895.104</b> (= <b>tổng CIF</b>, KHÔNG trừ cước/BH).</li>

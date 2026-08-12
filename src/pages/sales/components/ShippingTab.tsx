@@ -24,6 +24,7 @@ import {
   SaveOutlined,
   CloseOutlined,
   WarningOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { salesOrderService } from '../../../services/sales/salesOrderService'
@@ -331,13 +332,26 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
 
         {/* Cước & Bảo hiểm (CIF/CFR) + Hóa đơn thương mại */}
         <SectionHeader title="Cước, Bảo hiểm & Hóa đơn (cho Invoice)" color="#1257a8" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+          <Button size="small" icon={<ThunderboltOutlined />} onClick={() => {
+            const cont = order.container_count || 0
+            // Bảo hiểm = trị giá CIF × 110% (giá trị bảo hiểm) × 0,04% (phí) × 1,1 (VAT 10%)
+            const insurance = Math.round(totalUSD * 1.1 * 0.0004 * 1.1 * 100) / 100
+            const freight = 5 * cont   // $5 / container (sửa lại nếu đơn giá cước khác)
+            form.setFieldsValue({ insurance_amount: insurance, freight_amount: freight })
+            message.success(`Đã tính: BH $${insurance} · cước $${freight} (${cont} cont × $5)`)
+          }}>Tính tự động</Button>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>
+            BH = trị giá CIF × 1,1 × 0,04% × 1,1 · Cước = $5 × số cont <i>(sửa lại nếu đơn giá cước khác)</i>
+          </span>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
           <Form.Item label="Cước vận chuyển (USD)" name="freight_amount"
             tooltip="CIF/CFR: nhập cước — sẽ TRỪ khỏi trị giá CIF để ra 'THE COST' (số Hối phiếu draw)">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
           </Form.Item>
           <Form.Item label="Phí bảo hiểm (USD)" name="insurance_amount"
-            tooltip="CIF: nhập phí bảo hiểm — sẽ TRỪ khỏi trị giá CIF để ra 'THE COST'">
+            tooltip="Tự tính: trị giá CIF × 1,1 × 0,04% × 1,1 (giá trị BH 110% × phí 0,04% × VAT 10%). Bấm 'Tính tự động' hoặc nhập tay.">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
           </Form.Item>
           <Form.Item label="Số hóa đơn (Invoice No.)" name="invoice_no"

@@ -339,10 +339,10 @@ export default function ShippingTab({ order, salesRole, editable, onSaved }: Pro
             const insurance = Math.round(totalUSD * 1.1 * 0.0004 * 1.1 * 100) / 100
             const freight = 5 * cont   // $5 / container (sửa lại nếu đơn giá cước khác)
             form.setFieldsValue({ insurance_amount: insurance, freight_amount: freight })
-            message.success(`Đã tính: BH $${insurance} · cước $${freight} (${cont} cont × $5)`)
+            message.info(`Đã tính theo công thức: BH $${insurance} · cước $${freight} (${cont} cont × $5) — hãy KIỂM TRA LẠI rồi mới Lưu.`)
           }}>Tính tự động</Button>
           <span style={{ fontSize: 12, color: '#6b7280' }}>
-            BH = trị giá CIF × 1,1 × 0,04% × 1,1 · Cước = $5 × số cont <i>(sửa lại nếu đơn giá cước khác)</i>
+            BH = trị giá CIF × 1,1 × 0,04% × 1,1 · Cước = $5 × số cont · <b style={{ color: '#b9770e' }}>số tự tính — kiểm tra lại</b> <i>(sửa nếu đơn giá cước khác)</i>
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>

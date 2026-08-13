@@ -324,6 +324,53 @@ export const salesOrderPaymentService = {
       lotsTotal: lots.length,
     }
   },
+
+  /**
+   * Batch cho Kanban: với danh sách đơn → mỗi đơn trả { lotsPaid, lotsTotal }.
+   * Chỉ tính lô đã gán container; 1 lô "đã thu" khi tiền gắn lô ≥ trị giá lô.
+   */
+  async getLotPaymentForOrders(orderIds: string[]): Promise<Record<string, { lotsPaid: number; lotsTotal: number }>> {
+    const out: Record<string, { lotsPaid: number; lotsTotal: number }> = {}
+    if (!orderIds.length) return out
+    const [oRes, cRes, pRes] = await Promise.all([
+      supabase.from('sales_orders').select('id, total_value_usd').in('id', orderIds),
+      supabase.from('sales_order_containers').select('sales_order_id, lot_no, net_weight_kg').in('sales_order_id', orderIds),
+      supabase.from('sales_order_payments').select('sales_order_id, lot_no, amount, payment_type').in('sales_order_id', orderIds).not('lot_no', 'is', null),
+    ])
+    const totalValById: Record<string, number> = {}
+    for (const o of oRes.data || []) totalValById[o.id] = Number(o.total_value_usd || 0)
+    // gom net theo (đơn, lô) + tổng net theo đơn
+    const lotNet: Record<string, Map<number, number>> = {}
+    const totalNet: Record<string, number> = {}
+    for (const c of cRes.data || []) {
+      const oid = c.sales_order_id as string
+      const net = Number(c.net_weight_kg || 0)
+      totalNet[oid] = (totalNet[oid] || 0) + net
+      if (c.lot_no != null) {
+        ;(lotNet[oid] ||= new Map()).set(c.lot_no, ((lotNet[oid].get(c.lot_no)) || 0) + net)
+      }
+    }
+    // tiền thu theo (đơn, lô)
+    const lotPaid: Record<string, Map<number, number>> = {}
+    for (const p of pRes.data || []) {
+      const oid = p.sales_order_id as string
+      ;(lotPaid[oid] ||= new Map()).set(p.lot_no as number, ((lotPaid[oid].get(p.lot_no as number)) || 0) + Number(p.amount || 0))
+    }
+    for (const oid of orderIds) {
+      const nets = lotNet[oid]
+      if (!nets || nets.size === 0) { out[oid] = { lotsPaid: 0, lotsTotal: 0 }; continue }
+      const tv = totalValById[oid] || 0
+      const tn = totalNet[oid] || 0
+      let paidCount = 0
+      for (const [lotNo, net] of nets) {
+        const lotValue = tn > 0 ? tv * net / tn : (nets.size ? tv / nets.size : 0)
+        const paid = lotPaid[oid]?.get(lotNo) || 0
+        if (lotValue > 0 && paid >= lotValue - 0.01) paidCount++
+      }
+      out[oid] = { lotsPaid: paidCount, lotsTotal: nets.size }
+    }
+    return out
+  },
 }
 
 function round2(n: number): number { return Math.round(n * 100) / 100 }

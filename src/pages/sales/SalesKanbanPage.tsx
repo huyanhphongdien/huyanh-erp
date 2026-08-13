@@ -13,6 +13,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { salesStageService } from '../../services/sales/salesStageService'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
+import { salesOrderPaymentService } from '../../services/sales/salesOrderPaymentService'
 import {
   SALES_STAGES,
   SALES_STAGE_LABELS,
@@ -54,6 +55,7 @@ export default function SalesKanbanPage() {
   const canCollect = ['accounting', 'admin'].includes(getSalesRole(user) || '')
   const [orders, setOrders] = useState<KanbanOrder[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})
+  const [lotPay, setLotPay] = useState<Record<string, { lotsPaid: number; lotsTotal: number }>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterEtd, setFilterEtd] = useState<'all' | '7d' | '14d' | '30d'>('all')
@@ -116,9 +118,13 @@ export default function SalesKanbanPage() {
       }
     })
     setOrders(mapped)
+    const ids = mapped.map((o) => o.id)
     // Tiến độ lô cho card kanban (best-effort)
-    dispatchService.getLotProgressForOrders(mapped.map((o) => o.id))
+    dispatchService.getLotProgressForOrders(ids)
       .then(setLotProgress).catch(() => {})
+    // Thu tiền theo lô (best-effort) → badge "đã thu x/y lô"
+    salesOrderPaymentService.getLotPaymentForOrders(ids)
+      .then(setLotPay).catch(() => {})
   }
 
   useEffect(() => { fetchOrders() }, [])
@@ -431,6 +437,7 @@ export default function SalesKanbanPage() {
                         key={o.id}
                         order={o}
                         lp={lotProgress[o.id]}
+                        lotPay={lotPay[o.id]}
                         onDragStart={() => {}}
                         onDragEnd={() => {}}
                       />
@@ -498,6 +505,7 @@ export default function SalesKanbanPage() {
                         key={o.id}
                         order={o}
                         lp={lotProgress[o.id]}
+                        lotPay={lotPay[o.id]}
                         onDragStart={() => {}}
                         onDragEnd={() => {}}
                       />

@@ -39,9 +39,10 @@ interface KanbanCardProps {
   onDragStart: (orderId: string) => void
   onDragEnd: () => void
   lp?: LotProgress
+  lotPay?: { lotsPaid: number; lotsTotal: number }   // thu tiền theo lô
 }
 
-export default function KanbanCard({ order, onDragStart, onDragEnd, lp }: KanbanCardProps) {
+export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }: KanbanCardProps) {
   const navigate = useNavigate()
 
   const elapsedHours = order.stage_started_at
@@ -133,6 +134,12 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp }: Kanban
           if (b === 'partial') return pill('#dbeafe', '#1d4ed8', '💰 thu 1 phần')
           return pill('#fef3c7', '#b45309', '⚠ chưa thu tiền')
         })()}
+        {/* Thu tiền theo LÔ — chỉ hiện khi đơn nhiều lô và đã thu ≥1 lô (bổ nghĩa cho pill trên) */}
+        {lotPay && lotPay.lotsTotal > 1 && lotPay.lotsPaid > 0 && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', padding: '1px 7px', borderRadius: 10 }}>
+            💵 {lotPay.lotsPaid}/{lotPay.lotsTotal} lô đã thu
+          </span>
+        )}
       </div>
 
       {/* Footer: dwell + ETD countdown */}

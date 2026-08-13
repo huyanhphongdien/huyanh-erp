@@ -24,6 +24,7 @@ import {
   type SalesOrderPayment,
   type PaymentType,
   type CreatePaymentInput,
+  type OrderPaymentBreakdown,
 } from '../../../services/sales/salesOrderPaymentService'
 
 interface Props {
@@ -41,6 +42,7 @@ const fmtDate = (d: string | undefined | null) => d ? dayjs(d).format('DD/MM/YYY
 
 export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit, onSaved }: Props) {
   const [payments, setPayments] = useState<SalesOrderPayment[]>([])
+  const [breakdown, setBreakdown] = useState<OrderPaymentBreakdown | null>(null)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<SalesOrderPayment | null>(null)
@@ -50,8 +52,12 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
   const load = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await salesOrderPaymentService.listByOrder(orderId)
+      const [data, bd] = await Promise.all([
+        salesOrderPaymentService.listByOrder(orderId),
+        salesOrderPaymentService.getLotBreakdown(orderId).catch(() => null),
+      ])
       setPayments(data)
+      setBreakdown(bd)
     } catch (e: any) {
       message.error(e.message || 'Không thể tải lịch sử thanh toán')
     } finally {
@@ -94,6 +100,7 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
       setSaving(true)
       const payload: CreatePaymentInput = {
         sales_order_id: orderId,
+        lot_no: vals.lot_no ?? null,
         payment_date: vals.payment_date.format('YYYY-MM-DD'),
         amount: vals.amount,
         currency: vals.currency || 'USD',
@@ -173,6 +180,7 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
                   <Tag color={PAYMENT_TYPE_COLORS[p.payment_type]} style={{ margin: 0 }}>
                     {PAYMENT_TYPE_LABELS[p.payment_type]}
                   </Tag>
+                  {p.lot_no != null && <Tag color="geekblue" style={{ margin: 0 }}>Lô {p.lot_no}</Tag>}
                   <span style={{ fontWeight: 600, color: '#1B4D3E' }}>{fmtUSD(Number(p.amount))}</span>
                   {p.fee_amount && Number(p.fee_amount) > 0 && (
                     <Tooltip title="Phí ngân hàng">
@@ -230,6 +238,24 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
                 <WarningOutlined /> Đã thu vượt {fmtUSD(totalPaid - totalValueUsd)} so với HĐ
               </div>
             )}
+            {breakdown?.hasLots && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #d9d9d9' }}>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                  Thu theo lô: <b>{breakdown.lotsPaid}/{breakdown.lotsTotal}</b> lô đã thu đủ
+                  {breakdown.unattributedPaid > 0 && <span style={{ color: '#999' }}> · {fmtUSD(breakdown.unattributedPaid)} chưa gán lô</span>}
+                </div>
+                {breakdown.lots.map((l) => {
+                  const c = l.status === 'paid' ? 'green' : l.status === 'partial' ? 'gold' : 'red'
+                  const lbl = l.status === 'paid' ? 'đã thu' : l.status === 'partial' ? 'thu 1 phần' : 'chưa thu'
+                  return (
+                    <div key={l.lotNo} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '1px 0' }}>
+                      <span>Lô {l.lotNo} <Tag color={c} style={{ margin: 0 }}>{lbl}</Tag></span>
+                      <span style={{ color: '#666' }}>{fmtUSD(l.paidAmount)} / {fmtUSD(l.lotValue)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -246,6 +272,16 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
         width={560}
       >
         <Form form={form} layout="vertical" size="small">
+          {breakdown?.hasLots && (
+            <Form.Item label="Thu cho lô (đơn nhiều lô — D/P)" name="lot_no"
+              tooltip="Chọn lô để theo dõi thu riêng từng lô; bỏ trống = cả đơn">
+              <Select allowClear placeholder="Cả đơn (không gán lô)"
+                options={breakdown.lots.map((l) => ({
+                  value: l.lotNo,
+                  label: `Lô ${l.lotNo} — trị giá ${fmtUSD(l.lotValue)} · đã thu ${fmtUSD(l.paidAmount)}`,
+                }))} />
+            </Form.Item>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <Form.Item label="Ngày trả" name="payment_date" rules={[{ required: true }]}>
               <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />

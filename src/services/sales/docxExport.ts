@@ -440,38 +440,48 @@ export function boeDoc(d: {
     new TableCell({ width: { size: 3, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, margins: { top: 26, bottom: 26, left: 0, right: 0 }, children: [P(':', { size: 11, after: 0 })] }),
     new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, margins: { top: 26, bottom: 26, left: 30, right: 0 }, children: [P(v, { size: 11, bold: boldV, after: 0 })] }),
   ] })
-  const rows: TableRow[] = [
-    kvRow('Pay To The Order Of', d.ourBank),
-    kvRow('The Sum Of SAY (US DOLLARS)', amountToWords(d.amount).toUpperCase()),
-    kvRow('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}       Date: ${fmtD(d.invoiceDate)}`),
-  ]
-  if (isDP) {
-    // D/P·D/A (nhờ thu): NH người mua = "collecting bank" (tên + địa chỉ + SWIFT), TO = NGƯỜI MUA
-    rows.push(kvRow("The collecting bank's name", bank.name))
-    if (d.issuingBankAddress) rows.push(kvRow('Bank address', d.issuingBankAddress))
-    if (swift) rows.push(kvRow('Swift code', swift))
-    rows.push(kvRow('TO', d.drawnOn || '', true))
-  } else {
-    // L/C: drawn under NH phát hành, có số L/C, TO = NH phát hành
-    rows.push(kvRow('Drawn under', bank.name))
-    if (swift) rows.push(kvRow('Swift code', swift))
-    rows.push(kvRow('L/C NUMBER', `${d.lcNumber}${d.lcDate ? `        L/C DATE: ${d.lcDate}` : ''}`))
-    rows.push(kvRow('TO', bank.name, true))
+  // Xây các dòng field (rebuild mỗi tờ vì docx Table không tái dùng được)
+  const buildRows = (): TableRow[] => {
+    const rows: TableRow[] = [
+      kvRow('Pay To The Order Of', d.ourBank),
+      kvRow('The Sum Of SAY (US DOLLARS)', amountToWords(d.amount).toUpperCase()),
+      kvRow('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}       Date: ${fmtD(d.invoiceDate)}`),
+    ]
+    if (isDP) {
+      // D/P·D/A (nhờ thu): NH người mua = "collecting bank" (tên + địa chỉ + SWIFT), TO = NGƯỜI MUA
+      rows.push(kvRow("The collecting bank's name", bank.name))
+      if (d.issuingBankAddress) rows.push(kvRow('Bank address', d.issuingBankAddress))
+      if (swift) rows.push(kvRow('Swift code', swift))
+      rows.push(kvRow('TO', d.drawnOn || '', true))
+    } else {
+      // L/C: drawn under NH phát hành, có số L/C, TO = NH phát hành
+      rows.push(kvRow('Drawn under', bank.name))
+      if (swift) rows.push(kvRow('Swift code', swift))
+      rows.push(kvRow('L/C NUMBER', `${d.lcNumber}${d.lcDate ? `        L/C DATE: ${d.lcDate}` : ''}`))
+      rows.push(kvRow('TO', bank.name, true))
+    }
+    return rows
   }
-  const fieldTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, rows })
 
-  return makeDoc([
+  // 1 tờ Hối phiếu (First hoặc Second) — mẫu Huy Anh in CẢ HAI tờ trên 1 trang.
+  const bill = (ordinal: 'First' | 'Second', other: 'Second' | 'First'): (Paragraph | Table)[] => [
     P('BILL OF EXCHANGE', { align: AlignmentType.CENTER, bold: true, size: 15, after: 60 }),
     P(`Hue City, ${d.today}`, { after: 0 }),
     P([R('FOR: USD ', { bold: true }), R(money(d.amount), { bold: true })], { after: 20 }),
     P(tenorLine, { bold: true, after: 0 }),
-    P('of this First Bill of Exchange (Second of the same tenor and date being unpaid)', { italics: true, after: 80 }),
-    fieldTable,
-    P('', { after: 200 }),
+    P(`of this ${ordinal} Bill of Exchange (${other} of the same tenor and date being unpaid)`, { italics: true, after: 80 }),
+    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, rows: buildRows() }),
+    P('', { after: 160 }),
     P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.CENTER, bold: true, after: 0 }),
-    P('', { after: 240 }),
+    P('', { after: 180 }),
     P('PHÓ GIÁM ĐỐC', { align: AlignmentType.CENTER, bold: true, after: 0 }),
     P('Lê Xuân Hồng Trung', { align: AlignmentType.CENTER, bold: true }),
+  ]
+
+  return makeDoc([
+    ...bill('First', 'Second'),
+    P('', { after: 320 }),   // khoảng cách giữa 2 tờ
+    ...bill('Second', 'First'),
   ])
 }
 

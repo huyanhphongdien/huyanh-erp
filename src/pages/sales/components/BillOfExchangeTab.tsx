@@ -91,10 +91,10 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
     </tr>
   )
 
-  return (
-    <div className="doc-print-area" id="boe-print" style={{ color: '#000', fontSize: 13 }}>
+  // 1 tờ Hối phiếu (First / Second) — Huy Anh in CẢ HAI tờ.
+  const renderBill = (ordinal: string, other: string) => (
+    <>
       <Title level={3} style={{ textAlign: 'center', marginBottom: 12 }}>BILL OF EXCHANGE</Title>
-
       <div>Hue City, {drawDate}</div>
       <div style={{ fontWeight: 700, marginBottom: 8 }}>FOR: USD {fmtMoney(drawAmount)}</div>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>
@@ -105,7 +105,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
             : `AT ${effTenor} DAYS FROM BILL OF LADING DATE   -   ${drawDate}`}
       </div>
       <div style={{ fontStyle: 'italic', marginBottom: 14 }}>
-        of this First Bill of Exchange (Second of the same tenor and date being unpaid)
+        of this {ordinal} Bill of Exchange ({other} of the same tenor and date being unpaid)
       </div>
 
       <table style={{ borderCollapse: 'collapse', fontSize: 13 }}>
@@ -131,12 +131,20 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
         </tbody>
       </table>
 
-      <div style={{ marginTop: 40, textAlign: 'center' }}>
+      <div style={{ marginTop: 32, textAlign: 'center' }}>
         <div style={{ fontWeight: 700 }}>HUY ANH RUBBER COMPANY LIMITED</div>
-        <div style={{ height: 56 }} />
+        <div style={{ height: 48 }} />
         <div style={{ fontWeight: 700 }}>PHÓ GIÁM ĐỐC</div>
         <div style={{ fontWeight: 700 }}>Lê Xuân Hồng Trung</div>
       </div>
+    </>
+  )
+
+  return (
+    <div className="doc-print-area" id="boe-print" style={{ color: '#000', fontSize: 13 }}>
+      {renderBill('First', 'Second')}
+      <div style={{ borderTop: '1px dashed #bbb', margin: '32px 0' }} />
+      {renderBill('Second', 'First')}
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
         <Space>

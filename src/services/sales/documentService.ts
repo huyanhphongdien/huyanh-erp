@@ -150,6 +150,7 @@ export interface InvoiceData {
   insurance: number
   total: number
   the_cost: number
+  method: 'lc' | 'dp' | 'da'   // D/P/D/A: invoice KHÔNG tách Cước/BH/FOB (draw = tổng CIF)
   payment_terms: string
   lc_number: string | null
   bl_number: string | null
@@ -300,14 +301,14 @@ async function resolveConsignee(orderId: string, profile: any, lotNo?: number): 
 }
 
 // L/C số + ngày của đơn/lô (CÙNG nguồn = bảng thương lượng) — cho dòng "LC NO ... DATE:"
-async function loadLcInfo(orderId: string, lotNo?: number): Promise<{ lc_number: string | null; lc_date: string | null }> {
+async function loadLcInfo(orderId: string, lotNo?: number): Promise<{ lc_number: string | null; lc_date: string | null; method: 'lc' | 'dp' | 'da' }> {
   const { data } = await supabase
     .from('sales_order_lc_negotiations')
-    .select('lc_number, lc_date')
+    .select('lc_number, lc_date, method')
     .eq('sales_order_id', orderId)
     .eq('lot_no', lotNo || 0)
     .maybeSingle()
-  return { lc_number: data?.lc_number || null, lc_date: data?.lc_date || null }
+  return { lc_number: data?.lc_number || null, lc_date: data?.lc_date || null, method: (data?.method as 'lc' | 'dp' | 'da') || 'lc' }
 }
 
 // ── Helper thuần (khớp mẫu) — dùng chung getInvoiceData / getPackingListData / getWeightListData ──
@@ -771,6 +772,7 @@ export const documentService = {
       insurance,
       total,
       the_cost: theCost,
+      method: lcInfo.method,
       payment_terms: profile?.default_payment_term || PAYMENT_TERMS_EN[order.payment_terms || ''] || order.payment_terms || '',
       lc_number: lcInfo.lc_number || order.lc_number,
       // B/L: lô → từ booking của lô; cả đơn → order.bl_number

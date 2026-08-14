@@ -199,25 +199,29 @@ export function invoiceDoc(d: InvoiceData): Document {
         cellBox([P('', { after: 0 })]),
         cellBox([P(n2(d.subtotal), { align: CENTER, after: 0 })]),
       ] }),
+      // Cước/Bảo hiểm/FOB(COST) CHỈ cho L/C (draw = THE COST). D/P/D/A draw = TỔNG CIF
+      // → invoice KHÔNG tách 3 dòng này (khớp bản chiết khấu thật): TOTAL → PAYMENT TERM → SAY.
+      ...((d.method === 'dp' || d.method === 'da') ? [] : [
+        new TableRow({ children: [
+          cellBox([P('FREIGHT CHARGES', { align: CENTER, after: 0 })], { columnSpan: 3 }),
+          cellBox([P(n2(d.freight), { align: CENTER, after: 0 })]),
+        ] }),
+        new TableRow({ children: [
+          cellBox([P('INSURANCE', { align: CENTER, after: 0 })], { columnSpan: 3 }),
+          cellBox([P(n2(d.insurance), { align: CENTER, after: 0 })]),
+        ] }),
+        new TableRow({ children: [
+          cellBox([P(`FOB ${d.port_of_loading || ''} (COST)`, { align: CENTER, after: 0 })], { columnSpan: 3 }),
+          cellBox([P(n2(d.the_cost), { align: CENTER, after: 0 })]),
+        ] }),
+      ]),
       new TableRow({ children: [
-        cellBox([P('FREIGHT CHARGES', { align: CENTER, after: 0 })], { columnSpan: 3 }),
-        cellBox([P(n2(d.freight), { align: CENTER, after: 0 })]),
-      ] }),
-      new TableRow({ children: [
-        cellBox([P('INSURANCE', { align: CENTER, after: 0 })], { columnSpan: 3 }),
-        cellBox([P(n2(d.insurance), { align: CENTER, after: 0 })]),
-      ] }),
-      new TableRow({ children: [
-        cellBox([P(`FOB ${d.port_of_loading || ''} (COST)`, { align: CENTER, after: 0 })], { columnSpan: 3 }),
-        cellBox([P(n2(d.the_cost), { align: CENTER, after: 0 })]),
+        cellBox([P('PAYMENT TERM:', { after: 0 })]),
+        cellBox([P(d.payment_terms || '', { after: 0 })], { columnSpan: 3 }),
       ] }),
       new TableRow({ children: [
         cellBox([P('SAY US DOLLARS:', { after: 0 })]),
         cellBox([P(amountToWords(d.total), { after: 0 })], { columnSpan: 3 }),
-      ] }),
-      new TableRow({ children: [
-        cellBox([P('PAYMENT TERM:', { after: 0 })]),
-        cellBox([P(d.payment_terms || '', { after: 0 })], { columnSpan: 3 }),
       ] }),
     ],
   })

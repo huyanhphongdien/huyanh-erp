@@ -91,8 +91,11 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
     </tr>
   )
 
-  // 1 tờ Hối phiếu (First / Second) — Huy Anh in CẢ HAI tờ.
-  const renderBill = (ordinal: string, other: string) => (
+  // Số tiền bằng chữ khớp Hối phiếu thật: "...DOLLARS ONLY" (bỏ "US")
+  const sayWords = words.replace(/US Dollars/i, 'Dollars')
+
+  // 1 tờ Hối phiếu — Huy Anh in 2 tờ: tờ 1 "The Sum Of SAY", tờ 2 "The Sum Of SAY (US DOLLARS)".
+  const renderBill = (ordinal: string, other: string, sumLabel: string) => (
     <>
       <Title level={3} style={{ textAlign: 'center', marginBottom: 12 }}>BILL OF EXCHANGE</Title>
       <div>Hue City, {drawDate}</div>
@@ -111,7 +114,7 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
       <table style={{ borderCollapse: 'collapse', fontSize: 13 }}>
         <tbody>
           {kv('Pay To The Order Of', inv.bank_info.name)}
-          {kv('The Sum Of SAY (US DOLLARS)', <span style={{ textTransform: 'uppercase' }}>{words}</span>)}
+          {kv(sumLabel, <span style={{ textTransform: 'uppercase' }}>{sayWords}</span>)}
           {kv('Value received as per our Invoice(s) No(s)', `${inv.invoice_code}       Date: ${invDate}`)}
           {isDP ? (
             <>
@@ -142,9 +145,9 @@ export default function BillOfExchangeTab({ orderId, reloadKey, lotNo = 0 }: { o
 
   return (
     <div className="doc-print-area" id="boe-print" style={{ color: '#000', fontSize: 13 }}>
-      {renderBill('First', 'Second')}
-      <div style={{ borderTop: '1px dashed #bbb', margin: '32px 0' }} />
-      {renderBill('Second', 'First')}
+      {renderBill('First', 'Second', 'The Sum Of SAY')}
+      <div style={{ borderTop: '1px dashed #bbb', margin: '32px 0', pageBreakBefore: 'always' }} />
+      {renderBill('Second', 'First', 'The Sum Of SAY (US DOLLARS)')}
 
       <div className="no-print" style={{ marginTop: 24, textAlign: 'center' }}>
         <Space>

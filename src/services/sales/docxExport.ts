@@ -8,7 +8,7 @@
 
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  AlignmentType, BorderStyle, WidthType, ImageRun, VerticalAlign, TableLayoutType, type TableVerticalAlign,
+  AlignmentType, BorderStyle, WidthType, ImageRun, VerticalAlign, TableLayoutType, PageBreak, type TableVerticalAlign,
 } from 'docx'
 import { saveAs } from 'file-saver'
 import { amountToWords } from './contractGeneratorService'
@@ -440,11 +440,15 @@ export function boeDoc(d: {
     new TableCell({ width: { size: 3, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, margins: { top: 26, bottom: 26, left: 0, right: 0 }, children: [P(':', { size: 11, after: 0 })] }),
     new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, margins: { top: 26, bottom: 26, left: 30, right: 0 }, children: [P(v, { size: 11, bold: boldV, after: 0 })] }),
   ] })
-  // Xây các dòng field (rebuild mỗi tờ vì docx Table không tái dùng được)
-  const buildRows = (): TableRow[] => {
+  // "...US DOLLARS ONLY" → "...DOLLARS ONLY" (khớp bản Hối phiếu thật)
+  const sayValue = amountToWords(d.amount).toUpperCase().replace('US DOLLARS', 'DOLLARS')
+
+  // Xây các dòng field (rebuild mỗi tờ vì docx Table không tái dùng được).
+  // Nhãn dòng "The Sum Of SAY" KHÁC theo tờ: tờ 1 để trơn, tờ 2 thêm "(US DOLLARS)".
+  const buildRows = (sumLabel: string): TableRow[] => {
     const rows: TableRow[] = [
       kvRow('Pay To The Order Of', d.ourBank),
-      kvRow('The Sum Of SAY (US DOLLARS)', amountToWords(d.amount).toUpperCase()),
+      kvRow(sumLabel, sayValue),
       kvRow('Value received as per our Invoice(s) No(s)', `${d.invoiceRef}       Date: ${fmtD(d.invoiceDate)}`),
     ]
     if (isDP) {
@@ -463,14 +467,15 @@ export function boeDoc(d: {
     return rows
   }
 
-  // 1 tờ Hối phiếu (First hoặc Second) — mẫu Huy Anh in CẢ HAI tờ trên 1 trang.
-  const bill = (ordinal: 'First' | 'Second', other: 'Second' | 'First'): (Paragraph | Table)[] => [
+  // 1 tờ Hối phiếu — mẫu Huy Anh in 2 tờ, MỖI TỜ 1 TRANG (First: "The Sum Of SAY";
+  // Second: "The Sum Of SAY (US DOLLARS)").
+  const bill = (ordinal: 'First' | 'Second', other: 'Second' | 'First', sumLabel: string): (Paragraph | Table)[] => [
     P('BILL OF EXCHANGE', { align: AlignmentType.CENTER, bold: true, size: 15, after: 60 }),
     P(`Hue City, ${d.today}`, { after: 0 }),
     P([R('FOR: USD ', { bold: true }), R(money(d.amount), { bold: true })], { after: 20 }),
     P(tenorLine, { bold: true, after: 0 }),
     P(`of this ${ordinal} Bill of Exchange (${other} of the same tenor and date being unpaid)`, { italics: true, after: 80 }),
-    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, rows: buildRows() }),
+    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NO_BORDERS, rows: buildRows(sumLabel) }),
     P('', { after: 160 }),
     P('HUY ANH RUBBER COMPANY LIMITED', { align: AlignmentType.CENTER, bold: true, after: 0 }),
     P('', { after: 180 }),
@@ -479,9 +484,9 @@ export function boeDoc(d: {
   ]
 
   return makeDoc([
-    ...bill('First', 'Second'),
-    P('', { after: 320 }),   // khoảng cách giữa 2 tờ
-    ...bill('Second', 'First'),
+    ...bill('First', 'Second', 'The Sum Of SAY'),
+    new Paragraph({ children: [new PageBreak()] }),   // tờ 2 sang trang mới
+    ...bill('Second', 'First', 'The Sum Of SAY (US DOLLARS)'),
   ])
 }
 

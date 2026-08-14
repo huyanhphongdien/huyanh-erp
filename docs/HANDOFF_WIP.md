@@ -70,6 +70,28 @@ Tab Vận chuyển → mục Cước/Bảo hiểm có nút **"Tính tự động
 
 ---
 
+## 🟡 CÂU HỎI ĐANG CHỜ USER TRẢ LỜI (nhắc lại) — điểm 3: format Description chứng từ
+
+**Bối cảnh:** đối chiếu bộ chứng từ THẬT dùng chiết khấu `docs/du lieu tho/bo chung tu/BCT HA75 V1 - CK.pdf` (16 trang scan). Đã sửa xong 3/4 điểm (đã push): (1) vessel "YOUCAN V.2625N" — data đúng, sinh lại là ra; (2) Hối phiếu 2 tờ, mỗi tờ 1 trang, tờ 1 "The Sum Of SAY" / tờ 2 "The Sum Of SAY (US DOLLARS)", số bằng chữ "...DOLLARS ONLY" (commit 07cbdc4f, 682a7c54); (4) invoice D/P bỏ FREIGHT/INSURANCE/FOB, chỉ TOTAL → PAYMENT TERM → SAY (commit 05e35163). Xác nhận số: cước lô 1 = $25, BH lô 1 = $108,31 (khớp ghi chú tờ khai HQ).
+
+**CÒN ĐIỂM 3 — Packing List / Invoice Description chưa giống mẫu.** Mẫu thật (P14 CI + P2 rider) format:
+```
+MIXTURES OF NATURAL RUBBER SVR10 CV60 AND SBR1502   ← tên hàng (COMMODITY)
+97.5% SVR10 CV60 ; 2.5% SBR 1502                     ← tỉ lệ
+PACKING: 35 KGS/BALE; 576 BALES/16 SHRINK WRAPPED PLASTIC PALLETS / 01X20'
+TOTAL:   2880 BALES / 80 SHRINK WRAPPED PLASTIC PALLETS / 05 X 20'
+HS CODE NO: 40028000
+SHIPPING MARKS
+  BUYER / GRADE / PALLET NO / GROSS / NET / DESTINATION / INVOICE NO / MFG
+```
+Hệ hiện (`buildDescLines` trong docxExport.ts, DÙNG CHUNG Invoice+PKL+WL) khác: mở đầu "`{SL} MT - NATURAL RUBBER {grade}.`", có thêm dòng NET/GROSS WEIGHT + PRODUCER + COUNTRY OF ORIGIN, SHIPPING MARK là text tự do.
+
+**2 câu cần user chốt:**
+1. Đổi format Description sang mẫu ASIMCO thì **Invoice + PKL + WL của MỌI khách đều đổi** (kể cả GRI L/C). GRI có dùng **cùng** mẫu này không, hay mỗi khách 1 kiểu (→ làm format theo khách)?
+2. Mẫu cần **GROSS/NET mỗi pallet** (1271/1260 KGS) + **ngày MFG** — hệ chưa có ô riêng. Chọn: (a) thêm 2 ô ở tab Vận chuyển, hay (b) user nhập SHIPPING MARKS đầy đủ vào ô "Shipping mark" text tự do.
+
+→ User đang nghiên cứu; khi trả lời thì sửa `buildDescLines`.
+
 ## 4. TIẾP TỤC TRÊN MÁY KHÁC
 1. `git pull` (mọi code + migration + guide + file này đã ở repo).
 2. Migration đã áp prod rồi (idempotent) — không cần chạy lại, trừ khi DB máy khác trỏ instance khác.

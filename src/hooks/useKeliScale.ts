@@ -121,9 +121,20 @@ function getLockedConfig(): KeliScaleConfig | null {
   return LOCKED_FACILITIES.has(code) ? (FACILITY_DEFAULT_CONFIG[code] || null) : null
 }
 
-/** Nhà máy hiện tại có KHÓA cấu hình cân không (không tự dò) + thông số cố định. */
+function isLockedFacility(): boolean { return getLockedConfig() != null }
+
+/** Cấu hình ĐANG DÙNG: localStorage (do dò thành công lần trước lưu) → mặc định nhà máy → generic. */
+function readSavedConfig(): KeliScaleConfig {
+  try {
+    const s = localStorage.getItem(CONFIG_KEY)
+    if (s) return { ...DEFAULT_CONFIG, ...JSON.parse(s) }
+  } catch { /* ignore */ }
+  return getFacilityDefaultConfig() ?? DEFAULT_CONFIG
+}
+
+/** Nhà máy hiện tại có KHÓA cấu hình cân không (ưu tiên thông số cố định, chỉ dò khi cần). */
 export function getScaleLock(): { locked: boolean; config: KeliScaleConfig | null; facility: string } {
-  return { locked: getLockedConfig() != null, config: getLockedConfig(), facility: getFacilityCode() }
+  return { locked: isLockedFacility(), config: readSavedConfig(), facility: getFacilityCode() }
 }
 
 // Configs to try when auto-detecting (most common for weighbridge scales)
@@ -482,18 +493,8 @@ export function useKeliScale(): UseKeliScaleReturn {
   const [connected, setConnected] = useState(false)
   const [liveWeight, setLiveWeight] = useState<ScaleReading | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [config, setConfigState] = useState<KeliScaleConfig>(() => {
-    // Nhà máy KHÓA (TL) → dùng thông số cố định, BỎ QUA localStorage (có thể đã bị
-    // auto-detect cũ ghi sai) → luôn 1200/8/None/1, không tự dò.
-    const locked = getLockedConfig()
-    if (locked) return locked
-    try {
-      const saved = localStorage.getItem(CONFIG_KEY)
-      if (saved) return { ...DEFAULT_CONFIG, ...JSON.parse(saved) }
-    } catch { /* ignore */ }
-    // Chưa lưu → ưu tiên default theo nhà máy (TL=1200/8/None/1), nếu không có thì generic
-    return getFacilityDefaultConfig() ?? DEFAULT_CONFIG
-  })
+  // Cấu hình đang dùng = localStorage (dò lần trước lưu) → mặc định nhà máy → generic.
+  const [config, setConfigState] = useState<KeliScaleConfig>(() => readSavedConfig())
 
   const portRef = useRef<SerialPort | null>(null)
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
@@ -799,15 +800,27 @@ export function useKeliScale(): UseKeliScaleReturn {
       // Request port from user (browser shows picker dialog)
       const port = await (navigator as any).serial.requestPort()
 
-      // Nhà máy KHÓA cấu hình (TL) → KHÔNG dò, nối thẳng thông số cố định (nhanh + ổn định).
-      const lockedCfg = getLockedConfig()
-      if (lockedCfg) {
-        setConfigState(lockedCfg)
-        try { localStorage.setItem(CONFIG_KEY, JSON.stringify(lockedCfg)) } catch { /* ignore */ }
-        const ok = await connectWithConfig(port, lockedCfg)
-        if (ok) { setError(null); return true }
-        setError(`Không kết nối được với thông số cố định ${lockedCfg.baudRate}/${lockedCfg.dataBits}/${lockedCfg.parity}. Kiểm tra cáp RS232 / cổng COM đã chọn đúng chưa.`)
-        return false
+      // Nhà máy KHÓA (TL): thử THẲNG cấu hình cố định/đã lưu (nhanh, không dò cả danh sách).
+      // KIỂM có ra số hợp lệ không bằng tryConfigOnPort — connectWithConfig chỉ MỞ cổng,
+      // không phân biệt số thật vs RÁC (1200 sai vẫn "mở OK" nhưng đọc c0/c1/e0). Chỉ khi
+      // đọc được số mới dùng; nếu ra rác/không số → RƠI xuống auto-detect để tự phục hồi.
+      if (isLockedFacility()) {
+        const fixed = readSavedConfig()
+        setError(`Nối thông số cố định ${fixed.baudRate}/${fixed.dataBits}/${fixed.parity}…`)
+        const test = await tryConfigOnPort(port, fixed)
+        await new Promise(r => setTimeout(r, 300))
+        if (test === 'cannot_open') {
+          setError('Không mở được cổng COM. Có thể: cổng bị app khác chiếm / driver USB-Serial chưa cài / chọn nhầm cổng.')
+          return false
+        }
+        if (test === 'ok') {
+          setConfigState(fixed)
+          const ok = await connectWithConfig(port, fixed)
+          if (ok) { setError(null); return true }
+        }
+        console.warn('[KeliScale] Cấu hình cố định chưa đọc được số hợp lệ → dò lại để phục hồi')
+        setError('Thông số cố định chưa đọc được số — đang dò lại để tìm đúng…')
+        // (rơi xuống auto-detect bên dưới — tìm được sẽ lưu, lần sau dùng thẳng, khỏi dò)
       }
 
       // Always auto-detect first — try all configs to find one that returns valid weight data
@@ -877,14 +890,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       // KHÔNG dò 14 cấu hình ở đây: dò mất ~60s, không hợp cho tự-nối-lại.
       // Nếu cấu hình sai/garbled → watchdog 12s sẽ bắt và thử lại vòng sau.
       // Dò đầy đủ chỉ chạy khi user bấm "Kết nối cổng COM" (connect()).
-      // Nhà máy KHÓA (TL) → luôn thông số cố định; còn lại dùng cấu hình đã lưu.
-      const saved: KeliScaleConfig = getLockedConfig() ?? (() => {
-        try {
-          const s = localStorage.getItem(CONFIG_KEY)
-          if (s) return { ...DEFAULT_CONFIG, ...JSON.parse(s) }
-        } catch { /* ignore */ }
-        return getFacilityDefaultConfig() ?? DEFAULT_CONFIG
-      })()
+      // Dùng cấu hình ĐANG CHẠY (localStorage — đã phục hồi đúng nếu từng dò) — mở phát 1, không dò.
+      const saved = readSavedConfig()
       return await connectWithConfig(port, saved)
     } catch {
       return false
@@ -1057,12 +1064,17 @@ export function useKeliScale(): UseKeliScaleReturn {
         if (ports.length > 0 && !portRef.current && !fatalErrorRef.current) {
           const port = ports[0]
 
-          // Nhà máy KHÓA (TL) → nối thẳng thông số cố định, KHÔNG dò.
-          const lockedCfg = getLockedConfig()
-          if (lockedCfg) {
-            const ok = await connectWithConfig(port, lockedCfg)
-            if (ok) console.log('[KeliScale] Auto-reconnect (cấu hình cố định) SUCCESS')
-            return
+          // Nhà máy KHÓA (TL): thử cấu hình cố định/đã lưu; nếu ra rác/không số → dò phục hồi.
+          if (isLockedFacility()) {
+            const fixed = readSavedConfig()
+            const test = await tryConfigOnPort(port, fixed)
+            await new Promise(r => setTimeout(r, 300))
+            if (test === 'ok') {
+              const ok = await connectWithConfig(port, fixed)
+              if (ok) { console.log('[KeliScale] Auto-reconnect (cấu hình cố định) SUCCESS'); return }
+            }
+            console.warn('[KeliScale] Auto-reconnect: cấu hình cố định chưa đọc được số → dò lại phục hồi')
+            // (rơi xuống auto-detect bên dưới)
           }
 
           // Try auto-detect first to find the right config

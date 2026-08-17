@@ -114,16 +114,16 @@ export default function ScaleSettings({ scale }: ScaleSettingsProps) {
             </Space>
           </div>
 
-          {/* Cấu hình đã CỐ ĐỊNH cho nhà máy này (không tự dò) */}
+          {/* Nhà máy ưu tiên thông số cố định (không dò cả danh sách) */}
           {lock.locked && lock.config && (
             <div style={{ padding: 12, borderRadius: 8, background: '#EFF6FF', border: '1px solid #93C5FD' }}>
-              <Text strong>🔒 Đã cố định thông số cân cho nhà máy {lock.facility}</Text>
+              <Text strong>🔒 Ưu tiên thông số cố định — nhà máy {lock.facility}</Text>
               <div style={{ fontSize: 12, marginTop: 4 }}>
                 <Tag color="blue">{lock.config.baudRate} / {lock.config.dataBits} / {lock.config.parity} / {lock.config.stopBits}</Tag>
-                Máy sẽ nối THẲNG thông số này, <b>không tự dò</b> (nhanh + hết lỗi nhảy cấu hình).
+                Máy nối THẲNG thông số này, <b>không dò cả danh sách</b>. Chỉ khi đọc KHÔNG ra số mới tự dò lại 1 lần để phục hồi rồi lưu — lần sau dùng thẳng.
               </div>
               <div style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>
-                Đổi ở bảng dưới chỉ có tác dụng TẠM cho lần này; tải lại trang sẽ về lại thông số cố định. Muốn đổi hẳn phải sửa code (FACILITY_DEFAULT_CONFIG).
+                Đổi ở bảng dưới sẽ được <b>lưu lại</b>; bấm Ngắt kết nối rồi Kết nối lại để áp thông số mới.
               </div>
             </div>
           )}

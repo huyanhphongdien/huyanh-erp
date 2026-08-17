@@ -97,12 +97,15 @@ const DEFAULT_CONFIG: KeliScaleConfig = {
 
 // Cấu hình mặc định theo NHÀ MÁY (đầu cân thực tế đã xác định qua console/Cài đặt).
 // → vào thẳng cấu hình đúng, KHỎI dò 14 lần (~60s).
-//   TL (Tân Lâm / Quảng Trị): 1200/8/None/1 (legacy) — KHÔNG phải 9600.
+//   TL (Tân Lâm / Quảng Trị): 9600/8/None/1 — XÁC NHẬN 2026-08-17 qua console máy thật
+//      (đầu cân trả frame NHỊ PHÂN 10 byte "+00000001B", GIỐNG Phong Điền). Đầu cân model
+//      XK3118T-A3 map ra preset D2008FA/DS3/DS6. "1200 legacy" TRƯỚC ĐÂY LÀ SAI (đọc ra
+//      rác HEX c0/c1/e0 — sai baud). Đừng đổi lại 1200.
 //   PD (Phong Điền): 9600/8/None/1 — preset XK3118K8, xuất frame NHỊ PHÂN 10 byte
 //      STX + '+' + 7 chữ số + dp + status + ETX (vd "+000000001B"). Xác nhận 18/07/2026.
 //      LƯU Ý: parity = None (khác DEFAULT_CONFIG generic dùng Even).
 const FACILITY_DEFAULT_CONFIG: Record<string, KeliScaleConfig> = {
-  TL: { baudRate: 1200, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
+  TL: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
   PD: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
 }
 function getFacilityCode(): string {
@@ -113,7 +116,7 @@ function getFacilityDefaultConfig(): KeliScaleConfig | null {
 }
 
 // Nhà máy KHÓA cấu hình cân — LUÔN dùng thông số CỐ ĐỊNH, KHÔNG tự dò (auto-detect
-// hay chọn nhầm cấu hình / mất ổn định). Tân Lâm (TL) hay lỗi → cố định 1200/8/None/1.
+// hay chọn nhầm cấu hình / mất ổn định). Tân Lâm (TL) hay lỗi → cố định 9600/8/None/1.
 // Muốn đổi thông số TL: sửa FACILITY_DEFAULT_CONFIG.TL ở trên (1 chỗ duy nhất).
 const LOCKED_FACILITIES = new Set(['TL'])
 function getLockedConfig(): KeliScaleConfig | null {
@@ -385,6 +388,13 @@ async function tryConfigOnPort(
   cfg: { baudRate: number; parity: ParityType; dataBits?: number; stopBits?: number },
   timeoutMs = 4000
 ): Promise<'ok' | 'parity' | 'no_data' | 'garbled' | 'error' | 'cannot_open'> {
+  // Cổng còn đang mở (lần thử trước chưa đóng hẳn / còn open() dở) → ĐÓNG trước khi mở lại.
+  // Nếu không, port.open() ném InvalidStateError ("port is already open" / "a call to open()
+  // is already in progress") → autoDetect tưởng sai config, thử tiếp cả 15 lần đều lỗi.
+  if (port.readable || port.writable) {
+    try { await port.close() } catch { /* ignore */ }
+    await new Promise(r => setTimeout(r, 150))
+  }
   try {
     await port.open({
       baudRate: cfg.baudRate,
@@ -396,8 +406,15 @@ async function tryConfigOnPort(
   } catch (err: any) {
     // DOMException "Failed to open serial port" — port bị app khác chiếm, driver
     // chưa cài, hoặc port không tồn tại. Không có config nào fix được → bail.
+    // InvalidStateError (name, KHÔNG phải 'DOMException') = cổng đang mở / open() còn dở →
+    // cũng bail thay vì hammer 15 lần (guard đóng-trước ở trên đã xử đa số ca này).
+    const name = err?.name || ''
     const msg = (err?.message || '').toLowerCase()
-    if (err?.name === 'DOMException' || msg.includes('failed to open') || msg.includes('invalidstateerror')) {
+    if (
+      name === 'InvalidStateError' || name === 'DOMException' ||
+      msg.includes('failed to open') || msg.includes('already open') ||
+      msg.includes('already in progress') || msg.includes('invalidstateerror')
+    ) {
       return 'cannot_open'
     }
     return 'error'
@@ -726,6 +743,12 @@ export function useKeliScale(): UseKeliScaleReturn {
 
   const connectWithConfig = useCallback(async (port: SerialPort, cfg: KeliScaleConfig): Promise<boolean> => {
     try {
+      // Cổng còn mở (validate xong chưa đóng hẳn / lần trước rớt) → đóng trước, tránh
+      // InvalidStateError "port is already open" khi mở để đọc thật.
+      if (port.readable || port.writable) {
+        try { await port.close() } catch { /* ignore */ }
+        await new Promise(r => setTimeout(r, 150))
+      }
       await port.open({
         baudRate: cfg.baudRate,
         dataBits: cfg.dataBits,
@@ -815,6 +838,7 @@ export function useKeliScale(): UseKeliScaleReturn {
         }
         if (test === 'ok') {
           setConfigState(fixed)
+          try { localStorage.setItem(CONFIG_KEY, JSON.stringify(fixed)) } catch { /* ignore */ }
           const ok = await connectWithConfig(port, fixed)
           if (ok) { setError(null); return true }
         }
@@ -1070,6 +1094,8 @@ export function useKeliScale(): UseKeliScaleReturn {
             const test = await tryConfigOnPort(port, fixed)
             await new Promise(r => setTimeout(r, 300))
             if (test === 'ok') {
+              setConfigState(fixed)
+              try { localStorage.setItem(CONFIG_KEY, JSON.stringify(fixed)) } catch { /* ignore */ }
               const ok = await connectWithConfig(port, fixed)
               if (ok) { console.log('[KeliScale] Auto-reconnect (cấu hình cố định) SUCCESS'); return }
             }

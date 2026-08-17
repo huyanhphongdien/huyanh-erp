@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal, Select, Typography, Space, Tag, Descriptions, Button, InputNumber } from 'antd'
 import { SettingOutlined, WifiOutlined, DisconnectOutlined } from '@ant-design/icons'
 import type { UseKeliScaleReturn } from '@erp/hooks/useKeliScale'
+import { getScaleLock } from '@erp/hooks/useKeliScale'
 
 const { Text } = Typography
 
@@ -62,6 +63,7 @@ interface ScaleSettingsProps {
 
 export default function ScaleSettings({ scale }: ScaleSettingsProps) {
   const [open, setOpen] = useState(false)
+  const lock = getScaleLock()   // nhà máy khóa cấu hình (TL) → không tự dò
 
   function applyModel(model: typeof KELI_MODELS[0]) {
     if (model.baudRate > 0) {
@@ -111,6 +113,20 @@ export default function ScaleSettings({ scale }: ScaleSettingsProps) {
               </div>
             </Space>
           </div>
+
+          {/* Cấu hình đã CỐ ĐỊNH cho nhà máy này (không tự dò) */}
+          {lock.locked && lock.config && (
+            <div style={{ padding: 12, borderRadius: 8, background: '#EFF6FF', border: '1px solid #93C5FD' }}>
+              <Text strong>🔒 Đã cố định thông số cân cho nhà máy {lock.facility}</Text>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                <Tag color="blue">{lock.config.baudRate} / {lock.config.dataBits} / {lock.config.parity} / {lock.config.stopBits}</Tag>
+                Máy sẽ nối THẲNG thông số này, <b>không tự dò</b> (nhanh + hết lỗi nhảy cấu hình).
+              </div>
+              <div style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>
+                Đổi ở bảng dưới chỉ có tác dụng TẠM cho lần này; tải lại trang sẽ về lại thông số cố định. Muốn đổi hẳn phải sửa code (FACILITY_DEFAULT_CONFIG).
+              </div>
+            </div>
+          )}
 
           {/* Quick select model */}
           <div>

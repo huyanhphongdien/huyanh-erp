@@ -105,11 +105,25 @@ const FACILITY_DEFAULT_CONFIG: Record<string, KeliScaleConfig> = {
   TL: { baudRate: 1200, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
   PD: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' },
 }
+function getFacilityCode(): string {
+  try { return String((import.meta as any).env?.VITE_FACILITY_CODE || '').toUpperCase() } catch { return '' }
+}
 function getFacilityDefaultConfig(): KeliScaleConfig | null {
-  try {
-    const code = String((import.meta as any).env?.VITE_FACILITY_CODE || '').toUpperCase()
-    return FACILITY_DEFAULT_CONFIG[code] || null
-  } catch { return null }
+  return FACILITY_DEFAULT_CONFIG[getFacilityCode()] || null
+}
+
+// Nhà máy KHÓA cấu hình cân — LUÔN dùng thông số CỐ ĐỊNH, KHÔNG tự dò (auto-detect
+// hay chọn nhầm cấu hình / mất ổn định). Tân Lâm (TL) hay lỗi → cố định 1200/8/None/1.
+// Muốn đổi thông số TL: sửa FACILITY_DEFAULT_CONFIG.TL ở trên (1 chỗ duy nhất).
+const LOCKED_FACILITIES = new Set(['TL'])
+function getLockedConfig(): KeliScaleConfig | null {
+  const code = getFacilityCode()
+  return LOCKED_FACILITIES.has(code) ? (FACILITY_DEFAULT_CONFIG[code] || null) : null
+}
+
+/** Nhà máy hiện tại có KHÓA cấu hình cân không (không tự dò) + thông số cố định. */
+export function getScaleLock(): { locked: boolean; config: KeliScaleConfig | null; facility: string } {
+  return { locked: getLockedConfig() != null, config: getLockedConfig(), facility: getFacilityCode() }
 }
 
 // Configs to try when auto-detecting (most common for weighbridge scales)
@@ -469,6 +483,10 @@ export function useKeliScale(): UseKeliScaleReturn {
   const [liveWeight, setLiveWeight] = useState<ScaleReading | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [config, setConfigState] = useState<KeliScaleConfig>(() => {
+    // Nhà máy KHÓA (TL) → dùng thông số cố định, BỎ QUA localStorage (có thể đã bị
+    // auto-detect cũ ghi sai) → luôn 1200/8/None/1, không tự dò.
+    const locked = getLockedConfig()
+    if (locked) return locked
     try {
       const saved = localStorage.getItem(CONFIG_KEY)
       if (saved) return { ...DEFAULT_CONFIG, ...JSON.parse(saved) }
@@ -781,6 +799,17 @@ export function useKeliScale(): UseKeliScaleReturn {
       // Request port from user (browser shows picker dialog)
       const port = await (navigator as any).serial.requestPort()
 
+      // Nhà máy KHÓA cấu hình (TL) → KHÔNG dò, nối thẳng thông số cố định (nhanh + ổn định).
+      const lockedCfg = getLockedConfig()
+      if (lockedCfg) {
+        setConfigState(lockedCfg)
+        try { localStorage.setItem(CONFIG_KEY, JSON.stringify(lockedCfg)) } catch { /* ignore */ }
+        const ok = await connectWithConfig(port, lockedCfg)
+        if (ok) { setError(null); return true }
+        setError(`Không kết nối được với thông số cố định ${lockedCfg.baudRate}/${lockedCfg.dataBits}/${lockedCfg.parity}. Kiểm tra cáp RS232 / cổng COM đã chọn đúng chưa.`)
+        return false
+      }
+
       // Always auto-detect first — try all configs to find one that returns valid weight data
       setError('Đang tự động dò cấu hình đầu cân...')
 
@@ -848,7 +877,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       // KHÔNG dò 14 cấu hình ở đây: dò mất ~60s, không hợp cho tự-nối-lại.
       // Nếu cấu hình sai/garbled → watchdog 12s sẽ bắt và thử lại vòng sau.
       // Dò đầy đủ chỉ chạy khi user bấm "Kết nối cổng COM" (connect()).
-      const saved: KeliScaleConfig = (() => {
+      // Nhà máy KHÓA (TL) → luôn thông số cố định; còn lại dùng cấu hình đã lưu.
+      const saved: KeliScaleConfig = getLockedConfig() ?? (() => {
         try {
           const s = localStorage.getItem(CONFIG_KEY)
           if (s) return { ...DEFAULT_CONFIG, ...JSON.parse(s) }
@@ -1026,6 +1056,14 @@ export function useKeliScale(): UseKeliScaleReturn {
         const ports = await (navigator as any).serial.getPorts()
         if (ports.length > 0 && !portRef.current && !fatalErrorRef.current) {
           const port = ports[0]
+
+          // Nhà máy KHÓA (TL) → nối thẳng thông số cố định, KHÔNG dò.
+          const lockedCfg = getLockedConfig()
+          if (lockedCfg) {
+            const ok = await connectWithConfig(port, lockedCfg)
+            if (ok) console.log('[KeliScale] Auto-reconnect (cấu hình cố định) SUCCESS')
+            return
+          }
 
           // Try auto-detect first to find the right config
           console.log('[KeliScale] Auto-reconnect: running auto-detect...')

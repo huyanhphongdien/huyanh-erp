@@ -388,9 +388,11 @@ async function tryConfigOnPort(
   cfg: { baudRate: number; parity: ParityType; dataBits?: number; stopBits?: number },
   timeoutMs = 4000
 ): Promise<'ok' | 'parity' | 'no_data' | 'garbled' | 'error' | 'cannot_open'> {
-  // Cổng còn đang mở (lần thử trước chưa đóng hẳn / còn open() dở) → ĐÓNG trước khi mở lại.
-  // Nếu không, port.open() ném InvalidStateError ("port is already open" / "a call to open()
-  // is already in progress") → autoDetect tưởng sai config, thử tiếp cả 15 lần đều lỗi.
+  // Cổng còn đang mở (lần thử trước chưa đóng hẳn) → ĐÓNG trước khi mở lại. Nếu không,
+  // port.open() ném InvalidStateError "port is already open" → autoDetect tưởng sai config,
+  // thử tiếp cả 15 lần đều lỗi. (Lưu ý: ca "already in progress" = open() ĐANG BAY thì guard
+  //  này KHÔNG bắt được vì readable/writable còn null — ca đó xử ở catch bên dưới = trả 'error'
+  //  để thử lại, không phải 'cannot_open'.)
   if (port.readable || port.writable) {
     try { await port.close() } catch { /* ignore */ }
     await new Promise(r => setTimeout(r, 150))
@@ -406,14 +408,18 @@ async function tryConfigOnPort(
   } catch (err: any) {
     // DOMException "Failed to open serial port" — port bị app khác chiếm, driver
     // chưa cài, hoặc port không tồn tại. Không có config nào fix được → bail.
-    // InvalidStateError (name, KHÔNG phải 'DOMException') = cổng đang mở / open() còn dở →
-    // cũng bail thay vì hammer 15 lần (guard đóng-trước ở trên đã xử đa số ca này).
     const name = err?.name || ''
     const msg = (err?.message || '').toLowerCase()
+    // "already in progress" = một open() KHÁC đang bay (thường do instance/điều hướng khác,
+    // vd Home→Weighing) — TẠM THỜI, KHÔNG phải cổng bị chiếm hẳn → trả 'error' để dò tiếp
+    // (khe 300ms giữa các lần dò sẽ để open kia settle). Đừng báo "cổng bị chiếm" gây hiểu nhầm.
+    if (msg.includes('already in progress')) return 'error'
+    // InvalidStateError "already open" / DOMException "failed to open" = cổng đang bị giữ →
+    // bail 1 lần thay vì hammer 15 lần (guard đóng-trước ở trên đã xử ca cổng của CHÍNH ta).
     if (
       name === 'InvalidStateError' || name === 'DOMException' ||
       msg.includes('failed to open') || msg.includes('already open') ||
-      msg.includes('already in progress') || msg.includes('invalidstateerror')
+      msg.includes('invalidstateerror')
     ) {
       return 'cannot_open'
     }
@@ -424,7 +430,7 @@ async function tryConfigOnPort(
 
   try {
     if (!port.readable) {
-      await port.close()
+      try { await port.close() } catch { /* ignore — đừng để throw thoát ra làm sập cả vòng dò */ }
       return 'error'
     }
 
@@ -697,6 +703,11 @@ export function useKeliScale(): UseKeliScaleReturn {
     } catch { /* ignore */ }
 
     for (const cfg of configList) {
+      // User bấm Ngắt (hoặc trang unmount) GIỮA lúc dò → dừng ngay, đừng nối "số ma".
+      if (manualDisconnectRef.current) {
+        console.log('[KeliScale] Dừng dò — user đã Ngắt kết nối')
+        return null
+      }
       setError(`Đang thử cấu hình ${cfg.label}...`)
       console.log(`[KeliScale] Trying: ${cfg.label}`)
 
@@ -743,6 +754,13 @@ export function useKeliScale(): UseKeliScaleReturn {
 
   const connectWithConfig = useCallback(async (port: SerialPort, cfg: KeliScaleConfig): Promise<boolean> => {
     try {
+      // User đã bấm Ngắt kết nối TRONG lúc dò/validate → KHÔNG mở nối, đóng cổng và thoát.
+      // (portRef còn null lúc dò nên disconnect() không đóng được cổng — chốt chặn cuối ở đây,
+      //  tránh cân "kết nối lại" + chảy số ma sau khi thao tác viên đã chủ động ngắt.)
+      if (manualDisconnectRef.current) {
+        try { if (port.readable || port.writable) await port.close() } catch { /* ignore */ }
+        return false
+      }
       // Cổng còn mở (validate xong chưa đóng hẳn / lần trước rớt) → đóng trước, tránh
       // InvalidStateError "port is already open" khi mở để đọc thật.
       if (port.readable || port.writable) {
@@ -851,6 +869,11 @@ export function useKeliScale(): UseKeliScaleReturn {
       setError('Đang tự động dò cấu hình đầu cân...')
 
       const detectedConfig = await autoDetect(port)
+      // User bấm Ngắt giữa lúc dò → thoát sạch, đóng cổng, đừng báo lỗi "không tìm được cấu hình".
+      if (manualDisconnectRef.current) {
+        try { if (port.readable || port.writable) await port.close() } catch { /* ignore */ }
+        return false
+      }
       if (detectedConfig) {
         // Save detected config
         setConfigState(detectedConfig)
@@ -939,6 +962,10 @@ export function useKeliScale(): UseKeliScaleReturn {
         reconnectTriesRef.current = 0
         setError(null)
         console.log('[KeliScale] ✅ Đã tự kết nối lại')
+      } else if (portRef.current) {
+        // reconnectNow trả false vì cổng ĐÃ mở (đang kết nối rồi) → coi như xong, đừng spam.
+        reconnectTriesRef.current = 0
+        setError(null)
       } else {
         scheduleRef.current?.()                    // thử tiếp, giãn dần
       }
@@ -953,6 +980,9 @@ export function useKeliScale(): UseKeliScaleReturn {
   useEffect(() => {
     if (!supported) return
     const iv = setInterval(() => {
+      // Đang có luồng connect()/dò/reconnect chạy → watchdog đứng ngoài, tránh đóng cổng
+      // nửa chừng rồi hẹn reconnect chồng lên (gây banner "Mất kết nối" giả khi vẫn đang nối).
+      if (connectingRef.current) return
       if (!portRef.current || manualDisconnectRef.current) return
       if (!lastDataAtRef.current) return
       const silentMs = Date.now() - lastDataAtRef.current
@@ -1093,6 +1123,11 @@ export function useKeliScale(): UseKeliScaleReturn {
             const fixed = readSavedConfig()
             const test = await tryConfigOnPort(port, fixed)
             await new Promise(r => setTimeout(r, 300))
+            // Cổng bị app khác chiếm / không mở được → dừng, đừng dò tiếp (như connect()).
+            if (test === 'cannot_open') {
+              console.warn('[KeliScale] Auto-reconnect: cổng không mở được — để user tự nối lại')
+              return
+            }
             if (test === 'ok') {
               setConfigState(fixed)
               try { localStorage.setItem(CONFIG_KEY, JSON.stringify(fixed)) } catch { /* ignore */ }

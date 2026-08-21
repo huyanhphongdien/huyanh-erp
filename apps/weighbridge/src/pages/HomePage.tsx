@@ -18,7 +18,10 @@ import weighbridgeService from '@erp/services/wms/weighbridgeService'
 import weighbridgeImageService from '@erp/services/wms/weighbridgeImageService'
 import { dealWmsService, type ActiveDealForStockIn } from '@erp/services/b2b/dealWmsService'
 import { supabase } from '@erp/lib/supabase'
-import type { WeighbridgeTicket, WeighbridgeStatus, WeighbridgeImage } from '@erp/services/wms/wms.types'
+import type { WeighbridgeTicket, WeighbridgeStatus, WeighbridgeImage, TicketType } from '@erp/services/wms/wms.types'
+
+/** Loại phiếu thuộc trạm CÂN XE. 'retail' (cân mủ lẻ) cố ý nằm ngoài — xem docs/CAN_MU_LE_KE_HOACH.md */
+const WB_TYPES: TicketType[] = ['in', 'out', 'gate', 'fetch']
 
 const { Title, Text } = Typography
 const PRIMARY = '#1B4D3E'
@@ -72,9 +75,12 @@ export default function HomePage() {
       // F2.7: Filter theo facility hiện tại — mỗi instance app cân chỉ thấy phiếu của NM đó
       const facilityId = facility?.id || null
       const [allResult, statsResult] = await Promise.all([
-        weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facilityId }),
+        // WB_TYPES: loại phiếu CÂN MỦ LẺ (ticket_type='retail', app apps/retail-scale) ra khỏi
+        // trạm cân xe — nó nằm chung bảng nhưng là nghiệp vụ khác, và ở nhà máy cân lẻ nhiều
+        // thì nó ăn hết cửa sổ 200 phiếu lẫn thổi phồng "Tổng phiếu"/"Tấn nay".
+        weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facilityId, ticket_types: WB_TYPES }),
         // Tổng phiếu = toàn thời gian, KHÔNG tính phiếu đã hủy (cancelled)
-        weighbridgeService.getStats(undefined, undefined, facilityId),
+        weighbridgeService.getStats(undefined, undefined, facilityId, WB_TYPES),
       ])
       const all = allResult.data || []
       const inProg = all.filter((t) => t.status === 'weighing_gross' || t.status === 'weighing_tare')
@@ -124,7 +130,7 @@ export default function HomePage() {
     if (showAllDates || !filterDate) return
     const d = filterDate.format('YYYY-MM-DD')
     if (d === dayjs().format('YYYY-MM-DD')) return  // hôm nay đã nằm trong 200 phiếu mới
-    weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facility?.id, from_date: d, to_date: d })
+    weighbridgeService.getAll({ page: 1, pageSize: 200, facility_id: facility?.id, from_date: d, to_date: d, ticket_types: WB_TYPES })
       .then(res => {
         const extra = res.data || []
         if (!extra.length) return

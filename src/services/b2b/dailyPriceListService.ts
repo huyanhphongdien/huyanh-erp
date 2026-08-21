@@ -11,6 +11,19 @@
 
 import { supabase } from '../../lib/supabase'
 
+/**
+ * Bảng THẬT là `b2b.daily_price_list`; PostgREST chỉ thấy schema `public` nên phải đi qua
+ * VIEW `public.b2b_daily_price_list` (tạo ở b2b_views_resync_intake_v4.sql, security_invoker).
+ *
+ * ⚠ Trước 2026-08-21 file này gọi `.from('daily_price_list')` — bảng đó KHÔNG tồn tại ở
+ * public → mọi query trả lỗi PGRST205 (đúng sự cố "Daily price page 404" đã ghi trong
+ * b2b_views_resync_intake_v4.sql). Đừng đổi ngược lại.
+ *
+ * View là security_invoker → RLS của base table vẫn áp: role `anon` (app cân, app Cân mủ lẻ)
+ * cần policy SELECT trên b2b.daily_price_list, xem retail_scale_p3_daily_price_anon.sql.
+ */
+const PRICE_VIEW = 'b2b_daily_price_list'
+
 export interface DailyPrice {
   id: string
   effective_from: string
@@ -40,7 +53,7 @@ export async function getCurrentPrice(
 ): Promise<DailyPrice | null> {
   const atIso = at.toISOString()
   const { data, error } = await supabase
-    .from('daily_price_list')
+    .from(PRICE_VIEW)
     .select('*')
     .eq('product_code', productCode)
     .lte('effective_from', atIso)
@@ -61,7 +74,7 @@ export async function listPriceHistory(
   limit = 50
 ): Promise<DailyPrice[]> {
   const { data, error } = await supabase
-    .from('daily_price_list')
+    .from(PRICE_VIEW)
     .select('*')
     .eq('product_code', productCode)
     .order('effective_from', { ascending: false })
@@ -77,7 +90,7 @@ export async function listPriceHistory(
 export async function listCurrentAll(): Promise<DailyPrice[]> {
   const nowIso = new Date().toISOString()
   const { data, error } = await supabase
-    .from('daily_price_list')
+    .from(PRICE_VIEW)
     .select('*')
     .lte('effective_from', nowIso)
     .or(`effective_to.is.null,effective_to.gt.${nowIso}`)
@@ -106,7 +119,7 @@ export async function createPrice(input: CreatePriceInput): Promise<DailyPrice> 
   }
 
   const { data, error } = await supabase
-    .from('daily_price_list')
+    .from(PRICE_VIEW)
     .insert(payload)
     .select()
     .single()
@@ -132,7 +145,7 @@ export async function setNewPrice(input: CreatePriceInput): Promise<DailyPrice> 
 
   // Step 1: close row cũ (effective_to = NULL → = fromIso)
   await supabase
-    .from('daily_price_list')
+    .from(PRICE_VIEW)
     .update({ effective_to: fromIso })
     .eq('product_code', input.product_code)
     .is('effective_to', null)
@@ -146,7 +159,7 @@ export async function setNewPrice(input: CreatePriceInput): Promise<DailyPrice> 
  */
 export async function updatePrice(id: string, changes: Partial<CreatePriceInput>): Promise<DailyPrice> {
   const { data, error } = await supabase
-    .from('daily_price_list')
+    .from(PRICE_VIEW)
     .update(changes)
     .eq('id', id)
     .select()
@@ -161,7 +174,7 @@ export async function updatePrice(id: string, changes: Partial<CreatePriceInput>
  */
 export async function deletePrice(id: string): Promise<void> {
   const { error } = await supabase
-    .from('daily_price_list')
+    .from(PRICE_VIEW)
     .delete()
     .eq('id', id)
   if (error) throw new Error(`Delete price failed: ${error.message}`)

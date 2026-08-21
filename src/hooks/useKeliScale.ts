@@ -58,6 +58,26 @@ export interface KeliScaleConfig {
   flowControl: FlowControlType
 }
 
+/**
+ * Tuỳ chọn cho hook — MẶC ĐỊNH giữ nguyên 100% hành vi cũ của app cân xe.
+ * Thêm vào 2026-08-21 để app Cân mủ lẻ (apps/retail-scale) dùng chung hook này mà
+ * KHÔNG đá localStorage và KHÔNG bị ép thông số của đầu cân XE.
+ */
+export interface KeliScaleOptions {
+  /**
+   * Tiền tố key localStorage. Mặc định 'keli_scale' (app cân xe, ERP).
+   * App Cân mủ lẻ truyền 'rs_scale' → cân bàn và cân xe nhớ cấu hình RIÊNG.
+   * Cực kỳ quan trọng khi 2 app chạy cùng 1 máy trạm: chung key = ghim sai baud cho nhau.
+   */
+  storageNamespace?: string
+  /**
+   * Có áp thông số mặc định/khoá theo nhà máy (FACILITY_DEFAULT_CONFIG, LOCKED_FACILITIES)
+   * hay không. Mặc định true (cân XE — thông số đã xác minh tại PĐ/TL).
+   * Cân bàn/cân sàn là ĐẦU CÂN KHÁC → truyền false để tự dò, đừng ép 9600/8/None/1 của cân xe.
+   */
+  useFacilityDefaults?: boolean
+}
+
 export interface UseKeliScaleReturn {
   /** Whether Web Serial API is supported in this browser */
   supported: boolean
@@ -111,7 +131,8 @@ const FACILITY_DEFAULT_CONFIG: Record<string, KeliScaleConfig> = {
 function getFacilityCode(): string {
   try { return String((import.meta as any).env?.VITE_FACILITY_CODE || '').toUpperCase() } catch { return '' }
 }
-function getFacilityDefaultConfig(): KeliScaleConfig | null {
+function getFacilityDefaultConfig(useFacilityDefaults = true): KeliScaleConfig | null {
+  if (!useFacilityDefaults) return null
   return FACILITY_DEFAULT_CONFIG[getFacilityCode()] || null
 }
 
@@ -119,25 +140,35 @@ function getFacilityDefaultConfig(): KeliScaleConfig | null {
 // hay chọn nhầm cấu hình / mất ổn định). Tân Lâm (TL) hay lỗi → cố định 9600/8/None/1.
 // Muốn đổi thông số TL: sửa FACILITY_DEFAULT_CONFIG.TL ở trên (1 chỗ duy nhất).
 const LOCKED_FACILITIES = new Set(['TL'])
-function getLockedConfig(): KeliScaleConfig | null {
+function getLockedConfig(useFacilityDefaults = true): KeliScaleConfig | null {
+  if (!useFacilityDefaults) return null
   const code = getFacilityCode()
   return LOCKED_FACILITIES.has(code) ? (FACILITY_DEFAULT_CONFIG[code] || null) : null
 }
 
-function isLockedFacility(): boolean { return getLockedConfig() != null }
+function isLockedFacility(useFacilityDefaults = true): boolean {
+  return getLockedConfig(useFacilityDefaults) != null
+}
 
 /** Cấu hình ĐANG DÙNG: localStorage (do dò thành công lần trước lưu) → mặc định nhà máy → generic. */
-function readSavedConfig(): KeliScaleConfig {
+function readSavedConfig(ns = DEFAULT_NS, useFacilityDefaults = true): KeliScaleConfig {
   try {
-    const s = localStorage.getItem(CONFIG_KEY)
+    const s = localStorage.getItem(cfgKey(ns))
     if (s) return { ...DEFAULT_CONFIG, ...JSON.parse(s) }
   } catch { /* ignore */ }
-  return getFacilityDefaultConfig() ?? DEFAULT_CONFIG
+  return getFacilityDefaultConfig(useFacilityDefaults) ?? DEFAULT_CONFIG
 }
 
 /** Nhà máy hiện tại có KHÓA cấu hình cân không (ưu tiên thông số cố định, chỉ dò khi cần). */
-export function getScaleLock(): { locked: boolean; config: KeliScaleConfig | null; facility: string } {
-  return { locked: isLockedFacility(), config: readSavedConfig(), facility: getFacilityCode() }
+export function getScaleLock(
+  ns = DEFAULT_NS,
+  useFacilityDefaults = true,
+): { locked: boolean; config: KeliScaleConfig | null; facility: string } {
+  return {
+    locked: isLockedFacility(useFacilityDefaults),
+    config: readSavedConfig(ns, useFacilityDefaults),
+    facility: getFacilityCode(),
+  }
 }
 
 // Configs to try when auto-detecting (most common for weighbridge scales)
@@ -164,12 +195,16 @@ const AUTO_DETECT_CONFIGS: Array<{ baudRate: number; parity: ParityType; dataBit
   { baudRate: 115200, parity: 'none', label: '115200/8/None/1 (modern)' },
 ]
 
-// Config key in localStorage
-const CONFIG_KEY = 'keli_scale_config'
+// Key localStorage — có NAMESPACE để nhiều app cân chạy trên CÙNG một máy trạm mà không
+// ghi đè cấu hình của nhau (cân xe và cân bàn là 2 đầu cân khác nhau, khác baud).
+//   'keli_scale' → keli_scale_config / keli_scale_last_success  (app cân xe — GIỮ NGUYÊN)
+//   'rs_scale'   → rs_scale_config   / rs_scale_last_success    (app Cân mủ lẻ)
+const DEFAULT_NS = 'keli_scale'
+function cfgKey(ns: string): string { return `${ns}_config` }
 // Flag chỉ ON khi đã connect thành công 1 lần — gate cho auto-reconnect ở mount.
 // Nếu user chưa từng kết nối thành công → KHÔNG auto-reconnect (tránh spam DOMException
 // trên cổng cũ đã grant nhưng disconnected).
-const LAST_SUCCESS_KEY = 'keli_scale_last_success'
+function lastOkKey(ns: string): string { return `${ns}_last_success` }
 
 // ============================================================================
 // PARSER — Parse Keli output formats (text + binary)
@@ -509,15 +544,20 @@ async function tryConfigOnPort(
 // HOOK
 // ============================================================================
 
-export function useKeliScale(): UseKeliScaleReturn {
+export function useKeliScale(options?: KeliScaleOptions): UseKeliScaleReturn {
   // Check browser support
   const supported = typeof navigator !== 'undefined' && 'serial' in navigator
+
+  // Namespace localStorage + có dùng thông số mặc định theo nhà máy hay không.
+  // Bỏ trống = hành vi CŨ của app cân xe (không đổi gì).
+  const ns = options?.storageNamespace || DEFAULT_NS
+  const useFacDefaults = options?.useFacilityDefaults !== false
 
   const [connected, setConnected] = useState(false)
   const [liveWeight, setLiveWeight] = useState<ScaleReading | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Cấu hình đang dùng = localStorage (dò lần trước lưu) → mặc định nhà máy → generic.
-  const [config, setConfigState] = useState<KeliScaleConfig>(() => readSavedConfig())
+  const [config, setConfigState] = useState<KeliScaleConfig>(() => readSavedConfig(ns, useFacDefaults))
 
   const portRef = useRef<SerialPort | null>(null)
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
@@ -542,12 +582,12 @@ export function useKeliScale(): UseKeliScaleReturn {
   const setConfig = useCallback((partial: Partial<KeliScaleConfig>) => {
     setConfigState(prev => {
       const next = { ...prev, ...partial }
-      try { localStorage.setItem(CONFIG_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      try { localStorage.setItem(cfgKey(ns), JSON.stringify(next)) } catch { /* ignore */ }
       return next
     })
     // Clear fatal error flag when user changes config
     fatalErrorRef.current = false
-  }, [])
+  }, [ns])
 
   // --------------------------------------------------------------------------
   // READ LOOP — Continuously read from serial port
@@ -681,13 +721,14 @@ export function useKeliScale(): UseKeliScaleReturn {
     let configList: typeof AUTO_DETECT_CONFIGS = AUTO_DETECT_CONFIGS
     try {
       let firstCfg: { baudRate: number; parity?: ParityType; dataBits?: number; stopBits?: number } | null = null
-      const saved = localStorage.getItem(CONFIG_KEY)
+      const saved = localStorage.getItem(cfgKey(ns))
       if (saved) {
         const s = JSON.parse(saved)
         if (s && typeof s.baudRate === 'number') firstCfg = s
       }
-      // Chưa lưu → dùng default theo nhà máy (TL=1200/8/None/1)
-      if (!firstCfg) firstCfg = getFacilityDefaultConfig()
+      // Chưa lưu → dùng default theo nhà máy (chỉ áp cho cân XE; cân bàn truyền
+      // useFacilityDefaults=false nên bỏ qua, tự dò từ đầu).
+      if (!firstCfg) firstCfg = getFacilityDefaultConfig(useFacDefaults)
       if (firstCfg) {
         configList = [
           {
@@ -746,7 +787,7 @@ export function useKeliScale(): UseKeliScaleReturn {
     }
 
     return null
-  }, [])
+  }, [ns, useFacDefaults])
 
   // --------------------------------------------------------------------------
   // CONNECT — Open browser serial port picker
@@ -782,8 +823,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       // Mốc cho watchdog: nếu 12s sau vẫn không có số nào → coi như rớt, nối lại.
       lastDataAtRef.current = Date.now()
       // Đánh dấu đã connect thành công ít nhất 1 lần — auto-reconnect lần load sau OK
-      try { localStorage.setItem(LAST_SUCCESS_KEY, '1') } catch { /* ignore */ }
-      console.log(`[KeliScale] ✅ Connected — Model: XK3118T1-A3 | Baud: ${cfg.baudRate} | Parity: ${cfg.parity} | DataBits: ${cfg.dataBits} | StopBits: ${cfg.stopBits}`)
+      try { localStorage.setItem(lastOkKey(ns), '1') } catch { /* ignore */ }
+      console.log(`[KeliScale] ✅ Connected — Baud: ${cfg.baudRate} | Parity: ${cfg.parity} | DataBits: ${cfg.dataBits} | StopBits: ${cfg.stopBits}`)
       console.log(`[KeliScale] 📡 Listening for weight data... (check console for raw bytes)`)
 
       startReading(port)
@@ -803,7 +844,7 @@ export function useKeliScale(): UseKeliScaleReturn {
       console.error('[KeliScale] Open error:', err)
       return false
     }
-  }, [startReading])
+  }, [startReading, ns])
 
   const connect = useCallback(async (): Promise<boolean> => {
     if (!supported) {
@@ -845,8 +886,8 @@ export function useKeliScale(): UseKeliScaleReturn {
       // KIỂM có ra số hợp lệ không bằng tryConfigOnPort — connectWithConfig chỉ MỞ cổng,
       // không phân biệt số thật vs RÁC (1200 sai vẫn "mở OK" nhưng đọc c0/c1/e0). Chỉ khi
       // đọc được số mới dùng; nếu ra rác/không số → RƠI xuống auto-detect để tự phục hồi.
-      if (isLockedFacility()) {
-        const fixed = readSavedConfig()
+      if (isLockedFacility(useFacDefaults)) {
+        const fixed = readSavedConfig(ns, useFacDefaults)
         setError(`Nối thông số cố định ${fixed.baudRate}/${fixed.dataBits}/${fixed.parity}…`)
         const test = await tryConfigOnPort(port, fixed)
         await new Promise(r => setTimeout(r, 300))
@@ -856,7 +897,7 @@ export function useKeliScale(): UseKeliScaleReturn {
         }
         if (test === 'ok') {
           setConfigState(fixed)
-          try { localStorage.setItem(CONFIG_KEY, JSON.stringify(fixed)) } catch { /* ignore */ }
+          try { localStorage.setItem(cfgKey(ns), JSON.stringify(fixed)) } catch { /* ignore */ }
           const ok = await connectWithConfig(port, fixed)
           if (ok) { setError(null); return true }
         }
@@ -877,7 +918,7 @@ export function useKeliScale(): UseKeliScaleReturn {
       if (detectedConfig) {
         // Save detected config
         setConfigState(detectedConfig)
-        try { localStorage.setItem(CONFIG_KEY, JSON.stringify(detectedConfig)) } catch { /* ignore */ }
+        try { localStorage.setItem(cfgKey(ns), JSON.stringify(detectedConfig)) } catch { /* ignore */ }
 
         // Connect with detected config
         await new Promise(r => setTimeout(r, 300))
@@ -912,7 +953,7 @@ export function useKeliScale(): UseKeliScaleReturn {
     } finally {
       connectingRef.current = false
     }
-  }, [supported, config, connectWithConfig, autoDetect])
+  }, [supported, config, connectWithConfig, autoDetect, ns, useFacDefaults])
 
   // --------------------------------------------------------------------------
   // TỰ KẾT NỐI LẠI khi rớt giữa chừng + WATCHDOG "cổng mở nhưng câm"
@@ -923,7 +964,7 @@ export function useKeliScale(): UseKeliScaleReturn {
     if (connectingRef.current || portRef.current) return false
     // Chỉ tự nối lại nếu đã từng kết nối thành công (cổng đã được cấp quyền)
     const everConnected = (() => {
-      try { return localStorage.getItem(LAST_SUCCESS_KEY) === '1' } catch { return false }
+      try { return localStorage.getItem(lastOkKey(ns)) === '1' } catch { return false }
     })()
     if (!everConnected) return false
 
@@ -938,14 +979,14 @@ export function useKeliScale(): UseKeliScaleReturn {
       // Nếu cấu hình sai/garbled → watchdog 12s sẽ bắt và thử lại vòng sau.
       // Dò đầy đủ chỉ chạy khi user bấm "Kết nối cổng COM" (connect()).
       // Dùng cấu hình ĐANG CHẠY (localStorage — đã phục hồi đúng nếu từng dò) — mở phát 1, không dò.
-      const saved = readSavedConfig()
+      const saved = readSavedConfig(ns, useFacDefaults)
       return await connectWithConfig(port, saved)
     } catch {
       return false
     } finally {
       connectingRef.current = false
     }
-  }, [supported, connectWithConfig])
+  }, [supported, connectWithConfig, ns, useFacDefaults])
 
   const scheduleReconnect = useCallback((delayMs?: number) => {
     if (manualDisconnectRef.current) return
@@ -1106,7 +1147,7 @@ export function useKeliScale(): UseKeliScaleReturn {
       // Gate: chỉ auto-reconnect nếu user đã từng connect thành công.
       // Lần đầu chưa connect → skip, tránh spam DOMException trên port "ma".
       const everConnected = (() => {
-        try { return localStorage.getItem(LAST_SUCCESS_KEY) === '1' } catch { return false }
+        try { return localStorage.getItem(lastOkKey(ns)) === '1' } catch { return false }
       })()
       if (!everConnected) {
         console.log('[KeliScale] Bỏ qua auto-reconnect — chưa có kết nối thành công trước đây. User cần bấm "Kết nối cổng COM".')
@@ -1119,8 +1160,8 @@ export function useKeliScale(): UseKeliScaleReturn {
           const port = ports[0]
 
           // Nhà máy KHÓA (TL): thử cấu hình cố định/đã lưu; nếu ra rác/không số → dò phục hồi.
-          if (isLockedFacility()) {
-            const fixed = readSavedConfig()
+          if (isLockedFacility(useFacDefaults)) {
+            const fixed = readSavedConfig(ns, useFacDefaults)
             const test = await tryConfigOnPort(port, fixed)
             await new Promise(r => setTimeout(r, 300))
             // Cổng bị app khác chiếm / không mở được → dừng, đừng dò tiếp (như connect()).
@@ -1130,7 +1171,7 @@ export function useKeliScale(): UseKeliScaleReturn {
             }
             if (test === 'ok') {
               setConfigState(fixed)
-              try { localStorage.setItem(CONFIG_KEY, JSON.stringify(fixed)) } catch { /* ignore */ }
+              try { localStorage.setItem(cfgKey(ns), JSON.stringify(fixed)) } catch { /* ignore */ }
               const ok = await connectWithConfig(port, fixed)
               if (ok) { console.log('[KeliScale] Auto-reconnect (cấu hình cố định) SUCCESS'); return }
             }
@@ -1143,7 +1184,7 @@ export function useKeliScale(): UseKeliScaleReturn {
           const detectedConfig = await autoDetect(port)
           if (detectedConfig) {
             setConfigState(detectedConfig)
-            try { localStorage.setItem(CONFIG_KEY, JSON.stringify(detectedConfig)) } catch { /* ignore */ }
+            try { localStorage.setItem(cfgKey(ns), JSON.stringify(detectedConfig)) } catch { /* ignore */ }
             await new Promise(r => setTimeout(r, 300))
             const ok = await connectWithConfig(port, detectedConfig)
             if (ok) {
@@ -1187,15 +1228,15 @@ export function useKeliScale(): UseKeliScaleReturn {
         }
       }
     } catch { /* ignore */ }
-    try { localStorage.removeItem(CONFIG_KEY) } catch { /* ignore */ }
-    try { localStorage.removeItem(LAST_SUCCESS_KEY) } catch { /* ignore */ }
+    try { localStorage.removeItem(cfgKey(ns)) } catch { /* ignore */ }
+    try { localStorage.removeItem(lastOkKey(ns)) } catch { /* ignore */ }
     // Reset hook state local
     portRef.current = null
     setConnected(false)
     setLiveWeight(null)
     setError(null)
     console.log('[KeliScale] Đã quên tất cả cổng đã lưu + reset flag — user cần chọn lại')
-  }, [])
+  }, [ns])
 
   return {
     supported,

@@ -438,7 +438,26 @@ export interface BatchQCResult {
 
 // 'gate' = cân xe ra/vô CỔNG (hàng nội bộ, không phải mủ) — chỉ Phong Điền
 // 'fetch' = Đợt 2 "Nhận mủ NM khác" (đi lấy mủ TL→PĐ) — cân đảo chiều như out, ghi là mủ nhập
-export type TicketType = 'in' | 'out' | 'gate' | 'fetch'
+// 'retail' = CÂN MỦ LẺ (app apps/retail-scale): hộ tiểu điền/khách vãng lai bán mủ tạp tại
+//            nhà máy, cân bàn/cân sàn, CÂN 1 LẦN (không có xe rỗng) — gross=net, tare=0.
+//            Từng bao ghi ở weighbridge_ticket_lots. Gom chi tiền qua Đề nghị thanh toán.
+export type TicketType = 'in' | 'out' | 'gate' | 'fetch' | 'retail'
+
+/** Nhãn hiển thị loại phiếu cân — dùng CHUNG để không còn chỗ nào suy nhị phân in/out
+ *  (trước đây `type === 'in' ? 'Vào' : 'Ra'` khiến phiếu gate/fetch/retail hiện SAI). */
+export const TICKET_TYPE_LABELS: Record<TicketType, { short: string; long: string }> = {
+  in:     { short: '📥 Vào',  long: '📥 Xe vào (Nhập)' },
+  out:    { short: '📤 Ra',   long: '📤 Xe ra (Xuất)' },
+  gate:   { short: '🚪 Cổng', long: '🚪 Cổng (hàng nội bộ)' },
+  fetch:  { short: '🚚 Lấy',  long: '🚚 Đi lấy mủ (NM khác)' },
+  retail: { short: '🧺 Lẻ',   long: '🧺 Cân mủ lẻ (hộ tiểu điền)' },
+}
+
+export function ticketTypeLabel(t: string | null | undefined, variant: 'short' | 'long' = 'long'): string {
+  const hit = t ? TICKET_TYPE_LABELS[t as TicketType] : undefined
+  return hit ? hit[variant] : (t || '—')
+}
+
 export type WeighbridgeStatus = 'weighing_gross' | 'weighing_tare' | 'completed' | 'cancelled'
 export type ReferenceType = 'stock_in' | 'stock_out' | 'stock_in_raw' | 'purchase_order' | 'none'
 

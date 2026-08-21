@@ -400,13 +400,27 @@ async function cancel(id: string, reason?: string): Promise<WeighbridgeTicket> {
 /**
  * Danh sách phiếu cân — phân trang, filter
  */
-async function getAll(params: WMSPaginationParams & {
+// Omit facility_id khỏi WMSPaginationParams rồi khai lại: bản gốc là `string` nên khi giao
+// (&) với `string | null` ở dưới, TypeScript rút gọn thành `string | undefined` và mọi caller
+// truyền `facility?.id || null` đều báo lỗi TS2322. Truyền null là hợp lệ ở đây (nghĩa là
+// "không lọc nhà máy") — nhánh `if (facility_id)` bỏ qua giá trị falsy.
+async function getAll(params: Omit<WMSPaginationParams, 'facility_id'> & {
   ticket_type?: TicketType
+  /** Danh sách loại phiếu được phép trả về (allowlist). App cân XE truyền
+   *  ['in','out','gate','fetch'] để phiếu mủ lẻ không chiếm chỗ trong cửa sổ 200 phiếu.
+   *  Dùng allowlist cho tường minh — mọi nhánh insert đều set ticket_type và cột có DEFAULT
+   *  nên thực tế không có dòng NULL (đo 2026-08-21: 0/881). Nếu sau này cần phòng thủ NULL
+   *  thì phải dùng .or('ticket_type.is.null,ticket_type.in.(...)') — cả .in lẫn .neq đều
+   *  loại dòng NULL. */
+  ticket_types?: TicketType[]
   vehicle_plate?: string
   /** F2 multi-facility: lọc theo nhà máy phát sinh phiếu */
   facility_id?: string | null
 }): Promise<PaginatedResponse<WeighbridgeTicket>> {
-  const { page = 1, pageSize = 20, search, status, from_date, to_date, ticket_type, vehicle_plate, facility_id } = params
+  const {
+    page = 1, pageSize = 20, search, status, from_date, to_date,
+    ticket_type, ticket_types, vehicle_plate, facility_id,
+  } = params
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
 
@@ -416,6 +430,7 @@ async function getAll(params: WMSPaginationParams & {
 
   if (status) query = query.eq('status', status)
   if (ticket_type) query = query.eq('ticket_type', ticket_type)
+  else if (ticket_types && ticket_types.length) query = query.in('ticket_type', ticket_types)
   if (vehicle_plate) query = query.ilike('vehicle_plate', `%${vehicle_plate}%`)
   if (from_date) query = query.gte('created_at', from_date)
   if (to_date) query = query.lte('created_at', to_date + 'T23:59:59.999Z')
@@ -512,6 +527,18 @@ async function unlinkReference(id: string): Promise<WeighbridgeTicket> {
 // ============================================================================
 
 /**
+ * Loại phiếu CÂN MỦ LẺ khỏi các truy vấn phục vụ luồng cân XE.
+ *
+ * Phiếu retail (app apps/retail-scale) nằm chung bảng weighbridge_tickets nhưng ngữ nghĩa
+ * khác hẳn: `driver_name` là TÊN KHÁCH, `tare_weight` là bì BAO/RỔ vài kg, `vehicle_plate`
+ * thường là 'XE MÁY'. Trộn vào gợi ý tare / autocomplete biển số của cân xe là gợi ý sai.
+ *
+ * Dùng .or(is null, neq) chứ KHÔNG dùng .neq trần: PostgREST dịch .neq thành `<> 'retail'`,
+ * mà `NULL <> 'retail'` ra NULL nên dòng có ticket_type NULL sẽ bị loại oan (cột này nullable).
+ */
+const NOT_RETAIL = 'ticket_type.is.null,ticket_type.neq.retail'
+
+/**
  * Lịch sử cân gần nhất theo biển số → gợi ý Tare weight
  */
 async function getRecentByPlate(plate: string, limit = 5): Promise<WeighbridgeTicket[]> {
@@ -521,6 +548,7 @@ async function getRecentByPlate(plate: string, limit = 5): Promise<WeighbridgeTi
     .ilike('vehicle_plate', plate.trim())
     .eq('status', 'completed')
     .not('tare_weight', 'is', null)
+    .or(NOT_RETAIL)
     .order('completed_at', { ascending: false })
     .limit(limit)
 
@@ -566,6 +594,7 @@ async function getPlateHistory(search?: string, limit = 20): Promise<string[]> {
     .from('weighbridge_tickets')
     .select('vehicle_plate')
     .eq('status', 'completed')
+    .or(NOT_RETAIL)   // đừng để 'XE MÁY' của mủ lẻ ngập autocomplete biển số xe tải
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -585,13 +614,21 @@ async function getPlateHistory(search?: string, limit = 20): Promise<string[]> {
 /**
  * Thống kê nhanh — dùng cho header dashboard
  */
-async function getStats(fromDate?: string, toDate?: string, facilityId?: string | null): Promise<{
+async function getStats(
+  fromDate?: string,
+  toDate?: string,
+  facilityId?: string | null,
+  /** Giới hạn loại phiếu được đếm. App cân XE truyền ['in','out','gate','fetch'] để phiếu
+   *  mủ lẻ không cộng vào "Tổng phiếu" / "Tấn nay" của trạm cân xe. */
+  ticketTypes?: TicketType[],
+): Promise<{
   totalTickets: number
   completedToday: number
   inProgress: number
   totalNetWeight: number
 }> {
   const today = new Date().toISOString().split('T')[0]
+  const types = ticketTypes && ticketTypes.length ? ticketTypes : null
 
   // Đang cân (chưa hoàn tất)
   let inProgressQuery = supabase
@@ -599,6 +636,7 @@ async function getStats(fromDate?: string, toDate?: string, facilityId?: string 
     .select('id', { count: 'exact', head: true })
     .in('status', ['weighing_gross', 'weighing_tare'])
   if (facilityId) inProgressQuery = inProgressQuery.eq('facility_id', facilityId)
+  if (types) inProgressQuery = inProgressQuery.in('ticket_type', types)
   const { count: inProgress } = await inProgressQuery
 
   // Hoàn tất hôm nay
@@ -609,6 +647,7 @@ async function getStats(fromDate?: string, toDate?: string, facilityId?: string 
     .gte('completed_at', `${today}T00:00:00.000Z`)
     .lte('completed_at', `${today}T23:59:59.999Z`)
   if (facilityId) todayQuery = todayQuery.eq('facility_id', facilityId)
+  if (types) todayQuery = todayQuery.in('ticket_type', types)
   const { data: todayData, count: completedToday } = await todayQuery
 
   // Tổng net weight hôm nay
@@ -624,6 +663,7 @@ async function getStats(fromDate?: string, toDate?: string, facilityId?: string 
   if (fromDate) totalQuery = totalQuery.gte('created_at', fromDate)
   if (toDate) totalQuery = totalQuery.lte('created_at', toDate + 'T23:59:59.999Z')
   if (facilityId) totalQuery = totalQuery.eq('facility_id', facilityId)
+  if (types) totalQuery = totalQuery.in('ticket_type', types)
 
   const { count: totalTickets } = await totalQuery
 

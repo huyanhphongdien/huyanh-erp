@@ -80,6 +80,7 @@ export interface AvailableTicket {
   billable_weight: number     // KL tính tiền: mủ nước = tươi×DRC; còn lại = tươi
   unit_price: number
   price_unit: 'wet' | 'dry' | null
+  ticket_type: string | null  // 'in' = cân xe · 'retail' = cân mủ lẻ (app Cân mủ lẻ)
   deal_id: string | null
   partner_id: string | null
   supplier_id: string | null
@@ -92,8 +93,9 @@ export interface AvailableTicket {
   payee_note: string          // STK/NH auto (NCC mua lẻ)
   deal_number: string | null
   suggested_amount: number    // billable_weight × giá, làm tròn nghìn
-  // Nguồn giá: deal (b2b_deals.unit_price) | pcg (phiếu chốt giá) | manual (tự nhập)
-  price_source: 'deal' | 'pcg' | 'manual'
+  // Nguồn giá: deal (b2b_deals.unit_price) | pcg (phiếu chốt giá)
+  //          | retail (giá đã chốt tại cân mủ lẻ, in trên phiếu cho khách) | manual (tự nhập)
+  price_source: 'deal' | 'pcg' | 'retail' | 'manual'
   price_source_ref: string | null   // số deal hoặc mã PCG
   // PCG đã match (nếu có) — để create() group + insert dòng "Phí" + markUsed sau khi insert.
   applied_pcg_id?: string | null
@@ -341,11 +343,14 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
     .from('weighbridge_tickets')
     .select(`
       id, code, vehicle_plate, rubber_type, net_weight, unit_price, price_unit, qc_actual_drc,
-      deal_id, partner_id, supplier_id, supplier_name, completed_at, created_at, facility_id
+      deal_id, partner_id, supplier_id, supplier_name, completed_at, created_at, facility_id,
+      ticket_type
     `)
     .eq('status', 'completed')
     .is('payment_request_id', null)
-    .eq('ticket_type', 'in')   // CHỈ phiếu NHẬP (mua mủ) mới gom chi tiền — loại XUẤT & CỔNG (hàng nội bộ)
+    // Gom chi tiền cho phiếu MUA MỦ: 'in' (cân xe) + 'retail' (cân mủ lẻ — hộ tiểu điền
+    // bán tại nhà máy). Loại XUẤT & CỔNG (hàng nội bộ) và 'fetch' (nội bộ NM→NM).
+    .in('ticket_type', ['in', 'retail'])
     .order('created_at', { ascending: true })
 
   if (params.facility_id) q = q.eq('facility_id', params.facility_id)
@@ -372,10 +377,13 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
     const drcMissing = drcMissingForDryPricing(r.price_unit, drc)
     const bw = billableWeight(net, r.price_unit, drc)
 
-    // Giá KHÔNG lấy từ phiếu cân: deal → b2b_deals.unit_price; bộc phát → PCG; còn lại → tự nhập.
+    // Giá KHÔNG lấy từ phiếu cân xe: deal → b2b_deals.unit_price; bộc phát → PCG; còn lại → tự nhập.
+    // NGOẠI LỆ — phiếu CÂN MỦ LẺ (ticket_type='retail'): giá đã được chốt NGAY TẠI CÂN và ĐÃ IN
+    // trên phiếu giao cho khách, nên phải lấy đúng giá đó (weighbridge_tickets.unit_price).
+    // Nếu kế toán sửa giá ở đây thì số chi sẽ lệch với phiếu khách đang cầm.
     const partnerName = r.partner_id ? (partnerNames.get(r.partner_id) || '') : ''
     let price = 0
-    let priceSource: 'deal' | 'pcg' | 'manual' = 'manual'
+    let priceSource: 'deal' | 'pcg' | 'retail' | 'manual' = 'manual'
     let priceRef: string | null = null
     let payee = partnerName || (r.supplier_name || '')
 
@@ -386,6 +394,10 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       priceSource = 'deal'
       priceRef = dealNumbers.get(r.deal_id) || null
       payee = partnerName
+    } else if (r.ticket_type === 'retail' && Number(r.unit_price) > 0) {
+      price = Number(r.unit_price)
+      priceSource = 'retail'
+      priceRef = r.code
     } else {
       const pcg = pcgMap.get(r.id)
       if (pcg) {
@@ -422,6 +434,7 @@ async function listAvailableTickets(params: ListAvailableParams = {}): Promise<A
       billable_weight: bw,
       unit_price: price,
       price_unit: r.price_unit ?? null,
+      ticket_type: r.ticket_type ?? null,
       deal_id: r.deal_id ?? null,
       partner_id: r.partner_id ?? null,
       supplier_id: r.supplier_id ?? null,
@@ -474,7 +487,7 @@ function ticketsToLines(tickets: AvailableTicket[]): LineInput[] {
     vehicle_plate: t.vehicle_plate,
     weight: t.billable_weight,        // KL khô cho mủ nước
     unit_price: t.unit_price,
-    amount: t.suggested_amount,       // đã làm tròn nghìn
+    amount: t.suggested_amount,       // số CHÍNH XÁC tới đồng; roundThousand áp lúc chi/in
     note: t.code,                     // mã phiếu cân → "số phiếu" trên mẫu
     sort_order: i,
     applied_pcg_id: t.applied_pcg_id,
@@ -622,13 +635,33 @@ async function create(input: CreatePaymentRequestInput): Promise<PaymentRequest>
       .insert([...normalPayload, ...feePayload])
     if (lineErr) throw lineErr
 
-    // Đánh dấu phiếu cân đã gom (chống gom trùng)
-    const ticketIds = input.lines.map(l => l.ticket_id).filter(Boolean) as string[]
+    // Đánh dấu phiếu cân đã gom (chống gom trùng).
+    //
+    // Điều kiện .eq('status','completed') + .is('payment_request_id', null) chạy NGUYÊN TỬ
+    // trong chính câu UPDATE. Danh sách phiếu khả dụng được đọc từ trước đó vài phút — trong
+    // khoảng đó phiếu có thể đã bị huỷ (app Cân mủ lẻ) hoặc đã bị người khác gom vào đề nghị
+    // khác. Không có điều kiện này thì đề nghị vẫn tạo ra với dòng tiền trỏ vào phiếu chết,
+    // hoặc hai đề nghị cùng chi một phiếu.
+    // .select('id') để đếm được số phiếu thực sự đóng dấu — UPDATE trượt vẫn trả error=null.
+    // Dedupe: nếu 2 dòng cùng trỏ 1 phiếu cân thì UPDATE chỉ đụng 1 row, so length sẽ báo
+    // lỗi oan và cuốn cả đề nghị hợp lệ vào rollback.
+    const ticketIds = [...new Set(input.lines.map(l => l.ticket_id).filter(Boolean) as string[])]
     if (ticketIds.length > 0) {
-      await supabase
+      const { data: stamped, error: stampErr } = await supabase
         .from('weighbridge_tickets')
         .update({ payment_request_id: req.id })
         .in('id', ticketIds)
+        .eq('status', 'completed')
+        .is('payment_request_id', null)
+        .select('id')
+      if (stampErr) throw stampErr
+      if (!stamped || stamped.length !== ticketIds.length) {
+        // Ném trong khối try → rollback sẵn có xoá header (lines CASCADE theo).
+        throw new Error(
+          'Có phiếu cân vừa bị huỷ hoặc đã được gom vào đề nghị khác — ' +
+          'vui lòng tải lại danh sách và gom lại.',
+        )
+      }
     }
 
     // Đánh dấu PCG đã dùng (best-effort, không fail nếu lỗi)

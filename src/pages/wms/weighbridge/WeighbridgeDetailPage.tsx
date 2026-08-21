@@ -41,6 +41,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import weighbridgeService from '../../../services/wms/weighbridgeService'
 import weighbridgeImageService from '../../../services/wms/weighbridgeImageService'
 import type { WeighbridgeTicket, WeighbridgeImage, WeighbridgeStatus } from '../../../services/wms/wms.types'
+import { ticketTypeLabel } from '../../../services/wms/wms.types'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -273,7 +274,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
             </Space>
             <div>
               <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-                {ticket.vehicle_plate} • {ticket.ticket_type === 'in' ? 'Xe vào' : 'Xe ra'}
+                {ticket.vehicle_plate} • {ticketTypeLabel(ticket.ticket_type, 'short')}
               </Text>
             </div>
           </div>
@@ -347,7 +348,7 @@ export default function WeighbridgeDetailPage({ id: propId }: WeighbridgeDetailP
                 {ticket.driver_name || <Text type="secondary">—</Text>}
               </Descriptions.Item>
               <Descriptions.Item label="Loại">
-                {ticket.ticket_type === 'in' ? '📥 Xe vào (Nhập)' : '📤 Xe ra (Xuất)'}
+                {ticketTypeLabel(ticket.ticket_type, 'long')}
               </Descriptions.Item>
               <Descriptions.Item label="Mã phiếu">
                 <Text copyable style={MONO_FONT}>{ticket.code}</Text>

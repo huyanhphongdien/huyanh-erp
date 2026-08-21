@@ -39,6 +39,7 @@ import facilityService from '../../../services/wms/facilityService'
 import type { Facility } from '../../../services/wms/facilityService'
 import type { ActiveDealForStockIn } from '../../../services/b2b/dealWmsService'
 import type { WeighbridgeTicket, TicketType, WeighbridgeStatus, PaginatedResponse } from '../../../services/wms/wms.types'
+import { ticketTypeLabel } from '../../../services/wms/wms.types'
 import dayjs from 'dayjs'
 import { B2BSectionTabs, INTAKE_TABS } from '../../../components/b2b/B2BSectionTabs'
 import { useIsB2BPurchaser } from '../../../hooks/useIsB2BPurchaser'
@@ -75,6 +76,9 @@ const TYPE_OPTIONS = [
   { value: '', label: 'Tất cả' },
   { value: 'in', label: 'Xe vào' },
   { value: 'out', label: 'Xe ra' },
+  { value: 'gate', label: 'Cổng' },
+  { value: 'fetch', label: 'Đi lấy mủ' },
+  { value: 'retail', label: 'Mủ lẻ' },
 ]
 
 const MONO_FONT: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" }
@@ -264,7 +268,7 @@ export default function WeighbridgeListPage() {
       key: 'ticket_type',
       width: 80,
       render: (type: TicketType) => (
-        <Tag>{type === 'in' ? '📥 Vào' : '📤 Ra'}</Tag>
+        <Tag>{ticketTypeLabel(type, 'short')}</Tag>
       ),
     },
     {

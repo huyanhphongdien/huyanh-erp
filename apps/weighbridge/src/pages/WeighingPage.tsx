@@ -504,6 +504,10 @@ export default function WeighingPage() {
       .eq('vehicle_plate', trimmed)
       .gte('created_at', todayStart.toISOString())
       .neq('status', 'cancelled')
+      // Bỏ phiếu CÂN MỦ LẺ ra: hộ dân bán mủ sáng bằng xe cùng biển số sẽ làm banner này
+      // báo trùng giả, kèm mã ML-... mà thao tác viên cân xe không tra được ở đâu.
+      // .or(is null, neq) vì .neq trần sẽ loại luôn dòng ticket_type NULL.
+      .or('ticket_type.is.null,ticket_type.neq.retail')
     if (ticket?.id) q = q.neq('id', ticket.id)
     const { data } = await q
     const codes = (data || []).map((r: any) => r.code).filter(Boolean)

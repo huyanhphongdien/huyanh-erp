@@ -22,8 +22,13 @@ src/
   lib/             # supabase.ts client init
   App.tsx          # Router definition
 docs/              # Mockups, migration SQL, specs
-apps/weighbridge/  # Sub-app for weighbridge scale integration
+apps/weighbridge/  # Sub-app: truck weighbridge (2-pass weighing, cameras)
+apps/retail-scale/ # Sub-app: "Cân mủ lẻ" — smallholder walk-in purchase (bench scale, 1-pass)
 ```
+
+Sub-apps have their OWN `node_modules` (no npm workspaces) and their own Vercel project.
+They import ERP services via the `@erp` alias → `../../src`; dependency flow is one-way
+(sub-app → ERP, never the reverse).
 
 ## Key Conventions
 - Vietnamese UI labels, Vietnamese comments where helpful
@@ -38,6 +43,9 @@ apps/weighbridge/  # Sub-app for weighbridge scale integration
 - **huyanhrubber.vn** = ERP (this project) → Vercel, auto-deploy from GitHub `main`
 - **huyanhrubber.com.vn** = Company website (DIFFERENT project) → Netlify site `huyanh-rubber`
 - **b2b.huyanhrubber.vn** = B2B Partner Portal → Vercel, repo `huyanh-b2b-portal`
+- **can{,-tl,-lao}.huyanhrubber.vn** = App cân xe → Vercel, Root Dir `apps/weighbridge`
+- **canle{,-tl,-lao}.huyanhrubber.vn** = App Cân mủ lẻ → Vercel, Root Dir `apps/retail-scale`
+  (bật "Include source files outside of the Root Directory" — alias `@erp` trỏ ra `../../src`)
 - **NEVER** deploy this ERP project to Netlify `huyanh-rubber` site — that's the company website
 
 ## Database
@@ -64,6 +72,27 @@ apps/weighbridge/  # Sub-app for weighbridge scale integration
 - Page: `/sales/contracts/review` (queue Kiểm tra)
 - Templates: `public/contract-templates/template_{SC,PI}_{CIF,FOB}.docx`
 - **Cut-over (phương án A)**: HĐ trước 2026-05-14 không động vào, vẫn dùng `ContractFileSection` (upload PDF scan); HĐ mới (có row `sales_order_contracts`) dùng `ContractWorkflowSection`. `ContractTab.tsx` tự detect.
+
+## Cân mủ lẻ (apps/retail-scale)
+Hộ tiểu điền / khách vãng lai bán **mủ tạp** tại nhà máy — cân bàn RS232, **cân 1 lần**,
+không bắt buộc CCCD, in phiếu nhiệt 80mm. Xem [docs/CAN_MU_LE_KE_HOACH.md](docs/CAN_MU_LE_KE_HOACH.md).
+- **Không có bảng phiếu riêng**: phiếu = `weighbridge_tickets` với `ticket_type='retail'`,
+  `status='completed'`, `has_items=false`; từng bao = `weighbridge_ticket_lots`.
+  - Dùng `weighbridge_ticket_lots` **chứ không phải** `weighbridge_ticket_items`: bảng items có
+    `chk_exactly_one_source` (bắt buộc deal/partner/supplier), trigger `allocate_ticket_item_weights()`
+    ghi đè khối lượng theo prorata, và không có policy `anon`.
+  - `has_items` phải là **false** — bật true là trigger phân bổ xoá mất số cân thật từng bao.
+- **Tiền**: không chi tại cân. Phiếu chảy vào Đề nghị thanh toán (`payment_requests`) như mọi
+  luồng mua mủ khác; `paymentRequestService.listAvailableTickets` lọc `ticket_type IN ('in','retail')`
+  và lấy giá từ `weighbridge_tickets.unit_price` (`price_source='retail'`).
+- **Giá mủ tạp = kg TƯƠI** (`price_unit='wet'`, không nhân DRC). Chỉ `mu_nuoc` mới là giá khô.
+  ⚠ `src/services/b2b/intakeWalkinService.ts` nhân DRC cho mọi loại mủ — đó là **bug**, đừng bắt chước.
+- Migrations: `docs/migrations/retail_scale_p{1,2,3}_*.sql` — chạy theo thứ tự.
+  Kiểm tra DB sẵn sàng: `powershell -File docs/retail_scale_preflight.ps1`.
+- Phiếu retail **không** sinh `rubber_intake_batches` (bridge chỉ chạy cho `ticket_type='in'`) —
+  cố ý, để hộ tiểu điền không lọt vào `compute_monthly_bonus` của đại lý B2B.
+- `apps/weighbridge` và `apps/retail-scale` dùng chung hook `src/hooks/useKeliScale.ts` nhưng
+  **khác namespace localStorage** (`keli_scale` vs `rs_scale`) — chung key là ghim sai baud cho nhau.
 
 ## Git
 - Single branch: `main`

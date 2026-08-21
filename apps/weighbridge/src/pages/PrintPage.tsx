@@ -174,6 +174,19 @@ export default function PrintPage() {
     )
   }
 
+  // Phiếu CÂN MỦ LẺ (app apps/retail-scale) có cùng bảng nhưng KHÁC hẳn về cấu trúc: cân 1
+  // lần, không có xe rỗng, chi tiết nằm ở từng bao. Render bằng mẫu phiếu cân xe sẽ ra
+  // "PHIẾU CÂN XE / Xe ra (Xuất) / Biển số xe: XE MÁY" — sai toàn bộ. Chặn tại đây.
+  if (ticket.ticket_type === 'retail') {
+    return (
+      <div style={{ textAlign: 'center', padding: 48 }}>
+        <Text>Phiếu mủ lẻ ({ticket.code}) — in tại app Cân mủ lẻ</Text>
+        <br />
+        <Button style={{ marginTop: 12 }} onClick={() => navigate('/')}>Quay lại</Button>
+      </div>
+    )
+  }
+
   const ext = ticket as any
   const cfg = PAPER_CONFIGS[paperSize]
   // Thermal printer = giấy nhiệt (80mm / 58mm). A4 + A5 đều là laser/inkjet, layout giống nhau.

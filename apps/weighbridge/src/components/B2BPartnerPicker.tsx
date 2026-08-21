@@ -191,16 +191,22 @@ export default function B2BPartnerPicker({ value, onChange, placeholder, disable
       const supplierIds = result.filter((p) => p.kind === 'supplier').map((p) => p.id)
       const map: Record<string, string> = {}
       try {
+        // Bỏ phiếu CÂN MỦ LẺ khỏi "lần giao gần nhất": phiếu retail CÓ ghi partner_id, nên
+        // một đại lý vừa bán lẻ tại nhà máy sẽ nhảy lên đầu gợi ý của cân xe với ngày không
+        // phải ngày giao xe. (.or vì .neq trần loại luôn dòng ticket_type NULL.)
+        const notRetail = 'ticket_type.is.null,ticket_type.neq.retail'
         if (partnerIds.length) {
           const { data } = await supabase
             .from('weighbridge_tickets').select('partner_id, created_at')
-            .in('partner_id', partnerIds).order('created_at', { ascending: false }).limit(500)
+            .in('partner_id', partnerIds).or(notRetail)
+            .order('created_at', { ascending: false }).limit(500)
           for (const r of (data ?? []) as any[]) if (r.partner_id && !map[r.partner_id]) map[r.partner_id] = r.created_at
         }
         if (supplierIds.length) {
           const { data } = await supabase
             .from('weighbridge_tickets').select('supplier_id, created_at')
-            .in('supplier_id', supplierIds).order('created_at', { ascending: false }).limit(500)
+            .in('supplier_id', supplierIds).or(notRetail)
+            .order('created_at', { ascending: false }).limit(500)
           for (const r of (data ?? []) as any[]) if (r.supplier_id && !map[r.supplier_id]) map[r.supplier_id] = r.created_at
         }
       } catch { /* non-blocking */ }

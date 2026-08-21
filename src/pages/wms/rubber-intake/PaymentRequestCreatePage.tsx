@@ -32,13 +32,23 @@ const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
   supplier: { label: 'Mua lẻ',  cls: 'bg-blue-100 text-blue-700' },
   manual:   { label: 'Khác',    cls: 'bg-gray-100 text-gray-600' },
 }
+// Phiếu CÂN MỦ LẺ (ticket_type='retail') không có deal/NCC → source_type suy ra là 'manual'.
+// Cho nó badge riêng để kế toán phân biệt ngay, đừng để lẫn vào "Khác".
+const RETAIL_BADGE = { label: 'Mủ lẻ', cls: 'bg-violet-100 text-violet-700' }
+const FALLBACK_BADGE = { label: 'Khác', cls: 'bg-gray-100 text-gray-600' }
 
-// Nguồn giá: deal (giá deal) | pcg (phiếu chốt giá) | manual (chưa có giá → kế toán nhập)
+// Nguồn giá: deal (giá deal) | pcg (phiếu chốt giá) | retail (giá chốt tại cân mủ lẻ, đã in
+// cho khách — không nên sửa) | manual (chưa có giá → kế toán nhập)
 const PRICE_SRC: Record<string, { label: string; cls: string }> = {
   deal:   { label: 'Giá deal',       cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
   pcg:    { label: 'Giá PCG',        cls: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  retail: { label: 'Giá tại cân',    cls: 'bg-violet-50 text-violet-700 border border-violet-200' },
   manual: { label: '⚠ Chưa có giá',  cls: 'bg-red-50 text-red-600 border border-red-200' },
 }
+
+// SỐ THỰC CHI làm tròn tới NGHÌN — cùng quy tắc với paymentRequestService.roundThousand,
+// PaymentRequestPrintPage và app Cân mủ lẻ. Sửa ở đây thì phải sửa cả 3 chỗ kia.
+const roundThousand = (n: number | null | undefined) => Math.round((n || 0) / 1000) * 1000
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -98,7 +108,9 @@ const PaymentRequestCreatePage: React.FC = () => {
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(tickets.map(t => t.id)))
 
   const chosen = tickets.filter(t => selected.has(t.id))
-  const totalAmount = chosen.reduce((s, t) => s + t.suggested_amount, 0)
+  // Cộng số ĐÃ LÀM TRÒN của TỪNG DÒNG (không phải làm tròn tổng) — khớp đúng cách
+  // total_rounded và markPaid tính, và khớp con số in trên phiếu khách đang cầm.
+  const totalAmount = chosen.reduce((s, t) => s + roundThousand(t.suggested_amount), 0)
   const totalWeight = chosen.reduce((s, t) => s + t.billable_weight, 0)
 
   const handleCreate = async () => {
@@ -210,7 +222,9 @@ const PaymentRequestCreatePage: React.FC = () => {
           <div className="space-y-2">
             {tickets.map(t => {
               const sel = selected.has(t.id)
-              const badge = SOURCE_BADGE[t.source_type]
+              const badge = t.ticket_type === 'retail'
+                ? RETAIL_BADGE
+                : (SOURCE_BADGE[t.source_type] || FALLBACK_BADGE)
               return (
                 <button
                   key={t.id}
@@ -237,8 +251,8 @@ const PaymentRequestCreatePage: React.FC = () => {
                           {t.drc != null && t.price_unit === 'dry' && <span className="text-gray-300">(khô, DRC {t.drc}%)</span>}
                         </span>
                         <span className="flex items-center gap-1"><Tag className="w-3.5 h-3.5" />{fmtVnd(t.unit_price)}/kg</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${PRICE_SRC[t.price_source].cls}`}>
-                          {PRICE_SRC[t.price_source].label}{t.price_source === 'pcg' && t.price_source_ref ? ` ${t.price_source_ref}` : ''}
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${(PRICE_SRC[t.price_source] || PRICE_SRC.manual).cls}`}>
+                          {(PRICE_SRC[t.price_source] || PRICE_SRC.manual).label}{t.price_source === 'pcg' && t.price_source_ref ? ` ${t.price_source_ref}` : ''}
                         </span>
                         {t.drc_missing && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
@@ -248,7 +262,12 @@ const PaymentRequestCreatePage: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-[14px] font-bold text-emerald-600 font-mono">{fmtVnd(t.suggested_amount)}</p>
+                      {/* Số LỚN = số thực chi (làm tròn nghìn) — đúng con số in trên phiếu
+                          mủ lẻ khách đang cầm. Số chính xác chỉ hiện khi hai số khác nhau. */}
+                      <p className="text-[14px] font-bold text-emerald-600 font-mono">{fmtVnd(roundThousand(t.suggested_amount))}</p>
+                      {roundThousand(t.suggested_amount) !== t.suggested_amount && (
+                        <p className="text-[10px] text-gray-400 font-mono">chính xác {fmtVnd(t.suggested_amount)}</p>
+                      )}
                     </div>
                   </div>
                 </button>

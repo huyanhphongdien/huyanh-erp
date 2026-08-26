@@ -10,33 +10,33 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // ============================================================================
 // TỰ THỬ LẠI KHI GẶP PGRST303 "JWT issued at future"
 // ============================================================================
-// SỰ CỐ (26/08/2026): người dùng mở /sales/kanban thấy "Lỗi tải đơn: JWT issued at future"
-// và danh sách rỗng, dù đăng nhập bình thường.
+// SỰ CỐ (26/08/2026): toàn bộ ERP không lấy được dữ liệu. Trang /sales/kanban báo
+// "Lỗi tải đơn: JWT issued at future" và danh sách rỗng, dù đăng nhập bình thường.
+// Sự cố tự hết sau khi restart project trên Supabase.
 //
-// KHÔNG phải lỗi của code này, cũng không phải sai giờ máy người dùng. Đây là bug hạ tầng
-// của Supabase: PostgREST kiểm claim `iat` bằng một bộ đệm thời gian tự cập nhật, và có
-// luồng xác thực bỏ lỡ nhịp cập nhật nên "giờ hiện tại" của nó bị chậm. Token GoTrue vừa
-// phát (iat = giờ thật) bị luồng chậm giờ đó coi là "phát hành ở tương lai" → 401 PGRST303.
-//
-// Đã đo để loại trừ mọi nguyên nhân phía mình (26/08/2026):
+// ĐÃ ĐO ĐƯỢC — loại trừ mọi nguyên nhân phía mình:
 //   • đồng hồ máy dev lệch −1 giây so với Supabase/Google
 //   • đồng hồ Postgres lệch −1 giây so với giờ thật
 //   • 0/335 phiên trong auth.sessions có mốc thời gian tương lai
 //   • project Healthy, gói Pro, chưa từng bị pause
-// Độ lệch nằm TRONG cache của PostgREST, không phải đồng hồ máy chủ — nên không sửa được
-// từ phía ứng dụng, chỉ né được.
+//   • PostgREST đang chạy 14.17
 //
-// ĐẶC TÍNH: chập chờn. Token bị từ chối trong 100–200ms đầu sau khi phát, nhưng thử lại sau
-// 1-2 giây thì qua. Vì vậy request đầu tiên NGAY SAU khi đăng nhập/tải lại trang là dễ dính
-// nhất — đúng kịch bản trang Kanban gọi query lúc vừa mở.
+// CHƯA XÁC ĐỊNH ĐƯỢC nguyên nhân thật. PGRST303 nghĩa là bên nhận thấy claim `iat` của
+// token nằm ở tương lai so với đồng hồ CỦA NÓ — mà đồng hồ đó ta không đo được từ ngoài.
+// Không kết luận được là do bộ đệm thời gian của PostgREST, do GoTrue phát token lệch giờ,
+// hay do một tầng nào khác. Đừng chép lại phỏng đoán này như dữ kiện.
 //
-// VÌ SAO THỬ LẠI LÀ AN TOÀN VỚI MỌI PHƯƠNG THỨC (kể cả POST/PATCH/DELETE):
+// VÌ SAO VẪN THỬ LẠI: dù nguyên nhân là gì thì đặc tính vẫn là CHẬP CHỜN — cùng một token
+// bị từ chối rồi vài giây sau lại qua. Thử lại là cách né rẻ nhất và không che giấu lỗi nào
+// khác: chỉ đúng mã PGRST303 mới thử lại, mọi 401 khác trả về ngay như cũ.
+//
+// VÌ SAO THỬ LẠI AN TOÀN VỚI MỌI PHƯƠNG THỨC (kể cả POST/PATCH/DELETE):
 // 401 nghĩa là request bị chặn ở tầng xác thực, CHƯA hề chạm tới database. Không có tác dụng
-// phụ nào đã xảy ra để mà nhân đôi. Ta cũng chỉ thử lại khi đọc được đúng mã PGRST303 —
-// mọi lỗi 401 khác (hết hạn token, sai quyền) vẫn trả về ngay như cũ.
+// phụ nào đã xảy ra để mà nhân đôi.
 //
-// Bỏ lớp này đi khi nào? Khi Supabase deploy PostgREST ≥ v14.17 / v16.1 cho project.
-// Kiểm bằng: curl -sI https://<ref>.supabase.co/rest/v1/ | grep -i server
+// KHI NÀO BỎ LỚP NÀY: khi sự cố không tái diễn trong một thời gian đủ dài, hoặc khi xác định
+// được nguyên nhân thật và nó đã được sửa. KHÔNG có mốc phiên bản nào để căn — project đã
+// chạy 14.17 ngay lúc sự cố xảy ra.
 // ============================================================================
 
 /** Số lần thử LẠI (không tính lần đầu). 3 lần ≈ tối đa ~2,8s trước khi chịu thua. */

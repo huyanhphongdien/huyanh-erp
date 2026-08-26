@@ -91,7 +91,17 @@ export default function SalesKanbanPage() {
 
     setLoading(false)
     if (error) {
-      message.error('Lỗi tải đơn: ' + error.message)
+      // Lỗi token của Supabase trả về chuỗi tiếng Anh khó hiểu ("JWT expired",
+      // "JWT issued at future"). Người dùng ở nhà máy không biết phải làm gì với nó, nên dịch
+      // sang việc họ CẦN LÀM. Riêng PGRST303 là bug hạ tầng Supabase, src/lib/supabase.ts đã
+      // tự thử lại 3 lần — tới được đây nghĩa là cả 4 lần đều trượt.
+      const isJwt = /jwt|token/i.test(error.message) || ['PGRST301', 'PGRST303'].includes((error as { code?: string }).code || '')
+      message.error(
+        isJwt
+          ? 'Phiên đăng nhập có vấn đề — bấm Làm mới, nếu vẫn lỗi thì đăng xuất rồi đăng nhập lại.'
+          : 'Lỗi tải đơn: ' + error.message,
+        6,
+      )
       return
     }
 

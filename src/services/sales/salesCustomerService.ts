@@ -22,6 +22,12 @@ import type {
 // SERVICE
 // ============================================================================
 
+/** Cột được phép sắp xếp ở tầng DB. Giá trị khác rơi về 'name'. */
+export const SORTABLE_CUSTOMER_COLUMNS: ReadonlySet<string> = new Set([
+  'name', 'short_name', 'code', 'country', 'status',
+  'created_at', 'updated_at', 'contact_person', 'email',
+])
+
 export const salesCustomerService = {
   // ==========================================================================
   // LIST & QUERY
@@ -76,8 +82,10 @@ export const salesCustomerService = {
       )
     }
 
-    // Sắp xếp
-    query = query.order(sort_by, { ascending: sort_order === 'asc' })
+    // Sắp xếp — whitelist vì sort_by đi thẳng từ client vào .order();
+    // tên cột không tồn tại thì PostgREST trả 400 và danh sách không tải được.
+    const safeSortBy = SORTABLE_CUSTOMER_COLUMNS.has(sort_by) ? sort_by : 'name'
+    query = query.order(safeSortBy, { ascending: sort_order === 'asc' })
 
     // Phân trang
     const { data, error, count } = await query.range(from, to)

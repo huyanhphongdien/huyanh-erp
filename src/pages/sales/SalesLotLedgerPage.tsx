@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   salesLotService,
   type LotLedger, type SalesLotRow, type OrderWithoutLots, type LotPaymentStatus,
+  type LotDeliveryState,
 } from '../../services/sales/salesLotService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
 import { useAuthStore } from '../../stores/authStore'
@@ -47,12 +48,28 @@ const PAY_TAG: Record<LotPaymentStatus, { color: string; label: string }> = {
   unknown: { color: 'default', label: 'Chưa có trị giá' },
 }
 
+/**
+ * Trục GIAO — màu và nhãn. Tính từ chứng cứ container, KHÔNG từ `lot_status`.
+ * `lot_status` là số nhập tay/chép xuống lúc backfill và đang trái chứng cứ ở 9/20 lô;
+ * tô màu tiến độ bằng nó là gần một nửa số dòng sai màu ngay ngày đầu.
+ */
+const DELIVERY_TAG: Record<LotDeliveryState, { color: string; label: string; bar: string }> = {
+  full:    { color: 'green',   label: 'Giao đủ',  bar: '#22c55e' },
+  partial: { color: 'blue',    label: 'Giao dở',  bar: '#3b82f6' },
+  none:    { color: 'default', label: 'Chưa đi',  bar: '#d1d5db' },
+}
+
 const LOT_STATUS_LABEL: Record<string, string> = {
   planning: 'Kế hoạch', packing: 'Đang đóng', shipped: 'Đã đi',
   delivered: 'Đã giao', cancelled: 'Đã huỷ',
 }
 
-type PayFilter = 'all' | 'unpaid' | 'partial' | 'paid'
+/**
+ * Bộ lọc nhanh. Trộn hai trục vào một dải nút là cố ý: người dùng đến trang này với
+ * đúng một câu hỏi tại một thời điểm ("lô nào chưa thu" HAY "lô nào đang kẹt"),
+ * không phải hai câu cùng lúc. Hai dải Segmented sẽ tốn chỗ mà không ai dùng chéo.
+ */
+type PayFilter = 'all' | 'unpaid' | 'partial' | 'paid' | 'shipped_unpaid' | 'not_shipped' | 'mismatch'
 
 export default function SalesLotLedgerPage() {
   const navigate = useNavigate()
@@ -84,7 +101,16 @@ export default function SalesLotLedgerPage() {
 
   const lots = useMemo(() => {
     let rows = ledger?.lots ?? []
-    if (payFilter !== 'all') rows = rows.filter((l) => l.payment_status === payFilter)
+    if (payFilter === 'shipped_unpaid') {
+      // Hàng đã sang khách mà tiền chưa về — rủi ro thật, không phải cảnh báo hình thức.
+      rows = rows.filter((l) => l.delivery_state === 'full' && l.payment_status !== 'paid')
+    } else if (payFilter === 'not_shipped') {
+      rows = rows.filter((l) => l.delivery_state === 'none')
+    } else if (payFilter === 'mismatch') {
+      rows = rows.filter((l) => l.status_mismatch)
+    } else if (payFilter !== 'all') {
+      rows = rows.filter((l) => l.payment_status === payFilter)
+    }
     const kw = q.trim().toLowerCase()
     if (kw) {
       rows = rows.filter((l) =>
@@ -137,11 +163,63 @@ export default function SalesLotLedgerPage() {
       sorter: (a, b) => a.lot_no - b.lot_no,
     },
     {
-      title: 'Trạng thái lô', dataIndex: 'lot_status', width: 110, align: 'center',
-      render: (v: string) => <Tag>{LOT_STATUS_LABEL[v] || v}</Tag>,
+      // Trục GIAO — tính từ CHỨNG CỨ (container + dòng lệnh xe), không đọc lot_status.
+      title: 'Giao hàng', dataIndex: 'delivery_state', width: 168,
+      render: (v: LotDeliveryState, r) => {
+        // Lô có container nhưng chưa nhập số bành → net_kg_total = 0. Nếu để thanh rơi
+        // về 0% thì dòng đó hiện "Giao đủ · 5/5 cont" cạnh một thanh trống — tự mâu thuẫn.
+        // Rơi về tỉ lệ CONTAINER trong trường hợp đó.
+        const pct = r.net_kg_total > 0
+          ? (r.net_kg_delivered / r.net_kg_total) * 100
+          : r.container_count > 0
+            ? (r.containers_delivered / r.container_count) * 100
+            : 0
+        const c = DELIVERY_TAG[v]
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 3 }}>
+              <Tag color={c.color} style={{ margin: 0 }}>{c.label}</Tag>
+              <span style={{ fontSize: 11, color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                {r.containers_delivered}/{r.container_count} cont
+              </span>
+              {r.status_mismatch && (
+                <Tooltip
+                  title={`Bảng ghi "${LOT_STATUS_LABEL[r.lot_status] || r.lot_status}" nhưng chứng cứ giao nói khác (${r.containers_delivered}/${r.container_count} cont đã đi). Cột "Ghi chú trạng thái" là số nhập tay, không phải chứng cứ.`}
+                >
+                  <span style={{ color: '#dc2626', fontWeight: 700, cursor: 'help' }}>⚠</span>
+                </Tooltip>
+              )}
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: c.bar, borderRadius: 2 }} />
+            </div>
+            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+              {r.net_kg_total > 0
+                ? `${fmtTon(r.net_kg_delivered)} / ${fmtTon(r.net_kg_total)}`
+                : 'chưa nhập số bành'}
+            </div>
+          </div>
+        )
+      },
+      filters: (Object.keys(DELIVERY_TAG) as LotDeliveryState[]).map((k) => ({ text: DELIVERY_TAG[k].label, value: k })),
+      onFilter: (val, r) => r.delivery_state === val,
+      sorter: (a, b) => {
+        const ra = a.net_kg_total > 0 ? a.net_kg_delivered / a.net_kg_total : -1
+        const rb = b.net_kg_total > 0 ? b.net_kg_delivered / b.net_kg_total : -1
+        return ra - rb
+      },
     },
     {
-      title: 'Khối lượng', dataIndex: 'net_weight_kg', width: 110, align: 'right',
+      // Số NHẬP TAY, giữ lại để đối chiếu — không dùng để kết luận tiến độ.
+      title: 'Ghi chú trạng thái', dataIndex: 'lot_status', width: 118, align: 'center',
+      render: (v: string, r) => (
+        <Tag color={r.status_mismatch ? 'red' : undefined} style={{ margin: 0 }}>
+          {LOT_STATUS_LABEL[v] || v}
+        </Tag>
+      ),
+    },
+    {
+      title: 'KL chốt', dataIndex: 'net_weight_kg', width: 100, align: 'right',
       render: (v: number | null) => fmtTon(v),
       sorter: (a, b) => (a.net_weight_kg || 0) - (b.net_weight_kg || 0),
     },
@@ -282,7 +360,14 @@ export default function SalesLotLedgerPage() {
         </Col>
         <Col xs={12} md={6}>
           <Card size="small">
-            <Statistic title="Trị giá các lô" value={fmtUSD(t?.lotValueUsd ?? 0)} valueStyle={{ fontSize: 20 }} />
+            <Statistic
+              title="Đã giao"
+              value={t && t.netKgTotal > 0 ? `${((t.netKgDelivered / t.netKgTotal) * 100).toFixed(1)}%` : '—'}
+              valueStyle={{ fontSize: 20, color: '#1d4ed8' }}
+            />
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+              {fmtTon(t?.netKgDelivered)} / {fmtTon(t?.netKgTotal)} · {t?.containersDelivered ?? 0}/{t?.containersTotal ?? 0} cont
+            </div>
           </Card>
         </Col>
         <Col xs={12} md={6}>
@@ -291,6 +376,9 @@ export default function SalesLotLedgerPage() {
               title="Đã thu theo lô" value={fmtUSD(t?.lotPaidUsd ?? 0)}
               valueStyle={{ fontSize: 20, color: '#15803d' }}
             />
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+              trên {fmtUSD(t?.lotValueUsd ?? 0)} trị giá lô
+            </div>
           </Card>
         </Col>
         <Col xs={12} md={6}>
@@ -299,15 +387,38 @@ export default function SalesLotLedgerPage() {
               title="Còn nợ theo lô" value={fmtUSD(t?.lotRemainingUsd ?? 0)}
               valueStyle={{ fontSize: 20, color: '#dc2626' }}
             />
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+              {t?.lotsDelivered ?? 0} lô đã giao đủ · {t?.lotsNotShipped ?? 0} lô chưa đi
+            </div>
           </Card>
         </Col>
       </Row>
 
+      {/* Trạng thái nhập tay trái với chứng cứ giao — KHÔNG tự sửa dữ liệu, chỉ báo cho người xem */}
+      {t && t.lotsMismatch > 0 && (
+        <Alert
+          type="warning" showIcon style={{ marginBottom: 12 }}
+          message={`${t.lotsMismatch} lô có ghi chú trạng thái trái với chứng cứ giao hàng`}
+          description={
+            <div style={{ fontSize: 13 }}>
+              Cột <strong>Giao hàng</strong> tính từ container và lệnh xe — đó là chứng cứ.
+              Cột <strong>Ghi chú trạng thái</strong> là số nhập tay, và {t.lotsMismatch} lô đang
+              nói khác chứng cứ. Bấm bộ lọc <strong>“Lệch trạng thái”</strong> để xem đúng những lô đó.
+              <div style={{ marginTop: 4, color: '#6b7280' }}>
+                Hệ thống <strong>không tự sửa</strong> ghi chú, vì có lô ghi “đã giao” cao hơn chứng cứ —
+                có thể do dữ liệu lệnh xe còn thiếu chứ không phải hàng chưa đi. Người phụ trách xem rồi quyết.
+              </div>
+            </div>
+          }
+        />
+      )}
+
       {/* Hai khoản tiền KHÔNG nằm trong sổ lô — nói thẳng, đừng để người xem tự phát hiện */}
-      {t && (t.unassignedPaidUsd > 0 || t.valueNotInLotsUsd > 0) && (
+      {t && (t.unassignedPaidUsd > 0 || t.valueNotInLotsUsd > 0
+        || t.valueShortInLotsUsd > 0 || t.valueOverInLotsUsd > 0) && (
         <Alert
           type="info" showIcon style={{ marginBottom: 12 }}
-          message="Phần sổ lô chưa với tới"
+          message="Vì sao tổng trên trang này không bằng sổ đơn hàng"
           description={
             <div style={{ fontSize: 13 }}>
               {t.valueNotInLotsUsd > 0 && (
@@ -316,10 +427,28 @@ export default function SalesLotLedgerPage() {
                   {' '}<strong>chưa chia lô</strong> — xem bảng dưới, bấm "Chia lô" để gán số lô cho container.
                 </div>
               )}
+              {t.valueShortInLotsUsd > 0 && (
+                <div>
+                  • <strong>{fmtUSD(t.valueShortInLotsUsd)}</strong> thuộc hợp đồng <strong>đã chia lô
+                  nhưng chưa chia hết</strong> — phần hàng còn lại chưa được gán vào lô nào.
+                </div>
+              )}
+              {t.valueOverInLotsUsd > 0 && (
+                <div>
+                  • <strong>{fmtUSD(t.valueOverInLotsUsd)}</strong> là phần trị giá lô <strong>VƯỢT</strong> trị giá
+                  hợp đồng. <em>Không phải lỗi</em>: trị giá hợp đồng tính theo khối lượng danh nghĩa lúc ký,
+                  còn trị giá lô là cân thật in trên Commercial Invoice — đóng nhiều hơn ký thì lô lớn hơn.
+                </div>
+              )}
               {t.unassignedPaidUsd > 0 && (
                 <div>
                   • <strong>{fmtUSD(t.unassignedPaidUsd)}</strong> đã thu nhưng <strong>chưa gắn số lô</strong>,
                   {' '}nên không quy được về lô nào. Sửa lại khoản thu trong tab Tài chính của đơn để gắn lô.
+                </div>
+              )}
+              {t.ordersWithLotGap > 0 && (
+                <div style={{ marginTop: 4, color: '#6b7280' }}>
+                  {t.ordersWithLotGap} hợp đồng có chênh lệch giữa tổng trị giá lô và trị giá hợp đồng.
                 </div>
               )}
             </div>
@@ -329,56 +458,78 @@ export default function SalesLotLedgerPage() {
 
       <Card
         size="small"
-        title={
-          <Space wrap>
-            <span>Lô ({lots.length})</span>
-            <Segmented
-              size="small"
-              value={payFilter}
-              onChange={(v) => setPayFilter(v as PayFilter)}
-              options={[
-                { label: 'Tất cả', value: 'all' },
-                { label: 'Chưa thu', value: 'unpaid' },
-                { label: 'Thu 1 phần', value: 'partial' },
-                { label: 'Đã thu đủ', value: 'paid' },
-              ]}
-            />
-            <Input.Search
-              placeholder="Số HĐ, khách, INV, B/L…"
-              allowClear
-              size="small"
-              style={{ width: 240 }}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </Space>
-        }
+        title={<span>Lô ({lots.length})</span>}
         style={{ marginBottom: 12 }}
       >
+        {/* Dải lọc nằm trong THÂN card, không phải title. Title của antd Card là
+            overflow:hidden + nowrap — 7 nút ở đó thì cửa sổ hẹp cắt mất đúng hai nút
+            "Chưa đi" và "Lệch trạng thái" mà banner cảnh báo bên trên đang bảo bấm. */}
+        <Space wrap style={{ marginBottom: 10 }}>
+          <Segmented
+            size="small"
+            value={payFilter}
+            onChange={(v) => setPayFilter(v as PayFilter)}
+            options={[
+              { label: 'Tất cả', value: 'all' },
+              { label: `Đã giao, chưa thu${t ? ` (${t.lotsDeliveredUnpaid})` : ''}`, value: 'shipped_unpaid' },
+              { label: 'Chưa thu', value: 'unpaid' },
+              { label: 'Thu 1 phần', value: 'partial' },
+              { label: 'Đã thu đủ', value: 'paid' },
+              { label: `Chưa đi${t ? ` (${t.lotsNotShipped})` : ''}`, value: 'not_shipped' },
+              { label: `Lệch trạng thái${t ? ` (${t.lotsMismatch})` : ''}`, value: 'mismatch' },
+            ]}
+          />
+          <Input.Search
+            placeholder="Số HĐ, khách, INV, B/L…"
+            allowClear
+            size="small"
+            style={{ width: 240 }}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </Space>
         <Table<SalesLotRow>
           rowKey="lot_id"
           size="small"
           loading={loading}
           columns={lotCols}
           dataSource={lots}
-          scroll={{ x: 1280 }}
+          scroll={{ x: 1400 }}
           pagination={{ pageSize: 50, showSizeChanger: true, showTotal: (n) => `${n} lô` }}
           summary={(rows) => {
+            // 11 cột: 0 HĐ · 1 Lô · 2 Giao hàng · 3 Ghi chú · 4 KL chốt · 5 Trị giá
+            //         6 Đã thu · 7 Còn nợ · 8 Thu tiền · 9 Chứng từ · 10 (nút)
             const v = rows.reduce((s, r) => s + (r.value_usd || 0), 0)
             const p = rows.reduce((s, r) => s + r.paid_usd, 0)
             const rm = rows.reduce((s, r) => s + r.remaining_usd, 0)
+            const kgD = rows.reduce((s, r) => s + r.net_kg_delivered, 0)
+            const kgT = rows.reduce((s, r) => s + r.net_kg_total, 0)
+            const cD = rows.reduce((s, r) => s + r.containers_delivered, 0)
+            const cT = rows.reduce((s, r) => s + r.container_count, 0)
             return (
               <Table.Summary fixed>
+                {/* Mỗi cột MỘT ô, không gộp colSpan. Cột 0 fixed left và cột 10 fixed right;
+                    gộp ô đè lên chúng thì khi cuộn ngang (scroll.x 1400 > laptop 1366 nên
+                    LUÔN có cuộn) dòng tổng mất pin, trôi lệch khỏi phần thân bảng. */}
                 <Table.Summary.Row style={{ background: '#fafafa', fontWeight: 700 }}>
-                  <Table.Summary.Cell index={0} colSpan={4}>Cộng {rows.length} lô</Table.Summary.Cell>
-                  <Table.Summary.Cell index={4} align="right">{fmtUSD(v)}</Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} align="right">
+                  <Table.Summary.Cell index={0}>Cộng {rows.length} lô</Table.Summary.Cell>
+                  <Table.Summary.Cell index={1} />
+                  <Table.Summary.Cell index={2}>
+                    <span style={{ color: '#1d4ed8' }}>{fmtTon(kgD)} / {fmtTon(kgT)}</span>
+                    <div style={{ fontSize: 10, fontWeight: 400, color: '#6b7280' }}>{cD}/{cT} cont</div>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={3} />
+                  <Table.Summary.Cell index={4} />
+                  <Table.Summary.Cell index={5} align="right">{fmtUSD(v)}</Table.Summary.Cell>
+                  <Table.Summary.Cell index={6} align="right">
                     <span style={{ color: '#15803d' }}>{fmtUSD(p)}</span>
                   </Table.Summary.Cell>
-                  <Table.Summary.Cell index={6} align="right">
+                  <Table.Summary.Cell index={7} align="right">
                     <span style={{ color: '#dc2626' }}>{fmtUSD(rm)}</span>
                   </Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} colSpan={3} />
+                  <Table.Summary.Cell index={8} />
+                  <Table.Summary.Cell index={9} />
+                  <Table.Summary.Cell index={10} />
                 </Table.Summary.Row>
               </Table.Summary>
             )

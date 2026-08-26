@@ -27,7 +27,7 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
-import type { FilterValue, SorterResult } from 'antd/es/table/interface'
+import type { FilterValue, SorterResult, TableCurrentDataSource } from 'antd/es/table/interface'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -44,8 +44,8 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { supabase } from '../../lib/supabase'
-import { salesOrderService } from '../../services/sales/salesOrderService'
-import type { SalesOrderStats, SalesOrderListParams } from '../../services/sales/salesOrderService'
+import { salesOrderService, SORTABLE_ORDER_COLUMNS } from '../../services/sales/salesOrderService'
+import type { SalesOrderStats, SalesOrderListParams, SortableOrderColumn } from '../../services/sales/salesOrderService'
 import { dispatchService, deliveredTons, remainingTons, type LotProgress } from '../../services/logistics/dispatchService'
 import LotProgressBadge from '../../components/sales/LotProgressBadge'
 import StagePill from '../../components/common/StagePill'
@@ -152,6 +152,37 @@ const formatCurrency = (value?: number): string => {
 const formatDate = (date?: string): string => {
   if (!date) return '-'
   return dayjs(date).format('DD/MM/YYYY')
+}
+
+// ============================================
+// SẮP XẾP — bảng ánh xạ DUY NHẤT: key của cột → tên cột trong DB
+// ============================================
+// Khoá là `key` của cột (không phải `dataIndex`) vì antd trả về cả hai và ta đọc
+// `columnKey`. Cột nào KHÔNG có ở đây thì không sắp xếp được ở tầng DB — đúng ý đồ
+// với cột client-only: delivered_tons, shortage, lot_progress, progress, index.
+//
+// Cột SỐ HĐ sắp theo `contract_no_sort_key` (generated column = 4 chữ số cuối của
+// contract_no parse INT: HA20260001→1, HA20240046→46). Sắp tăng dần sẽ cho
+// HA20260001, HA20260002, …, HA20240046, … — đơn 2024 chen giữa theo hậu tố số,
+// đúng mong muốn của người dùng.
+const SORT_FIELD_BY_COLUMN: Record<string, SortableOrderColumn> = {
+  contract_no: 'contract_no_sort_key',
+  customer: 'customer_id',
+  grade: 'grade',
+  lot: 'customer_po',
+  qty: 'quantity_tons',
+  delivery: 'delivery_date',
+  ready_date: 'ready_date',
+  bank: 'bank_name',
+  bkg: 'booking_reference',
+  etd: 'etd',
+  unit_price: 'unit_price',
+  total_usd: 'total_value_usd',
+  deposit: 'deposit_amount',
+  discount: 'discount_amount',
+  discount_bank: 'discount_bank',
+  remaining: 'remaining_amount',
+  payment_date: 'payment_received_date',
 }
 
 // ============================================
@@ -418,7 +449,18 @@ const SalesOrderListPage = () => {
       setHiddenCols(new Set(v.columns.hiddenCols))
     }
     if (v.sort?.sortBy) {
-      setSortBy(v.sort.sortBy)
+      // v.sort là JSONB tự do trong user_saved_views — không có gì bảo đảm nó còn là cột
+      // hợp lệ (view cũ, cột đã đổi tên, sửa tay trong DB). Service cũng kẹp lần hai, nhưng
+      // kẹp ở ĐÂY để state khớp với cái server thật sự dùng — nếu không thì dữ liệu sắp
+      // theo order_date mà bảng không cột nào sáng mũi tên, người dùng thấy thứ tự lạ
+      // và không biết vì sao.
+      const s = v.sort.sortBy
+      if (SORTABLE_ORDER_COLUMNS.has(s)) {
+        setSortBy(s)
+      } else {
+        setSortBy('created_at')
+        message.warning(`View "${v.name}" sắp xếp theo cột không còn dùng được — đã về mặc định.`)
+      }
       setSortOrder(v.sort.sortOrder || 'desc')
     }
     if (v.density && ['compact', 'normal', 'comfortable'].includes(v.density)) {
@@ -661,55 +703,51 @@ const SalesOrderListPage = () => {
     pag: TablePaginationConfig,
     filters: Record<string, FilterValue | null>,
     sorter: SorterResult<SalesOrder> | SorterResult<SalesOrder>[],
+    extra: TableCurrentDataSource<SalesOrder>,
   ) => {
     setPagination({
       current: pag.current || 1,
       pageSize: pag.pageSize || 10,
     })
 
-    // Sort: map column key → server field. Server hỗ trợ sort theo column trong table.
-    const single = Array.isArray(sorter) ? sorter[0] : sorter
-    if (single && single.order && single.field) {
-      // single.field có thể là string hoặc array — Ant Design typing
-      const field = String(single.field)
-      // Map column key → DB field
-      const fieldMap: Record<string, string> = {
-        // Click cột SỐ HĐ → sort theo `contract_no_sort_key` (generated column,
-        // = last 4 chữ số của contract_no parse INT). Vd HA20260001→1,
-        // HA20240046→46, HA20260050→50. Sort numeric ASC sẽ:
-        //   HA20260001 (1), HA20260002 (2), ..., HA20240046 (46), ..., HA20260050 (50)
-        // → User thấy đơn 2024 chen giữa list theo suffix number, đúng mong muốn.
-        contract_no: 'contract_no_sort_key',
-        customer: 'customer_id',
-        grade: 'grade',
-        lot: 'customer_po',
-        qty: 'quantity_tons',
-        delivery: 'delivery_date',
-        ready_date: 'ready_date',
-        bank: 'bank_name',
-        bkg: 'booking_reference',
-        etd: 'etd',
-        unit_price: 'unit_price',
-        total_usd: 'total_value_usd',
-        deposit: 'deposit_amount',
-        discount: 'discount_amount',
-        discount_bank: 'discount_bank',
-        remaining: 'remaining_amount',
-        payment_date: 'payment_received_date',
+    // ─── SẮP XẾP ────────────────────────────────────────────────────────────
+    // Nhận biết "người dùng vừa bấm sắp xếp" bằng extra.action, KHÔNG bằng sự có mặt
+    // của sorter. Lý do: khi huỷ sort (bấm lần 3), antd 6.3.2 xoá SẠCH cả columnKey lẫn
+    // field lẫn order (useSorter.js:221-229) — nên nếu dò theo sorter thì nhánh huỷ là
+    // CODE CHẾT, người dùng bấm lần 3 không có gì xảy ra. Ngược lại, dò `!single.order`
+    // đơn thuần cũng sai: điều kiện đó đúng cả khi đổi trang/lọc lúc không cột nào active,
+    // và sẽ ghi đè sort mà người dùng đang có.
+    if (extra?.action === 'sort') {
+      const single = Array.isArray(sorter) ? sorter[0] : sorter
+      // ⚠ PHẢI đọc columnKey, KHÔNG phải field.
+      // antd đặt `field: column.dataIndex` và `columnKey: column.key`
+      // (node_modules/antd/es/table/hooks/useSorter.js:211-212), còn bảng ánh xạ khoá theo
+      // KEY. Cột nào có key ≠ dataIndex — lot/customer_po, qty/quantity_tons,
+      // delivery/delivery_date, bank, bkg, total_usd, deposit, discount, remaining,
+      // payment_date — thì tra theo field ra undefined rồi thoát im lặng. Hậu quả:
+      // 10/17 cột bấm sắp xếp KHÔNG có gì xảy ra, mũi tên cũng không đổi (sortOrder là
+      // controlled) nên không ai nghi ngờ. Bug có từ trước 26/08/2026.
+      const key = single?.order ? String(single.columnKey ?? single.field ?? '') : ''
+      const mapped = key ? SORT_FIELD_BY_COLUMN[key] : undefined
+
+      if (mapped && single?.order) {
+        setSortBy(mapped)
+        setSortOrder(single.order === 'ascend' ? 'asc' : 'desc')
+      } else if (!single?.order) {
+        // Bấm lần 3 → bỏ sắp xếp → về mặc định
+        setSortBy('created_at')
+        setSortOrder('desc')
       }
-      // Whitelist: cột client-only (delivered_tons/shortage/lot_progress) KHÔNG có ở DB.
-      // Nếu lỡ để lọt vào .order() → Supabase 400 → DANH SÁCH TRẮNG.
-      const mapped = fieldMap[field]
-      if (!mapped) return
-      setSortBy(mapped)
-      setSortOrder(single.order === 'ascend' ? 'asc' : 'desc')
-    } else if (single && single.field && !single.order) {
-      // User click lần 3 trên cùng cột → clear sort → fallback default
-      setSortBy('created_at')
-      setSortOrder('desc')
+      // mapped rỗng mà vẫn có order = cột client-only lỡ được gắn sorter → bỏ qua sắp xếp,
+      // nhưng KHÔNG return: phần đồng bộ bộ lọc bên dưới vẫn phải chạy, vì antd gửi cả
+      // sorter lẫn filters trong CÙNG một lần onChange.
+
+      // Sắp xếp lại thì phải về trang 1. antd cố tình không reset phân trang cho hành động
+      // sort (InternalTable.js:203-207 truyền reset = false, khác với lọc). Không ép về 1
+      // thì đang ở trang 4 bấm "Thành tiền" sẽ thấy hạng 31-40 và tưởng đó là đơn to nhất.
+      setPagination((prev) => ({ ...prev, current: 1 }))
     }
-    // Trường hợp khác (pagination, filter, ...): GIỮ NGUYÊN sort hiện tại,
-    // không setSortBy gì cả → tránh bug pagination reset sort.
+    // Trường hợp khác (đổi trang, lọc): GIỮ NGUYÊN sort hiện tại.
 
     // Filter: chỉ grade hiện hỗ trợ ở column header (đồng bộ với gradeFilter ở toolbar)
     if (filters.grade && filters.grade.length > 0) {
@@ -1013,14 +1051,11 @@ const SalesOrderListPage = () => {
     )
   }
 
-  // Helpers map state ↔ Ant sort order
+  // Helpers map state ↔ Ant sort order — đọc CHUNG bảng ánh xạ với handleTableChange.
+  // Trước 26/08/2026 chỗ này là bản chép tay thứ hai của cùng bảng đó, nên sửa một bên
+  // là hai bên lệch nhau (mũi tên chỉ một cột, dữ liệu sắp theo cột khác).
   const sortedColumn = (key: string) =>
-    sortBy === (key === 'lot' ? 'customer_po' : key === 'qty' ? 'quantity_tons' :
-      key === 'delivery' ? 'delivery_date' : key === 'bank' ? 'bank_name' :
-      key === 'bkg' ? 'booking_reference' : key === 'total_usd' ? 'total_value_usd' :
-      key === 'deposit' ? 'deposit_amount' : key === 'discount' ? 'discount_amount' :
-      key === 'remaining' ? 'remaining_amount' : key === 'payment_date' ? 'payment_received_date' :
-      key === 'customer' ? 'customer_id' : key === 'contract_no' ? 'contract_no_sort_key' : key)
+    sortBy === (SORT_FIELD_BY_COLUMN[key] ?? key)
       ? (sortOrder === 'asc' ? 'ascend' as const : 'descend' as const)
       : null
 

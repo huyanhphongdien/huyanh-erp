@@ -17,6 +17,18 @@ import { supabase } from '../../lib/supabase'
 export type LotPaymentStatus = 'unpaid' | 'partial' | 'paid' | 'unknown'
 export type LotStatus = 'planning' | 'packing' | 'shipped' | 'delivered' | 'cancelled'
 
+/**
+ * Tiến độ GIAO của lô, suy từ chứng cứ thật (container + dòng lệnh xe).
+ *   none    — chưa container nào của lô rời kho
+ *   partial — đã đi một phần
+ *   full    — mọi container của lô đã đi
+ *
+ * ⚠ ĐÂY mới là tiến độ giao. `lot_status` KHÔNG phải — nó là ảnh chụp chép xuống
+ * từ trạng thái hợp đồng lúc backfill 26/08/2026 và đang trái chứng cứ ở 9/20 lô.
+ * Tuyệt đối không tô màu tiến độ giao bằng `lot_status`.
+ */
+export type LotDeliveryState = 'none' | 'partial' | 'full'
+
 export interface SalesLotRow {
   lot_id: string
   sales_order_id: string
@@ -40,6 +52,21 @@ export interface SalesLotRow {
   last_payment_date: string | null
   other_currency_payments: number
   payment_status: LotPaymentStatus
+
+  // ─── Trục GIAO HÀNG (view v_sales_order_lot_progress, migration p4) ───────
+  container_count: number
+  containers_delivered: number
+  /**
+   * ⚠ Số ĐỘNG — cộng sống từ `sales_order_containers.net_weight_kg`, mà cột đó bị
+   * `containerService._recalcContainerTotals` ghi đè mỗi lần gán container. Nó sẽ ĐỔI
+   * sau khi hoá đơn đã phát cho khách. Dùng để xem tiến độ giao thì được; để đối chiếu
+   * TIỀN thì phải dùng `net_weight_kg` (số chốt) và `value_usd`.
+   */
+  net_kg_total: number
+  net_kg_delivered: number
+  delivery_state: LotDeliveryState
+  /** `lot_status` trái với chứng cứ giao. Chỉ dùng để cảnh báo, không dùng để tính. */
+  status_mismatch: boolean
 }
 
 /** Hợp đồng CHƯA chia lô — vẫn phải hiện, nếu không tổng tiền trên trang sẽ không khớp sổ đơn. */
@@ -70,6 +97,33 @@ export interface LotLedger {
     unassignedPaidUsd: number
     /** Trị giá các hợp đồng chưa chia lô — phần sổ lô chưa với tới được. */
     valueNotInLotsUsd: number
+
+    /**
+     * Hợp đồng ĐÃ chia lô nhưng Σ trị giá lô ≠ trị giá hợp đồng. Đi CẢ HAI CHIỀU và
+     * hai chiều có ý nghĩa khác hẳn nhau, nên phải tách:
+     *   • thiếu — mới chia một phần hàng thành lô (vd HA20260075 mới gán 5/20 cont)
+     *   • vượt  — đóng thật NHIỀU HƠN khối lượng ký. Không phải lỗi: trị giá hợp đồng
+     *             là số danh nghĩa lúc ký, trị giá lô là cân thật trên Commercial Invoice.
+     * Không có hai số này thì tổng trên trang không bao giờ khớp sổ đơn và người dùng
+     * sẽ kết luận hệ thống sai.
+     */
+    valueShortInLotsUsd: number
+    valueOverInLotsUsd: number
+    ordersWithLotGap: number
+
+    /** Lô đã giao đủ nhưng chưa thu đủ tiền — hàng đã sang khách, tiền chưa về. */
+    lotsDeliveredUnpaid: number
+
+    // ─── Trục GIAO HÀNG ────────────────────────────────────────────────────
+    lotsDelivered: number
+    lotsDelivering: number
+    lotsNotShipped: number
+    containersTotal: number
+    containersDelivered: number
+    netKgTotal: number
+    netKgDelivered: number
+    /** Số lô có `lot_status` trái chứng cứ giao — cần người xem lại, không tự sửa. */
+    lotsMismatch: number
   }
 }
 
@@ -128,10 +182,41 @@ export const salesLotService = {
       last_payment_date: r.last_payment_date,
       other_currency_payments: num(r.other_currency_payments),
       payment_status: r.payment_status as LotPaymentStatus,
+
+      container_count: num(r.container_count),
+      containers_delivered: num(r.containers_delivered),
+      net_kg_total: num(r.net_kg_total),
+      net_kg_delivered: num(r.net_kg_delivered),
+      delivery_state: (r.delivery_state ?? 'none') as LotDeliveryState,
+      status_mismatch: r.status_mismatch === true,
     }))
 
     // Đơn nào đã có lô thì bỏ khỏi nhóm "chưa chia lô"
-    const orderIdsWithLots = new Set(lots.map((l) => l.sales_order_id))
+    // Đơn huỷ: query lô KHÔNG lọc được ở tầng DB (view không có cột đó dạng lọc được
+    // qua PostgREST cho mọi trạng thái), nên lọc ở đây cho khớp với query đơn bên trên.
+    // Không lọc là đơn huỷ vẫn hiện lô và cộng vào tổng.
+    const liveLots = lots.filter((l) => l.order_status !== 'cancelled')
+
+    const orderIdsWithLots = new Set(liveLots.map((l) => l.sales_order_id))
+
+    // Đối chiếu Σ trị giá lô với trị giá hợp đồng, CHỈ trên đơn đã chia lô.
+    // Dung sai $0,01 cho sai số làm tròn numeric.
+    const orderTotalById = new Map<string, number>()
+    for (const o of orderRes.data || []) orderTotalById.set(o.id as string, num(o.total_value_usd))
+    const lotSumByOrder = new Map<string, number>()
+    for (const l of liveLots) {
+      lotSumByOrder.set(l.sales_order_id, (lotSumByOrder.get(l.sales_order_id) || 0) + num(l.value_usd))
+    }
+    const lotGap = { short: 0, over: 0, orders: 0 }
+    for (const [oid, lotSum] of lotSumByOrder) {
+      const orderTotal = orderTotalById.get(oid)
+      if (orderTotal === undefined) continue      // đơn huỷ / ngoài phạm vi
+      const d = lotSum - orderTotal
+      if (Math.abs(d) <= 0.01) continue
+      lotGap.orders += 1
+      if (d < 0) lotGap.short += -d
+      else lotGap.over += d
+    }
 
     const contCount = new Map<string, number>()
     for (const c of contRes.data || []) {
@@ -164,19 +249,34 @@ export const salesLotService = {
       .reduce((s, p) => s + num(p.amount), 0)
 
     return {
-      lots,
+      lots: liveLots,
       ordersWithoutLots,
       totals: {
-        lotCount: lots.length,
-        lotValueUsd: lots.reduce((s, l) => s + num(l.value_usd), 0),
-        lotPaidUsd: lots.reduce((s, l) => s + l.paid_usd, 0),
-        lotRemainingUsd: lots.reduce((s, l) => s + l.remaining_usd, 0),
-        lotsPaid: lots.filter((l) => l.payment_status === 'paid').length,
-        lotsPartial: lots.filter((l) => l.payment_status === 'partial').length,
-        lotsUnpaid: lots.filter((l) => l.payment_status === 'unpaid').length,
-        lotsUnknown: lots.filter((l) => l.payment_status === 'unknown').length,
+        lotCount: liveLots.length,
+        lotValueUsd: liveLots.reduce((s, l) => s + num(l.value_usd), 0),
+        lotPaidUsd: liveLots.reduce((s, l) => s + l.paid_usd, 0),
+        lotRemainingUsd: liveLots.reduce((s, l) => s + l.remaining_usd, 0),
+        lotsPaid: liveLots.filter((l) => l.payment_status === 'paid').length,
+        lotsPartial: liveLots.filter((l) => l.payment_status === 'partial').length,
+        lotsUnpaid: liveLots.filter((l) => l.payment_status === 'unpaid').length,
+        lotsUnknown: liveLots.filter((l) => l.payment_status === 'unknown').length,
         unassignedPaidUsd,
         valueNotInLotsUsd: ordersWithoutLots.reduce((s, o) => s + num(o.total_value_usd), 0),
+        valueShortInLotsUsd: lotGap.short,
+        valueOverInLotsUsd: lotGap.over,
+        ordersWithLotGap: lotGap.orders,
+        lotsDeliveredUnpaid: liveLots.filter(
+          (l) => l.delivery_state === 'full' && l.payment_status !== 'paid',
+        ).length,
+
+        lotsDelivered: liveLots.filter((l) => l.delivery_state === 'full').length,
+        lotsDelivering: liveLots.filter((l) => l.delivery_state === 'partial').length,
+        lotsNotShipped: liveLots.filter((l) => l.delivery_state === 'none').length,
+        containersTotal: liveLots.reduce((s, l) => s + l.container_count, 0),
+        containersDelivered: liveLots.reduce((s, l) => s + l.containers_delivered, 0),
+        netKgTotal: liveLots.reduce((s, l) => s + l.net_kg_total, 0),
+        netKgDelivered: liveLots.reduce((s, l) => s + l.net_kg_delivered, 0),
+        lotsMismatch: liveLots.filter((l) => l.status_mismatch).length,
       },
     }
   },

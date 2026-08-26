@@ -113,6 +113,34 @@ export interface CreateSalesOrderData {
   }>
 }
 
+/**
+ * Cột ĐƯỢC PHÉP sắp xếp ở tầng DB. Mọi giá trị khác rơi về 'order_date'.
+ *
+ * VÌ SAO CẦN: `sort_by` đi thẳng từ client vào `.order()` — qua tham số URL hoặc qua
+ * bộ lọc lưu sẵn (JSONB trong user_saved_views, không hề được kiểm). Tên cột không tồn
+ * tại thì PostgREST trả 400, danh sách không cập nhật được, người dùng chỉ thấy toast đỏ
+ * không hiểu vì sao. Đặc biệt nguy hiểm với cột CHỈ CÓ Ở CLIENT — delivered_tons,
+ * shortage, lot_progress — chúng không có trong DB.
+ */
+export const SORTABLE_ORDER_COLUMN_LIST = [
+  'order_date', 'created_at', 'updated_at', 'code', 'id',
+  'contract_no', 'contract_no_sort_key', 'customer_id', 'grade', 'customer_po',
+  'quantity_tons', 'delivery_date', 'ready_date', 'bank_name', 'booking_reference',
+  'etd', 'unit_price', 'total_value_usd', 'deposit_amount', 'discount_amount',
+  'discount_bank', 'remaining_amount', 'payment_received_date',
+  'status', 'payment_status', 'current_stage',
+] as const
+
+/**
+ * Dùng kiểu này cho mọi bảng ánh xạ cột→DB ở tầng UI. Khi đó thêm một tên cột không có
+ * trong danh sách là `tsc` đỏ NGAY TẠI CHỖ, thay vì service âm thầm hạ xuống 'order_date'
+ * — kịch bản tệ hơn cả lỗi cũ, vì dữ liệu sắp theo NGÀY ĐẶT trong khi mũi tên vẫn chỉ
+ * đúng cột người dùng vừa bấm. Không lỗi, không toast, build vẫn xanh.
+ */
+export type SortableOrderColumn = typeof SORTABLE_ORDER_COLUMN_LIST[number]
+
+export const SORTABLE_ORDER_COLUMNS: ReadonlySet<string> = new Set(SORTABLE_ORDER_COLUMN_LIST)
+
 export interface SalesOrderListParams {
   page?: number
   pageSize?: number
@@ -304,8 +332,10 @@ export const salesOrderService = {
     // (vd ETD null) xuống cuối list. Secondary sort by id để stable order
     // khi nhiều row cùng primary value (avoid Postgres arbitrary plan).
     const isAsc = sort_order === 'asc'
-    query = query.order(sort_by, { ascending: isAsc, nullsFirst: false })
-    if (sort_by !== 'code' && sort_by !== 'id') {
+    // Chặn ở ĐÂY vì đây là nút cổ chai duy nhất che được mọi đường vào (URL, bộ lọc lưu sẵn).
+    const safeSortBy = SORTABLE_ORDER_COLUMNS.has(sort_by) ? sort_by : 'order_date'
+    query = query.order(safeSortBy, { ascending: isAsc, nullsFirst: false })
+    if (safeSortBy !== 'code' && safeSortBy !== 'id') {
       query = query.order('id', { ascending: false })  // stable tie-breaker
     }
 

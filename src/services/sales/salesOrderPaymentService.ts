@@ -415,13 +415,13 @@ export const salesOrderPaymentService = {
     type ORow = { id: string; unit_price: number | null }
     type LRow = { sales_order_id: string; lot_no: number; value_usd: number | null }
     type CRow = { sales_order_id: string; lot_no: number | null; net_weight_kg: number | null }
-    type PRow = { sales_order_id: string; lot_no: number | null; amount: number | null; payment_type: string | null }
+    type PRow = { sales_order_id: string; lot_no: number | null; amount: number | null; payment_type: string | null; currency: string | null }
 
     const [oRows, lRows, cRows, pRows] = await Promise.all([
       fetchChunked<ORow>((s) => supabase.from('sales_orders').select('id, unit_price').in('id', s)),
       fetchChunked<LRow>((s) => supabase.from('sales_order_lots').select('sales_order_id, lot_no, value_usd').in('sales_order_id', s)),
       fetchChunked<CRow>((s) => supabase.from('sales_order_containers').select('sales_order_id, lot_no, net_weight_kg').in('sales_order_id', s)),
-      fetchChunked<PRow>((s) => supabase.from('sales_order_payments').select('sales_order_id, lot_no, amount, payment_type').in('sales_order_id', s).not('lot_no', 'is', null)),
+      fetchChunked<PRow>((s) => supabase.from('sales_order_payments').select('sales_order_id, lot_no, amount, payment_type, currency').in('sales_order_id', s).not('lot_no', 'is', null)),
     ])
     const oRes = { data: oRows }, lRes = { data: lRows }, cRes = { data: cRows }, pRes = { data: pRows }
 
@@ -443,7 +443,12 @@ export const salesOrderPaymentService = {
     }
     // tiền thu theo (đơn, lô)
     const lotPaid: Record<string, Map<number, number>> = {}
-    for (const p of (pRes.data || []).filter((p) => p.payment_type !== 'fee_offset')) {
+    // Chỉ cộng khoản USD. Trị giá lô là USD, cộng thẳng số tiền ngoại tệ khác vào đó
+    // là so hai đơn vị với nhau — view v_sales_order_lot_payments cũng lọc y hệt,
+    // hai bên phải cùng một luật thì badge Kanban mới khớp Sổ lô.
+    for (const p of (pRes.data || [])
+      .filter((p) => p.payment_type !== 'fee_offset')
+      .filter((p) => !p.currency || p.currency === 'USD')) {
       const oid = p.sales_order_id as string
       ;(lotPaid[oid] ||= new Map()).set(p.lot_no as number, ((lotPaid[oid].get(p.lot_no as number)) || 0) + Number(p.amount || 0))
     }

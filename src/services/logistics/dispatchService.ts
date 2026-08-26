@@ -480,24 +480,74 @@ async function setStatus(id: string, next: DispatchStatus): Promise<DispatchOrde
 export type DeliveryState = 'delivered' | 'dispatching'
 
 /**
- * Trạng thái giao của từng container (theo dispatch_order_lines):
- *  - 'delivered'   = đã cân xuất (dòng lệnh có actual_weight_kg).
- *  - 'dispatching' = đã vào lệnh nhưng chưa cân.
- *  - (không có key) = chưa điều động (chưa giao).
+ * Trạng thái container coi như ĐÃ RA KHỎI KHO mà không cần dòng lệnh điều động.
+ * Hàng đi bằng phiếu cân/xuất kho chỉ set cột status, không sinh dòng lệnh.
+ * `loaded` KHÔNG nằm đây: mới lên xe, chưa rời kho.
+ *
+ * ⚠ Đây là MỘT trong hai vế của định nghĩa "đã giao". Dùng ở CẢ getDeliveryStatus lẫn
+ * getLotProgressForOrders — sửa thì sửa qua hằng này, đừng gõ lại chuỗi ở chỗ thứ ba.
+ */
+export const DELIVERED_CONTAINER_STATUSES = ['shipped', 'delivered'] as const
+
+/**
+ * ĐỊNH NGHĨA DUY NHẤT "container đã giao". Gộp HAI đường, thiếu một là hai màn hình lệch:
+ *  - 'delivered'    = đã cân xuất (dòng lệnh có actual_weight_kg)
+ *                     HOẶC container mang status thuộc DELIVERED_CONTAINER_STATUSES
+ *                     (đi bằng phiếu cân/xuất kho, không qua lệnh điều động)
+ *  - 'dispatching'  = đã vào lệnh nhưng chưa cân
+ *  - (không có key) = chưa điều động, chưa giao
+ *
+ * Ném lỗi nếu truy vấn hỏng — KHÔNG trả về map thiếu. Xem lý do ở trong thân hàm.
  */
 async function getDeliveryStatus(containerIds: string[]): Promise<Record<string, DeliveryState>> {
   const map: Record<string, DeliveryState> = {}
   const ids = [...new Set((containerIds || []).filter(Boolean))]
   if (ids.length === 0) return map
-  const { data } = await supabase
-    .from('dispatch_order_lines')
-    .select('sales_order_container_id, actual_weight_kg')
-    .in('sales_order_container_id', ids)
-  for (const r of (data || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null }>) {
-    const cid = r.sales_order_container_id
-    if (!cid) continue
-    if (r.actual_weight_kg != null) map[cid] = 'delivered'
-    else if (map[cid] !== 'delivered') map[cid] = 'dispatching'
+
+  // Chunk 120 cho ĐỒNG BỘ với các hàm khác trong file. Đây là PHÒNG XA, không phải đang
+  // chữa lỗi: đơn nhiều container nhất hiện có 25 cont ≈ URL 1.127 ký tự, còn xa ngưỡng
+  // ~8.000; điểm gãy khoảng 201 cont/đơn.
+  for (let i = 0; i < ids.length; i += 120) {
+    const { data, error } = await supabase
+      .from('dispatch_order_lines')
+      .select('sales_order_container_id, actual_weight_kg')
+      .in('sales_order_container_id', ids.slice(i, i + 120))
+    // Nuốt lỗi ở đây biến hỏng "tất cả hoặc không" (nhìn là thấy) thành hỏng "thiếu một
+    // phần" (trông vẫn hợp lý). Nguy nhất ở buildFromSalesOrder: map thiếu → container ĐÃ
+    // GIAO lọt vào lệnh điều động mới mà không ai biết.
+    if (error) throw error
+    for (const r of (data || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null }>) {
+      const cid = r.sales_order_container_id
+      if (!cid) continue
+      if (r.actual_weight_kg != null) map[cid] = 'delivered'
+      else if (map[cid] !== 'delivered') map[cid] = 'dispatching'
+    }
+  }
+
+  // ⚠ VẾ THỨ HAI — BẮT BUỘC, nếu không hai màn hình sẽ nói khác nhau.
+  // Hàng đi bằng phiếu cân/xuất kho KHÔNG sinh dòng lệnh điều động, mà set thẳng
+  // sales_order_containers.status. getLotProgressForOrders đã bù vế này từ lâu, còn hàm
+  // này thì chưa — nên badge Kanban và bảng lô tab Đóng gói ăn hai tập "đã giao" KHÁC NHAU.
+  //
+  // VÌ SAO HÔM NAY CHÚNG VẪN KHỚP (đo 26/08/2026: 92 cont shipped đều nằm trong 133 cont
+  // đã cân, 0 ngoại lệ): KHÔNG phải may mắn — dispatchService.markWeighed ghi status
+  // 'shipped' NGAY SAU khi ghi actual_weight_kg, nên với đường đó shipped ⊆ đã-cân là
+  // quan hệ nhân quả.
+  //
+  // NGÒI NỔ THẬT nằm ở đường khác: stockOutService.processContainerShipment set 'shipped'
+  // mà KHÔNG sinh dòng lệnh, và nó được gọi từ app cân xe với GUARD KHÁC hàm ghi cân
+  // (một bên cần đơn bán + container, bên kia cần lệnh điều động + dòng lệnh). Người vận
+  // hành chọn đơn và container mà không chọn lệnh là sinh ngay ca lệch.
+  for (let i = 0; i < ids.length; i += 120) {
+    const { data, error } = await supabase
+      .from('sales_order_containers')
+      .select('id')
+      .in('id', ids.slice(i, i + 120))
+      .in('status', DELIVERED_CONTAINER_STATUSES as unknown as string[])
+    if (error) throw error
+    for (const r of (data || []) as Array<{ id: string }>) {
+      map[r.id] = 'delivered'
+    }
   }
   return map
 }
@@ -533,11 +583,47 @@ async function getDispatchOrdersForContainers(containerIds: string[]): Promise<A
  * KL để ở KG (nguồn gốc); quy ra tấn bằng deliveredTons()/remainingTons() bên dưới,
  * để MÀN HÌNH và EXCEL luôn dùng CHUNG một công thức (không thể lệch nhau).
  */
+/**
+ * Tiến độ GIAO của MỘT lô. Đã được tính sẵn trong vòng lặp, trước đây bị vứt đi.
+ *
+ * ⚠ netKg* là KHỐI LƯỢNG, KHÔNG phải mẫu số tiền. Tuyệt đối không nhân nó với đơn giá
+ * để ra "trị giá lô" — đó đúng là bug prorata đã gỡ 26/08/2026 (HA20260059 lô 1 ra
+ * $473.760 thay vì $50.820 trên Invoice). Mẫu số tiền duy nhất là
+ * sales_order_lots.value_usd, đọc qua salesLotService / v_sales_order_lot_payments.
+ * Lý do sâu hơn: net_weight_kg bị containerService._recalcContainerTotals ghi đè mỗi
+ * lần gán container, nên nó ĐỔI sau khi hoá đơn đã phát cho khách.
+ */
+export interface LotProgressRow {
+  lotNo: number
+  contsTotal: number
+  contsDelivered: number
+  netKgTotal: number
+  netKgDelivered: number
+}
+
 export interface LotProgress {
   contsTotal: number
   contsDelivered: number
   lotsTotal: number
   lotsDelivered: number
+  /**
+   * Chi tiết GIAO HÀNG của từng lô, sắp theo số lô tăng dần. Cho phép vẽ dải chip lô mà
+   * KHÔNG cần thêm truy vấn nào — dữ liệu vốn đã có trong cùng vòng lặp.
+   *
+   * Tên là `deliveryByLot` chứ không phải `lots` là CỐ Ý: getLotBreakdown() cũng trả một
+   * mảng tên `lots` nhưng đó là TIỀN theo lô. KanbanCard cầm đồng thời cả hai; hai mảng
+   * cùng tên cạnh nhau là công thức để đọc nhầm.
+   *
+   * Chỉ chứa lô ĐÃ gán lot_no. Phần chưa gán nằm ở contsNoLot / netKgNoLot, để bất biến
+   * tự phát biểu:  Σ contsTotal + contsNoLot === contsTotal của đơn
+   *                Σ netKgTotal + netKgNoLot === plannedKg
+   */
+  deliveryByLot: LotProgressRow[]
+  /** Container chưa gán lô — hôm nay 105/210 cont. Không có nó thì tổng cấp lô không khớp đơn. */
+  contsNoLot: number
+  contsNoLotDelivered: number
+  netKgNoLot: number
+  netKgNoLotDelivered: number
   plannedKg: number           // Σ net_weight_kg của MỌI container trong đơn
   deliveredKg: number         // Σ net_weight_kg của container ĐÃ giao
   contsWithKg: number         // số container CÓ net_weight_kg (để ước lượng)
@@ -639,7 +725,12 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
     }
   }
   // Bù cho đơn giao qua phiếu cân/xuất kho (không sinh dòng lệnh điều động).
-  for (const r of rows) if (r.status === 'shipped') deliveredSet.add(r.id)
+  // Vế thứ hai của định nghĩa "đã giao" — dùng CHUNG hằng với getDeliveryStatus.
+  for (const r of rows) {
+    if (r.status && (DELIVERED_CONTAINER_STATUSES as readonly string[]).includes(r.status)) {
+      deliveredSet.add(r.id)
+    }
+  }
 
   // Mã lệnh điều động (để hiện chip bấm được, khỏi phải mò sang module Vận tải)
   const allDispatchIds = [...new Set([...dispatchIdsByOrder.values()].flatMap((s) => [...s]))]
@@ -658,8 +749,9 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
     byOrder.get(r.sales_order_id)!.push(r)
   }
   for (const [oid, cs] of byOrder) {
-    const lots = new Map<number, { total: number; delivered: number }>()
+    const lots = new Map<number, { total: number; delivered: number; kg: number; kgDone: number }>()
     let plannedKg = 0, deliveredKg = 0, contsWithKg = 0, deliveredContsNoKg = 0, contsDelivered = 0
+    let contsNoLot = 0, contsNoLotDelivered = 0, netKgNoLot = 0, netKgNoLotDelivered = 0
     for (const c of cs) {
       const kg = c.net_weight_kg ?? 0
       plannedKg += kg
@@ -670,17 +762,33 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
         deliveredKg += kg
         if (c.net_weight_kg == null) deliveredContsNoKg++
       }
-      if (c.lot_no == null) continue
-      if (!lots.has(c.lot_no)) lots.set(c.lot_no, { total: 0, delivered: 0 })
+      if (c.lot_no == null) {
+        contsNoLot++
+        netKgNoLot += kg
+        if (done) { contsNoLotDelivered++; netKgNoLotDelivered += kg }
+        continue
+      }
+      if (!lots.has(c.lot_no)) lots.set(c.lot_no, { total: 0, delivered: 0, kg: 0, kgDone: 0 })
       const L = lots.get(c.lot_no)!
       L.total++
-      if (done) L.delivered++
+      L.kg += kg
+      if (done) { L.delivered++; L.kgDone += kg }
     }
     out[oid] = {
       contsTotal: cs.length,
       contsDelivered,
       lotsTotal: lots.size,
       lotsDelivered: [...lots.values()].filter((L) => L.total > 0 && L.delivered === L.total).length,
+      deliveryByLot: [...lots.entries()]
+        .sort((a, b) => a[0] - b[0])   // luôn theo số lô tăng dần — vị trí là danh tính của lô
+        .map(([lotNo, L]) => ({
+          lotNo,
+          contsTotal: L.total,
+          contsDelivered: L.delivered,
+          netKgTotal: L.kg,
+          netKgDelivered: L.kgDone,
+        })),
+      contsNoLot, contsNoLotDelivered, netKgNoLot, netKgNoLotDelivered,
       plannedKg, deliveredKg, contsWithKg, deliveredContsNoKg,
       dispatchOrders: [...(dispatchIdsByOrder.get(oid) || [])]
         .map((id) => ({ id, code: codeById.get(id) || '' }))

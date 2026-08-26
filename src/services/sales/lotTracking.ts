@@ -5,6 +5,7 @@
 // ============================================================================
 
 import type { SalesOrderContainer } from './salesTypes'
+import { DELIVERED_CONTAINER_STATUSES } from '../logistics/dispatchService'
 import type { DeliveryState } from '../logistics/dispatchService'
 
 // 5 giai đoạn của 1 container, theo thứ tự tiến triển.
@@ -20,16 +21,32 @@ export const LOT_STAGES: Array<{ key: LotStageKey; label: string; short: string;
 
 /**
  * Giai đoạn 1 container:
- *  - cân xuất rồi (delivery=delivered) → đã giao
- *  - trong lệnh chưa cân (dispatching)  → điều động
- *  - đã seal/shipped                    → sẵn sàng giao
- *  - có bành gán vào / status packing   → đang đóng gói
- *  - còn lại (planning, chưa bành)      → đang sản xuất / chờ hàng
+ *  - đã giao (delivery=delivered)      → đã giao
+ *  - trong lệnh chưa cân (dispatching) → điều động
+ *  - đã seal                           → sẵn sàng giao
+ *  - có bành gán vào / status packing  → đang đóng gói
+ *  - còn lại (planning, chưa bành)     → đang sản xuất / chờ hàng
+ *
+ * ⚠ MỘT ĐỊNH NGHĨA "ĐÃ GIAO" DUY NHẤT. Việc quyết định container nào đã giao nằm TRỌN
+ * trong dispatchService.getDeliveryStatus, và danh sách status thì ở hằng
+ * DELIVERED_CONTAINER_STATUSES. Đừng gõ lại luật "đã giao" ở đây nữa.
+ *
+ * Trước 26/08/2026 hàm này coi `shipped` là 'ready' trong khi getLotProgressForOrders coi
+ * là ĐÃ GIAO — badge Kanban và bảng lô tab Đóng gói ăn hai tập khác nhau. Chúng khớp nhau
+ * tới hôm đó KHÔNG phải do may mắn: dispatchService.markWeighed ghi status 'shipped' ngay
+ * sau khi ghi actual_weight_kg, nên với đường đó shipped ⊆ đã-cân là quan hệ nhân quả.
+ * Ngòi nổ thật là stockOutService.processContainerShipment — set status mà không sinh dòng
+ * lệnh, gọi từ app cân xe với guard khác hàm ghi cân.
+ *
+ * Nhánh dùng hằng bên dưới là DỰ PHÒNG cho khi deliveryMap rỗng (truy vấn hỏng, hoặc gọi
+ * hàm mà không truyền map) — khi đó status đã nói hàng ra khỏi kho thì tin status.
  */
 export function stageOfContainer(c: SalesOrderContainer, delivery: DeliveryState | undefined): LotStageKey {
   if (delivery === 'delivered') return 'delivered'
   if (delivery === 'dispatching') return 'dispatching'
-  if (c.status === 'sealed' || c.status === 'shipped') return 'ready'
+  // Dự phòng khi deliveryMap rỗng: status đã nói hàng ra khỏi kho thì đừng tụt về 'ready'.
+  if (c.status && (DELIVERED_CONTAINER_STATUSES as readonly string[]).includes(c.status)) return 'delivered'
+  if (c.status === 'sealed' || c.status === 'loaded') return 'ready'
   if ((c.items?.length || 0) > 0 || c.status === 'packing') return 'packing'
   return 'producing'
 }

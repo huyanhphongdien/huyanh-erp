@@ -16,7 +16,15 @@ export type ContainerType = '20ft' | '40ft'
 export type SalesCurrency = 'USD' | 'EUR' | 'JPY' | 'CNY'
 
 export type SalesOrderStatus = 'draft' | 'confirmed' | 'producing' | 'ready' | 'packing' | 'shipped' | 'delivered' | 'invoiced' | 'paid' | 'cancelled'
-export type ContainerStatus = 'planning' | 'packing' | 'sealed' | 'shipped'
+/**
+ * Trạng thái container. PHẢI khớp CHECK `chk_so_containers_status` trên
+ * public.sales_order_containers — trước 26/08/2026 kiểu này chỉ khai 4 giá trị trong khi
+ * DB cho phép 7, tức kiểu đang nói dối về database: một dòng status='delivered' đọc lên
+ * vẫn lọt qua mọi so sánh mà TypeScript không hề cảnh báo.
+ * Thực dùng hôm nay chỉ có planning và shipped; 5 giá trị còn lại là 0 dòng.
+ */
+export type ContainerStatus =
+  | 'planning' | 'packing' | 'packed' | 'sealed' | 'loaded' | 'shipped' | 'delivered'
 export type InvoiceStatus = 'draft' | 'issued' | 'sent' | 'paid' | 'cancelled'
 export type PaymentStatus = 'unpaid' | 'partial' | 'paid'
 
@@ -484,15 +492,21 @@ export const PAYMENT_TERMS_EXTENDED_LABELS: Record<string, string> = {
 export const CONTAINER_STATUS_LABELS: Record<ContainerStatus, string> = {
   planning: 'Đang lên kế hoạch',
   packing: 'Đang đóng hàng',
+  packed: 'Đã đóng xong',
   sealed: 'Đã niêm phong',
+  loaded: 'Đã lên xe',
   shipped: 'Đã xuất',
+  delivered: 'Đã giao',
 }
 
 export const CONTAINER_STATUS_COLORS: Record<ContainerStatus, string> = {
   planning: 'default',
   packing: 'orange',
+  packed: 'gold',
   sealed: 'blue',
+  loaded: 'cyan',
   shipped: 'green',
+  delivered: 'green',
 }
 
 // -- Loại đóng gói --

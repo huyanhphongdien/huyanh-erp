@@ -159,9 +159,21 @@ async function recomputeOrderAggregates(orderId: string): Promise<void> {
 
 export type LotPayStatus = 'unpaid' | 'partial' | 'paid'
 
+/**
+ * Trị giá lô lấy từ đâu — quyết định có tin được kết luận "đã thu đủ" hay không.
+ *  'lot'       : sales_order_lots.value_usd — số ĐÃ CHỐT, khớp Commercial Invoice. Tin được.
+ *  'invoice'   : tính sống = net lô/1000 × unit_price. Đúng công thức Invoice, nhưng net_weight_kg
+ *                bị containerService._recalcContainerTotals ghi đè mỗi lần gán cont, nên con số
+ *                này có thể đổi SAU khi đã phát hoá đơn. Cần chốt vào sales_order_lots.
+ *  'unknown'   : không có giá → không kết luận được, không bao giờ trả 'paid'.
+ */
+export type LotValueSource = 'lot' | 'invoice' | 'unknown'
+
 export interface LotPaymentRow {
   lotNo: number
-  lotValue: number        // trị giá lô (USD) — chia theo net container
+  lotLabel?: string | null
+  lotValue: number        // trị giá lô (USD) — xem valueSource để biết đáng tin tới đâu
+  valueSource: LotValueSource
   paidAmount: number      // đã thu GẮN cho lô này (USD)
   status: LotPayStatus
   netKg: number
@@ -267,37 +279,57 @@ export const salesOrderPaymentService = {
   },
 
   /**
-   * Bóc tách thu tiền THEO LÔ cho 1 đơn:
-   *  - Trị giá mỗi lô = total_value_usd × (net lô / tổng net) — khớp cách chia của documentService.
-   *  - Đã thu mỗi lô = SUM(amount) các payment có lot_no = lô đó (bỏ fee_offset).
-   *  - Trạng thái lô: paid nếu đã thu ≥ trị giá lô, partial nếu > 0, còn lại unpaid.
-   *  - Khoản thu lot_no NULL = chưa gán lô (unattributedPaid) — vẫn tính vào tổng đơn.
+   * Bóc tách thu tiền THEO LÔ cho 1 đơn.
+   *
+   * TRỊ GIÁ LÔ lấy theo thứ tự ưu tiên (xem LotValueSource):
+   *   1. sales_order_lots.value_usd  — số đã chốt, đúng bằng số trên Commercial Invoice
+   *   2. net lô/1000 × unit_price    — công thức Invoice, tính sống khi lô chưa có dòng chốt
+   *   3. 0 → 'unknown', không bao giờ kết luận "đã thu đủ"
+   *
+   * ⚠ TRƯỚC 26/08/2026 hàm này chia PRORATA: total_value_usd × net lô / Σnet(mọi container).
+   * Đó là SỐ SAI và phải bỏ, vì hai lý do:
+   *   • total_value_usd tính theo khối lượng danh nghĩa lúc ký, còn khách trả theo khối lượng
+   *     thực trên Invoice → lệch thật 7/20 lô, nặng nhất HA20260059 lô 1: $473.760 (prorata)
+   *     vs $50.820 (Invoice) — gấp 9 lần. HA20260056 lệch −$34.624/lô, tức lô sẽ hiện
+   *     "đã thu đủ" khi khách mới trả 85% hoá đơn.
+   *   • Mẫu số Σnet cộng cả container CHƯA gán lô, nên tổng trị giá các lô không bằng trị giá
+   *     đơn: HA20260075 chỉ quy được $223.776 trên $895.104 vào lô.
+   *
+   * Khoản thu lot_no NULL = chưa gán lô (unattributedPaid) — vẫn tính vào tổng đơn.
    */
   async getLotBreakdown(orderId: string): Promise<OrderPaymentBreakdown> {
-    const [oRes, cRes, pRes] = await Promise.all([
-      supabase.from('sales_orders').select('total_value_usd').eq('id', orderId).single(),
+    const [oRes, lRes, cRes, pRes] = await Promise.all([
+      supabase.from('sales_orders').select('total_value_usd, unit_price').eq('id', orderId).single(),
+      supabase.from('sales_order_lots').select('lot_no, lot_label, value_usd, net_weight_kg').eq('sales_order_id', orderId),
       supabase.from('sales_order_containers').select('lot_no, net_weight_kg').eq('sales_order_id', orderId),
       supabase.from('sales_order_payments').select('amount, lot_no, payment_type').eq('sales_order_id', orderId),
     ])
     const totalValue = Number(oRes.data?.total_value_usd || 0)
-    const conts = cRes.data || []
+    const unitPrice = Number(oRes.data?.unit_price || 0)
     const pays = (pRes.data || []).filter((p) => p.payment_type !== 'fee_offset')
     const totalPaid = round2(pays.reduce((s, p) => s + Number(p.amount || 0), 0))
     const orderStatus: LotPayStatus =
       totalPaid >= totalValue && totalValue > 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid'
 
-    // Gom container theo lô + tổng net
-    const lotNet = new Map<number, { net: number; count: number }>()
-    let totalNet = 0
-    for (const c of conts) {
-      const net = Number(c.net_weight_kg || 0)
-      totalNet += net
-      if (c.lot_no != null) {
-        const e = lotNet.get(c.lot_no) || { net: 0, count: 0 }
-        e.net += net; e.count += 1
-        lotNet.set(c.lot_no, e)
-      }
+    // Lô đã chốt trong sales_order_lots
+    const lotRows = new Map<number, { value: number; label: string | null; net: number }>()
+    for (const l of lRes.data || []) {
+      lotRows.set(l.lot_no as number, {
+        value: Number(l.value_usd || 0),
+        label: (l.lot_label as string | null) ?? null,
+        net: Number(l.net_weight_kg || 0),
+      })
     }
+
+    // Gom container theo lô (để đếm cont + có net dự phòng khi lô chưa chốt)
+    const lotNet = new Map<number, { net: number; count: number }>()
+    for (const c of cRes.data || []) {
+      if (c.lot_no == null) continue
+      const e = lotNet.get(c.lot_no) || { net: 0, count: 0 }
+      e.net += Number(c.net_weight_kg || 0); e.count += 1
+      lotNet.set(c.lot_no, e)
+    }
+
     // Tiền thu theo lô
     const lotPaid = new Map<number, number>()
     let unattributedPaid = 0
@@ -306,16 +338,43 @@ export const salesOrderPaymentService = {
       if (p.lot_no != null) lotPaid.set(p.lot_no, (lotPaid.get(p.lot_no) || 0) + amt)
       else unattributedPaid += amt
     }
-    const lotNos = [...lotNet.keys()].sort((a, b) => a - b)
+
+    // Vũ trụ lô = hợp của (lô đã chốt) ∪ (lô suy từ container). Lô đã chốt nhưng chưa gán
+    // container vẫn phải hiện, nếu không thì thu tiền xong lô đó biến mất khỏi bảng.
+    const lotNos = [...new Set([...lotRows.keys(), ...lotNet.keys()])].sort((a, b) => a - b)
+
     const lots: LotPaymentRow[] = lotNos.map((lotNo) => {
-      const { net, count } = lotNet.get(lotNo)!
-      const lotValue = totalNet > 0
-        ? round2(totalValue * net / totalNet)
-        : (lotNos.length ? round2(totalValue / lotNos.length) : 0)
+      const row = lotRows.get(lotNo)
+      const fromConts = lotNet.get(lotNo)
+      const netKg = fromConts?.net ?? row?.net ?? 0
+
+      let lotValue = 0
+      let valueSource: LotValueSource = 'unknown'
+      if (row && row.value > 0) {
+        lotValue = round2(row.value)
+        valueSource = 'lot'
+      } else if (netKg > 0 && unitPrice > 0) {
+        lotValue = round2((netKg / 1000) * unitPrice)
+        valueSource = 'invoice'
+      }
+
       const paidAmount = round2(lotPaid.get(lotNo) || 0)
-      const status: LotPayStatus = paidAmount >= lotValue && lotValue > 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid'
-      return { lotNo, lotValue, paidAmount, status, netKg: net, containerCount: count }
+      // Dung sai 0,01 USD cho sai số làm tròn. lotValue = 0 thì KHÔNG bao giờ là 'paid'.
+      const status: LotPayStatus =
+        lotValue > 0 && paidAmount >= lotValue - 0.01 ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid'
+
+      return {
+        lotNo,
+        lotLabel: row?.label ?? null,
+        lotValue,
+        valueSource,
+        paidAmount,
+        status,
+        netKg,
+        containerCount: fromConts?.count ?? 0,
+      }
     })
+
     return {
       totalValue, totalPaid, orderStatus,
       hasLots: lots.length > 0,
@@ -327,47 +386,58 @@ export const salesOrderPaymentService = {
 
   /**
    * Batch cho Kanban: với danh sách đơn → mỗi đơn trả { lotsPaid, lotsTotal }.
-   * Chỉ tính lô đã gán container; 1 lô "đã thu" khi tiền gắn lô ≥ trị giá lô.
+   * Dùng ĐÚNG thứ tự trị giá lô như getLotBreakdown (lot chốt → công thức Invoice → bỏ qua),
+   * không prorata. Hai chỗ lệch công thức thì badge Kanban và bảng chi tiết sẽ nói khác nhau
+   * về cùng một lô.
    */
   async getLotPaymentForOrders(orderIds: string[]): Promise<Record<string, { lotsPaid: number; lotsTotal: number }>> {
     const out: Record<string, { lotsPaid: number; lotsTotal: number }> = {}
     if (!orderIds.length) return out
-    const [oRes, cRes, pRes] = await Promise.all([
-      supabase.from('sales_orders').select('id, total_value_usd').in('id', orderIds),
+    const [oRes, lRes, cRes, pRes] = await Promise.all([
+      supabase.from('sales_orders').select('id, unit_price').in('id', orderIds),
+      supabase.from('sales_order_lots').select('sales_order_id, lot_no, value_usd').in('sales_order_id', orderIds),
       supabase.from('sales_order_containers').select('sales_order_id, lot_no, net_weight_kg').in('sales_order_id', orderIds),
       supabase.from('sales_order_payments').select('sales_order_id, lot_no, amount, payment_type').in('sales_order_id', orderIds).not('lot_no', 'is', null),
     ])
-    const totalValById: Record<string, number> = {}
-    for (const o of oRes.data || []) totalValById[o.id] = Number(o.total_value_usd || 0)
-    // gom net theo (đơn, lô) + tổng net theo đơn
+    const unitPriceById: Record<string, number> = {}
+    for (const o of oRes.data || []) unitPriceById[o.id] = Number(o.unit_price || 0)
+
+    // trị giá lô ĐÃ CHỐT theo (đơn, lô)
+    const lotValue: Record<string, Map<number, number>> = {}
+    for (const l of lRes.data || []) {
+      const oid = l.sales_order_id as string
+      ;(lotValue[oid] ||= new Map()).set(l.lot_no as number, Number(l.value_usd || 0))
+    }
+    // net theo (đơn, lô) — dự phòng khi lô chưa chốt
     const lotNet: Record<string, Map<number, number>> = {}
-    const totalNet: Record<string, number> = {}
     for (const c of cRes.data || []) {
+      if (c.lot_no == null) continue
       const oid = c.sales_order_id as string
-      const net = Number(c.net_weight_kg || 0)
-      totalNet[oid] = (totalNet[oid] || 0) + net
-      if (c.lot_no != null) {
-        ;(lotNet[oid] ||= new Map()).set(c.lot_no, ((lotNet[oid].get(c.lot_no)) || 0) + net)
-      }
+      ;(lotNet[oid] ||= new Map()).set(c.lot_no, ((lotNet[oid].get(c.lot_no)) || 0) + Number(c.net_weight_kg || 0))
     }
     // tiền thu theo (đơn, lô)
     const lotPaid: Record<string, Map<number, number>> = {}
-    for (const p of pRes.data || []) {
+    for (const p of (pRes.data || []).filter((p) => p.payment_type !== 'fee_offset')) {
       const oid = p.sales_order_id as string
       ;(lotPaid[oid] ||= new Map()).set(p.lot_no as number, ((lotPaid[oid].get(p.lot_no as number)) || 0) + Number(p.amount || 0))
     }
+
     for (const oid of orderIds) {
+      const values = lotValue[oid]
       const nets = lotNet[oid]
-      if (!nets || nets.size === 0) { out[oid] = { lotsPaid: 0, lotsTotal: 0 }; continue }
-      const tv = totalValById[oid] || 0
-      const tn = totalNet[oid] || 0
+      const lotNos = [...new Set([...(values?.keys() ?? []), ...(nets?.keys() ?? [])])]
+      if (!lotNos.length) { out[oid] = { lotsPaid: 0, lotsTotal: 0 }; continue }
+
+      const up = unitPriceById[oid] || 0
       let paidCount = 0
-      for (const [lotNo, net] of nets) {
-        const lotValue = tn > 0 ? tv * net / tn : (nets.size ? tv / nets.size : 0)
+      for (const lotNo of lotNos) {
+        const chot = values?.get(lotNo) || 0
+        const net = nets?.get(lotNo) || 0
+        const v = chot > 0 ? chot : (net > 0 && up > 0 ? (net / 1000) * up : 0)
         const paid = lotPaid[oid]?.get(lotNo) || 0
-        if (lotValue > 0 && paid >= lotValue - 0.01) paidCount++
+        if (v > 0 && paid >= v - 0.01) paidCount++
       }
-      out[oid] = { lotsPaid: paidCount, lotsTotal: nets.size }
+      out[oid] = { lotsPaid: paidCount, lotsTotal: lotNos.length }
     }
     return out
   },

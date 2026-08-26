@@ -134,12 +134,21 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
           if (b === 'partial') return pill('#dbeafe', '#1d4ed8', '💰 thu 1 phần')
           return pill('#fef3c7', '#b45309', '⚠ chưa thu tiền')
         })()}
-        {/* Thu tiền theo LÔ — chỉ hiện khi đơn nhiều lô và đã thu ≥1 lô (bổ nghĩa cho pill trên) */}
-        {lotPay && lotPay.lotsTotal > 1 && lotPay.lotsPaid > 0 && (
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', background: '#e0f2fe', padding: '1px 7px', borderRadius: 10 }}>
-            💵 {lotPay.lotsPaid}/{lotPay.lotsTotal} lô đã thu
-          </span>
-        )}
+        {/* Thu tiền theo LÔ — hiện với MỌI đơn nhiều lô, kể cả chưa thu đồng nào.
+            Trước 26/08/2026 badge này còn điều kiện `lotsPaid > 0`, nên đơn nhiều lô mà chưa
+            thu gì thì không thấy gì cả — đúng lúc cần nhìn nhất lại không hiện. Bỏ điều kiện,
+            đổi màu theo tiến độ để 0/3 đọc ra là cảnh báo chứ không giống đã có tiến triển. */}
+        {lotPay && lotPay.lotsTotal > 1 && (() => {
+          const { lotsPaid, lotsTotal } = lotPay
+          const [bg, fg] = lotsPaid === 0            ? ['#fef3c7', '#b45309']
+                         : lotsPaid >= lotsTotal     ? ['#dcfce7', '#15803d']
+                         :                             ['#e0f2fe', '#0369a1']
+          return (
+            <span style={{ fontSize: 10, fontWeight: 700, color: fg, background: bg, padding: '1px 7px', borderRadius: 10 }}>
+              💵 {lotsPaid}/{lotsTotal} lô đã thu
+            </span>
+          )
+        })()}
       </div>
 
       {/* Footer: dwell + ETD countdown */}

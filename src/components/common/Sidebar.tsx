@@ -371,6 +371,9 @@ const getMenuGroups = (
       // Nối lại 2 trang công nợ/dòng tiền (đã code sẵn, route có nhưng thiếu link — 2026-08-06)
       { path: '/sales/ar-aging', label: 'Công nợ khách', icon: <DollarSign size={18} />,
         requireSalesRoles: ['sale', 'accounting', 'admin'] },
+      // Sổ lô: dạng xem duy nhất lấy LÔ làm dòng — trả lời "lô nào đã thu, thuộc HĐ nào"
+      { path: '/sales/lots', label: 'Sổ lô', icon: <Package size={18} />,
+        requireSalesRoles: ['sale', 'logistics', 'accounting', 'admin'] },
       { path: '/sales/cash-flow', label: 'Dòng tiền bán', icon: <BarChart3 size={18} />,
         requireSalesRoles: ['accounting', 'admin'] },
     ],

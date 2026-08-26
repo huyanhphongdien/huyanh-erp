@@ -30,6 +30,12 @@ export interface QuickPayTarget {
   label: string        // Số HĐ (hoặc mã đơn) hiển thị chính
   subLabel?: string     // Mã SO phụ (nếu có số HĐ)
   outstanding: number   // USD còn phải thu — prefill
+  /**
+   * Mở modal với lô này chọn sẵn (dùng từ trang Sổ lô, nơi người dùng bấm đúng dòng lô).
+   * Bỏ trống = mặc định "cả đơn" như cũ. Số tiền vẫn prefill lại theo còn-nợ của lô
+   * ngay khi bóc tách lô tải xong.
+   */
+  presetLotNo?: number | null
 }
 
 interface Props {
@@ -50,15 +56,25 @@ export default function QuickPayModal({ target, onClose, onDone }: Props) {
   // Nạp bóc tách theo lô khi mở modal (để cho chọn lô + prefill còn nợ theo lô)
   useEffect(() => {
     if (!target) return
+    const preset = target.presetLotNo ?? null
     setBreakdown(null)
-    setLotNo(null)
+    setLotNo(preset)
     setAmount(Math.round(target.outstanding * 100) / 100)
     setDate(dayjs())
     setType('final')
     setBankRef('')
     let alive = true
     salesOrderPaymentService.getLotBreakdown(target.id)
-      .then((b) => { if (alive) setBreakdown(b) })
+      .then((b) => {
+        if (!alive) return
+        setBreakdown(b)
+        // Bóc tách về sau khi modal đã mở → prefill lại số tiền theo còn-nợ của LÔ được
+        // chọn sẵn. Không làm bước này thì ô tiền giữ nguyên số còn-nợ CẢ ĐƠN, dễ ghi thừa.
+        if (preset != null) {
+          const row = b.lots.find((l) => l.lotNo === preset)
+          if (row) setAmount(Math.max(0, Math.round((row.lotValue - row.paidAmount) * 100) / 100))
+        }
+      })
       .catch(() => {})
     return () => { alive = false }
   }, [target])

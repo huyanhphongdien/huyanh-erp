@@ -54,6 +54,30 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - RLS enabled on most tables — use service role key for admin operations
 - Key tables: employees, attendance, shifts, departments, positions, leave_requests, b2b_demand_offers, b2b_chat_messages
 
+## Lô hàng bán & thanh toán theo lô
+1 hợp đồng có nhiều lô; khách trả tiền **theo từng lô**, mỗi lô một lần chuyển tiền + chứng từ riêng.
+- **Lô = `sales_order_lots`**, khoá nhận dạng `(sales_order_id, lot_no)` — đúng khoá mà
+  `sales_order_containers.lot_no` và `sales_order_payments.lot_no` đã dùng sẵn.
+  Cố ý KHÔNG thêm `lot_id` vào 2 bảng đó (2 nguồn sự thật sẽ lệch nhau).
+- **`value_usd` = trị giá lô đã CHỐT** — mẫu số để kết luận "đã thu đủ chưa". Sửa tay được,
+  vì số trên chứng từ phát cho khách mới là số đúng.
+- ⚠ **Không bao giờ chia prorata** `total_value_usd × net_lô / Σnet`. Đó là bug đã gỡ 26/08/2026:
+  lệch 7/20 lô, nặng nhất HA20260059 lô 1 ($473.760 prorata vs $50.820 Invoice), và mẫu số còn
+  cộng cả container chưa gán lô. Công thức đúng = `net_lô/1000 × unit_price` (số trên Commercial
+  Invoice), và tốt nhất là đọc thẳng `sales_order_lots.value_usd`.
+- ⚠ `sales_order_containers.net_weight_kg` là số **động** (`containerService._recalcContainerTotals`
+  ghi đè mỗi lần gán cont) → tính trị giá lô sống sẽ đổi sau khi đã phát hoá đơn. Phải chốt vào
+  `value_usd`.
+- Views: `v_sales_order_lot_payments` (1 dòng = 1 lô + tiền), `v_sales_order_lot_summary`
+  (cuộn lên mức hợp đồng, có `unassigned_paid_usd` = tiền thu chưa gắn lô).
+- Service: `src/services/sales/salesLotService.ts`; tính tiền theo lô ở
+  `salesOrderPaymentService.getLotBreakdown` / `getLotPaymentForOrders`.
+- Trang: `/sales/lots` (Sổ lô — dạng xem duy nhất lấy LÔ làm dòng).
+  Badge Kanban `💵 x/y lô đã thu` ở `KanbanCard.tsx`; badge `📦 x/y lô` là tiến độ **giao**, khác.
+- Migrations: `docs/migrations/sales_lots_p{1,2,3}_*.sql` — chạy theo thứ tự (đã áp production 26/08/2026).
+- ⚠ Migration chạy qua RPC `agent_sql` **không được có `BEGIN`/`COMMIT`** (lỗi 0A000) — đã nằm sẵn
+  trong transaction.
+
 ## Sales Contract Workflow
 - Tab Hợp đồng bán: 3 actor
   - **Sale** lên HĐ (form Compose Studio, KHÔNG nhập bank)

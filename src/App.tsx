@@ -306,6 +306,7 @@ const ExportDocumentsPage = lazy(() => import('./pages/sales/ExportDocumentsPage
 const SalesDashboardPage = lazy(() => import('./pages/sales/SalesDashboardPage'))
 const ShipmentFollowingPage = lazy(() => import('./pages/sales/ShipmentFollowingPage'))
 const ARAgingReportPage = lazy(() => import('./pages/sales/ARAgingReportPage'))
+const SalesLotLedgerPage = lazy(() => import('./pages/sales/SalesLotLedgerPage'))
 const CashFlowPage = lazy(() => import('./pages/sales/CashFlowPage'))
 const ExecutiveDashboardPage = lazy(() => import('./pages/sales/ExecutiveDashboardPage'))
 
@@ -514,6 +515,7 @@ function App() {
               <Route path="sales/orders/:orderId/documents" element={<Suspense fallback={<LoadingSpinner />}><ExportDocumentsPage /></Suspense>} />
               <Route path="sales/shipments" element={<Suspense fallback={<LoadingSpinner />}><ShipmentFollowingPage /></Suspense>} />
               <Route path="sales/ar-aging" element={<Suspense fallback={<LoadingSpinner />}><ARAgingReportPage /></Suspense>} />
+              <Route path="sales/lots" element={<Suspense fallback={<LoadingSpinner />}><SalesLotLedgerPage /></Suspense>} />
               <Route path="sales/cash-flow" element={<Suspense fallback={<LoadingSpinner />}><CashFlowPage /></Suspense>} />
               <Route path="executive" element={<Suspense fallback={<LoadingSpinner />}><ExecutiveDashboardPage /></Suspense>} />
 

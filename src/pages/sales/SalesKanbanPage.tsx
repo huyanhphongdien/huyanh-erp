@@ -13,7 +13,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { salesStageService } from '../../services/sales/salesStageService'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
-import { salesOrderPaymentService } from '../../services/sales/salesOrderPaymentService'
+import { salesOrderPaymentService, type OrderLotMoney } from '../../services/sales/salesOrderPaymentService'
 import {
   SALES_STAGES,
   SALES_STAGE_LABELS,
@@ -55,7 +55,7 @@ export default function SalesKanbanPage() {
   const canCollect = ['accounting', 'admin'].includes(getSalesRole(user) || '')
   const [orders, setOrders] = useState<KanbanOrder[]>([])
   const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})
-  const [lotPay, setLotPay] = useState<Record<string, { lotsPaid: number; lotsTotal: number }>>({})
+  const [lotPay, setLotPay] = useState<Record<string, OrderLotMoney>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterEtd, setFilterEtd] = useState<'all' | '7d' | '14d' | '30d'>('all')
@@ -135,9 +135,10 @@ export default function SalesKanbanPage() {
       // Xem ghi chú cùng chỗ ở SalesOrderListPage: hỏng thì xoá trắng + log, đừng im lặng.
       // lotProgress rỗng làm badge "còn thiếu" trên thẻ hiện nguyên số lượng hợp đồng.
       .catch((e) => { console.error('[sales] Không tải được tiến độ lô:', e); setLotProgress({}) })
-    // Thu tiền theo lô (best-effort) → badge "đã thu x/y lô"
+    // Trục TIỀN theo lô — nuôi máng dưới của viên lô trên thẻ.
     salesOrderPaymentService.getLotPaymentForOrders(ids)
-      .then(setLotPay).catch(() => {})
+      .then(setLotPay)
+      .catch((e) => { console.error('[sales] Không tải được tiền theo lô:', e); setLotPay({}) })
   }
 
   useEffect(() => { fetchOrders() }, [])

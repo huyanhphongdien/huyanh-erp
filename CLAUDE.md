@@ -73,7 +73,15 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
 - Service: `src/services/sales/salesLotService.ts`; tính tiền theo lô ở
   `salesOrderPaymentService.getLotBreakdown` / `getLotPaymentForOrders`.
 - Trang: `/sales/lots` (Sổ lô — dạng xem duy nhất lấy LÔ làm dòng).
-  Badge Kanban `💵 x/y lô đã thu` ở `KanbanCard.tsx`; badge `📦 x/y lô` là tiến độ **giao**, khác.
+- **Ký hiệu dùng chung: "viên lô"** (`src/components/sales/LotChipStrip.tsx`). 1 viên = 1 lô,
+  **thân viên = trục GIAO** (nét đứt/xanh dương/xanh lá, tính từ container thật),
+  **máng dưới = trục TIỀN**. Thứ tự đó bất biến ở mọi màn, tooltip luôn đọc 📦 trước 💵 sau.
+  Từ 27/08/2026 nó THAY hai badge cũ `📦 x/y lô` và `💵 x/y lô đã thu` trên thẻ Kanban và
+  cột Lô ở Sổ đơn hàng. Chấm đỏ góc viên = `lot_status` trái chứng cứ giao.
+- ⚠ Danh sách trạng thái "container đã giao" tồn tại ở **HAI nơi không gộp được**:
+  hằng `DELIVERED_CONTAINER_STATUSES` (dispatchService.ts) và chuỗi gõ cứng trong
+  `sales_lots_p5_progress_union.sql`. Sửa một bên mà quên bên kia là tab Đóng gói và
+  badge Kanban nói khác nhau.
 - Migrations: `docs/migrations/sales_lots_p{1,2,3}_*.sql` — chạy theo thứ tự (đã áp production 26/08/2026).
 - ⚠ Migration chạy qua RPC `agent_sql` **không được có `BEGIN`/`COMMIT`** (lỗi 0A000) — đã nằm sẵn
   trong transaction.

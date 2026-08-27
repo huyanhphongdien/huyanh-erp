@@ -180,6 +180,30 @@ export interface LotPaymentRow {
   containerCount: number
 }
 
+/**
+ * Tiền của MỘT lô, cho dải chip lô. Vốn đã được tính trong vòng lặp của
+ * getLotPaymentForOrders rồi bị vứt, chỉ giữ lại con số đếm — giống hệt chuyện
+ * deliveryByLot bên dispatchService. Tốn 0 truy vấn thêm.
+ *
+ * `status = 'unknown'` khi lô chưa có trị giá: KHÔNG kết luận được đã thu đủ hay chưa,
+ * và tuyệt đối không được vẽ thành 100%.
+ */
+export interface LotMoneyRow {
+  lotNo: number
+  valueUsd: number
+  paidUsd: number
+  status: LotPayStatus | 'unknown'
+  /** sales_order_lots.status — số NHẬP TAY, chỉ để đối chiếu với chứng cứ giao. */
+  lotStatus?: string | null
+}
+
+/** Tiền theo lô của MỘT đơn — kết quả batch cho danh sách / Kanban. */
+export interface OrderLotMoney {
+  lotsPaid: number
+  lotsTotal: number
+  moneyByLot: LotMoneyRow[]
+}
+
 export interface OrderPaymentBreakdown {
   totalValue: number
   totalPaid: number       // tổng đã thu (mọi khoản, trừ fee_offset)
@@ -390,8 +414,8 @@ export const salesOrderPaymentService = {
    * không prorata. Hai chỗ lệch công thức thì badge Kanban và bảng chi tiết sẽ nói khác nhau
    * về cùng một lô.
    */
-  async getLotPaymentForOrders(orderIds: string[]): Promise<Record<string, { lotsPaid: number; lotsTotal: number }>> {
-    const out: Record<string, { lotsPaid: number; lotsTotal: number }> = {}
+  async getLotPaymentForOrders(orderIds: string[]): Promise<Record<string, OrderLotMoney>> {
+    const out: Record<string, OrderLotMoney> = {}
     if (!orderIds.length) return out
 
     // ⚠ PHẢI CHUNK. PostgREST nhét cả mảng id vào URL: 104 UUID ≈ 3,9KB, sát ngưỡng
@@ -413,13 +437,13 @@ export const salesOrderPaymentService = {
     }
 
     type ORow = { id: string; unit_price: number | null }
-    type LRow = { sales_order_id: string; lot_no: number; value_usd: number | null }
+    type LRow = { sales_order_id: string; lot_no: number; value_usd: number | null; status: string | null }
     type CRow = { sales_order_id: string; lot_no: number | null; net_weight_kg: number | null }
     type PRow = { sales_order_id: string; lot_no: number | null; amount: number | null; payment_type: string | null; currency: string | null }
 
     const [oRows, lRows, cRows, pRows] = await Promise.all([
       fetchChunked<ORow>((s) => supabase.from('sales_orders').select('id, unit_price').in('id', s)),
-      fetchChunked<LRow>((s) => supabase.from('sales_order_lots').select('sales_order_id, lot_no, value_usd').in('sales_order_id', s)),
+      fetchChunked<LRow>((s) => supabase.from('sales_order_lots').select('sales_order_id, lot_no, value_usd, status').in('sales_order_id', s)),
       fetchChunked<CRow>((s) => supabase.from('sales_order_containers').select('sales_order_id, lot_no, net_weight_kg').in('sales_order_id', s)),
       fetchChunked<PRow>((s) => supabase.from('sales_order_payments').select('sales_order_id, lot_no, amount, payment_type, currency').in('sales_order_id', s).not('lot_no', 'is', null)),
     ])
@@ -430,9 +454,11 @@ export const salesOrderPaymentService = {
 
     // trị giá lô ĐÃ CHỐT theo (đơn, lô)
     const lotValue: Record<string, Map<number, number>> = {}
+    const lotStatusMap: Record<string, Map<number, string | null>> = {}
     for (const l of lRes.data || []) {
       const oid = l.sales_order_id as string
       ;(lotValue[oid] ||= new Map()).set(l.lot_no as number, Number(l.value_usd || 0))
+      ;(lotStatusMap[oid] ||= new Map()).set(l.lot_no as number, l.status)
     }
     // net theo (đơn, lô) — dự phòng khi lô chưa chốt
     const lotNet: Record<string, Map<number, number>> = {}
@@ -457,18 +483,28 @@ export const salesOrderPaymentService = {
       const values = lotValue[oid]
       const nets = lotNet[oid]
       const lotNos = [...new Set([...(values?.keys() ?? []), ...(nets?.keys() ?? [])])]
-      if (!lotNos.length) { out[oid] = { lotsPaid: 0, lotsTotal: 0 }; continue }
+        .sort((a, b) => a - b)   // vị trí là danh tính của lô — luôn theo số lô tăng dần
+      if (!lotNos.length) { out[oid] = { lotsPaid: 0, lotsTotal: 0, moneyByLot: [] }; continue }
 
       const up = unitPriceById[oid] || 0
       let paidCount = 0
+      const moneyByLot: LotMoneyRow[] = []
       for (const lotNo of lotNos) {
         const chot = values?.get(lotNo) || 0
         const net = nets?.get(lotNo) || 0
         const v = chot > 0 ? chot : (net > 0 && up > 0 ? (net / 1000) * up : 0)
-        const paid = lotPaid[oid]?.get(lotNo) || 0
-        if (v > 0 && paid >= v - 0.01) paidCount++
+        const paid = round2(lotPaid[oid]?.get(lotNo) || 0)
+        const isPaid = v > 0 && paid >= v - 0.01
+        if (isPaid) paidCount++
+        moneyByLot.push({
+          lotNo,
+          valueUsd: round2(v),
+          paidUsd: paid,
+          status: !v ? 'unknown' : isPaid ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
+          lotStatus: lotStatusMap[oid]?.get(lotNo) ?? null,
+        })
       }
-      out[oid] = { lotsPaid: paidCount, lotsTotal: lotNos.length }
+      out[oid] = { lotsPaid: paidCount, lotsTotal: lotNos.length, moneyByLot }
     }
     return out
   },

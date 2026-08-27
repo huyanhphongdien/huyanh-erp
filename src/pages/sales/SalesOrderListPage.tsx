@@ -47,7 +47,9 @@ import { supabase } from '../../lib/supabase'
 import { salesOrderService, SORTABLE_ORDER_COLUMNS } from '../../services/sales/salesOrderService'
 import type { SalesOrderStats, SalesOrderListParams, SortableOrderColumn } from '../../services/sales/salesOrderService'
 import { dispatchService, deliveredTons, remainingTons, type LotProgress } from '../../services/logistics/dispatchService'
-import LotProgressBadge from '../../components/sales/LotProgressBadge'
+import LotProgressBadge, { DispatchChips } from '../../components/sales/LotProgressBadge'
+import LotChipStrip, { mergeLotAxes } from '../../components/sales/LotChipStrip'
+import { salesOrderPaymentService, type OrderLotMoney } from '../../services/sales/salesOrderPaymentService'
 import StagePill from '../../components/common/StagePill'
 import type { SalesStage } from '../../services/sales/salesStages'
 import { getSLAStatus } from '../../services/sales/salesStages'
@@ -249,7 +251,8 @@ const SalesOrderListPage = () => {
 
   // State
   const [orders, setOrders] = useState<SalesOrder[]>([])
-  const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})  // tiến độ lô từng đơn
+  const [lotProgress, setLotProgress] = useState<Record<string, LotProgress>>({})  // trục GIAO theo lô
+  const [lotPay, setLotPay] = useState<Record<string, OrderLotMoney>>({})          // trục TIỀN theo lô
   // DÒNG TỔNG — tính trên TOÀN BỘ đơn khớp bộ lọc (KHÔNG chỉ trang hiện tại).
   // Khách lọc Grade=RSS rồi hỏi "còn thiếu bao nhiêu tấn" ⇒ tổng của 10 dòng là vô nghĩa.
   const [summary, setSummary] = useState<{ orders: number; qty: number; delivered: number; shortage: number; estimated: boolean; truncated: boolean } | null>(null)
@@ -616,13 +619,20 @@ const SalesOrderListPage = () => {
       setOrders(response.data)
       setTotal(response.total)
       // Tiến độ lô cho 3 view (best-effort, không chặn list)
-      dispatchService.getLotProgressForOrders(response.data.map((o) => o.id))
+      const ids = response.data.map((o) => o.id)
+      dispatchService.getLotProgressForOrders(ids)
         .then(setLotProgress)
         // Hỏng thì XOÁ TRẮNG tiến độ lô, đừng giữ số của lần tải trước — số cũ đứng cạnh
         // danh sách mới là số sai mà trông vẫn hợp lý. Và phải log: khi lotProgress rỗng,
         // remainingTons() trả về NGUYÊN số lượng hợp đồng và được vẽ tự tin ở cột
         // "Còn thiếu (T)" — im lặng ở đây nghĩa là con số đó sai mà không ai biết.
         .catch((e) => { console.error('[sales] Không tải được tiến độ lô:', e); setLotProgress({}) })
+
+      // Trục TIỀN theo lô — nuôi máng dưới của viên lô. Best-effort riêng: hỏng trục tiền
+      // thì viên vẫn vẽ được trục giao, chỉ mất máng.
+      salesOrderPaymentService.getLotPaymentForOrders(ids)
+        .then(setLotPay)
+        .catch((e) => { console.error('[sales] Không tải được tiền theo lô:', e); setLotPay({}) })
 
       // DÒNG TỔNG trên TOÀN BỘ bộ lọc (best-effort — lỗi thì ẩn dòng tổng, không chặn list)
       salesOrderService.getAllForSummary(params)
@@ -1132,10 +1142,38 @@ const SalesOrderListPage = () => {
     {
       title: hdr('Tiến độ lô'),
       key: 'lot_progress',
-      width: 108,
+      width: 158,
+      // ⚠ KHÔNG đặt `sorter` và KHÔNG đặt `dataIndex` cho cột này: nó là cột client-only,
+      // không có cột tương ứng trong DB. Gắn sorter là tên nó lọt vào .order() → 400.
       render: (_: unknown, r: SalesOrder) => {
         const p = lotProgress[r.id]
-        return p && p.contsTotal > 0 ? <LotProgressBadge p={p} /> : gray(null)
+        if (!p || p.contsTotal === 0) return gray(null)
+        const chips = mergeLotAxes(p.deliveryByLot, lotPay[r.id]?.moneyByLot)
+        if (chips.length === 0) return <LotProgressBadge p={p} />
+        const money = lotPay[r.id]
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <LotChipStrip lots={chips} size="s" />
+              {/* Dải viên không có chip lệnh — giữ riêng, nếu không đơn CÓ LÔ mất hẳn
+                  lối nhảy sang Lệnh điều động vốn đang nằm trong cột này. */}
+              <DispatchChips orders={p.dispatchOrders} />
+            </div>
+            <span style={{ display: 'block', fontSize: 10, color: '#6b7280', marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
+              {p.lotsDelivered}/{p.lotsTotal} giao
+              {money && (
+                <> · <span style={{ color: money.lotsPaid === 0 ? '#b45309' : money.lotsPaid >= money.lotsTotal ? '#15803d' : '#0369a1', fontWeight: 600 }}>
+                  {money.lotsPaid}/{money.lotsTotal} thu
+                </span></>
+              )}
+              {p.contsNoLot > 0 && (
+                <Tooltip title={`${p.contsNoLot} container chưa gán lô — không nằm trong phân số lô ở trên.`}>
+                  <span style={{ color: '#dc2626', fontWeight: 700, cursor: 'help' }}> ⚠</span>
+                </Tooltip>
+              )}
+            </span>
+          </div>
+        )
       },
     },
     {
@@ -1840,7 +1878,7 @@ const SalesOrderListPage = () => {
             pageSizeOptions: ['10', '20', '50'],
           }}
           onChange={handleTableChange}
-          scroll={{ x: 1800 }}
+          scroll={{ x: 1850 }}
           size={densityConfig.size}
           locale={{
             emptyText: (

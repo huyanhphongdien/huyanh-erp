@@ -3,6 +3,8 @@
 // File: src/pages/sales/components/KanbanCard.tsx
 // ============================================================================
 
+import { useMemo } from 'react'
+import { Tooltip } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import {
   type SalesStage,
@@ -12,7 +14,9 @@ import {
   paymentBucket,
 } from '../../../services/sales/salesStages'
 import { remainingTons, type LotProgress } from '../../../services/logistics/dispatchService'
-import LotProgressBadge from '../../../components/sales/LotProgressBadge'
+import LotProgressBadge, { DispatchChips } from '../../../components/sales/LotProgressBadge'
+import LotChipStrip, { mergeLotAxes } from '../../../components/sales/LotChipStrip'
+import type { OrderLotMoney } from '../../../services/sales/salesOrderPaymentService'
 import { soDisplayCode } from '../../../services/sales/salesTypes'
 
 export interface KanbanOrder {
@@ -39,11 +43,17 @@ interface KanbanCardProps {
   onDragStart: (orderId: string) => void
   onDragEnd: () => void
   lp?: LotProgress
-  lotPay?: { lotsPaid: number; lotsTotal: number }   // thu tiền theo lô
+  lotPay?: OrderLotMoney   // thu tiền theo lô
 }
 
 export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }: KanbanCardProps) {
   const navigate = useNavigate()
+
+  // Ghép hai trục theo số lô. Đơn chưa chia lô → mảng rỗng → rơi về badge cũ theo container.
+  const chipLots = useMemo(
+    () => mergeLotAxes(lp?.deliveryByLot, lotPay?.moneyByLot),
+    [lp?.deliveryByLot, lotPay?.moneyByLot],
+  )
 
   const elapsedHours = order.stage_started_at
     ? (Date.now() - new Date(order.stage_started_at).getTime()) / (1000 * 3600)
@@ -114,42 +124,75 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
         </div>
       )}
 
-      {/* Tiến độ lô + Còn thiếu (cùng công thức với dạng Bảng, Split & file Excel) */}
+      {/* ─── DÒNG LÔ ───────────────────────────────────────────────────────────
+          Dải viên lô THAY hai badge cũ (`📦 x/y lô` và `💵 x/y lô đã thu`). Ít thứ
+          hơn trên thẻ mà nói được nhiều hơn: mỗi viên là một lô, thân = giao, máng = tiền.
+          Thẻ ở cột hẹp nhất 180px; 4 viên cỡ xs + khoảng cách ≈ 73px, còn dư chỗ.
+
+          Pill tiền cấp ĐƠN co thành một chấm 8px: nó chỉ còn nhiệm vụ nói "đơn này đã tới
+          khâu thu chưa", chi tiết đã nằm ở máng từng viên. Tiết kiệm ~62px. */}
       <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        {lp && lp.contsTotal > 0 && <LotProgressBadge p={lp} small />}
+        {/* Dải viên `flex: 1 1 0` để LUÔN ở lại dòng 1 và tự wrap viên bên trong.
+            Nếu để nó co giãn tự nhiên thì ở cột hẹp nhất (180px, tức lòng thẻ 134px) dải
+            4 viên + "còn thiếu 403.20T" + chấm = 172px → tràn dòng, và khi tràn thì
+            marginLeft:auto được giải theo TỪNG DÒNG nên chữ dán mép phải dòng 2, zigzag. */}
+        <span style={{ flex: '1 1 0', minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          {chipLots.length > 0
+            ? <LotChipStrip lots={chipLots} size="xs" />
+            : lp && lp.contsTotal > 0 && <LotProgressBadge p={lp} small showDispatch={false} />}
+
+          {/* Container CHƯA gán lô không nằm trong bất kỳ viên nào — Bảng đã cảnh báo,
+              thẻ Kanban cũng phải, nếu không HA20260075 nhìn như đã giao xong 1/1 lô
+              trong khi còn 15 cont chưa chia. */}
+          {chipLots.length > 0 && lp && lp.contsNoLot > 0 && (
+            <Tooltip title={`${lp.contsNoLot} container chưa gán lô — không nằm trong dải viên bên trái.`}>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: '#dc2626', cursor: 'help' }}>
+                ⚠+{lp.contsNoLot}
+              </span>
+            </Tooltip>
+          )}
+        </span>
+
         {(() => {
           const rem = remainingTons(order.quantity_tons, lp, order.status)
           return rem > 0
-            ? <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626' }}>còn thiếu {rem.toFixed(2)}T</span>
-            : <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d' }}>đủ hàng</span>
+            ? <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', flex: 'none' }}>còn thiếu {rem.toFixed(2)}T</span>
+            : <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d', flex: 'none' }}>đủ hàng</span>
         })()}
-        {/* Tiền về — dùng chung paymentBucket() với KPI/lọc ở KanbanPage */}
+
+        {/* Tiền cấp ĐƠN — dùng chung paymentBucket() với KPI/lọc ở KanbanPage.
+            Co thành chấm để nhường chỗ cho dải viên, nhưng phải bấm được: điện thoại
+            không có hover, mà trigger mặc định của Tooltip là hover — chạm vào là
+            điều hướng sang trang đơn thay vì đọc được nghĩa của chấm. */}
         {(() => {
           const b = paymentBucket(order)
           if (b === 'none') return null
-          const pill = (bg: string, fg: string, txt: string) => (
-            <span style={{ fontSize: 10, fontWeight: 700, color: fg, background: bg, padding: '1px 7px', borderRadius: 10 }}>{txt}</span>
-          )
-          if (b === 'paid') return pill('#dcfce7', '#15803d', '✅ đã thu tiền')
-          if (b === 'partial') return pill('#dbeafe', '#1d4ed8', '💰 thu 1 phần')
-          return pill('#fef3c7', '#b45309', '⚠ chưa thu tiền')
-        })()}
-        {/* Thu tiền theo LÔ — hiện với MỌI đơn nhiều lô, kể cả chưa thu đồng nào.
-            Trước 26/08/2026 badge này còn điều kiện `lotsPaid > 0`, nên đơn nhiều lô mà chưa
-            thu gì thì không thấy gì cả — đúng lúc cần nhìn nhất lại không hiện. Bỏ điều kiện,
-            đổi màu theo tiến độ để 0/3 đọc ra là cảnh báo chứ không giống đã có tiến triển. */}
-        {lotPay && lotPay.lotsTotal > 1 && (() => {
-          const { lotsPaid, lotsTotal } = lotPay
-          const [bg, fg] = lotsPaid === 0            ? ['#fef3c7', '#b45309']
-                         : lotsPaid >= lotsTotal     ? ['#dcfce7', '#15803d']
-                         :                             ['#e0f2fe', '#0369a1']
+          const [color, txt] = b === 'paid'    ? ['#15803d', 'Đã thu tiền']
+                             : b === 'partial' ? ['#1d4ed8', 'Thu 1 phần']
+                             :                   ['#b45309', 'Chưa thu tiền']
           return (
-            <span style={{ fontSize: 10, fontWeight: 700, color: fg, background: bg, padding: '1px 7px', borderRadius: 10 }}>
-              💵 {lotsPaid}/{lotsTotal} lô đã thu
-            </span>
+            <Tooltip title={txt} trigger={['hover', 'click']}>
+              <span
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 24, height: 24, flex: 'none', cursor: 'help', margin: '-8px 0',
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+              </span>
+            </Tooltip>
           )
         })()}
       </div>
+
+      {/* Lối nhảy sang LỆNH ĐIỀU ĐỘNG — trước Đợt 4 nằm trong LotProgressBadge; dải viên
+          không có nó, nên phải giữ riêng ở đây, nếu không đơn có lô sẽ MẤT hẳn lối này. */}
+      {lp && lp.dispatchOrders.length > 0 && (
+        <div style={{ marginTop: 4 }}>
+          <DispatchChips orders={lp.dispatchOrders} small />
+        </div>
+      )}
 
       {/* Footer: dwell + ETD countdown */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>

@@ -87,6 +87,30 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
   `actual_weight_kg`**, bỏ vế đó là 8 container trên lệnh nháp bị tính là đã giao
   (SO-2026-0091 lô 1 từng hiện 5/5 trong khi thật ra 3/5).
 - Migrations: `docs/migrations/sales_lots_p{1,2,3}_*.sql` — chạy theo thứ tự (đã áp production 26/08/2026).
+
+## Công nợ phải thu (A/R)
+- **Mẫu số phải thu = `sales_orders.total_value_usd`** (trị giá hợp đồng). Trị giá lô chỉ
+  dùng để PHÂN BỔ tiền vào lô, **không bao giờ** làm mẫu số công nợ.
+- Hoà giải hai mức bằng **PHÉP TRỪ, không phải phép nhân**: `v_ar_aging_rows` sinh 3 loại
+  dòng — `lot` (mỗi lô đã chốt) + `residual` (trị giá HĐ − Σ trị giá lô, MỘT dòng/đơn) +
+  `order` (đơn chưa chia lô). Σ mọi dòng ≡ Σ `total_value_usd`, sai số 0.
+  Mọi công thức dạng `total_value_usd × tỉ_lệ_của_lô` đều là prorata đội tên → cấm.
+- ⚠ `residual` **được phép ÂM** và phải để âm: hàng giao vượt khối lượng danh nghĩa lúc ký
+  (2 đơn, −$234.057 hôm 27/08/2026). `Math.max(0, …)` ở đây là nuốt mất tiền khách nợ thêm.
+- ⚠ Cột tuổi là **"tuổi kể từ ngày giao"**, KHÔNG phải "quá hạn" — hệ thống không lưu ngày
+  đến hạn ở đâu (`fin_receivables` 0 dòng, `sales_invoices` 0 dòng, `payment_terms` 13/89 đơn).
+- Mốc đếm = `dispatch_orders.dispatch_date` (lệnh đã phát hành). Lô đi trọn → chuyến CUỐI;
+  lô đang đi dở → chuyến **ĐẦU**, nếu dùng `max` thì nợ tự trẻ lại mỗi lần thêm cont rời kho.
+  Nợ không có mốc vào cột riêng **"Chưa có mốc"**, không nhét vào nhóm tuổi nào.
+  ⚠ ĐỪNG lấy mốc từ `sales_order_lots.created_at`: NOT NULL 20/20 trông rất đầy đủ nhưng
+  cả 20 đều là `2026-08-26`, ngày chạy backfill.
+- `sales_order_payments.lot_no` được trigger `trg_sop_check_lot_no` chặn "lô ma" (cho phép
+  NULL = cả đơn). Cố ý KHÔNG đặt NOT NULL/`required`: 80/89 đơn chưa chia lô, ép cứng là
+  kế toán gán bừa một lô cho xong.
+- Service `src/services/sales/arAgingService.ts`; trang `/sales/ar-aging`. Trang KHÔNG được
+  tự viết công thức nào.
+- Migrations: `sales_ar_p8_aging_rows.sql`, `sales_ar_p9_payment_lot_guard.sql`
+  (đã áp production 27/08/2026).
 - ⚠ Migration chạy qua RPC `agent_sql` **không được có `BEGIN`/`COMMIT`** (lỗi 0A000) — đã nằm sẵn
   trong transaction.
 

@@ -476,16 +476,12 @@ export default function ARAgingReportPage() {
         )}
       </div>
 
+      {/* MỘT câu, và nó đổi cách người dùng đọc cả bảng: đây không phải "quá hạn".
+          Cơ chế chọn mốc đếm nằm ở CLAUDE.md mục Công nợ phải thu, không thuộc màn hình. */}
       {showAging && (
         <Alert
           type="info" showIcon style={{ marginBottom: 12, fontSize: 12 }}
-          message={
-            <span>
-              Đây là <strong>tuổi kể từ ngày giao</strong>, <strong>không phải "quá hạn"</strong> — hệ thống chưa lưu ngày đến hạn thanh toán ở đâu cả.
-              {' '}Mốc đếm lấy từ lệnh điều động đã phát hành (lô đã đi trọn tính theo chuyến cuối, lô đang đi dở tính theo chuyến ĐẦU để nợ không tự trẻ lại).
-              {' '}Nợ không có mốc nào nằm riêng ở cột <strong>Chưa có mốc</strong>.
-            </span>
-          }
+          message={<span>Số ngày tính từ <strong>ngày giao hàng</strong>, không phải số ngày quá hạn thanh toán.</span>}
         />
       )}
 

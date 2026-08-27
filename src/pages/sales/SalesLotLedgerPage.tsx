@@ -518,67 +518,19 @@ export default function SalesLotLedgerPage() {
         />
       )}
 
-      {/* Trạng thái nhập tay trái với chứng cứ giao — KHÔNG tự sửa dữ liệu, chỉ báo cho người xem */}
-      {t && t.lotsMismatch > 0 && (
-        <Alert
-          type="warning" showIcon style={{ marginBottom: 12 }}
-          message={`${t.lotsMismatch} lô có ghi chú trạng thái trái với chứng cứ giao hàng`}
-          description={
-            <div style={{ fontSize: 13 }}>
-              Cột <strong>Giao hàng</strong> tính từ container và lệnh xe — đó là chứng cứ.
-              Cột <strong>Ghi chú trạng thái</strong> là số nhập tay, và {t.lotsMismatch} lô đang
-              nói khác chứng cứ. Bấm bộ lọc <strong>“Lệch trạng thái”</strong> để xem đúng những lô đó.
-              <div style={{ marginTop: 4, color: '#6b7280' }}>
-                Hệ thống <strong>không tự sửa</strong> ghi chú, vì có lô ghi “đã giao” cao hơn chứng cứ —
-                có thể do dữ liệu lệnh xe còn thiếu chứ không phải hàng chưa đi. Người phụ trách xem rồi quyết.
-              </div>
-            </div>
-          }
-        />
-      )}
+      {/* ⚠ ĐỪNG THÊM LẠI BANNER GIẢI THÍCH Ở ĐÂY.
+          Trước 28/08/2026 chỗ này có hai khối Alert dài: một khối giảng về lô lệch trạng
+          thái, một khối liệt kê 4 lý do tổng trang không bằng sổ đơn hàng. Nội dung đúng,
+          nhưng đó là việc của người viết phần mềm chứ không phải của người bán hàng —
+          đọc xong họ cũng không làm gì khác đi.
 
-      {/* Hai khoản tiền KHÔNG nằm trong sổ lô — nói thẳng, đừng để người xem tự phát hiện */}
-      {t && (t.unassignedPaidUsd > 0 || t.valueNotInLotsUsd > 0
-        || t.valueShortInLotsUsd > 0 || t.valueOverInLotsUsd > 0) && (
-        <Alert
-          type="info" showIcon style={{ marginBottom: 12 }}
-          message="Vì sao tổng trên trang này không bằng sổ đơn hàng"
-          description={
-            <div style={{ fontSize: 13 }}>
-              {t.valueNotInLotsUsd > 0 && (
-                <div>
-                  • <strong>{fmtUSD(t.valueNotInLotsUsd)}</strong> thuộc {ledger?.ordersWithoutLots.length} hợp đồng
-                  {' '}<strong>chưa chia lô</strong> — xem bảng dưới, bấm "Chia lô" để gán số lô cho container.
-                </div>
-              )}
-              {t.valueShortInLotsUsd > 0 && (
-                <div>
-                  • <strong>{fmtUSD(t.valueShortInLotsUsd)}</strong> thuộc hợp đồng <strong>đã chia lô
-                  nhưng chưa chia hết</strong> — phần hàng còn lại chưa được gán vào lô nào.
-                </div>
-              )}
-              {t.valueOverInLotsUsd > 0 && (
-                <div>
-                  • <strong>{fmtUSD(t.valueOverInLotsUsd)}</strong> là phần trị giá lô <strong>VƯỢT</strong> trị giá
-                  hợp đồng. <em>Không phải lỗi</em>: trị giá hợp đồng tính theo khối lượng danh nghĩa lúc ký,
-                  còn trị giá lô là cân thật in trên Commercial Invoice — đóng nhiều hơn ký thì lô lớn hơn.
-                </div>
-              )}
-              {t.unassignedPaidUsd > 0 && (
-                <div>
-                  • <strong>{fmtUSD(t.unassignedPaidUsd)}</strong> đã thu nhưng <strong>chưa gắn số lô</strong>,
-                  {' '}nên không quy được về lô nào. Sửa lại khoản thu trong tab Tài chính của đơn để gắn lô.
-                </div>
-              )}
-              {t.ordersWithLotGap > 0 && (
-                <div style={{ marginTop: 4, color: '#6b7280' }}>
-                  {t.ordersWithLotGap} hợp đồng có chênh lệch giữa tổng trị giá lô và trị giá hợp đồng.
-                </div>
-              )}
-            </div>
-          }
-        />
-      )}
+          Tín hiệu vẫn còn nguyên, chỉ gọn hơn:
+            • số lô lệch  → viên lọc "Lệch trạng thái (n)" ngay dưới, bấm là ra đúng danh sách
+            • từng dòng lệch → chấm đỏ ở cột Lô và cột Ghi chú trạng thái
+            • các khoản tiền ngoài sổ lô → cột và dòng tổng của chính bảng
+
+          Phần giải thích đầy đủ (vì sao không tự sửa, bốn nguồn chênh lệch, con số đo được)
+          nằm ở docs/SO_LO_DOI_CHIEU.html. */}
 
       <Card
         size="small"
@@ -587,7 +539,9 @@ export default function SalesLotLedgerPage() {
       >
         {/* Dải lọc nằm trong THÂN card, không phải title. Title của antd Card là
             overflow:hidden + nowrap — 7 nút ở đó thì cửa sổ hẹp cắt mất đúng hai nút
-            "Chưa đi" và "Lệch trạng thái" mà banner cảnh báo bên trên đang bảo bấm. */}
+            "Chưa đi" và "Lệch trạng thái", mà từ 28/08/2026 viên "Lệch trạng thái (n)"
+            là chỗ DUY NHẤT báo có lô lệch (banner giải thích đã gỡ). Cắt mất nó là
+            mất luôn tín hiệu. */}
         <Space wrap style={{ marginBottom: 10 }}>
           <Segmented
             size="small"
@@ -701,15 +655,15 @@ export default function SalesLotLedgerPage() {
       >
         {priceTarget && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Giữ đúng MỘT câu — đây là lúc người dùng sắp gõ con số thành sổ, họ cần biết
+                gõ số nào. Phần cơ chế (vì sao số tạm tính có thể đã đổi) nằm ở
+                docs/SO_LO_DOI_CHIEU.html, không thuộc về màn hình. */}
             <Alert
               type="warning" showIcon
-              message="Nhập đúng số trên chứng từ đã phát cho khách"
+              message="Nhập đúng số trên Commercial Invoice đã phát cho khách"
               description={
                 <span style={{ fontSize: 13 }}>
-                  Số tạm tính <strong>{fmtUSD(priceTarget.value_est_usd)}</strong> lấy từ khối lượng
-                  container hiện tại × đơn giá hợp đồng. Khối lượng đó <strong>bị ghi đè mỗi lần gán
-                  thêm container</strong>, nên nó có thể đã khác số in trên Commercial Invoice.
-                  Số anh chốt ở đây mới là mẫu số để kết luận “đã thu đủ chưa”.
+                  Số gợi ý <strong>{fmtUSD(priceTarget.value_est_usd)}</strong> là tạm tính, có thể khác chứng từ.
                 </span>
               }
             />

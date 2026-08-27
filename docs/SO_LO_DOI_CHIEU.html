@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sổ lô — đối chiếu số liệu (tài liệu nội bộ)</title>
+<style>
+  :root {
+    --paper:#F7F8F5; --card:#fff; --ink:#101C17; --ink2:#3A4A43; --muted:#65756D;
+    --rule:#D6DED8; --brand:#1B4D3E; --warn:#8A5A05; --warn-bg:#FBF0D8; --rust:#C2410C;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',sans-serif;
+    font-size:16px; line-height:1.68;
+  }
+  .wrap { max-width:860px; margin:0 auto; padding:44px 22px 80px; }
+  h1 { font-size:32px; line-height:1.15; letter-spacing:-.015em; margin:0 0 10px; }
+  h2 { font-size:22px; margin:44px 0 10px; letter-spacing:-.01em; }
+  h3 { font-size:17px; margin:26px 0 8px; }
+  .lead { color:var(--ink2); font-size:17px; margin:0 0 8px; }
+  .meta {
+    font-family:'JetBrains Mono',ui-monospace,monospace; font-size:12px; color:var(--muted);
+    border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+    padding:12px 0; margin:22px 0 0; display:flex; gap:24px; flex-wrap:wrap;
+  }
+  p { margin:0 0 14px; }
+  code { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.87em;
+         background:#EDF1EC; padding:1px 5px; border-radius:3px; }
+  .box {
+    background:var(--warn-bg); border-left:3px solid var(--warn);
+    padding:16px 20px; border-radius:0 8px 8px 0; margin:0 0 18px;
+  }
+  .box p { margin:0; }
+  .box p + p { margin-top:8px; }
+  .scroll { overflow-x:auto; border:1px solid var(--rule); border-radius:8px; background:var(--card); }
+  table { border-collapse:collapse; width:100%; min-width:540px; font-size:14.5px; }
+  th { text-align:left; font-size:12px; letter-spacing:.05em; text-transform:uppercase;
+       color:var(--muted); padding:11px 15px; border-bottom:1px solid var(--rule); white-space:nowrap; }
+  td { padding:11px 15px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  tr:last-child td { border-bottom:none; }
+  td.num, th.num { font-family:'JetBrains Mono',ui-monospace,monospace;
+                   font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+  ul { margin:0 0 14px; padding-left:20px; }
+  li { margin-bottom:7px; }
+  footer { margin-top:52px; padding-top:20px; border-top:1px solid var(--rule);
+           font-size:13.5px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Sổ lô — đối chiếu số liệu</h1>
+<p class="lead">
+  Tài liệu nội bộ cho người bảo trì. Đây là phần giải thích đã được <strong>gỡ khỏi giao diện</strong>
+  ngày 28/08/2026 — nội dung vẫn đúng, nhưng nó là việc của người viết phần mềm, không phải của
+  người bán hàng.
+</p>
+<div class="meta">
+  <span>Trang liên quan: <code>/sales/lots</code></span>
+  <span>Mã: <code>src/pages/sales/SalesLotLedgerPage.tsx</code></span>
+  <span>Số đo: 27–28/08/2026</span>
+</div>
+
+<div class="box" style="margin-top:26px;">
+  <p><strong>Nguyên tắc đã chốt với chủ doanh nghiệp (28/08/2026):</strong>
+  chi tiết kỹ thuật và lý do nội bộ không hiện trên màn hình người dùng.</p>
+  <p>Tín hiệu thì giữ, bài giảng thì bỏ. Trước khi thêm bất kỳ khối cảnh báo hay banner giải thích
+  nào vào giao diện, tự hỏi: <em>người dùng đọc xong sẽ làm gì khác đi?</em> Không trả lời được
+  thì đừng thêm.</p>
+</div>
+
+<h2>1. Vì sao tổng sổ lô không bằng tổng sổ đơn hàng</h2>
+
+<p>
+  Sổ lô lấy <strong>lô</strong> làm dòng, sổ đơn hàng lấy <strong>hợp đồng</strong> làm dòng.
+  Hai tổng không bằng nhau, và đó là đúng chứ không phải lỗi. Bốn nguồn chênh lệch, đo ngày 28/08/2026:
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Nguồn chênh lệch</th><th class="num">Giá trị</th><th>Nghĩa là gì</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Chưa chia lô</strong></td>
+      <td class="num">$10.071.615</td>
+      <td>93 hợp đồng chưa ai gán số lô cho container. Không phải mất tiền — chỉ là chưa chia.</td>
+    </tr>
+    <tr>
+      <td><strong>Chia chưa hết</strong></td>
+      <td class="num">$955.639</td>
+      <td>Hợp đồng đã chia lô nhưng còn hàng chưa gán vào lô nào.</td>
+    </tr>
+    <tr>
+      <td><strong>Lô vượt hợp đồng</strong></td>
+      <td class="num">$234.058</td>
+      <td>
+        Trị giá lô lớn hơn trị giá hợp đồng. <strong>Không phải lỗi:</strong> trị giá hợp đồng
+        tính theo khối lượng danh nghĩa lúc ký, còn trị giá lô là cân thật in trên Commercial
+        Invoice. Đóng nhiều hơn ký thì lô lớn hơn — khách nợ THÊM khoản này.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Thu chưa gắn lô</strong></td>
+      <td class="num">$4.416</td>
+      <td>
+        Khoản thu không có <code>lot_no</code> nên không quy được về lô. Sửa ở tab Tài chính
+        của đơn để gắn lô.
+      </td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p style="margin-top:14px;">
+  5 hợp đồng có chênh lệch giữa tổng trị giá lô và trị giá hợp đồng.
+</p>
+
+<h3>Chỗ này nối với công nợ thế nào</h3>
+<p>
+  Cùng một phép trừ đã được đưa vào view <code>v_ar_aging_rows</code> (Đợt 8): mỗi đơn có lô sinh
+  thêm một dòng <code>residual</code> = trị giá hợp đồng − Σ trị giá lô. Nhờ vậy
+  <code>Σ mọi dòng ≡ Σ total_value_usd</code>, sai lệch 0,00 trên toàn bộ 105 dòng.
+  Dòng <code>residual</code> <strong>được phép âm</strong> — đó chính là chỗ khoản “lô vượt hợp đồng”
+  $234.058 hiện ra thay vì bị làm tròn về 0.
+</p>
+<p>
+  ⚠ Tuyệt đối không chia trị giá hợp đồng xuống lô theo tỉ lệ. Xem luật cấm prorata trong
+  <code>CLAUDE.md</code>.
+</p>
+
+<h2>2. Lô có ghi chú trạng thái trái với chứng cứ giao hàng</h2>
+
+<p>
+  Cột <strong>Giao hàng</strong> tính từ container và lệnh điều động — đó là chứng cứ vật lý.
+  Cột <strong>Ghi chú trạng thái</strong> (<code>sales_order_lots.status</code>) là số nhập tay,
+  chép xuống lúc backfill. Ngày 28/08/2026 có <strong>8 lô</strong> hai bên nói khác nhau.
+</p>
+
+<h3>Vì sao hệ thống không tự sửa</h3>
+<p>
+  Có lô ghi “đã giao” <em>cao hơn</em> chứng cứ. Việc đó có thể do dữ liệu lệnh điều động còn
+  thiếu chứ không phải hàng chưa đi — tự động hạ ghi chú xuống cho khớp là xoá mất thông tin
+  người phụ trách đã biết. Nên hệ thống chỉ đánh dấu, người phụ trách xem rồi quyết.
+</p>
+
+<h3>Tín hiệu còn lại trên giao diện sau khi gỡ banner</h3>
+<ul>
+  <li>Viên lọc <strong>“Lệch trạng thái (n)”</strong> trong dải lọc — có sẵn số đếm, bấm ra đúng danh sách.</li>
+  <li><strong>Chấm đỏ</strong> ở cột Lô và cột Ghi chú trạng thái của từng dòng lệch.</li>
+  <li>Chấm đỏ góc <strong>viên lô</strong> (<code>LotChipStrip</code>) ở Kanban và Sổ đơn hàng.</li>
+</ul>
+<p>
+  ⚠ Dải lọc phải nằm trong <strong>thân</strong> Card, không phải title: title của antd Card là
+  <code>overflow:hidden</code> + <code>nowrap</code>, cửa sổ hẹp sẽ cắt mất đúng viên
+  “Lệch trạng thái” — mà giờ nó là chỗ duy nhất báo có lô lệch.
+</p>
+
+<h2>3. Luật nghiệp vụ liên quan, đừng làm sai</h2>
+<ul>
+  <li>
+    <strong>Trị giá lô</strong> lấy từ <code>sales_order_lots.value_usd</code> (số đã chốt, khớp
+    Commercial Invoice). Nếu chưa chốt thì tạm tính <code>net/1000 × đơn giá</code> — nhưng
+    <code>net_weight_kg</code> bị ghi đè mỗi lần gán lại container, nên số tạm tính
+    <strong>phải hiện kèm dấu <code>~</code></strong>, không được hiện như số chốt.
+  </li>
+  <li>
+    <strong>“Container đã giao”</strong> có đúng một định nghĩa: view
+    <code>v_sales_order_container_delivery</code>. Cả SQL lẫn TypeScript đều đọc view đó.
+    Luật gồm vế <code>d.status &lt;&gt; 'draft'</code> — dòng lệnh điều động nháp vẫn có
+    <code>actual_weight_kg</code>.
+  </li>
+  <li>
+    <strong>Chốt trị giá lô</strong> không nhận số 0: view coi 0 là “chưa có mẫu số”, còn phía
+    TypeScript lại rơi về số tạm tính — hai bên nói khác nhau về cùng một lô. Muốn bỏ chốt thì xoá,
+    đừng nhập 0.
+  </li>
+</ul>
+
+<footer>
+  Gỡ khỏi giao diện ngày 28/08/2026 theo yêu cầu của chủ doanh nghiệp. Mọi con số trong tài liệu
+  này đo trực tiếp trên dữ liệu production ngày 27–28/08/2026.
+</footer>
+
+</div>
+</body>
+</html>

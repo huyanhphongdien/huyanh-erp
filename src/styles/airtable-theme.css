@@ -103,12 +103,19 @@ p, span, div {
   box-shadow: var(--at-shadow-md);
 }
 
-.ant-btn-primary {
+/* ⚠ PHẢI kèm .ant-btn-variant-solid, đừng bắt trần .ant-btn-primary.
+   antd v6 gắn class `ant-btn-primary` cho CẢ nút `type="primary" ghost` — mà nút ghost
+   thì nền trong suốt, chữ lấy chính màu primary. Tô nền primary đè lên bằng !important
+   là ra chữ xanh đậm trên nền xanh đậm: nút biến thành một viên bo tròn đặc, không đọc
+   được chữ. Chỉ hover mới thấy mờ mờ vì nền sáng lên. Dính 4 nút "Ghi thu" / "Ghi cân"
+   ở Sổ lô, B2B nhập mủ và Lệnh điều động.
+   Loại luôn màu nguy hiểm: `type="primary" danger` mà bị tô xanh thì mất hẳn tín hiệu đỏ. */
+.ant-btn-primary.ant-btn-variant-solid:not(.ant-btn-color-dangerous) {
   background: var(--ha-primary) !important;
   border-color: var(--ha-primary) !important;
 }
 
-.ant-btn-primary:hover {
+.ant-btn-primary.ant-btn-variant-solid:not(.ant-btn-color-dangerous):hover {
   background: var(--ha-primary-hover) !important;
   border-color: var(--ha-primary-hover) !important;
 }

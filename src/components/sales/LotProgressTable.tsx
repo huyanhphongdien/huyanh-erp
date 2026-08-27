@@ -42,7 +42,7 @@ export default function LotProgressTable({ order }: { order: SalesOrder }) {
   // Tự nạp, không nhận qua prop — xem lý do ở đầu useOrderLotAxes.ts.
   // Token = updated_at: đơn được lưu / realtime bắn về là bảng tự nạp lại.
   const { lotProgress, lotPay, loading, deliveryFailed, payFailed } =
-    useOrderLotAxes(order.id, (order as SalesOrder & { updated_at?: string }).updated_at)
+    useOrderLotAxes(order.id, order.updated_at)
 
   // CHƯA BIẾT — chưa được nói gì về lô.
   if (loading && !lotProgress && !lotPay) {

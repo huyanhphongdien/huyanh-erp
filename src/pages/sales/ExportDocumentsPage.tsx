@@ -11,6 +11,7 @@ import {
   Tabs,
   Table,
   Tag,
+  Tooltip,
   Button,
   Space,
   Typography,
@@ -55,6 +56,8 @@ import { containerService } from '../../services/sales/containerService'
 import customerExportProfileService, { type CustomerExportProfile } from '../../services/sales/customerExportProfileService'
 import { lcNegotiationService, type LcNegotiation } from '../../services/sales/lcNegotiationService'
 import { salesBookingService, type SalesBooking } from '../../services/sales/salesBookingService'
+import { useOrderLotAxes } from '../../hooks/useOrderLotAxes'
+import LotChipStrip, { mergeLotAxes } from '../../components/sales/LotChipStrip'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -717,6 +720,14 @@ const ExportDocumentsPage = () => {
     return Array.from(s).sort((a, b) => a - b)
   }, [rdContainers])
 
+  // Hai trục lô (giao + tiền) — CHỈ ĐỌC, chỉ để soi trước khi phát chứng từ cho khách.
+  // Trang này không ghi gì vào lô. Phải gọi TRƯỚC mọi early return bên dưới.
+  const { lotProgress, lotPay } = useOrderLotAxes(orderId, order?.updated_at)
+  const lotChips = useMemo(
+    () => mergeLotAxes(lotProgress?.deliveryByLot, lotPay?.moneyByLot),
+    [lotProgress, lotPay],
+  )
+
   // Nạp dữ liệu readiness (container / hồ sơ khách / đơn chiết khấu). negVersion bump khi lưu ĐNCK.
   useEffect(() => {
     if (!order?.id) return
@@ -871,6 +882,13 @@ const ExportDocumentsPage = () => {
   const scopeNetTons = scopeConts.reduce((s, c) => s + (c.net_weight_kg || 0), 0) / 1000
   const scopeQtyTons = lotNo ? scopeNetTons : (order.quantity_tons || 0)
   const scopeCif = scopeQtyTons * (order.unit_price || 0)
+  // Đối chiếu CIF tính SỐNG ở trang này với trị giá lô ĐÃ CHỐT.
+  // scopeCif = Σ net_weight_kg × đơn giá, mà net_weight_kg bị containerService ghi đè mỗi
+  // lần gán lại container — nên chứng từ sinh hôm nay có thể lệch con số đã phát cho khách
+  // hôm chốt hoá đơn. Chỉ so khi lô ĐÃ CHỐT; số tạm tính vốn dĩ bằng scopeCif, so là vô nghĩa.
+  const lotMoney = lotNo ? lotPay?.moneyByLot.find((r) => r.lotNo === lotNo) : undefined
+  const lockedValue = lotMoney?.valueLocked ? lotMoney.valueUsd : null
+  const cifDrift = lockedValue != null && Math.abs(lockedValue - scopeCif) > 1
   const contIncomplete = nCont === 0 || nReal < nCont
   const blockReason = nCont === 0
     ? `${lotNo ? `Lô ${lotNo}` : 'Đơn'} chưa có container`
@@ -898,6 +916,10 @@ const ExportDocumentsPage = () => {
         }
         @media print {
           .no-print { display: none !important; }
+          /* Popover/Tooltip của antd render qua PORTAL gắn thẳng vào <body>, nằm NGOÀI mọi
+             khối .no-print. Chế độ "In tất cả" (body.print-all) không ẩn cả trang, nên một
+             popover đang mở lúc bấm In sẽ nằm chình ình trên chứng từ gửi khách. */
+          .ant-popover, .ant-tooltip, .ant-dropdown, .ant-select-dropdown { display: none !important; }
           .ant-card { box-shadow: none !important; border: none !important; }
           @page { size: A4; margin: 12mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -1027,6 +1049,10 @@ const ExportDocumentsPage = () => {
             options={[{ label: 'Toàn đơn', value: 0 }, ...lots.map((l) => ({ label: `Lô ${l}`, value: l }))]}
           />
         ) : <Tag>Chưa chia lô</Tag>}
+        {/* Viên lô — CHỈ ĐỌC. Ký hiệu giống hệt Kanban / Sổ đơn hàng / Sổ lô:
+            thân viên = trục GIAO, máng dưới = trục TIỀN. Đứng đây để trước khi phát
+            chứng từ còn nhìn thấy lô đó đã giao tới đâu và đã thu được đồng nào chưa. */}
+        {lotChips.length > 0 && <LotChipStrip lots={lotChips} size="s" max={12} />}
         <Text style={{ fontSize: 13 }}>
           {lotNo ? `Lô ${lotNo}: ` : 'Toàn đơn: '}
           <b>{nCont}</b> cont · <b>{scopeQtyTons.toLocaleString('en-US', { maximumFractionDigits: 3 })}</b> tấn ·
@@ -1034,6 +1060,13 @@ const ExportDocumentsPage = () => {
         </Text>
         {contIncomplete && (
           <Tag color="warning">{nCont === 0 ? 'Chưa có container' : `${nCont - nReal}/${nCont} cont còn TBD`}</Tag>
+        )}
+        {cifDrift && (
+          <Tooltip title={`Lô ${lotNo} đã chốt trị giá $${lockedValue!.toLocaleString('en-US', { maximumFractionDigits: 2 })} ở Sổ lô, nhưng CIF tính theo cân hiện tại là $${scopeCif.toLocaleString('en-US', { maximumFractionDigits: 2 })}. Container của lô đã bị gán lại sau khi chốt. Chứng từ sinh ra sẽ mang số MỚI — nếu hoá đơn cũ đã phát cho khách thì hai bản không khớp. Kiểm lại ở /sales/lots trước khi in.`}>
+            <Tag color="error" style={{ cursor: 'help' }}>
+              ⚠ Lệch số đã chốt: ${Math.abs(lockedValue! - scopeCif).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </Tag>
+          </Tooltip>
         )}
         <Button size="small" type="primary" style={{ background: '#1B4D3E', borderColor: '#1B4D3E' }}
           onClick={() => setQuickGroup('packing')}>Chia lô / Nhập container</Button>

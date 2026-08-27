@@ -20,10 +20,10 @@ import {
   ClockCircleOutlined, DollarOutlined, TeamOutlined, FileTextOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { getSalesRole } from '../../services/sales/salesPermissionService'
 import QuickPayModal, { type QuickPayTarget } from './components/QuickPayModal'
+import { arAgingService, type ArAgingRow } from '../../services/sales/arAgingService'
 
 const { Title, Text } = Typography
 
@@ -93,6 +93,8 @@ export default function ARAgingReportPage() {
   const canCollect = role === 'accounting' || role === 'admin'
 
   const [rawOrders, setRawOrders] = useState<RawOrder[]>([])
+  /** Dòng công nợ gốc (lô / dư / đơn) — B3 sẽ bung ra bảng con. */
+  const [arRows, setArRows] = useState<ArAgingRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCurrency, setFilterCurrency] = useState<string>('all')
   const [scope, setScope] = useState<'delivered' | 'all'>('delivered')
@@ -104,47 +106,49 @@ export default function ARAgingReportPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data: orders, error } = await supabase
-        .from('sales_orders')
-        .select(`
-          id, code, contract_no, customer_id, quantity_tons, unit_price, total_value_usd, currency,
-          payment_status, delivery_date, etd, confirmed_at, status, created_at,
-          customer:sales_customers!customer_id(id, code, name, short_name, country),
-          payments:sales_order_payments!sales_order_id(amount, payment_type, payment_date)
-        `)
-        .in('status', ['confirmed', 'producing', 'ready', 'packing', 'shipped', 'delivered', 'invoiced'])
+      // Mẫu số KHÔNG còn tính ở đây. Nó nằm trong v_ar_aging_rows, và trang chỉ cuộn
+      // các dòng đó lên mức đơn để hiển thị. Xem arAgingService.ts.
+      const { rows: arRows, customers } = await arAgingService.listRows()
+      setArRows(arRows)
 
-      if (error) throw error
-
-      const rows: RawOrder[] = []
-      for (const o of (orders || [])) {
-        const customer = Array.isArray(o.customer) ? o.customer[0] : o.customer
+      // Cuộn lên mức ĐƠN: một đơn có thể gồm nhiều dòng lô + một dòng dư.
+      const byOrder = new Map<string, RawOrder>()
+      for (const r of arRows) {
+        const customer = customers[r.customerId]
         if (!customer) continue
-        const total = o.total_value_usd || (o.quantity_tons * o.unit_price) || 0
-        const paymentList = Array.isArray(o.payments) ? o.payments : []
-        const paid = paymentList
-          .filter((p: any) => p.payment_type !== 'fee_offset')
-          .reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
-        const outstanding = Math.max(0, total - paid)
-        if (outstanding <= 0) continue
-        rows.push({
-          id: o.id,
-          code: o.code,
-          contractNo: o.contract_no || null,
-          status: o.status,
-          total,
-          paid,
-          outstanding,
-          delivery_date: o.delivery_date,
-          invoiceDate: o.delivery_date || o.etd || o.confirmed_at || o.created_at,
-          custId: customer.id,
-          customerName: customer.short_name || customer.name || '',
-          customerCode: customer.code || '',
-          country: customer.country,
-          currency: o.currency || 'USD',
-        })
+        let rec = byOrder.get(r.salesOrderId)
+        if (!rec) {
+          rec = {
+            id: r.salesOrderId,
+            code: r.orderCode,
+            contractNo: r.contractNo,
+            status: r.orderStatus,
+            total: 0, paid: 0, outstanding: 0,
+            delivery_date: null,
+            invoiceDate: null,
+            custId: r.customerId,
+            customerName: customer.name,
+            customerCode: customer.code,
+            country: customer.country,
+            currency: r.currency,
+          }
+          byOrder.set(r.salesOrderId, rec)
+        }
+        rec.total += r.rowValueUsd
+        rec.paid += r.rowPaidUsd
+        // ⚠ KHÔNG kẹp Math.max(0, …). Dòng 'residual' có thể ÂM khi hàng giao VƯỢT hợp
+        // đồng (cân thật hơn khối lượng danh nghĩa lúc ký) — 2 đơn đang như vậy. Kẹp về 0
+        // là nuốt mất khoản khách thực sự nợ thêm.
+        rec.outstanding += r.rowOutstandingUsd
+        // Mốc tuổi của ĐƠN = khoản nợ GIÀ NHẤT trong đơn. Không dùng chuỗi dự phòng
+        // etd/confirmed_at/created_at nữa: ngày tạo đơn không phải ngày giao hàng, và
+        // chính nó đẩy 90% tiền vào bucket "trên 90 ngày" một cách giả tạo.
+        if (r.anchorDate && (!rec.invoiceDate || r.anchorDate < rec.invoiceDate)) {
+          rec.invoiceDate = r.anchorDate
+          rec.delivery_date = r.anchorDate
+        }
       }
-      setRawOrders(rows)
+      setRawOrders([...byOrder.values()])
     } catch (e) {
       console.error('Công nợ khách load error:', e)
       message.error('Lỗi tải công nợ')

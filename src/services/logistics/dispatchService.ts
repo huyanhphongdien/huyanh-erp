@@ -484,27 +484,33 @@ export type DeliveryState = 'delivered' | 'dispatching'
  * Hàng đi bằng phiếu cân/xuất kho chỉ set cột status, không sinh dòng lệnh.
  * `loaded` KHÔNG nằm đây: mới lên xe, chưa rời kho.
  *
- * ⚠⚠ DANH SÁCH NÀY TỒN TẠI Ở HAI NƠI, VÀ KHÔNG CÓ CÁCH NÀO GỘP ĐƯỢC:
- *   1. Hằng này — dùng cho getDeliveryStatus (tab Đóng gói, bảng lô, dựng lệnh điều động)
- *      và cho stageOfContainer trong lotTracking.ts.
- *   2. Chuỗi gõ cứng trong docs/migrations/sales_lots_p5_progress_union.sql — view
- *      v_sales_order_lot_progress_all, nuôi getLotProgressForOrders (badge Kanban,
- *      cột "Còn thiếu (tấn)", Sổ lô, file Excel).
+ * ⚠ TỪ 27/08/2026 HẰNG NÀY KHÔNG CÒN LÀ ĐỊNH NGHĨA "ĐÃ GIAO" NỮA.
+ * Định nghĩa nằm ở view `v_sales_order_container_delivery`
+ * (docs/migrations/sales_lots_p8_one_delivery_definition.sql), và cả SQL lẫn TypeScript
+ * đều đọc view đó — không còn bản chép tay nào để lệch.
  *
- * THÊM MỘT TRẠNG THÁI VÀO ĐÂY MÀ QUÊN SỬA VIEW = tab Đóng gói đổi, badge Kanban không đổi.
- * Đó đúng là kiểu lệch mà Đợt 2 vừa gỡ. Sửa thì sửa CẢ HAI, cùng một lúc.
+ * Hằng này chỉ còn hai chỗ dùng, đều là ĐƯỜNG LÙI khi không hỏi được view:
+ *   - lotTracking.stageOfContainer (suy trạng thái từ một dòng container đã cầm sẵn)
+ *   - getDeliveryStatus khi view không đọc được
+ * Nó CỐ Ý hẹp hơn view: view còn tính "đã cân xuất trên lệnh đã phát hành". Đường lùi
+ * đoán thiếu thì thà báo chưa giao, chứ đừng báo đã giao.
  */
 export const DELIVERED_CONTAINER_STATUSES = ['shipped', 'delivered'] as const
 
 /**
- * ĐỊNH NGHĨA DUY NHẤT "container đã giao". Gộp HAI đường, thiếu một là hai màn hình lệch:
- *  - 'delivered'    = đã cân xuất (dòng lệnh có actual_weight_kg)
- *                     HOẶC container mang status thuộc DELIVERED_CONTAINER_STATUSES
- *                     (đi bằng phiếu cân/xuất kho, không qua lệnh điều động)
- *  - 'dispatching'  = đã vào lệnh nhưng chưa cân
- *  - (không có key) = chưa điều động, chưa giao
+ * Trạng thái giao của từng container — ĐỌC THẲNG định nghĩa dùng chung, không tự tính.
+ *  - 'delivered'    = đã rời kho: status shipped/delivered, HOẶC đã cân xuất trên một
+ *                     lệnh ĐÃ PHÁT HÀNH (lệnh 'draft' không tính — dòng lệnh nháp vẫn
+ *                     có actual_weight_kg, xem p8).
+ *  - 'dispatching'  = đã nằm trong lệnh đã phát hành nhưng chưa cân
+ *  - (không có key) = chưa điều động, hoặc mới nằm trong lệnh nháp
  *
- * Ném lỗi nếu truy vấn hỏng — KHÔNG trả về map thiếu. Xem lý do ở trong thân hàm.
+ * Trước 27/08/2026 hàm này tự ghép luật từ hai truy vấn, còn view SQL ghép lại lần nữa
+ * bằng tay — hai bản chép tay của cùng một luật. Giờ chỉ còn một view.
+ *
+ * Ném lỗi nếu truy vấn hỏng — KHÔNG trả về map thiếu. Nuốt lỗi ở đây biến hỏng "tất cả
+ * hoặc không" (nhìn là thấy) thành hỏng "thiếu một phần" (trông vẫn hợp lý). Nguy nhất ở
+ * buildFromSalesOrder: map thiếu → container ĐÃ GIAO lọt vào lệnh điều động mới.
  */
 async function getDeliveryStatus(containerIds: string[]): Promise<Record<string, DeliveryState>> {
   const map: Record<string, DeliveryState> = {}
@@ -516,44 +522,14 @@ async function getDeliveryStatus(containerIds: string[]): Promise<Record<string,
   // ~8.000; điểm gãy khoảng 201 cont/đơn.
   for (let i = 0; i < ids.length; i += 120) {
     const { data, error } = await supabase
-      .from('dispatch_order_lines')
-      .select('sales_order_container_id, actual_weight_kg')
-      .in('sales_order_container_id', ids.slice(i, i + 120))
-    // Nuốt lỗi ở đây biến hỏng "tất cả hoặc không" (nhìn là thấy) thành hỏng "thiếu một
-    // phần" (trông vẫn hợp lý). Nguy nhất ở buildFromSalesOrder: map thiếu → container ĐÃ
-    // GIAO lọt vào lệnh điều động mới mà không ai biết.
+      .from('v_sales_order_container_delivery')
+      .select('container_id, delivery_state')
+      .in('container_id', ids.slice(i, i + 120))
     if (error) throw error
-    for (const r of (data || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null }>) {
-      const cid = r.sales_order_container_id
-      if (!cid) continue
-      if (r.actual_weight_kg != null) map[cid] = 'delivered'
-      else if (map[cid] !== 'delivered') map[cid] = 'dispatching'
-    }
-  }
-
-  // ⚠ VẾ THỨ HAI — BẮT BUỘC, nếu không hai màn hình sẽ nói khác nhau.
-  // Hàng đi bằng phiếu cân/xuất kho KHÔNG sinh dòng lệnh điều động, mà set thẳng
-  // sales_order_containers.status. getLotProgressForOrders đã bù vế này từ lâu, còn hàm
-  // này thì chưa — nên badge Kanban và bảng lô tab Đóng gói ăn hai tập "đã giao" KHÁC NHAU.
-  //
-  // VÌ SAO HÔM NAY CHÚNG VẪN KHỚP (đo 26/08/2026: 92 cont shipped đều nằm trong 133 cont
-  // đã cân, 0 ngoại lệ): KHÔNG phải may mắn — dispatchService.markWeighed ghi status
-  // 'shipped' NGAY SAU khi ghi actual_weight_kg, nên với đường đó shipped ⊆ đã-cân là
-  // quan hệ nhân quả.
-  //
-  // NGÒI NỔ THẬT nằm ở đường khác: stockOutService.processContainerShipment set 'shipped'
-  // mà KHÔNG sinh dòng lệnh, và nó được gọi từ app cân xe với GUARD KHÁC hàm ghi cân
-  // (một bên cần đơn bán + container, bên kia cần lệnh điều động + dòng lệnh). Người vận
-  // hành chọn đơn và container mà không chọn lệnh là sinh ngay ca lệch.
-  for (let i = 0; i < ids.length; i += 120) {
-    const { data, error } = await supabase
-      .from('sales_order_containers')
-      .select('id')
-      .in('id', ids.slice(i, i + 120))
-      .in('status', DELIVERED_CONTAINER_STATUSES as unknown as string[])
-    if (error) throw error
-    for (const r of (data || []) as Array<{ id: string }>) {
-      map[r.id] = 'delivered'
+    for (const r of (data || []) as Array<{ container_id: string; delivery_state: string | null }>) {
+      if (r.delivery_state === 'delivered' || r.delivery_state === 'dispatching') {
+        map[r.container_id] = r.delivery_state
+      }
     }
   }
   return map
@@ -686,11 +662,12 @@ export function remainingTons(qtyTons?: number | null, p?: LotProgress, status?:
 /**
  * Tiến độ lô CHO NHIỀU ĐƠN cùng lúc — dùng ở list/kanban/split + dòng TỔNG + Excel.
  *
- * Luật "đã giao" KHÔNG nằm ở file này nữa, nó nằm trong view
- * v_sales_order_lot_progress_all (docs/migrations/sales_lots_p5_progress_union.sql):
- *   container ĐÃ GIAO = có dòng lệnh điều động với actual_weight_kg != null,
- *                       HOẶC status ∈ ('shipped','delivered')
- * Xem cảnh báo ở DELIVERED_CONTAINER_STATUSES: danh sách trạng thái tồn tại ở HAI nơi.
+ * Luật "đã giao" KHÔNG nằm ở file này, và từ 27/08/2026 cũng không còn nằm ở hai nơi:
+ * nó ở view `v_sales_order_container_delivery`
+ * (docs/migrations/sales_lots_p8_one_delivery_definition.sql), và
+ * v_sales_order_lot_progress_all chỉ gom nhóm view đó lên mức (đơn, lô).
+ *   container ĐÃ GIAO = status ∈ ('shipped','delivered')
+ *                       HOẶC đã cân xuất trên một lệnh ĐÃ PHÁT HÀNH (không phải 'draft')
  *
  *  - 1 lô "đã giao" khi mọi container của lô đã giao.
  */

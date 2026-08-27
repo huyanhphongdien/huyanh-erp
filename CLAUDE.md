@@ -78,10 +78,14 @@ They import ERP services via the `@erp` alias → `../../src`; dependency flow i
   **máng dưới = trục TIỀN**. Thứ tự đó bất biến ở mọi màn, tooltip luôn đọc 📦 trước 💵 sau.
   Từ 27/08/2026 nó THAY hai badge cũ `📦 x/y lô` và `💵 x/y lô đã thu` trên thẻ Kanban và
   cột Lô ở Sổ đơn hàng. Chấm đỏ góc viên = `lot_status` trái chứng cứ giao.
-- ⚠ Danh sách trạng thái "container đã giao" tồn tại ở **HAI nơi không gộp được**:
-  hằng `DELIVERED_CONTAINER_STATUSES` (dispatchService.ts) và chuỗi gõ cứng trong
-  `sales_lots_p5_progress_union.sql`. Sửa một bên mà quên bên kia là tab Đóng gói và
-  badge Kanban nói khác nhau.
+- **"Container đã giao" có ĐÚNG MỘT định nghĩa**: view `v_sales_order_container_delivery`
+  (`sales_lots_p8_one_delivery_definition.sql`). SQL và TypeScript đều đọc view đó —
+  `dispatchService.getDeliveryStatus` chỉ select lại, không tự tính. Đừng gõ lại luật ở
+  chỗ khác; hằng `DELIVERED_CONTAINER_STATUSES` giờ chỉ còn là đường lùi khi không hỏi
+  được view, và cố ý HẸP hơn (đoán thiếu thì báo chưa giao, đừng báo đã giao).
+  ⚠ Luật gồm vế `d.status <> 'draft'`: dòng lệnh điều động **nháp vẫn có
+  `actual_weight_kg`**, bỏ vế đó là 8 container trên lệnh nháp bị tính là đã giao
+  (SO-2026-0091 lô 1 từng hiện 5/5 trong khi thật ra 3/5).
 - Migrations: `docs/migrations/sales_lots_p{1,2,3}_*.sql` — chạy theo thứ tự (đã áp production 26/08/2026).
 - ⚠ Migration chạy qua RPC `agent_sql` **không được có `BEGIN`/`COMMIT`** (lỗi 0A000) — đã nằm sẵn
   trong transaction.

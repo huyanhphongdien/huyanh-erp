@@ -27,9 +27,9 @@ export const LOT_STAGES: Array<{ key: LotStageKey; label: string; short: string;
  *  - có bành gán vào / status packing  → đang đóng gói
  *  - còn lại (planning, chưa bành)     → đang sản xuất / chờ hàng
  *
- * ⚠ MỘT ĐỊNH NGHĨA "ĐÃ GIAO" DUY NHẤT. Việc quyết định container nào đã giao nằm TRỌN
- * trong dispatchService.getDeliveryStatus, và danh sách status thì ở hằng
- * DELIVERED_CONTAINER_STATUSES. Đừng gõ lại luật "đã giao" ở đây nữa.
+ * ⚠ MỘT ĐỊNH NGHĨA "ĐÃ GIAO" DUY NHẤT, và từ 27/08/2026 nó là view
+ * `v_sales_order_container_delivery` — dispatchService.getDeliveryStatus chỉ đọc lại
+ * view đó. Đừng gõ lại luật "đã giao" ở đây nữa.
  *
  * Trước 26/08/2026 hàm này coi `shipped` là 'ready' trong khi getLotProgressForOrders coi
  * là ĐÃ GIAO — badge Kanban và bảng lô tab Đóng gói ăn hai tập khác nhau. Chúng khớp nhau

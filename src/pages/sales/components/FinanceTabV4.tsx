@@ -150,9 +150,10 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
         exchange_rate: exRate || null,
         discount_exchange_rate: discExRate || null,
         total_value_vnd: totalVndCalc,
-        payment_status: vals.payment_status || 'unpaid',
-        payment_received_date: vals.payment_received_date?.format('YYYY-MM-DD') || null,
-        actual_payment_amount: vals.actual_payment_amount || null,
+        // ⚠ KHÔNG gửi payment_status / payment_received_date / actual_payment_amount.
+        // Ô đã disabled nhưng antd Form vẫn giữ giá trị và vẫn gửi kèm — bỏ khỏi payload
+        // mới thật sự đóng đường ghi. Ba cột này do trigger trg_sop_sync_order tính lại
+        // từ bảng sales_order_payments; ghi thẳng vào chúng là tạo nguồn sự thật thứ hai.
         bank_charges: charges || null,
         bank_name: vals.bank_name || null,
         // Chiết khấu · Hoa hồng · Giá HĐ (gộp từ bản full-page cũ — dùng cột THẬT)
@@ -211,15 +212,40 @@ export default function FinanceTabV4({ order, salesRole, editable, onSaved }: Pr
 
         {/* Thanh toán */}
         <SectionHeader title="Thanh toán" color="#cf1322" />
+
+        {/* ⚠ BA Ô TIỀN Ở ĐÂY ĐÃ THÀNH CHỈ ĐỌC (27/08/2026).
+            Chúng ghi thẳng sales_orders.payment_status / actual_payment_amount /
+            payment_received_date qua updateFields, KHÔNG sinh dòng sales_order_payments.
+            Trong khi mỗi lần ghi thu qua bảng payments lại tính LẠI các cột đó:
+              • payment_status + actual_payment_amount — do trigger DB `trg_sop_sync_order`
+                (đã kiểm 27/08/2026: tgenabled = 'O', đang bật)
+              • payment_received_date — do recomputeOrderAggregates ở tầng JS
+            Nên số gõ tay bị ghi đè ÂM THẦM, không lỗi, không cảnh báo.
+            Hôm nay hai đường còn khớp (1/104 đơn có tiền, và đơn đó có đủ phiếu thu) —
+            đây là lúc rẻ nhất để khoá lại còn một đường.
+            ⚠ Vẫn CÒN một đường ghi payment_received_date chưa gác: ô inline ở Sổ đơn hàng.
+            Xếp lịch đóng nốt ở đợt sau. */}
+        <Alert
+          type="info" showIcon style={{ marginBottom: 12 }}
+          message="Số tiền ở đây do hệ thống tự cộng từ các khoản thu"
+          description={
+            <span style={{ fontSize: 13 }}>
+              Muốn ghi nhận tiền về, dùng khối <strong>Lịch sử thanh toán</strong> bên dưới hoặc
+              trang <strong>Sổ lô</strong>. Ở Sổ lô mỗi khoản thu gắn thẳng vào một lô, nên tiền
+              vào đúng lô ngay từ đầu — đó là cách nên dùng với đơn đã chia lô.
+              Sửa tay ở đây sẽ bị ghi đè ở lần ghi thu kế tiếp.
+            </span>
+          }
+        />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
           <Form.Item label="Trạng thái TT" name="payment_status">
-            <Select options={PAYMENT_STATUS_OPTIONS} />
+            <Select options={PAYMENT_STATUS_OPTIONS} disabled />
           </Form.Item>
           <Form.Item label="Ngày tiền về" name="payment_received_date">
-            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" disabled />
           </Form.Item>
           <Form.Item label="Số tiền thực nhận (USD)" name="actual_payment_amount">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" disabled />
           </Form.Item>
           <Form.Item label="Phí NH (USD)" name="bank_charges">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="USD" />

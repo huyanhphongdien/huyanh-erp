@@ -1,7 +1,11 @@
 -- ============================================================================
--- Sprint Q — Sales Module audit fixes (local migration, CHƯA apply production)
+-- Sprint Q — Sales Module audit fixes
 -- Date: 2026-04-22
--- Status: ⏳ chờ user review + chạy thủ công qua Supabase Dashboard
+-- Status: ✅ ĐÃ CHẠY PRODUCTION. Kiểm lại 27/08/2026: trigger `trg_sop_sync_order` tồn tại
+--   trên bảng sales_order_payments với tgenabled = 'O' (đang bật).
+--   Header cũ ghi "CHƯA apply production" là SAI và đã gây hiểu nhầm — người đọc tưởng
+--   có thể ghi thẳng sales_orders.actual_payment_amount mà không bị ghi đè, trong khi
+--   trigger này recompute lại đúng cột đó sau mỗi thao tác trên bảng payments.
 -- ============================================================================
 -- Bugs phát hiện qua audit DB side:
 --

@@ -617,12 +617,29 @@ const ShipmentFollowingPage = () => {
       render: (_v, record) => renderEditableCell(record, 'bank_charges', record.bank_charges, 'number'),
     },
     {
-      title: 'Thực nhận',
+      // ⚠ CHỈ ĐỌC từ 27/08/2026. Cột này ghi thẳng sales_orders.actual_payment_amount mà
+      // KHÔNG sinh dòng sales_order_payments; trigger trg_sop_sync_order sẽ recompute lại
+      // từ bảng payments ở lần ghi thu kế tiếp và XOÁ ÂM THẦM số gõ tay ở đây.
+      // Ngoài ra một đơn có nhiều lô, mỗi lô một lần chuyển tiền — một ô ở mức ĐƠN không
+      // tả nổi bốn lần chuyển. Việc ghi thu chuyển hẳn về Sổ lô.
+      title: 'Thực nhận (đơn)',
       dataIndex: 'actual_payment_amount',
       key: 'actual_payment_amount',
-      width: 110,
+      width: 130,
       align: 'right',
-      render: (_v, record) => renderEditableCell(record, 'actual_payment_amount', record.actual_payment_amount, 'number'),
+      render: (v: number | null | undefined, record) => (
+        <Tooltip title="Số do hệ thống cộng từ các khoản thu. Ghi nhận tiền ở Sổ lô để gắn được số lô.">
+          <span style={{ cursor: 'help' }}>
+            {v != null ? Number(v).toLocaleString('en-US') : '—'}
+            <a
+              style={{ display: 'block', fontSize: 10 }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/sales/lots?order=${record.id}`) }}
+            >
+              ghi thu theo lô ↗
+            </a>
+          </span>
+        </Tooltip>
+      ),
     },
     {
       title: 'Payment Date',

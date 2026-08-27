@@ -167,9 +167,24 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
         {(() => {
           const b = paymentBucket(order)
           if (b === 'none') return null
-          const [color, txt] = b === 'paid'    ? ['#15803d', 'Đã thu tiền']
-                             : b === 'partial' ? ['#1d4ed8', 'Thu 1 phần']
-                             :                   ['#b45309', 'Chưa thu tiền']
+          let ring = false
+          const [color, txtBase] = b === 'paid'    ? ['#15803d', 'Đã thu tiền']
+                                : b === 'partial' ? ['#1d4ed8', 'Thu 1 phần']
+                                :                   ['#b45309', 'Chưa thu tiền']
+          let txt = txtBase
+          // Đơn ĐÃ có tiền về nhưng KHÔNG đồng nào gắn số lô: máng của mọi viên đều rỗng
+          // trong khi chấm này lại xanh — hai thứ cạnh nhau nói ngược nhau.
+          // ⚠ Phải kiểm paidUsd của TỪNG lô, KHÔNG dùng lotsPaid: lotsPaid là số lô đã thu
+          // ĐỦ. Đơn thu 60% một lô có lotsPaid = 0 nhưng tiền RÕ RÀNG đã gắn lô — dùng
+          // lotsPaid là tố oan.
+          const noLotMoney = !!lotPay && lotPay.lotsTotal > 0
+            && lotPay.moneyByLot.every((l) => l.paidUsd <= 0)
+          if (b !== 'unpaid' && noLotMoney) {
+            txt = `${txt} — nhưng chưa đồng nào gắn số lô, không quy được về lô nào`
+            // Giữ NGUYÊN màu chấm (KPI vẫn đếm đơn này là đã thu), đánh dấu bằng vành
+            // ngoài. Đổi màu sang hổ phách sẽ làm nó lẫn với "chưa thu tiền".
+            ring = true
+          }
           return (
             <Tooltip title={txt} trigger={['hover', 'click']}>
               <span
@@ -179,7 +194,10 @@ export default function KanbanCard({ order, onDragStart, onDragEnd, lp, lotPay }
                   width: 24, height: 24, flex: 'none', cursor: 'help', margin: '-8px 0',
                 }}
               >
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', background: color,
+                  boxShadow: ring ? '0 0 0 2px #fff, 0 0 0 3.5px #b45309' : undefined,
+                }} />
               </span>
             </Tooltip>
           )

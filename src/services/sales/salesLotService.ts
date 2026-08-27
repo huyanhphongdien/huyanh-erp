@@ -30,7 +30,18 @@ export type LotStatus = 'planning' | 'packing' | 'shipped' | 'delivered' | 'canc
 export type LotDeliveryState = 'none' | 'partial' | 'full'
 
 export interface SalesLotRow {
-  lot_id: string
+  /**
+   * ⚠ NULL khi lô CHỈ tồn tại qua container, chưa có dòng chốt trong sales_order_lots.
+   * Dùng `lot_key` làm khoá dòng ở giao diện, KHÔNG dùng lot_id.
+   */
+  lot_id: string | null
+  /** Khoá dòng ổn định: `${sales_order_id}#${lot_no}`. */
+  lot_key: string
+  /** false = lô có thật (container đã gán) nhưng CHƯA chốt trị giá. */
+  has_lot_row: boolean
+  /** Trị giá tạm tính net/1000 × đơn giá. Chỉ để gợi ý — phải chốt mới dùng làm mẫu số thật. */
+  value_est_usd: number | null
+  value_source: 'lot' | 'invoice' | 'unknown'
   sales_order_id: string
   contract_no: string | null
   order_status: string | null
@@ -86,7 +97,10 @@ export interface LotLedger {
   ordersWithoutLots: OrderWithoutLots[]
   totals: {
     lotCount: number
+    /** Mẫu số hiệu dụng = trị giá chốt, thiếu thì tạm tính. Cùng chuẩn với lotRemainingUsd. */
     lotValueUsd: number
+    /** Chỉ phần ĐÃ CHỐT — con số không suy đoán. */
+    lotValueLockedUsd: number
     lotPaidUsd: number
     lotRemainingUsd: number
     lotsPaid: number
@@ -124,6 +138,13 @@ export interface LotLedger {
     netKgDelivered: number
     /** Số lô có `lot_status` trái chứng cứ giao — cần người xem lại, không tự sửa. */
     lotsMismatch: number
+
+    /**
+     * Lô CHƯA CHỐT trị giá — có container gán lô nhưng chưa có dòng sales_order_lots.
+     * Tiền thu gắn vào những lô này không có mẫu số tin được. Hệ thống KHÔNG tự chốt hộ:
+     * đoán trị giá rồi để khách trả tiền vào đó là lặp lại đúng bug prorata đã gỡ 26/08.
+     */
+    lotsUnpriced: number
   }
 }
 
@@ -160,7 +181,11 @@ export const salesLotService = {
     }
 
     const lots: SalesLotRow[] = (lotRes.data || []).map((r) => ({
-      lot_id: r.lot_id,
+      lot_id: r.lot_id ?? null,
+      lot_key: r.lot_key,
+      has_lot_row: r.has_lot_row === true,
+      value_est_usd: r.value_est_usd === null ? null : num(r.value_est_usd),
+      value_source: (r.value_source ?? 'unknown') as SalesLotRow['value_source'],
       sales_order_id: r.sales_order_id,
       contract_no: r.contract_no,
       order_status: r.order_status,
@@ -253,7 +278,12 @@ export const salesLotService = {
       ordersWithoutLots,
       totals: {
         lotCount: liveLots.length,
-        lotValueUsd: liveLots.reduce((s, l) => s + num(l.value_usd), 0),
+        // Mẫu số HIỆU DỤNG: trị giá chốt, thiếu thì tạm tính. PHẢI cùng chuẩn với
+        // lotRemainingUsd (view tính remaining theo COALESCE(chốt, tạm tính)) — nếu tử số
+        // chỉ cộng phần đã chốt thì "Còn nợ" sẽ LỚN HƠN "Trị giá" và người xem thấy ngay
+        // là sai. Phần chắc chắn tách riêng ở lotValueLockedUsd.
+        lotValueUsd: liveLots.reduce((s, l) => s + num(l.value_usd ?? l.value_est_usd), 0),
+        lotValueLockedUsd: liveLots.reduce((s, l) => s + num(l.value_usd), 0),
         lotPaidUsd: liveLots.reduce((s, l) => s + l.paid_usd, 0),
         lotRemainingUsd: liveLots.reduce((s, l) => s + l.remaining_usd, 0),
         lotsPaid: liveLots.filter((l) => l.payment_status === 'paid').length,
@@ -277,6 +307,7 @@ export const salesLotService = {
         netKgTotal: liveLots.reduce((s, l) => s + l.net_kg_total, 0),
         netKgDelivered: liveLots.reduce((s, l) => s + l.net_kg_delivered, 0),
         lotsMismatch: liveLots.filter((l) => l.status_mismatch).length,
+        lotsUnpriced: liveLots.filter((l) => !l.has_lot_row).length,
       },
     }
   },

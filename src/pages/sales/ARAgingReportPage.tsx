@@ -317,6 +317,21 @@ export default function ARAgingReportPage() {
         title: 'Còn nợ', dataIndex: 'rowOutstandingUsd', key: 'o', align: 'right',
         render: (v: number) => <Text strong style={{ color: v < 0 ? '#c2410c' : '#f5222d' }}>{formatUSD(v)}</Text>,
       },
+      {
+        title: '', key: 'act', align: 'right', width: 130,
+        // Ghi thu ĐÚNG LÔ ngay tại dòng lô — đây là đường ngắn nhất để tiền vào kèm số lô,
+        // ngắn hơn hẳn việc mở đơn rồi tự chọn lô trong danh sách.
+        render: (_, r) => canCollect && r.rowKind === 'lot' && r.rowOutstandingUsd > 0
+          ? <Button size="small" icon={<DollarOutlined />}
+              onClick={() => setPayTarget({
+                id: r.salesOrderId,
+                label: r.contractNo || r.orderCode,
+                subLabel: `Lô ${r.lotNo}`,
+                outstanding: r.rowOutstandingUsd,
+                presetLotNo: r.lotNo,
+              })}>Ghi thu lô {r.lotNo}</Button>
+          : null,
+      },
     ]
     return <Table columns={cols} dataSource={rows} rowKey={(r) => `${r.salesOrderId}-${r.rowKind}-${r.lotNo ?? 'x'}`}
       pagination={false} size="small" showHeader />

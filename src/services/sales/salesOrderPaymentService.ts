@@ -242,9 +242,20 @@ export const salesOrderPaymentService = {
       ? input.amount * input.exchange_rate
       : null
 
+    // AI ghi khoản thu này. Cột created_by đã có sẵn nhưng chưa bao giờ được điền —
+    // 2/2 dòng trong hệ thống đang NULL. Không có nó thì "phải có người thực sự nhập
+    // thanh toán" là điều không kiểm chứng được, và khoản thu sai không truy được về ai.
+    // Hỏng phiên đăng nhập thì vẫn ghi (để null) chứ không chặn tiền về.
+    let created_by: string | null = null
+    try {
+      const { data: auth } = await supabase.auth.getUser()
+      created_by = auth?.user?.id ?? null
+    } catch { /* không chặn ghi tiền vì lỗi đọc phiên */ }
+
     const { data, error } = await supabase
       .from('sales_order_payments')
       .insert({
+        created_by,
         sales_order_id: input.sales_order_id,
         lot_no: input.lot_no ?? null,
         payment_date: input.payment_date,

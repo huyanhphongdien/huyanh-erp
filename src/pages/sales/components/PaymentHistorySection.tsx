@@ -74,12 +74,29 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
   const isPaid = totalValueUsd > 0 && totalPaid >= totalValueUsd
   const totalFee = payments.reduce((s, p) => s + Number(p.fee_amount || 0), 0)
 
+  /**
+   * Lô còn nợ CŨ NHẤT — mặc định khi mở form thêm khoản thu.
+   * Cùng luật với QuickPayModal; hai màn lệch nhau là hai thói quen nhập khác nhau.
+   * ⚠ Không chia đều tiền cho các lô: chia ĐỀU chính là prorata đội tên khác.
+   */
+  const oldestUnpaidLot = (): number | null => {
+    if (!breakdown?.hasLots) return null
+    const owing = breakdown.lots
+      .filter((l) => l.lotValue - l.paidAmount > 0.01)
+      .sort((a, b) => a.lotNo - b.lotNo)
+    return owing.length ? owing[0].lotNo : null
+  }
+
   const openAdd = () => {
     setEditing(null)
     form.resetFields()
+    // Chọn sẵn lô nợ cũ nhất: bỏ trống ô lô KHÔNG được là đường dễ nhất nữa. Trước đây
+    // mặc định là "cả đơn" nên chưa khoản thu nào trong hệ thống có số lô.
+    const lot = oldestUnpaidLot()
     form.setFieldsValue({
       payment_date: dayjs(),
       currency: 'USD',
+      lot_no: lot,
       payment_type: remaining > 0 ? (totalPaid === 0 ? 'deposit' : 'installment') : 'other',
     })
     setModalOpen(true)
@@ -272,14 +289,26 @@ export default function PaymentHistorySection({ orderId, totalValueUsd, canEdit,
         width={560}
       >
         <Form form={form} layout="vertical" size="small">
-          {breakdown?.hasLots && (
-            <Form.Item label="Thu cho lô (đơn nhiều lô — D/P)" name="lot_no"
-              tooltip="Chọn lô để theo dõi thu riêng từng lô; bỏ trống = cả đơn">
-              <Select allowClear placeholder="Cả đơn (không gán lô)"
-                options={breakdown.lots.map((l) => ({
-                  value: l.lotNo,
-                  label: `Lô ${l.lotNo} — trị giá ${fmtUSD(l.lotValue)} · đã thu ${fmtUSD(l.paidAmount)}`,
-                }))} />
+          {/* ⚠ LUÔN hiện ô này. Bản cũ ẩn hẳn khi đơn chưa chia lô — mà đó là đa số đơn,
+              nên hầu hết người nhập chưa từng thấy ô này và không ai có thói quen ghi thu
+              kèm lô. Đơn chưa chia lô thì khoá ô + chỉ đường, VẪN CHO LƯU. */}
+          {breakdown?.hasLots ? (
+            <Form.Item label="Thu cho lô nào?" name="lot_no"
+              tooltip="Đã chọn sẵn lô còn nợ cũ nhất. Đổi nếu khách trả cho lô khác; chọn 'Cả đơn' khi tiền gộp nhiều lô.">
+              <Select
+                options={[
+                  ...breakdown.lots.map((l) => ({
+                    value: l.lotNo,
+                    label: `Lô ${l.lotNo} — trị giá ${fmtUSD(l.lotValue)} · còn nợ ${fmtUSD(Math.max(0, l.lotValue - l.paidAmount))}`,
+                  })),
+                  // "Cả đơn" xuống CUỐI: vẫn chọn được, chỉ thôi làm mặc định.
+                  { value: null, label: 'Cả đơn — chưa quy được về lô' },
+                ]} />
+            </Form.Item>
+          ) : (
+            <Form.Item label="Thu cho lô nào?"
+              tooltip="Đơn chưa chia lô nên khoản thu chỉ ghi được ở mức cả đơn.">
+              <Select disabled placeholder="Đơn này chưa chia lô" />
             </Form.Item>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>

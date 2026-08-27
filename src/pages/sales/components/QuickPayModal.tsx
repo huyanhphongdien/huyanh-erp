@@ -42,9 +42,11 @@ interface Props {
   target: QuickPayTarget | null
   onClose: () => void
   onDone: () => void    // gọi sau khi ghi thu thành công (parent tự reload + đóng)
+  /** Mở tab Đóng gói của đơn để đi chia lô. Không truyền thì chỉ ẩn cái link. */
+  onGotoPacking?: (orderId: string) => void
 }
 
-export default function QuickPayModal({ target, onClose, onDone }: Props) {
+export default function QuickPayModal({ target, onClose, onDone, onGotoPacking }: Props) {
   const [amount, setAmount] = useState<number>(0)
   const [date, setDate] = useState<dayjs.Dayjs>(dayjs())
   const [type, setType] = useState<PaymentType>('final')
@@ -52,6 +54,22 @@ export default function QuickPayModal({ target, onClose, onDone }: Props) {
   const [saving, setSaving] = useState(false)
   const [breakdown, setBreakdown] = useState<OrderPaymentBreakdown | null>(null)
   const [lotNo, setLotNo] = useState<number | null>(null)   // null = cả đơn
+
+  /**
+   * Lô còn nợ CŨ NHẤT (số lô nhỏ nhất còn dư) — mặc định hợp lý nhất khi tiền về mà
+   * người nhập không nói rõ lô: khách trả theo thứ tự lô, và waterfall lấp lô cũ trước.
+   * Trả null khi đơn chưa chia lô hoặc mọi lô đã thu đủ.
+   *
+   * ⚠ KHÔNG chia đều tiền cho các lô còn nợ. Chia ĐỀU chính là prorata đội tên khác —
+   * xem luật cấm trong CLAUDE.md. Muốn rải nhiều lô thì ghi nhiều dòng thu.
+   */
+  const oldestUnpaidLot = (b: OrderPaymentBreakdown): number | null => {
+    if (!b.hasLots) return null
+    const owing = b.lots
+      .filter((l) => l.lotValue - l.paidAmount > 0.01)
+      .sort((a, c) => a.lotNo - c.lotNo)
+    return owing.length ? owing[0].lotNo : null
+  }
 
   // Nạp bóc tách theo lô khi mở modal (để cho chọn lô + prefill còn nợ theo lô)
   useEffect(() => {
@@ -70,8 +88,16 @@ export default function QuickPayModal({ target, onClose, onDone }: Props) {
         setBreakdown(b)
         // Bóc tách về sau khi modal đã mở → prefill lại số tiền theo còn-nợ của LÔ được
         // chọn sẵn. Không làm bước này thì ô tiền giữ nguyên số còn-nợ CẢ ĐƠN, dễ ghi thừa.
-        if (preset != null) {
-          const row = b.lots.find((l) => l.lotNo === preset)
+        //
+        // ⚠ ĐƯỜNG ÍT TRỞ LỰC NHẤT PHẢI DẪN TỚI "CÓ LÔ".
+        // Bản cũ mặc định lot_no = null và ô chọn lô còn bị ẩn hẳn với đơn chưa chia lô,
+        // nên bỏ qua nó là hợp lệ và là thao tác dễ nhất — kết quả là 0 khoản thu nào
+        // trong hệ thống có số lô. Nay nếu chỗ gọi không chỉ định lô thì tự chọn LÔ NỢ
+        // CŨ NHẤT còn dư. Vẫn đổi sang "cả đơn" được, chỉ là phải bấm.
+        const chosen = preset ?? oldestUnpaidLot(b)
+        if (chosen !== preset) setLotNo(chosen)
+        if (chosen != null) {
+          const row = b.lots.find((l) => l.lotNo === chosen)
           if (row) setAmount(Math.max(0, Math.round((row.lotValue - row.paidAmount) * 100) / 100))
         }
       })
@@ -135,27 +161,53 @@ export default function QuickPayModal({ target, onClose, onDone }: Props) {
             {target.subLabel && <Text type="secondary" style={{ fontSize: 11 }}> ({target.subLabel})</Text>} · Còn nợ{lotRow ? ` Lô ${lotRow.lotNo}` : ' (cả đơn)'}:{' '}
             <strong style={{ color: '#f5222d' }}>{fmtUSD(currentOutstanding)}</strong>
           </div>
-          {breakdown?.hasLots && (
-            <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Thu cho lô nào?</div>
-              <Select
-                value={lotNo}
-                onChange={onLotChange}
-                style={{ width: '100%' }}
-                options={[
-                  { value: null, label: `Cả đơn — còn nợ ${fmtUSD(breakdown.totalValue - breakdown.totalPaid)}` },
-                  ...breakdown.lots.map((l) => ({
-                    value: l.lotNo,
-                    label: (
-                      <span>Lô {l.lotNo} — trị giá {fmtUSD(l.lotValue)} · còn nợ <b>{fmtUSD(Math.max(0, l.lotValue - l.paidAmount))}</b>{' '}
-                        <Tag color={LOT_STATUS_TAG[l.status].color} style={{ marginInlineEnd: 0 }}>{LOT_STATUS_TAG[l.status].label}</Tag></span>
-                    ),
-                  })),
-                ]}
-              />
-              <div style={{ fontSize: 11, color: '#999', marginTop: 3 }}>Đơn nhiều lô (D/P): chọn đúng lô để theo dõi thu riêng từng lô. Bỏ trống = cả đơn.</div>
-            </div>
-          )}
+          {/* ⚠ Ô này LUÔN hiện, kể cả đơn chưa chia lô. Bản cũ ẩn hẳn nó khi !hasLots —
+              mà 80/89 đơn công nợ chưa chia lô, nên hầu hết người nhập chưa từng THẤY
+              ô này tồn tại, và không ai hình thành được thói quen ghi thu kèm lô.
+              Đơn chưa chia lô thì khoá ô + chỉ đường đi chia, NHƯNG VẪN CHO LƯU:
+              chặn ghi tiền ở đây là đẩy kế toán quay về gõ tay cột tiền trên đơn. */}
+          <div>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Thu cho lô nào?</div>
+            {breakdown?.hasLots ? (
+              <>
+                <Select
+                  value={lotNo}
+                  onChange={onLotChange}
+                  style={{ width: '100%' }}
+                  options={[
+                    ...breakdown.lots.map((l) => ({
+                      value: l.lotNo,
+                      label: (
+                        <span>Lô {l.lotNo} — trị giá {fmtUSD(l.lotValue)} · còn nợ <b>{fmtUSD(Math.max(0, l.lotValue - l.paidAmount))}</b>{' '}
+                          <Tag color={LOT_STATUS_TAG[l.status].color} style={{ marginInlineEnd: 0 }}>{LOT_STATUS_TAG[l.status].label}</Tag></span>
+                      ),
+                    })),
+                    // "Cả đơn" XUỐNG CUỐI và đổi nhãn. Nó vẫn là lựa chọn hợp lệ (tiền
+                    // gộp nhiều lô, cọc trước khi chia lô…), chỉ thôi làm mặc định.
+                    {
+                      value: null,
+                      label: <span style={{ color: '#8a5a05' }}>Cả đơn — chưa quy được về lô (còn nợ {fmtUSD(breakdown.totalValue - breakdown.totalPaid)})</span>,
+                    },
+                  ]}
+                />
+                <div style={{ fontSize: 11, color: '#999', marginTop: 3 }}>
+                  {lotNo == null
+                    ? '⚠ Khoản này sẽ KHÔNG gắn được vào lô nào — báo cáo công nợ sẽ xếp nó vào phần "chưa gắn lô".'
+                    : 'Đã chọn sẵn lô còn nợ cũ nhất. Đổi được nếu khách trả cho lô khác.'}
+                </div>
+              </>
+            ) : (
+              <>
+                <Select style={{ width: '100%' }} disabled placeholder="Đơn này chưa chia lô" />
+                <div style={{ fontSize: 11, color: '#8a5a05', marginTop: 3 }}>
+                  Đơn chưa chia lô nên khoản thu chỉ ghi được ở mức cả đơn.{' '}
+                  {onGotoPacking && (
+                    <a onClick={() => onGotoPacking(target.id)}>Chia lô ngay ↗</a>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <div>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Số tiền đã thu (USD)</div>
             <InputNumber

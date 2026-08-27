@@ -484,8 +484,15 @@ export type DeliveryState = 'delivered' | 'dispatching'
  * Hàng đi bằng phiếu cân/xuất kho chỉ set cột status, không sinh dòng lệnh.
  * `loaded` KHÔNG nằm đây: mới lên xe, chưa rời kho.
  *
- * ⚠ Đây là MỘT trong hai vế của định nghĩa "đã giao". Dùng ở CẢ getDeliveryStatus lẫn
- * getLotProgressForOrders — sửa thì sửa qua hằng này, đừng gõ lại chuỗi ở chỗ thứ ba.
+ * ⚠⚠ DANH SÁCH NÀY TỒN TẠI Ở HAI NƠI, VÀ KHÔNG CÓ CÁCH NÀO GỘP ĐƯỢC:
+ *   1. Hằng này — dùng cho getDeliveryStatus (tab Đóng gói, bảng lô, dựng lệnh điều động)
+ *      và cho stageOfContainer trong lotTracking.ts.
+ *   2. Chuỗi gõ cứng trong docs/migrations/sales_lots_p5_progress_union.sql — view
+ *      v_sales_order_lot_progress_all, nuôi getLotProgressForOrders (badge Kanban,
+ *      cột "Còn thiếu (tấn)", Sổ lô, file Excel).
+ *
+ * THÊM MỘT TRẠNG THÁI VÀO ĐÂY MÀ QUÊN SỬA VIEW = tab Đóng gói đổi, badge Kanban không đổi.
+ * Đó đúng là kiểu lệch mà Đợt 2 vừa gỡ. Sửa thì sửa CẢ HAI, cùng một lúc.
  */
 export const DELIVERED_CONTAINER_STATUSES = ['shipped', 'delivered'] as const
 
@@ -619,7 +626,7 @@ export interface LotProgress {
    *                Σ netKgTotal + netKgNoLot === plannedKg
    */
   deliveryByLot: LotProgressRow[]
-  /** Container chưa gán lô — hôm nay 105/210 cont. Không có nó thì tổng cấp lô không khớp đơn. */
+  /** Container chưa gán lô — đo 27/08/2026: 107/212 cont. Không có nó thì tổng cấp lô không khớp đơn. */
   contsNoLot: number
   contsNoLotDelivered: number
   netKgNoLot: number
@@ -677,9 +684,14 @@ export function remainingTons(qtyTons?: number | null, p?: LotProgress, status?:
 }
 
 /**
- * Tiến độ lô CHO NHIỀU ĐƠN cùng lúc (2 query batch) — dùng ở list/kanban/split + dòng TỔNG.
- *  - container ĐÃ GIAO = có dòng lệnh điều động với actual_weight_kg != null,
- *    HOẶC container.status = 'shipped' (giao qua phiếu cân/xuất kho, không có lệnh).
+ * Tiến độ lô CHO NHIỀU ĐƠN cùng lúc — dùng ở list/kanban/split + dòng TỔNG + Excel.
+ *
+ * Luật "đã giao" KHÔNG nằm ở file này nữa, nó nằm trong view
+ * v_sales_order_lot_progress_all (docs/migrations/sales_lots_p5_progress_union.sql):
+ *   container ĐÃ GIAO = có dòng lệnh điều động với actual_weight_kg != null,
+ *                       HOẶC status ∈ ('shipped','delivered')
+ * Xem cảnh báo ở DELIVERED_CONTAINER_STATUSES: danh sách trạng thái tồn tại ở HAI nơi.
+ *
  *  - 1 lô "đã giao" khi mọi container của lô đã giao.
  */
 async function getLotProgressForOrders(orderIds: string[]): Promise<Record<string, LotProgress>> {
@@ -687,113 +699,108 @@ async function getLotProgressForOrders(orderIds: string[]): Promise<Record<strin
   const ids = [...new Set((orderIds || []).filter(Boolean))]
   if (ids.length === 0) return out
 
-  type ContRow = { id: string; sales_order_id: string; lot_no: number | null; net_weight_kg: number | null; status: string | null }
-  // Chunk cả orderIds: dòng TỔNG truyền TOÀN BỘ đơn khớp bộ lọc (có thể hàng trăm)
-  // → IN(...) dài làm phình URL → HTTP 414 → tổng im lặng về 0.
-  const rows: ContRow[] = []
-  for (let i = 0; i < ids.length; i += 100) {
-    const { data } = await supabase
-      .from('sales_order_containers')
-      .select('id, sales_order_id, lot_no, net_weight_kg, status')
-      .in('sales_order_id', ids.slice(i, i + 100))
-    rows.push(...((data || []) as ContRow[]))
+  // ─── ĐỌC TỪ VIEW, KHÔNG TỰ TÍNH ─────────────────────────────────────────────
+  // Trước 26/08/2026 hàm này chạy 3 vòng gọi mạng NỐI TIẾP (container → dòng lệnh xe →
+  // mã lệnh), mỗi vòng lại chunk, tổng cộng tới 5 request cho một lần mở danh sách.
+  // Nay còn 2 truy vấn chạy SONG SONG, và quan trọng hơn: luật "đã giao" nằm TRỌN trong
+  // migration sales_lots_p5_progress_union.sql thay vì được chép lại bằng TypeScript.
+  //
+  // ⚠ Đơn KHÔNG có container sẽ không có khoá trong kết quả — giống hệt bản cũ.
+  // Nơi gọi phải chịu được `undefined` (KanbanCard đang kiểm `lp && lp.contsTotal > 0`).
+  // Mọi cột số khai `number | string` và đi qua n(): PostgREST hôm nay trả `numeric` dưới
+  // dạng số không ngoặc kép (đã kiểm raw JSON), nhưng đủ kiểu cấu hình/phiên bản trả về
+  // chuỗi — và `+=` trên chuỗi là NỐI CHUỖI chứ không báo lỗi. salesLotService cũng bọc
+  // num() cho cả họ view này; giữ nhất quán.
+  type ProgRow = {
+    sales_order_id: string
+    lot_no: number | null
+    container_count: number | string
+    containers_delivered: number | string
+    net_kg_total: number | string
+    net_kg_delivered: number | string
+    conts_with_kg: number | string
+    delivered_conts_no_kg: number | string
   }
-  if (rows.length === 0) return out
+  type CodeRow = { sales_order_id: string; dispatch_orders: Array<{ id: string; code: string }> | null }
 
-  // container đã giao + LỆNH nào chở nó — chunk IN tránh URL quá dài
-  const contToOrder = new Map<string, string>()
-  for (const r of rows) contToOrder.set(r.id, r.sales_order_id)
-
-  const contIds = rows.map((r) => r.id)
-  const deliveredSet = new Set<string>()
-  const dispatchIdsByOrder = new Map<string, Set<string>>()
-  for (let i = 0; i < contIds.length; i += 120) {
-    const chunk = contIds.slice(i, i + 120)
-    const { data: lines } = await supabase
-      .from('dispatch_order_lines')
-      .select('sales_order_container_id, actual_weight_kg, dispatch_order_id')
-      .in('sales_order_container_id', chunk)
-    for (const l of (lines || []) as Array<{ sales_order_container_id: string | null; actual_weight_kg: number | null; dispatch_order_id: string | null }>) {
-      const cid = l.sales_order_container_id
-      if (!cid) continue
-      if (l.actual_weight_kg != null) deliveredSet.add(cid)
-      const oid = contToOrder.get(cid)
-      if (oid && l.dispatch_order_id) {
-        if (!dispatchIdsByOrder.has(oid)) dispatchIdsByOrder.set(oid, new Set())
-        dispatchIdsByOrder.get(oid)!.add(l.dispatch_order_id)
-      }
+  async function chunked<T>(run: (slice: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+    const acc: T[] = []
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await run(ids.slice(i, i + 100))
+      // Ném lỗi thay vì trả kết quả thiếu: thiếu một phần thì con số "còn thiếu (tấn)"
+      // vẫn hiện ra và trông hợp lý, không ai biết là sai.
+      if (error) throw error
+      acc.push(...((data || []) as T[]))
     }
-  }
-  // Bù cho đơn giao qua phiếu cân/xuất kho (không sinh dòng lệnh điều động).
-  // Vế thứ hai của định nghĩa "đã giao" — dùng CHUNG hằng với getDeliveryStatus.
-  for (const r of rows) {
-    if (r.status && (DELIVERED_CONTAINER_STATUSES as readonly string[]).includes(r.status)) {
-      deliveredSet.add(r.id)
-    }
+    return acc
   }
 
-  // Mã lệnh điều động (để hiện chip bấm được, khỏi phải mò sang module Vận tải)
-  const allDispatchIds = [...new Set([...dispatchIdsByOrder.values()].flatMap((s) => [...s]))]
-  const codeById = new Map<string, string>()
-  for (let i = 0; i < allDispatchIds.length; i += 120) {
-    const { data } = await supabase
-      .from('dispatch_orders')
-      .select('id, code')
-      .in('id', allDispatchIds.slice(i, i + 120))
-    for (const d of (data || []) as Array<{ id: string; code: string }>) codeById.set(d.id, d.code)
+  const [progRows, codeRows] = await Promise.all([
+    chunked<ProgRow>((s) => supabase
+      .from('v_sales_order_lot_progress_all')
+      .select('sales_order_id, lot_no, container_count, containers_delivered, net_kg_total, net_kg_delivered, conts_with_kg, delivered_conts_no_kg')
+      .in('sales_order_id', s)),
+    chunked<CodeRow>((s) => supabase
+      .from('v_sales_order_dispatch_codes')
+      .select('sales_order_id, dispatch_orders')
+      .in('sales_order_id', s)),
+  ])
+
+  const codesByOrder = new Map<string, Array<{ id: string; code: string }>>()
+  for (const r of codeRows) {
+    if (Array.isArray(r.dispatch_orders)) codesByOrder.set(r.sales_order_id, r.dispatch_orders)
   }
 
-  const byOrder = new Map<string, ContRow[]>()
-  for (const r of rows) {
+  // Gom các rổ (lô, và rổ lot_no NULL) về từng đơn.
+  const byOrder = new Map<string, ProgRow[]>()
+  for (const r of progRows) {
     if (!byOrder.has(r.sales_order_id)) byOrder.set(r.sales_order_id, [])
     byOrder.get(r.sales_order_id)!.push(r)
   }
-  for (const [oid, cs] of byOrder) {
-    const lots = new Map<number, { total: number; delivered: number; kg: number; kgDone: number }>()
-    let plannedKg = 0, deliveredKg = 0, contsWithKg = 0, deliveredContsNoKg = 0, contsDelivered = 0
+
+  const n = (v: number | string | null | undefined): number => Number(v ?? 0)
+
+  for (const [oid, buckets] of byOrder) {
+    let contsTotal = 0, contsDelivered = 0, plannedKg = 0, deliveredKg = 0
+    let contsWithKg = 0, deliveredContsNoKg = 0
     let contsNoLot = 0, contsNoLotDelivered = 0, netKgNoLot = 0, netKgNoLotDelivered = 0
-    for (const c of cs) {
-      const kg = c.net_weight_kg ?? 0
-      plannedKg += kg
-      if (c.net_weight_kg != null) contsWithKg++
-      const done = deliveredSet.has(c.id)
-      if (done) {
-        contsDelivered++
-        deliveredKg += kg
-        if (c.net_weight_kg == null) deliveredContsNoKg++
+    const lotRows: LotProgressRow[] = []
+
+    for (const b of buckets) {
+      contsTotal += n(b.container_count)
+      contsDelivered += n(b.containers_delivered)
+      plannedKg += n(b.net_kg_total)
+      deliveredKg += n(b.net_kg_delivered)
+      contsWithKg += n(b.conts_with_kg)
+      deliveredContsNoKg += n(b.delivered_conts_no_kg)
+
+      if (b.lot_no == null) {
+        contsNoLot = n(b.container_count)
+        contsNoLotDelivered = n(b.containers_delivered)
+        netKgNoLot = n(b.net_kg_total)
+        netKgNoLotDelivered = n(b.net_kg_delivered)
+      } else {
+        lotRows.push({
+          lotNo: b.lot_no,
+          contsTotal: n(b.container_count),
+          contsDelivered: n(b.containers_delivered),
+          netKgTotal: n(b.net_kg_total),
+          netKgDelivered: n(b.net_kg_delivered),
+        })
       }
-      if (c.lot_no == null) {
-        contsNoLot++
-        netKgNoLot += kg
-        if (done) { contsNoLotDelivered++; netKgNoLotDelivered += kg }
-        continue
-      }
-      if (!lots.has(c.lot_no)) lots.set(c.lot_no, { total: 0, delivered: 0, kg: 0, kgDone: 0 })
-      const L = lots.get(c.lot_no)!
-      L.total++
-      L.kg += kg
-      if (done) { L.delivered++; L.kgDone += kg }
     }
+
+    lotRows.sort((a, b) => a.lotNo - b.lotNo)   // vị trí là danh tính của lô
+
     out[oid] = {
-      contsTotal: cs.length,
+      contsTotal,
       contsDelivered,
-      lotsTotal: lots.size,
-      lotsDelivered: [...lots.values()].filter((L) => L.total > 0 && L.delivered === L.total).length,
-      deliveryByLot: [...lots.entries()]
-        .sort((a, b) => a[0] - b[0])   // luôn theo số lô tăng dần — vị trí là danh tính của lô
-        .map(([lotNo, L]) => ({
-          lotNo,
-          contsTotal: L.total,
-          contsDelivered: L.delivered,
-          netKgTotal: L.kg,
-          netKgDelivered: L.kgDone,
-        })),
+      lotsTotal: lotRows.length,
+      lotsDelivered: lotRows.filter((L) => L.contsTotal > 0 && L.contsDelivered === L.contsTotal).length,
+      deliveryByLot: lotRows,
       contsNoLot, contsNoLotDelivered, netKgNoLot, netKgNoLotDelivered,
       plannedKg, deliveredKg, contsWithKg, deliveredContsNoKg,
-      dispatchOrders: [...(dispatchIdsByOrder.get(oid) || [])]
-        .map((id) => ({ id, code: codeById.get(id) || '' }))
-        .filter((d) => d.code)
-        .sort((a, b) => a.code.localeCompare(b.code)),
+      dispatchOrders: codesByOrder.get(oid) ?? [],
     }
   }
   return out

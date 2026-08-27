@@ -617,7 +617,12 @@ const SalesOrderListPage = () => {
       setTotal(response.total)
       // Tiến độ lô cho 3 view (best-effort, không chặn list)
       dispatchService.getLotProgressForOrders(response.data.map((o) => o.id))
-        .then(setLotProgress).catch(() => {})
+        .then(setLotProgress)
+        // Hỏng thì XOÁ TRẮNG tiến độ lô, đừng giữ số của lần tải trước — số cũ đứng cạnh
+        // danh sách mới là số sai mà trông vẫn hợp lý. Và phải log: khi lotProgress rỗng,
+        // remainingTons() trả về NGUYÊN số lượng hợp đồng và được vẽ tự tin ở cột
+        // "Còn thiếu (T)" — im lặng ở đây nghĩa là con số đó sai mà không ai biết.
+        .catch((e) => { console.error('[sales] Không tải được tiến độ lô:', e); setLotProgress({}) })
 
       // DÒNG TỔNG trên TOÀN BỘ bộ lọc (best-effort — lỗi thì ẩn dòng tổng, không chặn list)
       salesOrderService.getAllForSummary(params)

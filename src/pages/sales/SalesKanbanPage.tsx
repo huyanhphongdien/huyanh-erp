@@ -131,7 +131,10 @@ export default function SalesKanbanPage() {
     const ids = mapped.map((o) => o.id)
     // Tiến độ lô cho card kanban (best-effort)
     dispatchService.getLotProgressForOrders(ids)
-      .then(setLotProgress).catch(() => {})
+      .then(setLotProgress)
+      // Xem ghi chú cùng chỗ ở SalesOrderListPage: hỏng thì xoá trắng + log, đừng im lặng.
+      // lotProgress rỗng làm badge "còn thiếu" trên thẻ hiện nguyên số lượng hợp đồng.
+      .catch((e) => { console.error('[sales] Không tải được tiến độ lô:', e); setLotProgress({}) })
     // Thu tiền theo lô (best-effort) → badge "đã thu x/y lô"
     salesOrderPaymentService.getLotPaymentForOrders(ids)
       .then(setLotPay).catch(() => {})
